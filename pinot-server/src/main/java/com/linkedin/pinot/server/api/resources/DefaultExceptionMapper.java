@@ -32,7 +32,7 @@ public class DefaultExceptionMapper implements ExceptionMapper<WebApplicationExc
   @Override
   public Response toResponse(final WebApplicationException exception)
   {
-    Response.ResponseBuilder builder = Response.status(Response.Status.BAD_REQUEST)
+    Response.ResponseBuilder builder = Response.status(exception.getResponse().getStatus())
                                       .entity(toJson(exception))
                                       .type(MediaType.APPLICATION_JSON);
     return builder.build();

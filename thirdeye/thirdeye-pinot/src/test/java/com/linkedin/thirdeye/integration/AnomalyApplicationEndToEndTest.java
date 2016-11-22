@@ -76,8 +76,10 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
   private void setup() throws Exception {
 
     DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
-    DAO_REGISTRY.registerDAOs(anomalyFunctionDAO, emailConfigurationDAO, rawResultDAO, mergedResultDAO, jobDAO, taskDAO,
-        datasetConfigDAO, metricConfigDAO, dashboardConfigDAO, ingraphMetricConfigDAO, ingraphDashboardConfigDAO);
+    DAO_REGISTRY
+        .registerDAOs(anomalyFunctionDAO, emailConfigurationDAO, rawResultDAO, mergedResultDAO,
+            jobDAO, taskDAO, datasetConfigDAO, metricConfigDAO, dashboardConfigDAO,
+            ingraphMetricConfigDAO, ingraphDashboardConfigDAO, overrideConfigDAO);
 
     // Mock query cache
     ThirdEyeClient mockThirdeyeClient = Mockito.mock(ThirdEyeClient.class);
@@ -249,6 +251,9 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
     jobs = jobDAO.findAll();
     int completedJobCount = 0;
     for (JobDTO job : jobs) {
+      if (!job.getStatus().equals(JobStatus.COMPLETED)) {
+        Thread.sleep(5_000);
+      }
       if (job.getStatus().equals(JobStatus.COMPLETED)) {
         completedJobCount ++;
       }

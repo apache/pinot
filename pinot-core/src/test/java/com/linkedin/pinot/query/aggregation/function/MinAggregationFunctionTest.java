@@ -97,7 +97,7 @@ public class MinAggregationFunctionTest {
 
     MinAggregationFunction minAggregationFunction = new MinAggregationFunction();
     GroupByResultHolder resultHolder =
-        ResultHolderFactory.getGroupByResultHolder(minAggregationFunction, MAX_NUM_GROUP_KEYS);
+        ResultHolderFactory.getGroupByResultHolder(minAggregationFunction, MAX_NUM_GROUP_KEYS, MAX_NUM_GROUP_KEYS);
 
     minAggregationFunction.aggregateGroupBySV(NUM_VALUES_TO_AGGREGATE, groupKeysForValues, resultHolder,
         valuesToAggregate);

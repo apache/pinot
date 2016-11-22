@@ -30,4 +30,6 @@ public interface MergedAnomalyResultManager extends AbstractManager<MergedAnomal
   MergedAnomalyResultDTO findLatestByFunctionIdOnly(Long functionId);
 
   List<MergedAnomalyResultDTO> findByFunctionId(Long functionId);
+
+  void updateAnomalyFeedback(MergedAnomalyResultDTO entity);
 }

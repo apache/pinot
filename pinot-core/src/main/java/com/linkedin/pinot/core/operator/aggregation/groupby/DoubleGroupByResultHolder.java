@@ -26,16 +26,15 @@ import java.util.Arrays;
  * Result Holder implemented using DoubleArray.
  */
 public class DoubleGroupByResultHolder implements GroupByResultHolder {
-
-  private double[] _resultArray;
-  private Int2DoubleOpenHashMap _resultMap;
+  private final int _maxCapacity;
+  private final int _trimSize;
   private final double _defaultValue;
+  private final boolean _minHeap;
 
   private int _resultHolderCapacity;
-  private final int _maxCapacity;
-  private boolean _minHeap;
-
   private StorageMode _storageMode;
+  private double[] _resultArray;
+  private Int2DoubleOpenHashMap _resultMap;
   private IntDoubleIndexedPriorityQueue _priorityQueue;
 
   /**
@@ -43,14 +42,16 @@ public class DoubleGroupByResultHolder implements GroupByResultHolder {
    *
    * @param initialCapacity Initial capacity for storage
    * @param maxCapacity Max capacity of storage, beyond which trimming kicks in
+   * @param trimSize maximum number of groups returned after trimming.
    * @param defaultValue Default value of un-initialized results (in array mode)
    * @param minOrder Min ordering (in case of min aggregation functions)
    */
-  public DoubleGroupByResultHolder(int initialCapacity, int maxCapacity, double defaultValue,
+  public DoubleGroupByResultHolder(int initialCapacity, int maxCapacity, int trimSize, double defaultValue,
       boolean minOrder) {
     _resultHolderCapacity = initialCapacity;
     _defaultValue = defaultValue;
     _maxCapacity = maxCapacity;
+    _trimSize = trimSize;
     _minHeap = !minOrder; // Max ordering requires min-heap for trimming results, and vice-versa.
 
     // Used only when group keys need to be trimmed.
@@ -69,10 +70,11 @@ public class DoubleGroupByResultHolder implements GroupByResultHolder {
    *
    * @param initialCapacity Initial capacity for storage
    * @param maxCapacity Max capacity of storage, beyond which trimming kicks in
+   * @param trimSize maximum number of groups returned after trimming.
    * @param defaultValue Default value of un-initialized results (in array mode)
    */
-  public DoubleGroupByResultHolder(int initialCapacity, int maxCapacity, double defaultValue) {
-    this(initialCapacity, maxCapacity, defaultValue, false /* minOrdering */);
+  public DoubleGroupByResultHolder(int initialCapacity, int maxCapacity, int trimSize, double defaultValue) {
+    this(initialCapacity, maxCapacity, trimSize, defaultValue, false /* minOrdering */);
   }
 
   /**
@@ -84,17 +86,17 @@ public class DoubleGroupByResultHolder implements GroupByResultHolder {
    */
   @Override
   public void ensureCapacity(int capacity) {
+    Preconditions.checkArgument(capacity <= _maxCapacity);
+
     // Nothing to be done for map mode.
     if (_storageMode == StorageMode.MAP_STORAGE) {
       return;
     }
 
-    if (capacity > _maxCapacity) {
+    if (capacity > _trimSize) {
       switchToMapMode(capacity);
       return;
     }
-
-    Preconditions.checkArgument(capacity <= _maxCapacity);
 
     if (capacity > _resultHolderCapacity) {
       int copyLength = _resultHolderCapacity;
@@ -164,25 +166,17 @@ public class DoubleGroupByResultHolder implements GroupByResultHolder {
   /**
    * {@inheritDoc}
    *
-   * Keys with 'lowest' values (as per the sort order) are trimmed away to reduce
-   * the size to _maxCapacity.
+   * Keys with 'lowest' values (as per the sort order) are trimmed away to reduce the size to _trimSize.
    *
-   * @param targetSize Target size to trim the result set to.
    * @return Array of keys that were trimmed out.
    */
   @Override
-  public int[] trimResults(int targetSize) {
+  public int[] trimResults() {
     if (_storageMode == StorageMode.ARRAY_STORAGE) {
       return EMPTY_ARRAY; // Still in array mode, trimming has not kicked in yet.
     }
 
-    int currentNumKeys = _resultMap.size();
-    if (currentNumKeys <= _maxCapacity) {
-      return EMPTY_ARRAY;
-    }
-
-    // Current number of keys has exceeded the max capacity, we need to remove some keys.
-    int numKeysToRemove = currentNumKeys - targetSize;
+    int numKeysToRemove = _resultMap.size() - _trimSize;
     int[] removedGroupKeys = new int[numKeysToRemove];
 
     for (int i = 0; i < numKeysToRemove; i++) {
@@ -201,10 +195,10 @@ public class DoubleGroupByResultHolder implements GroupByResultHolder {
    */
   private void switchToMapMode(int initialPriorityQueueSize) {
     _storageMode = StorageMode.MAP_STORAGE;
-    _resultMap = new Int2DoubleOpenHashMap(_resultArray.length);
+    _resultMap = new Int2DoubleOpenHashMap(_resultHolderCapacity);
     _priorityQueue = new IntDoubleIndexedPriorityQueue(initialPriorityQueueSize, _minHeap);
 
-    for (int id = 0; id < _resultArray.length; id++) {
+    for (int id = 0; id < _resultHolderCapacity; id++) {
       _resultMap.put(id, _resultArray[id]);
       _priorityQueue.put(id, _resultArray[id]);
     }

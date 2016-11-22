@@ -1,11 +1,7 @@
 package com.linkedin.pinot.controller.api.restlet.resources;
 
-import com.linkedin.pinot.common.data.Schema;
 import java.io.File;
 import java.io.IOException;
-
-import com.linkedin.pinot.common.metrics.ControllerMeter;
-import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import org.apache.commons.io.FileUtils;
 import org.restlet.data.MediaType;
 import org.restlet.data.Status;
@@ -14,14 +10,16 @@ import org.restlet.representation.StringRepresentation;
 import org.restlet.resource.Get;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.config.AbstractTableConfig;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
 import com.linkedin.pinot.common.restlet.swagger.Parameter;
 import com.linkedin.pinot.common.restlet.swagger.Paths;
 import com.linkedin.pinot.common.restlet.swagger.Summary;
 import com.linkedin.pinot.common.restlet.swagger.Tags;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
+import com.linkedin.pinot.controller.api.ControllerRestApplication;
 
 
 public class PinotTableSchema extends BasePinotControllerRestletResource {
@@ -75,7 +73,10 @@ public class PinotTableSchema extends BasePinotControllerRestletResource {
       try {
         config = _pinotHelixResourceManager.getTableConfig(tableName, TableType.OFFLINE);
         String schemaName = config.getValidationConfig().getSchemaName();
-        Schema schema = _pinotHelixResourceManager.getSchema(schemaName);
+        Schema schema = null;
+        if (schemaName != null && !schemaName.isEmpty()) {
+          schema = _pinotHelixResourceManager.getSchema(schemaName);
+        }
         if (schema == null) {
           setStatus(Status.CLIENT_ERROR_NOT_FOUND);
           StringRepresentation repr = new StringRepresentation("{\"error\": \"Schema " + schemaName + " not found\"");

@@ -27,6 +27,7 @@ import com.linkedin.pinot.tools.admin.command.StartControllerCommand;
 import com.linkedin.pinot.tools.admin.command.StartServerCommand;
 import com.linkedin.pinot.tools.admin.command.StartZookeeperCommand;
 import com.linkedin.pinot.tools.admin.command.UploadSegmentCommand;
+import com.linkedin.pinot.tools.perf.PerfBenchmarkDriver;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -36,14 +37,6 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.net.URLEncoder;
 import java.net.UnknownHostException;
-import java.sql.Timestamp;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import org.apache.helix.manager.zk.ZKHelixAdmin;
-import org.apache.helix.model.ExternalView;
-import org.apache.helix.model.IdealState;
-import org.apache.helix.tools.ClusterStateVerifier;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,14 +69,7 @@ public class ClusterStarter {
   private boolean _startZookeeper;
   private boolean _enableStarTreeIndex;
 
-  private long TIMEOUT_IN_SECONDS = 200 * 1000;
-
-  ClusterStarter()
-      throws SocketException, UnknownHostException {
-    _startZookeeper = true;
-    _enableStarTreeIndex = false;
-    _localhost = NetUtil.getHostAddress();
-  }
+  private static final long TIMEOUT_IN_MILLISECONDS = 200 * 1000;
 
   ClusterStarter(QueryComparisonConfig config)
       throws SocketException, UnknownHostException {
@@ -226,7 +212,7 @@ public class ClusterStarter {
         new UploadSegmentCommand().setSegmentDir(_segmentDirName).setControllerHost(_localhost)
             .setControllerPort(_controllerPort);
     segmentUploader.execute();
-    waitForExternalViewUpdate();
+    PerfBenchmarkDriver.waitForExternalViewUpdate(_zkAddress, _clusterName, TIMEOUT_IN_MILLISECONDS);
   }
 
   private void createSegments()
@@ -283,43 +269,5 @@ public class ClusterStarter {
     LOGGER.debug("Actual response: " + sb.toString());
 
     return (int) (endTime - startTime);
-  }
-
-  private void waitForExternalViewUpdate() {
-    final ZKHelixAdmin helixAdmin = new ZKHelixAdmin(_zkAddress);
-    ClusterStateVerifier.Verifier customVerifier = new ClusterStateVerifier.Verifier() {
-
-      @Override
-      public boolean verify() {
-        List<String> resourcesInCluster = helixAdmin.getResourcesInCluster(_clusterName);
-        LOGGER.info("Waiting for external view to update " + new Timestamp(System.currentTimeMillis()));
-
-        for (String resourceName : resourcesInCluster) {
-          IdealState idealState = helixAdmin.getResourceIdealState(_clusterName, resourceName);
-          ExternalView externalView = helixAdmin.getResourceExternalView(_clusterName, resourceName);
-
-          if (idealState == null || externalView == null) {
-            return false;
-          }
-
-          Set<String> partitionSet = idealState.getPartitionSet();
-          for (String partition : partitionSet) {
-            Map<String, String> instanceStateMapIS = idealState.getInstanceStateMap(partition);
-            Map<String, String> instanceStateMapEV = externalView.getStateMap(partition);
-
-            if (instanceStateMapIS == null || instanceStateMapEV == null) {
-              return false;
-            }
-            if (!instanceStateMapIS.equals(instanceStateMapEV)) {
-              return false;
-            }
-          }
-        }
-
-        LOGGER.info("External View updated successfully.");
-        return true;
-      }
-    };
-    ClusterStateVerifier.verifyByPolling(customVerifier, TIMEOUT_IN_SECONDS);
   }
 }

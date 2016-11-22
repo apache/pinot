@@ -68,14 +68,64 @@
 </#if>
   <tr>
     <td>
-      Go to <a href="${dashboardHost}/dashboard#view=anomalies&dataset=${collection}&compareMode=WoW&aggTimeGranularity=${windowUnit}&currentStart=${startTime?c}&currentEnd=${endTime?c}&metrics=${metric}&filters=${filters}" target="_top">ThirdEye Anomalies Dashboard</a>
+      Go to <a href="${dashboardHost}/dashboard#view=anomalies&dataset=${collection}&compareMode=WoW&aggTimeGranularity=${windowUnit}&currentStart=${startTime?c}&currentEnd=${endTime?c}&metrics=${metric}" target="_top">ThirdEye Anomalies Dashboard</a>
     </td>
   </tr>
-
+<#if (metricDimensionValueReports?has_content)>
+   <tr>
+     <td>
+       <hr/>
+       <br/> Report start time : ${reportStartDateTime}
+    </td>
+  </tr>
+  <#assign reportCount = 1>
+  <#list metricDimensionValueReports?keys as metric>
+    <#list metricDimensionValueReports[metric]?keys as groupByDimension>
+      <#assign dimensionsTimeBucketValueMap = metricDimensionValueReports[metric][groupByDimension]>
+      <#assign dimensionsTimeBucketValueMap1 = metricDimensionValueReports[metric][groupByDimension]>
+      <tr>
+        <td><b>${reportCount} - ${metric} by ${groupByDimension}</b></td>
+      </tr>
+      <tr>
+        <td>
+          <table align="center" border="1" style="width:100%;border-collapse: collapse; border-spacing: 0 margin-bottom:15px;border-color:#ddd;" cellspacing="0px" cellpadding="2px">
+            <tr>
+              <td>${groupByDimension}</td>
+              <#assign itrCount = 0 >
+              <#list dimensionsTimeBucketValueMap?keys as dimensionKey>
+                <#assign timeBucketValueMap = dimensionsTimeBucketValueMap[dimensionKey]>
+                <#if itrCount == 0>
+                    <#list timeBucketValueMap?keys as timeBucket>
+                      <td>
+                        ${timeBucket?number?number_to_time?string("HH:mm")}
+                      </td>
+                    </#list>
+                </#if>
+                <#assign itrCount = itrCount+1>
+              </#list>
+            </tr>
+            <#list dimensionsTimeBucketValueMap1?keys as dimensionKey1>
+              <tr>
+                <td>
+                    ${dimensionKey1}
+                </td>
+                <#assign timevalmap = dimensionsTimeBucketValueMap1[dimensionKey1] >
+                <#list timevalmap?keys as timebucketkey>
+                  <td> ${timevalmap[timebucketkey]}% </td>
+                </#list>
+              </tr>
+            </#list>
+          </table>
+        </td>
+      </tr>
+      <#assign reportCount = reportCount + 1>
+    </#list>
+  </#list>
+</#if>
   <tr>
     <td style="padding:10px 30px; font-family:font-family: 'Proxima Nova','Arial', 'Helvetica Neue',Helvetica, sans-serif;font-size:16px;font-weight:300; width:100%;display:inline;">
-      <hr>
-      <br>
+      <hr/>
+      <br/>
       <p style="margin-left:15px">If you have any questions regarding this report, please email <a href="mailto:ask_thirdeye@linkedin.com" target="_top">ask_thirdeye@linkedin.com</a></p>
       <p style="margin-left:15px"> Report generated at: ${dateFormat(reportGenerationTimeMillis)}</p>
       <p style="margin-left:15px">

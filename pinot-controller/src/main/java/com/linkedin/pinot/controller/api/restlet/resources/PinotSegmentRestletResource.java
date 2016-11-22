@@ -261,7 +261,6 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
    */
   private PinotResourceManagerResponse toggleSegmentsForTable(String tableName, String segmentName, String state) throws JSONException {
     List<String> segmentsToToggle;
-    JSONArray ret = new JSONArray();
 
     long timeOutInSeconds = 10L;
     if (segmentName != null) {

@@ -15,45 +15,38 @@
  */
 package com.linkedin.pinot.core.plan;
 
+import com.linkedin.pinot.core.common.Operator;
+import com.linkedin.pinot.core.operator.UResultOperator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.core.common.Operator;
-import com.linkedin.pinot.core.operator.UResultOperator;
-
 
 /**
- * The root node of an instance query plan.
- *
- *
+ * The <code></code>
  */
 public class InstanceResponsePlanNode implements PlanNode {
   private static final Logger LOGGER = LoggerFactory.getLogger(InstanceResponsePlanNode.class);
-  private CombinePlanNode _planNode;
 
-  public void setPlanNode(CombinePlanNode combinePlanNode) {
-    _planNode = combinePlanNode;
-  }
+  private final CombinePlanNode _combinePlanNode;
 
-  public PlanNode getPlanNode() {
-    return _planNode;
+  public InstanceResponsePlanNode(CombinePlanNode combinePlanNode) {
+    _combinePlanNode = combinePlanNode;
   }
 
   @Override
   public Operator run() {
     long start = System.currentTimeMillis();
-    UResultOperator uResultOperator = new UResultOperator(_planNode.run());
+    UResultOperator uResultOperator = new UResultOperator(_combinePlanNode.run());
     long end = System.currentTimeMillis();
-    LOGGER.debug("InstanceResponsePlanNode.run took: " + (end - start));
+    LOGGER.debug("InstanceResponsePlanNode.run took: {}ms", end - start);
     return uResultOperator;
   }
 
   @Override
   public void showTree(String prefix) {
-    LOGGER.debug(prefix + "Instance Level Inter-Segments Query Plan Node: ");
+    LOGGER.debug(prefix + "Instance Level Inter-Segments Query Plan Node:");
     LOGGER.debug(prefix + "Operator: UResultOperator");
-    LOGGER.debug(prefix + "Argument 0:");
-    _planNode.showTree(prefix + "    ");
+    LOGGER.debug(prefix + "Argument 0: Combine -");
+    _combinePlanNode.showTree(prefix + "    ");
   }
-
 }

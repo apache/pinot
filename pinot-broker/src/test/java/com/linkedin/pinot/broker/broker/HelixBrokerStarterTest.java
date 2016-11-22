@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.broker.broker;
 
+import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.lang.reflect.Field;
@@ -22,6 +23,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
 import org.I0Itec.zkclient.ZkClient;
 import org.apache.commons.configuration.Configuration;
 import org.apache.helix.HelixAdmin;
@@ -54,6 +57,7 @@ import com.linkedin.pinot.routing.ServerToSegmentSetMap;
 public class HelixBrokerStarterTest {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixBrokerStarterTest.class);
+  private static final int SEGMENT_COUNT = 6;
   private PinotHelixResourceManager _pinotResourceManager;
   private final static String HELIX_CLUSTER_NAME = "TestHelixBrokerStarter";
   private final static String DINING_TABLE_NAME = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable("dining");
@@ -114,24 +118,32 @@ public class HelixBrokerStarterTest {
 
   @Test
   public void testResourceAndTagAssignment() throws Exception {
-
     IdealState idealState;
 
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "DefaultTenant_BROKER").size(), 6);
     idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
-    Assert.assertEquals(idealState.getInstanceSet(DINING_TABLE_NAME).size(), 6);
+    Assert.assertEquals(idealState.getInstanceSet(DINING_TABLE_NAME).size(), SEGMENT_COUNT);
 
     ExternalView externalView =
         _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
-    Assert.assertEquals(externalView.getStateMap(DINING_TABLE_NAME).size(), 6);
-    Thread.sleep(2000);
+    Assert.assertEquals(externalView.getStateMap(DINING_TABLE_NAME).size(), SEGMENT_COUNT);
+
     HelixExternalViewBasedRouting helixExternalViewBasedRouting = _helixBrokerStarter.getHelixExternalViewBasedRouting();
     Field brokerRoutingTableField;
     brokerRoutingTableField = HelixExternalViewBasedRouting.class.getDeclaredField("_brokerRoutingTable");
     brokerRoutingTableField.setAccessible(true);
 
-    Map<String, List<ServerToSegmentSetMap>> brokerRoutingTable =
+    final Map<String, List<ServerToSegmentSetMap>> brokerRoutingTable =
         (Map<String, List<ServerToSegmentSetMap>>)brokerRoutingTableField.get(helixExternalViewBasedRouting);
+
+    // Wait up to 30s for routing table to reach the expected size
+    waitForPredicate(new Callable<Boolean>() {
+      @Override
+      public Boolean call() throws Exception {
+        return brokerRoutingTable.size() == 1;
+      }
+    }, 30000L);
+
     Assert.assertEquals(Arrays.toString(brokerRoutingTable.keySet().toArray()), "[dining_OFFLINE]");
 
     final String tableName = "coffee";
@@ -142,13 +154,30 @@ public class HelixBrokerStarterTest {
 
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "DefaultTenant_BROKER").size(), 6);
     idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
-    Assert.assertEquals(idealState.getInstanceSet(COFFEE_TABLE_NAME).size(), 6);
-    Assert.assertEquals(idealState.getInstanceSet(DINING_TABLE_NAME).size(), 6);
+    Assert.assertEquals(idealState.getInstanceSet(COFFEE_TABLE_NAME).size(), SEGMENT_COUNT);
+    Assert.assertEquals(idealState.getInstanceSet(DINING_TABLE_NAME).size(), SEGMENT_COUNT);
 
-    Thread.sleep(3000);
+    // Wait up to 30s for broker external view to reach the expected size
+    waitForPredicate(new Callable<Boolean>() {
+      @Override
+      public Boolean call() throws Exception {
+        return _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE)
+            .getStateMap(COFFEE_TABLE_NAME).size() == SEGMENT_COUNT;
+      }
+    }, 30000L);
+
     externalView =
         _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
-    Assert.assertEquals(externalView.getStateMap(COFFEE_TABLE_NAME).size(), 6);
+    Assert.assertEquals(externalView.getStateMap(COFFEE_TABLE_NAME).size(), SEGMENT_COUNT);
+
+    // Wait up to 30s for routing table to reach the expected size
+    waitForPredicate(new Callable<Boolean>() {
+      @Override
+      public Boolean call() throws Exception {
+        return brokerRoutingTable.size() == 2;
+      }
+    }, 30000L);
+
     Object[] tableArray = brokerRoutingTable.keySet().toArray();
     Arrays.sort(tableArray);
     Assert.assertEquals(Arrays.toString(tableArray), "[coffee_OFFLINE, dining_OFFLINE]");
@@ -160,18 +189,50 @@ public class HelixBrokerStarterTest {
     final String dataResource = DINING_TABLE_NAME;
     addOneSegment(dataResource);
 
-    Thread.sleep(2000);
+    // Wait up to 30s for external view to reach the expected size
+    waitForPredicate(new Callable<Boolean>() {
+      @Override
+      public Boolean call() throws Exception {
+        return _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, DINING_TABLE_NAME).getPartitionSet().size() ==
+            SEGMENT_COUNT;
+      }
+    }, 30000L);
+
     externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, DINING_TABLE_NAME);
-    Assert.assertEquals(externalView.getPartitionSet().size(), 6);
-    helixExternalViewBasedRouting = _helixBrokerStarter.getHelixExternalViewBasedRouting();
+    Assert.assertEquals(externalView.getPartitionSet().size(), SEGMENT_COUNT);
     tableArray = brokerRoutingTable.keySet().toArray();
     Arrays.sort(tableArray);
     Assert.assertEquals(Arrays.toString(tableArray), "[coffee_OFFLINE, dining_OFFLINE]");
 
+    // Wait up to 30s for routing table to reach the expected size
+    waitForPredicate(new Callable<Boolean>() {
+      @Override
+      public Boolean call() throws Exception {
+        ServerToSegmentSetMap routingTable = brokerRoutingTable.get(DINING_TABLE_NAME).get(0);
+        String firstServer = routingTable.getServerSet().iterator().next();
+        return routingTable.getSegmentSet(firstServer).size() == SEGMENT_COUNT;
+      }
+    }, 30000L);
+
     serverSet = brokerRoutingTable.get(DINING_TABLE_NAME).get(0).getServerSet();
     Assert.assertEquals(brokerRoutingTable.get(DINING_TABLE_NAME).get(0)
-        .getSegmentSet(serverSet.iterator().next()).size(), 6);
+        .getSegmentSet(serverSet.iterator().next()).size(), SEGMENT_COUNT);
 
+  }
+
+  private void waitForPredicate(Callable<Boolean> predicate, long timeout) {
+    long deadline = System.currentTimeMillis() + timeout;
+    while (System.currentTimeMillis() < deadline) {
+      try {
+        if (predicate.call()) {
+          return;
+        }
+      } catch (Exception e) {
+        // Do nothing
+      }
+
+      Uninterruptibles.sleepUninterruptibly(500, TimeUnit.MILLISECONDS);
+    }
   }
 
   public void testWithCmdLines() throws Exception {

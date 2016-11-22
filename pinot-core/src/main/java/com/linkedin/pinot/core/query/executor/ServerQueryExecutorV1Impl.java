@@ -47,10 +47,10 @@ import org.apache.commons.configuration.ConfigurationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 public class ServerQueryExecutorV1Impl implements QueryExecutor {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerQueryExecutorV1Impl.class);
 
-  private QueryExecutorConfig _queryExecutorConfig = null;
   private InstanceDataManager _instanceDataManager = null;
   private SegmentPrunerService _segmentPrunerService = null;
   private PlanMaker _planMaker = null;
@@ -68,21 +68,19 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   }
 
   @Override
-  public void init(Configuration queryExecutorConfig, DataManager dataManager, ServerMetrics serverMetrics)
+  public void init(Configuration configuration, DataManager dataManager, ServerMetrics serverMetrics)
       throws ConfigurationException {
     _serverMetrics = serverMetrics;
-    _queryExecutorConfig = new QueryExecutorConfig(queryExecutorConfig);
     _instanceDataManager = (InstanceDataManager) dataManager;
-    if (_queryExecutorConfig.getTimeOut() > 0) {
-      _defaultTimeOutMs = _queryExecutorConfig.getTimeOut();
+    QueryExecutorConfig queryExecutorConfig = new QueryExecutorConfig(configuration);
+    if (queryExecutorConfig.getTimeOut() > 0) {
+      _defaultTimeOutMs = queryExecutorConfig.getTimeOut();
     }
     LOGGER.info("Default timeout for query executor : {}", _defaultTimeOutMs);
     LOGGER.info("Trying to build SegmentPrunerService");
-    if (_segmentPrunerService == null) {
-      _segmentPrunerService = new SegmentPrunerServiceImpl(_queryExecutorConfig.getPrunerConfig());
-    }
+    _segmentPrunerService = new SegmentPrunerServiceImpl(queryExecutorConfig.getPrunerConfig());
     LOGGER.info("Trying to build QueryPlanMaker");
-    _planMaker = new InstancePlanMakerImplV2(_queryExecutorConfig);
+    _planMaker = new InstancePlanMakerImplV2(queryExecutorConfig);
     LOGGER.info("Trying to build QueryExecutorTimer");
   }
 
@@ -118,20 +116,20 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
       TimerContext.Timer planBuildTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.BUILD_QUERY_PLAN);
       final Plan globalQueryPlan = _planMaker.makeInterSegmentPlan(queryableSegmentDataManagerList, brokerRequest,
-            _instanceDataManager.getTableDataManager(brokerRequest.getQuerySource().getTableName()).getExecutorService(),
-            getResourceTimeOut(instanceRequest.getQuery()));
+          _instanceDataManager.getTableDataManager(brokerRequest.getQuerySource().getTableName()).getExecutorService(),
+          getResourceTimeOut(instanceRequest.getQuery()));
       planBuildTimer.stopAndRecord();
 
       if (_printQueryPlan) {
-        LOGGER.debug("***************************** Query Plan for Request {} ***********************************", instanceRequest
-            .getRequestId());
+        LOGGER.debug("***************************** Query Plan for Request {} ***********************************",
+            instanceRequest.getRequestId());
         globalQueryPlan.print();
         LOGGER.debug("*********************************** End Query Plan ***********************************");
       }
 
-      try (TimerContext.Timer planExecTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PLAN_EXECUTION)) {
-        globalQueryPlan.execute();
-      }
+      TimerContext.Timer planExecTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PLAN_EXECUTION);
+      globalQueryPlan.execute();
+      planExecTimer.stopAndRecord();
 
       dataTable = globalQueryPlan.getInstanceResponse();
       queryProcessingTimer.stopAndRecord();
@@ -230,7 +228,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     try {
       String resourceName = brokerRequest.getQuerySource().getTableName();
       if (_resourceTimeOutMsMap.containsKey(resourceName)) {
-        return _resourceTimeOutMsMap.get(brokerRequest);
+        return _resourceTimeOutMsMap.get(resourceName);
       }
     } catch (Exception e) {
       // Return the default timeout value

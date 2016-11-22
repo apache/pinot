@@ -33,6 +33,7 @@ import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 
 
 /**
@@ -89,13 +90,14 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
   // For LONG_MAP_BASED storage type.
   private Long2IntOpenHashMap _groupKeyToId;
 
-  // Reverse mapping for trimming group keys
-  private Int2LongOpenHashMap _idToGroupKey;
-
   // For ARRAY_MAP_BASED storage type.
   private Object2IntOpenHashMap<IntArrayList> _arrayGroupKeyToId;
 
   // The following data structures are used for trimming group keys.
+
+  // TODO: the key will be contiguous so we should use array here.
+  // Reverse mapping for trimming group keys
+  private Int2LongOpenHashMap _idToGroupKey;
 
   // Reverse mapping from KeyIds to groupKeys. purgeGroupKeys takes an array of keyIds to remove,
   // this map tracks keyIds to groupKeys, to serve the purging.
@@ -340,16 +342,16 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
         } // else nothing to be done.
         break;
 
-      case ARRAY_MAP_BASED:
-        purgeArrayMapKeys(keyIdsToPurge);
-        break;
-
       case LONG_MAP_BASED:
         purgeLongMapKeys(keyIdsToPurge);
         break;
 
-        default:
-          throw new RuntimeException("Unsupported storage type for key generator " + _storageType);
+      case ARRAY_MAP_BASED:
+        purgeArrayMapKeys(keyIdsToPurge);
+        break;
+
+      default:
+        throw new RuntimeException("Unsupported storage type for key generator " + _storageType);
     }
   }
 
@@ -393,8 +395,7 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
 
     // Lazily build the idToGroupKey reverse map only once, and then keep the two maps in-sync after that.
     if (_trimMode == TrimMode.OFF) {
-      _idToArrayGroupKey = new Int2ObjectOpenHashMap<>(_groupKeyToId.size());
-
+      _idToArrayGroupKey = new Int2ObjectOpenHashMap<>(_arrayGroupKeyToId.size());
       for (Object2IntMap.Entry<IntArrayList> entry : _arrayGroupKeyToId.object2IntEntrySet()) {
         _idToArrayGroupKey.put(entry.getIntValue(), entry.getKey());
       }
@@ -626,6 +627,9 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
 
     @Override
     public GroupKey next() {
+      if (!hasNext()) {
+        throw new NoSuchElementException();
+      }
       String stringGroupKey = groupKeyToStringGroupKey(_index);
       _groupKey.setFirst(_index++);
       _groupKey.setSecond(stringGroupKey);

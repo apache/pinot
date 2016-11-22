@@ -171,7 +171,13 @@ public class HelixServerStarter {
               }
             });
 
-
+    _serverInstance.getServerMetrics().addCallbackGauge(
+        "memory.allocationFailureCount", new Callable<Long>() {
+              @Override
+              public Long call() throws Exception {
+                return (long) MmapUtils.getAllocationFailureCount();
+              }
+            });
   }
 
   private void updateInstanceConfigInHelix(int adminApiPort, boolean shuttingDown) {
@@ -259,7 +265,6 @@ public class HelixServerStarter {
     final Configuration configuration = new PropertiesConfiguration();
     final int port = 8003;
     configuration.addProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT, port);
-    long currentTimeMillis = System.currentTimeMillis();
     configuration.addProperty("pinot.server.instance.dataDir", "/tmp/PinotServer/test" + port + "/index");
     configuration.addProperty("pinot.server.instance.segmentTarDir", "/tmp/PinotServer/test" + port + "/segmentTar");
     final HelixServerStarter pinotHelixStarter = new HelixServerStarter("quickstart", "localhost:2191", configuration);

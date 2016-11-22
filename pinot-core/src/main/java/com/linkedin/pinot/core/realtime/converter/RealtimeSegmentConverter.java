@@ -61,7 +61,10 @@ public class RealtimeSegmentConverter {
     newSchema.addField(newTimeSpec);
     this.realtimeSegmentImpl = realtimeSegment;
     this.outputPath = outputPath;
-    this.invertedIndexColumns = invertedIndexColumns;
+    this.invertedIndexColumns = new ArrayList<>(invertedIndexColumns);
+    if (sortedColumn != null && this.invertedIndexColumns.contains(sortedColumn)) {
+      this.invertedIndexColumns.remove(sortedColumn);
+    }
     this.dataSchema = newSchema;
     this.sortedColumn = sortedColumn;
     this.tableName = tableName;

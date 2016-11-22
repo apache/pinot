@@ -1237,12 +1237,16 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected long getCurrentServingNumDocs(String tableName) {
     ensurePinotConnectionIsCreated();
-    com.linkedin.pinot.client.ResultSetGroup resultSetGroup =
-        _pinotConnection.execute("SELECT COUNT(*) from " + tableName + " LIMIT 0");
-    if (resultSetGroup.getResultSetCount() > 0) {
-      return resultSetGroup.getResultSet(0).getInt(0);
+    try {
+      com.linkedin.pinot.client.ResultSetGroup resultSetGroup =
+          _pinotConnection.execute("SELECT COUNT(*) from " + tableName + " LIMIT 0");
+      if (resultSetGroup.getResultSetCount() > 0) {
+        return resultSetGroup.getResultSet(0).getInt(0);
+      }
+      return 0;
+    } catch (Exception e) {
+      return -1L;
     }
-    return 0;
   }
 
   protected int getGeneratedQueryCount() {

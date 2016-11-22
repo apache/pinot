@@ -32,7 +32,7 @@ import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaHighLevelStreamProviderConfig;
+import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
 import junit.framework.Assert;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
@@ -535,8 +535,8 @@ public class LLRealtimeSegmentDataManagerTest {
     }
 
     @Override
-    protected KafkaHighLevelStreamProviderConfig createStreamProviderConfig() {
-      KafkaHighLevelStreamProviderConfig config = mock(KafkaHighLevelStreamProviderConfig.class);
+    protected KafkaLowLevelStreamProviderConfig createStreamProviderConfig() {
+      KafkaLowLevelStreamProviderConfig config = mock(KafkaLowLevelStreamProviderConfig.class);
       Mockito.doNothing().when(config).init(any(AbstractTableConfig.class), any(InstanceZKMetadata.class), any(Schema.class));
       when(config.getTopicName()).thenReturn(_topicName);
       when(config.getStreamName()).thenReturn(_topicName);

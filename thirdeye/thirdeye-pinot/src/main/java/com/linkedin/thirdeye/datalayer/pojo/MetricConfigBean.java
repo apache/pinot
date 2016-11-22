@@ -156,7 +156,7 @@ public class MetricConfigBean extends AbstractBean {
   public String toString() {
     return MoreObjects.toStringHelper(this).add("id", getId()).add("name", name).add("dataset", dataset)
         .add("alias", alias).add("derived", derived).add("derivedMetricExpression", derivedMetricExpression)
-        .add("rollupThreshold", rollupThreshold).add("cellSizeExpression", cellSizeExpression)
-        .add("active", active).add("extSourceLinkInfo", extSourceLinkInfo).toString();
+        .add("rollupThreshold", rollupThreshold).add("cellSizeExpression", cellSizeExpression).add("active", active)
+        .add("extSourceLinkInfo", extSourceLinkInfo).toString();
   }
 }

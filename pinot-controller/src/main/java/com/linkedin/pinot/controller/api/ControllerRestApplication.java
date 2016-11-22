@@ -15,20 +15,6 @@
  */
 package com.linkedin.pinot.controller.api;
 
-import org.restlet.Context;
-import org.restlet.Request;
-import org.restlet.Response;
-import org.restlet.Restlet;
-import org.restlet.data.MediaType;
-import org.restlet.representation.StringRepresentation;
-import org.restlet.resource.Directory;
-import org.restlet.resource.ServerResource;
-import org.restlet.routing.Filter;
-import org.restlet.routing.Redirector;
-import org.restlet.routing.Router;
-import org.restlet.routing.Template;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.restlet.PinotRestletApplication;
 import com.linkedin.pinot.common.restlet.swagger.SwaggerResource;
@@ -51,6 +37,21 @@ import com.linkedin.pinot.controller.api.restlet.resources.PinotTenantRestletRes
 import com.linkedin.pinot.controller.api.restlet.resources.PinotVersionRestletResource;
 import com.linkedin.pinot.controller.api.restlet.resources.PqlQueryResource;
 import com.linkedin.pinot.controller.api.restlet.resources.TableSize;
+import com.linkedin.pinot.controller.api.restlet.resources.TableViews;
+import org.restlet.Context;
+import org.restlet.Request;
+import org.restlet.Response;
+import org.restlet.Restlet;
+import org.restlet.data.MediaType;
+import org.restlet.representation.StringRepresentation;
+import org.restlet.resource.Directory;
+import org.restlet.resource.ServerResource;
+import org.restlet.routing.Filter;
+import org.restlet.routing.Redirector;
+import org.restlet.routing.Router;
+import org.restlet.routing.Template;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ControllerRestApplication extends PinotRestletApplication {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerRestApplication.class);
@@ -93,7 +94,6 @@ public class ControllerRestApplication extends PinotRestletApplication {
     attachRoutesForClass(router, PinotTableSchema.class);
     attachRoutesForClass(router, PinotSegmentRestletResource.class);
     attachRoutesForClass(router, TableSize.class);
-
     // PUT
     attachRoutesForClass(router, PinotTableSegmentConfigs.class);
     attachRoutesForClass(router, PinotTableIndexingConfigs.class);
@@ -109,6 +109,9 @@ public class ControllerRestApplication extends PinotRestletApplication {
     attachRoutesForClass(router, LLCSegmentCommit.class);
     attachRoutesForClass(router, LLCSegmentConsumed.class);
 
+    // GET... add it here because it can block visibility of
+    // some of the existing paths (like indexingConfigs) added above
+    attachRoutesForClass(router, TableViews.class);
 
     router.attach("/api", SwaggerResource.class);
 
@@ -121,26 +124,6 @@ public class ControllerRestApplication extends PinotRestletApplication {
     router.attach("/pinot-controller/admin", PinotControllerHealthCheck.class);
 
     router.attach("/pql", PqlQueryResource.class);
-
-    final Restlet mainpage = new Restlet() {
-      @Override
-      public void handle(Request request, Response response) {
-        final StringBuilder stringBuilder = new StringBuilder();
-        stringBuilder.append("<html>");
-        stringBuilder.append("<head><title>Restlet Cluster Management page</title></head>");
-        stringBuilder.append("<body bgcolor=white>");
-        stringBuilder.append("<table border=\"0\">");
-        stringBuilder.append("<tr>");
-        stringBuilder.append("<td>");
-        stringBuilder.append("<h1>Rest cluster management interface V1</h1>");
-        stringBuilder.append("</td>");
-        stringBuilder.append("</tr>");
-        stringBuilder.append("</table>");
-        stringBuilder.append("</body>");
-        stringBuilder.append("</html>");
-        response.setEntity(new StringRepresentation(stringBuilder.toString(), MediaType.TEXT_HTML));
-      }
-    };
 
     try {
       final Directory webdir = new Directory(getContext(), CONSOLE_WEBAPP_ROOT_PATH);

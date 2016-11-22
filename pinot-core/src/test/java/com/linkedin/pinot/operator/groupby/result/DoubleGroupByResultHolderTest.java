@@ -62,7 +62,8 @@ public class DoubleGroupByResultHolderTest {
    */
   @Test
   void testSetValueForKey() {
-    GroupByResultHolder resultHolder = new DoubleGroupByResultHolder(INITIAL_CAPACITY, MAX_CAPACITY, DEFAULT_VALUE);
+    GroupByResultHolder resultHolder =
+        new DoubleGroupByResultHolder(INITIAL_CAPACITY, MAX_CAPACITY, MAX_CAPACITY, DEFAULT_VALUE);
 
     for (int i = 0; i < INITIAL_CAPACITY; i++) {
       resultHolder.setValueForKey(i, _expected[i]);
@@ -79,7 +80,8 @@ public class DoubleGroupByResultHolderTest {
    */
   @Test
   void testEnsureCapacity() {
-    GroupByResultHolder resultHolder = new DoubleGroupByResultHolder(INITIAL_CAPACITY, MAX_CAPACITY, DEFAULT_VALUE);
+    GroupByResultHolder resultHolder =
+        new DoubleGroupByResultHolder(INITIAL_CAPACITY, MAX_CAPACITY, MAX_CAPACITY, DEFAULT_VALUE);
 
     for (int i = 0; i < INITIAL_CAPACITY; i++) {
       resultHolder.setValueForKey(i, _expected[i]);
@@ -139,7 +141,7 @@ public class DoubleGroupByResultHolderTest {
    */
   void testTrimResults(final boolean minOrder) {
     GroupByResultHolder resultHolder =
-        new DoubleGroupByResultHolder(INITIAL_CAPACITY, INITIAL_CAPACITY, DEFAULT_VALUE, minOrder);
+        new DoubleGroupByResultHolder(INITIAL_CAPACITY, MAX_CAPACITY, INITIAL_CAPACITY, DEFAULT_VALUE, minOrder);
     List<IntDoublePair> expected = new ArrayList<>(MAX_CAPACITY);
 
     for (int i = 0; i < INITIAL_CAPACITY; i++) {
@@ -155,8 +157,8 @@ public class DoubleGroupByResultHolderTest {
       expected.add(new IntDoublePair(i, _expected[i]));
     }
 
-    // Trim the results to INITIAL_CAPACITY.
-    resultHolder.trimResults(INITIAL_CAPACITY);
+    // Trim the results.
+    resultHolder.trimResults();
 
     // Sort the input
     Collections.sort(expected, new IntDoubleComparator(!minOrder));

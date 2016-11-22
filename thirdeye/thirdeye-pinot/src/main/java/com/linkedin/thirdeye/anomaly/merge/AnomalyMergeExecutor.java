@@ -178,6 +178,7 @@ public class AnomalyMergeExecutor implements Runnable {
   }
 
   private void updateMergedScoreAndPersist(MergedAnomalyResultDTO mergedResult, AnomalyMergeConfig mergeConfig) {
+    // Calculate default score and weight in case of the failure during updating score and weight through Pinot's value
     double weightedScoreSum = 0.0;
     double weightedWeightSum = 0.0;
     double totalBucketSize = 0.0;
@@ -199,15 +200,16 @@ public class AnomalyMergeExecutor implements Runnable {
 
     mergedResult.setMessage(anomalyMessage);
 
-    // recompute weight using anomaly function specific method
-    try {
-      updateMergedAnomalyWeight(mergedResult, mergeConfig);
-    } catch (Exception e) {
-      AnomalyFunctionDTO function = mergedResult.getFunction();
-      LOG.warn(
-          "Unable to compute merged weight and the average weight of raw anomalies is used. Dataset: {}, Metric: {}, Function: {}, Time:{} - {}, Exception: {}",
-          function.getCollection(), function.getMetric(), function.getFunctionName(),
-          new DateTime(mergedResult.getStartTime()), new DateTime(mergedResult.getEndTime()), e);
+    if (mergedResult.getAnomalyResults().size() > 1) {
+      // recompute weight using anomaly function specific method
+      try {
+        updateMergedAnomalyWeight(mergedResult, mergeConfig);
+      } catch (Exception e) {
+        AnomalyFunctionDTO function = mergedResult.getFunction();
+        LOG.warn(
+            "Unable to compute merged weight and the average weight of raw anomalies is used. Dataset: {}, Metric: {}, Function: {}, Time:{} - {}, Exception: {}",
+            function.getCollection(), function.getMetric(), function.getFunctionName(), new DateTime(mergedResult.getStartTime()), new DateTime(mergedResult.getEndTime()), e);
+      }
     }
     try {
       // persist the merged result

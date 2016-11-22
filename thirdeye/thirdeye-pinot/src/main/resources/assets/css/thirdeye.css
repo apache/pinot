@@ -1,0 +1,277 @@
+body {
+	font-family: SourceSansPro, sans-serif;
+	font-size: 14px;
+	background-color: #F3F6F8;
+	color: #000000;
+}
+
+.label-large-light {
+	font-weight: 100;
+	font-size: 23px;
+	margin-top: 5px;
+}
+.label-medium-light {
+	font-weight: 100;
+	font-size: 15px;
+	color: black;
+}
+
+.label-medium-semibold {
+	font-weight: 400;
+	font-size: 15px;
+	color: black;
+}
+
+.label-small-semibold {
+	font-weight: 400;
+	font-size: 11px;
+	color: #8C8C8C;
+}
+
+.metric-label {
+	font-weight: 400;
+	font-size: 13px;
+}
+
+.container-fluid {
+	
+}
+/* Underline From Center */
+.hvr-underline-from-center {
+	display: inline-block;
+	vertical-align: middle;
+	-webkit-transform: translateZ(0);
+	transform: translateZ(0);
+	box-shadow: 0 0 1px rgba(0, 0, 0, 0);
+	-webkit-backface-visibility: hidden;
+	backface-visibility: hidden;
+	-moz-osx-font-smoothing: grayscale;
+	position: relative;
+	overflow: hidden;
+}
+
+.hvr-underline-from-center:before {
+	content: "";
+	position: absolute;
+	z-index: -1;
+	left: 50%;
+	right: 50%;
+	bottom: 0;
+	background: #ffffff;
+	height: 4px;
+	-webkit-transition-property: left, right;
+	transition-property: left, right;
+	-webkit-transition-duration: 0.3s;
+	transition-duration: 0.3s;
+	-webkit-transition-timing-function: ease-out;
+	transition-timing-function: ease-out;
+}
+
+.hvr-underline-from-center:hover:before, .hvr-underline-from-center:focus:before,
+	.hvr-underline-from-center:active:before {
+	left: 0;
+	right: 0;
+}
+
+.navbar {
+	margin-bottom: 0px;
+	border-bottom: 1px solid #ccc;
+}
+
+.navbar-inverse {
+	background-image: none;
+	background-color: #222222;
+	margin-bottom: 0px;
+	border: 0px;
+}
+
+.navbar-inverse .navbar-inner {
+	background-image: none;
+	background-color: #222222;
+}
+
+.dashboard-tabs li.active a {
+	border-bottom: 4px solid #0073B0 !important;
+	color: #0073B0
+}
+
+.dashboard-tabs li a {
+	color: black;
+}
+
+.bg-black {
+	background-color: #222222;
+}
+
+.underlined-input {
+	border: 0px;
+	border-bottom: 1px solid #000;
+}
+
+.row-bordered:after {
+	content: "";
+	display: block;
+	border-bottom: 1px solid #ccc;
+}
+
+.bg-gray {
+	background: #D3D3D3;
+}
+
+.bg-white {
+	background: #ffffff;
+}
+
+hr {
+	margin-bottom: 5px;
+	margin-top: 5px
+}
+
+.top-buffer {
+	margin-top: 10px;
+}
+
+.bottom-buffer {
+	margin-bottom: 10px;
+}
+
+.padding-all {
+	padding-right: 20px;
+	padding-left: 20px;
+	padding-top: 20px;
+	padding-bottom: 20px;
+}
+
+.fill-up {
+	margin-bottom: 5px;
+	margin-top: 5px
+}
+
+.fill-down {
+	margin-bottom: 5px;
+	margin-top: 5px
+}
+
+.no-border {
+	border: 0;
+	box-shadow: none;
+	/* You may want to include this as bootstrap applies these styles too */
+}
+
+.view-anomaly-label {
+	font-weight: 300;
+	font-size: 23px;
+}
+
+.box {
+	width: 27px;
+	height: 27px;
+	text-align: center;
+	background: #F3F6F8;
+}
+
+.box-anomaly {
+	background: #FF9526;
+}
+
+/* dashboard table css*/
+
+.dashboard-table>thead>tr>th, .dashboard-table>tbody>tr>th,
+	.dashboard-table>tfoot>tr>th, .dashboard-table>thead>tr>td,
+	.dashboard-table>tbody>tr>td, .dashboard-table>tfoot>tr>td {
+	padding-left: 2px;
+	border-top: none;
+}
+
+.dashboard-table>thead>tr>th {
+	font-weight: 300;
+	font-size: 11px;
+	text-align: center;
+}
+
+/*Info table above heatmap*/
+.info-table {
+	border: 1px solid #ccc
+}
+.info-table>thead>tr>th, .info-table>tbody>tr>th,
+	.info-table>tfoot>tr>th, .info-table>thead>tr>td,
+	.info-table>tbody>tr>td, .info-table>tfoot>tr>td {
+	border: none;
+}
+
+.info-table>thead>tr>th {
+	font-weight: 100;
+	font-size: 11px;
+}
+
+/* analysis table css*/
+.analysis-table>thead>tr>th, .analysis-table>tbody>tr>th,
+	.analysis-table>tfoot>tr>th, .analysis-table>thead>tr>td,
+	.analysis-table>tbody>tr>td, .analysis-table>tfoot>tr>td {
+	
+}
+
+.analysis-table {
+	border: none !important;
+}
+
+.analysis-table>thead>tr>th {
+	font-weight: 300;
+	font-size: 11px;
+	text-align: center;
+	background-color: #E4E8EC;
+}
+
+.analysis-table>tbody>tr>td {
+	font-weight: 300;
+	font-size: 11px;
+	text-align: center;
+	background-color: white;
+	width: 50px;
+}
+
+.analysis-table>thead>tr>th.dim-label {
+	width: 100px;
+	background-color: #F3F6F8;
+	border: none !important;
+	font-weight: 400;
+}
+
+.analysis-table>tbody>tr>td.dim-label {
+	width: 100px;
+	background-color: #F3F6F8;
+	border: none !important;
+}
+.table-borderless td, .table-borderless th{
+	border: none !important;
+}
+.time-range {
+	font-weight: 300;
+	font-size: 15px;
+}
+
+.selectAutoWidth {
+	width: auto
+}
+/** C3 related*/
+.c3 .c3-axis-x path, .c3 .c3-axis-x line {
+	stroke: #979797;
+}
+
+.c3 .c3-axis-y path, .c3 .c3-axis-y line {
+	stroke: #979797;
+}
+
+/* heatmap background colors*/
+.heatmap {
+  display: block;
+  margin: auto;
+}
+
+text {
+  font-size: 11px;
+}
+
+rect {
+  fill: none;
+}

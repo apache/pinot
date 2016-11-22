@@ -1,5 +1,4 @@
-<section id="job-info-section" width="100%">
-	<script id="job-info-template" type="text/x-handlebars-template">
+<script id="job-info-template" type="text/x-handlebars-template">
 <div class="panel-body">
 	<form role="form">
 		<label for="job-dataset-selector">Dataset </label> <Select id="job-dataset-selector" name="dataset">
@@ -16,7 +15,7 @@
 <div class="JobInfoContainer" id="JobInfoContainer-{{this}}"></div>
 {{/each}}
 </script>
-</section>
+
 
 
 

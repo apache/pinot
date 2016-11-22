@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datalayer.util;
 
+import com.linkedin.thirdeye.datalayer.entity.OverrideConfigIndex;
 import io.dropwizard.configuration.ConfigurationFactory;
 import io.dropwizard.jackson.Jackson;
 
@@ -33,8 +34,8 @@ import com.linkedin.thirdeye.datalayer.entity.WebappConfigIndex;
 public abstract class DaoProviderUtil {
 
   private static DataSource dataSource;
+  private static ManagerProvider provider;
 
-  static ManagerProvider provider ;
   public static void init(File localConfigFile) {
     PersistenceConfig configuration = createConfiguration(localConfigFile);
     dataSource = new DataSource();
@@ -78,10 +79,6 @@ public abstract class DaoProviderUtil {
     return instance;
   }
 
-  public static DataSource getDataSource() {
-    return dataSource;
-  }
-
   static class DataSourceModule extends AbstractModule {
     SqlQueryBuilder builder;
     DataSource dataSource;
@@ -120,6 +117,8 @@ public abstract class DaoProviderUtil {
             convertCamelCaseToUnderscore(IngraphDashboardConfigIndex.class.getSimpleName()));
         entityMappingHolder.register(conn, IngraphMetricConfigIndex.class,
             convertCamelCaseToUnderscore(IngraphMetricConfigIndex.class.getSimpleName()));
+        entityMappingHolder.register(conn, OverrideConfigIndex.class,
+            convertCamelCaseToUnderscore(OverrideConfigIndex.class.getSimpleName()));
       } catch (Exception e) {
         throw new RuntimeException(e);
       }

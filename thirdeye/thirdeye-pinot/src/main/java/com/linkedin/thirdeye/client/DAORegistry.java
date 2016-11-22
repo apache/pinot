@@ -9,6 +9,7 @@ import com.linkedin.thirdeye.datalayer.bao.IngraphMetricConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 
@@ -24,6 +25,7 @@ public class DAORegistry {
   private static DashboardConfigManager dashboardConfigDAO;
   private static IngraphDashboardConfigManager ingraphDashboardConfigDAO;
   private static IngraphMetricConfigManager ingraphMetricConfigDAO;
+  private static OverrideConfigManager overrideConfigDAO;
 
 
   private static class Holder {
@@ -39,7 +41,8 @@ public class DAORegistry {
       MergedAnomalyResultManager mergedAnomalyResultDAO, JobManager jobDAO,  TaskManager taskDAO,
       DatasetConfigManager datasetConfigDAO, MetricConfigManager metricConfigDAO,
       DashboardConfigManager dashboardConfigDAO, IngraphMetricConfigManager ingraphMetricConfigDAO,
-      IngraphDashboardConfigManager ingraphDashboardConfigDAO) {
+      IngraphDashboardConfigManager ingraphDashboardConfigDAO,
+      OverrideConfigManager overrideConfigDAO) {
 
     DAORegistry daoRegistry = DAORegistry.getInstance();
     daoRegistry.registerAnomalyFunctionDAO(anomalyFunctionDAO);
@@ -53,7 +56,7 @@ public class DAORegistry {
     daoRegistry.registerMetricConfigDAO(metricConfigDAO);
     daoRegistry.registerIngraphDashboardConfigDAO(ingraphDashboardConfigDAO);
     daoRegistry.registerIngraphMetricConfigDAO(ingraphMetricConfigDAO);
-
+    daoRegistry.registerOverrideConfigDAO(overrideConfigDAO);
   }
 
   public AnomalyFunctionManager getAnomalyFunctionDAO() {
@@ -142,6 +145,10 @@ public class DAORegistry {
 
   private void registerIngraphDashboardConfigDAO(IngraphDashboardConfigManager ingraphDashboardConfigDAO) {
     DAORegistry.ingraphDashboardConfigDAO = ingraphDashboardConfigDAO;
+  }
+
+  private void registerOverrideConfigDAO(OverrideConfigManager overrideConfigDAO) {
+    DAORegistry.overrideConfigDAO = overrideConfigDAO;
   }
 
 }

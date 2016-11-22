@@ -62,7 +62,6 @@ public class HelixBrokerStarter {
   private final HelixAdmin _helixAdmin;
   private final ZkClient _zkClient;
   private final Configuration _pinotHelixProperties;
-  private final HelixBrokerRoutingTable _helixBrokerRoutingTable;
   private final HelixExternalViewBasedRouting _helixExternalViewBasedRouting;
   private final BrokerServerBuilder _brokerServerBuilder;
   private final ZkHelixPropertyStore<ZNRecord> _propertyStore;
@@ -102,13 +101,13 @@ public class HelixBrokerStarter {
     _propertyStore = new ZkHelixPropertyStore<ZNRecord>(new ZkBaseDataAccessor<ZNRecord>(_zkClient), "/", null);
     RoutingTableSelector selector = RoutingTableSelectorFactory.getRoutingTableSelector(
         pinotHelixProperties.subset(ROUTING_TABLE_SELECTOR_SUBSET_KEY), _propertyStore);
-    _helixExternalViewBasedRouting = new HelixExternalViewBasedRouting(_propertyStore, selector);
 
     LOGGER.info("Connecting Helix components");
     // _brokerServerBuilder = startBroker();
-    _brokerServerBuilder = startBroker(_pinotHelixProperties);
     _helixManager =
         HelixManagerFactory.getZKHelixManager(helixClusterName, brokerId, InstanceType.PARTICIPANT, zkServers);
+    _helixExternalViewBasedRouting = new HelixExternalViewBasedRouting(_propertyStore, selector, _helixManager);
+    _brokerServerBuilder = startBroker(_pinotHelixProperties);
     final StateMachineEngine stateMachineEngine = _helixManager.getStateMachineEngine();
     final StateModelFactory<?> stateModelFactory =
         new BrokerResourceOnlineOfflineStateModelFactory(_helixManager, _helixExternalViewBasedRouting);
@@ -116,10 +115,12 @@ public class HelixBrokerStarter {
         stateModelFactory);
     _helixManager.connect();
     _helixAdmin = _helixManager.getClusterManagmentTool();
-    _helixBrokerRoutingTable = new HelixBrokerRoutingTable(_helixExternalViewBasedRouting, brokerId, _helixManager);
     addInstanceTagIfNeeded(helixClusterName, brokerId);
-    _helixManager.addExternalViewChangeListener(_helixBrokerRoutingTable);
-    _helixManager.addInstanceConfigChangeListener(_helixBrokerRoutingTable);
+
+    ClusterChangeMediator clusterChangeMediator = new ClusterChangeMediator(_helixExternalViewBasedRouting);
+    _helixManager.addExternalViewChangeListener(clusterChangeMediator);
+    _helixManager.addInstanceConfigChangeListener(clusterChangeMediator);
+
     _helixManager.addLiveInstanceChangeListener(_liveInstancesListener);
 
     _brokerServerBuilder.getBrokerMetrics().addCallbackGauge(

@@ -62,7 +62,9 @@ body a{
 .blue {
     color: #1f77b4;
 }
-
+.blue a {
+    color: #1f77b4;
+}
 .thin-input{
    width:65px;
 }
@@ -912,7 +914,7 @@ body a{
 
 .large-anomaly-box{
     background: linear-gradient(90deg,#f0f0f0 130px,rgba(240,240,240,0) calc(130px + 20%));/*#f0f0f0*/
-    height: 300px;
+    height: 310px;
     padding-left:0px;
     border: 1px solid #ddd;
     margin: 10px auto 0 auto;

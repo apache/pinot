@@ -32,6 +32,8 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   REQUEST_FETCH_EXCEPTIONS("exceptions", false),
   REQUEST_DESERIALIZATION_EXCEPTIONS("exceptions", false),
   DOCUMENTS_SCANNED("documents", false),
+  REQUEST_CONNECTION_TIMEOUTS("timeouts", false),
+  REQUEST_CONNECTION_WAIT_TIME_IN_MILLIS("waits", false),
   HELIX_ZOOKEEPER_RECONNECTS("reconnects", true),
 
   // This metric tracks the number of requests dropped by the broker after we get a connection to the server.
@@ -49,10 +51,12 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   LLC_QUERY_COUNT("queries", false),
   HLC_QUERY_COUNT("queries", false),
 
-
   // This metric is emitted when DataTableCustomSerDe falls back to Java based de-serialization.
   // This implies that we have identified an object for which we have not implemented custom ser/de.
-  DATA_TABLE_OBJECT_DESERIALIZATION("dataTableObjectDeserialization", true);
+  DATA_TABLE_OBJECT_DESERIALIZATION("dataTableObjectDeserialization", true),
+
+  ROUTING_TABLE_REBUILD_FAILURES("failures", false),
+  ;
 
   private final String brokerMeterName;
   private final String unit;

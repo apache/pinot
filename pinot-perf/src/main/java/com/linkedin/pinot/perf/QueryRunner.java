@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.perf;
 
+import com.linkedin.pinot.tools.perf.PerfBenchmarkDriver;
+import com.linkedin.pinot.tools.perf.PerfBenchmarkDriverConf;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -26,7 +28,6 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.io.IOUtils;

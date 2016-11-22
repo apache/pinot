@@ -204,7 +204,7 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
       i++;
       LOGGER.info("Uploading segment {} : {}", i, segmentName);
       File file = new File(_offlineTarDir, segmentName);
-      FileUploadUtils.sendSegmentFile("localhost", "8998", segmentName, new FileInputStream(file), file.length());
+      FileUploadUtils.sendSegmentFile("localhost", "8998", segmentName, file, file.length());
     }
 
     // Wait for all offline segments to be online

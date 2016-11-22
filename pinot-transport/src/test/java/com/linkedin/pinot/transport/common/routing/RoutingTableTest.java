@@ -59,7 +59,7 @@ public class RoutingTableTest {
   @Test
   public void testHelixExternalViewBasedRoutingTable() throws Exception {
     RoutingTableBuilder routingStrategy = new RandomRoutingTableBuilder(100);
-    HelixExternalViewBasedRouting routingTable = new HelixExternalViewBasedRouting(null, NO_LLC_ROUTING);
+    HelixExternalViewBasedRouting routingTable = new HelixExternalViewBasedRouting(null, NO_LLC_ROUTING, null);
     Field offlineRTBField = HelixExternalViewBasedRouting.class.getDeclaredField("_offlineRoutingTableBuilder");
     offlineRTBField.setAccessible(true);
     offlineRTBField.set(routingTable, routingStrategy);
@@ -128,7 +128,7 @@ public class RoutingTableTest {
 
     final LLCSegmentName llcSegmentName = new LLCSegmentName("testResource0", 2, 65, System.currentTimeMillis());
 
-    HelixExternalViewBasedRouting routingTable = new HelixExternalViewBasedRouting(null, NO_LLC_ROUTING);
+    HelixExternalViewBasedRouting routingTable = new HelixExternalViewBasedRouting(null, NO_LLC_ROUTING, null);
 
     Field realtimeRTBField = HelixExternalViewBasedRouting.class.getDeclaredField("_realtimeHLCRoutingTableBuilder");
     realtimeRTBField.setAccessible(true);
@@ -241,7 +241,7 @@ public class RoutingTableTest {
   // Test that we can switch between llc and hlc routing depending on what the selector tells us.
   @Test
   public void testCombinedKafkaRouting() throws Exception {
-    HelixExternalViewBasedRouting routingTable = new HelixExternalViewBasedRouting(null, NO_LLC_ROUTING);
+    HelixExternalViewBasedRouting routingTable = new HelixExternalViewBasedRouting(null, NO_LLC_ROUTING, null);
 
     final long now = System.currentTimeMillis();
     final String tableName = "table";

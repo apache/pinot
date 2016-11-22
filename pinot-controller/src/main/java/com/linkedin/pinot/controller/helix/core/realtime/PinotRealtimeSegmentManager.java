@@ -191,6 +191,10 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
               RealtimeSegmentZKMetadata realtimeSegmentZKMetadata = ZKMetadataProvider
                   .getRealtimeSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(), segName.getTableName(),
                       partition);
+              if (realtimeSegmentZKMetadata == null) {
+                // Segment was deleted by retention manager.
+                continue;
+              }
               if (realtimeSegmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
                 instancesToAssignRealtimeSegment.removeAll(state.getInstanceSet(partition));
               }
@@ -337,6 +341,10 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
                 RealtimeSegmentZKMetadata realtimeSegmentZKMetadata = ZKMetadataProvider
                     .getRealtimeSegmentZKMetadata(_pinotHelixResourceManager.getPropertyStore(),
                         abstractTableConfig.getTableName(), segmentName);
+                if (realtimeSegmentZKMetadata == null) {
+                  // The segment got deleted by retention manager
+                  continue;
+                }
                 if (realtimeSegmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
                   LOGGER.info("Setting data change watch for real-time segment currently being consumed: {}",
                       segmentPath);

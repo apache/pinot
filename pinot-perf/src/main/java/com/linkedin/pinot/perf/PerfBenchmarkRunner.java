@@ -15,105 +15,57 @@
  */
 package com.linkedin.pinot.perf;
 
-import java.io.File;
-import java.util.ArrayList;
-import java.util.HashSet;
+import com.linkedin.pinot.tools.perf.PerfBenchmarkDriver;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Set;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.collect.Lists;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
-import com.linkedin.pinot.common.config.Tenant;
-import com.linkedin.pinot.common.config.Tenant.TenantBuilder;
-import com.linkedin.pinot.common.utils.TenantRole;
-import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
-
 
 /**
- * Launcher class to set up Pinot for perf testing
- *
+ * The <code>PerfBenchmarkRunner</code> class is a tool to start Pinot cluster with optional preloaded segments.
  */
 public class PerfBenchmarkRunner {
-  private static final Logger LOGGER = LoggerFactory.getLogger(PerfBenchmarkRunner.class);
-
-  public static void startComponents(boolean zk, boolean controller, boolean broker, boolean server) throws Exception {
-    LOGGER.info("Starting components");
-    //create conf with default values
-    PerfBenchmarkDriverConf conf = new PerfBenchmarkDriverConf();
-    conf.setStartBroker(broker);
-    conf.setStartController(controller);
-    conf.setStartServer(server);
-    conf.setStartZookeeper(zk);
-    conf.setUploadIndexes(false);
-    conf.setRunQueries(false);
-    conf.setServerInstanceSegmentTarDir(null);
-    conf.setServerInstanceDataDir(null);
-    conf.setConfigureResources(false);
-    PerfBenchmarkDriver driver = new PerfBenchmarkDriver(conf);
-    driver.run();
+  private PerfBenchmarkRunner() {
   }
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(PerfBenchmarkRunner.class);
+
   /**
-   * The segments are already extracted into a directory
+   * Start Pinot server with pre-loaded segments.
+   *
+   * @param dataDir data directory.
+   * @param tableNames list of table names to be loaded.
+   * @param invertedIndexColumns list of inverted index columns.
    * @throws Exception
    */
-  public static void startServerWithPreLoadedSegments(String directory, List<String> offlineTableNames,
-      List<String> invertedIndexColumns) throws Exception {
-    LOGGER.info("Starting Server and uploading segments.");
-    //create conf with default values
-    PerfBenchmarkDriverConf conf = new PerfBenchmarkDriverConf();
-    conf.setStartBroker(false);
-    conf.setStartController(false);
-    conf.setStartServer(true);
-    conf.setStartZookeeper(false);
-    conf.setUploadIndexes(false);
-    conf.setRunQueries(false);
-    conf.setServerInstanceSegmentTarDir(null);
-    conf.setServerInstanceDataDir(directory);
-    conf.setConfigureResources(false);
-    PerfBenchmarkDriver driver = new PerfBenchmarkDriver(conf);
-    driver.run();
-
-    Set<String> tables = new HashSet<String>();
-    for (String offlineTableName : offlineTableNames) {
-      File[] segments = new File(directory, offlineTableName).listFiles();
-      for (File segmentDir : segments) {
-        SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(segmentDir);
-        if (!tables.contains(segmentMetadata.getTableName())) {
-          driver.configureTable(segmentMetadata.getTableName(), invertedIndexColumns);
-          tables.add(segmentMetadata.getTableName());
-        }
-        driver.addSegment(segmentMetadata);
-      }
+  public static void startServerWithPreLoadedSegments(String dataDir, List<String> tableNames,
+      List<String> invertedIndexColumns)
+      throws Exception {
+    LOGGER.info("Starting server and uploading segments.");
+    PerfBenchmarkDriver driver = PerfBenchmarkDriver.startComponents(false, false, false, true, dataDir);
+    for (String tableName : tableNames) {
+      com.linkedin.pinot.tools.perf.PerfBenchmarkRunner.loadTable(driver, dataDir, tableName, invertedIndexColumns);
     }
   }
 
   public static void main(String[] args) throws Exception {
     if (args.length > 0) {
       if (args[0].equalsIgnoreCase("startAllButServer") || args[0].equalsIgnoreCase("startAll")) {
-        startComponents(true, true, true, false);
+        PerfBenchmarkDriver.startComponents(true, true, true, false, null);
       }
 
       if (args[0].equalsIgnoreCase("startServerWithPreLoadedSegments") || args[0].equalsIgnoreCase("startAll")) {
-        String offlineTableNames = args[1];
-        String indexRootDirectory = args[2];
-        List<String> invertedIndexColumns = new ArrayList<>();
+        String tableNames = args[1];
+        String dataDir = args[2];
+        List<String> invertedIndexColumns = null;
         if (args.length == 4) {
-          String[] columns = args[3].split(",");
-          for (int i = 0; i < columns.length; i++) {
-            invertedIndexColumns.add(columns[i].trim());
-          }
+          invertedIndexColumns = Arrays.asList(args[3].split(","));
         }
-        startServerWithPreLoadedSegments(indexRootDirectory, Lists.newArrayList(offlineTableNames.split(",")),
-            invertedIndexColumns);
+        startServerWithPreLoadedSegments(dataDir, Arrays.asList(tableNames.split(",")), invertedIndexColumns);
       }
-
     } else {
-      System.err.println("Expected one of [startAll|startAllButServer|StartServerWithPreLoadedSegments]");
+      LOGGER.error("Expected one of [startAll|startAllButServer|StartServerWithPreLoadedSegments]");
     }
   }
 }

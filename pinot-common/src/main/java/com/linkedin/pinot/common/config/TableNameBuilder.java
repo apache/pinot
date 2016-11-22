@@ -19,6 +19,7 @@ import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.StringUtil;
+import javax.annotation.Nonnull;
 
 
 public class TableNameBuilder {
@@ -32,7 +33,7 @@ public class TableNameBuilder {
     this.type = type;
   }
 
-  public String forTable(String tableName) {
+  public String forTable(@Nonnull String tableName) {
     Preconditions.checkNotNull(tableName);
     Preconditions.checkArgument(!tableName.contains(SegmentName.SEPARATOR),
         "Table name(" + tableName + ") cannot contain two consecutive underscore characters");

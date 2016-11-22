@@ -17,10 +17,12 @@ package com.linkedin.pinot.common.utils;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
+import java.nio.file.Path;
 import org.apache.commons.httpclient.HttpClient;
 import org.apache.commons.httpclient.HttpException;
 import org.apache.commons.httpclient.HttpVersion;
@@ -50,6 +52,8 @@ public class FileUploadUtils {
   private static final String SEGMENTS_PATH = "segments";
   public static final String UPLOAD_TYPE = "UPLOAD_TYPE";
   public static final String DOWNLOAD_URI = "DOWNLOAD_URI";
+  public static final int MAX_RETRIES = 5;
+  public static final int SLEEP_BETWEEN_RETRIES_IN_SECONDS = 60;
   private static final MultiThreadedHttpConnectionManager CONNECTION_MANAGER =
       new MultiThreadedHttpConnectionManager();
   private static final HttpClient FILE_UPLOAD_HTTP_CLIENT = new HttpClient(CONNECTION_MANAGER);
@@ -88,7 +92,7 @@ public class FileUploadUtils {
 
             @Override
             public String getFileName() {
-              return "fileName";
+              return fileName;
             }
 
             @Override
@@ -119,12 +123,60 @@ public class FileUploadUtils {
   }
 
   public static int sendSegmentFile(final String host, final String port, final String fileName,
+      File file, final long lengthInBytes) {
+    return sendSegmentFile(host, port, fileName, file, lengthInBytes, MAX_RETRIES, SLEEP_BETWEEN_RETRIES_IN_SECONDS);
+  }
+
+  public static int sendSegmentFile(final String host, final String port, final String fileName,
+      File file, final long lengthInBytes, int maxRetries, int sleepTimeSec) {
+    for (int numRetries = 0; ; numRetries++) {
+      try ( InputStream inputStream = new FileInputStream(file)) {
+        return sendSegmentFile(host, port, fileName, inputStream, lengthInBytes);
+      } catch (Exception e) {
+        if (numRetries >= maxRetries) {
+          throw new RuntimeException(e);
+        }
+        LOGGER.warn("Retry " + numRetries + " of Upload of File " + fileName + " to host " + host
+            + " after error trying to send file ");
+        try {
+          Thread.sleep(sleepTimeSec * 1000);
+        } catch (Exception e1) {
+          LOGGER.error("Upload of File " + fileName + " to host " + host + " interrupted while waiting to retry after error");
+          throw new RuntimeException(e1);
+        }
+      }
+    }
+  }
+
+  public static int sendSegmentFile(final String host, final String port, final String fileName,
       final InputStream inputStream, final long lengthInBytes) {
     return sendFile(host, port, SEGMENTS_PATH, fileName, inputStream, lengthInBytes, SendFileMethod.POST);
   }
 
-
   public static int sendSegmentUri(final String host, final String port, final String uri) {
+    return sendSegmentUri(host, port, uri, MAX_RETRIES, SLEEP_BETWEEN_RETRIES_IN_SECONDS);
+  }
+
+  public static int sendSegmentUri(final String host, final String port, final String uri, final int maxRetries,
+      final int sleepTimeSec) {
+    for (int numRetries = 0; ; numRetries++) {
+      try {
+        return sendSegmentUriImpl(host, port, uri);
+      } catch (Exception e) {
+        if (numRetries >= maxRetries) {
+          Utils.rethrowException(e);
+        }
+        try {
+          Thread.sleep(sleepTimeSec * 1000);
+        } catch (Exception e1) {
+          LOGGER.error("Upload of URI " + uri + " to host " + host + " interrupted while waiting to retry after error");
+          Utils.rethrowException(e1);
+        }
+      }
+    }
+  }
+
+  private static int sendSegmentUriImpl(final String host, final String port, final String uri) {
     SendFileMethod httpMethod = SendFileMethod.POST;
     EntityEnclosingMethod method = null;
     try {
@@ -152,6 +204,30 @@ public class FileUploadUtils {
   }
 
   public static int sendSegmentJson(final String host, final String port, final JSONObject segmentJson) {
+    return sendSegmentJson(host, port, segmentJson, MAX_RETRIES, SLEEP_BETWEEN_RETRIES_IN_SECONDS);
+  }
+
+  public static int sendSegmentJson(final String host, final String port, final JSONObject segmentJson,
+      final int maxRetries, final int sleepTimeSec) {
+    for (int numRetries = 0; ; numRetries++) {
+      try {
+        return sendSegmentJsonImpl(host, port, segmentJson);
+      } catch (Exception e) {
+        if (numRetries >= maxRetries) {
+          Utils.rethrowException(e);
+        }
+        try {
+          Thread.sleep(sleepTimeSec * 1000);
+        } catch (Exception e1) {
+          LOGGER.error("Upload of JSON " + " to host " + host + " interrupted while waiting to retry after error");
+          Utils.rethrowException(e1);
+        }
+      }
+    }
+  }
+
+
+  public static int sendSegmentJsonImpl(final String host, final String port, final JSONObject segmentJson) {
     PostMethod postMethod = null;
     try {
       RequestEntity requestEntity = new StringRequestEntity(

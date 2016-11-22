@@ -17,41 +17,45 @@ package com.linkedin.pinot.core.plan;
 
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.aggregation.groupby.AggregationGroupByOperator;
 import com.linkedin.pinot.core.startree.hll.HllConstants;
-
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * AggregationGroupByOperatorPlanNode takes care of how to apply multiple aggregation
- * functions and groupBy query to an IndexSegment.
+ * The <code>AggregationGroupByPlanNode</code> class provides the execution plan for aggregation group-by query on a
+ * single segment.
  */
 public class AggregationGroupByPlanNode implements PlanNode {
-  private static final Logger LOGGER = LoggerFactory.getLogger("QueryPlanLog");
-  private final IndexSegment _indexSegment;
-  private final BrokerRequest _brokerRequest;
-  private int _numAggrGroupsLimit;
-  private final ProjectionPlanNode _projectionPlanNode;
+  private static final Logger LOGGER = LoggerFactory.getLogger(AggregationGroupByPlanNode.class);
 
-  public AggregationGroupByPlanNode(IndexSegment indexSegment, BrokerRequest query, int numAggrGroupsLimit) {
+  private final IndexSegment _indexSegment;
+  private final List<AggregationInfo> _aggregationInfos;
+  private final GroupBy _groupBy;
+  private final ProjectionPlanNode _projectionPlanNode;
+  private final int _numAggrGroupsLimit;
+
+  public AggregationGroupByPlanNode(IndexSegment indexSegment, BrokerRequest brokerRequest, int numAggrGroupsLimit) {
     _indexSegment = indexSegment;
-    _brokerRequest = query;
+    _aggregationInfos = brokerRequest.getAggregationsInfo();
+    _groupBy = brokerRequest.getGroupBy();
     _numAggrGroupsLimit = numAggrGroupsLimit;
     _projectionPlanNode = new ProjectionPlanNode(_indexSegment, getAggregationGroupByRelatedColumns(),
-        new DocIdSetPlanNode(_indexSegment, _brokerRequest, 5000));
+        new DocIdSetPlanNode(_indexSegment, brokerRequest, 5000));
   }
 
   private String[] getAggregationGroupByRelatedColumns() {
     Set<String> aggregationGroupByRelatedColumns = new HashSet<>();
-    for (AggregationInfo aggregationInfo : _brokerRequest.getAggregationsInfo()) {
+    for (AggregationInfo aggregationInfo : _aggregationInfos) {
       if (aggregationInfo.getAggregationType().equalsIgnoreCase("count")) {
         continue;
       }
@@ -61,24 +65,25 @@ public class AggregationGroupByPlanNode implements PlanNode {
         aggregationGroupByRelatedColumns.add(columns + HllConstants.DEFAULT_HLL_DERIVE_COLUMN_SUFFIX);
       }
     }
-    aggregationGroupByRelatedColumns.addAll(_brokerRequest.getGroupBy().getColumns());
+    aggregationGroupByRelatedColumns.addAll(_groupBy.getColumns());
     return aggregationGroupByRelatedColumns.toArray(new String[aggregationGroupByRelatedColumns.size()]);
   }
 
   @Override
   public Operator run() {
     MProjectionOperator projectionOperator = (MProjectionOperator) _projectionPlanNode.run();
-    return new AggregationGroupByOperator(_brokerRequest.getAggregationsInfo(), _brokerRequest.getGroupBy(), projectionOperator, _numAggrGroupsLimit,
+    return new AggregationGroupByOperator(_aggregationInfos, _groupBy, projectionOperator, _numAggrGroupsLimit,
         _indexSegment.getSegmentMetadata().getTotalRawDocs());
   }
 
   @Override
   public void showTree(String prefix) {
-    LOGGER.debug(prefix + "Inner-Segment Plan Node :");
-    LOGGER.debug(prefix + "Operator: MAggregationGroupByOperator");
-    LOGGER.debug(prefix + "Argument 0: Projection - ");
+    LOGGER.debug(prefix + "Segment Level Inner-Segment Plan Node:");
+    LOGGER.debug(prefix + "Operator: AggregationGroupByOperator");
+    LOGGER.debug(prefix + "Argument 0: IndexSegment - " + _indexSegment.getSegmentName());
+    LOGGER.debug(prefix + "Argument 1: Aggregations - " + _aggregationInfos);
+    LOGGER.debug(prefix + "Argument 2: GroupBy - " + _groupBy);
+    LOGGER.debug(prefix + "Argument 3: Projection -");
     _projectionPlanNode.showTree(prefix + "    ");
-    LOGGER.debug(prefix + "Argument 1: AggregationGroupBy");
   }
-
 }

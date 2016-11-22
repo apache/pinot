@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.datalayer.dao;
 
+import com.linkedin.thirdeye.datalayer.entity.OverrideConfigIndex;
+import com.linkedin.thirdeye.datalayer.pojo.OverrideConfigBean;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -92,10 +94,14 @@ public class GenericPojoDao {
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, MetricConfigIndex.class));
     pojoInfoMap.put(DashboardConfigBean.class,
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, DashboardConfigIndex.class));
+
     pojoInfoMap.put(IngraphDashboardConfigBean.class,
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, IngraphDashboardConfigIndex.class));
     pojoInfoMap.put(IngraphMetricConfigBean.class,
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, IngraphMetricConfigIndex.class));
+
+    pojoInfoMap.put(OverrideConfigBean.class,
+        newPojoInfo(DEFAULT_BASE_TABLE_NAME, OverrideConfigIndex.class));
   }
 
   private static PojoInfo newPojoInfo(String baseTableName,

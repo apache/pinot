@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.operator.aggregation.groupby;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.utils.Pairs.IntObjectPair;
 import com.linkedin.pinot.core.util.IntObjectIndexedPriorityQueue;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
@@ -24,12 +25,13 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
  * Result Holder implemented using ObjectArray.
  */
 public class ObjectGroupByResultHolder implements GroupByResultHolder {
-  private Object[] _resultArray;
-  private int _resultHolderCapacity;
-  private int _maxCapacity;
+  private final int _maxCapacity;
+  private final int _trimSize;
   private final boolean _minHeap;
 
+  private int _resultHolderCapacity;
   private StorageMode _storageMode;
+  private Object[] _resultArray;
   private Int2ObjectOpenHashMap _resultMap;
   private IntObjectIndexedPriorityQueue _priorityQueue;
 
@@ -38,13 +40,15 @@ public class ObjectGroupByResultHolder implements GroupByResultHolder {
    *
    * @param initialCapacity Initial capacity of result holder
    * @param maxCapacity Max capacity of result holder
+   * @param trimSize maximum number of groups returned after trimming.
    * @param minOrder Min ordering for trim (in case of min aggregation functions)
    */
-  public ObjectGroupByResultHolder(int initialCapacity, int maxCapacity, boolean minOrder) {
+  public ObjectGroupByResultHolder(int initialCapacity, int maxCapacity, int trimSize, boolean minOrder) {
     _resultArray = new Object[initialCapacity];
     _resultHolderCapacity = initialCapacity;
     _storageMode = StorageMode.ARRAY_STORAGE;
     _maxCapacity = maxCapacity;
+    _trimSize = trimSize;
     _minHeap = !minOrder; // Max order requires minHeap for trimming results, and vice-versa
 
     _resultMap = null;
@@ -55,9 +59,10 @@ public class ObjectGroupByResultHolder implements GroupByResultHolder {
    *
    * @param initialCapacity Initial capacity of result holder
    * @param maxCapacity Max capacity of result holder
+   * @param trimSize maximum number of groups returned after trimming.
    */
-  public ObjectGroupByResultHolder(int initialCapacity, int maxCapacity) {
-    this(initialCapacity, maxCapacity, false /* minOrdering */);
+  public ObjectGroupByResultHolder(int initialCapacity, int maxCapacity, int trimSize) {
+    this(initialCapacity, maxCapacity, trimSize, false /* minOrdering */);
   }
 
   /**
@@ -67,13 +72,15 @@ public class ObjectGroupByResultHolder implements GroupByResultHolder {
    */
   @Override
   public void ensureCapacity(int capacity) {
+    Preconditions.checkArgument(capacity <= _maxCapacity);
+
     // Nothing to be done for map mode.
     if (_storageMode == StorageMode.MAP_STORAGE) {
       return;
     }
 
     // If object is not comparable, we cannot use a priority queue and cannot compare.
-    if (capacity > _maxCapacity && (_resultArray[0] instanceof Comparable)) {
+    if (capacity > _trimSize && (_resultArray[0] instanceof Comparable)) {
       switchToMapMode(capacity);
       return;
     }
@@ -139,24 +146,17 @@ public class ObjectGroupByResultHolder implements GroupByResultHolder {
   /**
    * {@inheritDoc}
    *
-   * Keys with 'lowest' values (as per the sort order) are trimmed away to reduce the
-   * size to _maxCapacity.
+   * Keys with 'lowest' values (as per the sort order) are trimmed away to reduce the size to _trimSize.
    *
-   * @param targetSize Target size to trim the result set to.
    * @return Array of keys that were trimmed.
    */
   @Override
-  public int[] trimResults(int targetSize) {
+  public int[] trimResults() {
     if (_storageMode == StorageMode.ARRAY_STORAGE) {
       return EMPTY_ARRAY; // Still in array mode, trimming has not kicked in yet.
     }
 
-    int size = _resultMap.size();
-    if (size <= _maxCapacity) {
-      return EMPTY_ARRAY;
-    }
-
-    int numKeysToRemove = size - targetSize;
+    int numKeysToRemove = _resultMap.size() - _trimSize;
     int[] removedGroupKeys = new int[numKeysToRemove];
 
     for (int i = 0; i < numKeysToRemove; i++) {

@@ -75,8 +75,7 @@ public interface GroupByResultHolder {
 
   /**
    * Trim the results to a pre-specified size.
-   * @param targetSize Target size to trim the result set to.
    * @return List of group keys that were removed.
    */
-  int[] trimResults(int targetSize);
+  int[] trimResults();
 }

@@ -33,6 +33,8 @@ import java.io.File;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.helix.ZNRecord;
@@ -121,12 +123,13 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     _tableDataManagerMap.put(tableName, tableDataManager);
   }
 
-  public Collection<TableDataManager> getTableDataManagers() {
+  @Override
+  public @Nonnull Collection<TableDataManager> getTableDataManagers() {
     return _tableDataManagerMap.values();
   }
 
   @Override
-  public TableDataManager getTableDataManager(String tableName) {
+  public @Nullable TableDataManager getTableDataManager(String tableName) {
     return _tableDataManagerMap.get(tableName);
   }
 

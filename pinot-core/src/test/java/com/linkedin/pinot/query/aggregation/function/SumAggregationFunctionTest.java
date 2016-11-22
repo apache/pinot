@@ -96,7 +96,7 @@ public class SumAggregationFunctionTest {
 
     SumAggregationFunction sumAggregationFunction = new SumAggregationFunction();
     GroupByResultHolder resultHolder =
-        ResultHolderFactory.getGroupByResultHolder(sumAggregationFunction, MAX_NUM_GROUP_KEYS);
+        ResultHolderFactory.getGroupByResultHolder(sumAggregationFunction, MAX_NUM_GROUP_KEYS, MAX_NUM_GROUP_KEYS);
 
     sumAggregationFunction.aggregateGroupBySV(NUM_VALUES_TO_AGGREGATE, groupKeysForValues, resultHolder,
         valuesToAggregate);

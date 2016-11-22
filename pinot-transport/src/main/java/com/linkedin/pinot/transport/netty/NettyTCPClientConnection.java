@@ -183,11 +183,10 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
      * can be treated as single timeout condition and handled in the same way
      */
     _lastRequestTimeout = _timer.newTimeout(new ReadTimeoutHandler(), _lastRequestTimeoutMS, TimeUnit.MILLISECONDS);
-    ChannelFuture f = null;
     try {
 
       _connState = State.REQUEST_WRITTEN;
-      f = _channel.writeAndFlush(serializedRequest);
+      _channel.writeAndFlush(serializedRequest);
       /**
        * IMPORTANT:
        * There could be 2 netty threads one running the below code and another for response/error handling.
