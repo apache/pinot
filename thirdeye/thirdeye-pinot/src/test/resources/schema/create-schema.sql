@@ -201,3 +201,15 @@ ALTER TABLE `ingraph_dashboard_config_index` ADD UNIQUE `ingraph_dashboard_confi
 create index ingraph_dashboard_config_name_idx on ingraph_dashboard_config_index(name);
 create index ingraph_dashboard_config_bootstrap_idx on ingraph_dashboard_config_index(bootstrap);
 
+
+create table if not exists override_config_index (
+    start_time bigint(20) NOT NULL,
+    end_time bigint(20) NOT NULL,
+    target_entity varchar(100) NOT NULL,
+    active boolean default false,
+    base_id bigint(20) not null,
+    create_time timestamp,
+    update_time timestamp default current_timestamp,
+    version int(10)
+) ENGINE=InnoDB;
+create index override_config_target_entity_idx on override_config_index(target_entity);

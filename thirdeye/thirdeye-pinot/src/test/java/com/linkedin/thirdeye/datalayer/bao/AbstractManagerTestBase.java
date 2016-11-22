@@ -1,13 +1,19 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
 import com.google.common.collect.Lists;
+import com.linkedin.thirdeye.anomaly.override.OverrideConfigHelper;
 import com.linkedin.thirdeye.api.DimensionMap;
+import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 
 import java.io.File;
 import java.io.FileReader;
 import java.net.URL;
 import java.sql.Connection;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.tomcat.jdbc.pool.DataSource;
@@ -45,6 +51,7 @@ public abstract class AbstractManagerTestBase {
   protected DashboardConfigManager dashboardConfigDAO;
   protected IngraphDashboardConfigManager ingraphDashboardConfigDAO;
   protected IngraphMetricConfigManager ingraphMetricConfigDAO;
+  protected OverrideConfigManager overrideConfigDAO;
 
   private ManagerProvider managerProvider;
   private PersistenceConfig configuration;
@@ -139,6 +146,8 @@ public abstract class AbstractManagerTestBase {
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.IngraphDashboardConfigManagerImpl.class);
     ingraphMetricConfigDAO = (IngraphMetricConfigManager) managerProvider
             .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.IngraphMetricConfigManagerImpl.class);
+    overrideConfigDAO = (OverrideConfigManager) managerProvider
+        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.OverrideConfigManagerImpl.class);
   }
 
   @AfterClass(alwaysRun = true)
@@ -254,5 +263,25 @@ public abstract class AbstractManagerTestBase {
     ingraphDashboardConfigDTO.setBootstrapStartTime(now.getMillis());
     ingraphDashboardConfigDTO.setBootstrapEndTime(now.minusDays(30).getMillis());
     return ingraphDashboardConfigDTO;
+  }
+
+  protected OverrideConfigDTO getTestOverrideConfigForTimeSeries(DateTime now) {
+    OverrideConfigDTO overrideConfigDTO = new OverrideConfigDTO();
+    overrideConfigDTO.setStartTime(now.minusHours(8).getMillis());
+    overrideConfigDTO.setEndTime(now.plusHours(8).getMillis());
+    overrideConfigDTO.setTargetEntity(OverrideConfigHelper.ENTITY_TIME_SERIES);
+    overrideConfigDTO.setActive(true);
+
+    Map<String, String> overrideProperties = new HashMap<>();
+    overrideProperties.put("scaling_factor", "1.2");
+    overrideConfigDTO.setOverrideProperties(overrideProperties);
+
+    Map<String, List<String>> overrideTarget = new HashMap<>();
+    overrideTarget.put(OverrideConfigHelper.TARGET_COLLECTION, Arrays.asList("collection1",
+        "collection2"));
+    overrideTarget.put(OverrideConfigHelper.EXCLUDED_COLLECTION, Arrays.asList("collection3"));
+    overrideConfigDTO.setTargetLevel(overrideTarget);
+
+    return overrideConfigDTO;
   }
 }
