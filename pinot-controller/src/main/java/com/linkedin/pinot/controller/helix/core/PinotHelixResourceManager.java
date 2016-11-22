@@ -15,9 +15,6 @@
  */
 package com.linkedin.pinot.controller.helix.core;
 
-import com.google.common.base.Function;
-import com.linkedin.pinot.common.utils.retry.RetryPolicies;
-import com.linkedin.pinot.common.utils.retry.RetryPolicy;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -52,6 +49,7 @@ import org.codehaus.jackson.map.JsonMappingException;
 import org.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
@@ -86,6 +84,8 @@ import com.linkedin.pinot.common.utils.TenantRole;
 import com.linkedin.pinot.common.utils.ZkUtils;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.helix.PinotHelixPropertyStoreZnRecordProvider;
+import com.linkedin.pinot.common.utils.retry.RetryPolicies;
+import com.linkedin.pinot.common.utils.retry.RetryPolicy;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.api.pojos.Instance;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse.ResponseStatus;
@@ -1149,22 +1149,26 @@ public class PinotHelixResourceManager {
 
   private void handleBrokerResource(AbstractTableConfig tableConfig) {
     try {
-      String brokerTenant =
+      final String brokerTenant =
           ControllerTenantNameBuilder.getBrokerTenantNameForTenant(tableConfig.getTenantConfig().getBroker());
       if (_helixAdmin.getInstancesInClusterWithTag(_helixClusterName, brokerTenant).isEmpty()) {
         throw new RuntimeException("broker tenant : " + tableConfig.getTenantConfig().getBroker() + " does not exist");
       }
       LOGGER.info("Trying to update BrokerDataResource IdealState!");
-      final IdealState idealState =
-          _helixAdmin.getResourceIdealState(_helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
-      String tableName = tableConfig.getTableName();
-      for (String instanceName : _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, brokerTenant)) {
-        idealState.setPartitionState(tableName, instanceName, BrokerOnlineOfflineStateModel.ONLINE);
-      }
-      if (idealState != null) {
-        _helixAdmin
-            .setResourceIdealState(_helixClusterName, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, idealState);
-      }
+      final String tableName = tableConfig.getTableName();
+      HelixHelper.updateIdealState(_helixZkManager, CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, new Function<IdealState, IdealState>() {
+        @Nullable
+        @Override
+        public IdealState apply(@Nullable IdealState idealState) {
+          if (idealState == null) {
+            throw new RuntimeException("idealstate not set up for " + CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+          }
+          for (String instanceName : _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, brokerTenant)) {
+            idealState.setPartitionState(tableName, instanceName, BrokerOnlineOfflineStateModel.ONLINE);
+          }
+          return idealState;
+        }
+      }, RetryPolicies.exponentialBackoffRetryPolicy(5, 500L, 2.0f));
     } catch (final Exception e) {
       LOGGER.warn("Caught exception while creating broker", e);
     }
