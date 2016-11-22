@@ -16,8 +16,6 @@
 package com.linkedin.pinot.common.segment;
 
 import java.util.List;
-import java.util.Map;
-import javax.annotation.Nullable;
 
 
 /**
@@ -31,8 +29,6 @@ public class StarTreeMetadata {
 
   private long _maxLeafRecords;
   private long _skipMaterializationCardinality;
-
-  private Map<String, String> _hllOriginToDerivedColumnMap;
 
   public StarTreeMetadata() {
   }
@@ -75,14 +71,5 @@ public class StarTreeMetadata {
 
   public void setSkipMaterializationForDimensions(List<String> skipMaterializationForDimensions) {
     _skipMaterializationForDimensions = skipMaterializationForDimensions;
-  }
-
-  @Nullable
-  public String getDerivedHllColumnFromOrigin(String originColumn) {
-    return _hllOriginToDerivedColumnMap.get(originColumn);
-  }
-
-  public void setHllOriginToDerivedColumnMap(Map<String, String> hllOriginToDerivedColumnMap) {
-    _hllOriginToDerivedColumnMap = hllOriginToDerivedColumnMap;
   }
 }

@@ -61,9 +61,6 @@ public class AggregationGroupByPlanNode implements PlanNode {
       }
       String columns = aggregationInfo.getAggregationParams().get("column").trim();
       aggregationGroupByRelatedColumns.addAll(Arrays.asList(columns.split(",")));
-      if (aggregationInfo.getAggregationType().equalsIgnoreCase("fasthll")) {
-        aggregationGroupByRelatedColumns.add(columns + HllConstants.DEFAULT_HLL_DERIVE_COLUMN_SUFFIX);
-      }
     }
     aggregationGroupByRelatedColumns.addAll(_groupBy.getColumns());
     return aggregationGroupByRelatedColumns.toArray(new String[aggregationGroupByRelatedColumns.size()]);

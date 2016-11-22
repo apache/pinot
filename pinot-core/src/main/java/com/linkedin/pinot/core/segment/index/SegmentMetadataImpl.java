@@ -85,6 +85,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private String _creatorName;
   private char _paddingCharacter = V1Constants.Str.DEFAULT_STRING_PAD_CHAR;
   private int _hllLog2m = HllConstants.DEFAULT_LOG2M;
+  private final Map<String, String> _hllDerivedColumnMap = new HashMap<>();
 
   public SegmentMetadataImpl(File indexDir) throws ConfigurationException, IOException {
     LOGGER.debug("SegmentMetadata location: {}", indexDir);
@@ -284,28 +285,27 @@ public class SegmentMetadataImpl implements SegmentMetadata {
       }
     }
 
-    // Column Metadata
-    for (final String column : _allColumns) {
-      _columnMetadataMap.put(column,
-          ColumnMetadata.fromPropertiesConfiguration(column, _segmentMetadataPropertiesConfiguration));
-    }
-
-    // Segment Name
+    // Set segment name.
     _segmentName = _segmentMetadataPropertiesConfiguration.getString(Segment.SEGMENT_NAME);
 
-    // Set hll log2m
+    // Set hll log2m.
     _hllLog2m = _segmentMetadataPropertiesConfiguration.getInt(Segment.SEGMENT_HLL_LOG2M, HllConstants.DEFAULT_LOG2M);
 
-    // StarTree config here
-    _hasStarTree = _segmentMetadataPropertiesConfiguration.getBoolean(
-        MetadataKeys.StarTree.STAR_TREE_ENABLED, false);
-    if (_hasStarTree) {
-      initStarTreeMetadata();
+    // Build column metadata map, schema and hll derived column map.
+    for (String column : _allColumns) {
+      ColumnMetadata columnMetadata =
+          ColumnMetadata.fromPropertiesConfiguration(column, _segmentMetadataPropertiesConfiguration);
+      _columnMetadataMap.put(column, columnMetadata);
+      _schema.addField(columnMetadata.getFieldSpec());
+      if (columnMetadata.getDerivedMetricType() == MetricFieldSpec.DerivedMetricType.HLL) {
+        _hllDerivedColumnMap.put(columnMetadata.getOriginColumnName(), columnMetadata.getColumnName());
+      }
     }
 
-    // Build Schema
-    for (final String column : _columnMetadataMap.keySet()) {
-      _schema.addField(_columnMetadataMap.get(column).getFieldSpec());
+    // Build star-tree metadata.
+    _hasStarTree = _segmentMetadataPropertiesConfiguration.getBoolean(MetadataKeys.StarTree.STAR_TREE_ENABLED, false);
+    if (_hasStarTree) {
+      initStarTreeMetadata();
     }
   }
 
@@ -314,23 +314,6 @@ public class SegmentMetadataImpl implements SegmentMetadata {
    */
   private void initStarTreeMetadata() {
     _starTreeMetadata = new StarTreeMetadata();
-
-    // Build Derived Column Map
-    Map<String, String> hllOriginToDerivedColumnMap = new HashMap<>();
-    for (final ColumnMetadata columnMetadata : _columnMetadataMap.values()) {
-      MetricFieldSpec.DerivedMetricType derivedMetricType = columnMetadata.getDerivedMetricType();
-      if (derivedMetricType != null) {
-        switch (derivedMetricType) {
-          case HLL:
-            hllOriginToDerivedColumnMap.put(columnMetadata.getOriginColumnName(), columnMetadata.getColumnName());
-            break;
-          default:
-            throw new IllegalArgumentException(
-                columnMetadata.getDerivedMetricType() + " type is not supported in building derived columns.");
-        }
-      }
-    }
-    _starTreeMetadata.setHllOriginToDerivedColumnMap(hllOriginToDerivedColumnMap);
 
     // Set the maxLeafRecords
     String maxLeafRecordsString =
@@ -533,6 +516,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     return _hasStarTree;
   }
 
+  @Nullable
   @Override
   public StarTreeMetadata getStarTreeMetadata() {
     return _starTreeMetadata;
@@ -568,17 +552,31 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     return column + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION;
   }
 
-  @Nullable @Override public String getCreatorName() {
+  @Nullable
+  @Override
+  public String getCreatorName() {
     return _creatorName;
   }
 
-  @Override public Character getPaddingCharacter() {
+  @Override
+  public char getPaddingCharacter() {
     return _paddingCharacter;
   }
 
   @Override
   public int getHllLog2m() {
     return _hllLog2m;
+  }
+
+  @Nullable
+  @Override
+  public String getDerivedColumn(String column, MetricFieldSpec.DerivedMetricType derivedMetricType) {
+    switch (derivedMetricType) {
+      case HLL:
+        return _hllDerivedColumnMap.get(column);
+      default:
+        throw new IllegalArgumentException();
+    }
   }
 
   /**

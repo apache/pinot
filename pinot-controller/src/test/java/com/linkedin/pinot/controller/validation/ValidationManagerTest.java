@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.validation;
 
+import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.util.ArrayList;
@@ -541,6 +542,7 @@ public class ValidationManagerTest {
       return false;
     }
 
+    @Nullable
     @Override
     public StarTreeMetadata getStarTreeMetadata() {
       return null;
@@ -564,18 +566,26 @@ public class ValidationManagerTest {
       return null;
     }
 
-    @Nullable @Override public String getCreatorName() {
+    @Nullable
+    @Override
+    public String getCreatorName() {
       return null;
     }
 
     @Override
-    public Character getPaddingCharacter() {
+    public char getPaddingCharacter() {
       return V1Constants.Str.DEFAULT_STRING_PAD_CHAR;
     }
 
     @Override
     public int getHllLog2m() {
       return HllConstants.DEFAULT_LOG2M;
+    }
+
+    @Nullable
+    @Override
+    public String getDerivedColumn(String column, MetricFieldSpec.DerivedMetricType derivedMetricType) {
+      return null;
     }
   }
 }
