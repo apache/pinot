@@ -418,6 +418,7 @@
 
   Context.prototype.pushState = function() {
     page.len++;
+    console.log("Pushing state:"+ this.path);
     history.pushState(this.state, this.title, hashbang && this.path !== '/' ? '#!' + this.path : this.canonicalPath);
   };
 

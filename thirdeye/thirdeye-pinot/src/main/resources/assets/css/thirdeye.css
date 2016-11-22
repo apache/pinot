@@ -2,7 +2,7 @@ body {
 	font-family: SourceSansPro, sans-serif;
 	font-size: 14px;
 	background-color: #F3F6F8;
-	color: #000000;
+	color:#080808
 }
 
 .label-large-light {
@@ -10,6 +10,7 @@ body {
 	font-size: 23px;
 	margin-top: 5px;
 }
+
 .label-medium-light {
 	font-weight: 100;
 	font-size: 15px;
@@ -33,9 +34,6 @@ body {
 	font-size: 13px;
 }
 
-.container-fluid {
-	
-}
 /* Underline From Center */
 .hvr-underline-from-center {
 	display: inline-block;
@@ -73,6 +71,12 @@ body {
 	right: 0;
 }
 
+#main-tabs .active {
+	border-bottom: 4px solid #ffffff;
+	background-color: #080808;
+	
+}
+
 .navbar {
 	margin-bottom: 0px;
 	border-bottom: 1px solid #ccc;
@@ -80,14 +84,14 @@ body {
 
 .navbar-inverse {
 	background-image: none;
-	background-color: #222222;
+	background-color: #080808;
 	margin-bottom: 0px;
 	border: 0px;
 }
 
 .navbar-inverse .navbar-inner {
 	background-image: none;
-	background-color: #222222;
+	background-color: #080808;
 }
 
 .dashboard-tabs li.active a {
@@ -100,7 +104,7 @@ body {
 }
 
 .bg-black {
-	background-color: #222222;
+	background-color: #080808;
 }
 
 .underlined-input {
@@ -175,7 +179,6 @@ hr {
 }
 
 /* dashboard table css*/
-
 .dashboard-table>thead>tr>th, .dashboard-table>tbody>tr>th,
 	.dashboard-table>tfoot>tr>th, .dashboard-table>thead>tr>td,
 	.dashboard-table>tbody>tr>td, .dashboard-table>tfoot>tr>td {
@@ -193,9 +196,10 @@ hr {
 .info-table {
 	border: 1px solid #ccc
 }
-.info-table>thead>tr>th, .info-table>tbody>tr>th,
-	.info-table>tfoot>tr>th, .info-table>thead>tr>td,
-	.info-table>tbody>tr>td, .info-table>tfoot>tr>td {
+
+.info-table>thead>tr>th, .info-table>tbody>tr>th, .info-table>tfoot>tr>th,
+	.info-table>thead>tr>td, .info-table>tbody>tr>td, .info-table>tfoot>tr>td
+	{
 	border: none;
 }
 
@@ -242,9 +246,11 @@ hr {
 	background-color: #F3F6F8;
 	border: none !important;
 }
-.table-borderless td, .table-borderless th{
+
+.table-borderless td, .table-borderless th {
 	border: none !important;
 }
+
 .time-range {
 	font-weight: 300;
 	font-size: 15px;
@@ -264,14 +270,14 @@ hr {
 
 /* heatmap background colors*/
 .heatmap {
-  display: block;
-  margin: auto;
+	display: block;
+	margin: auto;
 }
 
 text {
-  font-size: 11px;
+	font-size: 11px;
 }
 
 rect {
-  fill: none;
+	fill: none;
 }

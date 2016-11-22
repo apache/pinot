@@ -46,7 +46,6 @@
 <script src="../../assets/js/thirdeye/metric-config.js"></script>
 <script src="../../assets/js/thirdeye/dataset-config.js"></script>
 <script src="../../assets/js/thirdeye/job-info.js"></script>
-<script src="../../assets/js/thirdeye/anomalies.js"></script>
 
 <script src="../../../assets/js/lib/common/utility.js" defer></script>
 
@@ -55,9 +54,6 @@
 <script src="../../../assets/jsonedit/jsoneditor.min.js" defer></script>
 <script src="../../../assets/js/lib/entity-editor.js"></script>
 
-
-<script src="../../assets/js/thirdeye/analysis.js"></script>
-<script src="../../assets/js/thirdeye/dashboard.js"></script>
 <script id="anomalies-template" type="text/x-handlebars-template">
   <#include "tabs/anomalies.ftl"/>
 </script>
@@ -110,14 +106,14 @@
 							</button>
 							<a class="navbar-brand" href="#dashboard" data-toggle="tab">ThirdEye</a>
 						</div>
-						<div id="navbar" class="collapse navbar-collapse">
-							<ul id="main-tabs" class="nav navbar-nav">
-								<li class=""><a class="hvr-underline-from-center" href="#dashboard" data-toggle="tab">Dashboard</a></li>
-								<li class=""><a class="hvr-underline-from-center" href="#anomalies" data-toggle="tab">Anomalies</a></li>
-								<li class=""><a class="hvr-underline-from-center" href="#analysis" data-toggle="tab">Root Cause Analysis</a></li>
+						<div id="main-tabs" class="collapse navbar-collapse">
+							<ul class="nav navbar-nav">
+								<li class=""><a href="#dashboard" data-toggle="tab">Dashboard</a></li>
+								<li class=""><a href="#anomalies" data-toggle="tab">Anomalies</a></li>
+								<li class=""><a href="#analysis" data-toggle="tab">Root Cause Analysis</a></li>
 							</ul>
 
-							<ul id="admin-tabs" class="nav navbar-nav navbar-right">
+							<ul class="nav navbar-nav navbar-right">
 								<li><a href="#">Manage Anomalies</a></li>
 								<li class="dropdown"><a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Admin <span class="caret"></span></a>
 									<ul class="dropdown-menu">

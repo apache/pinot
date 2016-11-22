@@ -176,8 +176,6 @@ function renderHeatmapSection() {
   data = JSON.parse('{"t":"0", "children":[{"t":"010","value":100},{"t":"011","value":50},{"t":"012","value":5},{"t":"013","value":25}]}');
   var height = $('#browser-heatmap-placeholder').height();
   var width = $('#browser-heatmap-placeholder').width();
-  console.log("height: " + height);
-  console.log("width: " + width);
 
   var dimensions = [ "browser", "country", "device" ];
   for (i = 0; i < dimensions.length; i++) {
@@ -197,8 +195,6 @@ function renderHeatmapSection() {
     var nodes = treeMap.nodes(data).filter(function(d) {
       return !d.children;
     });
-    console.log("nodes:")
-    console.log(nodes);
     var cell = div.selectAll("g").data(nodes).enter().append("svg:g").attr("class", "cell").attr("transform", function(d) {
       return "translate(" + d.x + "," + d.y + ")";
     }).on("click", function(d) {
