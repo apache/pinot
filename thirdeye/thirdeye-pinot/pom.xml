@@ -150,18 +150,20 @@
       <artifactId>EvalEx</artifactId>
     </dependency>
 
-    <!-- Teradata dependency -->
-    <dependency>
-      <groupId>com.teradata.jdbc</groupId>
-      <artifactId>tdgssconfig</artifactId>
-      <version>15.10.00.22</version>
-    </dependency>
+    <!-- Teradata runtime dependency-->
+    <!-- Install Teradata driver jars to local repository and uncomment this block to use Teradata API-->
 
-    <dependency>
-      <groupId>com.teradata.jdbc</groupId>
-      <artifactId>terajdbc4</artifactId>
-      <version>15.10.00.22</version>
-    </dependency>
+    <!--<dependency>-->
+      <!--<groupId>com.teradata.jdbc</groupId>-->
+      <!--<artifactId>tdgssconfig</artifactId>-->
+      <!--<version>15.10.00.22</version>-->
+    <!--</dependency>-->
+
+    <!--<dependency>-->
+      <!--<groupId>com.teradata.jdbc</groupId>-->
+      <!--<artifactId>terajdbc4</artifactId>-->
+      <!--<version>15.10.00.22</version>-->
+    <!--</dependency>-->
 
     <!-- test dependencies -->
     <dependency>
