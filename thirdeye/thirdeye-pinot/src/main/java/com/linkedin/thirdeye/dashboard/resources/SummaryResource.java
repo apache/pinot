@@ -25,10 +25,8 @@ import com.linkedin.thirdeye.client.diffsummary.Dimensions;
 import com.linkedin.thirdeye.client.diffsummary.OLAPDataBaseClient;
 import com.linkedin.thirdeye.client.diffsummary.PinotThirdEyeSummaryClient;
 import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 import com.linkedin.thirdeye.dashboard.views.diffsummary.Summary;
 import com.linkedin.thirdeye.dashboard.views.diffsummary.SummaryResponse;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 
 @Path(value = "/dashboard")
@@ -60,16 +58,7 @@ public class SummaryResource {
     if (summarySize < 1) summarySize = 1;
 
     SummaryResponse response = null;
-//    String derivedMetricName = null;
     try {
-//      CollectionConfig collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().getIfPresent(collection);
-//      if (collectionConfig != null && collectionConfig.getDerivedMetrics() != null
-//          && collectionConfig.getDerivedMetrics().containsKey(metric)) {
-//        derivedMetricName = collectionConfig.getDerivedMetrics().get(metric);
-//      } else {
-//        derivedMetricName = metric;
-//      }
-//      List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(derivedMetricName, MetricAggFunction.SUM,collection);
     List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metric, MetricAggFunction.SUM,collection);
 
       OLAPDataBaseClient olapClient = new PinotThirdEyeSummaryClient(CACHE_REGISTRY_INSTANCE.getQueryCache());
@@ -100,6 +89,7 @@ public class SummaryResource {
     } catch (Exception e) {
       LOG.error("Exception while generating difference summary", e);
       response = SummaryResponse.buildNotAvailableResponse();
+      response.setMetricName(metric);
     }
     return OBJECT_MAPPER.writeValueAsString(response);
   }
@@ -121,12 +111,6 @@ public class SummaryResource {
 
     SummaryResponse response = null;
     try {
-//      collection = ThirdEyeUtils.getCollectionFromAlias(collection);
-//      CollectionConfig collectionConfig = CACHE_REGISTRY_INSTANCE.getCollectionConfigCache().getIfPresent(collection);
-//      if (collectionConfig != null && collectionConfig.getDerivedMetrics() != null
-//          && collectionConfig.getDerivedMetrics().containsKey(metric)) {
-//        metric = collectionConfig.getDerivedMetrics().get(metric);
-//      }
       List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metric, MetricAggFunction.SUM, collection);
 
       OLAPDataBaseClient olapClient = new PinotThirdEyeSummaryClient(CACHE_REGISTRY_INSTANCE.getQueryCache());

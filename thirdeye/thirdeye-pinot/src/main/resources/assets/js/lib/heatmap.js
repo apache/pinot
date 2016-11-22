@@ -290,18 +290,17 @@ function renderD3heatmap(data, tab, templatePlaceHolder) {
 }
 
 function renderHeatMapSummary(summaryData){
-
-    if (summaryData.responseRows == 0) {
-
-        var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
-        warning.append($('<p></p>', { html: 'There is no data available for this request.'  }))
-        $("#difference-summary" + summaryData.metricName).html(warning)
-        return
-    }
-
     var data = {summaryData : summaryData}
     var result_treemap_summary_template = HandleBarsTemplates.template_treemap_summary(data)
-    $("#difference-summary-" + summaryData.metricName).html(result_treemap_summary_template);
+    if (summaryData.responseRows == 0) {
+        var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' })
+        warning.append($('<p></p>', { html: 'Data is not complete (e.g., Pinot segment is missing)'
+        + ' in order to explain the difference.'}))
+        $("#difference-summary-" + summaryData.metricName).html(
+            result_treemap_summary_template).append(warning)
+    } else {
+        $("#difference-summary-" + summaryData.metricName).html(result_treemap_summary_template);
+    }
 
     //Create dataTable instance of summary table
     $("#heat-map-" + summaryData.metricName +"-difference-summary-table").DataTable({
