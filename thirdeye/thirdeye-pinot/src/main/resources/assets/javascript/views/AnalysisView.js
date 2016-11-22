@@ -1,3 +1,20 @@
+function AnalysisView() {
+
+}
+
+AnalysisView.prototype = {
+
+  init : function() {
+
+  },
+
+  render : function() {
+    var result_analysis_template_compiled = analysis_template_compiled({});
+    $("#analysis-place-holder").html(result_analysis_template_compiled);
+    renderAnalysisTab();
+  }
+}
+
 function renderAnalysisTab() {
   // TIME RANGE SELECTION
   var current_start = moment().subtract(1, 'days');

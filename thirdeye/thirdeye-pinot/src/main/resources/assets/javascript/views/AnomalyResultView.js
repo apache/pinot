@@ -1,3 +1,20 @@
+function AnomalyResultView() {
+
+}
+
+AnomalyResultView.prototype = {
+  init : function() {
+
+  },
+
+  render : function() {
+    var result_anomalies_template_compiled = anomalies_template_compiled({});
+    $("#anomalies-place-holder").html(result_anomalies_template_compiled);
+    renderAnomaliesTab();
+  }
+
+}
+
 function renderAnomaliesTab() {
 
   // METRIC SELECTION
