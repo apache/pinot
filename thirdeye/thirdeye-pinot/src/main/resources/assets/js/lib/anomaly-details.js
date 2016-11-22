@@ -77,14 +77,12 @@ function lineChartForSingleAnomaly(mergeAnomalyData) {
             case "HOURS":
             default:
                 var viewWindowSize = viewWindowEnd - viewWindowStart;
-                var multiplier = Math.max(2, parseInt(viewWindowSize / 3600000));
+                var multiplier = Math.max(2, parseInt(viewWindowSize / (2 * 3600000)));
                 extensionWindowMillis = 3600000 * multiplier;
         }
         viewWindowStart -= extensionWindowMillis;
-        if ((viewWindowEnd + extensionWindowMillis < new Date().getTime())) {
-            viewWindowEnd += extensionWindowMillis;
-        }
-        
+        viewWindowEnd += extensionWindowMillis;
+
         var timeSeriesUrl = "/dashboard/anomaly-merged-result/timeseries/" + mergeAnomalyData.id
             + "?aggTimeGranularity=" + aggTimeGranularity + "&start=" + viewWindowStart + "&end=" + viewWindowEnd;
 

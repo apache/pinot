@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
+import com.google.common.cache.LoadingCache;
 import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomaly.detection.TimeSeriesUtil;
 import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
@@ -84,6 +85,7 @@ public class AnomalyResource {
   private MetricConfigManager metricConfigDAO;
   private MergedAnomalyResultManager mergedAnomalyResultDAO;
   private AnomalyTimeSeriesViewFactory anomalyTimeSeriesViewFactory;
+  private LoadingCache<String, Long> collectionMaxDataTimeCache;
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
@@ -95,6 +97,7 @@ public class AnomalyResource {
     this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
     this.mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     this.anomalyTimeSeriesViewFactory = anomalyTimeSeriesViewFactory;
+    this.collectionMaxDataTimeCache = CACHE_REGISTRY_INSTANCE.getCollectionMaxDataTimeCache();
   }
 
   /************** CRUD for anomalies of a collection ********************************************************/
@@ -580,6 +583,12 @@ public class AnomalyResource {
     long bucketMillis = timeGranularity.toMillis();
     // ThirdEye backend is end time exclusive, so one more bucket is appended to make end time inclusive for frontend.
     viewWindowEndTime += bucketMillis;
+
+    long maxDataTime = collectionMaxDataTimeCache.get(anomalyResult.getCollection());
+    if (viewWindowEndTime > maxDataTime) {
+      viewWindowEndTime =
+          (anomalyResult.getEndTime() > maxDataTime) ? anomalyResult.getEndTime() : maxDataTime;
+    }
 
     List<Pair<Long, Long>> startEndTimeRanges =
         anomalyTimeSeriesView.getDataRangeIntervals(viewWindowStartTime, viewWindowEndTime);
