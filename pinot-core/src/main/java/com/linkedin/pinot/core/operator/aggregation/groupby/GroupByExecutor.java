@@ -15,6 +15,9 @@
  */
 package com.linkedin.pinot.core.operator.aggregation.groupby;
 
+import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
+
+
 /**
  * Interface class for executing the actual group-by operation.
  */
@@ -26,13 +29,11 @@ public interface GroupByExecutor {
   void init();
 
   /**
-   * Performs the actual group-by aggregation on the given docId's.
+   * Performs the actual group-by aggregation on the given projection block.
    *
-   * @param docIdSet
-   * @param startIndex
-   * @param length
+   * @param projectionBlock Projection block to process
    */
-  void process(int[] docIdSet, int startIndex, int length);
+  void process(ProjectionBlock projectionBlock);
 
   /**
    * Post processing (if any) to be done after all docIdSets have been processed, and
@@ -44,7 +45,7 @@ public interface GroupByExecutor {
    * Returns the result of group-by aggregation, ensures that 'finish' has been
    * called before calling getResult().
    *
-   * @return
+   * @return Result of aggregation group-by.
    */
   AggregationGroupByResult getResult();
 }

@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.operator.blocks;
 
+import com.linkedin.pinot.core.operator.aggregation.DataBlockCache;
 import java.util.Map;
 
 import com.linkedin.pinot.core.common.Block;
@@ -27,16 +28,19 @@ import com.linkedin.pinot.core.common.Predicate;
 
 /**
  * ProjectionBlock holds a column name to Block Map.
- * It provides DocIdSetBlock and DataBlock for a given column.
+ * It provides DocIdSetBlock and ProjectionColumnBlock for a given column.
  */
 public class ProjectionBlock implements Block {
 
   private final Map<String, Block> _blockMap;
   private final DocIdSetBlock _docIdSetBlock;
+  private final DataBlockCache _dataBlockCache;
 
-  public ProjectionBlock(Map<String, Block> blockMap, DocIdSetBlock docIdSetBlock) {
+  public ProjectionBlock(Map<String, Block> blockMap, DataBlockCache dataBlockCache, DocIdSetBlock docIdSetBlock) {
     _blockMap = blockMap;
     _docIdSetBlock = docIdSetBlock;
+    _dataBlockCache = dataBlockCache;
+    _dataBlockCache.initNewBlock(docIdSetBlock.getDocIdSet(), 0, docIdSetBlock.getSearchableLength());
   }
 
   @Override
@@ -73,7 +77,15 @@ public class ProjectionBlock implements Block {
     return _blockMap.get(column);
   }
 
+  public Block getDataBlock(String column) {
+    return new ProjectionColumnBlock(_dataBlockCache, column);
+  }
+
   public DocIdSetBlock getDocIdSetBlock() {
     return _docIdSetBlock;
+  }
+
+  public int getNumDocs() {
+    return _docIdSetBlock.getSearchableLength();
   }
 }

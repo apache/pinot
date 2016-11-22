@@ -28,6 +28,30 @@ public interface BlockValSet {
   DataType getValueType();
 
   /**
+   * Get values for single-valued column.
+   *
+   * @param <T> Return type
+   * @return Values for single-valued column.
+   */
+  <T> T getSingleValues();
+
+  /**
+   * Get values for multi-valued column.
+   *
+   * @param <T> Return type
+   * @return Values for multi-valued column.
+   *
+   * TODO: Re-visit batch reading of multi-valued columns.
+   */
+  <T> T getMultiValues();
+
+  /**
+   * Get the dictionary ids for all docs of this block.
+   * This version is for single-valued columns.
+   */
+  int[] getDictionaryIds();
+
+  /**
    * Copies the dictionaryIds for the input range DocIds.
    * Expects that the out array is properly sized
    * @param inDocIds input set of doc ids for which to read dictionaryIds
@@ -38,7 +62,18 @@ public interface BlockValSet {
    * @param outStartPos starting index position in outDictionaryIds. Indexes will
    *                    be copied starting at this position.
    *                    outDictionaryIds must be atleast (outStartPos + inDocIdsSize) in size
+   * TODO: Remove arguments from this api, as ProjectionBlock has all the required info.
    */
-  void readIntValues(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outDictionaryIds, int outStartPos);
+  void getDictionaryIds(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outDictionaryIds, int outStartPos);
 
+  /**
+   * Fills dictionary id's of multi-valued column for the current doc id in the passed in array,
+   * and returns the total number of multi-values read.
+   * Caller responsible to ensure that the passed in array is large enough to store the result.
+   *
+   * @param docId Doc id for which to get the dictionary ids.
+   * @param outputDictIds int array where the resulting dictionary ids will be stored.
+   * @return Total number of multi-valued columns.
+   */
+  int getDictionaryIdsForDocId(int docId, int[] outputDictIds);
 }

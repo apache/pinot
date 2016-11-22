@@ -54,7 +54,7 @@ public class AggregationOperator extends BaseOperator {
     Preconditions.checkArgument((aggregationsInfoList != null) && (aggregationsInfoList.size() > 0));
     Preconditions.checkNotNull(projectionOperator);
 
-    _aggregationExecutor = new DefaultAggregationExecutor(projectionOperator, aggregationsInfoList);
+    _aggregationExecutor = new DefaultAggregationExecutor(aggregationsInfoList);
     _aggregationInfoList = aggregationsInfoList;
     _projectionOperator = projectionOperator;
     _numTotalRawDocs = numTotalRawDocs;
@@ -85,10 +85,8 @@ public class AggregationOperator extends BaseOperator {
     _aggregationExecutor.init();
     ProjectionBlock projectionBlock;
     while ((projectionBlock = (ProjectionBlock) _projectionOperator.nextBlock()) != null) {
-      DocIdSetBlock docIdSetBlock = projectionBlock.getDocIdSetBlock();
-      int searchableLength = docIdSetBlock.getSearchableLength();
-      numDocsScanned += searchableLength;
-      _aggregationExecutor.aggregate(docIdSetBlock.getDocIdSet(), 0, searchableLength);
+      numDocsScanned += projectionBlock.getNumDocs();
+      _aggregationExecutor.aggregate(projectionBlock);
     }
     _aggregationExecutor.finish();
 

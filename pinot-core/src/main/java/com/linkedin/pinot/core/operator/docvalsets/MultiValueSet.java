@@ -33,6 +33,16 @@ public final class MultiValueSet implements BlockValSet {
   }
 
   @Override
+  public <T> T getSingleValues() {
+    throw new UnsupportedOperationException("Reading a batch of values is not supported for multi-value BlockValSet.");
+  }
+
+  @Override
+  public <T> T getMultiValues() {
+    throw new UnsupportedOperationException("Reading a batch of values is not supported for multi-value BlockValSet.");
+  }
+
+  @Override
   public BlockValIterator iterator() {
     return new MultiValueIterator(mVReader, columnMetadata);
   }
@@ -43,8 +53,17 @@ public final class MultiValueSet implements BlockValSet {
   }
 
   @Override
-  public void readIntValues(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outDictionaryIds, int outStartPos) {
+  public void getDictionaryIds(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outDictionaryIds, int outStartPos) {
     throw new UnsupportedOperationException("Reading a batch of values is not supported for multi-value BlockValSet");
   }
 
+  @Override
+  public int[] getDictionaryIds() {
+    throw new UnsupportedOperationException("Reading a batch of dictionary id is not supported for multi-value BlockValSet");
+  }
+
+  @Override
+  public int getDictionaryIdsForDocId(int docId, int[] outputDictIds) {
+    throw new UnsupportedOperationException("Reading a single values is not supported for multi-value BlockValSet");
+  }
 }

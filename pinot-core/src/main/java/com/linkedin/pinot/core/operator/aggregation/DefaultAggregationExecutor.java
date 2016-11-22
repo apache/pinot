@@ -18,14 +18,13 @@ package com.linkedin.pinot.core.operator.aggregation;
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.primitive.MutableLongValue;
-import com.linkedin.pinot.core.common.DataFetcher;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.operator.MProjectionOperator;
+import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunctionFactory;
 import com.linkedin.pinot.core.operator.aggregation.function.PercentileestAggregationFunction;
+import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
+import com.linkedin.pinot.core.operator.docvalsets.ProjectionBlockValSet;
 import com.linkedin.pinot.core.query.aggregation.function.AvgAggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.MinMaxRangeAggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.quantile.digest.QuantileDigest;
@@ -43,7 +42,6 @@ import java.util.List;
  * aggregations.
  */
 public class DefaultAggregationExecutor implements AggregationExecutor {
-  private final DataBlockCache _dataBlockCache;
   private final int _numAggrFunc;
   private final AggregationFunctionContext[] _aggrFuncContextArray;
 
@@ -53,11 +51,10 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
   boolean _inited = false;
   boolean _finished = false;
 
-  public DefaultAggregationExecutor(MProjectionOperator projectionOperator,List<AggregationInfo> aggregationInfoList) {
+  public DefaultAggregationExecutor(List<AggregationInfo> aggregationInfoList) {
     Preconditions.checkNotNull(aggregationInfoList);
     Preconditions.checkArgument(aggregationInfoList.size() > 0);
 
-    _dataBlockCache = new DataBlockCache(new DataFetcher(projectionOperator.getDataSourceMap()));
     _numAggrFunc = aggregationInfoList.size();
     _aggrFuncContextArray = new AggregationFunctionContext[_numAggrFunc];
     for (int i = 0; i < _numAggrFunc; i++) {
@@ -91,19 +88,15 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
    * Perform aggregation on a given docIdSet.
    * Asserts that 'init' has be called before calling this method.
    *
-   * @param docIdSet block doc id set.
-   * @param startIndex start index of the block.
-   * @param length length of the block.
+   * @param projectionBlock Projection block upon which to perform aggregation.
    */
   @Override
-  public void aggregate(int[] docIdSet, int startIndex, int length) {
+  public void aggregate(ProjectionBlock projectionBlock) {
     Preconditions
         .checkState(_inited, "Method 'aggregate' cannot be called before 'init' for class " + getClass().getName());
 
-    _dataBlockCache.initNewBlock(docIdSet, startIndex, length);
-
     for (int i = 0; i < _numAggrFunc; i++) {
-      aggregateColumn(_aggrFuncContextArray[i], _resultHolderArray[i], length);
+      aggregateColumn(projectionBlock, _aggrFuncContextArray[i], _resultHolderArray[i]);
     }
   }
 
@@ -112,40 +105,48 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
    *
    * @param aggrFuncContext aggregation function context.
    * @param resultHolder result holder.
-   * @param length length of the block.
    */
-  private void aggregateColumn(AggregationFunctionContext aggrFuncContext, AggregationResultHolder resultHolder,
-      int length) {
+  @SuppressWarnings("ConstantConditions")
+  private void aggregateColumn(ProjectionBlock projectionBlock, AggregationFunctionContext aggrFuncContext,
+      AggregationResultHolder resultHolder) {
     AggregationFunction aggregationFunction = aggrFuncContext.getAggregationFunction();
     String[] aggrColumns = aggrFuncContext.getAggregationColumns();
     String aggrFuncName = aggregationFunction.getName();
 
     Preconditions.checkState(aggrColumns.length == 1);
     String aggrColumn = aggrColumns[0];
+
+    ProjectionBlockValSet blockValueSet = null;
+    if (!aggrFuncName.equals(AggregationFunctionFactory.COUNT_AGGREGATION_FUNCTION)) {
+      Block dataBlock = projectionBlock.getDataBlock(aggrColumn);
+      blockValueSet = (ProjectionBlockValSet) dataBlock.getBlockValueSet();
+    }
+
+    int length = projectionBlock.getNumDocs();
     switch (aggrFuncName) {
       case AggregationFunctionFactory.COUNT_AGGREGATION_FUNCTION:
         aggregationFunction.aggregate(length, resultHolder);
         break;
       case AggregationFunctionFactory.COUNT_MV_AGGREGATION_FUNCTION:
         aggregationFunction.aggregate(length, resultHolder,
-            (Object) _dataBlockCache.getNumberOfEntriesArrayForColumn(aggrColumn));
+            (Object) blockValueSet.getNumberOfMVEntriesArray());
         break;
 
       case AggregationFunctionFactory.DISTINCTCOUNT_AGGREGATION_FUNCTION:
       case AggregationFunctionFactory.DISTINCTCOUNTHLL_AGGREGATION_FUNCTION:
         aggregationFunction.aggregate(length, resultHolder,
-            (Object) _dataBlockCache.getHashCodeArrayForColumn(aggrColumn));
+            (Object) blockValueSet.getSVHashCodeArray());
         break;
 
       case AggregationFunctionFactory.DISTINCTCOUNT_MV_AGGREGATION_FUNCTION:
       case AggregationFunctionFactory.DISTINCTCOUNTHLL_MV_AGGREGATION_FUNCTION:
         aggregationFunction.aggregate(length, resultHolder,
-            (Object) _dataBlockCache.getHashCodesArrayForColumn(aggrColumn));
+            (Object) blockValueSet.getMVHashCodeArray());
         break;
 
       case AggregationFunctionFactory.FASTHLL_AGGREGATION_FUNCTION:
         aggregationFunction.aggregate(length, resultHolder,
-            (Object) _dataBlockCache.getStringValueArrayForColumn(aggrColumn));
+            (Object) blockValueSet.getSingleValues());
         break;
 
       case AggregationFunctionFactory.SUM_AGGREGATION_FUNCTION:
@@ -162,7 +163,7 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
       case AggregationFunctionFactory.PERCENTILEEST95_AGGREGATION_FUNCTION:
       case AggregationFunctionFactory.PERCENTILEEST99_AGGREGATION_FUNCTION:
         aggregationFunction.aggregate(length, resultHolder,
-            (Object) _dataBlockCache.getDoubleValueArrayForColumn(aggrColumn));
+            (Object) blockValueSet.getSingleValues());
         break;
 
       case AggregationFunctionFactory.SUM_MV_AGGREGATION_FUNCTION:
@@ -179,7 +180,7 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
       case AggregationFunctionFactory.PERCENTILEEST95_MV_AGGREGATION_FUNCTION:
       case AggregationFunctionFactory.PERCENTILEEST99_MV_AGGREGATION_FUNCTION:
         aggregationFunction.aggregate(length, resultHolder,
-            (Object) _dataBlockCache.getDoubleValuesArrayForColumn(aggrColumn));
+            (Object) blockValueSet.getMultiValues());
         break;
 
       default:

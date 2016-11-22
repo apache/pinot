@@ -20,6 +20,7 @@ import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
@@ -30,6 +31,7 @@ import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.aggregation.AggregationExecutor;
 import com.linkedin.pinot.core.operator.aggregation.DefaultAggregationExecutor;
 import com.linkedin.pinot.core.operator.blocks.MatchEntireSegmentDocIdSetBlock;
+import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
 import com.linkedin.pinot.core.operator.filter.MatchEntireSegmentOperator;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
@@ -131,9 +133,10 @@ public class DefaultAggregationExecutorTest {
     MatchEntireSegmentOperator matchEntireSegmentOperator = new MatchEntireSegmentOperator(totalRawDocs);
     BReusableFilteredDocIdSetOperator docIdSetOperator = new BReusableFilteredDocIdSetOperator(matchEntireSegmentOperator,totalRawDocs, 10000);
     MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
-    AggregationExecutor aggregationExecutor = new DefaultAggregationExecutor(projectionOperator, _aggregationInfoList);
+    ProjectionBlock projectionBlock = (ProjectionBlock) projectionOperator.nextBlock();
+    AggregationExecutor aggregationExecutor = new DefaultAggregationExecutor(_aggregationInfoList);
     aggregationExecutor.init();
-    aggregationExecutor.aggregate(_docIdSet, 0, NUM_ROWS);
+    aggregationExecutor.aggregate(projectionBlock);
     aggregationExecutor.finish();
 
     List<Serializable> result = aggregationExecutor.getResult();
