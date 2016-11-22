@@ -19,7 +19,6 @@ import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import freemarker.template.Configuration;
-import freemarker.template.DefaultObjectWrapper;
 import freemarker.template.Template;
 import freemarker.template.TemplateExceptionHandler;
 import io.dropwizard.configuration.ConfigurationFactory;
@@ -173,7 +172,6 @@ public class GenerateAnomalyReport {
       freemarkerConfig.setClassForTemplateLoading(getClass(), "/com/linkedin/thirdeye/detector");
       freemarkerConfig.setDefaultEncoding(AlertTaskRunner.CHARSET);
       freemarkerConfig.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);
-      freemarkerConfig.setObjectWrapper(new DefaultObjectWrapper());
       Template template = freemarkerConfig.getTemplate("custom-anomaly-report.ftl");
       template.process(paramMap, out);
 

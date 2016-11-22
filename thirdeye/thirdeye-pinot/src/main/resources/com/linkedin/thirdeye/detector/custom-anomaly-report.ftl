@@ -18,7 +18,7 @@
   <tr>
     <td>
       <h3>Summary : </h3>
-      <table align="center" border="1"
+      <table align="center" border="1" cellpadding="4px"
              style="width:100%;border-collapse: collapse; border-spacing: 0 margin-bottom: 15px; border-color:#ddd;">
         <tr>
           <th>Anomalies</th>
@@ -42,7 +42,7 @@
 
     <#if anomalyDetails?has_content>
       <h3>Details : </h3>
-      <table align="center" border="1" cellpadding="5px"
+      <table align="center" border="1" cellpadding="4px"
              style="width:100%;border-collapse: collapse; border-spacing: 0 margin-bottom: 15px; border-color:#ddd;">
         <tr>
           <th>Metric</th>

@@ -293,7 +293,8 @@ public class AlertTaskRunner implements TaskRunner {
         for (int q = 0; q < numBuckets; q++) {
           int index = p * numBuckets + q;
           currentDimension = report.getResponseData().getResponseData().get(index)[dimensionIndex];
-          valueMap.put(String.valueOf(report.getTimeBuckets().get(q).getCurrentStart()), report.getResponseData().getResponseData().get(index)[valIndex]);
+          valueMap.put(String.valueOf(report.getTimeBuckets().get(q).getCurrentStart()), String
+              .format("%.1f", report.getResponseData().getResponseData().get(index)[valIndex]));
         }
         dimensionValueMap.put(currentDimension, valueMap);
       }
