@@ -1,8 +1,24 @@
+function DashboardView(dashboardModel) {
+
+}
+
+DashboardView.prototype = {
+  init : function() {
+
+  },
+
+  render : function() {
+    var result_dashboard_template_compiled = dashboard_template_compiled({});
+    $("#dashboard-place-holder").html(result_dashboard_template_compiled);
+    renderDashboardTab();
+  }
+
+}
+
 function renderDashboardTab() {
   // TIME RANGE SELECTION
   var start = moment().subtract(1, 'days');
   var end = moment();
-
 
   function dashboard_range_cb(start, end) {
     $('#dashboard-time-range span').addClass("time-range").html(start.format('MMM D, ') + start.format('hh:mm a') + '  &mdash;  ' + end.format('MMM D, ') + end.format('hh:mm a'));
@@ -33,7 +49,7 @@ function renderDashboardTab() {
   }, dashboard_range_cb);
 
   dashboard_range_cb(start, end);
-  $('#dashboard-tabs a').click(function (e) {
+  $('#dashboard-tabs a').click(function(e) {
     console.log("asdasd")
     e.preventDefault();
     $(this).tab('show');
@@ -44,7 +60,7 @@ function renderDashboardTab() {
     tabId = $(e.target).attr("href")
     console.log("tab clicked " + tabId);
   });
-  
+
   $('#dashboard-tabs a:first').click();
 
 }

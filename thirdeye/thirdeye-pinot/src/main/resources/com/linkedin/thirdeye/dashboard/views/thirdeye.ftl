@@ -36,6 +36,11 @@
 <script type="text/javascript" src="../../assets/tokenfield/bootstrap-tokenfield.min.js"></script>
 
 <!-- custom scripts -->
+<script src="../../../assets/javascript/libs/page.js" defer></script>
+<script src="https://rawgit.com/flatiron/director/master/build/director.min.js">
+  
+</script>
+
 <script src="../../assets/js/thirdeye/ingraph-metric-config.js"></script>
 <script src="../../assets/js/thirdeye/ingraph-dashboard-config.js"></script>
 <script src="../../assets/js/thirdeye/metric-config.js"></script>
@@ -46,7 +51,7 @@
 <script src="../../../assets/js/lib/common/utility.js" defer></script>
 
 <!-- JSON Editor comes here-->
-<link rel="stylesheet" href="../../../assets/jsonedit/jsoneditor.min.css"/>
+<link rel="stylesheet" href="../../../assets/jsonedit/jsoneditor.min.css" />
 <script src="../../../assets/jsonedit/jsoneditor.min.js" defer></script>
 <script src="../../../assets/js/lib/entity-editor.js"></script>
 
@@ -68,75 +73,26 @@
 <#include "admin/dataset-config.ftl"/>
 <#include "admin/metric-config.ftl"/>
 <#include "admin/job-info.ftl"/>
+
+<!-- MVC classes -->
+<script src="../../../assets/javascript/models/DashboardModel.js"></script>
+<script src="../../../assets/javascript/views/DashboardView.js"></script>
+<script src="../../../assets/javascript/controllers/DashboardController.js"></script>
+
+<script src="../../../assets/javascript/models/AnomalyResultModel.js"></script>
+<script src="../../../assets/javascript/views/AnomalyResultView.js"></script>
+<script src="../../../assets/javascript/controllers/AnomalyResultController.js"></script>
+
+<script src="../../../assets/javascript/models/AnalysisModel.js"></script>
+<script src="../../../assets/javascript/views/AnalysisView.js"></script>
+<script src="../../../assets/javascript/controllers/AnalysisController.js"></script>
+
+<script src="../../../assets/javascript/App.js"></script>
+
 <script type="text/javascript">
   $(document).ready(function() {
-    //compile templates
-    var dashboard_template = $("#dashboard-template").html();
-    dashboard_template_compiled = Handlebars.compile(dashboard_template);
-
-    var anomalies_template = $("#anomalies-template").html();
-    anomalies_template_compiled = Handlebars.compile(anomalies_template);
-
-    var analysis_template = $("#analysis-template").html();
-    analysis_template_compiled = Handlebars.compile(analysis_template);
-
-    var ingraph_metric_config_template = $("#ingraph-metric-config-template").html();
-    ingraph_metric_config_template_compiled = Handlebars.compile(ingraph_metric_config_template);
-
-    var metric_config_template = $("#metric-config-template").html();
-    metric_config_template_compiled = Handlebars.compile(metric_config_template);
-
-    var job_info_template = $("#job-info-template").html();
-    job_info_template_compiled = Handlebars.compile(job_info_template);
-
-    //register callbacks on tabs
-    $('#main-tabs a[data-toggle="tab"]').on('shown.bs.tab', function(e) {
-
-      e.target // newly activated tab
-      e.relatedTarget // previous active tab
-      tabId = $(e.target).attr("href")
-      console.log("tab clicked " + tabId);
-      $(tabId).tab('show')
-      if (tabId == "#dashboard") {
-        var result_dashboard_template_compiled = dashboard_template_compiled({});
-        $("#dashboard-place-holder").html(result_dashboard_template_compiled);
-        renderDashboardTab();
-      }
-      if (tabId == "#anomalies") {
-        var result_anomalies_template_compiled = anomalies_template_compiled({});
-        $("#anomalies-place-holder").html(result_anomalies_template_compiled);
-        $('.chosen-select').chosen();
-        $('input[id="anomalies-date-range-selector"]').daterangepicker();
-        renderAnomaliesTab();
-      }
-      if (tabId == "#analysis") {
-        var result_analysis_template_compiled = analysis_template_compiled({});
-        $("#analysis-place-holder").html(result_analysis_template_compiled);
-        renderAnalysisTab();
-      }
-
-      if (tabId == "#ingraph-metric-config") {
-        showIngraphDatasetSelection();
-      }
-      if (tabId == "#ingraph-dashboard-config") {
-        listIngraphDashboardConfigs();
-      }
-      if (tabId == "#metric-config") {
-        showMetricDatasetSelection();
-      }
-      if (tabId == "#dataset-config") {
-        listDatasetConfigs();
-      }
-      if (tabId == "#job-info") {
-        listJobs();
-      }
-      if(tabId == "#entity-editor"){
-        renderConfigSelector();
-      }
-    })
-
-    $("#main-tabs a:first").tab('show')
-
+    var app = new App();
+    app.init();
   });
 </script>
 
@@ -148,11 +104,11 @@
 			<div class="col-md-12">
 				<div class="container">
 					<nav class="navbar navbar-inverse" role="navigation">
-						<div class="navbar-header">
+						<div id="global-navbar" class="navbar-header">
 							<button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
 								<span class="sr-only">Toggle navigation</span><span class="icon-bar"></span><span class="icon-bar"></span><span class="icon-bar"></span>
 							</button>
-							<a class="navbar-brand" href="#">ThirdEye</a>
+							<a class="navbar-brand" href="#dashboard" data-toggle="tab">ThirdEye</a>
 						</div>
 						<div id="navbar" class="collapse navbar-collapse">
 							<ul id="main-tabs" class="nav navbar-nav">
@@ -169,8 +125,8 @@
 										<li class=""><a href="#ingraph-dashboard-config" data-toggle="tab">Ingraph Dashboard</a></li>
 										<li class=""><a href="#dataset-config" data-toggle="tab">Dataset </a></li>
 										<li class=""><a href="#metric-config" data-toggle="tab">Metric</a></li>
-                    <li class=""><a href="#job-info" data-toggle="tab">JobInfo</a></li>
-                    <li class=""><a href="#entity-editor" data-toggle="tab">Entity Editor</a></li>
+										<li class=""><a href="#job-info" data-toggle="tab">JobInfo</a></li>
+										<li class=""><a href="#entity-editor" data-toggle="tab">Entity Editor</a></li>
 									</ul></li>
 								<li><a href="#">Sign In</a></li>
 							</ul>
@@ -203,12 +159,12 @@
 		<div class="tab-pane" id="metric-config">
 			<div id="metric-config-place-holder"></div>
 		</div>
-    <div class="tab-pane" id="job-info">
-      <div id="job-info-place-holder"></div>
-    </div>
-    <div class="tab-pane" id="entity-editor">
-      <div id="entity-editor-place-holder"></div>
-    </div>
+		<div class="tab-pane" id="job-info">
+			<div id="job-info-place-holder"></div>
+		</div>
+		<div class="tab-pane" id="entity-editor">
+			<div id="entity-editor-place-holder"></div>
+		</div>
 	</div>
 </body>
 </html>
