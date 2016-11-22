@@ -151,4 +151,8 @@ public class DAORegistry {
     DAORegistry.overrideConfigDAO = overrideConfigDAO;
   }
 
+  public OverrideConfigManager getOverrideConfigDAO() {
+    return DAORegistry.overrideConfigDAO;
+  }
+
 }

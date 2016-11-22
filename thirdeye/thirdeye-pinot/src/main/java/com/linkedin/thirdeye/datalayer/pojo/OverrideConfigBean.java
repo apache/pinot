@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.datalayer.pojo;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 public class OverrideConfigBean extends AbstractBean {
 
@@ -64,5 +65,29 @@ public class OverrideConfigBean extends AbstractBean {
 
   public void setActive(boolean isActive) {
     this.active = isActive;
+  }
+
+  public boolean getActive() {
+    return active;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (!(o instanceof OverrideConfigBean)) {
+      return false;
+    }
+    OverrideConfigBean that = (OverrideConfigBean) o;
+    return Objects.equals(startTime, that.getStartTime())
+        && Objects.equals(endTime, that.getEndTime())
+        && Objects.equals(targetLevel, that.getTargetLevel())
+        && Objects.equals(targetEntity, that.getTargetEntity())
+        && Objects.equals(overrideProperties, that.getOverrideProperties())
+        && Objects.equals(active, that.getActive());
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(getStartTime(), getEndTime(), getTargetLevel(), getTargetEntity(),
+        getOverrideProperties(), getActive());
   }
 }

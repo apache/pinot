@@ -33,6 +33,11 @@ public class TestOverrideConfigManager extends AbstractManagerTestBase {
     Assert.assertEquals(overrideConfigDTOs.size(), 1);
 
     overrideConfigDTOs = overrideConfigDAO
+        .findAllConflictByTargetType(OverrideConfigHelper.ENTITY_ALERT_FILTER,
+            now.minusHours(5).getMillis(), now.minusHours(2).getMillis());
+    Assert.assertEquals(overrideConfigDTOs.size(), 0);
+
+    overrideConfigDTOs = overrideConfigDAO
         .findAllConflictByTargetType(OverrideConfigHelper.ENTITY_TIME_SERIES,
             now.minusDays(100).getMillis(), now.minusDays(50).getMillis());
     Assert.assertEquals(overrideConfigDTOs.size(), 0);

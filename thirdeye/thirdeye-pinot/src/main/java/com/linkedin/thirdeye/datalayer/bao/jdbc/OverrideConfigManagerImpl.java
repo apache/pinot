@@ -14,12 +14,25 @@ public class OverrideConfigManagerImpl extends AbstractManagerImpl<OverrideConfi
     super(OverrideConfigDTO.class, OverrideConfigBean.class);
   }
 
+  @Override
   public List<OverrideConfigDTO> findAllConflictByTargetType(String entityTypeName,
       long windowStart, long windowEnd) {
     Predicate predicate =
-        Predicate.AND(Predicate.LE("startTime", windowEnd), Predicate.GE("endTime", windowStart));
-            Predicate.EQ("targetEntity", entityTypeName);
+        Predicate.AND(Predicate.LE("startTime", windowEnd), Predicate.GE("endTime", windowStart),
+            Predicate.EQ("targetEntity", entityTypeName));
 
+    return findByPredicate(predicate);
+  }
+
+  @Override
+  public List<OverrideConfigDTO> findAllConflict(long windowStart, long windowEnd) {
+    Predicate predicate =
+        Predicate.AND(Predicate.LE("startTime", windowEnd), Predicate.GE("endTime", windowStart));
+
+    return findByPredicate(predicate);
+  }
+
+  private List<OverrideConfigDTO> findByPredicate(Predicate predicate) {
     List<OverrideConfigBean> list = genericPojoDao.get(predicate, OverrideConfigBean.class);
     List<OverrideConfigDTO> result = new ArrayList<>();
     for (OverrideConfigBean bean : list) {
