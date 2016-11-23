@@ -2,11 +2,16 @@ package com.linkedin.thirdeye.anomaly.merge;
 
 import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomaly.detection.TimeSeriesUtil;
+import com.linkedin.thirdeye.anomaly.override.OverrideConfigHelper;
 import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
+import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
+import com.linkedin.thirdeye.detector.metric.transfer.MetricTransfer;
+import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -41,6 +46,7 @@ public class AnomalyMergeExecutor implements Runnable {
   private final MergedAnomalyResultManager mergedResultDAO;
   private final RawAnomalyResultManager anomalyResultDAO;
   private final AnomalyFunctionManager anomalyFunctionDAO;
+  private final OverrideConfigManager overrideConfigDAO;
   private final ScheduledExecutorService executorService;
   private final AnomalyFunctionFactory anomalyFunctionFactory;
 
@@ -69,6 +75,7 @@ public class AnomalyMergeExecutor implements Runnable {
     this.mergedResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     this.anomalyResultDAO = DAO_REGISTRY.getRawAnomalyResultDAO();
     this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
+    this.overrideConfigDAO = DAO_REGISTRY.getOverrideConfigDAO();
     this.executorService = executorService;
     this.anomalyFunctionFactory = anomalyFunctionFactory;
   }
@@ -250,6 +257,7 @@ public class AnomalyMergeExecutor implements Runnable {
 
       List<MergedAnomalyResultDTO> knownAnomalies = Collections.emptyList();
 
+      // Retrieve history merged anomalies
       if (anomalyFunction.useHistoryAnomaly()) {
         switch (mergeConfig.getMergeStrategy()) {
           case FUNCTION:
@@ -269,6 +277,13 @@ public class AnomalyMergeExecutor implements Runnable {
           AnomalyUtils.logAnomaliesOverlapWithWindow(windowStart, windowEnd, knownAnomalies);
         }
       }
+
+      // Transform Time Series
+      List<ScalingFactor> scalingFactors = OverrideConfigHelper
+          .getTimeSeriesScalingFactors(overrideConfigDAO, anomalyFunctionSpec.getCollection(),
+              anomalyFunctionSpec.getMetric(), anomalyFunctionSpec.getId(), anomalyFunction
+                  .getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis()));
+      MetricTransfer.rescaleMetric(metricTimeSeries, anomalyFunctionSpec.getMetric(), scalingFactors);
 
       anomalyFunction.updateMergedAnomalyInfo(anomalyMergedResult, metricTimeSeries, windowStart, windowEnd,
           knownAnomalies);

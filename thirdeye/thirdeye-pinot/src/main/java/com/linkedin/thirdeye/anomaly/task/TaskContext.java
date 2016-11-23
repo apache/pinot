@@ -5,6 +5,7 @@ import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
@@ -18,6 +19,7 @@ public class TaskContext {
   private AnomalyFunctionFactory anomalyFunctionFactory;
   private DatasetConfigManager datasetConfigDAO;
   private MetricConfigManager metricConfigDAO;
+  private OverrideConfigManager overrideConfigDAO;
   private ThirdEyeAnomalyConfiguration thirdEyeAnomalyConfiguration;
 
   public ThirdEyeAnomalyConfiguration getThirdEyeAnomalyConfiguration() {
@@ -85,4 +87,11 @@ public class TaskContext {
     this.metricConfigDAO = metricConfigDAO;
   }
 
+  public OverrideConfigManager getOverrideConfigDAO() {
+    return overrideConfigDAO;
+  }
+
+  public void setOverrideConfigDAO(OverrideConfigManager overrideConfigDAO) {
+    this.overrideConfigDAO = overrideConfigDAO;
+  }
 }

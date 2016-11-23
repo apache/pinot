@@ -29,12 +29,12 @@ public class testMetricTransfer {
     }
 
     // create a list of mock scaling factors
-    ScalingFactor sf0 = new ScalingFactor(new TimeRange(2l, 4l), 0.8);
+    ScalingFactor sf0 = new ScalingFactor(2l, 4l, 0.8);
     List<ScalingFactor> sfList0 = new ArrayList<>();
     sfList0.add(sf0);
 
     MetricTransfer.rescaleMetric(metrics, mName, sfList0);
-    double [] m1_expected = {1.0, 1.0, 0.8, 0.8, 0.8, 1.0};
+    double [] m1_expected = {1.0, 1.0, 0.8, 0.8, 1.0, 1.0};
     double [] m_actual = new double[6];
     for (int i=0; i<=5; i++) {
       m_actual[i]= metrics.get(i, mName).doubleValue();
@@ -42,7 +42,7 @@ public class testMetricTransfer {
     Assert.assertEquals(m_actual, m1_expected);
 
     // revert to the original cases
-    ScalingFactor _sf0 = new ScalingFactor(new TimeRange(2l, 4l), 1.25);
+    ScalingFactor _sf0 = new ScalingFactor(2l, 4l, 1.25);
     // no points in time range and no change
     sfList0.remove(0);
     Assert.assertEquals(sfList0.size(), 0);
@@ -55,7 +55,7 @@ public class testMetricTransfer {
 
     //should not affect
     sfList0.remove(0);
-    ScalingFactor sf1 = new ScalingFactor(new TimeRange(12l, 14l), 0.8);
+    ScalingFactor sf1 = new ScalingFactor(12l, 14l, 0.8);
     sfList0.add(sf1);
     for (int i=0; i<=5; i++) {
       m_actual[i]= metrics.get(i, mName).doubleValue();

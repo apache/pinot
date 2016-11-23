@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.datalayer.bao;
 
 import com.linkedin.thirdeye.anomaly.override.OverrideConfigHelper;
 import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
+import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -49,18 +50,18 @@ public class TestOverrideConfigManager extends AbstractManagerTestBase {
     OverrideConfigDTO overrideConfigDTO = overrideConfigDAO.findById(overrideConfigId1);
     Assert.assertNotNull(overrideConfigDTO);
     Assert.assertNotNull(overrideConfigDTO.getOverrideProperties());
-    Assert.assertNotNull(overrideConfigDTO.getOverrideProperties().get("scaling_factor"));
-    Assert.assertEquals(overrideConfigDTO.getOverrideProperties().get("scaling_factor"), "1.2");
+    Assert.assertNotNull(overrideConfigDTO.getOverrideProperties().get(ScalingFactor.SCALING_FACTOR));
+    Assert.assertEquals(overrideConfigDTO.getOverrideProperties().get(ScalingFactor.SCALING_FACTOR), "1.2");
     Map<String, String> newOverrideProperties = new HashMap<>();
-    newOverrideProperties.put("scaling_factor", "0.8");
+    newOverrideProperties.put(ScalingFactor.SCALING_FACTOR, "0.8");
     overrideConfigDTO.setOverrideProperties(newOverrideProperties);
     overrideConfigDAO.update(overrideConfigDTO);
 
     overrideConfigDTO = overrideConfigDAO.findById(overrideConfigId1);
     Assert.assertNotNull(overrideConfigDTO);
     Assert.assertNotNull(overrideConfigDTO.getOverrideProperties());
-    Assert.assertNotNull(overrideConfigDTO.getOverrideProperties().get("scaling_factor"));
-    Assert.assertEquals(overrideConfigDTO.getOverrideProperties().get("scaling_factor"), "0.8");
+    Assert.assertNotNull(overrideConfigDTO.getOverrideProperties().get(ScalingFactor.SCALING_FACTOR));
+    Assert.assertEquals(overrideConfigDTO.getOverrideProperties().get(ScalingFactor.SCALING_FACTOR), "0.8");
 
     // Test update of target level
     overrideConfigDTO = overrideConfigDAO.findById(overrideConfigId1);

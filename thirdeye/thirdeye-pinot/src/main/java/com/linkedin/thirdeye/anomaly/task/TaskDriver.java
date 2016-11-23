@@ -57,6 +57,7 @@ public class TaskDriver {
     taskContext.setMergedResultDAO(DAO_REGISTRY.getMergedAnomalyResultDAO());
     taskContext.setDatasetConfigDAO(DAO_REGISTRY.getDatasetConfigDAO());
     taskContext.setMetricConfigDAO(DAO_REGISTRY.getMetricConfigDAO());
+    taskContext.setOverrideConfigDAO(DAO_REGISTRY.getOverrideConfigDAO());
     taskContext.setThirdEyeAnomalyConfiguration(thirdEyeAnomalyConfiguration);
     allowedOldTaskStatus.add(TaskStatus.FAILED);
     allowedOldTaskStatus.add(TaskStatus.WAITING);

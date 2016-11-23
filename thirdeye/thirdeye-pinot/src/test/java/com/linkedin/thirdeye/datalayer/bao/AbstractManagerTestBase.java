@@ -6,6 +6,7 @@ import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 
+import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
 import java.io.File;
 import java.io.FileReader;
 import java.net.URL;
@@ -273,7 +274,7 @@ public abstract class AbstractManagerTestBase {
     overrideConfigDTO.setActive(true);
 
     Map<String, String> overrideProperties = new HashMap<>();
-    overrideProperties.put("scaling_factor", "1.2");
+    overrideProperties.put(ScalingFactor.SCALING_FACTOR, "1.2");
     overrideConfigDTO.setOverrideProperties(overrideProperties);
 
     Map<String, List<String>> overrideTarget = new HashMap<>();

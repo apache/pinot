@@ -3,13 +3,17 @@ package com.linkedin.thirdeye.anomaly.detection;
 import com.google.common.collect.ArrayListMultimap;
 import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeExecutor;
+import com.linkedin.thirdeye.anomaly.override.OverrideConfigHelper;
 import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 
 import com.linkedin.thirdeye.detector.metric.transfer.MetricTransfer;
+import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -39,11 +43,13 @@ public class DetectionTaskRunner implements TaskRunner {
 
   private MergedAnomalyResultManager mergedResultDAO;
   private RawAnomalyResultManager rawAnomalyDAO;
+  private OverrideConfigManager overrideConfigDAO;
 
   private List<String> collectionDimensions;
   private DateTime windowStart;
   private DateTime windowEnd;
   private List<MergedAnomalyResultDTO> knownMergedAnomalies;
+  private List<ScalingFactor> scalingFactors;
   private List<RawAnomalyResultDTO> existingRawAnomalies;
   private BaseAnomalyFunction anomalyFunction;
   private DatasetConfigManager datasetConfigDAO;
@@ -58,6 +64,7 @@ public class DetectionTaskRunner implements TaskRunner {
     mergedResultDAO = taskContext.getMergedResultDAO();
     rawAnomalyDAO = taskContext.getResultDAO();
     datasetConfigDAO = taskContext.getDatasetConfigDAO();
+    overrideConfigDAO = taskContext.getOverrideConfigDAO();
     AnomalyFunctionFactory anomalyFunctionFactory = taskContext.getAnomalyFunctionFactory();
     AnomalyFunctionDTO anomalyFunctionSpec = detectionTaskInfo.getAnomalyFunctionSpec();
     anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
@@ -90,6 +97,11 @@ public class DetectionTaskRunner implements TaskRunner {
         anomalyFunction.getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis());
     Map<DimensionKey, MetricTimeSeries> dimensionKeyMetricTimeSeriesMap =
         TimeSeriesUtil.getTimeSeriesForAnomalyDetection(anomalyFunctionSpec, startEndTimeRanges);
+
+    scalingFactors = OverrideConfigHelper
+        .getTimeSeriesScalingFactors(overrideConfigDAO, anomalyFunctionSpec.getCollection(),
+            anomalyFunctionSpec.getMetric(), anomalyFunctionSpec.getId(),
+            anomalyFunction.getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis()));
 
     exploreDimensionsAndAnalyze(dimensionKeyMetricTimeSeriesMap);
 
@@ -124,6 +136,7 @@ public class DetectionTaskRunner implements TaskRunner {
       dimensionNamesToKnownRawAnomalies.put(existingRawAnomaly.getDimensions(), existingRawAnomaly);
     }
 
+    String metricName = anomalyFunction.getSpec().getMetric();
     for (Map.Entry<DimensionKey, MetricTimeSeries> entry : dimensionKeyMetricTimeSeriesMap.entrySet()) {
       DimensionKey dimensionKey = entry.getKey();
       DimensionMap exploredDimensions = DimensionMap.fromDimensionKey(dimensionKey, collectionDimensions);
@@ -152,13 +165,9 @@ public class DetectionTaskRunner implements TaskRunner {
         LOG.info("Checking if any known anomalies overlap with the monitoring window of anomaly detection, which could result in unwanted holes in current values.");
         AnomalyUtils.logAnomaliesOverlapWithWindow(windowStart, windowEnd, historyMergedAnomalies);
 
-        String metricName = anomalyFunction.getSpec().getMetric();
-        // The following is just a place holder here
-        // Need to get a list of ScalingFactors from database (same way as get anomaly histories)
-        // Passed this as the last input parameter replace null
-        MetricTransfer.rescaleMetric(metricTimeSeries, metricName, null);
+        // Scaling time series according to the scaling factor
+        MetricTransfer.rescaleMetric(metricTimeSeries, metricName, scalingFactors);
 
-        // Rescale the TimeSeriesMetric
         List<RawAnomalyResultDTO> resultsOfAnEntry = anomalyFunction
             .analyze(exploredDimensions, metricTimeSeries, windowStart, windowEnd, historyMergedAnomalies);
 

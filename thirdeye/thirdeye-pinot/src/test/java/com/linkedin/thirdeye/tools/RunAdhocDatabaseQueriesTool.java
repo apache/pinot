@@ -1,6 +1,9 @@
 package com.linkedin.thirdeye.tools;
 
 import com.linkedin.thirdeye.anomaly.alert.AlertFilterHelper;
+import com.linkedin.thirdeye.anomaly.override.OverrideConfigHelper;
+import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
 import com.linkedin.thirdeye.detector.email.filter.AlphaBetaAlertFilter;
 import java.io.File;
 import java.util.ArrayList;
@@ -9,6 +12,7 @@ import java.util.HashMap;
 import java.util.List;
 
 import java.util.Map;
+import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,6 +44,7 @@ public class RunAdhocDatabaseQueriesTool {
   private MergedAnomalyResultManager mergedResultDAO;
   private MetricConfigManager metricConfigDAO;
   private DashboardConfigManager dashboardConfigDAO;
+  private OverrideConfigManager overrideConfigDAO;
 
   public RunAdhocDatabaseQueriesTool(File persistenceFile)
       throws Exception {
@@ -60,6 +65,8 @@ public class RunAdhocDatabaseQueriesTool {
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.MetricConfigManagerImpl.class);
     dashboardConfigDAO = DaoProviderUtil
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.DashboardConfigManagerImpl.class);
+    overrideConfigDAO = DaoProviderUtil
+        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.OverrideConfigManagerImpl.class);
   }
 
   private void toggleAnomalyFunction(Long id) {
@@ -130,6 +137,38 @@ public class RunAdhocDatabaseQueriesTool {
         LOG.info("Add alert filter {} to function {} (dataset: {}, metric: {})", alertFilter,
             anomalyFunctionDTO.getId(), collection, metricName);
       }
+    }
+  }
+
+  private Long createOverrideConfig(OverrideConfigDTO overrideConfigDTO) {
+    // Check if there exist duplicate override config
+    List<OverrideConfigDTO> existingOverrideConfigDTOs = overrideConfigDAO
+        .findAllConflictByTargetType(overrideConfigDTO.getTargetEntity(),
+            overrideConfigDTO.getStartTime(), overrideConfigDTO.getEndTime());
+
+    for (OverrideConfigDTO existingOverrideConfig : existingOverrideConfigDTOs) {
+      if (existingOverrideConfig.equals(overrideConfigDTO)) {
+        LOG.warn("Exists a duplicate override config: {}", existingOverrideConfig.toString());
+        return null;
+      }
+    }
+
+    return overrideConfigDAO.save(overrideConfigDTO);
+  }
+
+  private void updateOverrideConfig(long id, OverrideConfigDTO overrideConfigDTO) {
+    OverrideConfigDTO overrideConfigToUpdated = overrideConfigDAO.findById(id);
+    if (overrideConfigToUpdated == null) {
+      LOG.warn("Failed to update config {}", id);
+    } else {
+      overrideConfigToUpdated.setStartTime(overrideConfigDTO.getStartTime());
+      overrideConfigToUpdated.setEndTime(overrideConfigDTO.getEndTime());
+      overrideConfigToUpdated.setTargetLevel(overrideConfigDTO.getTargetLevel());
+      overrideConfigToUpdated.setTargetEntity(overrideConfigDTO.getTargetEntity());
+      overrideConfigToUpdated.setOverrideProperties(overrideConfigDTO.getOverrideProperties());
+      overrideConfigToUpdated.setActive(overrideConfigDTO.getActive());
+      overrideConfigDAO.update(overrideConfigToUpdated);
+      LOG.info("Updated config {}" + id);
     }
   }
 
