@@ -124,7 +124,7 @@ public class OverrideConfigHelper {
         if (MapUtils.isNotEmpty(overrideConfigDTO.getOverrideProperties())) {
           try {
             double scalingFactor =
-                Double.parseDouble(overrideConfigDTO.getOverrideProperties().get("scalingFactor"));
+                Double.parseDouble(overrideConfigDTO.getOverrideProperties().get(ScalingFactor.SCALING_FACTOR));
             ScalingFactor sf = new ScalingFactor(startTime, endTime, scalingFactor);
             results.add(sf);
           } catch (Exception e) {
