@@ -273,7 +273,7 @@ public abstract class AbstractManagerTestBase {
     overrideConfigDTO.setActive(true);
 
     Map<String, String> overrideProperties = new HashMap<>();
-    overrideProperties.put("scaling_factor", "1.2");
+    overrideProperties.put("scalingFactor", "1.2");
     overrideConfigDTO.setOverrideProperties(overrideProperties);
 
     Map<String, List<String>> overrideTarget = new HashMap<>();

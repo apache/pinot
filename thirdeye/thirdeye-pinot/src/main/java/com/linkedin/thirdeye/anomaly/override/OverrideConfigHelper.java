@@ -1,15 +1,21 @@
 package com.linkedin.thirdeye.anomaly.override;
 
+import com.linkedin.pinot.pql.parsers.utils.Pair;
+import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
-import java.util.Arrays;
+import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
-import org.joda.time.DateTime;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class OverrideConfigHelper {
+  private static final Logger LOG = LoggerFactory.getLogger(OverrideConfigHelper.class);
+
   public static final String TARGET_COLLECTION = "collection";
   public static final String TARGET_METRIC = "metric";
   public static final String TARGET_FUNCTION_ID = "functionId";
@@ -94,5 +100,55 @@ public class OverrideConfigHelper {
     targetEntity.put(TARGET_FUNCTION_ID, functionIdString);
     targetEntity.put(EXCLUDED_FUNCTION_ID, functionIdString);
     return targetEntity;
+  }
+
+  /**
+   * Convert a list of OverrideConfigDTO to a list of scaling factor, in which each scaling factor
+   * are filtered through target level.
+   *
+   * @param overrideConfigDTOs the list of OverrideConfigDTO
+   * @param timeSereisTargetLevel the
+   *                              filtration rule for applying OverrideConfigDTO
+   * @return a list of scaling factor
+   */
+  public static List<ScalingFactor> convertToScalingFactors(
+      List<OverrideConfigDTO> overrideConfigDTOs, Map<String, String> timeSereisTargetLevel) {
+    List<ScalingFactor> results = new ArrayList<>();
+    for (OverrideConfigDTO overrideConfigDTO : overrideConfigDTOs) {
+      if (OverrideConfigHelper.isEnabled(timeSereisTargetLevel, overrideConfigDTO)) {
+        long startTime = overrideConfigDTO.getStartTime();
+        long endTime = overrideConfigDTO.getEndTime();
+        double scalingFactor = 1.0d;
+        if (MapUtils.isNotEmpty(overrideConfigDTO.getOverrideProperties())) {
+          scalingFactor =
+              Double.parseDouble(overrideConfigDTO.getOverrideProperties().get("scalingFactor"));
+        } else {
+          LOG.warn("Unable to parse scaling factor from override config:{}", overrideConfigDTO);
+        }
+
+        ScalingFactor sf = new ScalingFactor(startTime, endTime, scalingFactor);
+        results.add(sf);
+      }
+    }
+    return results;
+  }
+
+  /**
+   * Get a list of OverrideConfigDTOs according to the given start and end time ranges.
+   *
+   * @param startEndTimeRanges a list of start and end time ranges for retrieving override configs
+   * @param overrideConfigDAO the data access object for retrieving override configs
+   *
+   * @return a list of OverrideConfigDTOs
+   */
+  public static List<OverrideConfigDTO> getTimeSeriesOverrideConfigs(
+      List<Pair<Long, Long>> startEndTimeRanges, OverrideConfigManager overrideConfigDAO) {
+    List<OverrideConfigDTO> results = new ArrayList<>();
+    for (Pair<Long, Long> startEndTimeRange : startEndTimeRanges) {
+      results.addAll(overrideConfigDAO
+          .findAllConflictByTargetType(OverrideConfigHelper.ENTITY_TIME_SERIES,
+              startEndTimeRange.getFirst(), startEndTimeRange.getSecond()));
+    }
+    return results;
   }
 }

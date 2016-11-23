@@ -49,18 +49,18 @@ public class TestOverrideConfigManager extends AbstractManagerTestBase {
     OverrideConfigDTO overrideConfigDTO = overrideConfigDAO.findById(overrideConfigId1);
     Assert.assertNotNull(overrideConfigDTO);
     Assert.assertNotNull(overrideConfigDTO.getOverrideProperties());
-    Assert.assertNotNull(overrideConfigDTO.getOverrideProperties().get("scaling_factor"));
-    Assert.assertEquals(overrideConfigDTO.getOverrideProperties().get("scaling_factor"), "1.2");
+    Assert.assertNotNull(overrideConfigDTO.getOverrideProperties().get("scalingFactor"));
+    Assert.assertEquals(overrideConfigDTO.getOverrideProperties().get("scalingFactor"), "1.2");
     Map<String, String> newOverrideProperties = new HashMap<>();
-    newOverrideProperties.put("scaling_factor", "0.8");
+    newOverrideProperties.put("scalingFactor", "0.8");
     overrideConfigDTO.setOverrideProperties(newOverrideProperties);
     overrideConfigDAO.update(overrideConfigDTO);
 
     overrideConfigDTO = overrideConfigDAO.findById(overrideConfigId1);
     Assert.assertNotNull(overrideConfigDTO);
     Assert.assertNotNull(overrideConfigDTO.getOverrideProperties());
-    Assert.assertNotNull(overrideConfigDTO.getOverrideProperties().get("scaling_factor"));
-    Assert.assertEquals(overrideConfigDTO.getOverrideProperties().get("scaling_factor"), "0.8");
+    Assert.assertNotNull(overrideConfigDTO.getOverrideProperties().get("scalingFactor"));
+    Assert.assertEquals(overrideConfigDTO.getOverrideProperties().get("scalingFactor"), "0.8");
 
     // Test update of target level
     overrideConfigDTO = overrideConfigDAO.findById(overrideConfigId1);
