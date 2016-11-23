@@ -28,7 +28,6 @@ import java.io.File;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.text.DateFormat;
-import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -44,7 +43,6 @@ import org.apache.commons.mail.HtmlEmail;
 public class GenerateAnomalyReport {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper(new YAMLFactory());
   private static final DateFormat df = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ");
-  private static final NumberFormat nf = NumberFormat.getInstance();
 
   MergedAnomalyResultManager anomalyResultManager;
   MetricConfigManager metricConfigManager;
@@ -141,9 +139,9 @@ public class GenerateAnomalyReport {
 
       AnomalyReportDTO anomalyReportDTO =
           new AnomalyReportDTO(String.valueOf(anomaly.getId()), feedbackVal,
-              nf.format(anomaly.getWeight()), anomaly.getMetric(),
-              df.format(new Date(anomaly.getStartTime())),
-              nf.format(getTimeDiffInHours(anomaly.getStartTime(), anomaly.getEndTime())),
+              String.format("%+.2f",anomaly.getWeight()), anomaly.getMetric(),
+              new Date(anomaly.getStartTime()).toString(),
+              String.format("%.2f",getTimeDiffInHours(anomaly.getStartTime(), anomaly.getEndTime())),
               getAnomalyURL(anomaly));
 
       anomalyReportDTOList.add(anomalyReportDTO);
@@ -246,7 +244,8 @@ public class GenerateAnomalyReport {
     System.exit(-1);
   }
 
-  @JsonIgnoreProperties(ignoreUnknown = true) public static class AnomalyReportDTO {
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public static class AnomalyReportDTO {
     String metric;
     String startDateTime;
     String windowSize;
@@ -322,7 +321,8 @@ public class GenerateAnomalyReport {
       this.anomalyURL = anomalyURL;
     }
 
-    @Override public String toString() {
+    @Override
+    public String toString() {
       return "AnomalyReportDTO{" +
           "anomalyId=" + anomalyId +
           ", metric='" + metric + '\'' +

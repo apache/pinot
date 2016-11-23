@@ -47,7 +47,7 @@
         <tr>
           <th>Metric</th>
           <th>Anomaly Start Time</th>
-          <th>Window Size</th>
+          <th>Window Size (hours)</th>
           <th>Lift</th>
           <th>Feedback</th>
           <th>AnomalyId</th>
