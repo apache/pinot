@@ -23,26 +23,6 @@ App.prototype = {
     this.setupListeners();
     this.setupRouting();
     this.handleURL();
-    // Prepare
-    var History = window.History; // Note: We are using a capital H instead of a
-    // lower h
-    if (!History.enabled) {
-      // History.js is disabled for this browser.
-      // This is because we can optionally choose to support HTML4 browsers or
-      // not.
-      return false;
-    }
-
-    // Bind to StateChange Event
-    History.Adapter.bind(window, 'statechange', function() { // Note: We are
-      // using
-      // statechange
-      // instead of
-      // popstate
-      var State = History.getState();
-      //History.log(State.data, State.title, State.url);
-      //this.handleURL();
-    });
 
   },
 
@@ -89,30 +69,40 @@ App.prototype = {
     var router = Router(routes);
     // router.init();
     page.base("/thirdeye");
-    page("/", this.dashboardView.render);
-    page("/thirdeye", this.dashboardView.render);
-    page("/dashboard", this.dashboardView.render);
-    page("/anomalies", this.anomalyResultView.render);
-    page("/analysis", this.analysisView.render);
-    page("/ingraph-metric-config", showIngraphDatasetSelection);
-    page("/ingraph-dashboard-config", listIngraphDashboardConfigs);
-    page("/metric-config", showMetricDatasetSelection);
-    page("/dataset-config", listDatasetConfigs);
-    page("/job-info", listJobs);
-    page("/entity-editor", renderConfigSelector);
+    page("/", this.updateHistory, this.dashboardView.render);
+    page("/thirdeye", this.updateHistory, this.dashboardView.render);
+    page("/dashboard", this.updateHistory, this.dashboardView.render);
+    page("/anomalies", this.updateHistory, this.anomalyResultView.render);
+    page("/analysis", this.updateHistory, this.analysisView.render);
+    page("/ingraph-metric-config", this.updateHistory, showIngraphDatasetSelection);
+    page("/ingraph-dashboard-config", this.updateHistory, listIngraphDashboardConfigs);
+    page("/metric-config", this.updateHistory, showMetricDatasetSelection);
+    page("/dataset-config", this.updateHistory, listDatasetConfigs);
+    page("/job-info", this.updateHistory, listJobs);
+    page("/entity-editor", this.updateHistory, renderConfigSelector);
 
     page.start({
       hashbang : true
     });
+    //everytime hash changes, we should handle the new hash
+    $(window).on('hashchange', this.handleURL);
   },
-
+  /**
+   * Place holder that gets invoked before every call. This is pass through for now. 
+   */
+  updateHistory : function(ctx, next) {
+    next();
+  },
   setupListeners : function() {
     var tabSelectionEventHandler = function(e) {
       var targetView = $(e.target).attr('href')
-      //History.pushState(null, $(this).text(), targetView);
-      console.log("targetView:" + targetView)
-      targetView = targetView.replace("#", "");
-      page("/thirdeye/" + targetView)
+      var previousView = $(e.relatedTarget).attr('href');
+      if (targetView != previousView) {
+        console.log("targetView:" + targetView)
+        console.log("previousView:" + previousView)
+        targetView = targetView.replace("#", "");
+        page("/thirdeye/" + targetView)
+      }
     }
     $('#main-tabs a[data-toggle="tab"]').on('shown.bs.tab', tabSelectionEventHandler);
     $('#admin-tabs a[data-toggle="tab"]').on('shown.bs.tab', tabSelectionEventHandler);
