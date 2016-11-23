@@ -15,21 +15,22 @@
  */
 package com.linkedin.pinot.server.api.resources;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import org.apache.commons.lang3.tuple.Pair;
+import org.codehaus.jackson.annotate.JsonIgnoreProperties;
+import org.restlet.resource.ResourceException;
 import com.linkedin.pinot.common.utils.MmapUtils;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
-import org.apache.commons.lang3.tuple.Pair;
-import org.restlet.resource.ResourceException;
 
 
 /**
@@ -39,10 +40,11 @@ import org.restlet.resource.ResourceException;
 @Path("debug")
 public class MmapDebugResource {
 
+  @JsonIgnoreProperties(ignoreUnknown = true)
   public static class AllocationInfo {
-    String context;
-    String type;
-    int size;
+    public String context;
+    public String type;
+    public int size;
   }
 
   @GET
