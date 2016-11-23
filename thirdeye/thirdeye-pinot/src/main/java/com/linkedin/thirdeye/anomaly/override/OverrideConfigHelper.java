@@ -6,8 +6,10 @@ import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
 import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.slf4j.Logger;
@@ -118,16 +120,21 @@ public class OverrideConfigHelper {
       if (OverrideConfigHelper.isEnabled(timeSereisTargetLevel, overrideConfigDTO)) {
         long startTime = overrideConfigDTO.getStartTime();
         long endTime = overrideConfigDTO.getEndTime();
-        double scalingFactor = 1.0d;
-        if (MapUtils.isNotEmpty(overrideConfigDTO.getOverrideProperties())) {
-          scalingFactor =
-              Double.parseDouble(overrideConfigDTO.getOverrideProperties().get("scalingFactor"));
-        } else {
-          LOG.warn("Unable to parse scaling factor from override config:{}", overrideConfigDTO);
-        }
 
-        ScalingFactor sf = new ScalingFactor(startTime, endTime, scalingFactor);
-        results.add(sf);
+        if (MapUtils.isNotEmpty(overrideConfigDTO.getOverrideProperties())) {
+          try {
+            double scalingFactor =
+                Double.parseDouble(overrideConfigDTO.getOverrideProperties().get("scalingFactor"));
+            ScalingFactor sf = new ScalingFactor(startTime, endTime, scalingFactor);
+            results.add(sf);
+          } catch (Exception e) {
+            LOG.warn("Failed to parse scaling factor from override config:{}, Exception: {}",
+                overrideConfigDTO, e);
+          }
+        } else {
+          LOG.warn("Unable to parse scaling factor due to empty override properties. Config:{}",
+              overrideConfigDTO);
+        }
       }
     }
     return results;
@@ -143,12 +150,60 @@ public class OverrideConfigHelper {
    */
   public static List<OverrideConfigDTO> getTimeSeriesOverrideConfigs(
       List<Pair<Long, Long>> startEndTimeRanges, OverrideConfigManager overrideConfigDAO) {
-    List<OverrideConfigDTO> results = new ArrayList<>();
+    // The Set is used to prevent duplicate override configs are loaded, which could happen if
+    // there exists an override config that overlaps both time ranges of current and baseline
+    // values
+    Set<OverrideConfigDTO> overrideConfigDTOSet = new HashSet<>();
+
     for (Pair<Long, Long> startEndTimeRange : startEndTimeRanges) {
-      results.addAll(overrideConfigDAO
+      List<OverrideConfigDTO> overrideConfigDTOList = overrideConfigDAO
           .findAllConflictByTargetType(OverrideConfigHelper.ENTITY_TIME_SERIES,
-              startEndTimeRange.getFirst(), startEndTimeRange.getSecond()));
+              startEndTimeRange.getFirst(), startEndTimeRange.getSecond());
+      for (OverrideConfigDTO overrideConfig : overrideConfigDTOList) {
+        if (overrideConfig.isActive()) {
+          overrideConfigDTOSet.add(overrideConfig);
+        }
+      }
     }
+
+    List<OverrideConfigDTO> results = new ArrayList<>(overrideConfigDTOSet);
     return results;
+  }
+
+  /**
+   * Returns the scaling factor for the given collectoin, metric, function id, and the time
+   * ranges of current value and baseline values, which is specified in startEndTimeRanges.
+   *
+   * @param overrideConfigDAO the data access object for retrieving override configs
+   * @param collection the target collection
+   * @param metric the target metric
+   * @param functionId the target function id
+   * @param startEndTimeRanges the time ranges of current and baseline values
+   *
+   * @return the scaling factor for the given collectoin, metric, function id, and the time
+   * ranges of current value and baseline values
+   */
+  public static List<ScalingFactor> getTimeSeriesScalingFactors(OverrideConfigManager
+      overrideConfigDAO, String collection, String metric,
+      long functionId, List<Pair<Long, Long>> startEndTimeRanges) {
+
+    List<OverrideConfigDTO> overrideConfigs = OverrideConfigHelper.getTimeSeriesOverrideConfigs(
+        startEndTimeRanges, overrideConfigDAO);
+
+    // timeSeriesTargetLevel is used for check if the scaling factor should be apply on THIS
+    // collection, metric, and function id
+    Map<String, String> timeSeriesTargetLevel =
+        OverrideConfigHelper.getEntityTargetLevel(collection, metric, functionId);
+
+    // Convert override config to scaling factor
+    List<ScalingFactor> scalingFactors = OverrideConfigHelper
+        .convertToScalingFactors(overrideConfigs, timeSeriesTargetLevel);
+
+    if (CollectionUtils.isNotEmpty(scalingFactors)) {
+      LOG.info("Found {} scaling-factor rules for collection {}, metric {}, function {}",
+          scalingFactors.size(), collection, metric, functionId);
+    }
+
+    return scalingFactors;
   }
 }

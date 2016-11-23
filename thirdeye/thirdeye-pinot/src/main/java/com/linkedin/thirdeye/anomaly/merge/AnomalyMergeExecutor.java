@@ -279,26 +279,10 @@ public class AnomalyMergeExecutor implements Runnable {
       }
 
       // Transform Time Series
-      // timeSeriesTargetLevel is used for check if the scaling factor should be apply on THIS
-      // collection, metric, and function id
-      Map<String, String> timeSeriesTargetLevel = OverrideConfigHelper
-          .getEntityTargetLevel(anomalyFunctionSpec.getCollection(), anomalyFunctionSpec.getMetric(),
-              anomalyFunctionSpec.getId());
-
-      // Get override configs
-      List<OverrideConfigDTO> overrideConfigDTOs = OverrideConfigHelper
-          .getTimeSeriesOverrideConfigs(anomalyFunction.getDataRangeIntervals(windowStart
-              .getMillis(), windowEnd.getMillis()), overrideConfigDAO);
-
-      // Convert override config to scaling factor
-      List<ScalingFactor> scalingFactors =
-          OverrideConfigHelper.convertToScalingFactors(overrideConfigDTOs, timeSeriesTargetLevel);
-
-      LOG.info("Found {} scaling-factor rules for collection {}, metric {}, function {}",
-          scalingFactors.size(), anomalyFunctionSpec.getCollection(), anomalyFunctionSpec.getMetric(),
-          anomalyFunctionSpec.getId());
-
-      // Scaling time series according to the scaling factor
+      List<ScalingFactor> scalingFactors = OverrideConfigHelper
+          .getTimeSeriesScalingFactors(overrideConfigDAO, anomalyFunctionSpec.getCollection(),
+              anomalyFunctionSpec.getMetric(), anomalyFunctionSpec.getId(), anomalyFunction
+                  .getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis()));
       MetricTransfer.rescaleMetric(metricTimeSeries, anomalyFunctionSpec.getMetric(), scalingFactors);
 
       anomalyFunction.updateMergedAnomalyInfo(anomalyMergedResult, metricTimeSeries, windowStart, windowEnd,

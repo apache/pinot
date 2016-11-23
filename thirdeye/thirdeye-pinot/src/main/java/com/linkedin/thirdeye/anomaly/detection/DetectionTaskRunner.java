@@ -49,7 +49,7 @@ public class DetectionTaskRunner implements TaskRunner {
   private DateTime windowStart;
   private DateTime windowEnd;
   private List<MergedAnomalyResultDTO> knownMergedAnomalies;
-  private List<OverrideConfigDTO> overrideConfigs;
+  private List<ScalingFactor> scalingFactors;
   private List<RawAnomalyResultDTO> existingRawAnomalies;
   private BaseAnomalyFunction anomalyFunction;
   private DatasetConfigManager datasetConfigDAO;
@@ -98,9 +98,10 @@ public class DetectionTaskRunner implements TaskRunner {
     Map<DimensionKey, MetricTimeSeries> dimensionKeyMetricTimeSeriesMap =
         TimeSeriesUtil.getTimeSeriesForAnomalyDetection(anomalyFunctionSpec, startEndTimeRanges);
 
-    overrideConfigs = OverrideConfigHelper.getTimeSeriesOverrideConfigs(
-        anomalyFunction.getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis()),
-        overrideConfigDAO);
+    scalingFactors = OverrideConfigHelper
+        .getTimeSeriesScalingFactors(overrideConfigDAO, anomalyFunctionSpec.getCollection(),
+            anomalyFunctionSpec.getMetric(), anomalyFunctionSpec.getId(),
+            anomalyFunction.getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis()));
 
     exploreDimensionsAndAnalyze(dimensionKeyMetricTimeSeriesMap);
 
@@ -135,23 +136,7 @@ public class DetectionTaskRunner implements TaskRunner {
       dimensionNamesToKnownRawAnomalies.put(existingRawAnomaly.getDimensions(), existingRawAnomaly);
     }
 
-    // The parameters are used by scaling factor of time series
-    AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunction.getSpec();
-    String metricName = anomalyFunctionSpec.getMetric();
-
-    // timeSeriesTargetLevel is used for check if the scaling factor should be apply on THIS
-    // collection, metric, and function id
-    Map<String, String> timeSeriesTargetLevel = OverrideConfigHelper
-        .getEntityTargetLevel(anomalyFunctionSpec.getCollection(), metricName, anomalyFunctionSpec.getId());
-
-    // Convert override config to scaling factor
-    List<ScalingFactor> scalingFactors = OverrideConfigHelper
-        .convertToScalingFactors(overrideConfigs, timeSeriesTargetLevel);
-
-    LOG.info("Found {} scaling-factor rules for collection {}, metric {}, function {}",
-        scalingFactors.size(), anomalyFunctionSpec.getCollection(), anomalyFunctionSpec.getMetric(),
-        anomalyFunctionSpec.getId());
-
+    String metricName = anomalyFunction.getSpec().getMetric();
     for (Map.Entry<DimensionKey, MetricTimeSeries> entry : dimensionKeyMetricTimeSeriesMap.entrySet()) {
       DimensionKey dimensionKey = entry.getKey();
       DimensionMap exploredDimensions = DimensionMap.fromDimensionKey(dimensionKey, collectionDimensions);
