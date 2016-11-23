@@ -19,7 +19,7 @@
 <#if (groupedAnomalyResults?has_content)>
   <tr>
     <td>
-      <table align="center" border="1" style="width:100%;border-collapse: collapse; border-spacing: 0 margin-bottom: 15px; border-color:#ddd;">
+      <table align="center" border="1" cellpadding="4px" style="width:100%;border-collapse: collapse; border-spacing: 0 margin-bottom: 15px; border-color:#ddd;">
         <tr>
           <th style="padding:5px 3px">Dimensions</th>
           <th>No.</th>
@@ -88,7 +88,7 @@
       </tr>
       <tr>
         <td>
-          <table align="center" border="1" style="width:100%;border-collapse: collapse; border-spacing: 0 margin-bottom:15px;border-color:#ddd;" cellspacing="0px" cellpadding="2px">
+          <table align="center" border="1" style="width:100%;border-collapse: collapse; border-spacing: 0 margin-bottom:15px;border-color:#ddd;" cellspacing="0px" cellpadding="4px">
             <tr>
               <td>${groupByDimension}</td>
               <#assign itrCount = 0 >

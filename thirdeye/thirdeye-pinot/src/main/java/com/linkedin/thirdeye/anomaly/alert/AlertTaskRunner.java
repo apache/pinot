@@ -11,7 +11,6 @@ import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -294,7 +293,8 @@ public class AlertTaskRunner implements TaskRunner {
         for (int q = 0; q < numBuckets; q++) {
           int index = p * numBuckets + q;
           currentDimension = report.getResponseData().getResponseData().get(index)[dimensionIndex];
-          valueMap.put(String.valueOf(report.getTimeBuckets().get(q).getCurrentStart()), report.getResponseData().getResponseData().get(index)[valIndex]);
+          valueMap.put(String.valueOf(report.getTimeBuckets().get(q).getCurrentStart()), String
+              .format("%+.1f", report.getResponseData().getResponseData().get(index)[valIndex]));
         }
         dimensionValueMap.put(currentDimension, valueMap);
       }

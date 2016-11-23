@@ -98,6 +98,7 @@ create index raw_anomaly_result_feedback_idx on raw_anomaly_result_index(anomaly
 create index raw_anomaly_result_job_idx on raw_anomaly_result_index(job_id);
 create index raw_anomaly_result_merged_idx on raw_anomaly_result_index(merged);
 create index raw_anomaly_result_data_missing_idx on raw_anomaly_result_index(data_missing);
+create index raw_anomaly_result_start_time_idx on raw_anomaly_result_index(start_time);
 
 create table if not exists merged_anomaly_result_index (
     function_id bigint(20),
@@ -131,7 +132,6 @@ create table if not exists webapp_config_index (
 ) ENGINE=InnoDB;
 ALTER TABLE `webapp_config_index` ADD UNIQUE `webapp_config_unique_index`(`name`, `collection`, `type`);
 
-
 create table if not exists dataset_config_index (
     dataset varchar(200) not null,
     active boolean,
@@ -160,7 +160,6 @@ create index metric_config_dataset_idx on metric_config_index(dataset);
 create index metric_config_alias_idx on metric_config_index(alias);
 create index metric_config_active_idx on metric_config_index(active);
 
-
 create table if not exists dashboard_config_index (
     name varchar(200) not null,
     dataset varchar(200) not null,
@@ -188,7 +187,6 @@ ALTER TABLE `ingraph_metric_config_index` ADD UNIQUE `ingraph_metric_config_uniq
 create index ingraph_metric_config_metric_name_idx on ingraph_metric_config_index(metric_name);
 create index ingraph_metric_config_dashboard_name_idx on ingraph_metric_config_index(dashboard_name);
 
-
 create table if not exists ingraph_dashboard_config_index (
     name varchar(500) not null,
     bootstrap boolean,
@@ -201,7 +199,6 @@ ALTER TABLE `ingraph_dashboard_config_index` ADD UNIQUE `ingraph_dashboard_confi
 create index ingraph_dashboard_config_name_idx on ingraph_dashboard_config_index(name);
 create index ingraph_dashboard_config_bootstrap_idx on ingraph_dashboard_config_index(bootstrap);
 
-
 create table if not exists override_config_index (
     start_time bigint(20) NOT NULL,
     end_time bigint(20) NOT NULL,
@@ -213,3 +210,4 @@ create table if not exists override_config_index (
     version int(10)
 ) ENGINE=InnoDB;
 create index override_config_target_entity_idx on override_config_index(target_entity);
+create index override_config_target_start_time_idx on override_config_index(start_time);

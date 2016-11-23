@@ -576,7 +576,7 @@ function renderAnomalyThumbnails(data, extSourceLinkInfo, tab) {
     var result_anomalies_template = HandleBarsTemplates.template_anomalies(data);
     $("#" + tab + "-display-chart-section").append(result_anomalies_template);
 
-    attach_AnomalyTable_EventListeners()
+    attach_AnomalyTable_EventListeners();
 
     for (var i = 0, numAnomalies = data.length; i < numAnomalies; i++) {
         requestLineChart(i);

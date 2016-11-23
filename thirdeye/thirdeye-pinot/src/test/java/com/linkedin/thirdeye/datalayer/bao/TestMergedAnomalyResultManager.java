@@ -75,7 +75,8 @@ public class TestMergedAnomalyResultManager extends AbstractManagerTestBase {
     feedback.setFeedbackType(AnomalyFeedbackType.ANOMALY);
     feedback.setStatus(FeedbackStatus.NEW);
     anomalyMergedResult.setFeedback(feedback);
-    mergedResultDAO.save(anomalyMergedResult);
+    // now we need to make explicit call to anomaly update in order to update the feedback
+    mergedResultDAO.updateAnomalyFeedback(anomalyMergedResult);
 
     //verify feedback
     MergedAnomalyResultDTO mergedResult1 = mergedResultDAO.findById(mergedResult.getId());
