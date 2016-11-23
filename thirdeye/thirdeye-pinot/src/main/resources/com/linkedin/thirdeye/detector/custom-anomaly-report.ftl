@@ -18,7 +18,7 @@
   <tr>
     <td>
       <h3>Summary : </h3>
-      <table align="center" border="1" cellpadding="4px"
+      <table align="left" border="1" cellpadding="4px"
              style="width:100%;border-collapse: collapse; border-spacing: 0 margin-bottom: 15px; border-color:#ddd;">
         <tr>
           <th>Anomalies</th>
@@ -39,10 +39,14 @@
           <td>${nonActionableCount}</td>
         </tr>
       </table>
+    </td>
+  </tr>
 
-    <#if anomalyDetails?has_content>
+<#if anomalyDetails?has_content>
+  <tr>
+    <td>
       <h3>Details : </h3>
-      <table align="center" border="1" cellpadding="4px"
+      <table align="left" border="1" cellpadding="4px"
              style="width:100%;border-collapse: collapse; border-spacing: 0 margin-bottom: 15px; border-color:#ddd;">
         <tr>
           <th>Metric</th>
@@ -63,7 +67,7 @@
           </tr>
         </#list>
       </table>
-    </#if>
     </td>
   </tr>
+</#if>
 </table>

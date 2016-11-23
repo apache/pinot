@@ -110,7 +110,6 @@ public class GenerateAnomalyReport {
       System.exit(-1);
     }
 
-    List<AnomalyReportDTO> anomalyReportDTOList = new ArrayList<>();
     Set<String> metrics = new HashSet<>();
     int alertedAnomalies = 0;
     int feedbackCollected = 0;
@@ -118,33 +117,36 @@ public class GenerateAnomalyReport {
     int falseAlert = 0;
     int nonActionable = 0;
 
+    List<AnomalyReportDTO> anomalyReportDTOList = new ArrayList<>();
+
     for (MergedAnomalyResultDTO anomaly : anomalies) {
       metrics.add(anomaly.getMetric());
-      if (anomaly.isNotified()) {
-        alertedAnomalies++;
-      }
       if (anomaly.getFeedback() != null) {
         feedbackCollected++;
         if (anomaly.getFeedback().getFeedbackType().equals(AnomalyFeedbackType.ANOMALY)) {
           trueAlert++;
-        } else if (anomaly.getFeedback().getFeedbackType()
-            .equals(AnomalyFeedbackType.NOT_ANOMALY)) {
+        } else if (anomaly.getFeedback().getFeedbackType().equals(AnomalyFeedbackType.NOT_ANOMALY)) {
           falseAlert++;
         } else {
           nonActionable++;
         }
       }
-      String feedbackVal = getFeedback(
-          anomaly.getFeedback() == null ? "NA" : anomaly.getFeedback().getFeedbackType().name());
+      // include notified alerts only in the email
+      if (anomaly.isNotified()) {
+        alertedAnomalies++;
 
-      AnomalyReportDTO anomalyReportDTO =
-          new AnomalyReportDTO(String.valueOf(anomaly.getId()), feedbackVal,
-              String.format("%+.2f",anomaly.getWeight()), anomaly.getMetric(),
-              new Date(anomaly.getStartTime()).toString(),
-              String.format("%.2f",getTimeDiffInHours(anomaly.getStartTime(), anomaly.getEndTime())),
-              getAnomalyURL(anomaly));
+        String feedbackVal = getFeedback(
+            anomaly.getFeedback() == null ? "NA" : anomaly.getFeedback().getFeedbackType().name());
 
-      anomalyReportDTOList.add(anomalyReportDTO);
+        AnomalyReportDTO anomalyReportDTO =
+            new AnomalyReportDTO(String.valueOf(anomaly.getId()), feedbackVal,
+                String.format("%+.2f",anomaly.getWeight()), anomaly.getMetric(),
+                new Date(anomaly.getStartTime()).toString(),
+                String.format("%.2f",getTimeDiffInHours(anomaly.getStartTime(), anomaly.getEndTime())),
+                getAnomalyURL(anomaly));
+
+        anomalyReportDTOList.add(anomalyReportDTO);
+      }
     }
 
     Map<String, Object> templateData = new HashMap<>();
