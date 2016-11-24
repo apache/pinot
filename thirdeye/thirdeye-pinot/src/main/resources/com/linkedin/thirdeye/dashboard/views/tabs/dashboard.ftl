@@ -1,8 +1,21 @@
 <div class="container-fluid">
 	<div class="row bg-white row-bordered">
 		<div class="container top-buffer bottom-buffer ">
-			<label for="create-dashboard-button" class="view-anomaly-label">Dashboard:</label>
-			<button type="button" class="btn btn-link" id="create-dashboard-button">+Create New Dashboard</button>
+			<div class=row>
+				<div class="col-md-12">
+					<div style="float: left;">
+						<label for="create-dashboard-button" class="label-large-light">Dashboard:</label>
+					</div>
+					<div style="width:370px;float: left">
+						<select id="create-dashboard-button" class="form-control underlined label-large-light">
+							<option>100 most recent anomalies</option>
+						</select>
+					</div>
+					<div style="float: left">
+						<button type="button" class="btn btn-link label-medium-semibold" id="create-dashboard-button">+Create Custom Dashboard</button>
+					</div>
+				</div>
+			</div>
 		</div>
 	</div>
 </div>

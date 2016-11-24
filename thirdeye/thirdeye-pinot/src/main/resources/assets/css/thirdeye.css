@@ -4,36 +4,36 @@ body {
 	background-color: #F3F6F8;
 	color:#080808
 }
-
 .label-large-light {
 	font-weight: 100;
 	font-size: 23px;
-	margin-top: 5px;
+	padding-right:10px;
 }
 
 .label-medium-light {
 	font-weight: 100;
 	font-size: 15px;
-	color: black;
 }
 
 .label-medium-semibold {
 	font-weight: 400;
 	font-size: 15px;
-	color: black;
 }
 
 .label-small-semibold {
 	font-weight: 400;
 	font-size: 11px;
-	color: #8C8C8C;
 }
 
 .metric-label {
 	font-weight: 400;
 	font-size: 13px;
 }
-
+.underlined {
+	border-top:none;
+	border-right:none;
+	border-left:none;
+}
 /* Underline From Center */
 .hvr-underline-from-center {
 	display: inline-block;
@@ -162,10 +162,7 @@ hr {
 	/* You may want to include this as bootstrap applies these styles too */
 }
 
-.view-anomaly-label {
-	font-weight: 300;
-	font-size: 23px;
-}
+
 
 .box {
 	width: 27px;
