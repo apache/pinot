@@ -241,12 +241,20 @@ public class DashboardResource {
         currentEnd = currentEnd - delta;
         baselineEnd = baselineEnd - delta;
       }
+
+      // The input start and end time (i.e., currentStart, currentEnd, baselineStart, and
+      // baselineEnd) are given in millisecond since epoch, which is timezone insensitive. On the
+      // other hand, the start and end time of the request to be sent to backend database (e.g.,
+      // Pinot) could be converted to SimpleDateFormat, which is timezone sensitive. Therefore,
+      // we need to store user's start and end time in DateTime objects with data's timezone
+      // in order to ensure that the conversion to SimpleDateFormat is always correct regardless
+      // user and server's timezone, including daylight saving time.
       DateTimeZone timeZoneForCollection = Utils.getDataTimeZone(collection);
-//      DateTimeZone timeZoneForCollection = DateTimeZone.forID(timeZone);
       request.setBaselineStart(new DateTime(baselineStart, timeZoneForCollection));
       request.setBaselineEnd(new DateTime(baselineEnd, timeZoneForCollection));
       request.setCurrentStart(new DateTime(currentStart, timeZoneForCollection));
       request.setCurrentEnd(new DateTime(currentEnd, timeZoneForCollection));
+
       if (filterJson != null && !filterJson.isEmpty()) {
         filterJson = URLDecoder.decode(filterJson, "UTF-8");
         request.setFilters(ThirdEyeUtils.convertToMultiMap(filterJson));
@@ -291,10 +299,14 @@ public class DashboardResource {
       currentEnd = currentEnd - delta;
       baselineEnd = baselineEnd - delta;
     }
-    request.setBaselineStart(new DateTime(baselineStart, DateTimeZone.forID(timeZone)));
-    request.setBaselineEnd(new DateTime(baselineEnd, DateTimeZone.forID(timeZone)));
-    request.setCurrentStart(new DateTime(currentStart, DateTimeZone.forID(timeZone)));
-    request.setCurrentEnd(new DateTime(currentEnd, DateTimeZone.forID(timeZone)));
+
+    // See {@link #getDashboardData} for the reason that the start and end time are stored in a
+    // DateTime object with data's timezone.
+    DateTimeZone timeZoneForCollection = Utils.getDataTimeZone(collection);
+    request.setBaselineStart(new DateTime(baselineStart, timeZoneForCollection));
+    request.setBaselineEnd(new DateTime(baselineEnd, timeZoneForCollection));
+    request.setCurrentStart(new DateTime(currentStart, timeZoneForCollection));
+    request.setCurrentEnd(new DateTime(currentEnd, timeZoneForCollection));
     // filter
     if (filterJson != null && !filterJson.isEmpty()) {
       filterJson = URLDecoder.decode(filterJson, "UTF-8");
@@ -340,10 +352,14 @@ public class DashboardResource {
       baselineEnd = baselineEnd - delta;
     }
 
-    request.setBaselineStart(new DateTime(baselineStart, DateTimeZone.forID(timeZone)));
-    request.setBaselineEnd(new DateTime(baselineEnd, DateTimeZone.forID(timeZone)));
-    request.setCurrentStart(new DateTime(currentStart, DateTimeZone.forID(timeZone)));
-    request.setCurrentEnd(new DateTime(currentEnd, DateTimeZone.forID(timeZone)));
+    // See {@link #getDashboardData} for the reason that the start and end time are stored in a
+    // DateTime object with data's timezone.
+    DateTimeZone timeZoneForCollection = Utils.getDataTimeZone(collection);
+    request.setBaselineStart(new DateTime(baselineStart, timeZoneForCollection));
+    request.setBaselineEnd(new DateTime(baselineEnd, timeZoneForCollection));
+    request.setCurrentStart(new DateTime(currentStart, timeZoneForCollection));
+    request.setCurrentEnd(new DateTime(currentEnd, timeZoneForCollection));
+
     if (filterJson != null && !filterJson.isEmpty()) {
       filterJson = URLDecoder.decode(filterJson, "UTF-8");
       request.setFilters(ThirdEyeUtils.convertToMultiMap(filterJson));
@@ -389,10 +405,14 @@ public class DashboardResource {
       currentEnd = currentEnd - delta;
       baselineEnd = baselineEnd - delta;
     }
-    request.setBaselineStart(new DateTime(baselineStart, DateTimeZone.forID(timeZone)));
-    request.setBaselineEnd(new DateTime(baselineEnd, DateTimeZone.forID(timeZone)));
-    request.setCurrentStart(new DateTime(currentStart, DateTimeZone.forID(timeZone)));
-    request.setCurrentEnd(new DateTime(currentEnd, DateTimeZone.forID(timeZone)));
+
+    // See {@link #getDashboardData} for the reason that the start and end time are stored in a
+    // DateTime object with data's timezone.
+    DateTimeZone timeZoneForCollection = Utils.getDataTimeZone(collection);
+    request.setBaselineStart(new DateTime(baselineStart, timeZoneForCollection));
+    request.setBaselineEnd(new DateTime(baselineEnd, timeZoneForCollection));
+    request.setCurrentStart(new DateTime(currentStart, timeZoneForCollection));
+    request.setCurrentEnd(new DateTime(currentEnd, timeZoneForCollection));
 
     if (filterJson != null && !filterJson.isEmpty()) {
       filterJson = URLDecoder.decode(filterJson, "UTF-8");
@@ -432,8 +452,12 @@ public class DashboardResource {
 
     TimeSeriesRequest request = new TimeSeriesRequest();
     request.setCollectionName(collection);
-    request.setStart(new DateTime(start, DateTimeZone.forID(timeZone)));
-    request.setEnd(new DateTime(end, DateTimeZone.forID(timeZone)));
+
+    // See {@link #getDashboardData} for the reason that the start and end time are stored in a
+    // DateTime object with data's timezone.
+    DateTimeZone timeZoneForCollection = Utils.getDataTimeZone(collection);
+    request.setStart(new DateTime(start, timeZoneForCollection));
+    request.setEnd(new DateTime(end, timeZoneForCollection));
 
     if (groupByDimensions != null && !groupByDimensions.isEmpty()) {
       request.setGroupByDimensions(Arrays.asList(groupByDimensions.trim().split(",")));
