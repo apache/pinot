@@ -360,8 +360,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
       fixedPartitionSegmentName = new LLCSegmentName(segmentManager._paths.get(1));
     }
 
-    Assert.assertEquals(emptyPartitionSegmentName.getSequenceNumber(), PinotLLCRealtimeSegmentManager.STARTING_SEQUENCE_NULMBER);
-    Assert.assertEquals(fixedPartitionSegmentName.getSequenceNumber(), PinotLLCRealtimeSegmentManager.STARTING_SEQUENCE_NULMBER+1);
+    Assert.assertEquals(emptyPartitionSegmentName.getSequenceNumber(), PinotLLCRealtimeSegmentManager.STARTING_SEQUENCE_NUMBER);
+    Assert.assertEquals(fixedPartitionSegmentName.getSequenceNumber(), PinotLLCRealtimeSegmentManager.STARTING_SEQUENCE_NUMBER
+        +1);
 
     for (ZNRecord znRecord : segmentManager._records) {
       LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata(znRecord);
