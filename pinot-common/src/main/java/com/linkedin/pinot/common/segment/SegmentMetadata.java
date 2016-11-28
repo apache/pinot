@@ -15,158 +15,108 @@
  */
 package com.linkedin.pinot.common.segment;
 
-import java.io.File;
+import com.linkedin.pinot.common.data.MetricFieldSpec;
+import com.linkedin.pinot.common.data.Schema;
 import java.util.Map;
-
 import javax.annotation.Nullable;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
 
-import com.linkedin.pinot.common.data.Schema;
-
 
 /**
- * SegmentMetadata holds segment level management information and data
- * statistics.
+ * The <code>SegmentMetadata</code> class holds the segment level management information and data statistics.
  */
 public interface SegmentMetadata {
-  /**
-   * @return
-   */
-  public String getTableName();
 
-  /**
-   * @return
-   */
-  public String getIndexType();
+  String getTableName();
 
-  /**
-   * @return
-   */
-  public Duration getTimeGranularity();
+  String getIndexType();
 
-  /**
-   * @return
-   */
-  public Interval getTimeInterval();
+  Duration getTimeGranularity();
 
-  /**
-   * @return
-   */
-  public String getCrc();
+  Interval getTimeInterval();
 
-  /**
-   * @return
-   */
-  public String getVersion();
+  String getCrc();
 
-  /**
-   * @return
-   */
-  public Schema getSchema();
+  String getVersion();
 
-  /**
-   * @return
-   */
-  public String getShardingKey();
+  Schema getSchema();
 
-  /**
-   * @return
-   */
-  public int getTotalDocs();
+  String getShardingKey();
 
-  /**
-   *
-   * @return
-   */
+  int getTotalDocs();
+
   int getTotalRawDocs();
 
+  String getIndexDir();
+
+  String getName();
+
+  long getIndexCreationTime();
+
   /**
-   * @return
+   * Get the last time that this segment was pushed or <code>Long.MIN_VALUE</code> if it has never been pushed.
    */
-  public String getIndexDir();
+  long getPushTime();
 
   /**
-   * @return
+   * Get the last time that this segment was refreshed or <code>Long.MIN_VALUE</code> if it has never been refreshed.
    */
-  public String getName();
+  long getRefreshTime();
+
+  boolean hasDictionary(String columnName);
+
+  boolean hasStarTree();
+
+  @Nullable
+  StarTreeMetadata getStarTreeMetadata();
 
   /**
-   * @return
-   */
-  public long getIndexCreationTime();
-
-  /**
-   * Returns the last time that this segment was pushed or Long.MIN_VALUE if it has never been
-   * pushed.
-   */
-  public long getPushTime();
-
-  /**
-   * Returns the last time that this segment was refreshed or Long.MIN_VALUE if it has never been
-   * refreshed.
-   */
-  public long getRefreshTime();
-
-  /**
-   * Returns if a column has dictionary or not.
-   */
-  public boolean hasDictionary(String columnName);
-
-  /** Returns true if the segment has a StarTree index defined */
-  public boolean hasStarTree();
-
-  /**
-   * Returns the StarTreeMetadata for the segment
-   * @return
-   */
-  public StarTreeMetadata getStarTreeMetadata();
-
-  /**
-   * returns the forward Index file name with appropriate extension for a given version
-   * @param column
-   * @return
+   * Get the forward index file name with appropriate extension for a given version.
+   *
+   * @param column column name.
+   * @param segmentVersion segment version.
+   * @return forward index file name.
    */
   String getForwardIndexFileName(String column, String segmentVersion);
 
   /**
-   * returns the dictionary file name with appropriate extension for a given version
-   * @param column
-   * @return
+   * Get the dictionary file name with appropriate extension for a given version.
+   *
+   * @param column column name.
+   * @param segmentVersion segment version.
+   * @return dictionary file name.
    */
   String getDictionaryFileName(String column, String segmentVersion);
 
   /**
-   * returns the bitmap inverted index file name with appropriate extension for a given version
-   * @param column
-   * @return
+   * Get the bitmap inverted index file name with appropriate extension for a given version.
+   *
+   * @param column column name.
+   * @param segmentVersion segment version.
+   * @return bitmap inverted index file name.
    */
   String getBitmapInvertedIndexFileName(String column, String segmentVersion);
 
-  /**
-   * returns the name of the component that created the segment
-   * @return
-   */
   @Nullable
   String getCreatorName();
 
-  /**
-   * returns the padding character
-   * @return
-   */
-  Character getPaddingCharacter();
+  char getPaddingCharacter();
 
-  /**
-   * returns Hll Log2m parameter
-   * @return
-   */
   int getHllLog2m();
 
   /**
-   * @return
+   * Get the derived column name for the given original column and derived metric type.
+   *
+   * @param column original column name.
+   * @param derivedMetricType derived metric type.
+   * @return derived column name if exists.
+   *         null if not.
    */
-  public Map<String, String> toMap();
+  @Nullable
+  String getDerivedColumn(String column, MetricFieldSpec.DerivedMetricType derivedMetricType);
 
-  public boolean close();
+  Map<String, String> toMap();
 
+  boolean close();
 }

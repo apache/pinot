@@ -63,9 +63,8 @@ public class FilterPlanNode implements PlanNode {
     long start = System.currentTimeMillis();
     Operator operator;
     FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(_brokerRequest);
-    if (_segment.getSegmentMetadata().hasStarTree() &&
-        RequestUtils.isFitForStarTreeIndex(_segment.getSegmentMetadata(), filterQueryTree, _brokerRequest) &&
-        RequestUtils.performFastHllRewriting(_segment.getSegmentMetadata(), _brokerRequest)) {
+    if (_segment.getSegmentMetadata().hasStarTree()
+        && RequestUtils.isFitForStarTreeIndex(_segment.getSegmentMetadata(), filterQueryTree, _brokerRequest)) {
       operator = new StarTreeIndexOperator(_segment, _brokerRequest);
     } else {
       operator = constructPhysicalOperator(filterQueryTree);

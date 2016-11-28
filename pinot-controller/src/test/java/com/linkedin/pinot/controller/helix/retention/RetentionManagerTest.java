@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.helix.retention;
 
+import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.core.startree.hll.HllConstants;
 import java.io.File;
 import java.io.IOException;
@@ -452,12 +453,14 @@ public class RetentionManagerTest {
         throw new UnsupportedOperationException("getBitmapInvertedIndexFileName not supported in " + this.getClass());
       }
 
-      @Nullable @Override public String getCreatorName() {
+      @Nullable
+      @Override
+      public String getCreatorName() {
         return null;
       }
 
       @Override
-      public Character getPaddingCharacter() {
+      public char getPaddingCharacter() {
         return V1Constants.Str.DEFAULT_STRING_PAD_CHAR;
       }
 
@@ -466,6 +469,11 @@ public class RetentionManagerTest {
         return HllConstants.DEFAULT_LOG2M;
       }
 
+      @Nullable
+      @Override
+      public String getDerivedColumn(String column, MetricFieldSpec.DerivedMetricType derivedMetricType) {
+        return null;
+      }
     };
     return segmentMetadata;
   }
