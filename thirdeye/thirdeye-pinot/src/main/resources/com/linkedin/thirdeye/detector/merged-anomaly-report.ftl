@@ -10,8 +10,8 @@
     <td style="min-height: 30px; padding:10px 15px; font-family: 'Proxima Nova','Arial', 'Helvetica Neue',Helvetica, sans-serif;font-size:16px;font-weight:300; width:100%;display:inline;">
       <p style="margin-left:15px">Hello,</p>
       <p style="margin-left: 15px">You are receiving this email because you have subscribed to ThirdEye Anomaly detection service for '${collection}:${metric}'.<br/></p>
-      <p style="margin-left: 15px"> ThirdEye has analyzed your dataset for time range ${dateFormat(startTime)} to ${dateFormat(endTime)} (${timeZone}) and has detected <b>${anomalyCount} ${(anomalyCount == 1)?string("anomaly", "anomalies")}.</b> </p>
     <#if (anomalyCount > 0)>
+      <p style="margin-left: 15px"> ThirdEye has analyzed your dataset for time range ${dateFormat(startTime)} to ${dateFormat(endTime)} (${timeZone}) and has detected <b>${anomalyCount} ${(anomalyCount == 1)?string("anomaly", "anomalies")}.</b> </p>
       <p style="margin-left: 15px">Below is the full list of anomalies detected during this time period.</p>
     </#if>
     </td>
@@ -68,7 +68,7 @@
 </#if>
   <tr>
     <td>
-      Go to <a href="${dashboardHost}/dashboard#view=anomalies&dataset=${collection}&compareMode=WoW&aggTimeGranularity=${windowUnit}&currentStart=${startTime?c}&currentEnd=${endTime?c}&metrics=${metric}" target="_top">ThirdEye Anomalies Dashboard</a>
+      Go to <a href="${dashboardHost}/dashboard#view=anomalies&dataset=${collection}&compareMode=WoW&aggTimeGranularity=${windowUnit}&metrics=${metric}<#if (anomalyCount > 0) >&currentStart=${startTime?c}&currentEnd=${endTime?c}</#if>" target="_top">ThirdEye Anomalies Dashboard</a>
     </td>
   </tr>
 <#if (metricDimensionValueReports?has_content)>
