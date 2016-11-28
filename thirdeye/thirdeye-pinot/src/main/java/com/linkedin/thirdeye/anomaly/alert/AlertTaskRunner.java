@@ -11,10 +11,13 @@ import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeMap;
 
@@ -23,6 +26,7 @@ import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.commons.mail.EmailException;
 import org.apache.commons.mail.HtmlEmail;
+import org.apache.commons.math3.util.Pair;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.quartz.JobExecutionException;
@@ -219,6 +223,7 @@ public class AlertTaskRunner implements TaskRunner {
       freemarkerConfig.setDefaultEncoding(CHARSET);
       freemarkerConfig.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);
       Map<String, Object> templateData = new HashMap<>();
+
       String metric = alertConfig.getMetric();
       String windowUnit = alertConfig.getWindowUnit().toString();
       templateData.put("groupedAnomalyResults", convertToStringKeyBasedMap(groupedResults));
@@ -246,7 +251,7 @@ public class AlertTaskRunner implements TaskRunner {
         reportStartTs = reports.get(0).getTimeBuckets().get(0).getCurrentStart();
         metricDimensionValueReports = getReportListByMetric(reports);
         templateData.put("metricDimensionValueReports", metricDimensionValueReports);
-        templateData.put("reportStartDateTime", new DateTime(reportStartTs).toString());
+        templateData.put("reportStartDateTime", new Date(reportStartTs).toString());
       }
 
       Template template = freemarkerConfig.getTemplate("merged-anomaly-report.ftl");
@@ -286,18 +291,41 @@ public class AlertTaskRunner implements TaskRunner {
         groupByDimensionValueMap = new LinkedHashMap<>();
       }
 
+      // this is dimension vs timeBucketValue map, this should be sorted based on first bucket value
       Map<String, Map<String, String>> dimensionValueMap = new LinkedHashMap<>();
+      List<Pair<String, LinkedHashMap>> dimensionValueList = new ArrayList<>();
+
       for (int p = 0; p < numDimensions; p++) {
-        Map<String, String> valueMap = new LinkedHashMap<>();
+        // valueMap is timeBucket vs value map
+        LinkedHashMap<String, String> valueMap = new LinkedHashMap<>();
         String currentDimension = "";
         for (int q = 0; q < numBuckets; q++) {
           int index = p * numBuckets + q;
           currentDimension = report.getResponseData().getResponseData().get(index)[dimensionIndex];
           valueMap.put(String.valueOf(report.getTimeBuckets().get(q).getCurrentStart()), String
-              .format("%+.1f", report.getResponseData().getResponseData().get(index)[valIndex]));
+              .format("%+.1f", Double.valueOf(report.getResponseData().getResponseData().get(index)[valIndex])));
         }
-        dimensionValueMap.put(currentDimension, valueMap);
+        dimensionValueList.add(new Pair<>(currentDimension, valueMap));
       }
+
+      Collections.sort(dimensionValueList, new Comparator<Pair<String, LinkedHashMap>>() {
+        @Override public int compare(Pair<String, LinkedHashMap> o1,
+            Pair<String, LinkedHashMap> o2) {
+          Set<String> keys1 = o1.getSecond().keySet();
+          List<String> allKeys = new ArrayList<>();
+          allKeys.addAll(keys1);
+          String dim = allKeys.get(0);
+
+          Double key1 = Double.valueOf(o1.getSecond().get(dim).toString());
+          Double key2 = Double.valueOf(o2.getSecond().get(dim).toString());
+          return key1.compareTo(key2);
+        }
+      });
+
+      for (Pair<String, LinkedHashMap> dimensionValue  : dimensionValueList) {
+        dimensionValueMap.put(dimensionValue.getFirst(), dimensionValue.getSecond());
+      }
+
       groupByDimensionValueMap.put(groupByDimension, dimensionValueMap);
       ultimateResult.put(metric, groupByDimensionValueMap);
     }
