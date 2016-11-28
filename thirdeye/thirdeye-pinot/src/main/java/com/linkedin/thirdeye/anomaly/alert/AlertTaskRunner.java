@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.anomaly.alert;
 
-import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewResponse;
 import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
@@ -27,6 +26,7 @@ import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.commons.mail.EmailException;
 import org.apache.commons.mail.HtmlEmail;
+import org.apache.commons.math3.util.Pair;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.quartz.JobExecutionException;
@@ -308,15 +308,18 @@ public class AlertTaskRunner implements TaskRunner {
         dimensionValueList.add(new Pair<>(currentDimension, valueMap));
       }
 
-      Collections.sort(dimensionValueList, (o1, o2) -> {
-        Set<String> keys1 =  o1.getSecond().keySet();
-        List<String> allKeys = new ArrayList<>();
-        allKeys.addAll(keys1);
-        String dim = allKeys.get(0);
+      Collections.sort(dimensionValueList, new Comparator<Pair<String, LinkedHashMap>>() {
+        @Override public int compare(Pair<String, LinkedHashMap> o1,
+            Pair<String, LinkedHashMap> o2) {
+          Set<String> keys1 = o1.getSecond().keySet();
+          List<String> allKeys = new ArrayList<>();
+          allKeys.addAll(keys1);
+          String dim = allKeys.get(0);
 
-        Double key1 = Double.valueOf(o1.getSecond().get(dim).toString());
-        Double key2 = Double.valueOf(o2.getSecond().get(dim).toString());
-        return key1.compareTo(key2);
+          Double key1 = Double.valueOf(o1.getSecond().get(dim).toString());
+          Double key2 = Double.valueOf(o2.getSecond().get(dim).toString());
+          return key1.compareTo(key2);
+        }
       });
 
       for (Pair<String, LinkedHashMap> dimensionValue  : dimensionValueList) {
