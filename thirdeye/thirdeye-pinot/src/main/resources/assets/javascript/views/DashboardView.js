@@ -16,6 +16,23 @@ DashboardView.prototype = {
 }
 
 function renderDashboardTab() {
+
+  // DASHBOARD SELECTION
+  var countries = [ {
+    value : 'Andorra',
+    data : 'AD'
+  },
+  {
+    value : 'Zimbabwe',
+    data : 'ZZ'
+  } ];
+  $('#dashboard-input').autocomplete({
+    lookup : countries,
+    onSelect : function(suggestion) {
+      alert('You selected: ' + suggestion.value + ', ' + suggestion.data);
+    }
+  });
+
   // TIME RANGE SELECTION
   var start = moment().subtract(1, 'days');
   var end = moment();
