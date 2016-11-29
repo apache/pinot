@@ -21,6 +21,17 @@ import java.io.StringWriter;
 
 
 public class QueryException {
+  private QueryException() {
+  }
+
+  private static int _maxLinesOfStackTrace = 15;
+
+  // TODO: config max lines of stack trace if necessary. The config should be on instance level.
+  public static void setMaxLinesOfStackTrace(int maxLinesOfStackTrace) {
+    _maxLinesOfStackTrace = maxLinesOfStackTrace;
+  }
+
+  // TODO: several ProcessingExceptions are never used, clean them up.
   public static final int JSON_PARSING_ERROR_CODE = 100;
   public static final int JSON_COMPILATION_ERROR_CODE = 101;
   public static final int PQL_PARSING_ERROR_CODE = 150;
@@ -63,7 +74,6 @@ public class QueryException {
       new ProcessingException(FEDERATED_BROKER_UNAVAILABLE_ERROR_CODE);
   public static final ProcessingException COMBINE_GROUP_BY_EXCEPTION_ERROR =
       new ProcessingException(COMBINE_GROUP_BY_EXCEPTION_ERROR_CODE);
-
   public static final ProcessingException QUERY_VALIDATION_ERROR = new ProcessingException(QUERY_VALIDATION_ERROR_CODE);
   public static final ProcessingException UNKNOWN_ERROR = new ProcessingException(UNKNOWN_ERROR_CODE);
 
@@ -72,31 +82,40 @@ public class QueryException {
     JSON_COMPILATION_ERROR.setMessage("JsonCompilationError");
     PQL_PARSING_ERROR.setMessage("PQLParsingError");
     SEGMENT_PLAN_EXECUTION_ERROR.setMessage("SegmentPlanExecutionError");
-    COMBINE_SEGMENT_PLAN_TIMEOUT_ERROR.setMessage("CombineSegmentPlanTimeOut");
+    COMBINE_SEGMENT_PLAN_TIMEOUT_ERROR.setMessage("CombineSegmentPlanTimeoutError");
     QUERY_EXECUTION_ERROR.setMessage("QueryExecutionError");
-    EXECUTION_TIMEOUT_ERROR.setMessage("ExecutionTimeout");
+    EXECUTION_TIMEOUT_ERROR.setMessage("ExecutionTimeoutError");
     BROKER_GATHER_ERROR.setMessage("BrokerGatherError");
     FUTURE_CALL_ERROR.setMessage("FutureCallError");
-    BROKER_TIMEOUT_ERROR.setMessage("BrokerTimeout");
+    BROKER_TIMEOUT_ERROR.setMessage("BrokerTimeoutError");
     BROKER_RESOURCE_MISSING_ERROR.setMessage("BrokerResourceMissingError");
     BROKER_INSTANCE_MISSING_ERROR.setMessage("BrokerInstanceMissingError");
     INTERNAL_ERROR.setMessage("InternalError");
     MERGE_RESPONSE_ERROR.setMessage("MergeResponseError");
-    FEDERATED_BROKER_UNAVAILABLE_ERROR.setMessage("FederatedBrokerUnavailable");
+    FEDERATED_BROKER_UNAVAILABLE_ERROR.setMessage("FederatedBrokerUnavailableError");
+    COMBINE_GROUP_BY_EXCEPTION_ERROR.setMessage("CombineGroupByExceptionError");
     QUERY_VALIDATION_ERROR.setMessage("QueryValidationError");
     UNKNOWN_ERROR.setMessage("UnknownError");
   }
 
   public static ProcessingException getException(ProcessingException processingException, Exception exception,
-      int sizeOfStackTraceToTruncate) {
-    ProcessingException retProcessingException = processingException.deepCopy();
-    StringWriter sw = new StringWriter(sizeOfStackTraceToTruncate);
-    exception.printStackTrace(new PrintWriter(sw));
-    retProcessingException.setMessage(sw.toString());
-    return retProcessingException;
+      int maxLinesOfStackTrace) {
+    String errorType = processingException.getMessage();
+    ProcessingException copiedProcessingException = processingException.deepCopy();
+    StringWriter stringWriter = new StringWriter();
+    exception.printStackTrace(new PrintWriter(stringWriter));
+    String fullStackTrace = stringWriter.toString();
+    String[] lines = fullStackTrace.split("\n");
+    int numLinesOfStackTrace = Math.min(lines.length, maxLinesOfStackTrace);
+    int lengthOfStackTrace = numLinesOfStackTrace - 1;
+    for (int i = 0; i < numLinesOfStackTrace; i++) {
+      lengthOfStackTrace += lines[i].length();
+    }
+    copiedProcessingException.setMessage(errorType + ":\n" + fullStackTrace.substring(0, lengthOfStackTrace));
+    return copiedProcessingException;
   }
 
   public static ProcessingException getException(ProcessingException processingException, Exception exception) {
-    return getException(processingException, exception, 1000);
+    return getException(processingException, exception, _maxLinesOfStackTrace);
   }
 }
