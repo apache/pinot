@@ -15,6 +15,9 @@
  */
 package com.linkedin.pinot.controller.api.restlet.resources;
 
+import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.exception.QueryException;
+import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
@@ -23,69 +26,62 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Random;
 import java.util.Set;
-
 import org.apache.helix.model.InstanceConfig;
 import org.json.JSONObject;
+import org.restlet.data.Form;
 import org.restlet.representation.Representation;
 import org.restlet.representation.StringRepresentation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.exception.QueryException;
-import com.linkedin.pinot.pql.parsers.Pql2Compiler;
-
 public class PqlQueryResource extends BasePinotControllerRestletResource {
-
   private static final Logger LOGGER = LoggerFactory.getLogger(PqlQueryResource.class);
   private static final Pql2Compiler REQUEST_COMPILER = new Pql2Compiler();
-
-  public PqlQueryResource() {
-  }
+  private static final Random RANDOM = new Random();
 
   @Override
   public Representation get() {
-    LOGGER.info("Running query: " + getQuery());
-    final String pqlString = getQuery().getValues("pql");
-    final String traceEnabled = getQuery().getValues("trace");
-
-    LOGGER.info("*** found pql : " + pqlString);
-
-    final String resource;
     try {
-      resource = REQUEST_COMPILER.compileToBrokerRequest(pqlString).getQuerySource().getTableName();
-    } catch (final Exception e) {
-      LOGGER.error("Caught exception while processing get request", e);
-      return new StringRepresentation(QueryException.BROKER_RESOURCE_MISSING_ERROR.toString());
-    }
+      Form query = getQuery();
+      LOGGER.debug("Running query: " + query);
+      String pqlQuery = query.getValues("pql");
+      String traceEnabled = query.getValues("trace");
 
-    final String instanceId;
-    final InstanceConfig config;
-    try {
-      final List<String> instanceIds = _pinotHelixResourceManager.getBrokerInstancesFor(resource);
+      // Get resource table name.
+      String tableName;
+      try {
+        tableName = REQUEST_COMPILER.compileToBrokerRequest(pqlQuery).getQuerySource().getTableName();
+      } catch (Exception e) {
+        LOGGER.error("Caught exception while compiling PQL query: " + pqlQuery, e);
+        return new StringRepresentation(QueryException.getException(QueryException.PQL_PARSING_ERROR, e).toString());
+      }
+
+      // Get brokers for the resource table.
+      List<String> instanceIds = _pinotHelixResourceManager.getBrokerInstancesFor(tableName);
+      if (instanceIds.isEmpty()) {
+        return new StringRepresentation(QueryException.BROKER_RESOURCE_MISSING_ERROR.toString());
+      }
+
+      // Retain only online brokers.
       instanceIds.retainAll(_pinotHelixResourceManager.getOnlineInstanceList());
       if (instanceIds.isEmpty()) {
         return new StringRepresentation(QueryException.BROKER_INSTANCE_MISSING_ERROR.toString());
-      } else {
-        Collections.shuffle(instanceIds);
-        instanceId = instanceIds.get(0);
-        config = _pinotHelixResourceManager.getHelixInstanceConfig(instanceId);
       }
-    } catch (final Exception e) {
+
+      // Send query to a random broker.
+      String instanceId = instanceIds.get(RANDOM.nextInt(instanceIds.size()));
+      InstanceConfig instanceConfig = _pinotHelixResourceManager.getHelixInstanceConfig(instanceId);
+      String url = "http://" + instanceConfig.getHostName().split("_")[1] + ":" + instanceConfig.getPort() + "/query";
+      return new StringRepresentation(sendPQLRaw(url, pqlQuery, traceEnabled));
+    } catch (Exception e) {
       LOGGER.error("Caught exception while processing get request", e);
-      return new StringRepresentation(QueryException.BROKER_INSTANCE_MISSING_ERROR.toString());
+      return new StringRepresentation(QueryException.getException(QueryException.INTERNAL_ERROR, e).toString());
     }
-
-
-    String url = "http://" + config.getHostName().split("_")[1] + ":" + config.getPort() + "/query";
-    final String resp = sendPQLRaw(url, pqlString, traceEnabled );
-
-    return new StringRepresentation(resp);
   }
 
   public String sendPostRaw(String urlStr, String requestStr, Map<String, String> headers) {
