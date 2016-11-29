@@ -44,11 +44,11 @@ public class SegmentWithHllIndexCreateHelper {
   private final File inputAvro;
   private final String timeColumnName;
   private final TimeUnit timeUnit;
-  private final String segmentName = "starTreeSegment";
+  private String segmentName = "starTreeSegment";
   private Schema schema;
 
-  public SegmentWithHllIndexCreateHelper(String tableName, String avroDataPath,
-      String timeColumnName, TimeUnit timeUnit) throws IOException {
+  public SegmentWithHllIndexCreateHelper(String tableName, String avroDataPath, String timeColumnName,
+      TimeUnit timeUnit, String segmentName) throws IOException {
     INDEX_DIR = Files.createTempDirectory(SegmentWithHllIndexCreateHelper.class.getName() + "_" + tableName).toFile();
     LOGGER.info("INDEX_DIR: {}", INDEX_DIR.getAbsolutePath());
     String filePath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(avroDataPath));
@@ -57,6 +57,7 @@ public class SegmentWithHllIndexCreateHelper {
     this.timeColumnName = timeColumnName;
     this.timeUnit = timeUnit;
     this.tableName = tableName;
+    this.segmentName = segmentName;
   }
 
   /**

@@ -25,19 +25,29 @@ import com.linkedin.pinot.core.data.manager.offline.FileBasedInstanceDataManager
 import com.linkedin.pinot.core.data.manager.offline.TableDataManagerProvider;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
+import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
 import com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.startree.hll.HllConfig;
 import com.linkedin.pinot.core.startree.hll.HllConstants;
+import com.linkedin.pinot.core.startree.hll.HllUtil;
 import com.linkedin.pinot.core.startree.hll.SegmentWithHllIndexCreateHelper;
+import com.linkedin.pinot.util.TestUtils;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import org.apache.avro.Schema;
+import org.apache.avro.file.DataFileStream;
+import org.apache.avro.file.DataFileWriter;
+import org.apache.avro.generic.GenericData;
+import org.apache.avro.generic.GenericDatumWriter;
+import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -92,9 +102,8 @@ public class HllIndexSentinelTest {
   @BeforeClass
   public void setup() throws Exception {
     setupTableManager();
-
     // Setup Segment
-    helper = new SegmentWithHllIndexCreateHelper(tableName, AVRO_DATA, timeColumnName, timeUnit);
+    helper = new SegmentWithHllIndexCreateHelper(tableName, AVRO_DATA, timeColumnName, timeUnit, "starTreeSegment");
     SegmentIndexCreationDriver driver = helper.build(true, hllConfig);
     File segmentFile = helper.getSegmentDirectory();
     segmentName = helper.getSegmentName();
@@ -108,11 +117,12 @@ public class HllIndexSentinelTest {
     QUERY_EXECUTOR = new ServerQueryExecutorV1Impl(false);
     QUERY_EXECUTOR.init(serverConf.subset("pinot.server.query.executor"), instanceDataManager, new ServerMetrics(
         new MetricsRegistry()));
+
   }
 
   @AfterClass
   public void tearDown() {
-    helper.cleanTempDir();
+//    helper.cleanTempDir();
   }
 
   @Test
@@ -180,6 +190,72 @@ public class HllIndexSentinelTest {
                       " group by " + gbyColumn + " limit 0", null), serverMetrics);
           LOGGER.debug(ret.toString());
         }
+      }
+    }
+  }
+
+  @Test
+  public void testHllOnPregeneratedColumn()
+      throws Exception {
+    // First read avro file and generate avro file with an hll column
+
+    File newAvroDir = Files.createTempDirectory(HllIndexSentinelTest.class.getName() + "_PregeneratedHllAvro").toFile();
+    File newAvroFile = new File(newAvroDir, "data.avro");
+    DataFileStream<GenericRecord> avroReader = null;
+    try {
+      String filePath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(AVRO_DATA));
+      avroReader = AvroUtils.getAvroReader(new File(filePath));
+      Schema currentSchema = avroReader.getSchema();
+      List<Schema.Field> fields = currentSchema.getFields();
+      final String hllColumnName = "column1Hll";
+      final int log2m = 12;
+      List<Schema.Field> newFieldList =  new ArrayList<>(fields.size());
+      for (Schema.Field field : fields) {
+        newFieldList.add(new Schema.Field(field.name(), field.schema(), field.doc(), field.defaultValue()));
+      }
+      newFieldList.add(new Schema.Field(hllColumnName, Schema.create(Schema.Type.STRING), null, null));
+      Schema updatedSchema = Schema.createRecord(newFieldList);
+
+      try (DataFileWriter<GenericData.Record> writer = new DataFileWriter<GenericData.Record>(new GenericDatumWriter<GenericData.Record>(updatedSchema))) {
+        writer.create(updatedSchema, newAvroFile);
+        while (avroReader.hasNext()) {
+          GenericRecord record = avroReader.next();
+          GenericData.Record newRecord = new GenericData.Record(updatedSchema);
+          for (Schema.Field field : fields) {
+            newRecord.put(field.name(),record.get(field.name()));
+          }
+          newRecord.put(hllColumnName, HllUtil.singleValueHllAsString(log2m, record.get("column1")));
+          writer.append(newRecord);
+        }
+      }
+
+      SegmentWithHllIndexCreateHelper segmentGenHelper =
+          new SegmentWithHllIndexCreateHelper(tableName, AVRO_DATA, timeColumnName, timeUnit, "pregeneratedSegment");
+      SegmentIndexCreationDriver driver = segmentGenHelper.build(true, hllConfig);
+      File segmentFile = segmentGenHelper.getSegmentDirectory();
+      String newSegmentName = segmentGenHelper.getSegmentName();
+      LOGGER.debug("************************** Segment Directory: " + segmentFile.getAbsolutePath());
+
+      // Load Segment
+      final IndexSegment indexSegment = ColumnarSegmentLoader.load(segmentFile, ReadMode.mmap);
+      instanceDataManager.getTableDataManager(tableName).addSegment(indexSegment);
+
+      // Init Query Executor
+      final List<TestSimpleAggreationQuery> aggCalls = new ArrayList<>();
+        aggCalls.add(new TestSimpleAggreationQuery(
+            "select fasthll(column1) from " + tableName +
+                " where column1 > 100000 limit 0",
+            0.0));
+        aggCalls.add(new TestSimpleAggreationQuery(
+             "select distinctcounthll(column1) from " + tableName +
+                " where column1 > 100000 limit 0",
+            0.0));
+        ApproximateQueryTestUtil.runApproximationQueries(
+            QUERY_EXECUTOR, newSegmentName, aggCalls, approximationThreshold, serverMetrics);
+
+    } finally {
+      if (avroReader != null) {
+        avroReader.close();
       }
     }
   }

@@ -89,7 +89,10 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   long totalIndexTime = 0;
   long totalStatsCollectorTime = 0;
   boolean createStarTree = false;
-  boolean enableHllIndex = false;
+  // flag indicates if the this segment generator code
+  // will create the HLL index for the given columns.
+  // This will be false if HLL column is provided to us
+  boolean createHllIndex = false;
 
   private File starTreeTempDir;
 
@@ -107,11 +110,17 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     dataSchema = recordReader.getSchema();
 
     if (config.getHllConfig() != null) {
-      if (!createStarTree) {
-        throw new IllegalArgumentException("Derived HLL fields generation will not work if StarTree is not enabled.");
-      } else {
-        enableHllIndex = true;
-      }
+      HllConfig hllConfig = config.getHllConfig();
+      // create hll index is true only if we're provided with columns to
+      // generate HLL fields
+      if (hllConfig.getColumnsToDeriveHllFields() != null) {
+        if (!createStarTree) {
+          throw new IllegalArgumentException("Derived HLL fields generation will not work if StarTree is not enabled.");
+        } else {
+          createHllIndex = true;
+        }
+      } // else columnsToDeriveHllFields is null...don't do anything in this case
+        // segment seal() will write the log2m value to the metadata
     }
 
     addDerivedFieldsInSchema();
@@ -142,7 +151,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   }
 
   private void addDerivedFieldsInSchema() {
-    if (enableHllIndex) {
+    if (createHllIndex) {
       Collection<String> columnNames = dataSchema.getColumnNames();
       HllConfig hllConfig = config.getHllConfig();
       for (String derivedFieldName : hllConfig.getDerivedHllFieldToOriginMap().keySet()) {
@@ -161,7 +170,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   private void populateDefaultDerivedColumnValues(GenericRow row)
       throws IOException {
     //add default hll value in each row
-    if (enableHllIndex) {
+    if (createHllIndex) {
       HllConfig hllConfig = config.getHllConfig();
       for (Entry<String, String> entry : hllConfig.getDerivedHllFieldToOriginMap().entrySet()) {
         String derivedFieldName = entry.getKey();
