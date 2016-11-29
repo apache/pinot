@@ -92,7 +92,7 @@ public class HllIndexCreationTest {
     try {
       LOGGER.debug("================ Without StarTree ================");
       helper = new SegmentWithHllIndexCreateHelper(
-          "noStarTree", AVRO_DATA, timeColumnName, timeUnit, "starTreeSegment");
+          "noStarTree", getClass().getClassLoader().getResource(AVRO_DATA), timeColumnName, timeUnit, "starTreeSegment");
       SegmentIndexCreationDriver driver = helper.build(false, null);
       LOGGER.debug("================ Cardinality ================");
       for (String name : helper.getSchema().getColumnNames()) {
@@ -117,7 +117,7 @@ public class HllIndexCreationTest {
     try {
       LOGGER.debug("================ With StarTree ================");
       helper = new SegmentWithHllIndexCreateHelper(
-          "withStarTree", AVRO_DATA, timeColumnName, timeUnit, "starTreeSegment");
+          "withStarTree", getClass().getClassLoader().getResource(AVRO_DATA), timeColumnName, timeUnit, "starTreeSegment");
       SegmentIndexCreationDriver driver = helper.build(true, hllConfig);
       LOGGER.debug("================ Cardinality ================");
       for (String name : helper.getSchema().getColumnNames()) {
@@ -158,7 +158,7 @@ public class HllIndexCreationTest {
     SegmentWithHllIndexCreateHelper helper = null;
     try {
       helper = new SegmentWithHllIndexCreateHelper(
-          "testConvert", AVRO_DATA, timeColumnName, timeUnit, "starTreeSegment");
+          "testConvert", getClass().getClassLoader().getResource(AVRO_DATA), timeColumnName, timeUnit, "starTreeSegment");
 
       SegmentIndexCreationDriver driver = helper.build(true, hllConfig);
 

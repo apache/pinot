@@ -41,11 +41,6 @@ import org.apache.commons.collections.Predicate;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 
-
-/**
- * Oct 17, 2014
- */
-
 public class AvroQueryGenerator {
 
   public interface TestAggreationQuery {
