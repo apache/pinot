@@ -15,11 +15,12 @@
  */
 package com.linkedin.pinot.core.common;
 
+import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.data.FieldSpec;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
@@ -33,31 +34,32 @@ public class DataFetcher {
   private static final BlockId BLOCK_ZERO = new BlockId(0);
 
   private final Map<String, BaseOperator> _columnToDataSourceMap;
-  private final Map<String, Block> _columnToBlockMap;
   private final Map<String, Dictionary> _columnToDictionaryMap;
   private final Map<String, BlockValSet> _columnToBlockValSetMap;
+  private final Map<String, BlockValIterator> _columnToBlockValIteratorMap;
   private final Map<String, BlockMetadata> _columnToBlockMetadataMap;
 
   /**
    * Constructor for DataFetcher.
    *
-   * @param indexSegment index segment.
+   * @param columnToDataSourceMap Map from column name to data source
    */
   public DataFetcher(Map<String, BaseOperator> columnToDataSourceMap) {
     _columnToDataSourceMap = columnToDataSourceMap;
-    _columnToBlockMap = new HashMap<>();
     _columnToDictionaryMap = new HashMap<>();
     _columnToBlockValSetMap = new HashMap<>();
+    _columnToBlockValIteratorMap = new HashMap<>();
     _columnToBlockMetadataMap = new HashMap<>();
+
     for (String column : columnToDataSourceMap.keySet()) {
       BaseOperator baseOperator = columnToDataSourceMap.get(column);
       Block block = baseOperator.nextBlock(BLOCK_ZERO);
-      _columnToBlockMap.put(column, block);
       _columnToDictionaryMap.put(column, block.getMetadata().getDictionary());
+
       BlockValSet blockValSet = block.getBlockValueSet();
       _columnToBlockValSetMap.put(column, blockValSet);
-      _columnToBlockMetadataMap.put(column,block.getMetadata());
-
+      _columnToBlockValIteratorMap.put(column, blockValSet.iterator());
+      _columnToBlockMetadataMap.put(column, block.getMetadata());
     }
   }
 
@@ -68,12 +70,7 @@ public class DataFetcher {
    * @return data source associated with this column.
    */
   public BaseOperator getDataSourceForColumn(String column) {
-    BaseOperator dataSource = _columnToDataSourceMap.get(column);
-    return dataSource;
-  }
-
-  public Block getBlockForColumn(String column) {
-    return _columnToBlockMap.get(column);
+    return _columnToDataSourceMap.get(column);
   }
 
   /**
@@ -83,8 +80,7 @@ public class DataFetcher {
    * @return dictionary associated with this column.
    */
   public Dictionary getDictionaryForColumn(String column) {
-    Dictionary dictionary = _columnToDictionaryMap.get(column);
-    return dictionary;
+    return _columnToDictionaryMap.get(column);
   }
 
   /**
@@ -94,8 +90,17 @@ public class DataFetcher {
    * @return block value set associated with this column.
    */
   public BlockValSet getBlockValSetForColumn(String column) {
-    BlockValSet blockValSet = _columnToBlockValSetMap.get(column);
-    return blockValSet;
+    return _columnToBlockValSetMap.get(column);
+  }
+
+  /**
+   * Returns the BlockValIterator for the specified column.
+   *
+   * @param column Column for which to return the blockValIterator.
+   * @return BlockValIterator for the column.
+   */
+  public BlockValIterator getBlockValIteratorForColumn(String column) {
+    return _columnToBlockValIteratorMap.get(column);
   }
 
   public BlockMetadata getBlockMetadataFor(String column) {
@@ -113,7 +118,7 @@ public class DataFetcher {
    */
   public void fetchSingleDictIds(String column, int[] inDocIds, int inStartPos, int length, int[] outDictIds, int outStartPos) {
     BlockValSet blockValSet = getBlockValSetForColumn(column);
-    blockValSet.readIntValues(inDocIds, inStartPos, length, outDictIds, outStartPos);
+    blockValSet.getDictionaryIds(inDocIds, inStartPos, length, outDictIds, outStartPos);
   }
 
   /**
@@ -142,7 +147,7 @@ public class DataFetcher {
    * For a given multi-value column, trying to get the max number of
    * entries per row.
    *
-   * @param column
+   * @param column Column for which to get the max number of multi-values.
    * @return max number of entries for a given column.
    */
   public int getMaxNumberOfEntriesForColumn(String column) {
@@ -242,6 +247,15 @@ public class DataFetcher {
     }
   }
 
-
-
+  /**
+   * Returns the data type for the specified column.
+   *
+   * @param column Name of column for which to return the data type.
+   * @return Data type of the column.
+   */
+  public FieldSpec.DataType getDataType(String column) {
+    BlockMetadata blockMetadata = _columnToBlockMetadataMap.get(column);
+    Preconditions.checkNotNull(blockMetadata, "Invalid column " + column + " specified in DataFetcher.");
+    return blockMetadata.getDataType();
+  }
 }

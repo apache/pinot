@@ -106,7 +106,7 @@ public class SumAggregationFunction implements AggregationFunction<Double, Doubl
     while (current < docIdLength) {
       int pending = (docIdLength - current);
       int batchLimit = (pending > vectorSize) ? vectorSize : pending;
-      blockValueSet.readIntValues(docIds, current, batchLimit, dictIds, 0);
+      blockValueSet.getDictionaryIds(docIds, current, batchLimit, dictIds, 0);
       dictionaryReader.readDoubleValues(dictIds, 0, batchLimit, values, 0);
       for (int vi = 0; vi < batchLimit; vi++) {
         ret += values[vi];

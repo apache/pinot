@@ -36,6 +36,18 @@ public final class RealtimeSingleValueSet implements BlockValSet {
   }
 
   @Override
+  public <T> T getSingleValues() {
+    throw new UnsupportedOperationException(
+        "Reading a batch of values is not supported for realtime single-value BlockValSet.");
+  }
+
+  @Override
+  public <T> T getMultiValues() {
+    throw new UnsupportedOperationException(
+        "Reading a batch of values is not supported for realtime single-value BlockValSet.");
+  }
+
+  @Override
   public BlockValIterator iterator() {
     return new RealtimeSingleValueIterator(reader, length, dataType);
   }
@@ -46,11 +58,23 @@ public final class RealtimeSingleValueSet implements BlockValSet {
   }
 
   @Override
-  public void readIntValues(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outDictionaryIds, int outStartPos) {
+  public void getDictionaryIds(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outDictionaryIds, int outStartPos) {
     int endPos = inStartPos + inDocIdsSize;
     for (int iter = inStartPos; iter < endPos; ++iter) {
       int row = inDocIds[iter];
       outDictionaryIds[outStartPos++] = reader.getInt(row);
     }
+  }
+
+  @Override
+  public int[] getDictionaryIds() {
+    throw new UnsupportedOperationException(
+        "Unsupported operation 'getDictionaryIds' for realtime single-value BlockValSet.");
+  }
+
+  @Override
+  public int getDictionaryIdsForDocId(int docId, int[] outputDictIds) {
+    throw new UnsupportedOperationException(
+        "Reading value for a given docId is not supported in realtime single-value set");
   }
 }

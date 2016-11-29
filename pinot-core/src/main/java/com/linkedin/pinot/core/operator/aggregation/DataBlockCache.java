@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.core.operator.aggregation;
 
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.common.BlockMetadata;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -91,7 +93,7 @@ public class DataBlockCache {
    * @param column column name.
    * @return dictionary id array associated with this column.
    */
-  private int[] getDictIdArrayForColumn(String column) {
+  public int[] getDictIdArrayForColumn(String column) {
     int[] dictIds = _columnToDictIdsMap.get(column);
     if (!_columnDictIdLoaded.contains(column)) {
       if (dictIds == null) {
@@ -292,4 +294,32 @@ public class DataBlockCache {
     return stringsArray;
   }
 
+  /**
+   * Returns the data type of the specified column.
+   *
+   * @param column Column for which to return the data type.
+   * @return Data type of the column.
+   */
+  public FieldSpec.DataType getDataType(String column) {
+    return _dataFetcher.getDataType(column);
+  }
+
+  /**
+   * Returns the block metadata for the given column.
+   *
+   * @param column Column for which to get the metadata
+   * @return Metadata for the column
+   */
+  public BlockMetadata getMetadataFor(String column) {
+    return _dataFetcher.getBlockMetadataFor(column);
+  }
+
+  /**
+   * Returns the data fetcher
+   *
+   * @return Data fetcher
+   */
+  public DataFetcher getDataFetcher() {
+    return _dataFetcher;
+  }
 }

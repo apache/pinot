@@ -17,11 +17,9 @@ package com.linkedin.pinot.core.operator.aggregation.groupby;
 
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockMetadata;
-import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.common.DataFetcher;
 import com.linkedin.pinot.core.operator.aggregation.ResultHolderFactory;
-import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
+import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupByConstants;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import it.unimi.dsi.fastutil.ints.Int2LongOpenHashMap;
@@ -65,6 +63,7 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
     ARRAY_MAP_BASED
   }
 
+  private final String[] _groupByColumns;
   private final int _numGroupByColumns;
   private final int[] _cardinalities;
   private long _cardinalityProduct = 1L;
@@ -73,10 +72,9 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
   private final StorageType _storageType;
 
   private final Dictionary[] _dictionaries;
-  // For single value columns.
-  private final BlockValSet[] _singleBlockValSets;
-  // For multi value columns.
-  private final BlockMultiValIterator[] _multiValIterators;
+
+  // For projectionBlockValSet of columns.
+  private final BlockValSet[] _blockValSets;
 
   // Reusable arrays for single value columns.
   private final int[][] _reusableSingleDictIds;
@@ -114,16 +112,17 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
   /**
    * Constructor for the class. Initializes data members (reusable arrays).
    *
-   * @param dataFetcher data fetcher.
+   * @param projectionBlock Projection block for which to generate group keys
    * @param groupByColumns group-by columns.
    */
-  public DefaultGroupKeyGenerator(DataFetcher dataFetcher, String[] groupByColumns) {
+  public DefaultGroupKeyGenerator(ProjectionBlock projectionBlock, String[] groupByColumns) {
     _numGroupByColumns = groupByColumns.length;
+    _groupByColumns = groupByColumns;
+
     _cardinalities = new int[_numGroupByColumns];
     _isSingleValueGroupByColumn = new boolean[_numGroupByColumns];
     _dictionaries = new Dictionary[_numGroupByColumns];
-    _singleBlockValSets = new BlockValSet[_numGroupByColumns];
-    _multiValIterators = new BlockMultiValIterator[_numGroupByColumns];
+    _blockValSets = new BlockValSet[_numGroupByColumns];
     _reusableSingleDictIds = new int[_numGroupByColumns][];
 
     // Track the max number of values among all multi value group-by columns.
@@ -131,7 +130,7 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
 
     boolean longOverflow = false;
     for (int i = 0; i < _numGroupByColumns; i++) {
-      Block block = dataFetcher.getBlockForColumn(groupByColumns[i]);
+      Block block = projectionBlock.getBlock(groupByColumns[i]);
 
       // Store group-by column cardinalities and update cardinality product.
       BlockMetadata blockMetadata = block.getMetadata();
@@ -154,12 +153,8 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
         _hasMultiValueGroupByColumn = true;
       }
 
-      if (isSingleValueGroupByColumn) {
-        _singleBlockValSets[i] = block.getBlockValueSet();
-        _reusableSingleDictIds[i] = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-      } else {
+      if (!isSingleValueGroupByColumn) {
         maxNumMultiValues = Math.max(maxNumMultiValues, blockMetadata.getMaxNumberOfMultiValues());
-        _multiValIterators[i] = (BlockMultiValIterator) block.getBlockValueSet().iterator();
       }
     }
 
@@ -213,12 +208,18 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
 
   /**
    * {@inheritDoc}
+   *
    */
   @Override
-  public void generateKeysForDocIdSet(int[] docIdSet, int startIndex, int length, int[] docIdToGroupKey) {
+  public void generateKeysForBlock(ProjectionBlock projectionBlock, int[] outGroupKeys) {
+    int startIndex = 0;
+    int length = projectionBlock.getNumDocs();
+
     // Fetch all dictionary ids according to the document id set for all group-by columns.
     for (int i = 0; i < _numGroupByColumns; i++) {
-      _singleBlockValSets[i].readIntValues(docIdSet, startIndex, length, _reusableSingleDictIds[i], 0);
+      Block dataBlock = projectionBlock.getDataBlock(_groupByColumns[i]);
+      BlockValSet blockValueSet = dataBlock.getBlockValueSet();
+      _reusableSingleDictIds[i] = blockValueSet.getDictionaryIds();
     }
 
     // Calculate the group key and store it into the result buffer.
@@ -231,7 +232,7 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
           for (int j = _numGroupByColumns - 1; j >= 0; j--) {
             groupKey = groupKey * _cardinalities[j] + _reusableSingleDictIds[j][i];
           }
-          docIdToGroupKey[outIndex++] = groupKey;
+          outGroupKeys[outIndex++] = groupKey;
           _groupKeyFlags[groupKey] = true;
         }
         break;
@@ -241,7 +242,7 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
           for (int j = _numGroupByColumns - 1; j >= 0; j--) {
             rawKey = rawKey * _cardinalities[j] + _reusableSingleDictIds[j][i];
           }
-          docIdToGroupKey[outIndex++] = updateRawKeyToGroupKeyMapping(rawKey);
+          outGroupKeys[outIndex++] = updateRawKeyToGroupKeyMapping(rawKey);
         }
         break;
       case ARRAY_MAP_BASED:
@@ -252,7 +253,7 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
           for (int j = 0; j < _numGroupByColumns; j++) {
             rawKeyArray[j] = _reusableSingleDictIds[j][i];
           }
-          docIdToGroupKey[outIndex++] = updateRawKeyToGroupKeyMapping(rawKey);
+          outGroupKeys[outIndex++] = updateRawKeyToGroupKeyMapping(rawKey);
         }
         break;
       default:
@@ -264,11 +265,18 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
    * {@inheritDoc}
    */
   @Override
-  public void generateKeysForDocIdSet(int[] docIdSet, int startIndex, int length, int[][] docIdToGroupKeys) {
+  public void generateKeysForBlock(ProjectionBlock projectionBlock, int[][] outGroupKeys) {
+    int startIndex = 0;
+    int length = projectionBlock.getNumDocs();
+    int[] docIdSet = projectionBlock.getDocIdSetBlock().getDocIdSet();
+
     // Fetch all dictionary ids according to the document id set for all single value group-by columns.
     for (int i = 0; i < _numGroupByColumns; i++) {
+      Block dataBlock = projectionBlock.getDataBlock(_groupByColumns[i]);
+      _blockValSets[i] = dataBlock.getBlockValueSet();
+
       if (_isSingleValueGroupByColumn[i]) {
-        _singleBlockValSets[i].readIntValues(docIdSet, startIndex, length, _reusableSingleDictIds[i], 0);
+        _reusableSingleDictIds[i] = _blockValSets[i].getDictionaryIds();
       }
     }
 
@@ -278,19 +286,19 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
     switch (_storageType) {
       case ARRAY_BASED:
         for (int i = startIndex; i < endIndex; i++) {
-          docIdToGroupKeys[outIndex] = generateKeysForDocIdArrayBased(outIndex, docIdSet[i]);
+          outGroupKeys[outIndex] = generateKeysForDocIdArrayBased(outIndex, docIdSet[i]);
           outIndex++;
         }
         break;
       case LONG_MAP_BASED:
         for (int i = startIndex; i < endIndex; i++) {
-          docIdToGroupKeys[outIndex] = generateKeysForDocIdLongMapBased(outIndex, docIdSet[i]);
+          outGroupKeys[outIndex] = generateKeysForDocIdLongMapBased(outIndex, docIdSet[i]);
           outIndex++;
         }
         break;
       case ARRAY_MAP_BASED:
         for (int i = startIndex; i < endIndex; i++) {
-          docIdToGroupKeys[outIndex] = generateKeysForDocIdArrayMapBased(outIndex, docIdSet[i]);
+          outGroupKeys[outIndex] = generateKeysForDocIdArrayMapBased(outIndex, docIdSet[i]);
           outIndex++;
         }
         break;
@@ -417,6 +425,7 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
    * @param rawKey raw key.
    * @return group key.
    */
+  @SuppressWarnings("Duplicates")
   private int updateRawKeyToGroupKeyMapping(long rawKey) {
     int groupKey = _groupKeyToId.get(rawKey);
     if (groupKey == INVALID_ID) {
@@ -439,6 +448,7 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
    * @param rawKey raw key.
    * @return group key.
    */
+  @SuppressWarnings("Duplicates")
   private int updateRawKeyToGroupKeyMapping(IntArrayList rawKey) {
     int id = _arrayGroupKeyToId.getInt(rawKey);
     if (id == INVALID_ID) {
@@ -474,10 +484,7 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
           groupKeys[j] = groupKeys[j] * cardinality + dictId;
         }
       } else {
-        BlockMultiValIterator blockValIterator = _multiValIterators[i];
-        blockValIterator.skipTo(docId);
-        int numMultiValues = blockValIterator.nextIntVal(_reusableMultiValDictIdBuffer);
-
+        int numMultiValues = _blockValSets[i].getDictionaryIdsForDocId(docId, _reusableMultiValDictIdBuffer);
         int oldLength = length;
         length *= numMultiValues;
         int[] oldGroupKeys = groupKeys;
@@ -523,10 +530,7 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
           rawKeys[j] = rawKeys[j] * cardinality + dictId;
         }
       } else {
-        BlockMultiValIterator blockValIterator = _multiValIterators[i];
-        blockValIterator.skipTo(docId);
-        int numMultiValues = blockValIterator.nextIntVal(_reusableMultiValDictIdBuffer);
-
+        int numMultiValues = _blockValSets[i].getDictionaryIdsForDocId(docId, _reusableMultiValDictIdBuffer);
         int oldLength = length;
         length *= numMultiValues;
         long[] oldRawKeys = rawKeys;
@@ -573,10 +577,7 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
           rawKey.elements()[i] = dictId;
         }
       } else {
-        BlockMultiValIterator blockValIterator = _multiValIterators[i];
-        blockValIterator.skipTo(docId);
-        int numMultiValues = blockValIterator.nextIntVal(_reusableMultiValDictIdBuffer);
-
+        int numMultiValues = _blockValSets[i].getDictionaryIdsForDocId(docId, _reusableMultiValDictIdBuffer);
         int oldLength = length;
         length *= numMultiValues;
         IntArrayList[] oldRawKeys = rawKeys;

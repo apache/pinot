@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.core.operator;
 
+import com.linkedin.pinot.core.common.DataFetcher;
+import com.linkedin.pinot.core.operator.aggregation.DataBlockCache;
 import com.linkedin.pinot.core.operator.blocks.DocIdSetBlock;
 import java.util.HashMap;
 import java.util.Map;
@@ -40,11 +42,15 @@ public class MProjectionOperator extends BaseOperator {
   private final Map<String, BaseOperator> _columnToDataSourceMap;
   private ProjectionBlock _currentBlock = null;
   private Map<String, Block> _blockMap;
+  private DataBlockCache _dataBlockCache;
+  private final DataFetcher _dataFetcher;
 
   public MProjectionOperator(Map<String, BaseOperator> dataSourceMap, BReusableFilteredDocIdSetOperator docIdSetOperator) {
     _docIdSetOperator = docIdSetOperator;
     _columnToDataSourceMap = dataSourceMap;
     _blockMap = new HashMap<>();
+    _dataFetcher = new DataFetcher(_columnToDataSourceMap);
+    _dataBlockCache = new DataBlockCache(_dataFetcher);
   }
 
   @Override
@@ -75,7 +81,7 @@ public class MProjectionOperator extends BaseOperator {
       for (String column : _columnToDataSourceMap.keySet()) {
         _blockMap.put(column, _columnToDataSourceMap.get(column).nextBlock(new BlockId(0)));
       }
-      _currentBlock = new ProjectionBlock(_blockMap, docIdSetBlock);
+      _currentBlock = new ProjectionBlock(_blockMap, _dataBlockCache, docIdSetBlock);
     }
     return _currentBlock;
   }
@@ -92,10 +98,6 @@ public class MProjectionOperator extends BaseOperator {
 
   public BaseOperator getDataSource(String column) {
     return _columnToDataSourceMap.get(column);
-  }
-
-  public Map<String, BaseOperator> getDataSourceMap() {
-    return _columnToDataSourceMap;
   }
 
   public int getNumProjectionColumns() {

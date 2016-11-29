@@ -34,6 +34,18 @@ public final class UnSortedSingleValueSet implements BlockValSet {
   }
 
   @Override
+  public <T> T getSingleValues() {
+    throw new UnsupportedOperationException(
+        "Reading a batch of values is not supported for unsorted single-value BlockValSet.");
+  }
+
+  @Override
+  public <T> T getMultiValues() {
+    throw new UnsupportedOperationException(
+        "Reading a batch of values is not supported for unsorted single-value BlockValSet.");
+  }
+
+  @Override
   public BlockValIterator iterator() {
     return new UnSortedSingleValueIterator(sVReader, columnMetadata);
   }
@@ -44,7 +56,19 @@ public final class UnSortedSingleValueSet implements BlockValSet {
   }
 
   @Override
-  public void readIntValues(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outDictionaryIds, int outStartPos) {
+  public void getDictionaryIds(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outDictionaryIds, int outStartPos) {
     sVReader.readValues(inDocIds, inStartPos, inDocIdsSize, outDictionaryIds, outStartPos);
+  }
+
+  @Override
+  public int[] getDictionaryIds() {
+    throw new UnsupportedOperationException(
+        "Unsupported operation 'getDictionaryIds' for unsorted single-value BlockValSet.");
+  }
+
+  @Override
+  public int getDictionaryIdsForDocId(int docId, int[] outputDictIds) {
+    throw new UnsupportedOperationException(
+        "Reading value for a given docId not supported for unsorted single-value BlockValset.");
   }
 }

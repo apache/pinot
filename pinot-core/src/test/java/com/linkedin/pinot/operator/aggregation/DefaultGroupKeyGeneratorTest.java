@@ -19,13 +19,18 @@ import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.DataFetcher;
+import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.operator.BaseOperator;
+import com.linkedin.pinot.core.operator.aggregation.DataBlockCache;
 import com.linkedin.pinot.core.operator.aggregation.groupby.DefaultGroupKeyGenerator;
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupKeyGenerator;
+import com.linkedin.pinot.core.operator.blocks.DocIdSetBlock;
+import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.util.TestDataRecordReader;
@@ -56,7 +61,7 @@ public class DefaultGroupKeyGeneratorTest {
   private final long _randomSeed = System.currentTimeMillis();
   private final Random _random = new Random(_randomSeed);
   private final String _errorMessage = "Random seed is: " + _randomSeed;
-  private DataFetcher _dataFetcher;
+  ProjectionBlock _projectionBlock;
 
   private static final int TEST_LENGTH = 20;
   private final int[] _testDocIdSet = new int[TEST_LENGTH];
@@ -116,10 +121,13 @@ public class DefaultGroupKeyGeneratorTest {
 
     // Get a data fetcher for the index segment.
     Map<String, BaseOperator> dataSourceMap = new HashMap<>();
+    Map<String, Block> blockMap = new HashMap<>();
+
     for (String column : indexSegment.getColumnNames()) {
-      dataSourceMap.put(column, indexSegment.getDataSource(column));
+      DataSource dataSource = indexSegment.getDataSource(column);
+      dataSourceMap.put(column, dataSource);
+      blockMap.put(column, dataSource.getNextBlock());
     }
-    _dataFetcher = new DataFetcher(dataSourceMap);
 
     // Generate a random test doc id set.
     int num1 = _random.nextInt(50);
@@ -128,6 +136,11 @@ public class DefaultGroupKeyGeneratorTest {
       _testDocIdSet[i] = num1 + 50 * i;
       _testDocIdSet[i + 1] = num2 + 50 * i;
     }
+
+    DataFetcher dataFetcher = new DataFetcher(dataSourceMap);
+    DocIdSetBlock docIdSetBlock = new DocIdSetBlock(_testDocIdSet, _testDocIdSet.length);
+    _projectionBlock = new ProjectionBlock(blockMap, new DataBlockCache(dataFetcher), docIdSetBlock);
+
   }
 
   @Test
@@ -136,13 +149,13 @@ public class DefaultGroupKeyGeneratorTest {
     String[] groupByColumns = {"s1"};
 
     // Test initial status.
-    DefaultGroupKeyGenerator defaultGroupKeyGenerator = new DefaultGroupKeyGenerator(_dataFetcher, groupByColumns);
-    Assert.assertEquals(defaultGroupKeyGenerator.getGlobalGroupKeyUpperBound(), 100, _errorMessage);
-    Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 100, _errorMessage);
+    DefaultGroupKeyGenerator defaultGroupKeyGenerator = new DefaultGroupKeyGenerator(_projectionBlock, groupByColumns);
+    Assert.assertEquals(defaultGroupKeyGenerator.getGlobalGroupKeyUpperBound(), UNIQUE_ROWS, _errorMessage);
+    Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), UNIQUE_ROWS, _errorMessage);
     Assert.assertEquals(defaultGroupKeyGenerator.hasMultiValueGroupByColumn(), false, _errorMessage);
 
     // Test group key generation.
-    defaultGroupKeyGenerator.generateKeysForDocIdSet(_testDocIdSet, 0, TEST_LENGTH, _singleValueGroupKeyBuffer);
+    defaultGroupKeyGenerator.generateKeysForBlock(_projectionBlock, _singleValueGroupKeyBuffer);
     Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 100, _errorMessage);
     compareSingleValueBuffer();
     testGetUniqueGroupKeys(defaultGroupKeyGenerator.getUniqueGroupKeys(), 2);
@@ -154,13 +167,14 @@ public class DefaultGroupKeyGeneratorTest {
     String[] groupByColumns = {"s1", "s2", "s3", "s4"};
 
     // Test initial status.
-    DefaultGroupKeyGenerator defaultGroupKeyGenerator = new DefaultGroupKeyGenerator(_dataFetcher, groupByColumns);
-    Assert.assertEquals(defaultGroupKeyGenerator.getGlobalGroupKeyUpperBound(), 100000000, _errorMessage);
+    long expected = (long) Math.pow(UNIQUE_ROWS, groupByColumns.length);
+    DefaultGroupKeyGenerator defaultGroupKeyGenerator = new DefaultGroupKeyGenerator(_projectionBlock, groupByColumns);
+    Assert.assertEquals(defaultGroupKeyGenerator.getGlobalGroupKeyUpperBound(), expected, _errorMessage);
     Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
     Assert.assertEquals(defaultGroupKeyGenerator.hasMultiValueGroupByColumn(), false, _errorMessage);
 
     // Test group key generation.
-    defaultGroupKeyGenerator.generateKeysForDocIdSet(_testDocIdSet, 0, TEST_LENGTH, _singleValueGroupKeyBuffer);
+    defaultGroupKeyGenerator.generateKeysForBlock(_projectionBlock, _singleValueGroupKeyBuffer);
     Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 2, _errorMessage);
     compareSingleValueBuffer();
     testGetUniqueGroupKeys(defaultGroupKeyGenerator.getUniqueGroupKeys(), 2);
@@ -172,13 +186,13 @@ public class DefaultGroupKeyGeneratorTest {
     String[] groupByColumns = {"s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10"};
 
     // Test initial status.
-    DefaultGroupKeyGenerator defaultGroupKeyGenerator = new DefaultGroupKeyGenerator(_dataFetcher, groupByColumns);
+    DefaultGroupKeyGenerator defaultGroupKeyGenerator = new DefaultGroupKeyGenerator(_projectionBlock, groupByColumns);
     Assert.assertEquals(defaultGroupKeyGenerator.getGlobalGroupKeyUpperBound(), Integer.MAX_VALUE, _errorMessage);
     Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
     Assert.assertEquals(defaultGroupKeyGenerator.hasMultiValueGroupByColumn(), false, _errorMessage);
 
     // Test group key generation.
-    defaultGroupKeyGenerator.generateKeysForDocIdSet(_testDocIdSet, 0, TEST_LENGTH, _singleValueGroupKeyBuffer);
+    defaultGroupKeyGenerator.generateKeysForBlock(_projectionBlock, _singleValueGroupKeyBuffer);
     Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 2, _errorMessage);
     compareSingleValueBuffer();
     testGetUniqueGroupKeys(defaultGroupKeyGenerator.getUniqueGroupKeys(), 2);
@@ -204,13 +218,13 @@ public class DefaultGroupKeyGeneratorTest {
     String[] groupByColumns = {"m1"};
 
     // Test initial status.
-    DefaultGroupKeyGenerator defaultGroupKeyGenerator = new DefaultGroupKeyGenerator(_dataFetcher, groupByColumns);
+    DefaultGroupKeyGenerator defaultGroupKeyGenerator = new DefaultGroupKeyGenerator(_projectionBlock, groupByColumns);
     int groupKeyUpperBound = defaultGroupKeyGenerator.getGlobalGroupKeyUpperBound();
     Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), groupKeyUpperBound, _errorMessage);
     Assert.assertEquals(defaultGroupKeyGenerator.hasMultiValueGroupByColumn(), true, _errorMessage);
 
     // Test group key generation.
-    defaultGroupKeyGenerator.generateKeysForDocIdSet(_testDocIdSet, 0, TEST_LENGTH, _multiValueGroupKeyBuffer);
+    defaultGroupKeyGenerator.generateKeysForBlock(_projectionBlock, _multiValueGroupKeyBuffer);
     int numUniqueKeys = _multiValueGroupKeyBuffer[0].length + _multiValueGroupKeyBuffer[1].length;
     Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), groupKeyUpperBound, _errorMessage);
     compareMultiValueBuffer();
@@ -223,12 +237,12 @@ public class DefaultGroupKeyGeneratorTest {
     String[] groupByColumns = {"m1", "m2", "s1", "s2"};
 
     // Test initial status.
-    DefaultGroupKeyGenerator defaultGroupKeyGenerator = new DefaultGroupKeyGenerator(_dataFetcher, groupByColumns);
+    DefaultGroupKeyGenerator defaultGroupKeyGenerator = new DefaultGroupKeyGenerator(_projectionBlock, groupByColumns);
     Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
     Assert.assertEquals(defaultGroupKeyGenerator.hasMultiValueGroupByColumn(), true, _errorMessage);
 
     // Test group key generation.
-    defaultGroupKeyGenerator.generateKeysForDocIdSet(_testDocIdSet, 0, TEST_LENGTH, _multiValueGroupKeyBuffer);
+    defaultGroupKeyGenerator.generateKeysForBlock(_projectionBlock, _multiValueGroupKeyBuffer);
     int numUniqueKeys = _multiValueGroupKeyBuffer[0].length + _multiValueGroupKeyBuffer[1].length;
     Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), numUniqueKeys, _errorMessage);
     compareMultiValueBuffer();
@@ -241,12 +255,12 @@ public class DefaultGroupKeyGeneratorTest {
     String[] groupByColumns = {"m1", "m2", "s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10"};
 
     // Test initial status.
-    DefaultGroupKeyGenerator defaultGroupKeyGenerator = new DefaultGroupKeyGenerator(_dataFetcher, groupByColumns);
+    DefaultGroupKeyGenerator defaultGroupKeyGenerator = new DefaultGroupKeyGenerator(_projectionBlock, groupByColumns);
     Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
     Assert.assertEquals(defaultGroupKeyGenerator.hasMultiValueGroupByColumn(), true, _errorMessage);
 
     // Test group key generation.
-    defaultGroupKeyGenerator.generateKeysForDocIdSet(_testDocIdSet, 0, TEST_LENGTH, _multiValueGroupKeyBuffer);
+    defaultGroupKeyGenerator.generateKeysForBlock(_projectionBlock, _multiValueGroupKeyBuffer);
     int numUniqueKeys = _multiValueGroupKeyBuffer[0].length + _multiValueGroupKeyBuffer[1].length;
     Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), numUniqueKeys, _errorMessage);
     compareMultiValueBuffer();

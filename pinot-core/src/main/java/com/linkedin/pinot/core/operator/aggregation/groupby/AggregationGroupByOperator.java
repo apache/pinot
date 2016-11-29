@@ -20,11 +20,9 @@ import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.ExecutionStatistics;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
-import com.linkedin.pinot.core.operator.blocks.DocIdSetBlock;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
@@ -60,7 +58,8 @@ public class AggregationGroupByOperator extends BaseOperator {
     Preconditions.checkNotNull(groupBy);
     Preconditions.checkNotNull(projectionOperator);
 
-    _groupByExecutor = new DefaultGroupByExecutor(projectionOperator, aggregationsInfoList, groupBy, numGroupsLimit);
+    _groupByExecutor =
+        new DefaultGroupByExecutor(aggregationsInfoList, groupBy, numGroupsLimit);
     _aggregationInfoList = aggregationsInfoList;
     _projectionOperator = projectionOperator;
     _numTotalRawDocs = numTotalRawDocs;
@@ -68,7 +67,7 @@ public class AggregationGroupByOperator extends BaseOperator {
 
   /**
    * Returns the next ResultBlock containing the result of aggregation group by.
-   * @return
+   * @return Return next block of aggregation group-by
    */
   @Override
   public Block getNextBlock() {
@@ -89,10 +88,8 @@ public class AggregationGroupByOperator extends BaseOperator {
     _groupByExecutor.init();
     ProjectionBlock projectionBlock;
     while ((projectionBlock = (ProjectionBlock) _projectionOperator.nextBlock()) != null) {
-      DocIdSetBlock docIdSetBlock = projectionBlock.getDocIdSetBlock();
-      int searchableLength = docIdSetBlock.getSearchableLength();
-      numDocsScanned += searchableLength;
-      _groupByExecutor.process(docIdSetBlock.getDocIdSet(), 0, searchableLength);
+      numDocsScanned += projectionBlock.getNumDocs();
+      _groupByExecutor.process(projectionBlock);
     }
     _groupByExecutor.finish();
 
