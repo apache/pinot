@@ -22,10 +22,10 @@ import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.ExecutionStatistics;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
-import com.linkedin.pinot.core.operator.blocks.DocIdSetBlock;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
+import com.linkedin.pinot.core.query.config.AggregationOperatorConfig;
 import java.io.Serializable;
 import java.util.List;
 
@@ -38,7 +38,7 @@ public class AggregationOperator extends BaseOperator {
   private final AggregationExecutor _aggregationExecutor;
   private final List<AggregationInfo> _aggregationInfoList;
   private final MProjectionOperator _projectionOperator;
-  private final long _numTotalRawDocs;
+  private final AggregationOperatorConfig _aggreationConfig;
   private int _nextBlockCallCounter = 0;
   private ExecutionStatistics _executionStatistics;
 
@@ -47,17 +47,18 @@ public class AggregationOperator extends BaseOperator {
    *
    * @param aggregationsInfoList List of AggregationInfo (contains context for applying aggregation functions).
    * @param projectionOperator Projection operator.
-   * @param numTotalRawDocs Number of total raw documents.
+   * @param aggregationConfig Configuration for this aggregation operator
    */
   public AggregationOperator(List<AggregationInfo> aggregationsInfoList, MProjectionOperator projectionOperator,
-      long numTotalRawDocs) {
+      AggregationOperatorConfig aggregationConfig) {
     Preconditions.checkArgument((aggregationsInfoList != null) && (aggregationsInfoList.size() > 0));
     Preconditions.checkNotNull(projectionOperator);
+    Preconditions.checkNotNull(aggregationConfig);
 
-    _aggregationExecutor = new DefaultAggregationExecutor(aggregationsInfoList);
+    _aggregationExecutor = new DefaultAggregationExecutor(aggregationsInfoList, aggregationConfig);
     _aggregationInfoList = aggregationsInfoList;
     _projectionOperator = projectionOperator;
-    _numTotalRawDocs = numTotalRawDocs;
+    _aggreationConfig = aggregationConfig;
   }
 
   /**
@@ -95,7 +96,7 @@ public class AggregationOperator extends BaseOperator {
     long numEntriesScannedPostFilter = numDocsScanned * _projectionOperator.getNumProjectionColumns();
     _executionStatistics =
         new ExecutionStatistics(numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
-            _numTotalRawDocs);
+            _aggreationConfig.getTotalRawDocs());
 
     // Build intermediate result block based on aggregation result from the executor.
     List<Serializable> aggregationResults = _aggregationExecutor.getResult();

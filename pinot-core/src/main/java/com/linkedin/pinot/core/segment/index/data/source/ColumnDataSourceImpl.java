@@ -35,10 +35,6 @@ import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.column.ColumnIndexContainer;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
-/**
- * Nov 15, 2014
- */
-
 public class ColumnDataSourceImpl extends DataSource {
   private static final Logger LOGGER = LoggerFactory.getLogger(ColumnDataSourceImpl.class);
 

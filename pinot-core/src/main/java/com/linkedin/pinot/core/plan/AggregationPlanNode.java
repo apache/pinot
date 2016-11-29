@@ -22,7 +22,7 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.aggregation.AggregationOperator;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionUtils;
-import com.linkedin.pinot.core.startree.hll.HllConstants;
+import com.linkedin.pinot.core.query.config.AggregationOperatorConfig;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -66,8 +66,9 @@ public class AggregationPlanNode implements PlanNode {
   @Override
   public Operator run() {
     MProjectionOperator projectionOperator = (MProjectionOperator) _projectionPlanNode.run();
-    return new AggregationOperator(_aggregationInfos, projectionOperator,
-        _indexSegment.getSegmentMetadata().getTotalRawDocs());
+    AggregationOperatorConfig aggregationOperatorConfig =
+        AggregationOperatorConfig.instantiateFrom(_indexSegment.getSegmentMetadata());
+    return new AggregationOperator(_aggregationInfos, projectionOperator, aggregationOperatorConfig);
   }
 
   @Override
