@@ -49,7 +49,7 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
     // Rebalance retries will take up to 1 mins to fail.
     defaultProps.put("rebalance.max.retries", "30");
     defaultProps.put("rebalance.backoff.ms", "2000");
-    
+
     defaultProps.put("auto.commit.enable", "false");
     defaultProps.put("auto.offset.reset", "largest");
   }
@@ -203,6 +203,14 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
   @Override
   public long getTimeThresholdToFlushSegment() {
     return segmentTimeInMillis;
+  }
+
+  String getGroupId() {
+    return groupId;
+  }
+
+  String getZkString() {
+    return zkString;
   }
 
   @Override
