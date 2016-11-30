@@ -15,9 +15,7 @@
  */
 package com.linkedin.pinot.controller.validation;
 
-import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.common.metrics.ControllerMetrics;
-import com.yammer.metrics.core.MetricsRegistry;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -39,14 +37,18 @@ import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.metrics.ValidationMetrics;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.StarTreeMetadata;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.HLCSegmentName;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
+import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
@@ -57,6 +59,7 @@ import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegment
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.startree.hll.HllConstants;
+import com.yammer.metrics.core.MetricsRegistry;
 import javax.annotation.Nullable;
 
 
@@ -376,7 +379,13 @@ public class ValidationManagerTest {
     FakeValidationMetrics validationMetrics = new FakeValidationMetrics();
 
     ValidationManager validationManager = new ValidationManager(validationMetrics, _pinotHelixResourceManager, new ControllerConf());
-    validationManager.validateLLCSegments(realtimeTableName);
+    Map<String, String> streamConfigs = new HashMap<String, String>(4);
+    streamConfigs.put(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
+        CommonConstants.Helix.DataSource.Realtime.Kafka.CONSUMER_TYPE), "highLevel,simple");
+    Field autoCreateOnError = ValidationManager.class.getDeclaredField("_autoCreateOnError");
+    autoCreateOnError.setAccessible(true);
+    autoCreateOnError.setBoolean(validationManager, false);
+    validationManager.validateLLCSegments(realtimeTableName, streamConfigs);
 
     Assert.assertEquals(validationMetrics.partitionCount, 1);
 
@@ -388,7 +397,7 @@ public class ValidationManagerTest {
     idealstate.setPartitionState(p0s1.getSegmentName(), S3,
         PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
     helixAdmin.addResource(HELIX_CLUSTER_NAME, realtimeTableName, idealstate);
-    validationManager.validateLLCSegments(realtimeTableName);
+    validationManager.validateLLCSegments(realtimeTableName, streamConfigs);
     Assert.assertEquals(validationMetrics.partitionCount, 0);
 
     helixAdmin.dropResource(HELIX_CLUSTER_NAME, realtimeTableName);
