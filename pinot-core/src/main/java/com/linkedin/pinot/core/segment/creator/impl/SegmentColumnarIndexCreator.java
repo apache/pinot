@@ -275,13 +275,13 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       ColumnIndexCreationInfo columnIndexCreationInfo = entry.getValue();
       int dictionaryElementSize = dictionaryCreatorMap.get(column).getStringColumnMaxLength();
 
-// TODO: after fixing the server-side dependency on HAS_INVERTED_INDEX and deployed, set HAS_INVERTED_INDEX properly
-// The hasInvertedIndex flag in segment metadata is picked up in ColumnMetadata, and will be used during the query
-// plan phase. If it is set to false, then inverted indexes are not used in queries even if they are created via table
-// configs on segment load. So, we set it to true here for now, until we fix the server to update the value inside
-// ColumnMetadata, export information to the query planner that the inverted index available is current and can be used.
-//
-//    boolean hasInvertedIndex = invertedIndexCreatorMap.containsKey();
+      // TODO: after fixing the server-side dependency on HAS_INVERTED_INDEX and deployed, set HAS_INVERTED_INDEX properly
+      // The hasInvertedIndex flag in segment metadata is picked up in ColumnMetadata, and will be used during the query
+      // plan phase. If it is set to false, then inverted indexes are not used in queries even if they are created via table
+      // configs on segment load. So, we set it to true here for now, until we fix the server to update the value inside
+      // ColumnMetadata, export information to the query planner that the inverted index available is current and can be used.
+      //
+      //    boolean hasInvertedIndex = invertedIndexCreatorMap.containsKey();
       boolean hasInvertedIndex = true;
 
       String hllOriginColumn = null;

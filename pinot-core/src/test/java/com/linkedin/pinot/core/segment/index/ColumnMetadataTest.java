@@ -199,7 +199,7 @@ public class ColumnMetadataTest {
     try {
       // Build the Segment metadata.
       helper = new SegmentWithHllIndexCreateHelper(
-          "testHllIndexRelatedMetadata", "data/test_data-sv.avro", "daysSinceEpoch", TimeUnit.DAYS);
+          "testHllIndexRelatedMetadata", getClass().getClassLoader().getResource("data/test_data-sv.avro"), "daysSinceEpoch", TimeUnit.DAYS, "starTreeSegment");
       helper.build(true, new HllConfig(9, new HashSet<String>(Arrays.asList("column7")), "_hllSuffix"));
 
       // Load segment metadata.
