@@ -9,7 +9,6 @@ import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 
 import com.linkedin.thirdeye.detector.metric.transfer.MetricTransfer;
@@ -19,6 +18,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import java.util.Properties;
 import org.apache.commons.collections.CollectionUtils;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
@@ -166,7 +166,11 @@ public class DetectionTaskRunner implements TaskRunner {
         AnomalyUtils.logAnomaliesOverlapWithWindow(windowStart, windowEnd, historyMergedAnomalies);
 
         // Scaling time series according to the scaling factor
-        MetricTransfer.rescaleMetric(metricTimeSeries, metricName, scalingFactors);
+        if (CollectionUtils.isNotEmpty(scalingFactors)) {
+          Properties properties = anomalyFunction.getProperties();
+          MetricTransfer.rescaleMetric(metricTimeSeries, windowStart.getMillis(), scalingFactors,
+              metricName, properties);
+        }
 
         List<RawAnomalyResultDTO> resultsOfAnEntry = anomalyFunction
             .analyze(exploredDimensions, metricTimeSeries, windowStart, windowEnd, historyMergedAnomalies);

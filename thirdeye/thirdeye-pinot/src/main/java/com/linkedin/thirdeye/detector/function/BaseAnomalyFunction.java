@@ -27,7 +27,7 @@ public abstract class BaseAnomalyFunction implements AnomalyFunction {
     return spec;
   }
 
-  protected Properties getProperties() throws IOException {
+  public Properties getProperties() throws IOException {
     Properties props = new Properties();
     if (spec.getProperties() != null) {
       String[] tokens = spec.getProperties().split(";");

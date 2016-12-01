@@ -3,11 +3,14 @@ package com.linkedin.thirdeye.tools;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.client.ClientProtocolException;
+import org.joda.time.DateTime;
+import org.joda.time.format.ISODateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.collections.Lists;
@@ -88,19 +91,52 @@ public class CleanupAndRegenerateAnomaliesTool {
     return functionIdsList;
   }
 
+  /**
+   * Delete raw or merged anomalies whose start time is located in the given time ranges, except
+   * the following two cases:
+   *
+   * 1. If a raw anomaly belongs to a merged anomaly whose start time is not located in the given
+   * time ranges, then the raw anomaly will not be deleted.
+   *
+   * 2. If a raw anomaly belongs to a merged anomaly whose start time is located in the given
+   * time ranges, then it is deleted regardless its start time.
+   *
+   * If monitoringWindowStartTime is not given, then start time is set to 0.
+   * If monitoringWindowEndTime is not given, then end time is set to Long.MAX_VALUE.
+   */
   private void deleteExistingAnomalies() {
+    long startTime = 0;
+    long endTime = Long.MAX_VALUE;
+    if (StringUtils.isNotBlank(monitoringWindowStartTime)) {
+      startTime =
+          ISODateTimeFormat.dateTimeParser().parseDateTime(monitoringWindowStartTime).getMillis();
+    }
+    if (StringUtils.isNotBlank(monitoringWindowEndTime)) {
+      endTime =
+          ISODateTimeFormat.dateTimeParser().parseDateTime(monitoringWindowEndTime).getMillis();
+    }
+    LOG.info("Deleting anomalies in the time range: {} -- {}", new DateTime(startTime), new
+        DateTime(endTime));
 
     for (Long functionId : functionIds) {
       AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
       LOG.info("Beginning cleanup of functionId {} collection {} metric {}",
           functionId, anomalyFunction.getCollection(), anomalyFunction.getMetric());
-      List<RawAnomalyResultDTO> rawResults = rawResultDAO.findByFunctionId(functionId);
-      if (CollectionUtils.isNotEmpty(rawResults)) {
-        deleteRawResults(rawResults);
-      }
-      List<MergedAnomalyResultDTO> mergedResults = mergedResultDAO.findByFunctionId(functionId);
+      // Find merged anomalies and delete them first
+      List<MergedAnomalyResultDTO> mergedResults =
+          mergedResultDAO.findByStartTimeInRangeAndFunctionId(startTime, endTime, functionId);
       if (CollectionUtils.isNotEmpty(mergedResults)) {
         deleteMergedResults(mergedResults);
+      }
+      // Just in case unmerged raw anomalies exist and hence are not deleted in the previous step
+      List<RawAnomalyResultDTO> rawResults = rawResultDAO.findAllByTimeAndFunctionId(startTime, endTime, functionId);
+      if (CollectionUtils.isNotEmpty(rawResults)) {
+        for (int i = rawResults.size() -1; i >= 0; --i) {
+          if (!rawResults.get(i).isMerged()) {
+            rawResults.remove(i);
+          }
+        }
+        deleteRawResults(rawResults);
       }
     }
     LOG.info("Deleted {} raw anomalies", rawAnomaliesDeleted);
@@ -168,6 +204,10 @@ public class CleanupAndRegenerateAnomaliesTool {
   private void deleteMergedResults(List<MergedAnomalyResultDTO> mergedResults) {
     LOG.info("Deleting merged results");
     for (MergedAnomalyResultDTO mergedResult : mergedResults) {
+      // Delete raw anomalies of the merged anomaly
+      List<RawAnomalyResultDTO> rawAnomalyResultDTOs = mergedResult.getAnomalyResults();
+      deleteRawResults(rawAnomalyResultDTOs);
+
       LOG.info(".....Deleting id {} for functionId {}", mergedResult.getId(), mergedResult.getFunctionId());
       mergedResultDAO.delete(mergedResult);
       mergedAnomaliesDeleted++;
