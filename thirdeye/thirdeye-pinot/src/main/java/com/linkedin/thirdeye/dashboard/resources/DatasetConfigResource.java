@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
+import com.google.common.base.Strings;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -47,7 +48,9 @@ public class DatasetConfigResource {
       DatasetConfigDTO datasetConfigDTO = new DatasetConfigDTO();
       datasetConfigDTO.setDataset(dataset);
       datasetConfigDTO.setDimensions(toList(dimensions));
-      datasetConfigDTO.setDimensionsHaveNoPreAggregation(toList(dimensionsHaveNoPreAggregation));
+      if (!Strings.isNullOrEmpty(dimensionsHaveNoPreAggregation)) {
+        datasetConfigDTO.setDimensionsHaveNoPreAggregation(toList(dimensionsHaveNoPreAggregation));
+      }
       datasetConfigDTO.setActive(active);
       datasetConfigDTO.setAdditive(additive);
       datasetConfigDTO.setMetricAsDimension(metricAsDimension);

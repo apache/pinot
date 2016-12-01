@@ -118,15 +118,9 @@ public class AlertTaskRunner implements TaskRunner {
       }
       groupedResults.get(dimensions).add(result);
     }
-    // sort each list of anomaly results afterwards and keep track of sequence number in a new list
-    Map<MergedAnomalyResultDTO, String> anomaliesWithLabels = new LinkedHashMap<>();
-    int counter = 1;
+    // sort each list of anomaly results afterwards
     for (List<MergedAnomalyResultDTO> resultsByExploredDimensions : groupedResults.values()) {
       Collections.sort(resultsByExploredDimensions);
-      for (MergedAnomalyResultDTO result : resultsByExploredDimensions) {
-        anomaliesWithLabels.put(result, String.valueOf(counter));
-        counter++;
-      }
     }
     sendAlertForAnomalies(collection, results, groupedResults);
     updateNotifiedStatus(results);

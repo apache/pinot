@@ -649,10 +649,4 @@ public class AnomalyResource {
     return new JSONObject(urlTemplates).toString();
   }
 
-  public static void main(String[] args) throws Exception {
-    AnomalyResource anomalyResource = new AnomalyResource(null);
-    String anomalyUrl = anomalyResource.getExternalDashboardUrlForMergedAnomaly(null);
-    System.out.println(anomalyUrl);
-  }
-
 }
