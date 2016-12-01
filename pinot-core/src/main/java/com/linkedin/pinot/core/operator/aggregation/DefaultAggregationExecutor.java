@@ -17,7 +17,6 @@ package com.linkedin.pinot.core.operator.aggregation;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.utils.primitive.MutableLongValue;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunction;
@@ -51,18 +50,12 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
   boolean _inited = false;
   boolean _finished = false;
 
-  public DefaultAggregationExecutor(List<AggregationInfo> aggregationInfoList) {
-    Preconditions.checkNotNull(aggregationInfoList);
-    Preconditions.checkArgument(aggregationInfoList.size() > 0);
+  public DefaultAggregationExecutor(AggregationFunctionContext[] aggrFuncContextArray) {
+    Preconditions.checkNotNull(aggrFuncContextArray);
+    Preconditions.checkArgument(aggrFuncContextArray.length > 0);
 
-    _numAggrFunc = aggregationInfoList.size();
-    _aggrFuncContextArray = new AggregationFunctionContext[_numAggrFunc];
-    for (int i = 0; i < _numAggrFunc; i++) {
-      AggregationInfo aggregationInfo = aggregationInfoList.get(i);
-      String[] columns = aggregationInfo.getAggregationParams().get("column").trim().split(",");
-      _aggrFuncContextArray[i] = new AggregationFunctionContext(
-          aggregationInfo.getAggregationType(), columns);
-    }
+    _numAggrFunc = aggrFuncContextArray.length;
+    _aggrFuncContextArray = aggrFuncContextArray;
     _resultHolderArray = new AggregationResultHolder[_numAggrFunc];
   }
 

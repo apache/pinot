@@ -30,6 +30,11 @@ public class DistinctCountMVAggregationFunction implements AggregationFunction {
   private static final String FUNCTION_NAME = AggregationFunctionFactory.DISTINCTCOUNT_MV_AGGREGATION_FUNCTION;
   private static final ResultDataType RESULT_DATA_TYPE = ResultDataType.DISTINCTCOUNT_SET;
 
+  @Override
+  public void accept(AggregationFunctionVisitorBase visitor) {
+    visitor.visit(this);
+  }
+
   /**
    * Performs 'distinctcount' aggregation on the input array.
    *

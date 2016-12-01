@@ -113,7 +113,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       HllConfig hllConfig = config.getHllConfig();
       // create hll index is true only if we're provided with columns to
       // generate HLL fields
-      if (hllConfig.getColumnsToDeriveHllFields() != null) {
+      if (hllConfig.getColumnsToDeriveHllFields() != null && !hllConfig.getColumnsToDeriveHllFields().isEmpty()) {
         if (!createStarTree) {
           throw new IllegalArgumentException("Derived HLL fields generation will not work if StarTree is not enabled.");
         } else {

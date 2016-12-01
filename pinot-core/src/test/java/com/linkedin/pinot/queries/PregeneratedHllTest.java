@@ -43,7 +43,7 @@ import org.testng.annotations.Test;
 
 public class PregeneratedHllTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(PregeneratedHllTest.class);
-  private static final HllConfig hllConfig = new HllConfig(8 /*log2m*/);
+  private static final HllConfig hllConfig = new HllConfig(12 /*log2m*/);
   private TestHelper testHelper;
   private SegmentWithHllIndexCreateHelper helper;
   private static final double approximationThreshold = 0.001;
@@ -113,8 +113,10 @@ public class PregeneratedHllTest {
           "select distinctcounthll(column1) from " + testHelper.tableName +
               " where column1 > 100000 limit 0", 0.0));
 
+      // we give high value of 1000 because this test also runs with log2m different from distinctCounthll
+      // function. There is no guarantee about counts or accuracy. I want to make sure these are valid values
       ApproximateQueryTestUtil
-          .runApproximationQueries(testHelper.queryExecutor, helper.getSegmentName(), aggCalls, approximationThreshold,
+          .runApproximationQueries(testHelper.queryExecutor, helper.getSegmentName(), aggCalls, 1000,
               testHelper.serverMetrics);
     } finally {
       FileUtils.deleteQuietly(destinationDir);

@@ -22,7 +22,6 @@ import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.ExecutionStatistics;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
-import com.linkedin.pinot.core.operator.blocks.DocIdSetBlock;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
@@ -46,23 +45,23 @@ public class AggregationOperator extends BaseOperator {
    * Constructor for the class.
    *
    * @param aggregationsInfoList List of AggregationInfo (contains context for applying aggregation functions).
+   * @param executor Aggregation Executor
    * @param projectionOperator Projection operator.
    * @param numTotalRawDocs Number of total raw documents.
    */
-  public AggregationOperator(List<AggregationInfo> aggregationsInfoList, MProjectionOperator projectionOperator,
-      long numTotalRawDocs) {
+  public AggregationOperator(List<AggregationInfo> aggregationsInfoList, AggregationExecutor executor,
+      MProjectionOperator projectionOperator,long numTotalRawDocs) {
     Preconditions.checkArgument((aggregationsInfoList != null) && (aggregationsInfoList.size() > 0));
+    Preconditions.checkNotNull(executor);
     Preconditions.checkNotNull(projectionOperator);
-
-    _aggregationExecutor = new DefaultAggregationExecutor(aggregationsInfoList);
-    _aggregationInfoList = aggregationsInfoList;
+    this._aggregationInfoList = aggregationsInfoList;
+    _aggregationExecutor = executor;
     _projectionOperator = projectionOperator;
     _numTotalRawDocs = numTotalRawDocs;
   }
 
   /**
    * Returns the next ResultBlock containing the result of aggregation group by.
-   * @return
    */
   @Override
   public Block getNextBlock() {

@@ -29,6 +29,11 @@ public class MinMaxRangeMVAggregationFunction implements AggregationFunction {
   private static final String FUNCTION_NAME = AggregationFunctionFactory.MINMAXRANGE_MV_AGGREGATION_FUNCTION;
   private static final ResultDataType RESULT_DATA_TYPE = ResultDataType.MINMAXRANGE_PAIR;
 
+  @Override
+  public void accept(AggregationFunctionVisitorBase visitor) {
+    visitor.visit(this);
+  }
+
   /**
    * Performs 'minmaxrange' aggregation on the input array.
    *
