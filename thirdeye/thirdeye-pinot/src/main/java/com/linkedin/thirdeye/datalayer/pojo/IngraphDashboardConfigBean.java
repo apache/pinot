@@ -14,6 +14,8 @@ public class IngraphDashboardConfigBean extends AbstractBean {
 
   private String fabrics;
 
+  private boolean active = true;
+
   /** flag to indicate if this dashboard needs to be setup*/
   private boolean bootstrap = false;
 
@@ -60,6 +62,16 @@ public class IngraphDashboardConfigBean extends AbstractBean {
     this.fabrics = fabrics;
   }
 
+
+
+  public boolean isActive() {
+    return active;
+  }
+
+
+  public void setActive(boolean active) {
+    this.active = active;
+  }
 
 
   public boolean isBootstrap() {
@@ -157,7 +169,7 @@ public class IngraphDashboardConfigBean extends AbstractBean {
 
   @Override
   public String toString() {
-    return "IngraphMetricConfigBean [name=" + name + ", fabrics=" + fabrics
+    return "IngraphMetricConfigBean [name=" + name + ", fabrics=" + fabrics + ", active=" + active
         + ", bootstrap=" + bootstrap + ", fromIngraphDashboard=" + fromIngraphDashboard
         + ", bootstrapStartTime=" + bootstrapStartTime + ", bootstrapEndTime=" + bootstrapEndTime
         + ", fetchIntervalPeriod=" + fetchIntervalPeriod + ", mergeNumAvroRecords=" + mergeNumAvroRecords

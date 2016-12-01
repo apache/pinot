@@ -29,6 +29,11 @@ function listIngraphDashboardConfigs() {
       name : {
         title : 'DashboardName'
       },
+      active : {
+        title : 'Active',
+        defaultValue : true,
+        options : [ false, true ]
+      },
       bootstrap : {
         title : 'Bootstrap',
         defaultValue : false,

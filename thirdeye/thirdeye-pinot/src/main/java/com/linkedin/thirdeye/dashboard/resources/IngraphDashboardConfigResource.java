@@ -41,6 +41,7 @@ public class IngraphDashboardConfigResource {
   @GET
   @Path("/create")
   public String createDashboardConfig(@QueryParam("name") String name, @QueryParam("fabrics") String fabrics,
+      @QueryParam("active") boolean active,
       @QueryParam("bootstrap") boolean bootstrap, @QueryParam("fromIngraphDashboard") boolean fromIngraphDashboard,
       @QueryParam("startTime") String bootstrapStartTime, @QueryParam("endTime") String bootstrapEndTime,
       @QueryParam("fetchIntervalPeriod") String fetchIntervalPeriod, @QueryParam("mergeNumAvroRecords") String mergeNumAvroRecords,
@@ -61,6 +62,10 @@ public class IngraphDashboardConfigResource {
       if (StringUtils.isNotBlank(granularityUnit)) {
         ingraphDashboardConfigDTO.setGranularityUnit(TimeUnit.valueOf(granularityUnit));
       }
+
+      Boolean isActive = Boolean.valueOf(active);
+      ingraphDashboardConfigDTO.setActive(isActive);
+
       Boolean isFromIngraphDashboard = Boolean.valueOf(fromIngraphDashboard);
       ingraphDashboardConfigDTO.setFromIngraphDashboard(isFromIngraphDashboard);
 
@@ -86,6 +91,7 @@ public class IngraphDashboardConfigResource {
   public String updateDashboardConfig(@NotNull @QueryParam("id") long ingraphDashboardConfigId,
       @QueryParam("name") String name,
       @QueryParam("fabrics") String fabrics,
+      @QueryParam("active") boolean active,
       @QueryParam("bootstrap") boolean bootstrap , @QueryParam("fromIngraphDashboard") boolean fromIngraphDashboard,
       @QueryParam("startTime") String bootstrapStartTime,
       @QueryParam("endTime") String bootstrapEndTime, @QueryParam("fetchIntervalPeriod") String fetchIntervalPeriod,
@@ -108,6 +114,9 @@ public class IngraphDashboardConfigResource {
       if (StringUtils.isNotBlank(granularityUnit)) {
         ingraphDashboardConfigDTO.setGranularityUnit(TimeUnit.valueOf(granularityUnit));
       }
+
+      Boolean isActive = Boolean.valueOf(active);
+      ingraphDashboardConfigDTO.setActive(isActive);
 
       Boolean isFromIngraphDashboard = Boolean.valueOf(fromIngraphDashboard);
       ingraphDashboardConfigDTO.setFromIngraphDashboard(isFromIngraphDashboard);
