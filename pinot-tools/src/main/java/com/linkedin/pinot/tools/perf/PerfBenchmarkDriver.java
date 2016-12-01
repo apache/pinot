@@ -15,6 +15,30 @@
  */
 package com.linkedin.pinot.tools.perf;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileReader;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.net.URL;
+import java.net.URLConnection;
+import java.sql.Timestamp;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.helix.manager.zk.ZKHelixAdmin;
+import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
+import org.apache.helix.tools.ClusterStateVerifier;
+import org.apache.helix.tools.ClusterStateVerifier.Verifier;
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.yaml.snakeyaml.Yaml;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
@@ -30,31 +54,7 @@ import com.linkedin.pinot.controller.ControllerStarter;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileReader;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.net.URL;
-import java.net.URLConnection;
-import java.sql.Timestamp;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.helix.manager.zk.ZKHelixAdmin;
-import org.apache.helix.model.ExternalView;
-import org.apache.helix.model.IdealState;
-import org.apache.helix.tools.ClusterStateVerifier;
-import org.apache.helix.tools.ClusterStateVerifier.Verifier;
-import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.yaml.snakeyaml.Yaml;
 
 
 @SuppressWarnings("FieldCanBeLocal")
@@ -383,7 +383,6 @@ public class PerfBenchmarkDriver {
 
     try (
         BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(conn.getOutputStream(), "UTF-8"));
-        BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"))
     ) {
       String requestString = requestJson.toString();
 
@@ -392,6 +391,7 @@ public class PerfBenchmarkDriver {
 
       StringBuilder stringBuilder = new StringBuilder();
       String line;
+      BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
       while ((line = reader.readLine()) != null) {
         stringBuilder.append(line);
       }
