@@ -147,6 +147,16 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
   }
 
   @Override
+  public List<MergedAnomalyResultDTO> findByStartTimeInRangeAndFunctionId(long startTime, long
+      endTime, long functionId) {
+    Predicate predicate =
+        Predicate.AND(Predicate.GE("startTime", startTime), Predicate.LT("startTime", endTime),
+            Predicate.EQ("functionId", functionId));
+    List<MergedAnomalyResultBean> list = genericPojoDao.get(predicate, MergedAnomalyResultBean.class);
+    return batchConvertMergedAnomalyBean2DTO(list, true);
+  }
+
+  @Override
   public List<MergedAnomalyResultDTO> findByCollectionMetricDimensionsTime(String collection,
       String metric, String dimensions, long startTime, long endTime, boolean loadRawAnomalies) {
     Map<String, Object> filterParams = new HashMap<>();

@@ -4,6 +4,9 @@ import com.linkedin.thirdeye.api.MetricTimeSeries;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Properties;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.collections.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,16 +15,25 @@ public class MetricTransfer {
   private static final Logger LOG = LoggerFactory.getLogger(MetricTransfer.class);
   private static final boolean DEBUG = true;
 
+  public static final String SEASONAL_SIZE = "seasonalSize";
+  public static final String SEASONAL_UNIT = "seasonalUnit";
+  public static final String BASELINE_SEASONAL_PERIOD = "baselineSeasonalPeriod";
+
+  public static final String DEFAULT_SEASONAL_SIZE = "7";
+  public static final String DEFAULT_SEASONAL_UNIT = "DAYS";
+  public static final String DEFAULT_BASELINE_SEASONAL_PERIOD = "3";
+
   /**
    * Use the scaling factor to normalize the input time series
    *
    * @param metricsToModify the data MetricTimeSeries to be modified by scaling factor
-   * @param metricName the metricName withing the timeseries to be modified
+   * @param windowStartTime the timestamp when the data belongs to current monitoring window
    * @param scalingFactorList list of scaling factors
-   * @return
+   * @param metricName the metricName withing the timeseries to be modified
+   * @param properties the properties for scaling the values
    */
-  public static void rescaleMetric(MetricTimeSeries metricsToModify, String metricName,
-      List<ScalingFactor> scalingFactorList) {
+  public static void rescaleMetric(MetricTimeSeries metricsToModify, long windowStartTime,
+      List<ScalingFactor> scalingFactorList, String metricName, Properties properties) {
     if (CollectionUtils.isEmpty(scalingFactorList)) {
       return;  // no transformation if there is no scaling factor in
     }
@@ -31,20 +43,52 @@ public class MetricTransfer {
       scaledValues = new ArrayList<>();
     }
 
-    // Went over the List of Scaling Factors and Rescale the timestamps with in the time range
-    // get the metric name
-    for (long ts : metricsToModify.getTimeWindowSet()) {
+    int seasonalSize = Integer.parseInt(properties.getProperty(SEASONAL_SIZE, DEFAULT_SEASONAL_SIZE));
+    TimeUnit seasonalUnit = TimeUnit.valueOf(properties.getProperty(SEASONAL_UNIT, DEFAULT_SEASONAL_UNIT));
+    long seasonalMillis = seasonalUnit.toMillis(seasonalSize);
+    int baselineSeasonalPeriod = Integer.parseInt(properties.getProperty(BASELINE_SEASONAL_PERIOD, DEFAULT_BASELINE_SEASONAL_PERIOD));
+
+    // The scaling model works as follows:
+    // 1. If the time range of scaling factor overlaps with current time series, then the scaling
+    //    factor is applied to all corresponding baseline time series.
+    // 2. If the time range of scaling factor overlaps with a baseline time series, then baseline
+    //    value that overlaps with the scaling factor is set to 0. Note that in current
+    //    implementation of ThirdEye value 0 means missing data. Thus, the baseline value will be
+    //    removed from baseline calculation.
+    //
+    // The model is implemented as follows:
+    // 1. Check if a timestamp located in any time range of scaling factor.
+    // 2. If it is, then check if it is a current value or baseline value.
+    // 3a. If it is a baseline value, then set its value to 0.
+    // 3b. If it is a current value, then apply the scaling factor to its corresponding baseline
+    //     values.
+    Set<Long> timeWindowSet = metricsToModify.getTimeWindowSet();
+    for (long ts : timeWindowSet) {
       for (ScalingFactor sf: scalingFactorList) {
         if (sf.isInTimeWindow(ts)) {
-          double originalValue = metricsToModify.get(ts, metricName).doubleValue();
-          double scaledValue = originalValue * sf.getScalingFactor();
-          metricsToModify.set(ts, metricName, scaledValue);
-          if (DEBUG) {
-            scaledValues.add(new ScaledValue(ts, originalValue, scaledValue));
+          if (ts < windowStartTime) { // the timestamp belongs to a baseline time series
+            if (DEBUG) {
+              double originalValue = metricsToModify.get(ts, metricName).doubleValue();
+              scaledValues.add(new ScaledValue(ts, originalValue, 0.0));
+            }
+            metricsToModify.set(ts, metricName, 0.0); // zero will be removed in analyze function
+          } else { // the timestamp belongs to the current time series
+            for (int i = 1; i <= baselineSeasonalPeriod; ++i) {
+              long baseTs = ts - i * seasonalMillis;
+              if (timeWindowSet.contains(baseTs)) {
+                double originalValue = metricsToModify.get(baseTs, metricName).doubleValue();
+                double scaledValue = originalValue * sf.getScalingFactor();
+                metricsToModify.set(baseTs, metricName, scaledValue);
+                if (DEBUG) {
+                  scaledValues.add(new ScaledValue(baseTs, originalValue, scaledValue));
+                }
+              }
+            }
           }
         }
       }
     }
+
     if (DEBUG) {
       if (CollectionUtils.isNotEmpty(scaledValues)) {
         Collections.sort(scaledValues);
@@ -84,8 +128,8 @@ public class MetricTransfer {
 
     @Override
     public String toString() {
-      return "ScaledValue{" + "timestamp=" + timestamp + ", originalValue=" + originalValue
-          + ", scaledValue=" + scaledValue + ", scale=" + scaledValue / originalValue + '}';
+      return "ScaledValue{" + "time=" + timestamp + ", Value: " + originalValue
+          + "->" + scaledValue + ", scale=" + scaledValue / originalValue + '}';
     }
   }
 }
