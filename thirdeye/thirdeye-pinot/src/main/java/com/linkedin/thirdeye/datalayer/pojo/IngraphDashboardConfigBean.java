@@ -12,7 +12,7 @@ public class IngraphDashboardConfigBean extends AbstractBean {
   /** Name of ingraph dashboard*/
   private String name;
 
-  private String fabrics;
+  private String fabricGroup;
 
   private boolean active = true;
 
@@ -52,14 +52,14 @@ public class IngraphDashboardConfigBean extends AbstractBean {
 
 
 
-  public String getFabrics() {
-    return fabrics;
+  public String getFabricGroup() {
+    return fabricGroup;
   }
 
 
 
-  public void setFabrics(String fabrics) {
-    this.fabrics = fabrics;
+  public void setFabricGroup(String fabricGroup) {
+    this.fabricGroup = fabricGroup;
   }
 
 
@@ -169,7 +169,7 @@ public class IngraphDashboardConfigBean extends AbstractBean {
 
   @Override
   public String toString() {
-    return "IngraphMetricConfigBean [name=" + name + ", fabrics=" + fabrics + ", active=" + active
+    return "IngraphMetricConfigBean [name=" + name + ", fabricGroup=" + fabricGroup + ", active=" + active
         + ", bootstrap=" + bootstrap + ", fromIngraphDashboard=" + fromIngraphDashboard
         + ", bootstrapStartTime=" + bootstrapStartTime + ", bootstrapEndTime=" + bootstrapEndTime
         + ", fetchIntervalPeriod=" + fetchIntervalPeriod + ", mergeNumAvroRecords=" + mergeNumAvroRecords

@@ -65,8 +65,8 @@ function listIngraphDashboardConfigs() {
       fetchIntervalPeriod : {
         title : 'Interval Period'
       },
-      fabrics : {
-        title : 'Fabrics',
+      fabricGroup : {
+        title : 'FabricGroup',
         defaultValue : 'prod',
         options : [ 'prod', 'corp' ]
       },

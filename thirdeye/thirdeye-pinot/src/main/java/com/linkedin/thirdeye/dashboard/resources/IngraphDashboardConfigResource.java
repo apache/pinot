@@ -40,7 +40,7 @@ public class IngraphDashboardConfigResource {
 
   @GET
   @Path("/create")
-  public String createDashboardConfig(@QueryParam("name") String name, @QueryParam("fabrics") String fabrics,
+  public String createDashboardConfig(@QueryParam("name") String name, @QueryParam("fabricGroup") String fabricGroup,
       @QueryParam("active") boolean active,
       @QueryParam("bootstrap") boolean bootstrap, @QueryParam("fromIngraphDashboard") boolean fromIngraphDashboard,
       @QueryParam("startTime") String bootstrapStartTime, @QueryParam("endTime") String bootstrapEndTime,
@@ -49,7 +49,7 @@ public class IngraphDashboardConfigResource {
     try {
       IngraphDashboardConfigDTO ingraphDashboardConfigDTO = new IngraphDashboardConfigDTO();
       ingraphDashboardConfigDTO.setName(name);
-      ingraphDashboardConfigDTO.setFabrics(fabrics);
+      ingraphDashboardConfigDTO.setFabricGroup(fabricGroup);
       if (StringUtils.isNotBlank(fetchIntervalPeriod)) {
         ingraphDashboardConfigDTO.setFetchIntervalPeriod(Long.valueOf(fetchIntervalPeriod));
       }
@@ -90,7 +90,7 @@ public class IngraphDashboardConfigResource {
   @Path("/update")
   public String updateDashboardConfig(@NotNull @QueryParam("id") long ingraphDashboardConfigId,
       @QueryParam("name") String name,
-      @QueryParam("fabrics") String fabrics,
+      @QueryParam("fabricGroup") String fabricGroup,
       @QueryParam("active") boolean active,
       @QueryParam("bootstrap") boolean bootstrap , @QueryParam("fromIngraphDashboard") boolean fromIngraphDashboard,
       @QueryParam("startTime") String bootstrapStartTime,
@@ -101,7 +101,7 @@ public class IngraphDashboardConfigResource {
 
       IngraphDashboardConfigDTO ingraphDashboardConfigDTO = ingraphDashboardConfigDAO.findById(ingraphDashboardConfigId);
       ingraphDashboardConfigDTO.setName(name);
-      ingraphDashboardConfigDTO.setFabrics(fabrics);
+      ingraphDashboardConfigDTO.setFabricGroup(fabricGroup);
       if (StringUtils.isNotBlank(fetchIntervalPeriod)) {
         ingraphDashboardConfigDTO.setFetchIntervalPeriod(Long.valueOf(fetchIntervalPeriod));
       }
