@@ -381,19 +381,17 @@ public class PerfBenchmarkDriver {
     URLConnection conn = new URL(_brokerBaseApiUrl + "/query").openConnection();
     conn.setDoOutput(true);
 
-    try (
-        BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(conn.getOutputStream(), "UTF-8"));
-        BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"))
-    ) {
+    try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(conn.getOutputStream(), "UTF-8"))) {
       String requestString = requestJson.toString();
-
       writer.write(requestString);
       writer.flush();
 
       StringBuilder stringBuilder = new StringBuilder();
-      String line;
-      while ((line = reader.readLine()) != null) {
-        stringBuilder.append(line);
+      try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"))) {
+        String line;
+        while ((line = reader.readLine()) != null) {
+          stringBuilder.append(line);
+        }
       }
 
       long totalTime = System.currentTimeMillis() - start;
