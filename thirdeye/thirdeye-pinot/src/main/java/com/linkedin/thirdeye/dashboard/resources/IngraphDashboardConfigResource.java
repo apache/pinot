@@ -40,7 +40,9 @@ public class IngraphDashboardConfigResource {
 
   @GET
   @Path("/create")
-  public String createDashboardConfig(@QueryParam("name") String name, @QueryParam("fabrics") String fabrics, @QueryParam("bootstrap") boolean bootstrap,
+  public String createDashboardConfig(@QueryParam("name") String name, @QueryParam("fabrics") String fabrics,
+      @QueryParam("active") boolean active,
+      @QueryParam("bootstrap") boolean bootstrap, @QueryParam("fromIngraphDashboard") boolean fromIngraphDashboard,
       @QueryParam("startTime") String bootstrapStartTime, @QueryParam("endTime") String bootstrapEndTime,
       @QueryParam("fetchIntervalPeriod") String fetchIntervalPeriod, @QueryParam("mergeNumAvroRecords") String mergeNumAvroRecords,
       @QueryParam("granularitySize") String granularitySize, @QueryParam("granularityUnit") String granularityUnit) {
@@ -61,6 +63,12 @@ public class IngraphDashboardConfigResource {
         ingraphDashboardConfigDTO.setGranularityUnit(TimeUnit.valueOf(granularityUnit));
       }
 
+      Boolean isActive = Boolean.valueOf(active);
+      ingraphDashboardConfigDTO.setActive(isActive);
+
+      Boolean isFromIngraphDashboard = Boolean.valueOf(fromIngraphDashboard);
+      ingraphDashboardConfigDTO.setFromIngraphDashboard(isFromIngraphDashboard);
+
       Boolean needBootstrap = Boolean.valueOf(bootstrap);
       ingraphDashboardConfigDTO.setBootstrap(needBootstrap);
       if (needBootstrap) {
@@ -80,8 +88,12 @@ public class IngraphDashboardConfigResource {
 
   @GET
   @Path("/update")
-  public String updateDashboardConfig(@NotNull @QueryParam("id") long ingraphDashboardConfigId, @QueryParam("name") String name,
-      @QueryParam("fabrics") String fabrics, @QueryParam("bootstrap") boolean bootstrap, @QueryParam("startTime") String bootstrapStartTime,
+  public String updateDashboardConfig(@NotNull @QueryParam("id") long ingraphDashboardConfigId,
+      @QueryParam("name") String name,
+      @QueryParam("fabrics") String fabrics,
+      @QueryParam("active") boolean active,
+      @QueryParam("bootstrap") boolean bootstrap , @QueryParam("fromIngraphDashboard") boolean fromIngraphDashboard,
+      @QueryParam("startTime") String bootstrapStartTime,
       @QueryParam("endTime") String bootstrapEndTime, @QueryParam("fetchIntervalPeriod") String fetchIntervalPeriod,
       @QueryParam("mergeNumAvroRecords") String mergeNumAvroRecords, @QueryParam("granularitySize") String granularitySize,
       @QueryParam("granularityUnit") String granularityUnit) {
@@ -102,6 +114,12 @@ public class IngraphDashboardConfigResource {
       if (StringUtils.isNotBlank(granularityUnit)) {
         ingraphDashboardConfigDTO.setGranularityUnit(TimeUnit.valueOf(granularityUnit));
       }
+
+      Boolean isActive = Boolean.valueOf(active);
+      ingraphDashboardConfigDTO.setActive(isActive);
+
+      Boolean isFromIngraphDashboard = Boolean.valueOf(fromIngraphDashboard);
+      ingraphDashboardConfigDTO.setFromIngraphDashboard(isFromIngraphDashboard);
 
       Boolean needBootstrap = Boolean.valueOf(bootstrap);
       ingraphDashboardConfigDTO.setBootstrap(needBootstrap);
