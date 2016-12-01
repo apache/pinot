@@ -250,7 +250,7 @@ public abstract class AbstractManagerTestBase {
   protected IngraphDashboardConfigDTO getTestIngraphDashboardConfig(String name) {
     IngraphDashboardConfigDTO ingraphDashboardConfigDTO = new IngraphDashboardConfigDTO();
     ingraphDashboardConfigDTO.setName(name);
-    ingraphDashboardConfigDTO.setFabrics("test");
+    ingraphDashboardConfigDTO.setFabricGroup("test");
     ingraphDashboardConfigDTO.setFetchIntervalPeriod(3600_000);
     ingraphDashboardConfigDTO.setMergeNumAvroRecords(100);
     ingraphDashboardConfigDTO.setGranularitySize(5);
