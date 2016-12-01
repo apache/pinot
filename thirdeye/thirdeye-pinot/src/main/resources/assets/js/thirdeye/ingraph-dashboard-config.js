@@ -66,7 +66,9 @@ function listIngraphDashboardConfigs() {
         title : 'Interval Period'
       },
       fabrics : {
-        title : 'Fabrics'
+        title : 'Fabrics',
+        defaultValue : 'prod',
+        options : [ 'prod', 'corp' ]
       },
       granularitySize : {
         title : 'Granularity Size'
