@@ -17,6 +17,8 @@ public class IngraphDashboardConfigBean extends AbstractBean {
   /** flag to indicate if this dashboard needs to be setup*/
   private boolean bootstrap = false;
 
+  private boolean fromIngraphDashboard = true;
+
   /** window to bootstrap in milliseconds*/
   private long bootstrapStartTime; // Inclusive
 
@@ -34,7 +36,6 @@ public class IngraphDashboardConfigBean extends AbstractBean {
 
   public IngraphDashboardConfigBean() {
   }
-
 
 
   public String getName() {
@@ -71,6 +72,15 @@ public class IngraphDashboardConfigBean extends AbstractBean {
     this.bootstrap = bootstrap;
   }
 
+
+  public boolean isFromIngraphDashboard() {
+    return fromIngraphDashboard;
+  }
+
+
+  public void setFromIngraphDashboard(boolean fromIngraphDashboard) {
+    this.fromIngraphDashboard = fromIngraphDashboard;
+  }
 
 
   public long getBootstrapStartTime() {
@@ -148,8 +158,8 @@ public class IngraphDashboardConfigBean extends AbstractBean {
   @Override
   public String toString() {
     return "IngraphMetricConfigBean [name=" + name + ", fabrics=" + fabrics
-        + ", bootstrap=" + bootstrap + ", bootstrapStartTime=" + bootstrapStartTime
-        + ", bootstrapEndTime=" + bootstrapEndTime
+        + ", bootstrap=" + bootstrap + ", fromIngraphDashboard=" + fromIngraphDashboard
+        + ", bootstrapStartTime=" + bootstrapStartTime + ", bootstrapEndTime=" + bootstrapEndTime
         + ", fetchIntervalPeriod=" + fetchIntervalPeriod + ", mergeNumAvroRecords=" + mergeNumAvroRecords
         + ", granularitySize=" + granularitySize + ", granularityUnit=" + granularityUnit + "]";
   }

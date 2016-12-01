@@ -34,6 +34,11 @@ function listIngraphDashboardConfigs() {
         defaultValue : false,
         options : [ false, true ]
       },
+      fromIngraphDashboard : {
+        title : 'FromIngraphDashboard',
+        defaultValue : true,
+        options : [ false, true ]
+      },
       startTime : {
         title : 'Start Time',
         type : 'date',
