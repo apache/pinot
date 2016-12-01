@@ -1,7 +1,9 @@
 package com.linkedin.thirdeye.anomaly.alert;
 
 import com.linkedin.thirdeye.api.DimensionMap;
+import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewResponse;
+import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
 import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterType;
@@ -57,7 +59,11 @@ public class AlertTaskRunner implements TaskRunner {
   private static final String DIMENSION_VALUE_SEPARATOR = ", ";
   private static final String EQUALS = "=";
 
-  private MergedAnomalyResultManager anomalyMergedResultDAO;
+  private static final DAORegistry daoRegistry = DAORegistry.getInstance();
+
+  private final MergedAnomalyResultManager anomalyMergedResultDAO;
+  private final EmailConfigurationManager emailConfigurationDAO;
+
   private EmailConfigurationDTO alertConfig;
   private DateTime windowStart;
   private DateTime windowEnd;
@@ -67,13 +73,14 @@ public class AlertTaskRunner implements TaskRunner {
   public static final String CHARSET = "UTF-8";
 
   public AlertTaskRunner() {
+    anomalyMergedResultDAO = daoRegistry.getMergedAnomalyResultDAO();
+    emailConfigurationDAO = daoRegistry.getEmailConfigurationDAO();
   }
 
   @Override
   public List<TaskResult> execute(TaskInfo taskInfo, TaskContext taskContext) throws Exception {
     AlertTaskInfo alertTaskInfo = (AlertTaskInfo) taskInfo;
     List<TaskResult> taskResult = new ArrayList<>();
-    anomalyMergedResultDAO = taskContext.getMergedResultDAO();
     alertConfig = alertTaskInfo.getAlertConfig();
     windowStart = alertTaskInfo.getWindowStartTime();
     windowEnd = alertTaskInfo.getWindowEndTime();
@@ -118,15 +125,9 @@ public class AlertTaskRunner implements TaskRunner {
       }
       groupedResults.get(dimensions).add(result);
     }
-    // sort each list of anomaly results afterwards and keep track of sequence number in a new list
-    Map<MergedAnomalyResultDTO, String> anomaliesWithLabels = new LinkedHashMap<>();
-    int counter = 1;
+    // sort each list of anomaly results afterwards
     for (List<MergedAnomalyResultDTO> resultsByExploredDimensions : groupedResults.values()) {
       Collections.sort(resultsByExploredDimensions);
-      for (MergedAnomalyResultDTO result : resultsByExploredDimensions) {
-        anomaliesWithLabels.put(result, String.valueOf(counter));
-        counter++;
-      }
     }
     sendAlertForAnomalies(collection, results, groupedResults);
     updateNotifiedStatus(results);
@@ -271,6 +272,17 @@ public class AlertTaskRunner implements TaskRunner {
     } catch (Exception e) {
       throw new JobExecutionException(e);
     }
+
+    // once email is sent, update the last merged anomaly id as watermark in email config
+    long anomalyId = 0;
+    for (MergedAnomalyResultDTO anomalyResultDTO : results) {
+      if (anomalyResultDTO.getId() > anomalyId) {
+        anomalyId = anomalyResultDTO.getId();
+      }
+    }
+    alertConfig.setLastNotifiedAnomalyId(anomalyId);
+    emailConfigurationDAO.update(alertConfig);
+
     LOG.info("Sent email with {} anomalies! {}", results.size(), alertConfig);
   }
 

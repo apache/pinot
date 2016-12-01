@@ -183,10 +183,6 @@ public abstract class AbstractManagerTestBase {
     emailConfiguration.setFromAddress("thirdeye@linkedin.com");
     emailConfiguration.setMetric(metricName);
     emailConfiguration.setSendZeroAnomalyEmail(true);
-    emailConfiguration.setSmtpHost("email-server.linkedin.com");
-    emailConfiguration.setSmtpPassword(null);
-    emailConfiguration.setSmtpPort(25);
-    emailConfiguration.setSmtpUser(null);
     emailConfiguration.setToAddresses("anomaly@linkedin.com");
     emailConfiguration.setWindowDelay(2);
     emailConfiguration.setWindowSize(10);

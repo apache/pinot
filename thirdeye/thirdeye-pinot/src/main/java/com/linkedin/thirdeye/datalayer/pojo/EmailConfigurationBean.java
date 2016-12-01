@@ -13,7 +13,11 @@ import com.google.common.base.MoreObjects;
 @JsonIgnoreProperties(ignoreUnknown=true)
 public class EmailConfigurationBean extends AbstractBean {
 
-  List<Long> functionIds;
+  private List<Long> functionIds;
+
+  private String name;
+
+  private Long lastNotifiedAnomalyId;
 
   @Valid
   @NotNull
@@ -22,6 +26,8 @@ public class EmailConfigurationBean extends AbstractBean {
   @Valid
   @NotNull
   private String metric;
+
+  private boolean active;
 
   @Valid
   @NotNull
@@ -38,24 +44,15 @@ public class EmailConfigurationBean extends AbstractBean {
 
   @Valid
   @NotNull
-  private String smtpHost;
-
-  @Valid
-  private int smtpPort = 25;
-
-  private String smtpUser;
-
-  private String smtpPassword;
-
-  @Valid
-  @NotNull
   private int windowSize = 7;
+
+  private Integer windowDelay;
+
+  private TimeUnit windowDelayUnit;
 
   @Valid
   @NotNull
   private TimeUnit windowUnit = TimeUnit.DAYS;
-
-  private boolean active;
 
   private boolean sendZeroAnomalyEmail;
 
@@ -63,9 +60,21 @@ public class EmailConfigurationBean extends AbstractBean {
 
   private List<String> dimensions;
 
-  private Integer windowDelay;
+  public String getName() {
+    return name;
+  }
 
-  private TimeUnit windowDelayUnit;
+  public void setName(String name) {
+    this.name = name;
+  }
+
+  public Long getLastNotifiedAnomalyId() {
+    return lastNotifiedAnomalyId;
+  }
+
+  public void setLastNotifiedAnomalyId(Long lastNotifiedAnomalyId) {
+    this.lastNotifiedAnomalyId = lastNotifiedAnomalyId;
+  }
 
   public List<Long> getFunctionIds() {
     return functionIds;
@@ -113,38 +122,6 @@ public class EmailConfigurationBean extends AbstractBean {
 
   public void setCron(String cron) {
     this.cron = cron;
-  }
-
-  public String getSmtpHost() {
-    return smtpHost;
-  }
-
-  public void setSmtpHost(String smtpHost) {
-    this.smtpHost = smtpHost;
-  }
-
-  public int getSmtpPort() {
-    return smtpPort;
-  }
-
-  public void setSmtpPort(int smtpPort) {
-    this.smtpPort = smtpPort;
-  }
-
-  public String getSmtpUser() {
-    return smtpUser;
-  }
-
-  public void setSmtpUser(String smtpUser) {
-    this.smtpUser = smtpUser;
-  }
-
-  public String getSmtpPassword() {
-    return smtpPassword;
-  }
-
-  public void setSmtpPassword(String smtpPassword) {
-    this.smtpPassword = smtpPassword;
   }
 
   public int getWindowSize() {
@@ -215,7 +192,6 @@ public class EmailConfigurationBean extends AbstractBean {
   public String toString() {
     return MoreObjects.toStringHelper(this).add("collection", collection).add("metric", metric)
         .add("fromAddress", fromAddress).add("toAddresses", toAddresses).add("cron", cron)
-        .add("smtpHost", smtpHost).add("smtpPort", smtpPort).add("smtpUser", smtpUser)
         .add("windowSize", windowSize).add("windowUnit", windowUnit).add("isActive", active)
         .add("sendZeroAnomalyEmail", sendZeroAnomalyEmail)
         .add("includeReportByDimension", reportEnabled)
