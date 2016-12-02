@@ -1,7 +1,11 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
-import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
+import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.dashboard.configs.DashboardConfig;
+import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import java.util.ArrayList;
 import java.util.List;
@@ -13,16 +17,45 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
+import org.apache.commons.lang3.StringUtils;
 
+/**
+ * Do's and Dont's
+ * ================
+ * 1. Prefer PathParams over QueryParams
+ * 2. Protocols : use Post for new entity creation, Put for update, Delete for delete and Get for retrieval
+ * 3. Dont use OBJECT_MAPPER unnecessarily as REST library already takes care of marshalling your object to JSON
+ *
+ * 4. Errors: there are few ways to handle server side errors
+ *    a. catch exception and throw as WebApplicationException : its a REST library exception, you can pass your error response etc into this exception
+ *    b. Add a ExceptionMapper and register it in the dw environment
+ *    c. Add a web filter / intercepter to catch and convert RTEs to web exception
+ */
 @Path(value = "/data")
 @Produces(MediaType.APPLICATION_JSON)
 public class DataResource {
+  public static final DAORegistry daoRegistry = DAORegistry.getInstance();
+
+  private final MetricConfigManager metricConfigManager;
+  private final DatasetConfigManager datasetConfigManager;
+  private final DashboardConfigManager dashboardConfigManager;
+
+  public DataResource() {
+    metricConfigManager = daoRegistry.getMetricConfigDAO();
+    datasetConfigManager = daoRegistry.getDatasetConfigDAO();
+    dashboardConfigManager = daoRegistry.getDashboardConfigDAO();
+  }
 
   //------------- endpoints to fetch summary -------------
   @GET
-  @Path("summary/metrics")
-  public List<String> getMatricNames(String dataset) {
-    return null;
+  @Path("summary/metrics/{dataset}")
+  public List<String> getMatricNames(@PathParam("dataset") String dataset) {
+      List<MetricConfigDTO> metrics = metricConfigManager.findActiveByDataset(dataset);
+      List<String> metricsNames = new ArrayList<>();
+      for (MetricConfigDTO metricConfigDTO : metrics) {
+        metricsNames.add(metricConfigDTO.getName());
+      }
+      return metricsNames;
   }
 
   @GET
@@ -46,20 +79,30 @@ public class DataResource {
       @QueryParam("numResults") @DefaultValue("1000") int numResults,
       @QueryParam("dataset") String dataset, @QueryParam("metric") String metric
   ) {
-    return new ArrayList<>();
+    // TODO: add pagination support through out the data managers
+    List<MetricConfigDTO> output = new ArrayList<>();
+    if (StringUtils.isEmpty(dataset)) {
+      output.addAll(metricConfigManager.findAll());
+    } else {
+      if (StringUtils.isNotEmpty(metric)) {
+        output.addAll(metricConfigManager.findActiveByDataset(dataset));
+      } else {
+        output.add(metricConfigManager.findByMetricAndDataset(metric, dataset));
+      }
+    }
+    return output;
   }
 
   @GET
   @Path("metric/{id}")
   public MetricConfigDTO getMetricById(@PathParam("id") Long id) {
-    return null;
+    return metricConfigManager.findById(id);
   }
-
 
   // dataset end points
   @GET
   @Path("datasets")
-  public List<CollectionConfig> getDatasets(
+  public List<DatasetConfigDTO> getDatasets(
       @QueryParam("pageId") @DefaultValue("0") int pageId,
       @QueryParam("numResults") @DefaultValue("1000") int numResults) {
 
@@ -68,14 +111,14 @@ public class DataResource {
 
   @GET
   @Path("dataset/{id}")
-  public CollectionConfig getDatasetById(@PathParam("id") Long id) {
-    return null;
+  public DatasetConfigDTO getDatasetById(@PathParam("id") Long id) {
+    return datasetConfigManager.findById(id);
   }
 
   @GET
   @Path("dataset")
-  public CollectionConfig getDatasetByName(@QueryParam("dataset") String dataset) {
-    return null;
+  public DatasetConfigDTO getDatasetByName(@QueryParam("dataset") String dataset) {
+    return datasetConfigManager.findByDataset(dataset);
   }
 
   @GET
