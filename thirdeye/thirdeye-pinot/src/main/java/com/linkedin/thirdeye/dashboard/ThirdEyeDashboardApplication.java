@@ -19,6 +19,7 @@ import com.linkedin.thirdeye.dashboard.resources.OverrideConfigResource;
 import com.linkedin.thirdeye.dashboard.resources.SummaryResource;
 import com.linkedin.thirdeye.dashboard.resources.ThirdEyeResource;
 
+import com.linkedin.thirdeye.dashboard.resources.v2.DataResource;
 import io.dropwizard.assets.AssetsBundle;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
@@ -69,6 +70,7 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new SummaryResource());
     env.jersey().register(new ThirdEyeResource());
     env.jersey().register(new OverrideConfigResource());
+    env.jersey().register(new DataResource());
   }
 
   public static void main(String[] args) throws Exception {

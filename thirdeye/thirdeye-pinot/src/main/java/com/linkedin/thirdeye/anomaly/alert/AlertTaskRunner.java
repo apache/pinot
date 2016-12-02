@@ -320,19 +320,7 @@ public class AlertTaskRunner implements TaskRunner {
         dimensionValueList.add(new Pair<>(currentDimension, valueMap));
       }
 
-      Collections.sort(dimensionValueList, new Comparator<Pair<String, LinkedHashMap>>() {
-        @Override public int compare(Pair<String, LinkedHashMap> o1,
-            Pair<String, LinkedHashMap> o2) {
-          Set<String> keys1 = o1.getSecond().keySet();
-          List<String> allKeys = new ArrayList<>();
-          allKeys.addAll(keys1);
-          String dim = allKeys.get(0);
-
-          Double key1 = Double.valueOf(o1.getSecond().get(dim).toString());
-          Double key2 = Double.valueOf(o2.getSecond().get(dim).toString());
-          return key1.compareTo(key2);
-        }
-      });
+      sortDimensionValueList(dimensionValueList);
 
       for (Pair<String, LinkedHashMap> dimensionValue  : dimensionValueList) {
         dimensionValueMap.put(dimensionValue.getFirst(), dimensionValue.getSecond());
@@ -342,6 +330,22 @@ public class AlertTaskRunner implements TaskRunner {
       ultimateResult.put(metric, groupByDimensionValueMap);
     }
     return ultimateResult;
+  }
+
+  private static void sortDimensionValueList(List<Pair<String, LinkedHashMap>> dimensionValueList) {
+    Collections.sort(dimensionValueList, new Comparator<Pair<String, LinkedHashMap>>() {
+      @Override public int compare(Pair<String, LinkedHashMap> o1,
+          Pair<String, LinkedHashMap> o2) {
+        Set<String> keys1 = o1.getSecond().keySet();
+        List<String> allKeys = new ArrayList<>();
+        allKeys.addAll(keys1);
+        String dim = allKeys.get(0);
+
+        Double key1 = Double.valueOf(o1.getSecond().get(dim).toString());
+        Double key2 = Double.valueOf(o2.getSecond().get(dim).toString());
+        return key1.compareTo(key2);
+      }
+    });
   }
 
   /**
