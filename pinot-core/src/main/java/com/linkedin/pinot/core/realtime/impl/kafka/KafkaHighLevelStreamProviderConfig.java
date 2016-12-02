@@ -18,6 +18,10 @@ package com.linkedin.pinot.core.realtime.impl.kafka;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+import org.joda.time.Duration;
+import org.joda.time.Period;
+import org.joda.time.format.PeriodFormatter;
+import org.joda.time.format.PeriodFormatterBuilder;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
@@ -38,6 +42,8 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
   private final static long ONE_MINUTE_IN_MILLSEC = 1000 * 60;
   public static final long ONE_HOUR = ONE_MINUTE_IN_MILLSEC * 60;
 
+  private final static PeriodFormatter PERIOD_FORMATTER;
+
   static {
     defaultProps = new HashMap<String, String>();
     /*defaultProps.put("zookeeper.connect", zookeeper);
@@ -52,6 +58,14 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
 
     defaultProps.put("auto.commit.enable", "false");
     defaultProps.put("auto.offset.reset", "largest");
+
+    // A formatter for time specification that allows time to be specified in days, hours and minutes
+    // e.g. 1d2h3m, or 6h5m or simply 5h
+    PERIOD_FORMATTER =  new PeriodFormatterBuilder()
+        .appendDays().appendSuffix("d")
+        .appendHours().appendSuffix("h")
+        .appendMinutes().appendSuffix("m")
+        .toFormatter();
   }
 
   private String kafkaTopicName;
@@ -186,7 +200,7 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
 
     if (tableConfig.getIndexingConfig().getStreamConfigs().containsKey(Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_TIME)) {
       segmentTimeInMillis =
-          Long.parseLong(tableConfig.getIndexingConfig().getStreamConfigs().get(Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_TIME));
+          convertToMs(tableConfig.getIndexingConfig().getStreamConfigs().get(Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_TIME));
     }
   }
 
@@ -211,6 +225,22 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
 
   String getZkString() {
     return zkString;
+  }
+
+  protected long convertToMs(String timeStr) {
+    long ms = -1;
+    try {
+      ms = Long.valueOf(timeStr);
+    } catch (NumberFormatException e1) {
+      try {
+        Period p = PERIOD_FORMATTER.parsePeriod(timeStr);
+        Duration d = p.toStandardDuration();
+        ms = d.getStandardSeconds() * 1000L;
+      } catch (Exception e2) {
+        throw new RuntimeException("Invalid time spec '" + timeStr + "' (Valid examples: '3h', '4h30m')", e2);
+      }
+    }
+    return ms;
   }
 
   @Override
