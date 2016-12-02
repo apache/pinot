@@ -566,9 +566,10 @@ public class LLRealtimeSegmentDataManagerTest {
     }
 
     @Override
-    protected void consumeLoop() {
+    protected boolean consumeLoop() {
       setCurrentOffset(_consumeOffsets.remove());
       terminateLoopIfNecessary();
+      return true;
     }
 
     @Override

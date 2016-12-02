@@ -82,6 +82,26 @@ public class SimpleConsumerWrapper implements Closeable {
   private String _currentHost;
   private int _currentPort;
 
+  /**
+   * A Kafka protocol error that indicates a situation that is not likely to clear up by retrying the request (for
+   * example, no such topic or offset out of range).
+   */
+  public static class PermanentConsumerException extends RuntimeException {
+    public PermanentConsumerException(Errors error) {
+      super(error.exception());
+    }
+  }
+
+  /**
+   * A Kafka protocol error that indicates a situation that is likely to be transient (for example, network error or
+   * broker not available).
+   */
+  public static class TransientConsumerException extends RuntimeException {
+    public TransientConsumerException(Errors error) {
+      super(error.exception());
+    }
+  }
+
   private SimpleConsumerWrapper(KafkaSimpleConsumerFactory simpleConsumerFactory, String bootstrapNodes,
       String clientId, long connectTimeoutMillis) {
     _simpleConsumerFactory = simpleConsumerFactory;
@@ -390,7 +410,7 @@ public class SimpleConsumerWrapper implements Closeable {
         kafkaErrorCount++;
 
         if (MAX_KAFKA_ERROR_COUNT < kafkaErrorCount) {
-          throw Errors.forCode(errorCode).exception();
+          throw exceptionForKafkaErrorCode(errorCode);
         }
 
         Uninterruptibles.sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
@@ -438,7 +458,49 @@ public class SimpleConsumerWrapper implements Closeable {
           buildOffsetFilteringIterable(fetchResponse.messageSet(_topic, _partition), startOffset, endOffset);
       return Pair.of(messageAndOffsetIterable, fetchResponse.highWatermark(_topic, _partition));
     } else {
-      throw Errors.forCode(fetchResponse.errorCode(_topic, _partition)).exception();
+      throw exceptionForKafkaErrorCode(fetchResponse.errorCode(_topic, _partition));
+    }
+  }
+
+  private RuntimeException exceptionForKafkaErrorCode(short kafkaErrorCode) {
+    final Errors kafkaError = Errors.forCode(kafkaErrorCode);
+    switch (kafkaError) {
+      case UNKNOWN:
+      case OFFSET_OUT_OF_RANGE:
+      case CORRUPT_MESSAGE:
+      case UNKNOWN_TOPIC_OR_PARTITION:
+      case MESSAGE_TOO_LARGE:
+      case OFFSET_METADATA_TOO_LARGE:
+      case INVALID_TOPIC_EXCEPTION:
+      case RECORD_LIST_TOO_LARGE:
+      case INVALID_REQUIRED_ACKS:
+      case ILLEGAL_GENERATION:
+      case INCONSISTENT_GROUP_PROTOCOL:
+      case INVALID_GROUP_ID:
+      case UNKNOWN_MEMBER_ID:
+      case INVALID_SESSION_TIMEOUT:
+      case INVALID_COMMIT_OFFSET_SIZE:
+        return new PermanentConsumerException(kafkaError);
+      case LEADER_NOT_AVAILABLE:
+      case NOT_LEADER_FOR_PARTITION:
+      case REQUEST_TIMED_OUT:
+      case BROKER_NOT_AVAILABLE:
+      case REPLICA_NOT_AVAILABLE:
+      case STALE_CONTROLLER_EPOCH:
+      case NETWORK_EXCEPTION:
+      case GROUP_LOAD_IN_PROGRESS:
+      case GROUP_COORDINATOR_NOT_AVAILABLE:
+      case NOT_COORDINATOR_FOR_GROUP:
+      case NOT_ENOUGH_REPLICAS:
+      case NOT_ENOUGH_REPLICAS_AFTER_APPEND:
+      case REBALANCE_IN_PROGRESS:
+      case TOPIC_AUTHORIZATION_FAILED:
+      case GROUP_AUTHORIZATION_FAILED:
+      case CLUSTER_AUTHORIZATION_FAILED:
+        return new TransientConsumerException(kafkaError);
+      case NONE:
+      default:
+        return new RuntimeException("Unhandled error " + kafkaError);
     }
   }
 
@@ -526,7 +588,7 @@ public class SimpleConsumerWrapper implements Closeable {
         kafkaErrorCount++;
 
         if (MAX_KAFKA_ERROR_COUNT < kafkaErrorCount) {
-          throw Errors.forCode(errorCode).exception();
+          throw exceptionForKafkaErrorCode(errorCode);
         }
 
         Uninterruptibles.sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
