@@ -69,8 +69,12 @@ public class JSONRecordReader extends BaseRecordReader {
 
   @Override
   public GenericRow next() {
+    return next(new GenericRow());
+  }
+
+  @Override
+  public GenericRow next(GenericRow row) {
     Map<String, Object> record = _iterator.next();
-    Map<String, Object> fieldMap = new HashMap<String, Object>();
 
     for (final FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       String column = fieldSpec.getName();
@@ -87,12 +91,10 @@ public class JSONRecordReader extends BaseRecordReader {
         value = convertToDataTypeArray(data, fieldSpec.getDataType());
       }
 
-      fieldMap.put(column, value);
+      row.putField(column, value);
     }
 
-    GenericRow genericRow = new GenericRow();
-    genericRow.init(fieldMap);
-    return genericRow;
+    return row;
   }
 
   @Override

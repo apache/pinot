@@ -35,7 +35,7 @@ public class IntMutableDictionary extends MutableDictionaryReader {
     }
 
     if (rawValue instanceof String) {
-      Integer entry = new Integer(Integer.parseInt(rawValue.toString()));
+      Integer entry = Integer.parseInt(rawValue.toString());
       addToDictionaryBiMap(entry);
       updateMinMax(entry);
       return;
@@ -53,7 +53,7 @@ public class IntMutableDictionary extends MutableDictionaryReader {
       for (int i = 0; i < multivalues.length; i++) {
 
         if (multivalues[i] instanceof String) {
-          addToDictionaryBiMap(new Integer(Integer.parseInt(multivalues[i].toString())));
+          addToDictionaryBiMap(Integer.parseInt(multivalues[i].toString()));
           updateMinMax(Integer.parseInt(multivalues[i].toString()));
           continue;
         }
@@ -82,7 +82,7 @@ public class IntMutableDictionary extends MutableDictionaryReader {
       return hasNull;
     }
     if (rawValue instanceof String) {
-      return dictionaryIdBiMap.inverse().containsKey(new Integer(Integer.parseInt(rawValue.toString())));
+      return dictionaryIdBiMap.inverse().containsKey(Integer.parseInt(rawValue.toString()));
     }
     return dictionaryIdBiMap.inverse().containsKey(rawValue);
   }
@@ -90,7 +90,7 @@ public class IntMutableDictionary extends MutableDictionaryReader {
   @Override
   public int indexOf(Object rawValue) {
     if (rawValue instanceof String) {
-      return getIndexOfFromBiMap(new Integer(Integer.parseInt(rawValue.toString())));
+      return getIndexOfFromBiMap(Integer.parseInt(rawValue.toString()));
     }
     return getIndexOfFromBiMap(rawValue);
   }
@@ -174,7 +174,7 @@ public class IntMutableDictionary extends MutableDictionaryReader {
   }
 
   public int getInt(int dictionaryId) {
-    return ((Integer) dictionaryIdBiMap.get(new Integer(dictionaryId))).intValue();
+    return (Integer) dictionaryIdBiMap.get(dictionaryId);
   }
 
   @Override

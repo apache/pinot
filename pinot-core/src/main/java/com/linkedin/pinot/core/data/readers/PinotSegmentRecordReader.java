@@ -231,17 +231,20 @@ public class PinotSegmentRecordReader extends BaseRecordReader {
 
   @Override
   public GenericRow next() {
-    Map<String, Object> fields = new HashMap<>();
+    return next(new GenericRow());
+  }
 
+  @Override
+  public GenericRow next(GenericRow row) {
     for (String column : columns) {
       Dictionary dictionary = pinotDictionaryBufferMap.get(column);
 
       if (isSingleValueMap.get(column)) {
         // Single-value column.
         if (!isSortedMap.get(column)) {
-          fields.put(column, dictionary.get(singleValueReaderMap.get(column).getInt(docNumber)));
+          row.putField(column, dictionary.get(singleValueReaderMap.get(column).getInt(docNumber)));
         } else {
-          fields.put(column, dictionary.get(singleValueSortedReaderMap.get(column).getInt(docNumber)));
+          row.putField(column, dictionary.get(singleValueSortedReaderMap.get(column).getInt(docNumber)));
         }
       } else {
         // Multi-value column.
@@ -252,11 +255,10 @@ public class PinotSegmentRecordReader extends BaseRecordReader {
         for (int i = 0; i < numValues; i++) {
           objectArray[i] = dictionary.get(dictionaryIdArray[i]);
         }
-        fields.put(column, objectArray);
+        row.putField(column, objectArray);
       }
     }
-    GenericRow row = new GenericRow();
-    row.init(fields);
+
     docNumber++;
 
     return row;

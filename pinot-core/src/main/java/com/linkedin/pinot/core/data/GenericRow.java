@@ -25,6 +25,7 @@ import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 
 /**
@@ -39,6 +40,10 @@ public class GenericRow implements RowEvent {
   @Override
   public void init(Map<String, Object> field) {
     _fieldMap = field;
+  }
+
+  public Set<Map.Entry<String, Object>> getEntrySet() {
+    return _fieldMap.entrySet();
   }
 
   @Override
@@ -84,6 +89,15 @@ public class GenericRow implements RowEvent {
     }
     GenericRow r = (GenericRow) o;
     return _fieldMap.equals(r._fieldMap);
+  }
+
+  /**
+   * Empties the values of this generic row, keeping the keys and hash map nodes to minimize object allocation.
+   */
+  public void clear() {
+    for (Map.Entry<String, Object> mapEntry : getEntrySet()) {
+      mapEntry.setValue(null);
+    }
   }
 
   static TypeReference typeReference = new TypeReference<Map<String, Object>>() {};

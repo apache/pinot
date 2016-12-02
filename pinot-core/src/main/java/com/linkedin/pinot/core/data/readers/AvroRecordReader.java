@@ -53,9 +53,6 @@ public class AvroRecordReader extends BaseRecordReader {
   private FieldExtractor _schemaExtractor = null;
   private GenericRecord _genericRecord = null;
 
-  private final GenericRow _genericRow = new GenericRow();
-  private final Map<String, Object> _fieldMap = new HashMap<String, Object>();
-
   public AvroRecordReader(final FieldExtractor fieldExtractor, String filePath) throws Exception {
     super();
     _schemaExtractor = fieldExtractor;
@@ -89,9 +86,14 @@ public class AvroRecordReader extends BaseRecordReader {
 
   @Override
   public GenericRow next() {
+    return next(new GenericRow());
+  }
+
+  @Override
+  public GenericRow next(GenericRow row) {
     try {
       _genericRecord = _dataStream.next(_genericRecord);
-      return getGenericRow(_genericRecord);
+      return getGenericRow(_genericRecord, row);
     } catch (IOException e) {
       LOGGER.error("Caught exception while reading record", e);
       Utils.rethrowException(e);
@@ -99,7 +101,7 @@ public class AvroRecordReader extends BaseRecordReader {
     }
   }
 
-  private GenericRow getGenericRow(GenericRecord rawRecord) {
+  private GenericRow getGenericRow(GenericRecord rawRecord, GenericRow row) {
     for (final Field field : _dataStream.getSchema().getFields()) {
       FieldSpec spec = _schemaExtractor.getSchema().getFieldSpecFor(field.name());
       if (spec == null) {
@@ -122,10 +124,10 @@ public class AvroRecordReader extends BaseRecordReader {
         }
       }
 
-      _fieldMap.put(field.name(), value);
+      row.putField(field.name(), value);
     }
-    _genericRow.init(_fieldMap);
-    return _genericRow;
+
+    return row;
   }
 
   public static Object getDefaultNullValue(FieldSpec spec) {

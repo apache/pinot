@@ -136,7 +136,7 @@ public class StringMutableDictionary extends MutableDictionaryReader {
   }
 
   private String getString(int dictionaryId) {
-    return dictionaryIdBiMap.get(new Integer(dictionaryId)).toString();
+    return dictionaryIdBiMap.get(dictionaryId).toString();
   }
 
   @Override

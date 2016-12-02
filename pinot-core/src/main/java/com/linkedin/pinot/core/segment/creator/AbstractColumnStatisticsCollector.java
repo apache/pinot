@@ -150,25 +150,4 @@ public abstract class AbstractColumnStatisticsCollector implements  ColumnStatis
     }
     return entry;
   }
-
-  public Object addressNull(Object entry) {
-    System.out.println("******* calling ");
-    if (entry == null) {
-
-      System.out.println("entry is null");
-      if (entry instanceof String || entry instanceof Boolean || entry instanceof Utf8) {
-        entry = V1Constants.Str.NULL_STRING;
-        System.out.println("^^^^^^^^^^^^^^^^^^^ : " + entry);
-      } else if (entry instanceof Double) {
-        entry = V1Constants.Numbers.NULL_DOUBLE;
-      } else if (entry instanceof Float) {
-        entry = V1Constants.Numbers.NULL_FLOAT;
-      } else if (entry instanceof Long) {
-        entry = V1Constants.Numbers.NULL_LONG;
-      } else if (entry instanceof Integer) {
-        entry = V1Constants.Numbers.NULL_INT;
-      }
-    }
-    return entry;
-  }
 }

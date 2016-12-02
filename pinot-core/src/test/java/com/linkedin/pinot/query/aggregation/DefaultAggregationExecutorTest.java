@@ -322,6 +322,11 @@ public class DefaultAggregationExecutorTest {
       }
 
       @Override
+      public GenericRow next(GenericRow row) {
+        return next();
+      }
+
+      @Override
       public void init()
           throws Exception {
 

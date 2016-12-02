@@ -598,16 +598,13 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   }
 
   @Override
-  public GenericRow getRawValueRowAt(int docId) {
-    GenericRow row = new GenericRow();
-    Map<String, Object> rowValues = new HashMap<String, Object>();
-
+  public GenericRow getRawValueRowAt(int docId, GenericRow row) {
     for (String dimension : dataSchema.getDimensionNames()) {
       if (dataSchema.getFieldSpecFor(dimension).isSingleValueField()) {
         int dicId =
             ((FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWriterMap.get(dimension)).getInt(docId);
         Object rawValue = dictionaryMap.get(dimension).get(dicId);
-        rowValues.put(dimension, rawValue);
+        row.putField(dimension, rawValue);
       } else {
         int[] dicIds = new int[maxNumberOfMultivaluesMap.get(dimension)];
         int len =
@@ -617,7 +614,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
         for (int i = 0; i < len; i++) {
           rawValues[i] = dictionaryMap.get(dimension).get(dicIds[i]);
         }
-        rowValues.put(dimension, rawValues);
+        row.putField(dimension, rawValues);
       }
     }
 
@@ -627,32 +624,30 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
       switch (dataSchema.getFieldSpecFor(metric).getDataType()) {
       case INT:
         int intValue = dictionaryMap.get(metric).getIntValue(dicId);
-        rowValues.put(metric, intValue);
+        row.putField(metric, intValue);
         break;
       case FLOAT:
         float floatValue = dictionaryMap.get(metric).getFloatValue(dicId);
-        rowValues.put(metric, floatValue);
+        row.putField(metric, floatValue);
         break;
       case LONG:
         long longValue = dictionaryMap.get(metric).getLongValue(dicId);
-        rowValues.put(metric, longValue);
+        row.putField(metric, longValue);
         break;
       case DOUBLE:
         double doubleValue = dictionaryMap.get(metric).getDoubleValue(dicId);
-        rowValues.put(metric, doubleValue);
+        row.putField(metric, doubleValue);
         break;
       default:
         throw new UnsupportedOperationException("unsopported metric data type");
       }
     }
 
-    rowValues.put(
+    row.putField(
         outgoingTimeColumnName,
         dictionaryMap.get(outgoingTimeColumnName).get(
             ((FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWriterMap.get(outgoingTimeColumnName))
                 .getInt(docId)));
-
-    row.init(rowValues);
 
     return row;
   }

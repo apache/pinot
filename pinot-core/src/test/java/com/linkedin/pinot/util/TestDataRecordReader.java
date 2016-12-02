@@ -59,6 +59,11 @@ public class TestDataRecordReader implements RecordReader {
   }
 
   @Override
+  public GenericRow next(GenericRow row) {
+    return next();
+  }
+
+  @Override
   public Map<String, MutableLong> getNullCountMap() {
     return null;
   }

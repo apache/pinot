@@ -32,4 +32,6 @@ public interface FieldExtractor {
   Schema getSchema();
 
   GenericRow transform(GenericRow row);
+
+  GenericRow transform(GenericRow row, GenericRow destinationRow);
 }

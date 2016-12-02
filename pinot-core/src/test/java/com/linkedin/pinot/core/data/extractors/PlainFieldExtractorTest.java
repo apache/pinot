@@ -77,7 +77,7 @@ public class PlainFieldExtractorTest {
     fieldMap.put("timeInt", currentDaysSinceEpoch);
 
     row.init(fieldMap);
-    plainFieldExtractor.transform(row);
+    row = plainFieldExtractor.transform(row);
 
     Assert.assertTrue(row.getValue("svDimensionInt") instanceof Integer);
     Assert.assertEquals(row.getValue("svDimensionInt"), 5);
@@ -236,7 +236,7 @@ public class PlainFieldExtractorTest {
     long currentDaysSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24;
     fieldMap.put("incoming", currentDaysSinceEpoch);
     row.init(fieldMap);
-    plainFieldExtractor.transform(row);
+    row = plainFieldExtractor.transform(row);
 
     Assert.assertNull(row.getValue("incoming"));
     Assert.assertTrue(row.getValue("outgoing") instanceof Long);

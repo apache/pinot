@@ -35,7 +35,7 @@ public class DoubleMutableDictionary extends MutableDictionaryReader {
     }
 
     if (rawValue instanceof String) {
-      Double entry = new Double(Double.parseDouble(rawValue.toString()));
+      Double entry = Double.parseDouble((String) rawValue);
       addToDictionaryBiMap(entry);
       updateMinMax(entry);
       return;
@@ -50,15 +50,15 @@ public class DoubleMutableDictionary extends MutableDictionaryReader {
     if (rawValue instanceof Object[]) {
       for (Object o : (Object[]) rawValue) {
         if (o instanceof String) {
-          addToDictionaryBiMap(new Double(Double.parseDouble(o.toString())));
-          updateMinMax(new Double(Double.parseDouble(o.toString())));
+          final Double doubleValue = Double.parseDouble(o.toString());
+          addToDictionaryBiMap(doubleValue);
+          updateMinMax(doubleValue);
           continue;
         }
 
         if (o instanceof Double) {
           addToDictionaryBiMap(o);
           updateMinMax((Double) o);
-          continue;
         }
       }
     }
@@ -79,7 +79,7 @@ public class DoubleMutableDictionary extends MutableDictionaryReader {
       return hasNull;
     }
     if (rawValue instanceof String) {
-      return dictionaryIdBiMap.inverse().containsKey(new Double(Double.parseDouble(rawValue.toString())));
+      return dictionaryIdBiMap.inverse().containsKey(Double.parseDouble(rawValue.toString()));
     }
     return dictionaryIdBiMap.inverse().containsKey(rawValue);
   }
@@ -87,7 +87,7 @@ public class DoubleMutableDictionary extends MutableDictionaryReader {
   @Override
   public int indexOf(Object rawValue) {
     if (rawValue instanceof String) {
-      return getIndexOfFromBiMap(new Double(Double.parseDouble(rawValue.toString())));
+      return getIndexOfFromBiMap(Double.parseDouble(rawValue.toString()));
     }
     return getIndexOfFromBiMap(rawValue);
   }
@@ -104,7 +104,7 @@ public class DoubleMutableDictionary extends MutableDictionaryReader {
 
   @Override
   public double getDoubleValue(int dictionaryId) {
-    return ((Double) getRawValueFromBiMap(dictionaryId)).doubleValue();
+    return (Double) getRawValueFromBiMap(dictionaryId);
   }
 
   @Override
@@ -119,7 +119,7 @@ public class DoubleMutableDictionary extends MutableDictionaryReader {
 
   @Override
   public String toString(int dictionaryId) {
-    return ((Double) getRawValueFromBiMap(dictionaryId)).toString();
+    return (getRawValueFromBiMap(dictionaryId)).toString();
   }
 
   @Override
@@ -162,7 +162,7 @@ public class DoubleMutableDictionary extends MutableDictionaryReader {
   }
 
   private double getDouble(int dictionaryId) {
-    return ((Double) dictionaryIdBiMap.get(new Integer(dictionaryId))).doubleValue();
+    return (Double) dictionaryIdBiMap.get(dictionaryId);
   }
 
   @Override

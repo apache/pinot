@@ -65,6 +65,12 @@ public interface RecordReader {
   public GenericRow next();
 
   /**
+   *
+   * @return
+   */
+  public GenericRow next(GenericRow row);
+
+  /**
    * Get the map of fields that have null values.
    */
   public Map<String, MutableLong> getNullCountMap();

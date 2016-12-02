@@ -70,6 +70,11 @@ public class TestRecordReader extends BaseRecordReader {
   }
 
   @Override
+  public GenericRow next(GenericRow row) {
+    return next();
+  }
+
+  @Override
   public void close() throws Exception {
   }
 }
