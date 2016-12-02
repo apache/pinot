@@ -663,7 +663,8 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     _resourceDataDir = resourceDataDir;
     _schema = schema;
     _serverMetrics = serverMetrics;
-    _segmentVersion = SegmentVersion.fromStringOrDefault(tableConfig.getIndexingConfig().getSegmentFormatVersion());
+    _segmentVersion = SegmentVersion.fromString(tableConfig.getIndexingConfig().getSegmentFormatVersion(),
+        SegmentVersion.DEFAULT_TABLE_VERSION);
     _instance = _realtimeTableDataManager.getServerInstance();
     _protocolHandler = new ServerSegmentCompletionProtocolHandler(_instance);
 
