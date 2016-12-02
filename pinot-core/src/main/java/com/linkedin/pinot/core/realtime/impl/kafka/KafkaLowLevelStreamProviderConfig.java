@@ -16,11 +16,11 @@
 
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
+import java.util.Map;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import java.util.Map;
 
 
 /**
@@ -59,7 +59,7 @@ public class KafkaLowLevelStreamProviderConfig extends KafkaHighLevelStreamProvi
 
     if (properties.containsKey(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_TIME + LLC_PROPERTY_SUFFIX)) {
       llcSegmentTimeInMillis =
-          Long.parseLong(properties.get(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_TIME + LLC_PROPERTY_SUFFIX));
+          convertToMs(properties.get(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_TIME + LLC_PROPERTY_SUFFIX));
     }
   }
 

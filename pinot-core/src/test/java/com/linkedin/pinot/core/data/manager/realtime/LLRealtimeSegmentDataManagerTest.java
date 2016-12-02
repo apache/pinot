@@ -16,11 +16,11 @@
 
 package com.linkedin.pinot.core.data.manager.realtime;
 
-import com.yammer.metrics.core.MetricsRegistry;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.LinkedList;
+import org.json.JSONObject;
 import org.mockito.Mockito;
 import org.testng.annotations.Test;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
@@ -30,9 +30,11 @@ import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
+import com.yammer.metrics.core.MetricsRegistry;
 import junit.framework.Assert;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
@@ -66,7 +68,7 @@ public class LLRealtimeSegmentDataManagerTest {
       + "    ], \n" + "    \"lazyLoad\": \"false\", \n" + "    \"loadMode\": \"HEAP\", \n"
       + "    \"segmentFormatVersion\": null, \n" + "    \"sortedColumn\": [], \n"
       + "    \"streamConfigs\": {\n" + "      \"realtime.segment.flush.threshold.size\": \"" + String.valueOf(maxRowsInSegment) + "\", \n"
-      + "      \"realtime.segment.flush.threshold.time\": \"" + String.valueOf(maxTimeForSegmentCloseMs) + "\", \n"
+      + "      \"" + CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_TIME + "\": \"" + maxTimeForSegmentCloseMs + "\", \n"
       + "      \"stream.kafka.broker.list\": \"broker:7777\", \n"
       + "      \"stream.kafka.consumer.prop.auto.offset.reset\": \"smallest\", \n"
       + "      \"stream.kafka.consumer.type\": \"simple\", \n"
@@ -96,10 +98,15 @@ public class LLRealtimeSegmentDataManagerTest {
         + "}";
   }
 
-  private AbstractTableConfig createTableConfig() throws Exception {
-    AbstractTableConfig tableConfig = AbstractTableConfig.init(_tableConfigJson);
+  private AbstractTableConfig createTableConfig(String tableConfigJsonStr) throws Exception {
+    AbstractTableConfig tableConfig = AbstractTableConfig.init(tableConfigJsonStr);
     return tableConfig;
   }
+
+  private AbstractTableConfig createTableConfig() throws Exception {
+    return createTableConfig(_tableConfigJson);
+  }
+
   private RealtimeTableDataManager createTableDataManager() {
     RealtimeTableDataManager tableDataManager = mock(RealtimeTableDataManager.class);
     when(tableDataManager.getServerInstance()).thenReturn("server-1");
@@ -125,6 +132,43 @@ public class LLRealtimeSegmentDataManagerTest {
     FakeLLRealtimeSegmentDataManager segmentDataManager = new FakeLLRealtimeSegmentDataManager(segmentZKMetadata,
         tableConfig, instanceZKMetadata, tableDataManager, resourceDir, schema, serverMetrics);
     return segmentDataManager;
+  }
+
+  @Test
+  public void testTimeString() throws Exception {
+    JSONObject tableConfigJson = new JSONObject(_tableConfigJson);
+    JSONObject tableIndexConfig = (JSONObject)tableConfigJson.get("tableIndexConfig");
+    JSONObject streamConfigs = (JSONObject)tableIndexConfig.get("streamConfigs");
+    {
+      streamConfigs.put(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_TIME, "3h");
+      AbstractTableConfig tableConfig = createTableConfig(tableConfigJson.toString());
+      InstanceZKMetadata instanceZKMetadata = new InstanceZKMetadata();
+      Schema schema = Schema.fromString(makeSchema());
+      KafkaLowLevelStreamProviderConfig config = new KafkaLowLevelStreamProviderConfig();
+      config.init(tableConfig, instanceZKMetadata, schema);
+      Assert.assertEquals(3 * 3600 * 1000L, config.getTimeThresholdToFlushSegment());
+    }
+
+    {
+      streamConfigs.put(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_TIME, "3h30m");
+      AbstractTableConfig tableConfig = createTableConfig(tableConfigJson.toString());
+      InstanceZKMetadata instanceZKMetadata = new InstanceZKMetadata();
+      Schema schema = Schema.fromString(makeSchema());
+      KafkaLowLevelStreamProviderConfig config = new KafkaLowLevelStreamProviderConfig();
+      config.init(tableConfig, instanceZKMetadata, schema);
+      Assert.assertEquals((3 * 3600  + 30 * 60) * 1000L, config.getTimeThresholdToFlushSegment());
+    }
+
+    {
+      final long segTime = 898789748357L;
+      streamConfigs.put(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_TIME, String.valueOf(segTime));
+      AbstractTableConfig tableConfig = createTableConfig(tableConfigJson.toString());
+      InstanceZKMetadata instanceZKMetadata = new InstanceZKMetadata();
+      Schema schema = Schema.fromString(makeSchema());
+      KafkaLowLevelStreamProviderConfig config = new KafkaLowLevelStreamProviderConfig();
+      config.init(tableConfig, instanceZKMetadata, schema);
+      Assert.assertEquals(segTime, config.getTimeThresholdToFlushSegment());
+    }
   }
 
   // Test that we are in HOLDING state as long as the controller responds HOLD to our segmentConsumed() message.
