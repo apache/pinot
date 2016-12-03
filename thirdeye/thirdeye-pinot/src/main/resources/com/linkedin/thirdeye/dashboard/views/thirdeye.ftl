@@ -34,6 +34,8 @@
 <script type="text/javascript" src="//cdn.jsdelivr.net/bootstrap.daterangepicker/2/daterangepicker.js"></script>
 <script type="text/javascript" src="../../assets/typeahead/typeahead.js"></script>
 <script type="text/javascript" src="../../assets/tokenfield/bootstrap-tokenfield.min.js"></script>
+<script type="text/javascript" src="../../assets/autocomplete/autocomplete.min.js"></script>
+
 
 <!-- custom scripts -->
 <script src="../../../assets/javascript/libs/page.js" defer></script>

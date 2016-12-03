@@ -2,12 +2,13 @@ body {
 	font-family: SourceSansPro, sans-serif;
 	font-size: 14px;
 	background-color: #F3F6F8;
-	color:#080808
+	color: #080808
 }
+
 .label-large-light {
 	font-weight: 100;
 	font-size: 23px;
-	padding-right:10px;
+	padding-right: 10px;
 }
 
 .label-medium-light {
@@ -29,10 +30,11 @@ body {
 	font-weight: 400;
 	font-size: 13px;
 }
+
 .underlined {
-	border-top:none;
-	border-right:none;
-	border-left:none;
+	border-top: none;
+	border-right: none;
+	border-left: none;
 }
 /* Underline From Center */
 .hvr-underline-from-center {
@@ -74,7 +76,6 @@ body {
 #main-tabs .active {
 	border-bottom: 4px solid #ffffff;
 	background-color: #080808;
-	
 }
 
 .navbar {
@@ -162,13 +163,16 @@ hr {
 	/* You may want to include this as bootstrap applies these styles too */
 }
 
-
-
 .box {
 	width: 27px;
 	height: 27px;
 	text-align: center;
 	background: #F3F6F8;
+}
+
+.box-add-metric {
+	height: 200px;
+	
 }
 
 .box-anomaly {
@@ -277,4 +281,46 @@ text {
 
 rect {
 	fill: none;
+}
+
+.autocomplete-suggestions {
+	border: 1px solid #E3E3E3;
+	background: #FFF;
+	overflow: auto;
+	font-size: 15px;
+	font-weight: 100;
+}
+
+.autocomplete-suggestion {
+	padding: 2px 5px;
+	white-space: nowrap;
+	overflow: hidden;
+}
+
+.autocomplete-selected {
+	background: #F0F0F0;
+}
+
+.autocomplete-suggestions strong {
+	font-weight: normal;
+	color: #3399FF;
+}
+
+.autocomplete-group {
+	padding: 2px 5px;
+}
+
+.autocomplete-group strong {
+	display: block;
+	border-bottom: 1px solid #000;
+}
+
+.daterangepicker {
+	font=size:11px;
+	font-weight:100;
+}
+
+.daterangepicker ,.daterangepicker th, .daterangepicker td  {
+	font-size:12px;
+	font-weight:100;
 }

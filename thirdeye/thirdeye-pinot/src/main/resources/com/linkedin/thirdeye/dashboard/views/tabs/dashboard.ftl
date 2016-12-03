@@ -4,15 +4,13 @@
 			<div class=row>
 				<div class="col-md-12">
 					<div style="float: left;">
-						<label for="create-dashboard-button" class="label-large-light">Dashboard:</label>
+						<label for="dashboard-input" class="label-large-light">Dashboard Name: </label>
 					</div>
 					<div style="width:370px;float: left">
-						<select id="create-dashboard-button" class="form-control underlined label-large-light">
-							<option>100 most recent anomalies</option>
-						</select>
+						<input type="text" name="dashboard" size="35" id="dashboard-input" class="label-large-light underlined" placeholder="Search for a Dashboard"/>
 					</div>
 					<div style="float: left">
-						<button type="button" class="btn btn-link label-medium-semibold" id="create-dashboard-button">+Create Custom Dashboard</button>
+						<a type="button" class="btn btn-link label-medium-semibold" id="create-dashboard-button" data-toggle="modal" data-target="#create-dashboard-modal">+ Create Custom Dashboard</a>
 					</div>
 				</div>
 			</div>
@@ -67,3 +65,6 @@
 		</div>
 	</div>
 </div>
+
+<#include "dashboard/manage-dashboard-modal.ftl"/>
+
