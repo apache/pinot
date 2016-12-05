@@ -12,7 +12,7 @@ function renderConfigSelector() {
     for (var i in data) {
       select += "<option value='" + data[i] + "'>" + data[i] + "</option>";
     }
-    $("#entityTypeSelector").append(select);
+    $("#entityTypeSelector").html(select);
   });
 }
 
@@ -27,7 +27,7 @@ function renderEntitySelector() {
       for (var i in data) {
         select += "<option value='" + data[i].id + "'>" + buildNameForEntity(data[i], entityType) + "</option>";
       }
-      $("#entitySelector").append(select);
+      $("#entitySelector").html(select);
     });
   }
 }
@@ -64,6 +64,8 @@ function renderEntityEditor() {
   editor.set(entity);
   var submitHtml = "<input type='submit' name='submit' onclick='updateObject()' />";
   $("#entityDetails").append(submitHtml);
+
+  var textArea = "<textarea></textarea>";
 }
 
 function updateObject() {
