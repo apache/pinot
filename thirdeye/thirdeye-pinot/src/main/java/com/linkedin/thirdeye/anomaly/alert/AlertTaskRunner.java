@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomaly.alert;
 
+import com.linkedin.thirdeye.anomaly.alert.template.pojo.MetricDimensionReport;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewResponse;
@@ -241,7 +242,7 @@ public class AlertTaskRunner implements TaskRunner {
 
       if (alertConfig.isReportEnabled() & alertConfig.getDimensions() != null) {
         long reportStartTs = 0;
-        Map<String, Map<String, Map<String, Map<String, String>>>> metricDimensionValueReports;
+        List<MetricDimensionReport> metricDimensionValueReports;
         List<ContributorViewResponse> reports = new ArrayList<>();
         for (String dimension : alertConfig.getDimensions()) {
           ContributorViewResponse report = EmailHelper.getContributorData(collectionAlias, alertConfig.getMetric(), Arrays.asList(dimension));
@@ -250,12 +251,12 @@ public class AlertTaskRunner implements TaskRunner {
           }
         }
         reportStartTs = reports.get(0).getTimeBuckets().get(0).getCurrentStart();
-        metricDimensionValueReports = getReportListByMetric(reports);
+        metricDimensionValueReports = getDimensionReportList(reports);
         templateData.put("metricDimensionValueReports", metricDimensionValueReports);
         templateData.put("reportStartDateTime", new Date(reportStartTs).toString());
       }
 
-      Template template = freemarkerConfig.getTemplate("merged-anomaly-report.ftl");
+      Template template = freemarkerConfig.getTemplate("anomaly-report.ftl");
       template.process(templateData, out);
     } catch (Exception e) {
       throw new JobExecutionException(e);
@@ -263,9 +264,17 @@ public class AlertTaskRunner implements TaskRunner {
 
     // Send email
     try {
+      String alertEmailSubject;
+      if (results.size() > 0) {
       String anomalyString = (results.size() == 1) ? "anomaly" : "anomalies";
-      String alertEmailSubject = String.format("Thirdeye: %s: %s - %d %s detected",
-          alertConfig.getMetric(), collectionAlias, results.size(), anomalyString);
+        alertEmailSubject = String
+            .format("Thirdeye: %s: %s - %d %s detected", alertConfig.getMetric(), collectionAlias,
+                results.size(), anomalyString);
+      } else {
+        alertEmailSubject = String
+            .format("Thirdeye data report : %s: %s", alertConfig.getMetric(), collectionAlias);
+      }
+
       String alertEmailHtml = new String(baos.toByteArray(), CHARSET);
       EmailHelper.sendEmailWithHtml(email, thirdeyeConfig.getSmtpConfiguration(), alertEmailSubject,
           alertEmailHtml, alertConfig.getFromAddress(), alertConfig.getToAddresses());
@@ -287,27 +296,33 @@ public class AlertTaskRunner implements TaskRunner {
   }
 
   // report list metric vs groupByKey vs dimensionVal vs timeBucket vs values
-  private static Map<String, Map<String, Map<String, Map<String, String>>>> getReportListByMetric(List<ContributorViewResponse> reports) {
-    Map<String, Map<String, Map<String, Map<String, String>>>> ultimateResult = new LinkedHashMap<>();
+  private static List<MetricDimensionReport> getDimensionReportList(List<ContributorViewResponse> reports) {
+    List<MetricDimensionReport> ultimateResult = new ArrayList<>();
     for (ContributorViewResponse report : reports) {
+      MetricDimensionReport metricDimensionReport = new MetricDimensionReport();
+      String metric = report.getMetrics().get(0);
+      String groupByDimension = report.getDimensions().get(0);
+      metricDimensionReport.setMetricName(metric);
+      metricDimensionReport.setDimensionName(groupByDimension);
+
       int valIndex = report.getResponseData().getSchema().getColumnsToIndexMapping().get("percentageChange");
       int dimensionIndex = report.getResponseData().getSchema().getColumnsToIndexMapping().get("dimensionValue");
 
-      String metric = report.getMetrics().get(0);
-      String groupByDimension = report.getDimensions().get(0);
       int numDimensions = report.getDimensionValuesMap().get(groupByDimension).size();
       int numBuckets = report.getTimeBuckets().size();
-
-      Map<String, Map<String, Map<String, String>>> groupByDimensionValueMap = ultimateResult.get(metric);
-      if (groupByDimensionValueMap == null) {
-        groupByDimensionValueMap = new LinkedHashMap<>();
-      }
 
       // this is dimension vs timeBucketValue map, this should be sorted based on first bucket value
       Map<String, Map<String, String>> dimensionValueMap = new LinkedHashMap<>();
       List<Pair<String, LinkedHashMap>> dimensionValueList = new ArrayList<>();
 
       for (int p = 0; p < numDimensions; p++) {
+        if (p == 0) {
+          metricDimensionReport.setCurrentStartTime(report.getTimeBuckets().get(0).getCurrentStart());
+          metricDimensionReport.setCurrentEndTime(report.getTimeBuckets().get(numBuckets-1).getCurrentEnd());
+          metricDimensionReport.setBaselineStartTime(report.getTimeBuckets().get(0).getBaselineStart());
+          metricDimensionReport.setBaselineEndTime(report.getTimeBuckets().get(numBuckets-1).getBaselineEnd());
+        }
+
         // valueMap is timeBucket vs value map
         LinkedHashMap<String, String> valueMap = new LinkedHashMap<>();
         String currentDimension = "";
@@ -326,11 +341,12 @@ public class AlertTaskRunner implements TaskRunner {
         dimensionValueMap.put(dimensionValue.getFirst(), dimensionValue.getSecond());
       }
 
-      groupByDimensionValueMap.put(groupByDimension, dimensionValueMap);
-      ultimateResult.put(metric, groupByDimensionValueMap);
+      metricDimensionReport.setSubDimensionValueMap(dimensionValueMap);
+      ultimateResult.add(metricDimensionReport);
     }
     return ultimateResult;
   }
+
 
   private static void sortDimensionValueList(List<Pair<String, LinkedHashMap>> dimensionValueList) {
     Collections.sort(dimensionValueList, new Comparator<Pair<String, LinkedHashMap>>() {
@@ -394,6 +410,25 @@ public class AlertTaskRunner implements TaskRunner {
     }
   }
 
+  private void sendFailureEmail(Throwable t) throws JobExecutionException {
+    HtmlEmail email = new HtmlEmail();
+    String collection = alertConfig.getCollection();
+    String metric = alertConfig.getMetric();
+
+    String subject = String
+        .format("[ThirdEye Anomaly Detector] FAILED ALERT ID=%d (%s:%s)", alertConfig.getId(),
+            collection, metric);
+    String textBody = String
+        .format("%s%n%nException:%s", alertConfig.toString(), ExceptionUtils.getStackTrace(t));
+    try {
+      EmailHelper
+          .sendEmailWithTextBody(email, thirdeyeConfig.getSmtpConfiguration(), subject, textBody,
+              thirdeyeConfig.getFailureFromAddress(), thirdeyeConfig.getFailureToAddress());
+    } catch (EmailException e) {
+      throw new JobExecutionException(e);
+    }
+  }
+
   private class DateFormatMethod implements TemplateMethodModelEx {
     private final DateTimeZone TZ;
     private static final String DATE_PATTERN = "yyyy-MM-dd HH:mm:ss";
@@ -415,25 +450,6 @@ public class AlertTaskRunner implements TaskRunner {
       Long millisSinceEpoch = tnm.getAsNumber().longValue();
       DateTime date = new DateTime(millisSinceEpoch, TZ);
       return date.toString(DATE_PATTERN);
-    }
-  }
-
-  private void sendFailureEmail(Throwable t) throws JobExecutionException {
-    HtmlEmail email = new HtmlEmail();
-    String collection = alertConfig.getCollection();
-    String metric = alertConfig.getMetric();
-
-    String subject = String
-        .format("[ThirdEye Anomaly Detector] FAILED ALERT ID=%d (%s:%s)", alertConfig.getId(),
-            collection, metric);
-    String textBody = String
-        .format("%s%n%nException:%s", alertConfig.toString(), ExceptionUtils.getStackTrace(t));
-    try {
-      EmailHelper
-          .sendEmailWithTextBody(email, thirdeyeConfig.getSmtpConfiguration(), subject, textBody,
-              thirdeyeConfig.getFailureFromAddress(), thirdeyeConfig.getFailureToAddress());
-    } catch (EmailException e) {
-      throw new JobExecutionException(e);
     }
   }
 }
