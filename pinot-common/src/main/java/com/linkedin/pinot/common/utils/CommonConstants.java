@@ -246,6 +246,7 @@ public class CommonConstants {
     public static final String TOTAL_DOCS = "segment.total.docs";
     public static final String CRC = "segment.crc";
     public static final String CREATION_TIME = "segment.creation.time";
+    public static final String FLUSH_THRESHOLD_SIZE = "segment.flush.threshold.size";
 
     public static enum SegmentType {
       OFFLINE,

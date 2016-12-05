@@ -44,6 +44,7 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
   private long _totalRawDocs = -1;
   private long _crc = -1;
   private long _creationTime = -1;
+  private int _sizeThresholdToFlushSegment = -1;
 
   public SegmentZKMetadata() {
   }
@@ -62,6 +63,7 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     _totalRawDocs = znRecord.getLongField(CommonConstants.Segment.TOTAL_DOCS, -1);
     _crc = znRecord.getLongField(CommonConstants.Segment.CRC, -1);
     _creationTime = znRecord.getLongField(CommonConstants.Segment.CREATION_TIME, -1);
+    _sizeThresholdToFlushSegment = znRecord.getIntField(CommonConstants.Segment.FLUSH_THRESHOLD_SIZE, -1);
   }
 
   public String getSegmentName() {
@@ -221,5 +223,9 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
     configMap.put(CommonConstants.Segment.CRC, Long.toString(_crc));
     configMap.put(CommonConstants.Segment.CREATION_TIME, Long.toString(_creationTime));
     return configMap;
+  }
+
+  public int getSizeThresholdToFlushSegment() {
+    return _sizeThresholdToFlushSegment;
   }
 }

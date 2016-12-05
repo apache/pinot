@@ -678,7 +678,6 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     _segmentNameStr = _segmentZKMetadata.getSegmentName();
     _segmentName = new LLCSegmentName(_segmentNameStr);
     _kafkaPartitionId = _segmentName.getPartitionId();
-    _segmentMaxRowCount = kafkaStreamProviderConfig.getSizeThresholdToFlushSegment();
     _tableName = _tableConfig.getTableName();
     _metricKeyName = _tableName + "-" + _kafkaTopic + "-" + _kafkaPartitionId;
     segmentLogger = LoggerFactory.getLogger(LLRealtimeSegmentDataManager.class.getName() +
@@ -709,6 +708,16 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     if (_sortedColumn != null && !invertedIndexColumns.contains(_sortedColumn)) {
       invertedIndexColumns.add(_sortedColumn);
     }
+
+    // Read the max number of rows
+    int segmentMaxRowCount = kafkaStreamProviderConfig.getSizeThresholdToFlushSegment();
+
+    if (0 < segmentZKMetadata.getSizeThresholdToFlushSegment()) {
+      segmentMaxRowCount = segmentZKMetadata.getSizeThresholdToFlushSegment();
+    }
+
+    _segmentMaxRowCount = segmentMaxRowCount;
+
     // Start new realtime segment
     _realtimeSegment = new RealtimeSegmentImpl(schema, _segmentMaxRowCount, tableConfig.getTableName(),
         segmentZKMetadata.getSegmentName(), _kafkaTopic, _serverMetrics, invertedIndexColumns);
