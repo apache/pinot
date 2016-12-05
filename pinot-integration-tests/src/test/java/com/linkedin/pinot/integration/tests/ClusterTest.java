@@ -248,8 +248,7 @@ public abstract class ClusterTest extends ControllerTest {
     metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.DECODER_CLASS,
         AvroFileSchemaKafkaAvroMessageDecoder.class.getName());
     metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.KAFKA_BROKER_LIST, kafkaBrokerList);
-    metadata.put(DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE, Integer.toString(1)); // jfim: Invalid value to ensure the test fails if we don't pick the LLC override
-    metadata.put(DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE + KafkaLowLevelStreamProviderConfig.LLC_PROPERTY_SUFFIX, Integer.toString(realtimeSegmentFlushSize));
+    metadata.put(DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE, Integer.toString(realtimeSegmentFlushSize));
     metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.KAFKA_CONSUMER_PROPS_PREFIX + "." + Kafka.AUTO_OFFSET_RESET,
         "smallest");
 

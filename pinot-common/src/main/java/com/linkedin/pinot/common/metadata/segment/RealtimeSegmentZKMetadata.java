@@ -31,6 +31,7 @@ import static com.linkedin.pinot.common.utils.EqualityUtils.isNullOrNotSameClass
 public class RealtimeSegmentZKMetadata extends SegmentZKMetadata {
 
   private Status _status = null;
+  private int _sizeThresholdToFlushSegment = -1;
 
   public RealtimeSegmentZKMetadata() {
     setSegmentType(SegmentType.REALTIME);
@@ -40,6 +41,7 @@ public class RealtimeSegmentZKMetadata extends SegmentZKMetadata {
     super(znRecord);
     setSegmentType(SegmentType.REALTIME);
     _status = Status.valueOf(znRecord.getSimpleField(CommonConstants.Segment.Realtime.STATUS));
+    _sizeThresholdToFlushSegment = znRecord.getIntField(CommonConstants.Segment.FLUSH_THRESHOLD_SIZE, -1);
   }
 
   public Status getStatus() {
@@ -69,6 +71,7 @@ public class RealtimeSegmentZKMetadata extends SegmentZKMetadata {
   public ZNRecord toZNRecord() {
     ZNRecord znRecord = super.toZNRecord();
     znRecord.setSimpleField(CommonConstants.Segment.Realtime.STATUS, _status.toString());
+    znRecord.setLongField(CommonConstants.Segment.FLUSH_THRESHOLD_SIZE, _sizeThresholdToFlushSegment);
     return znRecord;
   }
 
@@ -83,13 +86,17 @@ public class RealtimeSegmentZKMetadata extends SegmentZKMetadata {
     }
 
     RealtimeSegmentZKMetadata metadata = (RealtimeSegmentZKMetadata) segmentMetadata;
-    return super.equals(metadata) && isEqual(_status, metadata._status);
+    return super.equals(metadata) &&
+        isEqual(_status, metadata._status) &&
+        isEqual(_sizeThresholdToFlushSegment, metadata._sizeThresholdToFlushSegment);
   }
 
   @Override
   public int hashCode() {
     int result = super.hashCode();
-    return hashCodeOf(result, _status);
+    result = hashCodeOf(result, _status);
+    result = hashCodeOf(result, _sizeThresholdToFlushSegment);
+    return result;
   }
 
   @Override
@@ -97,6 +104,15 @@ public class RealtimeSegmentZKMetadata extends SegmentZKMetadata {
     Map<String, String> configMap = super.toMap();
     configMap.put(CommonConstants.Segment.Realtime.STATUS, _status.toString());
     configMap.put(CommonConstants.Segment.SEGMENT_TYPE, SegmentType.REALTIME.toString());
+    configMap.put(CommonConstants.Segment.FLUSH_THRESHOLD_SIZE, Integer.toString(_sizeThresholdToFlushSegment));
     return configMap;
+  }
+
+  public void setSizeThresholdToFlushSegment(int sizeThresholdToFlushSegment) {
+    _sizeThresholdToFlushSegment = sizeThresholdToFlushSegment;
+  }
+
+  public int getSizeThresholdToFlushSegment() {
+    return _sizeThresholdToFlushSegment;
   }
 }

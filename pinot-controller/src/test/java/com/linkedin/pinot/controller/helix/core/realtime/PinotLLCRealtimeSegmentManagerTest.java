@@ -18,6 +18,7 @@ package com.linkedin.pinot.controller.helix.core.realtime;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -96,7 +97,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     segmentManager.setupHelixEntries(topic, rtTableName, nPartitions, instances, nReplicas, startOffset, DUMMY_HOST,
-        null, true);
+        null, true, 1000000);
 
     Map<String, List<String>> assignmentMap = segmentManager._partitionAssignment.getListFields();
     Assert.assertEquals(assignmentMap.size(), nPartitions);
@@ -144,7 +145,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     IdealState  idealState = PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(rtTableName, nReplicas);
     segmentManager.setupHelixEntries(topic, rtTableName, nPartitions, instances, nReplicas, startOffset,
-        DUMMY_HOST, idealState, !existingIS);
+        DUMMY_HOST, idealState, !existingIS, 1000000);
 
     final String actualRtTableName = segmentManager._realtimeTableName;
     final Map<String, List<String>> idealStateEntries = segmentManager._idealStateEntries;
@@ -207,14 +208,16 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     IdealState  idealState = PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(rtTableName, 10);
     try {
-      segmentManager.setupHelixEntries(topic, rtTableName, 8, instances, 3, startOffset, DUMMY_HOST, idealState, false);
+      segmentManager.setupHelixEntries(topic, rtTableName, 8, instances, 3, startOffset, DUMMY_HOST, idealState, false,
+          10000);
       Assert.fail("Did not get expected exception when setting up helix with existing segments in propertystore");
     } catch (RuntimeException e) {
       // Expected
     }
 
     try {
-      segmentManager.setupHelixEntries(topic, rtTableName, 8, instances, 3, startOffset, DUMMY_HOST, idealState, true);
+      segmentManager.setupHelixEntries(topic, rtTableName, 8, instances, 3, startOffset, DUMMY_HOST, idealState, true,
+          10000);
       Assert.fail("Did not get expected exception when setting up helix with existing segments in propertystore");
     } catch (RuntimeException e) {
       // Expected
@@ -237,7 +240,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     IdealState  idealState = PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(rtTableName, nReplicas);
     segmentManager.setupHelixEntries(topic, rtTableName, nPartitions, instances, nReplicas, startOffset, DUMMY_HOST, idealState,
-        !existingIS);
+        !existingIS, 10000);
     // Now commit the first segment of partition 6.
     final int committingPartition = 6;
     final long nextOffset = 3425666L;
@@ -345,7 +348,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     // Setup initial entries
     segmentManager.setupHelixEntries(topic, rtTableName, nKafkaPartitions, instances, nReplicas, startOffset, DUMMY_HOST,
-        null, true);
+        null, true, 1000);
 
     ZNRecord partitionAssignment = segmentManager._partitionAssignment;
     segmentManager._currentKafkaPartitionCount = nKafkaPartitions;
@@ -418,7 +421,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     IdealState  idealState = PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(rtTableName,
         nReplicas);
     segmentManager.setupHelixEntries(topic, rtTableName, nPartitions, instances, nReplicas, startOffset, DUMMY_HOST,
-        idealState, false);
+        idealState, false, 10000);
     // Add another segment for each partition
     long now = System.currentTimeMillis();
     List<String> existingSegments = new ArrayList<>(segmentManager._idealStateEntries.keySet());
@@ -564,7 +567,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
       final String startOffset = KAFKA_OFFSET;
 
       FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager(false, null);
-      segmentManager.setupHelixEntries(topic, realtimeTableName, nPartitions, instances, nReplicas, startOffset, DUMMY_HOST, idealState, false);
+      segmentManager.setupHelixEntries(topic, realtimeTableName, nPartitions, instances, nReplicas, startOffset,
+          DUMMY_HOST, idealState, false, 10000);
       ZNRecord partitionAssignment = segmentManager.getKafkaPartitionAssignment(realtimeTableName);
 
       for (int p = 0; p < nPartitions; p++) {
@@ -669,12 +673,12 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     @Override
     protected void setupInitialSegments(String realtimeTableName, ZNRecord partitionAssignment, String topicName, String startOffset, String bootstrapHostList,
-        IdealState idealState, boolean create, int nReplicas) {
+        IdealState idealState, boolean create, int nReplicas, int flushSize) {
       _realtimeTableName = realtimeTableName;
       _partitionAssignment = partitionAssignment;
       _startOffset = startOffset;
       if (_setupInitialSegments) {
-        super.setupInitialSegments(realtimeTableName, partitionAssignment, topicName, startOffset, bootstrapHostList, idealState, create, nReplicas);
+        super.setupInitialSegments(realtimeTableName, partitionAssignment, topicName, startOffset, bootstrapHostList, idealState, create, nReplicas, flushSize);
       }
     }
 
@@ -752,6 +756,11 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
+    protected int getRealtimeTableFlushSizeForTable(String tableName) {
+      return 1000;
+    }
+
+    @Override
     protected IdealState getTableIdealState(String realtimeTableName) {
       return _tableIdealState;
     }
@@ -764,6 +773,87 @@ public class PinotLLCRealtimeSegmentManagerTest {
     @Override
     protected int getKafkaPartitionCount(KafkaStreamMetadata metadata) {
       return _currentKafkaPartitionCount;
+    }
+  }
+
+  private String makeFakeSegmentName(int id) {
+    return new LLCSegmentName("fakeTable_REALTIME", id, 0, 1234L).getSegmentName();
+  }
+
+  @Test
+  public void testUpdateFlushThresholdForSegmentMetadata() {
+    PinotLLCRealtimeSegmentManager realtimeSegmentManager = new FakePinotLLCRealtimeSegmentManager(false,
+        Collections.<String>emptyList());
+
+    ZNRecord partitionAssignment = new ZNRecord("fakeTable_REALTIME");
+    // 4 partitions assigned to 4 servers, 4 replicas => the segments should have 250k rows each (1M / 4)
+    for(int segmentId = 1; segmentId <= 4; ++segmentId) {
+      List<String> instances = new ArrayList<>();
+
+      for(int replicaId = 1; replicaId <= 4; ++replicaId) {
+        instances.add("Server_1.2.3.4_123" + replicaId);
+      }
+
+      partitionAssignment.setListField(Integer.toString(segmentId), instances);
+    }
+
+    // Check that each segment has 250k rows each
+    for(int segmentId = 1; segmentId <= 4; ++segmentId) {
+      LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
+      metadata.setSegmentName(makeFakeSegmentName(segmentId));
+      realtimeSegmentManager.updateFlushThresholdForSegmentMetadata(metadata, partitionAssignment, 1000000);
+      Assert.assertEquals(metadata.getSizeThresholdToFlushSegment(), 250000);
+    }
+
+    // 4 partitions assigned to 4 servers, 2 partitions/server => the segments should have 500k rows each (1M / 2)
+    partitionAssignment.getListFields().clear();
+    for(int segmentId = 1; segmentId <= 4; ++segmentId) {
+      List<String> instances = new ArrayList<>();
+
+      for(int replicaId = 1; replicaId <= 2; ++replicaId) {
+        instances.add("Server_1.2.3.4_123" + ((replicaId + segmentId) % 4));
+      }
+
+      partitionAssignment.setListField(Integer.toString(segmentId), instances);
+    }
+
+    // Check that each segment has 500k rows each
+    for(int segmentId = 1; segmentId <= 4; ++segmentId) {
+      LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
+      metadata.setSegmentName(makeFakeSegmentName(segmentId));
+      realtimeSegmentManager.updateFlushThresholdForSegmentMetadata(metadata, partitionAssignment, 1000000);
+      Assert.assertEquals(metadata.getSizeThresholdToFlushSegment(), 500000);
+    }
+
+    // 4 partitions assigned to 4 servers, 1 partition/server => the segments should have 1M rows each (1M / 1)
+    partitionAssignment.getListFields().clear();
+    for(int segmentId = 1; segmentId <= 4; ++segmentId) {
+      List<String> instances = new ArrayList<>();
+      instances.add("Server_1.2.3.4_123" + segmentId);
+      partitionAssignment.setListField(Integer.toString(segmentId), instances);
+    }
+
+    // Check that each segment has 1M rows each
+    for(int segmentId = 1; segmentId <= 4; ++segmentId) {
+      LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
+      metadata.setSegmentName(makeFakeSegmentName(segmentId));
+      realtimeSegmentManager.updateFlushThresholdForSegmentMetadata(metadata, partitionAssignment, 1000000);
+      Assert.assertEquals(metadata.getSizeThresholdToFlushSegment(), 1000000);
+    }
+
+    // Assign another partition to all servers => the servers should have 500k rows each (1M / 2)
+    List<String> instances = new ArrayList<>();
+    for(int replicaId = 1; replicaId <= 4; ++replicaId) {
+      instances.add("Server_1.2.3.4_123" + replicaId);
+    }
+    partitionAssignment.setListField("5", instances);
+
+    // Check that each segment has 500k rows each
+    for(int segmentId = 1; segmentId <= 4; ++segmentId) {
+      LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
+      metadata.setSegmentName(makeFakeSegmentName(segmentId));
+      realtimeSegmentManager.updateFlushThresholdForSegmentMetadata(metadata, partitionAssignment, 1000000);
+      Assert.assertEquals(metadata.getSizeThresholdToFlushSegment(), 500000);
     }
   }
 }
