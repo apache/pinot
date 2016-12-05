@@ -44,6 +44,11 @@ function buildNameForEntity(entity, entityType) {
       return entity.id+ " : " + entity.functionName + " : " + entity.type;
     case "EMAIL_CONFIGURATION":
       return entity.id + " : " + entity.collection + " : " + entity.metric;
+    case "OVERRIDE_CONFIG":
+      var startTime = new Date(entity.startTime);
+      var endTime = new Date(entity.endTime);
+      return entity.id + " : " + entity.targetEntity + " : "+ startTime.toString() + " -- "
+             + endTime.toString();
     default:
       console.log("entity type not found : " + entityType);
       return entity.id;
@@ -70,6 +75,7 @@ function updateObject() {
   var entityType = $("#entityTypeSelector").find(':selected').val();
   var jsonVal = JSON.stringify(editor.get());
   submitData("/thirdeye/entity?entityType=" + entityType, jsonVal, "admin").done(function (data) {
-    console.log(data);
+    console.log(data)
+    renderEntitySelector();
   })
 }

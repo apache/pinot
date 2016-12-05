@@ -7,6 +7,7 @@ import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AbstractDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
@@ -14,6 +15,7 @@ import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -42,6 +44,7 @@ public class EntityManagerResource {
   private final DashboardConfigManager dashboardConfigManager;
   private final MetricConfigManager metricConfigManager;
   private final DatasetConfigManager datasetConfigManager;
+  private final OverrideConfigManager overrideConfigManager;
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
@@ -54,10 +57,12 @@ public class EntityManagerResource {
     this.dashboardConfigManager = DAO_REGISTRY.getDashboardConfigDAO();
     this.metricConfigManager = DAO_REGISTRY.getMetricConfigDAO();
     this.datasetConfigManager = DAO_REGISTRY.getDatasetConfigDAO();
+    this.overrideConfigManager = DAO_REGISTRY.getOverrideConfigDAO();
   }
 
   private enum EntityType {
-    ANOMALY_FUNCTION, EMAIL_CONFIGURATION, DASHBOARD_CONFIG, DATASET_CONFIG, METRIC_CONFIG
+    ANOMALY_FUNCTION, EMAIL_CONFIGURATION, DASHBOARD_CONFIG, DATASET_CONFIG, METRIC_CONFIG,
+    OVERRIDE_CONFIG
   }
 
   @GET
@@ -85,6 +90,9 @@ public class EntityManagerResource {
       break;
     case METRIC_CONFIG:
       results.addAll(metricConfigManager.findAll());
+      break;
+    case OVERRIDE_CONFIG:
+      results.addAll(overrideConfigManager.findAll());
       break;
     default:
       throw new WebApplicationException("Unknown entity type : " + entityType);
@@ -118,6 +126,10 @@ public class EntityManagerResource {
       case METRIC_CONFIG:
         MetricConfigDTO metricConfigDTO = OBJECT_MAPPER.readValue(jsonPayload, MetricConfigDTO.class);
         metricConfigManager.update(metricConfigDTO);
+        break;
+      case OVERRIDE_CONFIG:
+        OverrideConfigDTO overrideConfigDTO = OBJECT_MAPPER.readValue(jsonPayload, OverrideConfigDTO.class);
+        overrideConfigManager.update(overrideConfigDTO);
         break;
       }
     } catch (IOException e) {
