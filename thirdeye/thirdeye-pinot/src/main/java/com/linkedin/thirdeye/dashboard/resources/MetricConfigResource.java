@@ -77,7 +77,9 @@ public class MetricConfigResource {
     // optional ones
     metricConfigDTO.setCellSizeExpression(cellSizeExpression);
     metricConfigDTO.setInverseMetric(inverseMetric);
-    metricConfigDTO.setRollupThreshold(rollupThreshold);
+    if (rollupThreshold != null) {
+      metricConfigDTO.setRollupThreshold(rollupThreshold);
+    }
 
     // handle derived
     if (derived) {

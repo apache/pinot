@@ -123,6 +123,7 @@ function updateMetricConfigTable(dataset, metrics) {
       },
       rollupThreshold : {
         title : 'Rollup Threshold',
+        defaultValue : '0.01',
         visibility: 'hidden'
       }
     }
