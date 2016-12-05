@@ -75,7 +75,7 @@ function updateObject() {
   var entityType = $("#entityTypeSelector").find(':selected').val();
   var jsonVal = JSON.stringify(editor.get());
   submitData("/thirdeye/entity?entityType=" + entityType, jsonVal, "admin").done(function (data) {
-    console.log(data)
+    console.log(data);
     renderEntitySelector();
   })
 }
