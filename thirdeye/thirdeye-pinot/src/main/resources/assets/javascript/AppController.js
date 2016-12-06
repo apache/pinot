@@ -59,7 +59,7 @@ AppController.prototype = {
     page("/", this.parseHash, this.dashboardController.handleAppEvent.bind(this.dashboardController));
     page("/dashboard", this.parseHash, this.dashboardController.handleAppEvent.bind(this.dashboardController));
     page("/anomalies", this.parseHash, this.anomalyResultController.handleAppEvent.bind(this.anomalyResultController));
-    // page("/analysis", this.parseHash, this.analysisController.handleAppEvent.bind(this.analysisController));
+    page("/analysis", this.parseHash, this.analysisController.handleAppEvent.bind(this.analysisController));
     // page("/ingraph-metric-config", this.updateHistory,
     // showIngraphDatasetSelection);
     // page("/ingraph-dashboard-config", this.updateHistory,
