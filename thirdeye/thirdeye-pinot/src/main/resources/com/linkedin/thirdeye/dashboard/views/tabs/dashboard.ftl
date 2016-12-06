@@ -43,10 +43,10 @@
 				<div class="navbar-header">
 					<a class="navbar-brand"><label class="label-medium-semibold">View metrics by:</label></a>
 				</div>
-				<div class="collapse navbar-collapse">
+				<div id="dashboard-tabs" class="collapse navbar-collapse">
 					<ul class="nav navbar-nav dashboard-tabs" id="dashboard-tabs">
-						<li class=""><a href="#num_of_anomalies" data-toggle="tab"># of Anomalies</a></li>
-						<li class=""><a href="#wow" data-toggle="tab">Week Over Week</a></li>
+						<li class=""><a href="#anomaly-summary-tab" data-toggle="tab"># of Anomalies</a></li>
+						<li class=""><a href="#wow-summary-tab" data-toggle="tab">Week Over Week</a></li>
 					</ul>
 				</div>
 			</nav>

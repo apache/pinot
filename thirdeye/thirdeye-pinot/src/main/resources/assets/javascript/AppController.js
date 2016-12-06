@@ -7,17 +7,17 @@ function AppController() {
   this.appView = new AppView(this.appModel);
 
   // add listeners
-  this.appView.tabClickEvent.attach(this.onTabClickEventHandler);
+  this.appView.tabClickEvent.attach(this.onTabClickEventHandler.bind(this));
 }
 
 AppController.prototype = {
   init : function() {
     console.log("init called");
+    this.appView.init();
     // init page routing here
     this.compileTemplates();
     this.setupRouting();
     this.handleURL();
-
   },
 
   handleURL : function() {
@@ -58,8 +58,8 @@ AppController.prototype = {
     page.base("/thirdeye");
     page("/", this.parseHash, this.dashboardController.handleAppEvent.bind(this.dashboardController));
     page("/dashboard", this.parseHash, this.dashboardController.handleAppEvent.bind(this.dashboardController));
-    // page("/anomalies", this.updateHistory, this.dashboardController.render);
-    // page("/analysis", this.updateHistory, this.analysisView.render);
+    // page("/anomalies", this.parseHash, this.anomalyResultController.handleAppEvent.bind(this.anomalyResultController));
+    // page("/analysis", this.parseHash, this.analysisController.handleAppEvent.bind(this.analysisController));
     // page("/ingraph-metric-config", this.updateHistory,
     // showIngraphDatasetSelection);
     // page("/ingraph-dashboard-config", this.updateHistory,
@@ -84,12 +84,12 @@ AppController.prototype = {
     ctx.state.hashParams.dashboardName = "New Dashboard";
     next();
   },
-  onTabClickEventHandler : function(targetTab, previousTab) {
-    if (targetTab != previousTab) {
-      console.log("targetTab:" + targetTab)
-      console.log("previousTab:" + previousTab)
-      targetTab = targetTab.replace("#", "");
-      page("/thirdeye/" + targetTab)
+  onTabClickEventHandler : function(sender, args) { //targetTab, previousTab) {
+    console.log("targetTab:" + args.targetTab);
+    console.log("previousTab:" + args.previousTab);
+    if (args.targetTab != args.previousTab) {
+      args.targetTab = args.targetTab.replace("#", "");
+      page("/thirdeye/" + args.targetTab)
     }
   },
 }

@@ -5,6 +5,9 @@ function DashboardController(parentController) {
   console.log("initialized dashboard controller:" + this.dashboardView);
 
   this.anomalySummaryController = new AnomalySummaryController();
+  this.woWSummaryController = new WoWSummaryController();
+
+  this.dashboardView.tabClickEvent.attach(this.onTabClickEventHandler.bind(this));
 }
 
 DashboardController.prototype = {
@@ -13,9 +16,13 @@ DashboardController.prototype = {
     console.log("dashboardView: params from ctx" + ctx.state.hashParams);
     this.dashboardModel.init(ctx.state.hashParams);
     this.dashboardModel.rebuild();
+    this.dashboardView.init(ctx.state.hashParams);
+    // this.dashboardView.init(ctx.state.hashParams).bind(this.dashboardView);
     this.dashboardView.render();
     if (this.dashboardModel.mode == "AnomalySummary") {
       this.anomalySummaryController.handleAppEvent(ctx.state.hashParams)
+    } else if (this.dashboardModel.mode == "WoWSummary") {
+      this.woWSummaryController.handleAppEvent(ctx.state.hashParams)
     }
 
   },
@@ -25,6 +32,14 @@ DashboardController.prototype = {
 
   init : function() {
 
+  },
+  onTabClickEventHandler : function(sender, args) {
+    var params = this.dashboardModel.hashParams;
+    if (args == "#anomaly-summary-tab") {
+      this.anomalySummaryController.handleAppEvent(params);
+    } else if (args == "#wow-summary-tab") {
+      this.woWSummaryController.handleAppEvent(params);
+    }
   }
 
-}
+};

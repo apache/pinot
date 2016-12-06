@@ -1,19 +1,35 @@
 function DashboardView(dashboardModel) {
-
+  this.dashboardModel = dashboardModel;
+  this.tabClickEvent = new Event(this);
 }
 
 DashboardView.prototype = {
-  init : function() {
+  init: function () {
+    this.result_dashboard_template_compiled = dashboard_template_compiled({});
+    $("#dashboard-place-holder").html(this.result_dashboard_template_compiled);
 
+    $('#dashboard-tabs a').click(function (e) {
+      e.preventDefault();
+      $(this).tab('show');
+    });
+
+    var self = this;
+    var tabSelectionEventHandler = function (e) {
+      var targetTab = $(e.target).attr('href');
+      // var previousTab = $(e.relatedTarget).attr('href');
+      console.log("target tab:" + targetTab);
+      // console.log("previous tab:" + previousTab);
+      self.tabClickEvent.notify(targetTab);
+    };
+    $('#dashboard-tabs a[data-toggle="tab"]').on('shown.bs.tab', tabSelectionEventHandler);
+    $('#dashboard-tabs a:first').click();
   },
 
-  render : function() {
-    var result_dashboard_template_compiled = dashboard_template_compiled({});
-    $("#dashboard-place-holder").html(result_dashboard_template_compiled);
+  render: function () {
     renderDashboardTab();
   }
 
-}
+};
 
 function renderDashboardTab() {
 
@@ -65,17 +81,4 @@ function renderDashboardTab() {
   }, dashboard_range_cb);
 
   dashboard_range_cb(start, end);
-  $('#dashboard-tabs a').click(function(e) {
-    e.preventDefault();
-    $(this).tab('show');
-  });
-  $('#dashboard-tabs a[data-toggle="tab"]').on('shown.bs.tab', function(e) {
-    e.target // newly activated tab
-    e.relatedTarget // previous active tab
-    tabId = $(e.target).attr("href")
-    console.log("tab clicked " + tabId);
-  });
-
-  $('#dashboard-tabs a:first').click();
-
 }

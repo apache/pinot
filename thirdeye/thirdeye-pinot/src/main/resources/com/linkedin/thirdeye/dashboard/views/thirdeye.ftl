@@ -40,7 +40,7 @@
 <!-- custom scripts -->
 <script src="../../../assets/javascript/libs/page.js" defer></script>
 <script src="https://rawgit.com/flatiron/director/master/build/director.min.js">
-  
+
 </script>
 
 <script src="../../assets/js/thirdeye/ingraph-metric-config.js"></script>
@@ -86,6 +86,10 @@
 <script src="../../../assets/javascript/models/AnomalySummaryModel.js"></script>
 <script src="../../../assets/javascript/views/AnomalySummaryView.js"></script>
 <script src="../../../assets/javascript/controllers/AnomalySummaryController.js"></script>
+
+<script src="../../../assets/javascript/models/WoWSummaryModel.js"></script>
+<script src="../../../assets/javascript/views/WoWSummaryView.js"></script>
+<script src="../../../assets/javascript/controllers/WoWSummaryController.js"></script>
 
 <script src="../../../assets/javascript/models/AnomalyResultModel.js"></script>
 <script src="../../../assets/javascript/views/AnomalyResultView.js"></script>

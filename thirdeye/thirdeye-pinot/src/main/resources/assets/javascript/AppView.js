@@ -5,12 +5,15 @@ function AppView(appModel) {
 }
 AppView.prototype = {
 
-  init : function(hash) {
-    var tabSelectionEventHandler = function(e) {
-      var targetTab = $(e.target).attr('href')
+  init : function() {
+    var self = this;
+    var tabSelectionEventHandler = function (e) {
+      console.log(e);
+      var targetTab = $(e.target).attr('href');
       var previousTab = $(e.relatedTarget).attr('href');
-      this.tabClickEvent.notify(targetTab, previousTab);
-    }
+      var args = {targetTab: targetTab, previousTab: previousTab};
+      self.tabClickEvent.notify(args);
+    };
     $('#main-tabs a[data-toggle="tab"]').on('shown.bs.tab', tabSelectionEventHandler);
     $('#admin-tabs a[data-toggle="tab"]').on('shown.bs.tab', tabSelectionEventHandler);
     $('#global-navbar a').on('shown.bs.tab', tabSelectionEventHandler);
@@ -20,5 +23,5 @@ AppView.prototype = {
   render : function() {
     //compiledHtml
   }
-  
+
 }
