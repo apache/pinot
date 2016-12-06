@@ -5,5 +5,10 @@ function AnomalyResultController(parentController) {
 }
 
 AnomalyResultController.prototype = {
-
-}
+  handleAppEvent: function (ctx) {
+    this.anomalyResultModel.init(ctx.state.hashParams);
+    this.anomalyResultModel.update();
+    this.anomalyResultView.init();
+    this.anomalyResultView.render();
+  }
+};

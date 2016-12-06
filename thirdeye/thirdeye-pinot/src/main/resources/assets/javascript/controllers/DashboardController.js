@@ -15,9 +15,8 @@ DashboardController.prototype = {
   handleAppEvent : function(ctx) {
     console.log("dashboardView: params from ctx" + ctx.state.hashParams);
     this.dashboardModel.init(ctx.state.hashParams);
-    this.dashboardModel.rebuild();
+    this.dashboardModel.update();
     this.dashboardView.init(ctx.state.hashParams);
-    // this.dashboardView.init(ctx.state.hashParams).bind(this.dashboardView);
     this.dashboardView.render();
     if (this.dashboardModel.mode == "AnomalySummary") {
       this.anomalySummaryController.handleAppEvent(ctx.state.hashParams)

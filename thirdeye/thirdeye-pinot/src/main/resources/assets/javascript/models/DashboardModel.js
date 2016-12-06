@@ -8,7 +8,7 @@ function DashboardModel(params) {
 
 DashboardModel.prototype = {
 
-  init : function(params) {
+  init: function (params) {
     this.hashParams = params;
     if (params.dashboardName) {
       this.dashboardName = params.dashboardName;
@@ -16,16 +16,17 @@ DashboardModel.prototype = {
     if (params.startTime) {
       this.startTime = params.startTime;
     }
-    if (params.dashboardName) {
+    if (params.endTime) {
       this.endTime = params.endTime;
     }
-    if (params.dashboardName) {
+    if (params.dashboardViewMode) {
       this.dashboardViewMode = params.dashboardViewMode;
     }
     console.log("Changed dashboardName to " + params);
   },
-  rebuild : function(params) {
+
+  update: function (params) {
     console.log("Changed dashboardName to " + this.dashboardName);
   }
 
-}
+};

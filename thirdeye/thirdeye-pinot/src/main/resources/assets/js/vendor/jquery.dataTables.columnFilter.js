@@ -1,17 +1,17 @@
 /*
 * File:        jquery.dataTables.columnFilter.js
 * Version:     1.5.6.
-* Author:      Jovan Popovic 
-* 
+* Author:      Jovan Popovic
+*
 * Copyright 2011-2014 Jovan Popovic, all rights reserved.
 *
 * This source file is free software, under either the GPL v2 license or a
 * BSD style license, as supplied with this software.
-* 
-* This source file is distributed in the hope that it will be useful, but 
-* WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY 
-* or FITNESS FOR A PARTICULAR PURPOSE. 
-* 
+*
+* This source file is distributed in the hope that it will be useful, but
+* WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+* or FITNESS FOR A PARTICULAR PURPOSE.
+*
 * Parameters:"
 * @sPlaceHolder                 String      Place where inline filtering function should be placed ("tfoot", "thead:before", "thead:after"). Default is "tfoot"
 * @sRangeSeparator              String      Separator that will be used when range values are sent to the server-side. Default value is "~".
@@ -64,7 +64,7 @@
             // use all rows
             else aiRows = oSettings.aiDisplayMaster; // all row numbers
 
-            // set up data array	
+            // set up data array
             var asResultData = new Array();
 
             for (var i = 0, c = aiRows.length; i < c; i++) {
@@ -269,7 +269,7 @@
                         th.append(aoFragments[ti]);
                     }
                 }
-                
+
 
             }
 
@@ -369,7 +369,7 @@
             var select = $(r + '</select>');
             nTh.html(select);
             nTh.wrapInner('<span class="filter_column filter_select" />');
-			
+
 			if(bMultiselect) {
 				select.change(function () {
 					if ($(this).val() != "") {
@@ -387,7 +387,7 @@
 						} );
 						var re = '^(' + asEscapedFilters.join('|') + ')$';
 					}
-					 
+
 					oTable.fnFilter( re, index, true, false );
 				});
 			} else {
@@ -412,13 +412,13 @@
         function fnCreateSelect(oTable, aData, bRegex, oSelected, bMultiselect) {
             var oSettings = oTable.fnSettings();
             if ( (aData == null || typeof(aData) == 'function' ) && oSettings.sAjaxSource != "" && !oSettings.oFeatures.bServerSide) {
-                // Add a function to the draw callback, which will check for the Ajax data having 
-                // been loaded. Use a closure for the individual column elements that are used to 
+                // Add a function to the draw callback, which will check for the Ajax data having
+                // been loaded. Use a closure for the individual column elements that are used to
                 // built the column filter, since 'i' and 'th' (etc) are locally "global".
                 oSettings.aoDrawCallback.push({
                     "fn": (function (iColumn, nTh, sLabel) {
                         return function (oSettings) {
-                            // Only rebuild the select on the second draw - i.e. when the Ajax
+                            // Only update the select on the second draw - i.e. when the Ajax
                             // data has been loaded.
                             if (oSettings.iDraw == 2 && oSettings.sAjaxSource != null && oSettings.sAjaxSource != "" && !oSettings.oFeatures.bServerSide) {
                                 return fnCreateColumnSelect(oTable, aData && aData(oSettings.aoData, oSettings), _fnColumnIndex(iColumn), nTh, sLabel, bRegex, oSelected, bMultiselect); //Issue 37
@@ -432,9 +432,9 @@
             fnCreateColumnSelect(oTable, typeof(aData) == 'function' ? null: aData, _fnColumnIndex(i), th, label, bRegex, oSelected, bMultiselect); //Issue 37
 
         }
-		 
-		function fnRegExpEscape( sText ) { 
-			return sText.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&"); 
+
+		function fnRegExpEscape( sText ) {
+			return sText.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&");
 		};
 
 		function fnCreateDropdown(aData) {
@@ -451,8 +451,8 @@
 				oTable.fnFilter($(this).data('value'), index);
 			});
 		}
-		
-		
+
+
         function fnCreateCheckbox(oTable, aData) {
 
             if (aData == null)
@@ -628,7 +628,7 @@
             });
             oTable.fnFilter('', index, true, false);
             return false;
-            }); 
+            });
             */
         }
 
@@ -709,7 +709,7 @@
 
                 oHost = oTable.fnSettings().nTHead;
 
-                
+
             }
 
             //$(sFilterRow + " th", oHost).each(function (index) {//bug with ColVis
