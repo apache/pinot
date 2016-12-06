@@ -99,6 +99,10 @@
 <script src="../../../assets/javascript/views/AnalysisView.js"></script>
 <script src="../../../assets/javascript/controllers/AnalysisController.js"></script>
 
+<script src="../../../assets/javascript/models/TimeSeriesCompareModel.js"></script>
+<script src="../../../assets/javascript/views/TimeSeriesCompareView.js"></script>
+<script src="../../../assets/javascript/controllers/TimeSeriesCompareController.js"></script>
+
 <script src="../../../assets/javascript/AppController.js"></script>
 <script src="../../../assets/javascript/AppView.js"></script>
 <script src="../../../assets/javascript/AppModel.js"></script>

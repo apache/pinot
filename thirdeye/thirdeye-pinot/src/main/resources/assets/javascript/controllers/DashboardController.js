@@ -4,8 +4,8 @@ function DashboardController(parentController) {
   this.dashboardView = new DashboardView(this.dashboardModel);
   console.log("initialized dashboard controller:" + this.dashboardView);
 
-  this.anomalySummaryController = new AnomalySummaryController();
-  this.woWSummaryController = new WoWSummaryController();
+  this.anomalySummaryController = new AnomalySummaryController(this);
+  this.woWSummaryController = new WoWSummaryController(this);
 
   this.dashboardView.tabClickEvent.attach(this.onTabClickEventHandler.bind(this));
 }
