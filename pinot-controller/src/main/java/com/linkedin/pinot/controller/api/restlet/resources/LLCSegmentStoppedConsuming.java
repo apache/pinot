@@ -16,9 +16,9 @@
 
 package com.linkedin.pinot.controller.api.restlet.resources;
 
+import java.io.IOException;
 import org.restlet.representation.Representation;
 import org.restlet.representation.StringRepresentation;
-import org.restlet.resource.ServerResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
@@ -29,30 +29,32 @@ import com.linkedin.pinot.common.restlet.swagger.Summary;
 import com.linkedin.pinot.controller.helix.core.realtime.SegmentCompletionManager;
 
 
-/**
- * A class to field the segmentConsumed() API from a server instance,
- * signalling that it has consumed a kafka topic in a segment until the
- * end criteria.
- * @see {@link com.linkedin.pinot.common.protocols.SegmentCompletionProtocol}
- */
-public class LLCSegmentConsumed extends ServerResource {
-  private static Logger LOGGER = LoggerFactory.getLogger(LLCSegmentConsumed.class);
+public class LLCSegmentStoppedConsuming extends PinotSegmentUploadRestletResource {
+  private static Logger LOGGER = LoggerFactory.getLogger(LLCSegmentCommit.class);
+  long _offset;
+  String _segmentNameStr;
+  String _instanceId;
+
+  public LLCSegmentStoppedConsuming() throws IOException {
+  }
 
   @Override
   @HttpVerb("get")
-  @Description("Receives the consumed offset for a partition to be committed")
-  @Summary("Receives the consumed offset for a partition from the server")
-  @Paths({"/" + SegmentCompletionProtocol.MSG_TYPE_CONSUMED})
+  @Description("Receives indication from server that it has stopped consuming")
+  @Summary("Receives indication from server that it has stopped consuming")
+  @Paths({"/" + SegmentCompletionProtocol.MSG_TYPE_STOPPED_CONSUMING})
   public Representation get() {
     final String offset = getReference().getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_OFFSET);
     final String segmentName = getReference().getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_SEGMENT_NAME);
     final String instanceId = getReference().getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_INSTANCE_ID);
+    final String reason = getReference().getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_REASON);
     if (offset == null || segmentName == null || instanceId == null) {
       return new StringRepresentation(SegmentCompletionProtocol.RESP_FAILED.toJsonString());
     }
     LOGGER.info("Request: segment={} offset={} instance={} ", segmentName, offset, instanceId);
-    SegmentCompletionProtocol.Response response = SegmentCompletionManager.getInstance().segmentConsumed(segmentName, instanceId, Long.valueOf(offset));
+    SegmentCompletionProtocol.Response response = SegmentCompletionManager.getInstance().segmentStoppedConsuming(segmentName, instanceId, Long.valueOf(offset), reason);
     LOGGER.info("Response: instance={} segment={} status={} offset={}", instanceId, segmentName, response.getStatus(), response.getOffset());
     return new StringRepresentation(response.toJsonString());
   }
+
 }
