@@ -6,7 +6,7 @@ function AppController() {
   this.appModel = new AppModel();
   this.appView = new AppView(this.appModel);
 
-  //add listeners
+  // add listeners
   this.appView.tabClickEvent.attach(this.onTabClickEventHandler);
 }
 
@@ -57,40 +57,39 @@ AppController.prototype = {
   setupRouting : function() {
     page.base("/thirdeye");
     page("/", this.parseHash, this.dashboardController.handleAppEvent.bind(this.dashboardController));
-    page("/thirdeye", this.parseHash, this.dashboardController.handleAppEvent.bind(this.dashboardController));
     page("/dashboard", this.parseHash, this.dashboardController.handleAppEvent.bind(this.dashboardController));
-//    page("/anomalies", this.updateHistory, this.dashboardController.render);
-//    page("/analysis", this.updateHistory, this.analysisView.render);
-//    page("/ingraph-metric-config", this.updateHistory, showIngraphDatasetSelection);
-//    page("/ingraph-dashboard-config", this.updateHistory, listIngraphDashboardConfigs);
-//    page("/metric-config", this.updateHistory, showMetricDatasetSelection);
-//    page("/dataset-config", this.updateHistory, listDatasetConfigs);
-//    page("/job-info", this.updateHistory, listJobs);
-//    page("/entity-editor", this.updateHistory, renderConfigSelector);
+    // page("/anomalies", this.updateHistory, this.dashboardController.render);
+    // page("/analysis", this.updateHistory, this.analysisView.render);
+    // page("/ingraph-metric-config", this.updateHistory,
+    // showIngraphDatasetSelection);
+    // page("/ingraph-dashboard-config", this.updateHistory,
+    // listIngraphDashboardConfigs);
+    // page("/metric-config", this.updateHistory, showMetricDatasetSelection);
+    // page("/dataset-config", this.updateHistory, listDatasetConfigs);
+    // page("/job-info", this.updateHistory, listJobs);
+    // page("/entity-editor", this.updateHistory, renderConfigSelector);
 
     page.start({
       hashbang : true
     });
-    //everytime hash changes, we should handle the new hash
+    // everytime hash changes, we should handle the new hash
     $(window).on('hashchange', this.handleURL);
   },
   /**
-   * Place holder that gets invoked before every call. parse the hash 
+   * Place holder that gets invoked before every call. parse the hash
    */
   parseHash : function(ctx, next) {
-    //parseHash
+    // parseHash
     ctx.state.hashParams = {};
     ctx.state.hashParams.dashboardName = "New Dashboard";
     next();
   },
-  onTabClickEventHandler : function(e) {
-    var targetView = $(e.target).attr('href')
-    var previousView = $(e.relatedTarget).attr('href');
-    if (targetView != previousView) {
-      console.log("targetView:" + targetView)
-      console.log("previousView:" + previousView)
-      targetView = targetView.replace("#", "");
-      page("/thirdeye/" + targetView)
+  onTabClickEventHandler : function(targetTab, previousTab) {
+    if (targetTab != previousTab) {
+      console.log("targetTab:" + targetTab)
+      console.log("previousTab:" + previousTab)
+      targetTab = targetTab.replace("#", "");
+      page("/thirdeye/" + targetTab)
     }
   },
 }

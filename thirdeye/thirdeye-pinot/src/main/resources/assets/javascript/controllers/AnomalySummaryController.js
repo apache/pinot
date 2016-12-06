@@ -10,7 +10,7 @@ AnomalySummaryController.prototype ={
     handleAppEvent: function(params){
       this.anomalySummaryModel.init(params);
       this.anomalySummaryModel.rebuild();
-      this.anomalySummaryView.refresh();
+      this.anomalySummaryView.render();
     },
     onDashboardInputChange: function(){
       

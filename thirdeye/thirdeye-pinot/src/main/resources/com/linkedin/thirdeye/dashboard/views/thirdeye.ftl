@@ -65,6 +65,12 @@
 <script id="analysis-template" type="text/x-handlebars-template">
   <#include "tabs/analysis.ftl"/>
 </script>
+<script id="anomaly-summary-template" type="text/x-handlebars-template">
+	<#include "tabs/dashboard/anomaly-summary-dashboard.ftl">
+</script>
+<script id="wow-summary-template" type="text/x-handlebars-template">
+	<#include "tabs/dashboard/wow-summary-dashboard.ftl">
+</script>
 <#include "admin/job-info.ftl"/>
 <#include "admin/ingraph-metric-config.ftl"/>
 <#include "admin/ingraph-dashboard-config.ftl"/>

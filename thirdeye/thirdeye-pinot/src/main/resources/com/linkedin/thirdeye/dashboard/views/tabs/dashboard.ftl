@@ -53,13 +53,11 @@
 		</div>
 		<div class="tab-content">
 			<div class="tab-pane active in" id="num_of_anomalies">
-				<div id="num_of_anomalies-place-holder">
-					<#include "dashboard/num-of-anomalies-dashboard.ftl"/>
+				<div id="anomaly-summary-place-holder">
 				</div>
 			</div>
 			<div class="tab-pane" id="wow">
 				<div id="wow-place-holder">
-					<#include "dashboard/wow-dashboard.ftl"/>
 				</div>
 			</div>
 		</div>

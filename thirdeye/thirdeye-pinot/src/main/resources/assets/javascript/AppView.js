@@ -7,7 +7,9 @@ AppView.prototype = {
 
   init : function(hash) {
     var tabSelectionEventHandler = function(e) {
-      this.tabClickEvent.notify(e);
+      var targetTab = $(e.target).attr('href')
+      var previousTab = $(e.relatedTarget).attr('href');
+      this.tabClickEvent.notify(targetTab, previousTab);
     }
     $('#main-tabs a[data-toggle="tab"]').on('shown.bs.tab', tabSelectionEventHandler);
     $('#admin-tabs a[data-toggle="tab"]').on('shown.bs.tab', tabSelectionEventHandler);
