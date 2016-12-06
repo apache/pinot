@@ -2,6 +2,7 @@ function AnomalySummaryView(anomalySummaryModel) {
   var template = $("#anomaly-summary-template").html();
   this.template_compiled = Handlebars.compile(template);
   this.placeHolderId = "#anomaly-summary-place-holder";
+  this.anomalySummaryModel = anomalySummaryModel;
 }
 
 AnomalySummaryView.prototype = {

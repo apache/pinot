@@ -21,8 +21,7 @@ function renderDashboardTab() {
   var countries = [ {
     value : 'Andorra',
     data : 'AD'
-  },
-  {
+  }, {
     value : 'Zimbabwe',
     data : 'ZZ'
   } ];
@@ -67,7 +66,6 @@ function renderDashboardTab() {
 
   dashboard_range_cb(start, end);
   $('#dashboard-tabs a').click(function(e) {
-    console.log("asdasd")
     e.preventDefault();
     $(this).tab('show');
   });

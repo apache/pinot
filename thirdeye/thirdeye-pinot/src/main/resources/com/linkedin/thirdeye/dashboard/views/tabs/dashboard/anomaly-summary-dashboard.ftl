@@ -35,7 +35,7 @@
 					<tbody>
 						<tr class="bg-white">
 							<td><div>
-									<a href="#"><span class="metric-label">Metric A</span></a>
+									<a href="#"><span class="metric-label">{{this.metricName}}</span></a>
 								</div></td>
 							<td><div class="box"></div></td>
 							<td><div class="box box-anomaly">3</div></td>

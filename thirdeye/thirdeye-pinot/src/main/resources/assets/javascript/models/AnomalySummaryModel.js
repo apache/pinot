@@ -1,4 +1,5 @@
 function AnomalySummaryModel() {
+  this.metricName = "MyMetric"
   this.dashboardName = "100 Most Recent Anomalies";
   this.startTime = moment().subtract(7, "days");
   this.endTime = moment();
