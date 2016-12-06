@@ -77,6 +77,10 @@
 <script src="../../../assets/javascript/views/DashboardView.js"></script>
 <script src="../../../assets/javascript/controllers/DashboardController.js"></script>
 
+<script src="../../../assets/javascript/models/AnomalySummaryModel.js"></script>
+<script src="../../../assets/javascript/views/AnomalySummaryView.js"></script>
+<script src="../../../assets/javascript/controllers/AnomalySummaryController.js"></script>
+
 <script src="../../../assets/javascript/models/AnomalyResultModel.js"></script>
 <script src="../../../assets/javascript/views/AnomalyResultView.js"></script>
 <script src="../../../assets/javascript/controllers/AnomalyResultController.js"></script>
@@ -85,11 +89,15 @@
 <script src="../../../assets/javascript/views/AnalysisView.js"></script>
 <script src="../../../assets/javascript/controllers/AnalysisController.js"></script>
 
-<script src="../../../assets/javascript/App.js"></script>
+<script src="../../../assets/javascript/AppController.js"></script>
+<script src="../../../assets/javascript/AppView.js"></script>
+<script src="../../../assets/javascript/AppModel.js"></script>
+
+<script src="../../../assets/javascript/Event.js"></script>
 
 <script type="text/javascript">
   $(document).ready(function() {
-    var app = new App();
+    var app = new AppController();
     app.init();
   });
 </script>

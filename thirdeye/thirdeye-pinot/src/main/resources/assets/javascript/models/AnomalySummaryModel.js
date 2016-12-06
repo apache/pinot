@@ -1,11 +1,13 @@
-function DashboardModel() {
+function AnomalySummaryModel() {
   this.dashboardName = "100 Most Recent Anomalies";
   this.startTime = moment().subtract(7, "days");
   this.endTime = moment();
-  this.mode = "AnomalySummary"
+  this.mode = "AnomalySummary";
+  //this.anomalySummaryResult = { {"metricA": [0,1,2,0,0,0,0,1,2,0,0,0,0,1,2,0,0,0,0,1,2,0,0,0]},{"metricB": [0,1,2,0,0,0,0,1,2,0,0,0,0,1,2,0,0,0,0,1,2,0,0,0]},{"metricC": [0,1,2,0,0,0,0,1,2,0,0,0,0,1,2,0,0,0,0,1,2,0,0,0]}}
+  this.anomalySummaryResult ={};  
 }
 
-DashboardModel.prototype = {
+AnomalySummaryModel.prototype = {
 
   init : function(params) {
     if (params.dashboardName) {
@@ -22,7 +24,8 @@ DashboardModel.prototype = {
     }
     console.log("Changed dashboardName to " + params);
   },
-  rebuild : function(params) {
+  rebuild : function() {
+  // TODO: fetch relevant data from backend
     console.log("Changed dashboardName to " + this.dashboardName);
   }
 
