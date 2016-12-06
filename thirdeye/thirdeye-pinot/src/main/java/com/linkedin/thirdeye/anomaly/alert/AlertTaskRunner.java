@@ -15,7 +15,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -253,7 +252,7 @@ public class AlertTaskRunner implements TaskRunner {
         reportStartTs = reports.get(0).getTimeBuckets().get(0).getCurrentStart();
         metricDimensionValueReports = getDimensionReportList(reports);
         templateData.put("metricDimensionValueReports", metricDimensionValueReports);
-        templateData.put("reportStartDateTime", new Date(reportStartTs).toString());
+        templateData.put("reportStartDateTime", reportStartTs);
       }
 
       Template template = freemarkerConfig.getTemplate("anomaly-report.ftl");
@@ -346,7 +345,6 @@ public class AlertTaskRunner implements TaskRunner {
     }
     return ultimateResult;
   }
-
 
   private static void sortDimensionValueList(List<Pair<String, LinkedHashMap>> dimensionValueList) {
     Collections.sort(dimensionValueList, new Comparator<Pair<String, LinkedHashMap>>() {

@@ -79,7 +79,7 @@
     <td>
       <hr/>
       <p>
-        Report start time : ${reportStartDateTime}
+        Report start time : ${dateFormat(reportStartDateTime)}
       </p>
     </td>
   </tr>
