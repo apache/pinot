@@ -14,6 +14,7 @@ public class ContributorViewResponse implements ViewResponse {
   List<TimeBucket> timeBuckets;
   Map<String, String> summary;
   GenericResponse responseData;
+  // metrics vs dimension vs subDimension, aggValue
   Map<String, Map<String, Map<String, Double>>> baselineTotalMapPerDimensionValue;
   Map<String, Map<String, Map<String, Double>>> currentTotalMapPerDimensionValue;
 

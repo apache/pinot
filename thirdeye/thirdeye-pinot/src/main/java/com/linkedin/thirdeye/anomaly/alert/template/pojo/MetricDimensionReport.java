@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.anomaly.alert.template.pojo;
 
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class MetricDimensionReport {
@@ -10,7 +9,10 @@ public class MetricDimensionReport {
   long currentEndTime;
   long baselineStartTime;
   long baselineEndTime;
-  Map<String, Map<String, String>> subDimensionValueMap = new LinkedHashMap<>();
+  Map<String, Map<String, String>> subDimensionValueMap;
+  Map<String, String> subDimensionTotalValueMap;
+  Map<String, String> subDimensionShareValueMap;
+
   String compareMode = "WoW";
 
   public String getCompareMode() {
@@ -75,5 +77,21 @@ public class MetricDimensionReport {
 
   public void setMetricName(String metricName) {
     this.metricName = metricName;
+  }
+
+  public Map<String, String> getSubDimensionShareValueMap() {
+    return subDimensionShareValueMap;
+  }
+
+  public void setSubDimensionShareValueMap(Map<String, String> subDimensionShareValueMap) {
+    this.subDimensionShareValueMap = subDimensionShareValueMap;
+  }
+
+  public Map<String, String> getSubDimensionTotalValueMap() {
+    return subDimensionTotalValueMap;
+  }
+
+  public void setSubDimensionTotalValueMap(Map<String, String> subDimensionTotalValueMap) {
+    this.subDimensionTotalValueMap = subDimensionTotalValueMap;
   }
 }
