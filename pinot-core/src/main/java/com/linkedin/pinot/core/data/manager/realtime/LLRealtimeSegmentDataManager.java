@@ -258,7 +258,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
         consecutiveErrorCount++;
 
         if (consecutiveErrorCount > MAX_CONSECUTIVE_ERROR_COUNT) {
-          segmentLogger.warn("Timed out when fetching messages from Kafka, stopping consumption");
+          segmentLogger.warn("Timed out when fetching messages from Kafka, stopping consumption after {} attempts", consecutiveErrorCount);
           throw new RuntimeException(e);
         } else {
           segmentLogger.warn("Timed out when fetching messages from Kafka, retrying (count={})", consecutiveErrorCount);
@@ -269,7 +269,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
         consecutiveErrorCount++;
 
         if (consecutiveErrorCount > MAX_CONSECUTIVE_ERROR_COUNT) {
-          segmentLogger.warn("Kafka transient exception when fetching messages, stopping consumption", e);
+          segmentLogger.warn("Kafka transient exception when fetching messages, stopping consumption after {} attempts", consecutiveErrorCount, e);
           throw e;
         } else {
           segmentLogger.warn("Kafka transient exception when fetching messages, retrying (count={})", consecutiveErrorCount, e);
