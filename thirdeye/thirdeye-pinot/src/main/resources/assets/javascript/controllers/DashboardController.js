@@ -2,7 +2,6 @@ function DashboardController(parentController) {
   this.parentController = parentController;
   this.dashboardModel = new DashboardModel();
   this.dashboardView = new DashboardView(this.dashboardModel);
-  console.log("initialized dashboard controller:" + this.dashboardView);
 
   this.anomalySummaryController = new AnomalySummaryController(this);
   this.woWSummaryController = new WoWSummaryController(this);
@@ -34,10 +33,12 @@ DashboardController.prototype = {
   },
   onTabClickEventHandler : function(sender, args) {
     var params = this.dashboardModel.hashParams;
-    if (args == "#anomaly-summary-tab") {
-      this.anomalySummaryController.handleAppEvent(params);
-    } else if (args == "#wow-summary-tab") {
-      this.woWSummaryController.handleAppEvent(params);
+    if (args.previousTab != args.targetTab) {
+      if (args.targetTab == "#anomaly-summary-tab") {
+        this.anomalySummaryController.handleAppEvent(params);
+      } else if (args.targetTab == "#wow-summary-tab") {
+        this.woWSummaryController.handleAppEvent(params);
+      }
     }
   }
 

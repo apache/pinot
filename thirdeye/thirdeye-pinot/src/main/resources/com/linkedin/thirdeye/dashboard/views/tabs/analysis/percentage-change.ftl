@@ -3,10 +3,13 @@
     <span class="label-medium-semibold">Total % Changes</span>
   </div>
   <div class="col-md-2">
-    <input type="checkbox" id="show-details"> <label for="show-details" class="metric-label">See Contribution Details</label>
+    <input type="checkbox" id="show-details" {{#if this.showDetailsChecked}}checked{{/if}}>
+    <label for="show-details" class="metric-label">See Contribution
+      Details</label>
   </div>
   <div class="col-md-2">
-    <input type="checkbox" id="show-cumulative"> <label for="show-cumulative" class="metric-label">Show Cumulative</label>
+    <input type="checkbox" id="show-cumulative" {{#if this.showCumulativeChecked}}checked{{/if}}>
+    <label for="show-cumulative" class="metric-label">Show Cumulative</label>
   </div>
   <div class="col-md-6"></div>
 </div>

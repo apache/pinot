@@ -7,28 +7,18 @@ function PercentageChangeTableModel() {
   //this.anomalySummaryResult = { {"metricA": [0,1,2,0,0,0,0,1,2,0,0,0,0,1,2,0,0,0,0,1,2,0,0,0]},{"metricB": [0,1,2,0,0,0,0,1,2,0,0,0,0,1,2,0,0,0,0,1,2,0,0,0]},{"metricC": [0,1,2,0,0,0,0,1,2,0,0,0,0,1,2,0,0,0,0,1,2,0,0,0]}}
   this.wowMetricTable ={};
   this.wowMetricDimensionTable ={};
+  this.showDetailsChecked = false;
+  this.showCumulativeChecked = false;
+  this.params;
 }
 
 PercentageChangeTableModel.prototype = {
 
   init : function(params) {
-    if (params.dashboardName) {
-      this.dashboardName = params.dashboardName;
-    }
-    if (params.startTime) {
-      this.startTime = params.startTime;
-    }
-    if (params.dashboardName) {
-      this.endTime = params.endTime;
-    }
-    if (params.dashboardName) {
-      this.dashboardViewMode = params.dashboardViewMode;
-    }
-    console.log("Changed dashboardName to " + params);
+    this.params = params;
   },
   rebuild : function() {
   // TODO: fetch relevant data from backend
-    console.log("Changed dashboardName to " + this.dashboardName);
   }
 
 }

@@ -81,10 +81,9 @@ DashboardView.prototype = {
     var self = this;
     var tabSelectionEventHandler = function (e) {
       var targetTab = $(e.target).attr('href');
-      // var previousTab = $(e.relatedTarget).attr('href');
-      console.log("target tab:" + targetTab);
-      // console.log("previous tab:" + previousTab);
-      self.tabClickEvent.notify(targetTab);
+      var previousTab = $(e.relatedTarget).attr('href');
+      var args = {targetTab: targetTab, previousTab: previousTab};
+      self.tabClickEvent.notify(args);
     };
     $('#dashboard-tabs a[data-toggle="tab"]').on('shown.bs.tab', tabSelectionEventHandler);
     $('#dashboard-tabs a:first').click();

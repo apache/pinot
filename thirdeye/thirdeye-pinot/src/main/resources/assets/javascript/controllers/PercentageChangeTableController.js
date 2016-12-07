@@ -1,25 +1,38 @@
-function PercentageChangeTableController(parentController){
+function PercentageChangeTableController(parentController) {
   this.parentController = parentController;
-  this.contributorTableModel = new PercentageChangeTableModel();
-  this.contributorTableView = new PercentageChangeTableView(this.contributorTableModel);
+  this.percentageChangeTableModel = new PercentageChangeTableModel();
+  this.percentageChangeTableView = new PercentageChangeTableView(this.percentageChangeTableModel);
+
+  // Register listener
+  this.percentageChangeTableView.checkboxClickEvent.attach(this.onCheckboxClickEventHandler.bind(this));
+
+  this.params
 }
 
+PercentageChangeTableController.prototype = {
+  init: function () {
 
-PercentageChangeTableController.prototype ={
+  },
 
-    handleAppEvent: function(params){
-      this.contributorTableModel.init(params);
-      this.contributorTableModel.rebuild();
-      this.contributorTableView.render();
-      console.log("PercentageTable");
-    },
-    onDashboardInputChange: function(){
+  handleAppEvent: function (params) {
+    this.update(params);
+  },
 
-    },
-
-    init:function(){
-
+  onCheckboxClickEventHandler: function (sender, args) {
+    if (Object.is(args.id, "show-details")) {
+      this.percentageChangeTableModel.showDetailsChecked = args.checked;
+    } else if (Object.is(args.id, "show-cumulative")) {
+      this.percentageChangeTableModel.showCumulativeChecked = args.checked;
     }
 
+    params = this.percentageChangeTableModel.params;
+    // TODO: update params according to the event
+    this.update(params);
+  },
 
-}
+  update: function(params) {
+    this.percentageChangeTableModel.init(params);
+    this.percentageChangeTableModel.rebuild();
+    this.percentageChangeTableView.render();
+  }
+};
