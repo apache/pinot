@@ -1,7 +1,7 @@
 function AnalysisController(parentController) {
   this.parentController = parentController;
   this.analysisModel = new AnalysisModel();
-  this.analysisView = new AnalysisView();
+  this.analysisView = new AnalysisView(this.analysisModel);
   this.timeSeriesCompareController = new TimeSeriesCompareController(this);
   this.percentageChangeTableController = new PercentageChangeTableController(this);
   this.dimensionTreeMapController = new DimensionTreeMapController(this);

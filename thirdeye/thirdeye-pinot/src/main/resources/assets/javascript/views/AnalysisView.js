@@ -1,7 +1,8 @@
-function AnalysisView() {
+function AnalysisView(analysisModel) {
   // Compile template
   var analysis_template = $("#analysis-template").html();
   this.analysis_template_compiled = Handlebars.compile(analysis_template);
+  this.analysisModel = analysisModel;
 }
 
 AnalysisView.prototype = {
@@ -12,6 +13,15 @@ AnalysisView.prototype = {
 
   render: function () {
     $("#analysis-place-holder").html(this.analysis_template_compiled);
+
+    // METRIC SELECTION
+    $('#metric-input').autocomplete({
+      lookup : this.analysisModel.metrics,
+      onSelect : function(suggestion) {
+        console.log('You selected: ' + suggestion.value + ', ' + suggestion.data);
+      }
+    });
+
     renderAnalysisTab();
   }
 };

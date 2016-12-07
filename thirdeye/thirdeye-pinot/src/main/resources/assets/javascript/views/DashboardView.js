@@ -33,8 +33,6 @@ function DashboardView(dashboardModel) {
 DashboardView.prototype = {
   init: function () {
 
-
-
   },
 
   render: function () {
@@ -42,17 +40,10 @@ DashboardView.prototype = {
     $('#dashboard-tabs a:first').click();
 
     // DASHBOARD SELECTION
-    var countries = [ {
-      value : 'Andorra',
-      data : 'AD'
-    }, {
-      value : 'Zimbabwe',
-      data : 'ZZ'
-    } ];
     $('#dashboard-input').autocomplete({
-      lookup : countries,
+      lookup : this.dashboardModel.dashboards,
       onSelect : function(suggestion) {
-        alert('You selected: ' + suggestion.value + ', ' + suggestion.data);
+        console.log('You selected: ' + suggestion.value + ', ' + suggestion.data);
       }
     });
 

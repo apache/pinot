@@ -4,6 +4,15 @@ function DashboardModel(params) {
   this.endTime = moment();
   this.mode = "AnomalySummary";
   this.hashParams = params;
+
+  // TODO: fetch this from backend
+  this.dashboards = [ {
+    value : 'Foo Dashboard',
+    data : '1'
+  }, {
+    value : 'Bar Dashboard',
+    data : '2'
+  } ];
 }
 
 DashboardModel.prototype = {
