@@ -57,7 +57,7 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
     defaultProps.put("rebalance.backoff.ms", "2000");
 
     defaultProps.put("auto.commit.enable", "false");
-    defaultProps.put("auto.offset.reset", "largest");
+    defaultProps.put(Helix.DataSource.Realtime.Kafka.AUTO_OFFSET_RESET, "largest");
 
     // A formatter for time specification that allows time to be specified in days, hours and minutes
     // e.g. 1d2h3m, or 6h5m or simply 5h

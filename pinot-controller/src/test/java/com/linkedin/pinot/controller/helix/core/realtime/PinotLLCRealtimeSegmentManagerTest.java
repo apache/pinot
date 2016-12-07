@@ -36,6 +36,7 @@ import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
+import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
@@ -296,8 +297,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     Assert.assertEquals(oldsegStateMap.get(s3), PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
   }
 
-  @Test
-  public void testAutoReplaceConsumingSegment() throws Exception {
+  public void testAutoReplaceConsumingSegment(final String tableConfigStartOffset) throws Exception {
     FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager(true, null);
     final int nPartitions = 8;
     final int nInstances = 3;
@@ -318,8 +318,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
     final int partitionToBeFixed = 3;
     final int partitionWithHigherOffset = 4;
     final int emptyPartition = 5;
-    final long partitionOffset = 0x259080984568L;
-    final long higherOffset = partitionOffset + 100;
+    final long smallestPartitionOffset = 0x259080984568L;
+    final long largestPartitionOffset = smallestPartitionOffset + 100000;
+    final long higherOffset = smallestPartitionOffset + 100;
     for (String segmentNameStr : existingSegments) {
       LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
       switch (segmentName.getPartitionId()) {
@@ -348,15 +349,21 @@ public class PinotLLCRealtimeSegmentManagerTest {
       }
     }
 
+    Map<String, String> streamPropMap = new HashMap<>(1);
+    streamPropMap.put(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX, CommonConstants.Helix.DataSource.Realtime.Kafka.CONSUMER_TYPE), "simple");
+    streamPropMap.put(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX, CommonConstants.Helix.DataSource.Realtime.Kafka.KAFKA_CONSUMER_PROPS_PREFIX,
+        CommonConstants.Helix.DataSource.Realtime.Kafka.AUTO_OFFSET_RESET), tableConfigStartOffset);
+    KafkaStreamMetadata kafkaStreamMetadata = new KafkaStreamMetadata(streamPropMap);
     List<Integer> nonConsumingPartitions = new ArrayList<>(1);
     nonConsumingPartitions.add(partitionToBeFixed);
     nonConsumingPartitions.add(partitionWithHigherOffset);
     nonConsumingPartitions.add(emptyPartition);
-    segmentManager._kafkaOffsetToReturn = partitionOffset;
+    segmentManager._kafkaSmallestOffsetToReturn = smallestPartitionOffset;
+    segmentManager._kafkaLargestOffsetToReturn = largestPartitionOffset;
     existingSegments = new ArrayList<>(segmentManager._idealStateEntries.keySet());
     segmentManager._paths.clear();
     segmentManager._records.clear();
-    segmentManager.createConsumingSegment(rtTableName, nonConsumingPartitions, existingSegments, null);
+    segmentManager.createConsumingSegment(rtTableName, nonConsumingPartitions, existingSegments, kafkaStreamMetadata);
     Assert.assertEquals(segmentManager._paths.size(), 3);
     Assert.assertEquals(segmentManager._records.size(), 3);
     Assert.assertEquals(segmentManager._oldSegmentNameStr.size(), 3);
@@ -377,11 +384,12 @@ public class PinotLLCRealtimeSegmentManagerTest {
           // We had left this partition with one segment. So, a second one should be created with a sequence number one
           // higher than starting. Its start offset should be what kafka returns.
           found++;
-          Assert.assertEquals(segmentName.getSequenceNumber(), PinotLLCRealtimeSegmentManager.STARTING_SEQUENCE_NUMBER+1);
+          Assert.assertEquals(segmentName.getSequenceNumber(),
+              PinotLLCRealtimeSegmentManager.STARTING_SEQUENCE_NUMBER + 1);
           znRecord = segmentManager._records.get(index);
           metadata = new LLCRealtimeSegmentZKMetadata(znRecord);
           Assert.assertEquals(metadata.getNumReplicas(), 2);
-          Assert.assertEquals(metadata.getStartOffset(), partitionOffset);
+          Assert.assertEquals(metadata.getStartOffset(), smallestPartitionOffset);
           break;
         case emptyPartition:
           // We had removed any segments in this partition. A new one should be created with the offset as returned
@@ -391,14 +399,19 @@ public class PinotLLCRealtimeSegmentManagerTest {
           znRecord = segmentManager._records.get(index);
           metadata = new LLCRealtimeSegmentZKMetadata(znRecord);
           Assert.assertEquals(metadata.getNumReplicas(), 2);
-          Assert.assertEquals(metadata.getStartOffset(), partitionOffset);
+          if (tableConfigStartOffset.equals("smallest")) {
+            Assert.assertEquals(metadata.getStartOffset(), smallestPartitionOffset);
+          } else {
+            Assert.assertEquals(metadata.getStartOffset(), largestPartitionOffset);
+          }
           break;
         case partitionWithHigherOffset:
           // We had left this partition with one segment. In addition, we had the end-offset of the first segment set to
           // a value higher than that returned by kafka. So, a second one should be created with a sequence number one
           // equal to the end offset of the first one.
           found++;
-          Assert.assertEquals(segmentName.getSequenceNumber(), PinotLLCRealtimeSegmentManager.STARTING_SEQUENCE_NUMBER+1);
+          Assert.assertEquals(segmentName.getSequenceNumber(),
+              PinotLLCRealtimeSegmentManager.STARTING_SEQUENCE_NUMBER + 1);
           znRecord = segmentManager._records.get(index);
           metadata = new LLCRealtimeSegmentZKMetadata(znRecord);
           Assert.assertEquals(metadata.getNumReplicas(), 2);
@@ -407,8 +420,15 @@ public class PinotLLCRealtimeSegmentManagerTest {
       }
       index++;
     }
+
     // We should see all three cases here.
     Assert.assertEquals(3, found);
+  }
+
+  @Test
+  public void testAutoReplaceConsumingSegment() throws Exception {
+    testAutoReplaceConsumingSegment("smallest");
+    testAutoReplaceConsumingSegment("largest");
   }
 
   @Test
@@ -505,7 +525,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     public List<String> _oldSegmentNameStr = new ArrayList<>(16);
     public List<String> _newSegmentNameStr = new ArrayList<>(16);
 
-    public long _kafkaOffsetToReturn;
+    public long _kafkaLargestOffsetToReturn;
+    public long _kafkaSmallestOffsetToReturn;
 
     public List<ZNRecord> _existingSegmentMetadata;
 
@@ -604,7 +625,11 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     @Override
     protected long getPartitionOffset(KafkaStreamMetadata kafkaStreamMetadata, final String offsetCriteria, int partitionId) {
-      return _kafkaOffsetToReturn;
+      if (offsetCriteria.equals("largest")) {
+        return _kafkaLargestOffsetToReturn;
+      } else {
+        return _kafkaSmallestOffsetToReturn;
+      }
     }
 
     @Override

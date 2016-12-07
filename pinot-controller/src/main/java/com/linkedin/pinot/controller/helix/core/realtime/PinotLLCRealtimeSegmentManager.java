@@ -665,7 +665,8 @@ public class PinotLLCRealtimeSegmentManager {
           int seqNum = STARTING_SEQUENCE_NUMBER;
           List<String> instances = partitionAssignment.getListField(Integer.toString(curPartition));
           LOGGER.info("Creating CONSUMING segment for {} partition {} with seq {}", realtimeTableName, curPartition, seqNum);
-          long startOffset = getPartitionOffset(kafkaStreamMetadata, "smallest", curPartition);
+          String consumerStartOffsetSpec = kafkaStreamMetadata.getKafkaConsumerProperties().get(CommonConstants.Helix.DataSource.Realtime.Kafka.AUTO_OFFSET_RESET);
+          long startOffset = getPartitionOffset(kafkaStreamMetadata, consumerStartOffsetSpec, curPartition);
           LOGGER.info("Found kafka offset {} for table {} for partition {}", startOffset, realtimeTableName, curPartition);
 
           createSegment(realtimeTableName, nReplicas, curPartition, seqNum, instances, startOffset);

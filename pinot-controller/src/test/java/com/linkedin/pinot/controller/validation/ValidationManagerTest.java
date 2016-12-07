@@ -382,6 +382,9 @@ public class ValidationManagerTest {
     Map<String, String> streamConfigs = new HashMap<String, String>(4);
     streamConfigs.put(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
         CommonConstants.Helix.DataSource.Realtime.Kafka.CONSUMER_TYPE), "highLevel,simple");
+//    streamConfigs.put(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
+//        CommonConstants.Helix.DataSource.Realtime.Kafka.KAFKA_CONSUMER_PROPS_PREFIX,
+//        "auto.offset.reset"), "smallest");
     Field autoCreateOnError = ValidationManager.class.getDeclaredField("_autoCreateOnError");
     autoCreateOnError.setAccessible(true);
     autoCreateOnError.setBoolean(validationManager, false);
@@ -389,13 +392,15 @@ public class ValidationManagerTest {
 
     Assert.assertEquals(validationMetrics.partitionCount, 1);
 
+    // Set partition 0 to have one instance in CONSUMING state, and others in OFFLINE.
+    // we should not flag any partitions to correct.
     helixAdmin.dropResource(HELIX_CLUSTER_NAME, realtimeTableName);
     idealstate.setPartitionState(p0s1.getSegmentName(), S1,
         PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
     idealstate.setPartitionState(p0s1.getSegmentName(), S2,
-        PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
+        PinotHelixSegmentOnlineOfflineStateModelGenerator.OFFLINE_STATE);
     idealstate.setPartitionState(p0s1.getSegmentName(), S3,
-        PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE);
+        PinotHelixSegmentOnlineOfflineStateModelGenerator.OFFLINE_STATE);
     helixAdmin.addResource(HELIX_CLUSTER_NAME, realtimeTableName, idealstate);
     validationManager.validateLLCSegments(realtimeTableName, streamConfigs);
     Assert.assertEquals(validationMetrics.partitionCount, 0);

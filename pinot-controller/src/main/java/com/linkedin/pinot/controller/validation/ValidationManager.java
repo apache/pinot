@@ -197,7 +197,7 @@ public class ValidationManager {
       LOGGER.info("Skipping validation for {} since it is disabled", realtimeTableName);
       return;
     }
-    // Walk through all segments in the idealState, looking for one that is CONSUMING state. When we find one
+    // Walk through all segments in the idealState, looking for one instance that is in CONSUMING state. If we find one
     // remove the kafka partition that the segment belongs to, from the kafka partition set.
     // Make sure that there are at least some LLC segments in place. If there are no LLC segments, it is possible
     // that this table is in the process of being disabled for LLC
@@ -208,12 +208,17 @@ public class ValidationManager {
         llcSegments.add(segmentId);
         Map<String, String> stateMap = idealState.getInstanceStateMap(segmentId);
         Iterator<String> iterator = stateMap.values().iterator();
-        if (iterator.hasNext()) { // Should always be true.
-          String value = iterator.next();
-          if (value.equals(PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE)) {
-            LLCSegmentName llcSegmentName = new LLCSegmentName(segmentId);
-            nonConsumingKafkaPartitions.remove(nonConsumingKafkaPartitions.indexOf(llcSegmentName.getPartitionId()));
+        // If there is at least one instance in CONSUMING state, we are good.
+        boolean foundConsuming = false;
+        while (iterator.hasNext() && !foundConsuming) {
+          String stateString = iterator.next();
+          if (stateString.equals(PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE)) {
+            foundConsuming = true;
           }
+        }
+        if (foundConsuming) {
+          LLCSegmentName llcSegmentName = new LLCSegmentName(segmentId);
+          nonConsumingKafkaPartitions.remove(nonConsumingKafkaPartitions.indexOf(llcSegmentName.getPartitionId()));
         }
       }
      }

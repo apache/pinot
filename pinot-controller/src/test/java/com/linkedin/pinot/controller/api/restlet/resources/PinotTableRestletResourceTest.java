@@ -16,18 +16,17 @@
 
 package com.linkedin.pinot.controller.api.restlet.resources;
 
-import com.linkedin.pinot.common.request.helper.ControllerRequestBuilder;
-import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
-import com.linkedin.pinot.controller.helix.ControllerTest;
 import java.io.IOException;
 import java.util.Collections;
 import org.json.JSONObject;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
+import com.linkedin.pinot.common.request.helper.ControllerRequestBuilder;
+import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
+import com.linkedin.pinot.controller.helix.ControllerTest;
+import static com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource;
+import static com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.Realtime.Kafka;
 import static org.testng.FileAssert.fail;
-import static com.linkedin.pinot.common.utils.CommonConstants.Helix.*;
-import static com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.Realtime.*;
 
 
 /**
@@ -71,7 +70,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.ZK_BROKER_URL, "fakeUrl");
     metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.HighLevelConsumer.ZK_CONNECTION_STRING, "potato");
     metadata.put(DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE, Integer.toString(1234));
-    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.KAFKA_CONSUMER_PROPS_PREFIX + "." + "auto.offset.reset",
+    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.KAFKA_CONSUMER_PROPS_PREFIX + "." + Kafka.AUTO_OFFSET_RESET,
         "smallest");
 
     request = ControllerRequestBuilder.buildCreateRealtimeTableJSON("bad__table__name", "default", "default",
