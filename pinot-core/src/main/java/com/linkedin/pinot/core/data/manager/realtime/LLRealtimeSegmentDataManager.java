@@ -255,18 +255,29 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
         messagesAndOffsets = messagesAndWatermark.getLeft();
         highWatermark = messagesAndWatermark.getRight();
       } catch (TimeoutException e) {
-        segmentLogger.warn("Timed out when fetching messages from Kafka, retrying");
-        continue;
+        consecutiveErrorCount++;
+
+        if (consecutiveErrorCount > MAX_CONSECUTIVE_ERROR_COUNT) {
+          segmentLogger.warn("Timed out when fetching messages from Kafka, stopping consumption after {} attempts", consecutiveErrorCount);
+          throw new RuntimeException(e);
+        } else {
+          segmentLogger.warn("Timed out when fetching messages from Kafka, retrying (count={})", consecutiveErrorCount);
+          Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
+          continue;
+        }
       } catch (SimpleConsumerWrapper.TransientConsumerException e) {
         consecutiveErrorCount++;
 
-        if (consecutiveErrorCount < MAX_CONSECUTIVE_ERROR_COUNT) {
+        if (consecutiveErrorCount > MAX_CONSECUTIVE_ERROR_COUNT) {
+          segmentLogger.warn("Kafka transient exception when fetching messages, stopping consumption after {} attempts", consecutiveErrorCount, e);
           throw e;
         } else {
+          segmentLogger.warn("Kafka transient exception when fetching messages, retrying (count={})", consecutiveErrorCount, e);
           Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
           continue;
         }
       } catch (SimpleConsumerWrapper.PermanentConsumerException e) {
+        segmentLogger.warn("Kafka permanent exception when fetching messages, stopping consumption", e);
         throw e;
       }
 
@@ -340,7 +351,6 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
         (long) _fieldExtractor.getTotalNulls());
     _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.COLUMNS_WITH_NULL_VALUES,
         (long) _fieldExtractor.getTotalNullCols());
-
     return true;
   }
 
@@ -446,6 +456,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
         }
       } catch (Exception e) {
         segmentLogger.error("Exception while in work", e);
+        postStopConsumedMsg(e.getClass().getName());
         _state = State.ERROR;
       }
 
@@ -546,6 +557,11 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     } catch (InterruptedException e) {
       segmentLogger.warn("Interrupted while holding");
     }
+  }
+
+  // Inform the controller that the server had to stop consuming due to an error.
+  protected void postStopConsumedMsg(String reason) {
+
   }
 
   protected SegmentCompletionProtocol.Response postSegmentConsumedMsg() {
