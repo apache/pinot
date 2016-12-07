@@ -47,10 +47,10 @@ AppController.prototype = {
 
   setupRouting : function() {
     page.base("/thirdeye");
-    page("/", this.parseHash, this.dashboardController.handleAppEvent.bind(this.dashboardController));
-    page("/dashboard", this.parseHash, this.dashboardController.handleAppEvent.bind(this.dashboardController));
-    page("/anomalies", this.parseHash, this.anomalyResultController.handleAppEvent.bind(this.anomalyResultController));
-    page("/analysis", this.parseHash, this.analysisController.handleAppEvent.bind(this.analysisController));
+    page("/", this.parseHash.bind(this), this.dashboardController.handleAppEvent.bind(this.dashboardController));
+    page("/dashboard", this.parseHash.bind(this), this.dashboardController.handleAppEvent.bind(this.dashboardController));
+    page("/anomalies", this.parseHash.bind(this), this.anomalyResultController.handleAppEvent.bind(this.anomalyResultController));
+    page("/analysis", this.parseHash.bind(this), this.analysisController.handleAppEvent.bind(this.analysisController));
     // page("/ingraph-metric-config", this.updateHistory,
     // showIngraphDatasetSelection);
     // page("/ingraph-dashboard-config", this.updateHistory,
@@ -70,10 +70,11 @@ AppController.prototype = {
    * Place holder that gets invoked before every call. parse the hash
    */
   parseHash : function(ctx, next) {
-    // parseHash
+    // TODO: update ctx.state.hashParams (String) to this.appModel.hashParams (Map)
     ctx.state.hashParams = {};
     ctx.state.hashParams.dashboardName = "New Dashboard";
-    next(ctx.state.hashParams);
+    ctx.hashParams = this.appModel.hashParams;
+    next();
   },
   onTabClickEventHandler : function(sender, args) {
     console.log("targetTab:" + args.targetTab);

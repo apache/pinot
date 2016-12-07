@@ -1,6 +1,9 @@
 function DashboardView(dashboardModel) {
   this.dashboardModel = dashboardModel;
+
   this.tabClickEvent = new Event(this);
+  this.hideDataRangePickerEvent = new Event(this);
+
   this.timeRangeConfig = {
     startDate : this.dashboardModel.startTime,
     endDate : this.dashboardModel.endTime,
@@ -48,8 +51,8 @@ DashboardView.prototype = {
     });
 
     // TIME RANGE SELECTION
-    this.timeRangeConfig.startDate = this.dashboardModel.startTime;
-    this.timeRangeConfig.endDate = this.dashboardModel.endTime;
+    this.timeRangeConfig.startDate = this.dashboardModel.getStartTime();
+    this.timeRangeConfig.endDate = this.dashboardModel.getEndTime();
 
     function dashboard_range_cb(start, end) {
       $('#dashboard-time-range span').addClass("time-range").html(start.format('MMM D, ') + start.format('hh:mm a') + '  &mdash;  ' + end.format('MMM D, ') + end.format('hh:mm a'));
@@ -76,7 +79,15 @@ DashboardView.prototype = {
       self.tabClickEvent.notify(args);
     };
     $('#dashboard-tabs a[data-toggle="tab"]').on('shown.bs.tab', tabSelectionEventHandler);
-  }
 
+    var hideDataRangePickerEventHandler = function(e, dataRangePicker) {
+      // console.log(e);
+      // console.log(dataRangePicker.startDate.format('YYYY-MM-DD'));
+      // console.log(dataRangePicker.endDate.format('YYYY-MM-DD'));
+      var args = {e: e, dataRangePicker: dataRangePicker}
+      self.hideDataRangePickerEvent.notify(args);
+    };
+    $('#dashboard-time-range').on('hide.daterangepicker', hideDataRangePickerEventHandler);
+  }
 };
 

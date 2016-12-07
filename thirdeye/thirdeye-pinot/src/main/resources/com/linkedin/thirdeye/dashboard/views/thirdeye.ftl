@@ -128,6 +128,7 @@
 <script src="../../../assets/javascript/AppModel.js"></script>
 
 <script src="../../../assets/javascript/Event.js"></script>
+<script src="../../../assets/javascript/HashParams.js"></script>
 
 <script type="text/javascript">
   $(document).ready(function() {

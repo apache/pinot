@@ -1,7 +1,5 @@
 function DashboardModel(params) {
   this.dashboardName = "100 Most Recent Anomalies";
-  this.startTime = moment().subtract(7, "days");
-  this.endTime = moment();
   this.mode = "AnomalySummary";
   this.hashParams = params;
 
@@ -36,6 +34,14 @@ DashboardModel.prototype = {
 
   update: function (params) {
     console.log("Changed dashboardName to " + this.dashboardName);
+  },
+
+  getStartTime: function() {
+    return this.hashParams.startTime;
+  },
+
+  getEndTime: function() {
+    return this.hashParams.endTime;
   }
 
 };

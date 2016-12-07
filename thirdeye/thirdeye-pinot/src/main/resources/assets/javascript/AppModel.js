@@ -1,14 +1,17 @@
 function AppModel() {
-  this.tabSelected = "dashboard"
+  this.tabSelected = "dashboard";
+  this.hashParams = new HashParams();
+  this.hashParams.startTime = moment().subtract(7, "days");
+  this.hashParams.endTime = moment();
 }
 AppModel.prototype = {
 
-  init : function(hash) {
-  
+  init : function(hashParams) {
+    this.hashParams = hashParams;
   },
 
   getSelectedTab : function() {
     return this.tabSelected;
   }
 
-}
+};
