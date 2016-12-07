@@ -11,16 +11,17 @@ function DashboardController(parentController) {
 
 DashboardController.prototype = {
   //TODO: figure out how to invoke this function from page callback
-  handleAppEvent : function(ctx) {
-    console.log("dashboardView: params from ctx" + ctx.state.hashParams);
-    this.dashboardModel.init(ctx.state.hashParams);
+  handleAppEvent : function(hashParams) {
+    console.log("hashParams:");
+    console.log(hashParams);
+    this.dashboardModel.init(hashParams);
     this.dashboardModel.update();
-    this.dashboardView.init(ctx.state.hashParams);
+    this.dashboardView.init(hashParams);
     this.dashboardView.render();
     if (this.dashboardModel.mode == "AnomalySummary") {
-      this.anomalySummaryController.handleAppEvent(ctx.state.hashParams)
+      this.anomalySummaryController.handleAppEvent(hashParams)
     } else if (this.dashboardModel.mode == "WoWSummary") {
-      this.woWSummaryController.handleAppEvent(ctx.state.hashParams)
+      this.woWSummaryController.handleAppEvent(hashParams)
     }
 
   },

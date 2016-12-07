@@ -73,14 +73,21 @@ AppController.prototype = {
     // parseHash
     ctx.state.hashParams = {};
     ctx.state.hashParams.dashboardName = "New Dashboard";
-    next();
+    next(ctx.state.hashParams);
   },
-  onTabClickEventHandler : function(sender, args) { //targetTab, previousTab) {
+  onTabClickEventHandler : function(sender, args) {
     console.log("targetTab:" + args.targetTab);
     console.log("previousTab:" + args.previousTab);
     if (args.targetTab != args.previousTab) {
       args.targetTab = args.targetTab.replace("#", "");
-      page("/thirdeye/" + args.targetTab)
+      // page("/thirdeye/" + args.targetTab)
+      if (args.targetTab == "dashboard") {
+        this.dashboardController.handleAppEvent(args);
+      } else if (args.targetTab == "anomalies") {
+        this.anomalyResultController.handleAppEvent(args);
+      } else if (args.targetTab == "analysis") {
+        this.analysisController.handleAppEvent(args);
+      }
     }
-  },
-}
+  }
+};

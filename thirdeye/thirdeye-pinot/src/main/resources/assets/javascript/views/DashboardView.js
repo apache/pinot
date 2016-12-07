@@ -39,6 +39,7 @@ DashboardView.prototype = {
 
   render: function () {
     $("#dashboard-place-holder").html(this.dashboard_template_compiled(this.dashboardModel));
+    $('#dashboard-tabs a:first').click();
 
     // DASHBOARD SELECTION
     var countries = [ {
@@ -58,8 +59,6 @@ DashboardView.prototype = {
     // TIME RANGE SELECTION
     this.timeRangeConfig.startDate = this.dashboardModel.startTime;
     this.timeRangeConfig.endDate = this.dashboardModel.endTime;
-
-    console.log(this.dashboardModel.endTime);
 
     function dashboard_range_cb(start, end) {
       $('#dashboard-time-range span').addClass("time-range").html(start.format('MMM D, ') + start.format('hh:mm a') + '  &mdash;  ' + end.format('MMM D, ') + end.format('hh:mm a'));
@@ -86,7 +85,6 @@ DashboardView.prototype = {
       self.tabClickEvent.notify(args);
     };
     $('#dashboard-tabs a[data-toggle="tab"]').on('shown.bs.tab', tabSelectionEventHandler);
-    $('#dashboard-tabs a:first').click();
   }
 
 };

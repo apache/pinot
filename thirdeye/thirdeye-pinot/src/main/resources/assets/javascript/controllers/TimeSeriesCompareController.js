@@ -6,9 +6,8 @@ function TimeSeriesCompareController(parentController) {
 }
 
 TimeSeriesCompareController.prototype = {
-  handleAppEvent : function(ctx) {
-    console.log("dashboardView: params from ctx" + ctx.state.hashParams);
-    this.timeSeriesCompareModel.init(ctx.state.hashParams);
+  handleAppEvent : function(hashParams) {
+    this.timeSeriesCompareModel.init(hashParams);
     this.timeSeriesCompareModel.update();
     this.timeSeriesCompareView.init();
     this.timeSeriesCompareView.render();

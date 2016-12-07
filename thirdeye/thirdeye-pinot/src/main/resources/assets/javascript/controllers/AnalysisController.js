@@ -7,12 +7,12 @@ function AnalysisController(parentController) {
 }
 
 AnalysisController.prototype = {
-  handleAppEvent: function (ctx) {
-    this.analysisModel.init(ctx.state.hashParams);
+  handleAppEvent: function (hashParams) {
+    this.analysisModel.init(hashParams);
     this.analysisModel.update();
     this.analysisView.init();
     this.analysisView.render();
-    this.timeSeriesCompareController.handleAppEvent(ctx);
-    this.percentageChangeTableController.handleAppEvent(ctx);
+    this.timeSeriesCompareController.handleAppEvent(hashParams);
+    this.percentageChangeTableController.handleAppEvent(hashParams);
   }
 };
