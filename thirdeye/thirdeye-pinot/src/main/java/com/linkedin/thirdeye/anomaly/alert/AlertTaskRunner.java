@@ -14,13 +14,10 @@ import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Comparator;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.TimeZone;
 import java.util.TreeMap;
 
@@ -29,7 +26,6 @@ import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.commons.mail.EmailException;
 import org.apache.commons.mail.HtmlEmail;
-import org.apache.commons.math3.util.Pair;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.quartz.JobExecutionException;
@@ -72,6 +68,8 @@ public class AlertTaskRunner implements TaskRunner {
 
   public static final TimeZone DEFAULT_TIME_ZONE = TimeZone.getTimeZone("America/Los_Angeles");
   public static final String CHARSET = "UTF-8";
+  public static final String DECIMAL_FORMATTER = "%+.1f";
+  public static final String OVER_ALL = "OverAll";
 
   public AlertTaskRunner() {
     anomalyMergedResultDAO = daoRegistry.getMergedAnomalyResultDAO();
@@ -253,7 +251,7 @@ public class AlertTaskRunner implements TaskRunner {
         reportStartTs = reports.get(0).getTimeBuckets().get(0).getCurrentStart();
         metricDimensionValueReports = getDimensionReportList(reports);
         templateData.put("metricDimensionValueReports", metricDimensionValueReports);
-        templateData.put("reportStartDateTime", new Date(reportStartTs).toString());
+        templateData.put("reportStartDateTime", reportStartTs);
       }
 
       Template template = freemarkerConfig.getTemplate("anomaly-report.ftl");
@@ -295,8 +293,10 @@ public class AlertTaskRunner implements TaskRunner {
     LOG.info("Sent email with {} anomalies! {}", results.size(), alertConfig);
   }
 
+  // TODO: push custom report related methods to a ReportHelper util just like EmailHelper
   // report list metric vs groupByKey vs dimensionVal vs timeBucket vs values
-  private static List<MetricDimensionReport> getDimensionReportList(List<ContributorViewResponse> reports) {
+  private static List<MetricDimensionReport> getDimensionReportList(
+      List<ContributorViewResponse> reports) {
     List<MetricDimensionReport> ultimateResult = new ArrayList<>();
     for (ContributorViewResponse report : reports) {
       MetricDimensionReport metricDimensionReport = new MetricDimensionReport();
@@ -304,23 +304,34 @@ public class AlertTaskRunner implements TaskRunner {
       String groupByDimension = report.getDimensions().get(0);
       metricDimensionReport.setMetricName(metric);
       metricDimensionReport.setDimensionName(groupByDimension);
-
-      int valIndex = report.getResponseData().getSchema().getColumnsToIndexMapping().get("percentageChange");
-      int dimensionIndex = report.getResponseData().getSchema().getColumnsToIndexMapping().get("dimensionValue");
+      int valIndex =
+          report.getResponseData().getSchema().getColumnsToIndexMapping().get("percentageChange");
+      int dimensionIndex =
+          report.getResponseData().getSchema().getColumnsToIndexMapping().get("dimensionValue");
 
       int numDimensions = report.getDimensionValuesMap().get(groupByDimension).size();
       int numBuckets = report.getTimeBuckets().size();
 
       // this is dimension vs timeBucketValue map, this should be sorted based on first bucket value
       Map<String, Map<String, String>> dimensionValueMap = new LinkedHashMap<>();
-      List<Pair<String, LinkedHashMap>> dimensionValueList = new ArrayList<>();
+
+      // Lets populate 'OverAll' contribution
+      Map<String, String> overAllValueMap = new LinkedHashMap<>();
+      populateOverAllValuesMap(report, overAllValueMap);
+      dimensionValueMap.put(OVER_ALL, overAllValueMap);
+
+      Map<String, Map<String, String>> dimensionValueMapUnordered = new HashMap<>();
 
       for (int p = 0; p < numDimensions; p++) {
         if (p == 0) {
-          metricDimensionReport.setCurrentStartTime(report.getTimeBuckets().get(0).getCurrentStart());
-          metricDimensionReport.setCurrentEndTime(report.getTimeBuckets().get(numBuckets-1).getCurrentEnd());
-          metricDimensionReport.setBaselineStartTime(report.getTimeBuckets().get(0).getBaselineStart());
-          metricDimensionReport.setBaselineEndTime(report.getTimeBuckets().get(numBuckets-1).getBaselineEnd());
+          metricDimensionReport
+              .setCurrentStartTime(report.getTimeBuckets().get(0).getCurrentStart());
+          metricDimensionReport
+              .setCurrentEndTime(report.getTimeBuckets().get(numBuckets - 1).getCurrentEnd());
+          metricDimensionReport
+              .setBaselineStartTime(report.getTimeBuckets().get(0).getBaselineStart());
+          metricDimensionReport
+              .setBaselineEndTime(report.getTimeBuckets().get(numBuckets - 1).getBaselineEnd());
         }
 
         // valueMap is timeBucket vs value map
@@ -330,38 +341,116 @@ public class AlertTaskRunner implements TaskRunner {
           int index = p * numBuckets + q;
           currentDimension = report.getResponseData().getResponseData().get(index)[dimensionIndex];
           valueMap.put(String.valueOf(report.getTimeBuckets().get(q).getCurrentStart()), String
-              .format("%+.1f", Double.valueOf(report.getResponseData().getResponseData().get(index)[valIndex])));
+              .format(DECIMAL_FORMATTER,
+                  Double.valueOf(report.getResponseData().getResponseData().get(index)[valIndex])));
         }
-        dimensionValueList.add(new Pair<>(currentDimension, valueMap));
+        dimensionValueMapUnordered.put(currentDimension, valueMap);
       }
 
-      sortDimensionValueList(dimensionValueList);
-
-      for (Pair<String, LinkedHashMap> dimensionValue  : dimensionValueList) {
-        dimensionValueMap.put(dimensionValue.getFirst(), dimensionValue.getSecond());
-      }
-
+      orderDimensionValueMap(dimensionValueMapUnordered, dimensionValueMap,
+          report.getDimensionValuesMap().get(groupByDimension));
       metricDimensionReport.setSubDimensionValueMap(dimensionValueMap);
+      populateShareAndTotalMap(report, metricDimensionReport, metric, groupByDimension);
       ultimateResult.add(metricDimensionReport);
     }
     return ultimateResult;
   }
 
+  private static void orderDimensionValueMap(Map<String, Map<String, String>> src,
+      Map<String, Map<String, String>> target, List<String> orderedKeys) {
+    for (String key : orderedKeys) {
+      target.put(key, src.get(key));
+    }
+  }
 
-  private static void sortDimensionValueList(List<Pair<String, LinkedHashMap>> dimensionValueList) {
-    Collections.sort(dimensionValueList, new Comparator<Pair<String, LinkedHashMap>>() {
-      @Override public int compare(Pair<String, LinkedHashMap> o1,
-          Pair<String, LinkedHashMap> o2) {
-        Set<String> keys1 = o1.getSecond().keySet();
-        List<String> allKeys = new ArrayList<>();
-        allKeys.addAll(keys1);
-        String dim = allKeys.get(0);
+  private static void populateShareAndTotalMap(ContributorViewResponse report,
+      MetricDimensionReport metricDimensionReport, String metric, String dimension) {
+    Map<String, Double> currentValueMap =
+        report.getCurrentTotalMapPerDimensionValue().get(metric).get(dimension);
+    Map<String, Double> baselineValueMap =
+        report.getBaselineTotalMapPerDimensionValue().get(metric).get(dimension);
+    Map<String, String> shareMap = new HashMap<>();
+    Map<String, String> totalMap = new HashMap<>();
+    Double totalCurrent = 0d;
+    Double totalBaseline = 0d;
+    for (Map.Entry<String, Double> entry : currentValueMap.entrySet()) {
+      totalCurrent += entry.getValue();
+    }
+    for (Map.Entry<String, Double> entry : baselineValueMap.entrySet()) {
+      totalBaseline += entry.getValue();
+    }
+    // set value for overall as a sub-dimension
+    shareMap.put(OVER_ALL, "100");
+    totalMap.put(OVER_ALL,
+        String.format(DECIMAL_FORMATTER, computePercentage(totalBaseline, totalCurrent)));
 
-        Double key1 = Double.valueOf(o1.getSecond().get(dim).toString());
-        Double key2 = Double.valueOf(o2.getSecond().get(dim).toString());
-        return key1.compareTo(key2);
+    for (Map.Entry<String, Double> entry : currentValueMap.entrySet()) {
+      String subDimension = entry.getKey();
+      // Share formatter does not need sign
+      shareMap.put(subDimension, String.format("%.1f", 100 * entry.getValue() / totalCurrent));
+
+      totalMap.put(subDimension, String.format(DECIMAL_FORMATTER,
+          computePercentage(baselineValueMap.get(subDimension),
+              currentValueMap.get(subDimension))));
+    }
+
+    metricDimensionReport.setSubDimensionShareValueMap(shareMap);
+    metricDimensionReport.setSubDimensionTotalValueMap(totalMap);
+  }
+
+  private static double computePercentage(double baseline, double current) {
+    if (baseline == current) {
+      return 0d;
+    }
+    if (baseline == 0) {
+      return 100d;
+    }
+    return 100 * (current - baseline) / baseline;
+  }
+
+  private static void populateOverAllValuesMap(ContributorViewResponse report,
+      Map<String, String> overAllValueChangeMap) {
+    Map<Long, Double> timeBucketVsCurrentValueMap = new LinkedHashMap<>();
+    Map<Long, Double> timeBucketVsBaselineValueMap = new LinkedHashMap<>();
+    int currentValIndex =
+        report.getResponseData().getSchema().getColumnsToIndexMapping().get("currentValue");
+    int baselineValIndex =
+        report.getResponseData().getSchema().getColumnsToIndexMapping().get("baselineValue");
+
+    // this is dimension vs timeBucketValue map, this should be sorted based on first bucket value
+    String groupByDimension = report.getDimensions().get(0);
+    int numDimensions = report.getDimensionValuesMap().get(groupByDimension).size();
+    int numBuckets = report.getTimeBuckets().size();
+
+    for (int p = 0; p < numDimensions; p++) {
+      for (int q = 0; q < numBuckets; q++) {
+        int index = p * numBuckets + q;
+        long currentTimeKey = report.getTimeBuckets().get(q).getCurrentStart();
+        double currentVal =
+            Double.valueOf(report.getResponseData().getResponseData().get(index)[currentValIndex]);
+        double baselineVal =
+            Double.valueOf(report.getResponseData().getResponseData().get(index)[baselineValIndex]);
+
+        if (!timeBucketVsCurrentValueMap.containsKey(currentTimeKey)) {
+          timeBucketVsCurrentValueMap.put(currentTimeKey, 0D);
+          timeBucketVsBaselineValueMap.put(currentTimeKey, 0D);
+        }
+        timeBucketVsCurrentValueMap
+            .put(currentTimeKey, timeBucketVsCurrentValueMap.get(currentTimeKey) + currentVal);
+        timeBucketVsBaselineValueMap
+            .put(currentTimeKey, timeBucketVsBaselineValueMap.get(currentTimeKey) + baselineVal);
       }
-    });
+    }
+    for (Map.Entry<Long, Double> entry : timeBucketVsCurrentValueMap.entrySet()) {
+      Double currentTotal = timeBucketVsCurrentValueMap.get(entry.getKey());
+      Double baselineTotal = timeBucketVsBaselineValueMap.get(entry.getKey());
+      double percentageChange = 0d;
+      if (baselineTotal != 0d) {
+        percentageChange = 100 * (currentTotal - baselineTotal) / baselineTotal;
+      }
+      overAllValueChangeMap.put(entry.getKey().toString(),
+          String.format(DECIMAL_FORMATTER,percentageChange));
+    }
   }
 
   /**

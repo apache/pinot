@@ -79,7 +79,7 @@
     <td>
       <hr/>
       <p>
-        Report start time : ${reportStartDateTime}
+        Report start time : ${dateFormat(reportStartDateTime)}
       </p>
     </td>
   </tr>
@@ -100,6 +100,8 @@
                cellspacing="0px" cellpadding="4px">
           <tr>
             <td>${metricReport.dimensionName}</td>
+            <td>Share</td>
+            <td>Total</td>
             <#assign itrCount = 1 >
             <#list subDimensionValueMap?keys as groupByDimension>
               <#assign timeBucketValueMap = subDimensionValueMap[groupByDimension]>
@@ -118,6 +120,8 @@
               <td>
               ${dimensionKey}
               </td>
+              <td>${metricReport.subDimensionShareValueMap[dimensionKey]}</td>
+              <td>${metricReport.subDimensionTotalValueMap[dimensionKey]}</td>
               <#assign timevalmap = subDimensionValueMap[dimensionKey] >
               <#list timevalmap?keys as timebucketkey>
                 <td> ${timevalmap[timebucketkey]}%</td>
