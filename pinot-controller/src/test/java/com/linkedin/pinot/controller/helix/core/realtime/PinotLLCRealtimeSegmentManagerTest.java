@@ -316,59 +316,99 @@ public class PinotLLCRealtimeSegmentManagerTest {
     long now = System.currentTimeMillis();
     List<String> existingSegments = new ArrayList<>(segmentManager._idealStateEntries.keySet());
     final int partitionToBeFixed = 3;
+    final int partitionWithHigherOffset = 4;
     final int emptyPartition = 5;
-    // existingSegments has one segment per partition, with sequence number 0.
-    // Add a new segment with seq 2 for all partitions except the two special ones.
-    // For partitionToBeFixed, do not add a new segment, we will auto-create seq 0.
-    // For emptyPartition, remove existing segment, so we will auto-create seq 1.
+    final long partitionOffset = 0x259080984568L;
+    final long higherOffset = partitionOffset + 100;
     for (String segmentNameStr : existingSegments) {
       LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
-      if (segmentName.getPartitionId() != partitionToBeFixed) {
-        if (segmentName.getPartitionId() == emptyPartition) {
+      switch (segmentName.getPartitionId()) {
+        case partitionToBeFixed:
+          // Do nothing, we will test adding a new segment for this partition when there is only one segment in there.
+          break;
+        case emptyPartition:
+          // Remove existing segment, so we can test adding a new segment for this partition when none exists
           segmentManager._idealStateEntries.remove(segmentNameStr);
-        } else {
+          break;
+        case partitionWithHigherOffset:
+          // Set segment metadata for this segment such that its offset is higher than startOffset we get from kafka.
+          // In that case, we should choose the new segment offset as this one rather than the one kafka hands us.
+          LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
+          metadata.setSegmentName(segmentName.getSegmentName());
+          metadata.setEndOffset(higherOffset);
+          segmentManager._metadataMap.put(segmentName.getSegmentName(), metadata);
+          break;
+        default:
+          // Add a second segment for this partition. It will not be repaired.
           LLCSegmentName newSegmentName = new LLCSegmentName(segmentName.getTableName(), segmentName.getPartitionId(),
               segmentName.getSequenceNumber() + 1, now);
           List<String> hosts = segmentManager._idealStateEntries.get(segmentNameStr);
           segmentManager._idealStateEntries.put(newSegmentName.getSegmentName(), hosts);
-        }
+          break;
       }
     }
 
     List<Integer> nonConsumingPartitions = new ArrayList<>(1);
     nonConsumingPartitions.add(partitionToBeFixed);
+    nonConsumingPartitions.add(partitionWithHigherOffset);
     nonConsumingPartitions.add(emptyPartition);
-    final long partitionOffset = 0x259080984568L;
     segmentManager._kafkaOffsetToReturn = partitionOffset;
     existingSegments = new ArrayList<>(segmentManager._idealStateEntries.keySet());
     segmentManager._paths.clear();
     segmentManager._records.clear();
     segmentManager.createConsumingSegment(rtTableName, nonConsumingPartitions, existingSegments, null);
-    Assert.assertEquals(segmentManager._paths.size(), 2);
-    Assert.assertEquals(segmentManager._records.size(), 2);
-    Assert.assertEquals(segmentManager._oldSegmentNameStr.size(), 2);
-    Assert.assertEquals(segmentManager._newSegmentNameStr.size(), 2);
+    Assert.assertEquals(segmentManager._paths.size(), 3);
+    Assert.assertEquals(segmentManager._records.size(), 3);
+    Assert.assertEquals(segmentManager._oldSegmentNameStr.size(), 3);
+    Assert.assertEquals(segmentManager._newSegmentNameStr.size(), 3);
+    Assert.assertEquals(3, segmentManager._paths.size());
 
-    LLCSegmentName fixedPartitionSegmentName;
-    LLCSegmentName emptyPartitionSegmentName;
-    String segmentNameStr = segmentManager._paths.get(0);
-    fixedPartitionSegmentName  = new LLCSegmentName(segmentNameStr);
-    if (fixedPartitionSegmentName.getPartitionId() == partitionToBeFixed) {
-      emptyPartitionSegmentName = new LLCSegmentName(segmentManager._paths.get(1));
-    } else {
-      emptyPartitionSegmentName = fixedPartitionSegmentName;
-      fixedPartitionSegmentName = new LLCSegmentName(segmentManager._paths.get(1));
+    int found = 0;
+    int index = 0;
+    while (index < segmentManager._paths.size()) {
+      String znodePath = segmentManager._paths.get(index);
+      int slash = znodePath.lastIndexOf('/');
+      String segmentNameStr = znodePath.substring(slash + 1);
+      LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
+      ZNRecord znRecord;
+      LLCRealtimeSegmentZKMetadata metadata;
+      switch (segmentName.getPartitionId()) {
+        case partitionToBeFixed:
+          // We had left this partition with one segment. So, a second one should be created with a sequence number one
+          // higher than starting. Its start offset should be what kafka returns.
+          found++;
+          Assert.assertEquals(segmentName.getSequenceNumber(), PinotLLCRealtimeSegmentManager.STARTING_SEQUENCE_NUMBER+1);
+          znRecord = segmentManager._records.get(index);
+          metadata = new LLCRealtimeSegmentZKMetadata(znRecord);
+          Assert.assertEquals(metadata.getNumReplicas(), 2);
+          Assert.assertEquals(metadata.getStartOffset(), partitionOffset);
+          break;
+        case emptyPartition:
+          // We had removed any segments in this partition. A new one should be created with the offset as returned
+          // by kafka and with the starting sequence number.
+          found++;
+          Assert.assertEquals(segmentName.getSequenceNumber(), PinotLLCRealtimeSegmentManager.STARTING_SEQUENCE_NUMBER);
+          znRecord = segmentManager._records.get(index);
+          metadata = new LLCRealtimeSegmentZKMetadata(znRecord);
+          Assert.assertEquals(metadata.getNumReplicas(), 2);
+          Assert.assertEquals(metadata.getStartOffset(), partitionOffset);
+          break;
+        case partitionWithHigherOffset:
+          // We had left this partition with one segment. In addition, we had the end-offset of the first segment set to
+          // a value higher than that returned by kafka. So, a second one should be created with a sequence number one
+          // equal to the end offset of the first one.
+          found++;
+          Assert.assertEquals(segmentName.getSequenceNumber(), PinotLLCRealtimeSegmentManager.STARTING_SEQUENCE_NUMBER+1);
+          znRecord = segmentManager._records.get(index);
+          metadata = new LLCRealtimeSegmentZKMetadata(znRecord);
+          Assert.assertEquals(metadata.getNumReplicas(), 2);
+          Assert.assertEquals(metadata.getStartOffset(), higherOffset);
+          break;
+      }
+      index++;
     }
-
-    Assert.assertEquals(emptyPartitionSegmentName.getSequenceNumber(), PinotLLCRealtimeSegmentManager.STARTING_SEQUENCE_NUMBER);
-    Assert.assertEquals(fixedPartitionSegmentName.getSequenceNumber(), PinotLLCRealtimeSegmentManager.STARTING_SEQUENCE_NUMBER
-        +1);
-
-    for (ZNRecord znRecord : segmentManager._records) {
-      LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata(znRecord);
-      Assert.assertEquals(metadata.getNumReplicas(), 2);
-      Assert.assertEquals(metadata.getStartOffset(), partitionOffset);
-    }
+    // We should see all three cases here.
+    Assert.assertEquals(3, found);
   }
 
   @Test
@@ -459,6 +499,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     public String _startOffset;
     public boolean _createNew;
     public int _nReplicas;
+    public Map<String, LLCRealtimeSegmentZKMetadata> _metadataMap = new HashMap<>(4);
 
     public List<String> _newInstances;
     public List<String> _oldSegmentNameStr = new ArrayList<>(16);
@@ -535,6 +576,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     public LLCRealtimeSegmentZKMetadata getRealtimeSegmentZKMetadata(String realtimeTableName, String segmentName) {
+      if (_metadataMap.containsKey(segmentName)) {
+        return _metadataMap.get(segmentName);
+      }
       LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
       metadata.setSegmentName(segmentName);
       return metadata;
