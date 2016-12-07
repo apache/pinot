@@ -21,4 +21,4 @@ WoWSummaryController.prototype ={
     }
 
 
-}
+};

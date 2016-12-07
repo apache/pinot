@@ -52,11 +52,11 @@
 			</nav>
 		</div>
 		<div class="tab-content">
-			<div class="tab-pane active in" id="num_of_anomalies">
+			<div class="tab-pane in active" id="anomaly-summary-tab">
 				<div id="anomaly-summary-place-holder">
 				</div>
 			</div>
-			<div class="tab-pane" id="wow">
+			<div class="tab-pane fade" id="wow-summary-tab">
 				<div id="wow-place-holder">
 				</div>
 			</div>

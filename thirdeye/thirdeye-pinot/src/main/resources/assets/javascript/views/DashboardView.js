@@ -38,7 +38,7 @@ DashboardView.prototype = {
   },
 
   render: function () {
-    $("#dashboard-place-holder").html(this.dashboard_template_compiled);
+    $("#dashboard-place-holder").html(this.dashboard_template_compiled(this.dashboardModel));
 
     // DASHBOARD SELECTION
     var countries = [ {

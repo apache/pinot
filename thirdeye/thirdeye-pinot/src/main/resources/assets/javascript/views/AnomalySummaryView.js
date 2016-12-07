@@ -11,4 +11,4 @@ AnomalySummaryView.prototype = {
     var result = this.template_compiled(this.anomalySummaryModel);
     $(this.placeHolderId).html(result);
   }
-}
+};

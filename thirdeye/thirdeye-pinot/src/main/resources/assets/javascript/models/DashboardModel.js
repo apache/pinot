@@ -2,7 +2,7 @@ function DashboardModel(params) {
   this.dashboardName = "100 Most Recent Anomalies";
   this.startTime = moment().subtract(7, "days");
   this.endTime = moment();
-  this.mode = "WoWSummary";
+  this.mode = "AnomalySummary";
   this.hashParams = params;
 }
 

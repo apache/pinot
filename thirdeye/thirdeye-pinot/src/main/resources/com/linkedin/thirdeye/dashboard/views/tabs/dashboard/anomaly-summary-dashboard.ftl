@@ -33,93 +33,16 @@
 						</tr>
 					</thead>
 					<tbody>
+            {{#each this.anomalySummary.rows as |row rowIndex|}}
 						<tr class="bg-white">
-							<td><div>
-									<a href="#"><span class="metric-label">{{this.metricName}}</span></a>
-								</div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box box-anomaly">3</div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box">3</div></td>
-							<td><div class="box">4</div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box">8</div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
+                <td><div>
+                  <a href="#"><span class="metric-label">{{row.metricName}}</span></a>
+                </div></td>
+                {{#each row.data as |data dataIndex|}}
+                  <td><div class="box" box-anomaly>{{data}}</div></td>
+                {{/each}}
 						</tr>
-						<tr class="bg-white">
-							<td><div>
-									<a href="#"><span class="metric-label">Metric B</span></a>
-								</div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box box-anomaly">3</div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box">3</div></td>
-							<td><div class="box">4</div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box">8</div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-						</tr>
-						<tr class="bg-white">
-							<td><div>
-									<a href="#"><span class="metric-label">Metric C</span></a>
-								</div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box box-anomaly">3</div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box">3</div></td>
-							<td><div class="box">4</div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box">8</div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-							<td><div class="box"></div></td>
-						</tr>
+            {{/each}}
 				</table>
 			</div>
 		</div>

@@ -25,6 +25,9 @@ function AnomalyResultView(anomalyResultModel) {
       cancelClass : 'btn-default'
     };
 
+  // Compile HTML template
+  var anomalies_template = $("#anomalies-template").html();
+  this.result_anomalies_template_compiled = Handlebars.compile(anomalies_template);
 }
 
 AnomalyResultView.prototype = {
@@ -65,13 +68,11 @@ AnomalyResultView.prototype = {
     console.log("anomalies");
     console.log(anomalies);
 
-    var result_anomalies_template_compiled = anomalies_template_compiled(anomalies);
-    $("#anomalies-place-holder").html(result_anomalies_template_compiled);
-    this.renderAnomaliesTab();
+    $("#anomalies-place-holder").html(this.result_anomalies_template_compiled);
+    this.renderAnomaliesTab(anomalies);
   },
-  renderAnomaliesTab : function(){
 
-
+  renderAnomaliesTab: function (anomalies) {
     for (var i = 0; i < anomalies.length; i++) {
       var anomaly = anomalies[i];
       console.log(anomaly);
@@ -124,6 +125,4 @@ AnomalyResultView.prototype = {
     }
 
   }
-
-
-}
+};

@@ -24,13 +24,11 @@ DashboardController.prototype = {
     }
 
   },
-  onDashboardInputChange : function() {
-
-  },
 
   init : function() {
 
   },
+
   onTabClickEventHandler : function(sender, args) {
     var params = this.dashboardModel.hashParams;
     if (args.previousTab != args.targetTab) {

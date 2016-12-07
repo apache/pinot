@@ -3,9 +3,9 @@ function WoWSummaryModel() {
   this.dashboardName = "100 Most Recent Anomalies";
   this.startTime = moment().subtract(7, "days");
   this.endTime = moment();
-  this.mode = "AnomalySummary";
+  this.mode = "WoWSummary";
   //this.anomalySummaryResult = { {"metricA": [0,1,2,0,0,0,0,1,2,0,0,0,0,1,2,0,0,0,0,1,2,0,0,0]},{"metricB": [0,1,2,0,0,0,0,1,2,0,0,0,0,1,2,0,0,0,0,1,2,0,0,0]},{"metricC": [0,1,2,0,0,0,0,1,2,0,0,0,0,1,2,0,0,0,0,1,2,0,0,0]}}
-  this.woWSummaryResult ={};
+  this.woWSummaryResult = {};
 }
 
 WoWSummaryModel.prototype = {
@@ -23,11 +23,9 @@ WoWSummaryModel.prototype = {
     if (params.dashboardName) {
       this.dashboardViewMode = params.dashboardViewMode;
     }
-    console.log("Changed dashboardName to " + params);
   },
   rebuild : function() {
-  // TODO: fetch relevant data from backend
-    console.log("Changed dashboardName to " + this.dashboardName);
+    // TODO: fetch relevant data from backend
   }
 
 }
