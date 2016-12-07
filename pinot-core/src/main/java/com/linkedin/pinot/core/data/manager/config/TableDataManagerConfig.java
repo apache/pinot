@@ -118,6 +118,7 @@ public class TableDataManagerConfig {
     _tableDataManagerConfig.setProperty(IndexLoadingConfigMetadata.KEY_OF_STAR_TREE_FORMAT_VERSION,
         indexingConfig.getStarTreeFormat());
     String segmentVersionKey = IndexLoadingConfigMetadata.KEY_OF_SEGMENT_FORMAT_VERSION;
+
     // Server configuration is always to DEFAULT or configured value
     // Apply table configuration only if the server configuration is set with table config
     // overriding server config
@@ -126,10 +127,12 @@ public class TableDataManagerConfig {
     // security from inadvertent changes as both config will need to be enabled for the
     // change to take effect
     SegmentVersion tableConfigVersion =
-        SegmentVersion.fromStringOrDefault(indexingConfig.getSegmentFormatVersion());
-    SegmentVersion serverConfigVersion =
-        SegmentVersion.fromStringOrDefault(_tableDataManagerConfig.getString(
-            IndexLoadingConfigMetadata.KEY_OF_SEGMENT_FORMAT_VERSION));
+        SegmentVersion.fromString(indexingConfig.getSegmentFormatVersion(), SegmentVersion.DEFAULT_TABLE_VERSION);
+
+    SegmentVersion serverConfigVersion = SegmentVersion.fromString(
+        _tableDataManagerConfig.getString(IndexLoadingConfigMetadata.KEY_OF_SEGMENT_FORMAT_VERSION),
+        SegmentVersion.DEFAULT_SERVER_VERSION);
+
     // override server based configuration with table level configuration iff table configuration
     // is less than server configuration
     if (SegmentVersion.compare(tableConfigVersion, serverConfigVersion) < 0) {
