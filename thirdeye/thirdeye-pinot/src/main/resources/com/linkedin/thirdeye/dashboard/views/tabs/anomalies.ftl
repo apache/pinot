@@ -30,7 +30,7 @@
 	<div class="row row-bordered">
 		<div class="container top-buffer bottom-buffer">
 			<div>
-				Showing <label style="font-size: 15px; font-weight: 500"> 10 </label> anomalies of <label style="font-size: 15px; font-weight: 500"> this.length</label>
+				Showing <label style="font-size: 15px; font-weight: 500"> 10 </label> anomalies of <label style="font-size: 15px; font-weight: 500"> 25</label>
 			</div>
 		</div>
 		{{#each this as |anomalyData anomalyIndex|}}
@@ -38,26 +38,26 @@
 				<div class="panel padding-all">
 					<div class="row">
 						<div class="col-md-3">
-							<label>{{this.anomalyId}}<a href="#">show details</a></label>
+							<label>{{this.anomalyId}}<a href="#"> show details</a></label>
 						</div>
 						<div class="col-md-6"></div>
 						<div class="col-md-1">
 							<span class="pull-right">______</span>
 						</div>
-						<div class="col-md-2">
-							<span class="pull-left"><label> Sep 2 - Sep 9</label></span>
+						<div id="current-range-{{anomalyIndex}}" class="col-md-2">
+							<span class="pull-left"><label></label></span>
 						</div>
 					</div>
 					<div class="row">
 						<div class="col-md-3">
-							<label>num_login_attempt</label>
+							<label>{{this.metric}}</label>
 						</div>
 						<div class="col-md-6"></div>
 						<div class="col-md-1">
 							<span class="pull-right">--------</span>
 						</div>
-						<div class="col-md-2">
-							<span class="pull-left"><label> Aug 2 - Aug 9</label></span>
+						<div id="baseline-range-{{anomalyIndex}}"  class="col-md-2">
+							<span class="pull-left"><label></label></span>
 						</div>
 					</div>
 					<div class="row">
