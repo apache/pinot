@@ -51,8 +51,16 @@
   </organization>
   <developers>
     <developer>
+      <id>antumbde</id>
+      <name>Adwait Tumbde</name>
+    </developer>
+    <developer>
       <id>dpatel</id>
       <name>Dhaval Patel</name>
+    </developer>
+    <developer>
+      <id>Jackie-Jiang</id>
+      <name>Jackie Jiang </name>
     </developer>
     <developer>
       <id>jfim</id>
@@ -61,6 +69,18 @@
     <developer>
       <id>kgopalak</id>
       <name>Kishore Gopalakrishna</name>
+    </developer>
+    <developer>
+      <id>mayankshriv</id>
+      <name>Mayank Shrivastava</name>
+    </developer>
+    <developer>
+      <id>mcvsubbu</id>
+      <name>Subbu Subramaniam</name>
+    </developer>
+    <developer>
+      <id>rven</id>
+      <name>Venkatesh Radhakrishnan</name>
     </developer>
     <developer>
       <id>xiafu</id>
@@ -886,6 +906,40 @@
             <phase>validate</phase>
             <goals>
               <goal>create</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>2.4.3</version>
+        <configuration>
+          <shadedArtifactAttached>true</shadedArtifactAttached>
+          <transformers>
+            <transformer
+                implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+            <transformer
+                implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+              <mainClass>${mainClass}</mainClass>
+            </transformer>
+          </transformers>
+          <!-- exclude signed Manifests -->
+          <filters>
+            <filter>
+              <artifact>*:*</artifact>
+              <excludes>
+                <exclude>META-INF/*.SF</exclude>
+                <exclude>META-INF/*.DSA</exclude>
+                <exclude>META-INF/*.RSA</exclude>
+              </excludes>
+            </filter>
+          </filters>
+        </configuration>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
             </goals>
           </execution>
         </executions>
