@@ -24,6 +24,10 @@ function DashboardView(dashboardModel) {
     applyClass : 'btn-primary',
     cancelClass : 'btn-default'
   };
+
+  // Compile HTML template
+  var dashboard_template = $("#dashboard-template").html();
+  this.dashboard_template_compiled = Handlebars.compile(dashboard_template);
 }
 
 DashboardView.prototype = {
@@ -34,8 +38,7 @@ DashboardView.prototype = {
   },
 
   render: function () {
-    this.result_dashboard_template_compiled = dashboard_template_compiled({});
-    $("#dashboard-place-holder").html(this.result_dashboard_template_compiled);
+    $("#dashboard-place-holder").html(this.dashboard_template_compiled);
 
     // DASHBOARD SELECTION
     var countries = [ {

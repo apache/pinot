@@ -1,5 +1,7 @@
 function AnomalyResultView() {
-
+  // Compile HTML template
+  var anomalies_template = $("#anomalies-template").html();
+  this.anomalies_template_compiled = Handlebars.compile(anomalies_template);
 }
 
 AnomalyResultView.prototype = {
@@ -8,8 +10,7 @@ AnomalyResultView.prototype = {
   },
 
   render : function() {
-    var result_anomalies_template_compiled = anomalies_template_compiled({});
-    $("#anomalies-place-holder").html(result_anomalies_template_compiled);
+    $("#anomalies-place-holder").html(this.anomalies_template_compiled);
     renderAnomaliesTab();
   }
 

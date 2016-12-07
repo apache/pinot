@@ -91,34 +91,7 @@
 				</div>
 			</div>
 			<!-- Percentage change table -->
-			<div class="row">
-				<div class="col-md-2 pull-left ">
-					<span class="label-medium-semibold">Total % Changes</span>
-				</div>
-				<div class="col-md-2">
-					<input type="checkbox" id="show-details"> <label for="show-details" class="metric-label">See Contribution Details</label>
-				</div>
-				<div class="col-md-2">
-					<input type="checkbox" id="show-cumulative"> <label for="show-cumulative" class="metric-label">Show Cumulative</label>
-				</div>
-				<div class="col-md-6"></div>
-			</div>
-			<div class="row bottom-buffer">
-				<div class="col-md-12">
-					<span class="label-small-semibold">Click on a cell to drill down into its contribution breakdown.</span>
-				</div>
-			</div>
-			<div id="wow-metric-table" class="row">
-				<div class="col-md-12">
-					<#include "analysis/wow-metric.ftl"/>
-				</div>
-			</div>
-
-			<div id="wow-metric-dimension-table" class="row">
-				<div class="col-md-12">
-					<#include "analysis/wow-metric-dimension.ftl"/>
-				</div>
-			</div>
+      <div id="percentage-change-table-placeholder"></div>
 		</div>
 	</div>
 </div>

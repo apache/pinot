@@ -71,6 +71,15 @@
 <script id="wow-summary-template" type="text/x-handlebars-template">
 	<#include "tabs/dashboard/wow-summary-dashboard.ftl">
 </script>
+<script id="percentage-change-table-template" type="text/x-handlebars-template">
+  <#include "tabs/analysis/percentage-change.ftl"/>
+</script>
+<script id="wow-metric-table-template" type="text/x-handlebars-template">
+  <#include "tabs/analysis/wow-metric.ftl"/>
+</script>
+<script id="wow-metric-dimension-table-template" type="text/x-handlebars-template">
+  <#include "tabs/analysis/wow-metric-dimension.ftl"/>
+</script>
 <#include "admin/job-info.ftl"/>
 <#include "admin/ingraph-metric-config.ftl"/>
 <#include "admin/ingraph-dashboard-config.ftl"/>
@@ -102,6 +111,10 @@
 <script src="../../../assets/javascript/models/TimeSeriesCompareModel.js"></script>
 <script src="../../../assets/javascript/views/TimeSeriesCompareView.js"></script>
 <script src="../../../assets/javascript/controllers/TimeSeriesCompareController.js"></script>
+
+<script src="../../../assets/javascript/models/PercentageChangeTableModel.js"></script>
+<script src="../../../assets/javascript/views/PercentageChangeTableView.js"></script>
+<script src="../../../assets/javascript/controllers/PercentageChangeTableController.js"></script>
 
 <script src="../../../assets/javascript/AppController.js"></script>
 <script src="../../../assets/javascript/AppView.js"></script>

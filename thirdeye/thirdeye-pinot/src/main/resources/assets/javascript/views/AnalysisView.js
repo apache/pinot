@@ -1,5 +1,7 @@
 function AnalysisView() {
-
+  // Compile template
+  var analysis_template = $("#analysis-template").html();
+  this.analysis_template_compiled = Handlebars.compile(analysis_template);
 }
 
 AnalysisView.prototype = {
@@ -9,8 +11,7 @@ AnalysisView.prototype = {
   },
 
   render: function () {
-    var result_analysis_template_compiled = analysis_template_compiled({});
-    $("#analysis-place-holder").html(result_analysis_template_compiled);
+    $("#analysis-place-holder").html(this.analysis_template_compiled);
     renderAnalysisTab();
   }
 };

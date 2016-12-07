@@ -3,7 +3,7 @@ function AnalysisController(parentController) {
   this.analysisModel = new AnalysisModel();
   this.analysisView = new AnalysisView();
   this.timeSeriesCompareController = new TimeSeriesCompareController(this);
-
+  this.percentageChangeTableController = new PercentageChangeTableController(this);
 }
 
 AnalysisController.prototype = {
@@ -13,5 +13,6 @@ AnalysisController.prototype = {
     this.analysisView.init();
     this.analysisView.render();
     this.timeSeriesCompareController.handleAppEvent(ctx);
+    this.percentageChangeTableController.handleAppEvent(ctx);
   }
 };

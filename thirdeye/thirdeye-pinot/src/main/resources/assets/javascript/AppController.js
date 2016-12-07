@@ -35,15 +35,6 @@ AppController.prototype = {
 
   compileTemplates : function() {
     // compile templates
-    var dashboard_template = $("#dashboard-template").html();
-    dashboard_template_compiled = Handlebars.compile(dashboard_template);
-
-    var anomalies_template = $("#anomalies-template").html();
-    anomalies_template_compiled = Handlebars.compile(anomalies_template);
-
-    var analysis_template = $("#analysis-template").html();
-    analysis_template_compiled = Handlebars.compile(analysis_template);
-
     var ingraph_metric_config_template = $("#ingraph-metric-config-template").html();
     ingraph_metric_config_template_compiled = Handlebars.compile(ingraph_metric_config_template);
 
