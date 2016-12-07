@@ -80,6 +80,9 @@
 <script id="wow-metric-dimension-table-template" type="text/x-handlebars-template">
   <#include "tabs/analysis/wow-metric-dimension.ftl"/>
 </script>
+<script id="dimension-tree-map-template" type="text/x-handlebars-template">
+  <#include "tabs/analysis/dimension-tree-map.ftl"/>
+</script>
 <#include "admin/job-info.ftl"/>
 <#include "admin/ingraph-metric-config.ftl"/>
 <#include "admin/ingraph-dashboard-config.ftl"/>
@@ -115,6 +118,10 @@
 <script src="../../../assets/javascript/models/PercentageChangeTableModel.js"></script>
 <script src="../../../assets/javascript/views/PercentageChangeTableView.js"></script>
 <script src="../../../assets/javascript/controllers/PercentageChangeTableController.js"></script>
+
+<script src="../../../assets/javascript/models/DimensionTreeMapModel.js"></script>
+<script src="../../../assets/javascript/views/DimensionTreeMapView.js"></script>
+<script src="../../../assets/javascript/controllers/DimensionTreeMapController.js"></script>
 
 <script src="../../../assets/javascript/AppController.js"></script>
 <script src="../../../assets/javascript/AppView.js"></script>
