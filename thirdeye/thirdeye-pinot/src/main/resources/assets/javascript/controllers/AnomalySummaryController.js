@@ -6,19 +6,19 @@ function AnomalySummaryController(parentController){
 
 
 AnomalySummaryController.prototype ={
-    
+
     handleAppEvent: function(params){
       this.anomalySummaryModel.init(params);
       this.anomalySummaryModel.rebuild();
       this.anomalySummaryView.render();
     },
     onDashboardInputChange: function(){
-      
+
     },
-    
+
     init:function(){
-      
+
     }
-    
-    
+
+
 }

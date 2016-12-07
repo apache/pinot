@@ -80,14 +80,14 @@ AppController.prototype = {
     console.log("previousTab:" + args.previousTab);
     if (args.targetTab != args.previousTab) {
       args.targetTab = args.targetTab.replace("#", "");
-      // page("/thirdeye/" + args.targetTab)
-      if (args.targetTab == "dashboard") {
-        this.dashboardController.handleAppEvent(args);
-      } else if (args.targetTab == "anomalies") {
-        this.anomalyResultController.handleAppEvent(args);
-      } else if (args.targetTab == "analysis") {
-        this.analysisController.handleAppEvent(args);
-      }
+      page("/thirdeye/" + args.targetTab);
+      // if (args.targetTab == "dashboard") {
+      //   this.dashboardController.handleAppEvent(args);
+      // } else if (args.targetTab == "anomalies") {
+      //   this.anomalyResultController.handleAppEvent(args);
+      // } else if (args.targetTab == "analysis") {
+      //   this.analysisController.handleAppEvent(args);
+      // }
     }
   }
 };

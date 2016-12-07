@@ -5,41 +5,22 @@
 				<table class="table dashboard-table" style="border-collapse: separate; border-spacing: 0em 1em">
 					<thead>
 						<tr>
-							<th><div class="row-label">Sep 2nd, 2016</div></th>
-							<th>8p</th>
-							<th>9p</th>
-							<th>10p</th>
-							<th>10p</th>
-							<th>10p</th>
-							<th>10p</th>
-							<th>10p</th>
-							<th>10p</th>
-							<th>10p</th>
-							<th>10p</th>
-							<th>10p</th>
-							<th>10p</th>
-							<th>10p</th>
-							<th>10p</th>
-							<th>10p</th>
-							<th>10p</th>
-							<th>10p</th>
-							<th>10p</th>
-							<th>10p</th>
-							<th>10p</th>
-							<th>10p</th>
-							<th>10p</th>
-							<th>10p</th>
-							<th>8a</th>
+							{{#if this.timestamps.length}}
+								<th><div class="row-label"> {{displayDate this.timestamps.[0]}} </div></th>
+								{{#each this.timestamps as |timestamp timeIndex|}}
+									<th>{{displayHour timestamp}}</th>
+								{{/each}}
+							{{/if}}
 						</tr>
 					</thead>
 					<tbody>
-            {{#each this.anomalySummary.rows as |row rowIndex|}}
+            {{#each this.anomalySummary as |row rowIndex|}}
 						<tr class="bg-white">
                 <td><div>
                   <a href="#"><span class="metric-label">{{row.metricName}}</span></a>
                 </div></td>
                 {{#each row.data as |data dataIndex|}}
-                  <td><div class="box" box-anomaly>{{data}}</div></td>
+							    <td><div class="box {{#if data}}box-anomaly{{/if}}">{{data}}</div></td>
                 {{/each}}
 						</tr>
             {{/each}}
