@@ -117,6 +117,9 @@ public class CommonConstants {
           public static final String ZK_BROKER_URL = "kafka.zk.broker.url";
           public static final String KAFKA_BROKER_LIST = "kafka.broker.list";
 
+          // Consumer properties
+          public static final String AUTO_OFFSET_RESET = "auto.offset.reset";
+
           public static String getDecoderPropertyKeyFor(String key) {
             return StringUtils.join(new String[] { DECODER_PROPS_PREFIX, key }, ".");
           }

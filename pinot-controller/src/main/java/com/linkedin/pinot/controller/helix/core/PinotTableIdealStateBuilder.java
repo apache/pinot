@@ -213,7 +213,7 @@ public class PinotTableIdealStateBuilder {
     LOGGER.info("Assigning {} partitions to instances for simple consumer for table {}", nPartitions, realtimeTableName);
 
     segmentManager.setupHelixEntries(topicName, realtimeTableName, nPartitions, realtimeInstances, nReplicas,
-        kafkaMetadata.getKafkaConsumerProperties().get("auto.offset.reset"), kafkaMetadata.getBootstrapHosts(),
+        kafkaMetadata.getKafkaConsumerProperties().get(Helix.DataSource.Realtime.Kafka.AUTO_OFFSET_RESET), kafkaMetadata.getBootstrapHosts(),
         idealState, create);
   }
 

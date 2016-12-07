@@ -603,8 +603,9 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   private long getPartitionOffset(final String topicName, final String bootstrapHosts, final String offsetCriteria, int partitionId) {
-    SimpleConsumerWrapper kafkaConsumer = SimpleConsumerWrapper.forPartitionConsumption(new KafkaSimpleConsumerFactoryImpl(),
-        bootstrapHosts, "dummyClientId", topicName, partitionId, KAFKA_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
+    SimpleConsumerWrapper kafkaConsumer = SimpleConsumerWrapper.forPartitionConsumption(
+        new KafkaSimpleConsumerFactoryImpl(), bootstrapHosts, "dummyClientId", topicName, partitionId,
+        KAFKA_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
     final long startOffset;
     try {
       startOffset = kafkaConsumer.fetchPartitionOffset(offsetCriteria, KAFKA_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
@@ -639,7 +640,6 @@ public class PinotLLCRealtimeSegmentManager {
     final int nReplicas = partitionAssignment.getListField("0").size(); // Number of replicas of partition 0
 
     final int nSegments = segmentNames.size();
-    int curPartition = nonConsumingPartitions.get(0);
     // The segment names are sorted in reverse order, so we will have all the segments of the highest partition
     // first, and then the next partition, and so on. In each group, the highest sequence number will appear first.
     // The nonConsumingPartitions list is also sorted in reverse order.
@@ -648,21 +648,25 @@ public class PinotLLCRealtimeSegmentManager {
     // create a CONSUMING segment with STARTING_SEQUENCE_NUMER.
     // If we are done creating a CONSUMING segment for a partition, we remove it from the list of nonConsumingPartitions
     // and set curPartition to the next partition in the list.
-    for (int i = 0; i < nSegments; i++) {
-      final LLCSegmentName segmentName = segmentNames.get(i);
+    int segmentIndex = 0;
+    while (segmentIndex < nSegments && !nonConsumingPartitions.isEmpty()) {
+      final LLCSegmentName segmentName = segmentNames.get(segmentIndex);
       final int segmentPartitionId = segmentName.getPartitionId();
+      final int curPartition = nonConsumingPartitions.get(0);
       try {
         if (segmentPartitionId > curPartition) {
           // The partition we need to look for next is not this one, and could be down below in the list of segments.
           // We need to skip all the segments for higher partitions until we get to curPartition (or lower).
           // Be sure not to remove 'curPartition' from nonConsumingPartitions.
+          segmentIndex++;
           continue;
         } else if (segmentPartitionId < curPartition) {
           // We went past a partition that has no LLC segments. We can create one with STARTING_SEQUENCE_NUMBER
           int seqNum = STARTING_SEQUENCE_NUMBER;
           List<String> instances = partitionAssignment.getListField(Integer.toString(curPartition));
           LOGGER.info("Creating CONSUMING segment for {} partition {} with seq {}", realtimeTableName, curPartition, seqNum);
-          long startOffset = getPartitionOffset(kafkaStreamMetadata, "smallest", curPartition);
+          String consumerStartOffsetSpec = kafkaStreamMetadata.getKafkaConsumerProperties().get(CommonConstants.Helix.DataSource.Realtime.Kafka.AUTO_OFFSET_RESET);
+          long startOffset = getPartitionOffset(kafkaStreamMetadata, consumerStartOffsetSpec, curPartition);
           LOGGER.info("Found kafka offset {} for table {} for partition {}", startOffset, realtimeTableName, curPartition);
 
           createSegment(realtimeTableName, nReplicas, curPartition, seqNum, instances, startOffset);
@@ -673,8 +677,14 @@ public class PinotLLCRealtimeSegmentManager {
           LOGGER.info("Creating CONSUMING segment for {} partition {} with seq {}", realtimeTableName, curPartition, nextSeqNum);
           long startOffset = getPartitionOffset(kafkaStreamMetadata, "smallest", curPartition);
           LOGGER.info("Found kafka offset {} for table {} for partition {}", startOffset, realtimeTableName, curPartition);
-
+          final LLCRealtimeSegmentZKMetadata oldSegMetadata = getRealtimeSegmentZKMetadata(realtimeTableName,
+              segmentName.getSegmentName());
+          if (startOffset < oldSegMetadata.getEndOffset()) {
+            startOffset = oldSegMetadata.getEndOffset();
+            LOGGER.info("Choosing newer kafka offset {} for table {} for partition {}", startOffset, realtimeTableName, curPartition);
+          }
           createSegment(realtimeTableName, nReplicas, curPartition, nextSeqNum, instances, startOffset);
+          segmentIndex++;
         }
       } catch (Exception e) {
         LOGGER.error("Exception creating CONSUMING segment for {} partition {}", realtimeTableName, curPartition, e);
@@ -682,10 +692,6 @@ public class PinotLLCRealtimeSegmentManager {
       // We land here only if we have created a CONSUMING segment for 'curPartition'. Remove it from the list, and go on
       // to the next partition (if there is one);
       nonConsumingPartitions.remove(0);
-      if (nonConsumingPartitions.isEmpty()) {
-        break;
-      }
-      curPartition = nonConsumingPartitions.get(0);
     }
   }
 
