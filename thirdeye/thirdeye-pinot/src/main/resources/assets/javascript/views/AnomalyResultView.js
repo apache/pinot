@@ -27,7 +27,7 @@ function AnomalyResultView(anomalyResultModel) {
 
   // Compile HTML template
   var anomalies_template = $("#anomalies-template").html();
-  this.result_anomalies_template_compiled = Handlebars.compile(anomalies_template);
+  this.anomalies_template_compiled = Handlebars.compile(anomalies_template);
 }
 
 AnomalyResultView.prototype = {
@@ -68,7 +68,8 @@ AnomalyResultView.prototype = {
     console.log("anomalies");
     console.log(anomalies);
 
-    $("#anomalies-place-holder").html(this.result_anomalies_template_compiled);
+    var result_anomalies_template_compiled = this.anomalies_template_compiled(anomalies);
+    $("#anomalies-place-holder").html(result_anomalies_template_compiled);
     this.renderAnomaliesTab(anomalies);
   },
 
@@ -76,24 +77,30 @@ AnomalyResultView.prototype = {
     for (var i = 0; i < anomalies.length; i++) {
       var anomaly = anomalies[i];
       console.log(anomaly);
+
+      var currentRange = anomaly.currentStart + " - " + anomaly.currentEnd;
+      var baselineRange = anomaly.baselineStart + " - " + anomaly.baselineEnd;
+      $("#current-range-"+i).html(currentRange);
+      $("#baseline-range-"+i).html(baselineRange);
+
       var date = ['date'].concat(anomaly.dates);
-      var current = ['current'].concat(anomaly.currentValues);
-      var baseline = ['baseline'].concat(anomaly.baselineValues);
-      var chartColumns = [ date, current, baseline];
-      var regionStart = anomaly.anomalyRegionStart;
-      var regionEnd = anomaly.anomalyRegionEnd;
-      var current = anomaly.current;
-      var baseline = anomaly.baseline;
-      var dimension = anomaly.anomalyFunctionDimension;
-      console.log(date);
-      console.log(current);
-      console.log(baseline);
+      var currentValues = ['current'].concat(anomaly.currentValues);
+      var baselineValues = ['baseline'].concat(anomaly.baselineValues);
+      var chartColumns = [ date, currentValues, baselineValues];
       console.log(chartColumns);
 
+      var regionStart = anomaly.anomalyRegionStart;
+      var regionEnd = anomaly.anomalyRegionEnd;
+      $("#region-"+i).html(regionStart + " - " + regionEnd)
+
+      var current = anomaly.current;
+      var baseline = anomaly.baseline;
       $("#current-value-"+i).html(current);
       $("#baseline-value-"+i).html(baseline);
-      $("#region-"+i).html(regionStart + " - " + regionEnd)
+
+      var dimension = anomaly.anomalyFunctionDimension;
       $("#dimension-"+i).html(dimension)
+
 
       // CHART GENERATION
       var chart = c3.generate({
