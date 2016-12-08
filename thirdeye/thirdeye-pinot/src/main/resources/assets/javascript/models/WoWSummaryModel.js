@@ -1,31 +1,54 @@
 function WoWSummaryModel() {
-  this.metricName = "MyMetric"
-  this.dashboardName = "100 Most Recent Anomalies";
   this.startTime = moment().subtract(7, "days");
   this.endTime = moment();
-  this.mode = "WoWSummary";
-  //this.anomalySummaryResult = { {"metricA": [0,1,2,0,0,0,0,1,2,0,0,0,0,1,2,0,0,0,0,1,2,0,0,0]},{"metricB": [0,1,2,0,0,0,0,1,2,0,0,0,0,1,2,0,0,0,0,1,2,0,0,0]},{"metricC": [0,1,2,0,0,0,0,1,2,0,0,0,0,1,2,0,0,0,0,1,2,0,0,0]}}
-  this.woWSummaryResult = {};
+  this.timestamps = [];
+  this.wowSummary = [];
 }
 
 WoWSummaryModel.prototype = {
 
   init : function(params) {
-    if (params.dashboardName) {
-      this.dashboardName = params.dashboardName;
-    }
     if (params.startTime) {
       this.startTime = params.startTime;
     }
-    if (params.dashboardName) {
+    if (params.endTime) {
       this.endTime = params.endTime;
     }
-    if (params.dashboardName) {
-      this.dashboardViewMode = params.dashboardViewMode;
-    }
+    this.buildSampleData();
   },
   rebuild : function() {
     // TODO: fetch relevant data from backend
-  }
+  },
+  buildSampleData: function() {
+    var row1 = new WoWSummaryRow();
+    row1.metricName = "metricD";
+    row1.data = [0,0.1,0.2,0,0,0,0,0.1,0.2,0,0,0,0,0.1,0.2,0,0,0,0,0.1,0.2,0,0,0];
 
+    var row2 = new WoWSummaryRow();
+    row2.metricName = "metricE";
+    row2.data = [0,0.1,0.2,0,0,0,0,0.1,0.2,0,0,0,0,0.1,0.2,0,0,0,0,0.1,0.2,0,0,0];
+
+    var row3 = new WoWSummaryRow();
+    row3.metricName = "metricF";
+    row3.data = [0,0.1,0.2,0,0,0,0,0.1,0.2,0,0,0,0,0.1,0.2,0,0,0,0,0.1,0.2,0,0,0];
+
+    this.wowSummary = [];
+    this.wowSummary.push(row1);
+    this.wowSummary.push(row2);
+    this.wowSummary.push(row3);
+
+    this.timestamps = [];
+    var time = moment(this.endTime).subtract(24, 'hours');
+    for (var i = 0; i < 24; ++i) {
+      var date = new Date(time);
+      this.timestamps.push(date);
+      time.add(1, 'hours');
+    }
+  }
+};
+
+function WoWSummaryRow() {
+  this.metricName = "N/A";
+  this.timeGranularity = "HOURS";
+  this.data = [];
 }

@@ -10,6 +10,5 @@ WoWSummaryView.prototype = {
   render : function() {
     var result = this.template_compiled(this.woWSummaryModel);
     $(this.placeHolderId).html(result);
-    console.log(document.URL);
   }
 }

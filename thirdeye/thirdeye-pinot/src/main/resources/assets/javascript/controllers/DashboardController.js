@@ -47,14 +47,10 @@ DashboardController.prototype = {
 
   hideDataRangePickerEventHandler: function(sender, args) {
     var dataRangePicker = args.dataRangePicker;
-    console.log(this.dashboardModel.getStartTime());
     if (this.dashboardModel.getStartTime() != dataRangePicker.startDate ||
         this.dashboardModel.getEndTime() != dataRangePicker.endDate) {
       this.dashboardModel.setStartTime(dataRangePicker.startDate);
       this.dashboardModel.setEndTime(dataRangePicker.endDate);
-      console.log("Date changed:");
-      console.log(this.dashboardModel.getStartTime());
-      console.log(this.dashboardModel.getEndTime());
 
       if (this.dashboardModel.mode == "AnomalySummary") {
         this.anomalySummaryController.handleAppEvent(this.dashboardModel.hashParams);
