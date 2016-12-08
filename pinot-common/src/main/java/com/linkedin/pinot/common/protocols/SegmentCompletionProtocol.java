@@ -142,7 +142,7 @@ public class SegmentCompletionProtocol {
         PARAM_SEGMENT_NAME + "=" + _segmentName + "&" +
         PARAM_OFFSET + "=" + _offset + "&" +
         PARAM_INSTANCE_ID + "=" + _instanceId +
-        _reason == null ? "" : ("&" + PARAM_REASON + "=" + _reason);
+          (_reason == null ? "" : ("&" + PARAM_REASON + "=" + _reason));
     }
   }
 

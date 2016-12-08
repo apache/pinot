@@ -126,7 +126,7 @@ public class SegmentCompletionManager {
           fsm = SegmentCompletionFSM.fsmStoppedConsuming(_segmentManager, this, segmentName,
               segmentMetadata.getNumReplicas());
         } else {
-          // Segment is finalizing, and this is the first one to respond. Create an entry
+          // Segment is in the process of completing, and this is the first one to respond. Create fsm
           fsm = SegmentCompletionFSM.fsmInHolding(_segmentManager, this, segmentName, segmentMetadata.getNumReplicas());
         }
         LOGGER.info("Created FSM {}", fsm);

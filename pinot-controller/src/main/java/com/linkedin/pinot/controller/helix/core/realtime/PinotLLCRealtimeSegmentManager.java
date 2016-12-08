@@ -730,8 +730,13 @@ public class PinotLLCRealtimeSegmentManager {
     return newSegMetadata.toZNRecord();
   }
 
-  // An instance is reporting that it has stopped consuming a kafka topic due to some error.
-  // Mark the state of the segment to be OFFLINE in idealstate.
+  /**
+   * An instance is reporting that it has stopped consuming a kafka topic due to some error.
+   * Mark the state of the segment to be OFFLINE in idealstate.
+   * When all replicas of this segment are marked offline, the ValidationManager, in its next
+   * run, will auto-create a new segment with the appropriate offset.
+   * See {@link #createConsumingSegment(String, List, List, KafkaStreamMetadata)}
+  */
   public void segmentStoppedConsuming(final LLCSegmentName segmentName, final String instance) {
     String rawTableName = segmentName.getTableName();
     String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(rawTableName);
@@ -746,6 +751,6 @@ public class PinotLLCRealtimeSegmentManager {
         return idealState;
       }
     }, RetryPolicies.exponentialBackoffRetryPolicy(5, 500L, 2.0f));
-    LOGGER.info("Successfully marked {} offline", segmentNameStr);
+    LOGGER.info("Successfully marked {} offline for instance {} since it stopped consuming", segmentNameStr, instance);
   }
 }
