@@ -50,7 +50,7 @@ public class AggregationOperator extends BaseOperator {
    * @param numTotalRawDocs Number of total raw documents.
    */
   public AggregationOperator(List<AggregationInfo> aggregationsInfoList, AggregationExecutor executor,
-      MProjectionOperator projectionOperator,long numTotalRawDocs) {
+      MProjectionOperator projectionOperator, long numTotalRawDocs) {
     Preconditions.checkArgument((aggregationsInfoList != null) && (aggregationsInfoList.size() > 0));
     Preconditions.checkNotNull(executor);
     Preconditions.checkNotNull(projectionOperator);
