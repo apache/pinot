@@ -1,0 +1,7 @@
+function DataService() {
+
+}
+DataService.prototype = {
+
+
+};
