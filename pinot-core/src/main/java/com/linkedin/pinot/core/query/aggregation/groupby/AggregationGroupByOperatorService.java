@@ -34,6 +34,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import javax.annotation.Nonnull;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -243,9 +244,20 @@ public class AggregationGroupByOperatorService {
     return aggregationResults;
   }
 
-  private Serializable formatValue(Serializable value) {
-    return (value instanceof Float || value instanceof Double) ? String.format(Locale.US, "%1.5f", value)
-        : value.toString();
+  /**
+   * Format the {@link Serializable} value into {@link String}.
+   * <p>For {@link Double} value, format it into the form ###################0.0#########.
+   *
+   * @param value value to be formatted.
+   * @return formatted value.
+   */
+  @Nonnull
+  public static String formatValue(@Nonnull Serializable value) {
+    if (value instanceof Double) {
+      return String.format(Locale.US, "%1.5f", (Double) value);
+    } else {
+      return value.toString();
+    }
   }
 
   /**

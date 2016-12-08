@@ -15,30 +15,46 @@
  */
 package com.linkedin.pinot.common.query;
 
-import java.util.Map;
-
+import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.response.BrokerResponse;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.utils.DataTable;
+import java.util.Map;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import javax.annotation.concurrent.ThreadSafe;
 
 
 /**
  * Interface for merging/reducing responses from a set of servers.
- * @param <T>
+ * @param <T> type of broker response.
  */
+@ThreadSafe
 public interface ReduceService<T extends BrokerResponse> {
-  /**
-   * Reduce instanceResponses gathered from server instances to one brokerResponse.
-   * ServerInstance would be helpful in debug mode
-   * All the implementations should be thread safe.
-   *
-   *
-   * @param brokerRequest
-   * @param instanceResponseMap
-   * @return T extends BrokerResponse
-   */
-  public T reduceOnDataTable(BrokerRequest brokerRequest,
-      Map<ServerInstance, DataTable> instanceResponseMap);
 
+  /**
+   * Reduce data tables gathered from server instances to one brokerResponse.
+   * <p>Server instance information here is useful for debugging purpose.
+   *
+   * @param brokerRequest broker request.
+   * @param instanceResponseMap map from server instance to data table.
+   * @return broker response.
+   */
+  @Nonnull
+  T reduceOnDataTable(@Nonnull BrokerRequest brokerRequest,
+      @Nonnull Map<ServerInstance, DataTable> instanceResponseMap);
+
+  /**
+   * Reduce data tables gathered from server instances to one brokerResponse.
+   * <p>Server instance information here is useful for debugging purpose.
+   *
+   * @param brokerRequest broker request.
+   * @param instanceResponseMap map from server instance to data table.
+   * @param brokerMetrics broker metrics to track execution statistics.
+   * @return broker response.
+   */
+  @Nonnull
+  T reduceOnDataTable(@Nonnull BrokerRequest brokerRequest, @Nonnull Map<ServerInstance, DataTable> instanceResponseMap,
+      @Nullable BrokerMetrics brokerMetrics);
 }

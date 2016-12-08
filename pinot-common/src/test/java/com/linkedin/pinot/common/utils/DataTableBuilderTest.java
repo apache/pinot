@@ -51,9 +51,9 @@ public class DataTableBuilderTest {
     dataTable.addException(processingException);
     byte[] bytes = dataTable.toBytes();
     DataTable desDataTable = new DataTable(bytes);
-    String exceptionMsg =
-        desDataTable.getMetadata().get("Exception" + QueryException.EXECUTION_TIMEOUT_ERROR.getErrorCode());
-    org.testng.Assert.assertEquals(exceptionMsg, exception.toString());
+    String exceptionMsg = desDataTable.getMetadata()
+        .get(DataTable.EXCEPTION_METADATA_KEY + QueryException.EXECUTION_TIMEOUT_ERROR.getErrorCode());
+    Assert.assertEquals(exceptionMsg, exception.toString());
   }
 
   @Test
@@ -370,10 +370,10 @@ public class DataTableBuilderTest {
     map.put("2358\tmember\t2", 9.0);
     builder.setColumn(1, map);
     builder.finishRow();
-    builder.addMetaData("timeUsedMs", "18");
-    builder.addMetaData("requestId", "3");
-    builder.addMetaData("totalDocs", "1001049811");
-    builder.addMetaData("numDocsScanned", "25");
+    builder.addMetaData(DataTable.TIME_USED_MS_METADATA_KEY, "18");
+    builder.addMetaData(DataTable.REQUEST_ID_METADATA_KEY, "3");
+    builder.addMetaData(DataTable.TOTAL_DOCS_METADATA_KEY, "1001049811");
+    builder.addMetaData(DataTable.NUM_DOCS_SCANNED_METADATA_KEY, "25");
     builder.seal();
     DataTable dataTable = builder.build();
     byte[] bytes = dataTable.toBytes();

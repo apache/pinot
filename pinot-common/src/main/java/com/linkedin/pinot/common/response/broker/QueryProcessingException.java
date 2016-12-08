@@ -22,14 +22,15 @@ import org.codehaus.jackson.annotate.JsonProperty;
  * This class represents an exception using a message and an error code.
  */
 public class QueryProcessingException {
-  private String _message;
   private int _errorCode;
+  private String _message;
 
   public QueryProcessingException() {
   }
 
-  public QueryProcessingException(int errorCode) {
+  public QueryProcessingException(int errorCode, String message) {
     _errorCode = errorCode;
+    _message = message;
   }
 
   @JsonProperty("errorCode")

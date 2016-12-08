@@ -43,6 +43,10 @@ import org.json.JSONObject;
 public class BrokerResponseNative implements BrokerResponse {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
+  public static final BrokerResponseNative EMPTY_RESULT = BrokerResponseNative.empty();
+  public static final BrokerResponseNative NO_TABLE_RESULT =
+      new BrokerResponseNative(QueryException.BROKER_RESOURCE_MISSING_ERROR);
+
   private long _numDocsScanned = 0L;
   private long _numEntriesScannedInFilter = 0L;
   private long _numEntriesScannedPostFilter = 0L;
@@ -52,32 +56,60 @@ public class BrokerResponseNative implements BrokerResponse {
   private SelectionResults _selectionResults;
   private List<AggregationResult> _aggregationResults;
 
-  private Map<String, String> _traceInfo;
-  private List<QueryProcessingException> _processingExceptions;
-  private List<String> _segmentStatistics;
-
-  public static final BrokerResponseNative EMPTY_RESULT;
-  public static final BrokerResponseNative NO_TABLE_RESULT;
-
-  static {
-    EMPTY_RESULT = new BrokerResponseNative();
-    EMPTY_RESULT.setTimeUsedMs(0);
-
-    NO_TABLE_RESULT = new BrokerResponseNative();
-    NO_TABLE_RESULT.setTimeUsedMs(0);
-
-    List<ProcessingException> processingExceptions = new ArrayList<ProcessingException>();
-    ProcessingException exception = QueryException.BROKER_RESOURCE_MISSING_ERROR.deepCopy();
-    exception.setMessage("No table hit!");
-
-    processingExceptions.add(exception);
-    NO_TABLE_RESULT.setExceptions(processingExceptions);
-  }
+  private Map<String, String> _traceInfo = new HashMap<>();
+  private List<QueryProcessingException> _processingExceptions = new ArrayList<>();
+  private List<String> _segmentStatistics = new ArrayList<>();
 
   public BrokerResponseNative() {
-    _traceInfo = new HashMap<String, String>();
-    _processingExceptions = new ArrayList<QueryProcessingException>();
-    _segmentStatistics = new ArrayList<String>();
+  }
+
+  public BrokerResponseNative(ProcessingException exception) {
+    _processingExceptions.add(new QueryProcessingException(exception.getErrorCode(), exception.getMessage()));
+  }
+
+  public BrokerResponseNative(List<ProcessingException> exceptions) {
+    for (ProcessingException exception : exceptions) {
+      _processingExceptions.add(new QueryProcessingException(exception.getErrorCode(), exception.getMessage()));
+    }
+  }
+
+  /**
+   * Get a new empty {@link BrokerResponseNative}.
+   */
+  public static BrokerResponseNative empty() {
+    return new BrokerResponseNative();
+  }
+
+  @JsonProperty("selectionResults")
+  @JsonSerialize(include = JsonSerialize.Inclusion.NON_NULL)
+  public SelectionResults getSelectionResults() {
+    return _selectionResults;
+  }
+
+  @JsonProperty("selectionResults")
+  public void setSelectionResults(SelectionResults selectionResults) {
+    _selectionResults = selectionResults;
+  }
+
+  @JsonProperty("aggregationResults")
+  @JsonSerialize(include = JsonSerialize.Inclusion.NON_NULL)
+  public List<AggregationResult> getAggregationResults() {
+    return _aggregationResults;
+  }
+
+  @JsonProperty("aggregationResults")
+  public void setAggregationResults(List<AggregationResult> aggregationResults) {
+    _aggregationResults = aggregationResults;
+  }
+
+  @JsonProperty("exceptions")
+  public List<QueryProcessingException> getProcessingExceptions() {
+    return _processingExceptions;
+  }
+
+  @JsonProperty("exceptions")
+  public void setProcessingExceptions(List<QueryProcessingException> processingExceptions) {
+    _processingExceptions = processingExceptions;
   }
 
   @JsonProperty("numDocsScanned")
@@ -91,6 +123,7 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("numEntriesScannedInFilter")
+  @Override
   public long getNumEntriesScannedInFilter() {
     return _numEntriesScannedInFilter;
   }
@@ -101,6 +134,7 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("numEntriesScannedPostFilter")
+  @Override
   public long getNumEntriesScannedPostFilter() {
     return _numEntriesScannedPostFilter;
   }
@@ -111,6 +145,7 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @JsonProperty("totalDocs")
+  @Override
   public long getTotalDocs() {
     return _totalDocs;
   }
@@ -131,27 +166,14 @@ public class BrokerResponseNative implements BrokerResponse {
     _timeUsedMs = timeUsedMs;
   }
 
-  @JsonProperty("selectionResults")
-  public void setSelectionResults(SelectionResults selectionResults) {
-    _selectionResults = selectionResults;
+  @JsonProperty("segmentStatistics")
+  public List<String> getSegmentStatistics() {
+    return _segmentStatistics;
   }
 
-  @JsonProperty("aggregationResults")
-  @JsonSerialize(include = JsonSerialize.Inclusion.NON_NULL)
-  public void setAggregationResults(List<AggregationResult> aggregationResults) {
-    _aggregationResults = aggregationResults;
-  }
-
-  @JsonProperty("selectionResults")
-  @JsonSerialize(include = JsonSerialize.Inclusion.NON_NULL)
-  public SelectionResults getSelectionResults() {
-    return _selectionResults;
-  }
-
-  @JsonProperty("aggregationResults")
-  @JsonSerialize(include = JsonSerialize.Inclusion.NON_NULL)
-  public List<AggregationResult> getAggregationResults() {
-    return _aggregationResults;
+  @JsonProperty("segmentStatistics")
+  public void setSegmentStatistics(List<String> segmentStatistics) {
+    _segmentStatistics = segmentStatistics;
   }
 
   @JsonProperty("traceInfo")
@@ -164,26 +186,7 @@ public class BrokerResponseNative implements BrokerResponse {
     _traceInfo = traceInfo;
   }
 
-  @JsonProperty("exceptions")
-  public List<QueryProcessingException> getProcessingExceptions() {
-    return _processingExceptions;
-  }
-
-  @JsonProperty("exceptions")
-  public void setProcessingExceptions(List<QueryProcessingException> processingExceptions) {
-    _processingExceptions = processingExceptions;
-  }
-
-  @JsonProperty("segmentStatistics")
-  public List<String> getSegmentStatistics() {
-    return _segmentStatistics;
-  }
-
-  @JsonProperty("segmentStatistics")
-  public void setSegmentStatistics(List<String> segmentStatistics) {
-    _segmentStatistics = segmentStatistics;
-  }
-
+  @Override
   public String toJsonString()
       throws IOException {
     return OBJECT_MAPPER.writeValueAsString(this);
@@ -209,21 +212,18 @@ public class BrokerResponseNative implements BrokerResponse {
   @JsonIgnore
   @Override
   public void setExceptions(List<ProcessingException> exceptions) {
-    for (com.linkedin.pinot.common.response.ProcessingException exception : exceptions) {
-      QueryProcessingException processingException = new QueryProcessingException();
-      processingException.setErrorCode(exception.getErrorCode());
-      processingException.setMessage(exception.getMessage());
-      _processingExceptions.add(processingException);
+    for (ProcessingException exception : exceptions) {
+      _processingExceptions.add(new QueryProcessingException(exception.getErrorCode(), exception.getMessage()));
     }
+  }
+
+  public void addToExceptions(QueryProcessingException processingException) {
+    _processingExceptions.add(processingException);
   }
 
   @JsonIgnore
   @Override
   public int getExceptionsSize() {
     return _processingExceptions.size();
-  }
-
-  public void addToExceptions(QueryProcessingException processingException) {
-    _processingExceptions.add(processingException);
   }
 }

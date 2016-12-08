@@ -33,9 +33,9 @@ public class DataTableTest {
     dataTable.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
     final long execTimeMs = 243;
     final long requestId = 0xfeedbeef;
-    dataTable.getMetadata().put("timeUsedMs", Long.toString((execTimeMs)));
-    dataTable.getMetadata().put("requestId", Long.toString(requestId));
-    dataTable.getMetadata().put("traceInfo", "false");
+    dataTable.getMetadata().put(DataTable.TIME_USED_MS_METADATA_KEY, Long.toString((execTimeMs)));
+    dataTable.getMetadata().put(DataTable.REQUEST_ID_METADATA_KEY, Long.toString(requestId));
+    dataTable.getMetadata().put(DataTable.TRACE_INFO_METADATA_KEY, "false");
 
     byte[] dataTableBytes = dataTable.toBytes();
 
