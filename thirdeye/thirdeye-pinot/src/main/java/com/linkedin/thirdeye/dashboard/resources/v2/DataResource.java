@@ -36,21 +36,21 @@ import org.apache.commons.lang3.StringUtils;
 public class DataResource {
   public static final DAORegistry daoRegistry = DAORegistry.getInstance();
 
-  private final MetricConfigManager metricConfigManager;
-  private final DatasetConfigManager datasetConfigManager;
-  private final DashboardConfigManager dashboardConfigManager;
+  private final MetricConfigManager metricConfigDAO;
+  private final DatasetConfigManager datasetConfigDAOr;
+  private final DashboardConfigManager dashboardConfigDAO;
 
   public DataResource() {
-    metricConfigManager = daoRegistry.getMetricConfigDAO();
-    datasetConfigManager = daoRegistry.getDatasetConfigDAO();
-    dashboardConfigManager = daoRegistry.getDashboardConfigDAO();
+    metricConfigDAO = daoRegistry.getMetricConfigDAO();
+    datasetConfigDAOr = daoRegistry.getDatasetConfigDAO();
+    dashboardConfigDAO = daoRegistry.getDashboardConfigDAO();
   }
 
   //------------- endpoints to fetch summary -------------
   @GET
   @Path("summary/metrics/{dataset}")
-  public List<String> getMatricNames(@PathParam("dataset") String dataset) {
-      List<MetricConfigDTO> metrics = metricConfigManager.findActiveByDataset(dataset);
+  public List<String> getMetricNames(@PathParam("dataset") String dataset) {
+      List<MetricConfigDTO> metrics = metricConfigDAO.findActiveByDataset(dataset);
       List<String> metricsNames = new ArrayList<>();
       for (MetricConfigDTO metricConfigDTO : metrics) {
         metricsNames.add(metricConfigDTO.getName());
@@ -66,7 +66,7 @@ public class DataResource {
 
   @GET
   @Path("maxtime/{dataset}")
-  public Map<String, Long> getMatricMaxDataTime(@PathParam("dataset") String dataset) {
+  public Map<String, Long> getMetricMaxDataTime(@PathParam("dataset") String dataset) {
     return null;
   }
 
@@ -82,12 +82,12 @@ public class DataResource {
     // TODO: add pagination support through out the data managers
     List<MetricConfigDTO> output = new ArrayList<>();
     if (StringUtils.isEmpty(dataset)) {
-      output.addAll(metricConfigManager.findAll());
+      output.addAll(metricConfigDAO.findAll());
     } else {
       if (StringUtils.isNotEmpty(metric)) {
-        output.addAll(metricConfigManager.findActiveByDataset(dataset));
+        output.addAll(metricConfigDAO.findActiveByDataset(dataset));
       } else {
-        output.add(metricConfigManager.findByMetricAndDataset(metric, dataset));
+        output.add(metricConfigDAO.findByMetricAndDataset(metric, dataset));
       }
     }
     return output;
@@ -96,7 +96,14 @@ public class DataResource {
   @GET
   @Path("metric/{id}")
   public MetricConfigDTO getMetricById(@PathParam("id") Long id) {
-    return metricConfigManager.findById(id);
+    return metricConfigDAO.findById(id);
+  }
+
+  @GET
+  @Path("metrics/{name}")
+  public List<MetricConfigDTO> getMetricsWhereNameLike(@PathParam("name") Long name) {
+    List<MetricConfigDTO> metricConfigs = metricConfigDAO.findByNameLike("%" + name + "%");
+    return metricConfigs;
   }
 
   // dataset end points
@@ -112,13 +119,13 @@ public class DataResource {
   @GET
   @Path("dataset/{id}")
   public DatasetConfigDTO getDatasetById(@PathParam("id") Long id) {
-    return datasetConfigManager.findById(id);
+    return datasetConfigDAOr.findById(id);
   }
 
   @GET
   @Path("dataset")
   public DatasetConfigDTO getDatasetByName(@QueryParam("dataset") String dataset) {
-    return datasetConfigManager.findByDataset(dataset);
+    return datasetConfigDAOr.findByDataset(dataset);
   }
 
   @GET
