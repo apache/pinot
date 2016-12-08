@@ -37,12 +37,12 @@ public class DataResource {
   public static final DAORegistry daoRegistry = DAORegistry.getInstance();
 
   private final MetricConfigManager metricConfigDAO;
-  private final DatasetConfigManager datasetConfigDAOr;
+  private final DatasetConfigManager datasetConfigDAO;
   private final DashboardConfigManager dashboardConfigDAO;
 
   public DataResource() {
     metricConfigDAO = daoRegistry.getMetricConfigDAO();
-    datasetConfigDAOr = daoRegistry.getDatasetConfigDAO();
+    datasetConfigDAO = daoRegistry.getDatasetConfigDAO();
     dashboardConfigDAO = daoRegistry.getDashboardConfigDAO();
   }
 
@@ -99,9 +99,10 @@ public class DataResource {
     return metricConfigDAO.findById(id);
   }
 
+
   @GET
   @Path("metrics/{name}")
-  public List<MetricConfigDTO> getMetricsWhereNameLike(@PathParam("name") Long name) {
+  public List<MetricConfigDTO> getMetricsWhereNameLike(@PathParam("name") String name) {
     List<MetricConfigDTO> metricConfigs = metricConfigDAO.findByNameLike("%" + name + "%");
     return metricConfigs;
   }
@@ -119,13 +120,13 @@ public class DataResource {
   @GET
   @Path("dataset/{id}")
   public DatasetConfigDTO getDatasetById(@PathParam("id") Long id) {
-    return datasetConfigDAOr.findById(id);
+    return datasetConfigDAO.findById(id);
   }
 
   @GET
   @Path("dataset")
   public DatasetConfigDTO getDatasetByName(@QueryParam("dataset") String dataset) {
-    return datasetConfigDAOr.findByDataset(dataset);
+    return datasetConfigDAO.findByDataset(dataset);
   }
 
   @GET
