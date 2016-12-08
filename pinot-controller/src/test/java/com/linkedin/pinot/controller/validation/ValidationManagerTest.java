@@ -22,26 +22,25 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.IdealState;
-import org.apache.helix.store.HelixPropertyStore;
 import org.joda.time.DateTime;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
+import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.metrics.ValidationMetrics;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.StarTreeMetadata;
@@ -59,8 +58,10 @@ import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegment
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.startree.hll.HllConstants;
-import com.yammer.metrics.core.MetricsRegistry;
 import javax.annotation.Nullable;
+import static org.mockito.Matchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 
 /**
@@ -78,6 +79,7 @@ public class ValidationManagerTest {
 
   private PinotHelixResourceManager _pinotHelixResourceManager;
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
+  private PinotLLCRealtimeSegmentManager _segmentManager;
 
   @BeforeTest
   public void setUp() throws Exception {
@@ -87,8 +89,13 @@ public class ValidationManagerTest {
     _pinotHelixResourceManager =
         new PinotHelixResourceManager(ZK_STR, HELIX_CLUSTER_NAME, CONTROLLER_INSTANCE_NAME, null, 1000L, true, /*isUpdateStateModel=*/false);
     _pinotHelixResourceManager.start();
-    PinotLLCRealtimeSegmentManager.create(_pinotHelixResourceManager, new ControllerConf(),
-        new ControllerMetrics(new MetricsRegistry()));
+  }
+
+  private void makeMockPinotLLCRealtimeSegmentManager(ZNRecord kafkaPartitionAssignment) {
+    _segmentManager = mock(PinotLLCRealtimeSegmentManager.class);
+    Mockito.doNothing().when(_segmentManager).updateKafkaPartitionsIfNecessary(Mockito.any(String.class),
+        Mockito.any(AbstractTableConfig.class));
+    when(_segmentManager.getKafkaPartitionAssignment(anyString())).thenReturn(kafkaPartitionAssignment);
   }
 
   @Test
@@ -344,15 +351,13 @@ public class ValidationManagerTest {
     final String S2 = "S2"; // Server 2
     final String S3 = "S3"; // Server 3
     final List<String> hosts = Arrays.asList(new String[]{S1, S2, S3});
-    final HelixPropertyStore propertyStore = _pinotHelixResourceManager.getPropertyStore();
     final HelixAdmin helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
 
     ZNRecord znRecord = new ZNRecord(topicName);
     for (int i = 0; i < kafkaPartitionCount; i++) {
       znRecord.setListField(Integer.toString(i), hosts);
     }
-    final String path = ZKMetadataProvider.constructPropertyStorePathForKafkaPartitions(realtimeTableName);
-    propertyStore.set(path, znRecord, AccessOption.PERSISTENT);
+    makeMockPinotLLCRealtimeSegmentManager(znRecord);
 
     long msSinceEpoch = 1540;
 
@@ -361,7 +366,7 @@ public class ValidationManagerTest {
     LLCSegmentName p1s0 = new LLCSegmentName(tableName, 1, 0, msSinceEpoch);
     LLCSegmentName p1s1 = new LLCSegmentName(tableName, 1, 1, msSinceEpoch);
 
-    IdealState idealstate = PinotTableIdealStateBuilder.buildEmptyIdealStateFor(realtimeTableName, 3, helixAdmin, HELIX_CLUSTER_NAME);
+    IdealState idealstate = PinotTableIdealStateBuilder.buildEmptyIdealStateFor(realtimeTableName, 3);
     idealstate.setPartitionState(p0s0.getSegmentName(), S1, PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
     idealstate.setPartitionState(p0s0.getSegmentName(), S2, PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
     idealstate.setPartitionState(p0s0.getSegmentName(), S3, PinotHelixSegmentOnlineOfflineStateModelGenerator.ONLINE_STATE);
@@ -378,17 +383,20 @@ public class ValidationManagerTest {
 
     FakeValidationMetrics validationMetrics = new FakeValidationMetrics();
 
-    ValidationManager validationManager = new ValidationManager(validationMetrics, _pinotHelixResourceManager, new ControllerConf());
+    ValidationManager validationManager = new ValidationManager(validationMetrics, _pinotHelixResourceManager, new ControllerConf(),
+        _segmentManager);
     Map<String, String> streamConfigs = new HashMap<String, String>(4);
     streamConfigs.put(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
         CommonConstants.Helix.DataSource.Realtime.Kafka.CONSUMER_TYPE), "highLevel,simple");
-//    streamConfigs.put(StringUtil.join(".", CommonConstants.Helix.DataSource.STREAM_PREFIX,
-//        CommonConstants.Helix.DataSource.Realtime.Kafka.KAFKA_CONSUMER_PROPS_PREFIX,
-//        "auto.offset.reset"), "smallest");
     Field autoCreateOnError = ValidationManager.class.getDeclaredField("_autoCreateOnError");
     autoCreateOnError.setAccessible(true);
     autoCreateOnError.setBoolean(validationManager, false);
-    validationManager.validateLLCSegments(realtimeTableName, streamConfigs);
+    AbstractTableConfig tableConfig = mock(AbstractTableConfig.class);
+    IndexingConfig indexingConfig = mock(IndexingConfig.class);
+    when(tableConfig.getIndexingConfig()).thenReturn(indexingConfig);
+    when(indexingConfig.getStreamConfigs()).thenReturn(streamConfigs);
+
+    validationManager.validateLLCSegments(realtimeTableName, tableConfig);
 
     Assert.assertEquals(validationMetrics.partitionCount, 1);
 
@@ -402,7 +410,7 @@ public class ValidationManagerTest {
     idealstate.setPartitionState(p0s1.getSegmentName(), S3,
         PinotHelixSegmentOnlineOfflineStateModelGenerator.OFFLINE_STATE);
     helixAdmin.addResource(HELIX_CLUSTER_NAME, realtimeTableName, idealstate);
-    validationManager.validateLLCSegments(realtimeTableName, streamConfigs);
+    validationManager.validateLLCSegments(realtimeTableName, tableConfig);
     Assert.assertEquals(validationMetrics.partitionCount, 0);
 
     helixAdmin.dropResource(HELIX_CLUSTER_NAME, realtimeTableName);

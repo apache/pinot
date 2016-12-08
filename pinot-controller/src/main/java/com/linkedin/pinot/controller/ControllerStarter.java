@@ -66,9 +66,9 @@ public class ControllerStarter {
     helixResourceManager = new PinotHelixResourceManager(config);
     retentionManager = new RetentionManager(helixResourceManager, config.getRetentionControllerFrequencyInSeconds());
     _metricsRegistry = new MetricsRegistry();
-    ValidationMetrics validationMetrics = new ValidationMetrics(_metricsRegistry);
-    validationManager = new ValidationManager(validationMetrics, helixResourceManager, config);
     realtimeSegmentsManager = new PinotRealtimeSegmentManager(helixResourceManager);
+    ValidationMetrics validationMetrics = new ValidationMetrics(_metricsRegistry);
+    validationManager = new ValidationManager(validationMetrics, helixResourceManager, config, null);
     segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config);
     executorService = Executors.newCachedThreadPool(
         new ThreadFactoryBuilder().setNameFormat("restlet-multiget-thread-%d").build());
