@@ -1,10 +1,12 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
+import com.google.common.base.Strings;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.dashboard.configs.DashboardConfig;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import java.util.ArrayList;
@@ -48,20 +50,41 @@ public class DataResource {
 
   //------------- endpoints to fetch summary -------------
   @GET
-  @Path("summary/metrics/{dataset}")
-  public List<String> getMetricNames(@PathParam("dataset") String dataset) {
-      List<MetricConfigDTO> metrics = metricConfigDAO.findActiveByDataset(dataset);
-      List<String> metricsNames = new ArrayList<>();
-      for (MetricConfigDTO metricConfigDTO : metrics) {
-        metricsNames.add(metricConfigDTO.getName());
-      }
-      return metricsNames;
+  @Path("summary/metrics")
+  public List<String> getMetricNamesForDataset(@QueryParam("dataset") String dataset) {
+    List<MetricConfigDTO> metrics = new ArrayList<>();
+    if (Strings.isNullOrEmpty(dataset)) {
+      metrics.addAll(metricConfigDAO.findAll());
+    } else {
+      metrics.addAll(metricConfigDAO.findActiveByDataset(dataset));
+    }
+    List<String> metricsNames = new ArrayList<>();
+    for (MetricConfigDTO metricConfigDTO : metrics) {
+      metricsNames.add(metricConfigDTO.getName());
+    }
+    return metricsNames;
+  }
+
+  @GET
+  @Path("summary/dashboards")
+  public List<String> getDashboardNames() {
+    List<String> output = new ArrayList<>();
+    List<DashboardConfigDTO> dashboardConfigDTOs = dashboardConfigDAO.findAll();
+    for (DashboardConfigDTO dashboardConfigDTO : dashboardConfigDTOs) {
+      output.add(dashboardConfigDTO.getName());
+    }
+    return output;
   }
 
   @GET
   @Path("summary/datasets")
   public List<String> getDatasetNames() {
-    return null;
+    List<String> output = new ArrayList<>();
+    List<DatasetConfigDTO> datasetConfigDTOs = datasetConfigDAO.findAll();
+    for (DatasetConfigDTO dto : datasetConfigDTOs) {
+      output.add(dto.getDataset());
+    }
+    return output;
   }
 
   @GET
