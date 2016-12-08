@@ -131,9 +131,13 @@
 <script src="../../../assets/javascript/Event.js"></script>
 <script src="../../../assets/javascript/HashParams.js"></script>
 <script src="../../../assets/javascript/HashService.js"></script>
+<script src="../../../assets/javascript/DataService.js"></script>
 
 <script type="text/javascript">
+
+var dataService = undefined;
   $(document).ready(function() {
+    dataService = new DataService();
     var hashService = new HashService();
     var app = new AppController();
     app.init();
