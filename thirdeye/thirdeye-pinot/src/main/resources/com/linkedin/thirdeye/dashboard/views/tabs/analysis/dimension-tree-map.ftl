@@ -29,10 +29,10 @@
 	<div class="col-md-12">
 		<nav class="navbar navbar-transparent" role="navigation">
 			<div class="collapse navbar-collapse">
-				<ul class="nav navbar-nav dashboard-tabs" id="dashboard-tabs">
-					<li class=""><a href="#num_of_anomalies" data-toggle="tab">% Change</a></li>
-					<li class=""><a href="#wow" data-toggle="tab">Change in contribution</a></li>
-					<li class=""><a href="#wow" data-toggle="tab">Contribution to overall change</a></li>
+				<ul class="nav navbar-nav tree-map-tabs" id="dashboard-tabs">
+					<li class=""><a href="percent_change" data-toggle="tab">% Change</a></li>
+					<li class=""><a href="#change_in_contribution" data-toggle="tab">Change in contribution</a></li>
+					<li class=""><a href="#contribution_to_change" data-toggle="tab">Contribution to overall change</a></li>
 				</ul>
 			</div>
 		</nav>
@@ -43,18 +43,18 @@
 		<table class="table info-table">
 			<thead>
 				<tr>
-					<th>CURRENT TOTAL(9/02 8pm - 9/03 8pm)</th>
-					<th>BASELINE TOTAL(8/02 8pm - 8/03 8pm)</th>
+					<th>CURRENT TOTAL({{this.currentStartTime}} - {{this.currentEndTime}})</th>
+					<th>BASELINE TOTAL({{this.baselineStartTime}} - {{this.baselineEndTime}})</th>
 					<th>CHANGE VALUE</th>
 					<th>% CHANGE</th>
 				</tr>
 			</thead>
 			<tbody>
 				<tr>
-					<td>50,000</td>
-					<td>100,000</td>
-					<td><p class="text-danger">-50,000</p></td>
-					<td><p class="text-danger">-50%</p></td>
+					<td>{{this.currentTotal}}</td>
+					<td>{{this.baselineTotal}}</td>
+					<td><p class="text-danger">{{this.absoluteChange}}</p></td>
+					<td><p class="text-danger">{{this.percentChange}} %</p></td>
 				</tr>
 			</tbody>
 		</table>
@@ -71,25 +71,14 @@
 							<div id="axis-placeholder" style="height: 25px; width: 100%"></div>
 						</td>
 					</tr>
-
+					{{#each this.dimensions}}
 					<tr>
-						<td class="col-md-1" style="vertical-align: middle">Browser</td>
+						<td class="col-md-1" style="vertical-align: middle">{{this}}</td>
 						<td class="col-md-11">
-							<div id="browser-heatmap-placeholder" style="height: 50px; width: 100%"></div>
+							<div id="{{this}}-heatmap-placeholder" style="height: 50px; width: 100%"></div>
 						</td>
 					</tr>
-					<tr>
-						<td class="col-md-1" style="vertical-align: middle">Country</td>
-						<td class="col-md-11">
-							<div id="country-heatmap-placeholder" style="height: 50px; width: 100%"></div>
-						</td>
-					</tr>
-					<tr>
-						<td class="col-md-1" style="vertical-align: middle">Device</td>
-						<td class="col-md-11">
-							<div id="device-heatmap-placeholder" style="height: 50px; width: 100%"></div>
-						</td>
-					</tr>
+					{{/each}}
 				</tbody>
 			</table>
 		</div>
