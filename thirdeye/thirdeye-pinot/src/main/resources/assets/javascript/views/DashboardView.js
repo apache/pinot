@@ -81,9 +81,6 @@ DashboardView.prototype = {
     $('#dashboard-tabs a[data-toggle="tab"]').on('shown.bs.tab', tabSelectionEventHandler);
 
     var hideDataRangePickerEventHandler = function(e, dataRangePicker) {
-      // console.log(e);
-      // console.log(dataRangePicker.startDate.format('YYYY-MM-DD'));
-      // console.log(dataRangePicker.endDate.format('YYYY-MM-DD'));
       var args = {e: e, dataRangePicker: dataRangePicker}
       self.hideDataRangePickerEvent.notify(args);
     };

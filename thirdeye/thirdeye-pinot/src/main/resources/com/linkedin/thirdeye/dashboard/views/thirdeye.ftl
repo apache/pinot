@@ -39,6 +39,7 @@
 
 <!-- custom scripts -->
 <script src="../../../assets/javascript/libs/page.js" defer></script>
+<script src="../../../assets/javascript/libs/handlebarsHelpers.js" defer></script>
 <script src="https://rawgit.com/flatiron/director/master/build/director.min.js">
 
 </script>

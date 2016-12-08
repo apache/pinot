@@ -29,11 +29,9 @@ DashboardModel.prototype = {
     // if (params.dashboardViewMode) {
     //   this.dashboardViewMode = params.dashboardViewMode;
     // }
-    console.log("Changed dashboardName to " + params);
   },
 
   update: function (params) {
-    console.log("Changed dashboardName to " + this.dashboardName);
   },
 
   setStartTime: function(startTime) {
