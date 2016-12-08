@@ -145,7 +145,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   // Segment end criteria
   private volatile long _consumeEndTime = 0;
   private volatile long _finalOffset = -1;
-  private volatile boolean _receivedStop = false;
+  private volatile boolean _shouldStop = false;
 
   // It takes 30s to locate controller leader, and more if there are multiple controller failures.
   // For now, we let 31s pass for this state transition.
@@ -243,7 +243,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
 
     final long _endOffset = Long.MAX_VALUE; // No upper limit on Kafka offset
     segmentLogger.info("Starting consumption loop start offset {}, finalOffset {}", _currentOffset, _finalOffset);
-    while(!_receivedStop && !endCriteriaReached()) {
+    while(!_shouldStop && !endCriteriaReached()) {
       // Consume for the next _kafkaReadTime ms, or we get to final offset, whichever happens earlier,
       // Update _currentOffset upon return from this method
       Iterable<MessageAndOffset> messagesAndOffsets = null;
@@ -285,7 +285,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
 
       int indexedMessageCount = 0;
       int kafkaMessageCount = 0;
-      while (!_receivedStop && !endCriteriaReached() && msgIterator.hasNext()) {
+      while (!_shouldStop && !endCriteriaReached() && msgIterator.hasNext()) {
         // Get a batch of messages from Kafka
         // Index each message
         MessageAndOffset messageAndOffset = msgIterator.next();
@@ -365,7 +365,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
           if (_state.shouldConsume()) {
             consumeLoop();  // Consume until we reached the end criteria, or we are stopped.
           }
-          if (_receivedStop) {
+          if (_shouldStop) {
             break;
           }
 
@@ -458,6 +458,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
         segmentLogger.error("Exception while in work", e);
         postStopConsumedMsg(e.getClass().getName());
         _state = State.ERROR;
+        return;
       }
 
       if (initialConsumptionEnd != 0L) {
@@ -561,7 +562,15 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
 
   // Inform the controller that the server had to stop consuming due to an error.
   protected void postStopConsumedMsg(String reason) {
-
+    do {
+      SegmentCompletionProtocol.Response response = _protocolHandler.segmentStoppedConsuming(_segmentNameStr, _currentOffset, reason);
+      if (response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED)) {
+        LOGGER.info("Got response {}", response.toJsonString());
+        break;
+      }
+      Uninterruptibles.sleepUninterruptibly(10, TimeUnit.SECONDS);
+      LOGGER.info("Retrying after response {}", response.toJsonString());
+    } while (!_shouldStop);
   }
 
   protected SegmentCompletionProtocol.Response postSegmentConsumedMsg() {
@@ -633,8 +642,14 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     _finalOffset = endOffset;
     _consumeEndTime = now() + timeoutMs;
     _state = State.CONSUMING_TO_ONLINE;
-    _receivedStop = false;
-    consumeLoop();
+    _shouldStop = false;
+    try {
+      consumeLoop();
+    } catch (Exception e) {
+      // We will end up downloading the segment, so this is not a serious problem
+      segmentLogger.warn("Exception when catching up to final offset", e);
+      return false;
+    }
     if (_currentOffset != endOffset) {
       // Timeout?
       segmentLogger.error("Could not consume up to {} (current offset {})", endOffset, _currentOffset);
@@ -668,7 +683,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
    * Stop the consuming thread.
    */
   public void stop() throws InterruptedException {
-    _receivedStop = true;
+    _shouldStop = true;
     // This method could be called either when we get an ONLINE transition or
     // when we commit a segment and replace the realtime segment with a committed
     // one. In the latter case, we don't want to call join.

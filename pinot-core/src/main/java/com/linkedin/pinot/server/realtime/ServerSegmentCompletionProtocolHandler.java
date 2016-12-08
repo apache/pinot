@@ -79,6 +79,10 @@ public class ServerSegmentCompletionProtocolHandler {
     return doHttp(request, null);
   }
 
+  public SegmentCompletionProtocol.Response segmentStoppedConsuming(String segmentName, long offset, String reason) {
+    SegmentCompletionProtocol.SegmentStoppedConsuming request = new SegmentCompletionProtocol.SegmentStoppedConsuming(segmentName, offset, _instance, reason);
+    return doHttp(request, null);
+  }
 
   private SegmentCompletionProtocol.Response doHttp(SegmentCompletionProtocol.Request request, Part[] parts) {
     SegmentCompletionProtocol.Response response =
