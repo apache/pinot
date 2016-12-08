@@ -5,6 +5,8 @@ function AnomalyResultView(anomalyResultModel) {
   this.anomalyResultModel = anomalyResultModel;
 
   this.timeRangeConfig = {
+      startDate : this.anomalyResultModel.startDate,
+      endDate : this.anomalyResultModel.endDate,
       dateLimit : {
         days : 60
       },
@@ -44,6 +46,13 @@ AnomalyResultView.prototype = {
 
   render : function() {
 
+    var anomalies = this.anomalyResultModel.anomalies;
+    console.log("anomalies");
+    console.log(anomalies);
+
+    var result_anomalies_template_compiled = this.anomalies_template_compiled(anomalies);
+    $("#anomalies-place-holder").html(result_anomalies_template_compiled);
+    this.renderAnomaliesTab(anomalies);
 
     // METRIC SELECTION
     var metrics = this.anomalyResultModel.metrics;
@@ -58,26 +67,16 @@ AnomalyResultView.prototype = {
     });
 
 
-
     // TIME RANGE SELECTION
     this.timeRangeConfig.startDate = this.anomalyResultModel.startDate;
     this.timeRangeConfig.endDate = this.anomalyResultModel.endDate;
-
     function cb(start, end) {
       $('#anomalies-time-range span').addClass("time-range").html(start.format('MMM D, ') + start.format('hh:mm a') + '  &mdash;  ' + end.format('MMM D, ') + end.format('hh:mm a'));
     }
-
     $('#anomalies-time-range').daterangepicker(this.timeRangeConfig, cb);
-
     cb(this.timeRangeConfig.startDate, this.timeRangeConfig.endDate);
 
-    var anomalies = this.anomalyResultModel.anomalies;
-    console.log("anomalies");
-    console.log(anomalies);
 
-    var result_anomalies_template_compiled = this.anomalies_template_compiled(anomalies);
-    $("#anomalies-place-holder").html(result_anomalies_template_compiled);
-    this.renderAnomaliesTab(anomalies);
   },
 
   renderAnomaliesTab: function (anomalies) {
