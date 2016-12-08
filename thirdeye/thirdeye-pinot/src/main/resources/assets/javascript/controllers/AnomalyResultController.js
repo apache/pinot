@@ -3,6 +3,7 @@ function AnomalyResultController(parentController) {
   this.anomalyResultModel = new AnomalyResultModel();
   this.anomalyResultView = new AnomalyResultView(this.anomalyResultModel);
 
+  this.anomalyResultView.hideDataRangePickerEvent.attach(this.hideDataRangePickerEventHandler.bind(this));
   this.anomalyResultView.rootCauseAnalysisButtonClickEvent.attach(this.rootCauseAnalysisButtonClickEventHandler.bind(this));
   this.anomalyResultView.showDetailsLinkClickEvent.attach(this.showDetailsLinkClickEventHandler.bind(this));
   this.anomalyResultView.anomalyFeedbackSelectEvent.attach(this.anomalyFeedbackSelectEventHandler.bind(this));
@@ -10,10 +11,24 @@ function AnomalyResultController(parentController) {
 
 AnomalyResultController.prototype = {
   handleAppEvent: function (hashParams) {
+    console.log("Inside handle app event of AnomalyResultController");
     this.anomalyResultModel.init(hashParams);
     this.anomalyResultModel.update();
     this.anomalyResultView.init();
     this.anomalyResultView.render();
+  },
+  hideDataRangePickerEventHandler: function(sender, args) {
+    console.log("received hide date range picker event");
+    console.log(args);
+    if (this.anomalyResultModel.startDate != args.startDate ||
+        this.anomalyResultModel.endDate != args.endDate) {
+      this.anomalyResultModel.startDate = args.startDate;
+      this.anomalyResultModel.endDate = args.endDate;
+      console.log("Date changed:");
+      console.log(this.anomalyResultModel.startDate);
+      console.log(this.anomalyResultModel.endDate);
+      this.handleAppEvent();
+    }
   },
   rootCauseAnalysisButtonClickEventHandler: function (sender, args) {
     console.log("received root cause analysis button click event at AnomalyResultController");

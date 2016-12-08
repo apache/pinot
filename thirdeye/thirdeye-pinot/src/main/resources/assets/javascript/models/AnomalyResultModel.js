@@ -13,11 +13,11 @@ function AnomalyResultModel(){
 
   // list of metrics
   this.metrics = [ "m1", "m2" ];
+
 }
 
 AnomalyResultModel.prototype = {
-  init: function (ctx) {
-
+  init: function (params) {
   },
 
   update : function() {
