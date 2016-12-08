@@ -47,18 +47,19 @@ DashboardController.prototype = {
 
   hideDataRangePickerEventHandler: function(sender, args) {
     var dataRangePicker = args.dataRangePicker;
-    if (this.dashboardModel.startTime != dataRangePicker.startDate ||
-        this.dashboardModel.endTime != dataRangePicker.endDate) {
-      this.dashboardModel.startTime = dataRangePicker.startDate;
-      this.dashboardModel.endTime = dataRangePicker.endDate;
+    console.log(this.dashboardModel.getStartTime());
+    if (this.dashboardModel.getStartTime() != dataRangePicker.startDate ||
+        this.dashboardModel.getEndTime() != dataRangePicker.endDate) {
+      this.dashboardModel.setStartTime(dataRangePicker.startDate);
+      this.dashboardModel.setEndTime(dataRangePicker.endDate);
       console.log("Date changed:");
-      console.log(this.dashboardModel.params.startTime);
-      console.log(this.dashboardModel.params.endTime);
+      console.log(this.dashboardModel.getStartTime());
+      console.log(this.dashboardModel.getEndTime());
 
       if (this.dashboardModel.mode == "AnomalySummary") {
-        this.anomalySummaryController.handleAppEvent(params);
+        this.anomalySummaryController.handleAppEvent(this.dashboardModel.hashParams);
       } else if (this.dashboardModel.mode == "WoWSummary") {
-        this.woWSummaryController.handleAppEvent(params);
+        this.woWSummaryController.handleAppEvent(this.dashboardModel.hashParams);
       }
     }
 

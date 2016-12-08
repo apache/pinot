@@ -40,7 +40,7 @@ AnomalySummaryModel.prototype = {
     this.anomalySummary.push(row3);
 
     this.timestamps = [];
-    var time = moment().subtract(24, 'hours');
+    var time = moment(this.endTime).subtract(24, 'hours');
     for (var i = 0; i < 24; ++i) {
       var date = new Date(time);
       this.timestamps.push(date);

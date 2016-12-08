@@ -17,18 +17,18 @@ DashboardModel.prototype = {
 
   init: function (params) {
     this.hashParams = params;
-    if (params.dashboardName) {
-      this.dashboardName = params.dashboardName;
-    }
-    if (params.startTime) {
-      this.startTime = params.startTime;
-    }
-    if (params.endTime) {
-      this.endTime = params.endTime;
-    }
-    if (params.dashboardViewMode) {
-      this.dashboardViewMode = params.dashboardViewMode;
-    }
+    // if (params.dashboardName) {
+    //   this.dashboardName = params.dashboardName;
+    // }
+    // if (params.startTime) {
+    //   this.startTime = params.startTime;
+    // }
+    // if (params.endTime) {
+    //   this.endTime = params.endTime;
+    // }
+    // if (params.dashboardViewMode) {
+    //   this.dashboardViewMode = params.dashboardViewMode;
+    // }
     console.log("Changed dashboardName to " + params);
   },
 
@@ -36,8 +36,16 @@ DashboardModel.prototype = {
     console.log("Changed dashboardName to " + this.dashboardName);
   },
 
+  setStartTime: function(startTime) {
+    this.hashParams.startTime = startTime;
+  },
+
   getStartTime: function() {
     return this.hashParams.startTime;
+  },
+
+  setEndTime: function(endTime) {
+    this.hashParams.endTime = endTime;
   },
 
   getEndTime: function() {

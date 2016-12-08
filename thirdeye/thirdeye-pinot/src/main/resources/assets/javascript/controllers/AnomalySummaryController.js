@@ -8,7 +8,6 @@ function AnomalySummaryController(parentController){
 AnomalySummaryController.prototype ={
 
     handleAppEvent: function(params){
-      console.log(params);
       this.anomalySummaryModel.init(params);
       this.anomalySummaryModel.rebuild();
       this.anomalySummaryView.render();
