@@ -30,6 +30,20 @@ public interface BrokerResponse {
   void setExceptions(List<ProcessingException> exceptions);
 
   /**
+   * Set the number of servers got queried by the broker.
+   *
+   * @param numServersQueried number of servers got queried.
+   */
+  void setNumServersQueried(int numServersQueried);
+
+  /**
+   * Set the number of servers responded to the broker.
+   *
+   * @param numServersResponded number of servers responded.
+   */
+  void setNumServersResponded(int numServersResponded);
+
+  /**
    * Set the total time used in request handling, into the broker response.
    */
   void setTimeUsedMs(long timeUsedMs);

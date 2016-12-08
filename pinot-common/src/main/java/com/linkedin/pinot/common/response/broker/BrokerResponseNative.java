@@ -39,7 +39,7 @@ import org.json.JSONObject;
  *
  * Supports serialization via JSON.
  */
-@JsonPropertyOrder({"selectionResults", "aggregationResults", "exceptions", "numDocsScanned", "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "totalDocs", "timeUsedMs", "segmentStatistics", "traceInfo"})
+@JsonPropertyOrder({"selectionResults", "aggregationResults", "exceptions", "numServersQueried", "numServersResponded", "numDocsScanned", "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "totalDocs", "timeUsedMs", "segmentStatistics", "traceInfo"})
 public class BrokerResponseNative implements BrokerResponse {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
@@ -47,6 +47,8 @@ public class BrokerResponseNative implements BrokerResponse {
   public static final BrokerResponseNative NO_TABLE_RESULT =
       new BrokerResponseNative(QueryException.BROKER_RESOURCE_MISSING_ERROR);
 
+  private int _numServersQueried = 0;
+  private int _numServersResponded = 0;
   private long _numDocsScanned = 0L;
   private long _numEntriesScannedInFilter = 0L;
   private long _numEntriesScannedPostFilter = 0L;
@@ -110,6 +112,28 @@ public class BrokerResponseNative implements BrokerResponse {
   @JsonProperty("exceptions")
   public void setProcessingExceptions(List<QueryProcessingException> processingExceptions) {
     _processingExceptions = processingExceptions;
+  }
+
+  @JsonProperty("numServersQueried")
+  public int getNumServersQueried() {
+    return _numServersQueried;
+  }
+
+  @JsonProperty("numServersQueried")
+  @Override
+  public void setNumServersQueried(int numServersQueried) {
+    _numServersQueried = numServersQueried;
+  }
+
+  @JsonProperty("numServersResponded")
+  public int getNumServersResponded() {
+    return _numServersResponded;
+  }
+
+  @JsonProperty("numServersResponded")
+  @Override
+  public void setNumServersResponded(int numServersResponded) {
+    _numServersResponded = numServersResponded;
   }
 
   @JsonProperty("numDocsScanned")
