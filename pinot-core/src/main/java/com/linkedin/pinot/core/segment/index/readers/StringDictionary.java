@@ -55,14 +55,13 @@ public class StringDictionary extends ImmutableDictionaryReader {
     if ((dictionaryId == -1) || (dictionaryId >= length())) {
       return "null";
     }
-    String val = getString(dictionaryId);
-    byte[] bytes = val.getBytes(UTF_8);
-    for (int i = 0; i < lengthofMaxEntry; i++) {
-      if (bytes[i] == paddingChar) {
-        return new String(bytes, 0, i, UTF_8);
+    byte[] bytes = dataFileReader.getBytes(dictionaryId, 0);
+    for (int i = lengthofMaxEntry - 1; i >= 0; i--) {
+      if (bytes[i] != paddingChar) {
+        return new String(bytes, 0, i + 1, UTF_8);
       }
     }
-    return val;
+    return "";
   }
 
   @Override
