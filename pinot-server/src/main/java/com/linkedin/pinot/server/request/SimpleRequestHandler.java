@@ -100,12 +100,8 @@ public class SimpleRequestHandler implements RequestHandler {
       LOGGER.error("Got exception while processing request. Returning error response for requestId: {}, brokerId: {}",
           instanceRequest.getRequestId(), instanceRequest.getBrokerId(), e);
       _serverMetrics.addMeteredGlobalValue(ServerMeter.UNCAUGHT_EXCEPTIONS, 1);
-      DataTableBuilder dataTableBuilder = new DataTableBuilder(null);
-      List<ProcessingException> exceptions = new ArrayList<ProcessingException>();
-      ProcessingException exception = QueryException.INTERNAL_ERROR.deepCopy();
-      exception.setMessage(e.getMessage());
-      exceptions.add(exception);
-      instanceResponse = dataTableBuilder.buildExceptions();
+      instanceResponse = new DataTable();
+      instanceResponse.addException(QueryException.getException(QueryException.INTERNAL_ERROR, e));
     }
 
     byte[] responseBytes = ScheduledRequestHandler.serializeDataTable(queryRequest, instanceResponse);

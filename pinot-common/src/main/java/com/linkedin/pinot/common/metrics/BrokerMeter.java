@@ -28,10 +28,27 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   HEALTHCHECK_BAD_CALLS("healthcheck", true),
   HEALTHCHECK_OK_CALLS("healthcheck", true),
   QUERIES("queries", false),
+
+  // These metrics track the exceptions caught during query execution.
+  // PQL compile phase.
   REQUEST_COMPILATION_EXCEPTIONS("exceptions", true),
-  REQUEST_FETCH_EXCEPTIONS("exceptions", false),
-  REQUEST_DESERIALIZATION_EXCEPTIONS("exceptions", false),
+  //Query validation phase.
+  QUERY_VALIDATION_EXCEPTIONS("exceptions", false),
+  // Scatter phase.
+  RESOURCE_MISSING_EXCEPTIONS("exceptions", false),
+  NO_SERVER_FOUND_EXCEPTIONS("exceptions", false),
+  // Gather phase.
+  RESPONSE_FETCH_EXCEPTIONS("exceptions", false),
+  // Response deserialize phase.
+  DATA_TABLE_DESERIALIZATION_EXCEPTIONS("exceptions", false),
+  // Reduce responses phase.
+  RESPONSE_MERGE_EXCEPTIONS("exceptions", false),
+
+  // These metrics track the cost of the query.
   DOCUMENTS_SCANNED("documents", false),
+  ENTRIES_SCANNED_IN_FILTER("documents", false),
+  ENTRIES_SCANNED_POST_FILTER("documents", false),
+
   REQUEST_CONNECTION_TIMEOUTS("timeouts", false),
   REQUEST_CONNECTION_WAIT_TIME_IN_MILLIS("waits", false),
   HELIX_ZOOKEEPER_RECONNECTS("reconnects", true),

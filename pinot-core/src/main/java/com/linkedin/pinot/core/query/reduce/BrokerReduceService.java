@@ -15,10 +15,15 @@
  */
 package com.linkedin.pinot.core.query.reduce;
 
-import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.exception.QueryException;
+import com.linkedin.pinot.common.metrics.BrokerMeter;
+import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.query.ReduceService;
+import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.request.GroupBy;
+import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.response.broker.AggregationResult;
 import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
@@ -33,318 +38,296 @@ import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import javax.annotation.concurrent.ThreadSafe;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * BrokerReduceService will reduce DataTables gathered from multiple instances
- * to BrokerResponseNative.
- *
+ * The <code>BrokerReduceService</code> class provides service to reduce data tables gathered from multiple servers
+ * to {@link BrokerResponseNative}.
  */
+@ThreadSafe
 public class BrokerReduceService implements ReduceService<BrokerResponseNative> {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerReduceService.class);
 
-  private static final String NUM_DOCS_SCANNED = "numDocsScanned";
-  private static final String NUM_ENTRIES_SCANNED_IN_FILTER = "numEntriesScannedInFilter";
-  private static final String NUM_ENTREIS_SCANNED_POST_FILTER = "numEntriesScannedPostFilter";
-  private static final String TOTAL_DOCS = "totalDocs";
-
-  // Not used currently, but it records the time spent on server side.
-  private static final String TIME_USED_MS = "timeUsedMs";
-
+  @Nonnull
   @Override
-  public BrokerResponseNative reduceOnDataTable(BrokerRequest brokerRequest,
-      Map<ServerInstance, DataTable> dataTableMap) {
-    // Empty result.
-    if (dataTableMap == null || dataTableMap.size() == 0) {
-      return BrokerResponseNative.EMPTY_RESULT;
+  public BrokerResponseNative reduceOnDataTable(@Nonnull BrokerRequest brokerRequest,
+      @Nonnull Map<ServerInstance, DataTable> instanceResponseMap) {
+    return reduceOnDataTable(brokerRequest, instanceResponseMap, null);
+  }
+
+  @Nonnull
+  @Override
+  public BrokerResponseNative reduceOnDataTable(@Nonnull BrokerRequest brokerRequest,
+      @Nonnull Map<ServerInstance, DataTable> dataTableMap, @Nullable BrokerMetrics brokerMetrics) {
+    if (dataTableMap.size() == 0) {
+      // Empty response.
+      return BrokerResponseNative.empty();
     }
 
     BrokerResponseNative brokerResponseNative = new BrokerResponseNative();
+    List<QueryProcessingException> processingExceptions = brokerResponseNative.getProcessingExceptions();
     long numDocsScanned = 0L;
     long numEntriesScannedInFilter = 0L;
     long numEntriesScannedPostFilter = 0L;
     long numTotalRawDocs = 0L;
 
+    // Cache a data schema from data table with data rows inside.
+    DataSchema dataSchemaWithDataRows = null;
+    // Cache an entry for data table with data schema inside.
+    Map.Entry<ServerInstance, DataTable> entryWithDataSchema = null;
+
+    // Process server response metadata.
     Iterator<Map.Entry<ServerInstance, DataTable>> iterator = dataTableMap.entrySet().iterator();
     while (iterator.hasNext()) {
       Map.Entry<ServerInstance, DataTable> entry = iterator.next();
       ServerInstance serverInstance = entry.getKey();
-      DataTable dataTable = dataTableMap.get(serverInstance);
-      if (dataTable == null) {
-        continue;
-      }
+      DataTable dataTable = entry.getValue();
+      Map<String, String> metadata = dataTable.getMetadata();
 
-      // reduceOnTraceInfo (put it here so that trace info can show up even exception happens)
-      if (brokerRequest.isEnableTrace() && dataTable.getMetadata() != null) {
+      // Reduce on trace info.
+      if (brokerRequest.isEnableTrace()) {
         brokerResponseNative.getTraceInfo()
-            .put(serverInstance.getHostname(), dataTable.getMetadata().get("traceInfo"));
+            .put(serverInstance.getHostname(), metadata.get(DataTable.TRACE_INFO_METADATA_KEY));
       }
 
-      if (dataTable.getDataSchema() == null && dataTable.getMetadata() != null) {
-        for (String key : dataTable.getMetadata().keySet()) {
-          if (key.startsWith(DataTable.EXCEPTION_METADATA_KEY)) {
-            QueryProcessingException processingException = new QueryProcessingException();
-            processingException.setErrorCode(Integer.parseInt(key.substring(9)));
-            processingException.setMessage(dataTable.getMetadata().get(key));
-            brokerResponseNative.getProcessingExceptions().add(processingException);
-          }
+      // Reduce on exceptions.
+      for (String key : metadata.keySet()) {
+        if (key.startsWith(DataTable.EXCEPTION_METADATA_KEY)) {
+          processingExceptions.add(new QueryProcessingException(Integer.parseInt(key.substring(9)), metadata.get(key)));
         }
-        iterator.remove();
-        continue;
       }
 
-      String numDocsScannedString = dataTable.getMetadata().get(NUM_DOCS_SCANNED);
+      // Reduce on execution statistics.
+      String numDocsScannedString = metadata.get(DataTable.NUM_DOCS_SCANNED_METADATA_KEY);
       if (numDocsScannedString != null) {
         numDocsScanned += Long.parseLong(numDocsScannedString);
       }
-      String numEntriesScannedInFilterString = dataTable.getMetadata().get(NUM_ENTRIES_SCANNED_IN_FILTER);
+      String numEntriesScannedInFilterString = metadata.get(DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY);
       if (numEntriesScannedInFilterString != null) {
         numEntriesScannedInFilter += Long.parseLong(numEntriesScannedInFilterString);
       }
-      String numEntriesScannedPostFilterString = dataTable.getMetadata().get(NUM_ENTREIS_SCANNED_POST_FILTER);
+      String numEntriesScannedPostFilterString = metadata.get(DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY);
       if (numEntriesScannedPostFilterString != null) {
         numEntriesScannedPostFilter += Long.parseLong(numEntriesScannedPostFilterString);
       }
-      String numTotalRawDocsString = dataTable.getMetadata().get(TOTAL_DOCS);
+      String numTotalRawDocsString = metadata.get(DataTable.TOTAL_DOCS_METADATA_KEY);
       if (numTotalRawDocsString != null) {
         numTotalRawDocs += Long.parseLong(numTotalRawDocsString);
       }
+
+      // After processing the metadata, remove data tables without data rows inside.
+      // Cache dataSchemaWithDataRows and entryWithDataSchema.
+      DataSchema dataSchema = dataTable.getDataSchema();
+      if (dataSchema == null) {
+        iterator.remove();
+      } else {
+        entryWithDataSchema = entry;
+        if (dataTable.getNumberOfRows() == 0) {
+          iterator.remove();
+        } else {
+          dataSchemaWithDataRows = dataSchema;
+        }
+      }
     }
 
+    // Set execution statistics.
     brokerResponseNative.setNumDocsScanned(numDocsScanned);
     brokerResponseNative.setNumEntriesScannedInFilter(numEntriesScannedInFilter);
     brokerResponseNative.setNumEntriesScannedPostFilter(numEntriesScannedPostFilter);
     brokerResponseNative.setTotalDocs(numTotalRawDocs);
 
-    try {
-      if (brokerRequest.isSetSelections() && (brokerRequest.getSelections().getSelectionColumns() != null) && (
-          brokerRequest.getSelections().getSelectionColumns().size() >= 0)) {
-
-        // Reduce DataTable for selection query.
-        SelectionResults selectionResults = reduceOnSelectionResults(brokerRequest, dataTableMap);
-        brokerResponseNative.setSelectionResults(selectionResults);
-        return brokerResponseNative;
-      }
-
-      if (brokerRequest.isSetAggregationsInfo()) {
-        if (!brokerRequest.isSetGroupBy()) {
-          List<List<Serializable>> aggregationResultsList =
-              getShuffledAggregationResults(brokerRequest, dataTableMap);
-          brokerResponseNative.setAggregationResults(reduceOnAggregationResults(brokerRequest, aggregationResultsList));
-        } else {
-          AggregationGroupByOperatorService aggregationGroupByOperatorService =
-              new AggregationGroupByOperatorService(brokerRequest.getAggregationsInfo(), brokerRequest.getGroupBy());
-          brokerResponseNative.setAggregationResults(
-              reduceOnAggregationGroupByOperatorResults(aggregationGroupByOperatorService, dataTableMap));
-        }
-        return brokerResponseNative;
-      }
-    } catch (Exception e) {
-      QueryProcessingException processingException = new QueryProcessingException();
-      processingException.setMessage(e.getMessage());
-      processingException.setErrorCode(QueryException.BROKER_GATHER_ERROR_CODE);
-      brokerResponseNative.getProcessingExceptions().add(processingException);
-      return brokerResponseNative;
+    // Update broker metrics.
+    String tableName = brokerRequest.getQuerySource().getTableName();
+    if (brokerMetrics != null) {
+      brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.DOCUMENTS_SCANNED, numDocsScanned);
+      brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.ENTRIES_SCANNED_IN_FILTER, numEntriesScannedInFilter);
+      brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.ENTRIES_SCANNED_POST_FILTER,
+          numEntriesScannedPostFilter);
     }
 
-    throw new UnsupportedOperationException(
-        "Should not reach here, the query has no attributes of selection or aggregation!");
-  }
-
-  /**
-   * Reduce selection results from various servers into SelectionResults object, that goes
-   * into BrokerResponseNative.
-   *
-   * @param brokerRequest
-   * @param instanceResponseMap
-   * @return
-   */
-  private SelectionResults reduceOnSelectionResults(BrokerRequest brokerRequest,
-      Map<ServerInstance, DataTable> instanceResponseMap) {
-    try {
-      if (instanceResponseMap.size() > 0) {
-        DataTable dt = chooseFirstNonEmptySchema(instanceResponseMap.values());
-        removeConflictingResponses(dt.getDataSchema(), instanceResponseMap);
-
-        if (brokerRequest.getSelections().isSetSelectionSortSequence()) {
-          SelectionOperatorService selectionService =
-              new SelectionOperatorService(brokerRequest.getSelections(), dt.getDataSchema());
-          return selectionService.renderSelectionResultsWithOrdering(selectionService.reduceWithOrdering(instanceResponseMap));
-        } else {
-          Collection<Serializable[]> reduceResult =
-              SelectionOperatorUtils.reduceWithoutOrdering(instanceResponseMap, brokerRequest.getSelections().getSize());
-
-          return SelectionOperatorUtils
-              .renderSelectionResultsWithoutOrdering(reduceResult, brokerRequest.getSelections().getSelectionColumns(),
-                  dt.getDataSchema());
+    // Pre-process data table map before reducing data.
+    if (dataSchemaWithDataRows != null) {
+      // For non-empty data table map, remove conflicting responses.
+      List<String> droppedServers = removeConflictingResponses(dataSchemaWithDataRows, dataTableMap);
+      if (!droppedServers.isEmpty()) {
+        String errorMessage =
+            QueryException.MERGE_RESPONSE_ERROR.getMessage() + ": responses for table: " + tableName + " from servers: "
+                + droppedServers + " got dropped due to data schema mismatch.";
+        LOGGER.error(errorMessage);
+        if (brokerMetrics != null) {
+          brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.RESPONSE_MERGE_EXCEPTIONS, 1);
         }
+        brokerResponseNative.addToExceptions(
+            new QueryProcessingException(QueryException.MERGE_RESPONSE_ERROR_CODE, errorMessage));
+      }
+    } else {
+      // For empty data table map, put one data table with data schema to construct empty result.
+      if (entryWithDataSchema != null) {
+        dataTableMap.put(entryWithDataSchema.getKey(), entryWithDataSchema.getValue());
+      }
+    }
+
+    // Reduce server responses data and set query results into the broker response.
+    if (!dataTableMap.isEmpty()) {
+      if (brokerRequest.isSetSelections()) {
+        // Selection query.
+        setSelectionResults(brokerResponseNative, brokerRequest.getSelections(), dataTableMap);
       } else {
-        return null;
-      }
-    } catch (Exception e) {
-      LOGGER.error("Caught exception while reducing results", e);
-      Utils.rethrowException(e);
-      throw new AssertionError("Should not reach this");
-    }
-  }
-
-  /**
-   * Remove rows for which the schema does not match the provided master schema.
-   * @param masterSchema
-   * @param instanceResponseMap
-   */
-  private void removeConflictingResponses(DataSchema masterSchema, Map<ServerInstance, DataTable> instanceResponseMap) {
-    Iterator<Map.Entry<ServerInstance, DataTable>> responseIter = instanceResponseMap.entrySet().iterator();
-    StringBuilder droppedServersSb = new StringBuilder();
-
-    int droppedCount = 0;
-    while (responseIter.hasNext()) {
-      Map.Entry<ServerInstance, DataTable> entry = responseIter.next();
-      DataTable entryTable = entry.getValue();
-      DataSchema entrySchema = entryTable.getDataSchema();
-
-      if (!masterSchema.equals(entrySchema)) {
-        if (entryTable.getNumberOfRows() > 0) {
-          ++droppedCount;
-          droppedServersSb.append(" " + entry.getKey());
-        }
-        responseIter.remove();
-      }
-    }
-
-    // To log once per query
-    if (droppedCount > 0) {
-      LOGGER.error("SCHEMA-MISMATCH: Dropping responses from servers: {}", droppedServersSb.toString());
-    }
-  }
-
-  /**
-   * Given a collection of data tables, pick the first one with non-empty rows.
-   * @param dataTables
-   * @return
-   */
-  private DataTable chooseFirstNonEmptySchema(Iterable<DataTable> dataTables) {
-    for (DataTable dt : dataTables) {
-      if (dt.getNumberOfRows() > 0) {
-        return dt;
-      }
-    }
-    Iterator<DataTable> it = dataTables.iterator();
-    return it.hasNext() ? it.next() : null;
-  }
-
-  /**
-   * Reduce the aggregationGroupBy response from various servers, and return a list of
-   * AggregationResult objects, that is used to build the BrokerResponseNative object.
-   *
-   * @param aggregationGroupByOperatorService
-   * @param instanceResponseMap
-   * @return
-   */
-  private List<AggregationResult> reduceOnAggregationGroupByOperatorResults(
-      AggregationGroupByOperatorService aggregationGroupByOperatorService,
-      Map<ServerInstance, DataTable> instanceResponseMap) {
-
-    List<Map<String, Serializable>> reducedGroupByResults =
-        aggregationGroupByOperatorService.reduceGroupByOperators(instanceResponseMap);
-
-    return aggregationGroupByOperatorService.renderAggregationGroupByResult(reducedGroupByResults);
-  }
-
-  /**
-   * Reduce the aggregationGroupBy response from various servers, and return a list of
-   * AggregationResult objects, that is used to build the BrokerResponseNative object.
-   *
-   * @param brokerRequest
-   * @param aggregationResultsList
-   * @return
-   */
-  private List<AggregationResult> reduceOnAggregationResults(BrokerRequest brokerRequest,
-      List<List<Serializable>> aggregationResultsList) {
-    List<AggregationResult> aggregationResults = new ArrayList<AggregationResult>();
-    List<AggregationFunction> aggregationFunctions = AggregationFunctionFactory.getAggregationFunction(brokerRequest);
-
-    for (int i = 0; i < aggregationFunctions.size(); ++i) {
-      String function = aggregationFunctions.get(i).getFunctionName();
-      Serializable value = formatValue(aggregationFunctions.get(i).reduce(aggregationResultsList.get(i)));
-
-      AggregationResult aggregationResult = new AggregationResult(function, value);
-      aggregationResults.add(aggregationResult);
-    }
-
-    return aggregationResults;
-  }
-
-  /**
-   * Format the input float/double value to be of the form #####.#####.
-   * If the input is not float or double, return the value as is.
-   *
-   * @param value
-   * @return
-   */
-  private Serializable formatValue(Serializable value) {
-    return (value instanceof Float || value instanceof Double) ? String.format(Locale.US, "%1.5f", value)
-        : value.toString();
-  }
-
-  /**
-   * @param brokerRequest
-   * @param instanceResponseMap
-   * @return
-   */
-  private List<List<Serializable>> getShuffledAggregationResults(BrokerRequest brokerRequest,
-      Map<ServerInstance, DataTable> instanceResponseMap) {
-    List<List<Serializable>> aggregationResultsList = new ArrayList<List<Serializable>>();
-
-    for (int i = 0; i < brokerRequest.getAggregationsInfo().size(); ++i) {
-      aggregationResultsList.add(new ArrayList<Serializable>());
-    }
-
-    DataSchema aggregationResultSchema;
-    for (ServerInstance serverInstance : instanceResponseMap.keySet()) {
-      DataTable instanceResponse = instanceResponseMap.get(serverInstance);
-      aggregationResultSchema = instanceResponse.getDataSchema();
-
-      if (aggregationResultSchema == null) {
-        continue;
-      }
-
-      // Shuffle AggregationResults
-      for (int rowId = 0; rowId < instanceResponse.getNumberOfRows(); ++rowId) {
-        for (int colId = 0; colId < brokerRequest.getAggregationsInfoSize(); ++colId) {
-          switch (aggregationResultSchema.getColumnType(colId)) {
-            case INT:
-              aggregationResultsList.get(colId).add(instanceResponse.getInt(rowId, colId));
-              break;
-            case SHORT:
-              aggregationResultsList.get(colId).add(instanceResponse.getShort(rowId, colId));
-              break;
-            case FLOAT:
-              aggregationResultsList.get(colId).add(instanceResponse.getFloat(rowId, colId));
-              break;
-            case LONG:
-              aggregationResultsList.get(colId).add(instanceResponse.getLong(rowId, colId));
-              break;
-            case DOUBLE:
-              aggregationResultsList.get(colId).add(instanceResponse.getDouble(rowId, colId));
-              break;
-            case STRING:
-              aggregationResultsList.get(colId).add(instanceResponse.getString(rowId, colId));
-              break;
-            default:
-              aggregationResultsList.get(colId).add(instanceResponse.getObject(rowId, colId));
-              break;
-          }
+        // Aggregation query.
+        List<AggregationInfo> aggregationsInfo = brokerRequest.getAggregationsInfo();
+        if (!brokerRequest.isSetGroupBy()) {
+          // Aggregation only query.
+          setAggregationResults(brokerResponseNative, aggregationsInfo, dataTableMap);
+        } else {
+          // Aggregation group-by query.
+          setGroupByResults(brokerResponseNative, aggregationsInfo, brokerRequest.getGroupBy(), dataTableMap);
         }
       }
     }
-    return aggregationResultsList;
+
+    return brokerResponseNative;
+  }
+
+  /**
+   * Given a data schema, remove data tables that do not match this data schema.
+   *
+   * @param dataSchema data schema.
+   * @param dataTableMap map from server to data table.
+   * @return list of server names where the data table got removed.
+   */
+  private List<String> removeConflictingResponses(@Nonnull DataSchema dataSchema,
+      @Nonnull Map<ServerInstance, DataTable> dataTableMap) {
+    List<String> droppedServers = new ArrayList<>();
+    Iterator<Map.Entry<ServerInstance, DataTable>> iterator = dataTableMap.entrySet().iterator();
+    while (iterator.hasNext()) {
+      Map.Entry<ServerInstance, DataTable> entry = iterator.next();
+      DataSchema dataSchemaToCompare = entry.getValue().getDataSchema();
+      if (!dataSchema.equals(dataSchemaToCompare)) {
+        droppedServers.add(entry.getKey().toString());
+        iterator.remove();
+      }
+    }
+    return droppedServers;
+  }
+
+  /**
+   * Reduce selection results from multiple servers and set them into BrokerResponseNative passed in.
+   *
+   * @param brokerResponseNative broker response.
+   * @param selection selection information.
+   * @param dataTableMap map from server to data table.
+   */
+  private void setSelectionResults(@Nonnull BrokerResponseNative brokerResponseNative, @Nonnull Selection selection,
+      @Nonnull Map<ServerInstance, DataTable> dataTableMap) {
+    DataSchema dataSchema = dataTableMap.values().iterator().next().getDataSchema();
+
+    // Reduce the selection results.
+    SelectionResults selectionResults;
+    if (selection.isSetSelectionSortSequence()) {
+      // Selection order-by.
+      SelectionOperatorService selectionService = new SelectionOperatorService(selection, dataSchema);
+      selectionResults =
+          selectionService.renderSelectionResultsWithOrdering(selectionService.reduceWithOrdering(dataTableMap));
+    } else {
+      // Selection only.
+      selectionResults = SelectionOperatorUtils.renderSelectionResultsWithoutOrdering(
+          SelectionOperatorUtils.reduceWithoutOrdering(dataTableMap, selection.getSize()),
+          selection.getSelectionColumns(), dataSchema);
+    }
+
+    brokerResponseNative.setSelectionResults(selectionResults);
+  }
+
+  /**
+   * Reduce aggregation results from multiple servers and set them into BrokerResponseNative passed in.
+   *
+   * @param brokerResponseNative broker response.
+   * @param aggregationsInfo list of aggregation information.
+   * @param dataTableMap map from server to data table.
+   */
+  private void setAggregationResults(@Nonnull BrokerResponseNative brokerResponseNative,
+      @Nonnull List<AggregationInfo> aggregationsInfo, @Nonnull Map<ServerInstance, DataTable> dataTableMap) {
+    int numAggregations = aggregationsInfo.size();
+    List<List<Serializable>> shuffledAggregationResults = shuffleAggregationResults(aggregationsInfo, dataTableMap);
+    List<AggregationResult> reducedAggregationResults = new ArrayList<>(numAggregations);
+    List<AggregationFunction> aggregationFunctions =
+        AggregationFunctionFactory.getAggregationFunction(aggregationsInfo);
+
+    for (int i = 0; i < numAggregations; i++) {
+      AggregationFunction aggregationFunction = aggregationFunctions.get(i);
+      String functionName = aggregationFunction.getFunctionName();
+      @SuppressWarnings("unchecked")
+      String formattedValue =
+          AggregationGroupByOperatorService.formatValue(aggregationFunction.reduce(shuffledAggregationResults.get(i)));
+      AggregationResult aggregationResult = new AggregationResult(functionName, formattedValue);
+      reducedAggregationResults.add(aggregationResult);
+    }
+
+    brokerResponseNative.setAggregationResults(reducedAggregationResults);
+  }
+
+  /**
+   * Shuffle aggregation results, gather all results for each aggregation function together.
+   *
+   * @param aggregationsInfo list of aggregation information.
+   * @param dataTableMap map from server to data table.
+   * @return shuffled aggregation results.
+   */
+  private List<List<Serializable>> shuffleAggregationResults(@Nonnull List<AggregationInfo> aggregationsInfo,
+      @Nonnull Map<ServerInstance, DataTable> dataTableMap) {
+    int numAggregations = aggregationsInfo.size();
+    int numDataTables = dataTableMap.size();
+    List<List<Serializable>> shuffledAggregationResults = new ArrayList<>(numAggregations);
+    for (int i = 0; i < numAggregations; i++) {
+      shuffledAggregationResults.add(new ArrayList<Serializable>(numDataTables));
+    }
+
+    for (DataTable dataTable : dataTableMap.values()) {
+      DataSchema dataSchema = dataTable.getDataSchema();
+      for (int i = 0; i < numAggregations; i++) {
+        FieldSpec.DataType columnType = dataSchema.getColumnType(i);
+        switch (columnType) {
+          case LONG:
+            shuffledAggregationResults.get(i).add(dataTable.getLong(0, i));
+            break;
+          case DOUBLE:
+            shuffledAggregationResults.get(i).add(dataTable.getDouble(0, i));
+            break;
+          case OBJECT:
+            shuffledAggregationResults.get(i).add(dataTable.getObject(0, i));
+            break;
+          default:
+            throw new IllegalStateException("Illegal column type in aggregation results: " + columnType);
+        }
+      }
+    }
+
+    return shuffledAggregationResults;
+  }
+
+  /**
+   * Reduce group-by results from multiple servers and set them into BrokerResponseNative passed in.
+   *
+   * @param brokerResponseNative broker response.
+   * @param aggregationsInfo list of aggregation information.
+   * @param groupBy group-by information.
+   * @param dataTableMap map from server to data table.
+   */
+  private void setGroupByResults(@Nonnull BrokerResponseNative brokerResponseNative,
+      @Nonnull List<AggregationInfo> aggregationsInfo, @Nonnull GroupBy groupBy,
+      @Nonnull Map<ServerInstance, DataTable> dataTableMap) {
+    AggregationGroupByOperatorService aggregationGroupByOperatorService =
+        new AggregationGroupByOperatorService(aggregationsInfo, groupBy);
+    List<AggregationResult> aggregationResults = aggregationGroupByOperatorService.renderAggregationGroupByResult(
+        aggregationGroupByOperatorService.reduceGroupByOperators(dataTableMap));
+    brokerResponseNative.setAggregationResults(aggregationResults);
   }
 }

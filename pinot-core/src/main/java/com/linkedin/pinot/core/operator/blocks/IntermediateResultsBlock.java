@@ -57,11 +57,6 @@ public class IntermediateResultsBlock implements Block {
   private DataSchema _dataSchema;
   private Collection<Serializable[]> _selectionResult;
 
-  private static final String NUM_DOCS_SCANNED = "numDocsScanned";
-  private static final String NUM_ENTRIES_SCANNED_IN_FILTER = "numEntriesScannedInFilter";
-  private static final String NUM_ENTRIES_SCANNED_POST_FILTER = "numEntriesScannedPostFilter";
-  private static final String TOTAL_DOCS = "totalDocs";
-
   public IntermediateResultsBlock(List<AggregationFunction> aggregationFunctionList,
       List<Serializable> aggregationResult) {
     _aggregationFunctionList = aggregationFunctionList;
@@ -161,10 +156,12 @@ public class IntermediateResultsBlock implements Block {
   }
 
   public DataTable attachMetadataToDataTable(DataTable dataTable) {
-    dataTable.getMetadata().put(NUM_DOCS_SCANNED, String.valueOf(_numDocsScanned));
-    dataTable.getMetadata().put(NUM_ENTRIES_SCANNED_IN_FILTER, String.valueOf(_numEntriesScannedInFilter));
-    dataTable.getMetadata().put(NUM_ENTRIES_SCANNED_POST_FILTER, String.valueOf(_numEntriesScannedPostFilter));
-    dataTable.getMetadata().put(TOTAL_DOCS, String.valueOf(_totalRawDocs));
+    dataTable.getMetadata().put(DataTable.NUM_DOCS_SCANNED_METADATA_KEY, String.valueOf(_numDocsScanned));
+    dataTable.getMetadata()
+        .put(DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY, String.valueOf(_numEntriesScannedInFilter));
+    dataTable.getMetadata()
+        .put(DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY, String.valueOf(_numEntriesScannedPostFilter));
+    dataTable.getMetadata().put(DataTable.TOTAL_DOCS_METADATA_KEY, String.valueOf(_totalRawDocs));
     if (_processingExceptions != null && _processingExceptions.size() > 0) {
       for (ProcessingException exception : _processingExceptions) {
         dataTable.addException(exception);

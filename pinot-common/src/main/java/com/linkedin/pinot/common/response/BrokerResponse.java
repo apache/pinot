@@ -26,47 +26,48 @@ public interface BrokerResponse {
 
   /**
    * Set exceptions caught during request handling, into the broker response.
-   * @param exceptions
    */
   void setExceptions(List<ProcessingException> exceptions);
 
   /**
    * Set the total time used in request handling, into the broker response.
-   * @param timeUsedMs
    */
   void setTimeUsedMs(long timeUsedMs);
 
   /**
    * Convert the broker response to JSONObject.
-   * @return
-   * @throws Exception
    */
   JSONObject toJson()
       throws Exception;
 
   /**
    * Convert the broker response to JSON String.
-   * @return
-   * @throws Exception
    */
   String toJsonString()
       throws Exception;
 
   /**
-   * Return the number of documents scanned when processing the query.
-   * @return
+   * Get number of documents scanned while processing the query.
    */
   long getNumDocsScanned();
 
   /**
-   * Return the total number of documents within the table hit.
-   * @return
+   * Get number of entries scanned in filter phase while processing the query.
+   */
+  long getNumEntriesScannedInFilter();
+
+  /**
+   * Get number of entries scanned post filter phase while processing the query.
+   */
+  long getNumEntriesScannedPostFilter();
+
+  /**
+   * Get total number of documents within the table hit.
    */
   long getTotalDocs();
 
   /**
-   * Return the number of exceptions recorded in the response.
-   * @return
+   * Get number of exceptions recorded in the response.
    */
-  public int getExceptionsSize();
+  int getExceptionsSize();
 }

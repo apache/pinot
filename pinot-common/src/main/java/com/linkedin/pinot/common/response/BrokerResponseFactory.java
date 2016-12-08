@@ -16,14 +16,17 @@
 package com.linkedin.pinot.common.response;
 
 import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
-import org.json.JSONException;
-import org.json.JSONObject;
+import java.util.List;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 
 /**
  * Factory class to build a concrete BrokerResponse object for the given type.
  */
 public class BrokerResponseFactory {
+  private BrokerResponseFactory() {
+  }
 
   /**
    * Enum for broker response types.
@@ -32,84 +35,80 @@ public class BrokerResponseFactory {
     BROKER_RESPONSE_TYPE_NATIVE
   }
 
-  private static final String BROKER_RESPONSE_TYPE_KEY = "responseType";
-  public static final String ILLEGAL_RESPONSE_TYPE =
-      "Could not create brokerResponse object for specified illegal type.";
+  private static final String ILLEGAL_RESPONSE_TYPE = "Unsupported broker response type: ";
 
   /**
-   * Returns a new BrokerResponse object of the specified concrete type.
-   * Throws a IllegalArgumentException if an invalid response type is passed in as argument.
-   *
-   * @param brokerResponseType
-   * @return
+   * Get {@link ResponseType} response type from {@link String} response type.
+   * <p>If the input string is null, return the default <code>BROKER_RESPONSE_TYPE_NATIVE</code>.
    */
-  public static BrokerResponse get(ResponseType brokerResponseType) {
-    if (brokerResponseType.equals(ResponseType.BROKER_RESPONSE_TYPE_NATIVE)) {
+  @Nonnull
+  public static ResponseType getResponseType(@Nullable String responseType) {
+    if (responseType == null || responseType.equalsIgnoreCase(ResponseType.BROKER_RESPONSE_TYPE_NATIVE.name())) {
+      return ResponseType.BROKER_RESPONSE_TYPE_NATIVE;
+    } else {
+      throw new IllegalArgumentException(ILLEGAL_RESPONSE_TYPE + responseType);
+    }
+  }
+
+  /**
+   * Get a new broker response.
+   */
+  @Nonnull
+  public static BrokerResponse getBrokerResponse(@Nonnull ResponseType responseType) {
+    if (responseType.equals(ResponseType.BROKER_RESPONSE_TYPE_NATIVE)) {
       return new BrokerResponseNative();
     } else {
-      throw new IllegalArgumentException(ILLEGAL_RESPONSE_TYPE);
+      throw new IllegalArgumentException(ILLEGAL_RESPONSE_TYPE + responseType);
     }
   }
 
   /**
-   * Given a brokerRequest JSONObject, return the requested enum ResponseType
-   * - If request does not have responseType property, return the default value of ResponseType.BROKER_RESPONSE_NATIVE
-   * - If requested responseType property does not match enum values, throws IllegalArgumentException.
-   * - If JSONObject cannot be parsed, throws JSONException.
-   *
-   * @param brokerRequest
-   * @return
-   * @throws JSONException
+   * Get a new broker response with pre-loaded exception.
    */
-  public static ResponseType getResponseType(JSONObject brokerRequest)
-      throws JSONException {
-    if (!brokerRequest.has((BROKER_RESPONSE_TYPE_KEY))) {
-      return ResponseType.BROKER_RESPONSE_TYPE_NATIVE;
-    }
-
-    return ResponseType.valueOf(brokerRequest.get(BROKER_RESPONSE_TYPE_KEY).toString());
-  }
-
-  /**
-   * Given a responseType string, return the appropriate enum ResponseType.
-   * If the input string is null, return the default BROKER_RESPONSE_TYPE_NATIVE.
-   * If input string cannot be mapped to enum field, throws an IllegalArgumentException
-   *
-   * @param responseType
-   * @return
-   */
-  public static ResponseType getResponseType(String responseType) {
-    if (responseType == null || (responseType.equalsIgnoreCase(ResponseType.BROKER_RESPONSE_TYPE_NATIVE.name()))) {
-      return ResponseType.BROKER_RESPONSE_TYPE_NATIVE;
+  @Nonnull
+  public static BrokerResponse getBrokerResponseWithException(@Nonnull ResponseType responseType,
+      @Nonnull ProcessingException processingException) {
+    if (responseType.equals(ResponseType.BROKER_RESPONSE_TYPE_NATIVE)) {
+      return new BrokerResponseNative(processingException);
     } else {
-      throw new IllegalArgumentException("Illegal response type string " + responseType);
+      throw new IllegalArgumentException(ILLEGAL_RESPONSE_TYPE + responseType);
     }
   }
 
   /**
-   * Returns the static BrokerResponse of specified type, for case when table in query is not found.
-   *
-   * @param brokerResponseType
-   * @return
+   * Get a new broker response with pre-loaded exceptions.
    */
-  public static BrokerResponse getNoTableHitBrokerResponse(ResponseType brokerResponseType) {
-    if (brokerResponseType.equals(ResponseType.BROKER_RESPONSE_TYPE_NATIVE)) {
+  @Nonnull
+  public static BrokerResponse getBrokerResponseWithExceptions(@Nonnull ResponseType responseType,
+      @Nonnull List<ProcessingException> processingExceptions) {
+    if (responseType.equals(ResponseType.BROKER_RESPONSE_TYPE_NATIVE)) {
+      return new BrokerResponseNative(processingExceptions);
+    } else {
+      throw new IllegalArgumentException(ILLEGAL_RESPONSE_TYPE + responseType);
+    }
+  }
+
+  /**
+   * Get the static broker response for case when no table is hit. Don't modify the broker response returned.
+   */
+  @Nonnull
+  public static BrokerResponse getStaticNoTableHitBrokerResponse(@Nonnull ResponseType responseType) {
+    if (responseType.equals(ResponseType.BROKER_RESPONSE_TYPE_NATIVE)) {
       return BrokerResponseNative.NO_TABLE_RESULT;
     } else {
-      throw new RuntimeException(ILLEGAL_RESPONSE_TYPE);
+      throw new IllegalArgumentException(ILLEGAL_RESPONSE_TYPE + responseType);
     }
   }
 
   /**
-   * Returns the static empty BrokerResponse of specified type.
-   * @param brokerResponseType
-   * @return
+   * Get the static empty broker response. Don't modify the broker response returned.
    */
-  public static BrokerResponse getEmptyBrokerResponse(ResponseType brokerResponseType) {
-    if (brokerResponseType.equals(ResponseType.BROKER_RESPONSE_TYPE_NATIVE)) {
+  @Nonnull
+  public static BrokerResponse getStaticEmptyBrokerResponse(@Nonnull ResponseType responseType) {
+    if (responseType.equals(ResponseType.BROKER_RESPONSE_TYPE_NATIVE)) {
       return BrokerResponseNative.EMPTY_RESULT;
     } else {
-      throw new RuntimeException(ILLEGAL_RESPONSE_TYPE);
+      throw new IllegalArgumentException(ILLEGAL_RESPONSE_TYPE + responseType);
     }
   }
 }

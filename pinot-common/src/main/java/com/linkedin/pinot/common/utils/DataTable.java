@@ -43,9 +43,16 @@ import org.slf4j.LoggerFactory;
  */
 public class DataTable {
   private static final Logger LOGGER = LoggerFactory.getLogger(DataTable.class);
+  private static final Charset UTF8 = Charset.forName("UTF-8");
 
   public static final String EXCEPTION_METADATA_KEY = "Exception";
-  private static final Charset UTF8 = Charset.forName("UTF-8");
+  public static final String NUM_DOCS_SCANNED_METADATA_KEY = "numDocsScanned";
+  public static final String NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY = "numEntriesScannedInFilter";
+  public static final String NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY = "numEntriesScannedPostFilter";
+  public static final String TOTAL_DOCS_METADATA_KEY = "totalDocs";
+  public static final String TIME_USED_MS_METADATA_KEY = "timeUsedMs";
+  public static final String TRACE_INFO_METADATA_KEY = "traceInfo";
+  public static final String REQUEST_ID_METADATA_KEY = "requestId";
 
   // Data Table version
   public enum Version {
@@ -854,9 +861,6 @@ public class DataTable {
   }
 
   public void addException(ProcessingException exception) {
-    if (metadata == null) {
-      metadata = new HashMap<String, String>();
-    }
-    metadata.put("Exception" + exception.getErrorCode(), exception.getMessage());
+    metadata.put(EXCEPTION_METADATA_KEY + exception.getErrorCode(), exception.getMessage());
   }
 }

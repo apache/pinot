@@ -85,7 +85,7 @@ public class InstanceServerStarter {
       QueryRequest queryRequest = new QueryRequest(instanceRequest, metrics);
       DataTable instanceResponse = queryExecutor.processQuery(queryRequest);
       System.out.println(instanceResponse.toString());
-      System.out.println("Query Time Used : " + instanceResponse.getMetadata().get("timeUsedMs"));
+      System.out.println("Query Time Used : " + instanceResponse.getMetadata().get(DataTable.TIME_USED_MS_METADATA_KEY));
     } catch (Exception e) {
       e.printStackTrace();
     }

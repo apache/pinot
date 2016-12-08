@@ -46,23 +46,24 @@ public class BrokerResponseNativeTest {
     BrokerResponseNative actual = BrokerResponseNative.fromJsonString(brokerString);
     Assert.assertEquals(actual.getProcessingExceptions().get(0).getErrorCode(),
         QueryException.BROKER_RESOURCE_MISSING_ERROR.getErrorCode());
-    Assert.assertEquals(actual.getProcessingExceptions().get(0).getMessage(), "No table hit!");
+    Assert.assertEquals(actual.getProcessingExceptions().get(0).getMessage(),
+        QueryException.BROKER_RESOURCE_MISSING_ERROR.getMessage());
   }
 
   @Test
   public void testMultipleExceptionsResponse()
       throws JSONException, IOException {
     BrokerResponseNative expected = BrokerResponseNative.NO_TABLE_RESULT;
-    QueryProcessingException processingException = new QueryProcessingException(400);
     String errorMsgStr = "Some random string!";
-    processingException.setMessage(errorMsgStr);
+    QueryProcessingException processingException = new QueryProcessingException(400, errorMsgStr);
     expected.addToExceptions(processingException);
     String brokerString = expected.toJsonString();
     System.out.println(brokerString);
     BrokerResponseNative newBrokerResponse = BrokerResponseNative.fromJsonString(brokerString);
     Assert.assertEquals(newBrokerResponse.getProcessingExceptions().get(0).getErrorCode(),
         QueryException.BROKER_RESOURCE_MISSING_ERROR.getErrorCode());
-    Assert.assertEquals(newBrokerResponse.getProcessingExceptions().get(0).getMessage(), "No table hit!");
+    Assert.assertEquals(newBrokerResponse.getProcessingExceptions().get(0).getMessage(),
+        QueryException.BROKER_RESOURCE_MISSING_ERROR.getMessage());
     System.out.println(newBrokerResponse.getProcessingExceptions().get(1));
     Assert.assertEquals(newBrokerResponse.getProcessingExceptions().get(1).getErrorCode(), 400);
     Assert.assertEquals(newBrokerResponse.getProcessingExceptions().get(1).getMessage(), errorMsgStr);
