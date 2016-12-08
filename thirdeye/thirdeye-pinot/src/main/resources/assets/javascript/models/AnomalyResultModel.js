@@ -46,4 +46,5 @@ function AnomalyResult(anomalyId) {
   this.anomalyFunctionType = 'wow_rule';
   this.anomalyFunctionProps = 'props,props,props';
   this.anomalyFunctionDimension = 'country:US';
+  this.anomalyFeedback = "Confirmed Anomaly";
 }

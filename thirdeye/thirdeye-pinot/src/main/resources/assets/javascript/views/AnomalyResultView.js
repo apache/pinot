@@ -1,6 +1,7 @@
 
 function AnomalyResultView(anomalyResultModel) {
 
+  // model
   this.anomalyResultModel = anomalyResultModel;
 
   this.timeRangeConfig = {
@@ -28,6 +29,12 @@ function AnomalyResultView(anomalyResultModel) {
   // Compile HTML template
   var anomalies_template = $("#anomalies-template").html();
   this.anomalies_template_compiled = Handlebars.compile(anomalies_template);
+
+  // events
+  this.rootCauseAnalysisButtonClickEvent = new Event();
+  this.showDetailsLinkClickEvent = new Event();
+  this.anomalyFeedbackSelectEvent = new Event();
+
 }
 
 AnomalyResultView.prototype = {
@@ -101,6 +108,10 @@ AnomalyResultView.prototype = {
       var dimension = anomaly.anomalyFunctionDimension;
       $("#dimension-"+i).html(dimension)
 
+      if (anomaly.anomalyFeedback) {
+        $("#anomaly-feedback-"+i+" select").val(anomaly.anomalyFeedback);
+      }
+
 
       // CHART GENERATION
       var chart = c3.generate({
@@ -129,7 +140,47 @@ AnomalyResultView.prototype = {
           end : regionEnd
         } ]
       });
+
+      this.setupListeners(i, anomaly);
     }
 
+  },
+
+  dataEventHandler: function(e) {
+    var currentTargetId = e.currentTarget.id;
+    if (currentTargetId.startsWith('root-cause-analysis-button-')) {
+      this.rootCauseAnalysisButtonClickEvent.notify(e.data);
+    } else if (currentTargetId.startsWith('show-details-')) {
+      this.showDetailsLinkClickEvent.notify(e.data);
+    } else if (currentTargetId.startsWith('anomaly-feedback-')) {
+      var option = $("#" + currentTargetId + " option:selected").text();
+      e.data['feedback'] = option;
+      this.anomalyFeedbackSelectEvent.notify(e.data);
+    }
+  },
+
+  setupListeners : function(i, anomaly) {
+    var rootCauseAnalysisParams = {
+                    metric: anomaly.metric,
+                    rangeStart: anomaly.currentStart,
+                    rangeEnd: anomaly.currentEnd,
+                    dimension: anomaly.anomalyFunctionDimension
+                 }
+    $('#root-cause-analysis-button-'+i).click(rootCauseAnalysisParams, this.dataEventHandler.bind(this));
+
+    var showDetailsParams = {
+        anomalyId: anomaly.anomalyId,
+        metric: anomaly.metric,
+        rangeStart: anomaly.currentStart,
+        rangeEnd: anomaly.currentEnd,
+        dimension: anomaly.anomalyFunctionDimension
+     }
+    $('#show-details-'+i).click(showDetailsParams, this.dataEventHandler.bind(this));
+
+    var anomalyFeedbackParams = {
+        anomalyId: anomaly.anomalyId
+     }
+    $('#anomaly-feedback-'+i).change(anomalyFeedbackParams, this.dataEventHandler.bind(this));
   }
+
 };

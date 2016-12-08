@@ -37,7 +37,7 @@
 			<div class="container">
 				<div class="panel padding-all">
 					<div class="row">
-						<div class="col-md-3">
+						<div id="show-details-{{anomalyIndex}}" class="col-md-3">
 							<label>{{this.anomalyId}}<a href="#"> show details</a></label>
 						</div>
 						<div class="col-md-6"></div>
@@ -93,7 +93,7 @@
 						</div>
 					</div>
 					<div class="row">
-						<div class="col-md-3">
+						<div id="anomaly-feedback-{{anomalyIndex}}" class="col-md-3">
 							<select data-placeholder="Provide Anomaly Feedback" style="width: 250px; border: 0px" class="chosen-select">
 								<option>False Alarm</option>
 								<option>Confirmed Anomaly</option>
@@ -101,7 +101,7 @@
 							</select>
 						</div>
 						<div class="col-md-6"></div>
-						<div class="col-md-3">
+						<div id="root-cause-analysis-button-{{anomalyIndex}}" class="col-md-3">
 							<button type="button" class="btn btn-primary btn-sm">Root Cause Analysis</button>
 						</div>
 					</div>
