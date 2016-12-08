@@ -33,6 +33,7 @@ function AnomalyResultView(anomalyResultModel) {
   this.anomalies_template_compiled = Handlebars.compile(anomalies_template);
 
   // events
+  this.metricApplyEvent = new Event();
   this.hideDataRangePickerEvent = new Event(this);
   this.rootCauseAnalysisButtonClickEvent = new Event();
   this.showDetailsLinkClickEvent = new Event();
@@ -77,6 +78,7 @@ AnomalyResultView.prototype = {
     $('#anomalies-time-range').daterangepicker(this.timeRangeConfig, cb);
     cb(this.timeRangeConfig.startDate, this.timeRangeConfig.endDate);
 
+    this.setupListenerOnMetricApply();
     this.setupListenerOnDateRangePicker();
 
   },
@@ -173,6 +175,16 @@ AnomalyResultView.prototype = {
 
   setupListenerOnDateRangePicker: function() {
     $('#anomalies-time-range').on('hide.daterangepicker', this.hideDataRangePickerEventHandler.bind(this));
+  },
+
+  metricApplyEventHandler: function(e) {
+    var metric = $('#metric-search-input').val();
+    this.metricApplyEvent.notify(metric);
+
+  },
+
+  setupListenerOnMetricApply: function() {
+    $('#apply-metric-button').click(this.metricApplyEventHandler.bind(this));
   },
 
   setupListenersOnAnomaly : function(idx, anomaly) {

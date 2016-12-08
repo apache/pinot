@@ -3,9 +3,12 @@
 	<div class="row bg-white row-bordered">
 		<div class="container top-buffer bottom-buffer ">
 			<div class=row>
-				<div class="col-md-12">
+				<div class="col-md-5">
 					<label for="metric-button" class="label-large-light">View Anomalies for:</label>
 					<input type="text" class="btn btn-link label-medium-semibold" id="metric-search-input">Metric</input>
+				</div>
+				<div class="col-md-7">
+					<button type="button" id="apply-metric-button">Apply</button>
 				</div>
 			</div>
 		</div>
