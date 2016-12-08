@@ -23,11 +23,11 @@ PercentageChangeTableView.prototype = {
     $(this.percentage_change_table_placeHolderId).html(percentageChangeTableResult);
 
     var wowMetricTableResult = this.wow_metric_table_template_compiled(
-        this.model.wowMetricTable);
+        this.model);
     $(this.wow_metric_table_placeHolderId).html(wowMetricTableResult);
 
     var wowMetricDimensionTableResult = this.wow_metric_dimension_table_template_compiled(
-        this.model.wowMetricDimensionTable);
+        this.model);
     $(this.wow_metric_dimension_table_placeHolderId).html(wowMetricDimensionTableResult);
 
     this.setupListeners();
