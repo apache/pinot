@@ -1,5 +1,5 @@
 function DashboardModel(params) {
-  this.dashboardName = "100 Most Recent Anomalies";
+  this.dashboardName;
   this.mode = "AnomalySummary";
   this.hashParams = params;
 
@@ -17,9 +17,9 @@ DashboardModel.prototype = {
 
   init: function (params) {
     this.hashParams = params;
-    // if (params.dashboardName) {
-    //   this.dashboardName = params.dashboardName;
-    // }
+    if (params.dashboardName) {
+      this.dashboardName = params.dashboardName;
+    }
     // if (params.startTime) {
     //   this.startTime = params.startTime;
     // }
@@ -32,6 +32,10 @@ DashboardModel.prototype = {
   },
 
   update: function (params) {
+    this.hashParams = params;
+    if (params.dashboardName) {
+      this.dashboardName = params.dashboardName;
+    }
   },
 
   setStartTime: function(startTime) {

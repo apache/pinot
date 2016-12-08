@@ -6,12 +6,14 @@
 					<div style="float: left;">
 						<label for="dashboard-input" class="label-large-light">Dashboard Name: </label>
 					</div>
-					<div style="width:370px;float: left">
-						<input type="text" name="dashboard" size="35" id="dashboard-input" class="label-large-light underlined" placeholder="Search for a Dashboard"/>
-					</div>
-					<div style="float: left">
-						<a type="button" class="btn btn-link label-medium-semibold" id="create-dashboard-button" data-toggle="modal" data-target="#create-dashboard-modal">+ Create Custom Dashboard</a>
-					</div>
+          <div style="width:370px;float: left">
+            <input type="text" name="dashboard" size="35" id="dashboard-input" class="label-large-light underlined" placeholder="Search for a Dashboard"/>
+          </div>
+          <div style="width:370px;float: left" id = "selected-dashboard" ></div>
+
+				  <#--<div style="float: left">-->
+						<#--<a type="button" class="btn btn-link label-medium-semibold" id="create-dashboard-button" data-toggle="modal" data-target="#create-dashboard-modal">+ Create Custom Dashboard</a>-->
+					<#--</div>-->
 				</div>
 			</div>
 		</div>
@@ -33,6 +35,7 @@
 		</div>
 	</div>
 </div>
+{{#if this.dashboardName}}
 <div class="container-fluid">
 	<div class="row row-bordered">
 		<div class="container top-buffer bottom-buffer">
@@ -63,6 +66,7 @@
 		</div>
 	</div>
 </div>
+{{/if}}
 
 <#include "dashboard/manage-dashboard-modal.ftl"/>
 

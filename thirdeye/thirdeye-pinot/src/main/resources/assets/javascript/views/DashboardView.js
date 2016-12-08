@@ -3,6 +3,7 @@ function DashboardView(dashboardModel) {
 
   this.tabClickEvent = new Event(this);
   this.hideDataRangePickerEvent = new Event(this);
+  this.onDashboardSelectionEvent = new Event(this);
 
   this.timeRangeConfig = {
     startDate : this.dashboardModel.startTime,
@@ -34,19 +35,31 @@ function DashboardView(dashboardModel) {
 }
 
 DashboardView.prototype = {
-  init: function () {
+  init: function (hashParams) {
 
   },
 
   render: function () {
+    var self = this;
+
     $("#dashboard-place-holder").html(this.dashboard_template_compiled(this.dashboardModel));
     $('#dashboard-tabs a:first').click();
+
+    // DASHBOARD SELECTION
+    console.log(this.dashboardModel.hashParams.dashboardName);
+
+    // TODO : set selected dashboard in the input
+    if (this.dashboardModel.hashParams.dashboardName) {
+      $("#selected-dashboard").html(this.dashboardModel.hashParams.dashboardName);
+    }
 
     // DASHBOARD SELECTION
     $('#dashboard-input').autocomplete({
       lookup : this.dashboardModel.dashboards,
       onSelect : function(suggestion) {
         console.log('You selected: ' + suggestion.value + ', ' + suggestion.data);
+        var args = {dashboardName: suggestion.value, dashboardId: suggestion.data};
+        self.onDashboardSelectionEvent.notify(args);
       }
     });
 
@@ -66,12 +79,12 @@ DashboardView.prototype = {
   },
 
   setupListeners : function() {
+    var self = this;
     $('#dashboard-tabs a').click(function (e) {
       e.preventDefault();
       $(this).tab('show');
     });
 
-    var self = this;
     var tabSelectionEventHandler = function (e) {
       var targetTab = $(e.target).attr('href');
       var previousTab = $(e.relatedTarget).attr('href');
