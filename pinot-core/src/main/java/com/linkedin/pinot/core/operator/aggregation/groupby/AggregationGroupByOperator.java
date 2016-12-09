@@ -26,6 +26,7 @@ import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
+import com.linkedin.pinot.core.query.config.AggregationOperatorConfig;
 import java.util.List;
 
 
@@ -39,30 +40,30 @@ public class AggregationGroupByOperator extends BaseOperator {
   private final GroupByExecutor _groupByExecutor;
   private final List<AggregationInfo> _aggregationInfoList;
   private final MProjectionOperator _projectionOperator;
-  private final long _numTotalRawDocs;
+  private final AggregationOperatorConfig _aggregationConfig;
   private int _nextBlockCallCounter = 0;
   private ExecutionStatistics _executionStatistics;
 
   /**
    * Constructor for the class.
-   *
-   * @param aggregationsInfoList List of AggregationInfo (contains context for applying aggregation functions).
+   *  @param aggregationsInfoList List of AggregationInfo (contains context for applying aggregation functions).
    * @param groupBy GroupBy to perform
    * @param projectionOperator Projection
    * @param numGroupsLimit Limit on number of aggregation groups returned in the result
-   * @param numTotalRawDocs Number of total raw documents.
+   * @param aggregationConfig aggregation operator configuration
    */
   public AggregationGroupByOperator(List<AggregationInfo> aggregationsInfoList, GroupBy groupBy,
-      MProjectionOperator projectionOperator, int numGroupsLimit, long numTotalRawDocs) {
+      MProjectionOperator projectionOperator, int numGroupsLimit, AggregationOperatorConfig aggregationConfig) {
     Preconditions.checkArgument((aggregationsInfoList != null) && (aggregationsInfoList.size() > 0));
     Preconditions.checkNotNull(groupBy);
     Preconditions.checkNotNull(projectionOperator);
+    Preconditions.checkNotNull(aggregationConfig);
 
     _groupByExecutor =
-        new DefaultGroupByExecutor(aggregationsInfoList, groupBy, numGroupsLimit);
+        new DefaultGroupByExecutor(aggregationsInfoList, groupBy, numGroupsLimit, aggregationConfig);
     _aggregationInfoList = aggregationsInfoList;
     _projectionOperator = projectionOperator;
-    _numTotalRawDocs = numTotalRawDocs;
+    _aggregationConfig = aggregationConfig;
   }
 
   /**
@@ -98,7 +99,7 @@ public class AggregationGroupByOperator extends BaseOperator {
     long numEntriesScannedPostFilter = numDocsScanned * _projectionOperator.getNumProjectionColumns();
     _executionStatistics =
         new ExecutionStatistics(numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
-            _numTotalRawDocs);
+            _aggregationConfig.getTotalRawDocs());
 
     AggregationGroupByResult aggregationGroupByResult = _groupByExecutor.getResult();
     return new IntermediateResultsBlock(AggregationFunctionFactory.getAggregationFunction(_aggregationInfoList),

@@ -43,7 +43,7 @@ import org.testng.annotations.Test;
 
 public class PregeneratedHllTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(PregeneratedHllTest.class);
-  private static final HllConfig hllConfig = new HllConfig(8 /*log2m*/);
+  private static final HllConfig hllConfig = new HllConfig(12 /*log2m*/);
   private TestHelper testHelper;
   private SegmentWithHllIndexCreateHelper helper;
   private static final double approximationThreshold = 0.001;

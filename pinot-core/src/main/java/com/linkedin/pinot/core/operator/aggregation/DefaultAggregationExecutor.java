@@ -28,6 +28,7 @@ import com.linkedin.pinot.core.operator.docvalsets.ProjectionBlockValSet;
 import com.linkedin.pinot.core.query.aggregation.function.AvgAggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.MinMaxRangeAggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.function.quantile.digest.QuantileDigest;
+import com.linkedin.pinot.core.query.config.AggregationOperatorConfig;
 import com.linkedin.pinot.core.query.utils.Pair;
 import com.linkedin.pinot.core.startree.hll.HllConstants;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
@@ -47,21 +48,23 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
 
   // Array of result holders, one for each aggregation.
   private final AggregationResultHolder[] _resultHolderArray;
-
+  private final AggregationOperatorConfig _aggregationConfig;
   boolean _inited = false;
   boolean _finished = false;
 
-  public DefaultAggregationExecutor(List<AggregationInfo> aggregationInfoList) {
+  public DefaultAggregationExecutor(List<AggregationInfo> aggregationInfoList, AggregationOperatorConfig aggregationConfig) {
     Preconditions.checkNotNull(aggregationInfoList);
     Preconditions.checkArgument(aggregationInfoList.size() > 0);
+    Preconditions.checkNotNull(aggregationConfig);
 
+    _aggregationConfig = aggregationConfig;
     _numAggrFunc = aggregationInfoList.size();
     _aggrFuncContextArray = new AggregationFunctionContext[_numAggrFunc];
     for (int i = 0; i < _numAggrFunc; i++) {
       AggregationInfo aggregationInfo = aggregationInfoList.get(i);
       String[] columns = aggregationInfo.getAggregationParams().get("column").trim().split(",");
       _aggrFuncContextArray[i] = new AggregationFunctionContext(
-          aggregationInfo.getAggregationType(), columns);
+          aggregationInfo.getAggregationType(), columns, aggregationConfig);
     }
     _resultHolderArray = new AggregationResultHolder[_numAggrFunc];
   }

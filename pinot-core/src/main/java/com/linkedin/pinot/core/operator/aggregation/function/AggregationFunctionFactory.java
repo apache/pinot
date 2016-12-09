@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.operator.aggregation.function;
 
-import com.linkedin.pinot.core.startree.hll.HllConstants;
+import com.linkedin.pinot.core.query.config.AggregationOperatorConfig;
 
 
 /**
@@ -62,9 +62,10 @@ public class AggregationFunctionFactory {
    * of the corresponding aggregation function and return.
    *
    * @param functionName
+   * @param aggregationConfig
    * @return
    */
-  public static AggregationFunction getAggregationFunction(String functionName) {
+  public static AggregationFunction getAggregationFunction(String functionName, AggregationOperatorConfig aggregationConfig) {
     switch (functionName.toLowerCase()) {
       case COUNT_AGGREGATION_FUNCTION:
         return new CountAggregationFunction();
@@ -92,7 +93,7 @@ public class AggregationFunctionFactory {
 
       case FASTHLL_AGGREGATION_FUNCTION:
         // TODO: Add support for configurable hll per segment.
-        return new FastHllAggregationFunction(HllConstants.DEFAULT_LOG2M);
+        return new FastHllAggregationFunction(aggregationConfig.getHllLog2m());
 
       case PERCENTILE50_AGGREGATION_FUNCTION:
         return new PercentileAggregationFunction(50);

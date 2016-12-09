@@ -27,7 +27,9 @@ import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunction
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
 import com.linkedin.pinot.core.operator.docvalsets.ProjectionBlockValSet;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
+import com.linkedin.pinot.core.query.config.AggregationOperatorConfig;
 import java.util.List;
+import javax.annotation.Nonnull;
 
 
 /**
@@ -43,6 +45,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   private final int _numAggrFunc;
   private final int _numGroupsLimit;
   private final List<AggregationInfo> _aggregationInfoList;
+  private final AggregationOperatorConfig _aggregationConfig;
 
   private  GroupKeyGenerator _groupKeyGenerator;
   private AggregationFunctionContext[] _aggrFuncContextArray;
@@ -59,19 +62,22 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
 
   /**
    * Constructor for the class.
-   *
    * @param aggregationInfoList Aggregation info from broker request
    * @param groupBy Group by from broker request
    * @param numGroupsLimit Limit on number of aggregation groups returned in the result
+   * @param aggregationConfig
    */
-  public DefaultGroupByExecutor(List<AggregationInfo> aggregationInfoList, GroupBy groupBy, int numGroupsLimit) {
+  public DefaultGroupByExecutor(@Nonnull List<AggregationInfo> aggregationInfoList, @Nonnull GroupBy groupBy, int numGroupsLimit,
+      @Nonnull AggregationOperatorConfig aggregationConfig) {
     Preconditions.checkNotNull(aggregationInfoList);
     Preconditions.checkArgument(aggregationInfoList.size() > 0);
     Preconditions.checkNotNull(groupBy);
+    Preconditions.checkNotNull(aggregationConfig);
 
     List<String> groupByColumnList = groupBy.getColumns();
     _groupByColumns = groupByColumnList.toArray(new String[groupByColumnList.size()]);
     _numAggrFunc = aggregationInfoList.size();
+    _aggregationConfig = aggregationConfig;
 
     // TODO: revisit the trim factor. Usually the factor should be 5-10, and based on the 'TOP' limit.
     // When results are trimmed, drop bottom 10% of groups.
@@ -263,7 +269,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       AggregationInfo aggregationInfo = aggregationInfoList.get(i);
       String[] columns = aggregationInfo.getAggregationParams().get("column").trim().split(",");
 
-      _aggrFuncContextArray[i] = new AggregationFunctionContext(aggregationInfo.getAggregationType(), columns);
+      _aggrFuncContextArray[i] = new AggregationFunctionContext(aggregationInfo.getAggregationType(), columns, _aggregationConfig);
       _resultHolderArray[i] =
           ResultHolderFactory.getGroupByResultHolder(_aggrFuncContextArray[i].getAggregationFunction(), maxNumResults,
               trimSize);
