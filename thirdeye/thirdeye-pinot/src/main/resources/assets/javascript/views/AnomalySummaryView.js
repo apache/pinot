@@ -8,6 +8,7 @@ function AnomalySummaryView(anomalySummaryModel) {
 AnomalySummaryView.prototype = {
 
   render : function() {
+    console.log("AnomalySummaryView.render")
     var result = this.template_compiled(this.anomalySummaryModel);
     $(this.placeHolderId).html(result);
   }

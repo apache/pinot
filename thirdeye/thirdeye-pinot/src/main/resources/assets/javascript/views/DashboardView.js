@@ -35,15 +35,15 @@ function DashboardView(dashboardModel) {
 }
 
 DashboardView.prototype = {
-  init: function (hashParams) {
+  init: function () {
 
   },
-
   render: function () {
     var self = this;
-
-    $("#dashboard-place-holder").html(this.dashboard_template_compiled(this.dashboardModel));
-    $('#dashboard-tabs a:first').click();
+    result = this.dashboard_template_compiled(this.dashboardModel);
+    $("#dashboard-place-holder").html(result);
+    console.log("this.dashboardModel.tabSelected:" + this.dashboardModel.tabSelected);
+    $('#dashboard-tabs a[href="#' + this.dashboardModel.tabSelected + '"]').tab('show');
 
     // DASHBOARD SELECTION
     $('#dashboard-input').autocomplete({
@@ -64,16 +64,16 @@ DashboardView.prototype = {
         console.log('You selected: ' + suggestion.value + ', ' + suggestion.data);
         console.log(suggestion);
         var args = {dashboardName: suggestion.value, dashboardId: suggestion.data};
-        if (self.dashboardModel.hashParams.dashboardName != suggestion.value) {
+        if (self.dashboardModel.dashboardName != suggestion.value) {
           self.onDashboardSelectionEvent.notify(args);
         }
       }
-    }).val(this.dashboardModel.hashParams.dashboardName);
+    }).val(this.dashboardModel.dashboardName);
 
 
     // TIME RANGE SELECTION
-    this.timeRangeConfig.startDate = this.dashboardModel.getStartTime();
-    this.timeRangeConfig.endDate = this.dashboardModel.getEndTime();
+    this.timeRangeConfig.startDate = this.dashboardModel.startTime;
+    this.timeRangeConfig.endDate = this.dashboardModel.endTime;
 
     function dashboard_range_cb(start, end) {
       $('#dashboard-time-range span').addClass("time-range").html(start.format('MMM D, ') + start.format('hh:mm a') + '  &mdash;  ' + end.format('MMM D, ') + end.format('hh:mm a'));
@@ -88,18 +88,14 @@ DashboardView.prototype = {
 
   setupListeners : function() {
     var self = this;
-    $('#dashboard-tabs a').click(function (e) {
-      e.preventDefault();
-      $(this).tab('show');
-    });
-
     var tabSelectionEventHandler = function (e) {
       var targetTab = $(e.target).attr('href');
       var previousTab = $(e.relatedTarget).attr('href');
       var args = {targetTab: targetTab, previousTab: previousTab};
       self.tabClickEvent.notify(args);
+      e.preventDefault();
     };
-    $('#dashboard-tabs a[data-toggle="tab"]').on('shown.bs.tab', tabSelectionEventHandler);
+    $('#dashboard-tabs a').click(tabSelectionEventHandler);
 
     var hideDataRangePickerEventHandler = function(e, dataRangePicker) {
       var args = {e: e, dataRangePicker: dataRangePicker};

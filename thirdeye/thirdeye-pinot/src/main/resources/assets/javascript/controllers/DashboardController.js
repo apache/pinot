@@ -4,7 +4,7 @@ function DashboardController(parentController) {
   this.dashboardView = new DashboardView(this.dashboardModel);
 
   this.anomalySummaryController = new AnomalySummaryController(this);
-  this.woWSummaryController = new WoWSummaryController(this);
+  this.wowSummaryController = new WoWSummaryController(this);
 
   this.dashboardView.tabClickEvent.attach(this.onSubTabSelectionEventHandler.bind(this));
   this.dashboardView.hideDataRangePickerEvent.attach(this.hideDataRangePickerEventHandler.bind(this));
@@ -12,69 +12,55 @@ function DashboardController(parentController) {
 }
 
 DashboardController.prototype = {
-  //TODO: figure out how to invoke this function from page callback
-  handleAppEvent : function(hashParams) {
-    hashParams = hashParams.hashParams;
-    console.log("hashParams:");
-    console.log(hashParams);
-    this.refreshView(hashParams);
-  },
-
   init : function(hashParams) {
-    this.dashboardModel.init(hashParams);
-    this.dashboardView.init(hashParams);
+    this.dashboardModel.update(HASH_SERVICE.getParams());
+    this.dashboardView.init();
   },
 
-  refreshView: function(hashParams) {
-    this.dashboardModel.update(hashParams);
-    this.dashboardView.render();
-    if (hashParams.dashboardName) {
-      if (this.dashboardModel.mode == "AnomalySummary") {
-        $('#anomaly-summary-tab').click();
-      } else if (this.dashboardModel.mode == "WoWSummary") {
-        $('#wow-summary-tab').click();
-      } else {
-        $('#dashboard-tabs a:first').click();
-      }
+  handleAppEvent : function() {
+    console.log("DashboardController.handleAppEvent");
+    tabName = HASH_SERVICE.get("tab");
+
+    console.log("tabName:" + tabName);
+    var childController;
+    if (tabName.startsWith("dashboard_anomaly-summary-tab")) {
+      this.dashboardModel.tabSelected = "dashboard_anomaly-summary-tab";
+      childController = this.anomalySummaryController;
+    } else if (tabName.startsWith("dashboard_wow-summary-tab")) {
+      this.dashboardModel.tabSelected = "dashboard_wow-summary-tab";
+      childController = this.wowSummaryController;
+    } else {
+      this.dashboardModel.tabSelected = "dashboard_anomaly-summary-tab";
+      childController = this.anomalySummaryController;
     }
+    this.dashboardView.render();
+    childController.handleAppEvent();
+
   },
 
   onSubTabSelectionEventHandler : function(sender, args) {
     var params = this.dashboardModel.hashParams;
-    if (args.previousTab != args.targetTab) {
-      if (args.targetTab == "#anomaly-summary-tab") {
-        this.dashboardModel.mode = "AnomalySummary";
-        this.anomalySummaryController.handleAppEvent(params);
-      } else if (args.targetTab == "#wow-summary-tab") {
-        this.dashboardModel.mode = "WoWSummary";
-        this.woWSummaryController.handleAppEvent(params);
-      }
-    }
+    args.targetTab = args.targetTab.replace("#", "");
+    HASH_SERVICE.set("tab", args.targetTab);
+    this.handleAppEvent();
   },
 
-  hideDataRangePickerEventHandler: function(sender, args) {
+  hideDataRangePickerEventHandler : function(sender, args) {
     var dataRangePicker = args.dataRangePicker;
-    if (!this.dashboardModel.getStartTime().isSame(dataRangePicker.startDate) ||
-        !this.dashboardModel.getEndTime().isSame(dataRangePicker.endDate)) {
-      // Copy date range  to local model for checking if new date range needs update
-      this.dashboardModel.setStartTime(dataRangePicker.startDate);
-      this.dashboardModel.setEndTime(dataRangePicker.endDate);
-      // Copy date range to global hash params for updating other modules
-      var hashParams = this.dashboardModel.hashParams;
-      hashParams.startTime = dataRangePicker.startDate;
-      hashParams.endTime = dataRangePicker.endDate;
-
-      console.log(hashParams);
-      this.refreshView(hashParams);
+    if (!this.dashboardModel.getStartTime().isSame(dataRangePicker.startDate) || !this.dashboardModel.getEndTime().isSame(dataRangePicker.endDate)) {
+      // Copy date range to local model for checking if new date range needs
+      // update
+      this.dashboardModel.startTime = dataRangePicker.startDate;
+      this.dashboardModel.endTime = dataRangePicker.endDate;
+      this.handleAppEvent();
     }
 
   },
 
-  onDashboardSelectionEventHandler: function(sender, args) {
-    this.dashboardModel.hashParams.dashboardName = args.dashboardName;
-    this.dashboardModel.hashParams.dashboardId = args.dashboardId;
-    console.log(this.dashboardModel.hashParams);
-    this.refreshView(this.dashboardModel.hashParams);
+  onDashboardSelectionEventHandler : function(sender, args) {
+    this.dashboardModel.dashboardName = args.dashboardName;
+    this.dashboardModel.dashboardId = args.dashboardId;
+    this.handleAppEvent();
   }
 
 };

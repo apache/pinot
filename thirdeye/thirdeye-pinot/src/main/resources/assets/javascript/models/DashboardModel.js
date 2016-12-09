@@ -1,48 +1,26 @@
-function DashboardModel(params) {
+function DashboardModel() {
   this.dashboardName;
   this.mode = "AnomalySummary";
-  this.hashParams = params;
+  this.startTime = moment().subtract("7", "days");
+  this.endTime = moment();
+
 }
 
 DashboardModel.prototype = {
 
-  init: function (params) {
-    this.hashParams = params;
+  update : function(params) {
     if (params.dashboardName) {
       this.dashboardName = params.dashboardName;
     }
-    // if (params.startTime) {
-    //   this.startTime = params.startTime;
-    // }
-    // if (params.endTime) {
-    //   this.endTime = params.endTime;
-    // }
-    // if (params.dashboardViewMode) {
-    //   this.dashboardViewMode = params.dashboardViewMode;
-    // }
-  },
-
-  update: function (params) {
-    this.hashParams = params;
-    if (params.dashboardName) {
-      this.dashboardName = params.dashboardName;
+    if (params.mode) {
+      this.mode = params.mode;
+    }
+    if (params.startTime) {
+      this.startTime = params.startTime;
+    }
+    if (params.endTime) {
+      this.endTime = params.endTime;
     }
   },
-
-  setStartTime: function(startTime) {
-    this.hashParams.startTime = startTime;
-  },
-
-  getStartTime: function() {
-    return this.hashParams.startTime;
-  },
-
-  setEndTime: function(endTime) {
-    this.hashParams.endTime = endTime;
-  },
-
-  getEndTime: function() {
-    return this.hashParams.endTime;
-  }
 
 };

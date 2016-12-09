@@ -47,18 +47,18 @@
 				</div>
 				<div id="dashboard-tabs" class="collapse navbar-collapse">
 					<ul class="nav navbar-nav dashboard-tabs" id="dashboard-tabs">
-						<li class=""><a href="#anomaly-summary-tab" data-toggle="tab"># of Anomalies</a></li>
-						<li class=""><a href="#wow-summary-tab" data-toggle="tab">Week Over Week</a></li>
+						<li class=""><a href="#dashboard_anomaly-summary-tab"># of Anomalies</a></li>
+						<li class=""><a href="#dashboard_wow-summary-tab">Week Over Week</a></li>
 					</ul>
 				</div>
 			</nav>
 		</div>
 		<div class="tab-content">
-			<div class="tab-pane in active" id="anomaly-summary-tab">
+			<div class="tab-pane" id="dashboard_anomaly-summary-tab">
 				<div id="anomaly-summary-place-holder">
 				</div>
 			</div>
-			<div class="tab-pane fade" id="wow-summary-tab">
+			<div class="tab-pane" id="dashboard_wow-summary-tab">
 				<div id="wow-place-holder">
 				</div>
 			</div>

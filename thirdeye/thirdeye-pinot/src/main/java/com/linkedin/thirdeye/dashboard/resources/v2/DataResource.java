@@ -3,7 +3,7 @@ package com.linkedin.thirdeye.dashboard.resources.v2;
 import com.google.common.base.Strings;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.dashboard.configs.DashboardConfig;
-import com.linkedin.thirdeye.dashboard.resources.v2.dashboard.DashboardSummary;
+//import com.linkedin.thirdeye.dashboard.resources.v2.dashboard.DashboardSummary;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
@@ -189,9 +189,9 @@ public class DataResource {
     return dashboard.getMetricIds();
   }
 
-  @GET
-  @Path("dashboard/wowsummary")
-  public DashboardSummary getWoWSummary(@QueryParam("name") String name) {
-    return null;
-  }
+//  @GET
+//  @Path("dashboard/wowsummary")
+//  public DashboardSummary getWoWSummary(@QueryParam("name") String name) {
+//    return null;
+//  }
 }

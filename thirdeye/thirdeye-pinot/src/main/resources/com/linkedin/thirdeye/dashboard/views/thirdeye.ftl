@@ -138,11 +138,12 @@
 
 var dataService = undefined;
 var constants = undefined;
-var hashService = undefined;
+var HASH_SERVICE = undefined;
   $(document).ready(function() {
     constants = new Constants();
     dataService = new DataService();
-    hashService = new HashService();
+    HASH_SERVICE = new HashService();
+    HASH_SERVICE.init();
     var app = new AppController();
     app.init();
   });
@@ -164,9 +165,9 @@ var hashService = undefined;
 						</div>
 						<div id="main-tabs" class="collapse navbar-collapse">
 							<ul class="nav navbar-nav">
-								<li class=""><a href="#dashboard" data-toggle="tab">Dashboard</a></li>
-								<li class=""><a href="#anomalies" data-toggle="tab">Anomalies</a></li>
-								<li class=""><a href="#analysis" data-toggle="tab">Root Cause Analysis</a></li>
+								<li class=""><a href="#dashboard">Dashboard</a></li>
+								<li class=""><a href="#anomalies">Anomalies</a></li>
+								<li class=""><a href="#analysis">Root Cause Analysis</a></li>
 							</ul>
 
 							<ul class="nav navbar-nav navbar-right">

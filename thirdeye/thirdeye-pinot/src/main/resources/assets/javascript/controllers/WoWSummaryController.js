@@ -1,16 +1,17 @@
 function WoWSummaryController(parentController){
   this.parentController = parentController;
-  this.woWSummaryModel = new WoWSummaryModel();
-  this.woWSummaryView = new WoWSummaryView(this.woWSummaryModel);
+  this.wowSummaryModel = new WoWSummaryModel();
+  this.wowSummaryView = new WoWSummaryView(this.wowSummaryModel);
 }
 
 
 WoWSummaryController.prototype ={
 
-    handleAppEvent: function(params){
-      this.woWSummaryModel.init(params);
-      this.woWSummaryModel.rebuild();
-      this.woWSummaryView.render();
+    handleAppEvent: function(){
+      var params = HASH_SERVICE.getParams();
+      this.wowSummaryModel.init(params);
+      this.wowSummaryModel.rebuild();
+      this.wowSummaryView.render();
     },
     onDashboardInputChange: function(){
 

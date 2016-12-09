@@ -7,7 +7,8 @@ function AnomalySummaryController(parentController){
 
 AnomalySummaryController.prototype ={
 
-    handleAppEvent: function(params){
+    handleAppEvent: function(){
+      var params = HASH_SERVICE.getParams();
       this.anomalySummaryModel.init(params);
       this.anomalySummaryModel.rebuild();
       this.anomalySummaryView.render();

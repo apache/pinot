@@ -16,21 +16,30 @@ AppController.prototype = {
     this.appView.init();
     // init page routing here
     this.compileTemplates();
-    this.setupRouting();
-    this.handleURL();
+    this.handleAppEvent();
   },
 
-  handleURL : function() {
-    console.log("window.location:" + window.location.hash);
-    tab = "dashboard";
-    if (window.location.hash) {
-      splits = window.location.hash.split('/');
-      if (splits.length > 1) {
-        console.log("hash split[0]" + splits[1]);
-        tab = splits[1];
-      }
+  handleAppEvent : function() {
+    console.log("In AppController.handleAppEvent");
+    tabName = HASH_SERVICE.get("tab");
+    this.appModel.tabSelected = tabName;
+    console.log("tabName:" + tabName);
+    var childController;
+    if (tabName.startsWith("dashboard")) {
+      this.appModel.tabSelected = "dashboard";
+      childController = this.dashboardController;
+    } else if (tabName.startsWith("anomalies")) {
+      this.appModel.tabSelected = "anomalies";
+      childController = this.anomalyResultController;
+    } else if (tabName.startsWith("analysis")) {
+      this.appModel.tabSelected = "analysis";
+      childController = this.analysisController;
+    } else {
+      this.appModel.tabSelected = "dashboard";
+      childController = this.dashboardController;
     }
-    $("#main-tabs a[href='#" + tab + "']").click();
+    this.appView.render();
+    childController.handleAppEvent();
   },
 
   compileTemplates : function() {
@@ -45,50 +54,28 @@ AppController.prototype = {
     job_info_template_compiled = Handlebars.compile(job_info_template);
   },
 
-  setupRouting : function() {
-    page.base("/thirdeye");
-    page("/", this.parseHash.bind(this), this.dashboardController.handleAppEvent.bind(this.dashboardController));
-    page("/dashboard", this.parseHash.bind(this), this.dashboardController.handleAppEvent.bind(this.dashboardController));
-    page("/anomalies", this.parseHash.bind(this), this.anomalyResultController.handleAppEvent.bind(this.anomalyResultController));
-    page("/analysis", this.parseHash.bind(this), this.analysisController.handleAppEvent.bind(this.analysisController));
-    // page("/ingraph-metric-config", this.updateHistory,
-    // showIngraphDatasetSelection);
-    // page("/ingraph-dashboard-config", this.updateHistory,
-    // listIngraphDashboardConfigs);
-    // page("/metric-config", this.updateHistory, showMetricDatasetSelection);
-    // page("/dataset-config", this.updateHistory, listDatasetConfigs);
-    // page("/job-info", this.updateHistory, listJobs);
-    // page("/entity-editor", this.updateHistory, renderConfigSelector);
-
-    page.start({
-      hashbang : true
-    });
-    // everytime hash changes, we should handle the new hash
-    $(window).on('hashchange', this.handleURL);
-  },
   /**
    * Place holder that gets invoked before every call. parse the hash
    */
   parseHash : function(ctx, next) {
-    // TODO: update ctx.state.hashParams (String) to this.appModel.hashParams (Map)
+    console.log("START: parse hash" + ctx.path);
+    // TODO: update ctx.state.hashParams (String) to this.appModel.hashParams
+    // (Map)
     ctx.state.hashParams = {};
     ctx.state.hashParams.dashboardName = "New Dashboard";
     ctx.hashParams = this.appModel.hashParams;
+
     next();
+    console.log("END: parse hash" + ctx.path);
+
   },
   onTabClickEventHandler : function(sender, args) {
     console.log("targetTab:" + args.targetTab);
     console.log("previousTab:" + args.previousTab);
     if (args.targetTab != args.previousTab) {
       args.targetTab = args.targetTab.replace("#", "");
-      page("/thirdeye/" + args.targetTab);
-      // if (args.targetTab == "dashboard") {
-      //   this.dashboardController.handleAppEvent(args);
-      // } else if (args.targetTab == "anomalies") {
-      //   this.anomalyResultController.handleAppEvent(args);
-      // } else if (args.targetTab == "analysis") {
-      //   this.analysisController.handleAppEvent(args);
-      // }
+      HASH_SERVICE.set("tab", args.targetTab);
+      this.handleAppEvent();
     }
   }
 };

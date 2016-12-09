@@ -7,21 +7,33 @@ AppView.prototype = {
 
   init : function() {
     var self = this;
-    var tabSelectionEventHandler = function (e) {
+    var tabSelectionEventHandler = function(e) {
+      e.preventDefault();
       console.log(e);
       var targetTab = $(e.target).attr('href');
       var previousTab = $(e.relatedTarget).attr('href');
-      var args = {targetTab: targetTab, previousTab: previousTab};
+      var args = {
+        targetTab : targetTab,
+        previousTab : previousTab
+      };
       self.tabClickEvent.notify(args);
     };
-    $('#main-tabs a[data-toggle="tab"]').on('shown.bs.tab', tabSelectionEventHandler);
-    $('#admin-tabs a[data-toggle="tab"]').on('shown.bs.tab', tabSelectionEventHandler);
-    $('#global-navbar a').on('shown.bs.tab', tabSelectionEventHandler);
-    //compile thirdeye.ftl
+    $('#main-tabs').click(tabSelectionEventHandler);
+    $('#admin-tabs').click(tabSelectionEventHandler);
+    $('#global-navbar a').click(tabSelectionEventHandler);
+    // compile thirdeye.ftl
   },
 
   render : function() {
-    //compiledHtml
+    console.log("Switching to tab:" + this.appModel.tabSelected);
+    switch (this.appModel.tabSelected) {
+    case "dashboard":
+    case "anomalies":
+    case "analysis":
+      $('#main-tabs a[href=#' + this.appModel.tabSelected + "]").tab('show');
+      break;
+    }
+    // compiledHtml
   }
 
 }
