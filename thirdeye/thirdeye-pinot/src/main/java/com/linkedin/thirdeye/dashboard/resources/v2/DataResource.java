@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.dashboard.resources.v2;
 import com.google.common.base.Strings;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.dashboard.configs.DashboardConfig;
+import com.linkedin.thirdeye.dashboard.resources.v2.dashboard.DashboardSummary;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
@@ -10,6 +11,7 @@ import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.ws.rs.DefaultValue;
@@ -161,7 +163,7 @@ public class DataResource {
   // dashboard end points
   @GET
   @Path("dashboard")
-  public List<DashboardConfig> getDashboards(@QueryParam("dataset") String dataset) {
+  public List<DashboardConfig> getDashboards(@QueryParam("dashboard") String dashboard) {
     return new ArrayList<>();
   }
 
@@ -177,4 +179,19 @@ public class DataResource {
     return null;
   }
 
+  @GET
+  @Path("dashboard/metricids")
+  public List<Long> getMetricIdsByDashboard(@QueryParam("name") String name) {
+    if (StringUtils.isBlank(name)) {
+      return Collections.emptyList();
+    }
+    DashboardConfigDTO dashboard = dashboardConfigDAO.findByName(name);
+    return dashboard.getMetricIds();
+  }
+
+  @GET
+  @Path("dashboard/wowsummary")
+  public DashboardSummary getWoWSummary(@QueryParam("name") String name) {
+    return null;
+  }
 }
