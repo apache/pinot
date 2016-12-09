@@ -16,9 +16,9 @@
 package com.linkedin.pinot.core.operator.docvalsets;
 
 import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.common.BaseBlockValSet;
 import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockValIterator;
-import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.aggregation.DataBlockCache;
 
@@ -28,7 +28,7 @@ import com.linkedin.pinot.core.operator.aggregation.DataBlockCache;
  * It provides api's to access data for a specified projection column.
  * It uses {@link DataBlockCache} to cache the projection data.
  */
-public class ProjectionBlockValSet implements BlockValSet {
+public class ProjectionBlockValSet extends BaseBlockValSet {
 
   private DataBlockCache _dataBlockCache;
   private final BlockValIterator _blockValIterator;
@@ -74,11 +74,6 @@ public class ProjectionBlockValSet implements BlockValSet {
   @Override
   public <T> T getMultiValues() {
     return getValues(true);
-  }
-
-  @Override
-  public BlockValIterator iterator() {
-    throw new UnsupportedOperationException("iterator() not supported on ProjectionBlockValSet.");
   }
 
   @Override

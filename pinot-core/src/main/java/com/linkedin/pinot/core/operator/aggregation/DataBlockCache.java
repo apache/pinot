@@ -17,13 +17,12 @@ package com.linkedin.pinot.core.operator.aggregation;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.BlockMetadata;
+import com.linkedin.pinot.core.common.DataFetcher;
+import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-
-import com.linkedin.pinot.core.common.DataFetcher;
-import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 
 
 /**
@@ -107,7 +106,7 @@ public class DataBlockCache {
   }
 
   /**
-   * Get an arrary of array representation for dictionary ids for a given column for the
+   * Get an array of array representation for dictionary ids for a given column for the
    * specific block initialized in the initNewBlock.
    *
    * @param column column name.
@@ -128,13 +127,14 @@ public class DataBlockCache {
   }
 
   private int[] getTempDictIdArrayForColumn(String column) {
-    if  (!_columnToTempDictIdsMap.containsKey(column)) {
+    if (!_columnToTempDictIdsMap.containsKey(column)) {
       int maxNumberOfEntries = _dataFetcher.getMaxNumberOfEntriesForColumn(column);
       int[] tempDictIdArray = new int[maxNumberOfEntries];
       _columnToTempDictIdsMap.put(column, tempDictIdArray);
     }
     return _columnToTempDictIdsMap.get(column);
   }
+
   /**
    * Get double value array for a given column for the specific block initialized in the initNewBlock.
    *
@@ -148,8 +148,7 @@ public class DataBlockCache {
         doubleValues = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
         _columnToValuesMap.put(column, doubleValues);
       }
-      int[] dictIds = getDictIdArrayForColumn(column);
-      _dataFetcher.fetchSingleDoubleValues(column, dictIds, _startPos, _length, doubleValues, 0);
+      _dataFetcher.fetchDoubleValues(column, _docIds, _startPos, _length, doubleValues, 0);
       _columnValueLoaded.add(column);
     }
     return doubleValues;
@@ -162,22 +161,18 @@ public class DataBlockCache {
    * @return double values array associated with this column.
    */
   public double[][] getDoubleValuesArrayForColumn(String column) {
-    double[][] doubleValueArrayArray = _columnToValuesArrayMap.get(column);
+    double[][] doubleValuesArray = _columnToValuesArrayMap.get(column);
+
     if (!_columnValueLoaded.contains(column)) {
-      if (doubleValueArrayArray == null) {
-        doubleValueArrayArray = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
-        _columnToValuesArrayMap.put(column, doubleValueArrayArray);
+      if (doubleValuesArray == null) {
+        doubleValuesArray = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+        _columnToValuesArrayMap.put(column, doubleValuesArray);
       }
-      int[][] dictIdsArray = getDictIdsArrayForColumn(column);
-      for (int pos = 0; pos < _length; ++pos) {
-        int[] dictIds = dictIdsArray[pos];
-        double[] doubleValues = new double[dictIds.length];
-        _dataFetcher.fetchSingleDoubleValues(column, dictIds, 0, dictIds.length, doubleValues, 0);
-        doubleValueArrayArray[pos] = doubleValues;
-      }
+
+      _dataFetcher.fetchDoubleValues(column, _docIds, _startPos, _length, doubleValuesArray, 0);
       _columnValueLoaded.add(column);
     }
-    return doubleValueArrayArray;
+    return doubleValuesArray;
   }
 
   /**
@@ -193,8 +188,7 @@ public class DataBlockCache {
         hashCodes = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
         _columnToHashCodesMap.put(column, hashCodes);
       }
-      int[] dictIds = getDictIdArrayForColumn(column);
-      _dataFetcher.fetchSingleHashCodes(column, dictIds, _startPos, _length, hashCodes, 0);
+      _dataFetcher.fetchHashCodes(column, _docIds, _startPos, _length, hashCodes, 0);
       _columnHashCodeLoaded.add(column);
     }
     return hashCodes;
@@ -213,19 +207,16 @@ public class DataBlockCache {
         hashCodesArray = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
         _columnToHashCodesArrayMap.put(column, hashCodesArray);
       }
-      int[][] dictIdsArray = getDictIdsArrayForColumn(column);
-      for (int pos = 0; pos < _length; ++pos) {
-        int[] dictIds = dictIdsArray[pos];
-        double[] hashCodes = new double[dictIds.length];
-        _dataFetcher.fetchSingleHashCodes(column, dictIds, 0, dictIds.length, hashCodes, 0);
-        hashCodesArray[pos] = hashCodes;
 
+      int maxNumberOfEntriesForColumn = _dataFetcher.getMaxNumberOfEntriesForColumn(column);
+      for (int pos = 0; pos < _length; ++pos) {
+        hashCodesArray[pos] = new double[maxNumberOfEntriesForColumn];
       }
+      _dataFetcher.fetchHashCodes(column, _docIds, _startPos, _length, hashCodesArray, 0);
       _columnHashCodeLoaded.add(column);
     }
     return hashCodesArray;
   }
-
 
   /**
    * Get hash code array for a given column for the specific block initialized in the initNewBlock.
@@ -262,8 +253,7 @@ public class DataBlockCache {
         stringValues = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL];
         _columnToStringsMap.put(column, stringValues);
       }
-      int[] dictIds = getDictIdArrayForColumn(column);
-      _dataFetcher.fetchSingleStringValues(column, dictIds, _startPos, _length, stringValues, 0);
+      _dataFetcher.fetchStringValues(column, _docIds, _startPos, _length, stringValues, 0);
       _columnStringLoaded.add(column);
     }
     return stringValues;
@@ -282,13 +272,8 @@ public class DataBlockCache {
         stringsArray = new String[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
         _columnToStringsArrayMap.put(column, stringsArray);
       }
-      int[][] dictIdsArray = getDictIdsArrayForColumn(column);
-      for (int pos = 0; pos < _length; ++pos) {
-        int[] dictIds = dictIdsArray[pos];
-        String[] strings = new String[dictIds.length];
-        _dataFetcher.fetchSingleStringValues(column, dictIds, 0, dictIds.length, strings, 0);
-        stringsArray[pos] = strings;
-      }
+
+      _dataFetcher.fetchStringValues(column, _docIds, _startPos, _length, stringsArray, 0);
       _columnHashCodeLoaded.add(column);
     }
     return stringsArray;
