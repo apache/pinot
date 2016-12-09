@@ -46,13 +46,6 @@ DashboardView.prototype = {
     $('#dashboard-tabs a:first').click();
 
     // DASHBOARD SELECTION
-    console.log(this.dashboardModel.hashParams.dashboardName);
-
-    // TODO : set selected dashboard in the input
-    if (this.dashboardModel.hashParams.dashboardName) {
-      $("#selected-dashboard").html(this.dashboardModel.hashParams.dashboardName);
-    }
-
     $('#dashboard-input').autocomplete({
       minChars: 1,  // TODO : make this 3
       serviceUrl : constants.dashboardAutocompleteEndpoint,
@@ -68,14 +61,14 @@ DashboardView.prototype = {
         };
       },
       onSelect: function (suggestion) {
-        $('#dashboard-input').val(suggestion.value);
+        console.log('You selected: ' + suggestion.value + ', ' + suggestion.data);
         console.log(suggestion);
-
-        // TODO : send event to render summary
         var args = {dashboardName: suggestion.value, dashboardId: suggestion.data};
-        self.onDashboardSelectionEvent.notify(args);
+        if (self.dashboardModel.hashParams.dashboardName != suggestion.value) {
+          self.onDashboardSelectionEvent.notify(args);
+        }
       }
-    });
+    }).val(this.dashboardModel.hashParams.dashboardName);
 
 
     // TIME RANGE SELECTION
@@ -109,7 +102,7 @@ DashboardView.prototype = {
     $('#dashboard-tabs a[data-toggle="tab"]').on('shown.bs.tab', tabSelectionEventHandler);
 
     var hideDataRangePickerEventHandler = function(e, dataRangePicker) {
-      var args = {e: e, dataRangePicker: dataRangePicker}
+      var args = {e: e, dataRangePicker: dataRangePicker};
       self.hideDataRangePickerEvent.notify(args);
     };
     $('#dashboard-time-range').on('hide.daterangepicker', hideDataRangePickerEventHandler);
