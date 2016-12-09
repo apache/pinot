@@ -59,8 +59,8 @@ AnomalyResultView.prototype = {
     // METRIC SELECTION
     $('#metric-search-input').autocomplete({
       minChars: 3,
-      serviceUrl : constants.metricAutocompleteEndpoint,
-      paramName : constants.metricAutocompleteQueryParam,
+      serviceUrl : constants.METRIC_AUTOCOMPLETE_ENDPOINT,
+      paramName : constants.METRIC_AUTOCOMPLETE_QUERY_PARAM,
       transformResult : function(response) {
           return {
               suggestions : $.map($.parseJSON(response), function(item) {

@@ -1,12 +1,12 @@
 function Constants() {
 
   // constants
-  this.metricAutocompleteQueryParam = "name";
-  this.dashboardAutocompleteQueryParam = "name";
+  this.METRIC_AUTOCOMPLETE_QUERY_PARAM = "name";
+  this.DASHBOARD_AUTOCOMPLETE_QUERY_PARAM = "name";
 
   // endpoints
-  this.metricAutocompleteEndpoint = '/data/metric/aliases?';
-  this.dashboardAutocompleteEndpoint = '/data/autocomplete/dashboard';
+  this.METRIC_AUTOCOMPLETE_ENDPOINT = '/data/metric/aliases?';
+  this.DASHBOARD_AUTOCOMPLETE_ENDPOINT = '/data/autocomplete/dashboard';
 }
 
 Constants.prototype = {

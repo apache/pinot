@@ -48,8 +48,8 @@ DashboardView.prototype = {
     // DASHBOARD SELECTION
     $('#dashboard-input').autocomplete({
       minChars: 1,  // TODO : make this 3
-      serviceUrl : constants.dashboardAutocompleteEndpoint,
-      paramName : constants.dashboardAutocompleteQueryParam,
+      serviceUrl : constants.DASHBOARD_AUTOCOMPLETE_ENDPOINT,
+      paramName : constants.DASHBOARD_AUTOCOMPLETE_QUERY_PARAM,
       transformResult : function(response) {
         return {
           suggestions : $.map($.parseJSON(response), function(item) {
