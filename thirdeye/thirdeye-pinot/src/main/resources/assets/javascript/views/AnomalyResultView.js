@@ -76,8 +76,6 @@ AnomalyResultView.prototype = {
       }
   });
 
-
-
     // TIME RANGE SELECTION
     this.timeRangeConfig.startDate = this.anomalyResultModel.startDate;
     this.timeRangeConfig.endDate = this.anomalyResultModel.endDate;

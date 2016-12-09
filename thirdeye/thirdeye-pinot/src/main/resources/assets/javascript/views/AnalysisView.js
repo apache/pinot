@@ -14,19 +14,33 @@ AnalysisView.prototype = {
   render: function () {
     $("#analysis-place-holder").html(this.analysis_template_compiled);
 
-    // METRIC SELECTION
-    $('#metric-input').autocomplete({
-      lookup : this.analysisModel.metrics,
-      onSelect : function(suggestion) {
-        console.log('You selected: ' + suggestion.value + ', ' + suggestion.data);
-      }
-    });
-
     renderAnalysisTab();
   }
 };
 
 function renderAnalysisTab() {
+
+  // METRIC SELECTION
+  $('#metric-input').autocomplete({
+    minChars: 3,
+    serviceUrl : constants.metricAutocompleteEndpoint,
+    paramName : constants.metricAutocompleteQueryParam,
+    transformResult : function(response) {
+      return {
+        suggestions : $.map($.parseJSON(response), function(item) {
+          return {
+            value: item,
+            data : item
+          };
+        })
+      };
+    },
+    onSelect: function (value, data) {
+      $('#metric-input').val(value.data);
+      // TODO: add event to fetch dimensions / filters etc to render on this page
+    }
+  });
+
   // TIME RANGE SELECTION
   var current_start = moment().subtract(1, 'days');
   var current_end = moment();

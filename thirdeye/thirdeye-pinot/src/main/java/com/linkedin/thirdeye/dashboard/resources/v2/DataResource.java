@@ -166,6 +166,12 @@ public class DataResource {
   }
 
   @GET
+  @Path("autocomplete/dashboard")
+  public List<DashboardConfigDTO> getDashboardAliasesWhereNameLike(@QueryParam("name") String name) {
+    return dashboardConfigDAO.findWhereNameLike("%" + name + "%");
+  }
+
+  @GET
   @Path("dashboard/{id}")
   public DashboardConfig getDashboardById(@PathParam("id") Long id) {
     return null;

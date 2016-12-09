@@ -53,15 +53,30 @@ DashboardView.prototype = {
       $("#selected-dashboard").html(this.dashboardModel.hashParams.dashboardName);
     }
 
-    // DASHBOARD SELECTION
     $('#dashboard-input').autocomplete({
-      lookup : this.dashboardModel.dashboards,
-      onSelect : function(suggestion) {
-        console.log('You selected: ' + suggestion.value + ', ' + suggestion.data);
+      minChars: 1,  // TODO : make this 3
+      serviceUrl : constants.dashboardAutocompleteEndpoint,
+      paramName : constants.dashboardAutocompleteQueryParam,
+      transformResult : function(response) {
+        return {
+          suggestions : $.map($.parseJSON(response), function(item) {
+            return {
+              value: item.name,
+              data : item.id
+            };
+          })
+        };
+      },
+      onSelect: function (suggestion) {
+        $('#dashboard-input').val(suggestion.value);
+        console.log(suggestion);
+
+        // TODO : send event to render summary
         var args = {dashboardName: suggestion.value, dashboardId: suggestion.data};
         self.onDashboardSelectionEvent.notify(args);
       }
     });
+
 
     // TIME RANGE SELECTION
     this.timeRangeConfig.startDate = this.dashboardModel.getStartTime();
