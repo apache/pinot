@@ -57,16 +57,25 @@ AnomalyResultView.prototype = {
     this.renderAnomaliesTab(anomalies);
 
     // METRIC SELECTION
-    var metrics = this.anomalyResultModel.metrics;
-    console.log("metrics");
-    console.log(metrics);
-
     $('#metric-search-input').autocomplete({
-      lookup : metrics,
-      onSelect : function(suggestion) {
-        alert('You selected: ' + suggestion.value + ', ' + suggestion.data);
+      minChars: 3,
+      serviceUrl : constants.metricAutocompleteEndpoint,
+      paramName : constants.metricAutocompleteQueryParam,
+      transformResult : function(response) {
+          return {
+              suggestions : $.map($.parseJSON(response), function(item) {
+                  return {
+                    value: item,
+                    data : item
+                  };
+              })
+          };
+      },
+      onSelect: function (value, data) {
+          $('#metric-search-input').val(value.data);
       }
-    });
+  });
+
 
 
     // TIME RANGE SELECTION

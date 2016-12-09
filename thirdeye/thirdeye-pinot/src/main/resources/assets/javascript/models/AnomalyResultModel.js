@@ -11,8 +11,7 @@ function AnomalyResultModel(){
   this.anomalies.push(this.anomaly1);
   this.anomalies.push(this.anomaly2);
 
-  // list of metrics
-  this.metrics = [ "m1", "m2" ];
+
 
 }
 
@@ -23,7 +22,8 @@ AnomalyResultModel.prototype = {
   update : function() {
 
   }
-};
+
+}
 
 function AnomalyResult(anomalyId) {
   this.anomalyId = anomalyId;

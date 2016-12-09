@@ -132,13 +132,17 @@
 <script src="../../../assets/javascript/HashParams.js"></script>
 <script src="../../../assets/javascript/HashService.js"></script>
 <script src="../../../assets/javascript/DataService.js"></script>
+<script src="../../../assets/javascript/Constants.js"></script>
 
 <script type="text/javascript">
 
 var dataService = undefined;
+var constants = undefined;
+var hashService = undefined;
   $(document).ready(function() {
+    constants = new Constants();
     dataService = new DataService();
-    var hashService = new HashService();
+    hashService = new HashService();
     var app = new AppController();
     app.init();
   });

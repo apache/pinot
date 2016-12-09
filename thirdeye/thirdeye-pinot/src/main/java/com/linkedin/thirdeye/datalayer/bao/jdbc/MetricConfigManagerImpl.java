@@ -76,14 +76,14 @@ public class MetricConfigManagerImpl extends AbstractManagerImpl<MetricConfigDTO
   }
 
   @Override
-  public List<MetricConfigDTO> findByNameLike(String name) {
+  public List<String> findMetricAliasWhereNameLike(String name) {
     Map<String, Object> parameterMap = new HashMap<>();
     parameterMap.put("name", name);
     List<MetricConfigBean> list =
         genericPojoDao.executeParameterizedSQL(FIND_BY_NAME_LIKE, parameterMap, MetricConfigBean.class);
-    List<MetricConfigDTO> result = new ArrayList<>();
+    List<String> result = new ArrayList<>();
     for (MetricConfigBean bean : list) {
-      result.add((MetricConfigDTO) MODEL_MAPPER.map(bean, MetricConfigDTO.class));
+      result.add(bean.getAlias());
     }
     return result;
   }

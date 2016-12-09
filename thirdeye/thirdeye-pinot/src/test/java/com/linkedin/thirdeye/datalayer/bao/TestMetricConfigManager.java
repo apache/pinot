@@ -56,11 +56,11 @@ public class TestMetricConfigManager extends AbstractManagerTestBase {
 
   @Test(dependsOnMethods = { "testFind" })
   public void testFindLike() {
-    List<MetricConfigDTO> metricConfigs = metricConfigDAO.findByNameLike("%m%");
+    List<String> metricConfigs = metricConfigDAO.findMetricAliasWhereNameLike("%m%");
     Assert.assertEquals(metricConfigs.size(), 3);
-    metricConfigs = metricConfigDAO.findByNameLike("%1%");
+    metricConfigs = metricConfigDAO.findMetricAliasWhereNameLike("%1%");
     Assert.assertEquals(metricConfigs.size(), 1);
-    metricConfigs = metricConfigDAO.findByNameLike("%p%");
+    metricConfigs = metricConfigDAO.findMetricAliasWhereNameLike("%p%");
     Assert.assertEquals(metricConfigs.size(), 0);
   }
 

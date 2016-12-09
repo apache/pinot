@@ -124,9 +124,9 @@ public class DataResource {
 
 
   @GET
-  @Path("metrics/{name}")
-  public List<MetricConfigDTO> getMetricsWhereNameLike(@PathParam("name") String name) {
-    List<MetricConfigDTO> metricConfigs = metricConfigDAO.findByNameLike("%" + name + "%");
+  @Path("metric/aliases")
+  public List<String> getMetricAliasesWhereNameLike(@QueryParam("name") String name) {
+    List<String> metricConfigs = metricConfigDAO.findMetricAliasWhereNameLike("%" + name + "%");
     return metricConfigs;
   }
 
