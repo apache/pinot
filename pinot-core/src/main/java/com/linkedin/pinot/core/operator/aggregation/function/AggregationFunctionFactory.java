@@ -15,9 +15,6 @@
  */
 package com.linkedin.pinot.core.operator.aggregation.function;
 
-import com.linkedin.pinot.core.startree.hll.HllConstants;
-
-
 /**
  * Factory class to create instances of aggregation function of the given name.
  */
@@ -61,113 +58,147 @@ public class AggregationFunctionFactory {
    * Given the name of aggregation function, create and return a new instance
    * of the corresponding aggregation function and return.
    *
-   * @param functionName
+   * @param functionName aggregation function name
    * @return
    */
   public static AggregationFunction getAggregationFunction(String functionName) {
+    AggregationFunction function;
     switch (functionName.toLowerCase()) {
       case COUNT_AGGREGATION_FUNCTION:
-        return new CountAggregationFunction();
+        function = new CountAggregationFunction();
+        break;
 
       case MIN_AGGREGATION_FUNCTION:
-        return new MinAggregationFunction();
+        function = new MinAggregationFunction();
+        break;
 
       case MAX_AGGREGATION_FUNCTION:
-        return new MaxAggregationFunction();
+        function = new MaxAggregationFunction();
+        break;
 
       case SUM_AGGREGATION_FUNCTION:
-        return new SumAggregationFunction();
+        function = new SumAggregationFunction();
+        break;
 
       case AVG_AGGREGATION_FUNCTION:
-        return new AvgAggregationFunction();
+        function = new AvgAggregationFunction();
+        break;
 
       case MINMAXRANGE_AGGREGATION_FUNCTION:
-        return new MinMaxRangeAggregationFunction();
+        function = new MinMaxRangeAggregationFunction();
+        break;
 
       case DISTINCTCOUNT_AGGREGATION_FUNCTION:
-        return new DistinctCountAggregationFunction();
+        function = new DistinctCountAggregationFunction();
+        break;
 
       case DISTINCTCOUNTHLL_AGGREGATION_FUNCTION:
-        return new DistinctCountHLLAggregationFunction();
+        function = new DistinctCountHLLAggregationFunction();
+        break;
 
       case FASTHLL_AGGREGATION_FUNCTION:
-        // TODO: Add support for configurable hll per segment.
-        return new FastHllAggregationFunction(HllConstants.DEFAULT_LOG2M);
+        function = new FastHllAggregationFunction();
+        break;
 
       case PERCENTILE50_AGGREGATION_FUNCTION:
-        return new PercentileAggregationFunction(50);
+        function = new PercentileAggregationFunction(50);
+        break;
 
       case PERCENTILE90_AGGREGATION_FUNCTION:
-        return new PercentileAggregationFunction(90);
+        function = new PercentileAggregationFunction(90);
+        break;
 
       case PERCENTILE95_AGGREGATION_FUNCTION:
-        return new PercentileAggregationFunction(95);
+        function = new PercentileAggregationFunction(95);
+        break;
 
       case PERCENTILE99_AGGREGATION_FUNCTION:
-        return new PercentileAggregationFunction(99);
+        function = new PercentileAggregationFunction(99);
+        break;
 
       case PERCENTILEEST50_AGGREGATION_FUNCTION:
-        return new PercentileestAggregationFunction(50);
+        function = new PercentileestAggregationFunction(50);
+        break;
 
       case PERCENTILEEST90_AGGREGATION_FUNCTION:
-        return new PercentileestAggregationFunction(90);
+        function = new PercentileestAggregationFunction(90);
+        break;
 
       case PERCENTILEEST95_AGGREGATION_FUNCTION:
-        return new PercentileestAggregationFunction(95);
+        function = new PercentileestAggregationFunction(95);
+        break;
 
       case PERCENTILEEST99_AGGREGATION_FUNCTION:
-        return new PercentileestAggregationFunction(99);
+        function = new PercentileestAggregationFunction(99);
+        break;
 
       case COUNT_MV_AGGREGATION_FUNCTION:
-        return new CountMVAggregationFunction();
+        function = new CountMVAggregationFunction();
+        break;
 
       case MIN_MV_AGGREGATION_FUNCTION:
-        return new MinMVAggregationFunction();
+        function = new MinMVAggregationFunction();
+        break;
 
       case MAX_MV_AGGREGATION_FUNCTION:
-        return new MaxMVAggregationFunction();
+        function = new MaxMVAggregationFunction();
+        break;
 
       case SUM_MV_AGGREGATION_FUNCTION:
-        return new SumMVAggregationFunction();
+        function = new SumMVAggregationFunction();
+        break;
 
       case AVG_MV_AGGREGATION_FUNCTION:
-        return new AvgMVAggregationFunction();
+        function = new AvgMVAggregationFunction();
+        break;
 
       case MINMAXRANGE_MV_AGGREGATION_FUNCTION:
-        return new MinMaxRangeMVAggregationFunction();
+        function = new MinMaxRangeMVAggregationFunction();
+        break;
 
       case DISTINCTCOUNT_MV_AGGREGATION_FUNCTION:
-        return new DistinctCountMVAggregationFunction();
+        function = new DistinctCountMVAggregationFunction();
+        break;
 
       case DISTINCTCOUNTHLL_MV_AGGREGATION_FUNCTION:
-        return new DistinctCountHLLMVAggregationFunction();
+        function = new DistinctCountHLLMVAggregationFunction();
+        break;
 
       case PERCENTILE50_MV_AGGREGATION_FUNCTION:
-        return new PercentileMVAggregationFunction(50);
+        function = new PercentileMVAggregationFunction(50);
+        break;
 
       case PERCENTILE90_MV_AGGREGATION_FUNCTION:
-        return new PercentileMVAggregationFunction(90);
+        function = new PercentileMVAggregationFunction(90);
+        break;
 
       case PERCENTILE95_MV_AGGREGATION_FUNCTION:
-        return new PercentileMVAggregationFunction(95);
+        function = new PercentileMVAggregationFunction(95);
+        break;
 
       case PERCENTILE99_MV_AGGREGATION_FUNCTION:
-        return new PercentileMVAggregationFunction(99);
+        function = new PercentileMVAggregationFunction(99);
+        break;
 
       case PERCENTILEEST50_MV_AGGREGATION_FUNCTION:
-        return new PercentileestMVAggregationFunction(50);
+        function = new PercentileestMVAggregationFunction(50);
+        break;
 
       case PERCENTILEEST90_MV_AGGREGATION_FUNCTION:
-        return new PercentileestMVAggregationFunction(90);
+        function = new PercentileestMVAggregationFunction(90);
+        break;
 
       case PERCENTILEEST95_MV_AGGREGATION_FUNCTION:
-        return new PercentileestMVAggregationFunction(95);
+        function = new PercentileestMVAggregationFunction(95);
+        break;
 
       case PERCENTILEEST99_MV_AGGREGATION_FUNCTION:
-        return new PercentileestMVAggregationFunction(99);
+        function = new PercentileestMVAggregationFunction(99);
+        break;
 
       default:
         throw new RuntimeException("Unsupported aggregation function: " + functionName);
     }
+    return function;
   }
 }

@@ -30,6 +30,11 @@ public class AvgMVAggregationFunction implements AggregationFunction {
   private static final double DEFAULT_VALUE = 0.0;
   private static final ResultDataType RESULT_DATA_TYPE = ResultDataType.AVERAGE_PAIR;
 
+  @Override
+  public void accept(AggregationFunctionVisitorBase visitor) {
+    visitor.visit(this);
+  }
+
   /**
    * Performs 'avg' aggregation on the input array.
    * Returns {@value #DEFAULT_VALUE} if the input array is empty.

@@ -32,6 +32,11 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction 
 
   private static final int log2m = HllConstants.DEFAULT_LOG2M;
 
+  @Override
+  public void accept(AggregationFunctionVisitorBase visitor) {
+    visitor.visit(this);
+  }
+
   /**
    * Performs 'distinctcounthll' aggregation on the input array.
    *

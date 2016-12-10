@@ -16,7 +16,6 @@
 package com.linkedin.pinot.core.operator.aggregation.groupby;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockMetadata;
@@ -42,10 +41,9 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   private static final double GROUP_BY_TRIM_FACTOR = 0.9;
   private final int _numAggrFunc;
   private final int _numGroupsLimit;
-  private final List<AggregationInfo> _aggregationInfoList;
+  private final AggregationFunctionContext[] _aggrFunctionContexts;
 
   private  GroupKeyGenerator _groupKeyGenerator;
-  private AggregationFunctionContext[] _aggrFuncContextArray;
   private GroupByResultHolder[] _resultHolderArray;
   private final String[] _groupByColumns;
 
@@ -59,25 +57,23 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
 
   /**
    * Constructor for the class.
-   *
-   * @param aggregationInfoList Aggregation info from broker request
+   *  @param aggrFunctionContexts Array of aggregation functions
    * @param groupBy Group by from broker request
    * @param numGroupsLimit Limit on number of aggregation groups returned in the result
    */
-  public DefaultGroupByExecutor(List<AggregationInfo> aggregationInfoList, GroupBy groupBy, int numGroupsLimit) {
-    Preconditions.checkNotNull(aggregationInfoList);
-    Preconditions.checkArgument(aggregationInfoList.size() > 0);
+  public DefaultGroupByExecutor(AggregationFunctionContext[] aggrFunctionContexts, GroupBy groupBy, int numGroupsLimit) {
+    Preconditions.checkNotNull(aggrFunctionContexts != null && aggrFunctionContexts.length > 0);
     Preconditions.checkNotNull(groupBy);
 
     List<String> groupByColumnList = groupBy.getColumns();
     _groupByColumns = groupByColumnList.toArray(new String[groupByColumnList.size()]);
-    _numAggrFunc = aggregationInfoList.size();
+    _numAggrFunc = aggrFunctionContexts.length;
 
     // TODO: revisit the trim factor. Usually the factor should be 5-10, and based on the 'TOP' limit.
     // When results are trimmed, drop bottom 10% of groups.
     _numGroupsLimit = (int) (GROUP_BY_TRIM_FACTOR * numGroupsLimit);
 
-    _aggregationInfoList = aggregationInfoList;
+    _aggrFunctionContexts = aggrFunctionContexts;
   }
 
   /**
@@ -111,7 +107,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
 
     for (int i = 0; i < _numAggrFunc; i++) {
       _resultHolderArray[i].ensureCapacity(capacityNeeded);
-      aggregateColumn(projectionBlock, _aggrFuncContextArray[i], _resultHolderArray[i]);
+      aggregateColumn(projectionBlock, _aggrFunctionContexts[i], _resultHolderArray[i]);
 
       // Result holder limits the max number of group keys (default 100k), if the number of groups
       // exceeds beyond that limit, groups with lower values (as per sort order) are trimmed.
@@ -225,7 +221,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
 
     AggregationFunction.ResultDataType[] resultDataTypeArray = new AggregationFunction.ResultDataType[_numAggrFunc];
     for (int i = 0; i < _numAggrFunc; i++) {
-      AggregationFunction aggregationFunction = _aggrFuncContextArray[i].getAggregationFunction();
+      AggregationFunction aggregationFunction = _aggrFunctionContexts[i].getAggregationFunction();
       resultDataTypeArray[i] = aggregationFunction.getResultDataType();
     }
     return new AggregationGroupByResult(_groupKeyGenerator, _resultHolderArray, resultDataTypeArray);
@@ -251,21 +247,15 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   /**
    * Helper method to initialize result holder array.
    *
-   * @param aggregationInfoList List of aggregation infos.
    * @param trimSize Trim size for group by keys
    * @param maxNumResults Maximum number of groups possible
    */
-  private void initResultHolderArray(List<AggregationInfo> aggregationInfoList, int trimSize, int maxNumResults) {
-    _aggrFuncContextArray = new AggregationFunctionContext[_numAggrFunc];
+  private void initResultHolderArray(int trimSize, int maxNumResults) {
     _resultHolderArray = new GroupByResultHolder[_numAggrFunc];
 
     for (int i = 0; i < _numAggrFunc; i++) {
-      AggregationInfo aggregationInfo = aggregationInfoList.get(i);
-      String[] columns = aggregationInfo.getAggregationParams().get("column").trim().split(",");
-
-      _aggrFuncContextArray[i] = new AggregationFunctionContext(aggregationInfo.getAggregationType(), columns);
       _resultHolderArray[i] =
-          ResultHolderFactory.getGroupByResultHolder(_aggrFuncContextArray[i].getAggregationFunction(), maxNumResults,
+          ResultHolderFactory.getGroupByResultHolder(_aggrFunctionContexts[i].getAggregationFunction(), maxNumResults,
               trimSize);
     }
   }
@@ -301,7 +291,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     int maxNumResults = _groupKeyGenerator.getGlobalGroupKeyUpperBound();
     _hasMultiValuedColumns = _groupKeyGenerator.hasMultiValueGroupByColumn();
 
-    initResultHolderArray(_aggregationInfoList, _numGroupsLimit, maxNumResults);
+    initResultHolderArray(_numGroupsLimit, maxNumResults);
     initDocIdToGroupKeyMap();
     _groupByInited = true;
   }

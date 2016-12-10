@@ -21,8 +21,9 @@ import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
+import com.linkedin.pinot.core.operator.aggregation.AggregationFunctionContext;
 import com.linkedin.pinot.core.operator.aggregation.groupby.AggregationGroupByOperator;
-import com.linkedin.pinot.core.startree.hll.HllConstants;
+import com.linkedin.pinot.core.operator.aggregation.groupby.DefaultGroupByExecutor;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -69,7 +70,18 @@ public class AggregationGroupByPlanNode implements PlanNode {
   @Override
   public Operator run() {
     MProjectionOperator projectionOperator = (MProjectionOperator) _projectionPlanNode.run();
-    return new AggregationGroupByOperator(_aggregationInfos, _groupBy, projectionOperator, _numAggrGroupsLimit,
+    int numAggFuncs = _aggregationInfos.size();
+    AggregationFunctionContext[] aggrFuncContextArray = new AggregationFunctionContext[numAggFuncs];
+    AggregationFunctionInitializer aggFuncInitializer = new AggregationFunctionInitializer(_indexSegment.getSegmentMetadata());
+    for (int i = 0; i < numAggFuncs; i++) {
+      AggregationInfo aggregationInfo = _aggregationInfos.get(i);
+      aggrFuncContextArray[i] = AggregationFunctionContext.instantiate(aggregationInfo);
+      aggrFuncContextArray[i].getAggregationFunction().accept(aggFuncInitializer);
+    }
+
+    DefaultGroupByExecutor defaultGroupByExecutor =
+        new DefaultGroupByExecutor(aggrFuncContextArray, _groupBy, _numAggrGroupsLimit);
+    return new AggregationGroupByOperator(_aggregationInfos, defaultGroupByExecutor, projectionOperator,
         _indexSegment.getSegmentMetadata().getTotalRawDocs());
   }
 

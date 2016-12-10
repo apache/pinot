@@ -51,6 +51,11 @@ public class PercentileestMVAggregationFunction implements AggregationFunction {
     _percentile = percentile;
   }
 
+  @Override
+  public void accept(AggregationFunctionVisitorBase visitor) {
+    visitor.visit(this);
+  }
+
   /**
    * Performs 'percentileest' aggregation on the input array.
    *

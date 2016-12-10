@@ -37,6 +37,8 @@ public interface AggregationFunction {
     PERCENTILEEST_QUANTILEDIGEST
   }
 
+  void accept(AggregationFunctionVisitorBase visitor);
+
   /**
    * Performs aggregation on the input array of values.
    *

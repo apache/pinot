@@ -20,6 +20,7 @@ import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.core.operator.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupByResultHolder;
+import com.linkedin.pinot.core.startree.hll.HllConstants;
 import com.linkedin.pinot.core.startree.hll.HllUtil;
 import java.util.List;
 
@@ -32,10 +33,18 @@ public class FastHllAggregationFunction implements AggregationFunction {
   private static final String FUNCTION_NAME = AggregationFunctionFactory.FASTHLL_AGGREGATION_FUNCTION;
   // TODO: change or not?
   private static final ResultDataType RESULT_DATA_TYPE = ResultDataType.HLL_PREAGGREGATED;
-  private final int hllLog2m;
+  private int hllLog2m = HllConstants.DEFAULT_LOG2M;
 
-  public FastHllAggregationFunction(int hllLog2m) {
-    this.hllLog2m = hllLog2m;
+  public FastHllAggregationFunction() {
+  }
+
+  public void init(int log2m) {
+    hllLog2m = log2m;
+  }
+
+  @Override
+  public void accept(AggregationFunctionVisitorBase visitor) {
+    visitor.visit(this);
   }
 
   /**

@@ -20,9 +20,10 @@ import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
+import com.linkedin.pinot.core.operator.aggregation.AggregationFunctionContext;
 import com.linkedin.pinot.core.operator.aggregation.AggregationOperator;
+import com.linkedin.pinot.core.operator.aggregation.DefaultAggregationExecutor;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionUtils;
-import com.linkedin.pinot.core.startree.hll.HllConstants;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -66,8 +67,18 @@ public class AggregationPlanNode implements PlanNode {
   @Override
   public Operator run() {
     MProjectionOperator projectionOperator = (MProjectionOperator) _projectionPlanNode.run();
-    return new AggregationOperator(_aggregationInfos, projectionOperator,
-        _indexSegment.getSegmentMetadata().getTotalRawDocs());
+    int numAggFuncs = _aggregationInfos.size();
+    AggregationFunctionContext[] aggrFuncContextArray = new AggregationFunctionContext[numAggFuncs];
+    AggregationFunctionInitializer aggFuncInitializer = new AggregationFunctionInitializer(
+        _indexSegment.getSegmentMetadata());
+    for (int i = 0; i < numAggFuncs; i++) {
+      AggregationInfo aggregationInfo = _aggregationInfos.get(i);
+      aggrFuncContextArray[i] = AggregationFunctionContext.instantiate(aggregationInfo);
+      aggrFuncContextArray[i].getAggregationFunction().accept(aggFuncInitializer);
+    }
+
+    return new AggregationOperator(_aggregationInfos, new DefaultAggregationExecutor(aggrFuncContextArray),
+        projectionOperator, _indexSegment.getSegmentMetadata().getTotalRawDocs());
   }
 
   @Override

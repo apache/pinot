@@ -50,6 +50,11 @@ public class PercentileAggregationFunction implements AggregationFunction {
     _percentile = percentile;
   }
 
+  @Override
+  public void accept(AggregationFunctionVisitorBase visitor) {
+    visitor.visit(this);
+  }
+
   /**
    * Performs 'percentile' aggregation on the input array.
    *

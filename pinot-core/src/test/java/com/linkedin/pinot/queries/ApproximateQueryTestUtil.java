@@ -31,6 +31,7 @@ import com.linkedin.pinot.core.query.reduce.BrokerReduceService;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import com.linkedin.pinot.util.TestUtils;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,11 +49,18 @@ public class ApproximateQueryTestUtil {
 
   public static Object runQuery(QueryExecutor queryExecutor, String segmentName,
       AvroQueryGenerator.TestAggreationQuery query, ServerMetrics metrics) {
+    return runQuery(queryExecutor, Arrays.asList(segmentName), query, metrics);
+  }
+
+  public static Object runQuery(QueryExecutor queryExecutor, List<String> segments,
+      AvroQueryGenerator.TestAggreationQuery query, ServerMetrics metrics) {
     LOGGER.info("\nRunning: " + query.getPql());
     final BrokerRequest brokerRequest = REQUEST_COMPILER.compileToBrokerRequest(query.getPql());
     InstanceRequest instanceRequest = new InstanceRequest(counter++, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
-    instanceRequest.getSearchSegments().add(segmentName);
+    for (String segment : segments) {
+      instanceRequest.getSearchSegments().add(segment);
+    }
     QueryRequest queryRequest = new QueryRequest(instanceRequest, metrics);
     final DataTable instanceResponse = queryExecutor.processQuery(queryRequest);
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
@@ -82,11 +90,16 @@ public class ApproximateQueryTestUtil {
 
   public static void runApproximationQueries(QueryExecutor queryExecutor, String segmentName,
       List<? extends AvroQueryGenerator.TestAggreationQuery> queries, double precision, ServerMetrics metrics) throws Exception {
+    runApproximationQueries(queryExecutor, Arrays.asList(segmentName), queries, precision, metrics);
+  }
+
+  public static void runApproximationQueries(QueryExecutor queryExecutor, List<String> segments,
+        List<? extends AvroQueryGenerator.TestAggreationQuery> queries, double precision, ServerMetrics metrics) throws Exception {
     boolean isAccurate = true;
     Object accurateValue = null;
 
     for (final AvroQueryGenerator.TestAggreationQuery query : queries) {
-      Object val = runQuery(queryExecutor, segmentName, query, metrics);
+      Object val = runQuery(queryExecutor, segments, query, metrics);
       if (isAccurate) {
         // store accurate value
         accurateValue = val;

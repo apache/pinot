@@ -17,7 +17,6 @@ package com.linkedin.pinot.core.operator.aggregation.groupby;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.operator.BaseOperator;
@@ -37,32 +36,32 @@ import java.util.List;
 public class AggregationGroupByOperator extends BaseOperator {
 
   private final GroupByExecutor _groupByExecutor;
-  private final List<AggregationInfo> _aggregationInfoList;
   private final MProjectionOperator _projectionOperator;
   private final long _numTotalRawDocs;
+  private final List<AggregationInfo> _aggregationInfoList;
   private int _nextBlockCallCounter = 0;
   private ExecutionStatistics _executionStatistics;
 
   /**
    * Constructor for the class.
-   *
    * @param aggregationsInfoList List of AggregationInfo (contains context for applying aggregation functions).
-   * @param groupBy GroupBy to perform
+   * @param defaultGroupByExecutor default group by executor
+   * @param defaultGroupByExecutor
    * @param projectionOperator Projection
-   * @param numGroupsLimit Limit on number of aggregation groups returned in the result
    * @param numTotalRawDocs Number of total raw documents.
    */
-  public AggregationGroupByOperator(List<AggregationInfo> aggregationsInfoList, GroupBy groupBy,
-      MProjectionOperator projectionOperator, int numGroupsLimit, long numTotalRawDocs) {
-    Preconditions.checkArgument((aggregationsInfoList != null) && (aggregationsInfoList.size() > 0));
-    Preconditions.checkNotNull(groupBy);
+  // aggregationInfoList parameter is required to support legacy API in getNextBlock()
+  public AggregationGroupByOperator(List<AggregationInfo> aggregationsInfoList,
+      DefaultGroupByExecutor defaultGroupByExecutor, MProjectionOperator projectionOperator,
+      long numTotalRawDocs) {
+    Preconditions.checkArgument(aggregationsInfoList != null && aggregationsInfoList.size() > 0);
+    Preconditions.checkNotNull(defaultGroupByExecutor);
     Preconditions.checkNotNull(projectionOperator);
 
-    _groupByExecutor =
-        new DefaultGroupByExecutor(aggregationsInfoList, groupBy, numGroupsLimit);
-    _aggregationInfoList = aggregationsInfoList;
     _projectionOperator = projectionOperator;
+    _aggregationInfoList = aggregationsInfoList;
     _numTotalRawDocs = numTotalRawDocs;
+    _groupByExecutor = defaultGroupByExecutor;
   }
 
   /**

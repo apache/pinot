@@ -132,6 +132,10 @@ public class SegmentWithHllIndexCreateHelper {
       segmentGenConfig.setHllConfig(hllConfig);
     }
 
+    if (hllConfig != null) {
+      segmentGenConfig.setHllConfig(hllConfig);
+    }
+
     final SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(segmentGenConfig);
     /**

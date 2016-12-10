@@ -30,6 +30,11 @@ public class MaxAggregationFunction implements AggregationFunction {
   private static final double DEFAULT_VALUE = Double.NEGATIVE_INFINITY;
   private static final ResultDataType RESULT_DATA_TYPE = ResultDataType.DOUBLE;
 
+  @Override
+  public void accept(AggregationFunctionVisitorBase visitor) {
+    visitor.visit(this);
+  }
+
   /**
    * Performs 'max' aggregation on the input array.
    * Returns {@value #DEFAULT_VALUE} if the input array is empty.

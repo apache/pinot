@@ -30,6 +30,11 @@ public class MinMVAggregationFunction implements AggregationFunction {
   private static final double DEFAULT_VALUE = Double.POSITIVE_INFINITY;
   private static final ResultDataType RESULT_DATA_TYPE = ResultDataType.DOUBLE;
 
+  @Override
+  public void accept(AggregationFunctionVisitorBase visitor) {
+    visitor.visit(this);
+  }
+
   /**
    * Performs 'min' aggregation function on the input array.
    * Returns {@value #DEFAULT_VALUE} if input array is empty.
