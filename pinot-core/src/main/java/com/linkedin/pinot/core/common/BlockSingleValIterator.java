@@ -17,34 +17,35 @@ package com.linkedin.pinot.core.common;
 
 /**
  *
- *
+ * TODO: Split into two classes, one for iterator over data, another over dictionary id's.
  */
 public abstract class BlockSingleValIterator implements BlockValIterator {
 
-
-  char nextCharVal(){
+  char nextCharVal() {
     throw new UnsupportedOperationException();
   }
 
-  public int nextIntVal(){
+  public int nextIntVal() {
     throw new UnsupportedOperationException();
   }
 
-  public float nextFloatVal(){
+  public float nextFloatVal() {
     throw new UnsupportedOperationException();
   }
 
-  public long nextLongVal(){
+  public long nextLongVal() {
     throw new UnsupportedOperationException();
   }
 
-  public double nextDoubleVal(){
+  public double nextDoubleVal() {
     throw new UnsupportedOperationException();
   }
 
-  public byte[] nextBytesVal(){
+  public byte[] nextBytesVal() {
     throw new UnsupportedOperationException();
   }
 
-
+  public String nextStringVal() {
+    throw new UnsupportedOperationException();
+  }
 }

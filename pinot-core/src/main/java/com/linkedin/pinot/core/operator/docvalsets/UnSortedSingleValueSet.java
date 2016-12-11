@@ -15,9 +15,11 @@
  */
 package com.linkedin.pinot.core.operator.docvalsets;
 
+import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.core.common.BaseBlockValSet;
 import com.linkedin.pinot.core.common.BlockValIterator;
+import com.linkedin.pinot.core.io.reader.ReaderContext;
 import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
 import com.linkedin.pinot.core.operator.docvaliterators.UnSortedSingleValueIterator;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
@@ -41,6 +43,19 @@ public final class UnSortedSingleValueSet extends BaseBlockValSet {
   @Override
   public DataType getValueType() {
     return this.columnMetadata.getDataType();
+  }
+
+  @Override
+  public void getStringValues(int[] inDocIds, int inStartPos, int inDocIdsSize, String[] outValues, int outStartPos) {
+    ReaderContext context = sVReader.createContext();
+    int inEndPos = inStartPos + inDocIdsSize;
+    try {
+      for (int i = inStartPos; i < inEndPos; i++) {
+        outValues[outStartPos++] = sVReader.getString(inDocIds[i], context);
+      }
+    } catch (Exception e) {
+      Utils.rethrowException(e);
+    }
   }
 
   @Override
