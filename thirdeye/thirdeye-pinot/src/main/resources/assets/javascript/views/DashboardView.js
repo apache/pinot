@@ -35,10 +35,10 @@ function DashboardView(dashboardModel) {
 }
 
 DashboardView.prototype = {
-  init: function () {
+  init : function() {
 
   },
-  render: function () {
+  render : function() {
     var self = this;
     result = this.dashboard_template_compiled(this.dashboardModel);
     $("#dashboard-place-holder").html(result);
@@ -46,30 +46,51 @@ DashboardView.prototype = {
     $('#dashboard-tabs a[href="#' + this.dashboardModel.tabSelected + '"]').tab('show');
 
     // DASHBOARD SELECTION
-    $('#dashboard-input').autocomplete({
-      minChars: 1,  // TODO : make this 3
-      serviceUrl : constants.DASHBOARD_AUTOCOMPLETE_ENDPOINT,
-      paramName : constants.DASHBOARD_AUTOCOMPLETE_QUERY_PARAM,
-      transformResult : function(response) {
-        return {
-          suggestions : $.map($.parseJSON(response), function(item) {
-            return {
-              value: item.name,
-              data : item.id
-            };
-          })
-        };
-      },
-      onSelect: function (suggestion) {
-        console.log('You selected: ' + suggestion.value + ', ' + suggestion.data);
-        console.log(suggestion);
-        var args = {dashboardName: suggestion.value, dashboardId: suggestion.data};
-        if (self.dashboardModel.dashboardName != suggestion.value) {
-          self.onDashboardSelectionEvent.notify(args);
+    var self = this;
+    $('#dashboard-name-input').select2({
+      theme : "bootstrap",
+      placeholder : "Search for Dashboard",
+      ajax : {
+        url : constants.DASHBOARD_AUTOCOMPLETE_ENDPOINT,
+        minimumInputLength : 3,
+        delay : 250,
+        data : function(params) {
+          var query = {
+            name : params.term,
+            page : params.page
+          }
+          // Query paramters will be ?name=[term]&page=[page]
+          return query;
+        },
+        processResults : function(data) {
+          var results = [];
+          $.each(data, function(index, item) {
+            results.push({
+              id : item.id,
+              text : item.name
+            });
+          });
+          return {
+            results : results
+          };
         }
       }
+    }).on("select2:select", function(e) {
+      var selectedElement = $(e.currentTarget);
+      var selectedData = selectedElement.select2("data")[0];
+      console.log("Selected data:" + JSON.stringify(selectedData))
+      var selectedDashboardName = selectedData.text;
+      var selectedDashboardId = selectedData.id;
+      console.log('You selected: ' + selectedDashboardName);
+      console.log(e);
+      var args = {
+        dashboardName : selectedDashboardName,
+        dashboardId : selectedDashboardId
+      };
+      if (self.dashboardModel.dashboardName != selectedDashboardName) {
+        self.onDashboardSelectionEvent.notify(args);
+      }
     }).val(this.dashboardModel.dashboardName);
-
 
     // TIME RANGE SELECTION
     this.timeRangeConfig.startDate = this.dashboardModel.startTime;
@@ -88,20 +109,25 @@ DashboardView.prototype = {
 
   setupListeners : function() {
     var self = this;
-    var tabSelectionEventHandler = function (e) {
+    var tabSelectionEventHandler = function(e) {
       var targetTab = $(e.target).attr('href');
       var previousTab = $(e.relatedTarget).attr('href');
-      var args = {targetTab: targetTab, previousTab: previousTab};
+      var args = {
+        targetTab : targetTab,
+        previousTab : previousTab
+      };
       self.tabClickEvent.notify(args);
       e.preventDefault();
     };
     $('#dashboard-tabs a').click(tabSelectionEventHandler);
 
     var hideDataRangePickerEventHandler = function(e, dataRangePicker) {
-      var args = {e: e, dataRangePicker: dataRangePicker};
+      var args = {
+        e : e,
+        dataRangePicker : dataRangePicker
+      };
       self.hideDataRangePickerEvent.notify(args);
     };
     $('#dashboard-time-range').on('hide.daterangepicker', hideDataRangePickerEventHandler);
   }
 };
-

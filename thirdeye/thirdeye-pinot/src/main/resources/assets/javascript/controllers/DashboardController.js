@@ -47,7 +47,7 @@ DashboardController.prototype = {
 
   hideDataRangePickerEventHandler : function(sender, args) {
     var dataRangePicker = args.dataRangePicker;
-    if (!this.dashboardModel.getStartTime().isSame(dataRangePicker.startDate) || !this.dashboardModel.getEndTime().isSame(dataRangePicker.endDate)) {
+    if (!this.dashboardModel.startTime.isSame(dataRangePicker.startDate) || !this.dashboardModel.endTime.isSame(dataRangePicker.endDate)) {
       // Copy date range to local model for checking if new date range needs
       // update
       this.dashboardModel.startTime = dataRangePicker.startDate;

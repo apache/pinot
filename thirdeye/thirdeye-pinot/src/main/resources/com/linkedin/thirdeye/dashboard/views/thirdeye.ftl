@@ -8,17 +8,15 @@
 
 <link href="../../assets/bootstrap/css/bootstrap.min.css" rel="stylesheet" type="text/css" />
 <link href="../../assets/bootstrap/css/bootstrap-theme.min.css" rel="stylesheet" type="text/css" />
-<link href="../../assets/jquery-ui/jquery-ui.min.css" rel="stylesheet" type="text/css" />
 <link href="../../assets/jtable/themes/metro/blue/jtable.min.css" rel="stylesheet" type="text/css" />
 <link href="../../assets/chosen/chosen.min.css" rel="stylesheet" type="text/css" />
 <link rel="stylesheet" href="../../../assets/css/d3.css" />
 <link rel="stylesheet" href="../../../assets/css/c3.css" />
-<link rel="stylesheet" type="text/css" href="../../../assets/typeahead/typeaheadjs.css" />
-<link rel="stylesheet" type="text/css" href="../../../assets/tokenfield/css/bootstrap-tokenfield.css" />
 
 <link rel="stylesheet" type="text/css" href="//cdn.jsdelivr.net/bootstrap.daterangepicker/2/daterangepicker.css" />
-
 <link href="../../assets/css/styles.css" rel="stylesheet" type="text/css" />
+<link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.3/css/select2.min.css" rel="stylesheet" />
+<link href="../../assets/select2/select2-bootstrap.min.css" rel="stylesheet" type="text/css" />
 <link href="../../assets/css/thirdeye.css" rel="stylesheet" type="text/css" />
 
 <!-- javascripts -->
@@ -32,17 +30,12 @@
 <script src="../../assets/js/d3/d3.v3.min.js" charset="utf-8" defer></script>
 <script src="../../assets/js/c3/c3.js" defer></script>
 <script type="text/javascript" src="//cdn.jsdelivr.net/bootstrap.daterangepicker/2/daterangepicker.js"></script>
-<script type="text/javascript" src="../../assets/typeahead/typeahead.js"></script>
-<script type="text/javascript" src="../../assets/tokenfield/bootstrap-tokenfield.min.js"></script>
-<script type="text/javascript" src="../../assets/autocomplete/autocomplete.min.js"></script>
-
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.3/js/select2.min.js" defer></script>
 
 <!-- custom scripts -->
 <script src="../../../assets/javascript/libs/page.js" defer></script>
 <script src="../../../assets/javascript/libs/handlebarsHelpers.js" defer></script>
-<script src="https://rawgit.com/flatiron/director/master/build/director.min.js">
 
-</script>
 
 <script src="../../assets/js/thirdeye/ingraph-metric-config.js"></script>
 <script src="../../assets/js/thirdeye/ingraph-dashboard-config.js"></script>

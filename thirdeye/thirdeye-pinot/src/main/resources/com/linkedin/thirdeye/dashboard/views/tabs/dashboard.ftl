@@ -4,13 +4,12 @@
 			<div class=row>
 				<div class="col-md-12">
 					<div style="float: left;">
-						<label for="dashboard-input" class="label-large-light">Dashboard Name: </label>
+						<label for="dashboard-name-input" class="label-large-light">Dashboard Name: </label>
 					</div>
-          <div style="width:370px;float: left">
-            <input type="text" name="dashboard" size="35" id="dashboard-input" class="label-large-light underlined" placeholder="Search for a Dashboard"/>
-          </div>
-
-				  <div style="float: left">
+					<div style="width: 370px; float: left">
+						<select style="width: 100%" id="dashboard-name-input" class="label-large-light underlined"></select> 
+					</div>
+					<div style="float: left">
 						<a type="button" class="btn btn-link label-medium-semibold" id="create-dashboard-button" data-toggle="modal" data-target="#create-dashboard-modal">+ Create Custom Dashboard</a>
 					</div>
 				</div>
@@ -55,12 +54,10 @@
 		</div>
 		<div class="tab-content">
 			<div class="tab-pane" id="dashboard_anomaly-summary-tab">
-				<div id="anomaly-summary-place-holder">
-				</div>
+				<div id="anomaly-summary-place-holder"></div>
 			</div>
 			<div class="tab-pane" id="dashboard_wow-summary-tab">
-				<div id="wow-place-holder">
-				</div>
+				<div id="wow-place-holder"></div>
 			</div>
 		</div>
 	</div>

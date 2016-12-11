@@ -3,7 +3,7 @@ function AnomalyResultController(parentController) {
   this.anomalyResultModel = new AnomalyResultModel();
   this.anomalyResultView = new AnomalyResultView(this.anomalyResultModel);
 
-  this.anomalyResultView.metricApplyEvent.attach(this.metricApplyEventHandler.bind(this));
+  this.anomalyResultView.metricChangeEvent.attach(this.metricChangeEventHandler.bind(this));
   this.anomalyResultView.hideDataRangePickerEvent.attach(this.hideDataRangePickerEventHandler.bind(this));
   this.anomalyResultView.rootCauseAnalysisButtonClickEvent.attach(this.rootCauseAnalysisButtonClickEventHandler.bind(this));
   this.anomalyResultView.showDetailsLinkClickEvent.attach(this.showDetailsLinkClickEventHandler.bind(this));
@@ -18,7 +18,7 @@ AnomalyResultController.prototype = {
     this.anomalyResultView.init();
     this.anomalyResultView.render();
   },
-  metricApplyEventHandler: function(sender, args) {
+  metricChangeEventHandler: function(sender, args) {
     console.log("Inside button click event of Metric for AnomalyResuleController");
     console.log(args);
   },

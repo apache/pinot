@@ -7,11 +7,11 @@ function AnalysisView(analysisModel) {
 
 AnalysisView.prototype = {
 
-  init: function () {
+  init : function() {
 
   },
 
-  render: function () {
+  render : function() {
     $("#analysis-place-holder").html(this.analysis_template_compiled);
 
     renderAnalysisTab();
@@ -21,24 +21,42 @@ AnalysisView.prototype = {
 function renderAnalysisTab() {
 
   // METRIC SELECTION
-  $('#metric-input').autocomplete({
-    minChars: 3,
-    serviceUrl : constants.metricAutocompleteEndpoint,
-    paramName : constants.metricAutocompleteQueryParam,
-    transformResult : function(response) {
-      return {
-        suggestions : $.map($.parseJSON(response), function(item) {
-          return {
-            value: item,
-            data : item
-          };
-        })
-      };
-    },
-    onSelect: function (value, data) {
-      $('#metric-input').val(value.data);
-      // TODO: add event to fetch dimensions / filters etc to render on this page
+  var self = this;
+  $('#analysis-metric-input').select2({
+    theme : "bootstrap",
+    placeholder : "search for Metric(s)",
+    ajax : {
+      url : constants.METRIC_AUTOCOMPLETE_ENDPOINT,
+      delay : 250,
+      data : function(params) {
+        var query = {
+          name : params.term,
+          page : params.page
+        }
+        // Query paramters will be ?search=[term]&page=[page]
+        return query;
+      },
+      processResults : function(data) {
+        var results = [];
+        $.each(data, function(index, item) {
+          results.push({
+            id : item,
+            text : item
+          });
+        });
+        return {
+          results : results
+        };
+      }
     }
+  }).on("select2:select", function(e) {
+    var selectedElement = $(e.currentTarget);
+    var selectedData = selectedElement.select2("data");
+    console.log("Selected data:" + JSON.stringify(selectedData));
+    var selectedMetricIds = selectedData.map(function(e) {return e.id})
+    console.log('Selected Metric Ids: ' + selectedMetricIds);
+    self.metricChangeEvent.notify(selectedMetricIds);
+    //TODO: handle this event
   });
 
   // TIME RANGE SELECTION

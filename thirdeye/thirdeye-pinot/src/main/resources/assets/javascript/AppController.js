@@ -54,21 +54,6 @@ AppController.prototype = {
     job_info_template_compiled = Handlebars.compile(job_info_template);
   },
 
-  /**
-   * Place holder that gets invoked before every call. parse the hash
-   */
-  parseHash : function(ctx, next) {
-    console.log("START: parse hash" + ctx.path);
-    // TODO: update ctx.state.hashParams (String) to this.appModel.hashParams
-    // (Map)
-    ctx.state.hashParams = {};
-    ctx.state.hashParams.dashboardName = "New Dashboard";
-    ctx.hashParams = this.appModel.hashParams;
-
-    next();
-    console.log("END: parse hash" + ctx.path);
-
-  },
   onTabClickEventHandler : function(sender, args) {
     console.log("targetTab:" + args.targetTab);
     console.log("previousTab:" + args.previousTab);

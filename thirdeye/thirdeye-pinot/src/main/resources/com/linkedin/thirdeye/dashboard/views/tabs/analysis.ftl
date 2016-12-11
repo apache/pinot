@@ -1,18 +1,18 @@
 <div class="container-fluid ">
-  <div class="row bg-white row-bordered">
-    <div class="container top-buffer bottom-buffer ">
-      <div class=row>
-        <div class="col-md-12">
-          <div style="float: left;">
-            <label for="metric-input" class="label-large-light">Metric Name: </label>
-          </div>
-          <div style="width:370px;float: left">
-            <input type="text" name="metric" size="35" id="metric-input" class="label-large-light underlined" placeholder="Search for a Metric"/>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+	<div class="row bg-white row-bordered">
+		<div class="container top-buffer bottom-buffer ">
+			<div class=row>
+				<div class="col-md-12">
+					<div style="float: left;">
+						<label for="metric-input" class="label-large-light">Metric Name: </label>
+					</div>
+					<div style="width: 370px; float: left">
+						<select style="width: 100%" id="analysis-metric-input" class="label-large-light underlined"></select> 
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
 </div>
 <div class="container-fluid">
 	<div class="row bg-white row-bordered">

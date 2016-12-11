@@ -1,7 +1,7 @@
 function AppView(appModel) {
   this.appModel = appModel;
   this.tabClickEvent = new Event(this);
-
+  this.currentActiveTab = undefined;
 }
 AppView.prototype = {
 
@@ -9,18 +9,19 @@ AppView.prototype = {
     var self = this;
     var tabSelectionEventHandler = function(e) {
       e.preventDefault();
-      console.log(e);
       var targetTab = $(e.target).attr('href');
       var previousTab = $(e.relatedTarget).attr('href');
       var args = {
         targetTab : targetTab,
         previousTab : previousTab
       };
-      self.tabClickEvent.notify(args);
+      //don't notify if the tab is already active
+      if(!$(e.target).parent().hasClass('active')) {
+        self.tabClickEvent.notify(args);
+      }
     };
     $('#main-tabs').click(tabSelectionEventHandler);
     $('#admin-tabs').click(tabSelectionEventHandler);
-    $('#global-navbar a').click(tabSelectionEventHandler);
     // compile thirdeye.ftl
   },
 
