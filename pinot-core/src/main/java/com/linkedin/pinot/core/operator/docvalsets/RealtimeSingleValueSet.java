@@ -16,35 +16,23 @@
 package com.linkedin.pinot.core.operator.docvalsets;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.core.common.BaseBlockValSet;
 import com.linkedin.pinot.core.common.BlockValIterator;
-import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
 import com.linkedin.pinot.core.operator.docvaliterators.RealtimeSingleValueIterator;
 
-public final class RealtimeSingleValueSet implements BlockValSet {
+
+public final class RealtimeSingleValueSet extends BaseBlockValSet {
 
   private SingleColumnSingleValueReader reader;
   private int length;
   private DataType dataType;
 
-  public RealtimeSingleValueSet(SingleColumnSingleValueReader reader, int length,
-      DataType dataType) {
+  public RealtimeSingleValueSet(SingleColumnSingleValueReader reader, int length, DataType dataType) {
     super();
     this.reader = reader;
     this.length = length;
     this.dataType = dataType;
-  }
-
-  @Override
-  public <T> T getSingleValues() {
-    throw new UnsupportedOperationException(
-        "Reading a batch of values is not supported for realtime single-value BlockValSet.");
-  }
-
-  @Override
-  public <T> T getMultiValues() {
-    throw new UnsupportedOperationException(
-        "Reading a batch of values is not supported for realtime single-value BlockValSet.");
   }
 
   @Override
@@ -58,23 +46,12 @@ public final class RealtimeSingleValueSet implements BlockValSet {
   }
 
   @Override
-  public void getDictionaryIds(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outDictionaryIds, int outStartPos) {
+  public void getDictionaryIds(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outDictionaryIds,
+      int outStartPos) {
     int endPos = inStartPos + inDocIdsSize;
     for (int iter = inStartPos; iter < endPos; ++iter) {
       int row = inDocIds[iter];
       outDictionaryIds[outStartPos++] = reader.getInt(row);
     }
-  }
-
-  @Override
-  public int[] getDictionaryIds() {
-    throw new UnsupportedOperationException(
-        "Unsupported operation 'getDictionaryIds' for realtime single-value BlockValSet.");
-  }
-
-  @Override
-  public int getDictionaryIdsForDocId(int docId, int[] outputDictIds) {
-    throw new UnsupportedOperationException(
-        "Reading value for a given docId is not supported in realtime single-value set");
   }
 }
