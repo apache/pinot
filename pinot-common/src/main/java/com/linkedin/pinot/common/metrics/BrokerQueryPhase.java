@@ -28,7 +28,8 @@ public enum BrokerQueryPhase implements AbstractMetrics.QueryPhase {
   QUERY_ROUTING,
   SCATTER_GATHER,
   DESERIALIZATION,
-  REDUCE;
+  REDUCE,
+  REQUEST_CONNECTION_WAIT;
 
   private final String queryPhaseName;
 

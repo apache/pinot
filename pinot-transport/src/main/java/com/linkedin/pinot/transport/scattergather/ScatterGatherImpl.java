@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.transport.scattergather;
 
+import com.linkedin.pinot.common.metrics.BrokerQueryPhase;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -422,7 +423,8 @@ public class ScatterGatherImpl implements ScatterGather {
       boolean gotConnection = false;
       boolean error = true;
       long timeRemainingMillis = _timeoutMS - (System.currentTimeMillis() - _startTime);
-      long timeWaitedMillis = 0;
+      final long _startTimeNs = System.nanoTime();
+      long timeWaitedNs = 0;
       try {
         keyedFuture = _connPool.checkoutObject(_server);
 
@@ -435,7 +437,7 @@ public class ScatterGatherImpl implements ScatterGather {
           }
           conn = keyedFuture.getOne(timeRemainingMillis, TimeUnit.MILLISECONDS);
           if (conn != null && conn.validate()) {
-            timeWaitedMillis = System.currentTimeMillis() - _startTime;
+            timeWaitedNs = System.nanoTime() - _startTimeNs;
             gotConnection = true;
             break;
           }
@@ -477,7 +479,7 @@ public class ScatterGatherImpl implements ScatterGather {
       } finally {
         _requestDispatchLatch.countDown();
         BrokerRequest brokerRequest = (BrokerRequest) _request.getBrokerRequest();
-        _brokerMetrics.addMeteredQueryValue(brokerRequest, BrokerMeter.REQUEST_CONNECTION_WAIT_TIME_IN_MILLIS, timeWaitedMillis);
+        _brokerMetrics.addPhaseTiming(brokerRequest, BrokerQueryPhase.REQUEST_CONNECTION_WAIT, timeWaitedNs);
         if (timeRemainingMillis < 0) {
           _brokerMetrics.addMeteredQueryValue(brokerRequest, BrokerMeter.REQUEST_CONNECTION_TIMEOUTS, 1);
         }

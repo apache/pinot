@@ -33,7 +33,6 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   REQUEST_DESERIALIZATION_EXCEPTIONS("exceptions", false),
   DOCUMENTS_SCANNED("documents", false),
   REQUEST_CONNECTION_TIMEOUTS("timeouts", false),
-  REQUEST_CONNECTION_WAIT_TIME_IN_MILLIS("waits", false),
   HELIX_ZOOKEEPER_RECONNECTS("reconnects", true),
 
   // This metric tracks the number of requests dropped by the broker after we get a connection to the server.
