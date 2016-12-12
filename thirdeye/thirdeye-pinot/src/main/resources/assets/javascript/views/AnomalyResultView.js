@@ -76,8 +76,8 @@ AnomalyResultView.prototype = {
           var results = [];
           $.each(data, function(index, item) {
             results.push({
-              id : item,
-              text : item
+              id : item.id,
+              text : item.alias
             });
           });
           return {

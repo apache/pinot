@@ -150,12 +150,17 @@ public class DataResource {
     return metricConfigDAO.findById(id);
   }
 
+  //------------- endpoint for autocomplete ----------
+  @GET
+  @Path("autocomplete/dashboard")
+  public List<DashboardConfigDTO> getDashboardsWhereNameLike(@QueryParam("name") String name) {
+    return dashboardConfigDAO.findWhereNameLike("%" + name + "%");
+  }
 
   @GET
-  @Path("metric/aliases")
-  public List<String> getMetricAliasesWhereNameLike(@QueryParam("name") String name) {
-    List<String> metricConfigs = metricConfigDAO.findMetricAliasWhereNameLike("%" + name + "%");
-    return metricConfigs;
+  @Path("autocomplete/metric")
+  public List<MetricConfigDTO> getMetricsWhereNameLike(@QueryParam("name") String name) {
+    return metricConfigDAO.findWhereNameLike("%" + name + "%");
   }
 
   // dataset end points
@@ -191,12 +196,6 @@ public class DataResource {
   @Path("dashboard")
   public List<DashboardConfig> getDashboards(@QueryParam("dashboard") String dashboard) {
     return new ArrayList<>();
-  }
-
-  @GET
-  @Path("autocomplete/dashboard")
-  public List<DashboardConfigDTO> getDashboardAliasesWhereNameLike(@QueryParam("name") String name) {
-    return dashboardConfigDAO.findWhereNameLike("%" + name + "%");
   }
 
   @GET
