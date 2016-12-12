@@ -144,6 +144,7 @@ AnomalyResultView.prototype = {
         bindto : '#anomaly-chart-' + idx,
         data : {
           x : 'date',
+          xFormat: '%Y-%m-%d %H:%M',
           columns : chartColumns,
           type : 'spline'
         },
@@ -158,6 +159,11 @@ AnomalyResultView.prototype = {
           x : {
             type : 'timeseries',
             show : true
+//            tick: {
+//              format: function (x) {
+//                return "2016";
+//              }
+//            }
           }
         },
         regions : [ {

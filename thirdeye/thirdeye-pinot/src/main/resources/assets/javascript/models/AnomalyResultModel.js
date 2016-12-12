@@ -1,6 +1,6 @@
 function AnomalyResultModel(){
 
-  this.metricAliases = ["feed_sessions_additive::engaged_feed_session_count"];
+  this.metricAliases = ["feed_sessions_additive::engaged_feed_session_count", "ads_targeting::tscp_targeting_custom_CallCountTotal"];
   this.startDate = moment().subtract(6, 'days').startOf('day');
   this.endDate = moment().subtract(0, 'days').startOf('day');
 
