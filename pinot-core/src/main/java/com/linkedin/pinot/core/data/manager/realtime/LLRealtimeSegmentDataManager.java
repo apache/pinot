@@ -564,7 +564,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   protected void postStopConsumedMsg(String reason) {
     do {
       SegmentCompletionProtocol.Response response = _protocolHandler.segmentStoppedConsuming(_segmentNameStr, _currentOffset, reason);
-      if (response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED)) {
+      if (response.getStatus() == SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED) {
         LOGGER.info("Got response {}", response.toJsonString());
         break;
       }

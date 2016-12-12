@@ -138,10 +138,12 @@ public class SegmentCompletionIntegrationTests extends RealtimeClusterIntegratio
 
     while (now() < endTime) {
       ExternalView ev = HelixHelper.getExternalViewForResource(_helixAdmin, _clusterName, realtimeTableName);
-      Map<String, String> stateMap = ev.getStateMap(_segmentName);
-      if (stateMap != null && stateMap.containsKey(_serverInstance)) {
-        if (stateMap.get(_serverInstance).equals(PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE)) {
-          break;
+      if (ev != null) {
+        Map<String, String> stateMap = ev.getStateMap(_segmentName);
+        if (stateMap != null && stateMap.containsKey(_serverInstance)) {
+          if (stateMap.get(_serverInstance).equals(PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE)) {
+            break;
+          }
         }
       }
       Uninterruptibles.sleepUninterruptibly(50, TimeUnit.MILLISECONDS);
@@ -153,7 +155,7 @@ public class SegmentCompletionIntegrationTests extends RealtimeClusterIntegratio
     ServerSegmentCompletionProtocolHandler protocolHandler = new ServerSegmentCompletionProtocolHandler(_serverInstance);
     SegmentCompletionProtocol.Response response = protocolHandler.segmentStoppedConsuming(_segmentName, 45688L,
         "RandomReason");
-    Assert.assertTrue(response.getStatus().equals(SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED));
+    Assert.assertTrue(response.getStatus() == SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED);
 
     while (now() < endTime) {
       ExternalView ev = HelixHelper.getExternalViewForResource(_helixAdmin, _clusterName, realtimeTableName);
