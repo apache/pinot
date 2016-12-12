@@ -173,12 +173,14 @@ public class SegmentCompletionIntegrationTests extends RealtimeClusterIntegratio
 
   @Override
   public void testGeneratedQueriesWithMultiValues() throws Exception {
-
+    // If we don't override this method to do nothing, we will starting running the super-class's method
+    // with our fake server, which will not work
   }
 
   @Override
   public void testHardcodedQuerySet() throws Exception {
-
+    // If we don't override this method to do nothing, we will starting running the super-class's method
+    // with our fake server, which will not work
   }
 
   long now() {
