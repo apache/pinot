@@ -1,9 +1,6 @@
 function DashboardModel() {
-  this.dashboardName;
+  this.dashboardName = "100 Most Recent Anomalies";
   this.mode = "AnomalySummary";
-  this.startTime = moment().subtract("7", "days");
-  this.endTime = moment();
-
 }
 
 DashboardModel.prototype = {
@@ -14,12 +11,6 @@ DashboardModel.prototype = {
     }
     if (params.mode) {
       this.mode = params.mode;
-    }
-    if (params.startTime) {
-      this.startTime = params.startTime;
-    }
-    if (params.endTime) {
-      this.endTime = params.endTime;
     }
   },
 

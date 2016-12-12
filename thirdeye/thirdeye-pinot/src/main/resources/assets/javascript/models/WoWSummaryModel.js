@@ -1,6 +1,4 @@
 function WoWSummaryModel() {
-  this.startTime = moment().subtract(7, "days");
-  this.endTime = moment();
   this.timestamps = [];
   this.wowSummary = [];
 }
@@ -8,12 +6,6 @@ function WoWSummaryModel() {
 WoWSummaryModel.prototype = {
 
   init : function(params) {
-    if (params.startTime) {
-      this.startTime = params.startTime;
-    }
-    if (params.endTime) {
-      this.endTime = params.endTime;
-    }
     this.buildSampleData();
   },
   rebuild : function() {

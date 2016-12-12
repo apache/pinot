@@ -1,33 +1,7 @@
 function DashboardView(dashboardModel) {
   this.dashboardModel = dashboardModel;
-
   this.tabClickEvent = new Event(this);
-  this.hideDataRangePickerEvent = new Event(this);
   this.onDashboardSelectionEvent = new Event(this);
-
-  this.timeRangeConfig = {
-    startDate : this.dashboardModel.startTime,
-    endDate : this.dashboardModel.endTime,
-    dateLimit : {
-      days : 60
-    },
-    showDropdowns : true,
-    showWeekNumbers : true,
-    timePicker : true,
-    timePickerIncrement : 5,
-    timePicker12Hour : true,
-    ranges : {
-      'Last 24 Hours' : [ moment(), moment() ],
-      'Yesterday' : [ moment().subtract(1, 'days'), moment().subtract(1, 'days') ],
-      'Last 7 Days' : [ moment().subtract(6, 'days'), moment() ],
-      'Last 30 Days' : [ moment().subtract(29, 'days'), moment() ],
-      'This Month' : [ moment().startOf('month'), moment().endOf('month') ],
-      'Last Month' : [ moment().subtract(1, 'month').startOf('month'), moment().subtract(1, 'month').endOf('month') ]
-    },
-    buttonClasses : [ 'btn', 'btn-sm' ],
-    applyClass : 'btn-primary',
-    cancelClass : 'btn-default'
-  };
 
   // Compile HTML template
   var dashboard_template = $("#dashboard-template").html();
@@ -92,18 +66,6 @@ DashboardView.prototype = {
       }
     }).val(this.dashboardModel.dashboardName);
 
-    // TIME RANGE SELECTION
-    this.timeRangeConfig.startDate = this.dashboardModel.startTime;
-    this.timeRangeConfig.endDate = this.dashboardModel.endTime;
-
-    function dashboard_range_cb(start, end) {
-      $('#dashboard-time-range span').addClass("time-range").html(start.format('MMM D, ') + start.format('hh:mm a') + '  &mdash;  ' + end.format('MMM D, ') + end.format('hh:mm a'));
-    }
-
-    $('#dashboard-time-range').daterangepicker(this.timeRangeConfig, dashboard_range_cb);
-
-    dashboard_range_cb(this.timeRangeConfig.startDate, this.timeRangeConfig.endDate);
-
     this.setupListeners();
   },
 
@@ -120,14 +82,5 @@ DashboardView.prototype = {
       e.preventDefault();
     };
     $('#dashboard-tabs a').click(tabSelectionEventHandler);
-
-    var hideDataRangePickerEventHandler = function(e, dataRangePicker) {
-      var args = {
-        e : e,
-        dataRangePicker : dataRangePicker
-      };
-      self.hideDataRangePickerEvent.notify(args);
-    };
-    $('#dashboard-time-range').on('hide.daterangepicker', hideDataRangePickerEventHandler);
   }
 };

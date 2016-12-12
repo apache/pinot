@@ -26,7 +26,7 @@ body {
 	font-size: 11px;
 }
 
-.metric-label {
+.dashboard-metric-label {
 	font-weight: 400;
 	font-size: 13px;
 }
@@ -172,7 +172,6 @@ hr {
 
 .box-add-metric {
 	height: 200px;
-	
 }
 
 .box-anomaly {
@@ -180,16 +179,39 @@ hr {
 }
 
 /* dashboard table css*/
-.dashboard-table>thead>tr>th, .dashboard-table>tbody>tr>th,
-	.dashboard-table>tfoot>tr>th, .dashboard-table>thead>tr>td,
-	.dashboard-table>tbody>tr>td, .dashboard-table>tfoot>tr>td {
-	padding-left: 2px;
+.dashboard-table>thead>tr>th {
 	border-top: none;
+}
+
+.dashboard-table>tbody>tr>td:first-child {
+	border-left: 1px solid #D7D7D7;
+	width: 300px;
+}
+
+.dashboard-table>tbody>tr>td {
+	border-right: 1px solid #D7D7D7;
+	border-bottom: 1px solid #D7D7D7;
+	padding: 0px;
+	height: 44px;
+	vertical-align: middle;
+	font-weight: 300;
+	font-size: 15px;
+}
+
+.td-box-left {
+	float: left;
+	width: 50%;
+	text-align: center;
+}
+.td-box-right {
+	float: left;
+	width: 50%;
+	text-align: center;
 }
 
 .dashboard-table>thead>tr>th {
 	font-weight: 300;
-	font-size: 11px;
+	font-size: 13px;
 	text-align: center;
 }
 
@@ -316,11 +338,11 @@ rect {
 }
 
 .daterangepicker {
-	font=size:11px;
-	font-weight:100;
+	font =size: 11px;
+	font-weight: 100;
 }
 
-.daterangepicker ,.daterangepicker th, .daterangepicker td  {
-	font-size:12px;
-	font-weight:100;
+.daterangepicker, .daterangepicker th, .daterangepicker td {
+	font-size: 12px;
+	font-weight: 100;
 }

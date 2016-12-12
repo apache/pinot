@@ -7,28 +7,13 @@
 						<label for="dashboard-name-input" class="label-large-light">Dashboard Name: </label>
 					</div>
 					<div style="width: 370px; float: left">
-						<select style="width: 100%" id="dashboard-name-input" class="label-large-light underlined"></select> 
+						<select style="width: 100%" id="dashboard-name-input" class="label-large-light underlined"></select>
 					</div>
 					<div style="float: left">
-						<a type="button" class="btn btn-link label-medium-semibold" id="create-dashboard-button" data-toggle="modal" data-target="#create-dashboard-modal">+ Create Custom Dashboard</a>
+						<a type="button" class="btn btn-link label-medium-semibold" id="create-dashboard-button" data-toggle="modal" data-target="#create-dashboard-modal"><span class="glyphicon glyphicon-cog"
+							aria-hidden="true"></span></a>
 					</div>
 				</div>
-			</div>
-		</div>
-	</div>
-</div>
-<div class="container-fluid">
-	<div class="row bg-white row-bordered">
-		<div class="container top-buffer bottom-buffer ">
-			<div>
-				<label class="label-medium-semibold">Select time range: </label>
-			</div>
-			<div>
-				<label class="label-small-semibold">DATE RANGE(CURRENT) </label>
-			</div>
-
-			<div id="dashboard-time-range">
-				<i class="glyphicon glyphicon-calendar fa fa-calendar"></i>&nbsp; <span></span> <b class="caret"></b>
 			</div>
 		</div>
 	</div>
@@ -41,8 +26,8 @@
 		</div>
 		<div class="container">
 			<nav class="navbar navbar-transparent" role="navigation">
-				<div class="navbar-header">
-					<a class="navbar-brand"><label class="label-medium-semibold">View metrics by:</label></a>
+				<div class="navbar-header" >
+					<label class="label-medium-semibold" style="padding-top:15px;padding-bottom:15px">View metrics by:</label>
 				</div>
 				<div id="dashboard-tabs" class="collapse navbar-collapse">
 					<ul class="nav navbar-nav dashboard-tabs" id="dashboard-tabs">

@@ -5,25 +5,30 @@
 				<table class="table dashboard-table" style="border-collapse: separate; border-spacing: 0em 1em">
 					<thead>
 						<tr>
-							{{#if this.timestamps.length}}
-								<th><div class="row-label"> {{displayDate this.timestamps.[0]}} </div></th>
-								{{#each this.timestamps as |timestamp timeIndex|}}
-									<th>{{displayHour timestamp}}</th>
-								{{/each}}
-							{{/if}}
+							<th></th> 
+							{{#each timeRangeLabels as |label index|}}
+							<th>{{label}}</th> 
+							{{/each}}
 						</tr>
 					</thead>
 					<tbody>
-            {{#each this.anomalySummary as |row rowIndex|}}
+					   {{#each anomalySummaryList as |anomalySummary metricIndex|}}
 						<tr class="bg-white">
-                <td><div>
-                  <a href="#"><span class="metric-label">{{row.metricName}}</span></a>
-                </div></td>
-                {{#each row.data as |data dataIndex|}}
-							    <td><div class="box {{#if data}}box-anomaly{{/if}}">{{data}}</div></td>
-                {{/each}}
+							<td><a href="#"><span class="dashboard-metric-label">{{anomalySummary.metricName}}</span></a></td> 
+							{{#each anomalySummary.data as |info index|}}
+							<td><div class="td-box-left">
+									<span class="glyphicon glyphicon-ok" style="color: #7CB82F" aria-hidden="true"></span> 
+									<span aria-hidden="true">{{info.open}}</span>
+								</div>
+								<div class="td-box-right">
+									<span class="glyphicon glyphicon-remove" style="color: #DD2E1F" aria-hidden="true"></span> 
+									<span aria-hidden="true">{{info.resolved}}</span>
+								</div>
+							</td> 
+							{{/each}}
 						</tr>
-            {{/each}}
+						{{/each}}
+					</tbody>
 				</table>
 			</div>
 		</div>

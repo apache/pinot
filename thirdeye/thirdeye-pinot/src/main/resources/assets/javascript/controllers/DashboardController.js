@@ -7,7 +7,6 @@ function DashboardController(parentController) {
   this.wowSummaryController = new WoWSummaryController(this);
 
   this.dashboardView.tabClickEvent.attach(this.onSubTabSelectionEventHandler.bind(this));
-  this.dashboardView.hideDataRangePickerEvent.attach(this.hideDataRangePickerEventHandler.bind(this));
   this.dashboardView.onDashboardSelectionEvent.attach(this.onDashboardSelectionEventHandler.bind(this));
 }
 
