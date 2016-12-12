@@ -2,7 +2,6 @@ package com.linkedin.thirdeye.dashboard.resources.v2;
 
 import java.util.List;
 
-import com.google.common.collect.Lists;
 
 
 public class AnomalyWrapper {
@@ -17,8 +16,8 @@ public class AnomalyWrapper {
   private String currentStart;
   private String baselineEnd;
   private String baselineStart;
-  private List<Integer> baselineValues = Lists.newArrayList(35, 225, 200, 600, 170, 220, 70);
-  private List<Integer> currentValues = Lists.newArrayList(30, 200, 100, 400, 150, 250, 60);
+  private List<String> baselineValues;
+  private List<String> currentValues;
   private String current = "1000";
   private String baseline = "2000";
 
@@ -96,19 +95,19 @@ public class AnomalyWrapper {
     this.baselineStart = baselineStart;
   }
 
-  public List<Integer> getBaselineValues() {
+  public List<String> getBaselineValues() {
     return baselineValues;
   }
 
-  public void setBaselineValues(List<Integer> baselineValues) {
+  public void setBaselineValues(List<String> baselineValues) {
     this.baselineValues = baselineValues;
   }
 
-  public List<Integer> getCurrentValues() {
+  public List<String> getCurrentValues() {
     return currentValues;
   }
 
-  public void setCurrentValues(List<Integer> currentValues) {
+  public void setCurrentValues(List<String> currentValues) {
     this.currentValues = currentValues;
   }
 

@@ -1,8 +1,8 @@
 function AnomalyResultModel(){
 
   this.metricAliases = ["feed_sessions_additive::engaged_feed_session_count"];
-  this.startDate = moment().subtract(7, 'days');
-  this.endDate = moment().subtract(0, 'days');
+  this.startDate = moment().subtract(6, 'days').startOf('day');
+  this.endDate = moment().subtract(0, 'days').startOf('day');
 
   this.anomalies = [];
 
@@ -20,14 +20,6 @@ AnomalyResultModel.prototype = {
     var anomaliesList = dataService.fetchAnomalies(this.metricAliases, this.startDate, this.endDate);
     console.log(anomaliesList);
     return anomaliesList;
-
-    // list of anomalies
-    // get these from backend call above
-//    this.anomaly1 = new AnomalyWrapper();
-//    this.anomaly2 = new AnomalyWrapper();
-//    this.anomalies.push(this.anomaly1);
-//    this.anomalies.push(this.anomaly2);
-//    return this.anomalies;
   }
 
 }
