@@ -1,17 +1,10 @@
 function AnomalyResultModel(){
 
-  this.startDate = moment().subtract(6, 'days');
+  this.metricAliases = ["feed_sessions_additive::engaged_feed_session_count"];
+  this.startDate = moment().subtract(7, 'days');
   this.endDate = moment().subtract(0, 'days');
 
-  // list of anomalies
-  // get these from backend call
-  this.anomaly1 = new AnomalyResult(101);
-  this.anomaly2 = new AnomalyResult(102);
   this.anomalies = [];
-  this.anomalies.push(this.anomaly1);
-  this.anomalies.push(this.anomaly2);
-
-
 
 }
 
@@ -21,13 +14,28 @@ AnomalyResultModel.prototype = {
 
   update : function() {
 
+  },
+  getAnomaliesList : function() {
+
+    var anomaliesList = dataService.fetchAnomalies(this.metricAliases, this.startDate, this.endDate);
+    console.log(anomaliesList);
+    return anomaliesList;
+
+    // list of anomalies
+    // get these from backend call above
+//    this.anomaly1 = new AnomalyWrapper();
+//    this.anomaly2 = new AnomalyWrapper();
+//    this.anomalies.push(this.anomaly1);
+//    this.anomalies.push(this.anomaly2);
+//    return this.anomalies;
   }
 
 }
 
-function AnomalyResult(anomalyId) {
-  this.anomalyId = anomalyId;
-  this.metric = "feed_session_count";
+function AnomalyWrapper() {
+  this.anomalyId = "101";
+  this.metric = "feed_sessions_additive";
+  this.dataset = "engaged_feed_session_count"
 
   this.dates = ['2016-01-01', '2016-01-02', '2016-01-03', '2016-01-04', '2016-01-05', '2016-01-06', '2016-01-07'];
   this.currentEnd ='Jan 7 2016';
@@ -48,3 +56,4 @@ function AnomalyResult(anomalyId) {
   this.anomalyFunctionDimension = 'country:US';
   this.anomalyFeedback = "Confirmed Anomaly";
 }
+

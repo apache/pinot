@@ -47,7 +47,7 @@ AnomalyResultView.prototype = {
 
   render : function() {
 
-    var anomalies = this.anomalyResultModel.anomalies;
+    var anomalies = this.anomalyResultModel.getAnomaliesList();
     console.log("anomalies");
     console.log(anomalies);
 

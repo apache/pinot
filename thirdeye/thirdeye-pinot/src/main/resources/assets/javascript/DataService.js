@@ -4,39 +4,60 @@ function DataService() {
 
 DataService.prototype = {
 
-    getData: function(url, params)  {
+    getSynchronousData: function(url)  {
+      console.log("request url:", url)
+
+      var results = undefined;
+       $.ajax({
+        url: url,
+        type: 'get',
+        dataType: 'json',
+        async: false,
+        success: function(data) {
+          results = data;
+        },
+        error: function(e) {
+          console.log(e);
+        }
+      });
+       return results;
+    },
+    getAsynchronousData: function(url)  {
       console.log("request url:", url)
 
       return $.ajax({
-          url: url,
-          type: 'get',
-          dataType: 'json',
-          statusCode: {
-              404: function () {
-                  $("#" + tab + "-chart-area-error").empty();
-                  var warning = $('<div></div>', { class: 'uk-alert uk-alert-warning' });
-                  var closeBtn = $('<i></i>', { class: 'close-parent uk-icon-close' });
-                  warning.append($('<p></p>', { html: 'No data available. (Error code: 404)' }));
-                  $("#" + tab + "-chart-area-error").append(closeBtn);
-                  $("#" + tab + "-chart-area-error").append(warning);
-                  $("#" + tab + "-chart-area-error").fadeIn(100);
-                  return
-              },
-              500: function () {
-                  $("#" + tab + "-chart-area-error").empty()
-                  var error = $('<div></div>', { class: 'uk-alert uk-alert-danger' });
-                  var closeBtn = $('<i></i>', { class: 'close-parent uk-icon-close' });
-                  error.append($('<p></p>', { html: 'Internal server error' }));
-                  $("#" + tab + "-chart-area-error").append(closeBtn);
-                  $("#" + tab + "-chart-area-error").append(error);
-                  $("#" + tab + "-chart-area-error").fadeIn(100);
-                  return
-              }
-          }
-      })
-  }
+        url: url,
+        type: 'get',
+        dataType: 'json',
 
+      });
+    },
+    fetchAnomalyWrappers: function(dataset, metric, startTime, endTime) {
+      var url = '/anomalies/wrapper/' + dataset + '/' + metric + '/' + startTime + '/' + endTime;
+      return this.getSynchronousData(url);
+    },
+    fetchAnomalies: function(metricAliases, startTime, endTime) {
+      var anomalies = []; // array of AnomalyObject
 
+      // for each selected metric alias
+      for (var i = 0; i < metricAliases.length; i++) {
 
+        var tokens = metricAliases[i].split("::");
+        var dataset = tokens[0];
+        var metric = tokens[1];
+
+        // fetch anomaly wrappers
+        var anomalyWrappers = this.fetchAnomalyWrappers(dataset, metric, startTime, endTime);
+        console.log("Anomaly Wrappers");
+        console.log(anomalyWrappers);
+        anomalyWrappers.forEach( function (anomalyWrapper) {
+            anomalies.push(anomalyWrapper);
+        });
+
+      }
+      console.log("returning anomalies");
+      console.log(anomalies);
+      return anomalies;
+    }
 
 };

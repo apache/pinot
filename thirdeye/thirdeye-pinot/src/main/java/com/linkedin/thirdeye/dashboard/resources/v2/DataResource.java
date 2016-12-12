@@ -9,9 +9,11 @@ import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dashboard.configs.DashboardConfig;
+
 import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewHandler;
 import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewRequest;
 import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewResponse;
+
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
@@ -318,4 +320,5 @@ public class DataResource {
     }
     return maxDateTime;
   }
+
 }
