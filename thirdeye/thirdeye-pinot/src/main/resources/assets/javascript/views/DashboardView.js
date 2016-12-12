@@ -15,6 +15,8 @@ DashboardView.prototype = {
   render : function() {
     var self = this;
     result = this.dashboard_template_compiled(this.dashboardModel);
+
+    // autocomplete
     $("#dashboard-place-holder").html(result);
     console.log("this.dashboardModel.tabSelected:" + this.dashboardModel.tabSelected);
     $('#dashboard-tabs a[href="#' + this.dashboardModel.tabSelected + '"]').tab('show');
@@ -61,10 +63,12 @@ DashboardView.prototype = {
         dashboardName : selectedDashboardName,
         dashboardId : selectedDashboardId
       };
+
       if (self.dashboardModel.dashboardName != selectedDashboardName) {
-        self.onDashboardSelectionEvent.notify(args);
+      //  self.onDashboardSelectionEvent.notify(args);
+        console.log("Notify dashboard");
       }
-    }).val(this.dashboardModel.dashboardName);
+    });
 
     this.setupListeners();
   },
