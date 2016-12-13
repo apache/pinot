@@ -16,11 +16,13 @@
 
 package com.linkedin.pinot.broker.broker.helix;
 
+import com.linkedin.pinot.common.metrics.BrokerMetrics;
+import com.linkedin.pinot.common.metrics.BrokerTimer;
 import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.ExternalViewChangeListener;
@@ -50,7 +52,8 @@ public class ClusterChangeMediator implements LiveInstanceChangeListener, Extern
 
   private Thread _deferredClusterUpdater = null;
 
-  public ClusterChangeMediator(HelixExternalViewBasedRouting helixExternalViewBasedRouting) {
+  public ClusterChangeMediator(HelixExternalViewBasedRouting helixExternalViewBasedRouting,
+      final BrokerMetrics brokerMetrics) {
     _helixExternalViewBasedRouting = helixExternalViewBasedRouting;
 
     // Simple thread that polls every 10 seconds to check if there are any cluster updates to apply
@@ -61,6 +64,10 @@ public class ClusterChangeMediator implements LiveInstanceChangeListener, Extern
           try {
             // Wait for at least one update
             Pair<UpdateType, Long> firstUpdate = _clusterChangeQueue.take();
+
+            // Update the queue time metrics
+            long queueTime = System.currentTimeMillis() - firstUpdate.getValue();
+            brokerMetrics.addTimedValue(BrokerTimer.ROUTING_TABLE_UPDATE_QUEUE_TIME, queueTime, TimeUnit.MILLISECONDS);
 
             // Take all other updates also present
             List<Pair<UpdateType, Long>> allUpdates = new ArrayList<>();

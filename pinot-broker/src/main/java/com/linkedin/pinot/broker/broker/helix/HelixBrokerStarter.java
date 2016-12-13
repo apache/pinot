@@ -117,7 +117,8 @@ public class HelixBrokerStarter {
     _helixAdmin = _helixManager.getClusterManagmentTool();
     addInstanceTagIfNeeded(helixClusterName, brokerId);
 
-    ClusterChangeMediator clusterChangeMediator = new ClusterChangeMediator(_helixExternalViewBasedRouting);
+    ClusterChangeMediator clusterChangeMediator = new ClusterChangeMediator(_helixExternalViewBasedRouting,
+        _brokerServerBuilder.getBrokerMetrics());
     _helixManager.addExternalViewChangeListener(clusterChangeMediator);
     _helixManager.addInstanceConfigChangeListener(clusterChangeMediator);
 
