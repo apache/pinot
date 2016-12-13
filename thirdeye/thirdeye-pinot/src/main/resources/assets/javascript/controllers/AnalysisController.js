@@ -5,16 +5,27 @@ function AnalysisController(parentController) {
   this.timeSeriesCompareController = new TimeSeriesCompareController(this);
   this.percentageChangeTableController = new PercentageChangeTableController(this);
   this.dimensionTreeMapController = new DimensionTreeMapController(this);
+
+  // Event handlers
+  this.analysisView.applyDataChangeEvent.attach(this.handleApplyAnalysisEvent.bind(this));
 }
 
 AnalysisController.prototype = {
   handleAppEvent: function (hashParams) {
     this.analysisModel.init(hashParams);
-    this.analysisModel.update();
+    this.analysisModel.update(HASH_SERVICE.getParams());
     this.analysisView.init();
     this.analysisView.render();
     this.timeSeriesCompareController.handleAppEvent(hashParams);
     this.percentageChangeTableController.handleAppEvent(hashParams);
     this.dimensionTreeMapController.handleAppEvent(hashParams);
+  },
+
+  handleApplyAnalysisEvent: function (updatedAnalysisParams) {
+    HASH_SERVICE.update(updatedAnalysisParams.viewParams);
+    console.log("updated hash params ---> ");
+    console.log(HASH_SERVICE.getParams());
+    this.timeSeriesCompareController.handleAppEvent(HASH_SERVICE.getParams());
   }
-};
+}
+

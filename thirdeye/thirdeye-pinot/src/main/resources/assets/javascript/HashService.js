@@ -31,9 +31,9 @@ HashService.prototype = {
   get : function(key) {
     return this.params[key];
   },
-  update : function(params) {
-    for ( var key in params) {
-      this.params[key] = params[key];
+  update : function(myparams) {
+    for ( var key in myparams) {
+      this.params[key] = myparams[key];
     }
     this.refreshWindowHash();
   },

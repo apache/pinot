@@ -2,14 +2,17 @@
 	<div class="row bg-white row-bordered">
 		<div class="container top-buffer bottom-buffer ">
 			<div class=row>
-				<div class="col-md-12">
+				<div class="col-md-8">
 					<div style="float: left;">
 						<label for="metric-input" class="label-large-light">Metric Name: </label>
 					</div>
 					<div style="width: 370px; float: left">
-						<select style="width: 100%" id="analysis-metric-input" class="label-large-light underlined"></select> 
+						<select style="width: 100%" id="analysis-metric-input" class="label-large-light underlined"></select>
 					</div>
 				</div>
+        <div class="col-md-2">
+          <input id="analysis-apply-button" type="button" class="btn btn-info" value="Apply">
+        </div>
 			</div>
 		</div>
 	</div>

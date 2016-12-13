@@ -47,7 +47,6 @@ public class MetricConfigManagerImpl extends AbstractManagerImpl<MetricConfigDTO
     return result;
   }
 
-
   @Override
   public MetricConfigDTO findByMetricAndDataset(String metricName, String dataset) {
     Predicate datasetPredicate = Predicate.EQ("dataset", dataset);
@@ -60,7 +59,6 @@ public class MetricConfigManagerImpl extends AbstractManagerImpl<MetricConfigDTO
     }
     return result;
   }
-
 
   @Override
   public MetricConfigDTO findByAliasAndDataset(String alias, String dataset) {
@@ -87,5 +85,4 @@ public class MetricConfigManagerImpl extends AbstractManagerImpl<MetricConfigDTO
     }
     return result;
   }
-
 }

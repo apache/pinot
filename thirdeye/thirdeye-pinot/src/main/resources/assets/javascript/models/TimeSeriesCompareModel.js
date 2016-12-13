@@ -1,5 +1,14 @@
 function TimeSeriesCompareModel(params) {
-  this.hashParams = params;
+  this.metricId;
+
+  this.dimensions;
+  this.filters;
+
+  this.currentStart;
+  this.currentEnd;
+  this.baselineStart;
+  this.baselineEnd;
+
   this.timeSeriesObject = {
     'start': '2016-01-3',
     'end': '2016-01-5',
@@ -11,8 +20,12 @@ function TimeSeriesCompareModel(params) {
 
 TimeSeriesCompareModel.prototype = {
 
-  init : function (ctx) {
-
+  init: function (params) {
+    if (params) {
+      if (params.metric) {
+        this.metricId = params.metric;
+      }
+    }
   },
 
   update: function () {
