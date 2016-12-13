@@ -257,6 +257,66 @@ public abstract class FieldSpec {
       return this.ordinal() < BYTE_ARRAY.ordinal();
     }
 
+    public DataType toMultiValue() {
+      switch (this) {
+        case BYTE:
+          return BYTE_ARRAY;
+        case CHAR:
+          return CHAR_ARRAY;
+        case INT:
+          return INT_ARRAY;
+        case LONG:
+          return LONG_ARRAY;
+        case FLOAT:
+          return FLOAT_ARRAY;
+        case DOUBLE:
+          return DOUBLE_ARRAY;
+        case STRING:
+          return STRING_ARRAY;
+        default:
+          throw new UnsupportedOperationException("Unsupported toMultiValue for data type: " + this);
+      }
+    }
+
+    public DataType toSingleValue() {
+      switch (this) {
+        case BYTE_ARRAY:
+          return BYTE;
+        case CHAR_ARRAY:
+          return CHAR;
+        case INT_ARRAY:
+          return INT;
+        case LONG_ARRAY:
+          return LONG;
+        case FLOAT_ARRAY:
+          return FLOAT;
+        case DOUBLE_ARRAY:
+          return DOUBLE;
+        case STRING_ARRAY:
+          return STRING;
+        default:
+          throw new UnsupportedOperationException("Unsupported toSingleValue for data type: " + this);
+      }
+    }
+
+    public boolean isCompatible(DataType anotherDataType) {
+      // Single-value is not compatible with multi-value.
+      if (isSingleValue() != anotherDataType.isSingleValue()) {
+        return false;
+      }
+      // Number is not compatible with String.
+      if (isSingleValue()) {
+        if (isNumber() != anotherDataType.isNumber()) {
+          return false;
+        }
+      } else {
+        if (toSingleValue().isNumber() != anotherDataType.toSingleValue().isNumber()) {
+          return false;
+        }
+      }
+      return true;
+    }
+
     /**
      * Return the {@link DataType} stored in pinot.
      */
@@ -321,7 +381,8 @@ public abstract class FieldSpec {
       }
     }
 
-    public JSONObject toJSONSchemaFor(String column) throws JSONException {
+    public JSONObject toJSONSchemaFor(String column)
+        throws JSONException {
       final JSONObject ret = new JSONObject();
       ret.put("name", column);
       ret.put("doc", "data sample from load generator");

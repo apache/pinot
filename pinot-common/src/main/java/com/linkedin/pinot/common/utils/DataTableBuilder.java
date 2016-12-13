@@ -24,8 +24,10 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import javax.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -546,6 +548,62 @@ public class DataTableBuilder {
       return columnTypes[idx];
     }
 
+    /**
+     * Indicates whether the given {@link DataSchema} is type compatible with this one.
+     * <ul>
+     *   <li>All numbers are type compatible.</li>
+     *   <li>Number is not type compatible with String.</li>
+     *   <li>Single-value is not type compatible with multi-value.</li>
+     * </ul>
+     *
+     * @param anotherDataSchema data schema to compare.
+     * @return whether the two data schemas are type compatible.
+     */
+    public boolean isTypeCompatibleWith(@Nonnull DataSchema anotherDataSchema) {
+      if (!Arrays.equals(columnNames, anotherDataSchema.columnNames)) {
+        return false;
+      }
+      int numColumns = columnNames.length;
+      for (int i = 0; i < numColumns; i++) {
+        if (!columnTypes[i].isCompatible(anotherDataSchema.columnTypes[i])) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    /**
+     * Upgrade the current data schema to cover the column types in the given data schema.
+     * <p>Type <code>long</code> can cover <code>int</code> and <code>long</code>.
+     * <p>Type <code>double</code> can cover all numbers, but with potential precision loss when use it to cover
+     * <code>long</code>.
+     * <p>The given data schema should be type compatible with this one.
+     *
+     * @param anotherDataSchema data schema to be covered.
+     */
+    public void upgradeToCover(@Nonnull DataSchema anotherDataSchema) {
+      int numColumns = columnTypes.length;
+      for (int i = 0; i < numColumns; i++) {
+        DataType thisColumnType = columnTypes[i];
+        DataType thatColumnType = anotherDataSchema.columnTypes[i];
+        if (thisColumnType != thatColumnType) {
+          if (thisColumnType.isSingleValue()) {
+            if (thisColumnType.isInteger() && thatColumnType.isInteger()) {
+              columnTypes[i] = DataType.LONG;
+            } else {
+              columnTypes[i] = DataType.DOUBLE;
+            }
+          } else {
+            if (thisColumnType.toSingleValue().isInteger() && thatColumnType.toSingleValue().isInteger()) {
+              columnTypes[i] = DataType.LONG_ARRAY;
+            } else {
+              columnTypes[i] = DataType.DOUBLE_ARRAY;
+            }
+          }
+        }
+      }
+    }
+
     public byte[] toBytes() throws Exception {
       if (columnNames == null || columnNames.length == 0) {
         return new byte[0];
@@ -604,7 +662,12 @@ public class DataTableBuilder {
         LOGGER.error("Exception deserializing DataSchema", e);
         return new DataSchema(new String[] {}, new DataType[] {});
       }
+    }
 
+    @SuppressWarnings("CloneDoesntCallSuperClone")
+    @Override
+    public DataSchema clone() {
+      return new DataSchema(columnNames.clone(), columnTypes.clone());
     }
 
     @Override

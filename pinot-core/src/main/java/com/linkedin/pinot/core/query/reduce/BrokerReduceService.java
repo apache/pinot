@@ -79,8 +79,6 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     long numEntriesScannedPostFilter = 0L;
     long numTotalRawDocs = 0L;
 
-    // Cache a data schema from data table with data rows inside.
-    DataSchema dataSchemaWithDataRows = null;
     // Cache an entry for data table with data schema inside.
     Map.Entry<ServerInstance, DataTable> entryWithDataSchema = null;
 
@@ -132,8 +130,6 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
         entryWithDataSchema = entry;
         if (dataTable.getNumberOfRows() == 0) {
           iterator.remove();
-        } else {
-          dataSchemaWithDataRows = dataSchema;
         }
       }
     }
@@ -153,33 +149,33 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
           numEntriesScannedPostFilter);
     }
 
-    // Pre-process data table map before reducing data.
-    if (dataSchemaWithDataRows != null) {
-      // For non-empty data table map, remove conflicting responses.
-      List<String> droppedServers = removeConflictingResponses(dataSchemaWithDataRows, dataTableMap);
-      if (!droppedServers.isEmpty()) {
-        String errorMessage =
-            QueryException.MERGE_RESPONSE_ERROR.getMessage() + ": responses for table: " + tableName + " from servers: "
-                + droppedServers + " got dropped due to data schema mismatch.";
-        LOGGER.error(errorMessage);
-        if (brokerMetrics != null) {
-          brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.RESPONSE_MERGE_EXCEPTIONS, 1);
-        }
-        brokerResponseNative.addToExceptions(
-            new QueryProcessingException(QueryException.MERGE_RESPONSE_ERROR_CODE, errorMessage));
-      }
-    } else {
-      // For empty data table map, put one data table with data schema to construct empty result.
-      if (entryWithDataSchema != null) {
-        dataTableMap.put(entryWithDataSchema.getKey(), entryWithDataSchema.getValue());
-      }
+    // For empty data table map, put one data table with data schema to construct empty result.
+    if (dataTableMap.isEmpty() && entryWithDataSchema != null) {
+      dataTableMap.put(entryWithDataSchema.getKey(), entryWithDataSchema.getValue());
     }
 
     // Reduce server responses data and set query results into the broker response.
     if (!dataTableMap.isEmpty()) {
       if (brokerRequest.isSetSelections()) {
         // Selection query.
-        setSelectionResults(brokerResponseNative, brokerRequest.getSelections(), dataTableMap);
+
+        // For data table map with more than one data tables, remove conflicting data tables.
+        DataSchema masterDataSchema = dataTableMap.values().iterator().next().getDataSchema().clone();
+        if (dataTableMap.size() > 1) {
+          List<String> droppedServers = removeConflictingResponses(masterDataSchema, dataTableMap);
+          if (!droppedServers.isEmpty()) {
+            String errorMessage =
+                QueryException.MERGE_RESPONSE_ERROR.getMessage() + ": responses for table: " + tableName
+                    + " from servers: " + droppedServers + " got dropped due to data schema inconsistency.";
+            LOGGER.error(errorMessage);
+            if (brokerMetrics != null) {
+              brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.RESPONSE_MERGE_EXCEPTIONS, 1);
+            }
+            brokerResponseNative.addToExceptions(
+                new QueryProcessingException(QueryException.MERGE_RESPONSE_ERROR_CODE, errorMessage));
+          }
+        }
+        setSelectionResults(brokerResponseNative, brokerRequest.getSelections(), dataTableMap, masterDataSchema);
       } else {
         // Aggregation query.
         List<AggregationInfo> aggregationsInfo = brokerRequest.getAggregationsInfo();
@@ -197,12 +193,14 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
   }
 
   /**
-   * Given a data schema, remove data tables that do not match this data schema.
+   * Given a data schema, remove data tables that are not compatible with this data schema.
+   * <p>Upgrade the data schema passed in to cover all remaining data schemas.
    *
    * @param dataSchema data schema.
    * @param dataTableMap map from server to data table.
    * @return list of server names where the data table got removed.
    */
+  @Nonnull
   private List<String> removeConflictingResponses(@Nonnull DataSchema dataSchema,
       @Nonnull Map<ServerInstance, DataTable> dataTableMap) {
     List<String> droppedServers = new ArrayList<>();
@@ -210,9 +208,11 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     while (iterator.hasNext()) {
       Map.Entry<ServerInstance, DataTable> entry = iterator.next();
       DataSchema dataSchemaToCompare = entry.getValue().getDataSchema();
-      if (!dataSchema.equals(dataSchemaToCompare)) {
+      if (!dataSchema.isTypeCompatibleWith(dataSchemaToCompare)) {
         droppedServers.add(entry.getKey().toString());
         iterator.remove();
+      } else {
+        dataSchema.upgradeToCover(dataSchemaToCompare);
       }
     }
     return droppedServers;
@@ -224,23 +224,23 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
    * @param brokerResponseNative broker response.
    * @param selection selection information.
    * @param dataTableMap map from server to data table.
+   * @param dataSchema data schema.
    */
   private void setSelectionResults(@Nonnull BrokerResponseNative brokerResponseNative, @Nonnull Selection selection,
-      @Nonnull Map<ServerInstance, DataTable> dataTableMap) {
-    DataSchema dataSchema = dataTableMap.values().iterator().next().getDataSchema();
-
+      @Nonnull Map<ServerInstance, DataTable> dataTableMap, @Nonnull DataSchema dataSchema) {
     // Reduce the selection results.
     SelectionResults selectionResults;
-    if (selection.isSetSelectionSortSequence()) {
+    int selectionSize = selection.getSize();
+    if (selection.isSetSelectionSortSequence() && selectionSize != 0) {
       // Selection order-by.
       SelectionOperatorService selectionService = new SelectionOperatorService(selection, dataSchema);
-      selectionResults =
-          selectionService.renderSelectionResultsWithOrdering(selectionService.reduceWithOrdering(dataTableMap));
+      selectionService.reduceWithOrdering(dataTableMap);
+      selectionResults = selectionService.renderSelectionResultsWithOrdering();
     } else {
       // Selection only.
       selectionResults = SelectionOperatorUtils.renderSelectionResultsWithoutOrdering(
-          SelectionOperatorUtils.reduceWithoutOrdering(dataTableMap, selection.getSize()),
-          selection.getSelectionColumns(), dataSchema);
+          SelectionOperatorUtils.reduceWithoutOrdering(dataTableMap, selectionSize), dataSchema,
+          SelectionOperatorUtils.getSelectionColumns(selection.getSelectionColumns(), dataSchema));
     }
 
     brokerResponseNative.setSelectionResults(selectionResults);
@@ -281,6 +281,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
    * @param dataTableMap map from server to data table.
    * @return shuffled aggregation results.
    */
+  @Nonnull
   private List<List<Serializable>> shuffleAggregationResults(@Nonnull List<AggregationInfo> aggregationsInfo,
       @Nonnull Map<ServerInstance, DataTable> dataTableMap) {
     int numAggregations = aggregationsInfo.size();
