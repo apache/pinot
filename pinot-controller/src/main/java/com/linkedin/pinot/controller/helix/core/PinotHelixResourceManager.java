@@ -984,7 +984,7 @@ public class PinotHelixResourceManager {
         LOGGER.info("building empty ideal state for table : " + offlineTableName);
         final IdealState offlineIdealState =
             PinotTableIdealStateBuilder.buildEmptyIdealStateFor(offlineTableName,
-                Integer.parseInt(segmentsConfig.getReplication()), _helixAdmin, _helixClusterName);
+                Integer.parseInt(segmentsConfig.getReplication()));
         LOGGER.info("adding table via the admin");
         _helixAdmin.addResource(_helixClusterName, offlineTableName, offlineIdealState);
         LOGGER.info("successfully added the table : " + offlineTableName + " to the cluster");

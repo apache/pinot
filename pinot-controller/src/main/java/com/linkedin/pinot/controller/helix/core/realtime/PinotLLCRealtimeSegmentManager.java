@@ -25,6 +25,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -44,12 +45,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.google.common.base.Function;
 import com.google.common.util.concurrent.Uninterruptibles;
+import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.StringUtil;
@@ -59,6 +62,7 @@ import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
+import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaSimpleConsumerFactoryImpl;
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
@@ -188,18 +192,7 @@ public class PinotLLCRealtimeSegmentManager {
     */
 
     // Allocate kafka partitions across server instances.
-    ZNRecord znRecord = new ZNRecord(topicName);
-    int serverId = 0;
-    for (int p = 0; p < nPartitions; p++) {
-      List<String> instances = new ArrayList<>(nReplicas);
-      for (int r = 0; r < nReplicas; r++) {
-        instances.add(instanceNames.get(serverId++));
-        if (serverId == instanceNames.size()) {
-          serverId = 0;
-        }
-      }
-      znRecord.setListField(Integer.toString(p), instances);
-    }
+    ZNRecord znRecord = generatePartitionAssignment(topicName, nPartitions, instanceNames, nReplicas);
     writeKafkaPartitionAssignemnt(realtimeTableName, znRecord);
     setupInitialSegments(realtimeTableName, znRecord, topicName, initialOffset, bootstrapHosts, idealState, create,
         nReplicas);
@@ -595,7 +588,8 @@ public class PinotLLCRealtimeSegmentManager {
     }
   }
 
-  protected long getPartitionOffset(KafkaStreamMetadata kafkaStreamMetadata, final String offsetCriteria, int partitionId) {
+  protected long getKafkaPartitionOffset(KafkaStreamMetadata kafkaStreamMetadata, final String offsetCriteria,
+      int partitionId) {
     final String topicName = kafkaStreamMetadata.getKafkaTopicName();
     final String bootstrapHosts = kafkaStreamMetadata.getBootstrapHosts();
 
@@ -626,7 +620,8 @@ public class PinotLLCRealtimeSegmentManager {
    * @param llcSegments is a list of segment names in the ideal state as was observed last.
    */
   public void createConsumingSegment(String realtimeTableName, List<Integer> nonConsumingPartitions,
-      List<String> llcSegments, KafkaStreamMetadata kafkaStreamMetadata) {
+      List<String> llcSegments, AbstractTableConfig tableConfig) {
+    final KafkaStreamMetadata kafkaStreamMetadata = new KafkaStreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
     List<LLCSegmentName> segmentNames = new ArrayList<>(llcSegments.size());
     for (String segmentId: llcSegments) {
       segmentNames.add(new LLCSegmentName(segmentId));
@@ -666,7 +661,7 @@ public class PinotLLCRealtimeSegmentManager {
           List<String> instances = partitionAssignment.getListField(Integer.toString(curPartition));
           LOGGER.info("Creating CONSUMING segment for {} partition {} with seq {}", realtimeTableName, curPartition, seqNum);
           String consumerStartOffsetSpec = kafkaStreamMetadata.getKafkaConsumerProperties().get(CommonConstants.Helix.DataSource.Realtime.Kafka.AUTO_OFFSET_RESET);
-          long startOffset = getPartitionOffset(kafkaStreamMetadata, consumerStartOffsetSpec, curPartition);
+          long startOffset = getKafkaPartitionOffset(kafkaStreamMetadata, consumerStartOffsetSpec, curPartition);
           LOGGER.info("Found kafka offset {} for table {} for partition {}", startOffset, realtimeTableName, curPartition);
 
           createSegment(realtimeTableName, nReplicas, curPartition, seqNum, instances, startOffset);
@@ -675,7 +670,7 @@ public class PinotLLCRealtimeSegmentManager {
           int nextSeqNum = segmentName.getSequenceNumber() + 1;
           List<String> instances = partitionAssignment.getListField(Integer.toString(curPartition));
           LOGGER.info("Creating CONSUMING segment for {} partition {} with seq {}", realtimeTableName, curPartition, nextSeqNum);
-          long startOffset = getPartitionOffset(kafkaStreamMetadata, "smallest", curPartition);
+          long startOffset = getKafkaPartitionOffset(kafkaStreamMetadata, "smallest", curPartition);
           LOGGER.info("Found kafka offset {} for table {} for partition {}", startOffset, realtimeTableName, curPartition);
           final LLCRealtimeSegmentZKMetadata oldSegMetadata = getRealtimeSegmentZKMetadata(realtimeTableName,
               segmentName.getSegmentName());
@@ -735,7 +730,7 @@ public class PinotLLCRealtimeSegmentManager {
    * Mark the state of the segment to be OFFLINE in idealstate.
    * When all replicas of this segment are marked offline, the ValidationManager, in its next
    * run, will auto-create a new segment with the appropriate offset.
-   * See {@link #createConsumingSegment(String, List, List, KafkaStreamMetadata)}
+   * See {@link #createConsumingSegment(String, List, List, AbstractTableConfig)}
   */
   public void segmentStoppedConsuming(final LLCSegmentName segmentName, final String instance) {
     String rawTableName = segmentName.getTableName();
@@ -752,5 +747,119 @@ public class PinotLLCRealtimeSegmentManager {
       }
     }, RetryPolicies.exponentialBackoffRetryPolicy(5, 500L, 2.0f));
     LOGGER.info("Successfully marked {} offline for instance {} since it stopped consuming", segmentNameStr, instance);
+  }
+
+  /**
+   * Update the kafka partitions as necessary to accommodate changes in number of replicas, number of tenants or
+   * number of kafka partitions. As new segments are assigned, they will obey the new kafka partition assignment.
+   *
+   * @param realtimeTableName name of the realtime table
+   * @param tableConfig tableConfig from propertystore
+   */
+  public void updateKafkaPartitionsIfNecessary(String realtimeTableName, AbstractTableConfig tableConfig) {
+    final ZNRecord partitionAssignment = getKafkaPartitionAssignment(realtimeTableName);
+    final Map<String, List<String>> partitionToServersMap = partitionAssignment.getListFields();
+    final KafkaStreamMetadata kafkaStreamMetadata = new KafkaStreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
+
+    final String realtimeServerTenantName =
+        ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(tableConfig.getTenantConfig().getServer());
+    final List<String> currentInstances = getInstances(realtimeServerTenantName);
+
+    // Previous partition count is what we find in the Kafka partition assignment znode.
+    // Get the current partition count from Kafka.
+    final int prevPartitionCount = partitionToServersMap.size();
+    int currentPartitionCount = -1;
+    try {
+      currentPartitionCount = getKafkaPartitionCount(kafkaStreamMetadata);
+    } catch (Exception e) {
+      LOGGER.warn("Could not get partition count for {}. Leaving kafka partition count at {}", realtimeTableName, currentPartitionCount);
+      return;
+    }
+
+    // Previous instance set is what we find in the Kafka partition assignment znode (values of the map entries)
+    final Set<String> prevInstances = new HashSet<>(currentInstances.size());
+    for (List<String> servers : partitionToServersMap.values()) {
+      prevInstances.addAll(servers);
+    }
+
+    final int prevReplicaCount = partitionToServersMap.entrySet().iterator().next().getValue().size();
+    final int currentReplicaCount = Integer.valueOf(tableConfig.getValidationConfig().getReplicasPerPartition());
+
+    boolean updateKafkaAssignment = false;
+
+    if (!prevInstances.equals(new HashSet<String>(currentInstances))) {
+      LOGGER.info("Detected change in instances for table {}", realtimeTableName);
+      updateKafkaAssignment = true;
+    }
+
+    if (prevPartitionCount != currentPartitionCount) {
+      LOGGER.info("Detected change in Kafka partition count for table {} from {} to {}", realtimeTableName, prevPartitionCount, currentPartitionCount);
+      updateKafkaAssignment = true;
+    }
+
+    if (prevReplicaCount != currentReplicaCount) {
+      LOGGER.info("Detected change in per-partition replica count for table {} from {} to {}", realtimeTableName, prevReplicaCount, currentReplicaCount);
+      updateKafkaAssignment = true;
+    }
+
+    if (!updateKafkaAssignment) {
+      LOGGER.info("Not updating Kafka partition assignment for table {}");
+      return;
+    }
+
+    // Generate new kafka partition assignment and update the znode
+    if (currentInstances.size() < currentReplicaCount) {
+      LOGGER.error("Cannot have {} replicas in {} instances for {}.Not updating partition assignment", currentReplicaCount, currentInstances.size(), realtimeTableName);
+      return;
+    }
+    ZNRecord newPartitionAssignment = generatePartitionAssignment(kafkaStreamMetadata.getKafkaTopicName(), currentPartitionCount, currentInstances, currentReplicaCount);
+    writeKafkaPartitionAssignemnt(realtimeTableName, newPartitionAssignment);
+    LOGGER.info("Successfully updated Kafka partition assignment for table {}");
+  }
+
+  /*
+   * Generate partition assignment. An example znode for 8 kafka partitions and and 6 realtime servers looks as below
+   * in zookeeper.
+   * {
+     "id":"KafkaTopicName"
+     ,"simpleFields":{
+     }
+     ,"listFields":{
+       "0":["Server_s1.company.com_8001","Server_s2.company.com_8001","Server_s3.company.com_8001"]
+       ,"1":["Server_s4.company.com_8001","Server_s5.company.com_8001","Server_s6.company.com_8001"]
+       ,"2":["Server_s1.company.com_8001","Server_s2.company.com_8001","Server_s3.company.com_8001"]
+       ,"3":["Server_s4.company.com_8001","Server_s5.company.com_8001","Server_s6.company.com_8001"]
+       ,"4":["Server_s1.company.com_8001","Server_s2.company.com_8001","Server_s3.company.com_8001"]
+       ,"5":["Server_s4.company.com_8001","Server_s5.company.com_8001","Server_s6.company.com_8001"]
+       ,"6":["Server_s1.company.com_8001","Server_s2.company.com_8001","Server_s3.company.com_8001"]
+       ,"7":["Server_s4.company.com_8001","Server_s5.company.com_8001","Server_s6.company.com_8001"]
+     }
+     ,"mapFields":{
+     }
+   }
+   */
+  private ZNRecord generatePartitionAssignment(String topicName, int nPartitions, List<String> instanceNames,
+      int nReplicas) {
+    ZNRecord znRecord = new ZNRecord(topicName);
+    int serverId = 0;
+    for (int p = 0; p < nPartitions; p++) {
+      List<String> instances = new ArrayList<>(nReplicas);
+      for (int r = 0; r < nReplicas; r++) {
+        instances.add(instanceNames.get(serverId++));
+        if (serverId == instanceNames.size()) {
+          serverId = 0;
+        }
+      }
+      znRecord.setListField(Integer.toString(p), instances);
+    }
+    return znRecord;
+  }
+
+  protected int getKafkaPartitionCount(KafkaStreamMetadata kafkaStreamMetadata) {
+    return PinotTableIdealStateBuilder.getPartitionCount(kafkaStreamMetadata);
+  }
+
+  protected List<String> getInstances(String tenantName) {
+    return _helixAdmin.getInstancesInClusterWithTag(_clusterName, tenantName);
   }
 }

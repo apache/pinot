@@ -68,19 +68,22 @@ public class ValidationManager {
   private final PinotHelixResourceManager _pinotHelixResourceManager;
   private final long _validationIntervalSeconds;
   private final boolean _autoCreateOnError;
+  private final PinotLLCRealtimeSegmentManager _llcRealtimeSegmentManager;
 
   /**
    * Constructs the validation manager.
-   *  @param validationMetrics The validation metrics utility used to publish the metrics.
+   * @param validationMetrics The validation metrics utility used to publish the metrics.
    * @param pinotHelixResourceManager The resource manager used to interact with Helix
    * @param config
+   * @param llcRealtimeSegmentManager
    */
   public ValidationManager(ValidationMetrics validationMetrics, PinotHelixResourceManager pinotHelixResourceManager,
-      ControllerConf config) {
+      ControllerConf config, PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager) {
     _validationMetrics = validationMetrics;
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _validationIntervalSeconds = config.getValidationControllerFrequencyInSeconds();
     _autoCreateOnError = true;
+    _llcRealtimeSegmentManager = llcRealtimeSegmentManager;
 
     _executorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
       @Override
@@ -158,7 +161,7 @@ public class ValidationManager {
           _validationMetrics.updateTotalDocumentsGauge(tableName, computeRealtimeTotalDocumentInSegments(segmentMetadataList,
               countHLCSegments));
           if (streamMetadata.hasSimpleKafkaConsumerType()) {
-            validateLLCSegments(tableName, tableConfig.getIndexingConfig().getStreamConfigs());
+            validateLLCSegments(tableName, tableConfig);
           }
         } catch (Exception e) {
           if (tableConfig == null) {
@@ -175,9 +178,9 @@ public class ValidationManager {
   }
 
   // For LLC segments, validate that there is at least one segment in CONSUMING state for every partition.
-  void validateLLCSegments(final String realtimeTableName, Map<String, String> streamConfigs) {
-    ZNRecord partitionAssignment = PinotLLCRealtimeSegmentManager.getInstance().getKafkaPartitionAssignment(
-        realtimeTableName);
+  void validateLLCSegments(final String realtimeTableName, AbstractTableConfig tableConfig) {
+    Map<String, String> streamConfigs = tableConfig.getIndexingConfig().getStreamConfigs();
+    ZNRecord partitionAssignment = _llcRealtimeSegmentManager.getKafkaPartitionAssignment(realtimeTableName);
     if (partitionAssignment == null) {
       LOGGER.warn("No partition assignment found for table {}", realtimeTableName);
       return;
@@ -233,11 +236,13 @@ public class ValidationManager {
             realtimeTableName, kafkaPartition, llcSegments.size());
       }
       if (_autoCreateOnError) {
-        PinotLLCRealtimeSegmentManager segmentManager = PinotLLCRealtimeSegmentManager.getInstance();
-        KafkaStreamMetadata kafkaStreamMetadata = new KafkaStreamMetadata(streamConfigs);
-        segmentManager.createConsumingSegment(realtimeTableName, nonConsumingKafkaPartitions, llcSegments, kafkaStreamMetadata);
+        _llcRealtimeSegmentManager.createConsumingSegment(realtimeTableName, nonConsumingKafkaPartitions, llcSegments,
+            tableConfig);
       }
     }
+    // Make this call after other validations (so that we verify that we are consistent against the existing partition
+    // assignment). This call may end up changing the kafka partition assignment for the table.
+    _llcRealtimeSegmentManager.updateKafkaPartitionsIfNecessary(realtimeTableName, tableConfig);
   }
 
   // For offline segment pushes, validate that there are no missing segments, and update metrics
@@ -457,5 +462,4 @@ public class ValidationManager {
 
     return missingSegments;
   }
-
 }
