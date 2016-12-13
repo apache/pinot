@@ -10,3 +10,20 @@ Handlebars.registerHelper('displayHour', function (date) {
   var tz = getTimeZone();
   return moment(date).tz(tz).format('h a');
 });
+
+Handlebars.registerHelper('if_eq', function(a, b, opts) {
+  if (a == b) {
+      return opts.fn(this);
+  } else {
+      return opts.inverse(this);
+  }
+});
+
+Handlebars.registerHelper('if_no_anomalies', function(info, opts) {
+  if( info.open == 0 && info.resolved == 0) {
+    return opts.fn(this)
+  } else{
+    return opts.inverse(this);
+  }
+  
+});

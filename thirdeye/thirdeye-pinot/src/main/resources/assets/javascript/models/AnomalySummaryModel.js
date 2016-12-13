@@ -20,11 +20,11 @@ AnomalySummaryModel.prototype = {
 
     var row2 = new AnomalySummaryRow();
     row2.metricName = "metricB";
-    row2.data = [ {resolved:3, open:5}, {resolved:3, open:5}, {resolved:3, open:5}, {resolved:3, open:5}, {resolved:3, open:5} ];
+    row2.data = [ {resolved:3, open:0}, {resolved:3, open:5}, {resolved:3, open:5}, {resolved:3, open:5}, {resolved:3, open:5} ];
 
     var row3 = new AnomalySummaryRow();
     row3.metricName = "metricC";
-    row3.data = [ {resolved:3, open:5}, {resolved:3, open:5}, {resolved:3, open:5}, {resolved:3, open:5}, {resolved:3, open:5} ];
+    row3.data = [ {resolved:0, open:0}, {resolved:3, open:0}, {resolved:5, open:0}, {resolved:3, open:5}, {resolved:3, open:5} ];
 
     this.anomalySummaryList = [];
     this.anomalySummaryList.push(row1);
