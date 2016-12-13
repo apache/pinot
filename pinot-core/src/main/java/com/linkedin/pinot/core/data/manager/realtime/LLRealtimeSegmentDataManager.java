@@ -285,8 +285,26 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
 
       int indexedMessageCount = 0;
       int kafkaMessageCount = 0;
+      boolean canTakeMore = true;
       while (!_shouldStop && !endCriteriaReached() && msgIterator.hasNext()) {
-        // Get a batch of messages from Kafka
+        if (!canTakeMore) {
+          // The RealtimeSegmentImpl that we are pushing rows into has indicated that it cannot accept any more
+          // rows. This can happen in one of two conditions:
+          // 1. We are in INITIAL_CONSUMING state, and we somehow exceeded the max number of rows we are allowed to consume
+          //    for this row. Something is seriously wrong, because endCriteriaReached() should have returned true when
+          //    we hit the row limit.
+          //    Throw an exception.
+          //
+          // 2. We are in CATCHING_UP state, and we legally hit this error due to a Kafka failure scenarios where
+          //    offsets get changed with higher generation numbers for some pinot servers but not others. So, if another
+          //    server (who got a larger kafka offset) asked us to catch up to that offset, but we are connected to a
+          //    broker who has smaller offsets, then we may try to push more rows into the buffer than maximum. This
+          //    is a rare case, and we really don't know how to handle this at this time.
+          //    Throw an exception.
+          //
+          segmentLogger.error("Buffer full with {} rows consumed (row limit {})", _numRowsConsumed, _segmentMaxRowCount);
+          throw new RuntimeException("Realtime segment full");
+        }
         // Index each message
         MessageAndOffset messageAndOffset = msgIterator.next();
         byte[] array = messageAndOffset.message().payload().array();
@@ -311,17 +329,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
             _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1);
           }
 
-          boolean canTakeMore = _realtimeSegment.index(row);  // Ignore the boolean return
-          if (!canTakeMore) {
-            //TODO
-            // This condition can happen when we are catching up, (due to certain failure scenarios in kafka where
-            // offsets get changed with higher generation numbers for some pinot servers but not others).
-            // Also, it may be that we push in a row into the realtime segment, but it fails to index that row
-            // for some reason., so we may end up with less number of rows in the real segment. Actually, even 0 rows.
-            // In that case, we will see an exception when generating the segment.
-            // TODO We need to come up with how the system behaves in these cases and document/handle them
-            segmentLogger.warn("We got full during indexing");
-          }
+          canTakeMore = _realtimeSegment.index(row);
         } else {
           _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1);
         }
