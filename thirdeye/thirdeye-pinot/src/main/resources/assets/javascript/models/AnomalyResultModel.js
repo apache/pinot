@@ -1,26 +1,79 @@
 function AnomalyResultModel() {
 
-  this.metricAliases = [ "feed_sessions_additive::engaged_feed_session_count", "ads_targeting::tscp_targeting_custom_CallCountTotal" ];
+  this.anomaliesSearchTab = 'anomalies_search-by-metric';
+  this.anomaliesTabText = 'Metrics';
+  this.metricIds = [];
+  this.dashboardId = null;
+  this.anomalyIds = [];
+
   this.startDate = moment().subtract(6, 'days').startOf('day');
   this.endDate = moment().subtract(0, 'days').startOf('day');
+  this.functionName = null;
+  this.functions = [];
+  this.anomalyStatusResolved = true;
+  this.anomalyStatusUnresolved = true;
+
   this.anomalies = [];
 
 }
 
 AnomalyResultModel.prototype = {
-  init : function(params) {
-    // if(params.metricIDList){
-    //      
-    // }
+  reset : function() {
+    this.metricIds = [];
+    this.dashboardId = null;
+    this.anomalyIds = [];
+    this.functionName = null;
+  },
+  setParams : function(params) {
+    this.reset();
+    console.log(params);
+    if (params != undefined) {
+      this.anomaliesTabText = params['anomaliesTabText'];
+      switch(this.anomaliesTabText) {
+        case constants.ANOMALIES_TAB_TEXT_DASHBOARD:
+          this.anomaliesSearchTab = 'anomalies_search-by-dashboard'
+            break;
+        case constants.ANOMALIES_TAB_TEXT_ID:
+          this.anomaliesSearchTab = 'anomalies_search-by-id'
+            break;
+        case constants.ANOMALIES_TAB_TEXT_METRICS:
+        default:
+          this.anomaliesSearchTab = 'anomalies_search-by-metric'
+      }
+      if (params['metricIds'] != undefined) {
+        this.metricIds = params['metricIds'];
+      }
+      if (params['dashboardId'] != undefined) {
+        this.dashboardId = params['dashboardId'];
+      }
+      if (params['anomalyIds'] != undefined) {
+        this.anomalyIds = params['anomalyIds'];
+      }
+      this.startDate = params['startDate'];
+      this.endDate = params['endDate'];
+      if (params['functionName'] != undefined) {
+        this.functionName = params['functionName'];
+      }
+    }
   },
 
-  update : function() {
-    if (false) {
-      this.anomalies = dataService.fetchAnomalies(this.metricAliases, this.startDate, this.endDate);
+  rebuild : function() {
+    var anomalies = [];
+    if (this.anomaliesTabText == constants.ANOMALIES_TAB_TEXT_METRICS && this.metricIds != undefined && this.metricIds.length > 0) {
+      anomalies = dataService.fetchAnomaliesForMetricIds(this.startDate, this.endDate, this.metricIds, this.functionName);
+    } else if (this.anomaliesTabText == constants.ANOMALIES_TAB_TEXT_DASHBOARD && this.dashboardId != undefined) {
+      anomalies = dataService.fetchAnomaliesForDashboardId(this.startDate, this.endDate, this.dashboardId, this.functionName);
+    } else if (this.anomaliesTabText == constants.ANOMALIES_TAB_TEXT_ID && this.anomalyIds != undefined && this.anomalyIds.length > 0) {
+      anomalies = dataService.fetchAnomaliesForAnomalyIds(this.startDate, this.endDate, this.anomalyIds, this.functionName);
     }
+    this.anomalies = anomalies;
+
   },
   getAnomaliesList : function() {
     return this.anomalies;
+  },
+  getAnomalyFunctions : function() {
+    return this.functions;
   }
 
 }

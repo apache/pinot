@@ -4,12 +4,13 @@ function DataService() {
 
 DataService.prototype = {
 
-    getSynchronousData: function(url)  {
+    getSynchronousData: function(url, params)  {
       console.log("request url:", url)
 
       var results = undefined;
        $.ajax({
         url: url,
+        data: params,
         type: 'get',
         dataType: 'json',
         async: false,
@@ -32,32 +33,31 @@ DataService.prototype = {
 
       });
     },
-    fetchAnomalyWrappers: function(dataset, metric, startTime, endTime) {
-      var url = '/anomalies/wrapper/' + dataset + '/' + metric + '/' + startTime + '/' + endTime;
-      return this.getSynchronousData(url);
+    fetchAnomaliesForMetricIds(startTime, endTime, metricIds, functionName) {
+      var url = constants.SEARCH_ANOMALIES_METRICIDS + startTime + '/' + endTime;
+      var params = {
+          metricIds : metricIds.join(),
+          functionName : functionName
+      };
+      var anomalies = this.getSynchronousData(url, params);
+      return anomalies;
     },
-    fetchAnomalies: function(metricAliases, startTime, endTime) {
-      var anomalies = []; // array of AnomalyObject
-
-      // for each selected metric alias
-      for (var i = 0; i < metricAliases.length; i++) {
-
-        var tokens = metricAliases[i].split("::");
-        var dataset = tokens[0];
-        var metric = tokens[1];
-
-        // fetch anomaly wrappers
-        var anomalyWrappers = this.fetchAnomalyWrappers(dataset, metric, startTime, endTime);
-        console.log("Anomaly Wrappers");
-        console.log(anomalyWrappers);
-        anomalyWrappers.forEach( function (anomalyWrapper) {
-            anomalies.push(anomalyWrapper);
-        });
-
-      }
-      console.log("returning anomalies");
-      console.log(anomalies);
+    fetchAnomaliesForDashboardId(startTime, endTime, dashboardId, functionName) {
+      var url = constants.SEARCH_ANOMALIES_DASHBOARDID + startTime + '/' + endTime;
+      var params = {
+          dashboardId : dashboardId,
+          functionName : functionName
+      };
+      var anomalies = this.getSynchronousData(url, params);
+      return anomalies;
+    },
+    fetchAnomaliesForAnomalyIds(startTime, endTime, anomalyIds, functionName) {
+      var url = constants.SEARCH_ANOMALIES_ANOMALYIDS + startTime + '/' + endTime;
+      var params = {
+          anomalyIds : anomalyIds.join(),
+          functionName : functionName
+      };
+      var anomalies = this.getSynchronousData(url, params);
       return anomalies;
     }
-
 };

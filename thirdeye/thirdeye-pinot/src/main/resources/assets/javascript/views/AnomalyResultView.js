@@ -32,10 +32,9 @@ function AnomalyResultView(anomalyResultModel) {
   this.anomalies_template_compiled = Handlebars.compile(anomalies_template);
 
   // events
-  this.metricChangeEvent = new Event(this);
-  this.hideDataRangePickerEvent = new Event(this);
-  
-  
+  //this.metricChangeEvent = new Event(this);
+  //this.hideDataRangePickerEvent = new Event(this);
+  this.applyButtonEvent = new Event(this);
   this.rootCauseAnalysisButtonClickEvent = new Event(this);
   this.showDetailsLinkClickEvent = new Event(this);
   this.anomalyFeedbackSelectEvent = new Event(this);
@@ -50,19 +49,16 @@ AnomalyResultView.prototype = {
   render : function() {
 
     var anomalies = this.anomalyResultModel.getAnomaliesList();
-    console.log("anomalies");
-    console.log(anomalies);
 
     var result_anomalies_template_compiled = this.anomalies_template_compiled(anomalies);
     $("#anomalies-place-holder").html(result_anomalies_template_compiled);
     this.renderAnomaliesTab(anomalies);
 
-    $('#anomalies-search-tabs a[href="#anomalies_search-by-metric"]').click();
-    
-    // SEARCH BY METRIC SELECTION
-    var self = this;
-    this.setupSearchByMetricTab();
 
+    $('#anomalies-search-tabs a[href="#' + this.anomalyResultModel.anomaliesSearchTab + '"]').click();
+
+    // SEARCH BY METRIC SELECTION
+    this.setupSearchByMetricTab();
     // SEARCH BY DASHBOARD
     this.setupSearchByDashboardTab();
     // SEARCH BY ID
@@ -77,7 +73,19 @@ AnomalyResultView.prototype = {
     $('#anomalies-time-range').daterangepicker(this.timeRangeConfig, cb);
     cb(this.timeRangeConfig.startDate, this.timeRangeConfig.endDate);
 
-    this.setupListenerOnDateRangePicker();
+    //this.setupListenerOnDateRangePicker();
+
+    // FUNCTION DROPDOWN
+    var functions = this.anomalyResultModel.getAnomalyFunctions();
+    var anomalyFunctionSelector = $('#anomaly-function-dropdown');
+    $.each(functions, function(val, text) {
+      anomalyFunctionSelector.append(
+            $('<option></option>').val(val).html(text)
+        );
+    });
+
+    // APPLY BUTTON
+    this.setupListenerOnApplyButton();
 
   },
   setupSearchByIDTab : function() {
@@ -177,6 +185,7 @@ AnomalyResultView.prototype = {
     });
   },
   setupSearchByMetricTab : function() {
+    var self = this;
     $('#anomalies-metric-input').select2({
       theme : "bootstrap",
       placeholder : "search for Metric(s)",
@@ -206,12 +215,12 @@ AnomalyResultView.prototype = {
         }
       }
     }).on("select2:select", function(e) {
-      // var selectedElement = $(e.currentTarget);
-      // var selectedData = selectedElement.select2("data");
-      // console.log("Selected data:" + JSON.stringify(selectedData));
-      // var selectedMetricIds = selectedData.map(function(e) {return e.id})
-      // console.log('Selected Metric Ids: ' + selectedMetricIds);
-      // self.metricChangeEvent.notify(selectedMetricIds);
+//       var selectedElement = $(e.currentTarget);
+//       var selectedData = selectedElement.select2("data");
+//       console.log("Selected data:" + JSON.stringify(selectedData));
+//       var selectedMetricIds = selectedData.map(function(e) {return e.id})
+//       console.log('Selected Metric Ids: ' + selectedMetricIds);
+//       self.metricChangeEvent.notify(selectedMetricIds);
     });
   },
 
@@ -229,10 +238,9 @@ AnomalyResultView.prototype = {
       var currentValues = [ 'current' ].concat(anomaly.currentValues);
       var baselineValues = [ 'baseline' ].concat(anomaly.baselineValues);
       var chartColumns = [ date, currentValues, baselineValues ];
-      console.log(chartColumns);
 
-      var regionStart = anomaly.anomalyRegionStart;
-      var regionEnd = anomaly.anomalyRegionEnd;
+      var regionStart = moment(anomaly.anomalyRegionStart, constants.TIMESERIES_DATE_FORMAT).format(constants.DETAILS_DATE_FORMAT);
+      var regionEnd = moment(anomaly.anomalyRegionEnd, constants.TIMESERIES_DATE_FORMAT).format(constants.DETAILS_DATE_FORMAT);
       $("#region-" + idx).html(regionStart + " - " + regionEnd)
 
       var current = anomaly.current;
@@ -267,17 +275,15 @@ AnomalyResultView.prototype = {
           x : {
             type : 'timeseries',
             show : true
-          // tick: {
-          // format: function (x) {
-          // return "2016";
-          // }
-          // }
           }
         },
         regions : [ {
           axis : 'x',
-          start : regionStart,
-          end : regionEnd
+          start : anomaly.anomalyRegionStart,
+          end : anomaly.anomalyRegionEnd,
+          tick: {
+            format: '%m %d %Y'
+            }
         } ]
       });
 
@@ -299,21 +305,41 @@ AnomalyResultView.prototype = {
     }
   },
 
-  hideDataRangePickerEventHandler : function(e, dataRangePicker) {
-    console.log("hide event");
-    console.log(e);
-    console.log(dataRangePicker);
-    var dateRangeParams = {
-      startDate : dataRangePicker.startDate,
-      endDate : dataRangePicker.endDate
-    }
-    this.hideDataRangePickerEvent.notify(dateRangeParams);
-  },
+//  hideDataRangePickerEventHandler : function(e, dataRangePicker) {
+//    console.log("hide event");
+//    console.log(e);
+//    console.log(dataRangePicker);
+//    var dateRangeParams = {
+//      startDate : dataRangePicker.startDate,
+//      endDate : dataRangePicker.endDate
+//    }
+//    this.hideDataRangePickerEvent.notify(dateRangeParams);
+//  },
+//
+//  setupListenerOnDateRangePicker : function() {
+//    $('#anomalies-time-range').on('hide.daterangepicker', this.hideDataRangePickerEventHandler.bind(this));
+//  },
+  setupListenerOnApplyButton: function() {
+    var self = this;
+    $('#apply-button').click(function() {
+      var anomaliesTabText = $("ul#anomalies-search-tabs li.active").text();
+      var metricIds = $('#anomalies-metric-input').val();
+      var dashboardId = $('#anomalies-dashboard-input').val();
+      var anomalyIds = $('#anomalies-id-input').val();
+      var functionName = $('#anomaly-function-dropdown').val();
 
-  setupListenerOnDateRangePicker : function() {
-    $('#anomalies-time-range').on('hide.daterangepicker', this.hideDataRangePickerEventHandler.bind(this));
+      var anomaliesParams = {
+          anomaliesTabText : anomaliesTabText,
+          metricIds : metricIds,
+          dashboardId : dashboardId,
+          anomalyIds : anomalyIds,
+          startDate : self.timeRangeConfig.startDate,
+          endDate : self.timeRangeConfig.endDate,
+          functionName : functionName
+      }
+      self.applyButtonEvent.notify(anomaliesParams);
+    })
   },
-
   setupListenersOnAnomaly : function(idx, anomaly) {
     var rootCauseAnalysisParams = {
       metric : anomaly.metric,

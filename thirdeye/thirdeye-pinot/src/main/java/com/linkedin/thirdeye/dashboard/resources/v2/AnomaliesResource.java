@@ -26,6 +26,7 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.TimeSpec;
@@ -40,9 +41,11 @@ import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow.TimeSeriesMetric;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
@@ -58,10 +61,7 @@ public class AnomaliesResource {
   private static final String TIME_SERIES_DATE_FORMAT = "yyyy-MM-dd HH:mm";
   private static final String ANOMALY_BASELINE_VAL_KEY = "baseLineVal";
   private static final String ANOMALY_CURRENT_VAL_KEY = "currentVal";
-
-  DateTimeFormatter timeSeriesDateFormatter;
-  DateTimeFormatter startEndDateFormatterDays;
-  DateTimeFormatter startEndDateFormatterHours;
+  private static final String COMMA_SEPARATOR = ",";
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY = ThirdEyeCacheRegistry.getInstance();
@@ -69,11 +69,13 @@ public class AnomaliesResource {
   private final MetricConfigManager metricConfigDAO;
   private final MergedAnomalyResultManager mergedAnomalyResultDAO;
   private final AnomalyFunctionManager anomalyFunctionDAO;
+  private final DashboardConfigManager dashboardConfigDAO;
 
   public AnomaliesResource() {
     metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
     mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
+    dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
   }
 
   @GET
@@ -135,31 +137,36 @@ public class AnomaliesResource {
     return anomalyFunction;
   }
 
-
   @GET
-  @Path("wrapper/{dataset}/{metricName}/{startTime}/{endTime}")
-  public List<AnomalyWrapper> getAnomalyWrapper(
-      @PathParam("dataset") String dataset,
-      @PathParam("metricName") String metricName,
+  @Path("search/anomalyIds/{startTime}/{endTime}")
+  public List<AnomalyWrapper> getAnomaliesByAnomalyIds(
       @PathParam("startTime") Long startTime,
-      @PathParam("endTime") Long endTime) throws Exception {
+      @PathParam("endTime") Long endTime,
+      @QueryParam("anomalyIds") String anomalyIdsString,
+      @QueryParam("functionName") String functionName) throws Exception {
+
+    String[] anomalyIds = anomalyIdsString.split(COMMA_SEPARATOR);
+
+    List<MergedAnomalyResultDTO> mergedAnomalies = new ArrayList<>();
+    for (String id : anomalyIds) {
+      Long anomalyId = Long.valueOf(id);
+      mergedAnomalies.add(mergedAnomalyResultDAO.findById(anomalyId));
+    }
 
     List<AnomalyWrapper> anomalyWrappers = new ArrayList<>();
-
-    timeSeriesDateFormatter = DateTimeFormat.forPattern(TIME_SERIES_DATE_FORMAT).withZone(Utils.getDataTimeZone(dataset));
-    startEndDateFormatterDays = DateTimeFormat.forPattern(START_END_DATE_FORMAT_DAYS).withZone(Utils.getDataTimeZone(dataset));
-    startEndDateFormatterHours = DateTimeFormat.forPattern(START_END_DATE_FORMAT_HOURS).withZone(Utils.getDataTimeZone(dataset));
-
-    DatasetConfigDTO datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(dataset);
-
-    // fetch anomalies in range
-    List<MergedAnomalyResultDTO> mergedAnomalies = getAnomaliesForMetricInRange(dataset, metricName, startTime, endTime);
-
     Map<Long, AnomalyFunctionDTO> anomalyFunctionStore = new HashMap<>();
     Map<Long, JSONObject> currentTimeSeriesStore = new HashMap<>();
     Map<Long, JSONObject> baselineTimeSeriesStore = new HashMap<>();
+
     // for each anomaly, fetch function details and create wrapper
     for (MergedAnomalyResultDTO mergedAnomaly : mergedAnomalies) {
+
+      String dataset = mergedAnomaly.getCollection();
+      String metricName = mergedAnomaly.getMetric();
+      DatasetConfigDTO datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(dataset);
+      DateTimeFormatter  timeSeriesDateFormatter = DateTimeFormat.forPattern(TIME_SERIES_DATE_FORMAT).withZone(Utils.getDataTimeZone(dataset));
+      DateTimeFormatter startEndDateFormatterDays = DateTimeFormat.forPattern(START_END_DATE_FORMAT_DAYS).withZone(Utils.getDataTimeZone(dataset));
+      DateTimeFormatter startEndDateFormatterHours = DateTimeFormat.forPattern(START_END_DATE_FORMAT_HOURS).withZone(Utils.getDataTimeZone(dataset));
 
       Long anomalyFunctionId = mergedAnomaly.getFunctionId();
       LOG.info("AnomalyFunctionId {} MergedAnomalyId {}", anomalyFunctionId, mergedAnomaly.getId());
@@ -184,41 +191,98 @@ public class AnomaliesResource {
         baselineTimeSeriesStore.put(anomalyFunctionId, baselineTimeseriesResponse);
       }
 
-      AnomalyWrapper anomalyWrapper = new AnomalyWrapper();
-      anomalyWrapper.setMetric(metricName);
-      anomalyWrapper.setDataset(dataset);
-
-      // get this from timeseries calls
-      List<String> dateValues = getDateFromTimeSeriesObject(currentTimeseriesResponse);
-      anomalyWrapper.setDates(dateValues);
-      anomalyWrapper.setCurrentEnd(getFormattedDateTime(endTime, datasetConfig));
-      anomalyWrapper.setCurrentStart(getFormattedDateTime(startTime, datasetConfig));
-      anomalyWrapper.setBaselineEnd(getFormattedDateTime(baselineEndTime, datasetConfig));
-      anomalyWrapper.setBaselineStart(getFormattedDateTime(baselineStartTime, datasetConfig));
-      List<String> baselineValues = getDataFromTimeSeriesObject(baselineTimeseriesResponse, metricName);
-      anomalyWrapper.setBaselineValues(baselineValues);
-      List<String> currentValues = getDataFromTimeSeriesObject(currentTimeseriesResponse, metricName);
-      anomalyWrapper.setCurrentValues(currentValues);
-
-      // from function and anomaly
-      anomalyWrapper.setAnomalyId(mergedAnomaly.getId());
-      anomalyWrapper.setAnomalyRegionStart(getFormattedDateTime(mergedAnomaly.getStartTime(), datasetConfig));
-      anomalyWrapper.setAnomalyRegionEnd(getFormattedDateTime(mergedAnomaly.getEndTime(), datasetConfig));
-      Map<String, String> messageDataMap = getMessageDataMap(mergedAnomaly.getMessage());
-      anomalyWrapper.setCurrent(messageDataMap.get(ANOMALY_CURRENT_VAL_KEY));
-      anomalyWrapper.setBaseline(messageDataMap.get(ANOMALY_BASELINE_VAL_KEY));
-      anomalyWrapper.setAnomalyFunctionId(anomalyFunctionId);
-      anomalyWrapper.setAnomalyFunctionName(anomalyFunction.getFunctionName());
-      anomalyWrapper.setAnomalyFunctionType(anomalyFunction.getType());
-      anomalyWrapper.setAnomalyFunctionProps(anomalyFunction.getProperties());
-      anomalyWrapper.setAnomalyFunctionDimension(mergedAnomaly.getDimensions().toString());
-      if (mergedAnomaly.getFeedback() != null) {
-        anomalyWrapper.setAnomalyFeedback(mergedAnomaly.getFeedback().getStatus().toString());
-      }
+      AnomalyWrapper anomalyWrapper = constructAnomalyWrapper(metricName, dataset, datasetConfig, mergedAnomaly,
+          anomalyFunction, startTime, endTime, baselineStartTime, baselineEndTime,
+          currentTimeseriesResponse, baselineTimeseriesResponse,
+          timeSeriesDateFormatter, startEndDateFormatterHours, startEndDateFormatterDays);
       anomalyWrappers.add(anomalyWrapper);
     }
-    return anomalyWrappers;
 
+
+    return anomalyWrappers;
+  }
+
+
+  @GET
+  @Path("search/dashboardId/{startTime}/{endTime}")
+  public List<AnomalyWrapper> getAnomaliesByDashboardId(
+      @PathParam("startTime") Long startTime,
+      @PathParam("endTime") Long endTime,
+      @QueryParam("dashboardId") String dashboardId,
+      @QueryParam("functionName") String functionName) throws Exception {
+
+    DashboardConfigDTO dashboardConfig = dashboardConfigDAO.findById(Long.valueOf(dashboardId));
+    String metricIdsString = Joiner.on(COMMA_SEPARATOR).join(dashboardConfig.getMetricIds());
+    return getAnomaliesByMetricIds(startTime, endTime, metricIdsString, functionName);
+  }
+
+  @GET
+  @Path("search/metricIds/{startTime}/{endTime}")
+  public List<AnomalyWrapper> getAnomaliesByMetricIds(
+      @PathParam("startTime") Long startTime,
+      @PathParam("endTime") Long endTime,
+      @QueryParam("metricIds") String metricIdsString,
+      @QueryParam("functionName") String functionName) throws Exception {
+
+    List<AnomalyWrapper> anomalyWrappers = new ArrayList<>();
+
+    String[] metricIds = metricIdsString.split(COMMA_SEPARATOR);
+    for (String id : metricIds) {
+
+      Long metricId = Long.valueOf(id);
+      MetricConfigDTO metricConfig = metricConfigDAO.findById(metricId);
+      if (metricConfig == null) {
+        continue;
+      }
+      String metricName = metricConfig.getName();
+      String dataset = metricConfig.getDataset();
+      DatasetConfigDTO datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(dataset);
+
+      DateTimeFormatter  timeSeriesDateFormatter = DateTimeFormat.forPattern(TIME_SERIES_DATE_FORMAT).withZone(Utils.getDataTimeZone(dataset));
+      DateTimeFormatter startEndDateFormatterDays = DateTimeFormat.forPattern(START_END_DATE_FORMAT_DAYS).withZone(Utils.getDataTimeZone(dataset));
+      DateTimeFormatter startEndDateFormatterHours = DateTimeFormat.forPattern(START_END_DATE_FORMAT_HOURS).withZone(Utils.getDataTimeZone(dataset));
+
+      // fetch anomalies in range
+      List<MergedAnomalyResultDTO> mergedAnomalies = getAnomaliesForMetricInRange(dataset, metricName, startTime, endTime);
+
+      Map<Long, AnomalyFunctionDTO> anomalyFunctionStore = new HashMap<>();
+      Map<Long, JSONObject> currentTimeSeriesStore = new HashMap<>();
+      Map<Long, JSONObject> baselineTimeSeriesStore = new HashMap<>();
+      // for each anomaly, fetch function details and create wrapper
+      for (MergedAnomalyResultDTO mergedAnomaly : mergedAnomalies) {
+
+        Long anomalyFunctionId = mergedAnomaly.getFunctionId();
+        LOG.info("AnomalyFunctionId {} MergedAnomalyId {}", anomalyFunctionId, mergedAnomaly.getId());
+        AnomalyFunctionDTO anomalyFunction = anomalyFunctionStore.get(anomalyFunctionId);
+        if (anomalyFunction == null) {
+          anomalyFunction = anomalyFunctionDAO.findById(anomalyFunctionId);
+          anomalyFunctionStore.put(anomalyFunctionId, anomalyFunction);
+        }
+        String aggGranularity = constructAggGranularity(anomalyFunction);
+        JSONObject currentTimeseriesResponse = currentTimeSeriesStore.get(anomalyFunctionId);
+        if (currentTimeseriesResponse == null) {
+          currentTimeseriesResponse = getTimeSeriesData(dataset, anomalyFunction.getFilterSet(), startTime, endTime,
+              aggGranularity, metricName);
+          currentTimeSeriesStore.put(anomalyFunctionId, currentTimeseriesResponse);
+        }
+        JSONObject baselineTimeseriesResponse = baselineTimeSeriesStore.get(anomalyFunctionId);
+        long baselineStartTime = new DateTime(startTime).minusDays(7).getMillis();
+        long baselineEndTime = startTime;
+        if (baselineTimeseriesResponse == null) {
+          baselineTimeseriesResponse = getTimeSeriesData(dataset, anomalyFunction.getFilterSet(),
+              baselineStartTime, baselineEndTime, aggGranularity, metricName);
+          baselineTimeSeriesStore.put(anomalyFunctionId, baselineTimeseriesResponse);
+        }
+
+        AnomalyWrapper anomalyWrapper = constructAnomalyWrapper(metricName, dataset, datasetConfig,
+            mergedAnomaly, anomalyFunction,
+            startTime, endTime, baselineStartTime, baselineEndTime,
+            currentTimeseriesResponse, baselineTimeseriesResponse,
+            timeSeriesDateFormatter, startEndDateFormatterHours, startEndDateFormatterDays);
+        anomalyWrappers.add(anomalyWrapper);
+      }
+    }
+    return anomalyWrappers;
   }
 
 
@@ -325,7 +389,7 @@ public class AnomaliesResource {
     return list;
   }
 
-  private List<String> getDateFromTimeSeriesObject(JSONObject timeSeriesResponse) throws JSONException {
+  private List<String> getDateFromTimeSeriesObject(JSONObject timeSeriesResponse, DateTimeFormatter timeSeriesDateFormatter) throws JSONException {
 
     JSONObject timeSeriesMap = (JSONObject) timeSeriesResponse.get("timeSeriesData");
     JSONArray valueArray = (JSONArray) timeSeriesMap.get("time");
@@ -352,7 +416,8 @@ public class AnomaliesResource {
     return aggGranularity;
   }
 
-  private String getFormattedDateTime(long timestamp, DatasetConfigDTO datasetConfig) {
+  private String getFormattedDateTime(long timestamp, DatasetConfigDTO datasetConfig,
+      DateTimeFormatter startEndDateFormatterHours, DateTimeFormatter startEndDateFormatterDays) {
     TimeSpec timeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
     TimeUnit dataGranularityUnit = timeSpec.getDataGranularity().getUnit();
     String formattedDateTime = null;
@@ -362,6 +427,46 @@ public class AnomaliesResource {
       formattedDateTime = startEndDateFormatterDays.print(timestamp);
     }
     return formattedDateTime;
+  }
+
+  private AnomalyWrapper constructAnomalyWrapper(String metricName, String dataset, DatasetConfigDTO datasetConfig,
+      MergedAnomalyResultDTO mergedAnomaly, AnomalyFunctionDTO anomalyFunction,
+      long currentStartTime, long currentEndTime, long baselineStartTime, long baselineEndTime,
+      JSONObject currentTimeseriesResponse, JSONObject baselineTimeseriesResponse,
+      DateTimeFormatter timeSeriesDateFormatter, DateTimeFormatter startEndDateFormatterHours, DateTimeFormatter startEndDateFormatterDays) throws JSONException {
+
+    AnomalyWrapper anomalyWrapper = new AnomalyWrapper();
+    anomalyWrapper.setMetric(metricName);
+    anomalyWrapper.setDataset(dataset);
+
+    // get this from timeseries calls
+    List<String> dateValues = getDateFromTimeSeriesObject(currentTimeseriesResponse, timeSeriesDateFormatter);
+    anomalyWrapper.setDates(dateValues);
+    anomalyWrapper.setCurrentEnd(getFormattedDateTime(currentEndTime, datasetConfig, startEndDateFormatterHours, startEndDateFormatterDays));
+    anomalyWrapper.setCurrentStart(getFormattedDateTime(currentStartTime, datasetConfig, startEndDateFormatterHours, startEndDateFormatterDays));
+    anomalyWrapper.setBaselineEnd(getFormattedDateTime(baselineEndTime, datasetConfig, startEndDateFormatterHours, startEndDateFormatterDays));
+    anomalyWrapper.setBaselineStart(getFormattedDateTime(baselineStartTime, datasetConfig, startEndDateFormatterHours, startEndDateFormatterDays));
+    List<String> baselineValues = getDataFromTimeSeriesObject(baselineTimeseriesResponse, metricName);
+    anomalyWrapper.setBaselineValues(baselineValues);
+    List<String> currentValues = getDataFromTimeSeriesObject(currentTimeseriesResponse, metricName);
+    anomalyWrapper.setCurrentValues(currentValues);
+
+    // from function and anomaly
+    anomalyWrapper.setAnomalyId(mergedAnomaly.getId());
+    anomalyWrapper.setAnomalyRegionStart(timeSeriesDateFormatter.print(Long.valueOf(mergedAnomaly.getStartTime())));
+    anomalyWrapper.setAnomalyRegionEnd(timeSeriesDateFormatter.print(Long.valueOf(mergedAnomaly.getEndTime())));
+    Map<String, String> messageDataMap = getMessageDataMap(mergedAnomaly.getMessage());
+    anomalyWrapper.setCurrent(messageDataMap.get(ANOMALY_CURRENT_VAL_KEY));
+    anomalyWrapper.setBaseline(messageDataMap.get(ANOMALY_BASELINE_VAL_KEY));
+    anomalyWrapper.setAnomalyFunctionId(anomalyFunction.getId());
+    anomalyWrapper.setAnomalyFunctionName(anomalyFunction.getFunctionName());
+    anomalyWrapper.setAnomalyFunctionType(anomalyFunction.getType());
+    anomalyWrapper.setAnomalyFunctionProps(anomalyFunction.getProperties());
+    anomalyWrapper.setAnomalyFunctionDimension(mergedAnomaly.getDimensions().toString());
+    if (mergedAnomaly.getFeedback() != null) {
+      anomalyWrapper.setAnomalyFeedback(mergedAnomaly.getFeedback().getStatus().toString());
+    }
+    return anomalyWrapper;
   }
 
 

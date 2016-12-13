@@ -30,7 +30,7 @@
 								<label for="anomalies-metric-input" class="label-large-light">Metric(s): </label>
 							</div>
 							<div style="overflow: hidden">
-								<select style="width: 100%" id="anomalies-metric-input" class="label-large-light"></select>
+								<select style="width: 100%" id="anomalies-metric-input" class="label-large-light" multiple="multiple"></select>
 							</div>
 						</div>
 					</div>
@@ -54,7 +54,7 @@
 								<label for="anomalies-id-input" class="label-large-light">ID(s): </label>
 							</div>
 							<div style="overflow: hidden">
-								<select style="width: 100%" id="anomalies-id-input" class="label-large-light"></select>
+								<select style="width: 100%" id="anomalies-id-input" class="label-large-light" multiple="multiple"></select>
 							</div>
 						</div>
 					</div>
@@ -82,10 +82,7 @@
 					<label style="font-size: 15px; font-weight: 500">Filter by Function: </label>
 				</div>
 				<div>
-					<select class="form-control" id="function">
-						<option>Function 1</option>
-						<option>Function 2</option>
-						<option>Function 3</option>
+					<select class="form-control" id="anomaly-function-dropdown">
 					</select>
 				</div>
 			</div>
@@ -94,13 +91,13 @@
 					<label style="font-size: 15px; font-weight: 500">Anomaly Status: </label>
 				</div>
 				<div>
-					<label class="checkbox-inline"><input type="checkbox" value="Resolved"><span class="label anomaly-status-label">Resolved</span></label>
+					<label class="checkbox-inline"><input type="checkbox" id="status-resolved-checkbox"><span class="label anomaly-status-label">Resolved</span></label>
 				</div>
 				<div>
-					<label class="checkbox-inline"><input type="checkbox" value="Resolved"><span class="label anomaly-status-label">Unresolved</span></label>
+					<label class="checkbox-inline"><input type="checkbox" id="status-unresolved-checkbox"><span class="label anomaly-status-label">Unresolved</span></label>
 				</div>
 			</div>
-			<div class="col-md-2">
+			<div class="col-md-2" id="apply-button">
 				<input type="button" class="btn btn-info" value="Apply" />
 			</div>
 		</div>
