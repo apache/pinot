@@ -1,6 +1,6 @@
 function WoWSummaryModel() {
-  this.timestamps = [];
-  this.wowSummary = [];
+  this.timeRangeLabels = [ "Most Recent Hour", "Today", "Yesterday", "Last 7 Days" ];
+  this.wowSummaryList = [];
 }
 
 WoWSummaryModel.prototype = {
@@ -11,36 +11,43 @@ WoWSummaryModel.prototype = {
   rebuild : function() {
     // TODO: fetch relevant data from backend
   },
-  buildSampleData: function() {
-    var row1 = new WoWSummaryRow();
-    row1.metricName = "metricD";
-    row1.data = [0,0.1,0.2,0,0,0,0,0.1,0.2,0,0,0,0,0.1,0.2,0,0,0,0,0.1,0.2,0,0,0];
-
-    var row2 = new WoWSummaryRow();
-    row2.metricName = "metricE";
-    row2.data = [0,0.1,0.2,0,0,0,0,0.1,0.2,0,0,0,0,0.1,0.2,0,0,0,0,0.1,0.2,0,0,0];
-
-    var row3 = new WoWSummaryRow();
-    row3.metricName = "metricF";
-    row3.data = [0,0.1,0.2,0,0,0,0,0.1,0.2,0,0,0,0,0.1,0.2,0,0,0,0,0.1,0.2,0,0,0];
-
-    this.wowSummary = [];
-    this.wowSummary.push(row1);
-    this.wowSummary.push(row2);
-    this.wowSummary.push(row3);
-
-    this.timestamps = [];
-    var time = moment(this.endTime).subtract(24, 'hours');
-    for (var i = 0; i < 24; ++i) {
-      var date = new Date(time);
-      this.timestamps.push(date);
-      time.add(1, 'hours');
+  buildSampleData : function() {
+    this.wowSummaryList = [];
+    for (i = 0; i < 3; i++) {
+      var row = new WoWSummaryRow();
+      row.metricName = "metric" + i;
+      row.data = [ {
+        baseline : 1000,
+        current : 2000,
+        percentChange : 50,
+        startTime : moment().startOf('hour'),
+        endTime : moment().startOf('hour').subtract('1', 'hour')
+      }, {
+        baseline : 1000,
+        current : 2000,
+        percentChange : -50,
+        startTime : moment().startOf('hour'),
+        endTime : moment().startOf('day')
+      }, {
+        baseline : 1000,
+        current : 2000,
+        percentChange : -10,
+        startTime : moment().startOf('day'),
+        endTime : moment().startOf('day').subtract('1', 'day')
+      }, {
+        baseline : 1000,
+        current : 2000,
+        percentChange : 10,
+        startTime : moment().startOf('day'),
+        endTime : moment().startOf('day').subtract('7', 'day')
+      } ];
+      this.wowSummaryList.push(row);
     }
+
   }
 };
 
 function WoWSummaryRow() {
   this.metricName = "N/A";
-  this.timeGranularity = "HOURS";
   this.data = [];
 }

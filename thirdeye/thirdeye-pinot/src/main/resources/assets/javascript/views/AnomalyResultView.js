@@ -34,6 +34,8 @@ function AnomalyResultView(anomalyResultModel) {
   // events
   this.metricChangeEvent = new Event(this);
   this.hideDataRangePickerEvent = new Event(this);
+  
+  
   this.rootCauseAnalysisButtonClickEvent = new Event(this);
   this.showDetailsLinkClickEvent = new Event(this);
   this.anomalyFeedbackSelectEvent = new Event(this);

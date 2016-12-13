@@ -8,6 +8,7 @@ function WoWSummaryView(wowSummaryModel) {
 WoWSummaryView.prototype = {
 
   render : function() {
+    console.log(this.wowSummaryModel)
     var result = this.template_compiled(this.wowSummaryModel);
     $(this.placeHolderId).html(result);
   }

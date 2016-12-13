@@ -13,9 +13,6 @@ WoWSummaryController.prototype ={
       this.wowSummaryModel.rebuild();
       this.wowSummaryView.render();
     },
-    onDashboardInputChange: function(){
-
-    },
 
     init:function(){
 

@@ -5,6 +5,10 @@ body {
 	color: #080808
 }
 
+.label {
+	color: #000000;
+}
+
 .label-large-light {
 	font-weight: 100;
 	font-size: 23px;
@@ -31,11 +35,16 @@ body {
 	font-size: 13px;
 }
 
+.wow-summary-content {
+	font-weight: 300;
+	font-size: 13px;
+}
+
 .anomaly-status-label {
 	font-weight: 300;
 	font-size: 15px;
-	color: #000000;
 }
+
 .underlined {
 	border-top: none;
 	border-right: none;
@@ -202,7 +211,6 @@ hr {
 	font-weight: 300;
 	font-size: 15px;
 	text-align: center;
-	
 }
 
 .td-box-left {
@@ -210,6 +218,7 @@ hr {
 	width: 50%;
 	text-align: center;
 }
+
 .td-box-right {
 	float: left;
 	width: 50%;

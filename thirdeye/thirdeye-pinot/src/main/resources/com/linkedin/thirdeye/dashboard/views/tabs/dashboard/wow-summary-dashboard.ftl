@@ -5,25 +5,18 @@
 				<table class="table dashboard-table" style="border-collapse: separate; border-spacing: 0em 1em">
 					<thead>
 						<tr>
-							<th></th> 
-							{{#each timeRangeLabels as |label index|}}
-							<th>{{label}}</th> 
-							{{/each}}
+							<th class="col-md-4"></th> {{#each timeRangeLabels as |label index|}}
+							<th class="col-md-2">{{label}}</th> {{/each}}
 						</tr>
 					</thead>
 					<tbody>
-					   {{#each wowSummaryList as |wowSummary metricIndex|}}
+						{{#each wowSummaryList as |wowSummary metricIndex|}}
 						<tr class="bg-white">
-							<td><a href="#"><span class="dashboard-metric-label">{{wowSummary.metricName}}</span></a></td> 
+							<td class="col-md-4"><a href="#"><span class="dashboard-metric-label">{{wowSummary.metricName}}</span></a></td>
 							{{#each wowSummary.data as |info index|}}
-							<td><div class="td-box-left">
-									<span class="glyphicon glyphicon-ok" style="color: #7CB82F" aria-hidden="true"></span> 
-									<span aria-hidden="true">{{info.open}}</span>
-								</div>
-								<div class="td-box-right">
-									<span class="glyphicon glyphicon-remove" style="color: #DD2E1F" aria-hidden="true"></span> 
-									<span aria-hidden="true">{{info.resolved}}</span>
-								</div>
+							<td class="col-md-2" style="background-color:{{computeColor info.percentChange}};">
+							  <span class="label wow-summary-content" style="color:{{computeTextColor info.percentChange}}">{{info.current}}</span>
+							  <span class="label wow-summary-content" style="color:{{computeTextColor info.percentChange}}">({{info.percentChange}}%)</span>
 							</td> 
 							{{/each}}
 						</tr>
