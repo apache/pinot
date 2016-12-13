@@ -814,6 +814,7 @@ public class PinotLLCRealtimeSegmentManager {
     }
     ZNRecord newPartitionAssignment = generatePartitionAssignment(kafkaStreamMetadata.getKafkaTopicName(), currentPartitionCount, currentInstances, currentReplicaCount);
     writeKafkaPartitionAssignemnt(realtimeTableName, newPartitionAssignment);
+    LOGGER.info("Successfully updated Kafka partition assignment for table {}");
   }
 
   /*
@@ -855,7 +856,7 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   protected int getKafkaPartitionCount(KafkaStreamMetadata kafkaStreamMetadata) {
-    return PinotTableIdealStateBuilder.getPartitionsCount(kafkaStreamMetadata);
+    return PinotTableIdealStateBuilder.getPartitionCount(kafkaStreamMetadata);
   }
 
   protected List<String> getInstances(String tenantName) {

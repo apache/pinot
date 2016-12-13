@@ -207,7 +207,7 @@ public class PinotTableIdealStateBuilder {
     final KafkaStreamMetadata kafkaMetadata = new KafkaStreamMetadata(realtimeTableConfig.getIndexingConfig().getStreamConfigs());
     final String topicName = kafkaMetadata.getKafkaTopicName();
     final PinotLLCRealtimeSegmentManager segmentManager = PinotLLCRealtimeSegmentManager.getInstance();
-    final int nPartitions = getPartitionsCount(kafkaMetadata);
+    final int nPartitions = getPartitionCount(kafkaMetadata);
     LOGGER.info("Assigning {} partitions to instances for simple consumer for table {}", nPartitions, realtimeTableName);
 
     segmentManager.setupHelixEntries(topicName, realtimeTableName, nPartitions, realtimeInstances, nReplicas,
@@ -215,7 +215,7 @@ public class PinotTableIdealStateBuilder {
         idealState, create);
   }
 
-  public static int getPartitionsCount(KafkaStreamMetadata kafkaMetadata) {
+  public static int getPartitionCount(KafkaStreamMetadata kafkaMetadata) {
     String bootstrapHosts = kafkaMetadata.getBootstrapHosts();
     if (bootstrapHosts == null || bootstrapHosts.isEmpty()) {
       throw new RuntimeException("Invalid value for " + Helix.DataSource.Realtime.Kafka.KAFKA_BROKER_LIST);
