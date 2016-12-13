@@ -285,7 +285,7 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
     } else if (StateType.DISABLE.name().equalsIgnoreCase(state)) {
       return _pinotHelixResourceManager.toggleSegmentState(tableName, segmentsToToggle, false, timeOutInSeconds);
     } else if (StateType.DROP.name().equalsIgnoreCase(state)) {
-      return _pinotHelixResourceManager.dropSegments(tableName, segmentsToToggle, timeOutInSeconds);
+      return _pinotHelixResourceManager.deleteSegments(tableName, segmentsToToggle);
     } else {
       return new PinotResourceManagerResponse(INVALID_STATE_ERROR, false);
     }
