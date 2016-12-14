@@ -176,6 +176,30 @@ public class DataResource {
     }
     return filterMap;
   }
+
+  @GET
+  @Path("agg/granularity/metric/{metricId}")
+  public List<String> getDataAggregationGranularity(@PathParam("metricId") Long metricId) {
+    List<String> list = new ArrayList<>();
+    list.add("DAYS");
+    MetricConfigDTO metricConfigDTO = metricConfigDAO.findById(metricId);
+    DatasetConfigDTO datasetConfigDTO = datasetConfigDAO.findByDataset(metricConfigDTO.getDataset());
+    int dataAggSize = datasetConfigDTO.getTimeDuration();
+    String dataGranularity = datasetConfigDTO.getTimeUnit().name();
+    if (dataGranularity.equals("DAYS")) {
+      // do nothing
+    } else {
+      list.add("HOURS");
+      if (dataGranularity.equals("MINUTES")){
+        if (dataAggSize == 1) {
+          list.add("MINUTES");
+        } else {
+          list.add(dataAggSize+ "_MINUTES");
+        }
+      }
+    }
+    return list;
+  }
   //------------- auto complete ends ---------------------
 
   //----------------- dashboard end points -------------

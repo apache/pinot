@@ -131,32 +131,71 @@ AnalysisView.prototype = {
     this.setupListeners();
   },
 
-  setupListeners: function () {
-    self = this;
-    $("#analysis-apply-button").click(function (e) {
-      console.log(e);
-      self.applyDataChangeEvent.notify(self.viewParams);
-    });
-  },
-
   renderDimensions: function (metricId) {
+    var self = this;
     var dimensions = self.analysisModel.fetchDimensionsForMetric(metricId);
-    console.log("Dimensions ---> ")
-    console.log(dimensions);
-    var config = {theme: "bootstrap", placeholder: "select dimension", data: dimensions};
+    var config = {
+      theme: "bootstrap", placeholder: "select dimension", data: dimensions
+    };
     if (dimensions) {
       $("#analysis-metric-dimension-input").select2(config).on("select2:select", function (e) {
         console.log(e);
         var selectedElement = $(e.currentTarget);
         var selectedData = selectedElement.select2("data");
-        console.log(selectedData);
+        self.viewParams['dimension'] = selectedData[0].id;
       });
     }
   },
 
   renderFilters: function (metricId) {
+    var self = this;
     var filters = self.analysisModel.fetchFiltersForMetric(metricId);
-    console.log("Filters ---> ");
-    console.log(filters);
+    var filterData = [];
+    for (var key in filters) {
+      // TODO: introduce category
+      var values = filters[key];
+      for (var i in values) {
+        filterData.push(key + ":" + values[i]);
+      }
+    }
+    if (filters) {
+      var config = {
+        theme: "bootstrap",
+        placeholder: "select filter",
+        allowClear: false,
+        multiple: true,
+        data: filterData
+      };
+      $("#analysis-metric-filter-input").select2(config);
+    }
+  },
+
+  collectViewParams : function () {
+    var self = this;
+
+    // Collect filters
+    var selectedFilters = $("#analysis-metric-filter-input").val();
+    var filterMap = {};
+    for (var i in selectedFilters) {
+      var filterStr = selectedFilters[i];
+      var keyVal = filterStr.split(":");
+      var list = filterMap[keyVal[0]];
+      if (list) {
+        filterMap[keyVal[0]].push(keyVal[1]);
+      } else {
+        filterMap[keyVal[0]] = [keyVal[1]];
+      }
+    }
+    self.viewParams['filters'] = filterMap;
+    console.log( self.viewParams);
+  },
+
+  setupListeners: function () {
+    var self = this;
+    $("#analysis-apply-button").click(function (e) {
+      self.collectViewParams();
+      self.applyDataChangeEvent.notify(self.viewParams);
+    });
   }
+
 };
