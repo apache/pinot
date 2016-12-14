@@ -83,12 +83,24 @@ public class AnomaliesResource {
     dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
   }
 
+  /**
+   * Autocomplete values for search on anomaly id
+   * @param id
+   * @return
+   */
   @GET
   @Path("autocomplete/anomalyId")
   public List<String> getAnomaliesWhereAnomalyIdLike(@QueryParam("id") String id) {
     return mergedAnomalyResultDAO.findAllIdsLike(id);
   }
 
+  /** Find anomalies for metric id in time range
+   *
+   * @param metricId
+   * @param startTime
+   * @param endTime
+   * @return
+   */
   @GET
   @Path("metric/id/{metricId}/{startTime}/{endTime}")
   public List<MergedAnomalyResultDTO> getAnomaliesForMetricInRange(
@@ -104,6 +116,14 @@ public class AnomaliesResource {
     return mergedAnomalies;
   }
 
+  /**
+   * Find anomalies for metric in time range
+   * @param dataset
+   * @param metricName
+   * @param startTime
+   * @param endTime
+   * @return
+   */
   @GET
   @Path("metric/name/{dataset}/{metricName}/{startTime}/{endTime}")
   public List<MergedAnomalyResultDTO> getAnomaliesForMetricInRange(
@@ -118,6 +138,14 @@ public class AnomaliesResource {
   }
 
 
+  /**
+   * Get count of anomalies for metric in time range, divided into specified number of buckets
+   * @param metricId
+   * @param startTime
+   * @param endTime
+   * @param numBuckets
+   * @return
+   */
   @GET
   @Path("metric/count/{metricId}/{startTime}/{endTime}/{numBuckets}")
   public List<Integer> getAnomalyCountForMetricInRange(
@@ -138,6 +166,11 @@ public class AnomaliesResource {
     return Lists.newArrayList(anomalyCount);
   }
 
+  /**
+   * Get anomaly function details for merged anomaly
+   * @param mergedAnomalyId
+   * @return
+   */
   @GET
   @Path("function/{mergedAnomalyId}")
   public AnomalyFunctionDTO getFunctionDetailsForMergedAnomaly(
@@ -148,6 +181,15 @@ public class AnomaliesResource {
     return anomalyFunction;
   }
 
+  /**
+   * Find anomalies by anomaly ids
+   * @param startTime
+   * @param endTime
+   * @param anomalyIdsString
+   * @param functionName
+   * @return
+   * @throws Exception
+   */
   @GET
   @Path("search/anomalyIds/{startTime}/{endTime}")
   public List<AnomalyWrapper> getAnomaliesByAnomalyIds(
@@ -209,11 +251,19 @@ public class AnomaliesResource {
       anomalyWrappers.add(anomalyWrapper);
     }
 
-
     return anomalyWrappers;
   }
 
 
+  /**
+   * Find anomalies by dashboard id
+   * @param startTime
+   * @param endTime
+   * @param dashboardId
+   * @param functionName
+   * @return
+   * @throws Exception
+   */
   @GET
   @Path("search/dashboardId/{startTime}/{endTime}")
   public List<AnomalyWrapper> getAnomaliesByDashboardId(
@@ -227,6 +277,15 @@ public class AnomaliesResource {
     return getAnomaliesByMetricIds(startTime, endTime, metricIdsString, functionName);
   }
 
+  /**
+   * Find anomalies by metric ids
+   * @param startTime
+   * @param endTime
+   * @param metricIdsString
+   * @param functionName
+   * @return
+   * @throws Exception
+   */
   @GET
   @Path("search/metricIds/{startTime}/{endTime}")
   public List<AnomalyWrapper> getAnomaliesByMetricIds(
@@ -297,7 +356,84 @@ public class AnomaliesResource {
   }
 
 
-  public JSONObject getTimeSeriesData(String collection, Multimap<String, String> filters,
+  /**
+   * Get timeseries for metric
+   * @param collection
+   * @param filterJson
+   * @param start
+   * @param end
+   * @param aggTimeGranularity
+   * @param metric
+   * @return
+   * @throws Exception
+   */
+  @GET
+  @Path(value = "/data/timeseries")
+  @Produces(MediaType.APPLICATION_JSON)
+  public JSONObject getTimeSeriesData(@QueryParam("dataset") String collection,
+      @QueryParam("filters") String filterJson,
+      @QueryParam("currentStart") Long start, @QueryParam("currentEnd") Long end,
+      @QueryParam("aggTimeGranularity") String aggTimeGranularity,
+      @QueryParam("metric") String metric)
+      throws Exception {
+
+    Multimap<String, String> filters = null;
+    if (filterJson != null && !filterJson.isEmpty()) {
+      filterJson = URLDecoder.decode(filterJson, "UTF-8");
+      filters = ThirdEyeUtils.convertToMultiMap(filterJson);
+    }
+    JSONObject jsonResponseObject = getTimeSeriesData(collection, filters, start, end, aggTimeGranularity, metric);
+    return jsonResponseObject;
+  }
+
+  /**
+   * Update anomaly feedback
+   * @param mergedAnomalyId : mergedAnomalyId
+   * @param payload         : Json payload containing feedback @see com.linkedin.thirdeye.constant.AnomalyFeedbackType
+   *                        eg. payload
+   *                        <p/>
+   *                        { "feedbackType": "NOT_ANOMALY", "comment": "this is not an anomaly" }
+   */
+  @POST
+  @Path(value = "/updateFeedback/{mergedAnomalyId}")
+  public void updateAnomalyMergedResultFeedback(@PathParam("mergedAnomalyId") long mergedAnomalyId, String payload) {
+    try {
+      MergedAnomalyResultDTO result = mergedAnomalyResultDAO.findById(mergedAnomalyId);
+      if (result == null) {
+        throw new IllegalArgumentException("AnomalyResult not found with id " + mergedAnomalyId);
+      }
+      AnomalyFeedbackDTO feedback = result.getFeedback();
+      if (feedback == null) {
+        feedback = new AnomalyFeedbackDTO();
+        result.setFeedback(feedback);
+      }
+      AnomalyFeedbackDTO feedbackRequest = new ObjectMapper().readValue(payload, AnomalyFeedbackDTO.class);
+      if (feedbackRequest.getStatus() == null) {
+        feedback.setStatus(FeedbackStatus.NEW);
+      } else {
+        feedback.setStatus(feedbackRequest.getStatus());
+      }
+      feedback.setComment(feedbackRequest.getComment());
+      feedback.setFeedbackType(feedbackRequest.getFeedbackType());
+      mergedAnomalyResultDAO.updateAnomalyFeedback(result);
+    } catch (IOException e) {
+      throw new IllegalArgumentException("Invalid payload " + payload, e);
+    }
+  }
+
+  // ----------- HELPER FUNCTIONS
+  /**
+   * Get timeseries for metric
+   * @param collection
+   * @param filters
+   * @param start
+   * @param end
+   * @param aggTimeGranularity
+   * @param metric
+   * @return
+   * @throws Exception
+   */
+  private JSONObject getTimeSeriesData(String collection, Multimap<String, String> filters,
       Long start, Long end, String aggTimeGranularity, String metric) throws Exception {
 
     TimeSeriesRequest request = new TimeSeriesRequest();
@@ -368,61 +504,13 @@ public class AnomaliesResource {
     return jsonResponseObject;
   }
 
-
-
-  @GET
-  @Path(value = "/data/timeseries")
-  @Produces(MediaType.APPLICATION_JSON)
-  public JSONObject getTimeSeriesData(@QueryParam("dataset") String collection,
-      @QueryParam("filters") String filterJson,
-      @QueryParam("currentStart") Long start, @QueryParam("currentEnd") Long end,
-      @QueryParam("aggTimeGranularity") String aggTimeGranularity,
-      @QueryParam("metric") String metric)
-      throws Exception {
-
-    Multimap<String, String> filters = null;
-    if (filterJson != null && !filterJson.isEmpty()) {
-      filterJson = URLDecoder.decode(filterJson, "UTF-8");
-      filters = ThirdEyeUtils.convertToMultiMap(filterJson);
-    }
-    JSONObject jsonResponseObject = getTimeSeriesData(collection, filters, start, end, aggTimeGranularity, metric);
-    return jsonResponseObject;
-  }
-
   /**
-   * @param mergedAnomalyId : mergedAnomalyId
-   * @param payload         : Json payload containing feedback @see com.linkedin.thirdeye.constant.AnomalyFeedbackType
-   *                        eg. payload
-   *                        <p/>
-   *                        { "feedbackType": "NOT_ANOMALY", "comment": "this is not an anomaly" }
+   * Extract data values form timeseries object
+   * @param timeSeriesResponse
+   * @param metricName
+   * @return
+   * @throws JSONException
    */
-  @POST
-  @Path(value = "/updateFeedback/{mergedAnomalyId}")
-  public void updateAnomalyMergedResultFeedback(@PathParam("mergedAnomalyId") long mergedAnomalyId, String payload) {
-    try {
-      MergedAnomalyResultDTO result = mergedAnomalyResultDAO.findById(mergedAnomalyId);
-      if (result == null) {
-        throw new IllegalArgumentException("AnomalyResult not found with id " + mergedAnomalyId);
-      }
-      AnomalyFeedbackDTO feedback = result.getFeedback();
-      if (feedback == null) {
-        feedback = new AnomalyFeedbackDTO();
-        result.setFeedback(feedback);
-      }
-      AnomalyFeedbackDTO feedbackRequest = new ObjectMapper().readValue(payload, AnomalyFeedbackDTO.class);
-      if (feedbackRequest.getStatus() == null) {
-        feedback.setStatus(FeedbackStatus.NEW);
-      } else {
-        feedback.setStatus(feedbackRequest.getStatus());
-      }
-      feedback.setComment(feedbackRequest.getComment());
-      feedback.setFeedbackType(feedbackRequest.getFeedbackType());
-      mergedAnomalyResultDAO.updateAnomalyFeedback(result);
-    } catch (IOException e) {
-      throw new IllegalArgumentException("Invalid payload " + payload, e);
-    }
-  }
-
   private List<String> getDataFromTimeSeriesObject(JSONObject timeSeriesResponse, String metricName) throws JSONException {
     JSONObject timeSeriesMap = (JSONObject) timeSeriesResponse.get("timeSeriesData");
     JSONArray valueArray = (JSONArray) timeSeriesMap.get(metricName);
@@ -434,6 +522,13 @@ public class AnomaliesResource {
     return list;
   }
 
+  /**
+   * Extract date values from time series object
+   * @param timeSeriesResponse
+   * @param timeSeriesDateFormatter
+   * @return
+   * @throws JSONException
+   */
   private List<String> getDateFromTimeSeriesObject(JSONObject timeSeriesResponse, DateTimeFormatter timeSeriesDateFormatter) throws JSONException {
 
     JSONObject timeSeriesMap = (JSONObject) timeSeriesResponse.get("timeSeriesData");
@@ -446,7 +541,8 @@ public class AnomaliesResource {
     return list;
   }
 
-  private Map<String, String> getMessageDataMap(String message) {
+
+  private Map<String, String> getAnomalyMessageDataMap(String message) {
     Map<String, String> messageDataMap = new HashMap<>();
     String[] tokens = message.split("[,:]");
     for (int i = 0; i < tokens.length; i = i+2) {
@@ -456,11 +552,24 @@ public class AnomaliesResource {
     return messageDataMap;
   }
 
+  /**
+   * Construct agg granularity for using in timeseries
+   * @param anomalyFunction
+   * @return
+   */
   private String constructAggGranularity(AnomalyFunctionDTO anomalyFunction) {
     String aggGranularity = anomalyFunction.getBucketSize() + "_" + anomalyFunction.getBucketUnit();
     return aggGranularity;
   }
 
+  /**
+   * Get formatted date time for anomaly chart
+   * @param timestamp
+   * @param datasetConfig
+   * @param startEndDateFormatterHours
+   * @param startEndDateFormatterDays
+   * @return
+   */
   private String getFormattedDateTime(long timestamp, DatasetConfigDTO datasetConfig,
       DateTimeFormatter startEndDateFormatterHours, DateTimeFormatter startEndDateFormatterDays) {
     TimeSpec timeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
@@ -474,6 +583,25 @@ public class AnomaliesResource {
     return formattedDateTime;
   }
 
+  /** Construct anomaly wrapper using all details fetched from calls
+   *
+   * @param metricName
+   * @param dataset
+   * @param datasetConfig
+   * @param mergedAnomaly
+   * @param anomalyFunction
+   * @param currentStartTime
+   * @param currentEndTime
+   * @param baselineStartTime
+   * @param baselineEndTime
+   * @param currentTimeseriesResponse
+   * @param baselineTimeseriesResponse
+   * @param timeSeriesDateFormatter
+   * @param startEndDateFormatterHours
+   * @param startEndDateFormatterDays
+   * @return
+   * @throws JSONException
+   */
   private AnomalyWrapper constructAnomalyWrapper(String metricName, String dataset, DatasetConfigDTO datasetConfig,
       MergedAnomalyResultDTO mergedAnomaly, AnomalyFunctionDTO anomalyFunction,
       long currentStartTime, long currentEndTime, long baselineStartTime, long baselineEndTime,
@@ -500,7 +628,7 @@ public class AnomaliesResource {
     anomalyWrapper.setAnomalyId(mergedAnomaly.getId());
     anomalyWrapper.setAnomalyRegionStart(timeSeriesDateFormatter.print(Long.valueOf(mergedAnomaly.getStartTime())));
     anomalyWrapper.setAnomalyRegionEnd(timeSeriesDateFormatter.print(Long.valueOf(mergedAnomaly.getEndTime())));
-    Map<String, String> messageDataMap = getMessageDataMap(mergedAnomaly.getMessage());
+    Map<String, String> messageDataMap = getAnomalyMessageDataMap(mergedAnomaly.getMessage());
     anomalyWrapper.setCurrent(messageDataMap.get(ANOMALY_CURRENT_VAL_KEY));
     anomalyWrapper.setBaseline(messageDataMap.get(ANOMALY_BASELINE_VAL_KEY));
     anomalyWrapper.setAnomalyFunctionId(anomalyFunction.getId());

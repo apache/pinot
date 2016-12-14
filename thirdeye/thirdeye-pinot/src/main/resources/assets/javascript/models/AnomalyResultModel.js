@@ -26,6 +26,7 @@ AnomalyResultModel.prototype = {
     this.anomalyIds = [];
     this.functionName = null;
   },
+  // Call setParams every time there is a change to the model
   setParams : function(params) {
     console.log(params);
     if (params != undefined) {
@@ -77,7 +78,7 @@ AnomalyResultModel.prototype = {
       }
     }
   },
-
+  // Call rebuild every time new anomalies are to be loaded with new model
   rebuild : function() {
     var anomalies = [];
     if (this.anomaliesTabText == constants.ANOMALIES_TAB_TEXT_METRICS && this.metricIds != undefined && this.metricIds.length > 0) {
@@ -90,6 +91,7 @@ AnomalyResultModel.prototype = {
     this.anomalies = anomalies;
 
   },
+  // Instead of calling rebuild for a simple anomaly feedback change, made a smaller function
   updateAnomalyFeedback : function() {
     console.log("Updating feedback at backend");
     var feedbackType = this.getFeedbackTypeFromString(this.anomalyForFeedbackUpdate.anomalyFeedback);
@@ -101,6 +103,7 @@ AnomalyResultModel.prototype = {
   getAnomalyFunctions : function() {
     return this.functions;
   },
+  // Helper functions to convert between UI string for feedback to database enum
   getFeedbackTypeFromString : function(feedback) {
     switch (feedback) {
     case constants.FEEDBACK_STRING_CONFIRMED_ANOMALY:
