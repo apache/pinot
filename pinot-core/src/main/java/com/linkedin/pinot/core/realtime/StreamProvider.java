@@ -38,7 +38,7 @@ public interface StreamProvider {
   /**
    * return GenericRow
    */
-  GenericRow next();
+  GenericRow next(GenericRow destination);
 
   /**
    *

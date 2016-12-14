@@ -176,13 +176,19 @@ public class HLRealtimeSegmentDataManager extends SegmentDataManager {
         segmentLogger.info("Starting to collect rows");
 
         do {
+          GenericRow readRow = null;
+          GenericRow transformedRow = null;
           GenericRow row = null;
           try {
-            row = kafkaStreamProvider.next();
+            readRow = GenericRow.createOrReuseRow(readRow);
+            readRow = kafkaStreamProvider.next(readRow);
+            row = readRow;
 
-            if (row != null) {
-              row = extractor.transform(row);
-              notFull = realtimeSegment.index(row);
+            if (readRow != null) {
+              transformedRow = GenericRow.createOrReuseRow(transformedRow);
+              transformedRow = extractor.transform(readRow, transformedRow);
+              row = transformedRow;
+              notFull = realtimeSegment.index(transformedRow);
               exceptionSleepMillis = 50L;
             }
           } catch (Exception e) {

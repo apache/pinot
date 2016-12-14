@@ -62,7 +62,7 @@ public class FlakyConsumerRealtimeClusterIntegrationTest extends RealtimeCluster
     }
 
     @Override
-    public GenericRow next() {
+    public GenericRow next(GenericRow destination) {
       // Return a null row every ~1/1000 rows and an exception every ~1/1000 rows
       int randomValue = _random.nextInt(1000);
 
@@ -71,7 +71,7 @@ public class FlakyConsumerRealtimeClusterIntegrationTest extends RealtimeCluster
       } else if (randomValue == 1) {
         throw new RuntimeException("Flaky stream provider exception");
       } else {
-        return _streamProvider.next();
+        return _streamProvider.next(destination);
       }
     }
 

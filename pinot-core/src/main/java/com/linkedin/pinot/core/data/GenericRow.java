@@ -29,9 +29,8 @@ import java.util.Set;
 
 
 /**
- * A plain implementation of RowEvent based on HashMap.
- *
- *
+ * A plain implementation of RowEvent based on HashMap. Should be reused as much as possible via
+ * {@link GenericRow#createOrReuseRow(GenericRow)}
  */
 public class GenericRow implements RowEvent {
   private Map<String, Object> _fieldMap = new HashMap<String, Object>();
@@ -113,5 +112,21 @@ public class GenericRow implements RowEvent {
     StringWriter writer = new StringWriter();
     OBJECT_MAPPER.writeValue(writer, _fieldMap);
     return writer.toString().getBytes(Charset.forName("UTF-8"));
+  }
+
+  /**
+   * Creates a new row if the row given is null, otherwise just {@link GenericRow#clear()} the row so that it can be
+   * reused.
+   *
+   * @param row The row to potentially reuse.
+   * @return A cleared or new row.
+   */
+  public static GenericRow createOrReuseRow(GenericRow row) {
+    if (row == null) {
+      return new GenericRow();
+    } else {
+      row.clear();
+      return row;
+    }
   }
 }

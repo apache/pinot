@@ -37,8 +37,7 @@ public class AvroRecordToPinotRowGenerator {
     this.indexingSchema = indexingSchema;
   }
 
-  public GenericRow transform(GenericData.Record record, org.apache.avro.Schema schema) {
-    Map<String, Object> rowEntries = new HashMap<String, Object>();
+  public GenericRow transform(GenericData.Record record, org.apache.avro.Schema schema, GenericRow destination) {
     for (String column : indexingSchema.getColumnNames()) {
       Object entry = record.get(column);
       FieldSpec fieldSpec = indexingSchema.getFieldSpecFor(column);
@@ -78,16 +77,13 @@ public class AvroRecordToPinotRowGenerator {
           }
         }
       }
-      rowEntries.put(column, entry);
+      destination.putField(column, entry);
     }
 
-    GenericRow row = new GenericRow();
-    row.init(rowEntries);
-    return row;
+    return destination;
   }
 
-  public GenericRow transform(GenericRecord avroRecord) {
-    Map<String, Object> rowEntries = new HashMap<String, Object>();
+  public GenericRow transform(GenericRecord avroRecord, GenericRow destination) {
     for (String column : indexingSchema.getColumnNames()) {
       Object entry = avroRecord.get(column);
       if (entry instanceof Utf8) {
@@ -99,11 +95,9 @@ public class AvroRecordToPinotRowGenerator {
       if (entry == null && indexingSchema.getFieldSpecFor(column).isSingleValueField()) {
         entry = AvroRecordReader.getDefaultNullValue(indexingSchema.getFieldSpecFor(column));
       }
-      rowEntries.put(column, entry);
+      destination.putField(column, entry);
     }
 
-    GenericRow row = new GenericRow();
-    row.init(rowEntries);
-    return row;
+    return destination;
   }
 }

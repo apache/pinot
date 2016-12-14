@@ -42,11 +42,10 @@ public class KafkaJSONMessageDecoder implements KafkaMessageDecoder {
   }
 
   @Override
-  public GenericRow decode(byte[] payload) {
+  public GenericRow decode(byte[] payload, GenericRow destination) {
     try {
       String text = new String(payload, "UTF-8");
       JSONObject message = new JSONObject(text);
-      Map<String, Object> rowEntries = new HashMap<String, Object>();
       for (FieldSpec dimensionSpec : schema.getDimensionFieldSpecs()) {
         if (message.has(dimensionSpec.getName())) {
           Object entry;
@@ -64,35 +63,33 @@ public class KafkaJSONMessageDecoder implements KafkaMessageDecoder {
               entry = array;
             }
           }
-          rowEntries.put(dimensionSpec.getName(), entry);
+          destination.putField(dimensionSpec.getName(), entry);
         } else {
           Object entry = AvroRecordReader.getDefaultNullValue(dimensionSpec);
-          rowEntries.put(dimensionSpec.getName(), entry);
+          destination.putField(dimensionSpec.getName(), entry);
         }
       }
 
       for (FieldSpec metricSpec : schema.getMetricFieldSpecs()) {
         if (message.has(metricSpec.getName())) {
           Object entry = stringToDataType(metricSpec, message.getString(metricSpec.getName()));
-          rowEntries.put(metricSpec.getName(), entry);
+          destination.putField(metricSpec.getName(), entry);
         } else {
           Object entry = AvroRecordReader.getDefaultNullValue(metricSpec);
-          rowEntries.put(metricSpec.getName(), entry);
+          destination.putField(metricSpec.getName(), entry);
         }
       }
 
       TimeFieldSpec timeSpec = schema.getTimeFieldSpec();
       if (message.has(timeSpec.getName())) {
         Object entry = stringToDataType(timeSpec, message.getString(timeSpec.getName()));
-        rowEntries.put(timeSpec.getName(), entry);
+        destination.putField(timeSpec.getName(), entry);
       } else {
         Object entry = AvroRecordReader.getDefaultNullValue(timeSpec);
-        rowEntries.put(timeSpec.getName(), entry);
+        destination.putField(timeSpec.getName(), entry);
       }
 
-      GenericRow row = new GenericRow();
-      row.init(rowEntries);
-      return row;
+      return destination;
     } catch (Exception e) {
       LOGGER.error("error decoding , ", e);
     }
@@ -100,8 +97,8 @@ public class KafkaJSONMessageDecoder implements KafkaMessageDecoder {
   }
 
   @Override
-  public GenericRow decode(byte[] payload, int offset, int length) {
-    return decode(Arrays.copyOfRange(payload, offset, offset + length));
+  public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
+    return decode(Arrays.copyOfRange(payload, offset, offset + length), destination);
   }
 
   private Object stringToDataType(FieldSpec spec, String inString) {

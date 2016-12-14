@@ -91,11 +91,12 @@ public class RealtimeSegmentTest {
         invertedIdxCols);
     segmentWithoutInvIdx =
         new RealtimeSegmentImpl(schema, 100000, tableName, "noSegment", AVRO_DATA, new ServerMetrics(new MetricsRegistry()));
-    GenericRow row = provider.next();
+    GenericRow row = provider.next(new GenericRow());
     while (row != null) {
       segmentWithInvIdx.index(row);
       segmentWithoutInvIdx.index(row);
-      row = provider.next();
+      row = GenericRow.createOrReuseRow(row);
+      row = provider.next(row);
     }
     provider.shutdown();
   }

@@ -75,12 +75,12 @@ public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
   }
 
   @Override
-  public GenericRow decode(byte[] payload) {
-    return decode(payload, 0, payload.length);
+  public GenericRow decode(byte[] payload, GenericRow destination) {
+    return decode(payload, 0, payload.length, destination);
   }
 
   @Override
-  public GenericRow decode(byte[] payload, int offset, int length) {
+  public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
     if (payload == null || payload.length == 0 || length == 0) {
       return null;
     }
@@ -105,7 +105,7 @@ public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
       GenericData.Record avroRecord =
           reader.read(null, decoderFactory.createBinaryDecoder(payload, HEADER_LENGTH + offset,
               length - HEADER_LENGTH, null));
-      return avroRecordConvetrer.transform(avroRecord, schema);
+      return avroRecordConvetrer.transform(avroRecord, schema, destination);
     } catch (IOException e) {
       LOGGER.error("Caught exception while reading message", e);
       return null;

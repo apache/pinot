@@ -238,8 +238,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       statsCollector.collectRow(transformedRow);
       totalRawDocs++;
       totalDocs++;
-      readRow.clear();
-      transformedRow.clear();
     }
     recordReader.close();
     LOGGER.info("Start building star tree!");
@@ -366,8 +364,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       long stop1 = System.currentTimeMillis();
       totalRecordReadTime += (stop - start);
       totalStatsCollectorTime += (stop1 - stop);
-      readRow.clear();
-      transformedRow.clear();
     }
     buildIndexCreationInfo();
     LOGGER.info("Finished building StatsCollector!");
@@ -387,8 +383,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       long stop1 = System.currentTimeMillis();
       totalRecordReadTime += (stop - start);
       totalIndexTime += (stop1 - stop);
-      readRow.clear();
-      transformedRow.clear();
     }
     recordReader.close();
     LOGGER.info("Finished records indexing in IndexCreator!");
@@ -539,7 +533,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   }
 
   private GenericRow readNextRowSanitized(GenericRow readRow, GenericRow transformedRow) {
+    readRow = GenericRow.createOrReuseRow(readRow);
     readRow = recordReader.next(readRow);
+    transformedRow = GenericRow.createOrReuseRow(transformedRow);
     return extractor.transform(readRow, transformedRow);
   }
 
