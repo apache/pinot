@@ -65,8 +65,9 @@ DashboardView.prototype = {
       };
 
       if (self.dashboardModel.dashboardName != selectedDashboardName) {
-      //  self.onDashboardSelectionEvent.notify(args);
-        console.log("Notify dashboard");
+        console.log("Notify dashboard controller ----> ");
+        console.log(args);
+       self.onDashboardSelectionEvent.notify(args);
       }
     });
 

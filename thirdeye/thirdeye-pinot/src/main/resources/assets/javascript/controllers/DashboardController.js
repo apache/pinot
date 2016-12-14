@@ -57,8 +57,10 @@ DashboardController.prototype = {
   },
 
   onDashboardSelectionEventHandler : function(sender, args) {
+    HASH_SERVICE.update(args);
     this.dashboardModel.dashboardName = args.dashboardName;
     this.dashboardModel.dashboardId = args.dashboardId;
+    console.log(HASH_SERVICE.getParams());
     this.handleAppEvent();
   }
 
