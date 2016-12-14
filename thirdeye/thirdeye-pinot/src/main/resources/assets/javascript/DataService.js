@@ -93,7 +93,7 @@ DataService.prototype = {
       // TODO : set dimensions and filters
       var url = "/timeseries/compare/" + metricId + "/" + currentStart + "/" + currentEnd + "/"
           + baselineStart + "/" + baselineEnd;
-      return this.getSynchronousData(url);
+      return this.getDataSynchronous(url);
     }
 
 };
