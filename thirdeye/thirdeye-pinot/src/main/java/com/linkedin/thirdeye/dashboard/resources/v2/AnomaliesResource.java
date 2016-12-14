@@ -79,6 +79,12 @@ public class AnomaliesResource {
   }
 
   @GET
+  @Path("autocomplete/anomalyId")
+  public List<String> getAnomaliesWhereAnomalyIdLike(@QueryParam("id") String id) {
+    return mergedAnomalyResultDAO.findAllIdsLike(id);
+  }
+
+  @GET
   @Path("metric/id/{metricId}/{startTime}/{endTime}")
   public List<MergedAnomalyResultDTO> getAnomaliesForMetricInRange(
       @PathParam("metricId") Long metricId,

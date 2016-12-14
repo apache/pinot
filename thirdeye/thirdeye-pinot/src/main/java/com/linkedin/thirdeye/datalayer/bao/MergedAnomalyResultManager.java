@@ -35,4 +35,6 @@ public interface MergedAnomalyResultManager extends AbstractManager<MergedAnomal
       long functionId);
 
   void updateAnomalyFeedback(MergedAnomalyResultDTO entity);
+
+  List<String> findAllIdsLike(String id);
 }

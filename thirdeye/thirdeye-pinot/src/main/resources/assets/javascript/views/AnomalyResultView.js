@@ -91,14 +91,14 @@ AnomalyResultView.prototype = {
   setupSearchByIDTab : function() {
     $('#anomalies-id-input').select2({
       theme : "bootstrap",
-      placeholder : "Search for Dashboard",
+      placeholder : "Search for ID(s)",
       ajax : {
-        url : constants.DASHBOARD_AUTOCOMPLETE_ENDPOINT,
+        url : constants.ANOMALY_AUTOCOMPLETE_ENDPOINT,
         minimumInputLength : 3,
-        delay : 250,
+        delay : 500,
         data : function(params) {
           var query = {
-            name : params.term,
+            id : params.term,
             page : params.page
           }
           // Query paramters will be ?name=[term]&page=[page]
@@ -108,8 +108,8 @@ AnomalyResultView.prototype = {
           var results = [];
           $.each(data, function(index, item) {
             results.push({
-              id : item.id,
-              text : item.name
+              id : item,
+              text : item
             });
           });
           return {

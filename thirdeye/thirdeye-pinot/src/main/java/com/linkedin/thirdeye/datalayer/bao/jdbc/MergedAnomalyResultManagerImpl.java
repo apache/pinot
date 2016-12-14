@@ -50,6 +50,7 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
   private static final String FIND_BY_FUNCTION_AND_NULL_DIMENSION =
       "where functionId=:functionId " + "and dimensions is null order by endTime desc";
 
+
   private ExecutorService executorService = Executors.newFixedThreadPool(10);
 
   public MergedAnomalyResultManagerImpl() {
@@ -326,5 +327,20 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
     }
 
     return mergedAnomalyResultDTOList;
+  }
+
+
+  @Override
+  public List<String> findAllIdsLike(String id) {
+    // TODO: find by id like 'id%'
+    List<MergedAnomalyResultDTO> mergedResults = findAll();
+    List<String> mergedAnomalyIds = new ArrayList<>();
+    for (MergedAnomalyResultDTO mergedAnomaly : mergedResults) {
+      String mergedAnomalyId = String.valueOf(mergedAnomaly.getId());
+      if (mergedAnomalyId.startsWith(id)) {
+        mergedAnomalyIds.add(mergedAnomalyId);
+      }
+    }
+    return mergedAnomalyIds;
   }
 }
