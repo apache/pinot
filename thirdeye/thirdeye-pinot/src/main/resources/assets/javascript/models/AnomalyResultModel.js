@@ -15,6 +15,8 @@ function AnomalyResultModel() {
 
   this.anomalies = [];
 
+  this.anomalyForFeedbackUpdate = null;
+
 }
 
 AnomalyResultModel.prototype = {
@@ -25,34 +27,53 @@ AnomalyResultModel.prototype = {
     this.functionName = null;
   },
   setParams : function(params) {
-    this.reset();
     console.log(params);
     if (params != undefined) {
-      this.anomaliesTabText = params['anomaliesTabText'];
-      switch(this.anomaliesTabText) {
-        case constants.ANOMALIES_TAB_TEXT_DASHBOARD:
-          this.anomaliesSearchTab = 'anomalies_search-by-dashboard'
+      console.log("params");
+      if (params['anomaliesTabText'] != undefined) {
+        console.log("anomaliesTabText");
+        this.anomaliesTabText = params['anomaliesTabText'];
+        switch(this.anomaliesTabText) {
+          case constants.ANOMALIES_TAB_TEXT_DASHBOARD:
+            this.anomaliesSearchTab = 'anomalies_search-by-dashboard';
             break;
-        case constants.ANOMALIES_TAB_TEXT_ID:
-          this.anomaliesSearchTab = 'anomalies_search-by-id'
+          case constants.ANOMALIES_TAB_TEXT_ID:
+            this.anomaliesSearchTab = 'anomalies_search-by-id';
             break;
-        case constants.ANOMALIES_TAB_TEXT_METRICS:
-        default:
-          this.anomaliesSearchTab = 'anomalies_search-by-metric'
+          case constants.ANOMALIES_TAB_TEXT_METRICS:
+          default:
+            this.anomaliesSearchTab = 'anomalies_search-by-metric';
+        }
       }
       if (params['metricIds'] != undefined) {
+        console.log("metricIds");
         this.metricIds = params['metricIds'];
       }
       if (params['dashboardId'] != undefined) {
+        console.log("dashboardId");
         this.dashboardId = params['dashboardId'];
       }
       if (params['anomalyIds'] != undefined) {
+        console.log("anomalyIds");
         this.anomalyIds = params['anomalyIds'];
       }
-      this.startDate = params['startDate'];
-      this.endDate = params['endDate'];
+      if (params['startDate'] != undefined) {
+        console.log("startDate");
+        this.startDate = params['startDate'];
+      }
+      if (params['endDate'] != undefined) {
+        console.log("endDate");
+        this.endDate = params['endDate'];
+      }
       if (params['functionName'] != undefined) {
+        console.log("functionName");
         this.functionName = params['functionName'];
+      }
+      if (params['feedback'] != undefined) {
+        console.log("feedback");
+        var idx = params['idx'];
+        this.anomalies[idx].anomalyFeedback = params['feedback'];
+        this.anomalyForFeedbackUpdate = this.anomalies[idx];
       }
     }
   },
@@ -69,11 +90,40 @@ AnomalyResultModel.prototype = {
     this.anomalies = anomalies;
 
   },
+  updateAnomalyFeedback : function() {
+    console.log("Updating feedback at backend");
+    var feedbackType = this.getFeedbackTypeFromString(this.anomalyForFeedbackUpdate.anomalyFeedback);
+    dataService.updateFeedback(this.anomalyForFeedbackUpdate.anomalyId, feedbackType);
+  },
   getAnomaliesList : function() {
     return this.anomalies;
   },
   getAnomalyFunctions : function() {
     return this.functions;
+  },
+  getFeedbackTypeFromString : function(feedback) {
+    switch (feedback) {
+    case constants.FEEDBACK_STRING_CONFIRMED_ANOMALY:
+      return constants.FEEDBACK_TYPE_ANOMALY;
+    case constants.FEEDBACK_STRING_FALSE_ALARM:
+      return constants.FEEDBACK_TYPE_NOT_ANOMALY;
+    case constants.FEEDBACK_STRING_CONFIRMED_NOT_ACTIONABLE:
+      return constants.FEEDBACK_TYPE_ANOMALY_NO_ACTION;
+    default:
+      return feedbackTypeStr;
+    }
+  },
+  getFeedbackStringFromType : function(feedbackType) {
+    switch (feedbackType) {
+    case constants.FEEDBACK_TYPE_ANOMALY:
+      return constants.FEEDBACK_STRING_CONFIRMED_ANOMALY;
+    case constants.FEEDBACK_TYPE_NOT_ANOMALY:
+      return constants.FEEDBACK_STRING_FALSE_ALARM;
+    case constants.FEEDBACK_TYPE_ANOMALY_NO_ACTION:
+      return constants.FEEDBACK_STRING_CONFIRMED_NOT_ACTIONABLE;
+    default:
+      return feedbackType;
+    }
   }
 
 }

@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
+import java.io.IOException;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -9,6 +10,7 @@ import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 
 import javax.ws.rs.GET;
+import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
@@ -26,6 +28,7 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
@@ -38,12 +41,14 @@ import com.linkedin.thirdeye.client.timeseries.TimeSeriesRequest;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponse;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow.TimeSeriesMetric;
+import com.linkedin.thirdeye.constant.FeedbackStatus;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
@@ -384,6 +389,40 @@ public class AnomaliesResource {
     return jsonResponseObject;
   }
 
+  /**
+   * @param mergedAnomalyId : mergedAnomalyId
+   * @param payload         : Json payload containing feedback @see com.linkedin.thirdeye.constant.AnomalyFeedbackType
+   *                        eg. payload
+   *                        <p/>
+   *                        { "feedbackType": "NOT_ANOMALY", "comment": "this is not an anomaly" }
+   */
+  @POST
+  @Path(value = "/updateFeedback/{mergedAnomalyId}")
+  public void updateAnomalyMergedResultFeedback(@PathParam("mergedAnomalyId") long mergedAnomalyId, String payload) {
+    try {
+      MergedAnomalyResultDTO result = mergedAnomalyResultDAO.findById(mergedAnomalyId);
+      if (result == null) {
+        throw new IllegalArgumentException("AnomalyResult not found with id " + mergedAnomalyId);
+      }
+      AnomalyFeedbackDTO feedback = result.getFeedback();
+      if (feedback == null) {
+        feedback = new AnomalyFeedbackDTO();
+        result.setFeedback(feedback);
+      }
+      AnomalyFeedbackDTO feedbackRequest = new ObjectMapper().readValue(payload, AnomalyFeedbackDTO.class);
+      if (feedbackRequest.getStatus() == null) {
+        feedback.setStatus(FeedbackStatus.NEW);
+      } else {
+        feedback.setStatus(feedbackRequest.getStatus());
+      }
+      feedback.setComment(feedbackRequest.getComment());
+      feedback.setFeedbackType(feedbackRequest.getFeedbackType());
+      mergedAnomalyResultDAO.updateAnomalyFeedback(result);
+    } catch (IOException e) {
+      throw new IllegalArgumentException("Invalid payload " + payload, e);
+    }
+  }
+
   private List<String> getDataFromTimeSeriesObject(JSONObject timeSeriesResponse, String metricName) throws JSONException {
     JSONObject timeSeriesMap = (JSONObject) timeSeriesResponse.get("timeSeriesData");
     JSONArray valueArray = (JSONArray) timeSeriesMap.get(metricName);
@@ -470,10 +509,12 @@ public class AnomaliesResource {
     anomalyWrapper.setAnomalyFunctionProps(anomalyFunction.getProperties());
     anomalyWrapper.setAnomalyFunctionDimension(mergedAnomaly.getDimensions().toString());
     if (mergedAnomaly.getFeedback() != null) {
-      anomalyWrapper.setAnomalyFeedback(mergedAnomaly.getFeedback().getStatus().toString());
+      anomalyWrapper.setAnomalyFeedback(AnomalyWrapper.getFeedbackStringFromFeedbackType(mergedAnomaly.getFeedback().getFeedbackType()));
     }
     return anomalyWrapper;
   }
+
+
 
 
 }

@@ -1,16 +1,16 @@
 function DataService() {
-
+  this.URL_SEPARATOR = '/';
 }
 
 DataService.prototype = {
 
-    getSynchronousData: function(url, params)  {
+    getSynchronousData: function(url, data)  {
       console.log("request url:", url)
 
       var results = undefined;
        $.ajax({
         url: url,
-        data: params,
+        data: data,
         type: 'get',
         dataType: 'json',
         async: false,
@@ -33,31 +33,50 @@ DataService.prototype = {
 
       });
     },
-    fetchAnomaliesForMetricIds(startTime, endTime, metricIds, functionName) {
-      var url = constants.SEARCH_ANOMALIES_METRICIDS + startTime + '/' + endTime;
-      var params = {
+    postData: function(url, data) {
+      console.log("request url:", url)
+      return $.ajax({
+        url: url,
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        type: 'post',
+        dataType: 'json',
+        data: data
+      });
+    },
+    fetchAnomaliesForMetricIds : function(startTime, endTime, metricIds, functionName) {
+      var url = constants.SEARCH_ANOMALIES_METRICIDS + startTime + this.URL_SEPARATOR + endTime;
+      var data = {
           metricIds : metricIds.join(),
           functionName : functionName
       };
-      var anomalies = this.getSynchronousData(url, params);
+      var anomalies = this.getSynchronousData(url, data);
       return anomalies;
     },
-    fetchAnomaliesForDashboardId(startTime, endTime, dashboardId, functionName) {
-      var url = constants.SEARCH_ANOMALIES_DASHBOARDID + startTime + '/' + endTime;
-      var params = {
+    fetchAnomaliesForDashboardId : function(startTime, endTime, dashboardId, functionName) {
+      var url = constants.SEARCH_ANOMALIES_DASHBOARDID + startTime + this.URL_SEPARATOR + endTime;
+      var data = {
           dashboardId : dashboardId,
           functionName : functionName
       };
-      var anomalies = this.getSynchronousData(url, params);
+      var anomalies = this.getSynchronousData(url, data);
       return anomalies;
     },
-    fetchAnomaliesForAnomalyIds(startTime, endTime, anomalyIds, functionName) {
-      var url = constants.SEARCH_ANOMALIES_ANOMALYIDS + startTime + '/' + endTime;
-      var params = {
+    fetchAnomaliesForAnomalyIds : function(startTime, endTime, anomalyIds, functionName) {
+      var url = constants.SEARCH_ANOMALIES_ANOMALYIDS + startTime + this.URL_SEPARATOR + endTime;
+      var data = {
           anomalyIds : anomalyIds.join(),
           functionName : functionName
       };
-      var anomalies = this.getSynchronousData(url, params);
+      var anomalies = this.getSynchronousData(url, data);
       return anomalies;
+    },
+    updateFeedback : function(anomalyId, feedbackType) {
+      var url = constants.UPDATE_ANOMALY_FEEDBACK + anomalyId;
+      var data = '{ "feedbackType": "' + feedbackType + '","comment": ""}';
+      var response = this.postData(url, data);
+      console.log("Updated backend feedback " + feedbackType);
     }
 };
