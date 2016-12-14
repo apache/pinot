@@ -23,7 +23,7 @@ AnalysisController.prototype = {
 
   handleApplyAnalysisEvent: function (updatedAnalysisParams) {
     HASH_SERVICE.update(updatedAnalysisParams.viewParams);
-    console.log("updated hash params ---> ");
+    console.log("updated hash params in analysis controller ---> ");
     console.log(HASH_SERVICE.getParams());
     this.timeSeriesCompareController.handleAppEvent(HASH_SERVICE.getParams());
   }

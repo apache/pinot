@@ -8,7 +8,7 @@ import java.util.Map;
 public class GenericResponse {
 
   Info summary;
-  
+
   ResponseSchema schema;
   List<String[]> responseData;
   Map<String, List<Integer>> keyToRowIdMapping;
@@ -71,8 +71,8 @@ public class GenericResponse {
   public static class Info {
 
     private Map<String, String> simpleFields = new LinkedHashMap<>();
-    private Map<String, List<String>> listFields = new LinkedHashMap<>();;
-    private Map<String, Map<String, String>> mapFields = new LinkedHashMap<>();;
+    private Map<String, List<String>> listFields = new LinkedHashMap<>();
+    private Map<String, Map<String, String>> mapFields = new LinkedHashMap<>();
 
     public Map<String, String> getSimpleFields() {
       return simpleFields;

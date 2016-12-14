@@ -5,9 +5,10 @@ function AnalysisModel() {
   this.granularity;
   this.dimensions;
   this.filters;
-  this.currentStart = moment().subtract(1, 'days');;
+
+  this.currentStart = moment().subtract(4, 'days');;
   this.currentEnd = moment();
-  this.baselineStart= moment().subtract(6, 'days');
+  this.baselineStart= moment().subtract(10, 'days');
   this.baselineEnd = moment().subtract(6, 'days');
 }
 

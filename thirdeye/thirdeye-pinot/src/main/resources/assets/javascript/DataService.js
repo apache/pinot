@@ -33,7 +33,7 @@ DataService.prototype = {
 
       });
     },
-    fetchAnomaliesForMetricIds(startTime, endTime, metricIds, functionName) {
+    fetchAnomaliesForMetricIds : function(startTime, endTime, metricIds, functionName) {
       var url = constants.SEARCH_ANOMALIES_METRICIDS + startTime + '/' + endTime;
       var params = {
           metricIds : metricIds.join(),
@@ -42,7 +42,7 @@ DataService.prototype = {
       var anomalies = this.getSynchronousData(url, params);
       return anomalies;
     },
-    fetchAnomaliesForDashboardId(startTime, endTime, dashboardId, functionName) {
+    fetchAnomaliesForDashboardId : function(startTime, endTime, dashboardId, functionName) {
       var url = constants.SEARCH_ANOMALIES_DASHBOARDID + startTime + '/' + endTime;
       var params = {
           dashboardId : dashboardId,
@@ -51,7 +51,7 @@ DataService.prototype = {
       var anomalies = this.getSynchronousData(url, params);
       return anomalies;
     },
-    fetchAnomaliesForAnomalyIds(startTime, endTime, anomalyIds, functionName) {
+    fetchAnomaliesForAnomalyIds: function(startTime, endTime, anomalyIds, functionName) {
       var url = constants.SEARCH_ANOMALIES_ANOMALYIDS + startTime + '/' + endTime;
       var params = {
           anomalyIds : anomalyIds.join(),
@@ -59,5 +59,16 @@ DataService.prototype = {
       };
       var anomalies = this.getSynchronousData(url, params);
       return anomalies;
-    }
+    },
+
+  fetchTimeseriesCompare: function (metricId, currentStart, currentEnd, baselineStart, baselineEnd,
+      dimensions, filters) {
+
+    // TODO : set dimensions and filters
+
+    var url = "/timeseries/compare/" + metricId + "/" + currentStart + "/" + currentEnd + "/"
+        + baselineStart + "/" + baselineEnd;
+    return this.getSynchronousData(url);
+  }
+
 };

@@ -320,5 +320,4 @@ public class DataResource {
     }
     return maxDateTime;
   }
-
 }
