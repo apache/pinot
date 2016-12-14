@@ -295,7 +295,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
           //    we hit the row limit.
           //    Throw an exception.
           //
-          // 2. We are in CATCHING_UP state, and we legally hit this error due to a Kafka failure scenarios where
+          // 2. We are in CATCHING_UP state, and we legally hit this error due to Kafka unclean leader election where
           //    offsets get changed with higher generation numbers for some pinot servers but not others. So, if another
           //    server (who got a larger kafka offset) asked us to catch up to that offset, but we are connected to a
           //    broker who has smaller offsets, then we may try to push more rows into the buffer than maximum. This
