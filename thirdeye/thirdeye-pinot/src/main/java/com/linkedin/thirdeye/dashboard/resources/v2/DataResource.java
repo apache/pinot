@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ArrayListMultimap;
@@ -22,9 +23,11 @@ import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
@@ -34,6 +37,7 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
@@ -60,12 +64,14 @@ import static com.linkedin.thirdeye.client.ResponseParserUtils.CACHE_REGISTRY_IN
 public class DataResource {
   private static final Logger LOG = LoggerFactory.getLogger(DataResource.class);
   private static final DAORegistry daoRegistry = DAORegistry.getInstance();
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private final MetricConfigManager metricConfigDAO;
   private final DatasetConfigManager datasetConfigDAO;
   private final DashboardConfigManager dashboardConfigDAO;
 
   private final LoadingCache<String, Long> collectionMaxDataTimeCache;
+  private final LoadingCache<String, String> dimensionsFilterCache;
 
   private final QueryCache queryCache;
 
@@ -76,6 +82,7 @@ public class DataResource {
 
     this.queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
     this.collectionMaxDataTimeCache = CACHE_REGISTRY_INSTANCE.getCollectionMaxDataTimeCache();
+    this.dimensionsFilterCache = CACHE_REGISTRY_INSTANCE.getDimensionFiltersCache();
   }
 
   //------------- endpoints to fetch summary -------------
@@ -123,35 +130,6 @@ public class DataResource {
     return null;
   }
 
-  //------------- endpoints to fetch config objects -------------
-  // metric end points
-  @GET
-  @Path("metrics")
-  public List<MetricConfigDTO> getMetrics(
-      @QueryParam("pageId") @DefaultValue("0") int pageId,
-      @QueryParam("numResults") @DefaultValue("1000") int numResults,
-      @QueryParam("dataset") String dataset, @QueryParam("metric") String metric
-  ) {
-    // TODO: add pagination support through out the data managers
-    List<MetricConfigDTO> output = new ArrayList<>();
-    if (StringUtils.isEmpty(dataset)) {
-      output.addAll(metricConfigDAO.findAll());
-    } else {
-      if (StringUtils.isNotEmpty(metric)) {
-        output.addAll(metricConfigDAO.findActiveByDataset(dataset));
-      } else {
-        output.add(metricConfigDAO.findByMetricAndDataset(metric, dataset));
-      }
-    }
-    return output;
-  }
-
-  @GET
-  @Path("metric/{id}")
-  public MetricConfigDTO getMetricById(@PathParam("id") Long id) {
-    return metricConfigDAO.findById(id);
-  }
-
   //------------- endpoint for autocomplete ----------
   @GET
   @Path("autocomplete/dashboard")
@@ -165,47 +143,42 @@ public class DataResource {
     return metricConfigDAO.findWhereNameLike("%" + name + "%");
   }
 
-  // dataset end points
   @GET
-  @Path("datasets")
-  public List<DatasetConfigDTO> getDatasets(
-      @QueryParam("pageId") @DefaultValue("0") int pageId,
-      @QueryParam("numResults") @DefaultValue("1000") int numResults) {
-
-    return null;
+  @Path("autocomplete/dimensions/metric/{metricId}")
+  public List<String> getDimensionsForMetric(@PathParam("metricId") Long metricId) {
+    List<String> list = new ArrayList<>();
+    list.add("All");
+    try {
+      MetricConfigDTO metricConfigDTO = metricConfigDAO.findById(metricId);
+      DatasetConfigDTO datasetConfigDTO = datasetConfigDAO.findByDataset(metricConfigDTO.getDataset());
+      list.addAll(datasetConfigDTO.getDimensions());
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+    }
+    return list;
   }
 
   @GET
-  @Path("dataset/{id}")
-  public DatasetConfigDTO getDatasetById(@PathParam("id") Long id) {
-    return datasetConfigDAO.findById(id);
+  @Path("autocomplete/filters/metric/{metricId}")
+  public Map<String, List<String>> getFiltersForMetric(@PathParam("metricId") Long metricId) {
+    Map<String, List<String>> filterMap = new HashMap<>();
+    try {
+    // TODO : cache this
+    MetricConfigDTO metricConfigDTO = metricConfigDAO.findById(metricId);
+    DatasetConfigDTO datasetConfigDTO = datasetConfigDAO.findByDataset(metricConfigDTO.getDataset());
+    String dimensionFiltersJson = dimensionsFilterCache.get(datasetConfigDTO.getDataset());
+      if (!Strings.isNullOrEmpty(dimensionFiltersJson)) {
+        filterMap = OBJECT_MAPPER.readValue(dimensionFiltersJson, LinkedHashMap.class);
+      }
+    } catch (Exception e) {
+      LOG.error(e.getMessage(), e);
+      throw new WebApplicationException(e);
+    }
+    return filterMap;
   }
+  //------------- auto complete ends ---------------------
 
-  @GET
-  @Path("dataset")
-  public DatasetConfigDTO getDatasetByName(@QueryParam("dataset") String dataset) {
-    return datasetConfigDAO.findByDataset(dataset);
-  }
-
-  @GET
-  @Path(value = "filters/{dataset}")
-  public Map<String, List<String>> getFilters(@PathParam("dataset") String dataset) {
-    return null;
-  }
-
-  // dashboard end points
-  @GET
-  @Path("dashboard")
-  public List<DashboardConfig> getDashboards(@QueryParam("dashboard") String dashboard) {
-    return new ArrayList<>();
-  }
-
-  @GET
-  @Path("dashboard/{id}")
-  public DashboardConfig getDashboardById(@PathParam("id") Long id) {
-    return null;
-  }
-
+  //----------------- dashboard end points -------------
   @GET
   @Path("dashboard/metricids")
   public List<Long> getMetricIdsByDashboard(@QueryParam("name") String name) {

@@ -198,8 +198,7 @@ public class DashboardResource {
   @GET
   @Path(value = "/data/filters")
   @Produces(MediaType.APPLICATION_JSON)
-  public String getFilters(@QueryParam("dataset") String collection,
-      @QueryParam("start") String start, @QueryParam("end") String end) {
+  public String getFilters(@QueryParam("dataset") String collection) {
     String jsonFilters = null;
     try {
       jsonFilters = dimensionFiltersCache.get(collection);

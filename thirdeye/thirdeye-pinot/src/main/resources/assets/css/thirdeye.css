@@ -251,7 +251,7 @@ hr {
 .analysis-table>thead>tr>th, .analysis-table>tbody>tr>th,
 	.analysis-table>tfoot>tr>th, .analysis-table>thead>tr>td,
 	.analysis-table>tbody>tr>td, .analysis-table>tfoot>tr>td {
-	
+
 }
 
 .analysis-table {
@@ -354,7 +354,7 @@ rect {
 }
 
 .daterangepicker {
-	font =size: 11px;
+	font-size: 11px;
 	font-weight: 100;
 }
 

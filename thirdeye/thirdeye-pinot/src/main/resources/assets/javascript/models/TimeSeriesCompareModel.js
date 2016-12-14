@@ -1,7 +1,7 @@
 function TimeSeriesCompareModel() {
   this.metricId;
 
-  this.dimensions;
+  this.dimension;
   this.filters;
 
   this.currentStart;
@@ -42,6 +42,12 @@ TimeSeriesCompareModel.prototype = {
       if (params.granularity) {
         this.granularity = params.granularity;
       }
+      if (params.dimension) {
+        this.dimension = params.dimension;
+      }
+      if (params.filters) {
+        this.filters = params.filters;
+      }
     }
   },
 
@@ -51,7 +57,7 @@ TimeSeriesCompareModel.prototype = {
     console.log(this);
     if (this.metricId) {
       var timeSeriesResponse = dataService.fetchTimeseriesCompare(this.metricId, this.currentStart,
-          this.currentEnd, this.baselineStart, this.baselineEnd, this.dimensions, this.filters,
+          this.currentEnd, this.baselineStart, this.baselineEnd, this.dimension, this.filters,
           this.granularity);
       if (timeSeriesResponse) {
         // Transform

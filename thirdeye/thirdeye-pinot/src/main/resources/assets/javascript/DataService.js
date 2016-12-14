@@ -4,7 +4,6 @@ function DataService() {
 
 DataService.prototype = {
 
-
     // Make synchronous get call
     getDataSynchronous: function(url, data)  {
       console.log("request url:", url)
@@ -88,11 +87,21 @@ DataService.prototype = {
       console.log("Updated backend feedback " + feedbackType);
     },
 
+    fetchDimensionsForMetric : function(metricId) {
+      var url = "/data/autocomplete/dimensions/metric/"+metricId;
+      return this.getDataSynchronous(url);
+    },
+
+    fetchFiltersForMetric : function(metricId) {
+      var url = "/data/autocomplete/filters/metric/" + metricId;
+      return this.getDataSynchronous(url);
+    },
+
     fetchTimeseriesCompare: function (metricId, currentStart, currentEnd, baselineStart, baselineEnd,
-        dimensions, filters) {
+        dimension, filters) {
       // TODO : set dimensions and filters
       var url = "/timeseries/compare/" + metricId + "/" + currentStart + "/" + currentEnd + "/"
-          + baselineStart + "/" + baselineEnd;
+          + baselineStart + "/" + baselineEnd + "?dimensions="+dimension + "&filters="+JSON.stringify(filters);
       return this.getDataSynchronous(url);
     }
 

@@ -56,7 +56,10 @@
 						<label class="label-medium-semibold" for="add-dimension-button">Dimensions</label>
 					</div>
 					<div class="row">
-						<span><a id="add-dimension-button">+ Add Dimension</a></span>
+						<#--<span><a id="add-dimension-button">+ Add Dimension</a></span>-->
+            <div style="width: 370px; float: left">
+              <select id="analysis-metric-dimension-input" class="label-large-light underlined"></select>
+            </div>
 					</div>
 				</div>
 				<div class="col-md-3">
@@ -64,7 +67,8 @@
 						<label class="label-medium-semibold" for="add-filter-button">Filters </label>
 					</div>
 					<div class="row">
-						<a id="add-filter-button">+ Add Filter</a>
+						<#--<a id="add-filter-button">+ Add Filter</a>-->
+                <select id="analysis-metric-filter-input" class="label-large-light underlined"></select>
 					</div>
 				</div>
 			</div>

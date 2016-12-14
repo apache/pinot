@@ -3,7 +3,7 @@ function AnalysisModel() {
   this.metricId;
   this.timeRange;
   this.granularity;
-  this.dimensions;
+  this.dimension;
   this.filters;
 
   this.currentStart = moment().subtract(4, 'days');;
@@ -28,8 +28,8 @@ AnalysisModel.prototype = {
     if (params.granularity) {
       this.granularity = params.granularity;
     }
-    if (params.dimensions) {
-      this.dimensions = params.dimensions;
+    if (params.dimension) {
+      this.dimension = params.dimension;
     }
     if (params.filters) {
       this.filters = params.filters;
@@ -46,5 +46,13 @@ AnalysisModel.prototype = {
     if (params.baselineEnd) {
       this.baselineEnd = params.baselineEnd;
     }
+  },
+
+  fetchDimensionsForMetric : function(metricId) {
+    return dataService.fetchDimensionsForMetric(metricId);
+  },
+
+  fetchFiltersForMetric : function(metricId) {
+    return dataService.fetchFiltersForMetric(metricId);
   }
 }

@@ -4,7 +4,7 @@ function AnalysisView(analysisModel) {
   this.analysis_template_compiled = Handlebars.compile(analysis_template);
   this.analysisModel = analysisModel;
   this.applyDataChangeEvent = new Event(this);
-  this.viewParams = {granularity: "DAYS"};
+  this.viewParams = {granularity: "DAYS", dimension: "All", filters: {}};
 }
 
 AnalysisView.prototype = {
@@ -46,6 +46,10 @@ AnalysisView.prototype = {
         return e.text
       })[0];
       self.viewParams['metric'] = {id: metricId, alias: metricAlias};
+
+      // Now render the dimensions and filters for selected metric
+      self.renderDimensions(metricId);
+      self.renderFilters(metricId);
     });
 
     // TIME RANGE SELECTION
@@ -135,11 +139,24 @@ AnalysisView.prototype = {
     });
   },
 
-  renderDimensions: function () {
-    // TODO : Populate this on metricSelect
+  renderDimensions: function (metricId) {
+    var dimensions = self.analysisModel.fetchDimensionsForMetric(metricId);
+    console.log("Dimensions ---> ")
+    console.log(dimensions);
+    var config = {theme: "bootstrap", placeholder: "select dimension", data: dimensions};
+    if (dimensions) {
+      $("#analysis-metric-dimension-input").select2(config).on("select2:select", function (e) {
+        console.log(e);
+        var selectedElement = $(e.currentTarget);
+        var selectedData = selectedElement.select2("data");
+        console.log(selectedData);
+      });
+    }
   },
 
-  renderFilters: function () {
-    // TODO : populate this on metric select
+  renderFilters: function (metricId) {
+    var filters = self.analysisModel.fetchFiltersForMetric(metricId);
+    console.log("Filters ---> ");
+    console.log(filters);
   }
 };
