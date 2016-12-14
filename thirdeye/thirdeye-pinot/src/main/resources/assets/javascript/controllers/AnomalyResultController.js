@@ -14,10 +14,15 @@ function AnomalyResultController(parentController) {
 AnomalyResultController.prototype = {
   handleAppEvent: function (params) {
     console.log("Inside handle app event of AnomalyResultController");
+    this.anomalyResultModel.reset();
     this.anomalyResultModel.setParams(params);
     this.anomalyResultModel.rebuild();
     this.anomalyResultView.init();
     this.anomalyResultView.render();
+  },
+  handleAnomalyFeedbackChangeEvent: function(params) {
+    this.anomalyResultModel.setParams(params);
+    this.anomalyResultModel.updateAnomalyFeedback();
   },
   applyButtonEventHandler: function(sender, args) {
     console.log("Apply button Event");
@@ -38,9 +43,6 @@ AnomalyResultController.prototype = {
   },
   anomalyFeedbackSelectEventHandler: function(sender, args) {
     console.log("received anomaly feedback select event at AnomalyResultController");
-    console.log(args);
-
-    // Change the model's feedback
-    // Model updates backend?
+    this.handleAnomalyFeedbackChangeEvent(args);
   }
 };

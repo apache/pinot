@@ -2,6 +2,8 @@ package com.linkedin.thirdeye.dashboard.resources.v2;
 
 import java.util.List;
 
+import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
+
 
 
 public class AnomalyWrapper {
@@ -191,4 +193,22 @@ public class AnomalyWrapper {
     this.anomalyFeedback = anomalyFeedback;
   }
 
+
+  public static String getFeedbackStringFromFeedbackType(AnomalyFeedbackType feedbackType) {
+    String feedback = null;
+    switch (feedbackType) {
+      case ANOMALY:
+        feedback = "Confirmed Anomaly";
+        break;
+      case ANOMALY_NO_ACTION:
+        feedback = "Confirmed - Not Actionable";
+        break;
+      case NOT_ANOMALY:
+        feedback = "False Alarm";
+        break;
+      default:
+        break;
+    }
+    return feedback;
+  }
 }

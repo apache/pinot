@@ -61,14 +61,5 @@ DataService.prototype = {
       return anomalies;
     },
 
-  fetchTimeseriesCompare: function (metricId, currentStart, currentEnd, baselineStart, baselineEnd,
-      dimensions, filters) {
-
-    // TODO : set dimensions and filters
-
-    var url = "/timeseries/compare/" + metricId + "/" + currentStart + "/" + currentEnd + "/"
-        + baselineStart + "/" + baselineEnd;
-    return this.getSynchronousData(url);
-  }
 
 };

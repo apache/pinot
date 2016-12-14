@@ -55,7 +55,7 @@ AnomalyResultView.prototype = {
     this.renderAnomaliesTab(anomalies);
 
 
-    $('#anomalies-search-tabs a[href="#' + this.anomalyResultModel.anomaliesSearchTab + '"]').click();
+    $('#anomalies-search-tabs a[href="#' + this.anomalyResultModel.anomaliesSearchTab + '"]').tab('show');
 
     // SEARCH BY METRIC SELECTION
     this.setupSearchByMetricTab();
@@ -357,6 +357,7 @@ AnomalyResultView.prototype = {
     }
     $('#show-details-' + idx).click(showDetailsParams, this.dataEventHandler.bind(this));
     var anomalyFeedbackParams = {
+      idx : idx,
       anomalyId : anomaly.anomalyId
     }
     $('#anomaly-feedback-' + idx).change(anomalyFeedbackParams, this.dataEventHandler.bind(this));
