@@ -108,11 +108,16 @@ public class MCombineOperator extends BaseOperator {
               if (mergedBlock == null) {
                 mergedBlock = blockToMerge;
               } else {
-                CombineService.mergeTwoBlocks(_brokerRequest, mergedBlock, blockToMerge);
+                try {
+                  CombineService.mergeTwoBlocks(_brokerRequest, mergedBlock, blockToMerge);
+                } catch (Exception e) {
+                  LOGGER.error("Caught exception while merging two blocks (step 1).", e);
+                  mergedBlock.addToExceptionsList(QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, e));
+                }
               }
             }
           } catch (Exception e) {
-            LOGGER.error("exception in the MCombine operator ", e);
+            LOGGER.error("Caught exception while executing query.", e);
             mergedBlock = new IntermediateResultsBlock(e);
           }
           blockingQueue.offer(mergedBlock);
@@ -149,8 +154,9 @@ public class MCombineOperator extends BaseOperator {
                     LOGGER.debug("Merged response from operator {} after: {}", mergedBlocksNumber,
                         (System.currentTimeMillis() - startTime));
                   } catch (Exception e) {
-                    mergedBlock.getExceptions()
-                        .add(QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, e));
+                    LOGGER.error("Caught exception while merging two blocks (step 2).", e);
+                    mergedBlock.addToExceptionsList(
+                        QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, e));
                   }
                   mergedBlocksNumber++;
                 }

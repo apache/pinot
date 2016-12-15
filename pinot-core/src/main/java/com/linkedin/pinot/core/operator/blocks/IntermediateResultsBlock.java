@@ -175,7 +175,7 @@ public class IntermediateResultsBlock implements Block {
   }
 
   private DataTable getSelectionResultDataTable() throws Exception {
-    return attachMetadataToDataTable(SelectionOperatorUtils.getDataTableFromRowSet(_selectionResult, _dataSchema));
+    return attachMetadataToDataTable(SelectionOperatorUtils.getDataTableFromRows(_selectionResult, _dataSchema));
   }
 
   public DataTable getAggregationResultDataTable() throws Exception {
@@ -251,6 +251,13 @@ public class IntermediateResultsBlock implements Block {
 
   public void setExceptionsList(List<ProcessingException> processingExceptions) {
     _processingExceptions = processingExceptions;
+  }
+
+  public void addToExceptionsList(ProcessingException processingException) {
+    if (_processingExceptions == null) {
+      _processingExceptions = new ArrayList<>();
+    }
+    _processingExceptions.add(processingException);
   }
 
   public void setNumDocsScanned(long numDocsScanned) {

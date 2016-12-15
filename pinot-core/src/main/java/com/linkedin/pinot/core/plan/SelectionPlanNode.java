@@ -53,7 +53,8 @@ public class SelectionPlanNode implements PlanNode {
 
   @Override
   public Operator run() {
-    if (_selection.isSetSelectionSortSequence()) {
+    // Use selection order-by operator only if there are sorting columns and selection size is not 0.
+    if (_selection.isSetSelectionSortSequence() && (_selection.getSize() != 0)) {
       return new MSelectionOrderByOperator(_indexSegment, _selection, _projectionPlanNode.run());
     } else {
       return new MSelectionOnlyOperator(_indexSegment, _selection, _projectionPlanNode.run());

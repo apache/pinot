@@ -94,7 +94,7 @@ public class SelectionSingleValueQueriesTest extends BaseSingleValueQueriesTest 
     DataTableBuilder.DataSchema selectionDataSchema = resultsBlock.getSelectionDataSchema();
     Assert.assertEquals(selectionDataSchema.size(), 3);
     Assert.assertEquals(selectionDataSchema.getColumnName(0), "column1");
-    Assert.assertEquals(selectionDataSchema.getColumnName(1), "column11");
+    Assert.assertEquals(selectionDataSchema.getColumnName(2), "column11");
     Assert.assertEquals(selectionDataSchema.getColumnType(0), FieldSpec.DataType.INT);
     Assert.assertEquals(selectionDataSchema.getColumnType(1), FieldSpec.DataType.STRING);
     List<Serializable[]> selectionResult = (List<Serializable[]>) resultsBlock.getSelectionResult();
@@ -102,7 +102,7 @@ public class SelectionSingleValueQueriesTest extends BaseSingleValueQueriesTest 
     Serializable[] firstRow = selectionResult.get(0);
     Assert.assertEquals(firstRow.length, 3);
     Assert.assertEquals(((Integer) firstRow[0]).intValue(), 1578964907);
-    Assert.assertEquals((String) firstRow[1], "P");
+    Assert.assertEquals((String) firstRow[2], "P");
 
     // Test query with filter.
     selectionOnlyOperator = getOperatorForQueryWithFilter(query);
@@ -115,7 +115,7 @@ public class SelectionSingleValueQueriesTest extends BaseSingleValueQueriesTest 
     selectionDataSchema = resultsBlock.getSelectionDataSchema();
     Assert.assertEquals(selectionDataSchema.size(), 3);
     Assert.assertEquals(selectionDataSchema.getColumnName(0), "column1");
-    Assert.assertEquals(selectionDataSchema.getColumnName(1), "column11");
+    Assert.assertEquals(selectionDataSchema.getColumnName(2), "column11");
     Assert.assertEquals(selectionDataSchema.getColumnType(0), FieldSpec.DataType.INT);
     Assert.assertEquals(selectionDataSchema.getColumnType(1), FieldSpec.DataType.STRING);
     selectionResult = (List<Serializable[]>) resultsBlock.getSelectionResult();
@@ -123,7 +123,7 @@ public class SelectionSingleValueQueriesTest extends BaseSingleValueQueriesTest 
     firstRow = selectionResult.get(0);
     Assert.assertEquals(firstRow.length, 3);
     Assert.assertEquals(((Integer) firstRow[0]).intValue(), 351823652);
-    Assert.assertEquals((String) firstRow[1], "t");
+    Assert.assertEquals((String) firstRow[2], "t");
   }
 
   @Test

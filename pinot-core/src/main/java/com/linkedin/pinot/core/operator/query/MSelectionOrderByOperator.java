@@ -107,7 +107,7 @@ public class MSelectionOrderByOperator extends BaseOperator {
             numTotalRawDocs);
 
     IntermediateResultsBlock resultBlock = new IntermediateResultsBlock();
-    resultBlock.setSelectionResult(_selectionOperatorService.getRowEventsSet());
+    resultBlock.setSelectionResult(_selectionOperatorService.getRows());
     resultBlock.setSelectionDataSchema(_selectionOperatorService.getDataSchema());
     return resultBlock;
   }

@@ -32,6 +32,7 @@ import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,24 +48,21 @@ public class MSelectionOnlyOperator extends BaseOperator {
 
   private final IndexSegment _indexSegment;
   private final MProjectionOperator _projectionOperator;
-  private final Selection _selection;
   private final DataSchema _dataSchema;
   private final Block[] _blocks;
-  private final String[] _selectionColumns;
   private final int _limitDocs;
   private final Collection<Serializable[]> _rowEvents;
   private ExecutionStatistics _executionStatistics;
 
   public MSelectionOnlyOperator(IndexSegment indexSegment, Selection selection, Operator projectionOperator) {
     _indexSegment = indexSegment;
-    _selection = selection;
-    _limitDocs = _selection.getSize();
+    _limitDocs = selection.getSize();
     _projectionOperator = (MProjectionOperator) projectionOperator;
-
-    _selectionColumns = SelectionOperatorUtils.extractSelectionRelatedColumns(_selection, _indexSegment);
-    _dataSchema = SelectionOperatorUtils.extractDataSchema(_selectionColumns, indexSegment);
-    _blocks = new Block[_selectionColumns.length];
-    _rowEvents = new ArrayList<Serializable[]>();
+    List<String> selectionColumns =
+        SelectionOperatorUtils.getSelectionColumns(selection.getSelectionColumns(), indexSegment);
+    _dataSchema = SelectionOperatorUtils.extractDataSchema(null, selectionColumns, indexSegment);
+    _blocks = new Block[selectionColumns.size()];
+    _rowEvents = new ArrayList<>();
   }
 
   @Override
