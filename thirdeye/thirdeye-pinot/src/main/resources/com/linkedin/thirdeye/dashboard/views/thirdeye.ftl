@@ -53,6 +53,9 @@
 <script id="anomalies-template" type="text/x-handlebars-template">
   <#include "tabs/anomalies.ftl"/>
 </script>
+<script id="anomaly-results-template" type="text/x-handlebars-template">
+  <#include "tabs/anomaly-results.ftl"/>
+</script>
 <script id="dashboard-template" type="text/x-handlebars-template">
   <#include "tabs/dashboard.ftl"/>
 </script>

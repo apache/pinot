@@ -30,6 +30,11 @@ function AnomalyResultView(anomalyResultModel) {
   // Compile HTML template
   var anomalies_template = $("#anomalies-template").html();
   this.anomalies_template_compiled = Handlebars.compile(anomalies_template);
+  $("#anomalies-place-holder").html(this.anomalies_template_compiled);
+
+
+  var anomaly_results_template = $("#anomaly-results-template").html();
+  this.anomaly_results_template_compiled = Handlebars.compile(anomaly_results_template);
 
   // events
   //this.metricChangeEvent = new Event(this);
@@ -50,8 +55,8 @@ AnomalyResultView.prototype = {
 
     var anomalies = this.anomalyResultModel.getAnomaliesList();
 
-    var result_anomalies_template_compiled = this.anomalies_template_compiled(anomalies);
-    $("#anomalies-place-holder").html(result_anomalies_template_compiled);
+    var anomaly_results_template_compiled_with_results = this.anomaly_results_template_compiled(anomalies);
+    $("#anomaly-results-place-holder").html(anomaly_results_template_compiled_with_results);
     this.renderAnomaliesTab(anomalies);
 
 
