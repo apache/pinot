@@ -9,6 +9,8 @@ function AnomalyResultController(parentController) {
   this.anomalyResultView.rootCauseAnalysisButtonClickEvent.attach(this.rootCauseAnalysisButtonClickEventHandler.bind(this));
   this.anomalyResultView.showDetailsLinkClickEvent.attach(this.showDetailsLinkClickEventHandler.bind(this));
   this.anomalyResultView.anomalyFeedbackSelectEvent.attach(this.anomalyFeedbackSelectEventHandler.bind(this));
+
+  this.anomalyResultView.init();
 }
 
 AnomalyResultController.prototype = {
@@ -17,7 +19,7 @@ AnomalyResultController.prototype = {
     this.anomalyResultModel.reset();
     this.anomalyResultModel.setParams(params);
     this.anomalyResultModel.rebuild();
-    this.anomalyResultView.init();
+
     this.anomalyResultView.render();
   },
   handleAnomalyFeedbackChangeEvent: function(params) {

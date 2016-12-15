@@ -15,8 +15,14 @@
 								<option value="id">Anomaly ID</option>
 							</select>
 						</div>
-						<div style="overflow:hidden">
-							<select style="width: 100%" id="anomalies-search-input" class="label-large-light"></select>
+						<div id="anomalies-search-metrics-container" style="overflow:hidden; display: none;">
+							<select style="width: 100%" id="anomalies-search-metrics-input" class="label-large-light" multiple="multiple"></select>
+						</div>
+						<div id="anomalies-search-dashboard-container"  style="overflow:hidden; display: none;">
+							<select style="width: 100%;" id="anomalies-search-dashboard-input" class="label-large-light"></select>
+						</div>
+						<div id="anomalies-search-anomaly-container"  style="overflow:hidden; display: none;">
+							<select style="width: 100%;" id="anomalies-search-anomaly-input" class="label-large-light" multiple="multiple"></select>
 						</div>
 					</div>
 				</div>

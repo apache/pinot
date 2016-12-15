@@ -2,6 +2,74 @@ function AnomalyResultView(anomalyResultModel) {
 
   // model
   this.anomalyResultModel = anomalyResultModel;
+  this.metricSearchConfig = {
+      theme : "bootstrap",
+      placeholder : "Search for Metric",
+      ajax : {
+        url : '/data/autocomplete/metric',
+        minimumInputLength : 3,
+        delay : 250,
+        allowClear: true,
+        data : function(params) {
+          var query = {
+            name : params.term,
+            page : params.page
+          }
+          // Query paramters will be ?name=[term]&page=[page]
+          return query;
+        },
+        processResults : function(data) {
+          var results = [];
+          mode = $('#anomalies-search-mode').val();
+            $.each(data, function(index, item) {
+              results.push({
+                id : item.id,
+                text : item.alias
+              });
+            });
+          return {
+            results : results
+          };
+        }
+      }
+    };
+  this.dashboardSearchConfig = {
+      theme : "bootstrap",
+      placeholder : "Search for Dashboard",
+      ajax : {
+        url : '/data/autocomplete/dashboard',
+        minimumInputLength : 3,
+        delay : 250,
+        allowClear: true,
+        data : function(params) {
+          var query = {
+            name : params.term,
+            page : params.page
+          }
+          // Query paramters will be ?name=[term]&page=[page]
+          return query;
+        },
+        processResults : function(data) {
+          var results = [];
+          mode = $('#anomalies-search-mode').val();
+            $.each(data, function(index, item) {
+              results.push({
+                id : item.id,
+                text : item.name
+              });
+            });
+          return {
+            results : results
+          };
+        }
+      }
+    };
+
+  this.anomalySearchConfig = {
+      theme : "bootstrap",
+      placeholder : "Search for anomaly ID",
+      tags: true
+    };
 
   this.timeRangeConfig = {
     startDate : this.anomalyResultModel.startDate,
@@ -47,23 +115,15 @@ function AnomalyResultView(anomalyResultModel) {
 
 AnomalyResultView.prototype = {
   init : function() {
-
-  },
-
-  render : function() {
-
-    var anomalies = this.anomalyResultModel.getAnomaliesList();
-
-    var result_anomalies_template_compiled = this.anomalies_template_compiled(anomalies);
-    $("#anomalies-place-holder").html(result_anomalies_template_compiled);
-    this.renderAnomaliesTab(anomalies);
-
-    // $('#anomalies-search-tabs a[href="#' +
-//     this.anomalyResultModel.anomaliesSearchTab + '"]').tab('show');
     $('#anomalies-search-mode').select2({
       minimumResultsForSearch : -1,
       theme : "bootstrap"
+    }).on("change", function(e) {
+      console.log('On change of search mode');
+      console.log(e);
+      self.showSearchBarBasedOnMode();
     });
+
     this.setupSearchBar();
 
     // TIME RANGE SELECTION
@@ -75,6 +135,24 @@ AnomalyResultView.prototype = {
     $('#anomalies-time-range').daterangepicker(this.timeRangeConfig, cb);
     cb(this.timeRangeConfig.startDate, this.timeRangeConfig.endDate);
 
+
+    // APPLY BUTTON
+    this.setupListenerOnApplyButton();
+  },
+
+  render : function() {
+
+    var anomalies = this.anomalyResultModel.getAnomaliesList();
+
+    var anomaly_results_template_compiled_with_results = this.anomaly_results_template_compiled(anomalies);
+    $("#anomaly-results-place-holder").html(anomaly_results_template_compiled_with_results);
+    this.renderAnomaliesTab(anomalies);
+    self = this;
+
+    this.showSearchBarBasedOnMode();
+
+
+
     // this.setupListenerOnDateRangePicker();
 
     // FUNCTION DROPDOWN
@@ -84,70 +162,31 @@ AnomalyResultView.prototype = {
       anomalyFunctionSelector.append($('<option></option>').val(val).html(text));
     });
 
-    // APPLY BUTTON
-    this.setupListenerOnApplyButton();
 
   },
+  showSearchBarBasedOnMode : function() {
+    var mode = $('#anomalies-search-mode').val();
+    $('#anomalies-search-dashboard-container').hide();
+    $('#anomalies-search-anomaly-container').hide()
+    $('#anomalies-search-metrics-container').hide();
+    if (mode == 'metric') {
+      console.log('showing metric');
+      $('#anomalies-search-metrics-container').show();
+    } else if (mode == 'dashboard') {
+      console.log('showing dashboard');
+      $('#anomalies-search-dashboard-container').show();
+    } else if (mode == 'id') {
+      $('#anomalies-search-anomaly-container').show()
+    }
+  },
   setupSearchBar : function() {
-    $('#anomalies-search-input').select2({
-      theme : "bootstrap",
-      placeholder : "Search for Dashboard",
-      ajax : {
-        url : '/data/autocomplete/anomalies',
-        minimumInputLength : 3,
-        delay : 250,
-        data : function(params) {
-          mode = $('#anomalies-search-mode').val();
-          var query = {
-            name : params.term,
-            page : params.page,
-            mode : mode
-          }
-          // Query paramters will be ?name=[term]&page=[page]
-          return query;
-        },
-        processResults : function(data) {
-          var results = [];
-          mode = $('#anomalies-search-mode').val();
-          if (mode == "dashboard") {
-            $.each(data, function(index, item) {
-              results.push({
-                id : item.id,
-                text : item.name
-              });
-            });
-          }
-          if (mode == "metric") {
-            $.each(data, function(index, item) {
-              results.push({
-                id : item.id,
-                text : item.alias
-              });
-            });
-          }
-          return {
-            results : results
-          };
-        }
-      }
-    }).on("select2:select", function(e) {
-      // var selectedElement = $(e.currentTarget);
-      // var selectedData = selectedElement.select2("data")[0];
-      // console.log("Selected data:" + JSON.stringify(selectedData))
-      // var selectedDashboardName = selectedData.text;
-      // var selectedDashboardId = selectedData.id;
-      // console.log('You selected: ' + selectedDashboardName);
-      // console.log(e);
-      // var args = {
-      // dashboardName : selectedDashboardName,
-      // dashboardId : selectedDashboardId
-      // };
-      //
-      // if (self.dashboardModel.dashboardName != selectedDashboardName) {
-      // // self.onDashboardSelectionEvent.notify(args);
-      // console.log("Notify dashboard");
-      // }
+    $('#anomalies-search-metrics-input').select2(this.metricSearchConfig).on("select2:select", function(e) {
     });
+    $('#anomalies-search-dashboard-input').select2(this.dashboardSearchConfig).on("select2:select", function(e) {
+    });
+    $('#anomalies-search-anomaly-input').select2(this.anomalySearchConfig).on("select2:select", function(e) {
+    });
+
   },
   renderAnomaliesTab : function(anomalies) {
     for (var idx = 0; idx < anomalies.length; idx++) {
@@ -232,16 +271,19 @@ AnomalyResultView.prototype = {
   setupListenerOnApplyButton : function() {
     var self = this;
     $('#apply-button').click(function() {
+      console.log("Apply button click event..........");
       var mode = $('#anomalies-search-mode').val();
-      var ids = $('#anomalies-search-input').val();
-      var metricIds, dashboardIds, anomalyIds;
-      if (mode == "metric") {
-        metricIds = [ids];
-      } else if (mode == "dashboard") {
-        dashboardIds = ids;
-      } else {
-        anomalyIds = [ids];
+      var metricIds = [];
+      var dashboardId = null;
+      var anomalyIds = [];
+      if (mode == 'metric') {
+        metricIds = $('#anomalies-search-metrics-input').val();
+      } else if (mode = 'dashboard') {
+        dashboardId = $('#anomalies-search-dashboard-input').val();
+      } else if (mode = 'id') {
+        anomalyIds = $('#anomalies-search-anomaly-input').val();
       }
+
       var functionName = $('#anomaly-function-dropdown').val();
       var startDate = $('#anomalies-time-range').data('daterangepicker').startDate;
       var endDate = $('#anomalies-time-range').data('daterangepicker').endDate;
@@ -249,7 +291,7 @@ AnomalyResultView.prototype = {
       var anomaliesParams = {
         mode : mode,
         metricIds : metricIds,
-        dashboardId : dashboardIds,
+        dashboardId : dashboardId,
         anomalyIds : anomalyIds,
         startDate : startDate,
         endDate : endDate,

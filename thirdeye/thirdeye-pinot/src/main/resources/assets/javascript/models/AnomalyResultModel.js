@@ -1,7 +1,6 @@
 function AnomalyResultModel() {
 
-  this.anomaliesSearchTab = 'anomalies_search-by-metric';
-  this.anomaliesTabText = 'Metrics';
+  this.anomaliesSearchMode = "metric";
   this.metricIds = [];
   this.dashboardId = null;
   this.anomalyIds = [];
@@ -32,6 +31,10 @@ AnomalyResultModel.prototype = {
     console.log(params);
     if (params != undefined) {
       console.log("params");
+      if (params['mode'] != undefined) {
+        console.log('mode');
+        this.anomaliesSearchMode = params['mode'];
+      }
       if (params['metricIds'] != undefined) {
         console.log("metricIds");
         this.metricIds = params['metricIds'];
@@ -67,11 +70,11 @@ AnomalyResultModel.prototype = {
   // Call rebuild every time new anomalies are to be loaded with new model
   rebuild : function() {
     var anomalies = [];
-    if (this.anomaliesTabText == constants.ANOMALIES_TAB_TEXT_METRICS && this.metricIds != undefined && this.metricIds.length > 0) {
+    if (this.anomaliesSearchMode == 'metric' && this.metricIds != undefined && this.metricIds.length > 0) {
       anomalies = dataService.fetchAnomaliesForMetricIds(this.startDate, this.endDate, this.metricIds, this.functionName);
-    } else if (this.anomaliesTabText == constants.ANOMALIES_TAB_TEXT_DASHBOARD && this.dashboardId != undefined) {
+    } else if (this.anomaliesSearchMode == 'dashboard' && this.dashboardId != undefined) {
       anomalies = dataService.fetchAnomaliesForDashboardId(this.startDate, this.endDate, this.dashboardId, this.functionName);
-    } else if (this.anomaliesTabText == constants.ANOMALIES_TAB_TEXT_ID && this.anomalyIds != undefined && this.anomalyIds.length > 0) {
+    } else if (this.anomaliesSearchMode == 'id' && this.anomalyIds != undefined && this.anomalyIds.length > 0) {
       anomalies = dataService.fetchAnomaliesForAnomalyIds(this.startDate, this.endDate, this.anomalyIds, this.functionName);
     }
     this.anomalies = anomalies;
