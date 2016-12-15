@@ -327,14 +327,16 @@ AnomalyResultView.prototype = {
       var dashboardId = $('#anomalies-dashboard-input').val();
       var anomalyIds = $('#anomalies-id-input').val();
       var functionName = $('#anomaly-function-dropdown').val();
+      var startDate = $('#anomalies-time-range').data('daterangepicker').startDate;
+      var endDate = $('#anomalies-time-range').data('daterangepicker').endDate;
 
       var anomaliesParams = {
           anomaliesTabText : anomaliesTabText,
           metricIds : metricIds,
           dashboardId : dashboardId,
           anomalyIds : anomalyIds,
-          startDate : self.timeRangeConfig.startDate,
-          endDate : self.timeRangeConfig.endDate,
+          startDate : startDate,
+          endDate : endDate,
           functionName : functionName
       }
       self.applyButtonEvent.notify(anomaliesParams);
