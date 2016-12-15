@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -420,9 +421,25 @@ public class SelectionOperatorUtils {
   @Nonnull
   public static SelectionResults renderSelectionResultsWithoutOrdering(@Nonnull List<Serializable[]> rows,
       @Nonnull DataSchema dataSchema, @Nonnull List<String> selectionColumns) {
+    // TODO: remove the code for backward compatible after server updated to the latest code.
+    int numSelectionColumns = selectionColumns.size();
+    int[] columnIndices = new int[numSelectionColumns];
+    Map<String, Integer> dataSchemaIndices = new HashMap<>(numSelectionColumns);
+    for (int i = 0; i < numSelectionColumns; i++) {
+      dataSchemaIndices.put(dataSchema.getColumnName(i), i);
+    }
+    for (int i = 0; i < numSelectionColumns; i++) {
+      columnIndices[i] = dataSchemaIndices.get(selectionColumns.get(i));
+    }
+    int numRows = rows.size();
+    for (int i = 0; i < numRows; i++) {
+      rows.set(i, getFormattedRowWithoutOrdering(rows.get(i), dataSchema, columnIndices));
+    }
+
+    /* TODO: uncomment after server updated to the latest code.
     for (Serializable[] row : rows) {
       formatRowWithoutOrdering(row, dataSchema);
-    }
+    }*/
     return new SelectionResults(selectionColumns, rows);
   }
 
@@ -439,6 +456,19 @@ public class SelectionOperatorUtils {
     for (int i = 0; i < numColumns; i++) {
       row[i] = getFormattedValue(row[i], dataSchema.getColumnType(i));
     }
+  }
+
+  // TODO: remove this method after server updated to the latest code.
+  private static Serializable[] getFormattedRowWithoutOrdering(@Nonnull Serializable[] row,
+      @Nonnull DataSchema dataSchema, @Nonnull int[] columnIndices) {
+    int numColumns = columnIndices.length;
+    Serializable[] formattedRow = new Serializable[numColumns];
+    for (int i = 0; i < numColumns; i++) {
+      int columnIndex = columnIndices[i];
+      formattedRow[i] =
+          SelectionOperatorUtils.getFormattedValue(row[columnIndex], dataSchema.getColumnType(columnIndex));
+    }
+    return formattedRow;
   }
 
   /**
