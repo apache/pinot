@@ -69,8 +69,8 @@
 <script id="wow-summary-template" type="text/x-handlebars-template">
 	<#include "tabs/dashboard/wow-summary-dashboard.ftl">
 </script>
-<script id="percentage-change-table-template" type="text/x-handlebars-template">
-  <#include "tabs/analysis/percentage-change.ftl"/>
+<script id="timeseries-contributor-template" type="text/x-handlebars-template">
+  <#include "tabs/analysis/timeseries-contributor.ftl"/>
 </script>
 <script id="wow-metric-table-template" type="text/x-handlebars-template">
   <#include "tabs/analysis/wow-metric.ftl"/>

@@ -101,7 +101,7 @@ DataService.prototype = {
         dimension, filters) {
       // TODO : set dimensions and filters
       var url = "/timeseries/compare/" + metricId + "/" + currentStart + "/" + currentEnd + "/"
-          + baselineStart + "/" + baselineEnd + "?dimensions="+dimension + "&filters="+JSON.stringify(filters);
+          + baselineStart + "/" + baselineEnd + "?dimension="+dimension + "&filters="+JSON.stringify(filters);
       console.log("timeseries data fetch URL ----> ");
       console.log(url);
       return this.getDataSynchronous(url);

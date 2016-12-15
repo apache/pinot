@@ -1,6 +1,9 @@
 package com.linkedin.thirdeye.dashboard.resources.v2.pojo;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * A time series compare view for given metric
@@ -14,23 +17,42 @@ public class TimeSeriesCompareMetricView {
   List<Long> timeBucketsCurrent;
   List<Long> timeBucketsBaseline;
 
-  List<Double> currentValues;
-  List<Double> baselineValues;
+  ValuesWrapper overAllValues;
 
-  public List<Double> getBaselineValues() {
-    return baselineValues;
+  Map<String, ValuesWrapper> subDimensionContributionMap = new LinkedHashMap<>();
+
+  public TimeSeriesCompareMetricView() {
+
+  }
+  public TimeSeriesCompareMetricView(String metricName, long metricId, long start, long end) {
+    this(metricName, metricId, start, end, null, null);
   }
 
-  public void setBaselineValues(List<Double> baselineValues) {
-    this.baselineValues = baselineValues;
+  public TimeSeriesCompareMetricView(String metricName, long metricId, long start, long end,
+      List<Long> currentTimeBuckets, List<Long> baselineTimeBuckets) {
+    this.metricName = metricName;
+    this.metricId = metricId;
+    this.start = start;
+    this.end = end;
+    this.timeBucketsCurrent = currentTimeBuckets;
+    this.timeBucketsBaseline = baselineTimeBuckets;
   }
 
-  public List<Double> getCurrentValues() {
-    return currentValues;
+  public Map<String, ValuesWrapper> getSubDimensionContributionMap() {
+    return subDimensionContributionMap;
   }
 
-  public void setCurrentValues(List<Double> currentValues) {
-    this.currentValues = currentValues;
+  public void setSubDimensionContributionMap(
+      Map<String, ValuesWrapper> subDimensionContributionMap) {
+    this.subDimensionContributionMap = subDimensionContributionMap;
+  }
+
+  public ValuesWrapper getOverAllValues() {
+    return overAllValues;
+  }
+
+  public void setOverAllValues(ValuesWrapper values) {
+    this.overAllValues = values;
   }
 
   public long getEnd() {
@@ -80,4 +102,27 @@ public class TimeSeriesCompareMetricView {
   public void setTimeBucketsCurrent(List<Long> timeBucketsCurrent) {
     this.timeBucketsCurrent = timeBucketsCurrent;
   }
+
+  public static class ValuesWrapper {
+
+    List<Double> currentValues = new ArrayList<>();
+    List<Double> baselineValues = new ArrayList<>();
+
+    public List<Double> getBaselineValues() {
+      return baselineValues;
+    }
+
+    public void setBaselineValues(List<Double> baselineValues) {
+      this.baselineValues = baselineValues;
+    }
+
+    public List<Double> getCurrentValues() {
+      return currentValues;
+    }
+
+    public void setCurrentValues(List<Double> currentValues) {
+      this.currentValues = currentValues;
+    }
+  }
+
 }

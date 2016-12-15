@@ -79,29 +79,7 @@
 <div class="container-fluid">
 	<div class="row row-bordered">
 		<div class="container top-buffer bottom-buffer">
-			<div class="row bottom-buffer">
-				<div class="col-md-12">
-					<div>
-						<label>num_login_attempt</label>
-					</div>
-					<div>
-						3 anomalies detected for selected parameters <a href="">See Anomalies</a>
-					</div>
-				</div>
-			</div>
-			<!-- Chart section -->
-			<div class="row">
-				<div class="col-md-10">
-					<div class="panel">
-						<div id="analysis-chart" style="height: 400px"></div>
-					</div>
-				</div>
-				<div class="col-md-2">
-					<div id="analysis-chart-legend" style="height: 400px"></div>
-				</div>
-			</div>
-			<!-- Percentage change table -->
-			<div id="percentage-change-table-placeholder"></div>
+			<div id = "timeseries-contributor-placeholder"></div>
 		</div>
 	</div>
 </div>
