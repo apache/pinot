@@ -32,21 +32,6 @@ AnomalyResultModel.prototype = {
     console.log(params);
     if (params != undefined) {
       console.log("params");
-      if (params['anomaliesTabText'] != undefined) {
-        console.log("anomaliesTabText");
-        this.anomaliesTabText = params['anomaliesTabText'];
-        switch(this.anomaliesTabText) {
-          case constants.ANOMALIES_TAB_TEXT_DASHBOARD:
-            this.anomaliesSearchTab = 'anomalies_search-by-dashboard';
-            break;
-          case constants.ANOMALIES_TAB_TEXT_ID:
-            this.anomaliesSearchTab = 'anomalies_search-by-id';
-            break;
-          case constants.ANOMALIES_TAB_TEXT_METRICS:
-          default:
-            this.anomaliesSearchTab = 'anomalies_search-by-metric';
-        }
-      }
       if (params['metricIds'] != undefined) {
         console.log("metricIds");
         this.metricIds = params['metricIds'];

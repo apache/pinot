@@ -59,7 +59,7 @@ AnomalyResultView.prototype = {
     this.renderAnomaliesTab(anomalies);
 
     // $('#anomalies-search-tabs a[href="#' +
-    // this.anomalyResultModel.anomaliesSearchTab + '"]').tab('show');
+//     this.anomalyResultModel.anomaliesSearchTab + '"]').tab('show');
     $('#anomalies-search-mode').select2({
       minimumResultsForSearch : -1,
       theme : "bootstrap"
@@ -232,18 +232,24 @@ AnomalyResultView.prototype = {
   setupListenerOnApplyButton : function() {
     var self = this;
     $('#apply-button').click(function() {
-      var anomaliesTabText = $("ul#anomalies-search-tabs li.active").text();
-      var metricIds = $('#anomalies-metric-input').val();
-      var dashboardId = $('#anomalies-dashboard-input').val();
-      var anomalyIds = $('#anomalies-id-input').val();
+      var mode = $('#anomalies-search-mode').val();
+      var ids = $('#anomalies-search-input').val();
+      var metricIds, dashboardIds, anomalyIds;
+      if (mode == "metric") {
+        metricIds = [ids];
+      } else if (mode == "dashboard") {
+        dashboardIds = ids;
+      } else {
+        anomalyIds = [ids];
+      }
       var functionName = $('#anomaly-function-dropdown').val();
       var startDate = $('#anomalies-time-range').data('daterangepicker').startDate;
       var endDate = $('#anomalies-time-range').data('daterangepicker').endDate;
 
       var anomaliesParams = {
-        anomaliesTabText : anomaliesTabText,
+        mode : mode,
         metricIds : metricIds,
-        dashboardId : dashboardId,
+        dashboardId : dashboardIds,
         anomalyIds : anomalyIds,
         startDate : startDate,
         endDate : endDate,
