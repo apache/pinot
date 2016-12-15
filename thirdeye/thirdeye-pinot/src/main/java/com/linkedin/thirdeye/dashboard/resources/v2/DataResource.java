@@ -132,6 +132,17 @@ public class DataResource {
 
   //------------- endpoint for autocomplete ----------
   @GET
+  @Path("autocomplete/anomalies")
+  public List<? extends Object> getWhereNameLike(@QueryParam("mode") String mode, @QueryParam("name") String name){
+    if("metric".equalsIgnoreCase(mode)){
+      return getMetricsWhereNameLike(name);
+    }
+    if("dashboard".equalsIgnoreCase(mode)){
+      return getDashboardsWhereNameLike(name);
+    }
+    return Collections.emptyList();
+  }
+  @GET
   @Path("autocomplete/dashboard")
   public List<DashboardConfigDTO> getDashboardsWhereNameLike(@QueryParam("name") String name) {
     return dashboardConfigDAO.findWhereNameLike("%" + name + "%");

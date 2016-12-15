@@ -25,6 +25,7 @@ AnomalyResultModel.prototype = {
     this.dashboardId = null;
     this.anomalyIds = [];
     this.functionName = null;
+
   },
   // Call setParams every time there is a change to the model
   setParams : function(params) {
