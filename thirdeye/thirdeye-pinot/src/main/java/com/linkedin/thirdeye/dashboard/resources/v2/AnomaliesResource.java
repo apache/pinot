@@ -83,16 +83,6 @@ public class AnomaliesResource {
     dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
   }
 
-  /**
-   * Autocomplete values for search on anomaly id
-   * @param id
-   * @return
-   */
-  @GET
-  @Path("autocomplete/anomalyId")
-  public List<String> getAnomaliesWhereAnomalyIdLike(@QueryParam("id") String id) {
-    return mergedAnomalyResultDAO.findAllIdsLike(id);
-  }
 
   /** Find anomalies for metric id in time range
    *
