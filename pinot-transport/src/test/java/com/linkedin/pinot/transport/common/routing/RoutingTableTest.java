@@ -15,19 +15,24 @@
  */
 package com.linkedin.pinot.transport.common.routing;
 
-import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.routing.TableConfigRoutingTableSelector;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.I0Itec.zkclient.IZkDataListener;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.lang.mutable.MutableBoolean;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZkBaseDataAccessor;
 import org.apache.helix.model.ExternalView;
@@ -99,6 +104,47 @@ public class RoutingTableTest {
     for (int numRun = 0; numRun < 100; ++numRun) {
       assertResourceRequest(routingTable, "testResource2_OFFLINE", "[segment20, segment21, segment22]", 3);
     }
+  }
+
+  @Test
+  public void testTimeBoundaryRegression() throws Exception {
+    final FakePropertyStore propertyStore = new FakePropertyStore();
+    final OfflineSegmentZKMetadata offlineSegmentZKMetadata = new OfflineSegmentZKMetadata();
+    offlineSegmentZKMetadata.setTimeUnit(TimeUnit.DAYS);
+    offlineSegmentZKMetadata.setEndTime(1234L);
+
+    propertyStore.setContents(ZKMetadataProvider.constructPropertyStorePathForSegment("myTable_OFFLINE",
+        "someSegment_0"), offlineSegmentZKMetadata.toZNRecord());
+
+    final ExternalView offlineExternalView = new ExternalView("myTable_OFFLINE");
+    offlineExternalView.setState("someSegment_0", "Server_1.2.3.4_1234", "ONLINE");
+
+    final MutableBoolean timeBoundaryUpdated = new MutableBoolean(false);
+
+    HelixExternalViewBasedRouting routingTable = new HelixExternalViewBasedRouting(propertyStore, NO_LLC_ROUTING, null) {
+      @Override
+      protected ExternalView fetchExternalView(String table) {
+        return offlineExternalView;
+      }
+
+      @Override
+      protected void updateTimeBoundary(String tableName, ExternalView externalView) {
+        if (tableName.equals("myTable_OFFLINE")) {
+          timeBoundaryUpdated.setValue(true);
+        }
+      }
+    };
+    routingTable.setBrokerMetrics(new BrokerMetrics(new MetricsRegistry()));
+
+    Assert.assertFalse(timeBoundaryUpdated.booleanValue());
+
+    final ArrayList<InstanceConfig> instanceConfigList = new ArrayList<>();
+    instanceConfigList.add(new InstanceConfig("Server_1.2.3.4_1234"));
+
+    routingTable.markDataResourceOnline("myTable_OFFLINE", offlineExternalView, instanceConfigList);
+    routingTable.markDataResourceOnline("myTable_REALTIME", new ExternalView("myTable_REALTIME"), null);
+
+    Assert.assertTrue(timeBoundaryUpdated.booleanValue());
   }
 
   private void assertResourceRequest(HelixExternalViewBasedRouting routingTable, String resource,
@@ -411,7 +457,7 @@ public class RoutingTableTest {
   }
 
   class FakePropertyStore extends ZkHelixPropertyStore<ZNRecord> {
-    private ZNRecord _contents = null;
+    private Map<String, ZNRecord> _contents = new HashMap<>();
     private IZkDataListener _listener = null;
 
     public FakePropertyStore() {
@@ -420,7 +466,7 @@ public class RoutingTableTest {
 
     @Override
     public ZNRecord get(String path, Stat stat, int options) {
-      return _contents;
+      return _contents.get(path);
     }
 
     @Override
@@ -429,7 +475,7 @@ public class RoutingTableTest {
     }
 
     public void setContents(String path, ZNRecord contents) throws Exception {
-      _contents = contents;
+      _contents.put(path, contents);
       if (_listener != null) {
         _listener.handleDataChange(path, contents);
       }
@@ -463,7 +509,7 @@ public class RoutingTableTest {
 
     AbstractTableConfig tableConfig = AbstractTableConfig.init(propertyStoreEntry);
 
-    fakePropertyStore.setContents("/PROPERTYSTORE/TABLES/fakeTable_REALTIME", AbstractTableConfig.toZnRecord(tableConfig));
+    fakePropertyStore.setContents("/CONFIGS/TABLE/fakeTable_REALTIME", AbstractTableConfig.toZnRecord(tableConfig));
 
     tableConfigRoutingTableSelector.registerTable("fakeTable_REALTIME");
 
@@ -477,7 +523,7 @@ public class RoutingTableTest {
     Assert.assertTrue(4500 <= llcCount && llcCount <= 5500, "Expected approximately 50% probability of picking LLC, got " + llcCount / 100.0 + " %");
 
     tableConfig.getCustomConfigs().setCustomConfigs(Collections.singletonMap("routing.llc.percentage", "0"));
-    fakePropertyStore.setContents("/PROPERTYSTORE/TABLES/fakeTable_REALTIME", AbstractTableConfig.toZnRecord(tableConfig));
+    fakePropertyStore.setContents("/CONFIGS/TABLE/fakeTable_REALTIME", AbstractTableConfig.toZnRecord(tableConfig));
 
     llcCount = 0;
     for (int i = 0; i < 10000; ++i) {
@@ -489,7 +535,7 @@ public class RoutingTableTest {
     Assert.assertEquals(llcCount, 0, "Expected 0% probability of picking LLC, got " + llcCount / 100.0 + " %");
 
     tableConfig.getCustomConfigs().setCustomConfigs(Collections.singletonMap("routing.llc.percentage", "100"));
-    fakePropertyStore.setContents("/PROPERTYSTORE/TABLES/fakeTable_REALTIME", AbstractTableConfig.toZnRecord(tableConfig));
+    fakePropertyStore.setContents("/CONFIGS/TABLE/fakeTable_REALTIME", AbstractTableConfig.toZnRecord(tableConfig));
 
     llcCount = 0;
     for (int i = 0; i < 10000; ++i) {

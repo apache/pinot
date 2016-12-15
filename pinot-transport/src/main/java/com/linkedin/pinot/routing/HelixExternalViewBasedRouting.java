@@ -18,6 +18,7 @@ package com.linkedin.pinot.routing;
 
 import com.google.common.collect.Sets;
 import com.linkedin.pinot.common.utils.EqualityUtils;
+import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -384,6 +385,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
       // 2) We're adding a new realtime table and there's already an offline table, in which case we need to update the
       //    time boundary for the existing offline table
       String tableForTimeBoundaryUpdate = null;
+      ExternalView externalViewForTimeBoundaryUpdate = null;
 
       if (tableType == CommonConstants.Helix.TableType.OFFLINE) {
         // Does a realtime table exist?
@@ -391,6 +393,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
             TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(TableNameBuilder.extractRawTableName(tableName));
         if (_brokerRoutingTable.containsKey(realtimeTableName)) {
           tableForTimeBoundaryUpdate = tableName;
+          externalViewForTimeBoundaryUpdate = externalView;
         }
       }
 
@@ -401,18 +404,14 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
         if (_brokerRoutingTable.containsKey(offlineTableName)) {
           // Is there no time boundary?
           if (_timeBoundaryService.getTimeBoundaryInfoFor(offlineTableName) == null) {
-            tableForTimeBoundaryUpdate = tableName;
+            tableForTimeBoundaryUpdate = offlineTableName;
+            externalViewForTimeBoundaryUpdate = fetchExternalView(offlineTableName);
           }
         }
       }
 
       if (tableForTimeBoundaryUpdate != null) {
-        LOGGER.info("Trying to compute time boundary service for table {}", tableForTimeBoundaryUpdate);
-        long timeBoundaryUpdateStart = System.currentTimeMillis();
-        _timeBoundaryService.updateTimeBoundaryService(externalView);
-        long timeBoundaryUpdateEnd = System.currentTimeMillis();
-        LOGGER.info("Computed the time boundary for table {} in {} ms", tableForTimeBoundaryUpdate,
-            (timeBoundaryUpdateEnd - timeBoundaryUpdateStart));
+        updateTimeBoundary(tableForTimeBoundaryUpdate, externalViewForTimeBoundaryUpdate);
       } else {
         LOGGER.info("No need to update time boundary for table {}", tableName);
       }
@@ -427,6 +426,20 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     }
 
     LOGGER.info("Routing table update for table {} completed in {} ms", tableName, updateTime);
+  }
+
+  protected void updateTimeBoundary(String tableName, ExternalView externalView) {
+    LOGGER.info("Trying to compute time boundary service for table {}", tableName);
+    long timeBoundaryUpdateStart = System.currentTimeMillis();
+    _timeBoundaryService.updateTimeBoundaryService(externalView);
+    long timeBoundaryUpdateEnd = System.currentTimeMillis();
+    LOGGER.info("Computed the time boundary for table {} in {} ms", tableName,
+        (timeBoundaryUpdateEnd - timeBoundaryUpdateStart));
+  }
+
+  protected ExternalView fetchExternalView(String table) {
+    return HelixHelper.getExternalViewForResource(_helixManager.getClusterManagmentTool(),
+        _helixManager.getClusterName(), table);
   }
 
   private void updateInstanceConfigsMapFromRoutingTables(Map<String, InstanceConfig> relevantInstanceConfigs,
