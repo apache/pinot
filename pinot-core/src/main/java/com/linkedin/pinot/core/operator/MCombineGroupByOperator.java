@@ -202,7 +202,7 @@ public class MCombineGroupByOperator extends BaseOperator {
       });
     }
 
-    boolean opCompleted = operatorLatch.await(_timeOutMs, TimeUnit.SECONDS);
+    boolean opCompleted = operatorLatch.await(_timeOutMs, TimeUnit.MILLISECONDS);
     if (!opCompleted) {
       // If this happens, the broker side should already timed out, just log the error in server side.
       LOGGER.error("Timed out while combining group-by results, after {}ms.", _timeOutMs);
