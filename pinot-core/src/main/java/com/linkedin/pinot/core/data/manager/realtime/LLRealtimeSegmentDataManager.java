@@ -342,6 +342,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
       if (kafkaMessageCount != 0) {
         segmentLogger.debug("Indexed {} messages ({} messages read from Kafka) current offset {}", indexedMessageCount,
             kafkaMessageCount, _currentOffset);
+        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_KAFKA_OFFSET_CONSUMED, _currentOffset);
       } else {
         // If there were no messages to be fetched from Kafka, wait for a little bit as to avoid hammering the
         // Kafka broker
@@ -466,6 +467,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
         segmentLogger.error("Exception while in work", e);
         postStopConsumedMsg(e.getClass().getName());
         _state = State.ERROR;
+        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_KAFKA_OFFSET_CONSUMED, 0L);
         return;
       }
 
