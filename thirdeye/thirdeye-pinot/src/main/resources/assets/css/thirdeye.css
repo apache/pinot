@@ -317,9 +317,6 @@ text {
 	font-size: 11px;
 }
 
-rect {
-	fill: none;
-}
 
 .autocomplete-suggestions {
 	border: 1px solid #E3E3E3;
@@ -361,4 +358,8 @@ rect {
 .daterangepicker, .daterangepicker th, .daterangepicker td {
 	font-size: 12px;
 	font-weight: 100;
+}
+
+.c3-region.anomaly-region {
+  fill: #EF7E37
 }

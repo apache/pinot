@@ -95,6 +95,8 @@ function AnomalyResultView(anomalyResultModel) {
     cancelClass : 'btn-default'
   };
 
+  this.spinner = new Spinner();
+
   // Compile HTML template
   var anomalies_template = $("#anomalies-template").html();
   this.anomalies_template_compiled = Handlebars.compile(anomalies_template);
@@ -161,6 +163,8 @@ AnomalyResultView.prototype = {
     $.each(functions, function(val, text) {
       anomalyFunctionSelector.append($('<option></option>').val(val).html(text));
     });
+
+    this.spinner.stop();
 
 
   },
@@ -245,6 +249,7 @@ AnomalyResultView.prototype = {
           axis : 'x',
           start : anomaly.anomalyRegionStart,
           end : anomaly.anomalyRegionEnd,
+          class: 'anomaly-region',
           tick : {
             format : '%m %d %Y'
           }
@@ -271,7 +276,6 @@ AnomalyResultView.prototype = {
   setupListenerOnApplyButton : function() {
     var self = this;
     $('#apply-button').click(function() {
-      console.log("Apply button click event..........");
       var mode = $('#anomalies-search-mode').val();
       var metricIds = [];
       var dashboardId = null;
@@ -297,6 +301,31 @@ AnomalyResultView.prototype = {
         endDate : endDate,
         functionName : functionName
       }
+      var target = document.getElementById('anomaly-results-place-holder');
+      var opts = {
+          lines: 13 // The number of lines to draw
+        , length: 28 // The length of each line
+        , width: 14 // The line thickness
+        , radius: 42 // The radius of the inner circle
+        , scale: 1 // Scales overall size of the spinner
+        , corners: 1 // Corner roundness (0..1)
+        , color: '#000' // #rgb or #rrggbb or array of colors
+        , opacity: 0.25 // Opacity of the lines
+        , rotate: 0 // The rotation offset
+        , direction: 1 // 1: clockwise, -1: counterclockwise
+        , speed: 1 // Rounds per second
+        , trail: 60 // Afterglow percentage
+        , fps: 20 // Frames per second when using setTimeout() as a fallback for CSS
+        , zIndex: 2e9 // The z-index (defaults to 2000000000)
+        , className: 'spinner' // The CSS class to assign to the spinner
+        , top: '50%' // Top position relative to parent
+        , left: '50%' // Left position relative to parent
+        , shadow: false // Whether to render a shadow
+        , hwaccel: false // Whether to use hardware acceleration
+        , position: 'absolute' // Element positioning
+        }
+//      target.appendChild(self.spinner.spin().el);
+      self.spinner = new Spinner(opts).spin(target);
       self.applyButtonEvent.notify(anomaliesParams);
     })
   },
@@ -323,4 +352,6 @@ AnomalyResultView.prototype = {
     $('#anomaly-feedback-' + idx).change(anomalyFeedbackParams, this.dataEventHandler.bind(this));
   }
 
+
 };
+

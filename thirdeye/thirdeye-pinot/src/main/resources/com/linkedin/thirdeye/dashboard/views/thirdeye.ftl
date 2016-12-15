@@ -29,6 +29,7 @@
 <script src="../../assets/jtable/jquery.jtable.min.js" type="text/javascript"></script>
 <script src="../../assets/js/d3/d3.v3.min.js" charset="utf-8" defer></script>
 <script src="../../assets/js/c3/c3.js" defer></script>
+<script src="../../assets/spin/spin.js" defer></script>
 <script type="text/javascript" src="//cdn.jsdelivr.net/bootstrap.daterangepicker/2/daterangepicker.js"></script>
 <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.3/js/select2.min.js" defer></script>
 
