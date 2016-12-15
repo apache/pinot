@@ -334,8 +334,8 @@ public class SelectionOperatorService {
     int numSelectionColumns = _selectionColumns.size();
     int[] columnIndices = new int[numSelectionColumns];
 
-    Map<String, Integer> dataSchemaIndices = new HashMap<>();
     int numColumnsInDataSchema = _dataSchema.size();
+    Map<String, Integer> dataSchemaIndices = new HashMap<>(numColumnsInDataSchema);
     for (int i = 0; i < numColumnsInDataSchema; i++) {
       dataSchemaIndices.put(_dataSchema.getColumnName(i), i);
     }
