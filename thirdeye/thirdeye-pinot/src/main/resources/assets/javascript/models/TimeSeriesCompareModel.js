@@ -63,6 +63,7 @@ TimeSeriesCompareModel.prototype = {
       if (timeSeriesResponse) {
         var dateColumn = ['date'];
         for (var i in timeSeriesResponse.timeBucketsCurrent) {
+          // TODO: if granularity is hours or minutes then format accordingly
           dateColumn.push(moment(timeSeriesResponse.timeBucketsCurrent[i]).format('YYYY-M-D'));
         }
 

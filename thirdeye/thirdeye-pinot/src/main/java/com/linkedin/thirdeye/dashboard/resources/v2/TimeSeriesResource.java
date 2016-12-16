@@ -251,12 +251,17 @@ public class TimeSeriesResource {
 
         double [] currentValues = new double[numTimeBuckets];
         double [] baselineValues = new double[numTimeBuckets];
+        double [] percentageChangeValues = new double[numTimeBuckets];
+
         int currentValIndex =
             response.getData().get(metricConfigDTO.getName()).getSchema().getColumnsToIndexMapping()
                 .get("currentValue");
         int baselineValIndex =
             response.getData().get(metricConfigDTO.getName()).getSchema().getColumnsToIndexMapping()
                 .get("baselineValue");
+        int percentageChangeIndex =
+            response.getData().get(metricConfigDTO.getName()).getSchema().getColumnsToIndexMapping()
+                .get("ratio");
 
         for (int i = 0; i < numTimeBuckets; i++) {
           TimeBucket tb = response.getTimeBuckets().get(i);
@@ -268,6 +273,9 @@ public class TimeSeriesResource {
           baselineValues[i] = Double.valueOf(
               response.getData().get(metricConfigDTO.getName()).getResponseData()
                   .get(i)[baselineValIndex]);
+          percentageChangeValues[i] = Double.valueOf(
+              response.getData().get(metricConfigDTO.getName()).getResponseData()
+                  .get(i)[percentageChangeIndex]);
         }
 
         timeSeriesCompareView.setTimeBucketsCurrent(timeBucketsCurrent);
@@ -276,6 +284,8 @@ public class TimeSeriesResource {
 
         values.setCurrentValues(currentValues);
         values.setBaselineValues(baselineValues);
+        values.setPercentageChange(percentageChangeValues);
+
         timeSeriesCompareView.setSubDimensionContributionMap(new LinkedHashMap<>());
         timeSeriesCompareView.getSubDimensionContributionMap().put(ALL, values);
       }

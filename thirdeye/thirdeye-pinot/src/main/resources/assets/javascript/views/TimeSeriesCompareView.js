@@ -5,6 +5,10 @@ function TimeSeriesCompareView(timeSeriesCompareModel) {
   this.timeseries_contributor_template_compiled = Handlebars.compile(timeseries_contributor_template);
   this.timeseries_contributor_placeHolderId = "#timeseries-contributor-placeholder";
 
+  var timeseries_subdimension_legend_template = $("#timeseries-subdimension-legend-template").html();
+  this.timeseries_subdimension_legend_template_compiled = Handlebars.compile(timeseries_subdimension_legend_template);
+  this.timeseries_subdimension_legend_placeHolderId = "#analysis-chart-legend";
+
   var wow_metric_table_template = $("#wow-metric-table-template").html();
   this.wow_metric_table_template_compiled = Handlebars.compile(wow_metric_table_template);
   this.wow_metric_table_placeHolderId = "#wow-metric-table-placeholder";
@@ -46,6 +50,8 @@ TimeSeriesCompareView.prototype = {
          })
     }
 
+    this.loadSubDimensions(this.timeSeriesCompareModel.subDimensions);
+
     this.setupListeners();
   },
 
@@ -79,6 +85,12 @@ TimeSeriesCompareView.prototype = {
 
   },
 
+  loadSubDimensions : function() {
+    var timeseriesSubDimensionsHtml = this.timeseries_subdimension_legend_template_compiled(this.timeSeriesCompareModel);
+    $(this.timeseries_subdimension_legend_placeHolderId).html(timeseriesSubDimensionsHtml);
+    console.log(timeseriesSubDimensionsHtml);
+  },
+
   dataEventHandler: function(e) {
     if (Object.is(e.target.type, "checkbox")) {
       this.checkboxClickEvent.notify(e.target);
@@ -88,6 +100,10 @@ TimeSeriesCompareView.prototype = {
   setupListeners : function() {
     $('#show-details').change(this.dataEventHandler.bind(this));
     $('#show-cumulative').change(this.dataEventHandler.bind(this));
+  },
+
+  setupListenerForSubDimension : function () {
+
   }
 }
 

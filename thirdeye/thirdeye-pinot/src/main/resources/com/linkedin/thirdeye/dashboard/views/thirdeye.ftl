@@ -70,7 +70,10 @@
 	<#include "tabs/dashboard/wow-summary-dashboard.ftl">
 </script>
 <script id="timeseries-contributor-template" type="text/x-handlebars-template">
-  <#include "tabs/analysis/timeseries-contributor.ftl"/>
+	<#include "tabs/analysis/timeseries-contributor.ftl"/>
+</script>
+<script id="timeseries-subdimension-legend-template" type="text/x-handlebars-template">
+  <#include "tabs/analysis/timeseries-subdimension-legend.ftl"/>
 </script>
 <script id="wow-metric-table-template" type="text/x-handlebars-template">
   <#include "tabs/analysis/wow-metric.ftl"/>

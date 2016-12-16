@@ -16,7 +16,8 @@
     </div>
   </div>
   <div class="col-md-2">
-    <div id="analysis-chart-legend" style="height: 400px"></div>
+    <div id="analysis-chart-legend" style="height: 400px">
+    </div>
   </div>
 </div>
 

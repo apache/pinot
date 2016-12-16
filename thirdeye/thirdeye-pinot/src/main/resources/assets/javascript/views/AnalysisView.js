@@ -154,10 +154,13 @@ AnalysisView.prototype = {
     for (var key in filters) {
       // TODO: introduce category
       var values = filters[key];
+      var children = [];
       for (var i in values) {
-        filterData.push(key + ":" + values[i]);
+        children.push({id:key +":"+ values[i], text:values[i]});
       }
+      filterData.push({text:key, children:children});
     }
+    console.log(filterData)
     if (filters) {
       var config = {
         theme: "bootstrap",
@@ -172,10 +175,11 @@ AnalysisView.prototype = {
 
   collectViewParams : function () {
     var self = this;
-
     // Collect filters
     var selectedFilters = $("#analysis-metric-filter-input").val();
     var filterMap = {};
+    console.log("SELECTED filters -----> ")
+    console.log(selectedFilters);
     for (var i in selectedFilters) {
       var filterStr = selectedFilters[i];
       var keyVal = filterStr.split(":");
@@ -197,5 +201,4 @@ AnalysisView.prototype = {
       self.applyDataChangeEvent.notify(self.viewParams);
     });
   }
-
 };
