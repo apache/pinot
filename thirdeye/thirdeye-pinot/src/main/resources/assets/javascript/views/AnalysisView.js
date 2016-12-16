@@ -178,8 +178,6 @@ AnalysisView.prototype = {
     // Collect filters
     var selectedFilters = $("#analysis-metric-filter-input").val();
     var filterMap = {};
-    console.log("SELECTED filters -----> ")
-    console.log(selectedFilters);
     for (var i in selectedFilters) {
       var filterStr = selectedFilters[i];
       var keyVal = filterStr.split(":");
@@ -191,7 +189,6 @@ AnalysisView.prototype = {
       }
     }
     self.viewParams['filters'] = filterMap;
-    console.log( self.viewParams);
   },
 
   setupListeners: function () {

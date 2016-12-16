@@ -80,30 +80,38 @@ TimeSeriesCompareView.prototype = {
       regions : [ {
         start : timeSeriesObject.start,
         end : timeSeriesObject.end
-      } ]
+      }]
     });
 
   },
 
-  loadSubDimensions : function() {
-    var timeseriesSubDimensionsHtml = this.timeseries_subdimension_legend_template_compiled(this.timeSeriesCompareModel);
+  loadSubDimensions: function () {
+    var timeseriesSubDimensionsHtml = this.timeseries_subdimension_legend_template_compiled(
+        this.timeSeriesCompareModel);
     $(this.timeseries_subdimension_legend_placeHolderId).html(timeseriesSubDimensionsHtml);
-    console.log(timeseriesSubDimensionsHtml);
+    this.setupListenerForSubDimension();
   },
 
-  dataEventHandler: function(e) {
+  dataEventHandler: function (e) {
     if (Object.is(e.target.type, "checkbox")) {
       this.checkboxClickEvent.notify(e.target);
     }
   },
 
-  setupListeners : function() {
+  setupListeners: function () {
     $('#show-details').change(this.dataEventHandler.bind(this));
     $('#show-cumulative').change(this.dataEventHandler.bind(this));
   },
 
-  setupListenerForSubDimension : function () {
-
+  setupListenerForSubDimension: function () {
+    var self = this;
+    for (var i in this.timeSeriesCompareModel.subDimensions) {
+      $("#a-sub-dimension-" + i + " a").click(self, function (e) {
+        var index = e.currentTarget.getAttribute('id');
+        var subDimension = self.timeSeriesCompareModel.subDimensions[index];
+        self.loadChart(self.timeSeriesCompareModel.subDimensionContributionMap[subDimension]);
+      });
+    }
   }
 }
 
