@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.dashboard.resources.v2.pojo;
 
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,8 +15,6 @@ public class TimeSeriesCompareMetricView {
 
   List<Long> timeBucketsCurrent;
   List<Long> timeBucketsBaseline;
-
-  ValuesWrapper overAllValues;
 
   Map<String, ValuesWrapper> subDimensionContributionMap = new LinkedHashMap<>();
 
@@ -45,14 +42,6 @@ public class TimeSeriesCompareMetricView {
   public void setSubDimensionContributionMap(
       Map<String, ValuesWrapper> subDimensionContributionMap) {
     this.subDimensionContributionMap = subDimensionContributionMap;
-  }
-
-  public ValuesWrapper getOverAllValues() {
-    return overAllValues;
-  }
-
-  public void setOverAllValues(ValuesWrapper values) {
-    this.overAllValues = values;
   }
 
   public long getEnd() {
@@ -105,24 +94,23 @@ public class TimeSeriesCompareMetricView {
 
   public static class ValuesWrapper {
 
-    List<Double> currentValues = new ArrayList<>();
-    List<Double> baselineValues = new ArrayList<>();
+    double [] currentValues;
+    double [] baselineValues;
 
-    public List<Double> getBaselineValues() {
+    public double[] getBaselineValues() {
       return baselineValues;
     }
 
-    public void setBaselineValues(List<Double> baselineValues) {
+    public void setBaselineValues(double[] baselineValues) {
       this.baselineValues = baselineValues;
     }
 
-    public List<Double> getCurrentValues() {
+    public double[] getCurrentValues() {
       return currentValues;
     }
 
-    public void setCurrentValues(List<Double> currentValues) {
+    public void setCurrentValues(double[] currentValues) {
       this.currentValues = currentValues;
     }
   }
-
 }

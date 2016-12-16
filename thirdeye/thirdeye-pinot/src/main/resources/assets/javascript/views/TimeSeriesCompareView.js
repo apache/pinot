@@ -32,13 +32,18 @@ TimeSeriesCompareView.prototype = {
         this.model);
     $(this.wow_metric_dimension_table_placeHolderId).html(wowMetricDimensionTableResult);
 
+    this.loadChart(this.timeSeriesCompareModel.subDimensionContributionMap['All']);
 
+    this.setupListeners();
+  },
+
+  loadChart : function (timeSeriesObject) {
     // CHART GENERATION
     var chart = c3.generate({
       bindto : '#analysis-chart',
       data : {
         x : 'date',
-        columns : this.timeSeriesCompareModel.timeSeriesObject.columns,
+        columns : timeSeriesObject.columns,
         type : 'spline'
       },
       legend : {
@@ -55,13 +60,11 @@ TimeSeriesCompareView.prototype = {
         }
       },
       regions : [ {
-        start : this.timeSeriesCompareModel.timeSeriesObject.start,
-        end : this.timeSeriesCompareModel.timeSeriesObject.end
+        start : timeSeriesObject.start,
+        end : timeSeriesObject.end
       } ]
     });
 
-
-    this.setupListeners();
   },
 
   dataEventHandler: function(e) {

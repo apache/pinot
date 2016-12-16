@@ -21,7 +21,7 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -44,7 +44,6 @@ public class TimeSeriesResource {
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final Logger LOG = LoggerFactory.getLogger(TimeSeriesResource.class);
-
   private static final String ALL = "All";
 
   private LoadingCache<String, Long> datasetMaxDataTimeCache = CACHE_REGISTRY_INSTANCE
@@ -69,12 +68,17 @@ public class TimeSeriesResource {
       MetricConfigDTO metricConfigDTO = metricConfigDAO.findById(metricId);
       String dataset = metricConfigDTO.getDataset();
       long maxDataTime = datasetMaxDataTimeCache.get(dataset);
+
       if (currentEnd > maxDataTime) {
         long delta = currentEnd - maxDataTime;
         currentEnd = currentEnd - delta;
         baselineEnd = baselineStart + (currentEnd - currentStart);
       }
 
+      long analysisDuration = currentEnd - currentStart;
+      if (baselineEnd - baselineStart != analysisDuration) {
+        baselineEnd = baselineStart + analysisDuration;
+      }
       if (baselineEnd > currentEnd) {
         LOG.warn("Baseline time ranges are out of order, resetting as per current time ranges.");
         baselineEnd = currentEnd - TimeUnit.DAYS.toMillis(7);
@@ -99,8 +103,9 @@ public class TimeSeriesResource {
     }
   }
 
-  private TimeSeriesCompareMetricView getContributorDataForDimension(long metricId, long currentStart, long currentEnd,
-      long baselineStart, long baselineEnd, String dimension,  String filters, String granularity) {
+  private TimeSeriesCompareMetricView getContributorDataForDimension(long metricId,
+      long currentStart, long currentEnd, long baselineStart, long baselineEnd, String dimension,
+      String filters, String granularity) {
 
     MetricConfigDTO metricConfigDTO = metricConfigDAO.findById(metricId);
     TimeSeriesCompareMetricView timeSeriesCompareMetricView =
@@ -108,9 +113,8 @@ public class TimeSeriesResource {
             currentEnd);
 
     try {
-
-        String dataset = metricConfigDTO.getDataset();
-        ContributorViewRequest request = new ContributorViewRequest();
+      String dataset = metricConfigDTO.getDataset();
+      ContributorViewRequest request = new ContributorViewRequest();
       request.setCollection(dataset);
 
       MetricExpression metricExpression =
@@ -134,28 +138,62 @@ public class TimeSeriesResource {
       ContributorViewHandler handler = new ContributorViewHandler(queryCache);
       ContributorViewResponse response = handler.process(request);
 
-      // TODO: handle response
-      response.getDimensions();
-
-      // Assign the timebuckets
+      // Assign the time buckets
       List<Long> timeBucketsCurrent = new ArrayList<>();
       List<Long> timeBucketsBaseline = new ArrayList<>();
 
-      TimeSeriesCompareMetricView.ValuesWrapper vw = new TimeSeriesCompareMetricView.ValuesWrapper();
-      Map<String, TimeSeriesCompareMetricView.ValuesWrapper> subDimensionValuesMap = new HashMap<>();
+      timeSeriesCompareMetricView.setTimeBucketsCurrent(timeBucketsCurrent);
+      timeSeriesCompareMetricView.setTimeBucketsBaseline(timeBucketsBaseline);
 
-      timeSeriesCompareMetricView.setOverAllValues(vw);
+      TimeSeriesCompareMetricView.ValuesWrapper vw =
+          new TimeSeriesCompareMetricView.ValuesWrapper();
+      Map<String, TimeSeriesCompareMetricView.ValuesWrapper> subDimensionValuesMap =
+          new LinkedHashMap<>();
+
+      subDimensionValuesMap.put(ALL, vw);
+
       timeSeriesCompareMetricView.setSubDimensionContributionMap(subDimensionValuesMap);
 
-      int count = 0;
-      for (TimeBucket tb : response.getTimeBuckets()) {
+      // lets fill the indices
+      int subDimensionIndex =
+          response.getResponseData().getSchema().getColumnsToIndexMapping().get("dimensionValue");
+      int currentValueIndex =
+          response.getResponseData().getSchema().getColumnsToIndexMapping().get("currentValue");
+      int baselineValueIndex =
+          response.getResponseData().getSchema().getColumnsToIndexMapping().get("baselineValue");
+
+      int timeBuckets = response.getTimeBuckets().size();
+      vw.setCurrentValues(new double[timeBuckets]);
+      vw.setBaselineValues(new double[timeBuckets]);
+
+      for (int i = 0; i < timeBuckets; i++) {
+        TimeBucket tb = response.getTimeBuckets().get(i);
         timeBucketsCurrent.add(tb.getCurrentStart());
         timeBucketsBaseline.add(tb.getBaselineStart());
+      }
 
-//        currentOverAllValues.add(Double.valueOf(response.getResponseData());
-//        baselineOverAllValues.add(Double.valueOf(response.getResponseData());
+      for (int i = 0; i < response.getResponseData().getResponseData().size(); i++) {
+        String[] data = response.getResponseData().getResponseData().get(i);
+        String subDimension = data[subDimensionIndex];
+        Double currentVal = Double.valueOf(data[currentValueIndex]);
+        Double baselineVal = Double.valueOf(data[baselineValueIndex]);
+        int index = i % timeBuckets;
 
-        count++;
+        // set overAll values
+        vw.getCurrentValues()[index] += currentVal;
+        vw.getBaselineValues()[index] += baselineVal;
+
+        // set individual sub-dimension values
+        if (!subDimensionValuesMap.containsKey(subDimension)) {
+          TimeSeriesCompareMetricView.ValuesWrapper subDimVals =
+              new TimeSeriesCompareMetricView.ValuesWrapper();
+          subDimVals.setCurrentValues(new double[timeBuckets]);
+          subDimVals.setBaselineValues(new double[timeBuckets]);
+          subDimensionValuesMap.put(subDimension, subDimVals);
+        }
+
+        subDimensionValuesMap.get(subDimension).getCurrentValues()[index] += currentVal;
+        subDimensionValuesMap.get(subDimension).getBaselineValues()[index] += baselineVal;
       }
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
@@ -211,33 +249,38 @@ public class TimeSeriesResource {
 
         List<Long> timeBucketsCurrent = new ArrayList<>();
         List<Long> timeBucketsBaseline = new ArrayList<>();
-        List<Double> currentValues = new ArrayList<>();
-        List<Double> baselineValues = new ArrayList<>();
+
+        int numTimeBuckets = response.getTimeBuckets().size();
+
+        double [] currentValues = new double[numTimeBuckets];
+        double [] baselineValues = new double[numTimeBuckets];
         int currentValIndex =
             response.getData().get(metricConfigDTO.getName()).getSchema().getColumnsToIndexMapping()
                 .get("currentValue");
         int baselineValIndex =
             response.getData().get(metricConfigDTO.getName()).getSchema().getColumnsToIndexMapping()
                 .get("baselineValue");
-        int count = 0;
-        for (TimeBucket tb : response.getTimeBuckets()) {
+
+        for (int i = 0; i < numTimeBuckets; i++) {
+          TimeBucket tb = response.getTimeBuckets().get(i);
           timeBucketsCurrent.add(tb.getCurrentStart());
           timeBucketsBaseline.add(tb.getBaselineStart());
-          currentValues.add(Double.valueOf(
+          currentValues[i] = Double.valueOf(
               response.getData().get(metricConfigDTO.getName()).getResponseData()
-                  .get(count)[currentValIndex]));
-          baselineValues.add(Double.valueOf(
+                  .get(i)[currentValIndex]);
+          baselineValues[i] = Double.valueOf(
               response.getData().get(metricConfigDTO.getName()).getResponseData()
-                  .get(count)[baselineValIndex]));
-          count++;
+                  .get(i)[baselineValIndex]);
         }
 
         timeSeriesCompareView.setTimeBucketsCurrent(timeBucketsCurrent);
         timeSeriesCompareView.setTimeBucketsBaseline(timeBucketsBaseline);
         TimeSeriesCompareMetricView.ValuesWrapper values = new TimeSeriesCompareMetricView.ValuesWrapper();
+
         values.setCurrentValues(currentValues);
         values.setBaselineValues(baselineValues);
-        timeSeriesCompareView.setOverAllValues(values);
+        timeSeriesCompareView.setSubDimensionContributionMap(new LinkedHashMap<>());
+        timeSeriesCompareView.getSubDimensionContributionMap().put(ALL, values);
       }
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
@@ -245,5 +288,4 @@ public class TimeSeriesResource {
     }
     return timeSeriesCompareView;
   }
-
 }
