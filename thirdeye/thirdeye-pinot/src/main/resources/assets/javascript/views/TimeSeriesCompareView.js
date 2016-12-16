@@ -32,7 +32,19 @@ TimeSeriesCompareView.prototype = {
         this.model);
     $(this.wow_metric_dimension_table_placeHolderId).html(wowMetricDimensionTableResult);
 
-    this.loadChart(this.timeSeriesCompareModel.subDimensionContributionMap['All']);
+    if (this.timeSeriesCompareModel.subDimensionContributionMap) {
+      this.loadChart(this.timeSeriesCompareModel.subDimensionContributionMap['All']);
+    }
+    // TODO: remove this
+    else {
+      this.loadChart({
+            'start': '2016-01-3',
+            'end': '2016-01-5',
+            'columns': [['date', '2016-01-01', '2016-01-2', '2016-01-3', '2016-01-4', '2016-01-05',
+             '2016-01-06', '2016-01-07'], ['current', 30, 200, 100, 400, 150, 250, 60],
+             ['baseline', 35, 225, 200, 600, 170, 220, 70]]
+         })
+    }
 
     this.setupListeners();
   },
