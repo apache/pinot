@@ -173,13 +173,13 @@ AnomalyResultView.prototype = {
     $('#anomalies-search-dashboard-container').hide();
     $('#anomalies-search-anomaly-container').hide()
     $('#anomalies-search-metrics-container').hide();
-    if (mode == 'metric') {
+    if (mode == constants.MODE_METRIC) {
       console.log('showing metric');
       $('#anomalies-search-metrics-container').show();
-    } else if (mode == 'dashboard') {
+    } else if (mode == constants.MODE_DASHBOARD) {
       console.log('showing dashboard');
       $('#anomalies-search-dashboard-container').show();
-    } else if (mode == 'id') {
+    } else if (mode == constants.MODE_ID) {
       $('#anomalies-search-anomaly-container').show()
     }
   },
@@ -277,15 +277,18 @@ AnomalyResultView.prototype = {
     var self = this;
     $('#apply-button').click(function() {
       var mode = $('#anomalies-search-mode').val();
-      var metricIds = [];
-      var dashboardId = null;
-      var anomalyIds = [];
-      if (mode == 'metric') {
+      var metricIds = undefined;
+      var dashboardId = undefined;
+      var anomalyIds = undefined;
+      console.log('mode');
+      console.log(mode);
+      if (mode == constants.MODE_METRIC) {
         metricIds = $('#anomalies-search-metrics-input').val();
-      } else if (mode = 'dashboard') {
+      } else if (mode == constants.MODE_DASHBOARD) {
         dashboardId = $('#anomalies-search-dashboard-input').val();
-      } else if (mode = 'id') {
+      } else if (mode == constants.MODE_ID) {
         anomalyIds = $('#anomalies-search-anomaly-input').val();
+        console.log(anomalyIds);
       }
 
       var functionName = $('#anomaly-function-dropdown').val();

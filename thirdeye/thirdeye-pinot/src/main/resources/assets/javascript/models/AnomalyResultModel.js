@@ -71,16 +71,15 @@ AnomalyResultModel.prototype = {
   },
   // Call rebuild every time new anomalies are to be loaded with new model
   rebuild : function() {
-    var anomalies = [];
-    if (this.anomaliesSearchMode == 'metric' && this.metricIds != undefined && this.metricIds.length > 0) {
-      anomalies = dataService.fetchAnomaliesForMetricIds(
+    if (this.anomaliesSearchMode == constants.MODE_METRIC && this.metricIds != undefined && this.metricIds.length > 0) {
+      dataService.fetchAnomaliesForMetricIds(
           this.startDate, this.endDate, this.metricIds, this.functionName, this.updateModelAndNotifyView.bind(this));
-    } else if (this.anomaliesSearchMode == 'dashboard' && this.dashboardId != undefined) {
-      anomalies = dataService.fetchAnomaliesForDashboardId(
-          this.startDate, this.endDate, this.dashboardId, this.functionName, this.updateModelAndNotifyView);
-    } else if (this.anomaliesSearchMode == 'id' && this.anomalyIds != undefined && this.anomalyIds.length > 0) {
-      anomalies = dataService.fetchAnomaliesForAnomalyIds(
-          this.startDate, this.endDate, this.anomalyIds, this.functionName, this.updateModelAndNotifyView);
+    } else if (this.anomaliesSearchMode == constants.MODE_DASHBOARD && this.dashboardId != undefined) {
+      dataService.fetchAnomaliesForDashboardId(
+          this.startDate, this.endDate, this.dashboardId, this.functionName, this.updateModelAndNotifyView.bind(this));
+    } else if (this.anomaliesSearchMode == constants.MODE_ID && this.anomalyIds != undefined && this.anomalyIds.length > 0) {
+      dataService.fetchAnomaliesForAnomalyIds(
+          this.startDate, this.endDate, this.anomalyIds, this.functionName, this.updateModelAndNotifyView.bind(this));
     }
   },
   updateModelAndNotifyView : function(anomalies) {

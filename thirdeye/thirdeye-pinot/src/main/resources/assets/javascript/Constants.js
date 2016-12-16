@@ -17,9 +17,9 @@ function Constants() {
   this.TIMESERIES_DATE_FORMAT = 'YYYY-MM-DD HH:mm';
   this.DETAILS_DATE_FORMAT = 'MMM DD YYYY HH:mm';
 
-  this.ANOMALIES_TAB_TEXT_METRICS = 'Metrics';
-  this.ANOMALIES_TAB_TEXT_DASHBOARD = 'Dashboard';
-  this.ANOMALIES_TAB_TEXT_ID = 'ID';
+  this.MODE_METRIC = 'metric';
+  this.MODE_DASHBOARD = 'dashboard';
+  this.MODE_ID = 'id';
 
   this.FEEDBACK_STRING_CONFIRMED_ANOMALY = 'Confirmed Anomaly';
   this.FEEDBACK_STRING_FALSE_ALARM = 'False Alarm';
