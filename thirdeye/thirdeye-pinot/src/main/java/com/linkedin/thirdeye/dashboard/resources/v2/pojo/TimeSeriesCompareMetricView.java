@@ -16,7 +16,7 @@ public class TimeSeriesCompareMetricView {
   List<Long> timeBucketsCurrent;
   List<Long> timeBucketsBaseline;
 
-  Map<String, ValuesWrapper> subDimensionContributionMap = new LinkedHashMap<>();
+  Map<String, ValuesContainer> subDimensionContributionMap = new LinkedHashMap<>();
 
   public TimeSeriesCompareMetricView() {
 
@@ -35,12 +35,12 @@ public class TimeSeriesCompareMetricView {
     this.timeBucketsBaseline = baselineTimeBuckets;
   }
 
-  public Map<String, ValuesWrapper> getSubDimensionContributionMap() {
+  public Map<String, ValuesContainer> getSubDimensionContributionMap() {
     return subDimensionContributionMap;
   }
 
   public void setSubDimensionContributionMap(
-      Map<String, ValuesWrapper> subDimensionContributionMap) {
+      Map<String, ValuesContainer> subDimensionContributionMap) {
     this.subDimensionContributionMap = subDimensionContributionMap;
   }
 
@@ -90,27 +90,5 @@ public class TimeSeriesCompareMetricView {
 
   public void setTimeBucketsCurrent(List<Long> timeBucketsCurrent) {
     this.timeBucketsCurrent = timeBucketsCurrent;
-  }
-
-  public static class ValuesWrapper {
-
-    double [] currentValues;
-    double [] baselineValues;
-
-    public double[] getBaselineValues() {
-      return baselineValues;
-    }
-
-    public void setBaselineValues(double[] baselineValues) {
-      this.baselineValues = baselineValues;
-    }
-
-    public double[] getCurrentValues() {
-      return currentValues;
-    }
-
-    public void setCurrentValues(double[] currentValues) {
-      this.currentValues = currentValues;
-    }
   }
 }

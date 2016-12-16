@@ -8,6 +8,7 @@ import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.TimeSeriesCompareMetricView;
+import com.linkedin.thirdeye.dashboard.resources.v2.pojo.ValuesContainer;
 import com.linkedin.thirdeye.dashboard.views.TimeBucket;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewHandler;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewRequest;
@@ -60,7 +61,6 @@ public class TimeSeriesResource {
       @QueryParam("filters") String filters, @QueryParam("granularity") String granularity) {
 
     try {
-
       if (Strings.isNullOrEmpty(dimension)) {
         dimension = ALL;
       }
@@ -145,10 +145,8 @@ public class TimeSeriesResource {
       timeSeriesCompareMetricView.setTimeBucketsCurrent(timeBucketsCurrent);
       timeSeriesCompareMetricView.setTimeBucketsBaseline(timeBucketsBaseline);
 
-      TimeSeriesCompareMetricView.ValuesWrapper vw =
-          new TimeSeriesCompareMetricView.ValuesWrapper();
-      Map<String, TimeSeriesCompareMetricView.ValuesWrapper> subDimensionValuesMap =
-          new LinkedHashMap<>();
+      ValuesContainer vw = new ValuesContainer();
+      Map<String, ValuesContainer> subDimensionValuesMap = new LinkedHashMap<>();
 
       subDimensionValuesMap.put(ALL, vw);
 
@@ -185,8 +183,7 @@ public class TimeSeriesResource {
 
         // set individual sub-dimension values
         if (!subDimensionValuesMap.containsKey(subDimension)) {
-          TimeSeriesCompareMetricView.ValuesWrapper subDimVals =
-              new TimeSeriesCompareMetricView.ValuesWrapper();
+          ValuesContainer subDimVals = new ValuesContainer();
           subDimVals.setCurrentValues(new double[timeBuckets]);
           subDimVals.setBaselineValues(new double[timeBuckets]);
           subDimensionValuesMap.put(subDimension, subDimVals);
@@ -275,7 +272,7 @@ public class TimeSeriesResource {
 
         timeSeriesCompareView.setTimeBucketsCurrent(timeBucketsCurrent);
         timeSeriesCompareView.setTimeBucketsBaseline(timeBucketsBaseline);
-        TimeSeriesCompareMetricView.ValuesWrapper values = new TimeSeriesCompareMetricView.ValuesWrapper();
+        ValuesContainer values = new ValuesContainer();
 
         values.setCurrentValues(currentValues);
         values.setBaselineValues(baselineValues);

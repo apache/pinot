@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
+import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalyWrapper;
 import java.io.IOException;
 import java.net.URLDecoder;
 import java.util.ArrayList;

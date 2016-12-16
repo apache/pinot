@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.dashboard.resources.v2;
+package com.linkedin.thirdeye.dashboard.resources.v2.pojo;
 
 import java.util.List;
 
