@@ -58,6 +58,11 @@ public class BaseSingleColumnSingleValueReaderWriter<T extends ReaderContext>
   }
 
   @Override
+  public String getString(int row, ReaderContext context) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public byte[] getBytes(int row) {
     throw new UnsupportedOperationException();
   }
@@ -67,6 +72,7 @@ public class BaseSingleColumnSingleValueReaderWriter<T extends ReaderContext>
     throw new UnsupportedOperationException("not supported");
   }
 
+  @Override
   public T createContext() {
     throw new UnsupportedOperationException();
   }

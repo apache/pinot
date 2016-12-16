@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.segment.index.column;
 
 import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
+import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
 import com.linkedin.pinot.core.io.reader.DataFileReader;
 import com.linkedin.pinot.core.io.reader.ReaderContext;
 import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
@@ -23,6 +24,7 @@ import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
 import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
 import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader;
 import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
+import com.linkedin.pinot.core.io.reader.impl.v1.VarByteSingleValueReader;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.readers.BitmapInvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.DoubleDictionary;
@@ -52,8 +54,12 @@ public abstract class ColumnIndexContainer {
         loadInverted = indexLoadingConfigMetadata.getLoadingInvertedIndexColumns().contains(metadata.getColumnName());
       }
     }
-    PinotDataBuffer dictionaryBuffer = segmentReader.getIndexFor(column, ColumnIndexType.DICTIONARY);
-    ImmutableDictionaryReader dictionary = load(metadata, dictionaryBuffer);
+
+    ImmutableDictionaryReader dictionary = null;
+    if (metadata.hasDictionary()) {
+      PinotDataBuffer dictionaryBuffer = segmentReader.getIndexFor(column, ColumnIndexType.DICTIONARY);
+      dictionary = load(metadata, dictionaryBuffer);
+    }
 
     if (metadata.isSorted() && metadata.isSingleValue()) {
       return loadSorted(column, segmentReader, metadata, dictionary);
@@ -94,9 +100,14 @@ public abstract class ColumnIndexContainer {
       throws IOException {
 
     PinotDataBuffer fwdIndexBuffer = segmentReader.getIndexFor(column, ColumnIndexType.FORWARD_INDEX);
-    SingleColumnSingleValueReader fwdIndexReader =
-        new FixedBitSingleValueReader(fwdIndexBuffer, metadata.getTotalDocs(),
-            metadata.getBitsPerElement(), metadata.hasNulls());
+    SingleColumnSingleValueReader fwdIndexReader;
+    if (dictionary != null) {
+      fwdIndexReader =
+          new FixedBitSingleValueReader(fwdIndexBuffer, metadata.getTotalDocs(), metadata.getBitsPerElement(), metadata.hasNulls());
+    } else {
+      // TODO: Replace hard-coded compressor with getting information from meta-data.
+      fwdIndexReader = new VarByteSingleValueReader(fwdIndexBuffer, ChunkCompressorFactory.getDecompressor("snappy"));
+    }
 
     BitmapInvertedIndexReader invertedIndex = null;
 

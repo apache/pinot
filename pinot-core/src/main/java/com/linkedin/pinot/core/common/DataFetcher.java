@@ -275,8 +275,13 @@ public class DataFetcher {
    */
   public void fetchStringValues(String column, int[] inDocIds, int inStartPos, int length, String[] outValues, int outStartPos) {
     Dictionary dictionary = getDictionaryForColumn(column);
-    fetchSingleDictIds(column, inDocIds, inStartPos, length, _reusableDictIds, 0);
-    dictionary.readStringValues(_reusableDictIds, 0, length, outValues, outStartPos);
+    if (dictionary != null) {
+      fetchSingleDictIds(column, inDocIds, inStartPos, length, _reusableDictIds, 0);
+      dictionary.readStringValues(_reusableDictIds, 0, length, outValues, outStartPos);
+    } else {
+      BlockValSet blockValSet = _columnToBlockValSetMap.get(column);
+      blockValSet.getStringValues(inDocIds, 0, length, outValues, 0);
+    }
   }
 
   /**

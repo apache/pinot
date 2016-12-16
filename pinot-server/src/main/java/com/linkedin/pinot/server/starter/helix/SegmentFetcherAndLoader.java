@@ -256,7 +256,7 @@ public class SegmentFetcherAndLoader {
       SegmentFetcherFactory.getSegmentFetcherBasedOnURI(uri).fetchSegmentToLocal(uri, tempFile);
       LOGGER.info("Downloaded file from {} to {}; Length of downloaded file: {}; segmentName: {}; table: {}", uri, tempFile,
           tempFile.length(), segmentId, tableName);
-      LOGGER.info("Trying to uncompress segment tar file from {} to {} for table {}", tempFile, tempSegmentFile, tableName);
+      LOGGER.info("Trying to decompress segment tar file from {} to {} for table {}", tempFile, tempSegmentFile, tableName);
 
       TarGzCompressionUtils.unTar(tempFile, tempSegmentFile);
       FileUtils.deleteQuietly(tempFile);

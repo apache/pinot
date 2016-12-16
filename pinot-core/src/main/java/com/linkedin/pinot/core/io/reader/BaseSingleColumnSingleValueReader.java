@@ -18,7 +18,8 @@ package com.linkedin.pinot.core.io.reader;
 import java.io.IOException;
 
 public abstract class BaseSingleColumnSingleValueReader<T extends ReaderContext>
-    implements SingleColumnSingleValueReader {
+    implements SingleColumnSingleValueReader<T> {
+  @Override
   public T createContext() {
     throw new UnsupportedOperationException();
   }
@@ -56,6 +57,11 @@ public abstract class BaseSingleColumnSingleValueReader<T extends ReaderContext>
   }
 
   public String getString(int row) {
+    throw new UnsupportedOperationException();
+  }
+
+  public String getString(int row, T context)
+      throws IOException {
     throw new UnsupportedOperationException();
   }
 
