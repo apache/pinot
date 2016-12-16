@@ -24,14 +24,21 @@ DataService.prototype = {
       return results;
     },
     // Make asynchronous get call
-    getDataAsynchronous: function(url)  {
+    getDataAsynchronous: function(url, data, callback)  {
       console.log("request url:", url)
-
-      return $.ajax({
+      $.ajax({
         url: url,
+        data: data,
         type: 'get',
         dataType: 'json',
-
+        success: function(data) {
+          results = data;
+        },
+        error: function(e) {
+          console.log(e);
+        }
+      }).done(function(data) {
+        callback(data);
       });
     },
 
@@ -50,34 +57,31 @@ DataService.prototype = {
       });
     },
     // Fetch anomalies for metric ids in array in time range
-    fetchAnomaliesForMetricIds : function(startTime, endTime, metricIds, functionName) {
+    fetchAnomaliesForMetricIds : function(startTime, endTime, metricIds, functionName, callback) {
       var url = constants.SEARCH_ANOMALIES_METRICIDS + startTime + this.URL_SEPARATOR + endTime;
       var data = {
           metricIds : metricIds.join(),
           functionName : functionName
       };
-      var anomalies = this.getDataSynchronous(url, data);
-      return anomalies;
+      this.getDataAsynchronous(url, data, callback);
     },
     // Fetch anomalies for dashboard id in time range
-    fetchAnomaliesForDashboardId : function(startTime, endTime, dashboardId, functionName) {
+    fetchAnomaliesForDashboardId : function(startTime, endTime, dashboardId, functionName, callback) {
       var url = constants.SEARCH_ANOMALIES_DASHBOARDID + startTime + this.URL_SEPARATOR + endTime;
       var data = {
           dashboardId : dashboardId,
           functionName : functionName
       };
-      var anomalies = this.getDataSynchronous(url, data);
-      return anomalies;
+      this.getDataAsynchronous(url, data, callback);
     },
     // Fetch anomalies for anomaly ids in array in time range
-    fetchAnomaliesForAnomalyIds : function(startTime, endTime, anomalyIds, functionName) {
+    fetchAnomaliesForAnomalyIds : function(startTime, endTime, anomalyIds, functionName, callback) {
       var url = constants.SEARCH_ANOMALIES_ANOMALYIDS + startTime + this.URL_SEPARATOR + endTime;
       var data = {
           anomalyIds : anomalyIds.join(),
           functionName : functionName
       };
-      var anomalies = this.getDataSynchronous(url, data);
-      return anomalies;
+      this.getDataAsynchronous(url, data, callback);
     },
     // Update anomaly feedback for anomaly id
     updateFeedback : function(anomalyId, feedbackType) {

@@ -67,6 +67,7 @@
 			<div class="col-md-2" id="apply-button">
 				<input type="button" class="btn btn-info" value="Apply" />
 			</div>
+			<div id="spin-area"></div>
 		</div>
 	</div>
 </div>

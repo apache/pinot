@@ -19,8 +19,6 @@ AnomalyResultController.prototype = {
     this.anomalyResultModel.reset();
     this.anomalyResultModel.setParams(params);
     this.anomalyResultModel.rebuild();
-
-    this.anomalyResultView.render();
   },
   handleAnomalyFeedbackChangeEvent: function(params) {
     this.anomalyResultModel.setParams(params);

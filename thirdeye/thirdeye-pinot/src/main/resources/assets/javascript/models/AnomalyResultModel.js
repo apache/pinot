@@ -16,6 +16,8 @@ function AnomalyResultModel() {
 
   this.anomalyForFeedbackUpdate = null;
 
+  this.readyToRenderViewEvent = new Event();
+
 }
 
 AnomalyResultModel.prototype = {
@@ -71,14 +73,19 @@ AnomalyResultModel.prototype = {
   rebuild : function() {
     var anomalies = [];
     if (this.anomaliesSearchMode == 'metric' && this.metricIds != undefined && this.metricIds.length > 0) {
-      anomalies = dataService.fetchAnomaliesForMetricIds(this.startDate, this.endDate, this.metricIds, this.functionName);
+      anomalies = dataService.fetchAnomaliesForMetricIds(
+          this.startDate, this.endDate, this.metricIds, this.functionName, this.updateModelAndNotifyView.bind(this));
     } else if (this.anomaliesSearchMode == 'dashboard' && this.dashboardId != undefined) {
-      anomalies = dataService.fetchAnomaliesForDashboardId(this.startDate, this.endDate, this.dashboardId, this.functionName);
+      anomalies = dataService.fetchAnomaliesForDashboardId(
+          this.startDate, this.endDate, this.dashboardId, this.functionName, this.updateModelAndNotifyView);
     } else if (this.anomaliesSearchMode == 'id' && this.anomalyIds != undefined && this.anomalyIds.length > 0) {
-      anomalies = dataService.fetchAnomaliesForAnomalyIds(this.startDate, this.endDate, this.anomalyIds, this.functionName);
+      anomalies = dataService.fetchAnomaliesForAnomalyIds(
+          this.startDate, this.endDate, this.anomalyIds, this.functionName, this.updateModelAndNotifyView);
     }
+  },
+  updateModelAndNotifyView : function(anomalies) {
     this.anomalies = anomalies;
-
+    this.readyToRenderViewEvent.notify();
   },
   // Instead of calling rebuild for a simple anomaly feedback change, made a smaller function
   updateAnomalyFeedback : function() {

@@ -106,17 +106,18 @@ function AnomalyResultView(anomalyResultModel) {
   this.anomaly_results_template_compiled = Handlebars.compile(anomaly_results_template);
 
   // events
-  // this.metricChangeEvent = new Event(this);
-  // this.hideDataRangePickerEvent = new Event(this);
   this.applyButtonEvent = new Event(this);
   this.rootCauseAnalysisButtonClickEvent = new Event(this);
   this.showDetailsLinkClickEvent = new Event(this);
   this.anomalyFeedbackSelectEvent = new Event(this);
 
+  this.anomalyResultModel.readyToRenderViewEvent.attach(this.readyToRenderViewEventHandler.bind(this));
+
 }
 
 AnomalyResultView.prototype = {
   init : function() {
+    var self = this;
     $('#anomalies-search-mode').select2({
       minimumResultsForSearch : -1,
       theme : "bootstrap"
@@ -127,6 +128,7 @@ AnomalyResultView.prototype = {
     });
 
     this.setupSearchBar();
+    this.showSearchBarBasedOnMode();
 
     // TIME RANGE SELECTION
     this.timeRangeConfig.startDate = this.anomalyResultModel.startDate;
@@ -141,6 +143,9 @@ AnomalyResultView.prototype = {
     // APPLY BUTTON
     this.setupListenerOnApplyButton();
   },
+  readyToRenderViewEventHandler : function() {
+    this.render();
+  },
 
   render : function() {
 
@@ -153,10 +158,6 @@ AnomalyResultView.prototype = {
 
     this.showSearchBarBasedOnMode();
 
-
-
-    // this.setupListenerOnDateRangePicker();
-
     // FUNCTION DROPDOWN
     var functions = this.anomalyResultModel.getAnomalyFunctions();
     var anomalyFunctionSelector = $('#anomaly-function-dropdown');
@@ -165,7 +166,6 @@ AnomalyResultView.prototype = {
     });
 
     this.spinner.stop();
-
 
   },
   showSearchBarBasedOnMode : function() {
@@ -301,32 +301,12 @@ AnomalyResultView.prototype = {
         endDate : endDate,
         functionName : functionName
       }
-      var target = document.getElementById('anomaly-results-place-holder');
-      var opts = {
-          lines: 13 // The number of lines to draw
-        , length: 28 // The length of each line
-        , width: 14 // The line thickness
-        , radius: 42 // The radius of the inner circle
-        , scale: 1 // Scales overall size of the spinner
-        , corners: 1 // Corner roundness (0..1)
-        , color: '#000' // #rgb or #rrggbb or array of colors
-        , opacity: 0.25 // Opacity of the lines
-        , rotate: 0 // The rotation offset
-        , direction: 1 // 1: clockwise, -1: counterclockwise
-        , speed: 1 // Rounds per second
-        , trail: 60 // Afterglow percentage
-        , fps: 20 // Frames per second when using setTimeout() as a fallback for CSS
-        , zIndex: 2e9 // The z-index (defaults to 2000000000)
-        , className: 'spinner' // The CSS class to assign to the spinner
-        , top: '50%' // Top position relative to parent
-        , left: '50%' // Left position relative to parent
-        , shadow: false // Whether to render a shadow
-        , hwaccel: false // Whether to use hardware acceleration
-        , position: 'absolute' // Element positioning
-        }
-//      target.appendChild(self.spinner.spin().el);
-      self.spinner = new Spinner(opts).spin(target);
+
+      var target = document.getElementById('spin-area');
+      self.spinner.spin(target);
+
       self.applyButtonEvent.notify(anomaliesParams);
+
     })
   },
   setupListenersOnAnomaly : function(idx, anomaly) {
