@@ -27,7 +27,9 @@ AnalysisView.prototype = {
           var results = [];
           $.each(data, function (index, item) {
             results.push({
-              id: item.id, text: item.alias
+              id: item.id,
+              text: item.alias,
+              name: item.name
             });
           });
           return {
@@ -36,16 +38,12 @@ AnalysisView.prototype = {
         }
       }
     }).on("select2:select", function (e) {
-      console.log(e);
       var selectedElement = $(e.currentTarget);
       var selectedData = selectedElement.select2("data");
-      var metricId = selectedData.map(function (e) {
-        return e.id
-      })[0];
-      var metricAlias = selectedData.map(function (e) {
-        return e.text
-      })[0];
-      self.viewParams['metric'] = {id: metricId, alias: metricAlias};
+      var metricId = selectedData.map(function (e) {return e.id})[0];
+      var metricAlias = selectedData.map(function (e) {return e.text})[0];
+      var metricName = selectedData.map(function (e) {return e.name})[0];
+      self.viewParams['metric'] = {id: metricId, alias: metricAlias, name:metricName};
 
       // Now render the dimensions and filters for selected metric
       self.renderDimensions(metricId);
@@ -112,7 +110,6 @@ AnalysisView.prototype = {
     }, baseline_range_cb);
 
     function current_range_cb(start, end) {
-      console.log(self.viewParams);
       self.viewParams['currentStart'] = start;
       self.viewParams['currentEnd'] = end;
       $('#current-range span').addClass("time-range").html(
@@ -139,7 +136,6 @@ AnalysisView.prototype = {
     };
     if (dimensions) {
       $("#analysis-metric-dimension-input").select2(config).on("select2:select", function (e) {
-        console.log(e);
         var selectedElement = $(e.currentTarget);
         var selectedData = selectedElement.select2("data");
         self.viewParams['dimension'] = selectedData[0].id;
@@ -160,7 +156,6 @@ AnalysisView.prototype = {
       }
       filterData.push({text:key, children:children});
     }
-    console.log(filterData)
     if (filters) {
       var config = {
         theme: "bootstrap",

@@ -1,5 +1,6 @@
 function TimeSeriesCompareModel() {
   this.metricId;
+  this.metricName;
 
   this.dimension;
   this.filters;
@@ -23,7 +24,9 @@ TimeSeriesCompareModel.prototype = {
   init: function (params) {
     if (params) {
       if (params.metric) {
+        // metric is collection of id / name / alias
         this.metricId = params.metric.id;
+        this.metricName = params.metric.name;
       }
       if (params.currentStart) {
         this.currentStart = params.currentStart;

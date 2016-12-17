@@ -116,10 +116,6 @@
 <script src="../../../assets/javascript/views/TimeSeriesCompareView.js"></script>
 <script src="../../../assets/javascript/controllers/TimeSeriesCompareController.js"></script>
 
-<script src="../../../assets/javascript/models/PercentageChangeTableModel.js"></script>
-<script src="../../../assets/javascript/views/PercentageChangeTableView.js"></script>
-<script src="../../../assets/javascript/controllers/PercentageChangeTableController.js"></script>
-
 <script src="../../../assets/javascript/models/DimensionTreeMapModel.js"></script>
 <script src="../../../assets/javascript/views/DimensionTreeMapView.js"></script>
 <script src="../../../assets/javascript/controllers/DimensionTreeMapController.js"></script>

@@ -3,7 +3,6 @@ function AnalysisController(parentController) {
   this.analysisModel = new AnalysisModel();
   this.analysisView = new AnalysisView(this.analysisModel);
   this.timeSeriesCompareController = new TimeSeriesCompareController(this);
-  // this.percentageChangeTableController = new PercentageChangeTableController(this);
   this.dimensionTreeMapController = new DimensionTreeMapController(this);
 
   // Event handlers
@@ -17,7 +16,6 @@ AnalysisController.prototype = {
     this.analysisView.init();
     this.analysisView.render();
     this.timeSeriesCompareController.handleAppEvent(hashParams);
-    // this.percentageChangeTableController.handleAppEvent(hashParams);
     this.dimensionTreeMapController.handleAppEvent(hashParams);
   },
 

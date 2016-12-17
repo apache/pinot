@@ -1,10 +1,11 @@
+{{#if this.subDimensionContributionMap}}
 <div class="row bottom-buffer">
   <div class="col-md-12">
     <div>
-      <label>num_login_attempt</label>
+      <label>{{this.metricName}}</label>
     </div>
     <div>
-      3 anomalies detected for selected parameters <a href="">See Anomalies</a>
+       3 anomalies detected for selected parameters <a href="">See Anomalies</a>
     </div>
   </div>
 </div>
@@ -47,3 +48,4 @@
 <div class="row">
   <div id="wow-metric-dimension-table-placeholder"></div>
 </div>
+{{/if}}
