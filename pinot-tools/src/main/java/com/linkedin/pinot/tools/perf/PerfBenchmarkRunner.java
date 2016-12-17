@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -165,5 +166,19 @@ public class PerfBenchmarkRunner extends AbstractBaseCommand implements Command 
       }
       driver.addSegment(segmentMetadata);
     }
+  }
+
+  /**
+   * Main method for the class.
+   *
+   * @param args Arguments for the converter
+   * @throws Exception
+   */
+  public static void main(String[] args)
+      throws Exception {
+    PerfBenchmarkRunner perfBenchmarkRunner = new PerfBenchmarkRunner();
+    CmdLineParser parser = new CmdLineParser(perfBenchmarkRunner);
+    parser.parseArgument(args);
+    perfBenchmarkRunner.execute();
   }
 }

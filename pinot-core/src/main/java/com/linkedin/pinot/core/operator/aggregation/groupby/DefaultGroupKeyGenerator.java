@@ -55,8 +55,6 @@ import java.util.NoSuchElementException;
  * All the logic is maintained internally, and to the outside world, the group keys are always int type.
  */
 public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
-  private static final int INVALID_ID = -1;
-
   public enum StorageType {
     ARRAY_BASED,
     LONG_MAP_BASED,
@@ -68,7 +66,6 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
   private final int[] _cardinalities;
   private long _cardinalityProduct = 1L;
   private final boolean[] _isSingleValueGroupByColumn;
-  private boolean _hasMultiValueGroupByColumn = false;
   private final StorageType _storageType;
 
   private final Dictionary[] _dictionaries;
@@ -149,9 +146,6 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
       // Store single/multi value group-by columns, allocate reusable resources based on that.
       boolean isSingleValueGroupByColumn = blockMetadata.isSingleValue();
       _isSingleValueGroupByColumn[i] = isSingleValueGroupByColumn;
-      if (!isSingleValueGroupByColumn) {
-        _hasMultiValueGroupByColumn = true;
-      }
 
       if (!isSingleValueGroupByColumn) {
         maxNumMultiValues = Math.max(maxNumMultiValues, blockMetadata.getMaxNumberOfMultiValues());
@@ -196,14 +190,6 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
     } else {
       return (int) _cardinalityProduct;
     }
-  }
-
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  public boolean hasMultiValueGroupByColumn() {
-    return _hasMultiValueGroupByColumn;
   }
 
   /**

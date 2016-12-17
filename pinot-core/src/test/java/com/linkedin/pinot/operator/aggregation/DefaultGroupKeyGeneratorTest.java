@@ -152,7 +152,6 @@ public class DefaultGroupKeyGeneratorTest {
     DefaultGroupKeyGenerator defaultGroupKeyGenerator = new DefaultGroupKeyGenerator(_projectionBlock, groupByColumns);
     Assert.assertEquals(defaultGroupKeyGenerator.getGlobalGroupKeyUpperBound(), UNIQUE_ROWS, _errorMessage);
     Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), UNIQUE_ROWS, _errorMessage);
-    Assert.assertEquals(defaultGroupKeyGenerator.hasMultiValueGroupByColumn(), false, _errorMessage);
 
     // Test group key generation.
     defaultGroupKeyGenerator.generateKeysForBlock(_projectionBlock, _singleValueGroupKeyBuffer);
@@ -171,7 +170,6 @@ public class DefaultGroupKeyGeneratorTest {
     DefaultGroupKeyGenerator defaultGroupKeyGenerator = new DefaultGroupKeyGenerator(_projectionBlock, groupByColumns);
     Assert.assertEquals(defaultGroupKeyGenerator.getGlobalGroupKeyUpperBound(), expected, _errorMessage);
     Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
-    Assert.assertEquals(defaultGroupKeyGenerator.hasMultiValueGroupByColumn(), false, _errorMessage);
 
     // Test group key generation.
     defaultGroupKeyGenerator.generateKeysForBlock(_projectionBlock, _singleValueGroupKeyBuffer);
@@ -189,7 +187,6 @@ public class DefaultGroupKeyGeneratorTest {
     DefaultGroupKeyGenerator defaultGroupKeyGenerator = new DefaultGroupKeyGenerator(_projectionBlock, groupByColumns);
     Assert.assertEquals(defaultGroupKeyGenerator.getGlobalGroupKeyUpperBound(), Integer.MAX_VALUE, _errorMessage);
     Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
-    Assert.assertEquals(defaultGroupKeyGenerator.hasMultiValueGroupByColumn(), false, _errorMessage);
 
     // Test group key generation.
     defaultGroupKeyGenerator.generateKeysForBlock(_projectionBlock, _singleValueGroupKeyBuffer);
@@ -221,7 +218,6 @@ public class DefaultGroupKeyGeneratorTest {
     DefaultGroupKeyGenerator defaultGroupKeyGenerator = new DefaultGroupKeyGenerator(_projectionBlock, groupByColumns);
     int groupKeyUpperBound = defaultGroupKeyGenerator.getGlobalGroupKeyUpperBound();
     Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), groupKeyUpperBound, _errorMessage);
-    Assert.assertEquals(defaultGroupKeyGenerator.hasMultiValueGroupByColumn(), true, _errorMessage);
 
     // Test group key generation.
     defaultGroupKeyGenerator.generateKeysForBlock(_projectionBlock, _multiValueGroupKeyBuffer);
@@ -239,7 +235,6 @@ public class DefaultGroupKeyGeneratorTest {
     // Test initial status.
     DefaultGroupKeyGenerator defaultGroupKeyGenerator = new DefaultGroupKeyGenerator(_projectionBlock, groupByColumns);
     Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
-    Assert.assertEquals(defaultGroupKeyGenerator.hasMultiValueGroupByColumn(), true, _errorMessage);
 
     // Test group key generation.
     defaultGroupKeyGenerator.generateKeysForBlock(_projectionBlock, _multiValueGroupKeyBuffer);
@@ -257,7 +252,6 @@ public class DefaultGroupKeyGeneratorTest {
     // Test initial status.
     DefaultGroupKeyGenerator defaultGroupKeyGenerator = new DefaultGroupKeyGenerator(_projectionBlock, groupByColumns);
     Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
-    Assert.assertEquals(defaultGroupKeyGenerator.hasMultiValueGroupByColumn(), true, _errorMessage);
 
     // Test group key generation.
     defaultGroupKeyGenerator.generateKeysForBlock(_projectionBlock, _multiValueGroupKeyBuffer);

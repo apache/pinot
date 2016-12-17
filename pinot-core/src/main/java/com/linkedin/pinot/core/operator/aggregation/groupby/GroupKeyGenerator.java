@@ -24,6 +24,8 @@ import java.util.Iterator;
  * Interface for generating group keys.
  */
 public interface GroupKeyGenerator {
+  int INVALID_ID = -1;
+
   /**
    * Get the global upper bound of the group key. All group keys generated or will be generated should be less than this
    * value. This interface can be called before generating group keys to determine the type and size of the value result
@@ -32,14 +34,6 @@ public interface GroupKeyGenerator {
    * @return global upper bound of the group key.
    */
   int getGlobalGroupKeyUpperBound();
-
-  /**
-   * Return whether there are any multi value group-by columns. This interface can be used to determine using which
-   * interface to generate the group keys.
-   *
-   * @return whether there are multi value group-by columns.
-   */
-  boolean hasMultiValueGroupByColumn();
 
   /**
    * Generate group keys for a given docId set and return the mapping in the passed in docIdToGroupKey array.

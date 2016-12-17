@@ -30,6 +30,7 @@ import java.util.Set;
  * data multiple times. This class allocate resources on demand, and reuse them as much as possible to prevent garbage
  * collection.
  */
+@SuppressWarnings("Duplicates")
 public class DataBlockCache {
   private final DataFetcher _dataFetcher;
 
@@ -41,14 +42,14 @@ public class DataBlockCache {
 
   /** _columnToXXsMap must be defined accordingly */
   private final Map<String, int[]> _columnToDictIdsMap = new HashMap<>();
-  private final Map<String, double[]> _columnToValuesMap = new HashMap<>();
+  private final Map<String, Object> _columnToValuesMap = new HashMap<>();
   private final Map<String, double[]> _columnToHashCodesMap = new HashMap<>();
   private final Map<String, String[]> _columnToStringsMap = new HashMap<>();
 
   private final Map<String, int[]> _columnToNumberOfEntriesMap = new HashMap<>();
 
   private final Map<String, int[][]> _columnToDictIdsArrayMap = new HashMap<>();
-  private final Map<String, double[][]> _columnToValuesArrayMap = new HashMap<>();
+  private final Map<String, Object> _columnToValuesArrayMap = new HashMap<>();
   private final Map<String, double[][]> _columnToHashCodesArrayMap = new HashMap<>();
   private final Map<String, String[][]> _columnToStringsArrayMap = new HashMap<>();
 
@@ -136,13 +137,133 @@ public class DataBlockCache {
   }
 
   /**
+   * Get int value array for a given column for the specific block initialized in the initNewBlock.
+   *
+   * @param column column name.
+   * @return value array associated with this column.
+   */
+  public int[] getIntValueArrayForColumn(String column) {
+    int[] intValues = (int []) _columnToValuesMap.get(column);
+    if (!_columnValueLoaded.contains(column)) {
+      if (intValues == null) {
+        intValues = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+        _columnToValuesMap.put(column, intValues);
+      }
+      _dataFetcher.fetchIntValues(column, _docIds, _startPos, _length, intValues, 0);
+      _columnValueLoaded.add(column);
+    }
+    return intValues;
+  }
+
+  /**
+   * Get double value array for a given column for the specific block initialized in the initNewBlock.
+   *
+   * @param column column name.
+   * @return int values array associated with this column.
+   */
+  public int[][] getIntValuesArrayForColumn(String column) {
+    int[][] intValues = (int[][]) _columnToValuesArrayMap.get(column);
+
+    if (!_columnValueLoaded.contains(column)) {
+      if (intValues == null) {
+        intValues = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+        _columnToValuesArrayMap.put(column, intValues);
+      }
+
+      _dataFetcher.fetchIntValues(column, _docIds, _startPos, _length, intValues, 0);
+      _columnValueLoaded.add(column);
+    }
+    return intValues;
+  }
+
+  /**
+   * Get long value array for a given column for the specific block initialized in the initNewBlock.
+   *
+   * @param column column name.
+   * @return value array associated with this column.
+   */
+  public long[] getLongValueArrayForColumn(String column) {
+    long[] longValues = (long []) _columnToValuesMap.get(column);
+    if (!_columnValueLoaded.contains(column)) {
+      if (longValues == null) {
+        longValues = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+        _columnToValuesMap.put(column, longValues);
+      }
+      _dataFetcher.fetchLongValues(column, _docIds, _startPos, _length, longValues, 0);
+      _columnValueLoaded.add(column);
+    }
+    return longValues;
+  }
+
+  /**
+   * Get long value array for a given column for the specific block initialized in the initNewBlock.
+   *
+   * @param column column name.
+   * @return long values array associated with this column.
+   */
+  public long[][] getLongValuesArrayForColumn(String column) {
+    long[][] longValues = (long[][]) _columnToValuesArrayMap.get(column);
+
+    if (!_columnValueLoaded.contains(column)) {
+      if (longValues == null) {
+        longValues = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+        _columnToValuesArrayMap.put(column, longValues);
+      }
+
+      _dataFetcher.fetchLongValues(column, _docIds, _startPos, _length, longValues, 0);
+      _columnValueLoaded.add(column);
+    }
+    return longValues;
+  }
+
+  /**
+   * Get long value array for a given column for the specific block initialized in the initNewBlock.
+   *
+   * @param column column name.
+   * @return value array associated with this column.
+   */
+  public float[] getFloatValueArrayForColumn(String column) {
+    float[] floatValues = (float []) _columnToValuesMap.get(column);
+    if (!_columnValueLoaded.contains(column)) {
+      if (floatValues == null) {
+        floatValues = new float[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+        _columnToValuesMap.put(column, floatValues);
+      }
+      _dataFetcher.fetchFloatValues(column, _docIds, _startPos, _length, floatValues, 0);
+      _columnValueLoaded.add(column);
+    }
+    return floatValues;
+  }
+
+  /**
+   * Get long value array for a given column for the specific block initialized in the initNewBlock.
+   *
+   * @param column column name.
+   * @return long values array associated with this column.
+   */
+  public float[][] getFloatValuesArrayForColumn(String column) {
+    float[][] floatValues = (float[][]) _columnToValuesArrayMap.get(column);
+
+    if (!_columnValueLoaded.contains(column)) {
+      if (floatValues == null) {
+        floatValues = new float[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+        _columnToValuesArrayMap.put(column, floatValues);
+      }
+
+      _dataFetcher.fetchFloatValues(column, _docIds, _startPos, _length, floatValues, 0);
+      _columnValueLoaded.add(column);
+    }
+    return floatValues;
+  }
+
+  /**
    * Get double value array for a given column for the specific block initialized in the initNewBlock.
    *
    * @param column column name.
    * @return value array associated with this column.
    */
   public double[] getDoubleValueArrayForColumn(String column) {
-    double[] doubleValues = _columnToValuesMap.get(column);
+    double[] doubleValues = (double []) _columnToValuesMap.get(column);
     if (!_columnValueLoaded.contains(column)) {
       if (doubleValues == null) {
         doubleValues = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
@@ -161,7 +282,7 @@ public class DataBlockCache {
    * @return double values array associated with this column.
    */
   public double[][] getDoubleValuesArrayForColumn(String column) {
-    double[][] doubleValuesArray = _columnToValuesArrayMap.get(column);
+    double[][] doubleValuesArray = (double[][]) _columnToValuesArrayMap.get(column);
 
     if (!_columnValueLoaded.contains(column)) {
       if (doubleValuesArray == null) {

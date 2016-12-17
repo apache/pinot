@@ -198,6 +198,27 @@ public class DataFetcher {
   }
 
   /**
+   * Fetch the int values for a multi-valued column.
+   *
+   * @param column column name.
+   * @param inDocIds dictionary Id array.
+   * @param inStartPos input start position.
+   * @param length input length.
+   * @param outValues value array buffer.
+   * @param outStartPos output start position.
+   */
+  public void fetchIntValues(String column, int[] inDocIds, int inStartPos, int length, int[][] outValues, int outStartPos) {
+    Dictionary dictionary = getDictionaryForColumn(column);
+
+    int inEndPos = inStartPos + length;
+    for (int i = inStartPos; i < inEndPos; i++, outStartPos++) {
+      int numValues = fetchDictIdsForDocId(column, inDocIds[i], _reusableMVDictIds);
+      outValues[outStartPos] = new int[numValues];
+      dictionary.readIntValues(_reusableMVDictIds, 0, numValues, outValues[outStartPos], 0);
+    }
+  }
+
+  /**
    * Fetch the values for a single long value column.
    *
    * @param column column name.
@@ -214,6 +235,27 @@ public class DataFetcher {
   }
 
   /**
+   * Fetch the long values for a multi-valued column.
+   *
+   * @param column column name.
+   * @param inDocIds dictionary Id array.
+   * @param inStartPos input start position.
+   * @param length input length.
+   * @param outValues value array buffer.
+   * @param outStartPos output start position.
+   */
+  public void fetchLongValues(String column, int[] inDocIds, int inStartPos, int length, long[][] outValues, int outStartPos) {
+    Dictionary dictionary = getDictionaryForColumn(column);
+
+    int inEndPos = inStartPos + length;
+    for (int i = inStartPos; i < inEndPos; i++, outStartPos++) {
+      int numValues = fetchDictIdsForDocId(column, inDocIds[i], _reusableMVDictIds);
+      outValues[outStartPos] = new long[numValues];
+      dictionary.readLongValues(_reusableMVDictIds, 0, numValues, outValues[outStartPos], 0);
+    }
+  }
+
+  /**
    * Fetch the values for a single float value column.
    *
    * @param column column name.
@@ -227,6 +269,27 @@ public class DataFetcher {
     Dictionary dictionary = getDictionaryForColumn(column);
     fetchSingleDictIds(column, inDocIds, inStartPos, length, _reusableDictIds, 0);
     dictionary.readFloatValues(_reusableDictIds, 0, length, outValues, outStartPos);
+  }
+
+  /**
+   * Fetch the float values for a multi-valued column.
+   *
+   * @param column column name.
+   * @param inDocIds dictionary Id array.
+   * @param inStartPos input start position.
+   * @param length input length.
+   * @param outValues value array buffer.
+   * @param outStartPos output start position.
+   */
+  public void fetchFloatValues(String column, int[] inDocIds, int inStartPos, int length, float[][] outValues, int outStartPos) {
+    Dictionary dictionary = getDictionaryForColumn(column);
+
+    int inEndPos = inStartPos + length;
+    for (int i = inStartPos; i < inEndPos; i++, outStartPos++) {
+      int numValues = fetchDictIdsForDocId(column, inDocIds[i], _reusableMVDictIds);
+      outValues[outStartPos] = new float[numValues];
+      dictionary.readFloatValues(_reusableMVDictIds, 0, numValues, outValues[outStartPos], 0);
+    }
   }
 
   /**
