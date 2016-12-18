@@ -38,6 +38,8 @@ import org.slf4j.LoggerFactory;
 public class QueryRunner extends AbstractBaseCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryRunner.class);
   private static final int MILLIS_PER_SECOND = 1000;
+  private static final String CLIENT_TIME_STATISTICS = "Client side latency (in ms).";
+  private static final String NUM_DOCS_SCANNED_STATISTICS = "Number of documents scanned.";
 
   @Option(name = "-mode", required = true, metaVar = "<String>",
       usage = "Mode of query runner (singleThread|multiThreads|targetQPS|increasingQPS).")
@@ -227,6 +229,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     int totalBrokerTime = 0;
     int totalClientTime = 0;
     DescriptiveStatistics clientTimeStatistics = new DescriptiveStatistics();
+    DescriptiveStatistics docsScannedStatistics = new DescriptiveStatistics();
 
     long startTime = System.currentTimeMillis();
     long reportStartTime = startTime;
@@ -242,6 +245,9 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
         totalClientTime += clientTime;
         clientTimeStatistics.addValue(clientTime);
 
+        long numDocsScanned = response.getLong("numDocsScanned");
+        docsScannedStatistics.addValue(numDocsScanned);
+
         long currentTime = System.currentTimeMillis();
         if (currentTime - reportStartTime >= reportIntervalMs) {
           long timePassed = currentTime - startTime;
@@ -252,7 +258,8 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
           reportStartTime = currentTime;
           numReportIntervals++;
           if (numReportIntervals % numIntervalsToReportClientTimeStatistics == 0) {
-            reportClientTimeStatistics(clientTimeStatistics);
+            reportStatistics(clientTimeStatistics, CLIENT_TIME_STATISTICS);
+            reportStatistics(docsScannedStatistics, NUM_DOCS_SCANNED_STATISTICS);
           }
         }
       }
@@ -266,7 +273,8 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
             + "Average Client Time: {}ms.", timePassed, numQueriesExecuted,
         numQueriesExecuted / ((double) timePassed / MILLIS_PER_SECOND), totalBrokerTime / (double) numQueriesExecuted,
         totalClientTime / (double) numQueriesExecuted);
-    reportClientTimeStatistics(clientTimeStatistics);
+    reportStatistics(clientTimeStatistics, CLIENT_TIME_STATISTICS);
+    reportStatistics(docsScannedStatistics, NUM_DOCS_SCANNED_STATISTICS);
   }
 
   /**
@@ -299,12 +307,14 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     AtomicLong totalBrokerTime = new AtomicLong(0L);
     AtomicLong totalClientTime = new AtomicLong(0L);
     DescriptiveStatistics clientTimeStatistics = new DescriptiveStatistics();
+    DescriptiveStatistics docsScannedStatistics = new DescriptiveStatistics();
     ConcurrentLinkedQueue<String> queryQueue = new ConcurrentLinkedQueue<>();
 
     ExecutorService executorService = Executors.newFixedThreadPool(numThreads);
     for (int i = 0; i < numThreads; i++) {
       executorService.submit(
-          new Worker(driver, numQueriesExecuted, totalBrokerTime, totalClientTime, clientTimeStatistics, queryQueue));
+          new Worker(driver, numQueriesExecuted, totalBrokerTime, totalClientTime, clientTimeStatistics,
+              docsScannedStatistics, queryQueue));
     }
     executorService.shutdown();
 
@@ -337,7 +347,8 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
             reportStartTime = currentTime;
             numReportIntervals++;
             if (numReportIntervals % numIntervalsToReportClientTimeStatistics == 0) {
-              reportClientTimeStatistics(clientTimeStatistics);
+              reportStatistics(clientTimeStatistics, CLIENT_TIME_STATISTICS);
+              reportStatistics(docsScannedStatistics, NUM_DOCS_SCANNED_STATISTICS);
             }
           }
         }
@@ -362,7 +373,8 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
             + "Average Client Time: {}ms.", timePassed, numQueriesExecutedInt,
         numQueriesExecutedInt / ((double) timePassed / MILLIS_PER_SECOND),
         totalBrokerTime.get() / (double) numQueriesExecutedInt, totalClientTime.get() / (double) numQueriesExecutedInt);
-    reportClientTimeStatistics(clientTimeStatistics);
+    reportStatistics(clientTimeStatistics, CLIENT_TIME_STATISTICS);
+    reportStatistics(docsScannedStatistics, NUM_DOCS_SCANNED_STATISTICS);
   }
 
   /**
@@ -396,12 +408,14 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     AtomicLong totalBrokerTime = new AtomicLong(0L);
     AtomicLong totalClientTime = new AtomicLong(0L);
     DescriptiveStatistics clientTimeStatistics = new DescriptiveStatistics();
+    DescriptiveStatistics docsScannedStatistics = new DescriptiveStatistics();
     ConcurrentLinkedQueue<String> queryQueue = new ConcurrentLinkedQueue<>();
 
     ExecutorService executorService = Executors.newFixedThreadPool(numThreads);
     for (int i = 0; i < numThreads; i++) {
       executorService.submit(
-          new Worker(driver, numQueriesExecuted, totalBrokerTime, totalClientTime, clientTimeStatistics, queryQueue));
+          new Worker(driver, numQueriesExecuted, totalBrokerTime, totalClientTime, clientTimeStatistics,
+              docsScannedStatistics, queryQueue));
     }
     executorService.shutdown();
 
@@ -432,7 +446,8 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
           reportStartTime = currentTime;
           numReportIntervals++;
           if (numReportIntervals % numIntervalsToReportClientTimeStatistics == 0) {
-            reportClientTimeStatistics(clientTimeStatistics);
+            reportStatistics(clientTimeStatistics, CLIENT_TIME_STATISTICS);
+            reportStatistics(docsScannedStatistics, NUM_DOCS_SCANNED_STATISTICS);
           }
         }
       }
@@ -456,7 +471,8 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
             + "Average Broker Time: {}ms, Average Client Time: {}ms.", startQPS, timePassed, numQueriesExecutedInt,
         numQueriesExecutedInt / ((double) timePassed / MILLIS_PER_SECOND),
         totalBrokerTime.get() / (double) numQueriesExecutedInt, totalClientTime.get() / (double) numQueriesExecutedInt);
-    reportClientTimeStatistics(clientTimeStatistics);
+    reportStatistics(clientTimeStatistics, CLIENT_TIME_STATISTICS);
+    reportStatistics(docsScannedStatistics, NUM_DOCS_SCANNED_STATISTICS);
   }
 
   /**
@@ -495,12 +511,14 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     AtomicLong totalBrokerTime = new AtomicLong(0L);
     AtomicLong totalClientTime = new AtomicLong(0L);
     DescriptiveStatistics clientTimeStatistics = new DescriptiveStatistics();
+    DescriptiveStatistics docsScannedStatistics = new DescriptiveStatistics();
     ConcurrentLinkedQueue<String> queryQueue = new ConcurrentLinkedQueue<>();
 
     ExecutorService executorService = Executors.newFixedThreadPool(numThreads);
     for (int i = 0; i < numThreads; i++) {
       executorService.submit(
-          new Worker(driver, numQueriesExecuted, totalBrokerTime, totalClientTime, clientTimeStatistics, queryQueue));
+          new Worker(driver, numQueriesExecuted, totalBrokerTime, totalClientTime, clientTimeStatistics,
+              docsScannedStatistics, queryQueue));
     }
     executorService.shutdown();
 
@@ -535,7 +553,8 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
                 numQueriesExecutedInt, numQueriesExecutedInt / ((double) timePassed / MILLIS_PER_SECOND),
                 totalBrokerTime.get() / (double) numQueriesExecutedInt,
                 totalClientTime.get() / (double) numQueriesExecutedInt, queryQueue.size());
-            reportClientTimeStatistics(clientTimeStatistics);
+            reportStatistics(clientTimeStatistics, CLIENT_TIME_STATISTICS);
+            reportStatistics(docsScannedStatistics, NUM_DOCS_SCANNED_STATISTICS);
 
             // Find the next interval.
             double newQPS = currentQPS + deltaQPS;
@@ -570,7 +589,8 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
                 totalBrokerTime.get() / (double) numQueriesExecutedInt,
                 totalClientTime.get() / (double) numQueriesExecutedInt, queryQueue.size());
             if (numReportIntervals % numIntervalsToReportClientTimeStatistics == 0) {
-              reportClientTimeStatistics(clientTimeStatistics);
+              reportStatistics(clientTimeStatistics, CLIENT_TIME_STATISTICS);
+              reportStatistics(docsScannedStatistics, NUM_DOCS_SCANNED_STATISTICS);
             }
           }
         }
@@ -595,22 +615,23 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
             + "Average Broker Time: {}ms, Average Client Time: {}ms.", currentQPS, timePassed, numQueriesExecutedInt,
         numQueriesExecutedInt / ((double) timePassed / MILLIS_PER_SECOND),
         totalBrokerTime.get() / (double) numQueriesExecutedInt, totalClientTime.get() / (double) numQueriesExecutedInt);
-    reportClientTimeStatistics(clientTimeStatistics);
+    reportStatistics(clientTimeStatistics, CLIENT_TIME_STATISTICS);
+    reportStatistics(docsScannedStatistics, NUM_DOCS_SCANNED_STATISTICS);
   }
 
   @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter")
-  private static void reportClientTimeStatistics(DescriptiveStatistics clientTimeStatistics) {
-    synchronized (clientTimeStatistics) {
+  private static void reportStatistics(DescriptiveStatistics statistics, String name) {
+    synchronized (statistics) {
       LOGGER.info("--------------------------------------------------------------------------------");
-      LOGGER.info("CLIENT TIME STATISTICS:");
-      LOGGER.info(clientTimeStatistics.toString());
-      LOGGER.info("10th percentile: {}ms", clientTimeStatistics.getPercentile(10.0));
-      LOGGER.info("25th percentile: {}ms", clientTimeStatistics.getPercentile(25.0));
-      LOGGER.info("50th percentile: {}ms", clientTimeStatistics.getPercentile(50.0));
-      LOGGER.info("90th percentile: {}ms", clientTimeStatistics.getPercentile(90.0));
-      LOGGER.info("95th percentile: {}ms", clientTimeStatistics.getPercentile(95.0));
-      LOGGER.info("99th percentile: {}ms", clientTimeStatistics.getPercentile(99.0));
-      LOGGER.info("99.9th percentile: {}ms", clientTimeStatistics.getPercentile(99.9));
+      LOGGER.info("Statistics: {}", name);
+      LOGGER.info(statistics.toString());
+      LOGGER.info("10th percentile: {}", statistics.getPercentile(10.0));
+      LOGGER.info("25th percentile: {}", statistics.getPercentile(25.0));
+      LOGGER.info("50th percentile: {}", statistics.getPercentile(50.0));
+      LOGGER.info("90th percentile: {}", statistics.getPercentile(90.0));
+      LOGGER.info("95th percentile: {}", statistics.getPercentile(95.0));
+      LOGGER.info("99th percentile: {}", statistics.getPercentile(99.0));
+      LOGGER.info("99.9th percentile: {}", statistics.getPercentile(99.9));
       LOGGER.info("--------------------------------------------------------------------------------");
     }
   }
@@ -618,7 +639,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
   @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter")
   private static void executeQueryInMultiThreads(PerfBenchmarkDriver driver, String query,
       AtomicInteger numQueriesExecuted, AtomicLong totalBrokerTime, AtomicLong totalClientTime,
-      DescriptiveStatistics clientTimeStatistics)
+      DescriptiveStatistics clientTimeStatistics, DescriptiveStatistics docsScannedStatistics)
       throws Exception {
     JSONObject response = driver.postQuery(query);
     numQueriesExecuted.getAndIncrement();
@@ -629,6 +650,11 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     synchronized (clientTimeStatistics) {
       clientTimeStatistics.addValue(clientTime);
     }
+
+    long numDocsScanned = response.getLong("numDocsScanned");
+    synchronized (docsScannedStatistics) {
+      docsScannedStatistics.addValue(numDocsScanned);
+    }
   }
 
   private static class Worker implements Runnable {
@@ -638,15 +664,17 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     private final AtomicLong _totalClientTime;
     private final DescriptiveStatistics _clientTimeStatistics;
     private final ConcurrentLinkedQueue<String> _queryQueue;
+    private final DescriptiveStatistics _docsScannedStatistics;
 
     private Worker(PerfBenchmarkDriver driver, AtomicInteger numQueriesExecuted, AtomicLong totalBrokerTime,
         AtomicLong totalClientTime, DescriptiveStatistics clientTimeStatistics,
-        ConcurrentLinkedQueue<String> queryQueue) {
+        DescriptiveStatistics docsScannedStatistics, ConcurrentLinkedQueue<String> queryQueue) {
       _driver = driver;
       _numQueriesExecuted = numQueriesExecuted;
       _totalBrokerTime = totalBrokerTime;
       _totalClientTime = totalClientTime;
       _clientTimeStatistics = clientTimeStatistics;
+      _docsScannedStatistics = docsScannedStatistics;
       _queryQueue = queryQueue;
     }
 
@@ -664,7 +692,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
         }
         try {
           executeQueryInMultiThreads(_driver, query, _numQueriesExecuted, _totalBrokerTime, _totalClientTime,
-              _clientTimeStatistics);
+              _clientTimeStatistics, _docsScannedStatistics);
         } catch (Exception e) {
           LOGGER.error("Caught exception while running query: {}", query, e);
           return;
