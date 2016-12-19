@@ -88,7 +88,7 @@ public class PerfBenchmarkRunner extends AbstractBaseCommand implements Command 
 
   @Override
   public String description() {
-    return "Start Pinot cluster with optional preloaded segments";
+    return "Start Pinot cluster with optional preloaded segments.";
   }
 
   @Override
@@ -171,7 +171,7 @@ public class PerfBenchmarkRunner extends AbstractBaseCommand implements Command 
   /**
    * Main method for the class.
    *
-   * @param args Arguments for the converter
+   * @param args arguments for the perf benchmark runner.
    * @throws Exception
    */
   public static void main(String[] args)
@@ -179,6 +179,11 @@ public class PerfBenchmarkRunner extends AbstractBaseCommand implements Command 
     PerfBenchmarkRunner perfBenchmarkRunner = new PerfBenchmarkRunner();
     CmdLineParser parser = new CmdLineParser(perfBenchmarkRunner);
     parser.parseArgument(args);
-    perfBenchmarkRunner.execute();
+
+    if (perfBenchmarkRunner._help) {
+      perfBenchmarkRunner.printUsage();
+    } else {
+      perfBenchmarkRunner.execute();
+    }
   }
 }
