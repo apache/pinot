@@ -27,6 +27,7 @@ import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
 import com.linkedin.pinot.core.operator.docvalsets.ProjectionBlockValSet;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import java.util.List;
+import javax.annotation.Nonnull;
 
 
 /**
@@ -50,19 +51,21 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   private int[] _docIdToSVGroupKey;
   private int[][] _docIdToMVGroupKey;
 
-  private boolean _hasMultiValuedColumns = false;
+  private boolean _hasMVGroupByColumns = false;
   private boolean _inited = false; // boolean to ensure init() has been called.
   private boolean _finished = false; // boolean to ensure that finish() has been called.
   private boolean _groupByInited = false; // boolean for lazy creation of group-key generator etc.
+  private boolean _hasColumnsWithoutDictionary = false;
 
   /**
    * Constructor for the class.
-   *  @param aggrFunctionContexts Array of aggregation functions
+   * @param aggrFunctionContexts Array of aggregation functions
    * @param groupBy Group by from broker request
    * @param numGroupsLimit Limit on number of aggregation groups returned in the result
    */
-  public DefaultGroupByExecutor(AggregationFunctionContext[] aggrFunctionContexts, GroupBy groupBy, int numGroupsLimit) {
-    Preconditions.checkNotNull(aggrFunctionContexts != null && aggrFunctionContexts.length > 0);
+  public DefaultGroupByExecutor(@Nonnull AggregationFunctionContext[] aggrFunctionContexts, GroupBy groupBy,
+      int numGroupsLimit) {
+    Preconditions.checkNotNull(aggrFunctionContexts.length > 0);
     Preconditions.checkNotNull(groupBy);
 
     List<String> groupByColumnList = groupBy.getColumns();
@@ -112,8 +115,10 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       // Result holder limits the max number of group keys (default 100k), if the number of groups
       // exceeds beyond that limit, groups with lower values (as per sort order) are trimmed.
       // Once result holder trims those groups, the group key generator needs to purge them.
-      int[] trimmedKeys = _resultHolderArray[i].trimResults();
-      _groupKeyGenerator.purgeKeys(trimmedKeys);
+      if (!_hasColumnsWithoutDictionary) {
+        int[] trimmedKeys = _resultHolderArray[i].trimResults();
+        _groupKeyGenerator.purgeKeys(trimmedKeys);
+      }
     }
   }
 
@@ -149,7 +154,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     int length = projectionBlock.getNumDocs();
     switch (aggrFuncName) {
       case AggregationFunctionFactory.COUNT_AGGREGATION_FUNCTION:
-        if (_hasMultiValuedColumns) {
+        if (_hasMVGroupByColumns) {
           aggregationFunction.aggregateGroupByMV(length, _docIdToMVGroupKey, resultHolder);
         } else {
           aggregationFunction.aggregateGroupBySV(length, _docIdToSVGroupKey, resultHolder);
@@ -163,7 +168,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       case AggregationFunctionFactory.DISTINCTCOUNTHLL_MV_AGGREGATION_FUNCTION:
         Object hashCodeArray =
             (isAggrColumnSingleValue) ? blockValueSet.getSVHashCodeArray() : blockValueSet.getMVHashCodeArray();
-        if (_hasMultiValuedColumns) {
+        if (_hasMVGroupByColumns) {
           aggregationFunction.aggregateGroupByMV(length, _docIdToMVGroupKey, resultHolder, hashCodeArray);
         } else {
           aggregationFunction.aggregateGroupBySV(length, _docIdToSVGroupKey, resultHolder, hashCodeArray);
@@ -173,7 +178,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       case AggregationFunctionFactory.FASTHLL_AGGREGATION_FUNCTION:
         Object stringArray =
             (isAggrColumnSingleValue) ? blockValueSet.getSingleValues() : blockValueSet.getMultiValues();
-        if (_hasMultiValuedColumns) {
+        if (_hasMVGroupByColumns) {
           aggregationFunction.aggregateGroupByMV(length, _docIdToMVGroupKey, resultHolder, (Object) stringArray);
         } else {
           aggregationFunction.aggregateGroupBySV(length, _docIdToSVGroupKey, resultHolder, (Object) stringArray);
@@ -183,7 +188,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       default:
         Object valueArray =
             (isAggrColumnSingleValue) ? blockValueSet.getSingleValues() : blockValueSet.getMultiValues();
-        if (_hasMultiValuedColumns) {
+        if (_hasMVGroupByColumns) {
           aggregationFunction.aggregateGroupByMV(length, _docIdToMVGroupKey, resultHolder, (Object) valueArray);
         } else {
           aggregationFunction.aggregateGroupBySV(length, _docIdToSVGroupKey, resultHolder, (Object) valueArray);
@@ -237,7 +242,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
    * @param projectionBlock Projection block for which to generate group keys
    */
   private void generateGroupKeysForBlock(ProjectionBlock projectionBlock) {
-    if (_hasMultiValuedColumns) {
+    if (_hasMVGroupByColumns) {
       _groupKeyGenerator.generateKeysForBlock(projectionBlock, _docIdToMVGroupKey);
     } else {
       _groupKeyGenerator.generateKeysForBlock(projectionBlock, _docIdToSVGroupKey);
@@ -264,7 +269,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
    * Allocate storage for docId to group keys mapping.
    */
   private void initDocIdToGroupKeyMap() {
-    if (_hasMultiValuedColumns) {
+    if (_hasMVGroupByColumns) {
       // TODO: Revisit block fetching of multi-valued columns
       _docIdToMVGroupKey = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
     } else {
@@ -287,10 +292,25 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     if (_groupByInited) {
       return;
     }
-    _groupKeyGenerator = new DefaultGroupKeyGenerator(projectionBlock, _groupByColumns);
-    int maxNumResults = _groupKeyGenerator.getGlobalGroupKeyUpperBound();
-    _hasMultiValuedColumns = _groupKeyGenerator.hasMultiValueGroupByColumn();
 
+    for (String groupByColumn : _groupByColumns) {
+
+      Block block = projectionBlock.getBlock(groupByColumn);
+      BlockMetadata metadata = block.getMetadata();
+
+      if (!metadata.isSingleValue()) {
+        _hasMVGroupByColumns = true;
+      }
+
+      if (!metadata.hasDictionary()) {
+        _hasColumnsWithoutDictionary = true;
+      }
+    }
+
+    _groupKeyGenerator = (_hasColumnsWithoutDictionary) ? new NoDictionaryGroupKeyGenerator(_groupByColumns)
+        : new DefaultGroupKeyGenerator(projectionBlock, _groupByColumns);
+
+    int maxNumResults = _groupKeyGenerator.getGlobalGroupKeyUpperBound();
     initResultHolderArray(_numGroupsLimit, maxNumResults);
     initDocIdToGroupKeyMap();
     _groupByInited = true;
