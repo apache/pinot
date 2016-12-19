@@ -193,6 +193,55 @@ hr {
 }
 
 /* dashboard table css*/
+.metric-card-container {
+	width: 20%;
+	float: left;
+}
+
+.metric-card {
+	height: 200px;
+	border: 1px solid #CECECE;
+	margin: 15px 15px 15px 15px;
+}
+
+.metric-card-header {
+	width: 100%;
+	height: 20%;
+	background-color: #FFFFFF;
+	display: table;
+	border-bottom: 1px solid #CECECE
+}
+
+.metric-card-header>div {
+	display: table-cell;
+	vertical-align: middle;
+	text-align: center
+}
+
+.metric-card-body {
+	background-color: #CFEDFB;
+	height: 80%;
+	border: none
+}
+
+.metric-card-body-row-1 {
+	width: 100%;
+	height: 60%;
+	display: table;
+}
+
+.metric-card-body-row-2 {
+	width: 100%;
+	height: 20%;
+}
+
+}
+.metric-card-body-row3 {
+	width: 100%;
+	height: 20%;
+}
+
+}
 .dashboard-table>thead>tr>th {
 	border-top: none;
 }
@@ -251,7 +300,7 @@ hr {
 .analysis-table>thead>tr>th, .analysis-table>tbody>tr>th,
 	.analysis-table>tfoot>tr>th, .analysis-table>thead>tr>td,
 	.analysis-table>tbody>tr>td, .analysis-table>tfoot>tr>td {
-
+	
 }
 
 .analysis-table {
@@ -317,7 +366,6 @@ text {
 	font-size: 11px;
 }
 
-
 .autocomplete-suggestions {
 	border: 1px solid #E3E3E3;
 	background: #FFF;
@@ -361,5 +409,5 @@ text {
 }
 
 .c3-region.anomaly-region {
-  fill: #EF7E37
+	fill: #EF7E37
 }

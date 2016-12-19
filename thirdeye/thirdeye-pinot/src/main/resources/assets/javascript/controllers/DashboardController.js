@@ -3,6 +3,7 @@ function DashboardController(parentController) {
   this.dashboardModel = new DashboardModel();
   this.dashboardView = new DashboardView(this.dashboardModel);
 
+  this.metricSummaryController = new MetricSummaryController(this);
   this.anomalySummaryController = new AnomalySummaryController(this);
   this.wowSummaryController = new WoWSummaryController(this);
 
@@ -22,7 +23,10 @@ DashboardController.prototype = {
 
     console.log("tabName:" + tabName);
     var childController;
-    if (tabName.startsWith("dashboard_anomaly-summary-tab")) {
+    if (tabName.startsWith("dashboard_metric-summary-tab")) {
+      this.dashboardModel.tabSelected = "dashboard_metric-summary-tab";
+      childController = this.metricSummaryController;
+    } else if (tabName.startsWith("dashboard_anomaly-summary-tab")) {
       this.dashboardModel.tabSelected = "dashboard_anomaly-summary-tab";
       childController = this.anomalySummaryController;
     } else if (tabName.startsWith("dashboard_wow-summary-tab")) {

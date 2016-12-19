@@ -63,6 +63,9 @@
 <script id="analysis-template" type="text/x-handlebars-template">
   <#include "tabs/analysis.ftl"/>
 </script>
+<script id="metric-summary-template" type="text/x-handlebars-template">
+	<#include "tabs/dashboard/metric-summary-dashboard.ftl">
+</script>
 <script id="anomaly-summary-template" type="text/x-handlebars-template">
 	<#include "tabs/dashboard/anomaly-summary-dashboard.ftl">
 </script>
@@ -95,6 +98,11 @@
 <script src="../../../assets/javascript/models/DashboardModel.js"></script>
 <script src="../../../assets/javascript/views/DashboardView.js"></script>
 <script src="../../../assets/javascript/controllers/DashboardController.js"></script>
+
+<script src="../../../assets/javascript/models/MetricSummaryModel.js"></script>
+<script src="../../../assets/javascript/views/MetricSummaryView.js"></script>
+<script src="../../../assets/javascript/controllers/MetricSummaryController.js"></script>
+
 
 <script src="../../../assets/javascript/models/AnomalySummaryModel.js"></script>
 <script src="../../../assets/javascript/views/AnomalySummaryView.js"></script>
