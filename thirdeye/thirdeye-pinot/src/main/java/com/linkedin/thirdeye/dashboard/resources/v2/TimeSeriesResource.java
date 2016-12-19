@@ -145,36 +145,40 @@ public class TimeSeriesResource {
       timeSeriesCompareMetricView.setTimeBucketsCurrent(timeBucketsCurrent);
       timeSeriesCompareMetricView.setTimeBucketsBaseline(timeBucketsBaseline);
 
-      ValuesContainer vw = new ValuesContainer();
       Map<String, ValuesContainer> subDimensionValuesMap = new LinkedHashMap<>();
-
-      subDimensionValuesMap.put(ALL, vw);
-
       timeSeriesCompareMetricView.setSubDimensionContributionMap(subDimensionValuesMap);
 
-      // lets fill the indices
+      int timeBuckets = response.getTimeBuckets().size();
+      ValuesContainer vw = new ValuesContainer();
+      subDimensionValuesMap.put(ALL, vw);
+      vw.setCurrentValues(new double[timeBuckets]);
+      vw.setBaselineValues(new double[timeBuckets]);
+      vw.setPercentageChange(new double[timeBuckets]);
+
+      // lets find the indices
       int subDimensionIndex =
           response.getResponseData().getSchema().getColumnsToIndexMapping().get("dimensionValue");
       int currentValueIndex =
           response.getResponseData().getSchema().getColumnsToIndexMapping().get("currentValue");
       int baselineValueIndex =
           response.getResponseData().getSchema().getColumnsToIndexMapping().get("baselineValue");
+      int percentageChangeIndex =
+          response.getResponseData().getSchema().getColumnsToIndexMapping().get("percentageChange");
 
-      int timeBuckets = response.getTimeBuckets().size();
-      vw.setCurrentValues(new double[timeBuckets]);
-      vw.setBaselineValues(new double[timeBuckets]);
-
+      // populate current and baseline time buckets
       for (int i = 0; i < timeBuckets; i++) {
         TimeBucket tb = response.getTimeBuckets().get(i);
         timeBucketsCurrent.add(tb.getCurrentStart());
         timeBucketsBaseline.add(tb.getBaselineStart());
       }
 
+      // set current and baseline values for sub dimensions
       for (int i = 0; i < response.getResponseData().getResponseData().size(); i++) {
         String[] data = response.getResponseData().getResponseData().get(i);
         String subDimension = data[subDimensionIndex];
         Double currentVal = Double.valueOf(data[currentValueIndex]);
         Double baselineVal = Double.valueOf(data[baselineValueIndex]);
+        Double percentageChangeVal = Double.valueOf(data[percentageChangeIndex]);
         int index = i % timeBuckets;
 
         // set overAll values
@@ -186,17 +190,37 @@ public class TimeSeriesResource {
           ValuesContainer subDimVals = new ValuesContainer();
           subDimVals.setCurrentValues(new double[timeBuckets]);
           subDimVals.setBaselineValues(new double[timeBuckets]);
+          subDimVals.setPercentageChange(new double[timeBuckets]);
           subDimensionValuesMap.put(subDimension, subDimVals);
         }
 
-        subDimensionValuesMap.get(subDimension).getCurrentValues()[index] += currentVal;
-        subDimensionValuesMap.get(subDimension).getBaselineValues()[index] += baselineVal;
+        subDimensionValuesMap.get(subDimension).getCurrentValues()[index] = currentVal;
+        subDimensionValuesMap.get(subDimension).getBaselineValues()[index] = baselineVal;
+        subDimensionValuesMap.get(subDimension).getPercentageChange()[index] = percentageChangeVal;
+      }
+
+      // Now compute percentage change for all values
+      for (int i = 0; i < vw.getCurrentValues().length; i++) {
+        vw.getPercentageChange()[i] =
+            getPercentageChange(vw.getCurrentValues()[i], vw.getBaselineValues()[i]);
       }
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
       throw new WebApplicationException(e);
     }
     return timeSeriesCompareMetricView;
+  }
+
+  private double getPercentageChange(double current, double baseline) {
+    if (baseline == 0d) {
+      if (current == 0d) {
+        return 0d;
+      } else {
+        return 100d;
+      }
+    } else {
+      return 100 * (current - baseline) / baseline;
+    }
   }
 
   /**

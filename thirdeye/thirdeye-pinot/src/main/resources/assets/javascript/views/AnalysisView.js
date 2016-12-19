@@ -184,6 +184,9 @@ AnalysisView.prototype = {
       }
     }
     self.viewParams['filters'] = filterMap;
+
+    // collect and set granularity
+    self.viewParams['granularity'] = $("#granularity").val();
   },
 
   setupListeners: function () {

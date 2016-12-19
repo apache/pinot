@@ -9,13 +9,17 @@ function TimeSeriesCompareView(timeSeriesCompareModel) {
   this.timeseries_subdimension_legend_template_compiled = Handlebars.compile(timeseries_subdimension_legend_template);
   this.timeseries_subdimension_legend_placeHolderId = "#analysis-chart-legend";
 
-  var wow_metric_table_template = $("#wow-metric-table-template").html();
-  this.wow_metric_table_template_compiled = Handlebars.compile(wow_metric_table_template);
-  this.wow_metric_table_placeHolderId = "#wow-metric-table-placeholder";
+  var contributor_table_template = $("#contributor-table-details-template").html();
+  this.contributor_table_template_compiled = Handlebars.compile(contributor_table_template);
+  this.contributor_table_placeHolderId = "#contributor-table-placeholder";
 
-  var wow_metric_dimension_table_template = $("#wow-metric-dimension-table-template").html();
-  this.wow_metric_dimension_table_template_compiled = Handlebars.compile(wow_metric_dimension_table_template);
-  this.wow_metric_dimension_table_placeHolderId = "#wow-metric-dimension-table-placeholder";
+  // var wow_metric_table_template = $("#wow-metric-table-template").html();
+  // this.wow_metric_table_template_compiled = Handlebars.compile(wow_metric_table_template);
+  // this.wow_metric_table_placeHolderId = "#wow-metric-table-placeholder";
+  //
+  // var wow_metric_dimension_table_template = $("#wow-metric-dimension-table-template").html();
+  // this.wow_metric_dimension_table_template_compiled = Handlebars.compile(wow_metric_dimension_table_template);
+  // this.wow_metric_dimension_table_placeHolderId = "#wow-metric-dimension-table-placeholder";
 
   this.checkboxClickEvent = new Event();
 }
@@ -25,21 +29,30 @@ TimeSeriesCompareView.prototype = {
   },
 
   render: function () {
-    var timeseriesContributorViewResult = this.timeseries_contributor_template_compiled(this.timeSeriesCompareModel);
-    $(this.timeseries_contributor_placeHolderId).html(timeseriesContributorViewResult);
 
-    var wowMetricTableResult = this.wow_metric_table_template_compiled(this.model);
-    $(this.wow_metric_table_placeHolderId).html(wowMetricTableResult);
+    // var wowMetricTableResult = this.wow_metric_table_template_compiled(this.model);
+    // $(this.wow_metric_table_placeHolderId).html(wowMetricTableResult);
+    //
+    // var wowMetricDimensionTableResult = this.wow_metric_dimension_table_template_compiled(this.model);
+    // $(this.wow_metric_dimension_table_placeHolderId).html(wowMetricDimensionTableResult);
 
-    var wowMetricDimensionTableResult = this.wow_metric_dimension_table_template_compiled(this.model);
-    $(this.wow_metric_dimension_table_placeHolderId).html(wowMetricDimensionTableResult);
+    if (this.timeSeriesCompareModel.subDimensionContributionDetails) {
+      // render chart
+      var timeseriesContributorViewResult = this.timeseries_contributor_template_compiled(this.timeSeriesCompareModel);
+      $(this.timeseries_contributor_placeHolderId).html(timeseriesContributorViewResult);
+      this.loadChart(this.timeSeriesCompareModel.subDimensionContributionDetails.contributionMap['All']);
 
-    if (this.timeSeriesCompareModel.subDimensionContributionMap) {
-      this.loadChart(this.timeSeriesCompareModel.subDimensionContributionMap['All']);
+      // render chart legned
+      var timeseriesSubDimensionsHtml = this.timeseries_subdimension_legend_template_compiled(this.timeSeriesCompareModel);
+      $(this.timeseries_subdimension_legend_placeHolderId).html(timeseriesSubDimensionsHtml);
+      this.setupListenerForSubDimension();
+
+      // render contributor table
+      var contributorTableResult = this.contributor_table_template_compiled(this.timeSeriesCompareModel);
+      $(this.contributor_table_placeHolderId).html(contributorTableResult);
+
+      // this.setupListeners();
     }
-
-    this.loadSubDimensions(this.timeSeriesCompareModel.subDimensions);
-    this.setupListeners();
   },
 
   loadChart : function (timeSeriesObject) {
@@ -72,23 +85,16 @@ TimeSeriesCompareView.prototype = {
 
   },
 
-  loadSubDimensions: function () {
-    var timeseriesSubDimensionsHtml = this.timeseries_subdimension_legend_template_compiled(
-        this.timeSeriesCompareModel);
-    $(this.timeseries_subdimension_legend_placeHolderId).html(timeseriesSubDimensionsHtml);
-    this.setupListenerForSubDimension();
-  },
-
   dataEventHandler: function (e) {
     if (Object.is(e.target.type, "checkbox")) {
       this.checkboxClickEvent.notify(e.target);
     }
   },
 
-  setupListeners: function () {
-    $('#show-details').change(this.dataEventHandler.bind(this));
-    $('#show-cumulative').change(this.dataEventHandler.bind(this));
-  },
+  // setupListeners: function () {
+  //   $('#show-details').change(this.dataEventHandler.bind(this));
+  //   $('#show-cumulative').change(this.dataEventHandler.bind(this));
+  // },
 
   setupListenerForSubDimension: function () {
     var self = this;
@@ -96,7 +102,7 @@ TimeSeriesCompareView.prototype = {
       $("#a-sub-dimension-" + i + " a").click(self, function (e) {
         var index = e.currentTarget.getAttribute('id');
         var subDimension = self.timeSeriesCompareModel.subDimensions[index];
-        self.loadChart(self.timeSeriesCompareModel.subDimensionContributionMap[subDimension]);
+        self.loadChart(self.timeSeriesCompareModel.subDimensionContributionDetails.contributionMap[subDimension]);
       });
     }
   }

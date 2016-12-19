@@ -3,19 +3,17 @@
     <table class="table table-bordered analysis-table">
       <thead>
       <tr>
-        {{#if this.timestamps.length}}
-        {{#each this.timestamps as |timestamp timeIndex|}}
-        <th>{{displayHour timestamp}}</th>
+        {{#each this.timeBucketsCurrent as |timestamp timeIndex|}}
+        <th>{{timestamp}}</th>
         {{/each}}
-        {{/if}}
       </tr>
       </thead>
       <tbody>
+      {{#each this as |key keyIndex|}}
       <tr>
-        {{#each this.metricTable.[0].data as |data dataIndex|}}
-        <td>{{data}}</td>
-        {{/each}}
+        <td>{{keyIndex}}</td>
       </tr>
+      {{/each}}
       </tbody>
     </table>
   </div>

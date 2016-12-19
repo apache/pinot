@@ -75,8 +75,8 @@
 <script id="timeseries-subdimension-legend-template" type="text/x-handlebars-template">
   <#include "tabs/analysis/timeseries-subdimension-legend.ftl"/>
 </script>
-<script id="wow-metric-table-template" type="text/x-handlebars-template">
-  <#include "tabs/analysis/wow-metric.ftl"/>
+<script id="contributor-table-details-template" type="text/x-handlebars-template">
+  <#include "tabs/analysis/contributor-table-details.ftl"/>
 </script>
 <script id="wow-metric-dimension-table-template" type="text/x-handlebars-template">
   <#include "tabs/analysis/wow-metric-dimension.ftl"/>

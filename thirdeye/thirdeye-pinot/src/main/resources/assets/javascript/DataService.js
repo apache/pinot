@@ -102,10 +102,10 @@ DataService.prototype = {
     },
 
     fetchTimeseriesCompare: function (metricId, currentStart, currentEnd, baselineStart, baselineEnd,
-        dimension, filters) {
-      // TODO : set dimensions and filters
+        dimension, filters, granularity) {
       var url = "/timeseries/compare/" + metricId + "/" + currentStart + "/" + currentEnd + "/"
-          + baselineStart + "/" + baselineEnd + "?dimension="+dimension + "&filters="+JSON.stringify(filters);
+          + baselineStart + "/" + baselineEnd + "?dimension=" + dimension + "&filters="
+          + JSON.stringify(filters) + "&granularity=" + granularity;
       console.log("timeseries data fetch URL ----> ");
       console.log(url);
       return this.getDataSynchronous(url);
