@@ -26,7 +26,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -140,6 +139,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   private volatile long _currentOffset;
   private volatile State _state;
   private volatile int _numRowsConsumed = 0;
+  private volatile int consecutiveErrorCount = 0;
   private long _startTimeMs = 0;
   private final String _segmentNameStr;
   private final SegmentVersion _segmentVersion;
@@ -238,13 +238,13 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  private void handleTransientKafkaErrors(MutableInt consecutiveErrorCount, Exception e) throws  Exception {
-    int errorCount = consecutiveErrorCount.incrementAndGet();
-    if (errorCount > MAX_CONSECUTIVE_ERROR_COUNT) {
-      segmentLogger.warn("Kafka transient exception when fetching messages, stopping consumption after {} attempts", errorCount, e);
+  private void handleTransientKafkaErrors(Exception e) throws  Exception {
+    consecutiveErrorCount++;
+    if (consecutiveErrorCount > MAX_CONSECUTIVE_ERROR_COUNT) {
+      segmentLogger.warn("Kafka transient exception when fetching messages, stopping consumption after {} attempts", consecutiveErrorCount, e);
       throw e;
     } else {
-      segmentLogger.warn("Kafka transient exception when fetching messages, retrying (count={})", errorCount, e);
+      segmentLogger.warn("Kafka transient exception when fetching messages, retrying (count={})", consecutiveErrorCount, e);
       Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
       makeConsumerWrapper();
     }
@@ -252,8 +252,6 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
 
   protected boolean consumeLoop() throws Exception {
     _fieldExtractor.resetCounters();
-
-    MutableInt consecutiveErrorCount = new MutableInt(0);
 
     final long _endOffset = Long.MAX_VALUE; // No upper limit on Kafka offset
     segmentLogger.info("Starting consumption loop start offset {}, finalOffset {}", _currentOffset, _finalOffset);
@@ -266,20 +264,20 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
         Pair<Iterable<MessageAndOffset>, Long> messagesAndWatermark =
             _consumerWrapper.fetchMessagesAndHighWatermark(_currentOffset, _endOffset,
                 _kafkaStreamMetadata.getKafkaFetchTimeoutMillis());
-        consecutiveErrorCount.setValue(0);
+        consecutiveErrorCount = 0;
         messagesAndOffsets = messagesAndWatermark.getLeft();
         highWatermark = messagesAndWatermark.getRight();
       } catch (TimeoutException e) {
-        handleTransientKafkaErrors(consecutiveErrorCount, e);
+        handleTransientKafkaErrors(e);
       } catch (SimpleConsumerWrapper.TransientConsumerException e) {
-        handleTransientKafkaErrors(consecutiveErrorCount, e);
+        handleTransientKafkaErrors(e);
       } catch (SimpleConsumerWrapper.PermanentConsumerException e) {
         segmentLogger.warn("Kafka permanent exception when fetching messages, stopping consumption", e);
         throw e;
       } catch (Exception e) {
         // Unknown exception from Kafka. Treat as a transient exception.
         // One such exception seen so far is java.net.SocketTimeoutException
-        handleTransientKafkaErrors(consecutiveErrorCount, e);
+        handleTransientKafkaErrors(e);
       }
 
       Iterator<MessageAndOffset> msgIterator = messagesAndOffsets.iterator();
