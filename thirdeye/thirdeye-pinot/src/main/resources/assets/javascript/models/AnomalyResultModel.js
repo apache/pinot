@@ -16,7 +16,7 @@ function AnomalyResultModel() {
 
   this.anomalyForFeedbackUpdate = null;
 
-  this.readyToRenderViewEvent = new Event();
+  this.renderViewEvent = new Event();
 
 }
 
@@ -84,7 +84,7 @@ AnomalyResultModel.prototype = {
   },
   updateModelAndNotifyView : function(anomalies) {
     this.anomalies = anomalies;
-    this.readyToRenderViewEvent.notify();
+    this.renderViewEvent.notify();
   },
   // Instead of calling rebuild for a simple anomaly feedback change, made a smaller function
   updateAnomalyFeedback : function() {

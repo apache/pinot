@@ -111,7 +111,7 @@ function AnomalyResultView(anomalyResultModel) {
   this.showDetailsLinkClickEvent = new Event(this);
   this.anomalyFeedbackSelectEvent = new Event(this);
 
-  this.anomalyResultModel.readyToRenderViewEvent.attach(this.readyToRenderViewEventHandler.bind(this));
+  this.anomalyResultModel.renderViewEvent.attach(this.renderViewEventHandler.bind(this));
 
 }
 
@@ -143,7 +143,7 @@ AnomalyResultView.prototype = {
     // APPLY BUTTON
     this.setupListenerOnApplyButton();
   },
-  readyToRenderViewEventHandler : function() {
+  renderViewEventHandler : function() {
     this.render();
   },
 
