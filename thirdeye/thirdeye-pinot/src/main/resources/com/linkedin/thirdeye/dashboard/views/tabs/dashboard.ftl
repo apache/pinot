@@ -26,11 +26,9 @@
 		</div>
 		<div class="container">
 			<nav class="navbar navbar-transparent" role="navigation">
-				<div class="navbar-header" >
-					<label class="label-medium-semibold" style="padding-top:15px;padding-bottom:15px">View metrics by:</label>
-				</div>
 				<div id="dashboard-tabs" class="collapse navbar-collapse">
 					<ul class="nav navbar-nav dashboard-tabs" id="dashboard-tabs">
+					    <li class=""><a href="#dashboard_metric-summary-tab">Metric Health by last 24 hours</a></li>
 						<li class=""><a href="#dashboard_anomaly-summary-tab"># of Anomalies</a></li>
 						<li class=""><a href="#dashboard_wow-summary-tab">Week Over Week</a></li>
 					</ul>
@@ -38,6 +36,9 @@
 			</nav>
 		</div>
 		<div class="tab-content">
+			<div class="tab-pane" id="dashboard_metric-summary-tab">
+				<div id="metric-summary-place-holder"></div>
+  			</div>
 			<div class="tab-pane" id="dashboard_anomaly-summary-tab">
 				<div id="anomaly-summary-place-holder"></div>
 			</div>

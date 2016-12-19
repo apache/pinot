@@ -1,5 +1,5 @@
 function DashboardModel() {
-  this.dashboardName;
+  this.dashboardName="100 Recent Anomalies";
   this.dashboardId;
   this.mode = "AnomalySummary";
 }
