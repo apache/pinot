@@ -46,6 +46,7 @@ AnalysisView.prototype = {
       self.viewParams['metric'] = {id: metricId, alias: metricAlias, name:metricName};
 
       // Now render the dimensions and filters for selected metric
+      self.renderGranularity(metricId);
       self.renderDimensions(metricId);
       self.renderFilters(metricId);
     });
@@ -59,55 +60,8 @@ AnalysisView.prototype = {
     current_range_cb(current_start, current_end);
     baseline_range_cb(baseline_start, baseline_end);
 
-    $('#current-range').daterangepicker({
-      startDate: current_start,
-      endDate: current_end,
-      dateLimit: {
-        days: 60
-      },
-      showDropdowns: true,
-      showWeekNumbers: true,
-      timePicker: true,
-      timePickerIncrement: 5,
-      timePicker12Hour: true,
-      ranges: {
-        'Last 24 Hours': [moment(), moment()],
-        'Yesterday': [moment().subtract(1, 'days'), moment().subtract(1, 'days')],
-        'Last 7 Days': [moment().subtract(6, 'days'), moment()],
-        'Last 30 Days': [moment().subtract(29, 'days'), moment()],
-        'This Month': [moment().startOf('month'), moment().endOf('month')],
-        'Last Month': [moment().subtract(1, 'month').startOf('month'),
-          moment().subtract(1, 'month').endOf('month')]
-      },
-      buttonClasses: ['btn', 'btn-sm'],
-      applyClass: 'btn-primary',
-      cancelClass: 'btn-default'
-    }, current_range_cb);
-
-    $('#baseline-range').daterangepicker({
-      startDate: baseline_start,
-      endDate: baseline_end,
-      dateLimit: {
-        days: 60
-      },
-      showDropdowns: true,
-      showWeekNumbers: true,
-      timePicker: true,
-      timePickerIncrement: 5,
-      timePicker12Hour: true,
-      ranges: {
-        'Last 24 Hours': [moment(), moment()],
-        'Yesterday': [moment().subtract(1, 'days'), moment().subtract(1, 'days')],
-        'Last 7 Days': [moment().subtract(6, 'days'), moment()],
-        'Last 30 Days': [moment().subtract(29, 'days'), moment()],
-        'This Month': [moment().startOf('month'), moment().endOf('month')],
-        'Last Month': [moment().subtract(1, 'month').startOf('month'),
-          moment().subtract(1, 'month').endOf('month')]
-      },
-      buttonClasses: ['btn', 'btn-sm'],
-      applyClass: 'btn-primary',
-      cancelClass: 'btn-default'
-    }, baseline_range_cb);
+    this.renderDatePicker('#current-range', current_range_cb, current_start, current_end);
+    this.renderDatePicker('#baseline-range', baseline_range_cb, baseline_start, baseline_end);
 
     function current_range_cb(start, end) {
       self.viewParams['currentStart'] = start;
@@ -126,6 +80,49 @@ AnalysisView.prototype = {
     }
 
     this.setupListeners();
+  },
+
+  renderDatePicker: function (domId, callbackFun, initialStart, initialEnd){
+    $(domId).daterangepicker({
+      startDate: initialStart,
+      endDate: initialEnd,
+      dateLimit: {
+        days: 60
+      },
+      showDropdowns: true,
+      showWeekNumbers: true,
+      timePicker: true,
+      timePickerIncrement: 5,
+      timePicker12Hour: true,
+      ranges: {
+        'Last 24 Hours': [moment(), moment()],
+        'Yesterday': [moment().subtract(1, 'days'), moment().subtract(1, 'days')],
+        'Last 7 Days': [moment().subtract(6, 'days'), moment()],
+        'Last 30 Days': [moment().subtract(29, 'days'), moment()],
+        'This Month': [moment().startOf('month'), moment().endOf('month')],
+        'Last Month': [moment().subtract(1, 'month').startOf('month'),
+          moment().subtract(1, 'month').endOf('month')]
+      },
+      buttonClasses: ['btn', 'btn-sm'],
+      applyClass: 'btn-primary',
+      cancelClass: 'btn-default'
+    }, callbackFun);
+  },
+
+  renderGranularity: function (metricId) {
+    var self = this;
+    var granularities = self.analysisModel.fetchGranularityForMetric(metricId);
+
+    var config = {
+      theme: "bootstrap", placeholder: "select dimension", data: granularities
+    };
+    if (granularities) {
+      $("#analysis-granularity-input").select2(config).on("select2:select", function (e) {
+        var selectedElement = $(e.currentTarget);
+        var selectedData = selectedElement.select2("data");
+        self.viewParams['granularity'] = selectedData[0].id;
+      });
+    }
   },
 
   renderDimensions: function (metricId) {
@@ -184,9 +181,6 @@ AnalysisView.prototype = {
       }
     }
     self.viewParams['filters'] = filterMap;
-
-    // collect and set granularity
-    self.viewParams['granularity'] = $("#granularity").val();
   },
 
   setupListeners: function () {

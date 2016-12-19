@@ -48,6 +48,10 @@ AnalysisModel.prototype = {
     }
   },
 
+  fetchGranularityForMetric: function (metricId) {
+    return dataService.fetchGranularityForMetric(metricId);
+  },
+
   fetchDimensionsForMetric : function(metricId) {
     return dataService.fetchDimensionsForMetric(metricId);
   },

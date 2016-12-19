@@ -44,11 +44,8 @@
 				</div>
 				<div class="col-md-2">
 					<div class="form-group ">
-						<label class="label-small-semibold" for="granularity">GRANULARITY </label> <select class="form-control selectAutoWidth" id="granularity">
-							<option>DAYS</option>
-							<option>HOURS</option>
-							<option>MINUTES</option>
-						</select>
+						<label class="label-small-semibold" for="granularity">GRANULARITY </label>
+            <select id="analysis-granularity-input" class="label-large-light underlined"></select>
 					</div>
 				</div>
 				<div class="col-md-3">

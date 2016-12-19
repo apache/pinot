@@ -91,6 +91,11 @@ DataService.prototype = {
       console.log("Updated backend feedback " + feedbackType);
     },
 
+    fetchGranularityForMetric: function (metricId) {
+      var url = "/data/agg/granularity/metric/"+metricId;
+      return this.getDataSynchronous(url);
+    },
+
     fetchDimensionsForMetric : function(metricId) {
       var url = "/data/autocomplete/dimensions/metric/"+metricId;
       return this.getDataSynchronous(url);
