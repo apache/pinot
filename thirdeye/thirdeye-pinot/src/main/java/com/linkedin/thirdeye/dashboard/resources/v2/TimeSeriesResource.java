@@ -153,7 +153,7 @@ public class TimeSeriesResource {
       subDimensionValuesMap.put(ALL, vw);
       vw.setCurrentValues(new double[timeBuckets]);
       vw.setBaselineValues(new double[timeBuckets]);
-      vw.setPercentageChange(new double[timeBuckets]);
+      vw.setPercentageChange(new String[timeBuckets]);
 
       // lets find the indices
       int subDimensionIndex =
@@ -190,19 +190,19 @@ public class TimeSeriesResource {
           ValuesContainer subDimVals = new ValuesContainer();
           subDimVals.setCurrentValues(new double[timeBuckets]);
           subDimVals.setBaselineValues(new double[timeBuckets]);
-          subDimVals.setPercentageChange(new double[timeBuckets]);
+          subDimVals.setPercentageChange(new String[timeBuckets]);
           subDimensionValuesMap.put(subDimension, subDimVals);
         }
 
         subDimensionValuesMap.get(subDimension).getCurrentValues()[index] = currentVal;
         subDimensionValuesMap.get(subDimension).getBaselineValues()[index] = baselineVal;
-        subDimensionValuesMap.get(subDimension).getPercentageChange()[index] = percentageChangeVal;
+        subDimensionValuesMap.get(subDimension).getPercentageChange()[index] = String.format("%.2f", percentageChangeVal);
       }
 
       // Now compute percentage change for all values
       for (int i = 0; i < vw.getCurrentValues().length; i++) {
-        vw.getPercentageChange()[i] =
-            getPercentageChange(vw.getCurrentValues()[i], vw.getBaselineValues()[i]);
+        vw.getPercentageChange()[i] = String.format("%.2f",
+            getPercentageChange(vw.getCurrentValues()[i], vw.getBaselineValues()[i]));
       }
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
@@ -275,7 +275,7 @@ public class TimeSeriesResource {
 
         double [] currentValues = new double[numTimeBuckets];
         double [] baselineValues = new double[numTimeBuckets];
-        double [] percentageChangeValues = new double[numTimeBuckets];
+        String [] percentageChangeValues = new String[numTimeBuckets];
 
         int currentValIndex =
             response.getData().get(metricConfigDTO.getName()).getSchema().getColumnsToIndexMapping()
@@ -297,9 +297,9 @@ public class TimeSeriesResource {
           baselineValues[i] = Double.valueOf(
               response.getData().get(metricConfigDTO.getName()).getResponseData()
                   .get(i)[baselineValIndex]);
-          percentageChangeValues[i] = Double.valueOf(
+          percentageChangeValues[i] =
               response.getData().get(metricConfigDTO.getName()).getResponseData()
-                  .get(i)[percentageChangeIndex]);
+                  .get(i)[percentageChangeIndex];
         }
 
         timeSeriesCompareView.setTimeBucketsCurrent(timeBucketsCurrent);

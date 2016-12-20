@@ -4,7 +4,7 @@ public class ValuesContainer {
   // TODO: add percentage change, cummulative values etc here
   double[] currentValues;
   double[] baselineValues;
-  double[] percentageChange;
+  String[] percentageChange;
 
   public double[] getBaselineValues() {
     return baselineValues;
@@ -22,11 +22,11 @@ public class ValuesContainer {
     this.currentValues = currentValues;
   }
 
-  public double[] getPercentageChange() {
+  public String[] getPercentageChange() {
     return percentageChange;
   }
 
-  public void setPercentageChange(double[] percentageChange) {
+  public void setPercentageChange(String[] percentageChange) {
     this.percentageChange = percentageChange;
   }
 }
