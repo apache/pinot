@@ -6,7 +6,7 @@ function AnalysisModel() {
   this.dimension;
   this.filters;
 
-  this.currentStart = moment().subtract(4, 'days');;
+  this.currentStart = moment().subtract(4, 'days');
   this.currentEnd = moment();
   this.baselineStart= moment().subtract(10, 'days');
   this.baselineEnd = moment().subtract(6, 'days');

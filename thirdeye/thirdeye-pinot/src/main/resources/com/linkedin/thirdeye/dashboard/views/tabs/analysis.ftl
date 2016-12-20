@@ -43,10 +43,14 @@
 					<hr>
 				</div>
 				<div class="col-md-2">
-					<div class="form-group ">
-						<label class="label-small-semibold" for="granularity">GRANULARITY </label>
-            <select id="analysis-granularity-input" class="label-large-light underlined"></select>
+					<div class="row">
+						<label class="label-medium-semibold" for="granularity">Granularity </label>
 					</div>
+          <div class="row">
+            <div style="width: 370px; float: left">
+              <select id="analysis-granularity-input" class="label-large-light underlined"></select>
+            </div>
+          </div>
 				</div>
 				<div class="col-md-3">
 					<div class="row">
@@ -54,7 +58,7 @@
 					</div>
 					<div class="row">
             <div style="width: 370px; float: left">
-              <select id="analysis-metric-dimension-input" class="label-large-light underlined"></select>
+              <select id="analysis-metric-dimension-input" style="width: 50%;" class="label-large-light underlined"></select>
             </div>
 					</div>
 				</div>
@@ -63,7 +67,7 @@
 						<label class="label-medium-semibold" for="add-filter-button">Filters </label>
 					</div>
 					<div>
-                <select id="analysis-metric-filter-input" style="width: 100%;" class="label-large-light underlined"></select>
+                <select id="analysis-metric-filter-input" style="width: 110%;" class="label-large-light underlined"></select>
 					</div>
 				</div>
 			</div>

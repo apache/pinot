@@ -12,15 +12,6 @@ function TimeSeriesCompareView(timeSeriesCompareModel) {
   var contributor_table_template = $("#contributor-table-details-template").html();
   this.contributor_table_template_compiled = Handlebars.compile(contributor_table_template);
   this.contributor_table_placeHolderId = "#contributor-table-placeholder";
-
-  // var wow_metric_table_template = $("#wow-metric-table-template").html();
-  // this.wow_metric_table_template_compiled = Handlebars.compile(wow_metric_table_template);
-  // this.wow_metric_table_placeHolderId = "#wow-metric-table-placeholder";
-  //
-  // var wow_metric_dimension_table_template = $("#wow-metric-dimension-table-template").html();
-  // this.wow_metric_dimension_table_template_compiled = Handlebars.compile(wow_metric_dimension_table_template);
-  // this.wow_metric_dimension_table_placeHolderId = "#wow-metric-dimension-table-placeholder";
-
   this.checkboxClickEvent = new Event();
 }
 
@@ -29,13 +20,6 @@ TimeSeriesCompareView.prototype = {
   },
 
   render: function () {
-
-    // var wowMetricTableResult = this.wow_metric_table_template_compiled(this.model);
-    // $(this.wow_metric_table_placeHolderId).html(wowMetricTableResult);
-    //
-    // var wowMetricDimensionTableResult = this.wow_metric_dimension_table_template_compiled(this.model);
-    // $(this.wow_metric_dimension_table_placeHolderId).html(wowMetricDimensionTableResult);
-
     if (this.timeSeriesCompareModel.subDimensionContributionDetails) {
       // render chart
       var timeseriesContributorViewResult = this.timeseries_contributor_template_compiled(this.timeSeriesCompareModel);

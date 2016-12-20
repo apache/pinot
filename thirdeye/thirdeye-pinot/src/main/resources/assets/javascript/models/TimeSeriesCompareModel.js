@@ -66,17 +66,13 @@ TimeSeriesCompareModel.prototype = {
       if (timeSeriesResponse) {
         var dateColumn = ['date'];
         for (var i in timeSeriesResponse.timeBucketsCurrent) {
-          // TODO: if granularity is hours or minutes then format accordingly
-          dateColumn.push(moment(timeSeriesResponse.timeBucketsCurrent[i]).format('YYYY-M-D'));
+          dateColumn.push(timeSeriesResponse.timeBucketsCurrent[i]);
         }
-
         if (timeSeriesResponse.subDimensionContributionMap) {
           this.subDimensions = [];
           this.subDimensionContributionDetails = {};
           this.subDimensionContributionDetails.contributionMap = {};
           this.subDimensionContributionDetails.percentageChange = {};
-
-          // TODO: parse and format timebuckets based on selected granularity
           this.subDimensionContributionDetails.timeBucketsCurrent = timeSeriesResponse.timeBucketsCurrent;
 
           for (var key in timeSeriesResponse.subDimensionContributionMap) {
@@ -92,8 +88,8 @@ TimeSeriesCompareModel.prototype = {
             }
             this.subDimensions.push(key);
             this.subDimensionContributionDetails.contributionMap[key] = {
-              start: moment(timeSeriesResponse.start).format('YYYY-M-D'),
-              end: moment(timeSeriesResponse.end).format('YYYY-M-D'),
+              start: timeSeriesResponse.start,
+              end: timeSeriesResponse.end,
               columns: [dateColumn, currentVal, baselineVal]
             };
             this.subDimensionContributionDetails.percentageChange[key] = percentageChange;

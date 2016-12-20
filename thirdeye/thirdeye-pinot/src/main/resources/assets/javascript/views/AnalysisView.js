@@ -15,7 +15,7 @@ AnalysisView.prototype = {
     $("#analysis-place-holder").html(this.analysis_template_compiled);
     var self = this;
     // METRIC SELECTION
-    $('#analysis-metric-input').select2({
+    var analysisMetricSelect = $('#analysis-metric-input').select2({
       theme: "bootstrap", placeholder: "search for Metric(s)", ajax: {
         url: constants.METRIC_AUTOCOMPLETE_ENDPOINT, delay: 250, data: function (params) {
           var query = {
@@ -37,19 +37,30 @@ AnalysisView.prototype = {
           };
         }
       }
-    }).on("select2:select", function (e) {
+    });
+
+    // analysisMetricSelect.on("select2:select", function (e) {
+    //   var selectedElement = $(e.currentTarget);
+    //   var selectedData = selectedElement.select2("data");
+    //   var metricId = selectedData.map(function (e) {return e.id})[0];
+    //   var metricAlias = selectedData.map(function (e) {return e.text})[0];
+    //   var metricName = selectedData.map(function (e) {return e.name})[0];
+    //   self.viewParams['metric'] = {id: metricId, alias: metricAlias, name:metricName};
+    // });
+
+    analysisMetricSelect.on("change", function(e) {
       var selectedElement = $(e.currentTarget);
       var selectedData = selectedElement.select2("data");
       var metricId = selectedData.map(function (e) {return e.id})[0];
       var metricAlias = selectedData.map(function (e) {return e.text})[0];
       var metricName = selectedData.map(function (e) {return e.name})[0];
-      self.viewParams['metric'] = {id: metricId, alias: metricAlias, name:metricName};
+      self.viewParams['metric'] = {id: metricId, alias: metricAlias, allowClear:true, name:metricName};
 
       // Now render the dimensions and filters for selected metric
-      self.renderGranularity(metricId);
-      self.renderDimensions(metricId);
-      self.renderFilters(metricId);
-    });
+      self.renderGranularity(self.viewParams.metric.id);
+      self.renderDimensions(self.viewParams.metric.id);
+      self.renderFilters(self.viewParams.metric.id);
+    }).trigger('change');
 
     // TIME RANGE SELECTION
     var current_start = self.analysisModel.currentStart
@@ -110,37 +121,45 @@ AnalysisView.prototype = {
   },
 
   renderGranularity: function (metricId) {
+    if(!metricId) return;
     var self = this;
     var granularities = self.analysisModel.fetchGranularityForMetric(metricId);
-
+    console.log(granularities);
     var config = {
-      theme: "bootstrap", placeholder: "select dimension", data: granularities
+      data: granularities
     };
+    console.log
     if (granularities) {
-      $("#analysis-granularity-input").select2(config).on("select2:select", function (e) {
+      $("#analysis-granularity-input").select2().empty();
+      $("#analysis-granularity-input").select2(config).on("change", function (e) {
         var selectedElement = $(e.currentTarget);
         var selectedData = selectedElement.select2("data");
         self.viewParams['granularity'] = selectedData[0].id;
-      });
+      }).trigger('change');
     }
   },
 
   renderDimensions: function (metricId) {
+    if(!metricId) return;
     var self = this;
     var dimensions = self.analysisModel.fetchDimensionsForMetric(metricId);
     var config = {
       theme: "bootstrap", placeholder: "select dimension", data: dimensions
     };
+    console.log(dimensions);
     if (dimensions) {
+      $("#analysis-metric-dimension-input").select2().empty();
       $("#analysis-metric-dimension-input").select2(config).on("select2:select", function (e) {
         var selectedElement = $(e.currentTarget);
         var selectedData = selectedElement.select2("data");
         self.viewParams['dimension'] = selectedData[0].id;
+        console.log(selectedData)
       });
     }
   },
 
   renderFilters: function (metricId) {
+    if(!metricId) return;
     var self = this;
     var filters = self.analysisModel.fetchFiltersForMetric(metricId);
     var filterData = [];
@@ -161,6 +180,7 @@ AnalysisView.prototype = {
         multiple: true,
         data: filterData
       };
+      $("#analysis-metric-filter-input").select2().empty();
       $("#analysis-metric-filter-input").select2(config);
     }
   },

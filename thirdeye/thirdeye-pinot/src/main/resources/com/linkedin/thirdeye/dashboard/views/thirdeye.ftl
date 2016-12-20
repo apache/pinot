@@ -81,9 +81,6 @@
 <script id="contributor-table-details-template" type="text/x-handlebars-template">
   <#include "tabs/analysis/contributor-table-details.ftl"/>
 </script>
-<script id="wow-metric-dimension-table-template" type="text/x-handlebars-template">
-  <#include "tabs/analysis/wow-metric-dimension.ftl"/>
-</script>
 <script id="dimension-tree-map-template" type="text/x-handlebars-template">
   <#include "tabs/analysis/dimension-tree-map.ftl"/>
 </script>

@@ -43,14 +43,6 @@
   <#--</div>-->
 <#--</div>-->
 
-
 <div class="row">
   <div id="contributor-table-placeholder"></div>
 </div>
-
-<#--<div class="row">-->
-  <#--<div id="wow-metric-table-placeholder"></div>-->
-<#--</div>-->
-<#--<div class="row">-->
-  <#--<div id="wow-metric-dimension-table-placeholder"></div>-->
-<#--</div>-->
