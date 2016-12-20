@@ -39,15 +39,6 @@ AnalysisView.prototype = {
       }
     });
 
-    // analysisMetricSelect.on("select2:select", function (e) {
-    //   var selectedElement = $(e.currentTarget);
-    //   var selectedData = selectedElement.select2("data");
-    //   var metricId = selectedData.map(function (e) {return e.id})[0];
-    //   var metricAlias = selectedData.map(function (e) {return e.text})[0];
-    //   var metricName = selectedData.map(function (e) {return e.name})[0];
-    //   self.viewParams['metric'] = {id: metricId, alias: metricAlias, name:metricName};
-    // });
-
     analysisMetricSelect.on("change", function(e) {
       var selectedElement = $(e.currentTarget);
       var selectedData = selectedElement.select2("data");
@@ -126,6 +117,7 @@ AnalysisView.prototype = {
     var granularities = self.analysisModel.fetchGranularityForMetric(metricId);
     console.log(granularities);
     var config = {
+      minimumResultsForSearch: -1,
       data: granularities
     };
     console.log
@@ -144,7 +136,7 @@ AnalysisView.prototype = {
     var self = this;
     var dimensions = self.analysisModel.fetchDimensionsForMetric(metricId);
     var config = {
-      theme: "bootstrap", placeholder: "select dimension", data: dimensions
+      minimumResultsForSearch: -1, data: dimensions
     };
     console.log(dimensions);
     if (dimensions) {

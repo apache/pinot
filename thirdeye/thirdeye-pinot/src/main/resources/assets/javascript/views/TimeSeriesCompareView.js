@@ -58,15 +58,16 @@ TimeSeriesCompareView.prototype = {
         },
         x : {
           type : 'timeseries',
-          show : true
+          show : true,
+          tick:{
+            "culling":{"max":100},
+            "count":10,
+            // "rotate":30,   // this will rotate the x axis values
+            "fit":true,
+            "format":"%m-%d %H:%M"}
         }
-      },
-      regions : [ {
-        start : timeSeriesObject.start,
-        end : timeSeriesObject.end
-      }]
+      }
     });
-
   },
 
   dataEventHandler: function (e) {

@@ -11,6 +11,11 @@ Handlebars.registerHelper('displayHour', function (date) {
   return moment(date).tz(tz).format('h a');
 });
 
+Handlebars.registerHelper('displayMonthDayHour', function (date) {
+  var tz = getTimeZone();
+  return moment(date).tz(tz).format('M-D H');
+});
+
 Handlebars.registerHelper('if_eq', function(a, b, opts) {
   if (a == b) {
       return opts.fn(this);
@@ -25,7 +30,7 @@ Handlebars.registerHelper('if_no_anomalies', function(info, opts) {
   } else{
     return opts.inverse(this);
   }
-  
+
 });
 
 Handlebars.registerHelper('computeColor', function(value) {
@@ -37,7 +42,7 @@ Handlebars.registerHelper('computeColor', function(value) {
  }
 });
 
-//compute the text color so that its visible based on background 
+//compute the text color so that its visible based on background
 Handlebars.registerHelper('computeTextColor', function(value) {
   opacity = Math.abs(value/25);
   if(opacity < 0.5){

@@ -5,7 +5,7 @@
       <tr>
         <th></th>
         {{#each this.subDimensionContributionDetails.timeBucketsCurrent as |timestamp timeIndex|}}
-        <th>{{timestamp}}</th>
+        <th>{{displayMonthDayHour timestamp}}</th>
         {{/each}}
       </tr>
       </thead>
@@ -14,7 +14,7 @@
       <tr>
         <td>{{keyIndex}}</td>
         {{#each percentageChangeArr as |percentageChange idx|}}
-        <td>{{percentageChange}}%</td>
+        <td style="background-color: {{computeColor percentageChange}};color: {{computeTextColor percentageChange}};">{{percentageChange}}%</td>
         {{/each}}
       </tr>
       {{/each}}

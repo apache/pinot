@@ -88,8 +88,8 @@ TimeSeriesCompareModel.prototype = {
             }
             this.subDimensions.push(key);
             this.subDimensionContributionDetails.contributionMap[key] = {
-              start: timeSeriesResponse.start,
-              end: timeSeriesResponse.end,
+              start: moment(timeSeriesResponse.start).format('YYYY-M-D'),
+              end: moment(timeSeriesResponse.end).format('YYYY-M-D'),
               columns: [dateColumn, currentVal, baselineVal]
             };
             this.subDimensionContributionDetails.percentageChange[key] = percentageChange;
