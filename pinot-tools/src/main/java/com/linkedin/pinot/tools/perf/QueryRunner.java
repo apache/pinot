@@ -19,12 +19,14 @@ import com.linkedin.pinot.tools.AbstractBaseCommand;
 import com.linkedin.pinot.tools.Command;
 import java.io.File;
 import java.io.FileInputStream;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import javax.annotation.concurrent.ThreadSafe;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.math.stat.descriptive.DescriptiveStatistics;
 import org.json.JSONObject;
@@ -38,6 +40,7 @@ import org.slf4j.LoggerFactory;
 public class QueryRunner extends AbstractBaseCommand implements Command {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryRunner.class);
   private static final int MILLIS_PER_SECOND = 1000;
+  private static final String CLIENT_TIME_STATISTICS = "CLIENT TIME STATISTICS";
 
   @Option(name = "-mode", required = true, metaVar = "<String>",
       usage = "Mode of query runner (singleThread|multiThreads|targetQPS|increasingQPS).")
@@ -50,9 +53,9 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
   @Option(name = "-reportIntervalMs", required = false, metaVar = "<int>",
       usage = "Interval in milliseconds to report simple statistics (default 3000).")
   private int _reportIntervalMs = 3000;
-  @Option(name = "-numIntervalsToReportClientTimeStatistics", required = false, metaVar = "<int>",
-      usage = "Number of report intervals to report detailed client time statistics (default 10).")
-  private int _numIntervalsToReportClientTimeStatistics = 10;
+  @Option(name = "-numIntervalsToReportAndClearStatistics", required = false, metaVar = "<int>",
+      usage = "Number of report intervals to report detailed statistics and clear them, 0 means never (default 10).")
+  private int _numIntervalsToReportAndClearStatistics = 10;
   @Option(name = "-numThreads", required = false, metaVar = "<int>",
       usage = "Number of threads sending queries for multiThreads, targetQPS and increasingQPS mode (default 5). "
           + "This can be used to simulate multiple clients sending queries concurrently.")
@@ -86,7 +89,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
   @Override
   public String description() {
     return "Run queries from a query file in singleThread, multiThreads, targetQPS or increasingQPS mode. E.g.\n"
-        + "  QueryRunner -mode singleThread -queryFile <queryFile> -numTimesToRunQueries 0 -numIntervalsToReportClientTimeStatistics 5\n"
+        + "  QueryRunner -mode singleThread -queryFile <queryFile> -numTimesToRunQueries 0 -numIntervalsToReportAndClearStatistics 5\n"
         + "  QueryRunner -mode multiThreads -queryFile <queryFile> -numThreads 10 -reportIntervalMs 1000\n"
         + "  QueryRunner -mode targetQPS -queryFile <queryFile> -startQPS 50\n"
         + "  QueryRunner -mode increasingQPS -queryFile <queryFile> -startQPS 50 -deltaQPS 10 -numIntervalsToIncreaseQPS 20\n";
@@ -110,8 +113,8 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
       printUsage();
       return false;
     }
-    if (_numIntervalsToReportClientTimeStatistics <= 0) {
-      LOGGER.error("Argument numIntervalsToReportClientTimeStatistics should be a positive number.");
+    if (_numIntervalsToReportAndClearStatistics < 0) {
+      LOGGER.error("Argument numIntervalsToReportAndClearStatistics should be a non-negative number.");
       printUsage();
       return false;
     }
@@ -129,10 +132,10 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     switch (_mode) {
       case "singleThread":
         LOGGER.info("MODE singleThread with queryFile: {}, numTimesToRunQueries: {}, reportIntervalMs: {}, "
-                + "numIntervalsToReportClientTimeStatistics: {}", _queryFile, _numTimesToRunQueries, _reportIntervalMs,
-            _numIntervalsToReportClientTimeStatistics);
+                + "numIntervalsToReportAndClearStatistics: {}", _queryFile, _numTimesToRunQueries, _reportIntervalMs,
+            _numIntervalsToReportAndClearStatistics);
         singleThreadedQueryRunner(conf, _queryFile, _numTimesToRunQueries, _reportIntervalMs,
-            _numIntervalsToReportClientTimeStatistics);
+            _numIntervalsToReportAndClearStatistics);
         break;
       case "multiThreads":
         if (_numThreads <= 0) {
@@ -141,10 +144,10 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
           break;
         }
         LOGGER.info("MODE multiThreads with queryFile: {}, numTimesToRunQueries: {}, numThreads: {}, "
-                + "reportIntervalMs: {}, numIntervalsToReportClientTimeStatistics: {}", _queryFile, _numTimesToRunQueries,
-            _numThreads, _reportIntervalMs, _numIntervalsToReportClientTimeStatistics);
+                + "reportIntervalMs: {}, numIntervalsToReportAndClearStatistics: {}", _queryFile, _numTimesToRunQueries,
+            _numThreads, _reportIntervalMs, _numIntervalsToReportAndClearStatistics);
         multiThreadedQueryRunner(conf, _queryFile, _numTimesToRunQueries, _numThreads, _reportIntervalMs,
-            _numIntervalsToReportClientTimeStatistics);
+            _numIntervalsToReportAndClearStatistics);
         break;
       case "targetQPS":
         if (_numThreads <= 0) {
@@ -153,16 +156,15 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
           break;
         }
         if (_startQPS <= 0 || _startQPS > 1000.0) {
-          System.out.println(
-              "For targetQPS mode, argument startQPS should be a positive number that less or equal to 1000.");
+          LOGGER.error("For targetQPS mode, argument startQPS should be a positive number that less or equal to 1000.");
           printUsage();
           break;
         }
         LOGGER.info("MODE targetQPS with queryFile: {}, numTimesToRunQueries: {}, numThreads: {}, startQPS: {}, "
-                + "reportIntervalMs: {}, numIntervalsToReportClientTimeStatistics: {}", _queryFile, _numTimesToRunQueries,
-            _numThreads, _startQPS, _reportIntervalMs, _numIntervalsToReportClientTimeStatistics);
+                + "reportIntervalMs: {}, numIntervalsToReportAndClearStatistics: {}", _queryFile, _numTimesToRunQueries,
+            _numThreads, _startQPS, _reportIntervalMs, _numIntervalsToReportAndClearStatistics);
         targetQPSQueryRunner(conf, _queryFile, _numTimesToRunQueries, _numThreads, _startQPS, _reportIntervalMs,
-            _numIntervalsToReportClientTimeStatistics);
+            _numIntervalsToReportAndClearStatistics);
         break;
       case "increasingQPS":
         if (_numThreads <= 0) {
@@ -171,13 +173,13 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
           break;
         }
         if (_startQPS <= 0 || _startQPS > 1000.0) {
-          System.out.println(
+          LOGGER.error(
               "For increasingQPS mode, argument startQPS should be a positive number that less or equal to 1000.");
           printUsage();
           break;
         }
         if (_deltaQPS <= 0) {
-          System.out.println("For increasingQPS mode, argument deltaQPS should be a positive number.");
+          LOGGER.error("For increasingQPS mode, argument deltaQPS should be a positive number.");
           printUsage();
           break;
         }
@@ -187,14 +189,14 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
           break;
         }
         LOGGER.info("MODE increasingQPS with queryFile: {}, numTimesToRunQueries: {}, numThreads: {}, startQPS: {}, "
-                + "deltaQPS: {}, reportIntervalMs: {}, numIntervalsToReportClientTimeStatistics: {}, "
+                + "deltaQPS: {}, reportIntervalMs: {}, numIntervalsToReportAndClearStatistics: {}, "
                 + "numIntervalsToIncreaseQPS: {}", _queryFile, _numTimesToRunQueries, _numThreads, _startQPS, _deltaQPS,
-            _reportIntervalMs, _numIntervalsToReportClientTimeStatistics, _numIntervalsToIncreaseQPS);
+            _reportIntervalMs, _numIntervalsToReportAndClearStatistics, _numIntervalsToIncreaseQPS);
         increasingQPSQueryRunner(conf, _queryFile, _numTimesToRunQueries, _numThreads, _startQPS, _deltaQPS,
-            _reportIntervalMs, _numIntervalsToReportClientTimeStatistics, _numIntervalsToIncreaseQPS);
+            _reportIntervalMs, _numIntervalsToReportAndClearStatistics, _numIntervalsToIncreaseQPS);
         break;
       default:
-        LOGGER.error("Invalid mode: {}" + _mode);
+        LOGGER.error("Invalid mode: {}", _mode);
         printUsage();
         break;
     }
@@ -211,11 +213,12 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
    * @param queryFile query file.
    * @param numTimesToRunQueries number of times to run all queries in the query file, 0 means infinite times.
    * @param reportIntervalMs report interval in milliseconds.
-   * @param numIntervalsToReportClientTimeStatistics number of intervals to report detailed client time statistics.
+   * @param numIntervalsToReportAndClearStatistics number of report intervals to report detailed statistics and clear
+   *                                               them, 0 means never.
    * @throws Exception
    */
   public static void singleThreadedQueryRunner(PerfBenchmarkDriverConf conf, String queryFile, int numTimesToRunQueries,
-      int reportIntervalMs, int numIntervalsToReportClientTimeStatistics)
+      int reportIntervalMs, int numIntervalsToReportAndClearStatistics)
       throws Exception {
     List<String> queries;
     try (FileInputStream input = new FileInputStream(new File(queryFile))) {
@@ -224,9 +227,9 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
 
     PerfBenchmarkDriver driver = new PerfBenchmarkDriver(conf);
     int numQueriesExecuted = 0;
-    int totalBrokerTime = 0;
-    int totalClientTime = 0;
-    DescriptiveStatistics clientTimeStatistics = new DescriptiveStatistics();
+    long totalBrokerTime = 0L;
+    long totalClientTime = 0L;
+    List<Statistics> statisticsList = Collections.singletonList(new Statistics(CLIENT_TIME_STATISTICS));
 
     long startTime = System.currentTimeMillis();
     long reportStartTime = startTime;
@@ -240,7 +243,7 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
         totalBrokerTime += brokerTime;
         long clientTime = response.getLong("totalTime");
         totalClientTime += clientTime;
-        clientTimeStatistics.addValue(clientTime);
+        statisticsList.get(0).addValue(clientTime);
 
         long currentTime = System.currentTimeMillis();
         if (currentTime - reportStartTime >= reportIntervalMs) {
@@ -251,8 +254,18 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
               totalBrokerTime / (double) numQueriesExecuted, totalClientTime / (double) numQueriesExecuted);
           reportStartTime = currentTime;
           numReportIntervals++;
-          if (numReportIntervals % numIntervalsToReportClientTimeStatistics == 0) {
-            reportClientTimeStatistics(clientTimeStatistics);
+
+          if ((numIntervalsToReportAndClearStatistics != 0)
+              && (numReportIntervals == numIntervalsToReportAndClearStatistics)) {
+            numReportIntervals = 0;
+            startTime = currentTime;
+            numQueriesExecuted = 0;
+            totalBrokerTime = 0L;
+            totalClientTime = 0L;
+            for (Statistics statistics : statisticsList) {
+              statistics.report();
+              statistics.clear();
+            }
           }
         }
       }
@@ -266,7 +279,9 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
             + "Average Client Time: {}ms.", timePassed, numQueriesExecuted,
         numQueriesExecuted / ((double) timePassed / MILLIS_PER_SECOND), totalBrokerTime / (double) numQueriesExecuted,
         totalClientTime / (double) numQueriesExecuted);
-    reportClientTimeStatistics(clientTimeStatistics);
+    for (Statistics statistics : statisticsList) {
+      statistics.report();
+    }
   }
 
   /**
@@ -283,11 +298,12 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
    * @param numTimesToRunQueries number of times to run all queries in the query file, 0 means infinite times.
    * @param numThreads number of threads sending queries.
    * @param reportIntervalMs report interval in milliseconds.
-   * @param numIntervalsToReportClientTimeStatistics number of intervals to report detailed client time statistics.
+   * @param numIntervalsToReportAndClearStatistics number of report intervals to report detailed statistics and clear
+   *                                               them, 0 means never.
    * @throws Exception
    */
   public static void multiThreadedQueryRunner(PerfBenchmarkDriverConf conf, String queryFile, int numTimesToRunQueries,
-      int numThreads, int reportIntervalMs, int numIntervalsToReportClientTimeStatistics)
+      int numThreads, int reportIntervalMs, int numIntervalsToReportAndClearStatistics)
       throws Exception {
     List<String> queries;
     try (FileInputStream input = new FileInputStream(new File(queryFile))) {
@@ -295,16 +311,16 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     }
 
     PerfBenchmarkDriver driver = new PerfBenchmarkDriver(conf);
+    ConcurrentLinkedQueue<String> queryQueue = new ConcurrentLinkedQueue<>();
     AtomicInteger numQueriesExecuted = new AtomicInteger(0);
     AtomicLong totalBrokerTime = new AtomicLong(0L);
     AtomicLong totalClientTime = new AtomicLong(0L);
-    DescriptiveStatistics clientTimeStatistics = new DescriptiveStatistics();
-    ConcurrentLinkedQueue<String> queryQueue = new ConcurrentLinkedQueue<>();
+    List<Statistics> statisticsList = Collections.singletonList(new Statistics(CLIENT_TIME_STATISTICS));
 
     ExecutorService executorService = Executors.newFixedThreadPool(numThreads);
     for (int i = 0; i < numThreads; i++) {
       executorService.submit(
-          new Worker(driver, numQueriesExecuted, totalBrokerTime, totalClientTime, clientTimeStatistics, queryQueue));
+          new Worker(driver, queryQueue, numQueriesExecuted, totalBrokerTime, totalClientTime, statisticsList));
     }
     executorService.shutdown();
 
@@ -336,8 +352,12 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
                 totalClientTime.get() / (double) numQueriesExecutedInt);
             reportStartTime = currentTime;
             numReportIntervals++;
-            if (numReportIntervals % numIntervalsToReportClientTimeStatistics == 0) {
-              reportClientTimeStatistics(clientTimeStatistics);
+
+            if ((numIntervalsToReportAndClearStatistics != 0)
+                && (numReportIntervals == numIntervalsToReportAndClearStatistics)) {
+              numReportIntervals = 0;
+              startTime = currentTime;
+              reportAndClearStatistics(numQueriesExecuted, totalBrokerTime, totalClientTime, statisticsList);
             }
           }
         }
@@ -362,7 +382,9 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
             + "Average Client Time: {}ms.", timePassed, numQueriesExecutedInt,
         numQueriesExecutedInt / ((double) timePassed / MILLIS_PER_SECOND),
         totalBrokerTime.get() / (double) numQueriesExecutedInt, totalClientTime.get() / (double) numQueriesExecutedInt);
-    reportClientTimeStatistics(clientTimeStatistics);
+    for (Statistics statistics : statisticsList) {
+      statistics.report();
+    }
   }
 
   /**
@@ -380,11 +402,12 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
    * @param numThreads number of threads sending queries.
    * @param startQPS start QPS (target QPS).
    * @param reportIntervalMs report interval in milliseconds.
-   * @param numIntervalsToReportClientTimeStatistics number of intervals to report detailed client time statistics.
+   * @param numIntervalsToReportAndClearStatistics number of report intervals to report detailed statistics and clear
+   *                                               them, 0 means never.
    * @throws Exception
    */
   public static void targetQPSQueryRunner(PerfBenchmarkDriverConf conf, String queryFile, int numTimesToRunQueries,
-      int numThreads, double startQPS, int reportIntervalMs, int numIntervalsToReportClientTimeStatistics)
+      int numThreads, double startQPS, int reportIntervalMs, int numIntervalsToReportAndClearStatistics)
       throws Exception {
     List<String> queries;
     try (FileInputStream input = new FileInputStream(new File(queryFile))) {
@@ -392,16 +415,16 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     }
 
     PerfBenchmarkDriver driver = new PerfBenchmarkDriver(conf);
+    ConcurrentLinkedQueue<String> queryQueue = new ConcurrentLinkedQueue<>();
     AtomicInteger numQueriesExecuted = new AtomicInteger(0);
     AtomicLong totalBrokerTime = new AtomicLong(0L);
     AtomicLong totalClientTime = new AtomicLong(0L);
-    DescriptiveStatistics clientTimeStatistics = new DescriptiveStatistics();
-    ConcurrentLinkedQueue<String> queryQueue = new ConcurrentLinkedQueue<>();
+    List<Statistics> statisticsList = Collections.singletonList(new Statistics(CLIENT_TIME_STATISTICS));
 
     ExecutorService executorService = Executors.newFixedThreadPool(numThreads);
     for (int i = 0; i < numThreads; i++) {
       executorService.submit(
-          new Worker(driver, numQueriesExecuted, totalBrokerTime, totalClientTime, clientTimeStatistics, queryQueue));
+          new Worker(driver, queryQueue, numQueriesExecuted, totalBrokerTime, totalClientTime, statisticsList));
     }
     executorService.shutdown();
 
@@ -431,8 +454,12 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
               totalClientTime.get() / (double) numQueriesExecutedInt, queryQueue.size());
           reportStartTime = currentTime;
           numReportIntervals++;
-          if (numReportIntervals % numIntervalsToReportClientTimeStatistics == 0) {
-            reportClientTimeStatistics(clientTimeStatistics);
+
+          if ((numIntervalsToReportAndClearStatistics != 0)
+              && (numReportIntervals == numIntervalsToReportAndClearStatistics)) {
+            numReportIntervals = 0;
+            startTime = currentTime;
+            reportAndClearStatistics(numQueriesExecuted, totalBrokerTime, totalClientTime, statisticsList);
           }
         }
       }
@@ -456,7 +483,9 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
             + "Average Broker Time: {}ms, Average Client Time: {}ms.", startQPS, timePassed, numQueriesExecutedInt,
         numQueriesExecutedInt / ((double) timePassed / MILLIS_PER_SECOND),
         totalBrokerTime.get() / (double) numQueriesExecutedInt, totalClientTime.get() / (double) numQueriesExecutedInt);
-    reportClientTimeStatistics(clientTimeStatistics);
+    for (Statistics statistics : statisticsList) {
+      statistics.report();
+    }
   }
 
   /**
@@ -476,14 +505,15 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
    * @param startQPS start QPS.
    * @param deltaQPS delta QPS.
    * @param reportIntervalMs report interval in milliseconds.
-   * @param numIntervalsToReportClientTimeStatistics number of intervals to report detailed client time statistics.
+   * @param numIntervalsToReportAndClearStatistics number of report intervals to report detailed statistics and clear
+   *                                               them, 0 means never.
    * @param numIntervalsToIncreaseQPS number of intervals to increase QPS.
    * @throws Exception
    */
-  @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter")
+
   public static void increasingQPSQueryRunner(PerfBenchmarkDriverConf conf, String queryFile, int numTimesToRunQueries,
       int numThreads, double startQPS, double deltaQPS, int reportIntervalMs,
-      int numIntervalsToReportClientTimeStatistics, int numIntervalsToIncreaseQPS)
+      int numIntervalsToReportAndClearStatistics, int numIntervalsToIncreaseQPS)
       throws Exception {
     List<String> queries;
     try (FileInputStream input = new FileInputStream(new File(queryFile))) {
@@ -491,16 +521,16 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     }
 
     PerfBenchmarkDriver driver = new PerfBenchmarkDriver(conf);
+    ConcurrentLinkedQueue<String> queryQueue = new ConcurrentLinkedQueue<>();
     AtomicInteger numQueriesExecuted = new AtomicInteger(0);
     AtomicLong totalBrokerTime = new AtomicLong(0L);
     AtomicLong totalClientTime = new AtomicLong(0L);
-    DescriptiveStatistics clientTimeStatistics = new DescriptiveStatistics();
-    ConcurrentLinkedQueue<String> queryQueue = new ConcurrentLinkedQueue<>();
+    List<Statistics> statisticsList = Collections.singletonList(new Statistics(CLIENT_TIME_STATISTICS));
 
     ExecutorService executorService = Executors.newFixedThreadPool(numThreads);
     for (int i = 0; i < numThreads; i++) {
       executorService.submit(
-          new Worker(driver, numQueriesExecuted, totalBrokerTime, totalClientTime, clientTimeStatistics, queryQueue));
+          new Worker(driver, queryQueue, numQueriesExecuted, totalBrokerTime, totalClientTime, statisticsList));
     }
     executorService.shutdown();
 
@@ -526,51 +556,47 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
           reportStartTime = currentTime;
           numReportIntervals++;
 
-          if (numReportIntervals % numIntervalsToIncreaseQPS == 0) {
-            LOGGER.info("--------------------------------------------------------------------------------");
-            LOGGER.info("REPORT FOR TARGET QPS: {}", currentQPS);
-            int numQueriesExecutedInt = numQueriesExecuted.get();
-            LOGGER.info("Current Target QPS: {}, Time Passed: {}ms, Queries Executed: {}, Average QPS: {}, "
-                    + "Average Broker Time: {}ms, Average Client Time: {}ms, Queries Queued: {}.", currentQPS, timePassed,
-                numQueriesExecutedInt, numQueriesExecutedInt / ((double) timePassed / MILLIS_PER_SECOND),
-                totalBrokerTime.get() / (double) numQueriesExecutedInt,
-                totalClientTime.get() / (double) numQueriesExecutedInt, queryQueue.size());
-            reportClientTimeStatistics(clientTimeStatistics);
-
-            // Find the next interval.
+          if (numReportIntervals == numIntervalsToIncreaseQPS) {
+            // Try to find the next interval.
             double newQPS = currentQPS + deltaQPS;
             int newQueryIntervalMs;
+            // Skip the target QPS with the same interval as the previous one.
             while ((newQueryIntervalMs = (int) (MILLIS_PER_SECOND / newQPS)) == queryIntervalMs) {
-              LOGGER.info(
-                  "Skip target QPS: {} because the interval to produce queries is the same as the previous target QPS.",
-                  newQPS);
               newQPS += deltaQPS;
             }
             if (newQueryIntervalMs == 0) {
               LOGGER.warn("Due to sleep granularity of millisecond, cannot further increase QPS.");
             } else {
+              // Find the next interval.
+              LOGGER.info("--------------------------------------------------------------------------------");
+              LOGGER.info("REPORT FOR TARGET QPS: {}", currentQPS);
+              int numQueriesExecutedInt = numQueriesExecuted.get();
+              LOGGER.info("Current Target QPS: {}, Time Passed: {}ms, Queries Executed: {}, Average QPS: {}, "
+                      + "Average Broker Time: {}ms, Average Client Time: {}ms, Queries Queued: {}.", currentQPS,
+                  timePassed, numQueriesExecutedInt, numQueriesExecutedInt / ((double) timePassed / MILLIS_PER_SECOND),
+                  totalBrokerTime.get() / (double) numQueriesExecutedInt,
+                  totalClientTime.get() / (double) numQueriesExecutedInt, queryQueue.size());
+              numReportIntervals = 0;
+              startTime = currentTime;
+              reportAndClearStatistics(numQueriesExecuted, totalBrokerTime, totalClientTime, statisticsList);
+
               currentQPS = newQPS;
               queryIntervalMs = newQueryIntervalMs;
-              LOGGER.info("Increase target QPS to: {}, the following statistics are for this new QPS.", currentQPS);
-
-              // Clear the statistics.
-              startTime = currentTime;
-              numQueriesExecuted.set(0);
-              totalBrokerTime.set(0);
-              totalClientTime.set(0);
-              synchronized (clientTimeStatistics) {
-                clientTimeStatistics.clear();
-              }
+              LOGGER.info("Increase target QPS to: {}, the following statistics are for the new target QPS.",
+                  currentQPS);
             }
           } else {
             int numQueriesExecutedInt = numQueriesExecuted.get();
             LOGGER.info("Current Target QPS: {}, Time Passed: {}ms, Queries Executed: {}, Average QPS: {}, "
-                    + "Average Broker Time: {}ms, Average Client Time: {}ms, Queries Queued: {}.", currentQPS, timePassed,
-                numQueriesExecutedInt, numQueriesExecutedInt / ((double) timePassed / MILLIS_PER_SECOND),
+                    + "Average Broker Time: {}ms, Average Client Time: {}ms, Queries Queued: {}.", currentQPS,
+                timePassed, numQueriesExecutedInt, numQueriesExecutedInt / ((double) timePassed / MILLIS_PER_SECOND),
                 totalBrokerTime.get() / (double) numQueriesExecutedInt,
                 totalClientTime.get() / (double) numQueriesExecutedInt, queryQueue.size());
-            if (numReportIntervals % numIntervalsToReportClientTimeStatistics == 0) {
-              reportClientTimeStatistics(clientTimeStatistics);
+
+            if ((numIntervalsToReportAndClearStatistics != 0) && (
+                numReportIntervals % numIntervalsToReportAndClearStatistics == 0)) {
+              startTime = currentTime;
+              reportAndClearStatistics(numQueriesExecuted, totalBrokerTime, totalClientTime, statisticsList);
             }
           }
         }
@@ -595,30 +621,25 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
             + "Average Broker Time: {}ms, Average Client Time: {}ms.", currentQPS, timePassed, numQueriesExecutedInt,
         numQueriesExecutedInt / ((double) timePassed / MILLIS_PER_SECOND),
         totalBrokerTime.get() / (double) numQueriesExecutedInt, totalClientTime.get() / (double) numQueriesExecutedInt);
-    reportClientTimeStatistics(clientTimeStatistics);
-  }
-
-  @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter")
-  private static void reportClientTimeStatistics(DescriptiveStatistics clientTimeStatistics) {
-    synchronized (clientTimeStatistics) {
-      LOGGER.info("--------------------------------------------------------------------------------");
-      LOGGER.info("CLIENT TIME STATISTICS:");
-      LOGGER.info(clientTimeStatistics.toString());
-      LOGGER.info("10th percentile: {}ms", clientTimeStatistics.getPercentile(10.0));
-      LOGGER.info("25th percentile: {}ms", clientTimeStatistics.getPercentile(25.0));
-      LOGGER.info("50th percentile: {}ms", clientTimeStatistics.getPercentile(50.0));
-      LOGGER.info("90th percentile: {}ms", clientTimeStatistics.getPercentile(90.0));
-      LOGGER.info("95th percentile: {}ms", clientTimeStatistics.getPercentile(95.0));
-      LOGGER.info("99th percentile: {}ms", clientTimeStatistics.getPercentile(99.0));
-      LOGGER.info("99.9th percentile: {}ms", clientTimeStatistics.getPercentile(99.9));
-      LOGGER.info("--------------------------------------------------------------------------------");
+    for (Statistics statistics : statisticsList) {
+      statistics.report();
     }
   }
 
-  @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter")
+  private static void reportAndClearStatistics(AtomicInteger numQueriesExecuted, AtomicLong totalBrokerTime,
+      AtomicLong totalClientTime, List<Statistics> statisticsList) {
+    numQueriesExecuted.set(0);
+    totalBrokerTime.set(0L);
+    totalClientTime.set(0L);
+    for (Statistics statistics : statisticsList) {
+      statistics.report();
+      statistics.clear();
+    }
+  }
+
   private static void executeQueryInMultiThreads(PerfBenchmarkDriver driver, String query,
       AtomicInteger numQueriesExecuted, AtomicLong totalBrokerTime, AtomicLong totalClientTime,
-      DescriptiveStatistics clientTimeStatistics)
+      List<Statistics> statisticsList)
       throws Exception {
     JSONObject response = driver.postQuery(query);
     numQueriesExecuted.getAndIncrement();
@@ -626,28 +647,26 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
     totalBrokerTime.getAndAdd(brokerTime);
     long clientTime = response.getLong("totalTime");
     totalClientTime.getAndAdd(clientTime);
-    synchronized (clientTimeStatistics) {
-      clientTimeStatistics.addValue(clientTime);
-    }
+    statisticsList.get(0).addValue(clientTime);
   }
 
   private static class Worker implements Runnable {
     private final PerfBenchmarkDriver _driver;
+    private final ConcurrentLinkedQueue<String> _queryQueue;
     private final AtomicInteger _numQueriesExecuted;
     private final AtomicLong _totalBrokerTime;
     private final AtomicLong _totalClientTime;
-    private final DescriptiveStatistics _clientTimeStatistics;
-    private final ConcurrentLinkedQueue<String> _queryQueue;
+    private final List<Statistics> _statisticsList;
 
-    private Worker(PerfBenchmarkDriver driver, AtomicInteger numQueriesExecuted, AtomicLong totalBrokerTime,
-        AtomicLong totalClientTime, DescriptiveStatistics clientTimeStatistics,
-        ConcurrentLinkedQueue<String> queryQueue) {
+    private Worker(PerfBenchmarkDriver driver, ConcurrentLinkedQueue<String> queryQueue,
+        AtomicInteger numQueriesExecuted, AtomicLong totalBrokerTime, AtomicLong totalClientTime,
+        List<Statistics> statisticsList) {
       _driver = driver;
+      _queryQueue = queryQueue;
       _numQueriesExecuted = numQueriesExecuted;
       _totalBrokerTime = totalBrokerTime;
       _totalClientTime = totalClientTime;
-      _clientTimeStatistics = clientTimeStatistics;
-      _queryQueue = queryQueue;
+      _statisticsList = statisticsList;
     }
 
     @Override
@@ -664,11 +683,49 @@ public class QueryRunner extends AbstractBaseCommand implements Command {
         }
         try {
           executeQueryInMultiThreads(_driver, query, _numQueriesExecuted, _totalBrokerTime, _totalClientTime,
-              _clientTimeStatistics);
+              _statisticsList);
         } catch (Exception e) {
           LOGGER.error("Caught exception while running query: {}", query, e);
           return;
         }
+      }
+    }
+  }
+
+  @ThreadSafe
+  private static class Statistics {
+    private final DescriptiveStatistics _statistics = new DescriptiveStatistics();
+    private final String _name;
+
+    public Statistics(String name) {
+      _name = name;
+    }
+
+    public void addValue(double value) {
+      synchronized (_statistics) {
+        _statistics.addValue(value);
+      }
+    }
+
+    public void report() {
+      synchronized (_statistics) {
+        LOGGER.info("--------------------------------------------------------------------------------");
+        LOGGER.info("{}:", _name);
+        LOGGER.info(_statistics.toString());
+        LOGGER.info("10th percentile: {}", _statistics.getPercentile(10.0));
+        LOGGER.info("25th percentile: {}", _statistics.getPercentile(25.0));
+        LOGGER.info("50th percentile: {}", _statistics.getPercentile(50.0));
+        LOGGER.info("90th percentile: {}", _statistics.getPercentile(90.0));
+        LOGGER.info("95th percentile: {}", _statistics.getPercentile(95.0));
+        LOGGER.info("99th percentile: {}", _statistics.getPercentile(99.0));
+        LOGGER.info("99.9th percentile: {}", _statistics.getPercentile(99.9));
+        LOGGER.info("--------------------------------------------------------------------------------");
+      }
+    }
+
+    public void clear() {
+      synchronized (_statistics) {
+        _statistics.clear();
       }
     }
   }
