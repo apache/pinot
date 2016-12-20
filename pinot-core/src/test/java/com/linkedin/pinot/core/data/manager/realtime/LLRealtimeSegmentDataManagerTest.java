@@ -16,7 +16,6 @@
 
 package com.linkedin.pinot.core.data.manager.realtime;
 
-import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -36,6 +35,7 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
+import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import com.yammer.metrics.core.MetricsRegistry;
 import junit.framework.Assert;
 import static org.mockito.Matchers.any;
@@ -566,7 +566,7 @@ public class LLRealtimeSegmentDataManagerTest {
     }
 
     @Override
-    protected boolean consumeLoop() {
+    protected boolean consumeLoop() throws Exception {
       if (_throwExceptionFromConsume) {
         throw new SimpleConsumerWrapper.PermanentConsumerException(Errors.OFFSET_OUT_OF_RANGE);
       }

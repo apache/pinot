@@ -124,6 +124,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   private static final long TIME_THRESHOLD_FOR_LOG_MINUTES = 1;
   private static final long TIME_EXTENSION_ON_EMPTY_SEGMENT_HOURS = 1;
   private static final int MSG_COUNT_THRESHOLD_FOR_LOG = 100000;
+  private final int MAX_CONSECUTIVE_ERROR_COUNT = 5;
 
   private final LLCRealtimeSegmentZKMetadata _segmentZKMetadata;
   private final AbstractTableConfig _tableConfig;
@@ -138,6 +139,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   private volatile long _currentOffset;
   private volatile State _state;
   private volatile int _numRowsConsumed = 0;
+  private volatile int consecutiveErrorCount = 0;
   private long _startTimeMs = 0;
   private final String _segmentNameStr;
   private final SegmentVersion _segmentVersion;
@@ -157,7 +159,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   final String _clientId;
   private final LLCSegmentName _segmentName;
   private final PlainFieldExtractor _fieldExtractor;
-  private final SimpleConsumerWrapper _consumerWrapper;
+  private SimpleConsumerWrapper _consumerWrapper = null;
   private final File _resourceTmpDir;
   private final String _tableName;
   private final List<String> _invertedIndexColumns;
@@ -170,6 +172,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   private final long _consumeStartTime;
   private final long _startOffset;
   private final KafkaStreamMetadata _kafkaStreamMetadata;
+  private final String _kafkaBootstrapNodes;
 
   private long _lastLogTime = 0;
   private int _lastConsumedCount = 0;
@@ -235,11 +238,20 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  protected boolean consumeLoop() {
-    _fieldExtractor.resetCounters();
+  private void handleTransientKafkaErrors(Exception e) throws  Exception {
+    consecutiveErrorCount++;
+    if (consecutiveErrorCount > MAX_CONSECUTIVE_ERROR_COUNT) {
+      segmentLogger.warn("Kafka transient exception when fetching messages, stopping consumption after {} attempts", consecutiveErrorCount, e);
+      throw e;
+    } else {
+      segmentLogger.warn("Kafka transient exception when fetching messages, retrying (count={})", consecutiveErrorCount, e);
+      Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
+      makeConsumerWrapper();
+    }
+  }
 
-    int consecutiveErrorCount = 0;
-    final int MAX_CONSECUTIVE_ERROR_COUNT = 5;
+  protected boolean consumeLoop() throws Exception {
+    _fieldExtractor.resetCounters();
 
     final long _endOffset = Long.MAX_VALUE; // No upper limit on Kafka offset
     segmentLogger.info("Starting consumption loop start offset {}, finalOffset {}", _currentOffset, _finalOffset);
@@ -252,33 +264,20 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
         Pair<Iterable<MessageAndOffset>, Long> messagesAndWatermark =
             _consumerWrapper.fetchMessagesAndHighWatermark(_currentOffset, _endOffset,
                 _kafkaStreamMetadata.getKafkaFetchTimeoutMillis());
+        consecutiveErrorCount = 0;
         messagesAndOffsets = messagesAndWatermark.getLeft();
         highWatermark = messagesAndWatermark.getRight();
       } catch (TimeoutException e) {
-        consecutiveErrorCount++;
-
-        if (consecutiveErrorCount > MAX_CONSECUTIVE_ERROR_COUNT) {
-          segmentLogger.warn("Timed out when fetching messages from Kafka, stopping consumption after {} attempts", consecutiveErrorCount);
-          throw new RuntimeException(e);
-        } else {
-          segmentLogger.warn("Timed out when fetching messages from Kafka, retrying (count={})", consecutiveErrorCount);
-          Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
-          continue;
-        }
+        handleTransientKafkaErrors(e);
       } catch (SimpleConsumerWrapper.TransientConsumerException e) {
-        consecutiveErrorCount++;
-
-        if (consecutiveErrorCount > MAX_CONSECUTIVE_ERROR_COUNT) {
-          segmentLogger.warn("Kafka transient exception when fetching messages, stopping consumption after {} attempts", consecutiveErrorCount, e);
-          throw e;
-        } else {
-          segmentLogger.warn("Kafka transient exception when fetching messages, retrying (count={})", consecutiveErrorCount, e);
-          Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
-          continue;
-        }
+        handleTransientKafkaErrors(e);
       } catch (SimpleConsumerWrapper.PermanentConsumerException e) {
         segmentLogger.warn("Kafka permanent exception when fetching messages, stopping consumption", e);
         throw e;
+      } catch (Exception e) {
+        // Unknown exception from Kafka. Treat as a transient exception.
+        // One such exception seen so far is java.net.SocketTimeoutException
+        handleTransientKafkaErrors(e);
       }
 
       Iterator<MessageAndOffset> msgIterator = messagesAndOffsets.iterator();
@@ -362,8 +361,6 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
         // Kafka broker
         Uninterruptibles.sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
       }
-
-      consecutiveErrorCount = 0;
     }
 
     _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.ROWS_WITH_ERRORS,
@@ -746,7 +743,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     _kafkaStreamMetadata = new KafkaStreamMetadata(indexingConfig.getStreamConfigs());
     KafkaLowLevelStreamProviderConfig kafkaStreamProviderConfig = createStreamProviderConfig();
     kafkaStreamProviderConfig.init(tableConfig, instanceZKMetadata, schema);
-    final String bootstrapNodes = indexingConfig.getStreamConfigs()
+    _kafkaBootstrapNodes = indexingConfig.getStreamConfigs()
         .get(CommonConstants.Helix.DataSource.STREAM_PREFIX + "." + CommonConstants.Helix.DataSource.Realtime.Kafka.KAFKA_BROKER_LIST);
     _kafkaTopic = kafkaStreamProviderConfig.getTopicName();
     _segmentNameStr = _segmentZKMetadata.getSegmentName();
@@ -803,9 +800,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
 
     // Create field extractor
     _fieldExtractor = (PlainFieldExtractor) FieldExtractorFactory.getPlainFieldExtractor(schema);
-    _consumerWrapper = SimpleConsumerWrapper.forPartitionConsumption(new KafkaSimpleConsumerFactoryImpl(),
-        bootstrapNodes, _clientId, _kafkaTopic, _kafkaPartitionId,
-        _kafkaStreamMetadata.getKafkaConnectionTimeoutMillis());
+    makeConsumerWrapper();
     _startOffset = _segmentZKMetadata.getStartOffset();
     _currentOffset = _startOffset;
     _resourceTmpDir = new File(resourceDataDir, "_tmp");
@@ -846,6 +841,20 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
           ServerMeter.COLUMNS_WITH_NULL_VALUES, (long) numNullCols);
       segmentLogger.info("{} columns had null values", numNullCols);
     }
+  }
+
+  private void makeConsumerWrapper() {
+    if (_consumerWrapper != null) {
+      try {
+        _consumerWrapper.close();
+      } catch (Exception e) {
+        segmentLogger.warn("Could not close Kafka consumer wrapper");
+      }
+    }
+    segmentLogger.info("Creating new Kafka consumer wrapper");
+    _consumerWrapper = SimpleConsumerWrapper.forPartitionConsumption(new KafkaSimpleConsumerFactoryImpl(),
+        _kafkaBootstrapNodes, _clientId, _kafkaTopic, _kafkaPartitionId,
+        _kafkaStreamMetadata.getKafkaConnectionTimeoutMillis());
   }
 
   // This should be done during commit? We may not always commit when we build a segment....
