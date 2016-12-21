@@ -292,9 +292,21 @@ public class AnomaliesResource {
 
       // fetch anomalies in range, ordered by end time
       List<MergedAnomalyResultDTO> mergedAnomalies = getAnomaliesForMetricInRange(dataset, metricName, startTime, endTime);
-      // TODO: send back page number according to client inputs, instead of the first page by default
-      if (mergedAnomalies.size() > DEFAULT_PAGE_SIZE) {
-        mergedAnomalies.subList(DEFAULT_PAGE_SIZE, mergedAnomalies.size()).clear();
+      // TODO: get pagenumber and pagesize from client
+      int pageNumber = DEFAULT_PAGE_NUMBER;
+      int pageSize = DEFAULT_PAGE_SIZE;
+      int maxPageNumber = mergedAnomalies.size()/pageSize + 1;
+      if (pageNumber > maxPageNumber) {
+        pageNumber = maxPageNumber;
+      }
+      if (pageNumber < 1) {
+        pageNumber = 1;
+      }
+      if (mergedAnomalies.size() > pageSize) {
+        if (mergedAnomalies.size() > pageSize * pageNumber ) {
+          mergedAnomalies.subList(pageSize * pageNumber, mergedAnomalies.size()).clear();
+        }
+        mergedAnomalies.subList(0, pageSize * (pageNumber - 1)).clear();
       }
       // for each anomaly, fetch function details and create wrapper
       for (MergedAnomalyResultDTO mergedAnomaly : mergedAnomalies) {
