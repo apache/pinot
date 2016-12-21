@@ -133,6 +133,7 @@ public class AnomaliesResource {
   }
 
 
+
   /**
    * Get count of anomalies for metric in time range, divided into specified number of buckets
    * @param metricId
@@ -164,6 +165,7 @@ public class AnomaliesResource {
         resolvedAnomalies ++;
       }
     }
+    anomaliesSummary.setMetricId(metricId);
     anomaliesSummary.setNumAnomalies(mergedAnomalies.size());
     anomaliesSummary.setNumAnomaliesResolved(resolvedAnomalies);
     anomaliesSummary.setNumAnomaliesUnresolved(unresolvedAnomalies);

@@ -44,6 +44,8 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 
+import jersey.repackaged.com.google.common.collect.Lists;
+
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -335,6 +337,36 @@ public class DataResource {
     }
 
     return metricsSummary;
+  }
+
+
+
+  @GET
+  @Path("dashboard/anomalysummary")
+  public Map<String, List<AnomaliesSummary>> getAnomalySummary(
+      @QueryParam("dashboard") String dashboard,
+      @QueryParam("timeRanges") String timeRanges) {
+    List<Long> metricIds = getMetricIdsByDashboard(dashboard);
+    List<String> timeRangesList = Lists.newArrayList(timeRanges.split(","));
+
+    // TODO:
+    Map<String, List<AnomaliesSummary>> metricIdToAnomaliesSummariesMap = new HashMap<>();
+    for (Long metricId : metricIds) {
+      List<AnomaliesSummary> summaries = new ArrayList<>();
+      MetricConfigDTO metricConfig = metricConfigDAO.findById(metricId);
+      for (String timeRange : timeRangesList) {
+
+        AnomaliesSummary summary = new AnomaliesSummary();
+        summary.setMetricId(metricId);
+        summary.setMetricName(metricConfigDAO.findById(metricId).getName());
+        summary.setNumAnomalies(10);
+        summary.setNumAnomaliesResolved(6);
+        summary.setNumAnomaliesUnresolved(4);
+        summaries.add(summary);
+      }
+      metricIdToAnomaliesSummariesMap.put(metricConfig.getAlias(), summaries);
+    }
+    return metricIdToAnomaliesSummariesMap;
   }
 
   /**

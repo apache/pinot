@@ -61,3 +61,8 @@ Handlebars.registerHelper('computeAnomaliesString', function(value) {
   }
 });
 
+Handlebars.registerHelper('getMetricNameFromAlias', function(value) {
+  return value.split('::')[1];
+});
+
+

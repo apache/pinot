@@ -1,41 +1,37 @@
 function AnomalySummaryModel() {
   this.timeRangeLabels = [ "Last 6 Hours", "Last 24 Hours", "Last 48 Hours", "Last Week", "Last Month" ];
-  this.anomalySummaryList = [];
+  this.timeRanges = ['6_HOURS', '24_HOURS', '48_HOURS', '7_DAYS', '30_DAYS'];
+  this.metricToAnomalySummaryListMap = {};
+
+  this.renderViewEvent = new Event();
 }
 
 AnomalySummaryModel.prototype = {
 
-  init : function(params) {
-    this.buildSampleData();
+  reset : function() {
+    this.metricToAnomalySummaryListMap = {};
+  },
+  setParams : function(params) {
+    console.log("Set params");
+    if (params != undefined) {
+      console.log('params');
+      if (params['dashboardName'] != undefined) {
+        console.log('dashboard');
+        this.dashboardName = params['dashboardName'];
+      }
+    }
   },
 
   rebuild : function() {
-    // TODO: fetch relevant data from backend and update this.anomalySummary
+    if (this.dashboardName != null) {
+      dataService.fetchAnomalySummary(this.dashboardName, this.timeRanges, this.updateModelAndNotifyView.bind(this));
+    }
   },
-
-  buildSampleData : function() {
-    var row1 = new AnomalySummaryRow();
-    row1.metricName = "metricA";
-    row1.data = [ {resolved:3, open:5}, {resolved:3, open:5}, {resolved:3, open:5}, {resolved:3, open:5}, {resolved:3, open:5} ];
-
-    var row2 = new AnomalySummaryRow();
-    row2.metricName = "metricB";
-    row2.data = [ {resolved:3, open:0}, {resolved:3, open:5}, {resolved:3, open:5}, {resolved:3, open:5}, {resolved:3, open:5} ];
-
-    var row3 = new AnomalySummaryRow();
-    row3.metricName = "metricC";
-    row3.data = [ {resolved:0, open:0}, {resolved:3, open:0}, {resolved:5, open:0}, {resolved:3, open:5}, {resolved:3, open:5} ];
-
-    this.anomalySummaryList = [];
-    this.anomalySummaryList.push(row1);
-    this.anomalySummaryList.push(row2);
-    this.anomalySummaryList.push(row3);
-
+  updateModelAndNotifyView : function(metricToAnomalySummaryListMap) {
+    console.log('Results');
+    console.log(metricToAnomalySummaryListMap);
+    this.metricToAnomalySummaryListMap = metricToAnomalySummaryListMap;
+    this.renderViewEvent.notify();
   }
 };
 
-function AnomalySummaryRow() {
-  this.metricName = "N/A";
-  this.timeGranularity = "HOURS";
-  this.data = [];
-}

@@ -1,6 +1,8 @@
 package com.linkedin.thirdeye.dashboard.resources.v2.pojo;
 
 public class AnomaliesSummary {
+  Long metricId;
+  String metricName;
   int numAnomalies;
   int numAnomaliesResolved;
   int numAnomaliesUnresolved;
@@ -22,6 +24,18 @@ public class AnomaliesSummary {
   }
   public void setNumAnomaliesUnresolved(int numAnomaliesUnresolved) {
     this.numAnomaliesUnresolved = numAnomaliesUnresolved;
+  }
+  public Long getMetricId() {
+    return metricId;
+  }
+  public void setMetricId(Long metricId) {
+    this.metricId = metricId;
+  }
+  public String getMetricName() {
+    return metricName;
+  }
+  public void setMetricName(String metricName) {
+    this.metricName = metricName;
   }
 
 

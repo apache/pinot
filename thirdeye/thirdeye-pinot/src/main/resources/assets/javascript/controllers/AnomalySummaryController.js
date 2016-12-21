@@ -7,11 +7,11 @@ function AnomalySummaryController(parentController){
 
 AnomalySummaryController.prototype ={
 
-    handleAppEvent: function(){
-      var params = HASH_SERVICE.getParams();
-      this.anomalySummaryModel.init(params);
+    handleAppEvent: function(params){
+      //var params = HASH_SERVICE.getParams();
+      this.anomalySummaryModel.reset();
+      this.anomalySummaryModel.setParams(params);
       this.anomalySummaryModel.rebuild();
-      this.anomalySummaryView.render();
     },
     onDashboardInputChange: function(){
 
