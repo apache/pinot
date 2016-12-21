@@ -72,6 +72,8 @@ public class AnomaliesResource {
   private static final String ANOMALY_BASELINE_VAL_KEY = "baseLineVal";
   private static final String ANOMALY_CURRENT_VAL_KEY = "currentVal";
   private static final String COMMA_SEPARATOR = ",";
+  private static final int DEFAULT_PAGE_NUMBER = 1;
+  private static final int DEFAULT_PAGE_SIZE = 10;
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY = ThirdEyeCacheRegistry.getInstance();
@@ -288,9 +290,12 @@ public class AnomaliesResource {
       DateTimeFormatter startEndDateFormatterDays = DateTimeFormat.forPattern(START_END_DATE_FORMAT_DAYS).withZone(Utils.getDataTimeZone(dataset));
       DateTimeFormatter startEndDateFormatterHours = DateTimeFormat.forPattern(START_END_DATE_FORMAT_HOURS).withZone(Utils.getDataTimeZone(dataset));
 
-      // fetch anomalies in range
+      // fetch anomalies in range, ordered by end time
       List<MergedAnomalyResultDTO> mergedAnomalies = getAnomaliesForMetricInRange(dataset, metricName, startTime, endTime);
-
+      // TODO: send back page number according to client inputs, instead of the first page by default
+      if (mergedAnomalies.size() > DEFAULT_PAGE_SIZE) {
+        mergedAnomalies.subList(DEFAULT_PAGE_SIZE, mergedAnomalies.size()).clear();
+      }
       // for each anomaly, fetch function details and create wrapper
       for (MergedAnomalyResultDTO mergedAnomaly : mergedAnomalies) {
 
