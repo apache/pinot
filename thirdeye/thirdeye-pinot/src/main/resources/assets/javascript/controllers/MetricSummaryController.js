@@ -7,18 +7,16 @@ function MetricSummaryController(parentController){
 
 MetricSummaryController.prototype ={
 
-    handleAppEvent: function(){
-      var params = HASH_SERVICE.getParams();
-      this.metricSummaryModel.init(params);
+    handleAppEvent: function(params){
+      console.log("handleAppEvent of metricSummary");
+      console.log(params);
+      this.metricSummaryModel.reset();
+      this.metricSummaryModel.setParams(params);
       this.metricSummaryModel.rebuild();
-      this.metricSummaryView.render();
     },
-    onDashboardInputChange: function(){
-
-    },
-
-    init:function(){
-
+    onDashboardInputChange: function(params){
+      console.log("dashboard input change");
+      this.handleAppEvent(params);
     }
 
 

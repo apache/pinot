@@ -51,3 +51,13 @@ Handlebars.registerHelper('computeTextColor', function(value) {
     return "#ffffff" ;
   }
  });
+
+
+Handlebars.registerHelper('computeAnomaliesString', function(value) {
+  if (value == 1){
+    return value + " anomaly";
+  } else{
+    return value + " anomalies" ;
+  }
+});
+

@@ -56,6 +56,14 @@ DataService.prototype = {
         data: data
       });
     },
+    fetchMetricSummary: function(dashboard, timeRange, callback) {
+      var url = constants.METRIC_SUMMARY;
+      var data = {
+          dashboard : dashboard,
+          timeRange : timeRange
+      };
+      this.getDataAsynchronous(url, data, callback);
+    },
     // Fetch anomalies for metric ids in array in time range
     fetchAnomaliesForMetricIds : function(startTime, endTime, metricIds, functionName, callback) {
       var url = constants.SEARCH_ANOMALIES_METRICIDS + startTime + this.URL_SEPARATOR + endTime;

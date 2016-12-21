@@ -5,16 +5,18 @@ import com.google.common.base.Strings;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.MetricExpression;
+import com.linkedin.thirdeye.client.cache.MetricDataset;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.dashboard.configs.DashboardConfig;
-
+import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomaliesSummary;
+import com.linkedin.thirdeye.dashboard.resources.v2.pojo.MetricSummary;
+import com.linkedin.thirdeye.dashboard.views.GenericResponse;
 import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewHandler;
 import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewRequest;
 import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewResponse;
-
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
@@ -22,8 +24,9 @@ import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
+
+import java.text.DecimalFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -31,7 +34,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
-import javax.ws.rs.DefaultValue;
+import java.util.concurrent.TimeUnit;
+
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -39,6 +43,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
+
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -65,6 +70,7 @@ public class DataResource {
   private static final Logger LOG = LoggerFactory.getLogger(DataResource.class);
   private static final DAORegistry daoRegistry = DAORegistry.getInstance();
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  private static final DecimalFormat df2 = new DecimalFormat("#.#");
 
   private final MetricConfigManager metricConfigDAO;
   private final DatasetConfigManager datasetConfigDAO;
@@ -74,6 +80,7 @@ public class DataResource {
   private final LoadingCache<String, String> dimensionsFilterCache;
 
   private final QueryCache queryCache;
+  private AnomaliesResource anomaliesResoure;
 
   public DataResource() {
     metricConfigDAO = daoRegistry.getMetricConfigDAO();
@@ -83,6 +90,7 @@ public class DataResource {
     this.queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
     this.collectionMaxDataTimeCache = CACHE_REGISTRY_INSTANCE.getCollectionMaxDataTimeCache();
     this.dimensionsFilterCache = CACHE_REGISTRY_INSTANCE.getDimensionFiltersCache();
+    this.anomaliesResoure = new AnomaliesResource();
   }
 
   //------------- endpoints to fetch summary -------------
@@ -232,41 +240,40 @@ public class DataResource {
    * Note: For current implementation, we assume the number of buckets is always 1.
    */
   @GET
-  @Path("dashboard/wowsummary")
-  public TabularViewResponse getWoWSummary(@QueryParam("name") String dashboardName,
-      @QueryParam("currentStart") Long currentStart, @QueryParam("currentEnd") Long currentEnd,
-      @QueryParam("currentStart") Long baselineStart, @QueryParam("currentEnd") Long baselineEnd) {
-    if (StringUtils.isBlank(dashboardName)) {
-      return null;
+  @Path("dashboard/metricsummary")
+  public List<MetricSummary> getWoWSummary(@QueryParam("dashboard") String dashboard,
+      @QueryParam("timeRange") String timeRange) {
+    List<MetricSummary> metricsSummary = new ArrayList<>();
+
+    if (StringUtils.isBlank(dashboard)) {
+      return metricsSummary;
     }
 
-    List<Long> metricIds = getMetricIdsByDashboard(dashboardName);
+    List<Long> metricIds = getMetricIdsByDashboard(dashboard);
 
     // Sort metric's id and metric expression by collections
-    Multimap<String, Long> collectionToMetrics = ArrayListMultimap.create();
-    Multimap<String, MetricExpression> collectionToMetricExpressions = ArrayListMultimap.create();
+    Multimap<String, Long> datasetToMetrics = ArrayListMultimap.create();
+    Multimap<String, MetricExpression> datasetToMetricExpressions = ArrayListMultimap.create();
+    Map<Long, MetricConfigDTO> metricIdToMetricConfig = new HashMap<>();
+    Map<Long, GenericResponse> idToResponseMap = new HashMap<>();
     for (long metricId : metricIds) {
       MetricConfigDTO metricConfig = metricConfigDAO.findById(metricId);
-      collectionToMetrics.put(metricConfig.getDataset(), metricId);
-
-      MetricExpression metricExpression = ThirdEyeUtils.getMetricExpressionFromMetricConfig(metricConfig);
-      collectionToMetricExpressions.put(metricConfig.getDataset(), metricExpression);
+      metricIdToMetricConfig.put(metricId, metricConfig);
+      datasetToMetrics.put(metricConfig.getDataset(), metricId);
+      datasetToMetricExpressions.put(metricConfig.getDataset(), ThirdEyeUtils.getMetricExpressionFromMetricConfig(metricConfig));
     }
 
-    // Get the smallest max date time among all collection
-    long maxCollectionDateTime = getSmallestMaxDateTimeFromCollections(collectionToMetrics.keySet());
-    if (currentEnd > maxCollectionDateTime) {
-      long delta = currentEnd - maxCollectionDateTime;
-      currentEnd = currentEnd - delta;
-      baselineEnd = baselineEnd - delta;
-    }
+     // Get the smallest max date time among all collection
+    long currentEnd = getSmallestMaxDateTimeFromCollections(datasetToMetrics.keySet());
+    String[] tokens = timeRange.split("_");
+    TimeGranularity timeGranularity = new TimeGranularity(Integer.valueOf(tokens[0]), TimeUnit.valueOf(tokens[1]));
+    long currentStart = currentEnd - TimeUnit.MILLISECONDS.convert(Long.valueOf(tokens[0]), TimeUnit.valueOf(tokens[1]));
 
     // Create query request for each collection
-    Map<String, TabularViewResponse> collectionToTabularViewResponse = new HashMap<>();
-    for (String collection : collectionToMetrics.keySet()) {
+    for (String collection : datasetToMetrics.keySet()) {
       TabularViewRequest request = new TabularViewRequest();
       request.setCollection(collection);
-      request.setMetricExpressions(new ArrayList<>(collectionToMetricExpressions.get(collection)));
+      request.setMetricExpressions(new ArrayList<>(datasetToMetricExpressions.get(collection)));
 
       // The input start and end time (i.e., currentStart, currentEnd, baselineStart, and
       // baselineEnd) are given in millisecond since epoch, which is timezone insensitive. On the
@@ -281,34 +288,53 @@ public class DataResource {
       } catch (ExecutionException e) {
         LOG.info("Use UTC timezone for collection={} because failed to get its timezone.");
       }
-      request.setBaselineStart(new DateTime(baselineStart, timeZoneForCollection));
-      request.setBaselineEnd(new DateTime(baselineEnd, timeZoneForCollection));
+      request.setBaselineStart(new DateTime(currentStart, timeZoneForCollection).minusDays(7));
+      request.setBaselineEnd(new DateTime(currentEnd, timeZoneForCollection).minusDays(7));
       request.setCurrentStart(new DateTime(currentStart, timeZoneForCollection));
       request.setCurrentEnd(new DateTime(currentEnd, timeZoneForCollection));
+      request.setTimeGranularity(timeGranularity);
 
       TabularViewHandler handler = new TabularViewHandler(queryCache);
       try {
         TabularViewResponse response = handler.process(request);
-        collectionToTabularViewResponse.put(collection, response);
+        for (String metric : response.getMetrics()) {
+          MetricDataset metricDataset = new MetricDataset(metric, collection);
+          MetricConfigDTO metricConfig = CACHE_REGISTRY_INSTANCE.getMetricConfigCache().get(metricDataset);
+          idToResponseMap.put(metricConfig.getId(), response.getData().get(metric));
+        }
       } catch (Exception e) {
         LOG.error("Exception while processing /data/tabular call", e);
       }
     }
+    for (Long metricId : metricIds) {
+      MetricSummary metricSummary = new MetricSummary();
 
-    // Merge responses of collections
-    TabularViewResponse mergedResponse = null;
-    for (String collection : collectionToMetrics.keySet()) {
-      if (mergedResponse == null) {
-        mergedResponse = collectionToTabularViewResponse.get(collection);
-        continue;
+      MetricConfigDTO metricConfig = metricIdToMetricConfig.get(metricId);
+      metricSummary.setMetricId(metricId);
+      metricSummary.setMetricName(metricConfig.getName());
+      metricSummary.setMetricAlias(metricConfig.getAlias());
+
+      GenericResponse response = idToResponseMap.get(metricId);
+      String[] responseData = response.getResponseData().get(0);
+      double baselineValue = Double.valueOf(responseData[0]);
+      double curentvalue = Double.valueOf(responseData[1]);
+      double percentageChange = (curentvalue - baselineValue) * 100 / baselineValue;
+      String wowPercentageChange = String.format("%.2f", percentageChange) + "%";
+      if (percentageChange > 0) {
+        wowPercentageChange = "+" + wowPercentageChange;
       }
-      TabularViewResponse responseToBeMerged = collectionToTabularViewResponse.get(collection);
-      mergedResponse.getMetrics().addAll(responseToBeMerged.getMetrics());
-      mergedResponse.getData().putAll(responseToBeMerged.getData());
-      // TODO: merge response time bucket and summary
+      metricSummary.setBaselineValue(baselineValue);
+      metricSummary.setCurrentValue(curentvalue);
+      metricSummary.setWowPercentageChange(wowPercentageChange);
+
+      AnomaliesSummary anomaliesSummary =
+          anomaliesResoure.getAnomalyCountForMetricInRange(metricId, currentStart, currentEnd);
+      metricSummary.setAnomaliesSummary(anomaliesSummary);
+
+      metricsSummary.add(metricSummary);
     }
 
-    return mergedResponse;
+    return metricsSummary;
   }
 
   /**

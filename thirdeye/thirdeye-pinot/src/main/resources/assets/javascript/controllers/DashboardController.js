@@ -17,7 +17,7 @@ DashboardController.prototype = {
     this.dashboardView.init();
   },
 
-  handleAppEvent : function() {
+  handleAppEvent : function(args) {
     console.log("DashboardController.handleAppEvent");
     tabName = HASH_SERVICE.get("tab");
 
@@ -37,7 +37,9 @@ DashboardController.prototype = {
       childController = this.anomalySummaryController;
     }
     this.dashboardView.render();
-    childController.handleAppEvent();
+    console.log('Sending to child controller');
+    console.log(childController);
+    childController.handleAppEvent(args);
 
   },
 
@@ -65,7 +67,7 @@ DashboardController.prototype = {
     this.dashboardModel.dashboardName = args.dashboardName;
     this.dashboardModel.dashboardId = args.dashboardId;
     console.log(HASH_SERVICE.getParams());
-    this.handleAppEvent();
+    this.handleAppEvent(args);
   }
 
 };

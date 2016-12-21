@@ -1,6 +1,8 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
+import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomaliesSummary;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalyWrapper;
+
 import java.io.IOException;
 import java.net.URLDecoder;
 import java.util.ArrayList;
@@ -32,7 +34,6 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Joiner;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.TimeRange;
 import com.linkedin.thirdeye.api.TimeSpec;
@@ -44,6 +45,7 @@ import com.linkedin.thirdeye.client.timeseries.TimeSeriesRequest;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponse;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow.TimeSeriesMetric;
+import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.constant.FeedbackStatus;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dashboard.Utils;
@@ -104,7 +106,7 @@ public class AnomaliesResource {
     MetricConfigDTO metricConfig = metricConfigDAO.findById(metricId);
     String dataset = metricConfig.getDataset();
     String metric = metricConfig.getName();
-    List<MergedAnomalyResultDTO> mergedAnomalies = getAnomaliesForMetricInRange(metric, dataset, startTime, endTime);
+    List<MergedAnomalyResultDTO> mergedAnomalies = getAnomaliesForMetricInRange(dataset, metric, startTime, endTime);
 
     return mergedAnomalies;
   }
@@ -140,23 +142,32 @@ public class AnomaliesResource {
    * @return
    */
   @GET
-  @Path("metric/count/{metricId}/{startTime}/{endTime}/{numBuckets}")
-  public List<Integer> getAnomalyCountForMetricInRange(
+  @Path("metric/count/{metricId}/{startTime}/{endTime}")
+  public AnomaliesSummary getAnomalyCountForMetricInRange(
       @PathParam("metricId") Long metricId,
       @PathParam("startTime") Long startTime,
-      @PathParam("endTime") Long endTime,
-      @PathParam("numBuckets") int numBuckets) {
+      @PathParam("endTime") Long endTime){
 
-    Integer[] anomalyCount = new Integer[numBuckets];
+    AnomaliesSummary anomaliesSummary = new AnomaliesSummary();
     List<MergedAnomalyResultDTO> mergedAnomalies = getAnomaliesForMetricInRange(metricId, startTime, endTime);
 
-    long bucketSize = (endTime - startTime) / numBuckets;
+    int resolvedAnomalies = 0;
+    int unresolvedAnomalies = 0;
     for (MergedAnomalyResultDTO mergedAnomaly : mergedAnomalies) {
-      Long anomalyStartTime = mergedAnomaly.getStartTime();
-      Integer bucketNumber = (int) ((anomalyStartTime - startTime) / bucketSize);
-      anomalyCount[bucketNumber] ++;
+      AnomalyFeedbackDTO anomalyFeedback = mergedAnomaly.getFeedback();
+      if (anomalyFeedback == null || anomalyFeedback.getFeedbackType() == null) {
+        unresolvedAnomalies ++;
+      } else if (anomalyFeedback != null && anomalyFeedback.getFeedbackType() != null
+          && anomalyFeedback.getFeedbackType().equals(AnomalyFeedbackType.ANOMALY)) {
+        unresolvedAnomalies ++;
+      } else {
+        resolvedAnomalies ++;
+      }
     }
-    return Lists.newArrayList(anomalyCount);
+    anomaliesSummary.setNumAnomalies(mergedAnomalies.size());
+    anomaliesSummary.setNumAnomaliesResolved(resolvedAnomalies);
+    anomaliesSummary.setNumAnomaliesUnresolved(unresolvedAnomalies);
+    return anomaliesSummary;
   }
 
   /**

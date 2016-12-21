@@ -22,7 +22,7 @@
 <div class="container-fluid">
 	<div class="row row-bordered">
 		<div class="container top-buffer bottom-buffer">
-			<div>100 Metrics</div>
+			<div>{{this.dashboardName}}</div>
 		</div>
 		<div class="container">
 			<nav class="navbar navbar-transparent" role="navigation">
