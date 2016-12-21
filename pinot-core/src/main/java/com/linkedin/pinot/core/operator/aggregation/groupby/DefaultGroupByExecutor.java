@@ -20,7 +20,6 @@ import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.operator.aggregation.AggregationFunctionContext;
-import com.linkedin.pinot.core.operator.aggregation.ResultHolderFactory;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunctionFactory;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
@@ -38,11 +37,13 @@ import javax.annotation.Nonnull;
  * - Single/Multi valued columns.
  */
 public class DefaultGroupByExecutor implements GroupByExecutor {
+  public static final int MAX_INITIAL_RESULT_HOLDER_CAPACITY = 10_000;
 
   private static final double GROUP_BY_TRIM_FACTOR = 0.9;
   private final int _numAggrFunc;
   private final int _numGroupsLimit;
   private final AggregationFunctionContext[] _aggrFunctionContexts;
+  private final AggregationFunction[] _aggregationFunctions;
 
   private  GroupKeyGenerator _groupKeyGenerator;
   private GroupByResultHolder[] _resultHolderArray;
@@ -77,6 +78,10 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     _numGroupsLimit = (int) (GROUP_BY_TRIM_FACTOR * numGroupsLimit);
 
     _aggrFunctionContexts = aggrFunctionContexts;
+    _aggregationFunctions = new AggregationFunction[_numAggrFunc];
+    for (int i = 0; i < _numAggrFunc; i++) {
+      _aggregationFunctions[i] = aggrFunctionContexts[i].getAggregationFunction();
+    }
   }
 
   /**
@@ -133,75 +138,24 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   private void aggregateColumn(ProjectionBlock projectionBlock, AggregationFunctionContext aggrFuncContext,
       GroupByResultHolder resultHolder) {
     AggregationFunction aggregationFunction = aggrFuncContext.getAggregationFunction();
-    String[] aggrColumns = aggrFuncContext.getAggregationColumns();
-    String aggrFuncName = aggregationFunction.getName();
-
-    Preconditions.checkState(aggrColumns.length == 1);
-    String aggrColumn = aggrColumns[0];
-    boolean isAggrColumnSingleValue = true;
-
-    BlockMetadata blockMetadata = projectionBlock.getDataBlock(aggrColumn).getMetadata();
-    if (blockMetadata != null) {
-      isAggrColumnSingleValue = blockMetadata.isSingleValue();
-    }
-
-    ProjectionBlockValSet blockValueSet = null;
-    if (!aggrFuncName.equals(AggregationFunctionFactory.COUNT_AGGREGATION_FUNCTION)) {
-      Block dataBlock = projectionBlock.getDataBlock(aggrColumn);
-      blockValueSet = (ProjectionBlockValSet) dataBlock.getBlockValueSet();
-    }
-
+    String[] aggregationColumns = aggrFuncContext.getAggregationColumns();
+    Preconditions.checkState(aggregationColumns.length == 1);
     int length = projectionBlock.getNumDocs();
-    switch (aggrFuncName) {
-      case AggregationFunctionFactory.COUNT_AGGREGATION_FUNCTION:
-        if (_hasMVGroupByColumns) {
-          aggregationFunction.aggregateGroupByMV(length, _docIdToMVGroupKey, resultHolder);
-        } else {
-          aggregationFunction.aggregateGroupBySV(length, _docIdToSVGroupKey, resultHolder);
-        }
-        break;
 
-      case AggregationFunctionFactory.COUNT_MV_AGGREGATION_FUNCTION:
-        Object numOfMVEntriesArray = blockValueSet.getNumberOfMVEntriesArray();
-        if (_hasMVGroupByColumns) {
-          aggregationFunction.aggregateGroupByMV(length, _docIdToMVGroupKey, resultHolder, numOfMVEntriesArray);
-        } else {
-          aggregationFunction.aggregateGroupBySV(length, _docIdToSVGroupKey, resultHolder, numOfMVEntriesArray);
-        }
-        break;
-
-      case AggregationFunctionFactory.DISTINCTCOUNT_AGGREGATION_FUNCTION:
-      case AggregationFunctionFactory.DISTINCTCOUNTHLL_AGGREGATION_FUNCTION:
-      case AggregationFunctionFactory.DISTINCTCOUNT_MV_AGGREGATION_FUNCTION:
-      case AggregationFunctionFactory.DISTINCTCOUNTHLL_MV_AGGREGATION_FUNCTION:
-        Object hashCodeArray =
-            (isAggrColumnSingleValue) ? blockValueSet.getSVHashCodeArray() : blockValueSet.getMVHashCodeArray();
-        if (_hasMVGroupByColumns) {
-          aggregationFunction.aggregateGroupByMV(length, _docIdToMVGroupKey, resultHolder, hashCodeArray);
-        } else {
-          aggregationFunction.aggregateGroupBySV(length, _docIdToSVGroupKey, resultHolder, hashCodeArray);
-        }
-        break;
-
-      case AggregationFunctionFactory.FASTHLL_AGGREGATION_FUNCTION:
-        Object stringArray =
-            (isAggrColumnSingleValue) ? blockValueSet.getSingleValues() : blockValueSet.getMultiValues();
-        if (_hasMVGroupByColumns) {
-          aggregationFunction.aggregateGroupByMV(length, _docIdToMVGroupKey, resultHolder, (Object) stringArray);
-        } else {
-          aggregationFunction.aggregateGroupBySV(length, _docIdToSVGroupKey, resultHolder, (Object) stringArray);
-        }
-        break;
-
-      default:
-        Object valueArray =
-            (isAggrColumnSingleValue) ? blockValueSet.getSingleValues() : blockValueSet.getMultiValues();
-        if (_hasMVGroupByColumns) {
-          aggregationFunction.aggregateGroupByMV(length, _docIdToMVGroupKey, resultHolder, (Object) valueArray);
-        } else {
-          aggregationFunction.aggregateGroupBySV(length, _docIdToSVGroupKey, resultHolder, (Object) valueArray);
-        }
-        break;
+    if (!aggregationFunction.getName().equals(AggregationFunctionFactory.COUNT_AGGREGATION_FUNCTION)) {
+      Block dataBlock = projectionBlock.getDataBlock(aggregationColumns[0]);
+      ProjectionBlockValSet blockValueSet = (ProjectionBlockValSet) dataBlock.getBlockValueSet();
+      if (_hasMVGroupByColumns) {
+        aggregationFunction.aggregateGroupByMV(length, _docIdToMVGroupKey, resultHolder, blockValueSet);
+      } else {
+        aggregationFunction.aggregateGroupBySV(length, _docIdToSVGroupKey, resultHolder, blockValueSet);
+      }
+    } else {
+      if (_hasMVGroupByColumns) {
+        aggregationFunction.aggregateGroupByMV(length, _docIdToMVGroupKey, resultHolder);
+      } else {
+        aggregationFunction.aggregateGroupBySV(length, _docIdToSVGroupKey, resultHolder);
+      }
     }
   }
 
@@ -232,12 +186,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       return null;
     }
 
-    AggregationFunction.ResultDataType[] resultDataTypeArray = new AggregationFunction.ResultDataType[_numAggrFunc];
-    for (int i = 0; i < _numAggrFunc; i++) {
-      AggregationFunction aggregationFunction = _aggrFunctionContexts[i].getAggregationFunction();
-      resultDataTypeArray[i] = aggregationFunction.getResultDataType();
-    }
-    return new AggregationGroupByResult(_groupKeyGenerator, _resultHolderArray, resultDataTypeArray);
+    return new AggregationGroupByResult(_groupKeyGenerator, _aggregationFunctions, _resultHolderArray);
   }
 
   /**
@@ -265,11 +214,10 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
    */
   private void initResultHolderArray(int trimSize, int maxNumResults) {
     _resultHolderArray = new GroupByResultHolder[_numAggrFunc];
-
+    int initialCapacity = Math.min(maxNumResults, MAX_INITIAL_RESULT_HOLDER_CAPACITY);
     for (int i = 0; i < _numAggrFunc; i++) {
-      _resultHolderArray[i] =
-          ResultHolderFactory.getGroupByResultHolder(_aggrFunctionContexts[i].getAggregationFunction(), maxNumResults,
-              trimSize);
+      _resultHolderArray[i] = _aggrFunctionContexts[i].getAggregationFunction()
+          .createGroupByResultHolder(initialCapacity, maxNumResults, trimSize);
     }
   }
 

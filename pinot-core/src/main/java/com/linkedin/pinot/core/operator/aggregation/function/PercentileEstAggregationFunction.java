@@ -21,34 +21,33 @@ import com.linkedin.pinot.core.operator.aggregation.ObjectAggregationResultHolde
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupByResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.groupby.ObjectGroupByResultHolder;
 import com.linkedin.pinot.core.operator.docvalsets.ProjectionBlockValSet;
-import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
-import java.util.Collections;
+import com.linkedin.pinot.core.query.aggregation.function.quantile.digest.QuantileDigest;
 import javax.annotation.Nonnull;
 
 
-public class PercentileAggregationFunction implements AggregationFunction<DoubleArrayList, Double> {
-  private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
+public class PercentileEstAggregationFunction implements AggregationFunction<QuantileDigest, Long> {
+  public static final double DEFAULT_MAX_ERROR = 0.05;
 
   private final String _name;
   private final int _percentile;
 
-  public PercentileAggregationFunction(int percentile) {
+  public PercentileEstAggregationFunction(int percentile) {
     switch (percentile) {
       case 50:
-        _name = AggregationFunctionFactory.PERCENTILE50_AGGREGATION_FUNCTION;
+        _name = AggregationFunctionFactory.PERCENTILEEST50_AGGREGATION_FUNCTION;
         break;
       case 90:
-        _name = AggregationFunctionFactory.PERCENTILE90_AGGREGATION_FUNCTION;
+        _name = AggregationFunctionFactory.PERCENTILEEST90_AGGREGATION_FUNCTION;
         break;
       case 95:
-        _name = AggregationFunctionFactory.PERCENTILE95_AGGREGATION_FUNCTION;
+        _name = AggregationFunctionFactory.PERCENTILEEST95_AGGREGATION_FUNCTION;
         break;
       case 99:
-        _name = AggregationFunctionFactory.PERCENTILE99_AGGREGATION_FUNCTION;
+        _name = AggregationFunctionFactory.PERCENTILEEST99_AGGREGATION_FUNCTION;
         break;
       default:
         throw new UnsupportedOperationException(
-            "Unsupported percentile for PercentileAggregationFunction: " + percentile);
+            "Unsupported percentile for PercentileEstAggregationFunction: " + percentile);
     }
     _percentile = percentile;
   }
@@ -80,13 +79,13 @@ public class PercentileAggregationFunction implements AggregationFunction<Double
   public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
       @Nonnull ProjectionBlockValSet... projectionBlockValSets) {
     double[] valueArray = projectionBlockValSets[0].getSingleValues();
-    DoubleArrayList doubleArrayList = aggregationResultHolder.getResult();
-    if (doubleArrayList == null) {
-      doubleArrayList = new DoubleArrayList();
-      aggregationResultHolder.setValue(doubleArrayList);
+    QuantileDigest quantileDigest = aggregationResultHolder.getResult();
+    if (quantileDigest == null) {
+      quantileDigest = new QuantileDigest(DEFAULT_MAX_ERROR);
+      aggregationResultHolder.setValue(quantileDigest);
     }
     for (int i = 0; i < length; i++) {
-      doubleArrayList.add(valueArray[i]);
+      quantileDigest.add((long) valueArray[i]);
     }
   }
 
@@ -96,12 +95,12 @@ public class PercentileAggregationFunction implements AggregationFunction<Double
     double[] valueArray = projectionBlockValSets[0].getSingleValues();
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeyArray[i];
-      DoubleArrayList doubleArrayList = groupByResultHolder.getResult(groupKey);
-      if (doubleArrayList == null) {
-        doubleArrayList = new DoubleArrayList();
-        groupByResultHolder.setValueForKey(groupKey, doubleArrayList);
+      QuantileDigest quantileDigest = groupByResultHolder.getResult(groupKey);
+      if (quantileDigest == null) {
+        quantileDigest = new QuantileDigest(DEFAULT_MAX_ERROR);
+        groupByResultHolder.setValueForKey(groupKey, quantileDigest);
       }
-      doubleArrayList.add(valueArray[i]);
+      quantileDigest.add((long) valueArray[i]);
     }
   }
 
@@ -112,43 +111,43 @@ public class PercentileAggregationFunction implements AggregationFunction<Double
     for (int i = 0; i < length; i++) {
       double value = valueArray[i];
       for (int groupKey : groupKeysArray[i]) {
-        DoubleArrayList doubleArrayList = groupByResultHolder.getResult(groupKey);
-        if (doubleArrayList == null) {
-          doubleArrayList = new DoubleArrayList();
-          groupByResultHolder.setValueForKey(groupKey, doubleArrayList);
+        QuantileDigest quantileDigest = groupByResultHolder.getResult(groupKey);
+        if (quantileDigest == null) {
+          quantileDigest = new QuantileDigest(DEFAULT_MAX_ERROR);
+          groupByResultHolder.setValueForKey(groupKey, quantileDigest);
         }
-        doubleArrayList.add(value);
+        quantileDigest.add((long) value);
       }
     }
   }
 
   @Nonnull
   @Override
-  public DoubleArrayList extractAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder) {
-    DoubleArrayList doubleArrayList = aggregationResultHolder.getResult();
-    if (doubleArrayList == null) {
-      return new DoubleArrayList();
+  public QuantileDigest extractAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder) {
+    QuantileDigest quantileDigest = aggregationResultHolder.getResult();
+    if (quantileDigest == null) {
+      return new QuantileDigest(DEFAULT_MAX_ERROR);
     } else {
-      return doubleArrayList;
+      return quantileDigest;
     }
   }
 
   @Nonnull
   @Override
-  public DoubleArrayList extractGroupByResult(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
-    DoubleArrayList doubleArrayList = groupByResultHolder.getResult(groupKey);
-    if (doubleArrayList == null) {
-      return new DoubleArrayList();
+  public QuantileDigest extractGroupByResult(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
+    QuantileDigest quantileDigest = groupByResultHolder.getResult(groupKey);
+    if (quantileDigest == null) {
+      return new QuantileDigest(DEFAULT_MAX_ERROR);
     } else {
-      return doubleArrayList;
+      return quantileDigest;
     }
   }
 
   @Nonnull
   @Override
-  public DoubleArrayList merge(@Nonnull DoubleArrayList intermediateResult1,
-      @Nonnull DoubleArrayList intermediateResult2) {
-    intermediateResult1.addAll(intermediateResult2);
+  public QuantileDigest merge(@Nonnull QuantileDigest intermediateResult1,
+      @Nonnull QuantileDigest intermediateResult2) {
+    intermediateResult1.merge(intermediateResult2);
     return intermediateResult1;
   }
 
@@ -160,13 +159,7 @@ public class PercentileAggregationFunction implements AggregationFunction<Double
 
   @Nonnull
   @Override
-  public Double extractFinalResult(@Nonnull DoubleArrayList intermediateResult) {
-    int size = intermediateResult.size();
-    if (size == 0) {
-      return DEFAULT_FINAL_RESULT;
-    } else {
-      Collections.sort(intermediateResult);
-      return intermediateResult.get(intermediateResult.size() * _percentile / 100);
-    }
+  public Long extractFinalResult(@Nonnull QuantileDigest intermediateResult) {
+    return intermediateResult.getQuantile(_percentile / 100.0);
   }
 }

@@ -24,15 +24,21 @@ import com.linkedin.pinot.core.operator.aggregation.groupby.GroupByResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.groupby.ObjectGroupByResultHolder;
 import com.linkedin.pinot.core.operator.docvalsets.ProjectionBlockValSet;
 import com.linkedin.pinot.core.startree.hll.HllConstants;
+import com.linkedin.pinot.core.startree.hll.HllUtil;
 import javax.annotation.Nonnull;
 
 
-public class DistinctCountHLLAggregationFunction implements AggregationFunction<HyperLogLog, Long> {
+public class FastHLLAggregationFunction implements AggregationFunction<HyperLogLog, Long> {
+  protected int _log2m = HllConstants.DEFAULT_LOG2M;
 
   @Nonnull
   @Override
   public String getName() {
-    return AggregationFunctionFactory.DISTINCTCOUNTHLL_AGGREGATION_FUNCTION;
+    return AggregationFunctionFactory.FASTHLL_AGGREGATION_FUNCTION;
+  }
+
+  public void setLog2m(int log2m) {
+    _log2m = log2m;
   }
 
   @Override
@@ -55,45 +61,57 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
   @Override
   public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
       @Nonnull ProjectionBlockValSet... projectionBlockValSets) {
-    int[] valueArray = projectionBlockValSets[0].getSVHashCodeArray();
+    String[] valueArray = projectionBlockValSets[0].getSingleValues();
     HyperLogLog hyperLogLog = aggregationResultHolder.getResult();
     if (hyperLogLog == null) {
-      hyperLogLog = new HyperLogLog(HllConstants.DEFAULT_LOG2M);
+      hyperLogLog = new HyperLogLog(_log2m);
       aggregationResultHolder.setValue(hyperLogLog);
     }
     for (int i = 0; i < length; i++) {
-      hyperLogLog.offer(valueArray[i]);
+      try {
+        hyperLogLog.addAll(HllUtil.convertStringToHll(valueArray[i]));
+      } catch (CardinalityMergeException e) {
+        throw new RuntimeException("Caught exception while aggregating HyperLogLog.", e);
+      }
     }
   }
 
   @Override
   public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
       @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull ProjectionBlockValSet... projectionBlockValSets) {
-    int[] valueArray = projectionBlockValSets[0].getSVHashCodeArray();
+    String[] valueArray = projectionBlockValSets[0].getSingleValues();
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeyArray[i];
       HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
       if (hyperLogLog == null) {
-        hyperLogLog = new HyperLogLog(HllConstants.DEFAULT_LOG2M);
+        hyperLogLog = new HyperLogLog(_log2m);
         groupByResultHolder.setValueForKey(groupKey, hyperLogLog);
       }
-      hyperLogLog.offer(valueArray[i]);
+      try {
+        hyperLogLog.addAll(HllUtil.convertStringToHll(valueArray[i]));
+      } catch (CardinalityMergeException e) {
+        throw new RuntimeException("Caught exception while aggregating HyperLogLog.", e);
+      }
     }
   }
 
   @Override
   public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
       @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull ProjectionBlockValSet... projectionBlockValSets) {
-    int[] valueArray = projectionBlockValSets[0].getSVHashCodeArray();
+    String[] valueArray = projectionBlockValSets[0].getSingleValues();
     for (int i = 0; i < length; i++) {
-      int value = valueArray[i];
+      String value = valueArray[i];
       for (int groupKey : groupKeysArray[i]) {
         HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
         if (hyperLogLog == null) {
-          hyperLogLog = new HyperLogLog(HllConstants.DEFAULT_LOG2M);
+          hyperLogLog = new HyperLogLog(_log2m);
           groupByResultHolder.setValueForKey(groupKey, hyperLogLog);
         }
-        hyperLogLog.offer(value);
+        try {
+          hyperLogLog.addAll(HllUtil.convertStringToHll(value));
+        } catch (CardinalityMergeException e) {
+          throw new RuntimeException("Caught exception while aggregating HyperLogLog.", e);
+        }
       }
     }
   }
@@ -103,7 +121,7 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
   public HyperLogLog extractAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder) {
     HyperLogLog hyperLogLog = aggregationResultHolder.getResult();
     if (hyperLogLog == null) {
-      return new HyperLogLog(HllConstants.DEFAULT_LOG2M);
+      return new HyperLogLog(_log2m);
     } else {
       return hyperLogLog;
     }
@@ -114,7 +132,7 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
   public HyperLogLog extractGroupByResult(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
     HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
     if (hyperLogLog == null) {
-      return new HyperLogLog(HllConstants.DEFAULT_LOG2M);
+      return new HyperLogLog(_log2m);
     } else {
       return hyperLogLog;
     }

@@ -18,35 +18,54 @@ package com.linkedin.pinot.core.operator.aggregation.function;
 import com.linkedin.pinot.core.operator.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupByResultHolder;
 import com.linkedin.pinot.core.operator.docvalsets.ProjectionBlockValSet;
+import com.linkedin.pinot.core.query.aggregation.function.quantile.digest.QuantileDigest;
 import javax.annotation.Nonnull;
 
 
-public class MinMaxRangeMVAggregationFunction extends MinMaxRangeAggregationFunction {
+public class PercentileEstMVAggregationFunction extends PercentileEstAggregationFunction {
+  private final String _name;
+
+  public PercentileEstMVAggregationFunction(int percentile) {
+    super(percentile);
+    switch (percentile) {
+      case 50:
+        _name = AggregationFunctionFactory.PERCENTILEEST50_MV_AGGREGATION_FUNCTION;
+        break;
+      case 90:
+        _name = AggregationFunctionFactory.PERCENTILEEST90_MV_AGGREGATION_FUNCTION;
+        break;
+      case 95:
+        _name = AggregationFunctionFactory.PERCENTILEEST95_MV_AGGREGATION_FUNCTION;
+        break;
+      case 99:
+        _name = AggregationFunctionFactory.PERCENTILEEST99_MV_AGGREGATION_FUNCTION;
+        break;
+      default:
+        throw new UnsupportedOperationException(
+            "Unsupported percentile for PercentileEstMVAggregationFunction: " + percentile);
+    }
+  }
 
   @Nonnull
   @Override
   public String getName() {
-    return AggregationFunctionFactory.MINMAXRANGE_MV_AGGREGATION_FUNCTION;
+    return _name;
   }
 
   @Override
   public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
       @Nonnull ProjectionBlockValSet... projectionBlockValSets) {
     double[][] valuesArray = projectionBlockValSets[0].getMultiValues();
-    double min = Double.POSITIVE_INFINITY;
-    double max = Double.NEGATIVE_INFINITY;
+    QuantileDigest quantileDigest = aggregationResultHolder.getResult();
+    if (quantileDigest == null) {
+      quantileDigest = new QuantileDigest(DEFAULT_MAX_ERROR);
+      aggregationResultHolder.setValue(quantileDigest);
+    }
     for (int i = 0; i < length; i++) {
-      double[] values = valuesArray[i];
-      for (double value : values) {
-        if (value < min) {
-          min = value;
-        }
-        if (value > max) {
-          max = value;
-        }
+      for (double value : valuesArray[i]) {
+        quantileDigest.add((long) value);
       }
     }
-    setAggregationResult(aggregationResultHolder, min, max);
   }
 
   @Override
@@ -54,7 +73,15 @@ public class MinMaxRangeMVAggregationFunction extends MinMaxRangeAggregationFunc
       @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull ProjectionBlockValSet... projectionBlockValSets) {
     double[][] valuesArray = projectionBlockValSets[0].getMultiValues();
     for (int i = 0; i < length; i++) {
-      aggregateOnGroupKey(groupKeyArray[i], groupByResultHolder, valuesArray[i]);
+      int groupKey = groupKeyArray[i];
+      QuantileDigest quantileDigest = groupByResultHolder.getResult(groupKey);
+      if (quantileDigest == null) {
+        quantileDigest = new QuantileDigest(DEFAULT_MAX_ERROR);
+        groupByResultHolder.setValueForKey(groupKey, quantileDigest);
+      }
+      for (double value : valuesArray[i]) {
+        quantileDigest.add((long) value);
+      }
     }
   }
 
@@ -65,22 +92,15 @@ public class MinMaxRangeMVAggregationFunction extends MinMaxRangeAggregationFunc
     for (int i = 0; i < length; i++) {
       double[] values = valuesArray[i];
       for (int groupKey : groupKeysArray[i]) {
-        aggregateOnGroupKey(groupKey, groupByResultHolder, values);
+        QuantileDigest quantileDigest = groupByResultHolder.getResult(groupKey);
+        if (quantileDigest == null) {
+          quantileDigest = new QuantileDigest(DEFAULT_MAX_ERROR);
+          groupByResultHolder.setValueForKey(groupKey, quantileDigest);
+        }
+        for (double value : values) {
+          quantileDigest.add((long) value);
+        }
       }
     }
-  }
-
-  private void aggregateOnGroupKey(int groupKey, @Nonnull GroupByResultHolder groupByResultHolder, double[] values) {
-    double min = Double.POSITIVE_INFINITY;
-    double max = Double.NEGATIVE_INFINITY;
-    for (double value : values) {
-      if (value < min) {
-        min = value;
-      }
-      if (value > max) {
-        max = value;
-      }
-    }
-    setGroupByResult(groupKey, groupByResultHolder, min, max);
   }
 }

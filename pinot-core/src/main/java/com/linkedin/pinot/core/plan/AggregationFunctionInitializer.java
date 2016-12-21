@@ -13,27 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.core.plan;
 
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunctionVisitorBase;
-import com.linkedin.pinot.core.operator.aggregation.function.FastHllAggregationFunction;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.linkedin.pinot.core.operator.aggregation.function.FastHLLAggregationFunction;
+import com.linkedin.pinot.core.operator.aggregation.function.FastHLLMVAggregationFunction;
+
 
 // class is public because existing tests are in different package
 public class AggregationFunctionInitializer extends AggregationFunctionVisitorBase {
-  private static Logger LOGGER = LoggerFactory.getLogger(AggregationFunctionInitializer.class);
-
-  SegmentMetadata metadata;
+  private SegmentMetadata _segmentMetadata;
 
   public AggregationFunctionInitializer(SegmentMetadata metadata) {
-    this.metadata = metadata;
+    _segmentMetadata = metadata;
   }
 
   @Override
-  public void visit(FastHllAggregationFunction function) {
-    function.init(metadata.getHllLog2m());
+  public void visit(FastHLLAggregationFunction function) {
+    function.setLog2m(_segmentMetadata.getHllLog2m());
+  }
+
+  @Override
+  public void visit(FastHLLMVAggregationFunction function) {
+    function.setLog2m(_segmentMetadata.getHllLog2m());
   }
 }

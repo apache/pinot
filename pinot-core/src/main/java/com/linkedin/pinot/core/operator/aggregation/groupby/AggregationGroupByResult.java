@@ -15,15 +15,8 @@
  */
 package com.linkedin.pinot.core.operator.aggregation.groupby;
 
-import com.clearspring.analytics.stream.cardinality.HyperLogLog;
-import com.linkedin.pinot.common.utils.primitive.MutableLongValue;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunction;
-import com.linkedin.pinot.core.query.aggregation.function.AvgAggregationFunction;
-import com.linkedin.pinot.core.query.aggregation.function.MinMaxRangeAggregationFunction;
-import com.linkedin.pinot.core.query.aggregation.function.quantile.digest.QuantileDigest;
 import com.linkedin.pinot.core.query.utils.Pair;
-import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
-import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.io.Serializable;
 import java.util.Iterator;
 
@@ -36,16 +29,15 @@ import java.util.Iterator;
 public class AggregationGroupByResult {
 
   private final GroupKeyGenerator _groupKeyGenerator;
-  private final GroupByResultHolder _resultHolder[];
-  private AggregationFunction.ResultDataType _resultDataType[];
+  private final AggregationFunction[] _aggregationFunctions;
+  private final GroupByResultHolder[] _resultHolders;
   Pair<String, Serializable> _retPair;
 
-  public AggregationGroupByResult(GroupKeyGenerator keyGenerator, GroupByResultHolder resultHolder[],
-      AggregationFunction.ResultDataType resultDataType[]) {
-
-    _groupKeyGenerator = keyGenerator;
-    _resultHolder = resultHolder;
-    _resultDataType = resultDataType;
+  public AggregationGroupByResult(GroupKeyGenerator groupKeyGenerator, AggregationFunction[] aggregationFunctions,
+      GroupByResultHolder[] resultHolders) {
+    _groupKeyGenerator = groupKeyGenerator;
+    _aggregationFunctions = aggregationFunctions;
+    _resultHolders = resultHolders;
     _retPair = new Pair<>(null, null);
   }
 
@@ -75,40 +67,6 @@ public class AggregationGroupByResult {
    * @return
    */
   public Serializable getResultForKey(GroupKeyGenerator.GroupKey groupKey, int index) {
-    int groupId = groupKey.getFirst();
-
-    switch (_resultDataType[index]) {
-      case LONG:
-        return new MutableLongValue((long) _resultHolder[index].getDoubleResult(groupId));
-
-      case DOUBLE:
-        return _resultHolder[index].getDoubleResult(groupId);
-
-      case AVERAGE_PAIR:
-        Pair<Double, Long> doubleLongPair = _resultHolder[index].getResult(groupId);
-        return new AvgAggregationFunction.AvgPair(doubleLongPair.getFirst(), doubleLongPair.getSecond());
-
-      case MINMAXRANGE_PAIR:
-        Pair<Double, Double> doubleDoublePair = _resultHolder[index].getResult(groupId);
-        return new MinMaxRangeAggregationFunction.MinMaxRangePair(doubleDoublePair.getFirst(),
-            doubleDoublePair.getSecond());
-
-      case DISTINCTCOUNT_SET:
-        return (IntOpenHashSet) _resultHolder[index].getResult(groupId);
-
-      case DISTINCTCOUNTHLL_HYPERLOGLOG:
-      case HLL_PREAGGREGATED:
-        return (HyperLogLog) _resultHolder[index].getResult(groupId);
-
-      case PERCENTILE_LIST:
-        return (DoubleArrayList) _resultHolder[index].getResult(groupId);
-
-      case PERCENTILEEST_QUANTILEDIGEST:
-        return (QuantileDigest) _resultHolder[index].getResult(groupId);
-
-      default:
-        throw new RuntimeException(
-            "Unsupported result data type " + _resultDataType[index] + " in class " + getClass().getName());
-    }
+    return _aggregationFunctions[index].extractGroupByResult(_resultHolders[index], groupKey.getFirst());
   }
 }

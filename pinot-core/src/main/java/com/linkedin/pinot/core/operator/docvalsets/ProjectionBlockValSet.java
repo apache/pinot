@@ -104,7 +104,7 @@ public class ProjectionBlockValSet extends BaseBlockValSet {
    * Returns array containing hash codes for values of the single-valued projection column, for the filtered docIds.
    * @return Array of hash codes for values of the projection column
    */
-  public double[] getSVHashCodeArray() {
+  public int[] getSVHashCodeArray() {
     return _dataBlockCache.getHashCodeArrayForColumn(_column);
   }
 
@@ -112,7 +112,7 @@ public class ProjectionBlockValSet extends BaseBlockValSet {
    * Returns array containing hash codes for values of the multi-valued projection column, for the filtered docIds.
    * @return Array of hash codes for values of the projection column
    */
-  public double[][] getMVHashCodeArray() {
+  public int[][] getMVHashCodeArray() {
     return _dataBlockCache.getHashCodesArrayForColumn(_column);
   }
 

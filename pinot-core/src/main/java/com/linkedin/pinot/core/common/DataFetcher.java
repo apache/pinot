@@ -369,7 +369,7 @@ public class DataFetcher {
    * @param outValues value array buffer.
    * @param outStartPos output start position.
    */
-  public void fetchHashCodes(String column, int[] inDocIds, int inStartPos, int length, double[] outValues, int outStartPos) {
+  public void fetchHashCodes(String column, int[] inDocIds, int inStartPos, int length, int[] outValues, int outStartPos) {
     Dictionary dictionary = getDictionaryForColumn(column);
     fetchSingleDictIds(column, inDocIds, inStartPos, length, _reusableDictIds, 0);
 
@@ -388,7 +388,7 @@ public class DataFetcher {
    * @param outValues value array buffer.
    * @param outStartPos output start position.
    */
-  public void fetchHashCodes(String column, int[] inDocIds, int inStartPos, int length, double[][] outValues, int outStartPos) {
+  public void fetchHashCodes(String column, int[] inDocIds, int inStartPos, int length, int[][] outValues, int outStartPos) {
     Dictionary dictionary = getDictionaryForColumn(column);
     BlockMultiValIterator iterator = (BlockMultiValIterator) getBlockValIteratorForColumn(column);
 
@@ -396,8 +396,7 @@ public class DataFetcher {
     for (int i = inStartPos; i < inEndPos; i++, outStartPos++) {
       iterator.skipTo(inDocIds[i]);
       int numValues = iterator.nextIntVal(_reusableMVDictIds);
-
-      outValues[outStartPos] = new double[numValues];
+      outValues[outStartPos] = new int[numValues];
       for (int j = 0; j < numValues; j++) {
         outValues[outStartPos][j] = dictionary.get(_reusableMVDictIds[j]).hashCode();
       }
