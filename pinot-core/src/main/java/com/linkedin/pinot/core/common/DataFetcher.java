@@ -146,29 +146,13 @@ public class DataFetcher {
    */
   public void fetchMultiValueDictIds(String column, int[] inDocIds, int inStartPos, int length, int[][] outDictIdsArray, int outStartPos,
       int[] tempDictIdArray) {
-    BlockMultiValIterator iterator = (BlockMultiValIterator) getBlockValSetForColumn(column).iterator();
+    BlockMultiValIterator iterator = (BlockMultiValIterator) getBlockValIteratorForColumn(column);
     for (int i = inStartPos; i < inStartPos + length; i++, outStartPos++) {
       iterator.skipTo(inDocIds[i]);
       int dictIdLength = iterator.nextIntVal(tempDictIdArray);
       outDictIdsArray[outStartPos] = Arrays.copyOfRange(tempDictIdArray, 0, dictIdLength);
     }
   }
-
-  /**
-   * Fetches dictionary ids for a given docId of a multi-valued column.
-   * Expects outDictIds to be sufficiently large to accommodate all values.
-   *
-   * @param column Column name
-   * @param inDocId Input docId
-   * @param outDictIds output array
-   * @return Dictionary ids for all multi-values for the given docId
-   */
-  public int fetchDictIdsForDocId(String column, int inDocId, int[] outDictIds) {
-    BlockMultiValIterator iterator = (BlockMultiValIterator) getBlockValSetForColumn(column).iterator();
-    iterator.skipTo(inDocId);
-    return iterator.nextIntVal(outDictIds);
-  }
-
 
   /**
    * For a given multi-value column, trying to get the max number of
@@ -209,10 +193,12 @@ public class DataFetcher {
    */
   public void fetchIntValues(String column, int[] inDocIds, int inStartPos, int length, int[][] outValues, int outStartPos) {
     Dictionary dictionary = getDictionaryForColumn(column);
+    BlockMultiValIterator iterator = (BlockMultiValIterator) getBlockValIteratorForColumn(column);
 
     int inEndPos = inStartPos + length;
     for (int i = inStartPos; i < inEndPos; i++, outStartPos++) {
-      int numValues = fetchDictIdsForDocId(column, inDocIds[i], _reusableMVDictIds);
+      iterator.skipTo(inDocIds[i]);
+      int numValues = iterator.nextIntVal(_reusableMVDictIds);
       outValues[outStartPos] = new int[numValues];
       dictionary.readIntValues(_reusableMVDictIds, 0, numValues, outValues[outStartPos], 0);
     }
@@ -246,10 +232,12 @@ public class DataFetcher {
    */
   public void fetchLongValues(String column, int[] inDocIds, int inStartPos, int length, long[][] outValues, int outStartPos) {
     Dictionary dictionary = getDictionaryForColumn(column);
+    BlockMultiValIterator iterator = (BlockMultiValIterator) getBlockValIteratorForColumn(column);
 
     int inEndPos = inStartPos + length;
     for (int i = inStartPos; i < inEndPos; i++, outStartPos++) {
-      int numValues = fetchDictIdsForDocId(column, inDocIds[i], _reusableMVDictIds);
+      iterator.skipTo(inDocIds[i]);
+      int numValues = iterator.nextIntVal(_reusableMVDictIds);
       outValues[outStartPos] = new long[numValues];
       dictionary.readLongValues(_reusableMVDictIds, 0, numValues, outValues[outStartPos], 0);
     }
@@ -283,10 +271,12 @@ public class DataFetcher {
    */
   public void fetchFloatValues(String column, int[] inDocIds, int inStartPos, int length, float[][] outValues, int outStartPos) {
     Dictionary dictionary = getDictionaryForColumn(column);
+    BlockMultiValIterator iterator = (BlockMultiValIterator) getBlockValIteratorForColumn(column);
 
     int inEndPos = inStartPos + length;
     for (int i = inStartPos; i < inEndPos; i++, outStartPos++) {
-      int numValues = fetchDictIdsForDocId(column, inDocIds[i], _reusableMVDictIds);
+      iterator.skipTo(inDocIds[i]);
+      int numValues = iterator.nextIntVal(_reusableMVDictIds);
       outValues[outStartPos] = new float[numValues];
       dictionary.readFloatValues(_reusableMVDictIds, 0, numValues, outValues[outStartPos], 0);
     }
@@ -320,10 +310,12 @@ public class DataFetcher {
    */
   public void fetchDoubleValues(String column, int[] inDocIds, int inStartPos, int length, double[][] outValues, int outStartPos) {
     Dictionary dictionary = getDictionaryForColumn(column);
+    BlockMultiValIterator iterator = (BlockMultiValIterator) getBlockValIteratorForColumn(column);
 
     int inEndPos = inStartPos + length;
     for (int i = inStartPos; i < inEndPos; i++, outStartPos++) {
-      int numValues = fetchDictIdsForDocId(column, inDocIds[i], _reusableMVDictIds);
+      iterator.skipTo(inDocIds[i]);
+      int numValues = iterator.nextIntVal(_reusableMVDictIds);
       outValues[outStartPos] = new double[numValues];
       dictionary.readDoubleValues(_reusableMVDictIds, 0, numValues, outValues[outStartPos], 0);
     }
@@ -356,10 +348,12 @@ public class DataFetcher {
    */
   public void fetchStringValues(String column, int[] inDocIds, int inStartPos, int length, String[][] outValues, int outStartPos) {
     Dictionary dictionary = getDictionaryForColumn(column);
+    BlockMultiValIterator iterator = (BlockMultiValIterator) getBlockValIteratorForColumn(column);
 
     int inEndPos = inStartPos + length;
     for (int i = inStartPos; i < inEndPos; i++, outStartPos++) {
-      int numValues = fetchDictIdsForDocId(column, inDocIds[i], _reusableMVDictIds);
+      iterator.skipTo(inDocIds[i]);
+      int numValues = iterator.nextIntVal(_reusableMVDictIds);
       outValues[outStartPos] = new String[numValues];
       dictionary.readStringValues(_reusableMVDictIds, 0, numValues, outValues[outStartPos], 0);
     }
@@ -396,10 +390,13 @@ public class DataFetcher {
    */
   public void fetchHashCodes(String column, int[] inDocIds, int inStartPos, int length, double[][] outValues, int outStartPos) {
     Dictionary dictionary = getDictionaryForColumn(column);
+    BlockMultiValIterator iterator = (BlockMultiValIterator) getBlockValIteratorForColumn(column);
 
     int inEndPos = inStartPos + length;
     for (int i = inStartPos; i < inEndPos; i++, outStartPos++) {
-      int numValues = fetchDictIdsForDocId(column, inDocIds[i], _reusableMVDictIds);
+      iterator.skipTo(inDocIds[i]);
+      int numValues = iterator.nextIntVal(_reusableMVDictIds);
+
       outValues[outStartPos] = new double[numValues];
       for (int j = 0; j < numValues; j++) {
         outValues[outStartPos][j] = dictionary.get(_reusableMVDictIds[j]).hashCode();
