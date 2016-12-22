@@ -24,10 +24,11 @@ DataService.prototype = {
       return results;
     },
     // Make asynchronous get call
-    getDataAsynchronous: function(url, data, callback)  {
-      var target = document.getElementById('spin-area');
+    getDataAsynchronous: function(url, data, callback, spinArea)  {
+      var target = document.getElementById(spinArea);
       var spinner = new Spinner();
       spinner.spin(target);
+
       console.log("request url:", url)
       $.ajax({
         url: url,
@@ -60,13 +61,18 @@ DataService.prototype = {
         data: data
       });
     },
+    // FIXME: Tried to put spinner in ajax call, so that each page wont have to handle it separately, as long as 'spin-area' div is placed
+    // However, spinner doesn't work if generic 'spin-area' div is placed on all pages (usually doesn't load on anomaly results page when landing on it 2nd time)
+    // Hence I've put on each page, a different div id, and that id is passed to the ajax call
+    // TODO: Either figure out why generic div id won't work (because passing div id to the ajax caller isn't the best in terms of role separation)
+    // Or handle spinner on each page separately (I don't prefer this approach because duplication of logic everywhere)
     fetchMetricSummary: function(dashboard, timeRange, callback) {
       var url = constants.METRIC_SUMMARY;
       var data = {
           dashboard : dashboard,
           timeRange : timeRange
       };
-      this.getDataAsynchronous(url, data, callback);
+      this.getDataAsynchronous(url, data, callback, 'summary-spin-area');
     },
     fetchAnomalySummary: function(dashboard, timeRanges, callback) {
       var url = constants.ANOMALY_SUMMARY;
@@ -74,7 +80,7 @@ DataService.prototype = {
           dashboard : dashboard,
           timeRanges : timeRanges.join()
       };
-      this.getDataAsynchronous(url, data, callback);
+      this.getDataAsynchronous(url, data, callback, 'summary-spin-area');
     },
     // Fetch anomalies for metric ids in array in time range
     fetchAnomaliesForMetricIds : function(startTime, endTime, metricIds, functionName, callback) {
@@ -83,7 +89,7 @@ DataService.prototype = {
           metricIds : metricIds.join(),
           functionName : functionName
       };
-      this.getDataAsynchronous(url, data, callback);
+      this.getDataAsynchronous(url, data, callback, 'anomaly-spin-area');
     },
     // Fetch anomalies for dashboard id in time range
     fetchAnomaliesForDashboardId : function(startTime, endTime, dashboardId, functionName, callback) {
@@ -92,7 +98,7 @@ DataService.prototype = {
           dashboardId : dashboardId,
           functionName : functionName
       };
-      this.getDataAsynchronous(url, data, callback);
+      this.getDataAsynchronous(url, data, callback, 'anomaly-spin-area');
     },
     // Fetch anomalies for anomaly ids in array in time range
     fetchAnomaliesForAnomalyIds : function(startTime, endTime, anomalyIds, functionName, callback) {
@@ -101,7 +107,7 @@ DataService.prototype = {
           anomalyIds : anomalyIds.join(),
           functionName : functionName
       };
-      this.getDataAsynchronous(url, data, callback);
+      this.getDataAsynchronous(url, data, callback, 'anomaly-spin-area');
     },
     // Update anomaly feedback for anomaly id
     updateFeedback : function(anomalyId, feedbackType) {

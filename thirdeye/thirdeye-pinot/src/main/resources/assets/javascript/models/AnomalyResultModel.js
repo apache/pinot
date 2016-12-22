@@ -82,6 +82,8 @@ AnomalyResultModel.prototype = {
           this.startDate, this.endDate, this.anomalyIds, this.functionName, this.updateModelAndNotifyView.bind(this));
     }
   },
+  // TODO: change return value of anomalies to complex object, instead of array
+  // so that we can pass information such as total number of anomalies (this if for the "Showing x anomalies of y")
   updateModelAndNotifyView : function(anomalies) {
     this.anomalies = anomalies;
     this.renderViewEvent.notify();
