@@ -17,7 +17,7 @@ DashboardController.prototype = {
     this.dashboardView.init();
   },
 
-  handleAppEvent : function(args) {
+  handleAppEvent : function() {
     console.log("DashboardController.handleAppEvent");
     tabName = HASH_SERVICE.get("tab");
 
@@ -39,12 +39,14 @@ DashboardController.prototype = {
     this.dashboardView.render();
     console.log('Sending to child controller');
     console.log(childController);
+    var args = {
+        dashboardName : this.dashboardModel.dashboardName,
+        dashboardId : this.dashboardModel.dashboardId
+    };
     childController.handleAppEvent(args);
-
   },
 
   onSubTabSelectionEventHandler : function(sender, args) {
-    var params = this.dashboardModel.hashParams;
     args.targetTab = args.targetTab.replace("#", "");
     HASH_SERVICE.set("tab", args.targetTab);
     this.handleAppEvent();
@@ -55,7 +57,7 @@ DashboardController.prototype = {
     this.dashboardModel.dashboardName = args.dashboardName;
     this.dashboardModel.dashboardId = args.dashboardId;
     console.log(HASH_SERVICE.getParams());
-    this.handleAppEvent(args);
+    this.handleAppEvent();
   }
 
 };

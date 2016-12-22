@@ -10,6 +10,7 @@ MetricSummaryController.prototype ={
     handleAppEvent: function(params){
       console.log("handleAppEvent of metricSummary");
       console.log(params);
+      //var params = HASH_SERVICE.getParams();
       this.metricSummaryModel.reset();
       this.metricSummaryModel.setParams(params);
       this.metricSummaryModel.rebuild();

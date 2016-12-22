@@ -74,6 +74,7 @@ DashboardView.prototype = {
   setupListeners : function() {
     var self = this;
     var tabSelectionEventHandler = function(e) {
+      console.log("Switching tabs")
       var targetTab = $(e.target).attr('href');
       var previousTab = $(e.relatedTarget).attr('href');
       var args = {

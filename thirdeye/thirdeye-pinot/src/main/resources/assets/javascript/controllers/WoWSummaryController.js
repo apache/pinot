@@ -7,11 +7,11 @@ function WoWSummaryController(parentController){
 
 WoWSummaryController.prototype ={
 
-    handleAppEvent: function(){
-      var params = HASH_SERVICE.getParams();
-      this.wowSummaryModel.init(params);
+    handleAppEvent: function(params){
+      //var params = HASH_SERVICE.getParams();
+      this.wowSummaryModel.reset();
+      this.wowSummaryModel.setParams(params);
       this.wowSummaryModel.rebuild();
-      this.wowSummaryView.render();
     },
 
     init:function(){

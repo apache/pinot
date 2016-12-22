@@ -4,7 +4,7 @@
 			{{#each this as |metricSummary metricSummaryIndex|}}
 			<div class="metric-card-container">
 				<div class="metric-card">
-					<div class="metric-card-header">
+					<div class="metric-card-header" style="word-wrap: break-word;">
 						<div>
 							<span class="label-medium-light">{{this.metricName}}</span>
 						</div>

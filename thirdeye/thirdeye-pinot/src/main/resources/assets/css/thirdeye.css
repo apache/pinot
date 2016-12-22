@@ -209,7 +209,8 @@ hr {
 	height: 20%;
 	background-color: #FFFFFF;
 	display: table;
-	border-bottom: 1px solid #CECECE
+	border-bottom: 1px solid #CECECE;
+	word-wrap: break-word;
 }
 
 .metric-card-header>div {
@@ -300,7 +301,7 @@ hr {
 .analysis-table>thead>tr>th, .analysis-table>tbody>tr>th,
 	.analysis-table>tfoot>tr>th, .analysis-table>thead>tr>td,
 	.analysis-table>tbody>tr>td, .analysis-table>tfoot>tr>td {
-	
+
 }
 
 .analysis-table {

@@ -1,15 +1,45 @@
 function WoWSummaryModel() {
+  this.dashboardName = null;
+  this.dashboardId = null
+  this.previousDashboardName = null;
+
   this.timeRangeLabels = [ "Most Recent Hour", "Today", "Yesterday", "Last 7 Days" ];
   this.wowSummaryList = [];
+
+  this.renderViewEvent = new Event();
 }
 
 WoWSummaryModel.prototype = {
 
-  init : function(params) {
-    this.buildSampleData();
+  reset : function() {
+
+  },
+  setParams : function(params) {
+    console.log("Set params for WOW");
+    if (params != undefined) {
+      console.log('params');
+      if (params['dashboardName'] != undefined) {
+        console.log('dashboard');
+        this.previousDashboardName = this.dashboardName;
+        this.dashboardName = params['dashboardName'];
+        this.dashboardId = params['dashboardId'];
+      }
+    }
   },
   rebuild : function() {
-    // TODO: fetch relevant data from backend
+    if (this.dashboardName != null) {
+      if (this.previousDashboardName != this.dashboardName) {
+        this.buildSampleData();
+      } else {
+        this.updateModelAndNotifyView(this.wowSummaryList)
+      }
+    }
+  },
+  updateModelAndNotifyView : function(wowSummaryList) {
+    console.log('Results');
+    console.log(wowSummaryList);
+    this.wowSummaryList = wowSummaryList;
+    this.renderViewEvent.notify();
   },
   buildSampleData : function() {
     this.wowSummaryList = [];
@@ -43,6 +73,7 @@ WoWSummaryModel.prototype = {
       } ];
       this.wowSummaryList.push(row);
     }
+    this.updateModelAndNotifyView(this.wowSummaryList);
 
   }
 };
