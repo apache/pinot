@@ -168,6 +168,8 @@ public class AnomaliesResource {
       }
     }
     anomaliesSummary.setMetricId(metricId);
+    anomaliesSummary.setStartTime(startTime);
+    anomaliesSummary.setEndTime(endTime);
     anomaliesSummary.setNumAnomalies(mergedAnomalies.size());
     anomaliesSummary.setNumAnomaliesResolved(resolvedAnomalies);
     anomaliesSummary.setNumAnomaliesUnresolved(unresolvedAnomalies);

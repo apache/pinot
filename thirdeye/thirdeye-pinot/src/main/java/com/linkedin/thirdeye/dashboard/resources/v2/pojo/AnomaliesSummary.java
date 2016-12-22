@@ -3,6 +3,8 @@ package com.linkedin.thirdeye.dashboard.resources.v2.pojo;
 public class AnomaliesSummary {
   Long metricId;
   String metricName;
+  long startTime;
+  long endTime;
   int numAnomalies;
   int numAnomaliesResolved;
   int numAnomaliesUnresolved;
@@ -36,6 +38,18 @@ public class AnomaliesSummary {
   }
   public void setMetricName(String metricName) {
     this.metricName = metricName;
+  }
+  public long getStartTime() {
+    return startTime;
+  }
+  public void setStartTime(long startTime) {
+    this.startTime = startTime;
+  }
+  public long getEndTime() {
+    return endTime;
+  }
+  public void setEndTime(long endTime) {
+    this.endTime = endTime;
   }
 
 

@@ -25,6 +25,9 @@ DataService.prototype = {
     },
     // Make asynchronous get call
     getDataAsynchronous: function(url, data, callback)  {
+      var target = document.getElementById('spin-area');
+      var spinner = new Spinner();
+      spinner.spin(target);
       console.log("request url:", url)
       $.ajax({
         url: url,
@@ -38,6 +41,7 @@ DataService.prototype = {
           console.log(e);
         }
       }).done(function(data) {
+        spinner.stop();
         callback(data);
       });
     },

@@ -95,8 +95,6 @@ function AnomalyResultView(anomalyResultModel) {
     cancelClass : 'btn-default'
   };
 
-  this.spinner = new Spinner();
-
   // Compile HTML template
   var anomalies_template = $("#anomalies-template").html();
   this.anomalies_template_compiled = Handlebars.compile(anomalies_template);
@@ -165,7 +163,6 @@ AnomalyResultView.prototype = {
       anomalyFunctionSelector.append($('<option></option>').val(val).html(text));
     });
 
-    this.spinner.stop();
 
   },
   showSearchBarBasedOnMode : function() {
@@ -304,9 +301,6 @@ AnomalyResultView.prototype = {
         endDate : endDate,
         functionName : functionName
       }
-
-      var target = document.getElementById('spin-area');
-      self.spinner.spin(target);
 
       self.applyButtonEvent.notify(anomaliesParams);
 

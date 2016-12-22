@@ -72,7 +72,6 @@ public class DataResource {
   private static final Logger LOG = LoggerFactory.getLogger(DataResource.class);
   private static final DAORegistry daoRegistry = DAORegistry.getInstance();
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-  private static final DecimalFormat df2 = new DecimalFormat("#.#");
 
   private final MetricConfigManager metricConfigDAO;
   private final DatasetConfigManager datasetConfigDAO;
@@ -258,6 +257,7 @@ public class DataResource {
     Multimap<String, MetricExpression> datasetToMetricExpressions = ArrayListMultimap.create();
     Map<Long, MetricConfigDTO> metricIdToMetricConfig = new HashMap<>();
     Map<Long, GenericResponse> idToResponseMap = new HashMap<>();
+    Map<Long, AnomaliesSummary> idToAnomaliesSummaryMap = new HashMap<>();
     for (long metricId : metricIds) {
       MetricConfigDTO metricConfig = metricConfigDAO.findById(metricId);
       metricIdToMetricConfig.put(metricId, metricConfig);
@@ -265,17 +265,11 @@ public class DataResource {
       datasetToMetricExpressions.put(metricConfig.getDataset(), ThirdEyeUtils.getMetricExpressionFromMetricConfig(metricConfig));
     }
 
-     // Get the smallest max date time among all collection
-    long currentEnd = getSmallestMaxDateTimeFromCollections(datasetToMetrics.keySet());
-    String[] tokens = timeRange.split("_");
-    TimeGranularity timeGranularity = new TimeGranularity(Integer.valueOf(tokens[0]), TimeUnit.valueOf(tokens[1]));
-    long currentStart = currentEnd - TimeUnit.MILLISECONDS.convert(Long.valueOf(tokens[0]), TimeUnit.valueOf(tokens[1]));
-
     // Create query request for each collection
-    for (String collection : datasetToMetrics.keySet()) {
+    for (String dataset : datasetToMetrics.keySet()) {
       TabularViewRequest request = new TabularViewRequest();
-      request.setCollection(collection);
-      request.setMetricExpressions(new ArrayList<>(datasetToMetricExpressions.get(collection)));
+      request.setCollection(dataset);
+      request.setMetricExpressions(new ArrayList<>(datasetToMetricExpressions.get(dataset)));
 
       // The input start and end time (i.e., currentStart, currentEnd, baselineStart, and
       // baselineEnd) are given in millisecond since epoch, which is timezone insensitive. On the
@@ -284,12 +278,12 @@ public class DataResource {
       // we need to store user's start and end time in DateTime objects with data's timezone
       // in order to ensure that the conversion to SimpleDateFormat is always correct regardless
       // user and server's timezone, including daylight saving time.
-      DateTimeZone timeZoneForCollection = DateTimeZone.UTC;
-      try {
-        timeZoneForCollection = Utils.getDataTimeZone(collection);
-      } catch (ExecutionException e) {
-        LOG.info("Use UTC timezone for collection={} because failed to get its timezone.");
-      }
+      long currentEnd = Utils.getMaxDataTimeForDataset(dataset);
+      String[] tokens = timeRange.split("_");
+      TimeGranularity timeGranularity = new TimeGranularity(Integer.valueOf(tokens[0]), TimeUnit.valueOf(tokens[1]));
+      long currentStart = currentEnd - TimeUnit.MILLISECONDS.convert(Long.valueOf(tokens[0]), TimeUnit.valueOf(tokens[1]));
+
+      DateTimeZone timeZoneForCollection = Utils.getDataTimeZone(dataset);
       request.setBaselineStart(new DateTime(currentStart, timeZoneForCollection).minusDays(7));
       request.setBaselineEnd(new DateTime(currentEnd, timeZoneForCollection).minusDays(7));
       request.setCurrentStart(new DateTime(currentStart, timeZoneForCollection));
@@ -300,13 +294,18 @@ public class DataResource {
       try {
         TabularViewResponse response = handler.process(request);
         for (String metric : response.getMetrics()) {
-          MetricDataset metricDataset = new MetricDataset(metric, collection);
+          MetricDataset metricDataset = new MetricDataset(metric, dataset);
           MetricConfigDTO metricConfig = CACHE_REGISTRY_INSTANCE.getMetricConfigCache().get(metricDataset);
-          idToResponseMap.put(metricConfig.getId(), response.getData().get(metric));
+          Long metricId = metricConfig.getId();
+          idToResponseMap.put(metricId, response.getData().get(metric));
+          AnomaliesSummary anomaliesSummary = anomaliesResoure.getAnomalyCountForMetricInRange(metricId, currentStart, currentEnd);
+          idToAnomaliesSummaryMap.put(metricId, anomaliesSummary);
         }
       } catch (Exception e) {
         LOG.error("Exception while processing /data/tabular call", e);
       }
+
+
     }
     for (Long metricId : metricIds) {
       MetricSummary metricSummary = new MetricSummary();
@@ -329,9 +328,7 @@ public class DataResource {
       metricSummary.setCurrentValue(curentvalue);
       metricSummary.setWowPercentageChange(wowPercentageChange);
 
-      AnomaliesSummary anomaliesSummary =
-          anomaliesResoure.getAnomalyCountForMetricInRange(metricId, currentStart, currentEnd);
-      metricSummary.setAnomaliesSummary(anomaliesSummary);
+      metricSummary.setAnomaliesSummary(idToAnomaliesSummaryMap.get(metricId));
 
       metricsSummary.add(metricSummary);
     }
@@ -348,23 +345,29 @@ public class DataResource {
       @QueryParam("timeRanges") String timeRanges) {
     List<Long> metricIds = getMetricIdsByDashboard(dashboard);
     List<String> timeRangesList = Lists.newArrayList(timeRanges.split(","));
+    Map<String, Long> timeRangeToDurationMap = new HashMap<>();
+    for (String timeRange : timeRangesList) {
+      String[] tokens = timeRange.split("_");
+      long duration = TimeUnit.MILLISECONDS.convert(Long.valueOf(tokens[0]), TimeUnit.valueOf(tokens[1]));
+      timeRangeToDurationMap.put(timeRange, duration);
+    }
 
-    // TODO:
     Map<String, List<AnomaliesSummary>> metricIdToAnomaliesSummariesMap = new HashMap<>();
     for (Long metricId : metricIds) {
       List<AnomaliesSummary> summaries = new ArrayList<>();
-      MetricConfigDTO metricConfig = metricConfigDAO.findById(metricId);
-      for (String timeRange : timeRangesList) {
 
-        AnomaliesSummary summary = new AnomaliesSummary();
-        summary.setMetricId(metricId);
-        summary.setMetricName(metricConfigDAO.findById(metricId).getName());
-        summary.setNumAnomalies(10);
-        summary.setNumAnomaliesResolved(6);
-        summary.setNumAnomaliesUnresolved(4);
+      MetricConfigDTO metricConfig = metricConfigDAO.findById(metricId);
+      String metricAlias = metricConfig.getAlias();
+      String dataset = metricConfig.getDataset();
+
+      long endTime = Utils.getMaxDataTimeForDataset(dataset);
+
+      for (String timeRange : timeRangesList) {
+        long startTime = endTime - timeRangeToDurationMap.get(timeRange);
+        AnomaliesSummary summary = anomaliesResoure.getAnomalyCountForMetricInRange(metricId, startTime, endTime);
         summaries.add(summary);
       }
-      metricIdToAnomaliesSummariesMap.put(metricConfig.getAlias(), summaries);
+      metricIdToAnomaliesSummariesMap.put(metricAlias, summaries);
     }
     return metricIdToAnomaliesSummariesMap;
   }

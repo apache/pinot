@@ -50,18 +50,6 @@ DashboardController.prototype = {
     this.handleAppEvent();
   },
 
-  hideDataRangePickerEventHandler : function(sender, args) {
-    var dataRangePicker = args.dataRangePicker;
-    if (!this.dashboardModel.startTime.isSame(dataRangePicker.startDate) || !this.dashboardModel.endTime.isSame(dataRangePicker.endDate)) {
-      // Copy date range to local model for checking if new date range needs
-      // update
-      this.dashboardModel.startTime = dataRangePicker.startDate;
-      this.dashboardModel.endTime = dataRangePicker.endDate;
-      this.handleAppEvent();
-    }
-
-  },
-
   onDashboardSelectionEventHandler : function(sender, args) {
     HASH_SERVICE.update(args);
     this.dashboardModel.dashboardName = args.dashboardName;

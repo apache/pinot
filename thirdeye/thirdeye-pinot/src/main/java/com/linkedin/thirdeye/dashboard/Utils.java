@@ -25,6 +25,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
@@ -221,9 +222,14 @@ public class Utils {
   /*
    * This method returns the time zone of the data in this collection
    */
-  public static DateTimeZone getDataTimeZone(String collection) throws ExecutionException {
-    DatasetConfigDTO datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(collection);
-    String timezone = datasetConfig.getTimezone();
+  public static DateTimeZone getDataTimeZone(String collection)  {
+    String timezone = TimeSpec.DEFAULT_TIMEZONE;
+    try {
+      DatasetConfigDTO datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(collection);
+      timezone = datasetConfig.getTimezone();
+    } catch (ExecutionException e) {
+      LOG.error("Exception while getting dataset config for {}", collection);
+    }
     return DateTimeZone.forID(timezone);
   }
 
@@ -240,11 +246,21 @@ public class Utils {
   public static Map<String, Object> getMapFromObject(Object object) throws IOException {
     return getMapFromJson(getJsonFromObject(object));
   }
-  
+
   public static <T extends Object> List<T> sublist(List<T> input, int startIndex, int length) {
     startIndex = Math.min(startIndex, input.size());
     int endIndex = Math.min(startIndex + length, input.size());
     List<T> subList = Lists.newArrayList(input).subList(startIndex, endIndex);
     return subList;
+  }
+
+  public static long getMaxDataTimeForDataset(String dataset) {
+    long endTime = 0;
+    try {
+      endTime = CACHE_REGISTRY.getCollectionMaxDataTimeCache().get(dataset);
+    } catch (ExecutionException e) {
+      LOG.error("Exception when getting max data time for {}", dataset);
+    }
+    return endTime;
   }
 }

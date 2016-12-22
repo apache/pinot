@@ -19,7 +19,7 @@
 							<span class="label-medium-light" title="No anomaly configured">{{computeAnomaliesString metricSummary.anomaliesSummary.numAnomalies}}</span>
 						</div>
 						<div class="metric-card-body-row-3">
-							<span class="label-medium-light">{{metricSummary.currentValue}}(-15%)</span>
+							<span class="label-medium-light">{{metricSummary.currentValue}}({{metricSummary.wowPercentageChange}})</span>
 						</div>
 					</div>
 				</div>

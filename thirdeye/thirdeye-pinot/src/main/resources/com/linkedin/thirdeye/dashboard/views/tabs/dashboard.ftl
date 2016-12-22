@@ -49,6 +49,7 @@
 	</div>
 </div>
 {{/if}}
+<div id="spin-area"></div>
 
 <#include "dashboard/manage-dashboard-modal.ftl"/>
 
