@@ -162,6 +162,14 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
         break;
 
       case AggregationFunctionFactory.COUNT_MV_AGGREGATION_FUNCTION:
+        Object numOfMVEntriesArray = blockValueSet.getNumberOfMVEntriesArray();
+        if (_hasMVGroupByColumns) {
+          aggregationFunction.aggregateGroupByMV(length, _docIdToMVGroupKey, resultHolder, numOfMVEntriesArray);
+        } else {
+          aggregationFunction.aggregateGroupBySV(length, _docIdToSVGroupKey, resultHolder, numOfMVEntriesArray);
+        }
+        break;
+
       case AggregationFunctionFactory.DISTINCTCOUNT_AGGREGATION_FUNCTION:
       case AggregationFunctionFactory.DISTINCTCOUNTHLL_AGGREGATION_FUNCTION:
       case AggregationFunctionFactory.DISTINCTCOUNT_MV_AGGREGATION_FUNCTION:

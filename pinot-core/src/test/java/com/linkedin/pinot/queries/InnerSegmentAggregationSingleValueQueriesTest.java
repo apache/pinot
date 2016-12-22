@@ -29,7 +29,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-public class AggregationSingleValueQueriesTest extends BaseSingleValueQueriesTest {
+public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleValueQueriesTest {
   private static final String AGGREGATION = " COUNT(*), SUM(column1), MAX(column3), MIN(column6), AVG(column7)";
 
   // ARRAY_BASED
