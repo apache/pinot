@@ -79,7 +79,7 @@
   <#include "tabs/analysis/timeseries-subdimension-legend.ftl"/>
 </script>
 <script id="contributor-table-details-template" type="text/x-handlebars-template">
-  <#include "tabs/analysis/contributor-table-details.ftl"/>
+  <#include "tabs/analysis/percentage-change-table.ftl"/>
 </script>
 <script id="dimension-tree-map-template" type="text/x-handlebars-template">
   <#include "tabs/analysis/dimension-tree-map.ftl"/>

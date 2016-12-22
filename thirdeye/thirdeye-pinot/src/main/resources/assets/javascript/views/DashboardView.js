@@ -14,15 +14,14 @@ DashboardView.prototype = {
   },
   render : function() {
     var self = this;
-    result = this.dashboard_template_compiled(this.dashboardModel);
+    var result = self.dashboard_template_compiled(self.dashboardModel);
 
     // autocomplete
     $("#dashboard-place-holder").html(result);
-    console.log("this.dashboardModel.tabSelected:" + this.dashboardModel.tabSelected);
-    $('#dashboard-tabs a[href="#' + this.dashboardModel.tabSelected + '"]').tab('show');
+    console.log("this.dashboardModel.tabSelected:" + self.dashboardModel.tabSelected);
+    $('#dashboard-tabs a[href="#' + self.dashboardModel.tabSelected + '"]').tab('show');
 
     // DASHBOARD SELECTION
-    var self = this;
     $('#dashboard-name-input').select2({
       theme : "bootstrap",
       placeholder : "Search for Dashboard",
@@ -65,8 +64,6 @@ DashboardView.prototype = {
       };
 
       if (self.dashboardModel.dashboardName != selectedDashboardName) {
-        console.log("Notify dashboard controller ----> ");
-        console.log(args);
        self.onDashboardSelectionEvent.notify(args);
       }
     });

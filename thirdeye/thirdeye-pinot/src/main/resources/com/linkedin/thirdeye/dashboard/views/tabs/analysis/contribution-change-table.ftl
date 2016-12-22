@@ -14,7 +14,7 @@
       <tr>
         <td>{{keyIndex}}</td>
         {{#each percentageChangeArr as |percentageChange idx|}}
-        <td style="background-color: {{computeColor percentageChange}};color: {{computeTextColor percentageChange}};">{{percentageChange}}%</td>
+        <td style="background-color: {{computeColor percentageChange}};color: {{computeTextColor percentageChange}};" id="{{keyIndex}}-{{idx}}">{{percentageChange}}%</td>
         {{/each}}
       </tr>
       {{/each}}

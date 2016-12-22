@@ -47,6 +47,8 @@ public class TimeSeriesResource {
   private static final Logger LOG = LoggerFactory.getLogger(TimeSeriesResource.class);
   private static final String ALL = "All";
 
+  public static final String DECIMAL_FORMAT = "%+.1f";
+
   private LoadingCache<String, Long> datasetMaxDataTimeCache = CACHE_REGISTRY_INSTANCE
       .getCollectionMaxDataTimeCache();
   private QueryCache queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
@@ -196,12 +198,12 @@ public class TimeSeriesResource {
 
         subDimensionValuesMap.get(subDimension).getCurrentValues()[index] = currentVal;
         subDimensionValuesMap.get(subDimension).getBaselineValues()[index] = baselineVal;
-        subDimensionValuesMap.get(subDimension).getPercentageChange()[index] = String.format("%.2f", percentageChangeVal);
+        subDimensionValuesMap.get(subDimension).getPercentageChange()[index] = String.format(DECIMAL_FORMAT, percentageChangeVal);
       }
 
       // Now compute percentage change for all values
       for (int i = 0; i < vw.getCurrentValues().length; i++) {
-        vw.getPercentageChange()[i] = String.format("%.2f",
+        vw.getPercentageChange()[i] = String.format(DECIMAL_FORMAT,
             getPercentageChange(vw.getCurrentValues()[i], vw.getBaselineValues()[i]));
       }
     } catch (Exception e) {

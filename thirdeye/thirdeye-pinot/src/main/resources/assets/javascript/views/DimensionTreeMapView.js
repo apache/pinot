@@ -3,42 +3,42 @@ function DimensionTreeMapView(dimensionTreeMapModel) {
   this.template_compiled = Handlebars.compile(template);
   this.placeHolderId = "#dimension-tree-map-placeholder";
   this.dimensionTreeMapModel = dimensionTreeMapModel;
-  this.currentTimeRangeConfig = {
-    dateLimit : {
-      days : 60
-    },
-    showDropdowns : true,
-    showWeekNumbers : true,
-    timePicker : true,
-    timePickerIncrement : 5,
-    timePicker12Hour : true,
-    ranges : {
-      'Last 24 Hours' : [ moment(), moment() ],
-      'Yesterday' : [ moment().subtract(1, 'days'), moment().subtract(1, 'days') ],
-      'Last 7 Days' : [ moment().subtract(6, 'days'), moment() ],
-      'Last 30 Days' : [ moment().subtract(29, 'days'), moment() ],
-      'This Month' : [ moment().startOf('month'), moment().endOf('month') ],
-      'Last Month' : [ moment().subtract(1, 'month').startOf('month'), moment().subtract(1, 'month').endOf('month') ]
-    }
-  };
-  this.baselineTimeRangeConfig = {
-    dateLimit : {
-      days : 60
-    },
-    showDropdowns : true,
-    showWeekNumbers : true,
-    timePicker : true,
-    timePickerIncrement : 5,
-    timePicker12Hour : true,
-    ranges : {
-      'Last 24 Hours' : [ moment(), moment() ],
-      'Yesterday' : [ moment().subtract(1, 'days'), moment().subtract(1, 'days') ],
-      'Last 7 Days' : [ moment().subtract(6, 'days'), moment() ],
-      'Last 30 Days' : [ moment().subtract(29, 'days'), moment() ],
-      'This Month' : [ moment().startOf('month'), moment().endOf('month') ],
-      'Last Month' : [ moment().subtract(1, 'month').startOf('month'), moment().subtract(1, 'month').endOf('month') ]
-    }
-  };
+  // this.currentTimeRangeConfig = {
+  //   dateLimit : {
+  //     days : 60
+  //   },
+  //   showDropdowns : true,
+  //   showWeekNumbers : true,
+  //   timePicker : true,
+  //   timePickerIncrement : 5,
+  //   timePicker12Hour : true,
+  //   ranges : {
+  //     'Last 24 Hours' : [ moment(), moment() ],
+  //     'Yesterday' : [ moment().subtract(1, 'days'), moment().subtract(1, 'days') ],
+  //     'Last 7 Days' : [ moment().subtract(6, 'days'), moment() ],
+  //     'Last 30 Days' : [ moment().subtract(29, 'days'), moment() ],
+  //     'This Month' : [ moment().startOf('month'), moment().endOf('month') ],
+  //     'Last Month' : [ moment().subtract(1, 'month').startOf('month'), moment().subtract(1, 'month').endOf('month') ]
+  //   }
+  // };
+  // this.baselineTimeRangeConfig = {
+  //   dateLimit : {
+  //     days : 60
+  //   },
+  //   showDropdowns : true,
+  //   showWeekNumbers : true,
+  //   timePicker : true,
+  //   timePickerIncrement : 5,
+  //   timePicker12Hour : true,
+  //   ranges : {
+  //     'Last 24 Hours' : [ moment(), moment() ],
+  //     'Yesterday' : [ moment().subtract(1, 'days'), moment().subtract(1, 'days') ],
+  //     'Last 7 Days' : [ moment().subtract(6, 'days'), moment() ],
+  //     'Last 30 Days' : [ moment().subtract(29, 'days'), moment() ],
+  //     'This Month' : [ moment().startOf('month'), moment().endOf('month') ],
+  //     'Last Month' : [ moment().subtract(1, 'month').startOf('month'), moment().subtract(1, 'month').endOf('month') ]
+  //   }
+  // };
 
 }
 
@@ -52,19 +52,19 @@ DimensionTreeMapView.prototype = {
 
   renderTreemapHeaderSection : function() {
 
-    function current_range_cb(start, end) {
-      $('#heatmap-current-range span').addClass("time-range").html(start.format('MMM D, ') + start.format('hh:mm a') + '  &mdash;  ' + end.format('MMM D, ') + end.format('hh:mm a'));
-    }
-    function baseline_range_cb(start, end) {
-      $('#heatmap-baseline-range span').addClass("time-range").html(start.format('MMM D, ') + start.format('hh:mm a') + '  &mdash;  ' + end.format('MMM D, ') + end.format('hh:mm a'));
-    }
+    // function current_range_cb(start, end) {
+    //   $('#heatmap-current-range span').addClass("time-range").html(start.format('MMM D, ') + start.format('hh:mm a') + '  &mdash;  ' + end.format('MMM D, ') + end.format('hh:mm a'));
+    // }
+    // function baseline_range_cb(start, end) {
+    //   $('#heatmap-baseline-range span').addClass("time-range").html(start.format('MMM D, ') + start.format('hh:mm a') + '  &mdash;  ' + end.format('MMM D, ') + end.format('hh:mm a'));
+    // }
 
-    $('#heatmap-current-range').daterangepicker(this.currentTimeRangeConfig, current_range_cb);
-
-    $('#heatmap-baseline-range').daterangepicker(this.baselineTimeRangeConfig, baseline_range_cb);
-
-    current_range_cb(this.dimensionTreeMapModel.currentStartTime, this.dimensionTreeMapModel.currentEndTime);
-    baseline_range_cb(this.dimensionTreeMapModel.baselineStartTime, this.dimensionTreeMapModel.baselineEndTime);
+    // $('#heatmap-current-range').daterangepicker(this.currentTimeRangeConfig, current_range_cb);
+    //
+    // $('#heatmap-baseline-range').daterangepicker(this.baselineTimeRangeConfig, baseline_range_cb);
+    //
+    // current_range_cb(this.dimensionTreeMapModel.currentStartTime, this.dimensionTreeMapModel.currentEndTime);
+    // baseline_range_cb(this.dimensionTreeMapModel.baselineStartTime, this.dimensionTreeMapModel.baselineEndTime);
   },
 
   renderTreemapSection : function() {

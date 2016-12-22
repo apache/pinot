@@ -12,8 +12,8 @@ function TimeSeriesCompareModel() {
 
   this.granularity;
 
-  // this.showDetailsChecked = false;
-  // this.showCumulativeChecked = false;
+  this.showDetailsChecked = false;
+  this.showCumulativeChecked = false;
 
   this.subDimensions;
   this.subDimensionContributionDetails;

@@ -6,10 +6,12 @@ function AnalysisModel() {
   this.dimension;
   this.filters;
 
-  this.currentStart = moment().subtract(4, 'days');
-  this.currentEnd = moment();
-  this.baselineStart= moment().subtract(10, 'days');
-  this.baselineEnd = moment().subtract(6, 'days');
+  var currentTime = moment();
+  currentTime = currentTime - (currentTime % 3600000);
+  this.currentStart = moment(currentTime).subtract(4, 'days');
+  this.currentEnd = moment(currentTime);
+  this.baselineStart= moment(currentTime).subtract(10, 'days');
+  this.baselineEnd = moment(currentTime).subtract(6, 'days');
 }
 
 AnalysisModel.prototype = {

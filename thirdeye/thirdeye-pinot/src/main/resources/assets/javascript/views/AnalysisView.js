@@ -115,12 +115,10 @@ AnalysisView.prototype = {
     if(!metricId) return;
     var self = this;
     var granularities = self.analysisModel.fetchGranularityForMetric(metricId);
-    console.log(granularities);
     var config = {
       minimumResultsForSearch: -1,
       data: granularities
     };
-    console.log
     if (granularities) {
       $("#analysis-granularity-input").select2().empty();
       $("#analysis-granularity-input").select2(config).on("change", function (e) {
@@ -138,14 +136,12 @@ AnalysisView.prototype = {
     var config = {
       minimumResultsForSearch: -1, data: dimensions
     };
-    console.log(dimensions);
     if (dimensions) {
       $("#analysis-metric-dimension-input").select2().empty();
       $("#analysis-metric-dimension-input").select2(config).on("select2:select", function (e) {
         var selectedElement = $(e.currentTarget);
         var selectedData = selectedElement.select2("data");
         self.viewParams['dimension'] = selectedData[0].id;
-        console.log(selectedData)
       });
     }
   },

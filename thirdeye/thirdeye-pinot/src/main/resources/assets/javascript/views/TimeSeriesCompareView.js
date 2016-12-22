@@ -35,7 +35,7 @@ TimeSeriesCompareView.prototype = {
       var contributorTableResult = this.contributor_table_template_compiled(this.timeSeriesCompareModel);
       $(this.contributor_table_placeHolderId).html(contributorTableResult);
 
-      // this.setupListeners();
+      this.setupListeners();
     }
   },
 
@@ -76,10 +76,10 @@ TimeSeriesCompareView.prototype = {
     }
   },
 
-  // setupListeners: function () {
-  //   $('#show-details').change(this.dataEventHandler.bind(this));
-  //   $('#show-cumulative').change(this.dataEventHandler.bind(this));
-  // },
+  setupListeners: function () {
+    $('#show-details').change(this.dataEventHandler.bind(this));
+    $('#show-cumulative').change(this.dataEventHandler.bind(this));
+  },
 
   setupListenerForSubDimension: function () {
     var self = this;
