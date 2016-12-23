@@ -46,7 +46,8 @@ public abstract class ControllerTest {
   protected static boolean isTraceEnabled;
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerTest.class);
   protected String CONTROLLER_BASE_API_URL = "http://localhost:" + ControllerTestUtils.DEFAULT_CONTROLLER_API_PORT;
-  protected String BROKER_BASE_API_URL = "http://localhost:18099";
+  public static final int BROKER_PORT = 18099;
+  protected String BROKER_BASE_API_URL = "http://localhost:" + Integer.toString(BROKER_PORT);
   protected final String CONTROLLER_INSTANCE_NAME = "localhost_11984";
   protected ZkClient _zkClient;
   protected ControllerStarter _controllerStarter;
@@ -69,26 +70,34 @@ public abstract class ControllerTest {
 
     writer.write(reqStr, 0, reqStr.length());
     writer.flush();
-    final BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
 
+    JSONObject ret = getBrokerReturnJson(conn);
+    final long stop = System.currentTimeMillis();
+
+    LOGGER.debug("Time taken for '{}':{}ms", query, (stop - start));
+    return ret;
+  }
+
+  public JSONObject getDebugInfo(final String uri) throws Exception {
+    final URLConnection conn = new URL(BROKER_BASE_API_URL + "/" + uri).openConnection();
+    conn.setDoOutput(true);
+    return getBrokerReturnJson(conn);
+  }
+
+  private JSONObject getBrokerReturnJson(URLConnection conn) throws Exception {
+    final BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
     final StringBuilder sb = new StringBuilder();
     String line = null;
     while ((line = reader.readLine()) != null) {
       sb.append(line);
     }
 
-    final long stop = System.currentTimeMillis();
-
-    LOGGER.debug("Time taken for '{}':{}ms", query, (stop - start));
-
     final String res = sb.toString();
     try {
       final JSONObject ret = new JSONObject(res);
-      ret.put("totalTime", (stop - start));
-
       return ret;
     } catch (JSONException e) {
-      LOGGER.warn("Failed to parse response \"{}\" as JSON", res);
+      LOGGER.warn("Exception  to parse response \"{}\" as JSON", res);
       return null;
     }
   }

@@ -49,7 +49,6 @@ import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
 import com.linkedin.pinot.core.realtime.impl.kafka.AvroRecordToPinotRowGenerator;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaMessageDecoder;
 import com.linkedin.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
 import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
@@ -74,7 +73,7 @@ public abstract class ClusterTest extends ControllerTest {
         final String helixClusterName = getHelixClusterName();
         Configuration configuration = BrokerTestUtils.getDefaultBrokerConfiguration();
         configuration.setProperty("pinot.broker.timeoutMs", 100 * 1000L);
-        configuration.setProperty("pinot.broker.client.queryPort", Integer.toString(18099 + i));
+        configuration.setProperty("pinot.broker.client.queryPort", Integer.toString(BROKER_PORT + i));
         configuration.setProperty("pinot.broker.routing.table.builder.class", "random");
         overrideBrokerConf(configuration);
         _brokerStarters.add(BrokerTestUtils.startBroker(helixClusterName, ZkStarter.DEFAULT_ZK_STR, configuration));

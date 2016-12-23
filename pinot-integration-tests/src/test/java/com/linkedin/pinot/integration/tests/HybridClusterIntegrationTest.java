@@ -16,7 +16,6 @@
 package com.linkedin.pinot.integration.tests;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
@@ -39,6 +38,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
@@ -89,6 +89,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
   @BeforeClass
   public void setUp() throws Exception {
     //Clean up
+    final String tableName = "mytable";
     ensureDirectoryExistsAndIsEmpty(_tmpDir);
     ensureDirectoryExistsAndIsEmpty(_segmentDir);
     ensureDirectoryExistsAndIsEmpty(_tarDir);
@@ -112,7 +113,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     final String sortedColumn = makeSortedColumn();
 
     // Create Pinot table
-    addHybridTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", KafkaStarterUtils.DEFAULT_ZK_STR, KAFKA_TOPIC,
+    addHybridTable(tableName, "DaysSinceEpoch", "daysSinceEpoch", KafkaStarterUtils.DEFAULT_ZK_STR, KAFKA_TOPIC,
         schema.getSchemaName(), TENANT_NAME, TENANT_NAME, avroFiles.get(0), sortedColumn, invertedIndexColumns, null,
         false);
     LOGGER.info("Running with Sorted column=" + sortedColumn + " and inverted index columns = " + invertedIndexColumns);
@@ -127,7 +128,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
 
     // Create segments from Avro data
     LOGGER.info("Creating offline segments from avro files " + offlineAvroFiles);
-    buildSegmentsFromAvro(offlineAvroFiles, executor, 0, _segmentDir, _tarDir, "mytable", false, null);
+    buildSegmentsFromAvro(offlineAvroFiles, executor, 0, _segmentDir, _tarDir, tableName, false, null);
 
     // Initialize query generator
     setupQueryGenerator(avroFiles, executor);
@@ -145,7 +146,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
       @Override
       public void onExternalViewChange(List<ExternalView> externalViewList, NotificationContext changeContext) {
         for (ExternalView externalView : externalViewList) {
-          if (externalView.getId().contains("mytable")) {
+          if (externalView.getId().contains(tableName)) {
 
             Set<String> partitionSet = externalView.getPartitionSet();
             if (partitionSet.size() == offlineSegmentCount) {
@@ -188,13 +189,26 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     long timeInFiveMinutes = System.currentTimeMillis() + 5 * 60 * 1000L;
 
     Statement statement = _connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
-    statement.execute("select count(*) from mytable");
+    statement.execute("select count(*) from " + tableName);
     ResultSet rs = statement.getResultSet();
     rs.first();
     h2RecordCount = rs.getInt(1);
     rs.close();
 
     waitForRecordCountToStabilizeToExpectedCount(h2RecordCount, timeInFiveMinutes);
+    testBrokerDebugOutput(tableName);
+  }
+
+  private void testBrokerDebugOutput(String tableName) throws Exception {
+    // Some basic tests to make sure that we return json from these APIs.
+    getDebugInfo("debug/timeBoundary" + "");
+    getDebugInfo("debug/timeBoundary/" + tableName);
+    getDebugInfo("debug/timeBoundary/" + TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName));
+    getDebugInfo("debug/timeBoundary/" + TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName));
+    getDebugInfo("debug/routingTable/" + tableName);
+    getDebugInfo("debug/routingTable/" + TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName));
+    getDebugInfo("debug/routingTable/" + TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName));
+
   }
 
   protected boolean shouldUseLlc() {
