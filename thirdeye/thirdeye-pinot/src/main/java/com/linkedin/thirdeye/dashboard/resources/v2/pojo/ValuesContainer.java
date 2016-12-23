@@ -6,6 +6,8 @@ public class ValuesContainer {
   double[] baselineValues;
   String[] percentageChange;
 
+  double[] cumulativeCurrentValues;
+  double[] cumulativeBaselineValues;
   String[] cumulativePercentageChange;
 
   public double[] getBaselineValues() {
@@ -32,5 +34,27 @@ public class ValuesContainer {
     this.percentageChange = percentageChange;
   }
 
+  public double[] getCumulativeBaselineValues() {
+    return cumulativeBaselineValues;
+  }
 
+  public void setCumulativeBaselineValues(double[] cumulativeBaselineValues) {
+    this.cumulativeBaselineValues = cumulativeBaselineValues;
+  }
+
+  public double[] getCumulativeCurrentValues() {
+    return cumulativeCurrentValues;
+  }
+
+  public void setCumulativeCurrentValues(double[] cumulativeCurrentValues) {
+    this.cumulativeCurrentValues = cumulativeCurrentValues;
+  }
+
+  public String[] getCumulativePercentageChange() {
+    return cumulativePercentageChange;
+  }
+
+  public void setCumulativePercentageChange(String[] cumulativePercentageChange) {
+    this.cumulativePercentageChange = cumulativePercentageChange;
+  }
 }

@@ -10,14 +10,31 @@
       </tr>
       </thead>
       <tbody>
+      {{#if_eq this.showCumulativeChecked true}}
+      {{#each this.subDimensionContributionDetails.cumulativePercentageChange as |cumulativePercentageChangeArr cKeyIndex|}}
+      <tr>
+        <td>{{cKeyIndex}}</td>
+        {{#each cumulativePercentageChangeArr as |cPercentageChange cidx|}}
+        <td style="background-color: {{computeColor cPercentageChange}};color: {{computeTextColor cPercentageChange}};" id="{{cKeyIndex}}-{{cidx}}">{{cPercentageChange}}%
+        </td>
+        {{/each}}
+      </tr>
+      {{/each}}
+      {{/if_eq}}
+
+
+     {{#if_eq this.showCumulativeChecked false}}
       {{#each this.subDimensionContributionDetails.percentageChange as |percentageChangeArr keyIndex|}}
       <tr>
         <td>{{keyIndex}}</td>
         {{#each percentageChangeArr as |percentageChange idx|}}
-        <td style="background-color: {{computeColor percentageChange}};color: {{computeTextColor percentageChange}};" id="{{keyIndex}}-{{idx}}">{{percentageChange}}%</td>
+        <td style="background-color: {{computeColor percentageChange}};color: {{computeTextColor percentageChange}};" id="{{keyIndex}}-{{idx}}">{{percentageChange}}%
+        </td>
         {{/each}}
       </tr>
       {{/each}}
+      {{/if_eq}}
+
       </tbody>
     </table>
   </div>

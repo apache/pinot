@@ -21,14 +21,6 @@
   </div>
 </div>
 
-<#--<div class="row bottom-buffer">-->
-  <#--<div class="col-md-12">-->
-    <#--<div>-->
-      <#--% Change-->
-    <#--</div>-->
-  <#--</div>-->
-<#--</div>-->
-
 <!-- Percentage change table -->
 <div class="row">
   <div class="col-md-2 pull-left ">

@@ -21,22 +21,29 @@ TimeSeriesCompareView.prototype = {
 
   render: function () {
     if (this.timeSeriesCompareModel.subDimensionContributionDetails) {
-      // render chart
-      var timeseriesContributorViewResult = this.timeseries_contributor_template_compiled(this.timeSeriesCompareModel);
-      $(this.timeseries_contributor_placeHolderId).html(timeseriesContributorViewResult);
-      this.loadChart(this.timeSeriesCompareModel.subDimensionContributionDetails.contributionMap['All']);
-
-      // render chart legned
-      var timeseriesSubDimensionsHtml = this.timeseries_subdimension_legend_template_compiled(this.timeSeriesCompareModel);
-      $(this.timeseries_subdimension_legend_placeHolderId).html(timeseriesSubDimensionsHtml);
-      this.setupListenerForSubDimension();
-
-      // render contributor table
-      var contributorTableResult = this.contributor_table_template_compiled(this.timeSeriesCompareModel);
-      $(this.contributor_table_placeHolderId).html(contributorTableResult);
-
-      this.setupListeners();
+      this.renderChartSection();
+      this.renderPercentageChangeSection();
+      this.setupListenersForDetailsAndCumulativeCheckBoxes();
     }
+  },
+
+  renderChartSection : function() {
+    // render chart
+    var timeseriesContributorViewResult = this.timeseries_contributor_template_compiled(this.timeSeriesCompareModel);
+    $(this.timeseries_contributor_placeHolderId).html(timeseriesContributorViewResult);
+    this.loadChart(this.timeSeriesCompareModel.subDimensionContributionDetails.contributionMap['All']);
+
+    // render chart legned
+    var timeseriesSubDimensionsHtml = this.timeseries_subdimension_legend_template_compiled(this.timeSeriesCompareModel);
+    $(this.timeseries_subdimension_legend_placeHolderId).html(timeseriesSubDimensionsHtml);
+    this.setupListenerForSubDimension();
+  },
+
+  renderPercentageChangeSection : function() {
+    var contributorTableResult = this.contributor_table_template_compiled(this.timeSeriesCompareModel);
+    $(this.contributor_table_placeHolderId).html(contributorTableResult);
+    $('#show-details').checked = this.timeSeriesCompareModel.showDetailsChecked;
+    $('#show-cumulative').checked = this.timeSeriesCompareModel.showCumulativeChecked;
   },
 
   loadChart : function (timeSeriesObject) {
@@ -70,15 +77,23 @@ TimeSeriesCompareView.prototype = {
     });
   },
 
+  // TODO : use this for rendering heatmap
   dataEventHandler: function (e) {
     if (Object.is(e.target.type, "checkbox")) {
       this.checkboxClickEvent.notify(e.target);
     }
   },
 
-  setupListeners: function () {
-    $('#show-details').change(this.dataEventHandler.bind(this));
-    $('#show-cumulative').change(this.dataEventHandler.bind(this));
+  setupListenersForDetailsAndCumulativeCheckBoxes: function () {
+    var self = this;
+    $('#show-details').change(function () {
+      self.timeSeriesCompareModel.showDetailsChecked = !self.timeSeriesCompareModel.showDetailsChecked;
+      self.renderPercentageChangeSection();
+    });
+    $('#show-cumulative').change(function () {
+      self.timeSeriesCompareModel.showCumulativeChecked = !self.timeSeriesCompareModel.showCumulativeChecked;
+      self.renderPercentageChangeSection();
+    });
   },
 
   setupListenerForSubDimension: function () {

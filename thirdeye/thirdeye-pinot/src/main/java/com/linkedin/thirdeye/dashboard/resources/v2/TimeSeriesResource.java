@@ -151,11 +151,13 @@ public class TimeSeriesResource {
       timeSeriesCompareMetricView.setSubDimensionContributionMap(subDimensionValuesMap);
 
       int timeBuckets = response.getTimeBuckets().size();
+      // this is for over all values
       ValuesContainer vw = new ValuesContainer();
       subDimensionValuesMap.put(ALL, vw);
       vw.setCurrentValues(new double[timeBuckets]);
       vw.setBaselineValues(new double[timeBuckets]);
       vw.setPercentageChange(new String[timeBuckets]);
+      vw.setCumulativePercentageChange(new String[timeBuckets]);
 
       // lets find the indices
       int subDimensionIndex =
@@ -166,6 +168,8 @@ public class TimeSeriesResource {
           response.getResponseData().getSchema().getColumnsToIndexMapping().get("baselineValue");
       int percentageChangeIndex =
           response.getResponseData().getSchema().getColumnsToIndexMapping().get("percentageChange");
+      int cumPercentageChangeIndex =
+          response.getResponseData().getSchema().getColumnsToIndexMapping().get("cumulativePercentageChange");
 
       // populate current and baseline time buckets
       for (int i = 0; i < timeBuckets; i++) {
@@ -181,6 +185,8 @@ public class TimeSeriesResource {
         Double currentVal = Double.valueOf(data[currentValueIndex]);
         Double baselineVal = Double.valueOf(data[baselineValueIndex]);
         Double percentageChangeVal = Double.valueOf(data[percentageChangeIndex]);
+        Double cumPercentageChangeVal = Double.valueOf(data[cumPercentageChangeIndex]);
+
         int index = i % timeBuckets;
 
         // set overAll values
@@ -193,15 +199,18 @@ public class TimeSeriesResource {
           subDimVals.setCurrentValues(new double[timeBuckets]);
           subDimVals.setBaselineValues(new double[timeBuckets]);
           subDimVals.setPercentageChange(new String[timeBuckets]);
+          subDimVals.setCumulativePercentageChange(new String[timeBuckets]);
           subDimensionValuesMap.put(subDimension, subDimVals);
         }
 
         subDimensionValuesMap.get(subDimension).getCurrentValues()[index] = currentVal;
         subDimensionValuesMap.get(subDimension).getBaselineValues()[index] = baselineVal;
         subDimensionValuesMap.get(subDimension).getPercentageChange()[index] = String.format(DECIMAL_FORMAT, percentageChangeVal);
+        subDimensionValuesMap.get(subDimension).getCumulativePercentageChange()[index] = String.format(DECIMAL_FORMAT, cumPercentageChangeVal);
       }
 
       // Now compute percentage change for all values
+      // TODO : compute cumulative values for all
       for (int i = 0; i < vw.getCurrentValues().length; i++) {
         vw.getPercentageChange()[i] = String.format(DECIMAL_FORMAT,
             getPercentageChange(vw.getCurrentValues()[i], vw.getBaselineValues()[i]));
@@ -279,6 +288,10 @@ public class TimeSeriesResource {
         double [] baselineValues = new double[numTimeBuckets];
         String [] percentageChangeValues = new String[numTimeBuckets];
 
+        double [] cumCurrentValues = new double[numTimeBuckets];
+        double [] cumBaselineValues = new double[numTimeBuckets];
+        String [] cumPercentageChangeValues = new String[numTimeBuckets];
+
         int currentValIndex =
             response.getData().get(metricConfigDTO.getName()).getSchema().getColumnsToIndexMapping()
                 .get("currentValue");
@@ -289,10 +302,21 @@ public class TimeSeriesResource {
             response.getData().get(metricConfigDTO.getName()).getSchema().getColumnsToIndexMapping()
                 .get("ratio");
 
+        int cumCurrentValIndex =
+            response.getData().get(metricConfigDTO.getName()).getSchema().getColumnsToIndexMapping()
+                .get("cumulativeCurrentValue");
+        int cumBaselineValIndex =
+            response.getData().get(metricConfigDTO.getName()).getSchema().getColumnsToIndexMapping()
+                .get("cumulativeBaselineValue");
+        int cumPercentageChangeIndex =
+            response.getData().get(metricConfigDTO.getName()).getSchema().getColumnsToIndexMapping()
+                .get("cumulativeRatio");
+
         for (int i = 0; i < numTimeBuckets; i++) {
           TimeBucket tb = response.getTimeBuckets().get(i);
           timeBucketsCurrent.add(tb.getCurrentStart());
           timeBucketsBaseline.add(tb.getBaselineStart());
+
           currentValues[i] = Double.valueOf(
               response.getData().get(metricConfigDTO.getName()).getResponseData()
                   .get(i)[currentValIndex]);
@@ -302,6 +326,16 @@ public class TimeSeriesResource {
           percentageChangeValues[i] =
               response.getData().get(metricConfigDTO.getName()).getResponseData()
                   .get(i)[percentageChangeIndex];
+
+          cumCurrentValues[i] = Double.valueOf(
+              response.getData().get(metricConfigDTO.getName()).getResponseData()
+                  .get(i)[cumCurrentValIndex]);
+          cumBaselineValues[i] = Double.valueOf(
+              response.getData().get(metricConfigDTO.getName()).getResponseData()
+                  .get(i)[cumBaselineValIndex]);
+          cumPercentageChangeValues[i] =
+              response.getData().get(metricConfigDTO.getName()).getResponseData()
+                  .get(i)[cumPercentageChangeIndex];
         }
 
         timeSeriesCompareView.setTimeBucketsCurrent(timeBucketsCurrent);
@@ -311,6 +345,9 @@ public class TimeSeriesResource {
         values.setCurrentValues(currentValues);
         values.setBaselineValues(baselineValues);
         values.setPercentageChange(percentageChangeValues);
+        values.setCumulativeCurrentValues(cumCurrentValues);
+        values.setCumulativeBaselineValues(cumBaselineValues);
+        values.setCumulativePercentageChange(cumPercentageChangeValues);
 
         timeSeriesCompareView.setSubDimensionContributionMap(new LinkedHashMap<>());
         timeSeriesCompareView.getSubDimensionContributionMap().put(ALL, values);

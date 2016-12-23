@@ -73,17 +73,17 @@ TimeSeriesCompareModel.prototype = {
           this.subDimensionContributionDetails = {};
           this.subDimensionContributionDetails.contributionMap = {};
           this.subDimensionContributionDetails.percentageChange = {};
+          this.subDimensionContributionDetails.cumulativePercentageChange = {};
           this.subDimensionContributionDetails.timeBucketsCurrent = timeSeriesResponse.timeBucketsCurrent;
 
           for (var key in timeSeriesResponse.subDimensionContributionMap) {
             var currentVal = ['current'];
             var baselineVal = ['baseline'];
-            var percentageChange = [];
+            // var percentageChange = [];
             if (timeSeriesResponse.subDimensionContributionMap[key]) {
               for (var i in timeSeriesResponse.subDimensionContributionMap[key].currentValues) {
                 currentVal.push(timeSeriesResponse.subDimensionContributionMap[key].currentValues[i]);
                 baselineVal.push(timeSeriesResponse.subDimensionContributionMap[key].baselineValues[i]);
-                percentageChange.push(timeSeriesResponse.subDimensionContributionMap[key].percentageChange[i]);
               }
             }
             this.subDimensions.push(key);
@@ -92,7 +92,8 @@ TimeSeriesCompareModel.prototype = {
               end: moment(timeSeriesResponse.end).format('YYYY-M-D'),
               columns: [dateColumn, currentVal, baselineVal]
             };
-            this.subDimensionContributionDetails.percentageChange[key] = percentageChange;
+            this.subDimensionContributionDetails.percentageChange[key] = timeSeriesResponse.subDimensionContributionMap[key].percentageChange;
+            this.subDimensionContributionDetails.cumulativePercentageChange[key] = timeSeriesResponse.subDimensionContributionMap[key].cumulativePercentageChange;
           }
         }
       }
