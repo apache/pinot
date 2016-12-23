@@ -72,14 +72,14 @@ public class CountMVAggregationFunction implements AggregationFunction {
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeys, GroupByResultHolder resultHolder, Object... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkArgument(valueArray[0] instanceof Object[][]);
-    final Object[][] values = (Object[][]) valueArray[0];
+    Preconditions.checkArgument(valueArray[0] instanceof int[]);
+    final int[] values = (int[]) valueArray[0];
     Preconditions.checkState(length <= values.length);
 
     for (int i = 0; i < length; ++i) {
       int groupKey = groupKeys[i];
       double oldValue = resultHolder.getDoubleResult(groupKey);
-      resultHolder.setValueForKey(groupKey, (oldValue + values[i].length));
+      resultHolder.setValueForKey(groupKey, (oldValue + values[i]));
     }
   }
 
@@ -95,13 +95,13 @@ public class CountMVAggregationFunction implements AggregationFunction {
   public void aggregateGroupByMV(int length, int[][] docIdToGroupKeys, GroupByResultHolder resultHolder,
       Object... valueArray) {
     Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkArgument(valueArray[0] instanceof Object[][]);
-    final Object[][] values = (Object[][]) valueArray[0];
+    Preconditions.checkArgument(valueArray[0] instanceof int[]);
+    final int[] values = (int[]) valueArray[0];
     Preconditions.checkState(length <= values.length);
     for (int i = 0; i < length; ++i) {
       for (int groupKey : docIdToGroupKeys[i]) {
         double oldValue = resultHolder.getDoubleResult(groupKey);
-        resultHolder.setValueForKey(groupKey, (oldValue + values[i].length));
+        resultHolder.setValueForKey(groupKey, (oldValue + values[i]));
       }
     }
   }

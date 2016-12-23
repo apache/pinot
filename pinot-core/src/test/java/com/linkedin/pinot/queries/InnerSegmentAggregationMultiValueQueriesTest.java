@@ -29,7 +29,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-public class AggregationMultiValueQueriesTest extends BaseMultiValueQueriesTest {
+public class InnerSegmentAggregationMultiValueQueriesTest extends BaseMultiValueQueriesTest {
   private static final String AGGREGATION = " COUNT(*), SUM(column1), MAX(column2), MIN(column8), AVG(column9)";
   private static final String MULTI_VALUE_AGGREGATION =
       " COUNTMV(column6), SUMMV(column7), MAXMV(column6), MINMV(column7), AVGMV(column6)";

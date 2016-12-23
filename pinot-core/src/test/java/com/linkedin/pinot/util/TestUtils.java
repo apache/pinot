@@ -20,11 +20,8 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.util.HashMap;
-
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import javax.annotation.Nonnull;
 import org.apache.commons.io.FileUtils;
 import org.json.JSONArray;
@@ -32,8 +29,6 @@ import org.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
-
-import static org.testng.Assert.assertEquals;
 
 
 /**
@@ -86,7 +81,7 @@ public class TestUtils {
         errorRate = Math.abs((actual - estimate) / actual);
       }
       LOGGER.debug("estimate: " + estimate + " actual: " + actual + " error (in rate): " + errorRate);
-      Assert.assertEquals(errorRate < precision, true);
+      Assert.assertTrue(errorRate < precision);
     }
   }
 

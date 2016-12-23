@@ -28,9 +28,9 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
-public class SelectionMultiValueQueriesTest extends BaseMultiValueQueriesTest {
-  private static final String SELECTION = " column1, column5, column6";
-  private static final String ORDER_BY = " ORDER BY column5, column9";
+public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValueQueriesTest {
+  private static final String SELECTION = " column1, column5, column11";
+  private static final String ORDER_BY = " ORDER BY column6, column1";
 
   @Test
   public void testSelectStar() {
@@ -42,87 +42,88 @@ public class SelectionMultiValueQueriesTest extends BaseMultiValueQueriesTest {
     ExecutionStatistics executionStatistics = selectionOnlyOperator.getExecutionStatistics();
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 10L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 100L);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 100000L);
+    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 110L);
+    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 30000L);
     DataTableBuilder.DataSchema selectionDataSchema = resultsBlock.getSelectionDataSchema();
-    Assert.assertEquals(selectionDataSchema.size(), 10);
+    Assert.assertEquals(selectionDataSchema.size(), 11);
     Assert.assertEquals(selectionDataSchema.getColumnName(0), "column1");
-    Assert.assertEquals(selectionDataSchema.getColumnName(5), "column6");
+    Assert.assertEquals(selectionDataSchema.getColumnName(1), "column11");
     Assert.assertEquals(selectionDataSchema.getColumnType(0), FieldSpec.DataType.INT);
-    Assert.assertEquals(selectionDataSchema.getColumnType(5), FieldSpec.DataType.INT_ARRAY);
+    Assert.assertEquals(selectionDataSchema.getColumnType(1), FieldSpec.DataType.STRING);
     List<Serializable[]> selectionResult = (List<Serializable[]>) resultsBlock.getSelectionResult();
     Assert.assertEquals(selectionResult.size(), 10);
     Serializable[] firstRow = selectionResult.get(0);
-    Assert.assertEquals(firstRow.length, 10);
-    Assert.assertEquals(((Integer) firstRow[0]).intValue(), 890282370);
-    Assert.assertEquals(firstRow[5], new int[]{2147483647});
+    Assert.assertEquals(firstRow.length, 11);
+    Assert.assertEquals(((Integer) firstRow[0]).intValue(), 1578964907);
+    Assert.assertEquals((String) firstRow[1], "P");
 
     // Test query with filter.
     selectionOnlyOperator = getOperatorForQueryWithFilter(query);
     resultsBlock = (IntermediateResultsBlock) selectionOnlyOperator.nextBlock();
     executionStatistics = selectionOnlyOperator.getExecutionStatistics();
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 10L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 230501L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 100L);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 100000L);
+    Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 48241L);
+    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 110L);
+    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 30000L);
     selectionDataSchema = resultsBlock.getSelectionDataSchema();
-    Assert.assertEquals(selectionDataSchema.size(), 10);
+    Assert.assertEquals(selectionDataSchema.size(), 11);
     Assert.assertEquals(selectionDataSchema.getColumnName(0), "column1");
-    Assert.assertEquals(selectionDataSchema.getColumnName(5), "column6");
+    Assert.assertEquals(selectionDataSchema.getColumnName(1), "column11");
     Assert.assertEquals(selectionDataSchema.getColumnType(0), FieldSpec.DataType.INT);
-    Assert.assertEquals(selectionDataSchema.getColumnType(5), FieldSpec.DataType.INT_ARRAY);
+    Assert.assertEquals(selectionDataSchema.getColumnType(1), FieldSpec.DataType.STRING);
     selectionResult = (List<Serializable[]>) resultsBlock.getSelectionResult();
     Assert.assertEquals(selectionResult.size(), 10);
     firstRow = selectionResult.get(0);
-    Assert.assertEquals(firstRow.length, 10);
-    Assert.assertEquals(((Integer) firstRow[0]).intValue(), 890282370);
-    Assert.assertEquals(firstRow[5], new int[]{2147483647});
+    Assert.assertEquals(firstRow.length, 11);
+    Assert.assertEquals(((Integer) firstRow[0]).intValue(), 351823652);
+    Assert.assertEquals((String) firstRow[1], "t");
   }
 
   @Test
   public void testSelectionOnly() {
     String query = "SELECT" + SELECTION + " FROM testTable";
 
+    // Test query without filter.
     MSelectionOnlyOperator selectionOnlyOperator = getOperatorForQuery(query);
     IntermediateResultsBlock resultsBlock = (IntermediateResultsBlock) selectionOnlyOperator.nextBlock();
     ExecutionStatistics executionStatistics = selectionOnlyOperator.getExecutionStatistics();
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 10L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 30L);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 100000L);
+    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 30000L);
     DataTableBuilder.DataSchema selectionDataSchema = resultsBlock.getSelectionDataSchema();
     Assert.assertEquals(selectionDataSchema.size(), 3);
     Assert.assertEquals(selectionDataSchema.getColumnName(0), "column1");
-    Assert.assertEquals(selectionDataSchema.getColumnName(2), "column6");
+    Assert.assertEquals(selectionDataSchema.getColumnName(2), "column11");
     Assert.assertEquals(selectionDataSchema.getColumnType(0), FieldSpec.DataType.INT);
-    Assert.assertEquals(selectionDataSchema.getColumnType(2), FieldSpec.DataType.INT_ARRAY);
+    Assert.assertEquals(selectionDataSchema.getColumnType(1), FieldSpec.DataType.STRING);
     List<Serializable[]> selectionResult = (List<Serializable[]>) resultsBlock.getSelectionResult();
     Assert.assertEquals(selectionResult.size(), 10);
     Serializable[] firstRow = selectionResult.get(0);
     Assert.assertEquals(firstRow.length, 3);
-    Assert.assertEquals(((Integer) firstRow[0]).intValue(), 890282370);
-    Assert.assertEquals(firstRow[2], new int[]{2147483647});
+    Assert.assertEquals(((Integer) firstRow[0]).intValue(), 1578964907);
+    Assert.assertEquals((String) firstRow[2], "P");
 
     // Test query with filter.
     selectionOnlyOperator = getOperatorForQueryWithFilter(query);
     resultsBlock = (IntermediateResultsBlock) selectionOnlyOperator.nextBlock();
     executionStatistics = selectionOnlyOperator.getExecutionStatistics();
     Assert.assertEquals(executionStatistics.getNumDocsScanned(), 10L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 230501L);
+    Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 48241L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 30L);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 100000L);
+    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 30000L);
     selectionDataSchema = resultsBlock.getSelectionDataSchema();
     Assert.assertEquals(selectionDataSchema.size(), 3);
     Assert.assertEquals(selectionDataSchema.getColumnName(0), "column1");
-    Assert.assertEquals(selectionDataSchema.getColumnName(2), "column6");
+    Assert.assertEquals(selectionDataSchema.getColumnName(2), "column11");
     Assert.assertEquals(selectionDataSchema.getColumnType(0), FieldSpec.DataType.INT);
-    Assert.assertEquals(selectionDataSchema.getColumnType(2), FieldSpec.DataType.INT_ARRAY);
+    Assert.assertEquals(selectionDataSchema.getColumnType(1), FieldSpec.DataType.STRING);
     selectionResult = (List<Serializable[]>) resultsBlock.getSelectionResult();
     Assert.assertEquals(selectionResult.size(), 10);
     firstRow = selectionResult.get(0);
     Assert.assertEquals(firstRow.length, 3);
-    Assert.assertEquals(((Integer) firstRow[0]).intValue(), 890282370);
-    Assert.assertEquals(firstRow[2], new int[]{2147483647});
+    Assert.assertEquals(((Integer) firstRow[0]).intValue(), 351823652);
+    Assert.assertEquals((String) firstRow[2], "t");
   }
 
   @Test
@@ -133,42 +134,42 @@ public class SelectionMultiValueQueriesTest extends BaseMultiValueQueriesTest {
     MSelectionOrderByOperator selectionOrderByOperator = getOperatorForQuery(query);
     IntermediateResultsBlock resultsBlock = (IntermediateResultsBlock) selectionOrderByOperator.nextBlock();
     ExecutionStatistics executionStatistics = selectionOrderByOperator.getExecutionStatistics();
-    Assert.assertEquals(executionStatistics.getNumDocsScanned(), 100000L);
+    Assert.assertEquals(executionStatistics.getNumDocsScanned(), 30000L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 400000L);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 100000L);
+    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 120000L);
+    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 30000L);
     DataTableBuilder.DataSchema selectionDataSchema = resultsBlock.getSelectionDataSchema();
     Assert.assertEquals(selectionDataSchema.size(), 4);
-    Assert.assertEquals(selectionDataSchema.getColumnName(0), "column5");
-    Assert.assertEquals(selectionDataSchema.getColumnName(3), "column6");
-    Assert.assertEquals(selectionDataSchema.getColumnType(0), FieldSpec.DataType.STRING);
-    Assert.assertEquals(selectionDataSchema.getColumnType(3), FieldSpec.DataType.INT_ARRAY);
+    Assert.assertEquals(selectionDataSchema.getColumnName(0), "column6");
+    Assert.assertEquals(selectionDataSchema.getColumnName(1), "column1");
+    Assert.assertEquals(selectionDataSchema.getColumnType(0), FieldSpec.DataType.INT);
+    Assert.assertEquals(selectionDataSchema.getColumnType(1), FieldSpec.DataType.INT);
     Queue<Serializable[]> selectionResult = (Queue<Serializable[]>) resultsBlock.getSelectionResult();
     Assert.assertEquals(selectionResult.size(), 10);
     Serializable[] lastRow = selectionResult.peek();
     Assert.assertEquals(lastRow.length, 4);
-    Assert.assertEquals((String) lastRow[0], "AKXcXcIqsqOJFsdwxZ");
-    Assert.assertEquals(lastRow[3], new int[]{1252});
+    Assert.assertEquals(((Integer) lastRow[0]).intValue(), 6043515);
+    Assert.assertEquals(((Integer) lastRow[1]).intValue(), 10542595);
 
     // Test query with filter.
     selectionOrderByOperator = getOperatorForQueryWithFilter(query);
     resultsBlock = (IntermediateResultsBlock) selectionOrderByOperator.nextBlock();
     executionStatistics = selectionOrderByOperator.getExecutionStatistics();
-    Assert.assertEquals(executionStatistics.getNumDocsScanned(), 15620L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 282430L);
-    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 62480L);
-    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 100000L);
+    Assert.assertEquals(executionStatistics.getNumDocsScanned(), 6129L);
+    Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 84134L);
+    Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 24516L);
+    Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 30000L);
     selectionDataSchema = resultsBlock.getSelectionDataSchema();
     Assert.assertEquals(selectionDataSchema.size(), 4);
-    Assert.assertEquals(selectionDataSchema.getColumnName(0), "column5");
-    Assert.assertEquals(selectionDataSchema.getColumnName(3), "column6");
-    Assert.assertEquals(selectionDataSchema.getColumnType(0), FieldSpec.DataType.STRING);
-    Assert.assertEquals(selectionDataSchema.getColumnType(3), FieldSpec.DataType.INT_ARRAY);
+    Assert.assertEquals(selectionDataSchema.getColumnName(0), "column6");
+    Assert.assertEquals(selectionDataSchema.getColumnName(1), "column1");
+    Assert.assertEquals(selectionDataSchema.getColumnType(0), FieldSpec.DataType.INT);
+    Assert.assertEquals(selectionDataSchema.getColumnType(1), FieldSpec.DataType.INT);
     selectionResult = (Queue<Serializable[]>) resultsBlock.getSelectionResult();
     Assert.assertEquals(selectionResult.size(), 10);
     lastRow = selectionResult.peek();
     Assert.assertEquals(lastRow.length, 4);
-    Assert.assertEquals((String) lastRow[0], "AKXcXcIqsqOJFsdwxZ");
-    Assert.assertEquals(lastRow[3], new int[]{2147483647});
+    Assert.assertEquals(((Integer) lastRow[0]).intValue(), 6043515);
+    Assert.assertEquals(((Integer) lastRow[1]).intValue(), 462769197);
   }
 }
