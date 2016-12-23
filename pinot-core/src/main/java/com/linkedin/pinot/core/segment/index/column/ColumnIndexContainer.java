@@ -160,6 +160,11 @@ public abstract class ColumnIndexContainer {
   public abstract DataFileReader getForwardIndex();
 
   /**
+   * @return True if index has dictionary, false otherwise
+   */
+  public abstract boolean hasDictionary();
+
+  /**
    * @return
    */
   public abstract ImmutableDictionaryReader getDictionary();
