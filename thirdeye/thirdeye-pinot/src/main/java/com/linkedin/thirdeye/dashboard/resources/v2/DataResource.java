@@ -241,7 +241,7 @@ public class DataResource {
    */
   @GET
   @Path("dashboard/metricsummary")
-  public List<MetricSummary> getWoWSummary(@QueryParam("dashboard") String dashboard,
+  public List<MetricSummary> getMetricSummary(@QueryParam("dashboard") String dashboard,
       @QueryParam("timeRange") String timeRange) {
     List<MetricSummary> metricsSummary = new ArrayList<>();
 
@@ -371,21 +371,4 @@ public class DataResource {
     return metricIdToAnomaliesSummariesMap;
   }
 
-  /**
-   * Get the smallest max date time of the collections
-   * @param collections list of collection names
-   * @return the smallest max date time among the given collections
-   */
-  private long getSmallestMaxDateTimeFromCollections(Collection<String> collections) {
-    long maxDateTime = Long.MAX_VALUE;
-    for (String collection : collections) {
-      try {
-        long collectionMaxDataTime = collectionMaxDataTimeCache.get(collection);
-        maxDateTime = Math.min(maxDateTime, collectionMaxDataTime);
-      } catch (ExecutionException e) {
-        LOG.warn("Unable to get max date time of the collection: {}", collection);
-      }
-    }
-    return maxDateTime;
-  }
 }
