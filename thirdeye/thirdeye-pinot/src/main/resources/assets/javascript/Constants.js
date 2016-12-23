@@ -11,6 +11,7 @@ function Constants() {
   this.ANOMALY_AUTOCOMPLETE_ENDPOINT = '/anomalies/autocomplete/anomalyId';
   this.METRIC_SUMMARY = '/data/dashboard/metricsummary';
   this.ANOMALY_SUMMARY = '/data/dashboard/anomalysummary';
+  this.WOW_SUMMARY = '/data/dashboard/wowsummary';
   this.SEARCH_ANOMALIES_METRICIDS = '/anomalies/search/metricIds/';
   this.SEARCH_ANOMALIES_DASHBOARDID = '/anomalies/search/dashboardId/';
   this.SEARCH_ANOMALIES_ANOMALYIDS = '/anomalies/search/anomalyIds/';

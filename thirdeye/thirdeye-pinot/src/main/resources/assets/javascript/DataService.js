@@ -82,6 +82,14 @@ DataService.prototype = {
       };
       this.getDataAsynchronous(url, data, callback, 'summary-spin-area');
     },
+    fetchWowSummary: function(dashboard, timeRanges, callback) {
+      var url = constants.WOW_SUMMARY;
+      var data = {
+          dashboard : dashboard,
+          timeRanges : timeRanges.join()
+      };
+      this.getDataAsynchronous(url, data, callback, 'summary-spin-area');
+    },
     // Fetch anomalies for metric ids in array in time range
     fetchAnomaliesForMetricIds : function(startTime, endTime, metricIds, functionName, callback) {
       var url = constants.SEARCH_ANOMALIES_METRICIDS + startTime + this.URL_SEPARATOR + endTime;

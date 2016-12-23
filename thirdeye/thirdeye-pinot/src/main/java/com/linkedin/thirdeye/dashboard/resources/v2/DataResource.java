@@ -6,6 +6,7 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.api.TimeRange;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.cache.MetricDataset;
@@ -255,8 +256,6 @@ public class DataResource {
     Multimap<String, Long> datasetToMetrics = ArrayListMultimap.create();
     Multimap<String, MetricExpression> datasetToMetricExpressions = ArrayListMultimap.create();
     Map<Long, MetricConfigDTO> metricIdToMetricConfig = new HashMap<>();
-    Map<Long, GenericResponse> idToResponseMap = new HashMap<>();
-    Map<Long, AnomaliesSummary> idToAnomaliesSummaryMap = new HashMap<>();
     for (long metricId : metricIds) {
       MetricConfigDTO metricConfig = metricConfigDAO.findById(metricId);
       metricIdToMetricConfig.put(metricId, metricConfig);
@@ -291,46 +290,40 @@ public class DataResource {
 
       TabularViewHandler handler = new TabularViewHandler(queryCache);
       try {
-        TabularViewResponse response = handler.process(request);
-        for (String metric : response.getMetrics()) {
+        TabularViewResponse tabularViewResponse = handler.process(request);
+        for (String metric : tabularViewResponse.getMetrics()) {
           MetricDataset metricDataset = new MetricDataset(metric, dataset);
           MetricConfigDTO metricConfig = CACHE_REGISTRY_INSTANCE.getMetricConfigCache().get(metricDataset);
           Long metricId = metricConfig.getId();
-          idToResponseMap.put(metricId, response.getData().get(metric));
+          GenericResponse response = tabularViewResponse.getData().get(metric);
+
+          MetricSummary metricSummary = new MetricSummary();
+          metricSummary.setMetricId(metricId);
+          metricSummary.setMetricName(metricConfig.getName());
+          metricSummary.setMetricAlias(metricConfig.getAlias());
+          String[] responseData = response.getResponseData().get(0);
+          double baselineValue = Double.valueOf(responseData[0]);
+          double curentvalue = Double.valueOf(responseData[1]);
+          double percentageChange = (curentvalue - baselineValue) * 100 / baselineValue;
+          String wowPercentageChange = String.format("%.2f", percentageChange) + "%";
+          if (percentageChange > 0) {
+            wowPercentageChange = "+" + wowPercentageChange;
+          }
+          metricSummary.setBaselineValue(baselineValue);
+          metricSummary.setCurrentValue(curentvalue);
+          metricSummary.setWowPercentageChange(wowPercentageChange);
+
           AnomaliesSummary anomaliesSummary = anomaliesResoure.getAnomalyCountForMetricInRange(metricId, currentStart, currentEnd);
-          idToAnomaliesSummaryMap.put(metricId, anomaliesSummary);
+          metricSummary.setAnomaliesSummary(anomaliesSummary);
+
+          metricsSummary.add(metricSummary);
+
         }
       } catch (Exception e) {
         LOG.error("Exception while processing /data/tabular call", e);
       }
-
-
     }
-    for (Long metricId : metricIds) {
-      MetricSummary metricSummary = new MetricSummary();
 
-      MetricConfigDTO metricConfig = metricIdToMetricConfig.get(metricId);
-      metricSummary.setMetricId(metricId);
-      metricSummary.setMetricName(metricConfig.getName());
-      metricSummary.setMetricAlias(metricConfig.getAlias());
-
-      GenericResponse response = idToResponseMap.get(metricId);
-      String[] responseData = response.getResponseData().get(0);
-      double baselineValue = Double.valueOf(responseData[0]);
-      double curentvalue = Double.valueOf(responseData[1]);
-      double percentageChange = (curentvalue - baselineValue) * 100 / baselineValue;
-      String wowPercentageChange = String.format("%.2f", percentageChange) + "%";
-      if (percentageChange > 0) {
-        wowPercentageChange = "+" + wowPercentageChange;
-      }
-      metricSummary.setBaselineValue(baselineValue);
-      metricSummary.setCurrentValue(curentvalue);
-      metricSummary.setWowPercentageChange(wowPercentageChange);
-
-      metricSummary.setAnomaliesSummary(idToAnomaliesSummaryMap.get(metricId));
-
-      metricsSummary.add(metricSummary);
-    }
 
     return metricsSummary;
   }
@@ -351,7 +344,7 @@ public class DataResource {
       timeRangeToDurationMap.put(timeRange, duration);
     }
 
-    Map<String, List<AnomaliesSummary>> metricIdToAnomaliesSummariesMap = new HashMap<>();
+    Map<String, List<AnomaliesSummary>> metricAliasToAnomaliesSummariesMap = new HashMap<>();
     for (Long metricId : metricIds) {
       List<AnomaliesSummary> summaries = new ArrayList<>();
 
@@ -366,9 +359,126 @@ public class DataResource {
         AnomaliesSummary summary = anomaliesResoure.getAnomalyCountForMetricInRange(metricId, startTime, endTime);
         summaries.add(summary);
       }
-      metricIdToAnomaliesSummariesMap.put(metricAlias, summaries);
+      metricAliasToAnomaliesSummariesMap.put(metricAlias, summaries);
     }
-    return metricIdToAnomaliesSummariesMap;
+    return metricAliasToAnomaliesSummariesMap;
   }
 
+  @GET
+  @Path("dashboard/wowsummary")
+  public Multimap<String, MetricSummary> getWowSummary(
+      @QueryParam("dashboard") String dashboard,
+      @QueryParam("timeRanges") String timeRanges) {
+    Multimap<String, MetricSummary> metricAliasToMetricSummariesMap = ArrayListMultimap.create();
+
+    if (StringUtils.isBlank(dashboard)) {
+      return metricAliasToMetricSummariesMap;
+    }
+
+    List<Long> metricIds = getMetricIdsByDashboard(dashboard);
+    List<String> timeRangeLabels = Lists.newArrayList(timeRanges.split(","));
+
+    // Sort metric's id and metric expression by collections
+    Multimap<String, Long> datasetToMetrics = ArrayListMultimap.create();
+    Multimap<String, MetricExpression> datasetToMetricExpressions = ArrayListMultimap.create();
+    Map<Long, MetricConfigDTO> metricIdToMetricConfig = new HashMap<>();
+    for (long metricId : metricIds) {
+      MetricConfigDTO metricConfig = metricConfigDAO.findById(metricId);
+      metricIdToMetricConfig.put(metricId, metricConfig);
+      datasetToMetrics.put(metricConfig.getDataset(), metricId);
+      datasetToMetricExpressions.put(metricConfig.getDataset(), ThirdEyeUtils.getMetricExpressionFromMetricConfig(metricConfig));
+    }
+
+    // Create query request for each collection
+    for (String dataset : datasetToMetrics.keySet()) {
+      TabularViewRequest request = new TabularViewRequest();
+      request.setCollection(dataset);
+      request.setMetricExpressions(new ArrayList<>(datasetToMetricExpressions.get(dataset)));
+
+      // The input start and end time (i.e., currentStart, currentEnd, baselineStart, and
+      // baselineEnd) are given in millisecond since epoch, which is timezone insensitive. On the
+      // other hand, the start and end time of the request to be sent to backend database (e.g.,
+      // Pinot) could be converted to SimpleDateFormat, which is timezone sensitive. Therefore,
+      // we need to store user's start and end time in DateTime objects with data's timezone
+      // in order to ensure that the conversion to SimpleDateFormat is always correct regardless
+      // user and server's timezone, including daylight saving time.
+      for (String timeRangeLabel :  timeRangeLabels) {
+
+        // TODO:
+        TimeRange timeRange = getTimeRangeFromLabel(dataset, timeRangeLabel);
+        long currentEnd = timeRange.getEnd();
+        long currentStart = timeRange.getStart();
+
+        // TODO:
+        TimeGranularity timeGranularity = getTimeGranularityFromLabel(dataset, timeRangeLabel);
+
+        DateTimeZone timeZoneForCollection = Utils.getDataTimeZone(dataset);
+        request.setBaselineStart(new DateTime(currentStart, timeZoneForCollection).minusDays(7));
+        request.setBaselineEnd(new DateTime(currentEnd, timeZoneForCollection).minusDays(7));
+        request.setCurrentStart(new DateTime(currentStart, timeZoneForCollection));
+        request.setCurrentEnd(new DateTime(currentEnd, timeZoneForCollection));
+        request.setTimeGranularity(timeGranularity);
+
+        TabularViewHandler handler = new TabularViewHandler(queryCache);
+        try {
+          TabularViewResponse tabularViewResponse = handler.process(request);
+          for (String metric : tabularViewResponse.getMetrics()) {
+            MetricDataset metricDataset = new MetricDataset(metric, dataset);
+            MetricConfigDTO metricConfig = CACHE_REGISTRY_INSTANCE.getMetricConfigCache().get(metricDataset);
+            Long metricId = metricConfig.getId();
+            String metricAlias = metricConfig.getAlias();
+            GenericResponse response = tabularViewResponse.getData().get(metric);
+
+            MetricSummary metricSummary = new MetricSummary();
+            metricSummary.setMetricId(metricId);
+            metricSummary.setMetricName(metricConfig.getName());
+            metricSummary.setMetricAlias(metricAlias);
+
+            String[] responseData = response.getResponseData().get(0);
+            double baselineValue = Double.valueOf(responseData[0]);
+            double curentvalue = Double.valueOf(responseData[1]);
+            double percentageChange = (curentvalue - baselineValue) * 100 / baselineValue;
+            String wowPercentageChange = String.format("%.2f", percentageChange) + "%";
+            if (percentageChange > 0) {
+              wowPercentageChange = "+" + wowPercentageChange;
+            }
+            metricSummary.setBaselineValue(baselineValue);
+            metricSummary.setCurrentValue(curentvalue);
+            metricSummary.setWowPercentageChange(wowPercentageChange);
+
+            metricAliasToMetricSummariesMap.put(metricAlias, metricSummary);
+          }
+        } catch (Exception e) {
+          LOG.error("Exception while processing /data/tabular call", e);
+        }
+      }
+    }
+    return metricAliasToMetricSummariesMap;
+  }
+
+
+  private TimeRange getTimeRangeFromLabel(String dataset, String label) {
+    long start = 0;
+    long end = 0;
+    long datasetMaxTime = Utils.getMaxDataTimeForDataset(dataset);
+    switch (label) {
+      case "Most Recent Hour":
+        end = datasetMaxTime;
+        start = end - TimeUnit.MILLISECONDS.convert(1, TimeUnit.HOURS);
+        break;
+      case "Today":
+        break;
+      case "Yesterday":
+        break;
+      case "Last 7 Days":
+        break;
+      default:
+    }
+    TimeRange timeRange = new TimeRange(start, end);
+    return timeRange;
+  }
+
+  private TimeGranularity getTimeGranularityFromLabel(String dataset, String label) {
+    return null;
+  }
 }
