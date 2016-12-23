@@ -31,6 +31,12 @@ import javax.servlet.http.HttpServletResponse;
 
 /*
  * A servlet to print the time boundary info for a table, if it exists.
+ * Examples:
+ *   curl broker:port/debug/timeBoundary/table will print the time boundar of offline table.
+ *   curl broker:port/debug/timeBoundary/table_OFFLINE will do the same as above.
+ *
+ * Realtime tables do not have time boundary as of now, so it will return an empty json object
+ *
  */
 public class PinotBrokerTimeBoundaryDebugServlet extends HttpServlet {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotBrokerTimeBoundaryDebugServlet.class);

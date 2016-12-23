@@ -38,6 +38,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
@@ -46,6 +47,7 @@ import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.util.TestUtils;
+import junit.framework.Assert;
 import kafka.server.KafkaServerStartable;
 
 
@@ -61,12 +63,14 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
   protected final File _segmentDir = new File("/tmp/HybridClusterIntegrationTest/segmentDir");
   protected final File _tarDir = new File("/tmp/HybridClusterIntegrationTest/tarDir");
   protected static final String KAFKA_TOPIC = "hybrid-integration-test";
+  private static final String TABLE_NAME = "mytable";
 
   private int segmentCount = 12;
   private int offlineSegmentCount = 8;
   private int realtimeSegmentCount = 6;
   private Random random = new Random();
   private Schema schema;
+  private String tableName;
 
   private KafkaServerStartable kafkaStarter;
 
@@ -86,13 +90,18 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     return offlineSegmentCount;
   }
 
+  // In case inherited tests set up a different table name they can override this method.
+  protected String getTableName() {
+    return tableName;
+  }
+
   @BeforeClass
   public void setUp() throws Exception {
     //Clean up
-    final String tableName = "mytable";
     ensureDirectoryExistsAndIsEmpty(_tmpDir);
     ensureDirectoryExistsAndIsEmpty(_segmentDir);
     ensureDirectoryExistsAndIsEmpty(_tarDir);
+    tableName = TABLE_NAME;
 
     // Start Zk, Kafka and Pinot
     startHybridCluster(10);
@@ -196,19 +205,6 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     rs.close();
 
     waitForRecordCountToStabilizeToExpectedCount(h2RecordCount, timeInFiveMinutes);
-    testBrokerDebugOutput(tableName);
-  }
-
-  private void testBrokerDebugOutput(String tableName) throws Exception {
-    // Some basic tests to make sure that we return json from these APIs.
-    getDebugInfo("debug/timeBoundary" + "");
-    getDebugInfo("debug/timeBoundary/" + tableName);
-    getDebugInfo("debug/timeBoundary/" + TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName));
-    getDebugInfo("debug/timeBoundary/" + TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName));
-    getDebugInfo("debug/routingTable/" + tableName);
-    getDebugInfo("debug/routingTable/" + TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName));
-    getDebugInfo("debug/routingTable/" + TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName));
-
   }
 
   protected boolean shouldUseLlc() {
@@ -315,6 +311,20 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     createBrokerTenant(TENANT_NAME, 1);
     createServerTenant(TENANT_NAME, 1, 1);
   }
+
+  @Test
+  public void testBrokerDebugOutput() throws Exception {
+    if (getTableName() != null) {
+      Assert.assertNotNull(getDebugInfo("debug/timeBoundary" + ""));
+      Assert.assertNotNull(getDebugInfo("debug/timeBoundary/" + tableName));
+      Assert.assertNotNull(getDebugInfo("debug/timeBoundary/" + TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName)));
+      Assert.assertNotNull(getDebugInfo("debug/timeBoundary/" + TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName)));
+      Assert.assertNotNull(getDebugInfo("debug/routingTable/" + tableName));
+      Assert.assertNotNull(getDebugInfo("debug/routingTable/" + TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName)));
+      Assert.assertNotNull(getDebugInfo("debug/routingTable/" + TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName)));
+    }
+  }
+
 
   @AfterClass
   public void tearDown() throws Exception {
