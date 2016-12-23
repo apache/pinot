@@ -18,7 +18,6 @@ package com.linkedin.pinot.core.operator.aggregation.groupby;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.operator.aggregation.ResultHolderFactory;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupByConstants;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
@@ -166,7 +165,7 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
       _arrayGroupKeyToId.defaultReturnValue(INVALID_ID);
       _idToArrayGroupKey = null;
     } else {
-      if (_cardinalityProduct > ResultHolderFactory.MAX_INITIAL_RESULT_HOLDER_CAPACITY) {
+      if (_cardinalityProduct > DefaultGroupByExecutor.MAX_INITIAL_RESULT_HOLDER_CAPACITY) {
         // Long map based storage type.
         _storageType = StorageType.LONG_MAP_BASED;
         _groupKeyToId = new Long2IntOpenHashMap();

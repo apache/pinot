@@ -198,11 +198,11 @@ public class DataFetcherTest {
       docIds[length++] = i;
     }
 
-    double[] hashCodes = new double[length];
+    int[] hashCodes = new int[length];
     _dataFetcher.fetchHashCodes(DIMENSION_NAME, docIds, 0, length, hashCodes, 0);
 
     for (int i = 0; i < length; i++) {
-      Assert.assertEquals((int) hashCodes[i], _dimensionValues[docIds[i]].hashCode(), _errorMessage);
+      Assert.assertEquals(hashCodes[i], _dimensionValues[docIds[i]].hashCode(), _errorMessage);
     }
   }
 

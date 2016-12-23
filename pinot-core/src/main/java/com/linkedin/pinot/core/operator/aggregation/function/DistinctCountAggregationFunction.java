@@ -15,143 +15,126 @@
  */
 package com.linkedin.pinot.core.operator.aggregation.function;
 
-import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.operator.aggregation.AggregationResultHolder;
+import com.linkedin.pinot.core.operator.aggregation.ObjectAggregationResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupByResultHolder;
+import com.linkedin.pinot.core.operator.aggregation.groupby.ObjectGroupByResultHolder;
+import com.linkedin.pinot.core.operator.docvalsets.ProjectionBlockValSet;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
-import java.util.List;
+import javax.annotation.Nonnull;
 
 
-/**
- * Class to implement the 'distinctcount' aggregation function.
- */
-public class DistinctCountAggregationFunction implements AggregationFunction {
-  private static final String FUNCTION_NAME = AggregationFunctionFactory.DISTINCTCOUNT_AGGREGATION_FUNCTION;
-  private static final ResultDataType RESULT_DATA_TYPE = ResultDataType.DISTINCTCOUNT_SET;
+public class DistinctCountAggregationFunction implements AggregationFunction<IntOpenHashSet, Integer> {
+
+  @Nonnull
+  @Override
+  public String getName() {
+    return AggregationFunctionFactory.DISTINCTCOUNT_AGGREGATION_FUNCTION;
+  }
 
   @Override
-  public void accept(AggregationFunctionVisitorBase visitor) {
+  public void accept(@Nonnull AggregationFunctionVisitorBase visitor) {
     visitor.visit(this);
   }
 
-  /**
-   * Performs 'distinctcount' aggregation on the input array.
-   *
-   * {@inheritDoc}
-   *
-   * @param length
-   * @param resultHolder
-   * @param valueArray
-   */
+  @Nonnull
   @Override
-  public void aggregate(int length, AggregationResultHolder resultHolder, Object... valueArray) {
-    Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkArgument(valueArray[0] instanceof double[]);
-    final double[] values = (double[]) valueArray[0];
-    Preconditions.checkState(length <= values.length);
+  public AggregationResultHolder createAggregationResultHolder() {
+    return new ObjectAggregationResultHolder();
+  }
 
-    IntOpenHashSet valueSet = resultHolder.getResult();
+  @Nonnull
+  @Override
+  public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity, int trimSize) {
+    return new ObjectGroupByResultHolder(initialCapacity, maxCapacity, trimSize);
+  }
+
+  @Override
+  public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
+      @Nonnull ProjectionBlockValSet... projectionBlockValSets) {
+    int[] valueArray = projectionBlockValSets[0].getSVHashCodeArray();
+    IntOpenHashSet valueSet = aggregationResultHolder.getResult();
     if (valueSet == null) {
       valueSet = new IntOpenHashSet();
-      resultHolder.setValue(valueSet);
+      aggregationResultHolder.setValue(valueSet);
     }
-
     for (int i = 0; i < length; i++) {
-      valueSet.add((int) values[i]);
+      valueSet.add(valueArray[i]);
     }
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * While the interface allows for variable number of valueArrays, we do not support
-   * multiple columns within one aggregation function right now.
-   *
-   * @param length
-   * @param groupKeys
-   * @param resultHolder
-   * @param valueArray
-   */
   @Override
-  public void aggregateGroupBySV(int length, int[] groupKeys, GroupByResultHolder resultHolder, Object... valueArray) {
-    Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkArgument(valueArray[0] instanceof double[]);
-    final double[] values = (double[]) valueArray[0];
-    Preconditions.checkState(length <= values.length);
-
+  public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull ProjectionBlockValSet... projectionBlockValSets) {
+    int[] valueArray = projectionBlockValSets[0].getSVHashCodeArray();
     for (int i = 0; i < length; i++) {
-      int groupKey = groupKeys[i];
-      IntOpenHashSet valueSet = resultHolder.getResult(groupKey);
+      int groupKey = groupKeyArray[i];
+      IntOpenHashSet valueSet = groupByResultHolder.getResult(groupKey);
       if (valueSet == null) {
         valueSet = new IntOpenHashSet();
-        resultHolder.setValueForKey(groupKey, valueSet);
+        groupByResultHolder.setValueForKey(groupKey, valueSet);
       }
-      valueSet.add((int) values[i]);
+      valueSet.add(valueArray[i]);
     }
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * @param length
-   * @param docIdToGroupKeys
-   * @param resultHolder
-   * @param valueArray
-   */
   @Override
-  public void aggregateGroupByMV(int length, int[][] docIdToGroupKeys, GroupByResultHolder resultHolder,
-      Object... valueArray) {
-    Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkArgument(valueArray[0] instanceof double[]);
-    final double[] values = (double[]) valueArray[0];
-    Preconditions.checkState(length <= values.length);
-
+  public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull ProjectionBlockValSet... projectionBlockValSets) {
+    int[] valueArray = projectionBlockValSets[0].getSVHashCodeArray();
     for (int i = 0; i < length; i++) {
-      int value = (int) values[i];
-      for (int groupKey : docIdToGroupKeys[i]) {
-        IntOpenHashSet valueSet = resultHolder.getResult(groupKey);
+      int value = valueArray[i];
+      for (int groupKey : groupKeysArray[i]) {
+        IntOpenHashSet valueSet = groupByResultHolder.getResult(groupKey);
         if (valueSet == null) {
           valueSet = new IntOpenHashSet();
-          resultHolder.setValueForKey(groupKey, valueSet);
+          groupByResultHolder.setValueForKey(groupKey, valueSet);
         }
         valueSet.add(value);
       }
     }
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * @return
-   */
+  @Nonnull
   @Override
-  public double getDefaultValue() {
-    throw new RuntimeException("Unsupported method getDefaultValue() for class " + getClass().getName());
+  public IntOpenHashSet extractAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder) {
+    IntOpenHashSet valueSet = aggregationResultHolder.getResult();
+    if (valueSet == null) {
+      return new IntOpenHashSet();
+    } else {
+      return valueSet;
+    }
   }
 
-  /**
-   * {@inheritDoc}
-   * @return
-   */
+  @Nonnull
   @Override
-  public ResultDataType getResultDataType() {
-    return RESULT_DATA_TYPE;
+  public IntOpenHashSet extractGroupByResult(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
+    IntOpenHashSet valueSet = groupByResultHolder.getResult(groupKey);
+    if (valueSet == null) {
+      return new IntOpenHashSet();
+    } else {
+      return valueSet;
+    }
   }
 
+  @Nonnull
   @Override
-  public String getName() {
-    return FUNCTION_NAME;
+  public IntOpenHashSet merge(@Nonnull IntOpenHashSet intermediateResult1,
+      @Nonnull IntOpenHashSet intermediateResult2) {
+    intermediateResult1.addAll(intermediateResult2);
+    return intermediateResult1;
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * @param combinedResult
-   * @return
-   */
+  @Nonnull
   @Override
-  public Double reduce(List<Object> combinedResult) {
-    throw new RuntimeException(
-        "Unsupported method reduce(List<Object> combinedResult) for class " + getClass().getName());
+  public FieldSpec.DataType getIntermediateResultDataType() {
+    return FieldSpec.DataType.OBJECT;
+  }
+
+  @Nonnull
+  @Override
+  public Integer extractFinalResult(@Nonnull IntOpenHashSet intermediateResult) {
+    return intermediateResult.size();
   }
 }

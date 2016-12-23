@@ -59,7 +59,11 @@ public class AggregationFunctionVisitorBase {
     visitFunction(function);
   }
 
-  public void visit(FastHllAggregationFunction function) {
+  public void visit(FastHLLAggregationFunction function) {
+    visitFunction(function);
+  }
+
+  public void visit(FastHLLMVAggregationFunction function) {
     visitFunction(function);
   }
 
@@ -91,11 +95,11 @@ public class AggregationFunctionVisitorBase {
     visitFunction(function);
   }
 
-  public void visit(PercentileestAggregationFunction function) {
+  public void visit(PercentileEstAggregationFunction function) {
     visitFunction(function);
   }
 
-  public void visit(PercentileestMVAggregationFunction function) {
+  public void visit(PercentileEstMVAggregationFunction function) {
     visitFunction(function);
   }
 

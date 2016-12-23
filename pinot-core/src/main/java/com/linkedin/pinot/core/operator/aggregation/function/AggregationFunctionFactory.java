@@ -19,6 +19,9 @@ package com.linkedin.pinot.core.operator.aggregation.function;
  * Factory class to create instances of aggregation function of the given name.
  */
 public class AggregationFunctionFactory {
+  private AggregationFunctionFactory() {
+  }
+
   public static final String COUNT_AGGREGATION_FUNCTION = "count";
   public static final String MAX_AGGREGATION_FUNCTION = "max";
   public static final String MIN_AGGREGATION_FUNCTION = "min";
@@ -45,6 +48,7 @@ public class AggregationFunctionFactory {
   public static final String MINMAXRANGE_MV_AGGREGATION_FUNCTION = "minmaxrangemv";
   public static final String DISTINCTCOUNT_MV_AGGREGATION_FUNCTION = "distinctcountmv";
   public static final String DISTINCTCOUNTHLL_MV_AGGREGATION_FUNCTION = "distinctcounthllmv";
+  public static final String FASTHLL_MV_AGGREGATION_FUNCTION = "fasthllmv";
   public static final String PERCENTILE50_MV_AGGREGATION_FUNCTION = "percentile50mv";
   public static final String PERCENTILE90_MV_AGGREGATION_FUNCTION = "percentile90mv";
   public static final String PERCENTILE95_MV_AGGREGATION_FUNCTION = "percentile95mv";
@@ -55,11 +59,7 @@ public class AggregationFunctionFactory {
   public static final String PERCENTILEEST99_MV_AGGREGATION_FUNCTION = "percentileest99mv";
 
   /**
-   * Given the name of aggregation function, create and return a new instance
-   * of the corresponding aggregation function and return.
-   *
-   * @param functionName aggregation function name
-   * @return
+   * Given the name of aggregation function, create and return a new instance of the corresponding aggregation function.
    */
   public static AggregationFunction getAggregationFunction(String functionName) {
     AggregationFunction function;
@@ -97,7 +97,7 @@ public class AggregationFunctionFactory {
         break;
 
       case FASTHLL_AGGREGATION_FUNCTION:
-        function = new FastHllAggregationFunction();
+        function = new FastHLLAggregationFunction();
         break;
 
       case PERCENTILE50_AGGREGATION_FUNCTION:
@@ -117,19 +117,19 @@ public class AggregationFunctionFactory {
         break;
 
       case PERCENTILEEST50_AGGREGATION_FUNCTION:
-        function = new PercentileestAggregationFunction(50);
+        function = new PercentileEstAggregationFunction(50);
         break;
 
       case PERCENTILEEST90_AGGREGATION_FUNCTION:
-        function = new PercentileestAggregationFunction(90);
+        function = new PercentileEstAggregationFunction(90);
         break;
 
       case PERCENTILEEST95_AGGREGATION_FUNCTION:
-        function = new PercentileestAggregationFunction(95);
+        function = new PercentileEstAggregationFunction(95);
         break;
 
       case PERCENTILEEST99_AGGREGATION_FUNCTION:
-        function = new PercentileestAggregationFunction(99);
+        function = new PercentileEstAggregationFunction(99);
         break;
 
       case COUNT_MV_AGGREGATION_FUNCTION:
@@ -164,6 +164,10 @@ public class AggregationFunctionFactory {
         function = new DistinctCountHLLMVAggregationFunction();
         break;
 
+      case FASTHLL_MV_AGGREGATION_FUNCTION:
+        function = new FastHLLMVAggregationFunction();
+        break;
+
       case PERCENTILE50_MV_AGGREGATION_FUNCTION:
         function = new PercentileMVAggregationFunction(50);
         break;
@@ -181,24 +185,25 @@ public class AggregationFunctionFactory {
         break;
 
       case PERCENTILEEST50_MV_AGGREGATION_FUNCTION:
-        function = new PercentileestMVAggregationFunction(50);
+        function = new PercentileEstMVAggregationFunction(50);
         break;
 
       case PERCENTILEEST90_MV_AGGREGATION_FUNCTION:
-        function = new PercentileestMVAggregationFunction(90);
+        function = new PercentileEstMVAggregationFunction(90);
         break;
 
       case PERCENTILEEST95_MV_AGGREGATION_FUNCTION:
-        function = new PercentileestMVAggregationFunction(95);
+        function = new PercentileEstMVAggregationFunction(95);
         break;
 
       case PERCENTILEEST99_MV_AGGREGATION_FUNCTION:
-        function = new PercentileestMVAggregationFunction(99);
+        function = new PercentileEstMVAggregationFunction(99);
         break;
 
       default:
-        throw new RuntimeException("Unsupported aggregation function: " + functionName);
+        throw new UnsupportedOperationException("Unsupported aggregation function: " + functionName);
     }
+
     return function;
   }
 }

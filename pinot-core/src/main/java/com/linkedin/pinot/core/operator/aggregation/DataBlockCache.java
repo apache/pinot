@@ -43,14 +43,14 @@ public class DataBlockCache {
   /** _columnToXXsMap must be defined accordingly */
   private final Map<String, int[]> _columnToDictIdsMap = new HashMap<>();
   private final Map<String, Object> _columnToValuesMap = new HashMap<>();
-  private final Map<String, double[]> _columnToHashCodesMap = new HashMap<>();
+  private final Map<String, int[]> _columnToHashCodesMap = new HashMap<>();
   private final Map<String, String[]> _columnToStringsMap = new HashMap<>();
 
   private final Map<String, int[]> _columnToNumberOfEntriesMap = new HashMap<>();
 
   private final Map<String, int[][]> _columnToDictIdsArrayMap = new HashMap<>();
   private final Map<String, Object> _columnToValuesArrayMap = new HashMap<>();
-  private final Map<String, double[][]> _columnToHashCodesArrayMap = new HashMap<>();
+  private final Map<String, int[][]> _columnToHashCodesArrayMap = new HashMap<>();
   private final Map<String, String[][]> _columnToStringsArrayMap = new HashMap<>();
 
   private final Map<String, int[]> _columnToTempDictIdsMap = new HashMap<>();
@@ -302,11 +302,11 @@ public class DataBlockCache {
    * @param column column name.
    * @return hash code array associated with this column.
    */
-  public double[] getHashCodeArrayForColumn(String column) {
-    double[] hashCodes = _columnToHashCodesMap.get(column);
+  public int[] getHashCodeArrayForColumn(String column) {
+    int[] hashCodes = _columnToHashCodesMap.get(column);
     if (!_columnHashCodeLoaded.contains(column)) {
       if (hashCodes == null) {
-        hashCodes = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+        hashCodes = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
         _columnToHashCodesMap.put(column, hashCodes);
       }
       _dataFetcher.fetchHashCodes(column, _docIds, _startPos, _length, hashCodes, 0);
@@ -321,17 +321,17 @@ public class DataBlockCache {
    * @param column column name.
    * @return hash codes array associated with this column.
    */
-  public double[][] getHashCodesArrayForColumn(String column) {
-    double[][] hashCodesArray = _columnToHashCodesArrayMap.get(column);
+  public int[][] getHashCodesArrayForColumn(String column) {
+    int[][] hashCodesArray = _columnToHashCodesArrayMap.get(column);
     if (!_columnHashCodeLoaded.contains(column)) {
       if (hashCodesArray == null) {
-        hashCodesArray = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+        hashCodesArray = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
         _columnToHashCodesArrayMap.put(column, hashCodesArray);
       }
 
       int maxNumberOfEntriesForColumn = _dataFetcher.getMaxNumberOfEntriesForColumn(column);
       for (int pos = 0; pos < _length; ++pos) {
-        hashCodesArray[pos] = new double[maxNumberOfEntriesForColumn];
+        hashCodesArray[pos] = new int[maxNumberOfEntriesForColumn];
       }
       _dataFetcher.fetchHashCodes(column, _docIds, _startPos, _length, hashCodesArray, 0);
       _columnHashCodeLoaded.add(column);

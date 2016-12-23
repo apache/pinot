@@ -52,12 +52,12 @@ public class FastHllAggregationFunction implements AggregationFunction<HyperLogL
 
   @Override
   public HyperLogLog aggregate(Block docIdSetBlock, Block[] block) {
-    throw new UnsupportedOperationException("Calling old aggregate method of FastHllAggregationFunction is deprecated.");
+    throw new UnsupportedOperationException("Calling old aggregate method of FastHLLAggregationFunction is deprecated.");
   }
 
   @Override
   public HyperLogLog aggregate(HyperLogLog mergedResult, int docId, Block[] block) {
-    throw new UnsupportedOperationException("Calling old aggregate method of FastHllAggregationFunction is deprecated.");
+    throw new UnsupportedOperationException("Calling old aggregate method of FastHLLAggregationFunction is deprecated.");
   }
 
   /**
@@ -137,6 +137,6 @@ public class FastHllAggregationFunction implements AggregationFunction<HyperLogL
 
   @Override
   public Serializable getDefaultValue() {
-    throw new UnsupportedOperationException("Calling old getDefaultValue method of FastHllAggregationFunction is deprecated.");
+    throw new UnsupportedOperationException("Calling old getDefaultValue method of FastHLLAggregationFunction is deprecated.");
   }
 }
