@@ -105,19 +105,24 @@ public class IndexSegmentImpl implements IndexSegment {
   public void destroy() {
     LOGGER.info("Trying to destroy segment : {}", this.getSegmentName());
     for (String column : indexContainerMap.keySet()) {
+      ColumnIndexContainer columnIndexContainer = indexContainerMap.get(column);
+
       try {
-        indexContainerMap.get(column).getDictionary().close();
+        if (columnIndexContainer.hasDictionary()) {
+          ImmutableDictionaryReader dictionary = columnIndexContainer.getDictionary();
+          dictionary.close();
+        }
       } catch (Exception e) {
         LOGGER.error("Error when close dictionary index for column : " + column, e);
       }
       try {
-        indexContainerMap.get(column).getForwardIndex().close();
+        columnIndexContainer.getForwardIndex().close();
       } catch (Exception e) {
         LOGGER.error("Error when close forward index for column : " + column, e);
       }
       try {
-        if (indexContainerMap.get(column).getInvertedIndex() != null) {
-          indexContainerMap.get(column).getInvertedIndex().close();
+        if (columnIndexContainer.getInvertedIndex() != null) {
+          columnIndexContainer.getInvertedIndex().close();
         }
       } catch (Exception e) {
         LOGGER.error("Error when close inverted index for column : " + column, e);

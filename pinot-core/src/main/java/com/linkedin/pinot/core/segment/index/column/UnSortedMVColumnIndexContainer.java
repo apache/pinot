@@ -57,6 +57,11 @@ public class UnSortedMVColumnIndexContainer extends ColumnIndexContainer {
   }
 
   @Override
+  public boolean hasDictionary() {
+    return columnMetadata.hasDictionary();
+  }
+
+  @Override
   public ImmutableDictionaryReader getDictionary() {
     return dictionary;
   }
