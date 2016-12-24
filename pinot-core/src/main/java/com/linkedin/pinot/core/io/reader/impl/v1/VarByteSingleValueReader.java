@@ -83,16 +83,21 @@ public class VarByteSingleValueReader extends BaseSingleColumnSingleValueReader<
   @Override
   public String getString(int row, VarByteReaderContext context)
       throws IOException {
-
     int chunkRowId = row % _numDocsPerChunk;
     ByteBuffer chunkBuffer = getChunkForRow(row, context);
 
     int rowOffset = chunkBuffer.getInt(chunkRowId * INT_SIZE);
-    int nextRowOffset = chunkBuffer.getInt((chunkRowId + 1) * INT_SIZE);
+    int nextRowOffset;
 
-    // For incomplete chunks, the next string's offset will be 0 as row offset for absent rows are 0.
-    if ((chunkRowId == (_numDocsPerChunk - 1)) || (nextRowOffset == 0)) {
+    if (chunkRowId == _numDocsPerChunk - 1) {
+      // Last row in this trunk.
       nextRowOffset = chunkBuffer.limit();
+    } else {
+      nextRowOffset = chunkBuffer.getInt((chunkRowId + 1) * INT_SIZE);
+      // For incomplete chunks, the next string's offset will be 0 as row offset for absent rows are 0.
+      if (nextRowOffset == 0) {
+        nextRowOffset = chunkBuffer.limit();
+      }
     }
 
     int length = nextRowOffset - rowOffset;
