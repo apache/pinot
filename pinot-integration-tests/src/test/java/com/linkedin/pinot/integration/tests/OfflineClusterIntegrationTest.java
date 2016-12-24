@@ -104,7 +104,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     // Upload the segments
     int i = 0;
     for (String segmentName : _tarDir.list()) {
-      System.out.println("Uploading segment " + (i++) + " : " + segmentName);
+//      System.out.println("Uploading segment " + (i++) + " : " + segmentName);
       File file = new File(_tarDir, segmentName);
       FileUploadUtils.sendSegmentFile("localhost", "8998", segmentName, file, file.length());
     }
@@ -115,7 +115,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     long timeInTwoMinutes = System.currentTimeMillis() + 2 * 60 * 1000L;
     long numDocs;
     while ((numDocs = getCurrentServingNumDocs("mytable")) < TOTAL_DOCS) {
-      System.out.println("Current number of documents: " + numDocs);
+//      System.out.println("Current number of documents: " + numDocs);
       if (System.currentTimeMillis() < timeInTwoMinutes) {
         Thread.sleep(1000);
       } else {

@@ -90,7 +90,7 @@ public class NettySingleConnectionIntegrationTest {
       String gotResponse = new String(b2);
       Assert.assertEquals(gotResponse, server.getResponseStr(), "Response Check at client");
       Assert.assertEquals(server.getHandler().getRequest(), request, "Request Check at server");
-      System.out.println(metric);
+//      System.out.println(metric);
     } finally {
       if (null != clientConn) {
         clientConn.close();
@@ -144,7 +144,7 @@ public class NettySingleConnectionIntegrationTest {
       PoolStats stats;
       /* Validate with no connection in pool */
       Thread.sleep(3000);   // Give the pool enough time to create connections (in this case, 2 connections minSize)
-      System.out.println("Validating with no used objects in the pool");
+//      System.out.println("Validating with no used objects in the pool");
       pool.validate(false);
       stats = pool.getStats(); // System.out.println(stats);
       Assert.assertEquals(2, stats.getPoolSize());
@@ -155,7 +155,7 @@ public class NettySingleConnectionIntegrationTest {
       future.setCancellable(cancellable);
       NettyClientConnection conn = future.getOne();
       stats = pool.getStats(); // System.out.println(stats);
-      System.out.println("Validating with one used object in the pool");
+//      System.out.println("Validating with one used object in the pool");
       pool.validate(false);
       Assert.assertEquals(2, stats.getPoolSize());
       Assert.assertEquals(0, stats.getTotalBadDestroyed());
@@ -167,7 +167,7 @@ public class NettySingleConnectionIntegrationTest {
       Thread.sleep(2000); // Wait for the client channel to be closed.
       pool.validate(false);
       Thread.sleep(5000); // Wait for the callback into AsyncPoolImpl after the destroy thread completes destroying the connection
-      System.out.println("Validating with one used object in the pool, after server shutdown");
+//      System.out.println("Validating with one used object in the pool, after server shutdown");
       stats = pool.getStats(); // System.out.println(stats);
       Assert.assertEquals(2, stats.getPoolSize());
       Assert.assertEquals(1, stats.getTotalBadDestroyed());

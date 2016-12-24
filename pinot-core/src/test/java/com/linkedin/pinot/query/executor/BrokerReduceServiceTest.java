@@ -131,7 +131,7 @@ public class BrokerReduceServiceTest {
       File parent = new File(INDEXES_DIR, "segment_" + String.valueOf(i));
       String segmentName = parent.list()[0];
       _indexSegmentList.add(ColumnarSegmentLoader.load(new File(parent, segmentName), ReadMode.mmap));
-      System.out.println("built at : " + segmentDir.getAbsolutePath());
+//      System.out.println("built at : " + segmentDir.getAbsolutePath());
     }
   }
 
@@ -424,7 +424,7 @@ public class BrokerReduceServiceTest {
       LOGGER.info("Num Docs Scanned is " + brokerResponse.getNumDocsScanned());
       LOGGER.info("Total Docs for BrokerResponse is " + brokerResponse.getTotalDocs());
 
-      System.out.println(brokerResponse.toJson());
+//      System.out.println(brokerResponse.toJson());
     } catch (Exception e) {
       e.printStackTrace();
       // Should never happen

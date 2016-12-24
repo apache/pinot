@@ -96,7 +96,7 @@ public class ScatterGatherTest {
       Map<ServerInstance, SegmentIdSet> resultMap = ctxt.getSelectedServers();
       Assert.assertEquals(resultMap.size(), 1, "Count");
       Assert.assertEquals(resultMap.get(serverInstance1), pg, "Element check");
-      System.out.println(ctxt);
+//      System.out.println(ctxt);
     }
 
     {
@@ -132,7 +132,7 @@ public class ScatterGatherTest {
       Assert.assertEquals(resultMap.size(), 2, "Count");
       Assert.assertEquals(resultMap.get(serverInstance1), pg, "Element check");
       Assert.assertEquals(resultMap.get(serverInstance2), pg2, "Element check");
-      System.out.println(ctxt);
+//      System.out.println(ctxt);
     }
 
     {
@@ -164,14 +164,14 @@ public class ScatterGatherTest {
       Map<ServerInstance, SegmentIdSet> resultMap = ctxt.getSelectedServers();
       Assert.assertEquals(resultMap.size(), 1, "Count");
       Assert.assertEquals(resultMap.get(serverInstance1), pg, "Element check"); // first server is getting selected
-      System.out.println(ctxt);
+//      System.out.println(ctxt);
 
       // Run selection again. Now the second server should be selected
       scImpl.selectServices(ctxt);
       resultMap = ctxt.getSelectedServers();
       Assert.assertEquals(resultMap.size(), 1, "Count");
       Assert.assertEquals(resultMap.get(serverInstance2), pg, "Element check"); // second server is getting selected
-      System.out.println(ctxt);
+//      System.out.println(ctxt);
     }
 
     {
@@ -203,14 +203,14 @@ public class ScatterGatherTest {
       Map<ServerInstance, SegmentIdSet> resultMap = ctxt.getSelectedServers();
       Assert.assertEquals(resultMap.size(), 2, "Count");
       Assert.assertFalse(resultMap.get(serverInstance1).equals(resultMap.get(serverInstance2)), "Element check"); // first server is getting selected
-      System.out.println(ctxt);
+//      System.out.println(ctxt);
 
       // Run selection again. Now the second server should be selected
       scImpl.selectServices(ctxt);
       resultMap = ctxt.getSelectedServers();
       Assert.assertEquals(resultMap.size(), 2, "Count");
       Assert.assertFalse(resultMap.get(serverInstance1).equals(resultMap.get(serverInstance2)), "Element check"); // first server is getting selected
-      System.out.println(ctxt);
+//      System.out.println(ctxt);
     }
   }
 
@@ -474,10 +474,8 @@ public class ScatterGatherTest {
     Map<ServerInstance, Throwable> errorMap = fut.getError();
     Assert.assertEquals(errorMap.size(), 1, "One error");
     Assert.assertNotNull(errorMap.get(serverInstance4), "Server4 returned timeout");
-    System.out.println("Error is :" + errorMap.get(serverInstance4));
 
     Thread.sleep(3000);
-    System.out.println("Pool Stats :" + pool.getStats());
     pool.getStats().refresh();
     Assert.assertEquals(pool.getStats().getTotalBadDestroyed(), 1, "Total Bad destroyed");
 
@@ -592,10 +590,10 @@ public class ScatterGatherTest {
     Map<ServerInstance, Throwable> errorMap = fut.getError();
     Assert.assertEquals(errorMap.size(), 1, "One error");
     Assert.assertNotNull(errorMap.get(serverInstance4), "Server4 returned timeout");
-    System.out.println("Error is :" + errorMap.get(serverInstance4));
+//    System.out.println("Error is :" + errorMap.get(serverInstance4));
 
     Thread.sleep(3000);
-    System.out.println("Pool Stats :" + pool.getStats());
+//    System.out.println("Pool Stats :" + pool.getStats());
     pool.getStats().refresh();
     Assert.assertEquals(pool.getStats().getTotalBadDestroyed(), 1, "Total Bad destroyed");
 
@@ -780,7 +778,7 @@ public class ScatterGatherTest {
 
     @Override
     public ServerInstance selectServer(SegmentId p, List<ServerInstance> orderedServers, Object hashKey) {
-      System.out.println("Partition :" + p + ", Ordered Servers :" + orderedServers);
+//      System.out.println("Partition :" + p + ", Ordered Servers :" + orderedServers);
       return orderedServers.get(0);
     }
   }

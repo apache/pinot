@@ -818,7 +818,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
           producer.send(messagesToWrite);
         }
 
-        System.out.println("rowsRemaining = " + rowsRemaining);
+//        System.out.println("rowsRemaining = " + rowsRemaining);
         rowsRemaining -= rowsInThisBatch;
       }
 
@@ -1042,7 +1042,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
               }
 
               if (onlinePartitionCount == expectedSegmentCount) {
-                System.out.println("Got " + expectedSegmentCount + " online tables, unlatching the main thread");
+//                System.out.println("Got " + expectedSegmentCount + " online tables, unlatching the main thread");
                 latch.countDown();
                 _hasBeenTriggered = true;
               }

@@ -115,6 +115,6 @@ public class BitmapInvertedIndexTest {
     invertedIndexColumns = new String[iiColumns.size()];
     iiColumns.toArray(invertedIndexColumns);
     segmentDirectory = new File(INDEX_DIR, driver.getSegmentName());
-    System.out.println("built at : " + INDEX_DIR.getAbsolutePath());
+//    System.out.println("built at : " + INDEX_DIR.getAbsolutePath());
   }
 }

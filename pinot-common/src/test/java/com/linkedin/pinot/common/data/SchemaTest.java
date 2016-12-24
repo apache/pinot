@@ -268,14 +268,12 @@ public class SchemaTest {
         TimeUnit.DAYS, TimeFormat.SIMPLE_DATE_FORMAT + ":yyyyMMdd" , "Date");
     TimeGranularitySpec outgoingTimeGranularitySpec = new TimeGranularitySpec(DataType.STRING, 1,
         TimeUnit.DAYS, TimeFormat.SIMPLE_DATE_FORMAT + ":yyyyMMdd", "Date");
-    System.out.println(incomingTimeGranularitySpec);
+//    System.out.println(incomingTimeGranularitySpec);
     Schema schema = new Schema.SchemaBuilder().setSchemaName("testSchema")
         .addTime(incomingTimeGranularitySpec, outgoingTimeGranularitySpec).build();
     String jsonSchema = schema.getJSONSchema();
     Schema schemaFromJson = Schema.fromString(jsonSchema);
     Assert.assertEquals(schemaFromJson, schema);
     Assert.assertEquals(schemaFromJson.hashCode(), schema.hashCode());
-
-
   }
 }

@@ -89,7 +89,7 @@ public class QueriesSentinelTest {
     instanceDataManager.init(new FileBasedInstanceDataManagerConfig(serverConf.subset("pinot.server.instance")));
     instanceDataManager.start();
 
-    System.out.println("************************** : " + new File(INDEX_DIR, "segment").getAbsolutePath());
+//    System.out.println("************************** : " + new File(INDEX_DIR, "segment").getAbsolutePath());
     File segmentFile = new File(INDEX_DIR, "segment").listFiles()[0];
     segmentName = segmentFile.getName();
     final IndexSegment indexSegment = ColumnarSegmentLoader.load(segmentFile, ReadMode.heap);
@@ -250,7 +250,7 @@ public class QueriesSentinelTest {
 
   private void setUpTestQueries(String table) throws FileNotFoundException, IOException {
     final String filePath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(AVRO_DATA));
-    System.out.println(filePath);
+//    System.out.println(filePath);
     final List<String> dims = new ArrayList<String>();
     dims.add("column1");
     dims.add("column2");
@@ -292,7 +292,7 @@ public class QueriesSentinelTest {
     driver.init(config);
     driver.build();
 
-    System.out.println("built at : " + INDEX_DIR.getAbsolutePath());
+//    System.out.println("built at : " + INDEX_DIR.getAbsolutePath());
   }
 
   @Test

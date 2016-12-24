@@ -126,7 +126,7 @@ public class QueryExecutorTest {
       String segmentName = parent.list()[0];
       _indexSegmentList.add(ColumnarSegmentLoader.load(new File(parent, segmentName), ReadMode.mmap));
 
-      System.out.println("built at : " + segmentDir.getAbsolutePath());
+//      System.out.println("built at : " + segmentDir.getAbsolutePath());
     }
   }
 
