@@ -40,6 +40,7 @@ TimeSeriesCompareView.prototype = {
   },
 
   renderPercentageChangeSection : function() {
+    console.log(this.timeSeriesCompareModel)
     var contributorTableResult = this.contributor_table_template_compiled(this.timeSeriesCompareModel);
     $(this.contributor_table_placeHolderId).html(contributorTableResult);
     $('#show-details').checked = this.timeSeriesCompareModel.showDetailsChecked;
@@ -89,6 +90,7 @@ TimeSeriesCompareView.prototype = {
     $('#show-details').change(function () {
       self.timeSeriesCompareModel.showDetailsChecked = !self.timeSeriesCompareModel.showDetailsChecked;
       self.renderPercentageChangeSection();
+      console.log(self.timeSeriesCompareModel.showDetailsChecked);
     });
     $('#show-cumulative').change(function () {
       self.timeSeriesCompareModel.showCumulativeChecked = !self.timeSeriesCompareModel.showCumulativeChecked;

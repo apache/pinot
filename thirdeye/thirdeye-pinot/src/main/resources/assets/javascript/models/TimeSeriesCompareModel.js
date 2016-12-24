@@ -73,6 +73,10 @@ TimeSeriesCompareModel.prototype = {
           this.subDimensionContributionDetails = {};
           this.subDimensionContributionDetails.contributionMap = {};
           this.subDimensionContributionDetails.percentageChange = {};
+          this.subDimensionContributionDetails.currentValues = {};
+          this.subDimensionContributionDetails.baselineValues = {};
+          this.subDimensionContributionDetails.cumulativeCurrentValues = {};
+          this.subDimensionContributionDetails.cumulativeBaselineValues = {};
           this.subDimensionContributionDetails.cumulativePercentageChange = {};
           this.subDimensionContributionDetails.timeBucketsCurrent = timeSeriesResponse.timeBucketsCurrent;
 
@@ -82,8 +86,10 @@ TimeSeriesCompareModel.prototype = {
             // var percentageChange = [];
             if (timeSeriesResponse.subDimensionContributionMap[key]) {
               for (var i in timeSeriesResponse.subDimensionContributionMap[key].currentValues) {
-                currentVal.push(timeSeriesResponse.subDimensionContributionMap[key].currentValues[i]);
-                baselineVal.push(timeSeriesResponse.subDimensionContributionMap[key].baselineValues[i]);
+                currentVal.push(
+                    timeSeriesResponse.subDimensionContributionMap[key].currentValues[i]);
+                baselineVal.push(
+                    timeSeriesResponse.subDimensionContributionMap[key].baselineValues[i]);
               }
             }
             this.subDimensions.push(key);
@@ -92,6 +98,10 @@ TimeSeriesCompareModel.prototype = {
               end: moment(timeSeriesResponse.end).format('YYYY-M-D'),
               columns: [dateColumn, currentVal, baselineVal]
             };
+            this.subDimensionContributionDetails.currentValues[key] = timeSeriesResponse.subDimensionContributionMap[key].currentValues;
+            this.subDimensionContributionDetails.baselineValues[key] = timeSeriesResponse.subDimensionContributionMap[key].baselineValues;
+            this.subDimensionContributionDetails.cumulativeCurrentValues[key] = timeSeriesResponse.subDimensionContributionMap[key].cumulativeCurrentValues;
+            this.subDimensionContributionDetails.cumulativeBaselineValues[key] = timeSeriesResponse.subDimensionContributionMap[key].cumulativeBaselineValues;
             this.subDimensionContributionDetails.percentageChange[key] = timeSeriesResponse.subDimensionContributionMap[key].percentageChange;
             this.subDimensionContributionDetails.cumulativePercentageChange[key] = timeSeriesResponse.subDimensionContributionMap[key].cumulativePercentageChange;
           }

@@ -157,6 +157,8 @@ public class TimeSeriesResource {
       vw.setCurrentValues(new double[timeBuckets]);
       vw.setBaselineValues(new double[timeBuckets]);
       vw.setPercentageChange(new String[timeBuckets]);
+      vw.setCumulativeCurrentValues(new double[timeBuckets]);
+      vw.setCumulativeBaselineValues(new double[timeBuckets]);
       vw.setCumulativePercentageChange(new String[timeBuckets]);
 
       // lets find the indices
@@ -168,8 +170,9 @@ public class TimeSeriesResource {
           response.getResponseData().getSchema().getColumnsToIndexMapping().get("baselineValue");
       int percentageChangeIndex =
           response.getResponseData().getSchema().getColumnsToIndexMapping().get("percentageChange");
-      int cumPercentageChangeIndex =
-          response.getResponseData().getSchema().getColumnsToIndexMapping().get("cumulativePercentageChange");
+      int cumCurrentValueIndex = response.getResponseData().getSchema().getColumnsToIndexMapping().get("cumulativeCurrentValue");
+      int cumBaselineValueIndex = response.getResponseData().getSchema().getColumnsToIndexMapping().get("cumulativeBaselineValue");
+      int cumPercentageChangeIndex = response.getResponseData().getSchema().getColumnsToIndexMapping().get("cumulativePercentageChange");
 
       // populate current and baseline time buckets
       for (int i = 0; i < timeBuckets; i++) {
@@ -185,6 +188,8 @@ public class TimeSeriesResource {
         Double currentVal = Double.valueOf(data[currentValueIndex]);
         Double baselineVal = Double.valueOf(data[baselineValueIndex]);
         Double percentageChangeVal = Double.valueOf(data[percentageChangeIndex]);
+        Double cumCurrentVal = Double.valueOf(data[cumCurrentValueIndex]);
+        Double cumBaselineVal = Double.valueOf(data[cumBaselineValueIndex]);
         Double cumPercentageChangeVal = Double.valueOf(data[cumPercentageChangeIndex]);
 
         int index = i % timeBuckets;
@@ -192,6 +197,8 @@ public class TimeSeriesResource {
         // set overAll values
         vw.getCurrentValues()[index] += currentVal;
         vw.getBaselineValues()[index] += baselineVal;
+        vw.getCumulativeCurrentValues()[index] += cumCurrentVal;
+        vw.getCumulativeBaselineValues()[index] += cumBaselineVal;
 
         // set individual sub-dimension values
         if (!subDimensionValuesMap.containsKey(subDimension)) {
@@ -199,6 +206,8 @@ public class TimeSeriesResource {
           subDimVals.setCurrentValues(new double[timeBuckets]);
           subDimVals.setBaselineValues(new double[timeBuckets]);
           subDimVals.setPercentageChange(new String[timeBuckets]);
+          subDimVals.setCumulativeCurrentValues(new double[timeBuckets]);
+          subDimVals.setCumulativeBaselineValues(new double[timeBuckets]);
           subDimVals.setCumulativePercentageChange(new String[timeBuckets]);
           subDimensionValuesMap.put(subDimension, subDimVals);
         }
@@ -206,6 +215,8 @@ public class TimeSeriesResource {
         subDimensionValuesMap.get(subDimension).getCurrentValues()[index] = currentVal;
         subDimensionValuesMap.get(subDimension).getBaselineValues()[index] = baselineVal;
         subDimensionValuesMap.get(subDimension).getPercentageChange()[index] = String.format(DECIMAL_FORMAT, percentageChangeVal);
+        subDimensionValuesMap.get(subDimension).getCumulativeCurrentValues()[index] = cumCurrentVal;
+        subDimensionValuesMap.get(subDimension).getCumulativeBaselineValues()[index] = cumBaselineVal;
         subDimensionValuesMap.get(subDimension).getCumulativePercentageChange()[index] = String.format(DECIMAL_FORMAT, cumPercentageChangeVal);
       }
 
@@ -214,6 +225,9 @@ public class TimeSeriesResource {
       for (int i = 0; i < vw.getCurrentValues().length; i++) {
         vw.getPercentageChange()[i] = String.format(DECIMAL_FORMAT,
             getPercentageChange(vw.getCurrentValues()[i], vw.getBaselineValues()[i]));
+        vw.getCumulativePercentageChange()[i] = String.format(DECIMAL_FORMAT,
+            getPercentageChange(vw.getCumulativeCurrentValues()[i],
+                vw.getCumulativeBaselineValues()[i]));
       }
     } catch (Exception e) {
       LOG.error(e.getMessage(), e);
