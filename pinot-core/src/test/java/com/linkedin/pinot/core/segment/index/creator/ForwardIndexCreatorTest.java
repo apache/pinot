@@ -19,6 +19,7 @@ import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.data.readers.TestRecordReader;
@@ -36,6 +37,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.testng.Assert;
@@ -107,11 +109,14 @@ public class ForwardIndexCreatorTest {
 
     String[] expected = new String[NUM_ROWS];
     final List<GenericRow> rows = new ArrayList<>();
+    Random random = new Random();
+
     for (int row = 0; row < NUM_ROWS; row++) {
       HashMap<String, Object> map = new HashMap<>();
-      String value = RandomStringUtils.random(MAX_STRING_LENGTH);
-      expected[row] = value;
+      String value =
+          (row == 0) ? "" : StringUtil.trimTrailingNulls(RandomStringUtils.random(random.nextInt(MAX_STRING_LENGTH)));
 
+      expected[row] = value;
       for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
         map.put(fieldSpec.getName(), value);
       }
