@@ -16,19 +16,21 @@
 package com.linkedin.pinot.broker.servlet;
 
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
+import com.linkedin.pinot.requestHandler.BrokerRequestHandler;
+import com.linkedin.pinot.routing.TimeBoundaryService;
 import javax.servlet.ServletContextEvent;
 import javax.servlet.ServletContextListener;
-
-import com.linkedin.pinot.requestHandler.BrokerRequestHandler;
 
 
 public class PinotBrokerServletContextChangeListener implements ServletContextListener {
   private BrokerRequestHandler requestHandler;
   private BrokerMetrics _brokerMetrics;
+  private TimeBoundaryService _timeBoundaryService;
 
-  public PinotBrokerServletContextChangeListener(BrokerRequestHandler handler, BrokerMetrics brokerMetrics) {
+  public PinotBrokerServletContextChangeListener(BrokerRequestHandler handler, BrokerMetrics brokerMetrics, TimeBoundaryService timeBoundaryService) {
     this.requestHandler = handler;
     _brokerMetrics = brokerMetrics;
+    _timeBoundaryService = timeBoundaryService;
   }
 
   @Override
@@ -40,6 +42,7 @@ public class PinotBrokerServletContextChangeListener implements ServletContextLi
   public void contextInitialized(ServletContextEvent sce) {
     sce.getServletContext().setAttribute(BrokerRequestHandler.class.toString(), requestHandler);
     sce.getServletContext().setAttribute(BrokerMetrics.class.toString(), _brokerMetrics);
+    sce.getServletContext().setAttribute(TimeBoundaryService.class.toString(), _timeBoundaryService);
   }
 
 }

@@ -15,6 +15,9 @@
  */
 package com.linkedin.pinot.routing;
 
+import org.json.JSONObject;
+
+
 public interface TimeBoundaryService {
 
   /**
@@ -50,6 +53,12 @@ public interface TimeBoundaryService {
     public void setTimeValue(String timeValue) {
       _timeValue = timeValue;
     }
-  }
 
+    public String toJsonString() throws Exception {
+      JSONObject obj = new JSONObject();
+      obj.put("timeColumnName", _timeColumn);
+      obj.put("timeColumnValue",_timeValue);
+      return obj.toString(2);
+    }
+  }
 }
