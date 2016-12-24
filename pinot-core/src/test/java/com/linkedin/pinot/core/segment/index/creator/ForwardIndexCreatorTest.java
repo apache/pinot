@@ -36,6 +36,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.testng.Assert;
@@ -107,9 +108,11 @@ public class ForwardIndexCreatorTest {
 
     String[] expected = new String[NUM_ROWS];
     final List<GenericRow> rows = new ArrayList<>();
+    Random random = new Random();
+
     for (int row = 0; row < NUM_ROWS; row++) {
       HashMap<String, Object> map = new HashMap<>();
-      String value = RandomStringUtils.random(MAX_STRING_LENGTH);
+      String value = RandomStringUtils.randomAscii(1 + random.nextInt(MAX_STRING_LENGTH));
       expected[row] = value;
 
       for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
