@@ -12,7 +12,7 @@ public class MetricSummary {
 
   double baselineValue;
   double currentValue;
-  String wowPercentageChange;
+  double wowPercentageChange;
 
   AnomaliesSummary anomaliesSummary;
 
@@ -70,10 +70,10 @@ public class MetricSummary {
   public void setCurrentValue(double currentValue) {
     this.currentValue = currentValue;
   }
-  public String getWowPercentageChange() {
+  public double getWowPercentageChange() {
     return wowPercentageChange;
   }
-  public void setWowPercentageChange(String wowPercentageChange) {
+  public void setWowPercentageChange(double wowPercentageChange) {
     this.wowPercentageChange = wowPercentageChange;
   }
   public AnomaliesSummary getAnomaliesSummary() {

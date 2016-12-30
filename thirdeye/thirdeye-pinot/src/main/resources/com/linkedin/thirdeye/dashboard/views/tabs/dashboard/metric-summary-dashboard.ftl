@@ -9,17 +9,17 @@
 							<span class="label-medium-light">{{this.metricName}}</span>
 						</div>
 					</div>
-					<div class="metric-card-body">
+					<div class="metric-card-body" style="background-color:{{computeColor metricSummary.wowPercentageChange}}">
 						<div class="metric-card-body-row-1">
-							<div style="height: 100%; display: table-cell; vertical-align: middle; text-align: center" data-toggle="tooltip" data-placement="bottom">
-								<span class="label-large-light">{{metricSummary.wowPercentageChange}}</span>
+							<div style="">
+								<span class="label-large-light">{{formatPercent metricSummary.wowPercentageChange}}</span>
 							</div>
 						</div>
 						<div class="metric-card-body-row-2">
 							<span class="label-medium-light" title="No anomaly configured">{{computeAnomaliesString metricSummary.anomaliesSummary.numAnomalies}}</span>
 						</div>
 						<div class="metric-card-body-row-3">
-							<span class="label-medium-light">{{metricSummary.currentValue}}({{metricSummary.wowPercentageChange}})</span>
+							<span class="label-medium-light">{{abbreviateNumber metricSummary.currentValue}}({{abbreviateNumber (formatDelta metricSummary.currentValue metricSummary.baselineValue)}})</span>
 						</div>
 					</div>
 				</div>

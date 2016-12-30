@@ -305,14 +305,9 @@ public class DataResource {
           double baselineValue = Double.valueOf(responseData[0]);
           double curentvalue = Double.valueOf(responseData[1]);
           double percentageChange = (curentvalue - baselineValue) * 100 / baselineValue;
-          String wowPercentageChange = String.format("%.2f", percentageChange) + "%";
-          if (percentageChange > 0) {
-            wowPercentageChange = "+" + wowPercentageChange;
-          }
           metricSummary.setBaselineValue(baselineValue);
           metricSummary.setCurrentValue(curentvalue);
-          metricSummary.setWowPercentageChange(wowPercentageChange);
-
+          metricSummary.setWowPercentageChange(percentageChange);
           AnomaliesSummary anomaliesSummary = anomaliesResoure.getAnomalyCountForMetricInRange(metricId, currentStart, currentEnd);
           metricSummary.setAnomaliesSummary(anomaliesSummary);
 
@@ -438,14 +433,9 @@ public class DataResource {
             double baselineValue = Double.valueOf(responseData[0]);
             double curentvalue = Double.valueOf(responseData[1]);
             double percentageChange = (curentvalue - baselineValue) * 100 / baselineValue;
-            String wowPercentageChange = String.format("%.2f", percentageChange) + "%";
-            if (percentageChange > 0) {
-              wowPercentageChange = "+" + wowPercentageChange;
-            }
             metricSummary.setBaselineValue(baselineValue);
             metricSummary.setCurrentValue(curentvalue);
-            metricSummary.setWowPercentageChange(wowPercentageChange);
-
+            metricSummary.setWowPercentageChange(percentageChange);
             metricAliasToMetricSummariesMap.put(metricAlias, metricSummary);
           }
         } catch (Exception e) {
