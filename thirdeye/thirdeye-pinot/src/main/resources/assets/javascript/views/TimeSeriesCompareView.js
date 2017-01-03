@@ -14,19 +14,23 @@ function TimeSeriesCompareView(timeSeriesCompareModel) {
   this.contributor_table_placeHolderId = "#contributor-table-placeholder";
   this.heatmapRenderEvent = new Event(this);
 
+  var self = this;
   this.viewParams = {
-    metricId: this.timeSeriesCompareModel.metricId,
-    currentStart: this.timeSeriesCompareModel.currentStart,
-    currentEnd: this.timeSeriesCompareModel.currentEnd,
-    baselineStart: this.timeSeriesCompareModel.baselineStart,
-    baselineEnd: this.timeSeriesCompareModel.baselineEnd,
-    filters: this.timeSeriesCompareModel.filters
+    metricId: self.timeSeriesCompareModel.metricId,
+    currentStart: self.timeSeriesCompareModel.currentStart,
+    currentEnd: self.timeSeriesCompareModel.currentEnd,
+    baselineStart: self.timeSeriesCompareModel.baselineStart,
+    baselineEnd: self.timeSeriesCompareModel.baselineEnd,
+    filters: self.timeSeriesCompareModel.filters
   };
 }
 
 TimeSeriesCompareView.prototype = {
   render: function () {
     if (this.timeSeriesCompareModel.subDimensionContributionDetails) {
+      // collect view params for rendering heatmap
+      this.collectAndUpdateViewParamsForHeatMapRendering();
+
       this.renderChartSection();
       this.renderPercentageChangeSection();
       this.setupListenersForDetailsAndCumulativeCheckBoxes();
@@ -96,11 +100,11 @@ TimeSeriesCompareView.prototype = {
       self.renderPercentageChangeSection();
     });
 
-    // TODO: setup listener for percentage cells to populate heatmap
     for (var i in self.timeSeriesCompareModel.subDimensions) {
       for (var j in self.timeSeriesCompareModel.subDimensionContributionDetails.timeBucketsCurrent) {
         var tableCellId = self.timeSeriesCompareModel.subDimensions[i] + "-href-" + j;
         $("#"+tableCellId).click(function (e) {
+          self.collectAndUpdateViewParamsForHeatMapRendering();
           self.heatmapRenderEvent.notify();
         });
       }
@@ -120,7 +124,16 @@ TimeSeriesCompareView.prototype = {
 
   collectAndUpdateViewParamsForHeatMapRendering : function () {
     var self = this;
-    // TODO: update heatmap view params
+    this.viewParams = {
+      metricId: self.timeSeriesCompareModel.metricId,
+      currentStart: self.timeSeriesCompareModel.currentStart,
+      currentEnd: self.timeSeriesCompareModel.currentEnd,
+      baselineStart: self.timeSeriesCompareModel.baselineStart,
+      baselineEnd: self.timeSeriesCompareModel.baselineEnd,
+      filters: self.timeSeriesCompareModel.filters
+    };
+
+    // TODO: set selected dimension in filters
   }
 }
 

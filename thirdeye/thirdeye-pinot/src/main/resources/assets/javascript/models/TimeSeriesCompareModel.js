@@ -53,13 +53,9 @@ TimeSeriesCompareModel.prototype = {
   },
 
   update: function () {
-    // update the timeseries data
-    console.log("timeseries model ---> ");
-    console.log(this);
     if (this.metricId) {
-      var timeSeriesResponse = dataService.fetchTimeseriesCompare(this.metricId, this.currentStart,
-          this.currentEnd, this.baselineStart, this.baselineEnd, this.dimension, this.filters,
-          this.granularity);
+      // update the timeseries data
+      var timeSeriesResponse = dataService.fetchTimeseriesCompare(this.metricId, this.currentStart, this.currentEnd, this.baselineStart, this.baselineEnd, this.dimension, this.filters, this.granularity);
 
       // TODO: use time formatter according to granularity selected, currently only DAYS supported
 
@@ -87,10 +83,8 @@ TimeSeriesCompareModel.prototype = {
             // var percentageChange = [];
             if (timeSeriesResponse.subDimensionContributionMap[key]) {
               for (var i in timeSeriesResponse.subDimensionContributionMap[key].currentValues) {
-                currentVal.push(
-                    timeSeriesResponse.subDimensionContributionMap[key].currentValues[i]);
-                baselineVal.push(
-                    timeSeriesResponse.subDimensionContributionMap[key].baselineValues[i]);
+                currentVal.push(timeSeriesResponse.subDimensionContributionMap[key].currentValues[i]);
+                baselineVal.push(timeSeriesResponse.subDimensionContributionMap[key].baselineValues[i]);
               }
             }
             this.subDimensions.push(key);

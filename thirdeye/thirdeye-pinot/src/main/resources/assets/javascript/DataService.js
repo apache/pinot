@@ -148,6 +148,15 @@ DataService.prototype = {
       console.log("timeseries data fetch URL ----> ");
       console.log(url);
       return this.getDataSynchronous(url);
-    }
+    },
+
+  fetchHeatmapData: function (metricId, currentStart, currentEnd, baselineStart, baselineEnd,
+      filters) {
+    var url = "/data/heatmap/" + metricId + "/" + currentStart + "/" + currentEnd + "/"
+        + baselineStart + "/" + baselineEnd + "?filters=" + JSON.stringify(filters);
+    console.log("heatmap data fetch URL ----> ");
+    console.log(url);
+    return this.getDataSynchronous(url);
+  }
 
 };

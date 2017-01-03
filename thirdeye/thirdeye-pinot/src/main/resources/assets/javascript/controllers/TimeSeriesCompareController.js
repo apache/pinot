@@ -20,8 +20,8 @@ TimeSeriesCompareController.prototype = {
   },
 
   handleHeatMapRenderEvent: function (viewObject) {
-    console.log("Making request to populate heatmap");
-    console.log(viewObject);
+    console.log(HASH_SERVICE.getParams());
+
     // update hash params as per parameters set in the view
     HASH_SERVICE.update(viewObject.viewParams);
     this.dimensionTreeMapController.handleAppEvent(HASH_SERVICE.getParams());

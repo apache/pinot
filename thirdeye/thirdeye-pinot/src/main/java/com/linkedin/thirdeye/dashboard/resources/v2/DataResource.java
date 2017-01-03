@@ -11,10 +11,14 @@ import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.cache.MetricDataset;
 import com.linkedin.thirdeye.client.cache.QueryCache;
+import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomaliesSummary;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.MetricSummary;
 import com.linkedin.thirdeye.dashboard.views.GenericResponse;
+import com.linkedin.thirdeye.dashboard.views.heatmap.HeatMapViewHandler;
+import com.linkedin.thirdeye.dashboard.views.heatmap.HeatMapViewRequest;
+import com.linkedin.thirdeye.dashboard.views.heatmap.HeatMapViewResponse;
 import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewHandler;
 import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewRequest;
 import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewResponse;
@@ -26,6 +30,7 @@ import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
+import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -36,6 +41,7 @@ import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -210,7 +216,7 @@ public class DataResource {
       // do nothing
     } else {
       list.add("HOURS");
-      if (dataGranularity.equals("MINUTES")){
+      if (dataGranularity.equals("MINUTES")) {
         if (dataAggSize == 1) {
           list.add("MINUTES");
         } else {
@@ -220,7 +226,54 @@ public class DataResource {
     }
     return list;
   }
-  //------------- auto complete ends ---------------------
+
+  //------------- HeatMap -----------------
+  @GET
+  @Path(value = "heatmap/{metricId}/{currentStart}/{currentEnd}/{baselineStart}/{baselineEnd}")
+  @Produces(MediaType.APPLICATION_JSON)
+  public HeatMapViewResponse getHeatMap(
+      @QueryParam("filters") String filters,
+      @PathParam("baselineStart") Long baselineStart, @PathParam("baselineEnd") Long baselineEnd,
+      @PathParam("currentStart") Long currentStart, @PathParam("currentEnd") Long currentEnd,
+      @PathParam("metricId") Long metricId)
+      throws Exception {
+    MetricConfigDTO metricConfigDTO = metricConfigDAO.findById(metricId);
+
+    String collection = metricConfigDTO.getDataset();
+    String metric = metricConfigDTO.getName();
+
+    HeatMapViewRequest request = new HeatMapViewRequest();
+    request.setCollection(collection);
+    List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metric, MetricAggFunction.SUM, collection);
+    request.setMetricExpressions(metricExpressions);
+    long maxDataTime = collectionMaxDataTimeCache.get(collection);
+    if (currentEnd > maxDataTime) {
+      long delta = currentEnd - maxDataTime;
+      currentEnd = currentEnd - delta;
+      baselineEnd = baselineEnd - delta;
+    }
+
+    // See {@link #getDashboardData} for the reason that the start and end time are stored in a
+    // DateTime object with data's timezone.
+    DateTimeZone timeZoneForCollection = Utils.getDataTimeZone(collection);
+    request.setBaselineStart(new DateTime(baselineStart, timeZoneForCollection));
+    request.setBaselineEnd(new DateTime(baselineEnd, timeZoneForCollection));
+    request.setCurrentStart(new DateTime(currentStart, timeZoneForCollection));
+    request.setCurrentEnd(new DateTime(currentEnd, timeZoneForCollection));
+
+    // filter
+    if (filters != null && !filters.isEmpty()) {
+      filters = URLDecoder.decode(filters, "UTF-8");
+      request.setFilters(ThirdEyeUtils.convertToMultiMap(filters));
+    }
+
+    HeatMapViewHandler handler = new HeatMapViewHandler(queryCache);
+    HeatMapViewResponse response = handler.process(request);
+
+    return response;
+  }
+
+
 
   //----------------- dashboard end points -------------
   @GET
@@ -445,7 +498,6 @@ public class DataResource {
     }
     return metricAliasToMetricSummariesMap;
   }
-
 
   private TimeRange getTimeRangeFromLabel(String dataset, String label) {
     long start = 0;
