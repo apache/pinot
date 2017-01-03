@@ -12,14 +12,19 @@ function TimeSeriesCompareView(timeSeriesCompareModel) {
   var contributor_table_template = $("#contributor-table-details-template").html();
   this.contributor_table_template_compiled = Handlebars.compile(contributor_table_template);
   this.contributor_table_placeHolderId = "#contributor-table-placeholder";
-  this.checkboxClickEvent = new Event();
-  this.heatmapRenderEvent = new Event();
+  this.heatmapRenderEvent = new Event(this);
+
+  this.viewParams = {
+    metricId: this.timeSeriesCompareModel.metricId,
+    currentStart: this.timeSeriesCompareModel.currentStart,
+    currentEnd: this.timeSeriesCompareModel.currentEnd,
+    baselineStart: this.timeSeriesCompareModel.baselineStart,
+    baselineEnd: this.timeSeriesCompareModel.baselineEnd,
+    filters: this.timeSeriesCompareModel.filters
+  };
 }
 
 TimeSeriesCompareView.prototype = {
-  init: function () {
-  },
-
   render: function () {
     if (this.timeSeriesCompareModel.subDimensionContributionDetails) {
       this.renderChartSection();
@@ -71,20 +76,12 @@ TimeSeriesCompareView.prototype = {
           tick:{
             "culling":{"max":100},
             "count":10,
-            // "rotate":30,   // this will rotate the x axis values
+            // "rotate":30,   // this will rotate the x axis display values
             "fit":true,
             "format":"%m-%d %H:%M"}
         }
       }
     });
-  },
-
-  // TODO : use this for rendering heatmap
-  dataEventHandler: function (e) {
-    // TODO:
-    // if (Object.is(e.target.type, "checkbox")) {
-    //   this.checkboxClickEvent.notify(e.target);
-    // }
   },
 
   setupListenersForDetailsAndCumulativeCheckBoxes: function () {
@@ -104,8 +101,7 @@ TimeSeriesCompareView.prototype = {
       for (var j in self.timeSeriesCompareModel.subDimensionContributionDetails.timeBucketsCurrent) {
         var tableCellId = self.timeSeriesCompareModel.subDimensions[i] + "-href-" + j;
         $("#"+tableCellId).click(function (e) {
-          // TODO: render heatmap
-          self.heatmapRenderEvent.notify(e);
+          self.heatmapRenderEvent.notify();
         });
       }
     }
@@ -120,6 +116,11 @@ TimeSeriesCompareView.prototype = {
         self.loadChart(self.timeSeriesCompareModel.subDimensionContributionDetails.contributionMap[subDimension]);
       });
     }
+  },
+
+  collectAndUpdateViewParamsForHeatMapRendering : function () {
+    var self = this;
+    // TODO: update heatmap view params
   }
 }
 

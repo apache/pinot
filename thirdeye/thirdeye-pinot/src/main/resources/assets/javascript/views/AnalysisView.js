@@ -195,7 +195,7 @@ AnalysisView.prototype = {
     var self = this;
     $("#analysis-apply-button").click(function (e) {
       self.collectViewParams();
-      self.applyDataChangeEvent.notify(self.viewParams);
+      self.applyDataChangeEvent.notify();
     });
   }
 };

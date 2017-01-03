@@ -5,7 +5,8 @@ function DimensionTreeMapController() {
 
 DimensionTreeMapController.prototype = {
 
-  handleAppEvent : function() {
+  handleAppEvent : function(hashParams) {
+    this.dimensionTreeMapModel.init(hashParams);
     this.dimensionTreeMapModel.update();
     this.dimensionTreeMapView.render();
   },
