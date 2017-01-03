@@ -106,9 +106,12 @@ public class EntityManagerResource {
     try {
       switch (entityType) {
       case ANOMALY_FUNCTION:
-        AnomalyFunctionDTO anomalyFunctionDTO =
-            OBJECT_MAPPER.readValue(jsonPayload, AnomalyFunctionDTO.class);
-        anomalyFunctionManager.update(anomalyFunctionDTO);
+        AnomalyFunctionDTO anomalyFunctionDTO = OBJECT_MAPPER.readValue(jsonPayload, AnomalyFunctionDTO.class);
+        if (anomalyFunctionDTO.getId() == null) {
+          anomalyFunctionManager.save(anomalyFunctionDTO);
+        } else {
+          anomalyFunctionManager.update(anomalyFunctionDTO);
+        }
         break;
       case EMAIL_CONFIGURATION:
         EmailConfigurationDTO emailConfigurationDTO =
@@ -129,7 +132,11 @@ public class EntityManagerResource {
         break;
       case OVERRIDE_CONFIG:
         OverrideConfigDTO overrideConfigDTO = OBJECT_MAPPER.readValue(jsonPayload, OverrideConfigDTO.class);
-        overrideConfigManager.update(overrideConfigDTO);
+        if (overrideConfigDTO.getId() == null) {
+          overrideConfigManager.save(overrideConfigDTO);
+        } else {
+          overrideConfigManager.update(overrideConfigDTO);
+        }
         break;
       }
     } catch (IOException e) {
