@@ -10,14 +10,15 @@
       </tr>
       </thead>
       <tbody>
+
       {{#if_eq this.showCumulativeChecked true}}
       {{#each this.subDimensionContributionDetails.cumulativePercentageChange as
       |cumulativePercentageChangeArr cKeyIndex|}}
       <tr>
         <td>{{cKeyIndex}}</td>
         {{#each cumulativePercentageChangeArr as |cPercentageChange cidx|}}
-        <td style="background-color: {{computeColor cPercentageChange}};color: {{computeTextColor cPercentageChange}};"
-            id="{{cKeyIndex}}-{{cidx}}">
+        <td style="background-color: {{computeColor cPercentageChange}};color: {{computeTextColor cPercentageChange}};" id="{{cKeyIndex}}-{{cidx}}">
+          <a id="{{cKeyIndex}}-href-{{cidx}}" >
           <div class="row">
             {{#if_eq this.showDetailsChecked true}}
             <div class="col-md-4">
@@ -33,43 +34,43 @@
               {{cPercentageChange}}%
             </div>
           </div>
+          </a>
         </td>
         {{/each}}
-      </tr>
-      {{/each}}
-      {{/if_eq}}
+        </tr>
+        {{/each}}
+        {{/if_eq}}
 
 
-      {{#if_eq this.showCumulativeChecked false}}
-      {{#each this.subDimensionContributionDetails.percentageChange as |percentageChangeArr
-      keyIndex|}}
+        {{#if_eq this.showCumulativeChecked false}}
+        {{#each this.subDimensionContributionDetails.percentageChange as |percentageChangeArr
+        keyIndex|}}
       <tr>
         <td>{{keyIndex}}</td>
         {{#each percentageChangeArr as |percentageChange idx|}}
-        <td style="background-color: {{computeColor percentageChange}};color: {{computeTextColor percentageChange}};"
-            id="{{keyIndex}}-{{idx}}">
-          <div class="row">
+        <td style="background-color: {{computeColor percentageChange}};color: {{computeTextColor percentageChange}};" id="{{keyIndex}}-{{idx}}">
+          <a id="{{keyIndex}}-href-{{idx}}">
+          <div class="row" >
             {{#if_eq this.showDetailsChecked true}}
             <div class="col-md-4">
               current
-            <#--{{this.subDimensionContributionDetails.currentValues[keyIndex][cidx]}}-->
+            <#--{{this.subDimensionContributionDetails.currentValues[keyIndex][idx]}}-->
             </div>
             <div class="col-md-4">
               baseline
-            <#--{{this.subDimensionContributionDetails.baselineValues[keyIndex][cidx]}}-->
+            <#--{{this.subDimensionContributionDetails.baselineValues[keyIndex][idx]}}-->
             </div>
             {{/if_eq}}
             <div class="col-md-4">
               {{percentageChange}}%
             </div>
           </div>
-
         </td>
+        </a>
         {{/each}}
       </tr>
       {{/each}}
       {{/if_eq}}
-
       </tbody>
     </table>
   </div>

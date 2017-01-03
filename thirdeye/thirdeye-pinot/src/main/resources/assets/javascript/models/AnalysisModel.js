@@ -7,7 +7,7 @@ function AnalysisModel() {
   this.filters;
 
   var currentTime = moment();
-  currentTime = currentTime - (currentTime % 3600000);
+  currentTime = currentTime - (currentTime % 3600000) - 2 * 3600000;  // 2 hours behind current time
   this.currentStart = moment(currentTime).subtract(4, 'days');
   this.currentEnd = moment(currentTime);
   this.baselineStart= moment(currentTime).subtract(10, 'days');

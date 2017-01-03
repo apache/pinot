@@ -13,6 +13,7 @@ function TimeSeriesCompareView(timeSeriesCompareModel) {
   this.contributor_table_template_compiled = Handlebars.compile(contributor_table_template);
   this.contributor_table_placeHolderId = "#contributor-table-placeholder";
   this.checkboxClickEvent = new Event();
+  this.heatmapRenderEvent = new Event();
 }
 
 TimeSeriesCompareView.prototype = {
@@ -36,7 +37,7 @@ TimeSeriesCompareView.prototype = {
     // render chart legned
     var timeseriesSubDimensionsHtml = this.timeseries_subdimension_legend_template_compiled(this.timeSeriesCompareModel);
     $(this.timeseries_subdimension_legend_placeHolderId).html(timeseriesSubDimensionsHtml);
-    this.setupListenerForSubDimension();
+    this.setupListenerForChartSubDimension();
   },
 
   renderPercentageChangeSection : function() {
@@ -80,9 +81,10 @@ TimeSeriesCompareView.prototype = {
 
   // TODO : use this for rendering heatmap
   dataEventHandler: function (e) {
-    if (Object.is(e.target.type, "checkbox")) {
-      this.checkboxClickEvent.notify(e.target);
-    }
+    // TODO:
+    // if (Object.is(e.target.type, "checkbox")) {
+    //   this.checkboxClickEvent.notify(e.target);
+    // }
   },
 
   setupListenersForDetailsAndCumulativeCheckBoxes: function () {
@@ -96,12 +98,23 @@ TimeSeriesCompareView.prototype = {
       self.timeSeriesCompareModel.showCumulativeChecked = !self.timeSeriesCompareModel.showCumulativeChecked;
       self.renderPercentageChangeSection();
     });
+
+    // TODO: setup listener for percentage cells to populate heatmap
+    for (var i in self.timeSeriesCompareModel.subDimensions) {
+      for (var j in self.timeSeriesCompareModel.subDimensionContributionDetails.timeBucketsCurrent) {
+        var tableCellId = self.timeSeriesCompareModel.subDimensions[i] + "-href-" + j;
+        $("#"+tableCellId).click(function (e) {
+          // TODO: render heatmap
+          self.heatmapRenderEvent.notify(e);
+        });
+      }
+    }
   },
 
-  setupListenerForSubDimension: function () {
+  setupListenerForChartSubDimension: function () {
     var self = this;
-    for (var i in this.timeSeriesCompareModel.subDimensions) {
-      $("#a-sub-dimension-" + i + " a").click(self, function (e) {
+    for (var i in self.timeSeriesCompareModel.subDimensions) {
+      $('#a-sub-dimension-' + i + ' a').click(self, function (e) {
         var index = e.currentTarget.getAttribute('id');
         var subDimension = self.timeSeriesCompareModel.subDimensions[index];
         self.loadChart(self.timeSeriesCompareModel.subDimensionContributionDetails.contributionMap[subDimension]);

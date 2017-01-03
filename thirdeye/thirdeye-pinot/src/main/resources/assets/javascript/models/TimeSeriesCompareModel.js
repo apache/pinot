@@ -79,6 +79,7 @@ TimeSeriesCompareModel.prototype = {
           this.subDimensionContributionDetails.cumulativeBaselineValues = {};
           this.subDimensionContributionDetails.cumulativePercentageChange = {};
           this.subDimensionContributionDetails.timeBucketsCurrent = timeSeriesResponse.timeBucketsCurrent;
+          this.subDimensionContributionDetails.timeBucketsBaseline = timeSeriesResponse.timeBucketsBaseline;
 
           for (var key in timeSeriesResponse.subDimensionContributionMap) {
             var currentVal = ['current'];

@@ -49,7 +49,7 @@ Handlebars.registerHelper('if_no_anomalies', function(info, opts) {
 });
 
 Handlebars.registerHelper('computeColor', function(value) {
- var opacity = Math.abs(value / 50);
+ var opacity = Math.abs(value / 25);
  if(value > 0){
    return "rgba(0,0,234," + opacity + ")";
  } else{
