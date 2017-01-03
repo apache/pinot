@@ -20,16 +20,14 @@
         <td style="background-color: {{computeColor cPercentageChange}};color: {{computeTextColor cPercentageChange}};" id="{{cKeyIndex}}-{{cidx}}">
           <a id="{{cKeyIndex}}-href-{{cidx}}" >
           <div class="row">
-            {{#if_eq this.showDetailsChecked true}}
+            {{#if @root.showDetailsChecked}}
             <div class="col-md-4">
-              cumCurrent
-            <#--{{this.subDimensionContributionDetails.cumulativeCurrentValues[cKeyIndex][cidx]}}-->
+              {{lookup (lookup @root.subDimensionContributionDetails.cumulativeCurrentValues cKeyIndex) cidx}}
             </div>
             <div class="col-md-4">
-              cumBaseline
-            <#--{{this.subDimensionContributionDetails.cumulativeBaselineValues[cKeyIndex][cidx]}}-->
+              {{lookup (lookup @root.subDimensionContributionDetails.cumulativeBaselineValues cKeyIndex) cidx}}
             </div>
-            {{/if_eq}}
+            {{/if}}
             <div class="col-md-4">
               {{cPercentageChange}}%
             </div>
@@ -51,16 +49,14 @@
         <td style="background-color: {{computeColor percentageChange}};color: {{computeTextColor percentageChange}};" id="{{keyIndex}}-{{idx}}">
           <a id="{{keyIndex}}-href-{{idx}}">
           <div class="row" >
-            {{#if_eq this.showDetailsChecked true}}
+            {{#if @root.showDetailsChecked}}
             <div class="col-md-4">
-              current
-            <#--{{this.subDimensionContributionDetails.currentValues[keyIndex][idx]}}-->
+              {{lookup (lookup @root.subDimensionContributionDetails.currentValues keyIndex) idx}}
             </div>
             <div class="col-md-4">
-              baseline
-            <#--{{this.subDimensionContributionDetails.baselineValues[keyIndex][idx]}}-->
+              {{lookup (lookup @root.subDimensionContributionDetails.baselineValues keyIndex) idx}}
             </div>
-            {{/if_eq}}
+            {{/if}}
             <div class="col-md-4">
               {{percentageChange}}%
             </div>
