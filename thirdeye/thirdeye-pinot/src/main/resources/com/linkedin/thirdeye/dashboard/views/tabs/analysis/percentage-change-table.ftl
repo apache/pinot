@@ -38,38 +38,39 @@
       <tr>
         <td>{{cKeyIndex}}</td>
         {{#each cumulativePercentageChangeArr as |cPercentageChange cidx|}}
-        <td style="background-color: {{computeColor cPercentageChange}};color: {{computeTextColor cPercentageChange}};" id="{{cKeyIndex}}-{{cidx}}">
-          <a id="{{cKeyIndex}}-href-{{cidx}}" >
+        <td style="background-color: {{computeColor cPercentageChange}};color: {{computeTextColor cPercentageChange}};">
           <div class="row">
             {{#if @root.showDetailsChecked}}
             <div class="col-md-4">
-              {{lookup (lookup @root.subDimensionContributionDetails.cumulativeCurrentValues cKeyIndex) cidx}}
+              {{lookup (lookup @root.subDimensionContributionDetails.cumulativeCurrentValues
+              cKeyIndex) cidx}}
             </div>
             <div class="col-md-4">
-              {{lookup (lookup @root.subDimensionContributionDetails.cumulativeBaselineValues cKeyIndex) cidx}}
+              {{lookup (lookup @root.subDimensionContributionDetails.cumulativeBaselineValues
+              cKeyIndex) cidx}}
             </div>
             {{/if}}
             <div class="col-md-4">
-              {{cPercentageChange}}%
+              <a id="{{cKeyIndex}}-href-{{cidx}}">
+                {{cPercentageChange}}%
+              </a>
             </div>
           </div>
-          </a>
         </td>
         {{/each}}
-        </tr>
-        {{/each}}
-        {{/if_eq}}
+      </tr>
+      {{/each}}
+      {{/if_eq}}
 
 
-        {{#if_eq this.showCumulativeChecked false}}
-        {{#each this.subDimensionContributionDetails.percentageChange as |percentageChangeArr
-        keyIndex|}}
+      {{#if_eq this.showCumulativeChecked false}}
+      {{#each this.subDimensionContributionDetails.percentageChange as |percentageChangeArr
+      keyIndex|}}
       <tr>
         <td>{{keyIndex}}</td>
         {{#each percentageChangeArr as |percentageChange idx|}}
-        <td style="background-color: {{computeColor percentageChange}};color: {{computeTextColor percentageChange}};" id="{{keyIndex}}-{{idx}}">
-          <a id="{{keyIndex}}-href-{{idx}}">
-          <div class="row" >
+        <td style="background-color: {{computeColor percentageChange}};color: {{computeTextColor percentageChange}};">
+          <div class="row">
             {{#if @root.showDetailsChecked}}
             <div class="col-md-4">
               {{lookup (lookup @root.subDimensionContributionDetails.currentValues keyIndex) idx}}
@@ -79,11 +80,12 @@
             </div>
             {{/if}}
             <div class="col-md-4">
-              {{percentageChange}}%
+              <a id="{{keyIndex}}-href-{{idx}}">
+                {{percentageChange}}%
+              </a>
             </div>
           </div>
         </td>
-        </a>
         {{/each}}
       </tr>
       {{/each}}

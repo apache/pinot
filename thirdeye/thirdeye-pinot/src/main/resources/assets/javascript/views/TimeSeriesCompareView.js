@@ -55,6 +55,7 @@ TimeSeriesCompareView.prototype = {
     $(this.contributor_table_placeHolderId).html(contributorTableResult);
     $('#show-details').checked = this.timeSeriesCompareModel.showDetailsChecked;
     $('#show-cumulative').checked = this.timeSeriesCompareModel.showCumulativeChecked;
+    this.setupListenersForPercentageChangeCells();
   },
 
   loadChart : function (timeSeriesObject) {
@@ -99,7 +100,11 @@ TimeSeriesCompareView.prototype = {
       self.timeSeriesCompareModel.showCumulativeChecked = !self.timeSeriesCompareModel.showCumulativeChecked;
       self.renderPercentageChangeSection();
     });
+  },
 
+  setupListenersForPercentageChangeCells : function () {
+    var self = this;
+    // setting up listeners for percentage change cells
     for (var i in self.timeSeriesCompareModel.subDimensions) {
       for (var j in self.timeSeriesCompareModel.subDimensionContributionDetails.timeBucketsCurrent) {
         var tableCellId = self.timeSeriesCompareModel.subDimensions[i] + "-href-" + j;

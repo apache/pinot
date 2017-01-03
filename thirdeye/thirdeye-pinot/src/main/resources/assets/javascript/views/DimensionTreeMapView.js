@@ -43,11 +43,13 @@ function DimensionTreeMapView(dimensionTreeMapModel) {
 }
 
 DimensionTreeMapView.prototype = {
-  render : function() {
-    var result = this.template_compiled(this.dimensionTreeMapModel);
-    $(this.placeHolderId).html(result);
-    this.renderTreemapHeaderSection();
-    this.renderTreemapSection();
+  render: function () {
+    if (this.dimensionTreeMapModel.metricId) {
+      var result = this.template_compiled(this.dimensionTreeMapModel);
+      $(this.placeHolderId).html(result);
+      this.renderTreemapHeaderSection();
+      this.renderTreemapSection();
+    }
   },
 
   renderTreemapHeaderSection : function() {
