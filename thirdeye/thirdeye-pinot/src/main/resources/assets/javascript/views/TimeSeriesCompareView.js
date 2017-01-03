@@ -50,7 +50,7 @@ TimeSeriesCompareView.prototype = {
   },
 
   renderPercentageChangeSection : function() {
-    console.log(this.timeSeriesCompareModel)
+    console.log(this.timeSeriesCompareModel);
     var contributorTableResult = this.contributor_table_template_compiled(this.timeSeriesCompareModel);
     $(this.contributor_table_placeHolderId).html(contributorTableResult);
     $('#show-details').checked = this.timeSeriesCompareModel.showDetailsChecked;
