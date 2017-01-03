@@ -11,6 +11,27 @@
       </thead>
       <tbody>
 
+      {{#if this.showDetailsChecked}}
+      <tr>
+        <td></td>
+        {{#each this.subDimensionContributionDetails.timeBucketsCurrent}}
+        <td>
+          <div class="row">
+            <div class="col-md-4">
+              Current
+            </div>
+            <div class="col-md-4">
+              Baseline
+            </div>
+            <div class="col-md-4">
+              Ratio
+            </div>
+          </div>
+        </td>
+        {{/each}}
+      </tr>
+      {{/if}}
+
       {{#if_eq this.showCumulativeChecked true}}
       {{#each this.subDimensionContributionDetails.cumulativePercentageChange as
       |cumulativePercentageChangeArr cKeyIndex|}}
