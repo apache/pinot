@@ -17,6 +17,7 @@ function TimeSeriesCompareModel() {
 
   this.subDimensions;
   this.subDimensionContributionDetails;
+  this.timeBucketDiff;
 }
 
 TimeSeriesCompareModel.prototype = {

@@ -1,26 +1,37 @@
 function DimensionTreeMapModel() {
   this.metricId;
   this.metricName;
-
-  this.filters;
-
+  this.heatmapFilters = {};
   this.currentStart;
   this.currentEnd;
   this.baselineStart;
   this.baselineEnd;
+
+  this.heatmapData;
 
   this.currentTotal = 50000;
   this.baselineTotal = 100000;
   this.absoluteChange = this.currentTotal - this.baselineTotal;
   this.percentChange = (this.currentTotal - this.baselineTotal) * 100 / this.baselineTotal;
   this.dimensions = ["browser", "country", "device"];
+
   this.treeMapData = [{
     "t": "0", "children": [{
-      "t": "010", "value": 100
+      "t": "Chrome (10 %)", "value": 100
     }, {
       "t": "011", "value": 50
     }, {
-      "t": "012", "value": 5
+      "t": "012", "value": 55
+    }, {
+      "t": "013", "value": 25
+    }]
+  }, {
+    "t": "0", "children": [{
+      "t": "010", "value": 10
+    }, {
+      "t": "011", "value": 25
+    }, {
+      "t": "012", "value": 50
     }, {
       "t": "013", "value": 25
     }]
@@ -32,17 +43,7 @@ function DimensionTreeMapModel() {
     }, {
       "t": "012", "value": 5
     }, {
-      "t": "013", "value": 25
-    }]
-  }, {
-    "t": "0", "children": [{
-      "t": "010", "value": 100
-    }, {
-      "t": "011", "value": 50
-    }, {
-      "t": "012", "value": 5
-    }, {
-      "t": "013", "value": 25
+      "t": "013", "value": 55
     }]
   }];
 
@@ -70,18 +71,22 @@ DimensionTreeMapModel.prototype = {
       if (params.granularity) {
         this.granularity = params.granularity;
       }
-      if (params.filters) {
-        this.filters = params.filters;
+      if (params.heatmapFilters) {
+        this.heatmapFilters = params.heatmapFilters;
       }
     }
   },
 
   update: function () {
-    //TODO: update the heatmap / treemap rendering object
     if (this.metricId) {
-      var heatMapData = dataService.fetchHeatmapData(this.metricId, this.currentStart, this.currentEnd, this.baselineStart, this.baselineEnd, this.filters);
-      console.log("HEATMAP data ---->");
-      console.log(heatMapData);
+      var heatMapData = dataService.fetchHeatmapData(this.metricId, this.currentStart, this.currentEnd, this.baselineStart, this.baselineEnd, this.heatmapFilters);
+      this.heatmapData = heatMapData;
+    }
+  },
+
+  transformResponseData : function(heatMapData) {
+    if (heatMapData) {
+      // TODO: transform
     }
   }
 }
