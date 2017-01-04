@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.core.operator.aggregation;
 
-import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.operator.BaseOperator;
@@ -24,70 +22,44 @@ import com.linkedin.pinot.core.operator.ExecutionStatistics;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
-import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
-import java.io.Serializable;
-import java.util.List;
+import javax.annotation.Nonnull;
 
 
 /**
- * This class implements the aggregation operator, extends BaseOperator.
+ * The <code>AggregationOperator</code> class provides the operator for aggregation only query on a single segment.
  */
 public class AggregationOperator extends BaseOperator {
-
-  private final AggregationExecutor _aggregationExecutor;
-  private final List<AggregationInfo> _aggregationInfoList;
+  private final AggregationFunctionContext[] _aggregationFunctionContexts;
   private final MProjectionOperator _projectionOperator;
   private final long _numTotalRawDocs;
-  private int _nextBlockCallCounter = 0;
   private ExecutionStatistics _executionStatistics;
 
-  /**
-   * Constructor for the class.
-   *
-   * @param aggregationsInfoList List of AggregationInfo (contains context for applying aggregation functions).
-   * @param executor Aggregation Executor
-   * @param projectionOperator Projection operator.
-   * @param numTotalRawDocs Number of total raw documents.
-   */
-  public AggregationOperator(List<AggregationInfo> aggregationsInfoList, AggregationExecutor executor,
-      MProjectionOperator projectionOperator, long numTotalRawDocs) {
-    Preconditions.checkArgument((aggregationsInfoList != null) && (aggregationsInfoList.size() > 0));
-    Preconditions.checkNotNull(executor);
-    Preconditions.checkNotNull(projectionOperator);
-    this._aggregationInfoList = aggregationsInfoList;
-    _aggregationExecutor = executor;
+  public AggregationOperator(@Nonnull AggregationFunctionContext[] aggregationFunctionContexts,
+      @Nonnull MProjectionOperator projectionOperator, long numTotalRawDocs) {
+    _aggregationFunctionContexts = aggregationFunctionContexts;
     _projectionOperator = projectionOperator;
     _numTotalRawDocs = numTotalRawDocs;
   }
 
-  /**
-   * Returns the next ResultBlock containing the result of aggregation group by.
-   */
   @Override
-  public Block getNextBlock() {
-    return getNextBlock(new BlockId(_nextBlockCallCounter++));
+  public boolean open() {
+    _projectionOperator.open();
+    return true;
   }
 
-  /**
-   * {@inheritDoc}
-   * Returns the nextBlock for the given docId.
-   */
   @Override
-  public Block getNextBlock(BlockId blockId) {
-    if (blockId.getId() > 0) {
-      return null;
-    }
-
+  public Block getNextBlock() {
     int numDocsScanned = 0;
 
     // Perform aggregation on all the blocks.
-    _aggregationExecutor.init();
+    AggregationExecutor aggregationExecutor = new DefaultAggregationExecutor(_aggregationFunctionContexts);
+    aggregationExecutor.init();
     ProjectionBlock projectionBlock;
     while ((projectionBlock = (ProjectionBlock) _projectionOperator.nextBlock()) != null) {
       numDocsScanned += projectionBlock.getNumDocs();
-      _aggregationExecutor.aggregate(projectionBlock);
+      aggregationExecutor.aggregate(projectionBlock);
     }
-    _aggregationExecutor.finish();
+    aggregationExecutor.finish();
 
     // Create execution statistics.
     long numEntriesScannedInFilter = _projectionOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
@@ -97,15 +69,12 @@ public class AggregationOperator extends BaseOperator {
             _numTotalRawDocs);
 
     // Build intermediate result block based on aggregation result from the executor.
-    List<Serializable> aggregationResults = _aggregationExecutor.getResult();
-    return new IntermediateResultsBlock(AggregationFunctionFactory.getAggregationFunction(_aggregationInfoList),
-        aggregationResults);
+    return new IntermediateResultsBlock(_aggregationFunctionContexts, aggregationExecutor.getResult(), false);
   }
 
   @Override
-  public boolean open() {
-    _projectionOperator.open();
-    return true;
+  public Block getNextBlock(BlockId blockId) {
+    throw new UnsupportedOperationException();
   }
 
   @Override

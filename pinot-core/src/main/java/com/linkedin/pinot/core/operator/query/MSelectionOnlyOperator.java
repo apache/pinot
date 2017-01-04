@@ -101,10 +101,7 @@ public class MSelectionOnlyOperator extends BaseOperator {
         new ExecutionStatistics(numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
             numTotalRawDocs);
 
-    IntermediateResultsBlock resultBlock = new IntermediateResultsBlock();
-    resultBlock.setSelectionResult(_rowEvents);
-    resultBlock.setSelectionDataSchema(_dataSchema);
-    return resultBlock;
+    return new IntermediateResultsBlock(_dataSchema, _rowEvents);
   }
 
   @Override

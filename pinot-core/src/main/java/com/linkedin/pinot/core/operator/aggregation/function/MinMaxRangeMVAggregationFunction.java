@@ -29,6 +29,12 @@ public class MinMaxRangeMVAggregationFunction extends MinMaxRangeAggregationFunc
     return AggregationFunctionFactory.MINMAXRANGE_MV_AGGREGATION_FUNCTION;
   }
 
+  @Nonnull
+  @Override
+  public String getColumnName(@Nonnull String[] columns) {
+    return AggregationFunctionFactory.MINMAXRANGE_MV_AGGREGATION_FUNCTION + "_" + columns[0];
+  }
+
   @Override
   public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
       @Nonnull ProjectionBlockValSet... projectionBlockValSets) {

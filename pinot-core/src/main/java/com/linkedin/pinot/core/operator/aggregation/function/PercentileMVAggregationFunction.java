@@ -52,6 +52,12 @@ public class PercentileMVAggregationFunction extends PercentileAggregationFuncti
     return _name;
   }
 
+  @Nonnull
+  @Override
+  public String getColumnName(@Nonnull String[] columns) {
+    return _name + "_" + columns[0];
+  }
+
   @Override
   public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
       @Nonnull ProjectionBlockValSet... projectionBlockValSets) {

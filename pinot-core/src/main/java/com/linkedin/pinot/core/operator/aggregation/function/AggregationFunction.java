@@ -39,6 +39,12 @@ public interface AggregationFunction<IntermediateResult extends Serializable, Fi
   String getName();
 
   /**
+   * Given the aggregation columns, get the column name for the results.
+   */
+  @Nonnull
+  String getColumnName(@Nonnull String[] columns);
+
+  /**
    * Accept an aggregation function visitor to visit.
    */
   void accept(@Nonnull AggregationFunctionVisitorBase visitor);

@@ -17,17 +17,19 @@ package com.linkedin.pinot.core.plan;
 
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.aggregation.AggregationFunctionContext;
 import com.linkedin.pinot.core.operator.aggregation.AggregationOperator;
-import com.linkedin.pinot.core.operator.aggregation.DefaultAggregationExecutor;
+import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunctionFactory;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionUtils;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import javax.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,20 +45,19 @@ public class AggregationPlanNode implements PlanNode {
   private final List<AggregationInfo> _aggregationInfos;
   private final ProjectionPlanNode _projectionPlanNode;
 
-  public AggregationPlanNode(IndexSegment indexSegment, BrokerRequest brokerRequest) {
+  public AggregationPlanNode(@Nonnull IndexSegment indexSegment, @Nonnull BrokerRequest brokerRequest) {
     _indexSegment = indexSegment;
     _aggregationInfos = brokerRequest.getAggregationsInfo();
     _projectionPlanNode = new ProjectionPlanNode(_indexSegment, getAggregationRelatedColumns(),
         new DocIdSetPlanNode(_indexSegment, brokerRequest));
-    for (AggregationInfo aggregationInfo : _aggregationInfos) {
-      AggregationFunctionUtils.ensureAggregationColumnsAreSingleValued(aggregationInfo, _indexSegment);
-    }
   }
 
+  @Nonnull
   private String[] getAggregationRelatedColumns() {
     Set<String> aggregationRelatedColumns = new HashSet<>();
     for (AggregationInfo aggregationInfo : _aggregationInfos) {
-      if (!aggregationInfo.getAggregationType().equalsIgnoreCase("count")) {
+      if (!aggregationInfo.getAggregationType()
+          .equalsIgnoreCase(AggregationFunctionFactory.COUNT_AGGREGATION_FUNCTION)) {
         String columns = aggregationInfo.getAggregationParams().get("column").trim();
         aggregationRelatedColumns.addAll(Arrays.asList(columns.split(",")));
       }
@@ -67,18 +68,10 @@ public class AggregationPlanNode implements PlanNode {
   @Override
   public Operator run() {
     MProjectionOperator projectionOperator = (MProjectionOperator) _projectionPlanNode.run();
-    int numAggFuncs = _aggregationInfos.size();
-    AggregationFunctionContext[] aggrFuncContextArray = new AggregationFunctionContext[numAggFuncs];
-    AggregationFunctionInitializer aggFuncInitializer = new AggregationFunctionInitializer(
-        _indexSegment.getSegmentMetadata());
-    for (int i = 0; i < numAggFuncs; i++) {
-      AggregationInfo aggregationInfo = _aggregationInfos.get(i);
-      aggrFuncContextArray[i] = AggregationFunctionContext.instantiate(aggregationInfo);
-      aggrFuncContextArray[i].getAggregationFunction().accept(aggFuncInitializer);
-    }
-
-    return new AggregationOperator(_aggregationInfos, new DefaultAggregationExecutor(aggrFuncContextArray),
-        projectionOperator, _indexSegment.getSegmentMetadata().getTotalRawDocs());
+    SegmentMetadata segmentMetadata = _indexSegment.getSegmentMetadata();
+    return new AggregationOperator(
+        AggregationFunctionUtils.getAggregationFunctionContexts(_aggregationInfos, segmentMetadata), projectionOperator,
+        segmentMetadata.getTotalRawDocs());
   }
 
   @Override

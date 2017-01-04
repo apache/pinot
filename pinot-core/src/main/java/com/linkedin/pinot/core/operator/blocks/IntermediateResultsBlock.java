@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.operator.blocks;
 
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.utils.DataTable;
@@ -28,232 +28,135 @@ import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Predicate;
+import com.linkedin.pinot.core.operator.aggregation.AggregationFunctionContext;
+import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.operator.aggregation.groupby.AggregationGroupByResult;
-import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
-import com.linkedin.pinot.core.query.aggregation.AggregationFunctionUtils;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 
 /**
- * A holder of InstanceResponse components. Easy to do merge.
- *
- *
+ * The <code>IntermediateResultsBlock</code> class is the holder of the server side inter-segment results.
  */
 public class IntermediateResultsBlock implements Block {
-  private List<AggregationFunction> _aggregationFunctionList;
-  private List<Serializable> _aggregationResultList;
+  private DataSchema _selectionDataSchema;
+  private Collection<Serializable[]> _selectionResult;
+  private AggregationFunctionContext[] _aggregationFunctionContexts;
+  private List<Serializable> _aggregationResult;
+  private AggregationGroupByResult _aggregationGroupByResult;
+  private List<Map<String, Serializable>> _combinedAggregationGroupByResult;
   private List<ProcessingException> _processingExceptions;
   private long _numDocsScanned;
   private long _numEntriesScannedInFilter;
   private long _numEntriesScannedPostFilter;
-  private long _totalRawDocs;
-  private List<Map<String, Serializable>> _aggregationGroupByOperatorResult;
-  private AggregationGroupByResult _aggregationGroupByResult;
-  private DataSchema _dataSchema;
-  private Collection<Serializable[]> _selectionResult;
+  private long _numTotalRawDocs;
 
-  public IntermediateResultsBlock(List<AggregationFunction> aggregationFunctionList,
-      List<Serializable> aggregationResult) {
-    _aggregationFunctionList = aggregationFunctionList;
-    _aggregationResultList = aggregationResult;
+  /**
+   * Constructor for selection result.
+   */
+  public IntermediateResultsBlock(@Nonnull DataSchema selectionDataSchema,
+      @Nonnull Collection<Serializable[]> selectionResult) {
+    _selectionDataSchema = selectionDataSchema;
+    _selectionResult = selectionResult;
   }
 
   /**
-   * Constructor for the class when group-by results are provided in a list of Maps containing
-   * group-by keys and aggregation values.
-   *
-   * @param aggregationFunctionList List of aggregation functions in the query
-   * @param aggregationGroupByResults Result of aggregation group-by.
-   * @param isGroupByResults
+   * Constructor for aggregation result.
+   * <p>For aggregation only, the result is a list of values.
+   * <p>For aggregation group-by, the result is a list of maps from group keys to aggregation values.
    */
-  public IntermediateResultsBlock(List<AggregationFunction> aggregationFunctionList,
-      List<Map<String, Serializable>> aggregationGroupByResults, boolean isGroupByResults) {
-    _aggregationFunctionList = aggregationFunctionList;
-    _aggregationGroupByOperatorResult = aggregationGroupByResults;
-    _aggregationGroupByResult = null;
+  @SuppressWarnings("unchecked")
+  public IntermediateResultsBlock(@Nonnull AggregationFunctionContext[] aggregationFunctionContexts,
+      @Nonnull List aggregationResult, boolean isGroupBy) {
+    _aggregationFunctionContexts = aggregationFunctionContexts;
+    if (isGroupBy) {
+      _combinedAggregationGroupByResult = aggregationResult;
+    } else {
+      _aggregationResult = aggregationResult;
+    }
   }
 
   /**
-   * Constructor of the class when group-by results are provided in {@link AggregationGroupByResult}
-   *
-   * @param aggregationFunctions List of aggregation functions in the query
-   * @param aggregationGroupByResults Result of aggregation group-by.
+   * Constructor for aggregation group-by result with {@link AggregationGroupByResult}.
    */
-  public IntermediateResultsBlock(List<AggregationFunction> aggregationFunctions,
-      AggregationGroupByResult aggregationGroupByResults) {
-    _aggregationFunctionList = aggregationFunctions;
+  public IntermediateResultsBlock(@Nonnull AggregationFunctionContext[] aggregationFunctionContexts,
+      @Nonnull AggregationGroupByResult aggregationGroupByResults) {
+    _aggregationFunctionContexts = aggregationFunctionContexts;
     _aggregationGroupByResult = aggregationGroupByResults;
-    _aggregationGroupByOperatorResult = null;
   }
 
-  public IntermediateResultsBlock(Exception e) {
-    this(QueryException.QUERY_EXECUTION_ERROR, e);
-  }
-
-  public IntermediateResultsBlock(ProcessingException processingException, Exception e) {
+  /**
+   * Constructor for exception block.
+   */
+  public IntermediateResultsBlock(@Nonnull ProcessingException processingException, @Nonnull Exception e) {
     _processingExceptions = new ArrayList<>();
     _processingExceptions.add(QueryException.getException(processingException, e));
   }
 
-  public IntermediateResultsBlock() {
-    // TODO Auto-generated constructor stub
+  /**
+   * Constructor for exception block.
+   */
+  public IntermediateResultsBlock(@Nonnull Exception e) {
+    this(QueryException.QUERY_EXECUTION_ERROR, e);
   }
 
-  @Override
-  public boolean applyPredicate(Predicate predicate) {
-    throw new UnsupportedOperationException();
+  @Nullable
+  public DataSchema getSelectionDataSchema() {
+    return _selectionDataSchema;
   }
 
-  @Override
-  public BlockId getId() {
-    throw new UnsupportedOperationException();
+  public void setSelectionDataSchema(@Nullable DataSchema dataSchema) {
+    _selectionDataSchema = dataSchema;
   }
 
-  @Override
-  public BlockValSet getBlockValueSet() {
-    throw new UnsupportedOperationException();
+  @Nullable
+  public Collection<Serializable[]> getSelectionResult() {
+    return _selectionResult;
   }
 
-  @Override
-  public BlockDocIdValueSet getBlockDocIdValueSet() {
-    throw new UnsupportedOperationException();
+  public void setSelectionResult(@Nullable Collection<Serializable[]> rowEventsSet) {
+    _selectionResult = rowEventsSet;
   }
 
-  @Override
-  public BlockDocIdSet getBlockDocIdSet() {
-    throw new UnsupportedOperationException();
+  @Nullable
+  public AggregationFunctionContext[] getAggregationFunctionContexts() {
+    return _aggregationFunctionContexts;
   }
 
-  @Override
-  public BlockMetadata getMetadata() {
-    throw new UnsupportedOperationException();
+  public void setAggregationFunctionContexts(AggregationFunctionContext[] aggregationFunctionContexts) {
+    _aggregationFunctionContexts = aggregationFunctionContexts;
   }
 
+  @Nullable
   public List<Serializable> getAggregationResult() {
-    return _aggregationResultList;
+    return _aggregationResult;
   }
 
-  public DataTable getDataTable() throws Exception {
-    if (_aggregationResultList != null) {
-      return getAggregationResultDataTable();
-    }
-
-    if (_aggregationGroupByOperatorResult != null) {
-      return getAggregationGroupByResultDataTable();
-    }
-    if (_selectionResult != null) {
-      return getSelectionResultDataTable();
-    }
-    if (_processingExceptions != null && _processingExceptions.size() > 0) {
-      return getExceptionsDataTable();
-    }
-    throw new UnsupportedOperationException("Cannot get DataTable from IntermediateResultBlock!");
+  public void setAggregationResults(@Nullable List<Serializable> aggregationResults) {
+    _aggregationResult = aggregationResults;
   }
 
-  public DataTable attachMetadataToDataTable(DataTable dataTable) {
-    dataTable.getMetadata().put(DataTable.NUM_DOCS_SCANNED_METADATA_KEY, String.valueOf(_numDocsScanned));
-    dataTable.getMetadata()
-        .put(DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY, String.valueOf(_numEntriesScannedInFilter));
-    dataTable.getMetadata()
-        .put(DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY, String.valueOf(_numEntriesScannedPostFilter));
-    dataTable.getMetadata().put(DataTable.TOTAL_DOCS_METADATA_KEY, String.valueOf(_totalRawDocs));
-    if (_processingExceptions != null && _processingExceptions.size() > 0) {
-      for (ProcessingException exception : _processingExceptions) {
-        dataTable.addException(exception);
-      }
-    }
-    return dataTable;
+  @Nullable
+  public AggregationGroupByResult getAggregationGroupByResult() {
+    return _aggregationGroupByResult;
   }
 
-  public DataTable getExceptionsDataTable() {
-    return attachMetadataToDataTable(new DataTable());
-  }
-
-  private DataTable getSelectionResultDataTable() throws Exception {
-    return attachMetadataToDataTable(SelectionOperatorUtils.getDataTableFromRows(_selectionResult, _dataSchema));
-  }
-
-  public DataTable getAggregationResultDataTable() throws Exception {
-    DataSchema schema = AggregationFunctionUtils.getAggregationResultsDataSchema(_aggregationFunctionList);
-    DataTableBuilder builder = new DataTableBuilder(schema);
-    builder.open();
-    builder.startRow();
-    for (int i = 0; i < _aggregationResultList.size(); ++i) {
-      switch (_aggregationFunctionList.get(i).aggregateResultDataType()) {
-        case LONG:
-          builder.setColumn(i, ((Number) _aggregationResultList.get(i)).longValue());
-          break;
-        case DOUBLE:
-          builder.setColumn(i, ((Double) _aggregationResultList.get(i)).doubleValue());
-          break;
-        case OBJECT:
-          builder.setColumn(i, _aggregationResultList.get(i));
-          break;
-        default:
-          throw new UnsupportedOperationException("Shouldn't reach here in getAggregationResultsList()");
-      }
-    }
-    builder.finishRow();
-    builder.seal();
-    return attachMetadataToDataTable(builder.build());
-  }
-
-  public void setAggregationResults(List<Serializable> aggregationResults) {
-    _aggregationResultList = aggregationResults;
-  }
-
-  public List<Map<String, Serializable>> getAggregationGroupByOperatorResult() {
-    return _aggregationGroupByOperatorResult;
-  }
-
-  public DataTable getAggregationGroupByResultDataTable() throws Exception {
-
-    String[] columnNames = new String[] { "functionName", "GroupByResultMap" };
-    DataType[] columnTypes = new DataType[] { DataType.STRING, DataType.OBJECT };
-    DataSchema dataSchema = new DataSchema(columnNames, columnTypes);
-
-    DataTableBuilder dataTableBuilder = new DataTableBuilder(dataSchema);
-    dataTableBuilder.open();
-    for (int i = 0; i < _aggregationGroupByOperatorResult.size(); ++i) {
-      dataTableBuilder.startRow();
-      dataTableBuilder.setColumn(0, _aggregationFunctionList.get(i).getFunctionName());
-      dataTableBuilder.setColumn(1, _aggregationGroupByOperatorResult.get(i));
-      dataTableBuilder.finishRow();
-    }
-    dataTableBuilder.seal();
-    return attachMetadataToDataTable(dataTableBuilder.build());
-  }
-
-  public List<ProcessingException> getExceptions() {
+  @Nullable
+  public List<ProcessingException> getProcessingExceptions() {
     return _processingExceptions;
   }
 
-  public long getNumDocsScanned() {
-    return _numDocsScanned;
-  }
-
-  public long getNumEntriesScannedInFilter() {
-    return _numEntriesScannedInFilter;
-  }
-
-  public long getNumEntriesScannedPostFilter() {
-    return _numEntriesScannedPostFilter;
-  }
-
-  public long getTotalRawDocs() {
-    return _totalRawDocs;
-  }
-
-  public void setExceptionsList(List<ProcessingException> processingExceptions) {
+  public void setProcessingExceptions(@Nullable List<ProcessingException> processingExceptions) {
     _processingExceptions = processingExceptions;
   }
 
-  public void addToExceptionsList(ProcessingException processingException) {
+  public void addToProcessingExceptions(@Nonnull ProcessingException processingException) {
     if (_processingExceptions == null) {
       _processingExceptions = new ArrayList<>();
     }
@@ -272,37 +175,150 @@ public class IntermediateResultsBlock implements Block {
     _numEntriesScannedPostFilter = numEntriesScannedPostFilter;
   }
 
-  public void setTotalRawDocs(long totalRawDocs) {
-    _totalRawDocs = totalRawDocs;
+  public void setNumTotalRawDocs(long numTotalRawDocs) {
+    _numTotalRawDocs = numTotalRawDocs;
   }
 
-  public void setAggregationFunctions(List<AggregationFunction> aggregationFunctions) {
-    _aggregationFunctionList = aggregationFunctions;
+  @Nonnull
+  public DataTable getDataTable()
+      throws Exception {
+    if (_selectionResult != null) {
+      return getSelectionResultDataTable();
+    }
+
+    if (_aggregationResult != null) {
+      return getAggregationResultDataTable();
+    }
+
+    if (_combinedAggregationGroupByResult != null) {
+      return getAggregationGroupByResultDataTable();
+    }
+
+    if (_processingExceptions != null && _processingExceptions.size() > 0) {
+      return getProcessingExceptionsDataTable();
+    }
+
+    throw new UnsupportedOperationException("No data inside IntermediateResultsBlock.");
   }
 
-  public void setSelectionDataSchema(DataSchema dataSchema) {
-    _dataSchema = dataSchema;
-
+  @Nonnull
+  private DataTable getSelectionResultDataTable()
+      throws Exception {
+    return attachMetadataToDataTable(
+        SelectionOperatorUtils.getDataTableFromRows(_selectionResult, _selectionDataSchema));
   }
 
-  public void setSelectionResult(Collection<Serializable[]> rowEventsSet) {
-    _selectionResult = rowEventsSet;
+  @Nonnull
+  private DataTable getAggregationResultDataTable()
+      throws Exception {
+    // Extract each aggregation column name and type from aggregation function context.
+    int numAggregationFunctions = _aggregationFunctionContexts.length;
+    String[] columnNames = new String[numAggregationFunctions];
+    FieldSpec.DataType[] columnTypes = new FieldSpec.DataType[numAggregationFunctions];
+    for (int i = 0; i < numAggregationFunctions; i++) {
+      AggregationFunctionContext aggregationFunctionContext = _aggregationFunctionContexts[i];
+      AggregationFunction aggregationFunction = aggregationFunctionContext.getAggregationFunction();
+      columnNames[i] = aggregationFunction.getColumnName(aggregationFunctionContext.getAggregationColumns());
+      columnTypes[i] = aggregationFunction.getIntermediateResultDataType();
+    }
+
+    // Build the data table.
+    DataTableBuilder dataTableBuilder = new DataTableBuilder(new DataSchema(columnNames, columnTypes));
+    dataTableBuilder.open();
+    dataTableBuilder.startRow();
+    for (int i = 0; i < numAggregationFunctions; i++) {
+      switch (columnTypes[i]) {
+        case LONG:
+          dataTableBuilder.setColumn(i, ((Number) _aggregationResult.get(i)).longValue());
+          break;
+        case DOUBLE:
+          dataTableBuilder.setColumn(i, ((Double) _aggregationResult.get(i)).doubleValue());
+          break;
+        case OBJECT:
+          dataTableBuilder.setColumn(i, _aggregationResult.get(i));
+          break;
+        default:
+          throw new UnsupportedOperationException(
+              "Unsupported aggregation column data type: " + columnTypes[i] + " for column: " + columnNames[i]);
+      }
+    }
+    dataTableBuilder.finishRow();
+    dataTableBuilder.seal();
+    DataTable dataTable = dataTableBuilder.build();
+
+    return attachMetadataToDataTable(dataTable);
   }
 
-  public DataSchema getSelectionDataSchema() {
-    return _dataSchema;
+  @Nonnull
+  private DataTable getAggregationGroupByResultDataTable()
+      throws Exception {
+    String[] columnNames = new String[]{"functionName", "GroupByResultMap"};
+    FieldSpec.DataType[] columnTypes = new FieldSpec.DataType[]{FieldSpec.DataType.STRING, FieldSpec.DataType.OBJECT};
+
+    // Build the data table.
+    DataTableBuilder dataTableBuilder = new DataTableBuilder(new DataSchema(columnNames, columnTypes));
+    dataTableBuilder.open();
+    int numAggregationFunctions = _aggregationFunctionContexts.length;
+    for (int i = 0; i < numAggregationFunctions; i++) {
+      dataTableBuilder.startRow();
+      AggregationFunctionContext aggregationFunctionContext = _aggregationFunctionContexts[i];
+      dataTableBuilder.setColumn(0, aggregationFunctionContext.getAggregationFunction()
+          .getColumnName(aggregationFunctionContext.getAggregationColumns()));
+      dataTableBuilder.setColumn(1, _combinedAggregationGroupByResult.get(i));
+      dataTableBuilder.finishRow();
+    }
+    dataTableBuilder.seal();
+    DataTable dataTable = dataTableBuilder.build();
+
+    return attachMetadataToDataTable(dataTable);
   }
 
-  public Collection<Serializable[]> getSelectionResult() {
-    return _selectionResult;
+  private DataTable getProcessingExceptionsDataTable() {
+    return attachMetadataToDataTable(new DataTable());
   }
 
-  public void setAggregationGroupByResult(List<Map<String, Serializable>> combineAggregationGroupByResults1) {
-    _aggregationGroupByOperatorResult = combineAggregationGroupByResults1;
-
+  private DataTable attachMetadataToDataTable(DataTable dataTable) {
+    dataTable.getMetadata().put(DataTable.NUM_DOCS_SCANNED_METADATA_KEY, String.valueOf(_numDocsScanned));
+    dataTable.getMetadata()
+        .put(DataTable.NUM_ENTRIES_SCANNED_IN_FILTER_METADATA_KEY, String.valueOf(_numEntriesScannedInFilter));
+    dataTable.getMetadata()
+        .put(DataTable.NUM_ENTRIES_SCANNED_POST_FILTER_METADATA_KEY, String.valueOf(_numEntriesScannedPostFilter));
+    dataTable.getMetadata().put(DataTable.TOTAL_DOCS_METADATA_KEY, String.valueOf(_numTotalRawDocs));
+    if (_processingExceptions != null && _processingExceptions.size() > 0) {
+      for (ProcessingException exception : _processingExceptions) {
+        dataTable.addException(exception);
+      }
+    }
+    return dataTable;
   }
 
-  public AggregationGroupByResult getAggregationGroupByResult() {
-    return _aggregationGroupByResult;
+  @Override
+  public BlockId getId() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public boolean applyPredicate(Predicate predicate) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public BlockDocIdSet getBlockDocIdSet() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public BlockValSet getBlockValueSet() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public BlockDocIdValueSet getBlockDocIdValueSet() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public BlockMetadata getMetadata() {
+    throw new UnsupportedOperationException();
   }
 }

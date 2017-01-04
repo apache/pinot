@@ -15,59 +15,38 @@
  */
 package com.linkedin.pinot.core.query.aggregation;
 
-import java.util.List;
-
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
-import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.core.operator.aggregation.AggregationFunctionContext;
+import com.linkedin.pinot.core.plan.AggregationFunctionInitializer;
+import java.util.List;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 
 /**
- *
+ * The <code>AggregationFunctionUtils</code> class provides utility methods for aggregation function.
  */
 public class AggregationFunctionUtils {
-  public static DataSchema getAggregationResultsDataSchema(List<AggregationFunction> aggregationFunctionList)
-      throws Exception {
-    final String[] columnNames = new String[aggregationFunctionList.size()];
-    final DataType[] columnTypes = new DataType[aggregationFunctionList.size()];
-    for (int i = 0; i < aggregationFunctionList.size(); ++i) {
-      columnNames[i] = aggregationFunctionList.get(i).getFunctionName();
-      columnTypes[i] = aggregationFunctionList.get(i).aggregateResultDataType();
-    }
-    return new DataSchema(columnNames, columnTypes);
+  private AggregationFunctionUtils() {
   }
 
-  public static boolean isAggregationFunctionWithDictionary(AggregationInfo aggregationInfo, IndexSegment indexSegment) {
-    boolean hasDictionary = true;
-    if (!aggregationInfo.getAggregationType().equalsIgnoreCase("count")) {
-      String[] columns = aggregationInfo.getAggregationParams().get("column").trim().split(",");
-      for (String column : columns) {
-        if (indexSegment instanceof IndexSegmentImpl) {
-          if (!indexSegment.getSegmentMetadata().hasDictionary(column)) {
-            hasDictionary = false;
-          }
-        } else if (indexSegment instanceof RealtimeSegmentImpl) {
-          if (!((RealtimeSegmentImpl) indexSegment).hasDictionary(column)) {
-            hasDictionary = false;
-          }
-        }
+  @Nonnull
+  public static AggregationFunctionContext[] getAggregationFunctionContexts(
+      @Nonnull List<AggregationInfo> aggregationInfos, @Nullable SegmentMetadata segmentMetadata) {
+    int numAggregationFunctions = aggregationInfos.size();
+    AggregationFunctionContext[] aggregationFunctionContexts = new AggregationFunctionContext[numAggregationFunctions];
+    for (int i = 0; i < numAggregationFunctions; i++) {
+      AggregationInfo aggregationInfo = aggregationInfos.get(i);
+      aggregationFunctionContexts[i] = AggregationFunctionContext.instantiate(aggregationInfo);
+    }
+    if (segmentMetadata != null) {
+      AggregationFunctionInitializer aggregationFunctionInitializer =
+          new AggregationFunctionInitializer(segmentMetadata);
+      for (AggregationFunctionContext aggregationFunctionContext : aggregationFunctionContexts) {
+        aggregationFunctionContext.getAggregationFunction().accept(aggregationFunctionInitializer);
       }
     }
-    return hasDictionary;
-  }
-
-  public static void ensureAggregationColumnsAreSingleValued(AggregationInfo aggregationInfo, IndexSegment indexSegment) {
-    // Only check fasthll for single valued column.
-    if (aggregationInfo.getAggregationType().equalsIgnoreCase("fasthll")) {
-      String[] columns = aggregationInfo.getAggregationParams().get("column").trim().split(",");
-      for (String column : columns) {
-        if (!indexSegment.getDataSource(column).getDataSourceMetadata().isSingleValue()) {
-          throw new RuntimeException("Unsupported aggregation on multi value column: " + column);
-        }
-      }
-    }
+    return aggregationFunctionContexts;
   }
 }
