@@ -36,7 +36,7 @@
       {{#each this.subDimensionContributionDetails.cumulativePercentageChange as
       |cumulativePercentageChangeArr cKeyIndex|}}
       <tr>
-        <td>{{cKeyIndex}}</td>
+        <td><div style="overflow:auto">{{cKeyIndex}}</div></td>
         {{#each cumulativePercentageChangeArr as |cPercentageChange cidx|}}
         <td style="background-color: {{computeColor cPercentageChange}};color: {{computeTextColor cPercentageChange}};">
           <div class="row">
@@ -49,8 +49,10 @@
               {{lookup (lookup @root.subDimensionContributionDetails.cumulativeBaselineValues
               cKeyIndex) cidx}}
             </div>
-            {{/if}}
             <div class="col-md-4">
+            {{else}}
+            <div class="col-md-12">
+            {{/if}}
               <a id="{{lookup @root.subDimensionsIndex cKeyIndex}}-{{cidx}}"
                  style="color:{{computeTextColor cPercentageChange}}">
                 {{cPercentageChange}}%
@@ -68,7 +70,7 @@
       {{#each this.subDimensionContributionDetails.percentageChange as |percentageChangeArr
       keyIndex|}}
       <tr>
-        <td>{{keyIndex}}</td>
+        <td><div style="overflow:auto">{{keyIndex}}</div></td>
         {{#each percentageChangeArr as |percentageChange idx|}}
         <td style="background-color: {{computeColor percentageChange}};color: {{computeTextColor percentageChange}};">
           <div class="row">
@@ -79,8 +81,10 @@
             <div class="col-md-4">
               {{lookup (lookup @root.subDimensionContributionDetails.baselineValues keyIndex) idx}}
             </div>
-            {{/if}}
             <div class="col-md-4">
+            {{else}}
+            <div class="col-md-12">
+            {{/if}}
               <a id="{{lookup @root.subDimensionsIndex keyIndex}}-{{idx}}"
                  style="color:{{computeTextColor percentageChange}}">
                 {{percentageChange}}%
