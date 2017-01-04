@@ -51,7 +51,8 @@
             </div>
             {{/if}}
             <div class="col-md-4">
-              <a id="{{lookup @root.subDimensionsIndex cKeyIndex}}-{{cidx}}">
+              <a id="{{lookup @root.subDimensionsIndex cKeyIndex}}-{{cidx}}"
+                 style="color:{{computeTextColor cPercentageChange}}">
                 {{cPercentageChange}}%
               </a>
             </div>
@@ -80,7 +81,8 @@
             </div>
             {{/if}}
             <div class="col-md-4">
-              <a id="{{lookup @root.subDimensionsIndex keyIndex}}-{{idx}}">
+              <a id="{{lookup @root.subDimensionsIndex keyIndex}}-{{idx}}"
+                 style="color:{{computeTextColor percentageChange}}">
                 {{percentageChange}}%
               </a>
             </div>
