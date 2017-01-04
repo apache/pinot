@@ -3,14 +3,14 @@
     <table class="table table-bordered analysis-table">
       <thead>
       <tr>
-        <th></th>
+        <th style="width: 10%;"></th>
         {{#each this.subDimensionContributionDetails.timeBucketsCurrent as |timestamp timeIndex|}}
         <th>{{displayMonthDayHour timestamp}}</th>
         {{/each}}
       </tr>
       </thead>
-      <tbody>
 
+      <tbody>
       {{#if this.showDetailsChecked}}
       <tr>
         <td></td>

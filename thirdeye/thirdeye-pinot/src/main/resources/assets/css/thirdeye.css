@@ -208,7 +208,6 @@ hr {
     width: 100%;
     height: 20%;
 }
-}
 .dashboard-table>thead>tr>th {
     border-top: none;
 }
@@ -259,6 +258,10 @@ hr {
     font-size: 11px;
 }
 /* analysis table css*/
+
+.analysis-table {
+    table-layout: fixed;
+}
 
 .analysis-table>thead>tr>th,
 .analysis-table>tbody>tr>th,
