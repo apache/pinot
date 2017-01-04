@@ -92,7 +92,6 @@ TimeSeriesCompareView.prototype = {
     $('#show-details').change(function () {
       self.timeSeriesCompareModel.showDetailsChecked = !self.timeSeriesCompareModel.showDetailsChecked;
       self.renderPercentageChangeSection();
-      console.log(self.timeSeriesCompareModel.showDetailsChecked);
     });
     $('#show-cumulative').change(function () {
       self.timeSeriesCompareModel.showCumulativeChecked = !self.timeSeriesCompareModel.showCumulativeChecked;

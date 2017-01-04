@@ -23,7 +23,10 @@ TimeSeriesCompareController.prototype = {
     console.log(HASH_SERVICE.getParams());
 
     // update hash params as per parameters set in the view
-    HASH_SERVICE.update(viewObject.viewParams);
+    // Disable to prevent the page is scrolled to the top
+    // We should enable the service once we decide how to use hash service in RCA tab
+    // HASH_SERVICE.update(viewObject.viewParams);
+
     this.dimensionTreeMapController.handleAppEvent(HASH_SERVICE.getParams());
   }
 };
