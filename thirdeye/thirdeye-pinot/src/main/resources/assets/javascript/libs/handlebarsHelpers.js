@@ -13,6 +13,14 @@ Handlebars.registerHelper('formatPercent', function (percentValue) {
     return "" + percentValue.toFixed(1) + "%";
   }
 });
+
+Handlebars.registerHelper('formatDouble', function (doubleValue) {
+  if(doubleValue >= 0){
+    return "" + doubleValue.toFixed(1);
+  } else {
+    return "" + doubleValue.toFixed(1);
+  }
+});
 Handlebars.registerHelper('formatDelta', function (a, b) {
   delta = a - b;
   if(delta >= 0){

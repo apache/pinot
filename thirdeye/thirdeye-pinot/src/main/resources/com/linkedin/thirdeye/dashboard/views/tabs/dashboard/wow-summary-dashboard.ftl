@@ -10,13 +10,13 @@
 						</tr>
 					</thead>
 					<tbody>
-						{{#each wowSummaryList as |wowSummary metricIndex|}}
+						{{#each wowSummary.metricAliasToMetricSummariesMap as |metricSummariesList metricAlias|}}
 						<tr class="bg-white">
-							<td class="col-md-4"><a href="#"><span class="dashboard-metric-label">{{wowSummary.metricName}}</span></a></td>
-							{{#each wowSummary.data as |info index|}}
-							<td class="col-md-2" style="background-color:{{computeColor info.percentChange}};">
-							  <span class="label wow-summary-content" style="color:{{computeTextColor info.percentChange}}">{{info.current}}</span>
-							  <span class="label wow-summary-content" style="color:{{computeTextColor info.percentChange}}">({{info.percentChange}}%)</span>
+							<td class="col-md-4"><a href="#"><span class="dashboard-metric-label">{{getMetricNameFromAlias metricAlias}}</span></a></td>
+							{{#each metricSummariesList as |metricSummary index|}}
+							<td class="col-md-2" style="background-color:{{computeColor metricSummary.wowPercentageChange}};">
+							  <span class="label wow-summary-content" style="color:{{computeTextColor metricSummary.wowPercentageChange}}">{{formatDouble metricSummary.currentValue}}</span>
+							  <span class="label wow-summary-content" style="color:{{computeTextColor metricSummary.wowPercentageChange}}">({{formatPercent metricSummary.wowPercentageChange}})</span>
 							</td> 
 							{{/each}}
 						</tr>

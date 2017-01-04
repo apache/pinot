@@ -1,20 +1,46 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
+import java.net.URLDecoder;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+
+import javax.ws.rs.GET;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.MediaType;
+
+import org.apache.commons.lang3.StringUtils;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeRange;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.MetricExpression;
+import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.cache.MetricDataset;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomaliesSummary;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.MetricSummary;
+import com.linkedin.thirdeye.dashboard.resources.v2.pojo.WowSummary;
 import com.linkedin.thirdeye.dashboard.views.GenericResponse;
 import com.linkedin.thirdeye.dashboard.views.heatmap.HeatMapViewHandler;
 import com.linkedin.thirdeye.dashboard.views.heatmap.HeatMapViewRequest;
@@ -29,36 +55,6 @@ import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
-
-import java.net.URLDecoder;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-
-import javax.ws.rs.DefaultValue;
-import javax.ws.rs.GET;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
-import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.core.MediaType;
-
-import jersey.repackaged.com.google.common.collect.Lists;
-
-import org.apache.commons.lang3.StringUtils;
-import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import static com.linkedin.thirdeye.client.ResponseParserUtils.CACHE_REGISTRY_INSTANCE;
 
 /**
  * Do's and Dont's
@@ -78,6 +74,7 @@ public class DataResource {
   private static final Logger LOG = LoggerFactory.getLogger(DataResource.class);
   private static final DAORegistry daoRegistry = DAORegistry.getInstance();
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
 
   private final MetricConfigManager metricConfigDAO;
   private final DatasetConfigManager datasetConfigDAO;
@@ -329,9 +326,9 @@ public class DataResource {
       // we need to store user's start and end time in DateTime objects with data's timezone
       // in order to ensure that the conversion to SimpleDateFormat is always correct regardless
       // user and server's timezone, including daylight saving time.
-      long currentEnd = Utils.getMaxDataTimeForDataset(dataset);
       String[] tokens = timeRange.split("_");
       TimeGranularity timeGranularity = new TimeGranularity(Integer.valueOf(tokens[0]), TimeUnit.valueOf(tokens[1]));
+      long currentEnd = Utils.getMaxDataTimeForDataset(dataset);
       long currentStart = currentEnd - TimeUnit.MILLISECONDS.convert(Long.valueOf(tokens[0]), TimeUnit.valueOf(tokens[1]));
 
       DateTimeZone timeZoneForCollection = Utils.getDataTimeZone(dataset);
@@ -414,13 +411,13 @@ public class DataResource {
 
   @GET
   @Path("dashboard/wowsummary")
-  public Multimap<String, MetricSummary> getWowSummary(
+  public WowSummary getWowSummary(
       @QueryParam("dashboard") String dashboard,
       @QueryParam("timeRanges") String timeRanges) {
-    Multimap<String, MetricSummary> metricAliasToMetricSummariesMap = ArrayListMultimap.create();
+    WowSummary wowSummary = new WowSummary();
 
     if (StringUtils.isBlank(dashboard)) {
-      return metricAliasToMetricSummariesMap;
+      return wowSummary;
     }
 
     List<Long> metricIds = getMetricIdsByDashboard(dashboard);
@@ -437,6 +434,7 @@ public class DataResource {
       datasetToMetricExpressions.put(metricConfig.getDataset(), ThirdEyeUtils.getMetricExpressionFromMetricConfig(metricConfig));
     }
 
+    Multimap<String, MetricSummary> metricAliasToMetricSummariesMap = ArrayListMultimap.create();
     // Create query request for each collection
     for (String dataset : datasetToMetrics.keySet()) {
       TabularViewRequest request = new TabularViewRequest();
@@ -452,15 +450,12 @@ public class DataResource {
       // user and server's timezone, including daylight saving time.
       for (String timeRangeLabel :  timeRangeLabels) {
 
-        // TODO:
-        TimeRange timeRange = getTimeRangeFromLabel(dataset, timeRangeLabel);
+        DateTimeZone timeZoneForCollection = Utils.getDataTimeZone(dataset);
+        TimeRange timeRange = getTimeRangeFromLabel(dataset, timeZoneForCollection, timeRangeLabel);
         long currentEnd = timeRange.getEnd();
         long currentStart = timeRange.getStart();
-
-        // TODO:
-        TimeGranularity timeGranularity = getTimeGranularityFromLabel(dataset, timeRangeLabel);
-
-        DateTimeZone timeZoneForCollection = Utils.getDataTimeZone(dataset);
+        System.out.println(timeRangeLabel + "Current start end " + new DateTime(currentStart) + " " + new DateTime(currentEnd));
+        TimeGranularity timeGranularity = new TimeGranularity(1, TimeUnit.HOURS);
         request.setBaselineStart(new DateTime(currentStart, timeZoneForCollection).minusDays(7));
         request.setBaselineEnd(new DateTime(currentEnd, timeZoneForCollection).minusDays(7));
         request.setCurrentStart(new DateTime(currentStart, timeZoneForCollection));
@@ -482,12 +477,16 @@ public class DataResource {
             metricSummary.setMetricName(metricConfig.getName());
             metricSummary.setMetricAlias(metricAlias);
 
-            String[] responseData = response.getResponseData().get(0);
-            double baselineValue = Double.valueOf(responseData[0]);
-            double curentvalue = Double.valueOf(responseData[1]);
-            double percentageChange = (curentvalue - baselineValue) * 100 / baselineValue;
+            List<String[]> data = response.getResponseData();
+            double baselineValue = 0;
+            double currentValue = 0;
+            for (String[] responseData : data) {
+              baselineValue = baselineValue + Double.valueOf(responseData[0]);
+              currentValue = currentValue + Double.valueOf(responseData[1]);
+            }
+            double percentageChange = (currentValue - baselineValue) * 100 / baselineValue;
             metricSummary.setBaselineValue(baselineValue);
-            metricSummary.setCurrentValue(curentvalue);
+            metricSummary.setCurrentValue(currentValue);
             metricSummary.setWowPercentageChange(percentageChange);
             metricAliasToMetricSummariesMap.put(metricAlias, metricSummary);
           }
@@ -496,10 +495,19 @@ public class DataResource {
         }
       }
     }
-    return metricAliasToMetricSummariesMap;
+    wowSummary.setMetricAliasToMetricSummariesMap(metricAliasToMetricSummariesMap);
+    return wowSummary;
   }
 
-  private TimeRange getTimeRangeFromLabel(String dataset, String label) {
+
+  /**
+   *  convert label from WowSummaryModel to a TimeRange
+   * @param dataset
+   * @param timeZoneForCollection
+   * @param label
+   * @return
+   */
+  private TimeRange getTimeRangeFromLabel(String dataset, DateTimeZone timeZoneForCollection, String label) {
     long start = 0;
     long end = 0;
     long datasetMaxTime = Utils.getMaxDataTimeForDataset(dataset);
@@ -509,10 +517,16 @@ public class DataResource {
         start = end - TimeUnit.MILLISECONDS.convert(1, TimeUnit.HOURS);
         break;
       case "Today":
+        end = System.currentTimeMillis();
+        start = new DateTime().withTimeAtStartOfDay().getMillis();
         break;
       case "Yesterday":
+        end = new DateTime().withTimeAtStartOfDay().getMillis();
+        start = end - TimeUnit.MILLISECONDS.convert(1, TimeUnit.DAYS);
         break;
       case "Last 7 Days":
+        end = System.currentTimeMillis();
+        start = new DateTime(end).minusDays(6).withTimeAtStartOfDay().getMillis();
         break;
       default:
     }
@@ -520,7 +534,5 @@ public class DataResource {
     return timeRange;
   }
 
-  private TimeGranularity getTimeGranularityFromLabel(String dataset, String label) {
-    return null;
-  }
+
 }

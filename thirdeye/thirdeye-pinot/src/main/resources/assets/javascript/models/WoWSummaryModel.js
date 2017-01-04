@@ -4,7 +4,7 @@ function WoWSummaryModel() {
   this.previousDashboardName = null;
 
   this.timeRangeLabels = [ "Most Recent Hour", "Today", "Yesterday", "Last 7 Days" ];
-  this.wowSummaryList = [];
+  this.wowSummary = null;
 
   this.renderViewEvent = new Event();
 }
@@ -29,16 +29,16 @@ WoWSummaryModel.prototype = {
   rebuild : function() {
     if (this.dashboardName != null) {
       if (this.previousDashboardName != this.dashboardName) {
-        this.buildSampleData();
+        dataService.fetchWowSummary(this.dashboardName, this.timeRangeLabels, this.updateModelAndNotifyView.bind(this));
       } else {
-        this.updateModelAndNotifyView(this.wowSummaryList)
+        this.updateModelAndNotifyView(this.wowSummary)
       }
     }
   },
-  updateModelAndNotifyView : function(wowSummaryList) {
+  updateModelAndNotifyView : function(wowSummary) {
     console.log('Results');
-    console.log(wowSummaryList);
-    this.wowSummaryList = wowSummaryList;
+    console.log(wowSummary);
+    this.wowSummary = wowSummary;
     this.renderViewEvent.notify();
   },
   buildSampleData : function() {
