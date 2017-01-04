@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.dashboard.resources.v2;
 
 import com.google.common.base.Strings;
 import com.google.common.cache.LoadingCache;
+import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
@@ -26,6 +27,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -34,6 +36,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.kafka.common.utils.Time;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
@@ -60,7 +63,10 @@ public class TimeSeriesResource {
       @PathParam("metricId") long metricId, @PathParam("currentStart") long currentStart,
       @PathParam("currentEnd") long currentEnd, @PathParam("baselineStart") long baselineStart,
       @PathParam("baselineEnd") long baselineEnd, @QueryParam("dimension") String dimension,
-      @QueryParam("filters") String filters, @QueryParam("granularity") String granularity) {
+      @QueryParam("filters") String filters, @QueryParam("granularity") String granularity,
+      // Auto Resize tries to limit the number of data points to 20
+      @DefaultValue("false")@QueryParam("limitDataPointNum") boolean limitDataPointNum,
+      @DefaultValue("20")@QueryParam("dataPointNum") int dataPointNum) {
 
     try {
       if (Strings.isNullOrEmpty(dimension)) {
@@ -89,6 +95,10 @@ public class TimeSeriesResource {
 
       if (StringUtils.isEmpty(granularity)) {
         granularity = "DAYS";
+      }
+
+      if (limitDataPointNum) {
+        granularity = Utils.resizeTimeGranularity(analysisDuration, granularity, dataPointNum);
       }
 
       if (dimension.equalsIgnoreCase(ALL)) {
