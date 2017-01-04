@@ -52,11 +52,11 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.google.common.base.Joiner;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
-import com.linkedin.pinot.common.utils.SegmentNameBuilder;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
@@ -218,8 +218,9 @@ public class SegmentCreationPhaseMapReduceJob {
         segmentName = segmentName.split(ThirdEyeConstants.AVRO_SUFFIX)[0];
         segmentGeneratorConfig.setSegmentName(segmentName);
       } else {
-        segmentGeneratorConfig.setSegmentName(SegmentNameBuilder
-            .buildBasic(tableName + ThirdEyeConstants.SEGMENT_JOINER + segmentSchedule, minTime, maxTime, seqId));
+        String segmentName =
+            Joiner.on(ThirdEyeConstants.SEGMENT_JOINER).join(tableName, segmentSchedule, minTime, maxTime, seqId);
+        segmentGeneratorConfig.setSegmentName(segmentName);
       }
       LOGGER.info("Setting segment name {}", segmentGeneratorConfig.getSegmentName());
 
@@ -323,5 +324,6 @@ public class SegmentCreationPhaseMapReduceJob {
 
       return timeColumnStatisticsCollector;
     }
+
   }
 }
