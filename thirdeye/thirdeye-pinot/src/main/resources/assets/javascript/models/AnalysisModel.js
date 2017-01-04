@@ -19,8 +19,6 @@ AnalysisModel.prototype = {
   },
 
   update: function (params) {
-    console.log("Logging hash params");
-    console.log(params);
     if (params.metricId) {
       this.metricId = params.metricId;
     }

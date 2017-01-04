@@ -1,7 +1,7 @@
 function DimensionTreeMapModel() {
   this.metricId;
   this.metricName;
-  this.heatmapFilters = {};
+  this.heatmapFilters;
   this.currentStart;
   this.currentEnd;
   this.baselineStart;
@@ -73,6 +73,8 @@ DimensionTreeMapModel.prototype = {
       }
       if (params.heatmapFilters) {
         this.heatmapFilters = params.heatmapFilters;
+      } else if (params.filters) {
+        this.heatmapFilters = params.filters;
       }
     }
   },

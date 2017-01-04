@@ -16,6 +16,7 @@ function TimeSeriesCompareModel() {
   this.showCumulativeChecked = false;
 
   this.subDimensions;
+  this.subDimensionsIndex = {};
   this.subDimensionContributionDetails;
   this.timeBucketDiff;
 }
@@ -78,6 +79,7 @@ TimeSeriesCompareModel.prototype = {
           this.subDimensionContributionDetails.timeBucketsCurrent = timeSeriesResponse.timeBucketsCurrent;
           this.subDimensionContributionDetails.timeBucketsBaseline = timeSeriesResponse.timeBucketsBaseline;
 
+          var count = 0;
           for (var key in timeSeriesResponse.subDimensionContributionMap) {
             var currentVal = ['current'];
             var baselineVal = ['baseline'];
@@ -89,6 +91,7 @@ TimeSeriesCompareModel.prototype = {
               }
             }
             this.subDimensions.push(key);
+            this.subDimensionsIndex[key] = count++;
             this.subDimensionContributionDetails.contributionMap[key] = {
               start: moment(timeSeriesResponse.start).format('YYYY-M-D'),
               end: moment(timeSeriesResponse.end).format('YYYY-M-D'),

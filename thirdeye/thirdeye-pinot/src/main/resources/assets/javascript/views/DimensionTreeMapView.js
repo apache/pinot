@@ -115,6 +115,9 @@ DimensionTreeMapView.prototype = {
       }).attr("height", function(d) {
         return d.dy - 1
       }).style("fill", function(d) {
+        console.log("logging data in heatmap ====>");
+        console.log(d);
+        // TODO: fix background color
         return '#EC9F98'
       });
 

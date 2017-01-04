@@ -106,10 +106,10 @@ TimeSeriesCompareView.prototype = {
     for (var i in self.timeSeriesCompareModel.subDimensions) {
       for (var j in
           self.timeSeriesCompareModel.subDimensionContributionDetails.timeBucketsCurrent) {
-        var tableCellId = self.timeSeriesCompareModel.subDimensions[i] + "-href-" + j;
+        var tableCellId = i + "-" + j;
         $("#" + tableCellId).click(function (e) {
-          var subDimensionBucketIndexArr = e.target.attributes[0].value.split("-href-");
-          var subDimension = subDimensionBucketIndexArr[0];
+          var subDimensionBucketIndexArr = e.target.attributes[0].value.split("-");
+          var subDimension = self.timeSeriesCompareModel.subDimensions[subDimensionBucketIndexArr[0]];
           var bucketIndex = subDimensionBucketIndexArr[1];
           self.collectAndUpdateViewParamsForHeatMapRendering(subDimension, bucketIndex);
           self.heatmapRenderEvent.notify();
@@ -150,8 +150,8 @@ TimeSeriesCompareView.prototype = {
 
     // TODO: set selected dimension in filters
     var heatmapFilters = self.timeSeriesCompareModel.filters;
-    if (!(self.timeSeriesCompareModel.dimension.toUpperCase() === 'ALL')) {
-      heatmapFilters[self.timeSeriesCompareModel.dimension] = subDimension;
+    if (!(subDimension.toUpperCase() === 'ALL')) {
+      heatmapFilters[self.timeSeriesCompareModel.dimension] = [subDimension];
     }
 
     this.viewParams = {
