@@ -15,6 +15,22 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl;
 
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.mutable.MutableLong;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.google.common.collect.HashBiMap;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
@@ -47,22 +63,6 @@ import com.linkedin.pinot.core.startree.StarTreeSerDe;
 import com.linkedin.pinot.core.startree.hll.HllConfig;
 import com.linkedin.pinot.core.startree.hll.HllUtil;
 import com.linkedin.pinot.core.util.CrcUtils;
-import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.mutable.MutableLong;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Implementation of an index segment creator.
@@ -420,8 +420,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       if (timeColumn != null && timeColumn.length() > 0) {
         final Object minTimeValue = statsCollector.getColumnProfileFor(timeColumn).getMinValue();
         final Object maxTimeValue = statsCollector.getColumnProfileFor(timeColumn).getMaxValue();
-        segmentName = SegmentNameBuilder.buildBasic(config.getTableName(), minTimeValue, maxTimeValue,
-            config.getSegmentNamePostfix());
+        segmentName = SegmentNameBuilder
+            .buildBasic(config.getTableName(), minTimeValue, maxTimeValue, config.getSegmentNamePostfix());
       } else {
         segmentName = SegmentNameBuilder.buildBasic(config.getTableName(), config.getSegmentNamePostfix());
       }

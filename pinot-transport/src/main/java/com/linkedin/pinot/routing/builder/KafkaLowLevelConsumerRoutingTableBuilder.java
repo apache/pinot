@@ -16,11 +16,6 @@
 
 package com.linkedin.pinot.routing.builder;
 
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.LLCSegmentName;
-import com.linkedin.pinot.common.utils.SegmentName;
-import com.linkedin.pinot.common.utils.SegmentNameBuilder;
-import com.linkedin.pinot.routing.ServerToSegmentSetMap;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -39,6 +34,10 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.LLCSegmentName;
+import com.linkedin.pinot.common.utils.SegmentName;
+import com.linkedin.pinot.routing.ServerToSegmentSetMap;
 
 
 /**
@@ -105,7 +104,7 @@ public class KafkaLowLevelConsumerRoutingTableBuilder implements RoutingTableBui
     Map<String, SortedSet<SegmentName>> sortedSegmentsByKafkaPartition = new HashMap<String, SortedSet<SegmentName>>();
     for (String helixPartitionName : externalView.getPartitionSet()) {
       // Ignore segments that are not low level consumer segments
-      if (!SegmentNameBuilder.Realtime.isRealtimeV2Name(helixPartitionName)) {
+      if (!SegmentName.isLowLevelConsumerSegmentName(helixPartitionName)) {
         continue;
       }
 
