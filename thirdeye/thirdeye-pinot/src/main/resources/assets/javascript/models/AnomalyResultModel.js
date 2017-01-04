@@ -12,7 +12,7 @@ function AnomalyResultModel() {
   this.anomalyStatusResolved = true;
   this.anomalyStatusUnresolved = true;
 
-  this.anomalies = [];
+  this.anomaliesWrapper = null;
 
   this.anomalyForFeedbackUpdate = null;
 
@@ -64,8 +64,8 @@ AnomalyResultModel.prototype = {
       if (params['feedback'] != undefined) {
         console.log("feedback");
         var idx = params['idx'];
-        this.anomalies[idx].anomalyFeedback = params['feedback'];
-        this.anomalyForFeedbackUpdate = this.anomalies[idx];
+        this.anomaliesWrapper.anomalyDetailsList[idx].anomalyFeedback = params['feedback'];
+        this.anomalyForFeedbackUpdate = this.anomaliesWrapper.anomalyDetailsList[idx];
       }
     }
   },
@@ -84,8 +84,8 @@ AnomalyResultModel.prototype = {
   },
   // TODO: change return value of anomalies to complex object, instead of array
   // so that we can pass information such as total number of anomalies (this if for the "Showing x anomalies of y")
-  updateModelAndNotifyView : function(anomalies) {
-    this.anomalies = anomalies;
+  updateModelAndNotifyView : function(anomaliesWrapper) {
+    this.anomaliesWrapper = anomaliesWrapper;
     this.renderViewEvent.notify();
   },
   // Instead of calling rebuild for a simple anomaly feedback change, made a smaller function
@@ -94,8 +94,8 @@ AnomalyResultModel.prototype = {
     var feedbackType = this.getFeedbackTypeFromString(this.anomalyForFeedbackUpdate.anomalyFeedback);
     dataService.updateFeedback(this.anomalyForFeedbackUpdate.anomalyId, feedbackType);
   },
-  getAnomaliesList : function() {
-    return this.anomalies;
+  getAnomaliesWrapper : function() {
+    return this.anomaliesWrapper;
   },
   getAnomalyFunctions : function() {
     return this.functions;

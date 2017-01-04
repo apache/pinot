@@ -2,10 +2,10 @@
   <div class="row row-bordered">
     <div class="container top-buffer bottom-buffer">
       <div>
-        Showing <label style="font-size: 15px; font-weight: 500"> 10 </label> anomalies of <label style="font-size: 15px; font-weight: 500"> 25</label>
+        Showing <label style="font-size: 15px; font-weight: 500"> {{this.numAnomaliesOnPage}} </label> anomalies of <label style="font-size: 15px; font-weight: 500"> {{this.totalAnomalies}}</label>
       </div>
     </div>
-    {{#each this as |anomalyData anomalyIndex|}}
+    {{#each this.anomalyDetailsList as |anomalyData anomalyIndex|}}
     <div class="container">
       <div class="panel padding-all">
         <div class="row">

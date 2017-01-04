@@ -147,11 +147,11 @@ AnomalyResultView.prototype = {
 
   render : function() {
 
-    var anomalies = this.anomalyResultModel.getAnomaliesList();
+    var anomaliesWrapper = this.anomalyResultModel.getAnomaliesWrapper();
 
-    var anomaly_results_template_compiled_with_results = this.anomaly_results_template_compiled(anomalies);
+    var anomaly_results_template_compiled_with_results = this.anomaly_results_template_compiled(anomaliesWrapper);
     $("#anomaly-results-place-holder").html(anomaly_results_template_compiled_with_results);
-    this.renderAnomaliesTab(anomalies);
+    this.renderAnomaliesTab(anomaliesWrapper);
     self = this;
 
     this.showSearchBarBasedOnMode();
@@ -189,7 +189,8 @@ AnomalyResultView.prototype = {
     });
 
   },
-  renderAnomaliesTab : function(anomalies) {
+  renderAnomaliesTab : function(anomaliesWrapper) {
+    var anomalies = anomaliesWrapper.anomalyDetailsList;
     for (var idx = 0; idx < anomalies.length; idx++) {
       var anomaly = anomalies[idx];
       console.log(anomaly);

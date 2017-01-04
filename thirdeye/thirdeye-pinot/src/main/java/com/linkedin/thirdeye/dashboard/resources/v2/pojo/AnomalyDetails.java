@@ -4,9 +4,7 @@ import java.util.List;
 
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 
-
-
-public class AnomalyWrapper {
+public class AnomalyDetails {
 
   // anomaly details
   private Long anomalyId;

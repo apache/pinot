@@ -1,7 +1,8 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomaliesSummary;
-import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalyWrapper;
+import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomaliesWrapper;
+import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalyDetails;
 
 import java.io.IOException;
 import java.net.URLDecoder;
@@ -202,12 +203,13 @@ public class AnomaliesResource {
    */
   @GET
   @Path("search/anomalyIds/{startTime}/{endTime}")
-  public List<AnomalyWrapper> getAnomaliesByAnomalyIds(
+  public AnomaliesWrapper getAnomaliesByAnomalyIds(
       @PathParam("startTime") Long startTime,
       @PathParam("endTime") Long endTime,
       @QueryParam("anomalyIds") String anomalyIdsString,
       @QueryParam("functionName") String functionName) throws Exception {
 
+    AnomaliesWrapper anomaliesWrapper = new AnomaliesWrapper();
     String[] anomalyIds = anomalyIdsString.split(COMMA_SEPARATOR);
 
     List<MergedAnomalyResultDTO> mergedAnomalies = new ArrayList<>();
@@ -216,7 +218,7 @@ public class AnomaliesResource {
       mergedAnomalies.add(mergedAnomalyResultDAO.findById(anomalyId));
     }
 
-    List<AnomalyWrapper> anomalyWrappers = new ArrayList<>();
+    List<AnomalyDetails> anomalyDetailsList = new ArrayList<>();
     // for each anomaly, fetch function details and create wrapper
     for (MergedAnomalyResultDTO mergedAnomaly : mergedAnomalies) {
 
@@ -226,12 +228,14 @@ public class AnomaliesResource {
       DateTimeFormatter startEndDateFormatterDays = DateTimeFormat.forPattern(START_END_DATE_FORMAT_DAYS).withZone(Utils.getDataTimeZone(dataset));
       DateTimeFormatter startEndDateFormatterHours = DateTimeFormat.forPattern(START_END_DATE_FORMAT_HOURS).withZone(Utils.getDataTimeZone(dataset));
 
-      AnomalyWrapper anomalyWrapper = getAnomalyWrapper(mergedAnomaly, datasetConfig, timeSeriesDateFormatter,
+      AnomalyDetails anomalyDetails = getAnomalyDetails(mergedAnomaly, datasetConfig, timeSeriesDateFormatter,
           startEndDateFormatterHours, startEndDateFormatterDays);
-      anomalyWrappers.add(anomalyWrapper);
+      anomalyDetailsList.add(anomalyDetails);
     }
-
-    return anomalyWrappers;
+    anomaliesWrapper.setTotalAnomalies(anomalyDetailsList.size());
+    anomaliesWrapper.setNumAnomaliesOnPage(anomalyDetailsList.size());
+    anomaliesWrapper.setAnomalyDetailsList(anomalyDetailsList);
+    return anomaliesWrapper;
   }
 
 
@@ -246,7 +250,7 @@ public class AnomaliesResource {
    */
   @GET
   @Path("search/dashboardId/{startTime}/{endTime}")
-  public List<AnomalyWrapper> getAnomaliesByDashboardId(
+  public AnomaliesWrapper getAnomaliesByDashboardId(
       @PathParam("startTime") Long startTime,
       @PathParam("endTime") Long endTime,
       @QueryParam("dashboardId") String dashboardId,
@@ -268,13 +272,14 @@ public class AnomaliesResource {
    */
   @GET
   @Path("search/metricIds/{startTime}/{endTime}")
-  public List<AnomalyWrapper> getAnomaliesByMetricIds(
+  public AnomaliesWrapper getAnomaliesByMetricIds(
       @PathParam("startTime") Long startTime,
       @PathParam("endTime") Long endTime,
       @QueryParam("metricIds") String metricIdsString,
       @QueryParam("functionName") String functionName) throws Exception {
 
-    List<AnomalyWrapper> anomalyWrappers = new ArrayList<>();
+    AnomaliesWrapper anomaliesWrapper = new AnomaliesWrapper();
+    List<AnomalyDetails> anomalyDetailsList = new ArrayList<>();
 
     String[] metricIds = metricIdsString.split(COMMA_SEPARATOR);
     for (String id : metricIds) {
@@ -294,31 +299,35 @@ public class AnomaliesResource {
 
       // fetch anomalies in range, ordered by end time
       List<MergedAnomalyResultDTO> mergedAnomalies = getAnomaliesForMetricInRange(dataset, metricName, startTime, endTime);
-      // TODO: get pagenumber and pagesize from client
-      int pageNumber = DEFAULT_PAGE_NUMBER;
-      int pageSize = DEFAULT_PAGE_SIZE;
-      int maxPageNumber = mergedAnomalies.size()/pageSize + 1;
-      if (pageNumber > maxPageNumber) {
-        pageNumber = maxPageNumber;
-      }
-      if (pageNumber < 1) {
-        pageNumber = 1;
-      }
-      if (mergedAnomalies.size() > pageSize) {
-        if (mergedAnomalies.size() > pageSize * pageNumber ) {
-          mergedAnomalies.subList(pageSize * pageNumber, mergedAnomalies.size()).clear();
-        }
-        mergedAnomalies.subList(0, pageSize * (pageNumber - 1)).clear();
-      }
+
       // for each anomaly, fetch function details and create wrapper
       for (MergedAnomalyResultDTO mergedAnomaly : mergedAnomalies) {
 
-        AnomalyWrapper anomalyWrapper = getAnomalyWrapper(mergedAnomaly, datasetConfig, timeSeriesDateFormatter,
+        AnomalyDetails anomalyDetails = getAnomalyDetails(mergedAnomaly, datasetConfig, timeSeriesDateFormatter,
             startEndDateFormatterHours, startEndDateFormatterDays);
-        anomalyWrappers.add(anomalyWrapper);
+        anomalyDetailsList.add(anomalyDetails);
       }
     }
-    return anomalyWrappers;
+    anomaliesWrapper.setTotalAnomalies(anomalyDetailsList.size());
+    // TODO: get pagenumber and pagesize from client
+    int pageNumber = DEFAULT_PAGE_NUMBER;
+    int pageSize = DEFAULT_PAGE_SIZE;
+    int maxPageNumber = anomalyDetailsList.size()/pageSize + 1;
+    if (pageNumber > maxPageNumber) {
+      pageNumber = maxPageNumber;
+    }
+    if (pageNumber < 1) {
+      pageNumber = 1;
+    }
+    if (anomalyDetailsList.size() > pageSize) {
+      if (anomalyDetailsList.size() > pageSize * pageNumber ) {
+        anomalyDetailsList.subList(pageSize * pageNumber, anomalyDetailsList.size()).clear();
+      }
+      anomalyDetailsList.subList(0, pageSize * (pageNumber - 1)).clear();
+    }
+    anomaliesWrapper.setNumAnomaliesOnPage(anomalyDetailsList.size());
+    anomaliesWrapper.setAnomalyDetailsList(anomalyDetailsList);
+    return anomaliesWrapper;
   }
 
 
@@ -550,7 +559,7 @@ public class AnomaliesResource {
   }
 
 
-  private AnomalyWrapper getAnomalyWrapper(MergedAnomalyResultDTO mergedAnomaly, DatasetConfigDTO datasetConfig,
+  private AnomalyDetails getAnomalyDetails(MergedAnomalyResultDTO mergedAnomaly, DatasetConfigDTO datasetConfig,
       DateTimeFormatter timeSeriesDateFormatter, DateTimeFormatter startEndDateFormatterHours,
       DateTimeFormatter startEndDateFormatterDays) {
 
@@ -569,14 +578,14 @@ public class AnomaliesResource {
     long baselineStartTime = new DateTime(currentStartTime).minusDays(7).getMillis();
     long baselineEndTime = new DateTime(currentEndTime).minusDays(7).getMillis();
 
-    AnomalyWrapper anomalyWrapper = null;
+    AnomalyDetails anomalyDetails = null;
     try {
     JSONObject currentTimeseriesResponse = getTimeSeriesData(dataset, anomalyFunction.getFilterSet(),
         currentStartTime, currentEndTime, aggGranularity, metricName);
     JSONObject baselineTimeseriesResponse = getTimeSeriesData(dataset, anomalyFunction.getFilterSet(),
           baselineStartTime, baselineEndTime, aggGranularity, metricName);
 
-    anomalyWrapper = constructAnomalyWrapper(metricName, dataset, datasetConfig,
+    anomalyDetails = constructAnomalyDetails(metricName, dataset, datasetConfig,
         mergedAnomaly, anomalyFunction,
         currentStartTime, currentEndTime, baselineStartTime, baselineEndTime,
         currentTimeseriesResponse, baselineTimeseriesResponse,
@@ -584,7 +593,7 @@ public class AnomaliesResource {
     } catch (Exception e) {
       LOG.error("Exception in constructing anomaly wrapper for anomaly {}", mergedAnomaly.getId(), e);
     }
-    return anomalyWrapper;
+    return anomalyDetails;
   }
 
   /** Construct anomaly wrapper using all details fetched from calls
@@ -606,44 +615,44 @@ public class AnomaliesResource {
    * @return
    * @throws JSONException
    */
-  private AnomalyWrapper constructAnomalyWrapper(String metricName, String dataset, DatasetConfigDTO datasetConfig,
+  private AnomalyDetails constructAnomalyDetails(String metricName, String dataset, DatasetConfigDTO datasetConfig,
       MergedAnomalyResultDTO mergedAnomaly, AnomalyFunctionDTO anomalyFunction,
       long currentStartTime, long currentEndTime, long baselineStartTime, long baselineEndTime,
       JSONObject currentTimeseriesResponse, JSONObject baselineTimeseriesResponse,
       DateTimeFormatter timeSeriesDateFormatter, DateTimeFormatter startEndDateFormatterHours, DateTimeFormatter startEndDateFormatterDays) throws JSONException {
 
-    AnomalyWrapper anomalyWrapper = new AnomalyWrapper();
-    anomalyWrapper.setMetric(metricName);
-    anomalyWrapper.setDataset(dataset);
+    AnomalyDetails anomalyDetails = new AnomalyDetails();
+    anomalyDetails.setMetric(metricName);
+    anomalyDetails.setDataset(dataset);
 
     // get this from timeseries calls
     List<String> dateValues = getDateFromTimeSeriesObject(currentTimeseriesResponse, timeSeriesDateFormatter);
-    anomalyWrapper.setDates(dateValues);
-    anomalyWrapper.setCurrentEnd(getFormattedDateTime(currentEndTime, datasetConfig, startEndDateFormatterHours, startEndDateFormatterDays));
-    anomalyWrapper.setCurrentStart(getFormattedDateTime(currentStartTime, datasetConfig, startEndDateFormatterHours, startEndDateFormatterDays));
-    anomalyWrapper.setBaselineEnd(getFormattedDateTime(baselineEndTime, datasetConfig, startEndDateFormatterHours, startEndDateFormatterDays));
-    anomalyWrapper.setBaselineStart(getFormattedDateTime(baselineStartTime, datasetConfig, startEndDateFormatterHours, startEndDateFormatterDays));
+    anomalyDetails.setDates(dateValues);
+    anomalyDetails.setCurrentEnd(getFormattedDateTime(currentEndTime, datasetConfig, startEndDateFormatterHours, startEndDateFormatterDays));
+    anomalyDetails.setCurrentStart(getFormattedDateTime(currentStartTime, datasetConfig, startEndDateFormatterHours, startEndDateFormatterDays));
+    anomalyDetails.setBaselineEnd(getFormattedDateTime(baselineEndTime, datasetConfig, startEndDateFormatterHours, startEndDateFormatterDays));
+    anomalyDetails.setBaselineStart(getFormattedDateTime(baselineStartTime, datasetConfig, startEndDateFormatterHours, startEndDateFormatterDays));
     List<String> baselineValues = getDataFromTimeSeriesObject(baselineTimeseriesResponse, metricName);
-    anomalyWrapper.setBaselineValues(baselineValues);
+    anomalyDetails.setBaselineValues(baselineValues);
     List<String> currentValues = getDataFromTimeSeriesObject(currentTimeseriesResponse, metricName);
-    anomalyWrapper.setCurrentValues(currentValues);
+    anomalyDetails.setCurrentValues(currentValues);
 
     // from function and anomaly
-    anomalyWrapper.setAnomalyId(mergedAnomaly.getId());
-    anomalyWrapper.setAnomalyRegionStart(timeSeriesDateFormatter.print(Long.valueOf(mergedAnomaly.getStartTime())));
-    anomalyWrapper.setAnomalyRegionEnd(timeSeriesDateFormatter.print(Long.valueOf(mergedAnomaly.getEndTime())));
+    anomalyDetails.setAnomalyId(mergedAnomaly.getId());
+    anomalyDetails.setAnomalyRegionStart(timeSeriesDateFormatter.print(Long.valueOf(mergedAnomaly.getStartTime())));
+    anomalyDetails.setAnomalyRegionEnd(timeSeriesDateFormatter.print(Long.valueOf(mergedAnomaly.getEndTime())));
     Map<String, String> messageDataMap = getAnomalyMessageDataMap(mergedAnomaly.getMessage());
-    anomalyWrapper.setCurrent(messageDataMap.get(ANOMALY_CURRENT_VAL_KEY));
-    anomalyWrapper.setBaseline(messageDataMap.get(ANOMALY_BASELINE_VAL_KEY));
-    anomalyWrapper.setAnomalyFunctionId(anomalyFunction.getId());
-    anomalyWrapper.setAnomalyFunctionName(anomalyFunction.getFunctionName());
-    anomalyWrapper.setAnomalyFunctionType(anomalyFunction.getType());
-    anomalyWrapper.setAnomalyFunctionProps(anomalyFunction.getProperties());
-    anomalyWrapper.setAnomalyFunctionDimension(mergedAnomaly.getDimensions().toString());
+    anomalyDetails.setCurrent(messageDataMap.get(ANOMALY_CURRENT_VAL_KEY));
+    anomalyDetails.setBaseline(messageDataMap.get(ANOMALY_BASELINE_VAL_KEY));
+    anomalyDetails.setAnomalyFunctionId(anomalyFunction.getId());
+    anomalyDetails.setAnomalyFunctionName(anomalyFunction.getFunctionName());
+    anomalyDetails.setAnomalyFunctionType(anomalyFunction.getType());
+    anomalyDetails.setAnomalyFunctionProps(anomalyFunction.getProperties());
+    anomalyDetails.setAnomalyFunctionDimension(mergedAnomaly.getDimensions().toString());
     if (mergedAnomaly.getFeedback() != null) {
-      anomalyWrapper.setAnomalyFeedback(AnomalyWrapper.getFeedbackStringFromFeedbackType(mergedAnomaly.getFeedback().getFeedbackType()));
+      anomalyDetails.setAnomalyFeedback(AnomalyDetails.getFeedbackStringFromFeedbackType(mergedAnomaly.getFeedback().getFeedbackType()));
     }
-    return anomalyWrapper;
+    return anomalyDetails;
   }
 
 
