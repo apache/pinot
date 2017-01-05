@@ -31,10 +31,12 @@ import com.linkedin.pinot.core.query.aggregation.AggregationFunctionUtils;
 import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByOperatorService;
 import com.linkedin.pinot.core.util.trace.TraceRunnable;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -141,9 +143,9 @@ public class MCombineGroupByOperator extends BaseOperator {
   private IntermediateResultsBlock combineBlocks()
       throws InterruptedException {
     int numOperators = _operators.size();
-    final IntermediateResultsBlock[] intermediateResultsBlocks = new IntermediateResultsBlock[numOperators];
     final CountDownLatch operatorLatch = new CountDownLatch(numOperators);
     final Map<String, Serializable[]> resultsMap = new ConcurrentHashMap<>();
+    final ConcurrentLinkedQueue<ProcessingException> mergedProcessingExceptions = new ConcurrentLinkedQueue<>();
 
     List<AggregationInfo> aggregationInfos = _brokerRequest.getAggregationsInfo();
     final AggregationFunctionContext[] aggregationFunctionContexts =
@@ -162,9 +164,15 @@ public class MCombineGroupByOperator extends BaseOperator {
           try {
             IntermediateResultsBlock intermediateResultsBlock =
                 (IntermediateResultsBlock) _operators.get(index).nextBlock();
-            intermediateResultsBlocks[index] = intermediateResultsBlock;
-            aggregationGroupByResult = intermediateResultsBlock.getAggregationGroupByResult();
 
+            // Merge processing exceptions.
+            List<ProcessingException> processingExceptionsToMerge = intermediateResultsBlock.getProcessingExceptions();
+            if (processingExceptionsToMerge != null) {
+              mergedProcessingExceptions.addAll(processingExceptionsToMerge);
+            }
+
+            // Merge aggregation group-by result.
+            aggregationGroupByResult = intermediateResultsBlock.getAggregationGroupByResult();
             if (aggregationGroupByResult != null) {
               // Iterate over the group-by keys, for each key, update the group-by result in the resultsMap.
               Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
@@ -195,7 +203,7 @@ public class MCombineGroupByOperator extends BaseOperator {
           } catch (Exception e) {
             LOGGER.error("Exception processing CombineGroupBy for index {}, operator {}", index,
                 _operators.get(index).getClass().getName(), e);
-            intermediateResultsBlocks[index] = new IntermediateResultsBlock(e);
+            mergedProcessingExceptions.add(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
           }
 
           operatorLatch.countDown();
@@ -218,21 +226,12 @@ public class MCombineGroupByOperator extends BaseOperator {
     IntermediateResultsBlock mergedBlock =
         new IntermediateResultsBlock(aggregationFunctionContexts, trimmedResults, true);
 
-    // Merge all exceptions.
-    List<ProcessingException> processingExceptions = null;
-    for (IntermediateResultsBlock intermediateResultsBlock : intermediateResultsBlocks) {
-      List<ProcessingException> blockProcessingExceptions = intermediateResultsBlock.getProcessingExceptions();
-      if (blockProcessingExceptions != null) {
-        if (processingExceptions == null) {
-          processingExceptions = blockProcessingExceptions;
-        } else {
-          processingExceptions.addAll(blockProcessingExceptions);
-        }
-      }
+    // Set the processing exceptions.
+    if (!mergedProcessingExceptions.isEmpty()) {
+      mergedBlock.setProcessingExceptions(new ArrayList<>(mergedProcessingExceptions));
     }
-    mergedBlock.setProcessingExceptions(processingExceptions);
 
-    // Update execution statistics.
+    // Set the execution statistics.
     ExecutionStatistics executionStatistics = new ExecutionStatistics();
     for (Operator operator : _operators) {
       ExecutionStatistics executionStatisticsToMerge = operator.getExecutionStatistics();
