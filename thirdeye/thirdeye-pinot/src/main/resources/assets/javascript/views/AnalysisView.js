@@ -189,6 +189,9 @@ AnalysisView.prototype = {
       }
     }
     self.viewParams['filters'] = filterMap;
+
+    // Also reset the filters for heatmap
+    self.viewParams['heatmapFilters'] = filterMap;
   },
 
   setupListeners: function () {

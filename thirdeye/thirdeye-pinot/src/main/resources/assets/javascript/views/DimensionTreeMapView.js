@@ -3,50 +3,13 @@ function DimensionTreeMapView(dimensionTreeMapModel) {
   this.template_compiled = Handlebars.compile(template);
   this.placeHolderId = "#dimension-tree-map-placeholder";
   this.dimensionTreeMapModel = dimensionTreeMapModel;
-  this.currentTimeRangeConfig = {
-    dateLimit : {
-      days : 60
-    },
-    showDropdowns : true,
-    showWeekNumbers : true,
-    timePicker : true,
-    timePickerIncrement : 5,
-    timePicker12Hour : true,
-    ranges : {
-      'Last 24 Hours' : [ moment(), moment() ],
-      'Yesterday' : [ moment().subtract(1, 'days'), moment().subtract(1, 'days') ],
-      'Last 7 Days' : [ moment().subtract(6, 'days'), moment() ],
-      'Last 30 Days' : [ moment().subtract(29, 'days'), moment() ],
-      'This Month' : [ moment().startOf('month'), moment().endOf('month') ],
-      'Last Month' : [ moment().subtract(1, 'month').startOf('month'), moment().subtract(1, 'month').endOf('month') ]
-    }
-  };
-  this.baselineTimeRangeConfig = {
-    dateLimit : {
-      days : 60
-    },
-    showDropdowns : true,
-    showWeekNumbers : true,
-    timePicker : true,
-    timePickerIncrement : 5,
-    timePicker12Hour : true,
-    ranges : {
-      'Last 24 Hours' : [ moment(), moment() ],
-      'Yesterday' : [ moment().subtract(1, 'days'), moment().subtract(1, 'days') ],
-      'Last 7 Days' : [ moment().subtract(6, 'days'), moment() ],
-      'Last 30 Days' : [ moment().subtract(29, 'days'), moment() ],
-      'This Month' : [ moment().startOf('month'), moment().endOf('month') ],
-      'Last Month' : [ moment().subtract(1, 'month').startOf('month'), moment().subtract(1, 'month').endOf('month') ]
-    }
-  };
-
 }
 
 DimensionTreeMapView.prototype = {
   render: function () {
     if (this.dimensionTreeMapModel.heatmapData) {
       console.log("HeatMap view ---->");
-      console.log(this.dimensionTreeMapModel.heatmapData);
+      console.log(this.dimensionTreeMapModel.treeMapData);
 
       var result = this.template_compiled(this.dimensionTreeMapModel);
       $(this.placeHolderId).html(result);
@@ -56,17 +19,44 @@ DimensionTreeMapView.prototype = {
   },
 
   renderTreemapHeaderSection : function() {
+    var self = this;
     function current_range_cb(start, end) {
       $('#heatmap-current-range span').addClass("time-range").html(start.format('MMM D, ') + start.format('hh:mm a') + '  &mdash;  ' + end.format('MMM D, ') + end.format('hh:mm a'));
     }
     function baseline_range_cb(start, end) {
       $('#heatmap-baseline-range span').addClass("time-range").html(start.format('MMM D, ') + start.format('hh:mm a') + '  &mdash;  ' + end.format('MMM D, ') + end.format('hh:mm a'));
     }
-    $('#heatmap-current-range').daterangepicker(this.currentTimeRangeConfig, current_range_cb);
-    $('#heatmap-baseline-range').daterangepicker(this.baselineTimeRangeConfig, baseline_range_cb);
+    this.renderDatePicker('#heatmap-current-range', current_range_cb, self.dimensionTreeMapModel.currentStart, self.dimensionTreeMapModel.currentEnd);
+    this.renderDatePicker('#heatmap-baseline-range', baseline_range_cb, self.dimensionTreeMapModel.baselineStart, self.dimensionTreeMapModel.baselineEnd);
+    current_range_cb(self.dimensionTreeMapModel.currentStart, self.dimensionTreeMapModel.currentEnd);
+    baseline_range_cb(self.dimensionTreeMapModel.baselineStart, self.dimensionTreeMapModel.baselineEnd);
+  },
 
-    current_range_cb(this.dimensionTreeMapModel.currentStart, this.dimensionTreeMapModel.currentEnd);
-    baseline_range_cb(this.dimensionTreeMapModel.baselineStart, this.dimensionTreeMapModel.baselineEnd);
+  renderDatePicker: function (domId, callbackFun, initialStart, initialEnd){
+    $(domId).daterangepicker({
+      startDate: initialStart,
+      endDate: initialEnd,
+      dateLimit: {
+        days: 60
+      },
+      showDropdowns: true,
+      showWeekNumbers: true,
+      timePicker: true,
+      timePickerIncrement: 5,
+      timePicker12Hour: true,
+      ranges: {
+        'Last 24 Hours': [moment(), moment()],
+        'Yesterday': [moment().subtract(1, 'days'), moment().subtract(1, 'days')],
+        'Last 7 Days': [moment().subtract(6, 'days'), moment()],
+        'Last 30 Days': [moment().subtract(29, 'days'), moment()],
+        'This Month': [moment().startOf('month'), moment().endOf('month')],
+        'Last Month': [moment().subtract(1, 'month').startOf('month'),
+          moment().subtract(1, 'month').endOf('month')]
+      },
+      buttonClasses: ['btn', 'btn-sm'],
+      applyClass: 'btn-primary',
+      cancelClass: 'btn-default'
+    }, callbackFun);
   },
 
   renderTreemapSection : function() {
@@ -115,8 +105,6 @@ DimensionTreeMapView.prototype = {
       }).attr("height", function(d) {
         return d.dy - 1
       }).style("fill", function(d) {
-        console.log("logging data in heatmap ====>");
-        console.log(d);
         // TODO: fix background color
         return '#EC9F98'
       });
@@ -126,7 +114,8 @@ DimensionTreeMapView.prototype = {
       }).attr("y", function(d) {
         return d.dy / 2;
       }).attr("dy", ".35em").attr("text-anchor", "middle").text(function(d) {
-        return d.t;
+        // TODO : add a condition here based on that show percentage change or contribution
+        return d.t + '(' + d.percentageChange + ')'  ;
       }).style("opacity", function(d) {
         d.w = this.getComputedTextLength();
         return d.dx > d.w ? 1 : 0;

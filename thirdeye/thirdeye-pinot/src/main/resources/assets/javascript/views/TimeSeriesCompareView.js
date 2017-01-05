@@ -48,7 +48,7 @@ TimeSeriesCompareView.prototype = {
     this.loadChart(
         this.timeSeriesCompareModel.subDimensionContributionDetails.contributionMap['All']);
 
-    // render chart legned
+    // render chart legend
     var timeseriesSubDimensionsHtml = this.timeseries_subdimension_legend_template_compiled(
         this.timeSeriesCompareModel);
     $(this.timeseries_subdimension_legend_placeHolderId).html(timeseriesSubDimensionsHtml);
@@ -147,7 +147,6 @@ TimeSeriesCompareView.prototype = {
     var currentEnd = currentStart + delta;
     var baselineEnd = baselineStart + delta;
 
-    // TODO: set selected dimension in filters
     var heatmapFilters = self.timeSeriesCompareModel.filters;
     if (!(subDimension.toUpperCase() === 'ALL')) {
       heatmapFilters[self.timeSeriesCompareModel.dimension] = [subDimension];

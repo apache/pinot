@@ -9,44 +9,14 @@ function DimensionTreeMapModel() {
 
   this.heatmapData;
 
-  this.currentTotal = 50000;
-  this.baselineTotal = 100000;
-  this.absoluteChange = this.currentTotal - this.baselineTotal;
-  this.percentChange = (this.currentTotal - this.baselineTotal) * 100 / this.baselineTotal;
-  this.dimensions = ["browser", "country", "device"];
+  this.heatmapMode = "percentageChange";
 
-  this.treeMapData = [{
-    "t": "0", "children": [{
-      "t": "Chrome (10 %)", "value": 100
-    }, {
-      "t": "011", "value": 50
-    }, {
-      "t": "012", "value": 55
-    }, {
-      "t": "013", "value": 25
-    }]
-  }, {
-    "t": "0", "children": [{
-      "t": "010", "value": 10
-    }, {
-      "t": "011", "value": 25
-    }, {
-      "t": "012", "value": 50
-    }, {
-      "t": "013", "value": 25
-    }]
-  }, {
-    "t": "0", "children": [{
-      "t": "010", "value": 100
-    }, {
-      "t": "011", "value": 50
-    }, {
-      "t": "012", "value": 5
-    }, {
-      "t": "013", "value": 55
-    }]
-  }];
-
+  this.currentTotal = 0;
+  this.baselineTotal = 0;
+  this.absoluteChange = 0;
+  this.percentChange = 0;
+  this.dimensions = [];
+  this.treeMapData = [];
 }
 
 DimensionTreeMapModel.prototype = {
@@ -71,24 +41,66 @@ DimensionTreeMapModel.prototype = {
       if (params.granularity) {
         this.granularity = params.granularity;
       }
+
       if (params.heatmapFilters) {
         this.heatmapFilters = params.heatmapFilters;
       } else if (params.filters) {
         this.heatmapFilters = params.filters;
+      }
+
+      if (params.heatmapMode) {
+        this.heatmapMode = params.heatmapMode;
       }
     }
   },
 
   update: function () {
     if (this.metricId) {
-      var heatMapData = dataService.fetchHeatmapData(this.metricId, this.currentStart, this.currentEnd, this.baselineStart, this.baselineEnd, this.heatmapFilters);
+      var heatMapData = dataService.fetchHeatmapData(this.metricId, this.currentStart,
+          this.currentEnd, this.baselineStart, this.baselineEnd, this.heatmapFilters);
       this.heatmapData = heatMapData;
+      this.transformResponseData(heatMapData);
     }
   },
 
-  transformResponseData : function(heatMapData) {
+  transformResponseData: function (heatMapData) {
     if (heatMapData) {
-      // TODO: transform
+      console.log(heatMapData);
+
+      // TODO: fix summary
+      if (heatMapData.dimensions) {
+        this.dimensions = heatMapData.dimensions;
+        var treeMapData = [];
+        for (var i in heatMapData.dimensions) {
+          var dimension = heatMapData.dimensions[i];
+          var dataKey = this.metricName + "." + dimension;
+          var row = {"t": "0", "children": []};
+          if (heatMapData.data && heatMapData.data[dataKey]) {
+            var dimensionValueIndex = heatMapData.data[dataKey].schema.columnsToIndexMapping['dimensionValue'];
+            var percentageChangeIndex = heatMapData.data[dataKey].schema.columnsToIndexMapping['percentageChange'];
+            var currentValueIndex = heatMapData.data[dataKey].schema.columnsToIndexMapping['currentValue'];
+            var contributionToOverallChangeIndex = heatMapData.data[dataKey].schema.columnsToIndexMapping['contributionToOverallChange'];
+            var contributionChangeIndex = heatMapData.data[dataKey].schema.columnsToIndexMapping['contributionDifference'];
+            for (var j in heatMapData.data[dataKey].responseData) {
+              var record = heatMapData.data[dataKey].responseData[j];
+              var item = {
+                "t": record[dimensionValueIndex],
+                "value": record[currentValueIndex],
+                "percentageChange": record[percentageChangeIndex],
+                "contributionChange": record[contributionChangeIndex],
+                "contributionToOverallChange": record[contributionToOverallChangeIndex]
+              };
+              row.children.push(item);
+            }
+          }
+          treeMapData.push(row);
+        }
+        this.treeMapData = treeMapData;
+      }
+      this.currentTotal = heatMapData.summary.simpleFields.currentTotal;
+      this.baselineTotal = heatMapData.summary.simpleFields.baselineTotal;
+      this.percentChange = heatMapData.summary.simpleFields.deltaPercentage;
+      this.absoluteChange = heatMapData.summary.simpleFields.deltaChange;
     }
   }
 }
