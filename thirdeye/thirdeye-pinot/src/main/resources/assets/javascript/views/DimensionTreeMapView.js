@@ -8,13 +8,11 @@ function DimensionTreeMapView(dimensionTreeMapModel) {
 DimensionTreeMapView.prototype = {
   render: function () {
     if (this.dimensionTreeMapModel.heatmapData) {
-      console.log("HeatMap view ---->");
-      console.log(this.dimensionTreeMapModel.treeMapData);
-
       var result = this.template_compiled(this.dimensionTreeMapModel);
       $(this.placeHolderId).html(result);
       this.renderTreemapHeaderSection();
       this.renderTreemapSection();
+      this.setupListenersForMode();
     }
   },
 
@@ -76,6 +74,37 @@ DimensionTreeMapView.prototype = {
 
     var margin = 0;
 
+    var self = this;
+
+    var getChangeFactor = function (dataRow) {
+      var factor = dataRow.percentageChange;
+      if (self.dimensionTreeMapModel.heatmapMode === 'contributionChange') {
+        factor = dataRow.contributionChange;
+      }
+      if (self.dimensionTreeMapModel.heatmapMode === 'contributionToOverallChange') {
+        factor = dataRow.contributionToOverallChange;
+      }
+      return factor;
+    };
+
+    var getBackgroundColor = function (factor) {
+      var opacity = Math.abs(factor / 25);
+      if(factor > 0){
+        return "rgba(0,0,234," + opacity + ")";
+      } else{
+        return "rgba(234,0,0,"  + opacity + ")" ;
+      }
+    };
+
+    var getTextColor = function (factor) {
+      var opacity = Math.abs(factor / 25);
+      if(opacity < 0.5){
+        return "#000000";
+      } else{
+        return "#ffffff" ;
+      }
+    };
+
     var dimensions = this.dimensionTreeMapModel.dimensions;
     for (var i = 0; i < dimensions.length; i++) {
       var data = this.dimensionTreeMapModel.treeMapData[i];
@@ -88,7 +117,7 @@ DimensionTreeMapView.prototype = {
       });
 
       var div = d3.select(dimensionPlaceHolderId).attr("class", "heatmap")
-      .append("svg:svg").attr("width", width).attr("height", height).append("svg:g").attr("transform", "translate(.5,.5)");
+          .append("svg:svg").attr("width", width).attr("height", height).append("svg:g").attr("transform", "translate(.5,.5)");
 
       var nodes = treeMap.nodes(data).filter(function(d) {
         return !d.children;
@@ -120,13 +149,8 @@ DimensionTreeMapView.prototype = {
       }).attr("height", function(d) {
         return d.dy - 1
       }).style("fill", function(d) {
-        var opacity = Math.abs(d.percentageChange / 25);
-        console.log("opacity:"+opacity);
-        if(d.percentageChange > 0){
-          return "rgba(0,0,234," + opacity + ")";
-        } else{
-          return "rgba(234,0,0,"  + opacity + ")" ;
-        }
+        var factor = getChangeFactor(d);
+        return getBackgroundColor(factor);
       });
 
       cell.append("svg:text").attr("x", function(d) {
@@ -135,9 +159,11 @@ DimensionTreeMapView.prototype = {
         return d.dy / 2;
       }).attr("dy", ".35em").attr("text-anchor", "middle").text(function(d) {
         // TODO : add a condition here based on that show percentage change or contribution
-        text = d.t + '(' + d.percentageChange + ')';
+        var factor = getChangeFactor(d);
+        var text = d.t + '(' + factor + ')';
+
         //each character takes up 7 pixels on an average
-        estimatedTextLength = text.length * 7;
+        var estimatedTextLength = text.length * 7;
         if(estimatedTextLength > d.dx) {
           return text.substring(0, d.dx/7) + "..";
         } else {
@@ -152,15 +178,28 @@ DimensionTreeMapView.prototype = {
 //        }
         return d.dx > d.w ? 1 : 0;
       }).style("fill", function(d){
-        var opacity = Math.abs(d.percentageChange / 25);
-        if(opacity < 0.5){
-          return "#000000";
-        } else{
-          return "#ffffff" ;
-        }
+        var factor = getChangeFactor(d);
+        return getTextColor(factor);
       });
+
     }
-  }
+  },
+
+  setupListenersForMode : function () {
+    var self = this;
+    $("#percent_change a").click(self, function() {
+      self.dimensionTreeMapModel.heatmapMode = "percentChange";
+      self.render();
+    });
+    $("#change_in_contribution").click(self, function() {
+      self.dimensionTreeMapModel.heatmapMode = "contributionChange";
+      self.render();
+    });
+    $("#contribution_to_overall_change").click(self, function() {
+      self.dimensionTreeMapModel.heatmapMode = "contributionToOverallChange";
+      self.render();
+    });
+  },
 }
 
 

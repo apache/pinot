@@ -9,7 +9,7 @@ function DimensionTreeMapModel() {
 
   this.heatmapData;
 
-  this.heatmapMode = "percentageChange";
+  this.heatmapMode = "percentChange";
 
   this.currentTotal = 0;
   this.baselineTotal = 0;
@@ -65,9 +65,6 @@ DimensionTreeMapModel.prototype = {
 
   transformResponseData: function (heatMapData) {
     if (heatMapData) {
-      console.log(heatMapData);
-
-      // TODO: fix summary
       if (heatMapData.dimensions) {
         this.dimensions = heatMapData.dimensions;
         var treeMapData = [];

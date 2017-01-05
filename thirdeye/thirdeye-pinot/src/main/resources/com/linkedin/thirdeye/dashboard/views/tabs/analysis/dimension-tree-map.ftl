@@ -30,9 +30,9 @@
 		<nav class="navbar navbar-transparent" role="navigation">
 			<div class="collapse navbar-collapse">
 				<ul class="nav navbar-nav tree-map-tabs" id="dashboard-tabs">
-					<li class=""><a href="percent_change" data-toggle="tab">% Change</a></li>
-					<li class=""><a href="#change_in_contribution" data-toggle="tab">Change in contribution</a></li>
-					<li class=""><a href="#contribution_to_change" data-toggle="tab">Contribution to overall change</a></li>
+					<li id="percent_change"><a href="#percent_change" data-toggle="tab">% Change</a></li>
+					<li id="change_in_contribution"><a href="#change_in_contribution" data-toggle="tab">Change in contribution</a></li>
+					<li id="contribution_to_overall_change"><a href="#contribution_to_overall_change" data-toggle="tab">Contribution to overall change</a></li>
 				</ul>
 			</div>
 		</nav>
@@ -90,4 +90,3 @@
 	<p><span id="currentValue"></span></p>
 	<p><span id="baselineValue"></span></p>
 </div>
-
