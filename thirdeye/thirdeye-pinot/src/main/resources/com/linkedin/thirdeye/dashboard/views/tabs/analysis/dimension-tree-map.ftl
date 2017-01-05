@@ -73,7 +73,7 @@
 					</tr>
 					{{#each this.dimensions}}
 					<tr>
-						<td class="col-md-1" style="vertical-align: middle">{{this}}</td>
+						<td class="col-md-1" style="vertical-align: middle" class="label-medium-light">{{this}}</td>
 						<td class="col-md-11">
 							<div id="{{this}}-heatmap-placeholder" style="height: 50px; width: 100%"></div>
 						</td>
@@ -84,3 +84,10 @@
 		</div>
 	</div>
 </div>
+<div id="tooltip" class="hidden">
+	<p><strong id="heading"></strong></p>
+	<p><span id="percentageChange"></span></p>
+	<p><span id="currentValue"></span></p>
+	<p><span id="baselineValue"></span></p>
+</div>
+

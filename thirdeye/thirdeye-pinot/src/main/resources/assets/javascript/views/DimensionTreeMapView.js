@@ -98,6 +98,21 @@ DimensionTreeMapView.prototype = {
       }).on("click", function(d) {
         // TODO : fix zoom - may be call controller again with more filters added in the request?
         // return zoom(node == d.parent ? root : d.parent);
+      }).on("mousemove", function(d) {
+        var xPosition = d3.event.pageX + 5;
+        var yPosition = d3.event.pageY + 5;
+        d3.select("#tooltip")
+          .style("left", xPosition + "px")
+          .style("top", yPosition + "px");
+        d3.select("#tooltip #heading")
+          .text(d.t);
+        d3.select("#tooltip #percentageChange")
+          .text(d.percentageChange);
+        d3.select("#tooltip #currentValue")
+          .text(d.value);
+        d3.select("#tooltip").classed("hidden", false);
+      }).on("mouseout", function() {
+        d3.select("#tooltip").classed("hidden", true);
       });
 
       cell.append("svg:rect").attr("width", function(d) {
@@ -120,10 +135,21 @@ DimensionTreeMapView.prototype = {
         return d.dy / 2;
       }).attr("dy", ".35em").attr("text-anchor", "middle").text(function(d) {
         // TODO : add a condition here based on that show percentage change or contribution
-        text = d.t + '(' + d.percentageChange + ')'  ;
-        return text;
+        text = d.t + '(' + d.percentageChange + ')';
+        //each character takes up 7 pixels on an average
+        estimatedTextLength = text.length * 7;
+        if(estimatedTextLength > d.dx) {
+          return text.substring(0, d.dx/7) + "..";
+        } else {
+          return text;
+        }
       }).style("opacity", function(d) {
         d.w = this.getComputedTextLength();
+        //uncomment this code to detect the average number of pixels per character. Currently its 6 but we use 7 to estimate the text length.
+//        if(d.dx < d.w) {
+//          text = d.t + '(' + d.percentageChange + ')'  ;
+//          //console.log("text-length:"+ d.w + " cell-width:"+ d.dx + " text:" + text + " length:" + text.length + " pixels-per-letter:" + (d.w/text.length))
+//        }
         return d.dx > d.w ? 1 : 0;
       }).style("fill", function(d){
         var opacity = Math.abs(d.percentageChange / 25);
