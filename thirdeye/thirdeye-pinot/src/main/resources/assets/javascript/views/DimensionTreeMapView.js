@@ -125,7 +125,6 @@ DimensionTreeMapView.prototype = {
       var cell = div.selectAll("g").data(nodes).enter().append("svg:g").attr("class", "cell").attr("transform", function(d) {
         return "translate(" + d.x + "," + d.y + ")";
       }).on("click", function(d) {
-        // TODO : fix zoom - may be call controller again with more filters added in the request?
         // return zoom(node == d.parent ? root : d.parent);
       }).on("mousemove", function(d) {
         var xPosition = d3.event.pageX + 5;
