@@ -105,8 +105,13 @@ DimensionTreeMapView.prototype = {
       }).attr("height", function(d) {
         return d.dy - 1
       }).style("fill", function(d) {
-        // TODO: fix background color
-        return '#EC9F98'
+        var opacity = Math.abs(d.percentageChange / 25);
+        console.log("opacity:"+opacity);
+        if(d.percentageChange > 0){
+          return "rgba(0,0,234," + opacity + ")";
+        } else{
+          return "rgba(234,0,0,"  + opacity + ")" ;
+        }
       });
 
       cell.append("svg:text").attr("x", function(d) {
@@ -115,11 +120,21 @@ DimensionTreeMapView.prototype = {
         return d.dy / 2;
       }).attr("dy", ".35em").attr("text-anchor", "middle").text(function(d) {
         // TODO : add a condition here based on that show percentage change or contribution
-        return d.t + '(' + d.percentageChange + ')'  ;
+        text = d.t + '(' + d.percentageChange + ')'  ;
+        return text;
       }).style("opacity", function(d) {
         d.w = this.getComputedTextLength();
         return d.dx > d.w ? 1 : 0;
+      }).style("fill", function(d){
+        var opacity = Math.abs(d.percentageChange / 25);
+        if(opacity < 0.5){
+          return "#000000";
+        } else{
+          return "#ffffff" ;
+        }
       });
     }
   }
 }
+
+
