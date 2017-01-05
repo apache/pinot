@@ -100,7 +100,7 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
   }
 
   @Override
-  public void setString(int row, String string) throws Exception {
+  public void setString(int row, String string) {
     writer.setString(row, 0, string);
   }
 

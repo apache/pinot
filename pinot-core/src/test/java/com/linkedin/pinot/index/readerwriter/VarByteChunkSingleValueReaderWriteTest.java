@@ -19,9 +19,9 @@ import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.io.compression.ChunkCompressor;
 import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
 import com.linkedin.pinot.core.io.compression.ChunkDecompressor;
-import com.linkedin.pinot.core.io.reader.impl.VarByteReaderContext;
-import com.linkedin.pinot.core.io.reader.impl.v1.VarByteSingleValueReader;
-import com.linkedin.pinot.core.io.writer.impl.v1.VarByteSingleValueWriter;
+import com.linkedin.pinot.core.io.reader.impl.ChunkReaderContext;
+import com.linkedin.pinot.core.io.reader.impl.v1.VarByteChunkSingleValueReader;
+import com.linkedin.pinot.core.io.writer.impl.v1.VarByteChunkSingleValueWriter;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
 import java.nio.channels.FileChannel;
@@ -34,9 +34,9 @@ import org.testng.annotations.Test;
 
 
 /**
- * Unit test for {@link VarByteSingleValueReader} and {@link VarByteSingleValueWriter} classes.
+ * Unit test for {@link VarByteChunkSingleValueReader} and {@link VarByteChunkSingleValueWriter} classes.
  */
-public class VarByteSingleValueReaderWriteTest {
+public class VarByteChunkSingleValueReaderWriteTest {
   private static final Charset UTF_8 = Charset.forName("UTF-8");
 
   private static final int NUM_STRINGS = 5003;
@@ -45,8 +45,8 @@ public class VarByteSingleValueReaderWriteTest {
   private static final String TEST_FILE = System.getProperty("java.io.tmpdir") + File.separator + "varByteSVRTest";
 
   /**
-   * This test writes {@link #NUM_STRINGS} using {@link VarByteSingleValueWriter}. It then reads
-   * the strings using {@link VarByteSingleValueReader}, and asserts that what was written is the same as
+   * This test writes {@link #NUM_STRINGS} using {@link VarByteChunkSingleValueWriter}. It then reads
+   * the strings using {@link VarByteChunkSingleValueReader}, and asserts that what was written is the same as
    * what was read in.
    *
    * Number of docs and docs per chunk are chosen to generate complete as well partial chunks.
@@ -69,8 +69,8 @@ public class VarByteSingleValueReaderWriteTest {
     }
 
     ChunkCompressor compressor = ChunkCompressorFactory.getCompressor("snappy");
-    VarByteSingleValueWriter writer =
-        new VarByteSingleValueWriter(outFile, compressor, NUM_STRINGS, NUM_DOCS_PER_CHUNK, maxStringLengthInBytes);
+    VarByteChunkSingleValueWriter writer =
+        new VarByteChunkSingleValueWriter(outFile, compressor, NUM_STRINGS, NUM_DOCS_PER_CHUNK, maxStringLengthInBytes);
 
     for (int i = 0; i < NUM_STRINGS; i++) {
       writer.setString(i, expected[i]);
@@ -81,8 +81,8 @@ public class VarByteSingleValueReaderWriteTest {
         PinotDataBuffer.fromFile(outFile, ReadMode.mmap, FileChannel.MapMode.READ_ONLY, getClass().getName());
 
     ChunkDecompressor uncompressor = ChunkCompressorFactory.getDecompressor("snappy");
-    VarByteSingleValueReader reader = new VarByteSingleValueReader(pinotDataBuffer, uncompressor);
-    VarByteReaderContext context = reader.createContext();
+    VarByteChunkSingleValueReader reader = new VarByteChunkSingleValueReader(pinotDataBuffer, uncompressor);
+    ChunkReaderContext context = reader.createContext();
 
     for (int i = 0; i < NUM_STRINGS; i++) {
       String actual = reader.getString(i, context);

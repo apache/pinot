@@ -27,10 +27,12 @@ import com.linkedin.pinot.core.segment.creator.MultiValueForwardIndexCreator;
 import com.linkedin.pinot.core.segment.creator.SegmentCreator;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationInfo;
 import com.linkedin.pinot.core.segment.creator.SingleValueForwardIndexCreator;
+import com.linkedin.pinot.core.segment.creator.SingleValueRawIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.fwd.MultiValueUnsortedForwardIndexCreator;
+import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueFixedByteRawIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueSortedForwardIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueUnsortedForwardIndexCreator;
-import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueVarLengthRawIndexCreator;
+import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueVarByteRawIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
 import com.linkedin.pinot.core.startree.hll.HllConfig;
 import java.io.File;
@@ -137,26 +139,28 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       int maxLength = indexCreationInfo.getLegnthOfLongestEntry();
 
       boolean buildRawIndex = config.getRawIndexCreationColumns().contains(column);
-      if (schema.getFieldSpecFor(column).isSingleValueField()) {
+      FieldSpec fieldSpec = schema.getFieldSpecFor(column);
+      if (fieldSpec.isSingleValueField()) {
         // Raw indexes store actual values, instead of dictionary ids.
         if (buildRawIndex) {
-          forwardIndexCreatorMap.put(column, new SingleValueVarLengthRawIndexCreator(file, column, totalDocs, maxLength));
+          forwardIndexCreatorMap.put(column,
+              getRawIndexCreatorForColumn(file, column, fieldSpec.getDataType(), totalDocs, maxLength));
         } else {
           if (indexCreationInfo.isSorted()) {
             forwardIndexCreatorMap.put(column,
-                new SingleValueSortedForwardIndexCreator(file, uniqueValueCount, schema.getFieldSpecFor(column)));
+                new SingleValueSortedForwardIndexCreator(file, uniqueValueCount, fieldSpec));
           } else {
             forwardIndexCreatorMap.put(column,
-                new SingleValueUnsortedForwardIndexCreator(schema.getFieldSpecFor(column), file, uniqueValueCount,
+                new SingleValueUnsortedForwardIndexCreator(fieldSpec, file, uniqueValueCount,
                     totalDocs, indexCreationInfo.getTotalNumberOfEntries(), indexCreationInfo.hasNulls()));
           }
         }
       } else {
-        if (buildRawIndex) {
+        if (buildRawIndex) { // TODO: Add support for multi-valued columns.
           throw new RuntimeException("Raw index generation not supported for multi-valued columns: " + column);
         }
         forwardIndexCreatorMap.put(column,
-            new MultiValueUnsortedForwardIndexCreator(schema.getFieldSpecFor(column), file, uniqueValueCount, totalDocs,
+            new MultiValueUnsortedForwardIndexCreator(fieldSpec, file, uniqueValueCount, totalDocs,
                 indexCreationInfo.getTotalNumberOfEntries(), indexCreationInfo.hasNulls()));
       }
     }
@@ -194,9 +198,9 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     String column = spec.getName();
 
     if (config.getRawIndexCreationColumns().contains(column)) {
-      if (spec.getDataType() != FieldSpec.DataType.STRING || !spec.isSingleValueField()) {
+      if (!spec.isSingleValueField()) {
         throw new RuntimeException(
-            "Creation of indices without dictionaries is supported for single valued string columns only.");
+            "Creation of indices without dictionaries is supported for single valued columns only.");
       }
       return false;
     }
@@ -222,7 +226,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
               invertedIndexCreatorMap.get(column).add(docIdCounter, dictionaryIndex);
             }
           } else {
-            ((SingleValueVarLengthRawIndexCreator) forwardIndexCreatorMap.get(column)).index(docIdCounter, columnValueToIndex.toString());
+            ((SingleValueRawIndexCreator) forwardIndexCreatorMap.get(column)).index(docIdCounter, columnValueToIndex);
           }
         } else {
           int[] dictionaryIndex = dictionaryCreator.indexOfMV(columnValueToIndex);
@@ -413,5 +417,53 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     properties.clearProperty(getKeyFor(column, TOTAL_NUMBER_OF_ENTRIES));
     properties.clearProperty(getKeyFor(column, IS_AUTO_GENERATED));
     properties.clearProperty(getKeyFor(column, DEFAULT_NULL_VALUE));
+  }
+
+  /**
+   * Helper method to build the raw index creator for the column.
+   * Assumes that column to be indexed is single valued.
+   *
+   * @param file Output index file
+   * @param column Column name
+   * @param totalDocs Total number of documents to index
+   * @param lengthOfLongestEntry Length of longest entry
+   * @return
+   * @throws IOException
+   */
+  public static SingleValueRawIndexCreator getRawIndexCreatorForColumn(File file, String column,
+      FieldSpec.DataType dataType, int totalDocs, int lengthOfLongestEntry)
+      throws IOException {
+
+    SingleValueRawIndexCreator indexCreator;
+    switch(dataType) {
+      case INT:
+        indexCreator =
+            new SingleValueFixedByteRawIndexCreator(file, column, totalDocs, V1Constants.Numbers.INTEGER_SIZE);
+        break;
+
+      case LONG:
+        indexCreator =
+            new SingleValueFixedByteRawIndexCreator(file, column, totalDocs, V1Constants.Numbers.LONG_SIZE);
+        break;
+
+      case FLOAT:
+        indexCreator =
+            new SingleValueFixedByteRawIndexCreator(file, column, totalDocs, V1Constants.Numbers.FLOAT_SIZE);
+        break;
+
+      case DOUBLE:
+        indexCreator =
+            new SingleValueFixedByteRawIndexCreator(file, column, totalDocs, V1Constants.Numbers.DOUBLE_SIZE);
+        break;
+
+      case STRING:
+        indexCreator = new SingleValueVarByteRawIndexCreator(file, column, totalDocs, lengthOfLongestEntry);
+        break;
+
+      default:
+        throw new UnsupportedOperationException("Data type not supported for raw indexing: " + dataType);
+    }
+
+    return indexCreator;
   }
 }

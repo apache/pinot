@@ -22,8 +22,8 @@ import com.linkedin.pinot.core.common.BlockSingleValIterator;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
-import com.linkedin.pinot.core.io.writer.impl.v1.VarByteSingleValueWriter;
+import com.linkedin.pinot.core.segment.creator.SingleValueRawIndexCreator;
+import com.linkedin.pinot.core.segment.creator.impl.SegmentColumnarIndexCreator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
@@ -49,7 +49,6 @@ import org.slf4j.LoggerFactory;
 @SuppressWarnings({"FieldCanBeLocal", "unused"})
 public class DictionaryToRawIndexConverter {
   private static final Logger LOGGER = LoggerFactory.getLogger(DictionaryToRawIndexConverter.class);
-  private static final int DEFAULT_NUM_DOCS_PER_CHUNK = 1000;
   private static final Charset UTF_8 = Charset.forName("UTF-8");
 
   @Option(name = "-dataDir", required = true, usage = "Directory containing uncompressed segments")
@@ -66,9 +65,6 @@ public class DictionaryToRawIndexConverter {
 
   @Option(name = "-overwrite", required = false, usage = "Overwrite output directory")
   private boolean _overwrite = false;
-
-  @Option(name = "-numDocsPerChunk", required = false, usage = "Number of docs per chunk in the output raw index.")
-  private int _numDocsPerChunk = DEFAULT_NUM_DOCS_PER_CHUNK;
 
   @Option(name = "-numThreads", required = false, usage = "Number of threads to launch for conversion")
   private int _numThreads = 4;
@@ -120,18 +116,6 @@ public class DictionaryToRawIndexConverter {
    */
   public DictionaryToRawIndexConverter setOverwrite(boolean overwrite) {
     _overwrite = overwrite;
-    return this;
-  }
-
-  /**
-   * Setter for {@link #_numDocsPerChunk}. Specifies number of docs per chunk
-   * in the raw index to be created.
-   *
-   * @param numDocsPerChunk Number of docs per chunk
-   * @return this
-   */
-  public DictionaryToRawIndexConverter setNumDocsPerChunk(int numDocsPerChunk) {
-    _numDocsPerChunk = numDocsPerChunk;
     return this;
   }
 
@@ -226,8 +210,7 @@ public class DictionaryToRawIndexConverter {
     IndexSegment segment = Loaders.IndexSegment.load(newSegment, ReadMode.mmap);
     for (String column : columns) {
       LOGGER.info("Converting column '{}' for segment '{}'.", column, segment.getSegmentName());
-      File rawIndexFile = new File(newSegment, column + V1Constants.Indexes.RAW_SV_FWD_IDX_FILE_EXTENTION);
-      convertOneColumn(segment, column, rawIndexFile);
+      convertOneColumn(segment, column, newSegment);
     }
 
     updateMetadata(newSegment, columns, _tableName);
@@ -289,10 +272,10 @@ public class DictionaryToRawIndexConverter {
    *
    * @param segment Input segment to convert
    * @param column Column to convert
-   * @param rawIndexFile File where raw index to be written
+   * @param newSegment Directory where raw index to be written
    * @throws IOException
    */
-  private void convertOneColumn(IndexSegment segment, String column, File rawIndexFile)
+  private void convertOneColumn(IndexSegment segment, String column, File newSegment)
       throws IOException {
     DataSource dataSource = segment.getDataSource(column);
     Dictionary dictionary = dataSource.getDictionary();
@@ -308,31 +291,30 @@ public class DictionaryToRawIndexConverter {
       return;
     }
 
-    if (dataSourceMetadata.getDataType() != FieldSpec.DataType.STRING) {
-      LOGGER.error("Cannot convert non-string type column '{}'.", column);
-    }
-
     int totalDocs = segment.getSegmentMetadata().getTotalDocs();
     BlockSingleValIterator bvIter = (BlockSingleValIterator) dataSource.getNextBlock().getBlockValueSet().iterator();
-    int lengthOfLongestEntry = getLengthOfLongestEntry(bvIter, dictionary);
 
-    VarByteSingleValueWriter rawIndexWriter =
-        new VarByteSingleValueWriter(rawIndexFile, ChunkCompressorFactory.getCompressor("snappy"), totalDocs,
-            _numDocsPerChunk, lengthOfLongestEntry);
+    FieldSpec.DataType dataType = dataSourceMetadata.getDataType();
+    int lengthOfLongestEntry =
+        (dataType == FieldSpec.DataType.STRING) ? getLengthOfLongestEntry(bvIter, dictionary) : -1;
+
+    SingleValueRawIndexCreator rawIndexCreator =
+        SegmentColumnarIndexCreator.getRawIndexCreatorForColumn(newSegment, column, dataType, totalDocs,
+            lengthOfLongestEntry);
 
     int docId = 0;
     bvIter.reset();
     while (bvIter.hasNext()) {
       int dictId = bvIter.nextIntVal();
-      String value = (String) dictionary.get(dictId);
-      rawIndexWriter.setString(docId++, value);
+      Object value = dictionary.get(dictId);
+      rawIndexCreator.index(docId++, value);
 
       if (docId % 1000000 == 0) {
         LOGGER.info("Converted {} records.", docId);
       }
     }
-    rawIndexWriter.close();
-    deleteForwardIndex(rawIndexFile.getParentFile(), column, dataSourceMetadata.isSorted());
+    rawIndexCreator.close();
+    deleteForwardIndex(newSegment.getParentFile(), column, dataSourceMetadata.isSorted());
   }
 
   /**

@@ -15,8 +15,10 @@
  */
 package com.linkedin.pinot.core.segment.index.column;
 
+import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
+import com.linkedin.pinot.core.io.compression.ChunkDecompressor;
 import com.linkedin.pinot.core.io.reader.DataFileReader;
 import com.linkedin.pinot.core.io.reader.ReaderContext;
 import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
@@ -24,7 +26,10 @@ import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
 import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
 import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader;
 import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
-import com.linkedin.pinot.core.io.reader.impl.v1.VarByteSingleValueReader;
+import com.linkedin.pinot.core.io.reader.impl.v1.FixedByteChunkSingleValueReader;
+import com.linkedin.pinot.core.io.reader.impl.v1.FixedByteSingleValueReader;
+import com.linkedin.pinot.core.io.reader.impl.v1.VarByteChunkSingleValueReader;
+import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueFixedByteRawIndexCreator;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.readers.BitmapInvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.DoubleDictionary;
@@ -34,8 +39,8 @@ import com.linkedin.pinot.core.segment.index.readers.IntDictionary;
 import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.LongDictionary;
 import com.linkedin.pinot.core.segment.index.readers.StringDictionary;
-import com.linkedin.pinot.core.segment.store.ColumnIndexType;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import com.linkedin.pinot.core.segment.store.ColumnIndexType;
 import com.linkedin.pinot.core.segment.store.SegmentDirectory;
 import java.io.IOException;
 import org.slf4j.Logger;
@@ -106,7 +111,8 @@ public abstract class ColumnIndexContainer {
           new FixedBitSingleValueReader(fwdIndexBuffer, metadata.getTotalDocs(), metadata.getBitsPerElement(), metadata.hasNulls());
     } else {
       // TODO: Replace hard-coded compressor with getting information from meta-data.
-      fwdIndexReader = new VarByteSingleValueReader(fwdIndexBuffer, ChunkCompressorFactory.getDecompressor("snappy"));
+      fwdIndexReader =
+          getRawIndexReader(fwdIndexBuffer, metadata.getDataType());
     }
 
     BitmapInvertedIndexReader invertedIndex = null;
@@ -147,6 +153,33 @@ public abstract class ColumnIndexContainer {
     }
 
     throw new UnsupportedOperationException("unsupported data type : " + metadata.getDataType());
+  }
+
+  public static SingleColumnSingleValueReader getRawIndexReader(PinotDataBuffer fwdIndexBuffer,
+      FieldSpec.DataType dataType)
+      throws IOException {
+    SingleColumnSingleValueReader reader;
+
+    // TODO: Make compression/decompression configurable.
+    ChunkDecompressor decompressor = ChunkCompressorFactory.getDecompressor("snappy");
+
+    switch (dataType) {
+      case INT:
+      case LONG:
+      case FLOAT:
+      case DOUBLE:
+        reader = new FixedByteChunkSingleValueReader(fwdIndexBuffer, decompressor);
+        break;
+
+      case STRING:
+        reader = new VarByteChunkSingleValueReader(fwdIndexBuffer, decompressor);
+        break;
+
+      default:
+        throw new IllegalArgumentException("Illegal data type for raw index reader: " + dataType);
+    }
+
+    return reader;
   }
 
   /**
