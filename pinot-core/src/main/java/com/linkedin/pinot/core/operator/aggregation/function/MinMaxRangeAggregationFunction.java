@@ -34,6 +34,12 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction<MinMa
     return AggregationFunctionFactory.MINMAXRANGE_AGGREGATION_FUNCTION;
   }
 
+  @Nonnull
+  @Override
+  public String getColumnName(@Nonnull String[] columns) {
+    return AggregationFunctionFactory.MINMAXRANGE_AGGREGATION_FUNCTION + "_" + columns[0];
+  }
+
   @Override
   public void accept(@Nonnull AggregationFunctionVisitorBase visitor) {
     visitor.visit(this);
@@ -162,7 +168,7 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction<MinMa
   @Nonnull
   @Override
   public FieldSpec.DataType getIntermediateResultDataType() {
-    return FieldSpec.DataType.DOUBLE;
+    return FieldSpec.DataType.OBJECT;
   }
 
   @Nonnull

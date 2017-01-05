@@ -35,6 +35,12 @@ public class DistinctCountHLLAggregationFunction implements AggregationFunction<
     return AggregationFunctionFactory.DISTINCTCOUNTHLL_AGGREGATION_FUNCTION;
   }
 
+  @Nonnull
+  @Override
+  public String getColumnName(@Nonnull String[] columns) {
+    return AggregationFunctionFactory.DISTINCTCOUNTHLL_AGGREGATION_FUNCTION + "_" + columns[0];
+  }
+
   @Override
   public void accept(@Nonnull AggregationFunctionVisitorBase visitor) {
     visitor.visit(this);

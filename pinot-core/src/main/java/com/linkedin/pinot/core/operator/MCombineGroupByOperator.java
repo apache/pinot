@@ -23,11 +23,11 @@ import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
+import com.linkedin.pinot.core.operator.aggregation.AggregationFunctionContext;
 import com.linkedin.pinot.core.operator.aggregation.groupby.AggregationGroupByResult;
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupKeyGenerator;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
-import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
-import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
+import com.linkedin.pinot.core.query.aggregation.AggregationFunctionUtils;
 import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByOperatorService;
 import com.linkedin.pinot.core.util.trace.TraceRunnable;
 import java.io.Serializable;
@@ -49,12 +49,14 @@ import org.slf4j.LoggerFactory;
 public class MCombineGroupByOperator extends BaseOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MCombineGroupByOperator.class);
 
+  // TODO: check whether it is better to use thread local.
   // Choose a proper prime number for the number of locks.
   // Use prime number to reduce the conflict rate of different hashcodes.
   // Too small number of locks will cause high conflict rate.
   // Too large number of locks will consume too much memory.
   private static final int NUM_LOCKS = 10007;
   private static final Object[] LOCKS = new Object[NUM_LOCKS];
+
   static {
     for (int i = 0; i < NUM_LOCKS; i++) {
       LOCKS[i] = new Object();
@@ -138,35 +140,34 @@ public class MCombineGroupByOperator extends BaseOperator {
    */
   private IntermediateResultsBlock combineBlocks()
       throws InterruptedException {
-    final int numOperators = _operators.size();
-    final IntermediateResultsBlock[] blocks = new IntermediateResultsBlock[numOperators];
+    int numOperators = _operators.size();
+    final IntermediateResultsBlock[] intermediateResultsBlocks = new IntermediateResultsBlock[numOperators];
     final CountDownLatch operatorLatch = new CountDownLatch(numOperators);
-
-    final List<AggregationInfo> aggregationsInfo = _brokerRequest.getAggregationsInfo();
-    final int numAggrFunctions = aggregationsInfo.size();
-
-    // TODO: use new aggregation functions to combine results.
-    final List<AggregationFunction> aggregationFunctions =
-        AggregationFunctionFactory.getAggregationFunction(_brokerRequest);
-
     final Map<String, Serializable[]> resultsMap = new ConcurrentHashMap<>();
+
+    List<AggregationInfo> aggregationInfos = _brokerRequest.getAggregationsInfo();
+    final AggregationFunctionContext[] aggregationFunctionContexts =
+        AggregationFunctionUtils.getAggregationFunctionContexts(aggregationInfos, null);
+    final int numAggregationFunctions = aggregationFunctionContexts.length;
 
     for (int i = 0; i < numOperators; i++) {
       final int index = i;
 
       _executorService.execute(new TraceRunnable() {
+        @SuppressWarnings("unchecked")
         @Override
         public void runJob() {
-          AggregationGroupByResult groupByResult;
+          AggregationGroupByResult aggregationGroupByResult;
 
           try {
-            blocks[index] = (IntermediateResultsBlock) _operators.get(index).nextBlock();
-            groupByResult = blocks[index].getAggregationGroupByResult();
+            IntermediateResultsBlock intermediateResultsBlock =
+                (IntermediateResultsBlock) _operators.get(index).nextBlock();
+            intermediateResultsBlocks[index] = intermediateResultsBlock;
+            aggregationGroupByResult = intermediateResultsBlock.getAggregationGroupByResult();
 
-            if (groupByResult != null) {
+            if (aggregationGroupByResult != null) {
               // Iterate over the group-by keys, for each key, update the group-by result in the resultsMap.
-              Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = groupByResult.getGroupKeyIterator();
-
+              Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
               while (groupKeyIterator.hasNext()) {
                 GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
                 String groupKeyString = groupKey.getStringKey();
@@ -177,24 +178,24 @@ public class MCombineGroupByOperator extends BaseOperator {
                   Serializable[] results = resultsMap.get(groupKeyString);
 
                   if (results == null) {
-                    results = new Serializable[numAggrFunctions];
-                    for (int j = 0; j < numAggrFunctions; j++) {
-                      results[j] = groupByResult.getResultForKey(groupKey, j);
+                    results = new Serializable[numAggregationFunctions];
+                    for (int j = 0; j < numAggregationFunctions; j++) {
+                      results[j] = aggregationGroupByResult.getResultForKey(groupKey, j);
                     }
                     resultsMap.put(groupKeyString, results);
                   } else {
-                    for (int j = 0; j < numAggrFunctions; j++) {
-                      results[j] = aggregationFunctions.get(j)
-                          .combineTwoValues(results[j], groupByResult.getResultForKey(groupKey, j));
+                    for (int j = 0; j < numAggregationFunctions; j++) {
+                      results[j] = aggregationFunctionContexts[j].getAggregationFunction()
+                          .merge(results[j], aggregationGroupByResult.getResultForKey(groupKey, j));
                     }
                   }
                 }
               }
             }
           } catch (Exception e) {
-            LOGGER.error("Exception processing CombineGroupBy for index {}, operator {}",
-                index, _operators.get(index).getClass().getName(), e);
-            blocks[index] = new IntermediateResultsBlock(e);
+            LOGGER.error("Exception processing CombineGroupBy for index {}, operator {}", index,
+                _operators.get(index).getClass().getName(), e);
+            intermediateResultsBlocks[index] = new IntermediateResultsBlock(e);
           }
 
           operatorLatch.countDown();
@@ -209,13 +210,28 @@ public class MCombineGroupByOperator extends BaseOperator {
       return new IntermediateResultsBlock(new TimeoutException("CombineGroupBy timed out."));
     }
 
-    // Use aggregationGroupByOperatorService to trim the resultsMap
+    // Use aggregationGroupByOperatorService to trim the results map.
     AggregationGroupByOperatorService aggregationGroupByOperatorService =
-        new AggregationGroupByOperatorService(_brokerRequest.getAggregationsInfo(), _brokerRequest.getGroupBy());
+        new AggregationGroupByOperatorService(aggregationInfos, _brokerRequest.getGroupBy());
     List<Map<String, Serializable>> trimmedResults =
-        aggregationGroupByOperatorService.trimToSize(resultsMap, numAggrFunctions);
+        aggregationGroupByOperatorService.trimToSize(resultsMap, numAggregationFunctions);
+    IntermediateResultsBlock mergedBlock =
+        new IntermediateResultsBlock(aggregationFunctionContexts, trimmedResults, true);
 
-    IntermediateResultsBlock mergedBlock = buildResultBlock(aggregationFunctions, trimmedResults, blocks);
+    // Merge all exceptions.
+    List<ProcessingException> processingExceptions = null;
+    for (IntermediateResultsBlock intermediateResultsBlock : intermediateResultsBlocks) {
+      List<ProcessingException> blockProcessingExceptions = intermediateResultsBlock.getProcessingExceptions();
+      if (blockProcessingExceptions != null) {
+        if (processingExceptions == null) {
+          processingExceptions = blockProcessingExceptions;
+        } else {
+          processingExceptions.addAll(blockProcessingExceptions);
+        }
+      }
+    }
+    mergedBlock.setProcessingExceptions(processingExceptions);
+
     // Update execution statistics.
     ExecutionStatistics executionStatistics = new ExecutionStatistics();
     for (Operator operator : _operators) {
@@ -227,42 +243,9 @@ public class MCombineGroupByOperator extends BaseOperator {
     mergedBlock.setNumDocsScanned(executionStatistics.getNumDocsScanned());
     mergedBlock.setNumEntriesScannedInFilter(executionStatistics.getNumEntriesScannedInFilter());
     mergedBlock.setNumEntriesScannedPostFilter(executionStatistics.getNumEntriesScannedPostFilter());
-    mergedBlock.setTotalRawDocs(executionStatistics.getNumTotalRawDocs());
+    mergedBlock.setNumTotalRawDocs(executionStatistics.getNumTotalRawDocs());
 
     return mergedBlock;
-  }
-
-  /**
-   * Helper method to builds and returns an IntermediateResultBlock containing the
-   * merged results from all underlying operators.
-   *
-   * @param aggregationFunctions List of aggregation functions.
-   * @param trimmedResults List of maps containing the trimmed results.
-   * @param blocks Array of blocks for which the results are being merged.
-   * @return IntermediateResultsBlock containing merged results.
-   */
-  private IntermediateResultsBlock buildResultBlock(List<AggregationFunction> aggregationFunctions,
-      List<Map<String, Serializable>> trimmedResults, IntermediateResultsBlock[] blocks) {
-
-    IntermediateResultsBlock resultBlock = new IntermediateResultsBlock(aggregationFunctions, null, true);
-    List<ProcessingException> exceptions = null;
-
-    for (IntermediateResultsBlock block : blocks) {
-      List<ProcessingException> blockExceptions = block.getExceptions();
-      if (blockExceptions != null) {
-        if (exceptions == null) {
-          exceptions = blockExceptions;
-        } else {
-          exceptions.addAll(blockExceptions);
-        }
-      } else {
-        // If there are blocks without exception, set the aggregation group-by result.
-        resultBlock.setAggregationGroupByResult(trimmedResults);
-      }
-    }
-
-    resultBlock.setExceptionsList(exceptions);
-    return resultBlock;
   }
 
   @Override

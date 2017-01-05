@@ -15,65 +15,73 @@
  */
 package com.linkedin.pinot.core.query.aggregation;
 
-import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.utils.DataTableBuilder;
+import com.linkedin.pinot.core.operator.aggregation.AggregationFunctionContext;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.PriorityQueue;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import javax.annotation.Nonnull;
 
 
 /**
- * CombineReduceService will take a list of intermediate results and merge them.
- *
+ * The <code>CombineService</code> class provides the utility methods to combine {@link IntermediateResultsBlock}s.
  */
+@SuppressWarnings({"ConstantConditions", "unchecked"})
 public class CombineService {
   private CombineService() {
   }
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(CombineService.class);
-
-  public static void mergeTwoBlocks(BrokerRequest brokerRequest, IntermediateResultsBlock mergedBlock,
-      IntermediateResultsBlock blockToMerge) {
-    // Sanity check
-    Preconditions.checkNotNull(mergedBlock);
-    if (blockToMerge == null) {
-      return;
+  public static void mergeTwoBlocks(@Nonnull BrokerRequest brokerRequest, @Nonnull IntermediateResultsBlock mergedBlock,
+      @Nonnull IntermediateResultsBlock blockToMerge) {
+    // Combine processing exceptions.
+    List<ProcessingException> mergedProcessingExceptions = mergedBlock.getProcessingExceptions();
+    List<ProcessingException> processingExceptionsToMerge = blockToMerge.getProcessingExceptions();
+    if (mergedProcessingExceptions == null) {
+      mergedBlock.setProcessingExceptions(processingExceptionsToMerge);
+    } else if (processingExceptionsToMerge != null) {
+      mergedProcessingExceptions.addAll(processingExceptionsToMerge);
     }
 
-    // Debug mode enable : Combine SegmentStatistics and TraceInfo
-    if (brokerRequest.isEnableTrace()) {
-      // mergedBlock.getSegmentStatistics().addAll(blockToMerge.getSegmentStatistics());
-    }
-    // Combine Exceptions
-    mergedBlock.setExceptionsList(combineExceptions(mergedBlock.getExceptions(), blockToMerge.getExceptions()));
-
+    // Combine result.
     if (brokerRequest.isSetAggregationsInfo()) {
-      if (brokerRequest.isSetGroupBy()) {
-        // Combine AggregationGroupBy
-        mergedBlock.setAggregationGroupByResult(combineAggregationGroupByResults1(brokerRequest,
-            mergedBlock.getAggregationGroupByOperatorResult(), blockToMerge.getAggregationGroupByOperatorResult()));
+      // Combine aggregation result.
+
+      if (!brokerRequest.isSetGroupBy()) {
+        // Combine aggregation only result.
+
+        // Might be null if caught exception during query execution.
+        List<Serializable> aggregationResultToMerge = blockToMerge.getAggregationResult();
+        if (aggregationResultToMerge == null) {
+          // No data in block to merge.
+          return;
+        }
+
+        AggregationFunctionContext[] mergedAggregationFunctionContexts = mergedBlock.getAggregationFunctionContexts();
+        if (mergedAggregationFunctionContexts == null) {
+          // No data in merged block.
+          mergedBlock.setAggregationFunctionContexts(blockToMerge.getAggregationFunctionContexts());
+          mergedBlock.setAggregationResults(aggregationResultToMerge);
+        }
+
+        // Merge two block.
+        List<Serializable> mergedAggregationResult = mergedBlock.getAggregationResult();
+        int numAggregationFunctions = mergedAggregationFunctionContexts.length;
+        for (int i = 0; i < numAggregationFunctions; i++) {
+          mergedAggregationResult.set(i, mergedAggregationFunctionContexts[i].getAggregationFunction()
+              .merge(mergedAggregationResult.get(i), aggregationResultToMerge.get(i)));
+        }
       } else {
-        // TODO: use new aggregation functions to combine results.
-        // Combine Aggregations
-        List<AggregationFunction> aggregationFunctions =
-            AggregationFunctionFactory.getAggregationFunction(brokerRequest);
-        mergedBlock.setAggregationFunctions(aggregationFunctions);
-        mergedBlock.setAggregationResults(combineAggregationResults(brokerRequest, mergedBlock.getAggregationResult(),
-            blockToMerge.getAggregationResult()));
+        // Combine aggregation group-by result, which should not come into CombineService.
+        throw new UnsupportedOperationException();
       }
     } else {
-      // Combine selection.
+      // Combine selection result.
 
       // Data schema will be null if exceptions caught during query processing.
       // Result set size will be zero if no row matches the predicate.
@@ -128,83 +136,5 @@ public class CombineService {
         }
       }
     }
-  }
-
-  private static List<Map<String, Serializable>> combineAggregationGroupByResults1(BrokerRequest brokerRequest,
-      List<Map<String, Serializable>> list1, List<Map<String, Serializable>> list2) {
-    if (list1 == null) {
-      return list2;
-    }
-    if (list2 == null) {
-      return list1;
-    }
-
-    for (int i = 0; i < list1.size(); ++i) {
-      list1.set(i, mergeTwoGroupedResults(brokerRequest.getAggregationsInfo().get(i), list1.get(i), list2.get(i)));
-    }
-
-    return list1;
-
-  }
-
-  private static Map<String, Serializable> mergeTwoGroupedResults(AggregationInfo aggregationInfo,
-      Map<String, Serializable> map1, Map<String, Serializable> map2) {
-    if (map1 == null) {
-      return map2;
-    }
-    if (map2 == null) {
-      return map1;
-    }
-
-    AggregationFunction aggregationFunction = AggregationFunctionFactory.get(aggregationInfo, true);
-    for (String key : map2.keySet()) {
-      if (map1.containsKey(key)) {
-        map1.put(key, aggregationFunction.combineTwoValues(map1.get(key), map2.get(key)));
-      } else {
-        map1.put(key, map2.get(key));
-      }
-    }
-    return map1;
-  }
-
-  private static List<Serializable> combineAggregationResults(BrokerRequest brokerRequest,
-      List<Serializable> aggregationResult1, List<Serializable> aggregationResult2) {
-    if (aggregationResult1 == null) {
-      return aggregationResult2;
-    }
-    if (aggregationResult2 == null) {
-      return aggregationResult1;
-    }
-    List<List<Serializable>> aggregationResultsList = new ArrayList<List<Serializable>>();
-
-    for (int i = 0; i < brokerRequest.getAggregationsInfoSize(); ++i) {
-      aggregationResultsList.add(new ArrayList<Serializable>());
-      if (aggregationResult1.get(i) != null) {
-        aggregationResultsList.get(i).add(aggregationResult1.get(i));
-      }
-      if (aggregationResult2.get(i) != null) {
-        aggregationResultsList.get(i).add(aggregationResult2.get(i));
-      }
-    }
-
-    List<Serializable> retAggregationResults = new ArrayList<Serializable>();
-    List<AggregationFunction> aggregationFunctions = AggregationFunctionFactory.getAggregationFunction(brokerRequest);
-    for (int i = 0; i < aggregationFunctions.size(); ++i) {
-      retAggregationResults.add((Serializable) aggregationFunctions.get(i)
-          .combine(aggregationResultsList.get(i), CombineLevel.INSTANCE).get(0));
-    }
-    return retAggregationResults;
-  }
-
-  private static List<ProcessingException> combineExceptions(List<ProcessingException> exceptions1,
-      List<ProcessingException> exceptions2) {
-    if (exceptions1 == null) {
-      return exceptions2;
-    }
-    if (exceptions2 == null) {
-      return exceptions1;
-    }
-    exceptions1.addAll(exceptions2);
-    return exceptions1;
   }
 }

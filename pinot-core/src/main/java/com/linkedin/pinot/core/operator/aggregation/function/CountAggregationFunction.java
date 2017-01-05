@@ -35,6 +35,12 @@ public class CountAggregationFunction implements AggregationFunction<MutableLong
     return AggregationFunctionFactory.COUNT_AGGREGATION_FUNCTION;
   }
 
+  @Nonnull
+  @Override
+  public String getColumnName(@Nonnull String[] columns) {
+    return AggregationFunctionFactory.COUNT_AGGREGATION_FUNCTION + "_star";
+  }
+
   @Override
   public void accept(@Nonnull AggregationFunctionVisitorBase visitor) {
     visitor.visit(this);

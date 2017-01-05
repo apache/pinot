@@ -18,16 +18,21 @@ package com.linkedin.pinot.core.plan;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.GroupBy;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.aggregation.AggregationFunctionContext;
+import com.linkedin.pinot.core.operator.aggregation.AggregationOperator;
+import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunctionFactory;
 import com.linkedin.pinot.core.operator.aggregation.groupby.AggregationGroupByOperator;
 import com.linkedin.pinot.core.operator.aggregation.groupby.DefaultGroupByExecutor;
+import com.linkedin.pinot.core.query.aggregation.AggregationFunctionUtils;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import javax.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,25 +48,27 @@ public class AggregationGroupByPlanNode implements PlanNode {
   private final List<AggregationInfo> _aggregationInfos;
   private final GroupBy _groupBy;
   private final ProjectionPlanNode _projectionPlanNode;
-  private final int _numAggrGroupsLimit;
+  private final int _numGroupsLimit;
 
-  public AggregationGroupByPlanNode(IndexSegment indexSegment, BrokerRequest brokerRequest, int numAggrGroupsLimit) {
+  public AggregationGroupByPlanNode(@Nonnull IndexSegment indexSegment, @Nonnull BrokerRequest brokerRequest,
+      int numGroupsLimit) {
     _indexSegment = indexSegment;
     _aggregationInfos = brokerRequest.getAggregationsInfo();
     _groupBy = brokerRequest.getGroupBy();
-    _numAggrGroupsLimit = numAggrGroupsLimit;
+    _numGroupsLimit = numGroupsLimit;
     _projectionPlanNode = new ProjectionPlanNode(_indexSegment, getAggregationGroupByRelatedColumns(),
-        new DocIdSetPlanNode(_indexSegment, brokerRequest, 5000));
+        new DocIdSetPlanNode(_indexSegment, brokerRequest));
   }
 
+  @Nonnull
   private String[] getAggregationGroupByRelatedColumns() {
     Set<String> aggregationGroupByRelatedColumns = new HashSet<>();
     for (AggregationInfo aggregationInfo : _aggregationInfos) {
-      if (aggregationInfo.getAggregationType().equalsIgnoreCase("count")) {
-        continue;
+      if (!aggregationInfo.getAggregationType()
+          .equalsIgnoreCase(AggregationFunctionFactory.COUNT_AGGREGATION_FUNCTION)) {
+        String columns = aggregationInfo.getAggregationParams().get("column").trim();
+        aggregationGroupByRelatedColumns.addAll(Arrays.asList(columns.split(",")));
       }
-      String columns = aggregationInfo.getAggregationParams().get("column").trim();
-      aggregationGroupByRelatedColumns.addAll(Arrays.asList(columns.split(",")));
     }
     aggregationGroupByRelatedColumns.addAll(_groupBy.getColumns());
     return aggregationGroupByRelatedColumns.toArray(new String[aggregationGroupByRelatedColumns.size()]);
@@ -70,19 +77,10 @@ public class AggregationGroupByPlanNode implements PlanNode {
   @Override
   public Operator run() {
     MProjectionOperator projectionOperator = (MProjectionOperator) _projectionPlanNode.run();
-    int numAggFuncs = _aggregationInfos.size();
-    AggregationFunctionContext[] aggrFuncContextArray = new AggregationFunctionContext[numAggFuncs];
-    AggregationFunctionInitializer aggFuncInitializer = new AggregationFunctionInitializer(_indexSegment.getSegmentMetadata());
-    for (int i = 0; i < numAggFuncs; i++) {
-      AggregationInfo aggregationInfo = _aggregationInfos.get(i);
-      aggrFuncContextArray[i] = AggregationFunctionContext.instantiate(aggregationInfo);
-      aggrFuncContextArray[i].getAggregationFunction().accept(aggFuncInitializer);
-    }
-
-    DefaultGroupByExecutor defaultGroupByExecutor =
-        new DefaultGroupByExecutor(aggrFuncContextArray, _groupBy, _numAggrGroupsLimit);
-    return new AggregationGroupByOperator(_aggregationInfos, defaultGroupByExecutor, projectionOperator,
-        _indexSegment.getSegmentMetadata().getTotalRawDocs());
+    SegmentMetadata segmentMetadata = _indexSegment.getSegmentMetadata();
+    return new AggregationGroupByOperator(
+        AggregationFunctionUtils.getAggregationFunctionContexts(_aggregationInfos, segmentMetadata), _groupBy,
+        _numGroupsLimit, projectionOperator, segmentMetadata.getTotalRawDocs());
   }
 
   @Override

@@ -58,6 +58,12 @@ public class PercentileEstAggregationFunction implements AggregationFunction<Qua
     return _name;
   }
 
+  @Nonnull
+  @Override
+  public String getColumnName(@Nonnull String[] columns) {
+    return _name + "_" + columns[0];
+  }
+
   @Override
   public void accept(@Nonnull AggregationFunctionVisitorBase visitor) {
     visitor.visit(this);

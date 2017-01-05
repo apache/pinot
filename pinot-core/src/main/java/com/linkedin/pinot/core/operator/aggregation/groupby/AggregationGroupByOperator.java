@@ -15,82 +15,59 @@
  */
 package com.linkedin.pinot.core.operator.aggregation.groupby;
 
-import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.ExecutionStatistics;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
+import com.linkedin.pinot.core.operator.aggregation.AggregationFunctionContext;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
-import com.linkedin.pinot.core.query.aggregation.AggregationFunctionFactory;
-import java.util.List;
+import javax.annotation.Nonnull;
 
 
 /**
- * Operator class for implementing aggregation group by functionality.
- * Extends the BaseOperator class.
- *
+ * The <code>AggregationOperator</code> class provides the operator for aggregation group-by query on a single segment.
  */
 public class AggregationGroupByOperator extends BaseOperator {
-
-  private final GroupByExecutor _groupByExecutor;
+  private final AggregationFunctionContext[] _aggregationFunctionContexts;
+  private final GroupBy _groupBy;
+  private final int _numGroupsLimit;
   private final MProjectionOperator _projectionOperator;
   private final long _numTotalRawDocs;
-  private final List<AggregationInfo> _aggregationInfoList;
-  private int _nextBlockCallCounter = 0;
   private ExecutionStatistics _executionStatistics;
 
-  /**
-   * Constructor for the class.
-   * @param aggregationsInfoList List of AggregationInfo (contains context for applying aggregation functions).
-   * @param defaultGroupByExecutor default group by executor
-   * @param defaultGroupByExecutor
-   * @param projectionOperator Projection
-   * @param numTotalRawDocs Number of total raw documents.
-   */
-  // aggregationInfoList parameter is required to support legacy API in getNextBlock()
-  public AggregationGroupByOperator(List<AggregationInfo> aggregationsInfoList,
-      DefaultGroupByExecutor defaultGroupByExecutor, MProjectionOperator projectionOperator,
+  public AggregationGroupByOperator(@Nonnull AggregationFunctionContext[] aggregationFunctionContexts,
+      @Nonnull GroupBy groupBy, int numGroupsLimit, @Nonnull MProjectionOperator projectionOperator,
       long numTotalRawDocs) {
-    Preconditions.checkArgument(aggregationsInfoList != null && aggregationsInfoList.size() > 0);
-    Preconditions.checkNotNull(defaultGroupByExecutor);
-    Preconditions.checkNotNull(projectionOperator);
-
+    _aggregationFunctionContexts = aggregationFunctionContexts;
+    _groupBy = groupBy;
+    _numGroupsLimit = numGroupsLimit;
     _projectionOperator = projectionOperator;
-    _aggregationInfoList = aggregationsInfoList;
     _numTotalRawDocs = numTotalRawDocs;
-    _groupByExecutor = defaultGroupByExecutor;
   }
 
-  /**
-   * Returns the next ResultBlock containing the result of aggregation group by.
-   * @return Return next block of aggregation group-by
-   */
+  @Override
+  public boolean open() {
+    _projectionOperator.open();
+    return true;
+  }
+
   @Override
   public Block getNextBlock() {
-    return getNextBlock(new BlockId(_nextBlockCallCounter++));
-  }
-
-  /**
-   * This method is currently not supported.
-   */
-  @Override
-  public Block getNextBlock(BlockId blockId) {
-    if (blockId.getId() > 0) {
-      return null;
-    }
-
     int numDocsScanned = 0;
 
-    _groupByExecutor.init();
+    // Perform aggregation group-by on all the blocks.
+    GroupByExecutor groupByExecutor =
+        new DefaultGroupByExecutor(_aggregationFunctionContexts, _groupBy, _numGroupsLimit);
+    groupByExecutor.init();
     ProjectionBlock projectionBlock;
     while ((projectionBlock = (ProjectionBlock) _projectionOperator.nextBlock()) != null) {
       numDocsScanned += projectionBlock.getNumDocs();
-      _groupByExecutor.process(projectionBlock);
+      groupByExecutor.process(projectionBlock);
     }
-    _groupByExecutor.finish();
+    groupByExecutor.finish();
 
     // Create execution statistics.
     long numEntriesScannedInFilter = _projectionOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
@@ -99,15 +76,13 @@ public class AggregationGroupByOperator extends BaseOperator {
         new ExecutionStatistics(numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
             _numTotalRawDocs);
 
-    AggregationGroupByResult aggregationGroupByResult = _groupByExecutor.getResult();
-    return new IntermediateResultsBlock(AggregationFunctionFactory.getAggregationFunction(_aggregationInfoList),
-        aggregationGroupByResult);
+    // Build intermediate result block based on aggregation group-by result from the executor.
+    return new IntermediateResultsBlock(_aggregationFunctionContexts, groupByExecutor.getResult());
   }
 
   @Override
-  public boolean open() {
-    _projectionOperator.open();
-    return true;
+  public Block getNextBlock(BlockId blockId) {
+    throw new UnsupportedOperationException();
   }
 
   @Override

@@ -106,10 +106,7 @@ public class MSelectionOrderByOperator extends BaseOperator {
         new ExecutionStatistics(numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
             numTotalRawDocs);
 
-    IntermediateResultsBlock resultBlock = new IntermediateResultsBlock();
-    resultBlock.setSelectionResult(_selectionOperatorService.getRows());
-    resultBlock.setSelectionDataSchema(_selectionOperatorService.getDataSchema());
-    return resultBlock;
+    return new IntermediateResultsBlock(_selectionOperatorService.getDataSchema(), _selectionOperatorService.getRows());
   }
 
   @Override

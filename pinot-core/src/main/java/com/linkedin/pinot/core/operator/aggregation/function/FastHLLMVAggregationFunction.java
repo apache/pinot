@@ -32,6 +32,12 @@ public class FastHLLMVAggregationFunction extends FastHLLAggregationFunction {
     return AggregationFunctionFactory.FASTHLL_MV_AGGREGATION_FUNCTION;
   }
 
+  @Nonnull
+  @Override
+  public String getColumnName(@Nonnull String[] columns) {
+    return AggregationFunctionFactory.FASTHLL_MV_AGGREGATION_FUNCTION + "_" + columns[0];
+  }
+
   @Override
   public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
       @Nonnull ProjectionBlockValSet... projectionBlockValSets) {
