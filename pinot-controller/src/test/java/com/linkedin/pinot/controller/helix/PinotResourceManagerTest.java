@@ -16,15 +16,21 @@
 package com.linkedin.pinot.controller.helix;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.InputStreamReader;
+import java.nio.file.Files;
+import java.util.Collections;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -49,6 +55,7 @@ public class PinotResourceManagerTest {
   private final static String ZK_SERVER = ZkStarter.DEFAULT_ZK_STR;
   private final static String HELIX_CLUSTER_NAME = "TestPinotResourceManager";
   private final static String TABLE_NAME = "testTable";
+  private final static String LOCAL_DISK_DIR = "/tmp/segments";
   private ZkClient _zkClient;
 
   private HelixManager _helixZkManager;
@@ -179,6 +186,30 @@ public class PinotResourceManagerTest {
 
     idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, offlineTableName);
     Assert.assertEquals(idealState.getPartitionSet().size(), 0);
+  }
+
+  @Test
+  public void testDeletingTheSameSegmentInSegmentDeletionManager() throws Exception {
+    final SegmentMetadata segmentMetadata = new SimpleSegmentMetadata(TABLE_NAME);
+    final String segmentName = segmentMetadata.getName();
+
+    File segmentFile = new File(LOCAL_DISK_DIR + "/" + TABLE_NAME + "/" + segmentName);
+    for (int i = 0; i < 2; i++) {
+      addOneSegment(TABLE_NAME);
+      // Waiting for the external view to update
+      Thread.sleep(2000);
+
+      final ExternalView externalView =
+          _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME,
+              TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(TABLE_NAME));
+
+      for (final String segmentId : externalView.getPartitionSet()) {
+        deleteOneSegment(TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(TABLE_NAME), segmentId);
+        // Waiting for the external view to update
+        Thread.sleep(2000);
+      }
+    }
+    assert(!segmentFile.exists());
   }
 
   public void testWithCmdLines() throws Exception {

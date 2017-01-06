@@ -140,9 +140,13 @@ public class SegmentDeletionManager {
         if (fileToMove.exists()) {
           File targetDir = new File(new File(_localDiskDir, DELETED_SEGMENTS), rawTableName);
           try {
-            FileUtils.moveFileToDirectory(fileToMove, targetDir, true);
+            // Overwrites the file if it already exists in the target directory.
+            FileUtils.copyFileToDirectory(fileToMove, targetDir, true);
             LOGGER.info("Moved segment {} from {} to {}", segmentId, fileToMove.getAbsolutePath(),
                 targetDir.getAbsolutePath());
+            if (!fileToMove.delete()) {
+              LOGGER.warn("Could not delete file", segmentId, fileToMove.getAbsolutePath());
+            }
           } catch (IOException e) {
             LOGGER.warn("Could not move segment {} from {} to {}", segmentId, fileToMove.getAbsolutePath(),
                 targetDir.getAbsolutePath(), e);
