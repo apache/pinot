@@ -28,17 +28,18 @@ import javax.annotation.Nonnull;
 
 
 public class DistinctCountHLLAggregationFunction implements AggregationFunction<HyperLogLog, Long> {
+  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.DISTINCTCOUNTHLL.getName();
 
   @Nonnull
   @Override
   public String getName() {
-    return AggregationFunctionFactory.DISTINCTCOUNTHLL_AGGREGATION_FUNCTION;
+    return NAME;
   }
 
   @Nonnull
   @Override
   public String getColumnName(@Nonnull String[] columns) {
-    return AggregationFunctionFactory.DISTINCTCOUNTHLL_AGGREGATION_FUNCTION + "_" + columns[0];
+    return NAME + "_" + columns[0];
   }
 
   @Override

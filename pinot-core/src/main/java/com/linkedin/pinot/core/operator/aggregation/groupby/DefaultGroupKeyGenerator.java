@@ -19,7 +19,6 @@ import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
-import com.linkedin.pinot.core.query.aggregation.groupby.GroupByConstants;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import it.unimi.dsi.fastutil.ints.Int2LongOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
@@ -703,7 +702,7 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
       StringBuilder builder = new StringBuilder(_dictionaries[0].get(groupKey % cardinality).toString());
       groupKey /= cardinality;
       for (int i = 1; i < _numGroupByColumns; i++) {
-        builder.append(GroupByConstants.GroupByDelimiter.groupByMultiDelimeter);
+        builder.append(AggregationGroupByTrimmingService.GROUP_KEY_DELIMITER);
         cardinality = _cardinalities[i];
         builder.append(_dictionaries[i].get(groupKey % cardinality));
         groupKey /= cardinality;
@@ -730,7 +729,7 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
       StringBuilder builder = new StringBuilder(_dictionaries[0].get((int) (rawKey % cardinality)).toString());
       rawKey /= cardinality;
       for (int i = 1; i < _numGroupByColumns; i++) {
-        builder.append(GroupByConstants.GroupByDelimiter.groupByMultiDelimeter);
+        builder.append(AggregationGroupByTrimmingService.GROUP_KEY_DELIMITER);
         cardinality = _cardinalities[i];
         builder.append(_dictionaries[i].get((int) (rawKey % cardinality)));
         rawKey /= cardinality;
@@ -751,7 +750,7 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
     int[] rawKeyArray = rawKey.elements();
     StringBuilder builder = new StringBuilder(_dictionaries[0].get(rawKeyArray[0]).toString());
     for (int i = 1; i < _numGroupByColumns; i++) {
-      builder.append(GroupByConstants.GroupByDelimiter.groupByMultiDelimeter);
+      builder.append(AggregationGroupByTrimmingService.GROUP_KEY_DELIMITER);
       builder.append(_dictionaries[i].get(rawKeyArray[i]).toString());
     }
     return builder.toString();

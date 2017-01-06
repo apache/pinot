@@ -22,17 +22,18 @@ import javax.annotation.Nonnull;
 
 
 public class MinMaxRangeMVAggregationFunction extends MinMaxRangeAggregationFunction {
+  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.MINMAXRANGEMV.getName();
 
   @Nonnull
   @Override
   public String getName() {
-    return AggregationFunctionFactory.MINMAXRANGE_MV_AGGREGATION_FUNCTION;
+    return NAME;
   }
 
   @Nonnull
   @Override
   public String getColumnName(@Nonnull String[] columns) {
-    return AggregationFunctionFactory.MINMAXRANGE_MV_AGGREGATION_FUNCTION + "_" + columns[0];
+    return NAME + "_" + columns[0];
   }
 
   @Override

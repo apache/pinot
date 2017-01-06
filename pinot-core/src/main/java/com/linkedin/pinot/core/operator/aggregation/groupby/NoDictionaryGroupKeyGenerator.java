@@ -20,7 +20,6 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
 import com.linkedin.pinot.core.operator.blocks.ProjectionColumnBlock;
-import com.linkedin.pinot.core.query.aggregation.groupby.GroupByConstants;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -115,7 +114,7 @@ public class NoDictionaryGroupKeyGenerator implements GroupKeyGenerator {
         }
 
         if (j < (numGroupByColumns - 1)) {
-          stringBuilder.append(GroupByConstants.GroupByDelimiter.groupByMultiDelimeter);
+          stringBuilder.append(AggregationGroupByTrimmingService.GROUP_KEY_DELIMITER);
         }
       }
 

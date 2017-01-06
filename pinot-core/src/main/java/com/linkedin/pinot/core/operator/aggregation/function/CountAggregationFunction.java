@@ -16,7 +16,6 @@
 package com.linkedin.pinot.core.operator.aggregation.function;
 
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.utils.primitive.MutableLongValue;
 import com.linkedin.pinot.core.operator.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.DoubleAggregationResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.groupby.DoubleGroupByResultHolder;
@@ -25,20 +24,20 @@ import com.linkedin.pinot.core.operator.docvalsets.ProjectionBlockValSet;
 import javax.annotation.Nonnull;
 
 
-// TODO: use Long as aggregate result type.
-public class CountAggregationFunction implements AggregationFunction<MutableLongValue, Long> {
+public class CountAggregationFunction implements AggregationFunction<Long, Long> {
+  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.COUNT.getName();
   private static final double DEFAULT_INITIAL_VALUE = 0.0;
 
   @Nonnull
   @Override
   public String getName() {
-    return AggregationFunctionFactory.COUNT_AGGREGATION_FUNCTION;
+    return NAME;
   }
 
   @Nonnull
   @Override
   public String getColumnName(@Nonnull String[] columns) {
-    return AggregationFunctionFactory.COUNT_AGGREGATION_FUNCTION + "_star";
+    return NAME + "_star";
   }
 
   @Override
@@ -85,22 +84,20 @@ public class CountAggregationFunction implements AggregationFunction<MutableLong
 
   @Nonnull
   @Override
-  public MutableLongValue extractAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder) {
-    return new MutableLongValue((long) aggregationResultHolder.getDoubleResult());
+  public Long extractAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder) {
+    return (long) aggregationResultHolder.getDoubleResult();
   }
 
   @Nonnull
   @Override
-  public MutableLongValue extractGroupByResult(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
-    return new MutableLongValue((long) groupByResultHolder.getDoubleResult(groupKey));
+  public Long extractGroupByResult(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
+    return (long) groupByResultHolder.getDoubleResult(groupKey);
   }
 
   @Nonnull
   @Override
-  public MutableLongValue merge(@Nonnull MutableLongValue intermediateResult1,
-      @Nonnull MutableLongValue intermediateResult2) {
-    intermediateResult1.addToValue(intermediateResult2.getValue());
-    return intermediateResult1;
+  public Long merge(@Nonnull Long intermediateResult1, @Nonnull Long intermediateResult2) {
+    return intermediateResult1 + intermediateResult2;
   }
 
   @Nonnull
@@ -111,7 +108,7 @@ public class CountAggregationFunction implements AggregationFunction<MutableLong
 
   @Nonnull
   @Override
-  public Long extractFinalResult(@Nonnull MutableLongValue intermediateResult) {
-    return intermediateResult.getValue();
+  public Long extractFinalResult(@Nonnull Long intermediateResult) {
+    return intermediateResult;
   }
 }

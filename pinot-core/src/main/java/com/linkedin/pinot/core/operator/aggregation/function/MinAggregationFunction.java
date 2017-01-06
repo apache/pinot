@@ -25,18 +25,19 @@ import javax.annotation.Nonnull;
 
 
 public class MinAggregationFunction implements AggregationFunction<Double, Double> {
+  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.MIN.getName();
   private static final double DEFAULT_VALUE = Double.POSITIVE_INFINITY;
 
   @Nonnull
   @Override
   public String getName() {
-    return AggregationFunctionFactory.MIN_AGGREGATION_FUNCTION;
+    return NAME;
   }
 
   @Nonnull
   @Override
   public String getColumnName(@Nonnull String[] columns) {
-    return AggregationFunctionFactory.MIN_AGGREGATION_FUNCTION + "_" + columns[0];
+    return NAME + "_" + columns[0];
   }
 
   @Override

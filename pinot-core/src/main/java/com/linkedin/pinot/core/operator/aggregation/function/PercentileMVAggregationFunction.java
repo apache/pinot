@@ -29,16 +29,16 @@ public class PercentileMVAggregationFunction extends PercentileAggregationFuncti
     super(percentile);
     switch (percentile) {
       case 50:
-        _name = AggregationFunctionFactory.PERCENTILE50_MV_AGGREGATION_FUNCTION;
+        _name = AggregationFunctionFactory.AggregationFunctionType.PERCENTILE50MV.getName();
         break;
       case 90:
-        _name = AggregationFunctionFactory.PERCENTILE90_MV_AGGREGATION_FUNCTION;
+        _name = AggregationFunctionFactory.AggregationFunctionType.PERCENTILE90MV.getName();
         break;
       case 95:
-        _name = AggregationFunctionFactory.PERCENTILE95_MV_AGGREGATION_FUNCTION;
+        _name = AggregationFunctionFactory.AggregationFunctionType.PERCENTILE95MV.getName();
         break;
       case 99:
-        _name = AggregationFunctionFactory.PERCENTILE99_MV_AGGREGATION_FUNCTION;
+        _name = AggregationFunctionFactory.AggregationFunctionType.PERCENTILE99MV.getName();
         break;
       default:
         throw new UnsupportedOperationException(

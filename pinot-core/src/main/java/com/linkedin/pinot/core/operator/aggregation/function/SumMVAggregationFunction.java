@@ -22,17 +22,18 @@ import javax.annotation.Nonnull;
 
 
 public class SumMVAggregationFunction extends SumAggregationFunction {
+  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.SUMMV.getName();
 
   @Nonnull
   @Override
   public String getName() {
-    return AggregationFunctionFactory.SUM_MV_AGGREGATION_FUNCTION;
+    return NAME;
   }
 
   @Nonnull
   @Override
   public String getColumnName(@Nonnull String[] columns) {
-    return AggregationFunctionFactory.SUM_MV_AGGREGATION_FUNCTION + "_" + columns[0];
+    return NAME + "_" + columns[0];
   }
 
   @Override

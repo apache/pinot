@@ -19,7 +19,6 @@ import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.RecordReader;
@@ -29,12 +28,12 @@ import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.operator.BReusableFilteredDocIdSetOperator;
 import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
+import com.linkedin.pinot.core.operator.aggregation.groupby.AggregationGroupByTrimmingService;
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupKeyGenerator;
 import com.linkedin.pinot.core.operator.aggregation.groupby.NoDictionaryGroupKeyGenerator;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
 import com.linkedin.pinot.core.operator.filter.MatchEntireSegmentOperator;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
-import com.linkedin.pinot.core.query.aggregation.groupby.GroupByConstants;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import java.io.File;
@@ -160,7 +159,7 @@ public class NoDictionaryGroupKeyGeneratorTest {
         }
         stringBuilder.append(map.get(column));
         if (j++ < NUM_COLUMNS - 1) {
-          stringBuilder.append(GroupByConstants.GroupByDelimiter.groupByMultiDelimeter);
+          stringBuilder.append(AggregationGroupByTrimmingService.GROUP_KEY_DELIMITER);
         }
       }
       keys.add(stringBuilder.toString());

@@ -25,18 +25,19 @@ import javax.annotation.Nonnull;
 
 
 public class SumAggregationFunction implements AggregationFunction<Double, Double> {
+  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.SUM.getName();
   private static final double DEFAULT_VALUE = 0.0;
 
   @Nonnull
   @Override
   public String getName() {
-    return AggregationFunctionFactory.SUM_AGGREGATION_FUNCTION;
+    return NAME;
   }
 
   @Nonnull
   @Override
   public String getColumnName(@Nonnull String[] columns) {
-    return AggregationFunctionFactory.SUM_AGGREGATION_FUNCTION + "_" + columns[0];
+    return NAME + "_" + columns[0];
   }
 
   @Override

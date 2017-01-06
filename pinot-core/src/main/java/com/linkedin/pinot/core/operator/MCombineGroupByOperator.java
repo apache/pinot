@@ -24,11 +24,11 @@ import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.aggregation.AggregationFunctionContext;
+import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunctionUtils;
 import com.linkedin.pinot.core.operator.aggregation.groupby.AggregationGroupByResult;
+import com.linkedin.pinot.core.operator.aggregation.groupby.AggregationGroupByTrimmingService;
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupKeyGenerator;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
-import com.linkedin.pinot.core.query.aggregation.AggregationFunctionUtils;
-import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByOperatorService;
 import com.linkedin.pinot.core.util.trace.TraceRunnable;
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -218,11 +218,10 @@ public class MCombineGroupByOperator extends BaseOperator {
       return new IntermediateResultsBlock(new TimeoutException("CombineGroupBy timed out."));
     }
 
-    // Use aggregationGroupByOperatorService to trim the results map.
-    AggregationGroupByOperatorService aggregationGroupByOperatorService =
-        new AggregationGroupByOperatorService(aggregationInfos, _brokerRequest.getGroupBy());
-    List<Map<String, Serializable>> trimmedResults =
-        aggregationGroupByOperatorService.trimToSize(resultsMap, numAggregationFunctions);
+    // Trim the results map.
+    AggregationGroupByTrimmingService aggregationGroupByTrimmingService =
+        new AggregationGroupByTrimmingService(aggregationFunctionContexts, (int) _brokerRequest.getGroupBy().getTopN());
+    List<Map<String, Serializable>> trimmedResults = aggregationGroupByTrimmingService.trimIntermediateResultsMap(resultsMap);
     IntermediateResultsBlock mergedBlock =
         new IntermediateResultsBlock(aggregationFunctionContexts, trimmedResults, true);
 

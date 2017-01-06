@@ -96,7 +96,7 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
     Preconditions.checkState(aggregationColumns.length == 1);
     int length = projectionBlock.getNumDocs();
 
-    if (!aggregationFunction.getName().equals(AggregationFunctionFactory.COUNT_AGGREGATION_FUNCTION)) {
+    if (!aggregationFunction.getName().equals(AggregationFunctionFactory.AggregationFunctionType.COUNT.getName())) {
       Block dataBlock = projectionBlock.getDataBlock(aggregationColumns[0]);
       ProjectionBlockValSet blockValueSet = (ProjectionBlockValSet) dataBlock.getBlockValueSet();
       aggregationFunction.aggregate(length, resultHolder, blockValueSet);
