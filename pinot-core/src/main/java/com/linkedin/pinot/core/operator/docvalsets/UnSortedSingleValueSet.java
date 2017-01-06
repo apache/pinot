@@ -45,6 +45,52 @@ public final class UnSortedSingleValueSet extends BaseBlockValSet {
     return this.columnMetadata.getDataType();
   }
 
+  /**
+   * Reads double values for the given docIds and returns in the passed in double[].
+   * Compatible types (int, float, long) can also be read in as double.
+   *
+   * @param inDocIds DocIds for which to get the values
+   * @param inStartPos start index in the inDocIds array
+   * @param inDocIdsSize size of docIds to read
+   * @param outValues Array where output is written
+   * @param outStartPos start index into output array
+   */
+  @Override
+  public void getDoubleValues(int[] inDocIds, int inStartPos, int inDocIdsSize, double[] outValues, int outStartPos) {
+    int inEndPos = inStartPos + inDocIdsSize;
+    ReaderContext context = sVReader.createContext();
+
+    switch (columnMetadata.getDataType()) {
+      case INT:
+        for (int i = inStartPos; i < inEndPos; i++) {
+          outValues[outStartPos++] = sVReader.getInt(inDocIds[i], context);
+        }
+        break;
+
+      case LONG:
+        for (int i = inStartPos; i < inEndPos; i++) {
+          outValues[outStartPos++] = sVReader.getLong(inDocIds[i], context);
+        }
+        break;
+
+      case FLOAT:
+        for (int i = inStartPos; i < inEndPos; i++) {
+          outValues[outStartPos++] = sVReader.getFloat(inDocIds[i], context);
+        }
+        break;
+
+      case DOUBLE:
+        for (int i = inStartPos; i < inEndPos; i++) {
+          outValues[outStartPos++] = sVReader.getDouble(inDocIds[i], context);
+        }
+        break;
+
+      default:
+        throw new UnsupportedOperationException(
+            "Cannot fetch double values for column: " + columnMetadata.getColumnName());
+    }
+  }
+
   @Override
   public void getStringValues(int[] inDocIds, int inStartPos, int inDocIdsSize, String[] outValues, int outStartPos) {
     ReaderContext context = sVReader.createContext();

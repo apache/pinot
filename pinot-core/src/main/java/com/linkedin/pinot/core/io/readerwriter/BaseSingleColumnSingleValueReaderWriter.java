@@ -38,9 +38,17 @@ public class BaseSingleColumnSingleValueReaderWriter<T extends ReaderContext>
   }
 
   @Override
+  public int getInt(int row, ReaderContext context) {
+    throw new UnsupportedOperationException();  }
+
+  @Override
   public long getLong(int row) {
     throw new UnsupportedOperationException();
   }
+
+  @Override
+  public long getLong(int row, ReaderContext context) {
+    throw new UnsupportedOperationException();  }
 
   @Override
   public float getFloat(int row) {
@@ -48,9 +56,17 @@ public class BaseSingleColumnSingleValueReaderWriter<T extends ReaderContext>
   }
 
   @Override
+  public float getFloat(int row, ReaderContext context) {
+    throw new UnsupportedOperationException();  }
+
+  @Override
   public double getDouble(int row) {
     throw new UnsupportedOperationException();
   }
+
+  @Override
+  public double getDouble(int row, ReaderContext context) {
+    throw new UnsupportedOperationException();  }
 
   @Override
   public String getString(int row) {
@@ -75,11 +91,6 @@ public class BaseSingleColumnSingleValueReaderWriter<T extends ReaderContext>
   @Override
   public T createContext() {
     throw new UnsupportedOperationException();
-  }
-
-  public void read(T context) {
-    throw new UnsupportedOperationException();
-
   }
 
   @Override
@@ -125,7 +136,7 @@ public class BaseSingleColumnSingleValueReaderWriter<T extends ReaderContext>
   }
 
   @Override
-  public void setString(int row, String string) throws Exception {
+  public void setString(int row, String string) {
     throw new UnsupportedOperationException();
 
   }

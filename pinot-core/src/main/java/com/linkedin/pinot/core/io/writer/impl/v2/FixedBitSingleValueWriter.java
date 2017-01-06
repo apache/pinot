@@ -161,7 +161,7 @@ public class FixedBitSingleValueWriter implements SingleColumnSingleValueWriter 
   }
 
   @Override
-  public void setString(int row, String string) throws Exception {
+  public void setString(int row, String string) {
     // TODO Auto-generated method stub
 
   }

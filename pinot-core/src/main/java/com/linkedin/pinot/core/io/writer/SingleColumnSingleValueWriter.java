@@ -63,7 +63,7 @@ public interface SingleColumnSingleValueWriter extends DataFileWriter {
    * @param row
    * @param string
    */
-  public void setString(int row, String string) throws Exception;
+  public void setString(int row, String string);
 
   /**
    *

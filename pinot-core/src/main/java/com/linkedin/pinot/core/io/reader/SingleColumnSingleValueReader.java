@@ -40,11 +40,15 @@ public interface SingleColumnSingleValueReader<T extends ReaderContext> extends 
    */
   int getInt(int row);
 
+  int getInt(int row, T context);
+
   /**
    * @param row
    * @return
    */
   long getLong(int row);
+
+  long getLong(int row, T context);
 
   /**
    * @param row
@@ -52,11 +56,15 @@ public interface SingleColumnSingleValueReader<T extends ReaderContext> extends 
    */
   float getFloat(int row);
 
+  float getFloat(int row, T context);
+
   /**
    * @param row
    * @return
    */
   double getDouble(int row);
+
+  double getDouble(int row, T context);
 
   /**
    * @param row
@@ -70,8 +78,7 @@ public interface SingleColumnSingleValueReader<T extends ReaderContext> extends 
    * @param context Reader context.
    * @return String at the given row
    */
-  String getString(int row, T context)
-      throws IOException;
+  String getString(int row, T context);
 
   /**
    * @param row

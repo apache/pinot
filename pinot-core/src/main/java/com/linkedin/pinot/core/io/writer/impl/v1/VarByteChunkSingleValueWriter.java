@@ -16,12 +16,8 @@
 package com.linkedin.pinot.core.io.writer.impl.v1;
 
 import com.linkedin.pinot.core.io.compression.ChunkCompressor;
-import com.linkedin.pinot.core.io.writer.SingleColumnSingleValueWriter;
 import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
 import javax.annotation.concurrent.NotThreadSafe;
 
@@ -46,22 +42,15 @@ import javax.annotation.concurrent.NotThreadSafe;
  * </ul>
  */
 @NotThreadSafe
-public class VarByteSingleValueWriter implements SingleColumnSingleValueWriter {
+public class VarByteChunkSingleValueWriter extends BaseChunkSingleValueWriter {
 
   private static final int INT_SIZE = Integer.SIZE / Byte.SIZE;
   private static final Charset UTF_8 = Charset.forName("UTF-8");
   private static final int VERSION = 1;
 
-  private final FileChannel _dataFile;
-  private final ByteBuffer _header;
-  private final ByteBuffer _chunkBuffer;
-  private final ByteBuffer _compressedBuffer;
-  private final ChunkCompressor _chunkCompressor;
-
-  private int _chunkHeaderSize;
+  private final int _chunkHeaderSize;
   private int _chunkHeaderOffset;
   private int _chunkDataOffSet;
-  private int _dataOffset;
 
   /**
    * Constructor for the class.
@@ -73,64 +62,22 @@ public class VarByteSingleValueWriter implements SingleColumnSingleValueWriter {
    * @param lengthOfLongestEntry Length of longest entry (in bytes).
    * @throws IOException
    */
-  public VarByteSingleValueWriter(File file, ChunkCompressor compressor, int totalDocs, int numDocsPerChunk,
+  public VarByteChunkSingleValueWriter(File file, ChunkCompressor compressor, int totalDocs, int numDocsPerChunk,
       int lengthOfLongestEntry)
       throws IOException {
-    _chunkCompressor = compressor;
 
-    int numChunks = (totalDocs + numDocsPerChunk - 1) / numDocsPerChunk;
-    int headerSize = (numChunks + 4) * INT_SIZE; // 4 items written before chunk indexing.
-    _chunkHeaderSize = numDocsPerChunk * INT_SIZE;
-
-    _header = ByteBuffer.allocateDirect(headerSize);
-    _header.putInt(VERSION);
-    _header.putInt(numChunks);
-    _header.putInt(numDocsPerChunk);
-    _header.putInt(lengthOfLongestEntry);
-    _dataOffset = headerSize;
+    super(file, compressor, totalDocs, numDocsPerChunk,
+        ((numDocsPerChunk * INT_SIZE) + (lengthOfLongestEntry * numDocsPerChunk)), // chunkSize
+        lengthOfLongestEntry, VERSION);
 
     _chunkHeaderOffset = 0;
+    _chunkHeaderSize = numDocsPerChunk * INT_SIZE;
     _chunkDataOffSet = _chunkHeaderSize;
-
-    int chunkSize = _chunkDataOffSet + (lengthOfLongestEntry * numDocsPerChunk);
-    _chunkBuffer = ByteBuffer.allocateDirect(chunkSize);
-    _compressedBuffer = ByteBuffer.allocateDirect(chunkSize * 2);
-    _dataFile = new RandomAccessFile(file, "rw").getChannel();
   }
 
-  @Override
-  public void setChar(int row, char ch) {
-    throw new UnsupportedOperationException();
-  }
 
   @Override
-  public void setInt(int row, int i) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public void setShort(int row, short s) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public void setLong(int row, long l) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public void setFloat(int row, float f) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public void setDouble(int row, double d) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public void setString(int row, String string)
-      throws IOException {
+  public void setString(int row, String string) {
     byte[] bytes = string.getBytes(UTF_8);
     int length = bytes.length;
 
@@ -176,25 +123,17 @@ public class VarByteSingleValueWriter implements SingleColumnSingleValueWriter {
    *   <li> Clears up the buffers, so that they can be reused. </li>
    * </ul>
    *
-   * @throws IOException
    */
-  private void writeChunk()
-      throws IOException {
-    _chunkBuffer.flip();
-    _compressedBuffer.flip();
-
+  protected void writeChunk() {
     // For partially filled chunks, we still need to clear the offsets for remaining rows, as we reuse this buffer.
     for (int i = _chunkHeaderOffset; i < _chunkHeaderSize; i += INT_SIZE) {
-      _chunkBuffer.putInt(_chunkHeaderOffset, 0);
+      _chunkBuffer.putInt(i, 0);
     }
-    int compressedSize = _chunkCompressor.compress(_chunkBuffer, _compressedBuffer);
-    _dataFile.write(_compressedBuffer, _dataOffset);
 
-    _header.putInt(_dataOffset);
-    _dataOffset += compressedSize;
+    _chunkBuffer.flip(); // This is because setString changes 'position' of ByteBuffer.
+    super.writeChunk();
 
-    _chunkBuffer.clear();
-    _compressedBuffer.clear();
+    // Reset the chunk offsets.
     _chunkHeaderOffset = 0;
     _chunkDataOffSet = _chunkHeaderSize;
   }

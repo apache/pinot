@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.segment.creator;
 
+import java.io.Closeable;
 import java.io.IOException;
 
 
@@ -23,7 +24,39 @@ import java.io.IOException;
  * Implementations of this interface write raw data values (in potentially compressed formats),
  * as opposed to dictionary encoded index.
  */
-public interface SingleValueRawIndexCreator extends ForwardIndexCreator {
+public interface SingleValueRawIndexCreator extends ForwardIndexCreator, Closeable {
+
+  /**
+   * This method creates an index for the given docId and int value.
+   *
+   * @param docId Document id
+   * @param valueToIndex int value to index.
+   */
+  void index(int docId, int valueToIndex);
+
+  /**
+   * This method creates an index for the given docId and long value.
+   *
+   * @param docId Document id
+   * @param valueToIndex long value to index.
+   */
+  void index(int docId, long valueToIndex);
+
+  /**
+   * This method creates an index for the given docId and float value.
+   *
+   * @param docId Document id
+   * @param valueToIndex float value to index.
+   */
+  void index(int docId, float valueToIndex);
+
+  /**
+   * This method creates an index for the given docId and double value.
+   *
+   * @param docId Document id
+   * @param valueToIndex double value to index.
+   */
+  void index(int docId, double valueToIndex);
 
   /**
    * This method creates an index for the given docId and String value.
@@ -41,4 +74,14 @@ public interface SingleValueRawIndexCreator extends ForwardIndexCreator {
    * @param valueToIndex Variable length byte[] value to index.
    */
   void index(int docId, byte[] valueToIndex);
+
+  /**
+   * This method creates an index for the given docId and object value.
+   * Object should be one of the primitive supported types.
+   *
+   * @param docId Document id
+   * @param valueToIndex Object value to index.
+   */
+  void index(int docId, Object valueToIndex)
+      throws IOException;
 }
