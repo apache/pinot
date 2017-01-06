@@ -6,7 +6,7 @@ HashService.prototype = {
   init : function() {
     console.log("window.location:" + window.location + " path " + window.location.pathname);
     console.log(window.location);
-    tab = "dashboard";
+    tab = "anomalies";
     if (window.location.hash) {
       splits = window.location.hash.split('/');
       if (splits.length > 0) {
