@@ -5,7 +5,9 @@ function AnomalyResultModel() {
   this.dashboardId = null;
   this.anomalyIds = [];
 
+  this.previousStartDate = null;
   this.startDate = moment().subtract(6, 'days').startOf('day');
+  this.previousEndDate = null;
   this.endDate = moment().subtract(0, 'days').startOf('day');
   this.functionName = null;
   this.functions = [];
@@ -80,10 +82,13 @@ AnomalyResultModel.prototype = {
     } else if (this.anomaliesSearchMode == constants.MODE_ID && this.anomalyIds != undefined && this.anomalyIds.length > 0) {
       dataService.fetchAnomaliesForAnomalyIds(
           this.startDate, this.endDate, this.anomalyIds, this.functionName, this.updateModelAndNotifyView.bind(this));
+    } else if (this.anomaliesSearchMode == constants.MODE_TIME && (this.previousStartDate != this.startDate || this.previousEndDate != this.endDate)) {
+      this.previousStartDate = this.startDate;
+      this.previousEndDate = this.endDate;
+      dataService.fetchAnomaliesForTime(
+          this.startDate, this.endDate, this.updateModelAndNotifyView.bind(this));
     }
   },
-  // TODO: change return value of anomalies to complex object, instead of array
-  // so that we can pass information such as total number of anomalies (this if for the "Showing x anomalies of y")
   updateModelAndNotifyView : function(anomaliesWrapper) {
     this.anomaliesWrapper = anomaliesWrapper;
     this.renderViewEvent.notify();
@@ -125,30 +130,4 @@ AnomalyResultModel.prototype = {
       return feedbackType;
     }
   }
-
-}
-
-function AnomalyWrapper() {
-  this.anomalyId = "101";
-  this.metric = "feed_sessions_additive";
-  this.dataset = "engaged_feed_session_count"
-
-  this.dates = [ '2016-01-01', '2016-01-02', '2016-01-03', '2016-01-04', '2016-01-05', '2016-01-06', '2016-01-07' ];
-  this.currentEnd = 'Jan 7 2016';
-  this.currentStart = 'Jan 1 2016';
-  this.baselineEnd = 'Dec 31 2015';
-  this.baselineStart = 'Dec 25 2015';
-  this.baselineValues = [ 35, 225, 200, 600, 170, 220, 70 ];
-  this.currentValues = [ 30, 200, 100, 400, 150, 250, 60 ];
-  this.current = '1000';
-  this.baseline = '2000';
-
-  this.anomalyRegionStart = '2016-01-03';
-  this.anomalyRegionEnd = '2016-01-05';
-  this.anomalyFunctionId = 5;
-  this.anomalyFunctionName = 'efs_wow_country';
-  this.anomalyFunctionType = 'wow_rule';
-  this.anomalyFunctionProps = 'props,props,props';
-  this.anomalyFunctionDimension = 'country:US';
-  this.anomalyFeedback = "Confirmed Anomaly";
 }

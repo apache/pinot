@@ -34,5 +34,7 @@ public interface MergedAnomalyResultManager extends AbstractManager<MergedAnomal
   List<MergedAnomalyResultDTO> findByStartTimeInRangeAndFunctionId(long startTime, long endTime,
       long functionId);
 
+  List<MergedAnomalyResultDTO> findByTime(long startTime, long endTime);
+
   void updateAnomalyFeedback(MergedAnomalyResultDTO entity);
 }

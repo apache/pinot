@@ -13,6 +13,7 @@
 								<option value="metric">Metric(s)</option>
 								<option value="dashboard">Dashboard</option>
 								<option value="id">Anomaly ID</option>
+                <option value="time">Time</option>
 							</select>
 						</div>
 						<div id="anomalies-search-metrics-container" style="overflow:hidden; display: none;">
@@ -24,6 +25,9 @@
 						<div id="anomalies-search-anomaly-container"  style="overflow:hidden; display: none;">
 							<select style="width: 100%;" id="anomalies-search-anomaly-input" class="label-large-light" multiple="multiple"></select>
 						</div>
+            <div id="anomalies-search-time-container"  style="overflow:hidden; display: none;">
+              <select style="width: 100%;" id="anomalies-search-time-input" class="label-large-light"></select>
+            </div>
 					</div>
 				</div>
 			</div>

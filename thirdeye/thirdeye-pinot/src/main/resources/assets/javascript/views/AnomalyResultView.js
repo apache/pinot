@@ -70,6 +70,12 @@ function AnomalyResultView(anomalyResultModel) {
       placeholder : "Search for anomaly ID",
       tags: true
     };
+  this.timeSearchConfig = {
+      theme : "bootstrap",
+      placeholder : "All anomalies in the selected time range",
+      tags: true,
+      disabled: true
+    };
 
   this.timeRangeConfig = {
     startDate : this.anomalyResultModel.startDate,
@@ -170,6 +176,7 @@ AnomalyResultView.prototype = {
     $('#anomalies-search-dashboard-container').hide();
     $('#anomalies-search-anomaly-container').hide()
     $('#anomalies-search-metrics-container').hide();
+    $('#anomalies-search-time-container').hide();
     if (mode == constants.MODE_METRIC) {
       console.log('showing metric');
       $('#anomalies-search-metrics-container').show();
@@ -178,6 +185,8 @@ AnomalyResultView.prototype = {
       $('#anomalies-search-dashboard-container').show();
     } else if (mode == constants.MODE_ID) {
       $('#anomalies-search-anomaly-container').show()
+    } else if (mode == constants.MODE_TIME) {
+      $('#anomalies-search-time-container').show()
     }
   },
   setupSearchBar : function() {
@@ -186,6 +195,8 @@ AnomalyResultView.prototype = {
     $('#anomalies-search-dashboard-input').select2(this.dashboardSearchConfig).on("select2:select", function(e) {
     });
     $('#anomalies-search-anomaly-input').select2(this.anomalySearchConfig).on("select2:select", function(e) {
+    });
+    $('#anomalies-search-time-input').select2(this.timeSearchConfig).on("select2:select", function(e) {
     });
 
   },

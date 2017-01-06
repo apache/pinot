@@ -15,6 +15,7 @@ function Constants() {
   this.SEARCH_ANOMALIES_METRICIDS = '/anomalies/search/metricIds/';
   this.SEARCH_ANOMALIES_DASHBOARDID = '/anomalies/search/dashboardId/';
   this.SEARCH_ANOMALIES_ANOMALYIDS = '/anomalies/search/anomalyIds/';
+  this.SEARCH_ANOMALIES_TIME = '/anomalies/search/time/';
   this.UPDATE_ANOMALY_FEEDBACK = '/anomalies/updateFeedback/';
 
   this.TIMESERIES_DATE_FORMAT = 'YYYY-MM-DD HH:mm';
@@ -23,6 +24,7 @@ function Constants() {
   this.MODE_METRIC = 'metric';
   this.MODE_DASHBOARD = 'dashboard';
   this.MODE_ID = 'id';
+  this.MODE_TIME = 'time';
 
   this.FEEDBACK_STRING_CONFIRMED_ANOMALY = 'Confirmed Anomaly';
   this.FEEDBACK_STRING_FALSE_ALARM = 'False Alarm';

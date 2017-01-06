@@ -3,8 +3,6 @@ function AnomalyResultController(parentController) {
   this.anomalyResultModel = new AnomalyResultModel();
   this.anomalyResultView = new AnomalyResultView(this.anomalyResultModel);
 
-//  this.anomalyResultView.metricChangeEvent.attach(this.metricChangeEventHandler.bind(this));
-//  this.anomalyResultView.hideDataRangePickerEvent.attach(this.hideDataRangePickerEventHandler.bind(this));
   this.anomalyResultView.applyButtonEvent.attach(this.applyButtonEventHandler.bind(this));
   this.anomalyResultView.rootCauseAnalysisButtonClickEvent.attach(this.rootCauseAnalysisButtonClickEventHandler.bind(this));
   this.anomalyResultView.showDetailsLinkClickEvent.attach(this.showDetailsLinkClickEventHandler.bind(this));

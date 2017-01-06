@@ -117,6 +117,13 @@ DataService.prototype = {
       };
       this.getDataAsynchronous(url, data, callback, 'anomaly-spin-area');
     },
+    // Fetch anomalies for anomaly ids in array in time range
+    fetchAnomaliesForTime : function(startTime, endTime, callback) {
+      var url = constants.SEARCH_ANOMALIES_TIME + startTime + this.URL_SEPARATOR + endTime;
+      var data = {
+      };
+      this.getDataAsynchronous(url, data, callback, 'anomaly-spin-area');
+    },
     // Update anomaly feedback for anomaly id
     updateFeedback : function(anomalyId, feedbackType) {
       var url = constants.UPDATE_ANOMALY_FEEDBACK + anomalyId;

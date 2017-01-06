@@ -41,6 +41,9 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
   private static final String FIND_BY_COLLECTION_TIME = "where collection=:collection "
       + "and (startTime < :endTime and endTime > :startTime) order by endTime desc";
 
+  private static final String FIND_BY_TIME = "where (startTime < :endTime and endTime > :startTime) "
+      + "order by endTime desc";
+
   private static final String FIND_BY_FUNCTION_ID = "where functionId=:functionId";
 
   private static final String FIND_LATEST_CONFLICT_BY_FUNCTION_AND_DIMENSIONS =
@@ -198,6 +201,17 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
     List<MergedAnomalyResultBean> list = genericPojoDao.executeParameterizedSQL(
         FIND_BY_COLLECTION_TIME, filterParams, MergedAnomalyResultBean.class);
     return batchConvertMergedAnomalyBean2DTO(list, loadRawAnomalies);
+  }
+
+  @Override
+  public List<MergedAnomalyResultDTO> findByTime(long startTime, long endTime) {
+    Map<String, Object> filterParams = new HashMap<>();
+    filterParams.put("startTime", startTime);
+    filterParams.put("endTime", endTime);
+
+    List<MergedAnomalyResultBean> list =
+        genericPojoDao.executeParameterizedSQL(FIND_BY_TIME, filterParams, MergedAnomalyResultBean.class);
+    return batchConvertMergedAnomalyBean2DTO(list, false);
   }
 
   @Override

@@ -5,7 +5,6 @@ import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomaliesWrapper;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalyDetails;
 
 import java.io.IOException;
-import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -91,69 +90,20 @@ public class AnomaliesResource {
     dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
   }
 
-
-  /** Find anomalies for metric id in time range
-   *
+  /**
+   * Get count of anomalies for metric in time range
    * @param metricId
    * @param startTime
    * @param endTime
    * @return
    */
-  @GET
-  @Path("metric/id/{metricId}/{startTime}/{endTime}")
-  public List<MergedAnomalyResultDTO> getAnomaliesForMetricInRange(
-      @PathParam("metricId") Long metricId,
-      @PathParam("startTime") Long startTime,
-      @PathParam("endTime") Long endTime) {
-
-    MetricConfigDTO metricConfig = metricConfigDAO.findById(metricId);
-    String dataset = metricConfig.getDataset();
-    String metric = metricConfig.getName();
-    List<MergedAnomalyResultDTO> mergedAnomalies = getAnomaliesForMetricInRange(dataset, metric, startTime, endTime);
-
-    return mergedAnomalies;
-  }
-
-  /**
-   * Find anomalies for metric in time range
-   * @param dataset
-   * @param metricName
-   * @param startTime
-   * @param endTime
-   * @return
-   */
-  @GET
-  @Path("metric/name/{dataset}/{metricName}/{startTime}/{endTime}")
-  public List<MergedAnomalyResultDTO> getAnomaliesForMetricInRange(
-      @PathParam("dataset") String dataset,
-      @PathParam("metricName") String metricName,
-      @PathParam("startTime") Long startTime,
-      @PathParam("endTime") Long endTime) {
-
-    List<MergedAnomalyResultDTO> mergedAnomalies =
-        mergedAnomalyResultDAO.findByCollectionMetricTime(dataset, metricName, startTime, endTime, false);
-    return mergedAnomalies;
-  }
-
-
-
-  /**
-   * Get count of anomalies for metric in time range, divided into specified number of buckets
-   * @param metricId
-   * @param startTime
-   * @param endTime
-   * @param numBuckets
-   * @return
-   */
-  @GET
-  @Path("metric/count/{metricId}/{startTime}/{endTime}")
   public AnomaliesSummary getAnomalyCountForMetricInRange(
       @PathParam("metricId") Long metricId,
       @PathParam("startTime") Long startTime,
       @PathParam("endTime") Long endTime){
 
     AnomaliesSummary anomaliesSummary = new AnomaliesSummary();
-    List<MergedAnomalyResultDTO> mergedAnomalies = getAnomaliesForMetricInRange(metricId, startTime, endTime);
+    List<MergedAnomalyResultDTO> mergedAnomalies = getAnomaliesForMetricIdInRange(metricId, startTime, endTime);
 
     int resolvedAnomalies = 0;
     int unresolvedAnomalies = 0;
@@ -177,19 +127,23 @@ public class AnomaliesResource {
     return anomaliesSummary;
   }
 
+
   /**
-   * Get anomaly function details for merged anomaly
-   * @param mergedAnomalyId
+   * Search anomalies only by time
+   * @param startTime
+   * @param endTime
    * @return
+   * @throws Exception
    */
   @GET
-  @Path("function/{mergedAnomalyId}")
-  public AnomalyFunctionDTO getFunctionDetailsForMergedAnomaly(
-      @PathParam("mergedAnomalyId") Long mergedAnomalyId) {
-    MergedAnomalyResultDTO mergedAnomaly = mergedAnomalyResultDAO.findById(mergedAnomalyId);
-    Long anomalyFunctionId = mergedAnomaly.getFunctionId();
-    AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(anomalyFunctionId);
-    return anomalyFunction;
+  @Path("search/time/{startTime}/{endTime}")
+  public AnomaliesWrapper getAnomaliesByTime(
+      @PathParam("startTime") Long startTime,
+      @PathParam("endTime") Long endTime) throws Exception {
+
+    List<MergedAnomalyResultDTO> mergedAnomalies = mergedAnomalyResultDAO.findByTime(startTime, endTime);
+    AnomaliesWrapper anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(mergedAnomalies);
+    return anomaliesWrapper;
   }
 
   /**
@@ -209,35 +163,15 @@ public class AnomaliesResource {
       @QueryParam("anomalyIds") String anomalyIdsString,
       @QueryParam("functionName") String functionName) throws Exception {
 
-    AnomaliesWrapper anomaliesWrapper = new AnomaliesWrapper();
     String[] anomalyIds = anomalyIdsString.split(COMMA_SEPARATOR);
-
     List<MergedAnomalyResultDTO> mergedAnomalies = new ArrayList<>();
     for (String id : anomalyIds) {
       Long anomalyId = Long.valueOf(id);
       mergedAnomalies.add(mergedAnomalyResultDAO.findById(anomalyId));
     }
-
-    List<AnomalyDetails> anomalyDetailsList = new ArrayList<>();
-    // for each anomaly, fetch function details and create wrapper
-    for (MergedAnomalyResultDTO mergedAnomaly : mergedAnomalies) {
-
-      String dataset = mergedAnomaly.getCollection();
-      DatasetConfigDTO datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(dataset);
-      DateTimeFormatter  timeSeriesDateFormatter = DateTimeFormat.forPattern(TIME_SERIES_DATE_FORMAT).withZone(Utils.getDataTimeZone(dataset));
-      DateTimeFormatter startEndDateFormatterDays = DateTimeFormat.forPattern(START_END_DATE_FORMAT_DAYS).withZone(Utils.getDataTimeZone(dataset));
-      DateTimeFormatter startEndDateFormatterHours = DateTimeFormat.forPattern(START_END_DATE_FORMAT_HOURS).withZone(Utils.getDataTimeZone(dataset));
-
-      AnomalyDetails anomalyDetails = getAnomalyDetails(mergedAnomaly, datasetConfig, timeSeriesDateFormatter,
-          startEndDateFormatterHours, startEndDateFormatterDays);
-      anomalyDetailsList.add(anomalyDetails);
-    }
-    anomaliesWrapper.setTotalAnomalies(anomalyDetailsList.size());
-    anomaliesWrapper.setNumAnomaliesOnPage(anomalyDetailsList.size());
-    anomaliesWrapper.setAnomalyDetailsList(anomalyDetailsList);
+    AnomaliesWrapper anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(mergedAnomalies);
     return anomaliesWrapper;
   }
-
 
   /**
    * Find anomalies by dashboard id
@@ -278,87 +212,14 @@ public class AnomaliesResource {
       @QueryParam("metricIds") String metricIdsString,
       @QueryParam("functionName") String functionName) throws Exception {
 
-    AnomaliesWrapper anomaliesWrapper = new AnomaliesWrapper();
-    List<AnomalyDetails> anomalyDetailsList = new ArrayList<>();
-
-    String[] metricIds = metricIdsString.split(COMMA_SEPARATOR);
-    for (String id : metricIds) {
-
-      Long metricId = Long.valueOf(id);
-      MetricConfigDTO metricConfig = metricConfigDAO.findById(metricId);
-      if (metricConfig == null) {
-        continue;
-      }
-      String metricName = metricConfig.getName();
-      String dataset = metricConfig.getDataset();
-      DatasetConfigDTO datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(dataset);
-
-      DateTimeFormatter  timeSeriesDateFormatter = DateTimeFormat.forPattern(TIME_SERIES_DATE_FORMAT).withZone(Utils.getDataTimeZone(dataset));
-      DateTimeFormatter startEndDateFormatterDays = DateTimeFormat.forPattern(START_END_DATE_FORMAT_DAYS).withZone(Utils.getDataTimeZone(dataset));
-      DateTimeFormatter startEndDateFormatterHours = DateTimeFormat.forPattern(START_END_DATE_FORMAT_HOURS).withZone(Utils.getDataTimeZone(dataset));
-
-      // fetch anomalies in range, ordered by end time
-      List<MergedAnomalyResultDTO> mergedAnomalies = getAnomaliesForMetricInRange(dataset, metricName, startTime, endTime);
-
-      // for each anomaly, fetch function details and create wrapper
-      for (MergedAnomalyResultDTO mergedAnomaly : mergedAnomalies) {
-
-        AnomalyDetails anomalyDetails = getAnomalyDetails(mergedAnomaly, datasetConfig, timeSeriesDateFormatter,
-            startEndDateFormatterHours, startEndDateFormatterDays);
-        anomalyDetailsList.add(anomalyDetails);
-      }
+    String[] metricIdsList = metricIdsString.split(COMMA_SEPARATOR);
+    List<Long> metricIds = new ArrayList<>();
+    for (String metricId : metricIdsList) {
+      metricIds.add(Long.valueOf(metricId));
     }
-    anomaliesWrapper.setTotalAnomalies(anomalyDetailsList.size());
-    // TODO: get pagenumber and pagesize from client
-    int pageNumber = DEFAULT_PAGE_NUMBER;
-    int pageSize = DEFAULT_PAGE_SIZE;
-    int maxPageNumber = anomalyDetailsList.size()/pageSize + 1;
-    if (pageNumber > maxPageNumber) {
-      pageNumber = maxPageNumber;
-    }
-    if (pageNumber < 1) {
-      pageNumber = 1;
-    }
-    if (anomalyDetailsList.size() > pageSize) {
-      if (anomalyDetailsList.size() > pageSize * pageNumber ) {
-        anomalyDetailsList.subList(pageSize * pageNumber, anomalyDetailsList.size()).clear();
-      }
-      anomalyDetailsList.subList(0, pageSize * (pageNumber - 1)).clear();
-    }
-    anomaliesWrapper.setNumAnomaliesOnPage(anomalyDetailsList.size());
-    anomaliesWrapper.setAnomalyDetailsList(anomalyDetailsList);
+    List<MergedAnomalyResultDTO> mergedAnomalies = getAnomaliesForMetricIdsInRange(metricIds, startTime, endTime);
+    AnomaliesWrapper anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(mergedAnomalies);
     return anomaliesWrapper;
-  }
-
-
-  /**
-   * Get timeseries for metric
-   * @param collection
-   * @param filterJson
-   * @param start
-   * @param end
-   * @param aggTimeGranularity
-   * @param metric
-   * @return
-   * @throws Exception
-   */
-  @GET
-  @Path(value = "/data/timeseries")
-  @Produces(MediaType.APPLICATION_JSON)
-  public JSONObject getTimeSeriesData(@QueryParam("dataset") String collection,
-      @QueryParam("filters") String filterJson,
-      @QueryParam("currentStart") Long start, @QueryParam("currentEnd") Long end,
-      @QueryParam("aggTimeGranularity") String aggTimeGranularity,
-      @QueryParam("metric") String metric)
-      throws Exception {
-
-    Multimap<String, String> filters = null;
-    if (filterJson != null && !filterJson.isEmpty()) {
-      filterJson = URLDecoder.decode(filterJson, "UTF-8");
-      filters = ThirdEyeUtils.convertToMultiMap(filterJson);
-    }
-    JSONObject jsonResponseObject = getTimeSeriesData(collection, filters, start, end, aggTimeGranularity, metric);
-    return jsonResponseObject;
   }
 
   /**
@@ -397,6 +258,37 @@ public class AnomaliesResource {
   }
 
   // ----------- HELPER FUNCTIONS
+
+  /**
+   * Get anomalies for metric id in a time range
+   * @param metricId
+   * @param startTime
+   * @param endTime
+   * @return
+   */
+  private List<MergedAnomalyResultDTO> getAnomaliesForMetricIdInRange(Long metricId, Long startTime, Long endTime) {
+    MetricConfigDTO metricConfig = metricConfigDAO.findById(metricId);
+    String dataset = metricConfig.getDataset();
+    String metric = metricConfig.getName();
+    List<MergedAnomalyResultDTO> mergedAnomalies =
+        mergedAnomalyResultDAO.findByCollectionMetricTime(dataset, metric, startTime, endTime, false);
+    return mergedAnomalies;
+  }
+
+  private List<MergedAnomalyResultDTO> getAnomaliesForMetricIdsInRange(List<Long> metricIds, Long startTime, Long endTime) {
+    List<MergedAnomalyResultDTO> mergedAnomaliesForMetricIdsInRange = new ArrayList<>();
+    for (Long metricId : metricIds) {
+      MetricConfigDTO metricConfig = metricConfigDAO.findById(metricId);
+      String dataset = metricConfig.getDataset();
+      String metric = metricConfig.getName();
+      List<MergedAnomalyResultDTO> mergedAnomalies =
+          mergedAnomalyResultDAO.findByCollectionMetricTime(dataset, metric, startTime, endTime, false);
+      mergedAnomaliesForMetricIdsInRange.addAll(mergedAnomalies);
+    }
+    return mergedAnomaliesForMetricIdsInRange;
+  }
+
+
   /**
    * Get timeseries for metric
    * @param collection
@@ -559,6 +451,64 @@ public class AnomaliesResource {
   }
 
 
+  /**
+   * Constructs AnomaliesWrapper object from a list of merged anomalies
+   * @param mergedAnomalies
+   * @return
+   * @throws Exception
+   */
+  private AnomaliesWrapper constructAnomaliesWrapperFromMergedAnomalies(List<MergedAnomalyResultDTO> mergedAnomalies) throws Exception {
+    AnomaliesWrapper anomaliesWrapper = new AnomaliesWrapper();
+    anomaliesWrapper.setTotalAnomalies(mergedAnomalies.size());
+    LOG.info("Total anomalies: {}", mergedAnomalies.size());
+
+    // TODO: get page number and page size from client
+    int pageNumber = DEFAULT_PAGE_NUMBER;
+    int pageSize = DEFAULT_PAGE_SIZE;
+    int maxPageNumber = mergedAnomalies.size()/pageSize + 1;
+    if (pageNumber > maxPageNumber) {
+      pageNumber = maxPageNumber;
+    }
+    if (pageNumber < 1) {
+      pageNumber = 1;
+    }
+    if (mergedAnomalies.size() > pageSize) {
+      if (mergedAnomalies.size() > pageSize * pageNumber ) {
+        mergedAnomalies.subList(pageSize * pageNumber, mergedAnomalies.size()).clear();
+      }
+      mergedAnomalies.subList(0, pageSize * (pageNumber - 1)).clear();
+    }
+    anomaliesWrapper.setNumAnomaliesOnPage(mergedAnomalies.size());
+    LOG.info("Page number: {} Page size: {} Num anomalies on page: {}", pageNumber, pageSize, mergedAnomalies.size());
+
+    // for each anomaly, create anomaly details
+    List<AnomalyDetails> anomalyDetailsList = new ArrayList<>();
+    for (MergedAnomalyResultDTO mergedAnomaly : mergedAnomalies) {
+      String dataset = mergedAnomaly.getCollection();
+      DatasetConfigDTO datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(dataset);
+      DateTimeFormatter  timeSeriesDateFormatter = DateTimeFormat.forPattern(TIME_SERIES_DATE_FORMAT).withZone(Utils.getDataTimeZone(dataset));
+      DateTimeFormatter startEndDateFormatterDays = DateTimeFormat.forPattern(START_END_DATE_FORMAT_DAYS).withZone(Utils.getDataTimeZone(dataset));
+      DateTimeFormatter startEndDateFormatterHours = DateTimeFormat.forPattern(START_END_DATE_FORMAT_HOURS).withZone(Utils.getDataTimeZone(dataset));
+
+      AnomalyDetails anomalyDetails = getAnomalyDetails(mergedAnomaly, datasetConfig, timeSeriesDateFormatter,
+          startEndDateFormatterHours, startEndDateFormatterDays);
+      anomalyDetailsList.add(anomalyDetails);
+    }
+    anomaliesWrapper.setAnomalyDetailsList(anomalyDetailsList);
+
+    return anomaliesWrapper;
+  }
+
+
+  /**
+   * Generates Anomaly Details for each merged anomaly
+   * @param mergedAnomaly
+   * @param datasetConfig
+   * @param timeSeriesDateFormatter
+   * @param startEndDateFormatterHours
+   * @param startEndDateFormatterDays
+   * @return
+   */
   private AnomalyDetails getAnomalyDetails(MergedAnomalyResultDTO mergedAnomaly, DatasetConfigDTO datasetConfig,
       DateTimeFormatter timeSeriesDateFormatter, DateTimeFormatter startEndDateFormatterHours,
       DateTimeFormatter startEndDateFormatterDays) {
@@ -596,7 +546,7 @@ public class AnomaliesResource {
     return anomalyDetails;
   }
 
-  /** Construct anomaly wrapper using all details fetched from calls
+  /** Construct anomaly details using all details fetched from calls
    *
    * @param metricName
    * @param dataset
