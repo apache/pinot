@@ -115,6 +115,8 @@
     <async-http-client.version>1.9.21</async-http-client.version>
     <jersey.version>2.23</jersey.version>
     <restlet.version>2.3.4</restlet.version>
+    <!-- The jetty version needs to match with the one transitively imported from restlet -->
+    <jetty.version>9.2.6.v20141205</jetty.version>
     <!-- Sets the VM argument line used when unit tests are run. -->
     <argLine> -Xms4g -Xmx4g -XX:MaxPermSize=512m -XX:MaxDirectMemorySize=10g </argLine>
   </properties>
@@ -371,26 +373,26 @@
         <artifactId>libthrift</artifactId>
         <version>0.9.1</version>
       </dependency>
-      <dependency>
+      <!-- <dependency>
         <groupId>org.eclipse.jetty</groupId>
         <artifactId>jetty-server</artifactId>
         <version>8.1.8.v20121106</version>
-      </dependency>
+      </dependency> -->
       <dependency>
         <groupId>javax.servlet</groupId>
         <artifactId>javax.servlet-api</artifactId>
         <version>3.0.1</version>
         <scope>compile</scope>
       </dependency>
-      <dependency>
+      <!-- <dependency>
         <groupId>org.eclipse.jetty</groupId>
         <artifactId>jetty-servlet</artifactId>
         <version>8.1.8.v20121106</version>
-      </dependency>
+      </dependency> -->
       <dependency>
         <groupId>org.eclipse.jetty</groupId>
         <artifactId>jetty-webapp</artifactId>
-        <version>8.1.8.v20121106</version>
+        <version>${jetty.version}</version>
       </dependency>
       <dependency>
         <groupId>org.json</groupId>

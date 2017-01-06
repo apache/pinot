@@ -50,22 +50,18 @@
     <!-- Jetty -->
     <dependency>
       <groupId>org.eclipse.jetty</groupId>
-      <artifactId>jetty-server</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.eclipse.jetty</groupId>
       <artifactId>jetty-webapp</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.eclipse.jetty</groupId>
-      <artifactId>jetty-servlet</artifactId>
+      <groupId>org.restlet.jse</groupId>
+      <artifactId>org.restlet.ext.jetty</artifactId>
     </dependency>
     <dependency>
       <groupId>javax.servlet</groupId>
       <artifactId>javax.servlet-api</artifactId>
     </dependency>
     <!-- End jetty -->
-    
+
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-transport</artifactId>
