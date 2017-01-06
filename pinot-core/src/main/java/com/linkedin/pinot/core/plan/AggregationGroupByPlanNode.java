@@ -22,12 +22,9 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
-import com.linkedin.pinot.core.operator.aggregation.AggregationFunctionContext;
-import com.linkedin.pinot.core.operator.aggregation.AggregationOperator;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunctionFactory;
+import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunctionUtils;
 import com.linkedin.pinot.core.operator.aggregation.groupby.AggregationGroupByOperator;
-import com.linkedin.pinot.core.operator.aggregation.groupby.DefaultGroupByExecutor;
-import com.linkedin.pinot.core.query.aggregation.AggregationFunctionUtils;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -65,7 +62,7 @@ public class AggregationGroupByPlanNode implements PlanNode {
     Set<String> aggregationGroupByRelatedColumns = new HashSet<>();
     for (AggregationInfo aggregationInfo : _aggregationInfos) {
       if (!aggregationInfo.getAggregationType()
-          .equalsIgnoreCase(AggregationFunctionFactory.COUNT_AGGREGATION_FUNCTION)) {
+          .equalsIgnoreCase(AggregationFunctionFactory.AggregationFunctionType.COUNT.getName())) {
         String columns = aggregationInfo.getAggregationParams().get("column").trim();
         aggregationGroupByRelatedColumns.addAll(Arrays.asList(columns.split(",")));
       }

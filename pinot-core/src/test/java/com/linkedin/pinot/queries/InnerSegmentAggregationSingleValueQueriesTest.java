@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.queries;
 
-import com.linkedin.pinot.common.utils.primitive.MutableLongValue;
 import com.linkedin.pinot.core.operator.ExecutionStatistics;
 import com.linkedin.pinot.core.operator.aggregation.AggregationOperator;
 import com.linkedin.pinot.core.operator.aggregation.groupby.AggregationGroupByOperator;
@@ -53,10 +52,10 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 120000L);
     Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 30000L);
     List<Serializable> aggregationResult = resultsBlock.getAggregationResult();
-    Assert.assertEquals(((MutableLongValue) aggregationResult.get(0)).getValue(), 30000L);
-    Assert.assertEquals(((Double) aggregationResult.get(1)).longValue(), 32317185437847L);
-    Assert.assertEquals(((Double) aggregationResult.get(2)).intValue(), 2147419555);
-    Assert.assertEquals(((Double) aggregationResult.get(3)).intValue(), 1689277);
+    Assert.assertEquals(((Number) aggregationResult.get(0)).longValue(), 30000L);
+    Assert.assertEquals(((Number) aggregationResult.get(1)).longValue(), 32317185437847L);
+    Assert.assertEquals(((Number) aggregationResult.get(2)).intValue(), 2147419555);
+    Assert.assertEquals(((Number) aggregationResult.get(3)).intValue(), 1689277);
     AvgAggregationFunction.AvgPair avgResult = (AvgAggregationFunction.AvgPair) aggregationResult.get(4);
     Assert.assertEquals(avgResult.getFirst().longValue(), 28175373944314L);
     Assert.assertEquals(avgResult.getSecond().longValue(), 30000L);
@@ -70,10 +69,10 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 24516L);
     Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 30000L);
     aggregationResult = resultsBlock.getAggregationResult();
-    Assert.assertEquals(((MutableLongValue) aggregationResult.get(0)).getValue(), 6129L);
-    Assert.assertEquals(((Double) aggregationResult.get(1)).longValue(), 6875947596072L);
-    Assert.assertEquals(((Double) aggregationResult.get(2)).intValue(), 999813884);
-    Assert.assertEquals(((Double) aggregationResult.get(3)).intValue(), 1980174);
+    Assert.assertEquals(((Number) aggregationResult.get(0)).longValue(), 6129L);
+    Assert.assertEquals(((Number) aggregationResult.get(1)).longValue(), 6875947596072L);
+    Assert.assertEquals(((Number) aggregationResult.get(2)).intValue(), 999813884);
+    Assert.assertEquals(((Number) aggregationResult.get(3)).intValue(), 1980174);
     avgResult = (AvgAggregationFunction.AvgPair) aggregationResult.get(4);
     Assert.assertEquals(avgResult.getFirst().longValue(), 4699510391301L);
     Assert.assertEquals(avgResult.getSecond().longValue(), 6129L);
@@ -96,10 +95,10 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
     GroupKeyGenerator.GroupKey firstGroupKey = aggregationGroupByResult.getGroupKeyIterator().next();
     Assert.assertEquals(firstGroupKey.getStringKey(), "11270");
-    Assert.assertEquals(((MutableLongValue) aggregationGroupByResult.getResultForKey(firstGroupKey, 0)).getValue(), 1L);
-    Assert.assertEquals(((Double) aggregationGroupByResult.getResultForKey(firstGroupKey, 1)).longValue(), 815409257L);
-    Assert.assertEquals(((Double) aggregationGroupByResult.getResultForKey(firstGroupKey, 2)).intValue(), 1215316262);
-    Assert.assertEquals(((Double) aggregationGroupByResult.getResultForKey(firstGroupKey, 3)).intValue(), 1328642550);
+    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 0)).longValue(), 1L);
+    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 1)).longValue(), 815409257L);
+    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 2)).intValue(), 1215316262);
+    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 3)).intValue(), 1328642550);
     AvgAggregationFunction.AvgPair avgResult =
         (AvgAggregationFunction.AvgPair) aggregationGroupByResult.getResultForKey(firstGroupKey, 4);
     Assert.assertEquals(avgResult.getFirst().longValue(), 788414092L);
@@ -116,10 +115,10 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
     firstGroupKey = aggregationGroupByResult.getGroupKeyIterator().next();
     Assert.assertEquals(firstGroupKey.getStringKey(), "242920");
-    Assert.assertEquals(((MutableLongValue) aggregationGroupByResult.getResultForKey(firstGroupKey, 0)).getValue(), 3L);
-    Assert.assertEquals(((Double) aggregationGroupByResult.getResultForKey(firstGroupKey, 1)).longValue(), 4348938306L);
-    Assert.assertEquals(((Double) aggregationGroupByResult.getResultForKey(firstGroupKey, 2)).intValue(), 407993712);
-    Assert.assertEquals(((Double) aggregationGroupByResult.getResultForKey(firstGroupKey, 3)).intValue(), 296467636);
+    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 0)).longValue(), 3L);
+    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 1)).longValue(), 4348938306L);
+    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 2)).intValue(), 407993712);
+    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 3)).intValue(), 296467636);
     avgResult = (AvgAggregationFunction.AvgPair) aggregationGroupByResult.getResultForKey(firstGroupKey, 4);
     Assert.assertEquals(avgResult.getFirst().longValue(), 5803888725L);
     Assert.assertEquals(avgResult.getSecond().longValue(), 3L);
@@ -142,10 +141,10 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
     GroupKeyGenerator.GroupKey firstGroupKey = aggregationGroupByResult.getGroupKeyIterator().next();
     Assert.assertEquals(firstGroupKey.getStringKey(), "1577638897\tP\tKrNxpdycSiwoRohEiTIlLqDHnx");
-    Assert.assertEquals(((MutableLongValue) aggregationGroupByResult.getResultForKey(firstGroupKey, 0)).getValue(), 5L);
-    Assert.assertEquals(((Double) aggregationGroupByResult.getResultForKey(firstGroupKey, 1)).longValue(), 1211410535L);
-    Assert.assertEquals(((Double) aggregationGroupByResult.getResultForKey(firstGroupKey, 2)).intValue(), 1720170285);
-    Assert.assertEquals(((Double) aggregationGroupByResult.getResultForKey(firstGroupKey, 3)).intValue(), 1585725369);
+    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 0)).longValue(), 5L);
+    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 1)).longValue(), 1211410535L);
+    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 2)).intValue(), 1720170285);
+    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 3)).intValue(), 1585725369);
     AvgAggregationFunction.AvgPair avgResult =
         (AvgAggregationFunction.AvgPair) aggregationGroupByResult.getResultForKey(firstGroupKey, 4);
     Assert.assertEquals(avgResult.getFirst().longValue(), 8398774425L);
@@ -162,11 +161,11 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
     firstGroupKey = aggregationGroupByResult.getGroupKeyIterator().next();
     Assert.assertEquals(firstGroupKey.getStringKey(), "1096298724\tP\tKrNxpdycSiwoRohEiTIlLqDHnx");
-    Assert.assertEquals(((MutableLongValue) aggregationGroupByResult.getResultForKey(firstGroupKey, 0)).getValue(), 7L);
-    Assert.assertEquals(((Double) aggregationGroupByResult.getResultForKey(firstGroupKey, 1)).longValue(),
+    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 0)).longValue(), 7L);
+    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 1)).longValue(),
         13531749490L);
-    Assert.assertEquals(((Double) aggregationGroupByResult.getResultForKey(firstGroupKey, 2)).intValue(), 478007592);
-    Assert.assertEquals(((Double) aggregationGroupByResult.getResultForKey(firstGroupKey, 3)).intValue(), 394608493);
+    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 2)).intValue(), 478007592);
+    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 3)).intValue(), 394608493);
     avgResult = (AvgAggregationFunction.AvgPair) aggregationGroupByResult.getResultForKey(firstGroupKey, 4);
     Assert.assertEquals(avgResult.getFirst().longValue(), 1229066783L);
     Assert.assertEquals(avgResult.getSecond().longValue(), 7L);
@@ -190,10 +189,10 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     GroupKeyGenerator.GroupKey firstGroupKey = aggregationGroupByResult.getGroupKeyIterator().next();
     Assert.assertEquals(firstGroupKey.getStringKey(),
         "1784773968\t204243323\t628170461\t1985159279\t296467636\tP\tHEuxNvH\t402773817\t2047180536");
-    Assert.assertEquals(((MutableLongValue) aggregationGroupByResult.getResultForKey(firstGroupKey, 0)).getValue(), 1L);
-    Assert.assertEquals(((Double) aggregationGroupByResult.getResultForKey(firstGroupKey, 1)).longValue(), 1784773968L);
-    Assert.assertEquals(((Double) aggregationGroupByResult.getResultForKey(firstGroupKey, 2)).intValue(), 204243323);
-    Assert.assertEquals(((Double) aggregationGroupByResult.getResultForKey(firstGroupKey, 3)).intValue(), 628170461);
+    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 0)).longValue(), 1L);
+    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 1)).longValue(), 1784773968L);
+    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 2)).intValue(), 204243323);
+    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 3)).intValue(), 628170461);
     AvgAggregationFunction.AvgPair avgResult =
         (AvgAggregationFunction.AvgPair) aggregationGroupByResult.getResultForKey(firstGroupKey, 4);
     Assert.assertEquals(avgResult.getFirst().longValue(), 1985159279L);
@@ -211,10 +210,10 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     firstGroupKey = aggregationGroupByResult.getGroupKeyIterator().next();
     Assert.assertEquals(firstGroupKey.getStringKey(),
         "1361199163\t178133991\t296467636\t788414092\t1719301234\tP\tMaztCmmxxgguBUxPti\t1284373442\t752388855");
-    Assert.assertEquals(((MutableLongValue) aggregationGroupByResult.getResultForKey(firstGroupKey, 0)).getValue(), 1L);
-    Assert.assertEquals(((Double) aggregationGroupByResult.getResultForKey(firstGroupKey, 1)).longValue(), 1361199163L);
-    Assert.assertEquals(((Double) aggregationGroupByResult.getResultForKey(firstGroupKey, 2)).intValue(), 178133991);
-    Assert.assertEquals(((Double) aggregationGroupByResult.getResultForKey(firstGroupKey, 3)).intValue(), 296467636);
+    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 0)).longValue(), 1L);
+    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 1)).longValue(), 1361199163L);
+    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 2)).intValue(), 178133991);
+    Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 3)).intValue(), 296467636);
     avgResult = (AvgAggregationFunction.AvgPair) aggregationGroupByResult.getResultForKey(firstGroupKey, 4);
     Assert.assertEquals(avgResult.getFirst().longValue(), 788414092L);
     Assert.assertEquals(avgResult.getSecond().longValue(), 1L);

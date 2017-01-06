@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.query.aggregation;
+package com.linkedin.pinot.core.operator.aggregation.function;
 
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.operator.aggregation.AggregationFunctionContext;
 import com.linkedin.pinot.core.plan.AggregationFunctionInitializer;
 import java.util.List;
+import java.util.Locale;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -48,5 +49,25 @@ public class AggregationFunctionUtils {
       }
     }
     return aggregationFunctionContexts;
+  }
+
+  @Nonnull
+  public static AggregationFunction[] getAggregationFunctions(@Nonnull List<AggregationInfo> aggregationInfos) {
+    int numAggregationFunctions = aggregationInfos.size();
+    AggregationFunction[] aggregationFunctions = new AggregationFunction[numAggregationFunctions];
+    for (int i = 0; i < numAggregationFunctions; i++) {
+      aggregationFunctions[i] =
+          AggregationFunctionFactory.getAggregationFunction(aggregationInfos.get(i).getAggregationType());
+    }
+    return aggregationFunctions;
+  }
+
+  @Nonnull
+  public static String formatValue(@Nonnull Object value) {
+    if (value instanceof Double) {
+      return String.format(Locale.US, "%1.5f", (Double) value);
+    } else {
+      return value.toString();
+    }
   }
 }

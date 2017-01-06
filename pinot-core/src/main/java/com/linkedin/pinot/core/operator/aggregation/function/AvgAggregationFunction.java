@@ -26,18 +26,19 @@ import javax.annotation.Nonnull;
 
 
 public class AvgAggregationFunction implements AggregationFunction<AvgPair, Double> {
+  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.AVG.getName();
   private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
 
   @Nonnull
   @Override
   public String getName() {
-    return AggregationFunctionFactory.AVG_AGGREGATION_FUNCTION;
+    return NAME;
   }
 
   @Nonnull
   @Override
   public String getColumnName(@Nonnull String[] columns) {
-    return AggregationFunctionFactory.AVG_AGGREGATION_FUNCTION + "_" + columns[0];
+    return NAME + "_" + columns[0];
   }
 
   @Override
