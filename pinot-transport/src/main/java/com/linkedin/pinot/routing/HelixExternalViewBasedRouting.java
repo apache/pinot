@@ -19,6 +19,7 @@ package com.linkedin.pinot.routing;
 import com.google.common.collect.Sets;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
+import com.linkedin.pinot.routing.builder.LargeClusterRoutingTableBuilder;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -29,6 +30,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.configuration.Configuration;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
@@ -65,9 +67,14 @@ import com.linkedin.pinot.transport.common.SegmentIdSet;
  */
 public class HelixExternalViewBasedRouting implements RoutingTable {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixExternalViewBasedRouting.class);
-  private final RoutingTableBuilder _offlineRoutingTableBuilder;
+
+  private final RoutingTableBuilder _largeClusterRoutingTableBuilder;
+  private RoutingTableBuilder _smallClusterRoutingTableBuilder;
   private final RoutingTableBuilder _realtimeHLCRoutingTableBuilder;
   private final RoutingTableBuilder _realtimeLLCRoutingTableBuilder;
+
+  private static final int MIN_SERVER_COUNT_FOR_LARGE_CLUSTER = 30;
+  private static final int MIN_REPLICA_COUNT_FOR_LARGE_CLUSTER = 4;
 
   /*
    * _brokerRoutingTable has entries for offline as well as realtime tables. For the
@@ -94,12 +101,26 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
 
   private BrokerMetrics _brokerMetrics;
 
+  /**
+   * Changes the small cluster routing builder, only used by tests.
+   */
+  void setSmallClusterRoutingTableBuilder(RoutingTableBuilder routingTableBuilder) {
+    _smallClusterRoutingTableBuilder = routingTableBuilder;
+  }
+
   public HelixExternalViewBasedRouting(ZkHelixPropertyStore<ZNRecord> propertyStore,
-      RoutingTableSelector routingTableSelector, HelixManager helixManager) {
+      RoutingTableSelector routingTableSelector, HelixManager helixManager, Configuration configuration) {
     _timeBoundaryService = new HelixExternalViewBasedTimeBoundaryService(propertyStore);
-    _offlineRoutingTableBuilder = new BalancedRandomRoutingTableBuilder();
+    _largeClusterRoutingTableBuilder = new LargeClusterRoutingTableBuilder();
+    _smallClusterRoutingTableBuilder = new BalancedRandomRoutingTableBuilder();
     _realtimeHLCRoutingTableBuilder = new KafkaHighLevelConsumerBasedRoutingTableBuilder();
     _realtimeLLCRoutingTableBuilder = new KafkaLowLevelConsumerRoutingTableBuilder();
+
+    _largeClusterRoutingTableBuilder.init(configuration);
+    _smallClusterRoutingTableBuilder.init(configuration);
+    _realtimeHLCRoutingTableBuilder.init(configuration);
+    _realtimeLLCRoutingTableBuilder.init(configuration);
+
     _routingTableSelector = routingTableSelector;
     _helixManager = helixManager;
   }
@@ -309,7 +330,11 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     if (CommonConstants.Helix.TableType.REALTIME.equals(tableType)) {
       routingTableBuilder = _realtimeHLCRoutingTableBuilder;
     } else {
-      routingTableBuilder = _offlineRoutingTableBuilder;
+      if (isLargeCluster(externalView)) {
+        routingTableBuilder = _largeClusterRoutingTableBuilder;
+      } else {
+        routingTableBuilder = _smallClusterRoutingTableBuilder;
+      }
     }
 
     LOGGER.info("Trying to compute routing table for table {} using {}", tableName, routingTableBuilder);
@@ -426,6 +451,32 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     }
 
     LOGGER.info("Routing table update for table {} completed in {} ms", tableName, updateTime);
+  }
+
+  private boolean isLargeCluster(ExternalView externalView) {
+    // Check if the number of replicas is sufficient to treat it as a large cluster
+    final String helixReplicaCount = externalView.getRecord().getSimpleField("REPLICAS");
+    final int replicaCount;
+
+    try {
+      replicaCount = Integer.parseInt(helixReplicaCount);
+    } catch (Exception e) {
+      LOGGER.warn("Failed to parse the replica count ({}) from external view of table {}", helixReplicaCount,
+          externalView.getResourceName());
+      return false;
+    }
+
+    if (replicaCount < MIN_REPLICA_COUNT_FOR_LARGE_CLUSTER) {
+      return false;
+    }
+
+    // Check if the server count is high enough to count as a large cluster
+    final Set<String> instanceSet = new HashSet<>();
+    for (String partition : externalView.getPartitionSet()) {
+      instanceSet.addAll(externalView.getStateMap(partition).keySet());
+    }
+
+    return MIN_SERVER_COUNT_FOR_LARGE_CLUSTER <= instanceSet.size();
   }
 
   protected void updateTimeBoundary(String tableName, ExternalView externalView) {

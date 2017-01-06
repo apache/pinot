@@ -13,24 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.transport.common.routing;
+package com.linkedin.pinot.routing;
 
-import com.linkedin.pinot.routing.PercentageBasedRoutingTableSelector;
 import java.io.FileInputStream;
 import java.io.InputStream;
-import java.lang.reflect.Field;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.math.stat.descriptive.moment.Mean;
-import org.apache.commons.math.stat.descriptive.moment.StandardDeviation;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.model.ExternalView;
@@ -38,8 +34,6 @@ import org.apache.helix.model.InstanceConfig;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
-import com.linkedin.pinot.routing.RoutingTableLookupRequest;
 import com.linkedin.pinot.routing.builder.BalancedRandomRoutingTableBuilder;
 import com.linkedin.pinot.routing.builder.RoutingTableBuilder;
 import com.linkedin.pinot.transport.common.SegmentIdSet;
@@ -60,10 +54,10 @@ public class RandomRoutingTableTest {
     int totalRuns = 10000;
     RoutingTableBuilder routingStrategy = new BalancedRandomRoutingTableBuilder(10);
     HelixExternalViewBasedRouting routingTable =
-        new HelixExternalViewBasedRouting(null, new PercentageBasedRoutingTableSelector(), null);
-    Field offlineRTBField = HelixExternalViewBasedRouting.class.getDeclaredField("_offlineRoutingTableBuilder");
-    offlineRTBField.setAccessible(true);
-    offlineRTBField.set(routingTable, routingStrategy);
+        new HelixExternalViewBasedRouting(null, new PercentageBasedRoutingTableSelector(), null,
+            new BaseConfiguration());
+
+    routingTable.setSmallClusterRoutingTableBuilder(routingStrategy);
 
     ExternalView externalView = new ExternalView(externalViewRecord);
 

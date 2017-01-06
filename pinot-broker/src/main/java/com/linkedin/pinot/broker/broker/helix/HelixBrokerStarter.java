@@ -72,6 +72,9 @@ public class HelixBrokerStarter {
   private static final String ROUTING_TABLE_SELECTOR_SUBSET_KEY =
       "pinot.broker.routing.table.selector";
 
+  private static final String ROUTING_TABLE_PARAMS_SUBSET_KEY =
+      "pinot.broker.routing.table";
+
   public HelixBrokerStarter(String helixClusterName, String zkServer, Configuration pinotHelixProperties)
       throws Exception {
     LOGGER.info("Starting Pinot broker");
@@ -106,7 +109,8 @@ public class HelixBrokerStarter {
     // _brokerServerBuilder = startBroker();
     _helixManager =
         HelixManagerFactory.getZKHelixManager(helixClusterName, brokerId, InstanceType.PARTICIPANT, zkServers);
-    _helixExternalViewBasedRouting = new HelixExternalViewBasedRouting(_propertyStore, selector, _helixManager);
+    _helixExternalViewBasedRouting = new HelixExternalViewBasedRouting(_propertyStore, selector, _helixManager,
+        pinotHelixProperties.subset(ROUTING_TABLE_PARAMS_SUBSET_KEY));
     _brokerServerBuilder = startBroker(_pinotHelixProperties);
     final StateMachineEngine stateMachineEngine = _helixManager.getStateMachineEngine();
     final StateModelFactory<?> stateModelFactory =

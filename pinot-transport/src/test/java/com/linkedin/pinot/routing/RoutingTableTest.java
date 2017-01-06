@@ -13,13 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.transport.common.routing;
+package com.linkedin.pinot.routing;
 
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
-import com.linkedin.pinot.routing.TableConfigRoutingTableSelector;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -30,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.I0Itec.zkclient.IZkDataListener;
+import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.lang.mutable.MutableBoolean;
@@ -46,11 +46,6 @@ import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.HLCSegmentName;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
-import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
-import com.linkedin.pinot.routing.PercentageBasedRoutingTableSelector;
-import com.linkedin.pinot.routing.RoutingTableLookupRequest;
-import com.linkedin.pinot.routing.RoutingTableSelector;
-import com.linkedin.pinot.routing.RoutingTableSelectorFactory;
 import com.linkedin.pinot.routing.builder.KafkaHighLevelConsumerBasedRoutingTableBuilder;
 import com.linkedin.pinot.routing.builder.RandomRoutingTableBuilder;
 import com.linkedin.pinot.routing.builder.RoutingTableBuilder;
@@ -64,10 +59,10 @@ public class RoutingTableTest {
   @Test
   public void testHelixExternalViewBasedRoutingTable() throws Exception {
     RoutingTableBuilder routingStrategy = new RandomRoutingTableBuilder(100);
-    HelixExternalViewBasedRouting routingTable = new HelixExternalViewBasedRouting(null, NO_LLC_ROUTING, null);
-    Field offlineRTBField = HelixExternalViewBasedRouting.class.getDeclaredField("_offlineRoutingTableBuilder");
-    offlineRTBField.setAccessible(true);
-    offlineRTBField.set(routingTable, routingStrategy);
+    HelixExternalViewBasedRouting routingTable =
+        new HelixExternalViewBasedRouting(null, NO_LLC_ROUTING, null, new BaseConfiguration());
+
+    routingTable.setSmallClusterRoutingTableBuilder(routingStrategy);
 
     ExternalView externalView = new ExternalView("testResource0_OFFLINE");
     externalView.setState("segment0", "dataServer_instance_0", "ONLINE");
@@ -121,7 +116,8 @@ public class RoutingTableTest {
 
     final MutableBoolean timeBoundaryUpdated = new MutableBoolean(false);
 
-    HelixExternalViewBasedRouting routingTable = new HelixExternalViewBasedRouting(propertyStore, NO_LLC_ROUTING, null) {
+    HelixExternalViewBasedRouting routingTable = new HelixExternalViewBasedRouting(propertyStore, NO_LLC_ROUTING, null,
+        new BaseConfiguration()) {
       @Override
       protected ExternalView fetchExternalView(String table) {
         return offlineExternalView;
@@ -174,7 +170,8 @@ public class RoutingTableTest {
 
     final LLCSegmentName llcSegmentName = new LLCSegmentName("testResource0", 2, 65, System.currentTimeMillis());
 
-    HelixExternalViewBasedRouting routingTable = new HelixExternalViewBasedRouting(null, NO_LLC_ROUTING, null);
+    HelixExternalViewBasedRouting routingTable =
+        new HelixExternalViewBasedRouting(null, NO_LLC_ROUTING, null, new BaseConfiguration());
 
     Field realtimeRTBField = HelixExternalViewBasedRouting.class.getDeclaredField("_realtimeHLCRoutingTableBuilder");
     realtimeRTBField.setAccessible(true);
@@ -287,7 +284,8 @@ public class RoutingTableTest {
   // Test that we can switch between llc and hlc routing depending on what the selector tells us.
   @Test
   public void testCombinedKafkaRouting() throws Exception {
-    HelixExternalViewBasedRouting routingTable = new HelixExternalViewBasedRouting(null, NO_LLC_ROUTING, null);
+    HelixExternalViewBasedRouting routingTable =
+        new HelixExternalViewBasedRouting(null, NO_LLC_ROUTING, null, new BaseConfiguration());
 
     final long now = System.currentTimeMillis();
     final String tableName = "table";
