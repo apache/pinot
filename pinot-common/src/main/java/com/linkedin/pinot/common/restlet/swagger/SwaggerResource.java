@@ -40,7 +40,6 @@ import org.restlet.routing.Route;
 import org.restlet.routing.Router;
 import org.restlet.routing.TemplateRoute;
 import org.restlet.util.RouteList;
-import org.restlet.util.Series;
 
 
 /**
