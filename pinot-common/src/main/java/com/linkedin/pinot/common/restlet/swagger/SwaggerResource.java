@@ -25,12 +25,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 
-import java.util.Set;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.restlet.Restlet;
-import org.restlet.engine.header.Header;
+import org.restlet.data.Header;
 import org.restlet.representation.Representation;
 import org.restlet.representation.StringRepresentation;
 import org.restlet.resource.Finder;
@@ -109,12 +108,7 @@ public class SwaggerResource extends ServerResource {
       StringRepresentation representation = new StringRepresentation(swagger.toString());
 
       // Set up CORS
-      Series<Header> responseHeaders = (Series<Header>) getResponse().getAttributes().get("org.restlet.http.headers");
-      if (responseHeaders == null) {
-        responseHeaders = new Series(Header.class);
-        getResponse().getAttributes().put("org.restlet.http.headers", responseHeaders);
-      }
-      responseHeaders.add(new Header("Access-Control-Allow-Origin", "*"));
+      getResponse().getHeaders().add(new Header("Access-Control-Allow-Origin", "*"));
       return representation;
     } catch (JSONException e) {
       return new StringRepresentation(e.toString());
