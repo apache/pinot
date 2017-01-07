@@ -94,19 +94,21 @@ public class LoadersTest {
       throws Exception {
     SegmentMetadataImpl originalMetadata = new SegmentMetadataImpl(segmentDirectory);
     Assert.assertEquals(originalMetadata.getSegmentVersion(), SegmentVersion.v1);
+    // note: ordering of these two test blocks matters
     {
-      // with this code and converter in place, make sure we still load original version
-      // by default. We require specific configuration for v3.
-      IndexSegment indexSegment = Loaders.IndexSegment.load(segmentDirectory, ReadMode.mmap);
-      Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), originalMetadata.getVersion());
-      Assert.assertFalse(SegmentDirectoryPaths.segmentDirectoryFor(segmentDirectory, SegmentVersion.v3).exists());
-    }
-    {
-      // Same as above but with explicit indexLoadingConfigMetadata passed to load v1
+      // Explicitly pass v1 format since we will convert by default to v3
       IndexSegment indexSegment = Loaders.IndexSegment.load(segmentDirectory, ReadMode.mmap, v1LoadingConfig);
       Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), originalMetadata.getVersion());
       Assert.assertFalse(SegmentDirectoryPaths.segmentDirectoryFor(segmentDirectory, SegmentVersion.v3).exists());
     }
+    {
+      // with this code and converter in place, make sure we still load original version
+      // by default. We require specific configuration for v3.
+      IndexSegment indexSegment = Loaders.IndexSegment.load(segmentDirectory, ReadMode.mmap);
+      Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3.toString());
+      Assert.assertTrue(SegmentDirectoryPaths.segmentDirectoryFor(segmentDirectory, SegmentVersion.v3).exists());
+    }
+
   }
 
 
@@ -123,8 +125,8 @@ public class LoadersTest {
 
     {
       IndexSegment indexSegment = Loaders.IndexSegment.load(segmentDirectory, ReadMode.mmap);
-      Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), originalMetadata.getVersion());
-      Assert.assertFalse(SegmentDirectoryPaths.segmentDirectoryFor(segmentDirectory, SegmentVersion.v3).exists());
+      Assert.assertEquals(indexSegment.getSegmentMetadata().getVersion(), SegmentVersion.v3.toString());
+      Assert.assertTrue(SegmentDirectoryPaths.segmentDirectoryFor(segmentDirectory, SegmentVersion.v3).exists());
     }
     {
       IndexSegment indexSegment = Loaders.IndexSegment.load(segmentDirectory, ReadMode.mmap, v3LoadingConfig);

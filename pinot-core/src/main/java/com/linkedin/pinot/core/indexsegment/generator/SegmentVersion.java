@@ -30,7 +30,7 @@ public enum SegmentVersion {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentVersion.class);
 
-  public static SegmentVersion DEFAULT_TABLE_VERSION = SegmentVersion.v1;
+  public static SegmentVersion DEFAULT_TABLE_VERSION = SegmentVersion.v3;
   public static SegmentVersion DEFAULT_SERVER_VERSION = SegmentVersion.v3;
 
   int versionNumber;
