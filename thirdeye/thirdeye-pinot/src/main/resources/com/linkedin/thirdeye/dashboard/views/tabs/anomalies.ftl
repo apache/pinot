@@ -13,7 +13,7 @@
 								<option value="metric">Metric(s)</option>
 								<option value="dashboard">Dashboard</option>
 								<option value="id">Anomaly ID</option>
-                <option value="time">Time</option>
+                <option value="time" selected>Time</option>
 							</select>
 						</div>
 						<div id="anomalies-search-metrics-container" style="overflow:hidden; display: none;">

@@ -1,12 +1,12 @@
 function AnomalyResultModel() {
 
-  this.anomaliesSearchMode = "metric";
+  this.anomaliesSearchMode = "time";
   this.metricIds = [];
   this.dashboardId = null;
   this.anomalyIds = [];
 
   this.previousStartDate = null;
-  this.startDate = moment().subtract(6, 'days').startOf('day');
+  this.startDate = moment().subtract(1, 'days').startOf('day');
   this.previousEndDate = null;
   this.endDate = moment().subtract(0, 'days').startOf('day');
   this.functionName = null;
@@ -85,8 +85,7 @@ AnomalyResultModel.prototype = {
     } else if (this.anomaliesSearchMode == constants.MODE_TIME && (this.previousStartDate != this.startDate || this.previousEndDate != this.endDate)) {
       this.previousStartDate = this.startDate;
       this.previousEndDate = this.endDate;
-      dataService.fetchAnomaliesForTime(
-          this.startDate, this.endDate, this.updateModelAndNotifyView.bind(this));
+      dataService.fetchAnomaliesForTime(this.startDate, this.endDate, this.updateModelAndNotifyView.bind(this));
     }
   },
   updateModelAndNotifyView : function(anomaliesWrapper) {

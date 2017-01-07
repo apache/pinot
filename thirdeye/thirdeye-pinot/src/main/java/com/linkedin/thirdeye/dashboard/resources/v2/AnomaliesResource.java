@@ -10,8 +10,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -82,12 +87,14 @@ public class AnomaliesResource {
   private final MergedAnomalyResultManager mergedAnomalyResultDAO;
   private final AnomalyFunctionManager anomalyFunctionDAO;
   private final DashboardConfigManager dashboardConfigDAO;
+  private ExecutorService threadPool;
 
   public AnomaliesResource() {
     metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
     mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
+    threadPool = Executors.newFixedThreadPool(10);
   }
 
   /**
@@ -455,9 +462,9 @@ public class AnomaliesResource {
    * Constructs AnomaliesWrapper object from a list of merged anomalies
    * @param mergedAnomalies
    * @return
-   * @throws Exception
+   * @throws ExecutionException
    */
-  private AnomaliesWrapper constructAnomaliesWrapperFromMergedAnomalies(List<MergedAnomalyResultDTO> mergedAnomalies) throws Exception {
+  private AnomaliesWrapper constructAnomaliesWrapperFromMergedAnomalies(List<MergedAnomalyResultDTO> mergedAnomalies) throws ExecutionException {
     AnomaliesWrapper anomaliesWrapper = new AnomaliesWrapper();
     anomaliesWrapper.setTotalAnomalies(mergedAnomalies.size());
     LOG.info("Total anomalies: {}", mergedAnomalies.size());
@@ -482,7 +489,7 @@ public class AnomaliesResource {
     LOG.info("Page number: {} Page size: {} Num anomalies on page: {}", pageNumber, pageSize, mergedAnomalies.size());
 
     // for each anomaly, create anomaly details
-    List<AnomalyDetails> anomalyDetailsList = new ArrayList<>();
+    List<Future<AnomalyDetails>> anomalyDetailsListFutures = new ArrayList<>();
     for (MergedAnomalyResultDTO mergedAnomaly : mergedAnomalies) {
       String dataset = mergedAnomaly.getCollection();
       DatasetConfigDTO datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(dataset);
@@ -490,9 +497,23 @@ public class AnomaliesResource {
       DateTimeFormatter startEndDateFormatterDays = DateTimeFormat.forPattern(START_END_DATE_FORMAT_DAYS).withZone(Utils.getDataTimeZone(dataset));
       DateTimeFormatter startEndDateFormatterHours = DateTimeFormat.forPattern(START_END_DATE_FORMAT_HOURS).withZone(Utils.getDataTimeZone(dataset));
 
-      AnomalyDetails anomalyDetails = getAnomalyDetails(mergedAnomaly, datasetConfig, timeSeriesDateFormatter,
-          startEndDateFormatterHours, startEndDateFormatterDays);
-      anomalyDetailsList.add(anomalyDetails);
+      Callable<AnomalyDetails> callable = new Callable<AnomalyDetails>() {
+        @Override
+        public AnomalyDetails call() throws Exception {
+          return getAnomalyDetails(mergedAnomaly, datasetConfig, timeSeriesDateFormatter,
+              startEndDateFormatterHours, startEndDateFormatterDays);
+        }
+      };
+      anomalyDetailsListFutures.add(threadPool.submit(callable));
+    }
+
+    List<AnomalyDetails> anomalyDetailsList = new ArrayList<>();
+    for (Future<AnomalyDetails> anomalyDetailsFuture : anomalyDetailsListFutures) {
+      try {
+        anomalyDetailsList.add(anomalyDetailsFuture.get(120, TimeUnit.SECONDS));
+      } catch (InterruptedException | ExecutionException | TimeoutException e) {
+        LOG.error("Exception in getting AnomalyDetails", e);
+      }
     }
     anomaliesWrapper.setAnomalyDetailsList(anomalyDetailsList);
 
