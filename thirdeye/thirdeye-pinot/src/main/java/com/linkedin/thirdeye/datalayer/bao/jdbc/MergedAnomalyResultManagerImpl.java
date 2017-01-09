@@ -171,7 +171,6 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
     return batchConvertMergedAnomalyBean2DTO(list, loadRawAnomalies);
   }
 
-
   @Override
   public List<MergedAnomalyResultDTO> findByCollectionMetricTime(String collection, String metric,
       long startTime, long endTime, boolean loadRawAnomalies) {
@@ -215,7 +214,6 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
       MergedAnomalyResultBean mostRecentConflictMergedAnomalyResultBean = list.get(0);
       return convertMergedAnomalyBean2DTO(mostRecentConflictMergedAnomalyResultBean, true);
     }
-
     return null;
   }
 

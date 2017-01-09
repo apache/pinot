@@ -56,6 +56,15 @@ public class MetricConfigManagerImpl extends AbstractManagerImpl<MetricConfigDTO
     return result;
   }
 
+  public MetricConfigDTO findByMetricName(String metricName) {
+    Predicate metricNamePredicate = Predicate.EQ("name", metricName);
+    List<MetricConfigBean> list = genericPojoDao.get(metricNamePredicate, MetricConfigBean.class);
+    MetricConfigDTO result = null;
+    if (CollectionUtils.isNotEmpty(list)) {
+      result = MODEL_MAPPER.map(list.get(0), MetricConfigDTO.class);
+    }
+    return result;
+  }
 
   @Override
   public MetricConfigDTO findByAliasAndDataset(String alias, String dataset) {

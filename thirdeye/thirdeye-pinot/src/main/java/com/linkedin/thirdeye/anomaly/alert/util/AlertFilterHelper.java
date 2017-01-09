@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.anomaly.alert;
+package com.linkedin.thirdeye.anomaly.alert.util;
 
 import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.AlphaBetaAlertFilter;

@@ -1,6 +1,8 @@
 package com.linkedin.thirdeye.anomaly.alert;
 
 import com.linkedin.thirdeye.anomaly.alert.template.pojo.MetricDimensionReport;
+import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
+import com.linkedin.thirdeye.anomaly.alert.util.EmailHelper;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewResponse;
@@ -48,7 +50,7 @@ import freemarker.template.TemplateMethodModelEx;
 import freemarker.template.TemplateModelException;
 import freemarker.template.TemplateNumberModel;
 
-import static com.linkedin.thirdeye.anomaly.alert.AlertFilterHelper.FILTER_TYPE_KEY;
+import static com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper.FILTER_TYPE_KEY;
 
 public class AlertTaskRunner implements TaskRunner {
 
@@ -243,7 +245,8 @@ public class AlertTaskRunner implements TaskRunner {
         List<MetricDimensionReport> metricDimensionValueReports;
         List<ContributorViewResponse> reports = new ArrayList<>();
         for (String dimension : alertConfig.getDimensions()) {
-          ContributorViewResponse report = EmailHelper.getContributorData(collectionAlias, alertConfig.getMetric(), Arrays.asList(dimension));
+          ContributorViewResponse report = EmailHelper
+              .getContributorData(collectionAlias, alertConfig.getMetric(), Arrays.asList(dimension));
           if(report != null) {
             reports.add(report);
           }
