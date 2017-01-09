@@ -6,18 +6,25 @@ function DashboardView(dashboardModel) {
   // Compile HTML template
   var dashboard_template = $("#dashboard-template").html();
   this.dashboard_template_compiled = Handlebars.compile(dashboard_template);
+  this.inited = false;
 }
 
 DashboardView.prototype = {
-  init : function() {
-
-  },
   render : function() {
+    if(!this.inited){
+      this.init();
+      this.inited = false;
+    }
+  },
+  init : function() {
     var self = this;
     var result = self.dashboard_template_compiled(self.dashboardModel);
 
     // autocomplete
     $("#dashboard-place-holder").html(result);
+    if(self.dashboardModel.dashboardName != null) {
+      $("#dashboard-content").show();
+    }
     console.log("this.dashboardModel.tabSelected:" + self.dashboardModel.tabSelected);
     $('#dashboard-tabs a[href="#' + self.dashboardModel.tabSelected + '"]').tab('show');
 

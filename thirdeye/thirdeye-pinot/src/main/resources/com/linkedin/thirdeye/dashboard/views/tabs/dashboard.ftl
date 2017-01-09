@@ -7,7 +7,11 @@
 						<label for="dashboard-name-input" class="label-large-light">Dashboard Name: </label>
 					</div>
 					<div style="width: 370px; float: left">
-						<select style="width: 100%" id="dashboard-name-input" class="label-large-light underlined"></select>
+						<select style="width: 100%" id="dashboard-name-input" class="label-large-light underlined">
+						{{#if this.dashboardName}}
+						   <option value="{{this.dashboardId}}" selected>{{this.dashboardName}}</option>
+						{{/if}}
+						</select>
 					</div>
 					<div style="float: left">
 						<a type="button" class="btn btn-link label-medium-semibold" id="create-dashboard-button" data-toggle="modal" data-target="#create-dashboard-modal"><span class="glyphicon glyphicon-cog"
@@ -18,8 +22,7 @@
 		</div>
 	</div>
 </div>
-{{#if this.dashboardName}}
-<div class="container-fluid">
+<div id="dashboard-content" class="container-fluid" style="display:none">
 	<div class="row row-bordered">
 		<div class="container top-buffer bottom-buffer">
 			<div>{{this.dashboardName}}</div>
@@ -48,7 +51,6 @@
 		</div>
 	</div>
 </div>
-{{/if}}
 <div id='summary-spin-area'></div>
 
 <#include "dashboard/manage-dashboard-modal.ftl"/>

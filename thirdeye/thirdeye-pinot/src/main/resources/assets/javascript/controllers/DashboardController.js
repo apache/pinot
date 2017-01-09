@@ -33,8 +33,8 @@ DashboardController.prototype = {
       this.dashboardModel.tabSelected = "dashboard_wow-summary-tab";
       childController = this.wowSummaryController;
     } else {
-      this.dashboardModel.tabSelected = "dashboard_anomaly-summary-tab";
-      childController = this.anomalySummaryController;
+      this.dashboardModel.tabSelected = "dashboard_metric-summary-tab";
+      childController = this.metricSummaryController;
     }
     this.dashboardView.render();
     console.log('Sending to child controller');
