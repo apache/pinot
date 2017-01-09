@@ -13,15 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.pql.parsers;
-
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
+package com.linkedin.pinot.common.request.transform.result;
 
 /**
- * Interface for PQL compilers.
+ * Interface for representing the results of a transform function.
  */
-public interface AbstractCompiler {
-  BrokerRequest compileToBrokerRequest(String expression);
-  TransformExpressionTree compileToExpressionTree(String expression);
+public interface TransformResult {
+
+  /**
+   * Returns the underlying array storage for the results.
+   * Client responsible for passing the correct instance of T.
+   *
+   * @param <T> Data type of result.
+   * @return Result array containing results of transform.
+   */
+  <T> T getResultArray();
 }
