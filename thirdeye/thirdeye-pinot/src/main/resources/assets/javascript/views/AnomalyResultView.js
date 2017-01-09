@@ -162,6 +162,28 @@ AnomalyResultView.prototype = {
 
     this.showSearchBarBasedOnMode();
 
+    var totalAnomalies = anomaliesWrapper.totalAnomalies;
+    var pageSize = this.anomalyResultModel.pageSize;
+    var pageNumber = this.anomalyResultModel.pageNumber;
+    var numPages = totalAnomalies / pageSize + 1;
+    $('#pagination').twbsPagination({
+      totalPages: numPages,
+      visiblePages: 7,
+      startPage: pageNumber,
+      onPageClick: function (event, page) {
+          console.log("Page " + page + " PageNumber " + pageNumber);
+          if (page != pageNumber) {
+            var anomaliesParams = {
+                pageNumber : page,
+                metricIds : self.anomalyResultModel.metricIds,
+                dashboardId : self.anomalyResultModel.dashboardId,
+                anomalyIds : self.anomalyResultModel.anomalyIds,
+              }
+            self.applyButtonEvent.notify(anomaliesParams);
+          }
+      }
+    });
+
     // FUNCTION DROPDOWN
     var functions = this.anomalyResultModel.getAnomalyFunctions();
     var anomalyFunctionSelector = $('#anomaly-function-dropdown');
@@ -267,7 +289,6 @@ AnomalyResultView.prototype = {
 
       this.setupListenersOnAnomaly(idx, anomaly);
     }
-
   },
 
   dataEventHandler : function(e) {
@@ -311,6 +332,7 @@ AnomalyResultView.prototype = {
         anomalyIds : anomalyIds,
         startDate : startDate,
         endDate : endDate,
+        pageNumber : 1,
         functionName : functionName
       }
 

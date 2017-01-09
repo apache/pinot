@@ -80,5 +80,10 @@
       </div>
     </div>
     {{/each}}
+    <div class="container">
+      <nav aria-label="Page navigation">
+        <ul id="pagination" class="pagination-sm"></ul>
+      </nav>
+    </div>
   </div>
 </div>

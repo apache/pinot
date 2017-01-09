@@ -143,13 +143,14 @@ public class AnomaliesResource {
    * @throws Exception
    */
   @GET
-  @Path("search/time/{startTime}/{endTime}")
+  @Path("search/time/{startTime}/{endTime}/{pageNumber}")
   public AnomaliesWrapper getAnomaliesByTime(
       @PathParam("startTime") Long startTime,
-      @PathParam("endTime") Long endTime) throws Exception {
+      @PathParam("endTime") Long endTime,
+      @PathParam("pageNumber") int pageNumber) throws Exception {
 
     List<MergedAnomalyResultDTO> mergedAnomalies = mergedAnomalyResultDAO.findByTime(startTime, endTime);
-    AnomaliesWrapper anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(mergedAnomalies);
+    AnomaliesWrapper anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(mergedAnomalies, pageNumber);
     return anomaliesWrapper;
   }
 
@@ -163,10 +164,11 @@ public class AnomaliesResource {
    * @throws Exception
    */
   @GET
-  @Path("search/anomalyIds/{startTime}/{endTime}")
+  @Path("search/anomalyIds/{startTime}/{endTime}/{pageNumber}")
   public AnomaliesWrapper getAnomaliesByAnomalyIds(
       @PathParam("startTime") Long startTime,
       @PathParam("endTime") Long endTime,
+      @PathParam("pageNumber") int pageNumber,
       @QueryParam("anomalyIds") String anomalyIdsString,
       @QueryParam("functionName") String functionName) throws Exception {
 
@@ -176,7 +178,7 @@ public class AnomaliesResource {
       Long anomalyId = Long.valueOf(id);
       mergedAnomalies.add(mergedAnomalyResultDAO.findById(anomalyId));
     }
-    AnomaliesWrapper anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(mergedAnomalies);
+    AnomaliesWrapper anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(mergedAnomalies, pageNumber);
     return anomaliesWrapper;
   }
 
@@ -190,16 +192,17 @@ public class AnomaliesResource {
    * @throws Exception
    */
   @GET
-  @Path("search/dashboardId/{startTime}/{endTime}")
+  @Path("search/dashboardId/{startTime}/{endTime}/{pageNumber}")
   public AnomaliesWrapper getAnomaliesByDashboardId(
       @PathParam("startTime") Long startTime,
       @PathParam("endTime") Long endTime,
+      @PathParam("pageNumber") int pageNumber,
       @QueryParam("dashboardId") String dashboardId,
       @QueryParam("functionName") String functionName) throws Exception {
 
     DashboardConfigDTO dashboardConfig = dashboardConfigDAO.findById(Long.valueOf(dashboardId));
     String metricIdsString = Joiner.on(COMMA_SEPARATOR).join(dashboardConfig.getMetricIds());
-    return getAnomaliesByMetricIds(startTime, endTime, metricIdsString, functionName);
+    return getAnomaliesByMetricIds(startTime, endTime, pageNumber, metricIdsString, functionName);
   }
 
   /**
@@ -212,10 +215,11 @@ public class AnomaliesResource {
    * @throws Exception
    */
   @GET
-  @Path("search/metricIds/{startTime}/{endTime}")
+  @Path("search/metricIds/{startTime}/{endTime}/{pageNumber}")
   public AnomaliesWrapper getAnomaliesByMetricIds(
       @PathParam("startTime") Long startTime,
       @PathParam("endTime") Long endTime,
+      @PathParam("pageNumber") int pageNumber,
       @QueryParam("metricIds") String metricIdsString,
       @QueryParam("functionName") String functionName) throws Exception {
 
@@ -225,7 +229,7 @@ public class AnomaliesResource {
       metricIds.add(Long.valueOf(metricId));
     }
     List<MergedAnomalyResultDTO> mergedAnomalies = getAnomaliesForMetricIdsInRange(metricIds, startTime, endTime);
-    AnomaliesWrapper anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(mergedAnomalies);
+    AnomaliesWrapper anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(mergedAnomalies, pageNumber);
     return anomaliesWrapper;
   }
 
@@ -464,13 +468,12 @@ public class AnomaliesResource {
    * @return
    * @throws ExecutionException
    */
-  private AnomaliesWrapper constructAnomaliesWrapperFromMergedAnomalies(List<MergedAnomalyResultDTO> mergedAnomalies) throws ExecutionException {
+  private AnomaliesWrapper constructAnomaliesWrapperFromMergedAnomalies(List<MergedAnomalyResultDTO> mergedAnomalies, int pageNumber) throws ExecutionException {
     AnomaliesWrapper anomaliesWrapper = new AnomaliesWrapper();
     anomaliesWrapper.setTotalAnomalies(mergedAnomalies.size());
     LOG.info("Total anomalies: {}", mergedAnomalies.size());
 
     // TODO: get page number and page size from client
-    int pageNumber = DEFAULT_PAGE_NUMBER;
     int pageSize = DEFAULT_PAGE_SIZE;
     int maxPageNumber = mergedAnomalies.size()/pageSize + 1;
     if (pageNumber > maxPageNumber) {

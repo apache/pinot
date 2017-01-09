@@ -18,6 +18,10 @@ function AnomalyResultModel() {
 
   this.anomalyForFeedbackUpdate = null;
 
+  this.previousPageNumber = null;
+  this.pageNumber = 1;
+  this.pageSize = 10;
+
   this.renderViewEvent = new Event();
 
 }
@@ -28,6 +32,7 @@ AnomalyResultModel.prototype = {
     this.dashboardId = null;
     this.anomalyIds = [];
     this.functionName = null;
+    this.pageNumber = 1;
 
   },
   // Call setParams every time there is a change to the model
@@ -42,14 +47,17 @@ AnomalyResultModel.prototype = {
       if (params['metricIds'] != undefined) {
         console.log("metricIds");
         this.metricIds = params['metricIds'];
+        console.log(this.metricIds);
       }
       if (params['dashboardId'] != undefined) {
         console.log("dashboardId");
         this.dashboardId = params['dashboardId'];
+        console.log(this.dashboardId);
       }
       if (params['anomalyIds'] != undefined) {
         console.log("anomalyIds");
         this.anomalyIds = params['anomalyIds'];
+        console.log(this.anomalyIds);
       }
       if (params['startDate'] != undefined) {
         console.log("startDate");
@@ -58,6 +66,10 @@ AnomalyResultModel.prototype = {
       if (params['endDate'] != undefined) {
         console.log("endDate");
         this.endDate = params['endDate'];
+      }
+      if (params['pageNumber'] != undefined) {
+        console.log("pageNumber");
+        this.pageNumber = params['pageNumber'];
       }
       if (params['functionName'] != undefined) {
         console.log("functionName");
@@ -75,17 +87,18 @@ AnomalyResultModel.prototype = {
   rebuild : function() {
     if (this.anomaliesSearchMode == constants.MODE_METRIC && this.metricIds != undefined && this.metricIds.length > 0) {
       dataService.fetchAnomaliesForMetricIds(
-          this.startDate, this.endDate, this.metricIds, this.functionName, this.updateModelAndNotifyView.bind(this));
+          this.startDate, this.endDate, this.pageNumber, this.metricIds, this.functionName, this.updateModelAndNotifyView.bind(this));
     } else if (this.anomaliesSearchMode == constants.MODE_DASHBOARD && this.dashboardId != undefined) {
       dataService.fetchAnomaliesForDashboardId(
-          this.startDate, this.endDate, this.dashboardId, this.functionName, this.updateModelAndNotifyView.bind(this));
+          this.startDate, this.endDate, this.pageNumber, this.dashboardId, this.functionName, this.updateModelAndNotifyView.bind(this));
     } else if (this.anomaliesSearchMode == constants.MODE_ID && this.anomalyIds != undefined && this.anomalyIds.length > 0) {
       dataService.fetchAnomaliesForAnomalyIds(
-          this.startDate, this.endDate, this.anomalyIds, this.functionName, this.updateModelAndNotifyView.bind(this));
-    } else if (this.anomaliesSearchMode == constants.MODE_TIME && (this.previousStartDate != this.startDate || this.previousEndDate != this.endDate)) {
+          this.startDate, this.endDate, this.pageNumber, this.anomalyIds, this.functionName, this.updateModelAndNotifyView.bind(this));
+    } else if (this.anomaliesSearchMode == constants.MODE_TIME && (this.pageNumber != this.previousPageNumber || this.previousStartDate != this.startDate || this.previousEndDate != this.endDate)) {
       this.previousStartDate = this.startDate;
       this.previousEndDate = this.endDate;
-      dataService.fetchAnomaliesForTime(this.startDate, this.endDate, this.updateModelAndNotifyView.bind(this));
+      this.previousPageNumber = this.pageNumber;
+      dataService.fetchAnomaliesForTime(this.startDate, this.endDate, this.pageNumber, this.updateModelAndNotifyView.bind(this));
     }
   },
   updateModelAndNotifyView : function(anomaliesWrapper) {
