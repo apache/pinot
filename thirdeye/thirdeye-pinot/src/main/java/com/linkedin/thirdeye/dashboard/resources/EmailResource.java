@@ -129,7 +129,9 @@ public class EmailResource {
       @QueryParam("from") String fromAddr, @QueryParam("to") String toAddr,
       @QueryParam("includeSentAnomaliesOnly") boolean includeSentAnomaliesOnly,
       @QueryParam("teHost") String teHost,  @QueryParam("smtpHost") String smtpHost, @QueryParam("smtpPort") int smtpPort) {
-    AnomalyReportGenerator anomalyReportGenerator = AnomalyReportGenerator.getInstance();
+    if (Strings.isNullOrEmpty(datasets)) {
+      throw new WebApplicationException("datasets null or empty : " + datasets);
+    }
     String [] dataSetArr = datasets.split(",");
     if (dataSetArr.length == 0) {
       throw new WebApplicationException("Datasets empty : " + datasets);
@@ -143,6 +145,7 @@ public class EmailResource {
     if (Strings.isNullOrEmpty(smtpHost)) {
       throw new WebApplicationException("invalid smtp host" + smtpHost);
     }
+    AnomalyReportGenerator anomalyReportGenerator = AnomalyReportGenerator.getInstance();
     List<MergedAnomalyResultDTO> anomalies = anomalyReportGenerator
         .getAnomaliesForDatasets(Arrays.asList(dataSetArr), startTime, endTime);
     ThirdEyeAnomalyConfiguration configuration = new ThirdEyeAnomalyConfiguration();
@@ -164,7 +167,9 @@ public class EmailResource {
       @QueryParam("from") String fromAddr, @QueryParam("to") String toAddr,
       @QueryParam("includeSentAnomaliesOnly") boolean includeSentAnomaliesOnly,
       @QueryParam("teHost") String teHost,  @QueryParam("smtpHost") String smtpHost, @QueryParam("smtpPort") int smtpPort) {
-    AnomalyReportGenerator anomalyReportGenerator = AnomalyReportGenerator.getInstance();
+    if (Strings.isNullOrEmpty(metrics)) {
+      throw new WebApplicationException("metrics null or empty: " + metrics);
+    }
     String [] metricsArr = metrics.split(",");
     if (metricsArr.length == 0) {
       throw new WebApplicationException("metrics empty : " + metricsArr);
@@ -178,6 +183,7 @@ public class EmailResource {
     if (Strings.isNullOrEmpty(smtpHost)) {
       throw new WebApplicationException("invalid smtp host" + smtpHost);
     }
+    AnomalyReportGenerator anomalyReportGenerator = AnomalyReportGenerator.getInstance();
     List<MergedAnomalyResultDTO> anomalies = anomalyReportGenerator
         .getAnomaliesForMetrics(Arrays.asList(metricsArr), startTime, endTime);
     ThirdEyeAnomalyConfiguration configuration = new ThirdEyeAnomalyConfiguration();

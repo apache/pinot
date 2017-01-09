@@ -51,9 +51,16 @@ public class AnomalyReportGenerator {
 
   public List<MergedAnomalyResultDTO> getAnomaliesForMetrics(List<String> metrics, long startTime, long endTime) {
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
+    LOG.info("fetching anomalies for metrics : " + metrics);
     for (String metric : metrics) {
-      MetricConfigDTO metricConfigDTO = metricConfigManager.findByMetricName(metric);
-      anomalies.addAll(anomalyResultManager.findByCollectionMetricTime(metricConfigDTO.getDataset(), metric, startTime, endTime, false));
+      List<MetricConfigDTO> metricConfigDTOList = metricConfigManager.findByMetricName(metric);
+      for (MetricConfigDTO metricConfigDTO : metricConfigDTOList) {
+        List<MergedAnomalyResultDTO> results = anomalyResultManager
+            .findByCollectionMetricTime(metricConfigDTO.getDataset(), metric, startTime, endTime,
+                false);
+        LOG.info("Found {} result for metric {}", results.size(), metric);
+        anomalies.addAll(results);
+      }
     }
     return anomalies;
   }
