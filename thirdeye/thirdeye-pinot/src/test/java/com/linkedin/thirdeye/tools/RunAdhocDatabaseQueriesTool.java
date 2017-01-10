@@ -1,10 +1,7 @@
 package com.linkedin.thirdeye.tools;
 
-import com.linkedin.thirdeye.anomaly.alert.AlertFilterHelper;
 import com.linkedin.thirdeye.anomaly.override.OverrideConfigHelper;
-import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
-import com.linkedin.thirdeye.detector.email.filter.AlphaBetaAlertFilter;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -12,67 +9,26 @@ import java.util.HashMap;
 import java.util.List;
 
 import java.util.Map;
+
+import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.thirdeye.autoload.pinot.metrics.ConfigGenerator;
-import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
-import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
-import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 /**
  * Run adhoc queries to db
  */
-public class RunAdhocDatabaseQueriesTool {
+public class RunAdhocDatabaseQueriesTool extends GenericDatabaseAccessTool {
 
   private static final Logger LOG = LoggerFactory.getLogger(RunAdhocDatabaseQueriesTool.class);
 
-  private AnomalyFunctionManager anomalyFunctionDAO;
-  private EmailConfigurationManager emailConfigurationDAO;
-  private RawAnomalyResultManager rawResultDAO;
-  private MergedAnomalyResultManager mergedResultDAO;
-  private MetricConfigManager metricConfigDAO;
-  private DashboardConfigManager dashboardConfigDAO;
-  private OverrideConfigManager overrideConfigDAO;
-
   public RunAdhocDatabaseQueriesTool(File persistenceFile)
       throws Exception {
-    init(persistenceFile);
-  }
-
-  public void init(File persistenceFile) throws Exception {
-    DaoProviderUtil.init(persistenceFile);
-    anomalyFunctionDAO = DaoProviderUtil
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl.class);
-    emailConfigurationDAO = DaoProviderUtil
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.EmailConfigurationManagerImpl.class);
-    rawResultDAO = DaoProviderUtil
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.RawAnomalyResultManagerImpl.class);
-    mergedResultDAO = DaoProviderUtil
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl.class);
-    metricConfigDAO = DaoProviderUtil
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.MetricConfigManagerImpl.class);
-    dashboardConfigDAO = DaoProviderUtil
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.DashboardConfigManagerImpl.class);
-    overrideConfigDAO = DaoProviderUtil
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.OverrideConfigManagerImpl.class);
-  }
-
-  private void toggleAnomalyFunction(Long id) {
-    AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(id);
-    anomalyFunction.setActive(true);
-    anomalyFunctionDAO.update(anomalyFunction);
+    super(persistenceFile);
   }
 
   private void updateFields() {
@@ -105,72 +61,26 @@ public class RunAdhocDatabaseQueriesTool {
     }
   }
 
-  private void updateEmailConfigs() {
-    List<EmailConfigurationDTO> emailConfigs = emailConfigurationDAO.findByCollection("login_additive");
-    for (EmailConfigurationDTO emailConfig : emailConfigs) {
-      emailConfig.setToAddresses("thirdeye-dev@linkedin.com,zilin@linkedin.com,ehuang@linkedin.com,login-alerts@linkedin.com");
-      emailConfigurationDAO.update(emailConfig);
+  // util function for setting Metric scaling factor
+
+  private static Map<String, List<String>> getTargetLevelSet(String commaSeparatedMetricNames) {
+    Map<String, List<String>> targetLevelSet1 = new HashMap<>();
+    targetLevelSet1.put(OverrideConfigHelper.TARGET_METRIC,
+        new ArrayList<>(Arrays.asList(commaSeparatedMetricNames.split(","))));
+    return(targetLevelSet1);
+  }
+
+  private static List<Map<String, String>> getOverrideScalingFactorSet (double[] scalingFactors) {
+    List<Map<String, String>> overridePropertySet1 = new ArrayList<>();
+    // fill in the scaling factors
+    for(double scaleFactor : scalingFactors) {
+      Map<String, String> overrideProperty = new HashMap<>();
+      overrideProperty.put(ScalingFactor.SCALING_FACTOR, String.valueOf(scaleFactor));
+      overridePropertySet1.add(overrideProperty);
     }
+    return(overridePropertySet1);
   }
 
-  private void createDashboard(String dataset) {
-
-    String dashboardName = ThirdEyeUtils.getDefaultDashboardName(dataset);
-    DashboardConfigDTO dashboardConfig = dashboardConfigDAO.findByName(dashboardName);
-    dashboardConfig.setMetricIds(ConfigGenerator.getMetricIdsFromMetricConfigs(metricConfigDAO.findByDataset(dataset)));
-    dashboardConfigDAO.update(dashboardConfig);
-  }
-
-  private void setAlertFilterForFunctionInCollection(String collection, List<String> metricList,
-      Map<String, Map<String, String>> metricRuleMap, Map<String, String> defaultAlertFilter) {
-    List<AnomalyFunctionDTO> anomalyFunctionDTOs =
-        anomalyFunctionDAO.findAllByCollection(collection);
-    for (AnomalyFunctionDTO anomalyFunctionDTO : anomalyFunctionDTOs) {
-      String metricName = anomalyFunctionDTO.getMetric();
-      if (metricList.contains(metricName)) {
-        Map<String, String> alertFilter = defaultAlertFilter;
-        if (metricRuleMap.containsKey(metricName)) {
-          alertFilter = metricRuleMap.get(metricName);
-        }
-        anomalyFunctionDTO.setAlertFilter(alertFilter);
-        anomalyFunctionDAO.update(anomalyFunctionDTO);
-        LOG.info("Add alert filter {} to function {} (dataset: {}, metric: {})", alertFilter,
-            anomalyFunctionDTO.getId(), collection, metricName);
-      }
-    }
-  }
-
-  private Long createOverrideConfig(OverrideConfigDTO overrideConfigDTO) {
-    // Check if there exist duplicate override config
-    List<OverrideConfigDTO> existingOverrideConfigDTOs = overrideConfigDAO
-        .findAllConflictByTargetType(overrideConfigDTO.getTargetEntity(),
-            overrideConfigDTO.getStartTime(), overrideConfigDTO.getEndTime());
-
-    for (OverrideConfigDTO existingOverrideConfig : existingOverrideConfigDTOs) {
-      if (existingOverrideConfig.equals(overrideConfigDTO)) {
-        LOG.warn("Exists a duplicate override config: {}", existingOverrideConfig.toString());
-        return null;
-      }
-    }
-
-    return overrideConfigDAO.save(overrideConfigDTO);
-  }
-
-  private void updateOverrideConfig(long id, OverrideConfigDTO overrideConfigDTO) {
-    OverrideConfigDTO overrideConfigToUpdated = overrideConfigDAO.findById(id);
-    if (overrideConfigToUpdated == null) {
-      LOG.warn("Failed to update config {}", id);
-    } else {
-      overrideConfigToUpdated.setStartTime(overrideConfigDTO.getStartTime());
-      overrideConfigToUpdated.setEndTime(overrideConfigDTO.getEndTime());
-      overrideConfigToUpdated.setTargetLevel(overrideConfigDTO.getTargetLevel());
-      overrideConfigToUpdated.setTargetEntity(overrideConfigDTO.getTargetEntity());
-      overrideConfigToUpdated.setOverrideProperties(overrideConfigDTO.getOverrideProperties());
-      overrideConfigToUpdated.setActive(overrideConfigDTO.getActive());
-      overrideConfigDAO.update(overrideConfigToUpdated);
-      LOG.info("Updated config {}" + id);
-    }
-  }
 
   public static void main(String[] args) throws Exception {
 
@@ -180,7 +90,60 @@ public class RunAdhocDatabaseQueriesTool {
       System.exit(1);
     }
     RunAdhocDatabaseQueriesTool dq = new RunAdhocDatabaseQueriesTool(persistenceFile);
+    List<Map<String, List<String>>> targetLevelList = new ArrayList<>();
+    List<List<Map<String, String>>> overridePropertyList = new ArrayList<>();
 
+
+//    List<Integer> idList = Arrays
+//        .asList(954637, 954638, 954639, 954640, 954641, 954642, 954643, 954644, 954645, 954646,
+//            954647, 954648);
+//    int idIdx = 0;
+
+    // Override config for 12/21 - 12/27
+    // Override Config for SU_Request Desktop
+    targetLevelList.add(getTargetLevelSet("SU_Request_from_Desktop"));
+    overridePropertyList.add(getOverrideScalingFactorSet(new double[]{1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0}));
+
+    // Override Config for SU_Request Mobile
+    targetLevelList.add(getTargetLevelSet("SU_Request_from_Android,SU_Request_from_iOS"));
+    overridePropertyList.add(getOverrideScalingFactorSet(new double[]{1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0}));
+
+    // Override Config for Imp Desktop
+    targetLevelList.add(getTargetLevelSet("SU_Impression_Count_on_Desktop"));
+    overridePropertyList.add(getOverrideScalingFactorSet(new double[]{1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0}));
+
+    // Override Config for Imp Mobile
+    targetLevelList.add(getTargetLevelSet("SU_Impression_Count_on_Android,SU_Impression_Count_on_iOS"));
+    overridePropertyList.add(getOverrideScalingFactorSet(new double[]{1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0}));
+
+    // Override Config for Clk Desktop
+    targetLevelList.add(getTargetLevelSet("SU_Click_Count_on_Desktop"));
+    overridePropertyList.add(getOverrideScalingFactorSet(new double[]{1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0}));
+
+    // Override Config for Clk Mobile
+    targetLevelList.add(getTargetLevelSet("SU_Click_Count_on_Android,SU_Click_Count_on_iOS"));
+    overridePropertyList.add(getOverrideScalingFactorSet(new double[]{1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0}));
+
+    for (int i = 0; i < targetLevelList.size(); ++i) {
+      DateTime time = new DateTime(2014, 12, 21, 0, 0);
+      Map<String, List<String>> targetLevel = targetLevelList.get(i);
+      List<Map<String, String>> overrideProperties = overridePropertyList.get(i);
+
+      for (int day = 0; day < 6; ++day) {
+        OverrideConfigDTO overrideConfigDTO = new OverrideConfigDTO();
+        overrideConfigDTO.setStartTime(time.getMillis());
+        time = time.plusDays(1);
+        overrideConfigDTO.setEndTime(time.getMillis());
+        overrideConfigDTO.setTargetEntity(OverrideConfigHelper.ENTITY_TIME_SERIES);
+        overrideConfigDTO.setTargetLevel(targetLevel);
+        overrideConfigDTO.setOverrideProperties(overrideProperties.get(day));
+        overrideConfigDTO.setActive(true);
+
+        Long id = dq.createOverrideConfig(overrideConfigDTO);
+        LOG.info("Inserted config {}", id);
+//        dq.updateOverrideConfig(idList.get(idIdx++), overrideConfigDTO);
+      }
+    }
   }
 
 }
