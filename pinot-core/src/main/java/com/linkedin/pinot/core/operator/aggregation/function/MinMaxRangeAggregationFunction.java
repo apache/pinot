@@ -16,11 +16,11 @@
 package com.linkedin.pinot.core.operator.aggregation.function;
 
 import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.ObjectAggregationResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupByResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.groupby.ObjectGroupByResultHolder;
-import com.linkedin.pinot.core.operator.docvalsets.ProjectionBlockValSet;
 import com.linkedin.pinot.core.query.aggregation.function.MinMaxRangeAggregationFunction.MinMaxRangePair;
 import javax.annotation.Nonnull;
 
@@ -60,8 +60,8 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction<MinMa
 
   @Override
   public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
-      @Nonnull ProjectionBlockValSet... projectionBlockValSets) {
-    double[] valueArray = projectionBlockValSets[0].getSingleValues();
+      @Nonnull BlockValSet... blockValSets) {
+    double[] valueArray = blockValSets[0].getDoubleValuesSV();
     double min = Double.POSITIVE_INFINITY;
     double max = Double.NEGATIVE_INFINITY;
     for (int i = 0; i < length; i++) {
@@ -94,8 +94,8 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction<MinMa
 
   @Override
   public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull ProjectionBlockValSet... projectionBlockValSets) {
-    double[] valueArray = projectionBlockValSets[0].getSingleValues();
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+    double[] valueArray = blockValSets[0].getDoubleValuesSV();
     for (int i = 0; i < length; i++) {
       double value = valueArray[i];
       setGroupByResult(groupKeyArray[i], groupByResultHolder, value, value);
@@ -104,8 +104,8 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction<MinMa
 
   @Override
   public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull ProjectionBlockValSet... projectionBlockValSets) {
-    double[] valueArray = projectionBlockValSets[0].getSingleValues();
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+    double[] valueArray = blockValSets[0].getDoubleValuesSV();
     for (int i = 0; i < length; i++) {
       double value = valueArray[i];
       for (int groupKey : groupKeysArray[i]) {

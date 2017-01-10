@@ -73,7 +73,7 @@ public class NoDictionaryGroupKeyGenerator implements GroupKeyGenerator {
           "Multi-valued column specified in single valued group key generator: " + _groupByColumns[i]);
 
       dataTypes[i] = blockValSet.getValueType();
-      values[i] = blockValSet.getSingleValues();
+      values[i] = getValuesFromBlockValSet(blockValSet, dataTypes[i]);
     }
 
     StringBuilder stringBuilder = new StringBuilder();
@@ -81,36 +81,38 @@ public class NoDictionaryGroupKeyGenerator implements GroupKeyGenerator {
       stringBuilder.setLength(0);
 
       for (int j = 0; j < numGroupByColumns; j++) {
-        double[] doubleValues;
 
-        // BlockValSet.getSingleValues() always returns double currently, as all aggregation functions assume
+        // BlockValSet.getDoubleValuesSV() always returns double currently, as all aggregation functions assume
         // data type to be double.
 
         switch (dataTypes[j]) {
           case INT:
-            doubleValues = (double[]) values[j];
-            stringBuilder.append((int) doubleValues[i]);
+            int[] intValues = (int[]) values[j];
+            stringBuilder.append(intValues[i]);
             break;
 
           case LONG:
-            doubleValues = (double[]) values[j];
-            stringBuilder.append((long) doubleValues[i]);
+            long[] longValues = (long[]) values[j];
+            stringBuilder.append(longValues[i]);
             break;
 
           case FLOAT:
-            doubleValues = (double[]) values[j];
-            stringBuilder.append((float) doubleValues[i]);
+            float[] floatValues = (float[]) values[j];
+            stringBuilder.append(floatValues[i]);
             break;
 
           case DOUBLE:
-            doubleValues = (double[]) values[j];
+            double[] doubleValues = (double[]) values[j];
             stringBuilder.append(doubleValues[i]);
             break;
 
-          default:
-            Object[] objects = (Object[]) values[j];
-            stringBuilder.append(objects[i].toString());
+          case STRING:
+            String[] stringValues = (String[]) values[j];
+            stringBuilder.append(stringValues[i]);
             break;
+
+          default:
+            throw new IllegalArgumentException("Illegal data type for no-dictionary key generator: " + dataTypes[j]);
         }
 
         if (j < (numGroupByColumns - 1)) {
@@ -192,5 +194,41 @@ public class NoDictionaryGroupKeyGenerator implements GroupKeyGenerator {
     public void remove() {
       throw new UnsupportedOperationException();
     }
+  }
+
+  /**
+   * Helper method to fetch values from BlockValSet
+   * @param dataType Data type
+   * @param blockValSet Block val set
+   * @return Values from block val set
+   */
+  private Object getValuesFromBlockValSet(BlockValSet blockValSet, FieldSpec.DataType dataType) {
+    Object values;
+
+    switch (dataType) {
+      case INT:
+        values = blockValSet.getIntValuesSV();
+        break;
+
+      case LONG:
+        values = blockValSet.getLongValuesSV();
+        break;
+
+      case FLOAT:
+        values = blockValSet.getFloatValuesSV();
+        break;
+
+      case DOUBLE:
+        values = blockValSet.getDoubleValuesSV();
+        break;
+
+      case STRING:
+        values = blockValSet.getStringValuesSV();
+        break;
+
+      default:
+        throw new IllegalArgumentException("Illegal data type for no-dictionary key generator: " + dataType);
+    }
+    return values;
   }
 }

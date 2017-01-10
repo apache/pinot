@@ -15,9 +15,9 @@
  */
 package com.linkedin.pinot.core.operator.aggregation.function;
 
+import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupByResultHolder;
-import com.linkedin.pinot.core.operator.docvalsets.ProjectionBlockValSet;
 import javax.annotation.Nonnull;
 
 
@@ -38,8 +38,8 @@ public class CountMVAggregationFunction extends CountAggregationFunction {
 
   @Override
   public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
-      @Nonnull ProjectionBlockValSet... projectionBlockValSets) {
-    int[] valueArray = projectionBlockValSets[0].getNumberOfMVEntriesArray();
+      @Nonnull BlockValSet... blockValSets) {
+    int[] valueArray = blockValSets[0].getNumberOfMVEntriesArray();
     long count = 0L;
     for (int i = 0; i < length; i++) {
       count += valueArray[i];
@@ -49,8 +49,8 @@ public class CountMVAggregationFunction extends CountAggregationFunction {
 
   @Override
   public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull ProjectionBlockValSet... projectionBlockValSets) {
-    int[] valueArray = projectionBlockValSets[0].getNumberOfMVEntriesArray();
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+    int[] valueArray = blockValSets[0].getNumberOfMVEntriesArray();
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeyArray[i];
       groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + valueArray[i]);
@@ -59,8 +59,8 @@ public class CountMVAggregationFunction extends CountAggregationFunction {
 
   @Override
   public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull ProjectionBlockValSet... projectionBlockValSets) {
-    int[] valueArray = projectionBlockValSets[0].getNumberOfMVEntriesArray();
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+    int[] valueArray = blockValSets[0].getNumberOfMVEntriesArray();
     for (int i = 0; i < length; i++) {
       int value = valueArray[i];
       for (int groupKey : groupKeysArray[i]) {

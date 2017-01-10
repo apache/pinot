@@ -82,22 +82,72 @@ public interface BlockValSet {
   void getStringValues(int[] inDocIds, int inStartPos, int inDocIdsSize, String[] outValues, int outStartPos);
 
   /**
-   * Get values for single-valued column.
-   *
-   * @param <T> Return type
-   * @return Values for single-valued column.
+   * Get int values for a single-valued column.
+   * @return int values
    */
-  <T> T getSingleValues();
+  int[] getIntValuesSV();
 
   /**
-   * Get values for multi-valued column.
+   * Get int values for a multi-valued column.
+   * @return int values
+   */
+  int[][] getIntValuesMV();
+
+  /**
+   * Get long values for a single-valued column.
+   * @return long values
+   */
+  long[] getLongValuesSV();
+
+  /**
+   * Get long values for a single-valued column.
+   * @return long values
+   */
+  long[][] getLongValuesMV();
+
+  /**
+   * Get float values for a single-valued column.
+   * @return float values
+   */
+  float[] getFloatValuesSV();
+
+  /**
+   * Get int values for a single-valued column.
+   * @return int values
+   */
+  float[][] getFloatValuesMV();
+
+  /**
+   * Get double values for single-valued column.
    *
-   * @param <T> Return type
+   * @return Values for single-valued column.
+   */
+  double[] getDoubleValuesSV();
+
+  /**
+   * Get double values for multi-valued column.
+   *
    * @return Values for multi-valued column.
    *
    * TODO: Re-visit batch reading of multi-valued columns.
    */
-  <T> T getMultiValues();
+  double[][] getDoubleValuesMV();
+
+  /**
+   * Get String values for single-valued column.
+   *
+   * @return Values for single-valued column.
+   */
+  String[] getStringValuesSV();
+
+  /**
+   * Get String values for multi-valued column.
+   *
+   * @return Values for multi-valued column.
+   *
+   * TODO: Re-visit batch reading of multi-valued columns.
+   */
+  String[][] getStringValuesMV();
 
   /**
    * Get the dictionary ids for all docs of this block.
@@ -130,4 +180,10 @@ public interface BlockValSet {
    * @return Total number of multi-valued columns.
    */
   int getDictionaryIdsForDocId(int docId, int[] outputDictIds);
+
+  /**
+   * Returns an array containing number of MV entries for each docId in the BlockValSet.
+   * @return Array of number of MV entries
+   */
+  int[] getNumberOfMVEntriesArray();
 }

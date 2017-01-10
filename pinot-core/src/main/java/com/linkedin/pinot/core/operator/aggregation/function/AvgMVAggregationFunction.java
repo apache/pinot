@@ -15,9 +15,9 @@
  */
 package com.linkedin.pinot.core.operator.aggregation.function;
 
+import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupByResultHolder;
-import com.linkedin.pinot.core.operator.docvalsets.ProjectionBlockValSet;
 import javax.annotation.Nonnull;
 
 
@@ -38,8 +38,8 @@ public class AvgMVAggregationFunction extends AvgAggregationFunction {
 
   @Override
   public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
-      @Nonnull ProjectionBlockValSet... projectionBlockValSets) {
-    double[][] valuesArray = projectionBlockValSets[0].getMultiValues();
+      @Nonnull BlockValSet... blockValSets) {
+    double[][] valuesArray = blockValSets[0].getDoubleValuesMV();
     double sum = 0.0;
     long count = 0L;
     for (int i = 0; i < length; i++) {
@@ -54,8 +54,8 @@ public class AvgMVAggregationFunction extends AvgAggregationFunction {
 
   @Override
   public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull ProjectionBlockValSet... projectionBlockValSets) {
-    double[][] valuesArray = projectionBlockValSets[0].getMultiValues();
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+    double[][] valuesArray = blockValSets[0].getDoubleValuesMV();
     for (int i = 0; i < length; i++) {
       aggregateOnGroupKey(groupKeyArray[i], groupByResultHolder, valuesArray[i]);
     }
@@ -63,8 +63,8 @@ public class AvgMVAggregationFunction extends AvgAggregationFunction {
 
   @Override
   public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull ProjectionBlockValSet... projectionBlockValSets) {
-    double[][] valuesArray = projectionBlockValSets[0].getMultiValues();
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+    double[][] valuesArray = blockValSets[0].getDoubleValuesMV();
     for (int i = 0; i < length; i++) {
       double[] values = valuesArray[i];
       for (int groupKey : groupKeysArray[i]) {
