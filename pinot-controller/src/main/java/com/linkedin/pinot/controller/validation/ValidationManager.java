@@ -143,6 +143,7 @@ public class ValidationManager {
       if (tableType.equals(TableType.OFFLINE)) {
         validateOfflineSegmentPush(propertyStore, tableName, segmentMetadataList);
       } else if (tableType.equals(TableType.REALTIME)) {
+        LOGGER.info("Starting to validate table {}", tableName);
         List<RealtimeSegmentZKMetadata> realtimeSegmentZKMetadatas = ZKMetadataProvider.getRealtimeSegmentZKMetadataListForTable(propertyStore, tableName);
         boolean countHLCSegments = true;  // false if this table has ONLY LLC segments (i.e. fully migrated)
         AbstractTableConfig tableConfig = null;
@@ -179,6 +180,7 @@ public class ValidationManager {
 
   // For LLC segments, validate that there is at least one segment in CONSUMING state for every partition.
   void validateLLCSegments(final String realtimeTableName, AbstractTableConfig tableConfig) {
+    LOGGER.info("Validating LLC Segments for {}", realtimeTableName);
     Map<String, String> streamConfigs = tableConfig.getIndexingConfig().getStreamConfigs();
     ZNRecord partitionAssignment = _llcRealtimeSegmentManager.getKafkaPartitionAssignment(realtimeTableName);
     if (partitionAssignment == null) {
@@ -216,6 +218,7 @@ public class ValidationManager {
         while (iterator.hasNext() && !foundConsuming) {
           String stateString = iterator.next();
           if (stateString.equals(PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE)) {
+            LOGGER.info("Found CONSUMING segment {}", segmentId);
             foundConsuming = true;
           }
         }
