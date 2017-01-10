@@ -43,7 +43,7 @@ public abstract class AbstractTableConfig {
   protected SegmentsValidationAndRetentionConfig validationConfig;
   protected TenantConfig tenantConfig;
   protected TableCustomConfig customConfigs;
-  private final QuotaConfig quotaConfig;
+  protected final QuotaConfig quotaConfig;
 
   protected AbstractTableConfig(String tableName, String tableType,
       SegmentsValidationAndRetentionConfig validationConfig,

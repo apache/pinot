@@ -60,6 +60,7 @@ public class OfflineTableConfig extends AbstractTableConfig {
     ret.put("tenants", new JSONObject(new ObjectMapper().writeValueAsString(tenantConfig)));
     ret.put("tableIndexConfig", new JSONObject(new ObjectMapper().writeValueAsString(indexConfig)));
     ret.put("metadata", new JSONObject(new ObjectMapper().writeValueAsString(customConfigs)));
+    ret.put("quota", new JSONObject(new ObjectMapper().writeValueAsString(quotaConfig)));
     return ret;
   }
 }
