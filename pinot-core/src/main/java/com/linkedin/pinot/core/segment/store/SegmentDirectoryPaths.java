@@ -68,6 +68,10 @@ public class SegmentDirectoryPaths {
     Preconditions.checkNotNull(indexDir);
     Preconditions.checkArgument(indexDir.exists(), "Path %s does not exist", indexDir);
 
+    if (! indexDir.isDirectory()) {
+      return indexDir;
+    }
+
     File v1File = new File(indexDir, fileName);
     if (v1File.exists()) {
       return v1File;
