@@ -16,7 +16,7 @@
 package com.linkedin.pinot.util;
 
 import com.linkedin.pinot.common.utils.Pairs;
-import com.linkedin.pinot.core.query.aggregation.function.AvgAggregationFunction.AvgPair;
+import com.linkedin.pinot.core.operator.aggregation.function.customobject.AvgPair;
 import com.linkedin.pinot.core.util.IntObjectIndexedPriorityQueue;
 import java.util.ArrayList;
 import java.util.Collections;

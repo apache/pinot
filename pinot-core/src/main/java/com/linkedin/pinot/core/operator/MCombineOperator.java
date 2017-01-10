@@ -21,7 +21,7 @@ import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
-import com.linkedin.pinot.core.query.aggregation.CombineService;
+import com.linkedin.pinot.core.query.reduce.CombineService;
 import com.linkedin.pinot.core.util.trace.TraceCallable;
 import com.linkedin.pinot.core.util.trace.TraceRunnable;
 import java.util.ArrayList;

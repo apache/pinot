@@ -24,7 +24,7 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunctionFactory;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunctionUtils;
-import com.linkedin.pinot.core.operator.aggregation.groupby.AggregationGroupByOperator;
+import com.linkedin.pinot.core.operator.query.AggregationGroupByOperator;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;

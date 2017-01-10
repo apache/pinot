@@ -13,16 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.operator.groupby.result;
+package com.linkedin.pinot.operator.aggregation.groupby.result;
 
 import com.linkedin.pinot.common.utils.Pairs;
 import com.linkedin.pinot.common.utils.Pairs.IntObjectPair;
+import com.linkedin.pinot.core.operator.aggregation.function.customobject.AvgPair;
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupByResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.groupby.ObjectGroupByResultHolder;
-import com.linkedin.pinot.core.query.aggregation.function.AvgAggregationFunction;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
 import org.testng.Assert;
@@ -33,6 +32,9 @@ import org.testng.annotations.Test;
  * Unit test for {@link ObjectGroupByResultHolder}
  */
 public class ObjectGroupByResultHolderTest {
+  private static final long RANDOM_SEED = System.currentTimeMillis();
+  private static final Random RANDOM = new Random(RANDOM_SEED);
+  private static final String ERROR_MESSAGE = "Random seed: " + RANDOM_SEED;
 
   private static final int INITIAL_CAPACITY = 100;
   private static final int MAX_CAPACITY = 1000;
@@ -57,18 +59,15 @@ public class ObjectGroupByResultHolderTest {
    * Helper method for testing trimming of results.
    * @param minOrder Min ordering if true, max ordering else.
    */
-  private void testTrimResults(final boolean minOrder) {
-    Random random = new Random(0);
-
+  private void testTrimResults(boolean minOrder) {
     GroupByResultHolder resultHolder =
         new ObjectGroupByResultHolder(INITIAL_CAPACITY, MAX_CAPACITY, INITIAL_CAPACITY, minOrder);
-    List<IntObjectPair> expected = new ArrayList<>(MAX_CAPACITY);
+    List<IntObjectPair<AvgPair>> expectedIntObjectPairs = new ArrayList<>(MAX_CAPACITY);
 
     for (int i = 0; i < INITIAL_CAPACITY; i++) {
-      AvgAggregationFunction.AvgPair avgPair =
-          new AvgAggregationFunction.AvgPair((double) random.nextInt(1000), (long) random.nextInt(100));
-      IntObjectPair value = new IntObjectPair(i, avgPair);
-      expected.add(value);
+      AvgPair avgPair = new AvgPair(RANDOM.nextDouble(), (long) RANDOM.nextInt(100));
+      IntObjectPair<AvgPair> intObjectPair = new IntObjectPair<>(i, avgPair);
+      expectedIntObjectPairs.add(intObjectPair);
       resultHolder.setValueForKey(i, avgPair);
     }
 
@@ -76,26 +75,25 @@ public class ObjectGroupByResultHolderTest {
     resultHolder.ensureCapacity(MAX_CAPACITY);
 
     for (int i = INITIAL_CAPACITY; i < MAX_CAPACITY; i++) {
-      AvgAggregationFunction.AvgPair avgPair =
-          new AvgAggregationFunction.AvgPair((double) random.nextInt(1000), (long) random.nextInt(100));
-      IntObjectPair value = new IntObjectPair(i, avgPair);
-      expected.add(value);
+      AvgPair avgPair = new AvgPair(RANDOM.nextDouble(), (long) RANDOM.nextInt(100));
+      IntObjectPair<AvgPair> intObjectPair = new IntObjectPair<>(i, avgPair);
+      expectedIntObjectPairs.add(intObjectPair);
       resultHolder.setValueForKey(i, avgPair);
     }
 
-    Collections.sort(expected, new Pairs.IntObjectComparator(!minOrder));
+    Collections.sort(expectedIntObjectPairs, new Pairs.IntObjectComparator(!minOrder));
 
     // Trim the results.
-    resultHolder.trimResults();
+    Assert.assertEquals(resultHolder.trimResults().length, MAX_CAPACITY - INITIAL_CAPACITY, ERROR_MESSAGE);
 
     // Ensure that all the correct group keys survive after trimming.
     for (int i = 0; i < INITIAL_CAPACITY; i++) {
-      IntObjectPair pair = expected.get(i);
-      AvgAggregationFunction.AvgPair exp = (AvgAggregationFunction.AvgPair) pair.getObjectValue();
-      AvgAggregationFunction.AvgPair act = resultHolder.getResult(pair.getIntValue());
+      IntObjectPair intObjectPair = expectedIntObjectPairs.get(i);
+      AvgPair actualAvgPair = resultHolder.getResult(intObjectPair.getIntValue());
+      AvgPair expectedAvgPair = (AvgPair) intObjectPair.getObjectValue();
 
-      Assert.assertEquals(act.getFirst(), exp.getFirst());
-      Assert.assertEquals(act.getSecond(), exp.getSecond());
+      Assert.assertEquals(actualAvgPair.getSum(), expectedAvgPair.getSum(), ERROR_MESSAGE);
+      Assert.assertEquals(actualAvgPair.getCount(), expectedAvgPair.getCount(), ERROR_MESSAGE);
     }
   }
 }
