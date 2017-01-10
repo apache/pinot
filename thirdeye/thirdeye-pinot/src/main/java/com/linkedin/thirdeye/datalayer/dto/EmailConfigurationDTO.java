@@ -5,6 +5,7 @@ import java.util.List;
 
 import com.linkedin.thirdeye.datalayer.pojo.EmailConfigurationBean;
 
+@Deprecated
 public class EmailConfigurationDTO extends EmailConfigurationBean {
 
   private List<AnomalyFunctionDTO> functions = new ArrayList<>();

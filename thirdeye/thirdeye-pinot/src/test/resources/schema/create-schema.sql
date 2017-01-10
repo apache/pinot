@@ -211,3 +211,14 @@ create table if not exists override_config_index (
 ) ENGINE=InnoDB;
 create index override_config_target_entity_idx on override_config_index(target_entity);
 create index override_config_target_start_time_idx on override_config_index(start_time);
+
+
+create table if not exists alert_config_index (
+    active boolean,
+    name varchar(500) not null,
+    base_id bigint(20) not null,
+    create_time timestamp,
+    update_time timestamp default current_timestamp,
+    version int(10)
+) ENGINE=InnoDB;
+

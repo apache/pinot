@@ -10,9 +10,8 @@
   </tr>
   <tr>
     <td style="min-height: 30px; padding:10px 15px; font-family: 'Proxima Nova','Arial', 'Helvetica Neue',Helvetica, sans-serif;font-size:16px;font-weight:300; width:100%;display:inline;">
-      <p> Datasets : [${datasets}] </p>
-      <p>Analysis Start : ${startTime} </p>
-      <p>Analysis End : ${endTime} </p>
+      <p>Analysis Start : ${startTime?date} </p>
+      <p>Analysis End : ${endTime?date} </p>
     </td>
   </tr>
   <tr>

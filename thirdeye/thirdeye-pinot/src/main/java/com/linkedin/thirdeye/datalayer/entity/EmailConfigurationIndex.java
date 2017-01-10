@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datalayer.entity;
 
+@Deprecated
 public class EmailConfigurationIndex extends AbstractIndexEntity {
   String collection;
   String metric;

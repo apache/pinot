@@ -18,8 +18,9 @@ public interface MergedAnomalyResultManager extends AbstractManager<MergedAnomal
   List<MergedAnomalyResultDTO> findByCollectionMetricDimensionsTime(String collection,
       String metric, String dimensions, long startTime, long endTime, boolean loadRawAnomalies);
 
-  List<MergedAnomalyResultDTO> findByCollectionMetricTime(String collection, String metric,
-      long startTime, long endTime, boolean loadRawAnomalies);
+  List<MergedAnomalyResultDTO> findByCollectionMetricTime(String collection, String metric, long startTime, long endTime, boolean loadRawAnomalies);
+
+  // TODO : add findByMetricId - currently we are not updating metricId in table.
 
   List<MergedAnomalyResultDTO> findByCollectionTime(String collection, long startTime,
       long endTime, boolean loadRawAnomalies);

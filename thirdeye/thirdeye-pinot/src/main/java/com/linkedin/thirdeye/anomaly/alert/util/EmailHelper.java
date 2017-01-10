@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.anomaly.alert;
+package com.linkedin.thirdeye.anomaly.alert.util;
 
 import com.google.common.cache.LoadingCache;
 import com.linkedin.thirdeye.anomaly.SmtpConfiguration;

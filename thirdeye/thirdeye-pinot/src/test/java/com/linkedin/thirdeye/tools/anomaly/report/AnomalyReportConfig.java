@@ -7,6 +7,7 @@ public class AnomalyReportConfig {
   private String datasets;
   private String teBaseUrl;
   private String emailRecipients;
+  private boolean includeNotifiedOnly = true;
 
   public String getEndTimeIso() {
     return endTimeIso;
@@ -54,5 +55,13 @@ public class AnomalyReportConfig {
 
   public void setEmailRecipients(String emailRecipients) {
     this.emailRecipients = emailRecipients;
+  }
+
+  public boolean isIncludeNotifiedOnly() {
+    return includeNotifiedOnly;
+  }
+
+  public void setIncludeNotifiedOnly(boolean includeNotifiedOnly) {
+    this.includeNotifiedOnly = includeNotifiedOnly;
   }
 }
