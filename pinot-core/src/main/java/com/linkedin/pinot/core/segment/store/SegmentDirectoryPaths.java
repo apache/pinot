@@ -48,22 +48,7 @@ public class SegmentDirectoryPaths {
   }
 
   public static @Nullable File findMetadataFile(@Nonnull File indexDir) {
-    Preconditions.checkNotNull(indexDir);
-    Preconditions.checkArgument(indexDir.exists(), "Path: %s does not exist", indexDir);
-    if (! indexDir.isDirectory()) {
-      return indexDir;
-    }
-    File metadataFile = new File(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
-    if (metadataFile.exists()) {
-      return metadataFile;
-    }
-
-    File v3Dir = segmentDirectoryFor(indexDir, SegmentVersion.v3);
-    metadataFile = new File(v3Dir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
-    if (metadataFile.exists()) {
-      return metadataFile;
-    }
-    return null;
+    return findFormatFile(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
   }
 
   /**
@@ -73,18 +58,29 @@ public class SegmentDirectoryPaths {
    * @return creation metadata file or null if the file is not found
    */
   public static @Nullable File findCreationMetaFile(@Nonnull File indexDir) {
+    return findFormatFile(indexDir, V1Constants.SEGMENT_CREATION_META);
+  }
+
+  public static @Nullable File findStarTreeFile(@Nonnull File indexDir) {
+    return findFormatFile(indexDir, V1Constants.STAR_TREE_INDEX_FILE);
+  }
+  private static @Nullable File findFormatFile(@Nonnull File indexDir, String fileName) {
     Preconditions.checkNotNull(indexDir);
     Preconditions.checkArgument(indexDir.exists(), "Path %s does not exist", indexDir);
 
-    File creationMetaFile = new File(indexDir, V1Constants.SEGMENT_CREATION_META);
-    if (creationMetaFile.exists()) {
-      return creationMetaFile;
+    if (! indexDir.isDirectory()) {
+      return indexDir;
+    }
+
+    File v1File = new File(indexDir, fileName);
+    if (v1File.exists()) {
+      return v1File;
     }
 
     File v3Dir = segmentDirectoryFor(indexDir, SegmentVersion.v3);
-    creationMetaFile = new File(v3Dir, V1Constants.SEGMENT_CREATION_META);
-    if (creationMetaFile.exists()) {
-      return creationMetaFile;
+    File v3File = new File(v3Dir, V1Constants.SEGMENT_CREATION_META);
+    if (v3File.exists()) {
+      return v3File;
     }
 
     return null;

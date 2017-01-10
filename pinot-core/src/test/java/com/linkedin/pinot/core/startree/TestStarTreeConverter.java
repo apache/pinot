@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.startree;
 
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import java.io.File;
 import java.io.IOException;
@@ -46,8 +47,7 @@ public class TestStarTreeConverter {
       throws Exception {
     StarTreeIndexTestSegmentHelper.buildSegment(SEGMENT_DIR_NAME, SEGMENT_NAME, false);
     _segment = StarTreeIndexTestSegmentHelper.loadSegment(SEGMENT_DIR_NAME, SEGMENT_NAME);
-    _indexDir = new File(SEGMENT_DIR_NAME, SEGMENT_NAME);
-
+    _indexDir = new File(new File(SEGMENT_DIR_NAME, SEGMENT_NAME), SegmentVersion.v3.toString());
   }
 
   /**
@@ -80,7 +80,7 @@ public class TestStarTreeConverter {
 
   private void assertStarTreeVersion(File indexDir, StarTreeFormatVersion expectedVersion)
       throws IOException {
-    File starTreeFile = new File(indexDir, V1Constants.STAR_TREE_INDEX_FILE);
+    File starTreeFile = new File(_indexDir, V1Constants.STAR_TREE_INDEX_FILE);
     Assert.assertEquals(StarTreeSerDe.getStarTreeVersion(starTreeFile), expectedVersion);
   }
 
