@@ -47,16 +47,16 @@ public class TaskGenerator {
 
   }
 
-  public List<AlertTaskInfo> createAlertTasks(AlertJobContext alertJobContext, DateTime monitoringWindowStartTime,
-      DateTime monitoringWindowEndTime)
-      throws Exception{
+  public List<AlertTaskInfo> createAlertTasks(AlertJobContext alertJobContext,
+      DateTime monitoringWindowStartTime, DateTime monitoringWindowEndTime) throws Exception {
 
     List<AlertTaskInfo> tasks = new ArrayList<>();
     EmailConfigurationDTO alertConfig = alertJobContext.getAlertConfig();
     long jobExecutionId = alertJobContext.getJobExecutionId();
 
-
-    AlertTaskInfo taskInfo = new AlertTaskInfo(jobExecutionId, monitoringWindowStartTime, monitoringWindowEndTime, alertConfig);
+    AlertTaskInfo taskInfo =
+        new AlertTaskInfo(jobExecutionId, monitoringWindowStartTime, monitoringWindowEndTime,
+            alertConfig, alertJobContext.getAlertConfigDTO());
     tasks.add(taskInfo);
     return tasks;
   }

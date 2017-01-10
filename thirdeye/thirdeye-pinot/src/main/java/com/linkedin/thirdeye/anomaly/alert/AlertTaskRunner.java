@@ -6,7 +6,9 @@ import com.linkedin.thirdeye.anomaly.alert.util.EmailHelper;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewResponse;
+import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
+import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterType;
@@ -62,8 +64,10 @@ public class AlertTaskRunner implements TaskRunner {
 
   private final MergedAnomalyResultManager anomalyMergedResultDAO;
   private final EmailConfigurationManager emailConfigurationDAO;
+  private final AlertConfigManager alertConfigManager;
 
   private EmailConfigurationDTO alertConfig;
+  private AlertConfigDTO alertConfigDTO;
   private DateTime windowStart;
   private DateTime windowEnd;
   private ThirdEyeAnomalyConfiguration thirdeyeConfig;
@@ -76,6 +80,7 @@ public class AlertTaskRunner implements TaskRunner {
   public AlertTaskRunner() {
     anomalyMergedResultDAO = daoRegistry.getMergedAnomalyResultDAO();
     emailConfigurationDAO = daoRegistry.getEmailConfigurationDAO();
+    alertConfigManager = daoRegistry.getAlertConfigDAO();
   }
 
   @Override
@@ -83,6 +88,7 @@ public class AlertTaskRunner implements TaskRunner {
     AlertTaskInfo alertTaskInfo = (AlertTaskInfo) taskInfo;
     List<TaskResult> taskResult = new ArrayList<>();
     alertConfig = alertTaskInfo.getAlertConfig();
+    alertConfigDTO = alertTaskInfo.getAlertConfigDTO();
     windowStart = alertTaskInfo.getWindowStartTime();
     windowEnd = alertTaskInfo.getWindowEndTime();
     thirdeyeConfig = taskContext.getThirdEyeAnomalyConfiguration();
@@ -99,6 +105,7 @@ public class AlertTaskRunner implements TaskRunner {
     return taskResult;
   }
 
+  // TODO : separate code path for new vs old alert config !
   private void runTask() throws Exception {
     LOG.info("Starting email report {}", alertConfig.getId());
 
