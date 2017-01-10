@@ -3,6 +3,19 @@ package com.linkedin.thirdeye.datalayer.bao;
 import com.google.common.collect.Lists;
 import com.linkedin.thirdeye.anomaly.override.OverrideConfigHelper;
 import com.linkedin.thirdeye.api.DimensionMap;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.AlertConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.DashboardConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.DatasetConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.EmailConfigurationManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.IngraphDashboardConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.IngraphMetricConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.JobManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.MetricConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.OverrideConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.RawAnomalyResultManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.TaskManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.WebappConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 
@@ -53,6 +66,7 @@ public abstract class AbstractManagerTestBase {
   protected IngraphDashboardConfigManager ingraphDashboardConfigDAO;
   protected IngraphMetricConfigManager ingraphMetricConfigDAO;
   protected OverrideConfigManager overrideConfigDAO;
+  protected AlertConfigManager alertConfigManager;
 
   private ManagerProvider managerProvider;
   private PersistenceConfig configuration;
@@ -60,7 +74,8 @@ public abstract class AbstractManagerTestBase {
   private DataSource ds;
   private String dbId = System.currentTimeMillis() + "" + Math.random();
 
-  @BeforeClass(alwaysRun = true) public void init() throws Exception {
+  @BeforeClass(alwaysRun = true)
+  public void init() throws Exception {
     URL url = AbstractManagerTestBase.class.getResource("/persistence-local.yml");
     File configFile = new File(url.toURI());
     configuration = DaoProviderUtil.createConfiguration(configFile);
@@ -120,35 +135,23 @@ public abstract class AbstractManagerTestBase {
 
   public void initManagers() throws Exception {
     managerProvider = new ManagerProvider(ds);
-    Class<AnomalyFunctionManagerImpl> c =
-        com.linkedin.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl.class;
+    Class<AnomalyFunctionManagerImpl> c = AnomalyFunctionManagerImpl.class;
     System.out.println(c);
-    anomalyFunctionDAO = (AnomalyFunctionManager) managerProvider
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl.class);
-    rawResultDAO = (RawAnomalyResultManager) managerProvider
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.RawAnomalyResultManagerImpl.class);
-    jobDAO = (JobManager) managerProvider
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.JobManagerImpl.class);
-    taskDAO = (TaskManager) managerProvider
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.TaskManagerImpl.class);
-    emailConfigurationDAO = (EmailConfigurationManager) managerProvider
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.EmailConfigurationManagerImpl.class);
-    mergedResultDAO = (MergedAnomalyResultManager) managerProvider
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl.class);
-    webappConfigDAO = (WebappConfigManager) managerProvider
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.WebappConfigManagerImpl.class);
-    datasetConfigDAO = (DatasetConfigManager) managerProvider
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.DatasetConfigManagerImpl.class);
-    metricConfigDAO = (MetricConfigManager) managerProvider
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.MetricConfigManagerImpl.class);
-    dashboardConfigDAO = (DashboardConfigManager) managerProvider
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.DashboardConfigManagerImpl.class);
-    ingraphDashboardConfigDAO = (IngraphDashboardConfigManager) managerProvider
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.IngraphDashboardConfigManagerImpl.class);
-    ingraphMetricConfigDAO = (IngraphMetricConfigManager) managerProvider
-            .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.IngraphMetricConfigManagerImpl.class);
-    overrideConfigDAO = (OverrideConfigManager) managerProvider
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.OverrideConfigManagerImpl.class);
+    anomalyFunctionDAO = managerProvider.getInstance(AnomalyFunctionManagerImpl.class);
+    rawResultDAO = managerProvider.getInstance(RawAnomalyResultManagerImpl.class);
+    jobDAO = managerProvider.getInstance(JobManagerImpl.class);
+    taskDAO = managerProvider.getInstance(TaskManagerImpl.class);
+    emailConfigurationDAO = managerProvider.getInstance(EmailConfigurationManagerImpl.class);
+    mergedResultDAO = managerProvider.getInstance(MergedAnomalyResultManagerImpl.class);
+    webappConfigDAO = managerProvider.getInstance(WebappConfigManagerImpl.class);
+    datasetConfigDAO = managerProvider.getInstance(DatasetConfigManagerImpl.class);
+    metricConfigDAO = managerProvider.getInstance(MetricConfigManagerImpl.class);
+    dashboardConfigDAO = managerProvider.getInstance(DashboardConfigManagerImpl.class);
+    ingraphDashboardConfigDAO =
+        managerProvider.getInstance(IngraphDashboardConfigManagerImpl.class);
+    ingraphMetricConfigDAO = managerProvider.getInstance(IngraphMetricConfigManagerImpl.class);
+    overrideConfigDAO = managerProvider.getInstance(OverrideConfigManagerImpl.class);
+    alertConfigManager = managerProvider.getInstance(AlertConfigManagerImpl.class);
   }
 
   @AfterClass(alwaysRun = true)

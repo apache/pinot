@@ -1,6 +1,8 @@
 package com.linkedin.thirdeye.datalayer.dao;
 
+import com.linkedin.thirdeye.datalayer.entity.AlertConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.OverrideConfigIndex;
+import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.OverrideConfigBean;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -102,6 +104,9 @@ public class GenericPojoDao {
 
     pojoInfoMap.put(OverrideConfigBean.class,
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, OverrideConfigIndex.class));
+
+    pojoInfoMap
+        .put(AlertConfigBean.class, newPojoInfo(DEFAULT_BASE_TABLE_NAME, AlertConfigIndex.class));
   }
 
   private static PojoInfo newPojoInfo(String baseTableName,
@@ -124,12 +129,14 @@ public class GenericPojoDao {
   static ModelMapper MODEL_MAPPER = new ModelMapper();
   static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-  public GenericPojoDao() {}
+  public GenericPojoDao() {
+  }
 
   /**
    * Use at your own risk!!! Ensure to close the connection after using it or it can cause a leak.
    *
    * @return
+   *
    * @throws SQLException
    */
   public Connection getConnection() throws SQLException {

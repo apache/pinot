@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datalayer.util;
 
+import com.linkedin.thirdeye.datalayer.entity.AlertConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.OverrideConfigIndex;
 import io.dropwizard.configuration.ConfigurationFactory;
 import io.dropwizard.jackson.Jackson;
@@ -119,6 +120,8 @@ public abstract class DaoProviderUtil {
             convertCamelCaseToUnderscore(IngraphMetricConfigIndex.class.getSimpleName()));
         entityMappingHolder.register(conn, OverrideConfigIndex.class,
             convertCamelCaseToUnderscore(OverrideConfigIndex.class.getSimpleName()));
+        entityMappingHolder.register(conn, AlertConfigIndex.class,
+            convertCamelCaseToUnderscore(AlertConfigIndex.class.getSimpleName()));
       } catch (Exception e) {
         throw new RuntimeException(e);
       }

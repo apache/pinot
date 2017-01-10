@@ -10,6 +10,7 @@ import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
 import com.linkedin.thirdeye.datalayer.pojo.EmailConfigurationBean;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
 
+@Deprecated
 public class EmailConfigurationManagerImpl extends AbstractManagerImpl<EmailConfigurationDTO>
     implements EmailConfigurationManager {
 
