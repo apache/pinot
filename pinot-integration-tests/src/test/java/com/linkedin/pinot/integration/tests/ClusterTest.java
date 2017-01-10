@@ -63,6 +63,14 @@ public abstract class ClusterTest extends ControllerTest {
   protected List<HelixBrokerStarter> _brokerStarters = new ArrayList<HelixBrokerStarter>();
   protected List<HelixServerStarter> _serverStarters = new ArrayList<HelixServerStarter>();
 
+  protected int getRealtimeSegmentFlushSize(boolean useLlc) {
+    if (useLlc) {
+      return 5000;
+    } else {
+      return 20000;
+    }
+  }
+
   protected void startBroker() {
     startBrokers(1);
   }
@@ -265,12 +273,12 @@ public abstract class ClusterTest extends ControllerTest {
     String retentionTimeUnit = "";
     if (useLlc) {
       addLLCRealtimeTable(tableName, timeColumnName, timeColumnType, retentionDays, retentionTimeUnit, KafkaStarterUtils.DEFAULT_KAFKA_BROKER,
-          kafkaTopic, schemaName, serverTenant, brokerTenant, avroFile, 5000,
+          kafkaTopic, schemaName, serverTenant, brokerTenant, avroFile, getRealtimeSegmentFlushSize(useLlc),
           sortedColumn, invertedIndexColumns, loadMode);
     } else {
       addRealtimeTable(tableName, timeColumnName, timeColumnType, retentionDays, retentionTimeUnit, kafkaZkUrl,
-          kafkaTopic, schemaName, serverTenant, brokerTenant, avroFile, 20000, sortedColumn, invertedIndexColumns,
-          loadMode);
+          kafkaTopic, schemaName, serverTenant, brokerTenant, avroFile, getRealtimeSegmentFlushSize(useLlc),
+          sortedColumn, invertedIndexColumns, loadMode);
     }
     addOfflineTable(timeColumnName, timeColumnType, retentionDays, retentionTimeUnit, brokerTenant, serverTenant,
         invertedIndexColumns, loadMode, tableName, SegmentVersion.v1);

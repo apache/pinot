@@ -523,4 +523,9 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
   protected int getKafkaPartitionCount() {
     return 10;
   }
+
+  @Override
+  protected int getRealtimeSegmentFlushSize(boolean useLlc) {
+    return super.getRealtimeSegmentFlushSize(useLlc) * 10;
+  }
 }

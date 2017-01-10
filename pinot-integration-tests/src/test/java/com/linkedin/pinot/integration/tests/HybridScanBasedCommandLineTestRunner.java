@@ -280,43 +280,48 @@ public class HybridScanBasedCommandLineTestRunner {
 
     @Test
     public void testQueriesFromLog() throws Exception {
-      if (!_inCmdLine) {
-        return;
-      }
-      runTestLoop(new Callable<Object>() {
-        @Override
-        public Object call()
-            throws Exception {
-          LineNumberReader queryReader = new LineNumberReader(getQueryFile());
-          for (;;) {
-            String line = queryReader.readLine();
-            if (line == null) {
-              break;
-            }
-            _nQueriesRead++;
-            final String query = replaceTableName(line);
-            String compareStr = null;
-            if (_compareWithRspFile) {
-              compareStr = _scanRspFileReader.readLine();
-              if (compareStr == null) {
-                Assert.fail("Not enough lines in " + _scanRspFilePath);
+      try {
+        if (!_inCmdLine) {
+          return;
+        }
+        runTestLoop(new Callable<Object>() {
+          @Override
+          public Object call()
+              throws Exception {
+            LineNumberReader queryReader = new LineNumberReader(getQueryFile());
+            for (; ; ) {
+              String line = queryReader.readLine();
+              if (line == null) {
+                break;
+              }
+              _nQueriesRead++;
+              final String query = replaceTableName(line);
+              String compareStr = null;
+              if (_compareWithRspFile) {
+                compareStr = _scanRspFileReader.readLine();
+                if (compareStr == null) {
+                  Assert.fail("Not enough lines in " + _scanRspFilePath);
+                }
+              }
+              final String scanRsp = compareStr;
+              if (_multiThreaded) {
+                runQueryAsync(query, scanRsp);
+              } else {
+                runQuery(query, _scanBasedQueryProcessor, false, scanRsp);
               }
             }
-            final String scanRsp = compareStr;
-            if (_multiThreaded) {
-              runQueryAsync(query, scanRsp);
-            } else {
-              runQuery(query, _scanBasedQueryProcessor, false, scanRsp);
-            }
+            queryReader.close();
+            return null;
           }
-          queryReader.close();
-          return null;
-        }
-      }, _multiThreaded);
-      System.out.println(
-          getNumSuccesfulQueries() + " Passed, " + getNumFailedQueries() + " Failed, " + getNumEmptyResults()
-              + " empty results");
-      Assert.assertEquals(0, getNumFailedQueries(), "There were query failures. See " + _logFileName);
+        }, _multiThreaded);
+        System.out.println(
+            getNumSuccesfulQueries() + " Passed, " + getNumFailedQueries() + " Failed, " + getNumEmptyResults() + " empty results");
+        Assert.assertEquals(0, getNumFailedQueries(), "There were query failures. See " + _logFileName);
+      } catch (Exception e) {
+        System.out.println("Caught exception while running queries from log");
+        e.printStackTrace();
+        throw e;
+      }
     }
   }
 }
