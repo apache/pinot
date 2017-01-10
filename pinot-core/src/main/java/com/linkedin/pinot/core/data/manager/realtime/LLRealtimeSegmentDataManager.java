@@ -269,8 +269,10 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
         highWatermark = messagesAndWatermark.getRight();
       } catch (TimeoutException e) {
         handleTransientKafkaErrors(e);
+        continue;
       } catch (SimpleConsumerWrapper.TransientConsumerException e) {
         handleTransientKafkaErrors(e);
+        continue;
       } catch (SimpleConsumerWrapper.PermanentConsumerException e) {
         segmentLogger.warn("Kafka permanent exception when fetching messages, stopping consumption", e);
         throw e;
@@ -278,89 +280,10 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
         // Unknown exception from Kafka. Treat as a transient exception.
         // One such exception seen so far is java.net.SocketTimeoutException
         handleTransientKafkaErrors(e);
+        continue;
       }
 
-      Iterator<MessageAndOffset> msgIterator = messagesAndOffsets.iterator();
-
-      int indexedMessageCount = 0;
-      int kafkaMessageCount = 0;
-      boolean canTakeMore = true;
-      GenericRow decodedRow = null;
-      GenericRow transformedRow = null;
-      while (!_shouldStop && !endCriteriaReached() && msgIterator.hasNext()) {
-        if (!canTakeMore) {
-          // The RealtimeSegmentImpl that we are pushing rows into has indicated that it cannot accept any more
-          // rows. This can happen in one of two conditions:
-          // 1. We are in INITIAL_CONSUMING state, and we somehow exceeded the max number of rows we are allowed to consume
-          //    for this row. Something is seriously wrong, because endCriteriaReached() should have returned true when
-          //    we hit the row limit.
-          //    Throw an exception.
-          //
-          // 2. We are in CATCHING_UP state, and we legally hit this error due to Kafka unclean leader election where
-          //    offsets get changed with higher generation numbers for some pinot servers but not others. So, if another
-          //    server (who got a larger kafka offset) asked us to catch up to that offset, but we are connected to a
-          //    broker who has smaller offsets, then we may try to push more rows into the buffer than maximum. This
-          //    is a rare case, and we really don't know how to handle this at this time.
-          //    Throw an exception.
-          //
-          segmentLogger.error("Buffer full with {} rows consumed (row limit {})", _numRowsConsumed, _segmentMaxRowCount);
-          throw new RuntimeException("Realtime segment full");
-        }
-        // Index each message
-        MessageAndOffset messageAndOffset = msgIterator.next();
-        byte[] array = messageAndOffset.message().payload().array();
-        int offset = messageAndOffset.message().payload().arrayOffset();
-        int length = messageAndOffset.message().payloadSize();
-        decodedRow = GenericRow.createOrReuseRow(decodedRow);
-        decodedRow = _messageDecoder.decode(array, offset, length, decodedRow);
-
-        // Update lag metric on the first message of each batch
-        if (kafkaMessageCount == 0) {
-          long messageOffset = messageAndOffset.offset();
-          long offsetDifference = highWatermark - messageOffset;
-          _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.KAFKA_PARTITION_OFFSET_LAG, offsetDifference);
-        }
-
-        if (decodedRow != null) {
-          transformedRow = GenericRow.createOrReuseRow(transformedRow);
-          transformedRow = _fieldExtractor.transform(decodedRow, transformedRow);
-
-          if (transformedRow != null) {
-            _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.REALTIME_ROWS_CONSUMED, 1);
-            indexedMessageCount++;
-          } else {
-            _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1);
-          }
-
-          canTakeMore = _realtimeSegment.index(transformedRow);  // Ignore the boolean return
-          if (!canTakeMore) {
-            //TODO
-            // This condition can happen when we are catching up, (due to certain failure scenarios in kafka where
-            // offsets get changed with higher generation numbers for some pinot servers but not others).
-            // Also, it may be that we push in a row into the realtime segment, but it fails to index that row
-            // for some reason., so we may end up with less number of rows in the real segment. Actually, even 0 rows.
-            // In that case, we will see an exception when generating the segment.
-            // TODO We need to come up with how the system behaves in these cases and document/handle them
-            segmentLogger.warn("We got full during indexing");
-          }
-        } else {
-          _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1);
-        }
-
-        _currentOffset = messageAndOffset.nextOffset();
-        _numRowsConsumed++;
-        kafkaMessageCount++;
-      }
-      updateCurrentDocumentCountMetrics();
-      if (kafkaMessageCount != 0) {
-        segmentLogger.debug("Indexed {} messages ({} messages read from Kafka) current offset {}", indexedMessageCount,
-            kafkaMessageCount, _currentOffset);
-        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_KAFKA_OFFSET_CONSUMED, _currentOffset);
-      } else {
-        // If there were no messages to be fetched from Kafka, wait for a little bit as to avoid hammering the
-        // Kafka broker
-        Uninterruptibles.sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
-      }
+      processKafkaEvents(messagesAndOffsets, highWatermark);
     }
 
     _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.ROWS_WITH_ERRORS,
@@ -372,6 +295,90 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.COLUMNS_WITH_NULL_VALUES,
         (long) _fieldExtractor.getTotalNullCols());
     return true;
+  }
+
+  private void processKafkaEvents(Iterable<MessageAndOffset> messagesAndOffsets, Long highWatermark) {
+    Iterator<MessageAndOffset> msgIterator = messagesAndOffsets.iterator();
+
+    int indexedMessageCount = 0;
+    int kafkaMessageCount = 0;
+    boolean canTakeMore = true;
+    GenericRow decodedRow = null;
+    GenericRow transformedRow = null;
+    while (!_shouldStop && !endCriteriaReached() && msgIterator.hasNext()) {
+      if (!canTakeMore) {
+        // The RealtimeSegmentImpl that we are pushing rows into has indicated that it cannot accept any more
+        // rows. This can happen in one of two conditions:
+        // 1. We are in INITIAL_CONSUMING state, and we somehow exceeded the max number of rows we are allowed to consume
+        //    for this row. Something is seriously wrong, because endCriteriaReached() should have returned true when
+        //    we hit the row limit.
+        //    Throw an exception.
+        //
+        // 2. We are in CATCHING_UP state, and we legally hit this error due to Kafka unclean leader election where
+        //    offsets get changed with higher generation numbers for some pinot servers but not others. So, if another
+        //    server (who got a larger kafka offset) asked us to catch up to that offset, but we are connected to a
+        //    broker who has smaller offsets, then we may try to push more rows into the buffer than maximum. This
+        //    is a rare case, and we really don't know how to handle this at this time.
+        //    Throw an exception.
+        //
+        segmentLogger.error("Buffer full with {} rows consumed (row limit {})", _numRowsConsumed, _segmentMaxRowCount);
+        throw new RuntimeException("Realtime segment full");
+      }
+      // Index each message
+      MessageAndOffset messageAndOffset = msgIterator.next();
+      byte[] array = messageAndOffset.message().payload().array();
+      int offset = messageAndOffset.message().payload().arrayOffset();
+      int length = messageAndOffset.message().payloadSize();
+      decodedRow = GenericRow.createOrReuseRow(decodedRow);
+      decodedRow = _messageDecoder.decode(array, offset, length, decodedRow);
+
+      // Update lag metric on the first message of each batch
+      if (kafkaMessageCount == 0) {
+        long messageOffset = messageAndOffset.offset();
+        long offsetDifference = highWatermark - messageOffset;
+        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.KAFKA_PARTITION_OFFSET_LAG, offsetDifference);
+      }
+
+      if (decodedRow != null) {
+        transformedRow = GenericRow.createOrReuseRow(transformedRow);
+        transformedRow = _fieldExtractor.transform(decodedRow, transformedRow);
+
+        if (transformedRow != null) {
+          _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.REALTIME_ROWS_CONSUMED, 1);
+          indexedMessageCount++;
+        } else {
+          _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1);
+        }
+
+        canTakeMore = _realtimeSegment.index(transformedRow);  // Ignore the boolean return
+        if (!canTakeMore) {
+          //TODO
+          // This condition can happen when we are catching up, (due to certain failure scenarios in kafka where
+          // offsets get changed with higher generation numbers for some pinot servers but not others).
+          // Also, it may be that we push in a row into the realtime segment, but it fails to index that row
+          // for some reason., so we may end up with less number of rows in the real segment. Actually, even 0 rows.
+          // In that case, we will see an exception when generating the segment.
+          // TODO We need to come up with how the system behaves in these cases and document/handle them
+          segmentLogger.warn("We got full during indexing");
+        }
+      } else {
+        _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1);
+      }
+
+      _currentOffset = messageAndOffset.nextOffset();
+      _numRowsConsumed++;
+      kafkaMessageCount++;
+    }
+    updateCurrentDocumentCountMetrics();
+    if (kafkaMessageCount != 0) {
+      segmentLogger.debug("Indexed {} messages ({} messages read from Kafka) current offset {}", indexedMessageCount,
+          kafkaMessageCount, _currentOffset);
+      _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_KAFKA_OFFSET_CONSUMED, _currentOffset);
+    } else {
+      // If there were no messages to be fetched from Kafka, wait for a little bit as to avoid hammering the
+      // Kafka broker
+      Uninterruptibles.sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
+    }
   }
 
   public class PartitionConsumer implements Runnable {
