@@ -190,22 +190,6 @@ public class DataFetcherTest {
     }
   }
 
-  @Test
-  public void testFetchSingleHashCodes() {
-    int[] docIds = new int[NUM_ROWS];
-    int length = 0;
-    for (int i = _random.nextInt(MAX_STEP_LENGTH); i < NUM_ROWS; i += _random.nextInt(MAX_STEP_LENGTH) + 1) {
-      docIds[length++] = i;
-    }
-
-    int[] hashCodes = new int[length];
-    _dataFetcher.fetchHashCodes(DIMENSION_NAME, docIds, 0, length, hashCodes, 0);
-
-    for (int i = 0; i < length; i++) {
-      Assert.assertEquals(hashCodes[i], _dimensionValues[docIds[i]].hashCode(), _errorMessage);
-    }
-  }
-
   @AfterClass
   public void cleanUp() {
     FileUtils.deleteQuietly(new File(INDEX_DIR_PATH));

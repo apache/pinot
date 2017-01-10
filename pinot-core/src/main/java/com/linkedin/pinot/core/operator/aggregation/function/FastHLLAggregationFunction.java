@@ -18,11 +18,11 @@ package com.linkedin.pinot.core.operator.aggregation.function;
 import com.clearspring.analytics.stream.cardinality.CardinalityMergeException;
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.ObjectAggregationResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupByResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.groupby.ObjectGroupByResultHolder;
-import com.linkedin.pinot.core.operator.docvalsets.ProjectionBlockValSet;
 import com.linkedin.pinot.core.startree.hll.HllConstants;
 import com.linkedin.pinot.core.startree.hll.HllUtil;
 import javax.annotation.Nonnull;
@@ -68,8 +68,8 @@ public class FastHLLAggregationFunction implements AggregationFunction<HyperLogL
 
   @Override
   public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
-      @Nonnull ProjectionBlockValSet... projectionBlockValSets) {
-    String[] valueArray = projectionBlockValSets[0].getSingleValues();
+      @Nonnull BlockValSet... blockValSets) {
+    String[] valueArray = blockValSets[0].getStringValuesSV();
     HyperLogLog hyperLogLog = aggregationResultHolder.getResult();
     if (hyperLogLog == null) {
       hyperLogLog = new HyperLogLog(_log2m);
@@ -86,8 +86,8 @@ public class FastHLLAggregationFunction implements AggregationFunction<HyperLogL
 
   @Override
   public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull ProjectionBlockValSet... projectionBlockValSets) {
-    String[] valueArray = projectionBlockValSets[0].getSingleValues();
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+    String[] valueArray = blockValSets[0].getStringValuesSV();
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeyArray[i];
       HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
@@ -105,8 +105,8 @@ public class FastHLLAggregationFunction implements AggregationFunction<HyperLogL
 
   @Override
   public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull ProjectionBlockValSet... projectionBlockValSets) {
-    String[] valueArray = projectionBlockValSets[0].getSingleValues();
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+    String[] valueArray = blockValSets[0].getStringValuesSV();
     for (int i = 0; i < length; i++) {
       String value = valueArray[i];
       for (int groupKey : groupKeysArray[i]) {

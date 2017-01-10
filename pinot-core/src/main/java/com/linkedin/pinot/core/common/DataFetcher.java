@@ -365,50 +365,6 @@ public class DataFetcher {
   }
 
   /**
-   * Fetch the hash code values for a single value column.
-   *
-   * @param column column name.
-   * @param inDocIds doc Id array.
-   * @param inStartPos input start position.
-   * @param length input length.
-   * @param outValues value array buffer.
-   * @param outStartPos output start position.
-   */
-  public void fetchHashCodes(String column, int[] inDocIds, int inStartPos, int length, int[] outValues, int outStartPos) {
-    Dictionary dictionary = getDictionaryForColumn(column);
-    fetchSingleDictIds(column, inDocIds, inStartPos, length, _reusableDictIds, 0);
-
-    for (int i = 0; i < length; i++, outStartPos++) {
-      outValues[outStartPos] = dictionary.get(_reusableDictIds[i]).hashCode();
-    }
-  }
-
-  /**
-   * Fetch the hash code values for a single value column.
-   *
-   * @param column column name.
-   * @param inDocIds doc Id array.
-   * @param inStartPos input start position.
-   * @param length input length.
-   * @param outValues value array buffer.
-   * @param outStartPos output start position.
-   */
-  public void fetchHashCodes(String column, int[] inDocIds, int inStartPos, int length, int[][] outValues, int outStartPos) {
-    Dictionary dictionary = getDictionaryForColumn(column);
-    BlockMultiValIterator iterator = (BlockMultiValIterator) getBlockValIteratorForColumn(column);
-
-    int inEndPos = inStartPos + length;
-    for (int i = inStartPos; i < inEndPos; i++, outStartPos++) {
-      iterator.skipTo(inDocIds[i]);
-      int numValues = iterator.nextIntVal(_reusableMVDictIds);
-      outValues[outStartPos] = new int[numValues];
-      for (int j = 0; j < numValues; j++) {
-        outValues[outStartPos][j] = dictionary.get(_reusableMVDictIds[j]).hashCode();
-      }
-    }
-  }
-
-  /**
    * Returns the data type for the specified column.
    *
    * @param column Name of column for which to return the data type.

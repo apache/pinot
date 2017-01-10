@@ -43,14 +43,12 @@ public class DataBlockCache {
   /** _columnToXXsMap must be defined accordingly */
   private final Map<String, int[]> _columnToDictIdsMap = new HashMap<>();
   private final Map<String, Object> _columnToValuesMap = new HashMap<>();
-  private final Map<String, int[]> _columnToHashCodesMap = new HashMap<>();
   private final Map<String, String[]> _columnToStringsMap = new HashMap<>();
 
   private final Map<String, int[]> _columnToNumberOfEntriesMap = new HashMap<>();
 
   private final Map<String, int[][]> _columnToDictIdsArrayMap = new HashMap<>();
   private final Map<String, Object> _columnToValuesArrayMap = new HashMap<>();
-  private final Map<String, int[][]> _columnToHashCodesArrayMap = new HashMap<>();
   private final Map<String, String[][]> _columnToStringsArrayMap = new HashMap<>();
 
   private final Map<String, int[]> _columnToTempDictIdsMap = new HashMap<>();
@@ -143,14 +141,15 @@ public class DataBlockCache {
    * @return value array associated with this column.
    */
   public int[] getIntValueArrayForColumn(String column) {
-    int[] intValues = (int []) _columnToValuesMap.get(column);
-    if (!_columnValueLoaded.contains(column)) {
+    String key = getKeyForColumnAndType(column, FieldSpec.DataType.INT);
+    int[] intValues = (int []) _columnToValuesMap.get(key);
+    if (!_columnValueLoaded.contains(key)) {
       if (intValues == null) {
         intValues = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-        _columnToValuesMap.put(column, intValues);
+        _columnToValuesMap.put(key, intValues);
       }
       _dataFetcher.fetchIntValues(column, _docIds, _startPos, _length, intValues, 0);
-      _columnValueLoaded.add(column);
+      _columnValueLoaded.add(key);
     }
     return intValues;
   }
@@ -162,16 +161,17 @@ public class DataBlockCache {
    * @return int values array associated with this column.
    */
   public int[][] getIntValuesArrayForColumn(String column) {
-    int[][] intValues = (int[][]) _columnToValuesArrayMap.get(column);
+    String key = getKeyForColumnAndType(column, FieldSpec.DataType.INT_ARRAY);
+    int[][] intValues = (int[][]) _columnToValuesArrayMap.get(key);
 
-    if (!_columnValueLoaded.contains(column)) {
+    if (!_columnValueLoaded.contains(key)) {
       if (intValues == null) {
         intValues = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
-        _columnToValuesArrayMap.put(column, intValues);
+        _columnToValuesArrayMap.put(key, intValues);
       }
 
       _dataFetcher.fetchIntValues(column, _docIds, _startPos, _length, intValues, 0);
-      _columnValueLoaded.add(column);
+      _columnValueLoaded.add(key);
     }
     return intValues;
   }
@@ -183,14 +183,15 @@ public class DataBlockCache {
    * @return value array associated with this column.
    */
   public long[] getLongValueArrayForColumn(String column) {
-    long[] longValues = (long []) _columnToValuesMap.get(column);
-    if (!_columnValueLoaded.contains(column)) {
+    String key = getKeyForColumnAndType(column, FieldSpec.DataType.LONG);
+    long[] longValues = (long []) _columnToValuesMap.get(key);
+    if (!_columnValueLoaded.contains(key)) {
       if (longValues == null) {
         longValues = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-        _columnToValuesMap.put(column, longValues);
+        _columnToValuesMap.put(key, longValues);
       }
       _dataFetcher.fetchLongValues(column, _docIds, _startPos, _length, longValues, 0);
-      _columnValueLoaded.add(column);
+      _columnValueLoaded.add(key);
     }
     return longValues;
   }
@@ -202,16 +203,17 @@ public class DataBlockCache {
    * @return long values array associated with this column.
    */
   public long[][] getLongValuesArrayForColumn(String column) {
-    long[][] longValues = (long[][]) _columnToValuesArrayMap.get(column);
+    String key = getKeyForColumnAndType(column, FieldSpec.DataType.LONG_ARRAY);
+    long[][] longValues = (long[][]) _columnToValuesArrayMap.get(key);
 
-    if (!_columnValueLoaded.contains(column)) {
+    if (!_columnValueLoaded.contains(key)) {
       if (longValues == null) {
         longValues = new long[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
-        _columnToValuesArrayMap.put(column, longValues);
+        _columnToValuesArrayMap.put(key, longValues);
       }
 
       _dataFetcher.fetchLongValues(column, _docIds, _startPos, _length, longValues, 0);
-      _columnValueLoaded.add(column);
+      _columnValueLoaded.add(key);
     }
     return longValues;
   }
@@ -223,14 +225,15 @@ public class DataBlockCache {
    * @return value array associated with this column.
    */
   public float[] getFloatValueArrayForColumn(String column) {
-    float[] floatValues = (float []) _columnToValuesMap.get(column);
-    if (!_columnValueLoaded.contains(column)) {
+    String key = getKeyForColumnAndType(column, FieldSpec.DataType.FLOAT);
+    float[] floatValues = (float []) _columnToValuesMap.get(key);
+    if (!_columnValueLoaded.contains(key)) {
       if (floatValues == null) {
         floatValues = new float[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-        _columnToValuesMap.put(column, floatValues);
+        _columnToValuesMap.put(key, floatValues);
       }
       _dataFetcher.fetchFloatValues(column, _docIds, _startPos, _length, floatValues, 0);
-      _columnValueLoaded.add(column);
+      _columnValueLoaded.add(key);
     }
     return floatValues;
   }
@@ -242,16 +245,17 @@ public class DataBlockCache {
    * @return long values array associated with this column.
    */
   public float[][] getFloatValuesArrayForColumn(String column) {
-    float[][] floatValues = (float[][]) _columnToValuesArrayMap.get(column);
+    String key = getKeyForColumnAndType(column, FieldSpec.DataType.FLOAT_ARRAY);
+    float[][] floatValues = (float[][]) _columnToValuesArrayMap.get(key);
 
-    if (!_columnValueLoaded.contains(column)) {
+    if (!_columnValueLoaded.contains(key)) {
       if (floatValues == null) {
         floatValues = new float[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
-        _columnToValuesArrayMap.put(column, floatValues);
+        _columnToValuesArrayMap.put(key, floatValues);
       }
 
       _dataFetcher.fetchFloatValues(column, _docIds, _startPos, _length, floatValues, 0);
-      _columnValueLoaded.add(column);
+      _columnValueLoaded.add(key);
     }
     return floatValues;
   }
@@ -263,14 +267,15 @@ public class DataBlockCache {
    * @return value array associated with this column.
    */
   public double[] getDoubleValueArrayForColumn(String column) {
-    double[] doubleValues = (double []) _columnToValuesMap.get(column);
-    if (!_columnValueLoaded.contains(column)) {
+    String key = getKeyForColumnAndType(column, FieldSpec.DataType.DOUBLE);
+    double[] doubleValues = (double []) _columnToValuesMap.get(key);
+    if (!_columnValueLoaded.contains(key)) {
       if (doubleValues == null) {
         doubleValues = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-        _columnToValuesMap.put(column, doubleValues);
+        _columnToValuesMap.put(key, doubleValues);
       }
       _dataFetcher.fetchDoubleValues(column, _docIds, _startPos, _length, doubleValues, 0);
-      _columnValueLoaded.add(column);
+      _columnValueLoaded.add(key);
     }
     return doubleValues;
   }
@@ -282,61 +287,19 @@ public class DataBlockCache {
    * @return double values array associated with this column.
    */
   public double[][] getDoubleValuesArrayForColumn(String column) {
-    double[][] doubleValuesArray = (double[][]) _columnToValuesArrayMap.get(column);
+    String key = getKeyForColumnAndType(column, FieldSpec.DataType.DOUBLE_ARRAY);
+    double[][] doubleValuesArray = (double[][]) _columnToValuesArrayMap.get(key);
 
-    if (!_columnValueLoaded.contains(column)) {
+    if (!_columnValueLoaded.contains(key)) {
       if (doubleValuesArray == null) {
         doubleValuesArray = new double[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
-        _columnToValuesArrayMap.put(column, doubleValuesArray);
+        _columnToValuesArrayMap.put(key, doubleValuesArray);
       }
 
       _dataFetcher.fetchDoubleValues(column, _docIds, _startPos, _length, doubleValuesArray, 0);
-      _columnValueLoaded.add(column);
+      _columnValueLoaded.add(key);
     }
     return doubleValuesArray;
-  }
-
-  /**
-   * Get hash code array for a given column for the specific block initialized in the initNewBlock.
-   *
-   * @param column column name.
-   * @return hash code array associated with this column.
-   */
-  public int[] getHashCodeArrayForColumn(String column) {
-    int[] hashCodes = _columnToHashCodesMap.get(column);
-    if (!_columnHashCodeLoaded.contains(column)) {
-      if (hashCodes == null) {
-        hashCodes = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
-        _columnToHashCodesMap.put(column, hashCodes);
-      }
-      _dataFetcher.fetchHashCodes(column, _docIds, _startPos, _length, hashCodes, 0);
-      _columnHashCodeLoaded.add(column);
-    }
-    return hashCodes;
-  }
-
-  /**
-   * Get hash code array for a given column for the specific block initialized in the initNewBlock.
-   *
-   * @param column column name.
-   * @return hash codes array associated with this column.
-   */
-  public int[][] getHashCodesArrayForColumn(String column) {
-    int[][] hashCodesArray = _columnToHashCodesArrayMap.get(column);
-    if (!_columnHashCodeLoaded.contains(column)) {
-      if (hashCodesArray == null) {
-        hashCodesArray = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
-        _columnToHashCodesArrayMap.put(column, hashCodesArray);
-      }
-
-      int maxNumberOfEntriesForColumn = _dataFetcher.getMaxNumberOfEntriesForColumn(column);
-      for (int pos = 0; pos < _length; ++pos) {
-        hashCodesArray[pos] = new int[maxNumberOfEntriesForColumn];
-      }
-      _dataFetcher.fetchHashCodes(column, _docIds, _startPos, _length, hashCodesArray, 0);
-      _columnHashCodeLoaded.add(column);
-    }
-    return hashCodesArray;
   }
 
   /**
@@ -427,5 +390,20 @@ public class DataBlockCache {
    */
   public DataFetcher getDataFetcher() {
     return _dataFetcher;
+  }
+
+  /**
+   * Helper method that generates a key for {@link #_columnToValuesMap} using column name and data type
+   * to be fetched for the column.
+   *
+   * @param column Column Name
+   * @param dataType Data Type
+   * @return Key of column name and data type
+   */
+  private String getKeyForColumnAndType(String column, FieldSpec.DataType dataType) {
+    StringBuilder builder = new StringBuilder(column);
+    builder.append("_");
+    builder.append(dataType);
+    return builder.toString();
   }
 }

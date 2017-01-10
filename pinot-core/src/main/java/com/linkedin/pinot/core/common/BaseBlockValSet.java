@@ -58,12 +58,53 @@ public abstract class BaseBlockValSet implements BlockValSet {
   }
 
   @Override
-  public <T> T getSingleValues() {
+  public int[] getIntValuesSV() {
+    throw new UnsupportedOperationException();
+
+  }
+
+  @Override
+  public int[][] getIntValuesMV() {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public <T> T getMultiValues() {
+  public long[] getLongValuesSV() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public long[][] getLongValuesMV() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public float[] getFloatValuesSV() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public float[][] getFloatValuesMV() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public double[] getDoubleValuesSV() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public double[][] getDoubleValuesMV() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public String[] getStringValuesSV() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public String[][] getStringValuesMV() {
     throw new UnsupportedOperationException();
   }
 
@@ -80,6 +121,11 @@ public abstract class BaseBlockValSet implements BlockValSet {
 
   @Override
   public int getDictionaryIdsForDocId(int docId, int[] outputDictIds) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public int[] getNumberOfMVEntriesArray(){
     throw new UnsupportedOperationException();
   }
 }

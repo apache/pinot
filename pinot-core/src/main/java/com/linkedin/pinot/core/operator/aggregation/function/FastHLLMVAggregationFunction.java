@@ -17,9 +17,9 @@ package com.linkedin.pinot.core.operator.aggregation.function;
 
 import com.clearspring.analytics.stream.cardinality.CardinalityMergeException;
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupByResultHolder;
-import com.linkedin.pinot.core.operator.docvalsets.ProjectionBlockValSet;
 import com.linkedin.pinot.core.startree.hll.HllUtil;
 import javax.annotation.Nonnull;
 
@@ -41,8 +41,8 @@ public class FastHLLMVAggregationFunction extends FastHLLAggregationFunction {
 
   @Override
   public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
-      @Nonnull ProjectionBlockValSet... projectionBlockValSets) {
-    String[][] valuesArray = projectionBlockValSets[0].getMultiValues();
+      @Nonnull BlockValSet... blockValSets) {
+    String[][] valuesArray = blockValSets[0].getStringValuesMV();
     HyperLogLog hyperLogLog = aggregationResultHolder.getResult();
     if (hyperLogLog == null) {
       hyperLogLog = new HyperLogLog(_log2m);
@@ -61,8 +61,8 @@ public class FastHLLMVAggregationFunction extends FastHLLAggregationFunction {
 
   @Override
   public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull ProjectionBlockValSet... projectionBlockValSets) {
-    String[][] valuesArray = projectionBlockValSets[0].getMultiValues();
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+    String[][] valuesArray = blockValSets[0].getStringValuesMV();
     for (int i = 0; i < length; i++) {
       int groupKey = groupKeyArray[i];
       HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
@@ -82,8 +82,8 @@ public class FastHLLMVAggregationFunction extends FastHLLAggregationFunction {
 
   @Override
   public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
-      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull ProjectionBlockValSet... projectionBlockValSets) {
-    String[][] valuesArray = projectionBlockValSets[0].getMultiValues();
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+    String[][] valuesArray = blockValSets[0].getStringValuesMV();
     for (int i = 0; i < length; i++) {
       String[] values = valuesArray[i];
       for (int groupKey : groupKeysArray[i]) {

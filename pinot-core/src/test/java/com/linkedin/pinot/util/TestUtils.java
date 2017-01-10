@@ -85,6 +85,9 @@ public class TestUtils {
         errorRate = Math.abs((actual - estimate) / actual);
       }
       LOGGER.debug("estimate: " + estimate + " actual: " + actual + " error (in rate): " + errorRate);
+      if (errorRate >= precision) {
+        System.out.println("Found it: " + actual + " " +  estimate);
+      }
       Assert.assertTrue(errorRate < precision);
     }
   }

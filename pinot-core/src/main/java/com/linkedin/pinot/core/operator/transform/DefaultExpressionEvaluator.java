@@ -87,7 +87,7 @@ public class DefaultExpressionEvaluator implements TransformExpressionEvaluator 
       if (column != null) {
         Block dataBlock = projectionBlock.getDataBlock(column);
         ProjectionBlockValSet blockValSet = (ProjectionBlockValSet) dataBlock.getBlockValueSet();
-        double[] values = blockValSet.getSingleValues();
+        double[] values = blockValSet.getDoubleValuesSV();
         return new DoubleArrayTransformResult(values);
       } else {
         throw new RuntimeException("Literals not supported in transforms yet");

@@ -16,9 +16,9 @@
 package com.linkedin.pinot.core.operator.aggregation.function;
 
 import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupByResultHolder;
-import com.linkedin.pinot.core.operator.docvalsets.ProjectionBlockValSet;
 import java.io.Serializable;
 import javax.annotation.Nonnull;
 
@@ -64,25 +64,22 @@ public interface AggregationFunction<IntermediateResult extends Serializable, Fi
   /**
    * Perform aggregation on the given projection block value sets.
    */
-  // TODO: after adding all support in BlockValSet, change ProjectionBlockValSet to BlockValSet.
   void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
-      @Nonnull ProjectionBlockValSet... projectionBlockValSets);
+      @Nonnull BlockValSet... blockValSets);
 
   /**
    * Perform group-by on the given group key array and projection block value sets.
    * <p>This method is for all single-value group-by columns case, where each docId has only one group key.
    */
-  // TODO: after adding all support in BlockValSet, change ProjectionBlockValSet to BlockValSet.
   void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray, @Nonnull GroupByResultHolder groupByResultHolder,
-      @Nonnull ProjectionBlockValSet... projectionBlockValSets);
+      @Nonnull BlockValSet... blockValSets);
 
   /**
    * Perform group-by on the given group keys array and projection block value sets.
    * <p>This method is for multi-value group by columns case, where each docId can have multiple group keys.
    */
-  // TODO: after adding all support in BlockValSet, change ProjectionBlockValSet to BlockValSet.
   void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray, @Nonnull GroupByResultHolder groupByResultHolder,
-      @Nonnull ProjectionBlockValSet... projectionBlockValSets);
+      @Nonnull BlockValSet... blockValSets);
 
   /**
    * Extract aggregation result from the aggregation result holder.
