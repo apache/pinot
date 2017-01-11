@@ -16,7 +16,11 @@
 package com.linkedin.pinot.core.segment.store;
 
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import org.apache.commons.io.FileUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -34,4 +38,51 @@ public class SegmentDirectoryPathsTest {
     Assert.assertEquals(v2Dir, f);
     Assert.assertEquals(v3Dir, new File("f", SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME));
   }
+
+  @Test
+  public void testFindMetadataFile()
+      throws IOException {
+    File tempDirectory = null;
+    try {
+      // setup temp dir, v3 subdir and create metadata.properties in both
+      tempDirectory = new File(SegmentDirectoryPaths.class.toString());
+      tempDirectory.deleteOnExit();
+      FileUtils.forceMkdir(tempDirectory);
+      File v3Dir = new File(tempDirectory, "v3");
+      FileUtils.forceMkdir(v3Dir);
+      File metaFile = new File(tempDirectory, V1Constants.MetadataKeys.METADATA_FILE_NAME);
+      try(FileOutputStream outputStream = new FileOutputStream(metaFile)) {
+        outputStream.write(10);
+      }
+      File v3MetaFile = new File(v3Dir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
+      FileUtils.copyFile(metaFile, v3MetaFile);
+
+      {
+        File testMetaFile = SegmentDirectoryPaths.findMetadataFile(tempDirectory);
+        Assert.assertNotNull(testMetaFile);
+        Assert.assertEquals(testMetaFile.toString(), metaFile.toString());
+      }
+      {
+        // pass metadata file path directly
+        File testMetaFile = SegmentDirectoryPaths.findMetadataFile(metaFile);
+        Assert.assertEquals(testMetaFile.toString(), metaFile.toString());
+      }
+      {
+        // drop v1 metadata file
+        FileUtils.forceDelete(metaFile);
+        File testMetaFile = SegmentDirectoryPaths.findMetadataFile(tempDirectory);
+        Assert.assertEquals(testMetaFile.toString(), v3MetaFile.toString());
+      }
+      {
+        FileUtils.forceDelete(v3MetaFile);
+        File testMetaFile = SegmentDirectoryPaths.findMetadataFile(tempDirectory);
+        Assert.assertNull(testMetaFile);
+      }
+    } finally {
+      if (tempDirectory != null) {
+        FileUtils.deleteQuietly(tempDirectory);
+      }
+    }
+  }
+
 }
