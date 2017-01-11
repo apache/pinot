@@ -53,6 +53,7 @@ public class SegmentStatusChecker {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentStatusChecker.class);
   private static final int SegmentCheckerDefaultIntervalSeconds = 120;
   private static final int SegmentCheckerDefaultWaitForPushTimeSeconds = 600 * 1000;
+  private static final int MaxOfflineSegmentsToLog = 5;
   private static final String CONTROLLER_LEADER_CHANGE = "CONTROLLER LEADER CHANGE";
   public static final String ONLINE = "ONLINE";
   public static final String ERROR = "ERROR";
@@ -98,7 +99,6 @@ public class SegmentStatusChecker {
   private void startThread() {
     LOGGER.info("Starting segment status checker");
 
-
     if (_executorService == null) {
       _executorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
         @Override
@@ -108,18 +108,20 @@ public class SegmentStatusChecker {
           return thread;
         }
       });
-    }
-    // Set up an executor that executes segment status tasks periodically
-    _executorService.scheduleWithFixedDelay(new Runnable() {
-      @Override
-      public void run() {
-        try {
-          runSegmentMetrics();
-        } catch (Exception e) {
-          LOGGER.warn("Caught exception while running segment status checker", e);
+      // Set up an executor that executes segment status tasks periodically
+      _executorService.scheduleWithFixedDelay(new Runnable() {
+        @Override
+        public void run() {
+          try {
+            runSegmentMetrics();
+          } catch (Exception e) {
+            LOGGER.warn("Caught exception while running segment status checker", e);
+          }
         }
-      }
-    }, SegmentCheckerDefaultIntervalSeconds, _segmentStatusIntervalSeconds, TimeUnit.SECONDS);
+      }, SegmentCheckerDefaultIntervalSeconds, _segmentStatusIntervalSeconds, TimeUnit.SECONDS);
+    } else {
+      LOGGER.warn("SegmentStatusChecker already running. Attempt to start a duplicate thread");
+    }
   }
 
   /**
@@ -181,6 +183,7 @@ public class SegmentStatusChecker {
       final int nReplicasIdeal = Integer.parseInt(idealState.getReplicas());
       int nReplicasExternal = nReplicasIdeal;
       int nErrors = 0;
+      int nOffline = 0;
       for (String partitionName : idealState.getPartitionSet()) {
         int nReplicas = 0;
         int nIdeal = 0;
@@ -209,6 +212,10 @@ public class SegmentStatusChecker {
               continue;
             }
           }
+          nOffline++;
+          if (nOffline < MaxOfflineSegmentsToLog) {
+            LOGGER.warn("Segment {} of table {} has no replicas", partitionName, tableName);
+          }
           nReplicasExternal = 0;
           continue;
         }
@@ -221,6 +228,12 @@ public class SegmentStatusChecker {
             nErrors++;
           }
         }
+        if (nReplicas == 0) {
+          if (nOffline < MaxOfflineSegmentsToLog) {
+            LOGGER.warn("Segment {} of table {} has no online replicas", partitionName, tableName);
+          }
+          nOffline++;
+        }
         nReplicasExternal = (nReplicasExternal > nReplicas) ? nReplicas : nReplicasExternal;
       }
       // Synchronization provided by Controller Gauge to make sure that only one thread updates the gauge
@@ -228,6 +241,9 @@ public class SegmentStatusChecker {
           nReplicasExternal);
       _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.SEGMENTS_IN_ERROR_STATE,
           nErrors);
+      if (nOffline > 0) {
+        LOGGER.warn("Table {} has {} segments with no online replicas", tableName, nOffline);
+      }
       if (nReplicasExternal < nReplicasIdeal) {
         LOGGER.warn("Table {} has {} replicas, below replication threshold :{}", tableName,
             nReplicasExternal, nReplicasIdeal);
@@ -252,7 +268,7 @@ public class SegmentStatusChecker {
         LOGGER.info("Not the leader of this cluster, stopping Status Checker.");
       }
     } catch (Exception e) {
-      LOGGER.error("Caught exception while processing leader change for path {}", path, e);
+      LOGGER.error("Caught exception {} while processing leader change for path {}", e, path);
     }
   }
 
