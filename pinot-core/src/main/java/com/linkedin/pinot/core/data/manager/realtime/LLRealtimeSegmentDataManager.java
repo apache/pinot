@@ -350,17 +350,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
           _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1);
         }
 
-        canTakeMore = _realtimeSegment.index(transformedRow);  // Ignore the boolean return
-        if (!canTakeMore) {
-          //TODO
-          // This condition can happen when we are catching up, (due to certain failure scenarios in kafka where
-          // offsets get changed with higher generation numbers for some pinot servers but not others).
-          // Also, it may be that we push in a row into the realtime segment, but it fails to index that row
-          // for some reason., so we may end up with less number of rows in the real segment. Actually, even 0 rows.
-          // In that case, we will see an exception when generating the segment.
-          // TODO We need to come up with how the system behaves in these cases and document/handle them
-          segmentLogger.warn("We got full during indexing");
-        }
+        canTakeMore = _realtimeSegment.index(transformedRow);
       } else {
         _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1);
       }
