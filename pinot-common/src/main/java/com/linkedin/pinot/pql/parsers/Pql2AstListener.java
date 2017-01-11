@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.pql.parsers;
 
+import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.pql.parsers.pql2.ast.AstNode;
 import com.linkedin.pinot.pql.parsers.pql2.ast.BetweenPredicateAstNode;
 import com.linkedin.pinot.pql.parsers.pql2.ast.BinaryMathOpAstNode;
@@ -53,6 +55,11 @@ import org.antlr.v4.runtime.misc.NotNull;
 public class Pql2AstListener extends PQL2BaseListener {
   Stack<AstNode> _nodeStack = new Stack<>();
   AstNode _rootNode = null;
+  private String _expression;
+
+  public Pql2AstListener(String expression) {
+    _expression = expression; // Original expression being parsed.
+  }
 
   private void pushNode(AstNode node) {
     if (_rootNode == null) {
@@ -196,7 +203,8 @@ public class Pql2AstListener extends PQL2BaseListener {
 
   @Override
   public void enterFunctionCall(@NotNull PQL2Parser.FunctionCallContext ctx) {
-    pushNode(new FunctionCallAstNode(ctx.getChild(0).getText()));
+    String expression = _expression.substring(ctx.getStart().getStartIndex(), ctx.getStop().getStopIndex() + 1);
+    pushNode(new FunctionCallAstNode(ctx.getChild(0).getText(), expression));
   }
 
   @Override
@@ -226,7 +234,8 @@ public class Pql2AstListener extends PQL2BaseListener {
 
   @Override
   public void enterGroupBy(@NotNull PQL2Parser.GroupByContext ctx) {
-    pushNode(new GroupByAstNode());
+    String groupByExpression = _expression.substring(ctx.getStart().getStartIndex(), ctx.getStop().getStopIndex() + 1);
+    pushNode(new GroupByAstNode(groupByExpression));
   }
 
   @Override

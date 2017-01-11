@@ -48,7 +48,7 @@ public class Pql2Compiler implements AbstractCompiler {
       ParseTree parseTree = parser.root();
 
       ParseTreeWalker walker = new ParseTreeWalker();
-      Pql2AstListener listener = new Pql2AstListener();
+      Pql2AstListener listener = new Pql2AstListener(expression);
       walker.walk(listener, parseTree);
 
       AstNode rootNode = listener.getRootNode();
@@ -75,7 +75,7 @@ public class Pql2Compiler implements AbstractCompiler {
     ParseTree parseTree = parser.expression();
 
     ParseTreeWalker walker = new ParseTreeWalker();
-    Pql2AstListener listener = new Pql2AstListener();
+    Pql2AstListener listener = new Pql2AstListener(expression);
     walker.walk(listener, parseTree);
 
     final AstNode rootNode = listener.getRootNode();
