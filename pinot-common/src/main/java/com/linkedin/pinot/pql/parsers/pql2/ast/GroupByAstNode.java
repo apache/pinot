@@ -24,6 +24,12 @@ import com.linkedin.pinot.pql.parsers.Pql2CompilationException;
  * AST node for GROUP BY clauses.
  */
 public class GroupByAstNode extends BaseAstNode {
+  private String _expression;
+
+  public GroupByAstNode(String expression) {
+    _expression = expression;
+  }
+
   @Override
   public void updateBrokerRequest(BrokerRequest brokerRequest) {
     GroupBy groupBy = new GroupBy();
@@ -32,7 +38,8 @@ public class GroupByAstNode extends BaseAstNode {
         IdentifierAstNode node = (IdentifierAstNode) astNode;
         groupBy.addToColumns(node.getName());
       } else {
-        throw new Pql2CompilationException("Child of group by clause is not an identifier.");
+        FunctionCallAstNode functionCallAstNode = (FunctionCallAstNode) astNode;
+        groupBy.addToExpressions(functionCallAstNode.getExpression());
       }
     }
     brokerRequest.setGroupBy(groupBy);
