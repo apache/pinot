@@ -15,14 +15,21 @@
  */
 package com.linkedin.pinot.controller.validation;
 
+import com.linkedin.pinot.common.utils.helix.HelixHelper;
+import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
+import com.linkedin.pinot.controller.helix.starter.HelixConfig;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.IdealState;
@@ -96,6 +103,43 @@ public class ValidationManagerTest {
     Mockito.doNothing().when(_segmentManager).updateKafkaPartitionsIfNecessary(Mockito.any(String.class),
         Mockito.any(AbstractTableConfig.class));
     when(_segmentManager.getKafkaPartitionAssignment(anyString())).thenReturn(kafkaPartitionAssignment);
+  }
+
+  @Test
+  public void testRebuildBrokerResourceWhenBrokerAdded() throws Exception {
+    String testTableName = "testTable";
+    String partitionName = testTableName + "_OFFLINE";
+    DummyMetadata metadata = new DummyMetadata(testTableName);
+    FakeValidationMetrics validationMetrics = new FakeValidationMetrics();
+
+    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 2, true);
+    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 2, true);
+
+    String OfflineTableConfigJson = ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(testTableName, null, null,
+        "timestamp", "millsSinceEpoch", "DAYS", "5", 2, "BalanceNumSegmentAssignmentStrategy").toString();
+    AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(OfflineTableConfigJson);
+    final String ZK_SERVER = ZkStarter.DEFAULT_ZK_STR;
+    final String helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(ZK_SERVER);
+    _pinotHelixResourceManager.addTable(offlineTableConfig);
+    _pinotHelixResourceManager.addSegment(metadata, "http://dummy/");
+
+    ValidationManager validationManager = new ValidationManager(validationMetrics, _pinotHelixResourceManager, new ControllerConf(),
+        _segmentManager);
+
+    final String instanceId = "localhost_helixController";
+    final String brokerId = "Broker_localhost_0";
+    String brokerTenantName = offlineTableConfig.getTenantConfig().getBroker();
+
+    HelixManager helixZkManager = HelixSetupUtils.setup(HELIX_CLUSTER_NAME, helixZkURL, instanceId, /*isUpdateStateModel=*/false);
+    HelixAdmin helixAdmin = helixZkManager.getClusterManagmentTool();
+    IdealState idealState = mock(IdealState.class);
+    Set<String> brokerList = new HashSet<>(Collections.singletonList(brokerId));
+    // Remove the broker from the ideal state and ensure that it's rebuilt
+    when(idealState.getInstanceSet(partitionName)).thenReturn(brokerList);
+    validationManager.rebuildBrokerResourceWhenBrokerAdded(offlineTableConfig, idealState);
+    Assert.assertTrue(HelixHelper.getBrokerIdealStates(helixAdmin, HELIX_CLUSTER_NAME).getInstanceSet(partitionName).equals(
+        _pinotHelixResourceManager.getAllInstancesForBrokerTenant(brokerTenantName)));
+
   }
 
   @Test
