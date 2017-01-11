@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.segment.creator;
 
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import java.io.File;
 
 
 /**
@@ -49,4 +50,9 @@ public interface SegmentIndexCreationDriver {
    * @throws Exception
    */
   ColumnStatistics getColumnStatisticsCollector(final String columnName) throws Exception;
+
+  /**
+   * Returns the path of the output directory
+   */
+  File getOutputDirectory();
 }

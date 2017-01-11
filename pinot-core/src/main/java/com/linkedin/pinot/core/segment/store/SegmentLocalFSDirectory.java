@@ -49,12 +49,17 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     this(new File(directoryPath), metadata, readMode);
   }
 
+  SegmentLocalFSDirectory (File directory, ReadMode readMode)
+      throws IOException, ConfigurationException {
+    this(directory, loadSegmentMetadata(directory), readMode);
+  }
+
   SegmentLocalFSDirectory(File directoryFile, SegmentMetadataImpl metadata, ReadMode readMode) {
 
     Preconditions.checkNotNull(directoryFile);
     Preconditions.checkNotNull(metadata);
 
-    segmentDirectory = directoryFile;
+    segmentDirectory = getSegmentPath(directoryFile, metadata.getSegmentVersion());
     Preconditions.checkState(segmentDirectory.exists(), "Segment directory: " + directoryFile + " must exist");
 
     segmentLock = new SegmentLock();
@@ -66,6 +71,30 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
       LOGGER.error("Failed to load segment, error: ", e);
       throw new RuntimeException(e);
     }
+  }
+
+  private File getSegmentPath(File segmentDirectory, SegmentVersion segmentVersion) {
+    if (segmentVersion == SegmentVersion.v1 || segmentVersion == SegmentVersion.v2) {
+      return segmentDirectory;
+    }
+
+    if (segmentVersion == SegmentVersion.v3) {
+      if (segmentDirectory.getAbsolutePath().endsWith(SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME)) {
+        return segmentDirectory;
+      }
+      File v3SubDir = new File(segmentDirectory, SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
+      if (v3SubDir.exists()) {
+        return v3SubDir;
+      }
+      // return input path by default
+      return segmentDirectory;
+    }
+    throw new IllegalArgumentException("Unknown segment version: " + segmentVersion);
+  }
+
+  public static SegmentMetadataImpl loadSegmentMetadata(File segmentDirectory)
+      throws IOException, ConfigurationException {
+    return new SegmentMetadataImpl(segmentDirectory);
   }
 
   @Override
