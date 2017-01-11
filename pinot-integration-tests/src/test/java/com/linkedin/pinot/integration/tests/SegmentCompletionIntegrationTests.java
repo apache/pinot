@@ -27,6 +27,7 @@ import org.apache.helix.InstanceType;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
 import org.apache.helix.model.Message;
 import org.apache.helix.participant.StateMachineEngine;
 import org.apache.helix.participant.statemachine.StateModel;
@@ -45,6 +46,7 @@ import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.KafkaStarterUtils;
+import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.common.utils.ZkUtils;
@@ -132,7 +134,7 @@ public class SegmentCompletionIntegrationTests extends RealtimeClusterIntegratio
 
   // Test that if we send stoppedConsuming to the controller, the segment goes offline.
   @Test
-  public void testStopConsumingToOffline() throws  Exception {
+  public void testStopConsumingToOfflineAndAutofix() throws  Exception {
     final String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(_tableName);
     long endTime = now() + MAX_RUN_TIME_SECONDS * 1000L;
 
@@ -169,6 +171,26 @@ public class SegmentCompletionIntegrationTests extends RealtimeClusterIntegratio
     }
 
     Assert.assertTrue(now() < endTime, "Failed trying to reach offline state");
+
+    // Now call the validation manager, and the segment should fix itself
+    getControllerValidationManager().runValidation();
+
+    // Now there should be a new segment in CONSUMING state in the IDEALSTATE.
+    IdealState idealState = HelixHelper.getTableIdealState(_helixManager, realtimeTableName);
+    Assert.assertEquals(idealState.getPartitionSet().size(), 2);
+    for (String segmentId : idealState.getPartitionSet()) {
+      if (!segmentId.equals(_segmentName)) {
+        // This is a new segment. Verify that it is in CONSUMING state, and has a sequence number 1 more than prev one
+        LLCSegmentName oldSegmentName = new LLCSegmentName(_segmentName);
+        LLCSegmentName newSegmentName = new LLCSegmentName(segmentId);
+        Assert.assertEquals(newSegmentName.getSequenceNumber(), oldSegmentName.getSequenceNumber() + 1);
+        Map<String, String> instanceStateMap = idealState.getInstanceStateMap(segmentId);
+        for (String state : instanceStateMap.values()) {
+          Assert.assertTrue(state.equals(PinotHelixSegmentOnlineOfflineStateModelGenerator.CONSUMING_STATE));
+        }
+      }
+    }
+    // We will assume that it eventually makes it to externalview
   }
 
   @Override

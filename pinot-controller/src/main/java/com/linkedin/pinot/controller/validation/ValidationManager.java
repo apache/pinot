@@ -169,6 +169,8 @@ public class ValidationManager {
             LOGGER.warn("Cannot get realtime tableconfig for {}", tableName);
           } else if (streamMetadata == null) {
             LOGGER.warn("Cannot get streamconfig for {}", tableName);
+          } else {
+            LOGGER.error("Exception while validating table {}", tableName, e);
           }
         }
       } else {
