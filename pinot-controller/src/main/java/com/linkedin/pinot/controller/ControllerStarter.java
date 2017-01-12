@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.controller;
 
-import com.google.common.primitives.Longs;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -26,7 +25,6 @@ import java.util.concurrent.Executors;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
 import org.apache.helix.PreConnectCallback;
 import org.restlet.Application;
 import org.restlet.Component;
@@ -34,6 +32,7 @@ import org.restlet.Context;
 import org.restlet.data.Protocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.google.common.primitives.Longs;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
@@ -61,7 +60,7 @@ public class ControllerStarter {
   private final Application controllerRestApp;
   private final PinotHelixResourceManager helixResourceManager;
   private final RetentionManager retentionManager;
-  private final ValidationManager validationManager;
+  private ValidationManager validationManager;
   private final MetricsRegistry _metricsRegistry;
   private final PinotRealtimeSegmentManager realtimeSegmentsManager;
   private final SegmentStatusChecker segmentStatusChecker;
@@ -75,8 +74,6 @@ public class ControllerStarter {
     retentionManager = new RetentionManager(helixResourceManager, config.getRetentionControllerFrequencyInSeconds());
     _metricsRegistry = new MetricsRegistry();
     realtimeSegmentsManager = new PinotRealtimeSegmentManager(helixResourceManager);
-    ValidationMetrics validationMetrics = new ValidationMetrics(_metricsRegistry);
-    validationManager = new ValidationManager(validationMetrics, helixResourceManager, config, null);
     segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config);
     executorService = Executors.newCachedThreadPool(
         new ThreadFactoryBuilder().setNameFormat("restlet-multiget-thread-%d").build());
@@ -84,6 +81,10 @@ public class ControllerStarter {
 
   public PinotHelixResourceManager getHelixResourceManager() {
     return helixResourceManager;
+  }
+
+  public ValidationManager getValidationManager() {
+    return validationManager;
   }
 
   public void start() {
@@ -119,6 +120,8 @@ public class ControllerStarter {
       helixResourceManager.start();
       // Helix resource manager must be started in order to create PinotLLCRealtimeSegmentManager
       PinotLLCRealtimeSegmentManager.create(helixResourceManager, config, controllerMetrics);
+      ValidationMetrics validationMetrics = new ValidationMetrics(_metricsRegistry);
+      validationManager = new ValidationManager(validationMetrics, helixResourceManager, config, PinotLLCRealtimeSegmentManager.getInstance());
       LOGGER.info("Starting Pinot REST API component");
       component.start();
       LOGGER.info("Starting retention manager");

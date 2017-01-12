@@ -36,6 +36,7 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.ControllerStarter;
+import com.linkedin.pinot.controller.validation.ValidationManager;
 
 
 /**
@@ -137,6 +138,11 @@ public abstract class ControllerTest {
 
   protected void startController() {
     startController(false);
+  }
+
+  protected ValidationManager getControllerValidationManager() throws Exception {
+    assert _controllerStarter != null;
+    return _controllerStarter.getValidationManager();
   }
 
   /**
