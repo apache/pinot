@@ -137,7 +137,7 @@ public class ValidationManager {
     // Fetch the list of tables
     List<String> allTableNames = _pinotHelixResourceManager.getAllPinotTableNames();
     ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
-    HelixAdmin helixAdmin = new ZKHelixAdmin(_pinotHelixResourceManager.getHelixZkURL());
+    HelixAdmin helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
     String clusterName = _pinotHelixResourceManager.getHelixClusterName();
     IdealState brokerIdealState = HelixHelper.getBrokerIdealStates(helixAdmin, clusterName);
     for (String tableName : allTableNames) {
@@ -201,10 +201,10 @@ public class ValidationManager {
     Set<String> idealStateBrokerInstances = brokerIdealState.getInstanceSet(tableName);
 
     if(!idealStateBrokerInstances.equals(brokerTenantInstances)) {
+      LOGGER.info("Rebuilding broker resource for table {}", tableName);
       _pinotHelixResourceManager.rebuildBrokerResourceFromHelixTags(tableName);
-      LOGGER.info("Rebuilding broker resource", tableName);
     } else {
-      LOGGER.info("Broker resource does not need to be rebuilt", tableName);
+      LOGGER.info("Broker resource is not rebuilt for table {}", tableName);
     }
   }
 
