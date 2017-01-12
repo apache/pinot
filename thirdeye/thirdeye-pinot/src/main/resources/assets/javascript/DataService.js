@@ -94,7 +94,7 @@ DataService.prototype = {
     fetchAnomaliesForMetricIds : function(startTime, endTime, pageNumber, metricIds, functionName, callback) {
       var url = constants.SEARCH_ANOMALIES_METRICIDS + startTime + this.URL_SEPARATOR + endTime + this.URL_SEPARATOR + pageNumber;
       var data = {
-          metricIds : metricIds.join(),
+          metricIds : metricIds,
           functionName : functionName
       };
       this.getDataAsynchronous(url, data, callback, 'anomaly-spin-area');
@@ -112,7 +112,7 @@ DataService.prototype = {
     fetchAnomaliesForAnomalyIds : function(startTime, endTime, pageNumber, anomalyIds, functionName, callback) {
       var url = constants.SEARCH_ANOMALIES_ANOMALYIDS + startTime + this.URL_SEPARATOR + endTime + this.URL_SEPARATOR + pageNumber;
       var data = {
-          anomalyIds : anomalyIds.join(),
+          anomalyIds : anomalyIds,
           functionName : functionName
       };
       this.getDataAsynchronous(url, data, callback, 'anomaly-spin-area');

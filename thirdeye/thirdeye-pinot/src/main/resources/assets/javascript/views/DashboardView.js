@@ -18,11 +18,12 @@ DashboardView.prototype = {
   },
   init : function() {
     var self = this;
+    console.log(self.dashboardModel);
     var result = self.dashboard_template_compiled(self.dashboardModel);
 
     // autocomplete
     $("#dashboard-place-holder").html(result);
-    if(self.dashboardModel.dashboardName != null) {
+    if(HASH_SERVICE.get(HASH_PARAMS.DASHBOARD_DASHBOARD_NAME) != null) {
       $("#dashboard-content").show();
     }
     console.log("this.dashboardModel.tabSelected:" + self.dashboardModel.tabSelected);
@@ -67,7 +68,7 @@ DashboardView.prototype = {
       console.log(e);
       var args = {
         dashboardName : selectedDashboardName,
-        dashboardId : selectedDashboardId
+        summaryDashboardId : selectedDashboardId
       };
 
       if (self.dashboardModel.dashboardName != selectedDashboardName) {

@@ -12,10 +12,12 @@ function AppController() {
 
 AppController.prototype = {
   init : function() {
-    console.log("init called");
+    HASH_SERVICE.setTabControllers(this.dashboardController, this.anomalyResultController, this.analysisController);
+    console.log("App controller init ");
     this.appView.init();
     // init page routing here
     this.compileTemplates();
+    HASH_SERVICE.setHashParamsFromUrl();
     this.handleAppEvent();
   },
 
@@ -24,22 +26,19 @@ AppController.prototype = {
     tabName = HASH_SERVICE.get("tab");
     this.appModel.tabSelected = tabName;
     console.log("tabName:" + tabName);
-    var childController;
+    //var childController;
     if (tabName.startsWith("dashboard")) {
       this.appModel.tabSelected = "dashboard";
-      childController = this.dashboardController;
+      //childController = this.dashboardController;
     } else if (tabName.startsWith("anomalies")) {
       this.appModel.tabSelected = "anomalies";
-      childController = this.anomalyResultController;
+      //childController = this.anomalyResultController;
     } else if (tabName.startsWith("analysis")) {
       this.appModel.tabSelected = "analysis";
-      childController = this.analysisController;
-    } else {
-      this.appModel.tabSelected = "dashboard";
-      childController = this.dashboardController;
+      //childController = this.analysisController;
     }
     this.appView.render();
-    childController.handleAppEvent();
+    HASH_SERVICE.route();
   },
 
   compileTemplates : function() {
@@ -55,10 +54,12 @@ AppController.prototype = {
   },
 
   onTabClickEventHandler : function(sender, args) {
+    console.log('App controller onTabCLickEventHandler');
     console.log("targetTab:" + args.targetTab);
     console.log("previousTab:" + args.previousTab);
     if (args.targetTab != args.previousTab) {
       args.targetTab = args.targetTab.replace("#", "");
+      //HASH_SERVICE.clear();
       HASH_SERVICE.set("tab", args.targetTab);
       this.handleAppEvent();
     }

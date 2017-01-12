@@ -95,7 +95,6 @@ Handlebars.registerHelper('abbreviateNumber', function(value, digits) {
    if(digits == undefined){
      digits = 0;
    }
-   console.log("value:"+ value + "  digits:"+ digits);
    var num = Number(value);
     var si = [
     { value: 1E18, symbol: "e" },

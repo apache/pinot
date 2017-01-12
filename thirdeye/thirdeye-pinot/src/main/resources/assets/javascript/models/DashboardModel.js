@@ -1,7 +1,7 @@
 function DashboardModel() {
   this.dashboardName = null; // replace this with 100 Recent Anomalies
-  this.dashboardId = null;
-  this.mode = "AnomalySummary";
+  this.summaryDashboardId = null;
+  this.mode = constants.DASHBOARD_MODE_ANOMALY_SUMMARY;
 }
 
 DashboardModel.prototype = {
@@ -11,8 +11,8 @@ DashboardModel.prototype = {
       if (params.dashboardName) {
         this.dashboardName = params.dashboardName;
       }
-      if (params.dashboardId) {
-        this.dashboardId = params.dashboardId;
+      if (params.summaryDashboardId) {
+        this.summaryDashboardId = params.summaryDashboardId;
       }
       if (params.mode) {
         this.mode = params.mode;

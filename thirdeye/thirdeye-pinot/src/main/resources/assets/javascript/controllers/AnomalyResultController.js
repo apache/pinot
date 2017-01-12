@@ -12,10 +12,10 @@ function AnomalyResultController(parentController) {
 }
 
 AnomalyResultController.prototype = {
-  handleAppEvent: function (params) {
+  handleAppEvent: function () {
     console.log("Inside handle app event of AnomalyResultController");
     this.anomalyResultModel.reset();
-    this.anomalyResultModel.setParams(params);
+    this.anomalyResultModel.setParams();
     this.anomalyResultModel.rebuild();
   },
   handleAnomalyFeedbackChangeEvent: function(params) {
@@ -23,9 +23,10 @@ AnomalyResultController.prototype = {
     this.anomalyResultModel.updateAnomalyFeedback();
   },
   applyButtonEventHandler: function(sender, args) {
-    console.log("Apply button Event");
-    this.handleAppEvent(args);
-
+    console.log("Apply button Event in AnomalyResultController");
+    console.log(args);
+    HASH_SERVICE.update(args);
+    HASH_SERVICE.route();
   },
   rootCauseAnalysisButtonClickEventHandler: function (sender, args) {
     console.log("received root cause analysis button click event at AnomalyResultController");

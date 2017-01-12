@@ -194,20 +194,20 @@ AnomalyResultView.prototype = {
 
   },
   showSearchBarBasedOnMode : function() {
-    var mode = $('#anomalies-search-mode').val();
+    var anomaliesSearchMode = $('#anomalies-search-mode').val();
     $('#anomalies-search-dashboard-container').hide();
     $('#anomalies-search-anomaly-container').hide()
     $('#anomalies-search-metrics-container').hide();
     $('#anomalies-search-time-container').hide();
-    if (mode == constants.MODE_METRIC) {
+    if (anomaliesSearchMode == constants.MODE_METRIC) {
       console.log('showing metric');
       $('#anomalies-search-metrics-container').show();
-    } else if (mode == constants.MODE_DASHBOARD) {
+    } else if (anomaliesSearchMode == constants.MODE_DASHBOARD) {
       console.log('showing dashboard');
       $('#anomalies-search-dashboard-container').show();
-    } else if (mode == constants.MODE_ID) {
+    } else if (anomaliesSearchMode == constants.MODE_ID) {
       $('#anomalies-search-anomaly-container').show()
-    } else if (mode == constants.MODE_TIME) {
+    } else if (anomaliesSearchMode == constants.MODE_TIME) {
       $('#anomalies-search-time-container').show()
     }
   },
@@ -306,18 +306,18 @@ AnomalyResultView.prototype = {
   setupListenerOnApplyButton : function() {
     var self = this;
     $('#apply-button').click(function() {
-      var mode = $('#anomalies-search-mode').val();
+      var anomaliesSearchMode = $('#anomalies-search-mode').val();
       var metricIds = undefined;
       var dashboardId = undefined;
       var anomalyIds = undefined;
-      console.log('mode');
-      console.log(mode);
-      if (mode == constants.MODE_METRIC) {
-        metricIds = $('#anomalies-search-metrics-input').val();
-      } else if (mode == constants.MODE_DASHBOARD) {
+      console.log('anomaliesSearchMode');
+      console.log(anomaliesSearchMode);
+      if (anomaliesSearchMode == constants.MODE_METRIC) {
+        metricIds = $('#anomalies-search-metrics-input').val().join();
+      } else if (anomaliesSearchMode == constants.MODE_DASHBOARD) {
         dashboardId = $('#anomalies-search-dashboard-input').val();
-      } else if (mode == constants.MODE_ID) {
-        anomalyIds = $('#anomalies-search-anomaly-input').val();
+      } else if (anomaliesSearchMode == constants.MODE_ID) {
+        anomalyIds = $('#anomalies-search-anomaly-input').val().join();
         console.log(anomalyIds);
       }
 
@@ -326,7 +326,7 @@ AnomalyResultView.prototype = {
       var endDate = $('#anomalies-time-range').data('daterangepicker').endDate;
 
       var anomaliesParams = {
-        mode : mode,
+        anomaliesSearchMode : anomaliesSearchMode,
         metricIds : metricIds,
         dashboardId : dashboardId,
         anomalyIds : anomalyIds,

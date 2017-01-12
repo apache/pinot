@@ -1,5 +1,5 @@
 function MetricSummaryModel() {
-  this.dashboardId = null;
+  this.summaryDashboardId = null;
   this.dashboardName = null;
   this.previousDashboardName = null;
 
@@ -15,14 +15,15 @@ MetricSummaryModel.prototype = {
 
   },
   setParams : function(params) {
-    console.log("Set params");
+    console.log("Set params of MetricSummaryController");
+    var params = HASH_SERVICE.getParams();
     if (params != undefined) {
       console.log('params');
-      if (params['dashboardName'] != undefined) {
+      if (params[HASH_PARAMS.DASHBOARD_DASHBOARD_NAME] != undefined) {
         console.log('dashboard');
         this.previousDashboardName = this.dashboardName;
-        this.dashboardName = params['dashboardName'];
-        this.dashboardId = params['dashboardId'];
+        this.dashboardName = params[HASH_PARAMS.DASHBOARD_DASHBOARD_NAME];
+        this.summaryDashboardId = params[HASH_PARAMS.DASHBOARD_SUMMARY_DASHBOARD_ID];
       }
     }
   },

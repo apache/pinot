@@ -141,8 +141,10 @@
 var dataService = undefined;
 var constants = undefined;
 var HASH_SERVICE = undefined;
+var HASH_PARAMS = undefined;
   $(document).ready(function() {
     constants = new Constants();
+    HASH_PARAMS = new HashParams();
     dataService = new DataService();
     HASH_SERVICE = new HashService();
     HASH_SERVICE.init();

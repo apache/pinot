@@ -10,7 +10,7 @@ WoWSummaryController.prototype ={
     handleAppEvent: function(params){
       //var params = HASH_SERVICE.getParams();
       this.wowSummaryModel.reset();
-      this.wowSummaryModel.setParams(params);
+      this.wowSummaryModel.setParams();
       this.wowSummaryModel.rebuild();
     },
 

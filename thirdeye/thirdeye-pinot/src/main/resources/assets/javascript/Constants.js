@@ -18,13 +18,23 @@ function Constants() {
   this.SEARCH_ANOMALIES_TIME = '/anomalies/search/time/';
   this.UPDATE_ANOMALY_FEEDBACK = '/anomalies/updateFeedback/';
 
+  //
   this.TIMESERIES_DATE_FORMAT = 'YYYY-MM-DD HH:mm';
   this.DETAILS_DATE_FORMAT = 'MMM DD YYYY HH:mm';
 
+  // modes
   this.MODE_METRIC = 'metric';
   this.MODE_DASHBOARD = 'dashboard';
   this.MODE_ID = 'id';
   this.MODE_TIME = 'time';
+  this.DASHBOARD_MODE_METRIC_SUMMARY = 'MetricSummary';
+  this.DASHBOARD_MODE_ANOMALY_SUMMARY = 'AnomalySummary';
+  this.DASHBOARD_MODE_WOW_SUMMARY = 'WowSummary';
+
+  // tabs
+  this.TAB_DASHBOARD = 'dashboard';
+  this.TAB_ANOMALIES = 'anomalies';
+  this.TAB_ANALYSIS = 'analysis';
 
   this.FEEDBACK_STRING_CONFIRMED_ANOMALY = 'Confirmed Anomaly';
   this.FEEDBACK_STRING_FALSE_ALARM = 'False Alarm';

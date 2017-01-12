@@ -8,9 +8,9 @@ function AnomalySummaryController(parentController){
 AnomalySummaryController.prototype ={
 
     handleAppEvent: function(params){
-      //var params = HASH_SERVICE.getParams();
+      console.log('anomaly summary controller');
       this.anomalySummaryModel.reset();
-      this.anomalySummaryModel.setParams(params);
+      this.anomalySummaryModel.setParams();
       this.anomalySummaryModel.rebuild();
     },
     onDashboardInputChange: function(){
