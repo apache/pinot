@@ -78,7 +78,7 @@ public class SegmentDirectoryPaths {
     }
 
     File v3Dir = segmentDirectoryFor(indexDir, SegmentVersion.v3);
-    File v3File = new File(v3Dir, V1Constants.SEGMENT_CREATION_META);
+    File v3File = new File(v3Dir, fileName);
     if (v3File.exists()) {
       return v3File;
     }
