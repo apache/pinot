@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.client.diffsummary;
 
 import com.linkedin.thirdeye.constant.MetricAggFunction;
-import com.linkedin.thirdeye.datalayer.bao.WebappConfigManager;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import java.io.File;
 import java.io.IOException;
@@ -11,7 +10,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -31,10 +29,7 @@ import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
 import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 import com.linkedin.thirdeye.dashboard.views.diffsummary.Summary;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
-
 
 /**
  * This class generates query requests to the backend database and retrieve the data for summary algorithm.
@@ -320,8 +315,6 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
     String thirdEyeConfigDir = argList.get(lastIndex);
     String persistenceConfig = thirdEyeConfigDir + "/persistence.yml";
     DaoProviderUtil.init(new File(persistenceConfig));
-    WebappConfigManager webappConfigDAO = DaoProviderUtil
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.WebappConfigManagerImpl.class);
 
     ThirdEyeConfiguration thirdEyeConfig = new ThirdEyeDashboardConfiguration();
     thirdEyeConfig.setWhitelistCollections(collection);

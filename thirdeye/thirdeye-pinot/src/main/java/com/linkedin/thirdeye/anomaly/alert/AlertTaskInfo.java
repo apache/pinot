@@ -70,16 +70,16 @@ public class AlertTaskInfo implements TaskInfo {
     return alertConfig;
   }
 
-  public void setAlertConfig(EmailConfigurationDTO alertConfig) {
-    this.alertConfig = alertConfig;
+  public void setAlertConfig(EmailConfigurationDTO emailConfig) {
+    this.alertConfig = emailConfig;
   }
 
   public AlertConfigDTO getAlertConfigDTO() {
     return alertConfigDTO;
   }
 
-  public void setAlertConfigDTO(AlertConfigDTO alertConfigDTO) {
-    this.alertConfigDTO = alertConfigDTO;
+  public void setAlertConfigDTO(AlertConfigDTO alertConfig) {
+    this.alertConfigDTO = alertConfig;
   }
 
   @Override
@@ -102,7 +102,6 @@ public class AlertTaskInfo implements TaskInfo {
   @Override
   public String toString() {
     return MoreObjects.toStringHelper(this).add("jobExecutionId", jobExecutionId)
-        .add("windowStartTime", windowStartTime).add("windowEndTime", windowEndTime)
-        .add("alertConfig", alertConfig).toString();
+        .add("windowStartTime", windowStartTime).add("windowEndTime", windowEndTime).toString();
   }
 }

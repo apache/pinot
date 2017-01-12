@@ -1,21 +1,30 @@
-package com.linkedin.thirdeye.anomaly.alert;
+package com.linkedin.thirdeye.anomaly.alert.v2;
 
+import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
+import com.linkedin.thirdeye.anomaly.alert.AlertTaskInfo;
+import com.linkedin.thirdeye.anomaly.alert.AlertTaskRunner;
 import com.linkedin.thirdeye.anomaly.alert.template.pojo.MetricDimensionReport;
 import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import com.linkedin.thirdeye.anomaly.alert.util.EmailHelper;
+import com.linkedin.thirdeye.anomaly.task.TaskContext;
+import com.linkedin.thirdeye.anomaly.task.TaskInfo;
+import com.linkedin.thirdeye.anomaly.task.TaskResult;
+import com.linkedin.thirdeye.anomaly.task.TaskRunner;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewResponse;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
+import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterType;
+import freemarker.template.TemplateMethodModelEx;
+import freemarker.template.TemplateModelException;
+import freemarker.template.TemplateNumberModel;
 import java.io.ByteArrayOutputStream;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -23,7 +32,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 import java.util.TreeMap;
-
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
@@ -35,36 +43,19 @@ import org.quartz.JobExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import com.linkedin.thirdeye.anomaly.task.TaskContext;
-import com.linkedin.thirdeye.anomaly.task.TaskInfo;
-import com.linkedin.thirdeye.anomaly.task.TaskResult;
-import com.linkedin.thirdeye.anomaly.task.TaskRunner;
-import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-
-import freemarker.template.Configuration;
-import freemarker.template.Template;
-import freemarker.template.TemplateExceptionHandler;
-import freemarker.template.TemplateMethodModelEx;
-import freemarker.template.TemplateModelException;
-import freemarker.template.TemplateNumberModel;
-
 import static com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper.FILTER_TYPE_KEY;
 
-public class AlertTaskRunner implements TaskRunner {
+public class AlertTaskRunnerV2 implements TaskRunner {
 
   private static final Logger LOG = LoggerFactory.getLogger(AlertTaskRunner.class);
   private static final String DIMENSION_VALUE_SEPARATOR = ", ";
   private static final String EQUALS = "=";
 
-  private static final DAORegistry daoRegistry = DAORegistry.getInstance();
-
   private final MergedAnomalyResultManager anomalyMergedResultDAO;
-  private final EmailConfigurationManager emailConfigurationDAO;
+  private final AlertConfigManager alertConfigDAO;
 
-  private EmailConfigurationDTO alertConfig;
+  private AlertConfigDTO alertConfig;
+  private AlertConfigDTO alertConfigDTO;
   private DateTime windowStart;
   private DateTime windowEnd;
   private ThirdEyeAnomalyConfiguration thirdeyeConfig;
@@ -72,18 +63,18 @@ public class AlertTaskRunner implements TaskRunner {
   public static final TimeZone DEFAULT_TIME_ZONE = TimeZone.getTimeZone("America/Los_Angeles");
   public static final String CHARSET = "UTF-8";
   public static final String DECIMAL_FORMATTER = "%+.1f";
-  public static final String OVER_ALL = "OverAll";
+  public static final String ALL = "All";
 
-  public AlertTaskRunner() {
-    anomalyMergedResultDAO = daoRegistry.getMergedAnomalyResultDAO();
-    emailConfigurationDAO = daoRegistry.getEmailConfigurationDAO();
+  public AlertTaskRunnerV2() {
+    anomalyMergedResultDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
+    alertConfigDAO = DAORegistry.getInstance().getAlertConfigDAO();
   }
 
   @Override
   public List<TaskResult> execute(TaskInfo taskInfo, TaskContext taskContext) throws Exception {
-    AlertTaskInfo alertTaskInfo = (AlertTaskInfo) taskInfo;
     List<TaskResult> taskResult = new ArrayList<>();
-    alertConfig = alertTaskInfo.getAlertConfig();
+    AlertTaskInfo alertTaskInfo = (AlertTaskInfo) taskInfo;
+    alertConfig = alertTaskInfo.getAlertConfigDTO();
     windowStart = alertTaskInfo.getWindowStartTime();
     windowEnd = alertTaskInfo.getWindowEndTime();
     thirdeyeConfig = taskContext.getThirdEyeAnomalyConfiguration();
@@ -100,10 +91,11 @@ public class AlertTaskRunner implements TaskRunner {
     return taskResult;
   }
 
+  // TODO : separate code path for new vs old alert config !
   private void runTask() throws Exception {
     LOG.info("Starting email report {}", alertConfig.getId());
 
-    final String collection = alertConfig.getCollection();
+    final String collection = ""; //alertConfig.getCollection();
 
     // Get the anomalies in that range
     final List<MergedAnomalyResultDTO> allResults = anomalyMergedResultDAO
@@ -113,7 +105,7 @@ public class AlertTaskRunner implements TaskRunner {
     // apply filtration rule
     List<MergedAnomalyResultDTO> results = applyFiltrationRule(allResults);
 
-    if (results.isEmpty() && !alertConfig.isSendZeroAnomalyEmail()) {
+    if (results.isEmpty() && !alertConfig.getEmailConfig().isSendAlertOnZeroAnomaly()) {
       LOG.info("Zero anomalies found, skipping sending email");
       return;
     }
@@ -215,11 +207,11 @@ public class AlertTaskRunner implements TaskRunner {
     }
 
     DateTimeZone timeZone = DateTimeZone.forTimeZone(DEFAULT_TIME_ZONE);
-    DateFormatMethod dateFormatMethod = new DateFormatMethod(timeZone);
+    AlertTaskRunnerV2.DateFormatMethod dateFormatMethod = new AlertTaskRunnerV2.DateFormatMethod(timeZone);
 
     HtmlEmail email = new HtmlEmail();
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
-
+/*
     try (Writer out = new OutputStreamWriter(baos, CHARSET)) {
       Configuration freemarkerConfig = new Configuration(Configuration.VERSION_2_3_21);
       freemarkerConfig.setClassForTemplateLoading(getClass(), "/com/linkedin/thirdeye/detector/");
@@ -262,24 +254,24 @@ public class AlertTaskRunner implements TaskRunner {
       template.process(templateData, out);
     } catch (Exception e) {
       throw new JobExecutionException(e);
-    }
+    }*/
 
     // Send email
     try {
       String alertEmailSubject;
       if (results.size() > 0) {
-      String anomalyString = (results.size() == 1) ? "anomaly" : "anomalies";
-        alertEmailSubject = String
-            .format("Thirdeye: %s: %s - %d %s detected", alertConfig.getMetric(), collectionAlias,
-                results.size(), anomalyString);
+        String anomalyString = (results.size() == 1) ? "anomaly" : "anomalies";
+//        alertEmailSubject = String
+//            .format("Thirdeye: %s: %s - %d %s detected", alertConfig.getMetric(), collectionAlias,
+//                results.size(), anomalyString);
       } else {
-        alertEmailSubject = String
-            .format("Thirdeye data report : %s: %s", alertConfig.getMetric(), collectionAlias);
+//        alertEmailSubject = String
+//            .format("Thirdeye data report : %s: %s", alertConfig.getMetric(), collectionAlias);
       }
 
       String alertEmailHtml = new String(baos.toByteArray(), CHARSET);
-      EmailHelper.sendEmailWithHtml(email, thirdeyeConfig.getSmtpConfiguration(), alertEmailSubject,
-          alertEmailHtml, alertConfig.getFromAddress(), alertConfig.getToAddresses());
+//      EmailHelper.sendEmailWithHtml(email, thirdeyeConfig.getSmtpConfiguration(), alertEmailSubject,
+//          alertEmailHtml, alertConfig.getFromAddress(), alertConfig.getToAddresses());
     } catch (Exception e) {
       throw new JobExecutionException(e);
     }
@@ -291,8 +283,8 @@ public class AlertTaskRunner implements TaskRunner {
         anomalyId = anomalyResultDTO.getId();
       }
     }
-    alertConfig.setLastNotifiedAnomalyId(anomalyId);
-    emailConfigurationDAO.update(alertConfig);
+//    alertConfig.setLastNotifiedAnomalyId(anomalyId);
+//    emailConfigurationDAO.update(alertConfig);
 
     LOG.info("Sent email with {} anomalies! {}", results.size(), alertConfig);
   }
@@ -322,7 +314,7 @@ public class AlertTaskRunner implements TaskRunner {
       // Lets populate 'OverAll' contribution
       Map<String, String> overAllValueMap = new LinkedHashMap<>();
       populateOverAllValuesMap(report, overAllValueMap);
-      dimensionValueMap.put(OVER_ALL, overAllValueMap);
+      dimensionValueMap.put(ALL + " " + groupByDimension, overAllValueMap);
 
       Map<String, Map<String, String>> dimensionValueMapUnordered = new HashMap<>();
 
@@ -384,8 +376,8 @@ public class AlertTaskRunner implements TaskRunner {
       totalBaseline += entry.getValue();
     }
     // set value for overall as a sub-dimension
-    shareMap.put(OVER_ALL, "100");
-    totalMap.put(OVER_ALL,
+    shareMap.put(ALL + " " + dimension, "100");
+    totalMap.put(ALL + " " + dimension,
         String.format(DECIMAL_FORMATTER, computePercentage(totalBaseline, totalCurrent)));
 
     for (Map.Entry<String, Double> entry : currentValueMap.entrySet()) {
@@ -505,8 +497,8 @@ public class AlertTaskRunner implements TaskRunner {
 
   private void sendFailureEmail(Throwable t) throws JobExecutionException {
     HtmlEmail email = new HtmlEmail();
-    String collection = alertConfig.getCollection();
-    String metric = alertConfig.getMetric();
+    String collection = ""; //alertConfig.getCollection();
+    String metric = "";//alertConfig.getMetric();
 
     String subject = String
         .format("[ThirdEye Anomaly Detector] FAILED ALERT ID=%d (%s:%s)", alertConfig.getId(),

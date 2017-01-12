@@ -15,7 +15,6 @@ import com.linkedin.thirdeye.datalayer.bao.jdbc.MetricConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.OverrideConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.RawAnomalyResultManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.TaskManagerImpl;
-import com.linkedin.thirdeye.datalayer.bao.jdbc.WebappConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 
@@ -59,7 +58,6 @@ public abstract class AbstractManagerTestBase {
   protected TaskManager taskDAO;
   protected EmailConfigurationManager emailConfigurationDAO;
   protected MergedAnomalyResultManager mergedResultDAO;
-  protected WebappConfigManager webappConfigDAO;
   protected DatasetConfigManager datasetConfigDAO;
   protected MetricConfigManager metricConfigDAO;
   protected DashboardConfigManager dashboardConfigDAO;
@@ -143,7 +141,6 @@ public abstract class AbstractManagerTestBase {
     taskDAO = managerProvider.getInstance(TaskManagerImpl.class);
     emailConfigurationDAO = managerProvider.getInstance(EmailConfigurationManagerImpl.class);
     mergedResultDAO = managerProvider.getInstance(MergedAnomalyResultManagerImpl.class);
-    webappConfigDAO = managerProvider.getInstance(WebappConfigManagerImpl.class);
     datasetConfigDAO = managerProvider.getInstance(DatasetConfigManagerImpl.class);
     metricConfigDAO = managerProvider.getInstance(MetricConfigManagerImpl.class);
     dashboardConfigDAO = managerProvider.getInstance(DashboardConfigManagerImpl.class);

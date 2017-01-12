@@ -30,7 +30,6 @@ import com.linkedin.thirdeye.datalayer.entity.MergedAnomalyResultIndex;
 import com.linkedin.thirdeye.datalayer.entity.MetricConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.RawAnomalyResultIndex;
 import com.linkedin.thirdeye.datalayer.entity.TaskIndex;
-import com.linkedin.thirdeye.datalayer.entity.WebappConfigIndex;
 
 public abstract class DaoProviderUtil {
 
@@ -106,8 +105,6 @@ public abstract class DaoProviderUtil {
             convertCamelCaseToUnderscore(TaskIndex.class.getSimpleName()));
         entityMappingHolder.register(conn, EmailConfigurationIndex.class,
             convertCamelCaseToUnderscore(EmailConfigurationIndex.class.getSimpleName()));
-        entityMappingHolder.register(conn, WebappConfigIndex.class,
-            convertCamelCaseToUnderscore(WebappConfigIndex.class.getSimpleName()));
         entityMappingHolder.register(conn, DatasetConfigIndex.class,
             convertCamelCaseToUnderscore(DatasetConfigIndex.class.getSimpleName()));
         entityMappingHolder.register(conn, MetricConfigIndex.class,

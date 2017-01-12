@@ -1,10 +1,12 @@
 package com.linkedin.thirdeye.anomaly.alert;
 
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.linkedin.thirdeye.anomaly.job.JobContext;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class AlertJobContext extends JobContext {
 
   private Long alertConfigId;
