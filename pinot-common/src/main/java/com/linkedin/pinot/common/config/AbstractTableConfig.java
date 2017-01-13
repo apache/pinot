@@ -15,10 +15,11 @@
  */
 package com.linkedin.pinot.common.config;
 
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-
+import javax.annotation.Nullable;
 import org.apache.helix.ZNRecord;
 import org.codehaus.jackson.JsonGenerationException;
 import org.codehaus.jackson.JsonNode;
@@ -31,8 +32,6 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
-
 
 public abstract class AbstractTableConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(AbstractTableConfig.class);
@@ -43,12 +42,12 @@ public abstract class AbstractTableConfig {
   protected SegmentsValidationAndRetentionConfig validationConfig;
   protected TenantConfig tenantConfig;
   protected TableCustomConfig customConfigs;
-  protected final QuotaConfig quotaConfig;
+  protected final @Nullable QuotaConfig quotaConfig;
 
   protected AbstractTableConfig(String tableName, String tableType,
       SegmentsValidationAndRetentionConfig validationConfig,
       TenantConfig tenantConfig, TableCustomConfig customConfigs,
-      QuotaConfig quotaConfig) {
+      @Nullable QuotaConfig quotaConfig) {
     this.tableName = new TableNameBuilder(TableType.valueOf(tableType.toUpperCase())).forTable(tableName);
     this.tableType = tableType;
     this.validationConfig = validationConfig;
@@ -190,7 +189,7 @@ public abstract class AbstractTableConfig {
 
   public abstract IndexingConfig getIndexingConfig();
 
-  public QuotaConfig getQuotaConfig() {
+  public @Nullable QuotaConfig getQuotaConfig() {
     return quotaConfig;
   }
 
@@ -202,9 +201,11 @@ public abstract class AbstractTableConfig {
     result.append("tenant : " + tenantConfig.toString() + " \n");
     result.append("segments : " + validationConfig.toString() + "\n");
     result.append("customConfigs : " + customConfigs.toString() + "\n");
-    result.append("quota : " + quotaConfig.toString() + "\n");
+    if (quotaConfig != null) {
+      result.append("quota : " + quotaConfig.toString() + "\n");
+    }
     return result.toString();
   }
 
-  public abstract JSONObject toJSON() throws JSONException, JsonGenerationException, JsonMappingException, IOException;
+  public abstract JSONObject toJSON() throws JSONException, IOException;
 }

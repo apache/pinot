@@ -16,9 +16,7 @@
 package com.linkedin.pinot.common.config;
 
 import java.io.IOException;
-
-import org.codehaus.jackson.JsonGenerationException;
-import org.codehaus.jackson.map.JsonMappingException;
+import javax.annotation.Nullable;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -30,7 +28,7 @@ public class OfflineTableConfig extends AbstractTableConfig {
 
   protected OfflineTableConfig(String tableName, String tableType,
       SegmentsValidationAndRetentionConfig validationConfig, TenantConfig tenantConfig,
-      TableCustomConfig customConfigs, IndexingConfig indexConfig, QuotaConfig quotaConfig) {
+      TableCustomConfig customConfigs, IndexingConfig indexConfig, @Nullable QuotaConfig quotaConfig) {
     super(tableName, tableType, validationConfig, tenantConfig, customConfigs, quotaConfig);
     this.indexConfig = indexConfig;
   }
@@ -52,7 +50,7 @@ public class OfflineTableConfig extends AbstractTableConfig {
   }
 
   @Override
-  public JSONObject toJSON() throws JSONException, JsonGenerationException, JsonMappingException, IOException {
+  public JSONObject toJSON() throws JSONException, IOException {
     JSONObject ret = new JSONObject();
     ret.put("tableName", tableName);
     ret.put("tableType", tableType);
@@ -60,7 +58,9 @@ public class OfflineTableConfig extends AbstractTableConfig {
     ret.put("tenants", new JSONObject(new ObjectMapper().writeValueAsString(tenantConfig)));
     ret.put("tableIndexConfig", new JSONObject(new ObjectMapper().writeValueAsString(indexConfig)));
     ret.put("metadata", new JSONObject(new ObjectMapper().writeValueAsString(customConfigs)));
-    ret.put("quota", new JSONObject(new ObjectMapper().writeValueAsString(quotaConfig)));
+    if (quotaConfig != null) {
+      ret.put("quota", new JSONObject(new ObjectMapper().writeValueAsString(quotaConfig)));
+    }
     return ret;
   }
 }
