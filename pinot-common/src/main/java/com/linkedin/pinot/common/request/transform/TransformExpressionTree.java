@@ -33,7 +33,7 @@ import java.util.List;
 public class TransformExpressionTree {
   private final String _column;
   private final String _literal;
-  private final TransformFunction _transform;
+  private final String _transformName;
   private final List<TransformExpressionTree> _children;
 
   /**
@@ -47,7 +47,7 @@ public class TransformExpressionTree {
       List<TransformExpressionTree> children) {
     _column = column;
     _literal = literal;
-    _transform = (transformName != null) ? TransformFunctionFactory.get(transformName) : null;
+    _transformName = transformName;
     _children = children;
 
   }
@@ -105,8 +105,8 @@ public class TransformExpressionTree {
    * Getter for transform function name.
    * @return transform function name
    */
-  public TransformFunction getTransform() {
-    return _transform;
+  public String getTransformName() {
+    return _transformName;
   }
 
   /**

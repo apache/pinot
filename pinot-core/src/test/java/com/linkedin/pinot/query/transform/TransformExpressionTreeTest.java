@@ -16,8 +16,8 @@
 package com.linkedin.pinot.query.transform;
 
 import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
-import com.linkedin.pinot.common.request.transform.TransformFunction;
-import com.linkedin.pinot.common.request.transform.TransformFunctionFactory;
+import com.linkedin.pinot.core.operator.transform.function.TransformFunction;
+import com.linkedin.pinot.core.operator.transform.function.TransformFunctionFactory;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import com.linkedin.pinot.pql.parsers.pql2.ast.AstNode;
 import java.util.List;
@@ -42,20 +42,20 @@ public class TransformExpressionTreeTest {
     String expression = "foo(bar('a', foo(b, 'c', d)), e)";
     TransformExpressionTree expressionTree = compiler.compileToExpressionTree(expression);
 
-    TransformFunction rootTransform = expressionTree.getTransform();
+    TransformFunction rootTransform = TransformFunctionFactory.get(expressionTree.getTransformName());
     Assert.assertEquals(rootTransform.getName(), "foo");
 
     List<TransformExpressionTree> firstChildren = expressionTree.getChildren();
     Assert.assertEquals(firstChildren.size(), 2);
 
     TransformExpressionTree firstChild = firstChildren.get(0);
-    Assert.assertEquals(firstChild.getTransform().getName(), "bar");
+    Assert.assertEquals(firstChild.getTransformName(), "bar");
     Assert.assertEquals(firstChildren.get(1).getColumn(), "e");
 
     List<TransformExpressionTree> secondChildren = firstChild.getChildren();
     Assert.assertEquals(secondChildren.size(), 2);
     Assert.assertEquals(secondChildren.get(0).getLiteral(), "a");
-    Assert.assertEquals(secondChildren.get(1).getTransform().getName(), "foo");
+    Assert.assertEquals(secondChildren.get(1).getTransformName(), "foo");
 
     List<TransformExpressionTree> thirdChildren = secondChildren.get(1).getChildren();
     Assert.assertEquals(thirdChildren.get(0).getColumn(), "b");

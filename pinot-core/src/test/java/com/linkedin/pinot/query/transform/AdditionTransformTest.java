@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.query.transform;
 
-import com.linkedin.pinot.common.request.transform.TransformFunction;
+import com.linkedin.pinot.core.operator.transform.function.TransformFunction;
 import com.linkedin.pinot.core.operator.transform.function.AdditionTransform;
 import java.util.Random;
 import org.testng.Assert;

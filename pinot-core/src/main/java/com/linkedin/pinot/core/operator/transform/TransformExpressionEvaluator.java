@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.operator.transform;
 
-import com.linkedin.pinot.common.request.transform.result.TransformResult;
+import com.linkedin.pinot.core.operator.transform.result.TransformResult;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
 
 

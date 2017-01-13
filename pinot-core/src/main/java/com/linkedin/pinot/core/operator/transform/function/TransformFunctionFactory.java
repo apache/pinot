@@ -13,9 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.common.request.transform;
+package com.linkedin.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.Utils;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nonnull;
@@ -29,7 +30,7 @@ import org.slf4j.LoggerFactory;
 public class TransformFunctionFactory {
   private static final Logger LOGGER = LoggerFactory.getLogger(TransformFunctionFactory.class);
 
-  private static final Map<String, TransformFunction> TRANSFORM_FUNCTION_MAP = new HashMap<>();
+  private static final Map<String, Class<TransformFunction>> TRANSFORM_FUNCTION_MAP = new HashMap<>();
   private static boolean _inited = false;
 
   /**
@@ -59,7 +60,7 @@ public class TransformFunctionFactory {
 
         Class<TransformFunction> functionClass = (Class<TransformFunction>) Class.forName(functionName);
         TransformFunction transformFunction = functionClass.newInstance();
-        TRANSFORM_FUNCTION_MAP.put(transformFunction.getName().toLowerCase(), transformFunction);
+        TRANSFORM_FUNCTION_MAP.put(transformFunction.getName().toLowerCase(), functionClass);
       } catch (ClassNotFoundException e) {
         LOGGER.error("Could not find class for transform function '{}'", functionName, e);
       } catch (InstantiationException e) {
@@ -74,13 +75,29 @@ public class TransformFunctionFactory {
 
   /**
    * Returns an instance of TransformFunction for the given name. Returns null if
-   * function name was not found, is null, or could not instantiate the class.
+   * function name was not found.
    *
    * @param functionName Transform function name
    * @return TransformFunction for the given functionName
    */
   public static TransformFunction get(@Nonnull String functionName) {
     Preconditions.checkState(_inited, "TransformFunctionFactory not initialized.");
-    return TRANSFORM_FUNCTION_MAP.get(functionName.toLowerCase());
+    Class<TransformFunction> transformFunctionClass = TRANSFORM_FUNCTION_MAP.get(functionName.toLowerCase());
+    if (transformFunctionClass == null) {
+      return null;
+    }
+
+    TransformFunction transformFunction = null;
+    try {
+      transformFunction = transformFunctionClass.newInstance();
+    } catch (InstantiationException e) {
+      LOGGER.error("Could not instantiate class for transform function '{}", functionName, e);
+      Utils.rethrowException(e);
+    } catch (IllegalAccessException e) {
+      LOGGER.error("Could not access members of class for transform function '{}", functionName, e);
+      Utils.rethrowException(e);
+    }
+
+    return transformFunction;
   }
 }

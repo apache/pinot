@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.common.request.transform;
+package com.linkedin.pinot.core.operator.transform.function;
 
-import com.linkedin.pinot.common.request.transform.result.TransformResult;
+import com.linkedin.pinot.core.operator.transform.result.TransformResult;
 
 
 /**

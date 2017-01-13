@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.operator.blocks;
 
-import com.linkedin.pinot.common.request.transform.result.TransformResult;
+import com.linkedin.pinot.core.operator.transform.result.TransformResult;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
