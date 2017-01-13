@@ -6,6 +6,9 @@ function DashboardController(parentController) {
   this.metricSummaryController = new MetricSummaryController(this);
   this.anomalySummaryController = new AnomalySummaryController(this);
   this.wowSummaryController = new WoWSummaryController(this);
+  HASH_SERVICE.registerController('metricSummary', this.metricSummaryController);
+  HASH_SERVICE.registerController('anomalySummary', this.anomalySummaryController);
+  HASH_SERVICE.registerController('wowSummary', this.wowSummaryController);
 
   this.dashboardView.tabClickEvent.attach(this.onSubTabSelectionEventHandler.bind(this));
   this.dashboardView.onDashboardSelectionEvent.attach(this.onDashboardSelectionEventHandler.bind(this));
@@ -19,50 +22,23 @@ DashboardController.prototype = {
 
   handleAppEvent : function() {
     console.log("DashboardController.handleAppEvent");
-    //tabName = HASH_SERVICE.get("tab");
     mode = HASH_SERVICE.get(HASH_PARAMS.DASHBOARD_MODE);
     console.log("tabName:" + tabName + " mode: " + mode);
-    var childController;
-    /*if (tabName.startsWith("dashboard_metric-summary-tab")) {
-      this.dashboardModel.tabSelected = "dashboard_metric-summary-tab";
-      this.dashboardModel.mode = 'MetricSummary';
-      childController = this.metricSummaryController;
-    } else if (tabName.startsWith("dashboard_anomaly-summary-tab")) {
-      this.dashboardModel.tabSelected = "dashboard_anomaly-summary-tab";
-      this.dashboardModel.mode = 'AnomalySummary';
-      childController = this.anomalySummaryController;
-    } else if (tabName.startsWith("dashboard_wow-summary-tab")) {
-      this.dashboardModel.tabSelected = "dashboard_wow-summary-tab";
-      this.dashboardModel.mode = 'WowSummary';
-      childController = this.wowSummaryController;
-    } else {
-      this.dashboardModel.tabSelected = "dashboard_metric-summary-tab";
-      childController = this.metricSummaryController;
-    }*/
+    var controllerName;
     if (mode == constants.DASHBOARD_MODE_METRIC_SUMMARY) {
       this.dashboardModel.tabSelected = "dashboard_metric-summary-tab";
-      //this.dashboardModel.mode = 'MetricSummary';
-      childController = this.metricSummaryController;
+      controllerName = 'metricSummary';
     } else if (mode == constants.DASHBOARD_MODE_ANOMALY_SUMMARY) {
       this.dashboardModel.tabSelected = "dashboard_anomaly-summary-tab";
-      //this.dashboardModel.mode = 'AnomalySummary';
-      childController = this.anomalySummaryController;
+      controllerName = 'anomalySummary';
     } else if (mode == constants.DASHBOARD_MODE_WOW_SUMMARY) {
       this.dashboardModel.tabSelected = "dashboard_wow-summary-tab";
-      //this.dashboardModel.mode = 'WowSummary';
-      childController = this.wowSummaryController;
+      controllerName = 'wowSummary';
     }
     this.dashboardModel.dashboardName = HASH_SERVICE.get(HASH_PARAMS.DASHBOARD_DASHBOARD_NAME);
     this.dashboardModel.summaryDashboardId = HASH_SERVICE.get(HASH_PARAMS.DASHBOARD_SUMMARY_DASHBOARD_ID);
     this.dashboardView.render();
-    console.log('Sending to child controller');
-    console.log(childController);
-    //var args = {
-    //    dashboardName : this.dashboardModel.dashboardName,
-    //    dashboardId : this.dashboardModel.dashboardId,
-    //    dashboardMode : this.dashboardModel.mode
-    //};
-    childController.handleAppEvent();
+    HASH_SERVICE.routeTo(controllerName);
   },
 
   onSubTabSelectionEventHandler : function(sender, args) {
@@ -83,16 +59,13 @@ DashboardController.prototype = {
     }
     this.dashboardModel.mode = mode;
     HASH_SERVICE.set(HASH_PARAMS.DASHBOARD_MODE, mode);
-    HASH_SERVICE.route();
+    HASH_SERVICE.routeTo('dashboard');
   },
 
   onDashboardSelectionEventHandler : function(sender, args) {
     console.log('dashboard selection event handler');
     HASH_SERVICE.update(args);
-    //this.dashboardModel.dashboardName = args.dashboardName;
-    //this.dashboardModel.dashboardId = args.dashboardId;
-    //this.handleAppEvent();
-    HASH_SERVICE.route();
+    HASH_SERVICE.routeTo('dashboard');
   }
 
 };

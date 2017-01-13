@@ -3,6 +3,10 @@ function AppController() {
   this.dashboardController = new DashboardController(this);
   this.anomalyResultController = new AnomalyResultController(this);
   this.analysisController = new AnalysisController(this);
+  HASH_SERVICE.registerController('dashboard', this.dashboardController);
+  HASH_SERVICE.registerController('anomalies', this.anomalyResultController);
+  HASH_SERVICE.registerController('analysis', this.analysisController);
+
   this.appModel = new AppModel();
   this.appView = new AppView(this.appModel);
 
@@ -12,33 +16,30 @@ function AppController() {
 
 AppController.prototype = {
   init : function() {
-    HASH_SERVICE.setTabControllers(this.dashboardController, this.anomalyResultController, this.analysisController);
     console.log("App controller init ");
     this.appView.init();
-    // init page routing here
     this.compileTemplates();
     HASH_SERVICE.setHashParamsFromUrl();
-    this.handleAppEvent();
   },
 
   handleAppEvent : function() {
-    console.log("In AppController.handleAppEvent");
-    tabName = HASH_SERVICE.get("tab");
+    console.log('In AppController.handleAppEvent');
+    tabName = HASH_SERVICE.get('tab');
     this.appModel.tabSelected = tabName;
-    console.log("tabName:" + tabName);
-    //var childController;
-    if (tabName.startsWith("dashboard")) {
-      this.appModel.tabSelected = "dashboard";
-      //childController = this.dashboardController;
-    } else if (tabName.startsWith("anomalies")) {
-      this.appModel.tabSelected = "anomalies";
-      //childController = this.anomalyResultController;
-    } else if (tabName.startsWith("analysis")) {
-      this.appModel.tabSelected = "analysis";
-      //childController = this.analysisController;
+    console.log('tabName:' + tabName);
+    var controllerName = 'anomalies';
+    if (tabName.startsWith('dashboard')) {
+      this.appModel.tabSelected = 'dashboard';
+      controllerName = 'dashboard';
+    } else if (tabName.startsWith('anomalies')) {
+      this.appModel.tabSelected = 'anomalies';
+      controllerName = 'anomalies';
+    } else if (tabName.startsWith('analysis')) {
+      this.appModel.tabSelected = 'analysis';
+      controllerName = 'analysis';
     }
     this.appView.render();
-    HASH_SERVICE.route();
+    HASH_SERVICE.routeTo(controllerName);
   },
 
   compileTemplates : function() {
@@ -59,9 +60,8 @@ AppController.prototype = {
     console.log("previousTab:" + args.previousTab);
     if (args.targetTab != args.previousTab) {
       args.targetTab = args.targetTab.replace("#", "");
-      //HASH_SERVICE.clear();
       HASH_SERVICE.set("tab", args.targetTab);
-      this.handleAppEvent();
+      HASH_SERVICE.routeTo('app');
     }
   }
 };

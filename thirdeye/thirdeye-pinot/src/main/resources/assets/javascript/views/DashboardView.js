@@ -61,11 +61,8 @@ DashboardView.prototype = {
     }).on("select2:select", function(e) {
       var selectedElement = $(e.currentTarget);
       var selectedData = selectedElement.select2("data")[0];
-      console.log("Selected data:" + JSON.stringify(selectedData))
       var selectedDashboardName = selectedData.text;
       var selectedDashboardId = selectedData.id;
-      console.log('You selected: ' + selectedDashboardName);
-      console.log(e);
       var args = {
         dashboardName : selectedDashboardName,
         summaryDashboardId : selectedDashboardId
