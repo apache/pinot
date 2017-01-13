@@ -15,9 +15,10 @@
  */
 package com.linkedin.pinot.query.transform;
 
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.transform.function.TransformFunction;
 import com.linkedin.pinot.core.operator.transform.function.TransformFunctionFactory;
-import com.linkedin.pinot.core.operator.transform.result.TransformResult;
 import junit.framework.Assert;
 import org.testng.annotations.Test;
 
@@ -53,7 +54,12 @@ public class TransformFunctionFactoryTest {
   public static class foo implements TransformFunction {
 
     @Override
-    public TransformResult transform(int length, Object... input) {
+    public <T> T transform(int length, BlockValSet... input) {
+      return null;
+    }
+
+    @Override
+    public FieldSpec.DataType getOutputType() {
       return null;
     }
 
@@ -69,7 +75,12 @@ public class TransformFunctionFactoryTest {
   public static class bar implements TransformFunction {
 
     @Override
-    public TransformResult transform(int length, Object... input) {
+    public <T> T transform(int length, BlockValSet... input) {
+      return null;
+    }
+
+    @Override
+    public FieldSpec.DataType getOutputType() {
       return null;
     }
 

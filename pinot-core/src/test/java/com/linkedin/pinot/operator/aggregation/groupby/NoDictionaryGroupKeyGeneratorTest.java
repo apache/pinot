@@ -18,6 +18,7 @@ package com.linkedin.pinot.operator.aggregation.groupby;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.data.GenericRow;
@@ -31,8 +32,9 @@ import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.aggregation.groupby.AggregationGroupByTrimmingService;
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupKeyGenerator;
 import com.linkedin.pinot.core.operator.aggregation.groupby.NoDictionaryGroupKeyGenerator;
-import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
+import com.linkedin.pinot.core.operator.blocks.TransformBlock;
 import com.linkedin.pinot.core.operator.filter.MatchEntireSegmentOperator;
+import com.linkedin.pinot.core.operator.transform.TransformExpressionOperator;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
@@ -88,13 +90,15 @@ public class NoDictionaryGroupKeyGeneratorTest {
     BReusableFilteredDocIdSetOperator docIdSetOperator =
         new BReusableFilteredDocIdSetOperator(matchEntireSegmentOperator, NUM_ROWS, 10000);
     MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
+    TransformExpressionOperator transformOperator =
+        new TransformExpressionOperator(projectionOperator, new ArrayList<TransformExpressionTree>());
 
     // Iterator over all projection blocks and generate group keys.
-    ProjectionBlock projectionBlock;
+    TransformBlock transformBlock;
     int[] docIdToGroupKeys = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
 
-    while ((projectionBlock = (ProjectionBlock) projectionOperator.nextBlock()) != null) {
-      groupKeyGenerator.generateKeysForBlock(projectionBlock, docIdToGroupKeys);
+    while ((transformBlock = (TransformBlock) transformOperator.nextBlock()) != null) {
+      groupKeyGenerator.generateKeysForBlock(transformBlock, docIdToGroupKeys);
     }
 
     // Assert total number of group keys is as expected

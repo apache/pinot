@@ -15,8 +15,10 @@
  */
 package com.linkedin.pinot.core.operator.transform.function;
 
-import com.linkedin.pinot.core.operator.transform.result.TransformResult;
-import com.linkedin.pinot.core.operator.transform.result.DoubleArrayTransformResult;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.common.BlockValSet;
+import com.linkedin.pinot.core.operator.docvalsets.TransformBlockValSet;
+import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import java.util.Arrays;
 import javax.annotation.Nonnull;
 
@@ -26,26 +28,34 @@ import javax.annotation.Nonnull;
  */
 public class MultiplicationTransform implements TransformFunction {
   private static final String TRANSFORM_NAME = "mult";
+  private double[] _product;
 
   /**
    * {@inheritDoc}
    *
    * @param length Length of doc ids to process
    * @param inputs Array of input values
-   * @return TransformResult containing result values
+   * @return BlockValSet containing transformed values.
    */
   @Override
-  public TransformResult transform(int length, @Nonnull Object... inputs) {
-    double[] product = new double[((double[]) inputs[0]).length];
-    Arrays.fill(product, 1);
+  public double[] transform(int length, @Nonnull BlockValSet... inputs) {
+    if (_product == null || _product.length < length) {
+      _product = new double[Math.max(length, DocIdSetPlanNode.MAX_DOC_PER_CALL)];
+    }
 
-    for (Object input : inputs) {
-      double[] values = (double[]) input;
+    Arrays.fill(_product, 1);
+    for (BlockValSet input : inputs) {
+      double[] values = input.getDoubleValuesSV();
       for (int j = 0; j < length; j++) {
-        product[j] *= values[j];
+        _product[j] *= values[j];
       }
     }
-    return new DoubleArrayTransformResult(product);
+    return _product;
+  }
+
+  @Override
+  public FieldSpec.DataType getOutputType() {
+    return FieldSpec.DataType.DOUBLE;
   }
 
   /**

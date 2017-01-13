@@ -16,10 +16,10 @@
 package com.linkedin.pinot.core.operator.aggregation;
 
 import com.google.common.base.Preconditions;
+import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunctionFactory;
-import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
-import com.linkedin.pinot.core.operator.docvalsets.ProjectionBlockValSet;
+import com.linkedin.pinot.core.operator.blocks.TransformBlock;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -59,13 +59,20 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
     _inited = true;
   }
 
+  /**
+   * {@inheritDoc}
+   * Perform aggregation on a given docIdSet.
+   * Asserts that 'init' has be called before calling this method.
+   *
+   * @param transformBlock Block upon which to perform aggregation.
+   */
   @Override
-  public void aggregate(ProjectionBlock projectionBlock) {
+  public void aggregate(TransformBlock transformBlock) {
     Preconditions.checkState(_inited,
         "Method 'aggregate' cannot be called before 'init' for class " + getClass().getName());
 
     for (int i = 0; i < _numAggrFunc; i++) {
-      aggregateColumn(projectionBlock, _aggrFuncContextArray[i], _resultHolderArray[i]);
+      aggregateColumn(transformBlock, _aggrFuncContextArray[i], _resultHolderArray[i]);
     }
   }
 
@@ -76,17 +83,16 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
    * @param resultHolder result holder.
    */
   @SuppressWarnings("ConstantConditions")
-  private void aggregateColumn(ProjectionBlock projectionBlock, AggregationFunctionContext aggrFuncContext,
+  private void aggregateColumn(TransformBlock transformBlock, AggregationFunctionContext aggrFuncContext,
       AggregationResultHolder resultHolder) {
     AggregationFunction aggregationFunction = aggrFuncContext.getAggregationFunction();
     String[] aggregationColumns = aggrFuncContext.getAggregationColumns();
     Preconditions.checkState(aggregationColumns.length == 1);
-    int length = projectionBlock.getNumDocs();
+    int length = transformBlock.getNumDocs();
 
     if (!aggregationFunction.getName().equals(AggregationFunctionFactory.AggregationFunctionType.COUNT.getName())) {
-      ProjectionBlockValSet blockValueSet =
-          (ProjectionBlockValSet) projectionBlock.getBlockValueSet(aggregationColumns[0]);
-      aggregationFunction.aggregate(length, resultHolder, blockValueSet);
+      BlockValSet blockValSet = transformBlock.getBlockValueSet(aggregationColumns[0]);
+      aggregationFunction.aggregate(length, resultHolder, blockValSet);
     } else {
       aggregationFunction.aggregate(length, resultHolder);
     }

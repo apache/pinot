@@ -16,8 +16,10 @@
 package com.linkedin.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.core.operator.transform.result.TransformResult;
-import com.linkedin.pinot.core.operator.transform.result.DoubleArrayTransformResult;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.common.BlockValSet;
+import com.linkedin.pinot.core.operator.docvalsets.TransformBlockValSet;
+import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import javax.annotation.Nonnull;
 
 
@@ -26,6 +28,7 @@ import javax.annotation.Nonnull;
  */
 public class DivisionTransform implements TransformFunction {
   private static final String TRANSFORM_NAME = "div";
+  private double[] _result;
 
   /**
    * {@inheritDoc}
@@ -35,20 +38,28 @@ public class DivisionTransform implements TransformFunction {
    *
    * @param length Length of doc ids to process
    * @param input Array of input values
-   * @return TransformResult containing result values
+   * @return BlockValSet containing transformed values.
    */
   @Override
-  public TransformResult transform(int length, @Nonnull Object... input) {
+  public double[] transform(int length, @Nonnull BlockValSet... input) {
     Preconditions.checkArgument((input.length == 2), "Division transform expects exactly two arguments");
 
-    double[] numerators = (double[]) input[0];
-    double[] denominators = (double[]) input[1];
-
-    double[] result = new double[length];
-    for (int i = 0; i < length; i++) {
-      result[i] = numerators[i] / denominators[i];
+    if (_result == null || _result.length < length) {
+      _result = new double[Math.max(length, DocIdSetPlanNode.MAX_DOC_PER_CALL)];
     }
-    return new DoubleArrayTransformResult(result);
+
+    double[] numerators = input[0].getDoubleValuesSV();
+    double[] denominators = input[1].getDoubleValuesSV();
+
+    for (int i = 0; i < length; i++) {
+      _result[i] = numerators[i] / denominators[i];
+    }
+    return _result;
+  }
+
+  @Override
+  public FieldSpec.DataType getOutputType() {
+    return FieldSpec.DataType.DOUBLE;
   }
 
   /**

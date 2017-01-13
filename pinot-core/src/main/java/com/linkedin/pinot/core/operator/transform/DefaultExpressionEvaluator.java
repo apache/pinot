@@ -16,14 +16,16 @@
 package com.linkedin.pinot.core.operator.transform;
 
 import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
+import com.linkedin.pinot.core.common.BlockValSet;
+import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
+import com.linkedin.pinot.core.operator.docvalsets.ConstantBlockValSet;
+import com.linkedin.pinot.core.operator.docvalsets.TransformBlockValSet;
 import com.linkedin.pinot.core.operator.transform.function.TransformFunction;
 import com.linkedin.pinot.core.operator.transform.function.TransformFunctionFactory;
-import com.linkedin.pinot.core.operator.transform.result.TransformResult;
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
-import com.linkedin.pinot.core.operator.docvalsets.ProjectionBlockValSet;
-import com.linkedin.pinot.core.operator.transform.result.DoubleArrayTransformResult;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import javax.annotation.Nonnull;
 
 
 /**
@@ -31,15 +33,14 @@ import java.util.List;
  */
 public class DefaultExpressionEvaluator implements TransformExpressionEvaluator {
 
-  private final TransformExpressionTree _expressionTree;
-  private TransformResult _result;
+  private final List<TransformExpressionTree> _expressionTrees;
 
   /**
    * Constructor for the class.
-   * @param expressionTree Expression tree to evaluate
+   * @param expressionTrees List of expression trees to evaluate
    */
-  public DefaultExpressionEvaluator(TransformExpressionTree expressionTree) {
-    _expressionTree = expressionTree;
+  public DefaultExpressionEvaluator(@Nonnull List<TransformExpressionTree> expressionTrees) {
+    _expressionTrees = expressionTrees;
   }
 
   /**
@@ -48,17 +49,16 @@ public class DefaultExpressionEvaluator implements TransformExpressionEvaluator 
    * @param projectionBlock Projection block to evaluate the expression for.
    */
   @Override
-  public void evaluate(ProjectionBlock projectionBlock) {
-    _result = evaluateExpression(projectionBlock, _expressionTree);
-  }
+  public Map<String, BlockValSet> evaluate(ProjectionBlock projectionBlock) {
+    Map<String, BlockValSet> resultsMap = new HashMap<>(_expressionTrees.size());
 
-  /**
-   * {@inheritDoc}
-   * @return Returns the result of transform expression evaluation.
-   */
-  @Override
-  public TransformResult getResult() {
-    return _result;
+    for (TransformExpressionTree expressionTree : _expressionTrees) {
+      // Enough to evaluate an expression once.
+      if (!resultsMap.containsKey(expressionTree.toString())) {
+        resultsMap.put(expressionTree.toString(), evaluateExpression(projectionBlock, expressionTree));
+      }
+    }
+    return resultsMap;
   }
 
   /**
@@ -69,29 +69,33 @@ public class DefaultExpressionEvaluator implements TransformExpressionEvaluator 
    * @param expressionTree Expression tree to evaluate
    * @return Result of the expression transform
    */
-  private TransformResult evaluateExpression(ProjectionBlock projectionBlock, TransformExpressionTree expressionTree) {
+  private BlockValSet evaluateExpression(ProjectionBlock projectionBlock,
+      TransformExpressionTree expressionTree) {
     TransformFunction function = getTransformFunction(expressionTree.getTransformName());
 
-    if (function != null) {
-      List<TransformExpressionTree> children = expressionTree.getChildren();
-      int numChildren = children.size();
-      Object[] transformArgs = new Object[numChildren];
+    int numDocs = projectionBlock.getNumDocs();
+    String expressionString = expressionTree.toString();
+    TransformExpressionTree.ExpressionType expressionType = expressionTree.getExpressionType();
 
-      for (int i = 0; i < numChildren; i++) {
-        transformArgs[i] = evaluateExpression(projectionBlock, children.get(i)).getResultArray();
-      }
-      return function.transform(projectionBlock.getNumDocs(), transformArgs);
-    } else {
-      String column = expressionTree.getColumn();
+    switch (expressionType) {
+      case FUNCTION:
+        List<TransformExpressionTree> children = expressionTree.getChildren();
+        int numChildren = children.size();
+        BlockValSet[] transformArgs = new BlockValSet[numChildren];
 
-      // TODO: Support non numeric columns.
-      if (column != null) {
-        ProjectionBlockValSet blockValSet = (ProjectionBlockValSet) projectionBlock.getBlockValueSet(column);
-        double[] values = blockValSet.getDoubleValuesSV();
-        return new DoubleArrayTransformResult(values);
-      } else {
-        throw new RuntimeException("Literals not supported in transforms yet");
-      }
+        for (int i = 0; i < numChildren; i++) {
+          transformArgs[i] = evaluateExpression(projectionBlock, children.get(i));
+        }
+        return new TransformBlockValSet(function, numDocs, transformArgs);
+
+      case IDENTIFIER:
+        return projectionBlock.getBlockValueSet(expressionString);
+
+      case LITERAL:
+        return new ConstantBlockValSet(expressionString, numDocs);
+
+      default:
+        throw new IllegalArgumentException("Illegal expression type in expression evaluator: " + expressionType);
     }
   }
 

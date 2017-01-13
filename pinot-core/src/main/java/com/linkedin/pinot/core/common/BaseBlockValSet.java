@@ -33,6 +33,11 @@ public abstract class BaseBlockValSet implements BlockValSet {
   }
 
   @Override
+  public int getNumDocs() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public void getIntValues(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outValues, int outStartPos) {
     throw new UnsupportedOperationException();
   }
@@ -60,7 +65,6 @@ public abstract class BaseBlockValSet implements BlockValSet {
   @Override
   public int[] getIntValuesSV() {
     throw new UnsupportedOperationException();
-
   }
 
   @Override
@@ -125,7 +129,7 @@ public abstract class BaseBlockValSet implements BlockValSet {
   }
 
   @Override
-  public int[] getNumberOfMVEntriesArray(){
+  public int[] getNumberOfMVEntriesArray() {
     throw new UnsupportedOperationException();
   }
 }
