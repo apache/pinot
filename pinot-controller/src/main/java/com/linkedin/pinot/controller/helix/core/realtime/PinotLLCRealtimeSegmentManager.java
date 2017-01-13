@@ -811,6 +811,7 @@ public class PinotLLCRealtimeSegmentManager {
     updateHelixIdealState(realtimeTableName, serverInstances, null, newSegmentNameStr);
 
     LOGGER.info("Successful auto-create of CONSUMING segment {}", newSegmentNameStr);
+    _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_AUTO_CREATED_PARTITIONS, 1);
   }
 
   private ZNRecord makeZnRecordForNewSegment(String realtimeTableName, int numReplicas, long startOffset,
