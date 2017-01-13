@@ -23,11 +23,12 @@ import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.operator.aggregation.DataBlockCache;
+import com.linkedin.pinot.core.operator.docvalsets.ProjectionBlockValSet;
 import java.util.Map;
 
 /**
  * ProjectionBlock holds a column name to Block Map.
- * It provides DocIdSetBlock and ProjectionColumnBlock for a given column.
+ * It provides DocIdSetBlock for a given column.
  */
 public class ProjectionBlock implements Block {
 
@@ -76,9 +77,8 @@ public class ProjectionBlock implements Block {
     return _blockMap.get(column);
   }
 
-  // TODO: getDataBlock should replace getBlock, this requires changing selection code to use projection block to fetch data.
-  public Block getDataBlock(String column) {
-    return new ProjectionColumnBlock(_dataBlockCache, column);
+  public BlockValSet getBlockValueSet(String column) {
+    return new ProjectionBlockValSet(_dataBlockCache, column);
   }
 
   public DocIdSetBlock getDocIdSetBlock() {

@@ -225,8 +225,7 @@ public class RawIndexBenchmark {
 
     long start = System.currentTimeMillis();
     while ((projectionBlock = (ProjectionBlock) projectionOperator.nextBlock()) != null) {
-      Block dataBlock = projectionBlock.getDataBlock(column);
-      ProjectionBlockValSet blockValueSet = (ProjectionBlockValSet) dataBlock.getBlockValueSet();
+      ProjectionBlockValSet blockValueSet = (ProjectionBlockValSet) projectionBlock.getBlockValueSet(column);
       blockValueSet.getDoubleValuesSV();
     }
     return (System.currentTimeMillis() - start);
