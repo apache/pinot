@@ -16,8 +16,9 @@
 package com.linkedin.pinot.core.operator.transform;
 
 import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
-import com.linkedin.pinot.common.request.transform.TransformFunction;
-import com.linkedin.pinot.common.request.transform.result.TransformResult;
+import com.linkedin.pinot.core.operator.transform.function.TransformFunction;
+import com.linkedin.pinot.core.operator.transform.function.TransformFunctionFactory;
+import com.linkedin.pinot.core.operator.transform.result.TransformResult;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
 import com.linkedin.pinot.core.operator.docvalsets.ProjectionBlockValSet;
@@ -69,7 +70,7 @@ public class DefaultExpressionEvaluator implements TransformExpressionEvaluator 
    * @return Result of the expression transform
    */
   private TransformResult evaluateExpression(ProjectionBlock projectionBlock, TransformExpressionTree expressionTree) {
-    TransformFunction function = expressionTree.getTransform();
+    TransformFunction function = getTransformFunction(expressionTree.getTransformName());
 
     if (function != null) {
       List<TransformExpressionTree> children = expressionTree.getChildren();
@@ -93,5 +94,15 @@ public class DefaultExpressionEvaluator implements TransformExpressionEvaluator 
         throw new RuntimeException("Literals not supported in transforms yet");
       }
     }
+  }
+
+  /**
+   * Helper method to get the transform function from the factory
+   *
+   * @param transformName Name of transform function
+   * @return Instance of transform function
+   */
+  private TransformFunction getTransformFunction(String transformName) {
+    return (transformName != null) ? TransformFunctionFactory.get(transformName) : null;
   }
 }

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.common.request.transform.result;
+package com.linkedin.pinot.core.operator.transform.result;
 
 /**
  * Interface for representing the results of a transform function.

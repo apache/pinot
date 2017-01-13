@@ -19,7 +19,7 @@ import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.common.request.transform.TransformFunctionFactory;
+import com.linkedin.pinot.core.operator.transform.function.TransformFunctionFactory;
 import com.linkedin.pinot.common.utils.DataTableSerDeRegistry;
 import com.linkedin.pinot.core.data.manager.offline.TableDataManagerProvider;
 import com.linkedin.pinot.core.operator.transform.TransformUtils;

@@ -15,9 +15,6 @@
  */
 package com.linkedin.pinot.core.operator.transform.result;
 
-import com.linkedin.pinot.common.request.transform.result.TransformResult;
-
-
 /**
  * This implementation of {@link TransformResult} uses primitive double array
  * as underlying storage for holding the transform results.

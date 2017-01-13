@@ -16,8 +16,7 @@
 package com.linkedin.pinot.core.operator.transform.function;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.request.transform.TransformFunction;
-import com.linkedin.pinot.common.request.transform.result.TransformResult;
+import com.linkedin.pinot.core.operator.transform.result.TransformResult;
 import com.linkedin.pinot.core.operator.transform.result.DoubleArrayTransformResult;
 import javax.annotation.Nonnull;
 
