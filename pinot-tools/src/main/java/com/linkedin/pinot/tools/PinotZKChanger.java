@@ -39,9 +39,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 
 /**
- * This class provides a base class for utilities that change zookeeper state in a cluster
+ * This class provides utilities that change zookeeper state in a cluster
  */
-public abstract class PinotZKChanger {
+public class PinotZKChanger {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotZKChanger.class);
 
   protected ZKHelixAdmin helixAdmin;
@@ -65,6 +65,10 @@ public abstract class PinotZKChanger {
     String path = PropertyPathConfig.getPath(PropertyType.PROPERTYSTORE, clusterName);
     propertyStore = new ZkHelixPropertyStore<>(zkAddress, serializer, path);
     objectMapper = new ObjectMapper();
+  }
+
+  public ZKHelixAdmin getHelixAdmin() {
+    return helixAdmin;
   }
 
   /**
@@ -92,7 +96,12 @@ public abstract class PinotZKChanger {
     return numDiff;
   }
 
-  protected void waitForStable(String resourceName)
+  /**
+   * Wait till state has stabilized {@link #isStable(String)}
+   * @param resourceName
+   * @throws InterruptedException
+   */
+  public void waitForStable(String resourceName)
       throws InterruptedException {
     int diff;
     Thread.sleep(3000);
@@ -132,4 +141,7 @@ public abstract class PinotZKChanger {
     LOGGER.info(stats.toString());
   }
 
+  public HelixManager getHelixManager() {
+    return helixManager;
+  }
 }
