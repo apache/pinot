@@ -86,8 +86,7 @@ public class DefaultExpressionEvaluator implements TransformExpressionEvaluator 
 
       // TODO: Support non numeric columns.
       if (column != null) {
-        Block dataBlock = projectionBlock.getDataBlock(column);
-        ProjectionBlockValSet blockValSet = (ProjectionBlockValSet) dataBlock.getBlockValueSet();
+        ProjectionBlockValSet blockValSet = (ProjectionBlockValSet) projectionBlock.getBlockValueSet(column);
         double[] values = blockValSet.getDoubleValuesSV();
         return new DoubleArrayTransformResult(values);
       } else {

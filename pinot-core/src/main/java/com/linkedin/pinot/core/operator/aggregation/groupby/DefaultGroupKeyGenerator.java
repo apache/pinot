@@ -201,8 +201,7 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
 
     // Fetch all dictionary ids according to the document id set for all group-by columns.
     for (int i = 0; i < _numGroupByColumns; i++) {
-      Block dataBlock = projectionBlock.getDataBlock(_groupByColumns[i]);
-      BlockValSet blockValueSet = dataBlock.getBlockValueSet();
+      BlockValSet blockValueSet = projectionBlock.getBlockValueSet(_groupByColumns[i]);
       _reusableSingleDictIds[i] = blockValueSet.getDictionaryIds();
     }
 
@@ -256,9 +255,7 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
 
     // Fetch all dictionary ids according to the document id set for all single value group-by columns.
     for (int i = 0; i < _numGroupByColumns; i++) {
-      Block dataBlock = projectionBlock.getDataBlock(_groupByColumns[i]);
-      _blockValSets[i] = dataBlock.getBlockValueSet();
-
+      _blockValSets[i] = projectionBlock.getBlockValueSet(_groupByColumns[i]);
       if (_isSingleValueGroupByColumn[i]) {
         _reusableSingleDictIds[i] = _blockValSets[i].getDictionaryIds();
       }

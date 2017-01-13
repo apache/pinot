@@ -16,7 +16,6 @@
 package com.linkedin.pinot.core.operator.aggregation;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunctionFactory;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
@@ -97,8 +96,8 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
     int length = projectionBlock.getNumDocs();
 
     if (!aggregationFunction.getName().equals(AggregationFunctionFactory.AggregationFunctionType.COUNT.getName())) {
-      Block dataBlock = projectionBlock.getDataBlock(aggregationColumns[0]);
-      ProjectionBlockValSet blockValueSet = (ProjectionBlockValSet) dataBlock.getBlockValueSet();
+      ProjectionBlockValSet blockValueSet =
+          (ProjectionBlockValSet) projectionBlock.getBlockValueSet(aggregationColumns[0]);
       aggregationFunction.aggregate(length, resultHolder, blockValueSet);
     } else {
       aggregationFunction.aggregate(length, resultHolder);

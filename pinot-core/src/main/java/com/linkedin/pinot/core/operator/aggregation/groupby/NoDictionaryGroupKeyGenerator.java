@@ -15,11 +15,9 @@
  */
 package com.linkedin.pinot.core.operator.aggregation.groupby;
 
-import com.clearspring.analytics.util.Preconditions;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
-import com.linkedin.pinot.core.operator.blocks.ProjectionColumnBlock;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -65,13 +63,7 @@ public class NoDictionaryGroupKeyGenerator implements GroupKeyGenerator {
     FieldSpec.DataType[] dataTypes = new FieldSpec.DataType[numGroupByColumns];
 
     for (int i = 0; i < numGroupByColumns; i++) {
-      ProjectionColumnBlock dataBlock = (ProjectionColumnBlock) projectionBlock.getDataBlock(_groupByColumns[i]);
-      BlockValSet blockValSet = dataBlock.getBlockValueSet();
-
-      // This method is only for single-valued columns, there's a separate method for multi-valued columns.
-      Preconditions.checkState(dataBlock.getMetadata().isSingleValue(),
-          "Multi-valued column specified in single valued group key generator: " + _groupByColumns[i]);
-
+      BlockValSet blockValSet = projectionBlock.getBlockValueSet(_groupByColumns[i]);
       dataTypes[i] = blockValSet.getValueType();
       values[i] = getValuesFromBlockValSet(blockValSet, dataTypes[i]);
     }

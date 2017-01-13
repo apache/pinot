@@ -143,8 +143,8 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     int length = projectionBlock.getNumDocs();
 
     if (!aggregationFunction.getName().equals(AggregationFunctionFactory.AggregationFunctionType.COUNT.getName())) {
-      Block dataBlock = projectionBlock.getDataBlock(aggregationColumns[0]);
-      ProjectionBlockValSet blockValueSet = (ProjectionBlockValSet) dataBlock.getBlockValueSet();
+      ProjectionBlockValSet blockValueSet =
+          (ProjectionBlockValSet) projectionBlock.getBlockValueSet(aggregationColumns[0]);
       if (_hasMVGroupByColumns) {
         aggregationFunction.aggregateGroupByMV(length, _docIdToMVGroupKey, resultHolder, blockValueSet);
       } else {
