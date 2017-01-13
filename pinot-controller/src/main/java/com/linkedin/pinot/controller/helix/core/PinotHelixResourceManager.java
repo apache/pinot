@@ -1663,11 +1663,6 @@ public class PinotHelixResourceManager {
     return getAllPinotTableNames().contains(actualTableName);
   }
 
-  public AbstractTableConfig getOfflineTableConfig(String offlineTableName) throws JsonParseException,
-      JsonMappingException, JsonProcessingException, JSONException, IOException {
-    return ZKMetadataProvider.getOfflineTableConfig(getPropertyStore(), offlineTableName);
-  }
-
   public AbstractTableConfig getRealtimeTableConfig(String realtimeTableName) throws JsonParseException,
       JsonMappingException, JsonProcessingException, JSONException, IOException {
     return ZKMetadataProvider.getRealtimeTableConfig(getPropertyStore(), realtimeTableName);
