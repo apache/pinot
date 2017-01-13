@@ -15,6 +15,9 @@
  */
 package com.linkedin.pinot.controller.validation;
 
+import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
+import com.linkedin.pinot.common.utils.helix.HelixHelper;
+import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -23,16 +26,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.model.InstanceConfig;
 import org.joda.time.DateTime;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
 import org.mockito.Mockito;
 import org.testng.Assert;
-import org.testng.annotations.AfterTest;
-import org.testng.annotations.BeforeTest;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.IndexingConfig;
@@ -60,8 +65,7 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.startree.hll.HllConstants;
 import javax.annotation.Nullable;
 import static org.mockito.Matchers.anyString;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 
 /**
@@ -74,21 +78,39 @@ public class ValidationManagerTest {
 
   private String ZK_STR = ZkStarter.DEFAULT_ZK_STR;
   private String CONTROLLER_INSTANCE_NAME = "localhost_11984";
+  private String TEST_TABLE_NAME = "testTable";
+  private String TEST_TABLE_TWO = "testTable2";
+
 
   private ZkClient _zkClient;
 
   private PinotHelixResourceManager _pinotHelixResourceManager;
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
   private PinotLLCRealtimeSegmentManager _segmentManager;
+  private AbstractTableConfig _offlineTableConfig;
+  private HelixManager _helixManager;
 
-  @BeforeTest
+  @BeforeClass
   public void setUp() throws Exception {
     _zookeeperInstance = ZkStarter.startLocalZkServer();
     _zkClient = new ZkClient(ZK_STR);
+    Thread.sleep(1000);
 
     _pinotHelixResourceManager =
         new PinotHelixResourceManager(ZK_STR, HELIX_CLUSTER_NAME, CONTROLLER_INSTANCE_NAME, null, 1000L, true, /*isUpdateStateModel=*/false);
     _pinotHelixResourceManager.start();
+
+    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 2, true);
+    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 2, true);
+
+    String OfflineTableConfigJson = ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(TEST_TABLE_NAME, null, null,
+        "timestamp", "millsSinceEpoch", "DAYS", "5", 2, "BalanceNumSegmentAssignmentStrategy").toString();
+    _offlineTableConfig = AbstractTableConfig.init(OfflineTableConfigJson);
+
+    final String instanceId = "localhost_helixController";
+    _helixManager = HelixSetupUtils.setup(HELIX_CLUSTER_NAME, ZK_STR, instanceId, /*isUpdateStateModel=*/false);
+    _pinotHelixResourceManager.addTable(_offlineTableConfig);
+
   }
 
   private void makeMockPinotLLCRealtimeSegmentManager(ZNRecord kafkaPartitionAssignment) {
@@ -99,21 +121,50 @@ public class ValidationManagerTest {
   }
 
   @Test
+  public void testRebuildBrokerResourceWhenBrokerAdded() throws Exception {
+    // Check that the first table we added doesn't need to be rebuilt(case where ideal state brokers and brokers in broker resource are the same.
+    String partitionName = _offlineTableConfig.getTableName();
+    FakeValidationMetrics validationMetrics = new FakeValidationMetrics();
+    ValidationManager validationManager = new ValidationManager(validationMetrics, _pinotHelixResourceManager, new ControllerConf(),
+        _segmentManager);
+    HelixAdmin helixAdmin = _helixManager.getClusterManagmentTool();
+
+    IdealState idealState = HelixHelper.getBrokerIdealStates(helixAdmin, HELIX_CLUSTER_NAME);
+    // Ensure that the broker resource is not rebuilt.
+    Assert.assertTrue(idealState.getInstanceSet(partitionName).equals(
+        _pinotHelixResourceManager.getAllInstancesForBrokerTenant(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME)));
+    validationManager.rebuildBrokerResourceWhenBrokerAdded(_offlineTableConfig, idealState);
+
+    // Add another table that needs to be rebuilt
+    String offlineTableTwoConfigJson =
+        ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(TEST_TABLE_TWO, null, null, 1).toString();
+    AbstractTableConfig offlineTableConfigTwo = AbstractTableConfig.init(offlineTableTwoConfigJson);
+    _pinotHelixResourceManager.addTable(offlineTableConfigTwo);
+    String partitionNameTwo = offlineTableConfigTwo.getTableName();
+
+    // Add a new broker manually such that the ideal state is not updated and ensure that rebuild broker resource is called
+    final String brokerId = "Broker_localhost_2";
+    InstanceConfig instanceConfig = new InstanceConfig(brokerId);
+    instanceConfig.setInstanceEnabled(true);
+    instanceConfig.setHostName("Broker_localhost");
+    instanceConfig.setPort("2");
+    helixAdmin.addInstance(HELIX_CLUSTER_NAME, instanceConfig);
+    helixAdmin.addInstanceTag(HELIX_CLUSTER_NAME, instanceConfig.getInstanceName(),
+        ControllerTenantNameBuilder.getBrokerTenantNameForTenant(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
+    idealState = HelixHelper.getBrokerIdealStates(helixAdmin, HELIX_CLUSTER_NAME);
+    // Assert that the two don't equal before the call to rebuild the broker resource.
+    Assert.assertTrue(!idealState.getInstanceSet(partitionNameTwo).equals(
+        _pinotHelixResourceManager.getAllInstancesForBrokerTenant(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME)));
+    validationManager.rebuildBrokerResourceWhenBrokerAdded(offlineTableConfigTwo, idealState);
+    idealState = HelixHelper.getBrokerIdealStates(helixAdmin, HELIX_CLUSTER_NAME);
+    // Assert that the two do equal after being rebuilt.
+    Assert.assertTrue(idealState.getInstanceSet(partitionNameTwo).equals(
+        _pinotHelixResourceManager.getAllInstancesForBrokerTenant(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME)));
+  }
+
+  @Test
   public void testPushTimePersistence() throws Exception {
-
-    String testTableName = "testTable";
-
-    Thread.sleep(1000);
-
-    ControllerRequestBuilderUtil.addFakeDataInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 2, true);
-    ControllerRequestBuilderUtil.addFakeBrokerInstancesToAutoJoinHelixCluster(HELIX_CLUSTER_NAME, ZK_STR, 2, true);
-
-    String OfflineTableConfigJson = ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(testTableName, null, null,
-        "timestamp", "millsSinceEpoch", "DAYS", "5", 2, "BalanceNumSegmentAssignmentStrategy").toString();
-    AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(OfflineTableConfigJson);
-    _pinotHelixResourceManager.addTable(offlineTableConfig);
-
-    DummyMetadata metadata = new DummyMetadata(testTableName);
+    DummyMetadata metadata = new DummyMetadata(TEST_TABLE_NAME);
 
     _pinotHelixResourceManager.addSegment(metadata, "http://dummy/");
 
@@ -208,7 +259,7 @@ public class ValidationManagerTest {
     Assert.assertEquals(ValidationManager.computeRealtimeTotalDocumentInSegments(segmentMetadataList, false), 15);
   }
 
-  @AfterTest
+  @AfterClass
   public void shutDown() {
     _pinotHelixResourceManager.stop();
     _zkClient.close();
