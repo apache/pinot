@@ -16,11 +16,6 @@
 
 package com.linkedin.pinot.controller.helix.core.realtime;
 
-import com.google.common.collect.Maps;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
-import it.unimi.dsi.fastutil.objects.Object2IntLinkedOpenHashMap;
-import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
@@ -55,6 +50,7 @@ import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
+import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
@@ -72,12 +68,15 @@ import com.linkedin.pinot.core.realtime.impl.kafka.KafkaSimpleConsumerFactoryImp
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import it.unimi.dsi.fastutil.objects.Object2IntLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
 
 
 public class PinotLLCRealtimeSegmentManager {
   public static final Logger LOGGER = LoggerFactory.getLogger(PinotLLCRealtimeSegmentManager.class);
   private static final int KAFKA_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS = 10000;
   protected static final int STARTING_SEQUENCE_NUMBER = 0; // Initial sequence number for new table segments
+  protected static final long END_OFFSET_FOR_CONSUMING_SEGMENTS = Long.MAX_VALUE;
 
   private static PinotLLCRealtimeSegmentManager INSTANCE = null;
 
@@ -273,7 +272,7 @@ public class PinotLLCRealtimeSegmentManager {
       final long startOffset = getPartitionOffset(topicName, bootstrapHosts, initialOffset, i);
       LOGGER.info("Setting start offset for segment {} to {}", segName, startOffset);
       metadata.setStartOffset(startOffset);
-      metadata.setEndOffset(Long.MAX_VALUE);
+      metadata.setEndOffset(END_OFFSET_FOR_CONSUMING_SEGMENTS);
 
       metadata.setNumReplicas(instances.size());
       metadata.setTableName(rawTableName);
@@ -730,13 +729,47 @@ public class PinotLLCRealtimeSegmentManager {
           int nextSeqNum = segmentName.getSequenceNumber() + 1;
           List<String> instances = partitionAssignment.getListField(Integer.toString(curPartition));
           LOGGER.info("Creating CONSUMING segment for {} partition {} with seq {}", realtimeTableName, curPartition, nextSeqNum);
+          // To begin with, set startOffset to the oldest availble offset in kafka. Fix it to be the one we want,
+          // depending on what the prev segment had.
           long startOffset = getKafkaPartitionOffset(kafkaStreamMetadata, "smallest", curPartition);
           LOGGER.info("Found kafka offset {} for table {} for partition {}", startOffset, realtimeTableName, curPartition);
+
           final LLCRealtimeSegmentZKMetadata oldSegMetadata = getRealtimeSegmentZKMetadata(realtimeTableName,
               segmentName.getSegmentName());
-          if (startOffset < oldSegMetadata.getEndOffset()) {
-            startOffset = oldSegMetadata.getEndOffset();
-            LOGGER.info("Choosing newer kafka offset {} for table {} for partition {}", startOffset, realtimeTableName, curPartition);
+          CommonConstants.Segment.Realtime.Status status = oldSegMetadata.getStatus();
+          final long prevSegStartOffset = oldSegMetadata.getStartOffset();  // Offset at which the prev segment intended to start consuming
+          if (status.equals(CommonConstants.Segment.Realtime.Status.IN_PROGRESS)) {
+            LOGGER.info("More than one consecutive non-consuming segments detected for table {} partition {}  below sequence {}",
+                realtimeTableName, curPartition, nextSeqNum);
+            // prev segment was never completed, so check it's start offset.
+            if (startOffset <= prevSegStartOffset) {
+              // We still have the same start offset available, re-use it.
+              startOffset = prevSegStartOffset;
+            } else {
+              // There is data loss.
+              LOGGER.warn("Data lost from kafka offset {} to {} for table {} partition {} sequence {}", prevSegStartOffset,
+                  startOffset, realtimeTableName, curPartition, nextSeqNum);
+              // Start from the earliest offset in kafka
+              _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_KAFKA_DATA_LOSS, 1);
+            }
+          } else {
+            // Status must be DONE, so we have a valid end-offset.
+            final long prevSegEndOffset = oldSegMetadata.getEndOffset();  // Will be 0 if the prev segment was not completed.
+            if (startOffset < prevSegEndOffset) {
+              // We don't want to create a segment that overlaps in data with the prev segment. We know that the previous
+              // segment's end offset is available in Kafka, so use that.
+              startOffset = prevSegEndOffset;
+              LOGGER.info("Choosing newer kafka offset {} for table {} for partition {}, sequence {}", startOffset,
+                  realtimeTableName, curPartition, nextSeqNum);
+            } else if (startOffset > prevSegEndOffset) {
+              // Kafka's oldest offset is greater than the end offset of the prev segment, so there is data loss.
+              LOGGER.warn("Data lost from kafka offset {} to {} for table {} partition {} sequence {}", prevSegEndOffset,
+                  startOffset, realtimeTableName, curPartition, nextSeqNum);
+              _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_KAFKA_DATA_LOSS, 1);
+            } else {
+              // The two happen to be equal. A rarity, so log it.
+              LOGGER.info("Kafka earlieset offset {} is the same as new segment start offset", startOffset);
+            }
           }
           createSegment(realtimeTableName, nReplicas, curPartition, nextSeqNum, instances, startOffset,
               partitionAssignment);
@@ -778,6 +811,7 @@ public class PinotLLCRealtimeSegmentManager {
     updateHelixIdealState(realtimeTableName, serverInstances, null, newSegmentNameStr);
 
     LOGGER.info("Successful auto-create of CONSUMING segment {}", newSegmentNameStr);
+    _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_AUTO_CREATED_PARTITIONS, 1);
   }
 
   private ZNRecord makeZnRecordForNewSegment(String realtimeTableName, int numReplicas, long startOffset,
@@ -785,6 +819,7 @@ public class PinotLLCRealtimeSegmentManager {
     final LLCRealtimeSegmentZKMetadata newSegMetadata = new LLCRealtimeSegmentZKMetadata();
     newSegMetadata.setCreationTime(System.currentTimeMillis());
     newSegMetadata.setStartOffset(startOffset);
+    newSegMetadata.setEndOffset(END_OFFSET_FOR_CONSUMING_SEGMENTS);
     newSegMetadata.setNumReplicas(numReplicas);
     newSegMetadata.setTableName(realtimeTableName);
     newSegMetadata.setSegmentName(newSegmentNameStr);
