@@ -58,6 +58,7 @@ import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderCo
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaMessageDecoder;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaSimpleConsumerFactoryImpl;
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
+import com.linkedin.pinot.server.realtime.ControllerLeaderLocator;
 import com.linkedin.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import kafka.message.MessageAndOffset;
 
@@ -408,6 +409,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
             case NOT_LEADER:
               _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.LLC_CONTROLLER_RESPONSE_NOT_LEADER, 1);
               // Retain the same state
+              ControllerLeaderLocator.getInstance().getControllerLeader(true);
               segmentLogger.warn("Got not leader response");
               hold();
               break;
