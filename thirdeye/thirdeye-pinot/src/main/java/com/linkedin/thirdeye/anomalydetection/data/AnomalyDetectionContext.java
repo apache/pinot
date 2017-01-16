@@ -2,10 +2,13 @@ package com.linkedin.thirdeye.anomalydetection.data;
 
 import com.linkedin.thirdeye.anomalydetection.model.AnomalyDetectionFunction;
 import com.linkedin.thirdeye.anomalydetection.model.prediction.PredictionModel;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import java.util.List;
 
+/**
+ * The context for performing an anomaly detection on the sets of time series from the same
+ * dimension and metric.
+ */
 public class AnomalyDetectionContext {
   private AnomalyDetectionFunction anomalyDetectionFunction;
 
@@ -20,8 +23,6 @@ public class AnomalyDetectionContext {
   private PredictionModel trainedPredictionModel;
 
   private List<RawAnomalyResultDTO> rawAnomalies;
-
-  private List<MergedAnomalyResultDTO> mergedAnomalies;
 
 
   public TimeSeriesKey getTimeSeriesKey() {
@@ -86,13 +87,5 @@ public class AnomalyDetectionContext {
 
   public void setRawAnomalies(List<RawAnomalyResultDTO> rawAnomalies) {
     this.rawAnomalies = rawAnomalies;
-  }
-
-  public List<MergedAnomalyResultDTO> getMergedAnomalies() {
-    return mergedAnomalies;
-  }
-
-  public void setMergedAnomalies(List<MergedAnomalyResultDTO> mergedAnomalies) {
-    this.mergedAnomalies = mergedAnomalies;
   }
 }
