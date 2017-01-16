@@ -20,10 +20,10 @@ import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.common.request.SelectionSort;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.response.broker.SelectionResults;
+import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.common.utils.DataTable;
-import com.linkedin.pinot.common.utils.DataTableBuilder;
-import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
 import com.linkedin.pinot.core.common.DataSourceMetadata;
+import com.linkedin.pinot.core.common.datatable.DataTableBuilder;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import java.io.Serializable;
 import java.text.DecimalFormat;
@@ -232,7 +232,6 @@ public class SelectionOperatorUtils {
     int numColumns = dataSchema.size();
 
     DataTableBuilder dataTableBuilder = new DataTableBuilder(dataSchema);
-    dataTableBuilder.open();
     for (Serializable[] row : rows) {
       dataTableBuilder.startRow();
       for (int i = 0; i < numColumns; i++) {
@@ -318,7 +317,6 @@ public class SelectionOperatorUtils {
       }
       dataTableBuilder.finishRow();
     }
-    dataTableBuilder.seal();
 
     return dataTableBuilder.build();
   }

@@ -16,6 +16,7 @@
 package com.linkedin.pinot.query.aggregation;
 
 import com.linkedin.pinot.common.request.AggregationInfo;
+import com.linkedin.pinot.core.operator.aggregation.function.customobject.QuantileDigest;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.CombineLevel;
 import com.linkedin.pinot.core.query.aggregation.function.quantile.PercentileAggregationFunction;
@@ -24,7 +25,6 @@ import com.linkedin.pinot.core.query.aggregation.function.quantile.Percentileest
 import com.linkedin.pinot.core.query.aggregation.function.quantile.Percentileest90;
 import com.linkedin.pinot.core.query.aggregation.function.quantile.Percentileest95;
 import com.linkedin.pinot.core.query.aggregation.function.quantile.digest.DigestAggregationFunction;
-import com.linkedin.pinot.core.query.aggregation.function.quantile.digest.QuantileDigest;
 import com.linkedin.pinot.util.TestUtils;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import java.io.ByteArrayInputStream;

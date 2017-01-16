@@ -17,8 +17,8 @@ package com.linkedin.pinot.core.operator.aggregation.function;
 
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.aggregation.AggregationResultHolder;
+import com.linkedin.pinot.core.operator.aggregation.function.customobject.QuantileDigest;
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupByResultHolder;
-import com.linkedin.pinot.core.query.aggregation.function.quantile.digest.QuantileDigest;
 import javax.annotation.Nonnull;
 
 

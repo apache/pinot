@@ -16,9 +16,7 @@
 package com.linkedin.pinot.core.operator.aggregation;
 
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
-import java.io.Serializable;
 import java.util.List;
-import java.util.Map;
 
 
 /**
@@ -54,7 +52,7 @@ public interface AggregationExecutor {
    * Returns the result of aggregation.
    * Asserts that 'finish' has been called before calling getResult().
    *
-   * @return
+   * @return list of aggregation results.
    */
-  List<Serializable> getResult();
+  List<Object> getResult();
 }

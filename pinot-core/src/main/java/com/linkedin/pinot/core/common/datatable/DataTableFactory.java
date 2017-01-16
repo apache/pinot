@@ -13,21 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.linkedin.pinot.core.common.datatable;
 
-package com.linkedin.pinot.requestHandler;
+import com.linkedin.pinot.common.utils.DataTable;
+import java.io.IOException;
+import java.nio.ByteBuffer;
 
-import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 
+public class DataTableFactory {
+  private DataTableFactory() {
+  }
 
-/**
- * Interface for optimizations that can be done on the FilterQueryTree of a query.
- */
-public abstract class FilterQueryTreeOptimizer {
-  private final String _optimizationName = OptimizationFlags.optimizationName(this.getClass());
-
-  public abstract FilterQueryTree optimize(FilterQueryTree filterQueryTree);
-
-  public String getOptimizationName() {
-    return _optimizationName;
+  public static DataTable getDataTable(byte[] bytes)
+      throws IOException {
+    ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+    int version = byteBuffer.getInt();
+    switch (version) {
+      case 2:
+        return new DataTableImplV2(byteBuffer);
+      default:
+        throw new UnsupportedOperationException("Unsupported data table version: " + version);
+    }
   }
 }

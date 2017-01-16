@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.requestHandler;
+package com.linkedin.pinot.broker.requesthandler;
 
 import com.google.common.base.Splitter;
 import com.linkedin.pinot.common.config.TableNameBuilder;
@@ -34,6 +34,7 @@ import com.linkedin.pinot.common.response.BrokerResponseFactory.ResponseType;
 import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.utils.DataTable;
+import com.linkedin.pinot.core.common.datatable.DataTableFactory;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import com.linkedin.pinot.routing.RoutingTable;
 import com.linkedin.pinot.routing.RoutingTableLookupRequest;
@@ -605,7 +606,7 @@ public class BrokerRequestHandler {
       try {
         byte[] byteArray = new byte[byteBuf.readableBytes()];
         byteBuf.readBytes(byteArray);
-        dataTableMap.put(serverInstance, new DataTable(byteArray));
+        dataTableMap.put(serverInstance, DataTableFactory.getDataTable(byteArray));
       } catch (Exception e) {
         LOGGER.error("Caught exceptions while deserializing response for table: {} from server: {}", tableName,
             serverInstance, e);

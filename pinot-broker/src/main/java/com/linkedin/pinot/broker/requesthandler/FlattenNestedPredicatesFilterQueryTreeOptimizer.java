@@ -13,8 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-package com.linkedin.pinot.requestHandler;
+package com.linkedin.pinot.broker.requesthandler;
 
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
@@ -56,19 +55,19 @@ public class FlattenNestedPredicatesFilterQueryTreeOptimizer extends FilterQuery
     }
     // Flatten all the children first.
     List<FilterQueryTree> toFlatten = new ArrayList<>(node.getChildren().size());
-    for (FilterQueryTree child: node.getChildren()) {
+    for (FilterQueryTree child : node.getChildren()) {
       if (child.getChildren() != null && !child.getChildren().isEmpty()) {
         toFlatten.add(child);
       }
     }
     for (FilterQueryTree child : toFlatten) {
-      flatten(child, node, maxDepth-1);
+      flatten(child, node, maxDepth - 1);
     }
     if (parent == null) {
       return;
     }
-    if (node.getOperator() == parent.getOperator() &&
-        (node.getOperator() == FilterOperator.OR || node.getOperator() == FilterOperator.AND)) {
+    if (node.getOperator() == parent.getOperator()
+        && (node.getOperator() == FilterOperator.OR || node.getOperator() == FilterOperator.AND)) {
       // Move all of 'node's children one level up. If 'node' has no children left, remove it from parent's list.
       List<FilterQueryTree> children = node.getChildren();
       Iterator<FilterQueryTree> it = children.iterator();

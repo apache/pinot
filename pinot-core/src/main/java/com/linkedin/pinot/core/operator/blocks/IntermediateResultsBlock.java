@@ -18,9 +18,8 @@ package com.linkedin.pinot.core.operator.blocks;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.response.ProcessingException;
+import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.common.utils.DataTable;
-import com.linkedin.pinot.common.utils.DataTableBuilder;
-import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
@@ -28,6 +27,8 @@ import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Predicate;
+import com.linkedin.pinot.core.common.datatable.DataTableBuilder;
+import com.linkedin.pinot.core.common.datatable.DataTableImplV2;
 import com.linkedin.pinot.core.operator.aggregation.AggregationFunctionContext;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.operator.aggregation.groupby.AggregationGroupByResult;
@@ -48,9 +49,9 @@ public class IntermediateResultsBlock implements Block {
   private DataSchema _selectionDataSchema;
   private Collection<Serializable[]> _selectionResult;
   private AggregationFunctionContext[] _aggregationFunctionContexts;
-  private List<Serializable> _aggregationResult;
+  private List<Object> _aggregationResult;
   private AggregationGroupByResult _aggregationGroupByResult;
-  private List<Map<String, Serializable>> _combinedAggregationGroupByResult;
+  private List<Map<String, Object>> _combinedAggregationGroupByResult;
   private List<ProcessingException> _processingExceptions;
   private long _numDocsScanned;
   private long _numEntriesScannedInFilter;
@@ -134,11 +135,11 @@ public class IntermediateResultsBlock implements Block {
   }
 
   @Nullable
-  public List<Serializable> getAggregationResult() {
+  public List<Object> getAggregationResult() {
     return _aggregationResult;
   }
 
-  public void setAggregationResults(@Nullable List<Serializable> aggregationResults) {
+  public void setAggregationResults(@Nullable List<Object> aggregationResults) {
     _aggregationResult = aggregationResults;
   }
 
@@ -224,7 +225,6 @@ public class IntermediateResultsBlock implements Block {
 
     // Build the data table.
     DataTableBuilder dataTableBuilder = new DataTableBuilder(new DataSchema(columnNames, columnTypes));
-    dataTableBuilder.open();
     dataTableBuilder.startRow();
     for (int i = 0; i < numAggregationFunctions; i++) {
       switch (columnTypes[i]) {
@@ -243,7 +243,6 @@ public class IntermediateResultsBlock implements Block {
       }
     }
     dataTableBuilder.finishRow();
-    dataTableBuilder.seal();
     DataTable dataTable = dataTableBuilder.build();
 
     return attachMetadataToDataTable(dataTable);
@@ -257,7 +256,6 @@ public class IntermediateResultsBlock implements Block {
 
     // Build the data table.
     DataTableBuilder dataTableBuilder = new DataTableBuilder(new DataSchema(columnNames, columnTypes));
-    dataTableBuilder.open();
     int numAggregationFunctions = _aggregationFunctionContexts.length;
     for (int i = 0; i < numAggregationFunctions; i++) {
       dataTableBuilder.startRow();
@@ -267,14 +265,13 @@ public class IntermediateResultsBlock implements Block {
       dataTableBuilder.setColumn(1, _combinedAggregationGroupByResult.get(i));
       dataTableBuilder.finishRow();
     }
-    dataTableBuilder.seal();
     DataTable dataTable = dataTableBuilder.build();
 
     return attachMetadataToDataTable(dataTable);
   }
 
   private DataTable getProcessingExceptionsDataTable() {
-    return attachMetadataToDataTable(new DataTable());
+    return attachMetadataToDataTable(new DataTableImplV2());
   }
 
   private DataTable attachMetadataToDataTable(DataTable dataTable) {

@@ -19,9 +19,9 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.ObjectAggregationResultHolder;
+import com.linkedin.pinot.core.operator.aggregation.function.customobject.AvgPair;
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupByResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.groupby.ObjectGroupByResultHolder;
-import com.linkedin.pinot.core.query.aggregation.function.AvgAggregationFunction.AvgPair;
 import javax.annotation.Nonnull;
 
 
@@ -71,13 +71,11 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
 
   protected void setAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder, double sum,
       long count) {
-    // TODO: make a class for the pair which implements comparable and stores mutable primitive values.
     AvgPair avgPair = aggregationResultHolder.getResult();
     if (avgPair == null) {
       aggregationResultHolder.setValue(new AvgPair(sum, count));
     } else {
-      avgPair.setFirst(avgPair.getFirst() + sum);
-      avgPair.setSecond(avgPair.getSecond() + count);
+      avgPair.apply(sum, count);
     }
   }
 
@@ -108,8 +106,7 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
     if (avgPair == null) {
       groupByResultHolder.setValueForKey(groupKey, new AvgPair(sum, count));
     } else {
-      avgPair.setFirst(avgPair.getFirst() + sum);
-      avgPair.setSecond(avgPair.getSecond() + count);
+      avgPair.apply(sum, count);
     }
   }
 
@@ -138,8 +135,7 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
   @Nonnull
   @Override
   public AvgPair merge(@Nonnull AvgPair intermediateResult1, @Nonnull AvgPair intermediateResult2) {
-    intermediateResult1.setFirst(intermediateResult1.getFirst() + intermediateResult2.getFirst());
-    intermediateResult1.setSecond(intermediateResult1.getSecond() + intermediateResult2.getSecond());
+    intermediateResult1.apply(intermediateResult2);
     return intermediateResult1;
   }
 
@@ -152,11 +148,11 @@ public class AvgAggregationFunction implements AggregationFunction<AvgPair, Doub
   @Nonnull
   @Override
   public Double extractFinalResult(@Nonnull AvgPair intermediateResult) {
-    long count = intermediateResult.getSecond();
+    long count = intermediateResult.getCount();
     if (count == 0L) {
       return DEFAULT_FINAL_RESULT;
     } else {
-      return intermediateResult.getFirst() / count;
+      return intermediateResult.getSum() / count;
     }
   }
 }

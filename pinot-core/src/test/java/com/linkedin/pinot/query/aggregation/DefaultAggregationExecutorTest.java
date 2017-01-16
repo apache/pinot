@@ -37,14 +37,12 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverIm
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.mutable.MutableLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -149,7 +147,7 @@ public class DefaultAggregationExecutorTest {
     aggregationExecutor.aggregate(projectionBlock);
     aggregationExecutor.finish();
 
-    List<Serializable> result = aggregationExecutor.getResult();
+    List<Object> result = aggregationExecutor.getResult();
     for (int i = 0; i < result.size(); i++) {
       double actual = (double) result.get(i);
       double expected = computeAggregation(AGGREGATION_FUNCTIONS[i], _inputData[i]);

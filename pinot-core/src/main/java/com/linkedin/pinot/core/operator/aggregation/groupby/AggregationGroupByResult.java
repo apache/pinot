@@ -16,8 +16,6 @@
 package com.linkedin.pinot.core.operator.aggregation.groupby;
 
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunction;
-import com.linkedin.pinot.core.query.utils.Pair;
-import java.io.Serializable;
 import java.util.Iterator;
 
 
@@ -27,18 +25,15 @@ import java.util.Iterator;
  * to get the aggregation result for the given group-by key.
  */
 public class AggregationGroupByResult {
-
   private final GroupKeyGenerator _groupKeyGenerator;
   private final AggregationFunction[] _aggregationFunctions;
   private final GroupByResultHolder[] _resultHolders;
-  Pair<String, Serializable> _retPair;
 
   public AggregationGroupByResult(GroupKeyGenerator groupKeyGenerator, AggregationFunction[] aggregationFunctions,
       GroupByResultHolder[] resultHolders) {
     _groupKeyGenerator = groupKeyGenerator;
     _aggregationFunctions = aggregationFunctions;
     _resultHolders = resultHolders;
-    _retPair = new Pair<>(null, null);
   }
 
   /**
@@ -66,7 +61,7 @@ public class AggregationGroupByResult {
    * @param index
    * @return
    */
-  public Serializable getResultForKey(GroupKeyGenerator.GroupKey groupKey, int index) {
+  public Object getResultForKey(GroupKeyGenerator.GroupKey groupKey, int index) {
     return _aggregationFunctions[index].extractGroupByResult(_resultHolders[index], groupKey.getFirst());
   }
 }

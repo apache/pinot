@@ -30,7 +30,6 @@ import com.linkedin.pinot.core.operator.aggregation.groupby.AggregationGroupByTr
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupKeyGenerator;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
 import com.linkedin.pinot.core.util.trace.TraceRunnable;
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -130,11 +129,11 @@ public class MCombineGroupByOperator extends BaseOperator {
    *   HashMap, with appropriate synchronizations. Result blocks themselves are stored
    *   in the specified blocks[].
    *   - The key in this concurrent map is the group-by key, and value is an array of
-   *     Serializables (one for each aggregation function).
+   *     Objects (one for each aggregation function).
    *   - Synchronization is provided by locking the group-key that is to be modified.
    *
    * 2. The result of the concurrent map is then translated into what is expected by
-   *    the broker (Map<String, Serializable>).
+   *    the broker (List<Map<String, Object>>).
    *
    * 3. This result is then sorted and then trimmed as per 'TOP N' in the brokerRequest.
    *
@@ -144,7 +143,7 @@ public class MCombineGroupByOperator extends BaseOperator {
       throws InterruptedException {
     int numOperators = _operators.size();
     final CountDownLatch operatorLatch = new CountDownLatch(numOperators);
-    final Map<String, Serializable[]> resultsMap = new ConcurrentHashMap<>();
+    final Map<String, Object[]> resultsMap = new ConcurrentHashMap<>();
     final ConcurrentLinkedQueue<ProcessingException> mergedProcessingExceptions = new ConcurrentLinkedQueue<>();
 
     List<AggregationInfo> aggregationInfos = _brokerRequest.getAggregationsInfo();
@@ -183,10 +182,10 @@ public class MCombineGroupByOperator extends BaseOperator {
                 // HashCode method might return negative value, make it non-negative
                 int lockIndex = (groupKeyString.hashCode() & Integer.MAX_VALUE) % NUM_LOCKS;
                 synchronized (LOCKS[lockIndex]) {
-                  Serializable[] results = resultsMap.get(groupKeyString);
+                  Object[] results = resultsMap.get(groupKeyString);
 
                   if (results == null) {
-                    results = new Serializable[numAggregationFunctions];
+                    results = new Object[numAggregationFunctions];
                     for (int j = 0; j < numAggregationFunctions; j++) {
                       results[j] = aggregationGroupByResult.getResultForKey(groupKey, j);
                     }
@@ -221,7 +220,7 @@ public class MCombineGroupByOperator extends BaseOperator {
     // Trim the results map.
     AggregationGroupByTrimmingService aggregationGroupByTrimmingService =
         new AggregationGroupByTrimmingService(aggregationFunctionContexts, (int) _brokerRequest.getGroupBy().getTopN());
-    List<Map<String, Serializable>> trimmedResults = aggregationGroupByTrimmingService.trimIntermediateResultsMap(resultsMap);
+    List<Map<String, Object>> trimmedResults = aggregationGroupByTrimmingService.trimIntermediateResultsMap(resultsMap);
     IntermediateResultsBlock mergedBlock =
         new IntermediateResultsBlock(aggregationFunctionContexts, trimmedResults, true);
 
