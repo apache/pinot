@@ -674,114 +674,108 @@ public class PinotLLCRealtimeSegmentManager {
    * Create a consuming segment for the kafka partitions that are missing one.
    *
    * @param realtimeTableName is the name of the realtime table (e.g. "table_REALTIME")
-   * @param nonConsumingPartitions is a list of integers (kafka partitions that do not have a consuming segment)
+   * @param nonConsumingPartitions is a set of integers (kafka partitions that do not have a consuming segment)
    * @param llcSegments is a list of segment names in the ideal state as was observed last.
    */
-  public void createConsumingSegment(String realtimeTableName, List<Integer> nonConsumingPartitions,
-      List<String> llcSegments, AbstractTableConfig tableConfig) {
+  public void createConsumingSegment(final String realtimeTableName, final Set<Integer> nonConsumingPartitions,
+      final List<String> llcSegments, final AbstractTableConfig tableConfig) {
     final KafkaStreamMetadata kafkaStreamMetadata = new KafkaStreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
-    List<LLCSegmentName> segmentNames = new ArrayList<>(llcSegments.size());
-    for (String segmentId: llcSegments) {
-      segmentNames.add(new LLCSegmentName(segmentId));
-    }
-
-    Collections.sort(segmentNames, Collections.reverseOrder());
-
-    Collections.sort(nonConsumingPartitions, Collections.reverseOrder());
-
     final ZNRecord partitionAssignment = getKafkaPartitionAssignment(realtimeTableName);
-    final int nReplicas = partitionAssignment.getListField("0").size(); // Number of replicas of partition 0
+    final HashMap<Integer, LLCSegmentName> ncPartitionToLatestSegment = new HashMap<>(nonConsumingPartitions.size());
+    final int nReplicas = partitionAssignment.getListField("0").size(); // Number of replicas (should be same for all partitions)
 
-    final int nSegments = segmentNames.size();
-    // The segment names are sorted in reverse order, so we will have all the segments of the highest partition
-    // first, and then the next partition, and so on. In each group, the highest sequence number will appear first.
-    // The nonConsumingPartitions list is also sorted in reverse order.
-    // In the loop below, we set 'curPartition' to be the partition that we are trying to find the highest sequence
-    // number for. If we find one, we create a CONSUMING segment with sequence X+1. If we don't find any partition,we
-    // create a CONSUMING segment with STARTING_SEQUENCE_NUMER.
-    // If we are done creating a CONSUMING segment for a partition, we remove it from the list of nonConsumingPartitions
-    // and set curPartition to the next partition in the list.
-    int segmentIndex = 0;
-    while (segmentIndex < nSegments && !nonConsumingPartitions.isEmpty()) {
-      final LLCSegmentName segmentName = segmentNames.get(segmentIndex);
-      final int segmentPartitionId = segmentName.getPartitionId();
-      final int curPartition = nonConsumingPartitions.get(0);
-      try {
-        if (segmentPartitionId > curPartition) {
-          // The partition we need to look for next is not this one, and could be down below in the list of segments.
-          // We need to skip all the segments for higher partitions until we get to curPartition (or lower).
-          // Be sure not to remove 'curPartition' from nonConsumingPartitions.
-          segmentIndex++;
-          continue;
-        } else if (segmentPartitionId < curPartition) {
-          // We went past a partition that has no LLC segments. We can create one with STARTING_SEQUENCE_NUMBER
-          int seqNum = STARTING_SEQUENCE_NUMBER;
-          List<String> instances = partitionAssignment.getListField(Integer.toString(curPartition));
-          LOGGER.info("Creating CONSUMING segment for {} partition {} with seq {}", realtimeTableName, curPartition, seqNum);
-          String consumerStartOffsetSpec = kafkaStreamMetadata.getKafkaConsumerProperties().get(CommonConstants.Helix.DataSource.Realtime.Kafka.AUTO_OFFSET_RESET);
-          long startOffset = getKafkaPartitionOffset(kafkaStreamMetadata, consumerStartOffsetSpec, curPartition);
-          LOGGER.info("Found kafka offset {} for table {} for partition {}", startOffset, realtimeTableName, curPartition);
-
-          createSegment(realtimeTableName, nReplicas, curPartition, seqNum, instances, startOffset,
-              partitionAssignment);
-        } else {
-          // We hit the segment with the highest sequence number for 'curPartition'. Create a consuming segment.
-          int nextSeqNum = segmentName.getSequenceNumber() + 1;
-          List<String> instances = partitionAssignment.getListField(Integer.toString(curPartition));
-          LOGGER.info("Creating CONSUMING segment for {} partition {} with seq {}", realtimeTableName, curPartition, nextSeqNum);
-          // To begin with, set startOffset to the oldest availble offset in kafka. Fix it to be the one we want,
-          // depending on what the prev segment had.
-          long startOffset = getKafkaPartitionOffset(kafkaStreamMetadata, "smallest", curPartition);
-          LOGGER.info("Found kafka offset {} for table {} for partition {}", startOffset, realtimeTableName, curPartition);
-
-          final LLCRealtimeSegmentZKMetadata oldSegMetadata = getRealtimeSegmentZKMetadata(realtimeTableName,
-              segmentName.getSegmentName());
-          CommonConstants.Segment.Realtime.Status status = oldSegMetadata.getStatus();
-          final long prevSegStartOffset = oldSegMetadata.getStartOffset();  // Offset at which the prev segment intended to start consuming
-          if (status.equals(CommonConstants.Segment.Realtime.Status.IN_PROGRESS)) {
-            LOGGER.info("More than one consecutive non-consuming segments detected for table {} partition {}  below sequence {}",
-                realtimeTableName, curPartition, nextSeqNum);
-            // prev segment was never completed, so check it's start offset.
-            if (startOffset <= prevSegStartOffset) {
-              // We still have the same start offset available, re-use it.
-              startOffset = prevSegStartOffset;
-            } else {
-              // There is data loss.
-              LOGGER.warn("Data lost from kafka offset {} to {} for table {} partition {} sequence {}", prevSegStartOffset,
-                  startOffset, realtimeTableName, curPartition, nextSeqNum);
-              // Start from the earliest offset in kafka
-              _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_KAFKA_DATA_LOSS, 1);
-            }
-          } else {
-            // Status must be DONE, so we have a valid end-offset.
-            final long prevSegEndOffset = oldSegMetadata.getEndOffset();  // Will be 0 if the prev segment was not completed.
-            if (startOffset < prevSegEndOffset) {
-              // We don't want to create a segment that overlaps in data with the prev segment. We know that the previous
-              // segment's end offset is available in Kafka, so use that.
-              startOffset = prevSegEndOffset;
-              LOGGER.info("Choosing newer kafka offset {} for table {} for partition {}, sequence {}", startOffset,
-                  realtimeTableName, curPartition, nextSeqNum);
-            } else if (startOffset > prevSegEndOffset) {
-              // Kafka's oldest offset is greater than the end offset of the prev segment, so there is data loss.
-              LOGGER.warn("Data lost from kafka offset {} to {} for table {} partition {} sequence {}", prevSegEndOffset,
-                  startOffset, realtimeTableName, curPartition, nextSeqNum);
-              _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_KAFKA_DATA_LOSS, 1);
-            } else {
-              // The two happen to be equal. A rarity, so log it.
-              LOGGER.info("Kafka earlieset offset {} is the same as new segment start offset", startOffset);
-            }
-          }
-          createSegment(realtimeTableName, nReplicas, curPartition, nextSeqNum, instances, startOffset,
-              partitionAssignment);
-          segmentIndex++;
+    // For each non-consuming partition, find the latest segment (i.e. segment with highest seq number) for that partition.
+    // (null if there is none).
+    for (String segmentId : llcSegments) {
+      LLCSegmentName segmentName = new LLCSegmentName(segmentId);
+      int partitionId = segmentName.getPartitionId();
+      if (nonConsumingPartitions.contains(partitionId)) {
+        LLCSegmentName hashedSegName = ncPartitionToLatestSegment.get(partitionId);
+        if (hashedSegName == null || hashedSegName.getSequenceNumber() < segmentName.getSequenceNumber()) {
+          ncPartitionToLatestSegment.put(partitionId, segmentName);
         }
-      } catch (Exception e) {
-        LOGGER.error("Exception creating CONSUMING segment for {} partition {}", realtimeTableName, curPartition, e);
       }
-      // We land here only if we have created a CONSUMING segment for 'curPartition'. Remove it from the list, and go on
-      // to the next partition (if there is one);
-      nonConsumingPartitions.remove(0);
     }
+
+    // For each non-consuming partition, create a segment with a sequence number one higher than the latest segment.
+    // If there are no segments, then this is the first segment, so create the new segment with sequence number
+    // STARTING_SEQUENCE_NUMBER.
+    // Pick the starting offset of the new segment depending on the end offset of the prev segment (if available
+    // and completed), or the table configuration (smallest/largest).
+    for (int partition : nonConsumingPartitions) {
+      try {
+        LLCSegmentName latestSegment = ncPartitionToLatestSegment.get(partition);
+        long startOffset;
+        int nextSeqNum;
+        List<String> instances = partitionAssignment.getListField(Integer.toString(partition));
+        if (latestSegment == null) {
+          // No segment yet in partition, Create a new one with a starting offset as per table config specification.
+          nextSeqNum = STARTING_SEQUENCE_NUMBER;
+          LOGGER.info("Creating CONSUMING segment for {} partition {} with seq {}", realtimeTableName, partition,
+              nextSeqNum);
+          String consumerStartOffsetSpec = kafkaStreamMetadata.getKafkaConsumerProperties()
+              .get(CommonConstants.Helix.DataSource.Realtime.Kafka.AUTO_OFFSET_RESET);
+          startOffset = getKafkaPartitionOffset(kafkaStreamMetadata, consumerStartOffsetSpec, partition);
+          LOGGER.info("Found kafka offset {} for table {} for partition {}", startOffset, realtimeTableName, partition);
+        } else {
+          nextSeqNum = latestSegment.getSequenceNumber() + 1;
+          LOGGER.info("Creating CONSUMING segment for {} partition {} with seq {}", realtimeTableName, partition,
+              nextSeqNum);
+          // To begin with, set startOffset to the oldest available offset in kafka. Fix it to be the one we want,
+          // depending on what the prev segment had.
+          startOffset = getKafkaPartitionOffset(kafkaStreamMetadata, "smallest", partition);
+          LOGGER.info("Found kafka offset {} for table {} for partition {}", startOffset, realtimeTableName, partition);
+          startOffset = getBetterStartOffsetIfNeeded(realtimeTableName, partition, latestSegment, startOffset,
+              nextSeqNum);
+        }
+        createSegment(realtimeTableName, nReplicas, partition, nextSeqNum, instances, startOffset, partitionAssignment);
+      } catch (Exception e) {
+        LOGGER.error("Exception creating CONSUMING segment for {} partition {}", realtimeTableName, partition, e);
+      }
+    }
+  }
+
+  private long getBetterStartOffsetIfNeeded(final String realtimeTableName, final int partition,
+      final LLCSegmentName latestSegment, final long oldestOffsetInKafka, final int nextSeqNum) {
+    final LLCRealtimeSegmentZKMetadata oldSegMetadata =
+        getRealtimeSegmentZKMetadata(realtimeTableName, latestSegment.getSegmentName());
+    CommonConstants.Segment.Realtime.Status status = oldSegMetadata.getStatus();
+    long segmentStartOffset = oldestOffsetInKafka;
+    final long prevSegStartOffset = oldSegMetadata.getStartOffset();  // Offset at which the prev segment intended to start consuming
+    if (status.equals(CommonConstants.Segment.Realtime.Status.IN_PROGRESS)) {
+      if (oldestOffsetInKafka <= prevSegStartOffset) {
+        // We still have the same start offset available, re-use it.
+        segmentStartOffset = prevSegStartOffset;
+        LOGGER.info("Choosing previous segment start offset {} for table {} for partition {}, sequence {}",
+            oldestOffsetInKafka,
+            realtimeTableName, partition, nextSeqNum);
+      } else {
+        // There is data loss.
+        LOGGER.warn("Data lost from kafka offset {} to {} for table {} partition {} sequence {}",
+            prevSegStartOffset, oldestOffsetInKafka, realtimeTableName, partition, nextSeqNum);
+        // Start from the earliest offset in kafka
+        _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_KAFKA_DATA_LOSS, 1);
+      }
+    } else {
+      // Status must be DONE, so we have a valid end-offset for the previous segment
+      final long prevSegEndOffset = oldSegMetadata.getEndOffset();  // Will be 0 if the prev segment was not completed.
+      if (oldestOffsetInKafka < prevSegEndOffset) {
+        // We don't want to create a segment that overlaps in data with the prev segment. We know that the previous
+        // segment's end offset is available in Kafka, so use that.
+        segmentStartOffset = prevSegEndOffset;
+        LOGGER.info("Choosing newer kafka offset {} for table {} for partition {}, sequence {}", oldestOffsetInKafka,
+            realtimeTableName, partition, nextSeqNum);
+      } else if (oldestOffsetInKafka > prevSegEndOffset) {
+        // Kafka's oldest offset is greater than the end offset of the prev segment, so there is data loss.
+        LOGGER.warn("Data lost from kafka offset {} to {} for table {} partition {} sequence {}", prevSegEndOffset,
+            oldestOffsetInKafka, realtimeTableName, partition, nextSeqNum);
+        _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_KAFKA_DATA_LOSS, 1);
+      } else {
+        // The two happen to be equal. A rarity, so log it.
+        LOGGER.info("Kafka earliest offset {} is the same as new segment start offset", oldestOffsetInKafka);
+      }
+    }
+    return segmentStartOffset;
   }
 
   private void createSegment(String realtimeTableName, int numReplicas, int partitionId, int seqNum,
