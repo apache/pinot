@@ -1,8 +1,6 @@
 package com.linkedin.thirdeye.anomaly.alert.v2;
 
 import com.linkedin.thirdeye.anomaly.alert.AlertJobContext;
-import com.linkedin.thirdeye.anomaly.alert.AlertJobRunner;
-import com.linkedin.thirdeye.anomaly.alert.AlertJobScheduler;
 import com.linkedin.thirdeye.anomaly.job.JobContext;
 import com.linkedin.thirdeye.anomaly.job.JobScheduler;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants;
@@ -33,7 +31,7 @@ import org.slf4j.LoggerFactory;
 
 public class AlertJobSchedulerV2 implements JobScheduler, Runnable {
 
-  private static final Logger LOG = LoggerFactory.getLogger(AlertJobScheduler.class);
+  private static final Logger LOG = LoggerFactory.getLogger(AlertJobSchedulerV2.class);
   public static final int DEFAULT_ALERT_DELAY = 10;
   public static final TimeUnit DEFAULT_ALERT_DELAY_UNIT = TimeUnit.MINUTES;
 
@@ -70,8 +68,7 @@ public class AlertJobSchedulerV2 implements JobScheduler, Runnable {
 
   public void start() throws SchedulerException {
     quartzScheduler.start();
-    scheduledExecutorService
-        .scheduleWithFixedDelay(this, 0, DEFAULT_ALERT_DELAY, DEFAULT_ALERT_DELAY_UNIT);
+    scheduledExecutorService.scheduleWithFixedDelay(this, 0, DEFAULT_ALERT_DELAY, DEFAULT_ALERT_DELAY_UNIT);
   }
 
   public void run() {
@@ -150,7 +147,7 @@ public class AlertJobSchedulerV2 implements JobScheduler, Runnable {
     startJob(alertConfig, jobKey);
   }
 
-  public void startJob(AlertConfigDTO alertConfig, String jobKey) throws SchedulerException {
+  private void startJob(AlertConfigDTO alertConfig, String jobKey) throws SchedulerException {
 
     if (quartzScheduler.checkExists(JobKey.jobKey(jobKey))) {
       throw new IllegalStateException("Alert config  " + jobKey + " is already scheduled");
@@ -159,6 +156,7 @@ public class AlertJobSchedulerV2 implements JobScheduler, Runnable {
     alertJobContext.setJobDAO(anomalyJobDAO);
     alertJobContext.setTaskDAO(anomalyTaskDAO);
     alertJobContext.setAlertConfigId(alertConfig.getId());
+    alertJobContext.setAlertConfigDTO(alertConfig);
     alertJobContext.setJobName(jobKey);
     scheduleJob(alertJobContext, alertConfig);
   }
@@ -182,11 +180,9 @@ public class AlertJobSchedulerV2 implements JobScheduler, Runnable {
     String triggerKey = String.format("alert_scheduler_trigger_%d", alertConfig.getId());
     CronTrigger trigger = TriggerBuilder.newTrigger().withIdentity(triggerKey)
         .withSchedule(CronScheduleBuilder.cronSchedule(alertConfig.getCronExpression())).build();
-
     String jobKey = jobContext.getJobName();
-    JobDetail job = JobBuilder.newJob(AlertJobRunner.class).withIdentity(jobKey).build();
-
-    job.getJobDataMap().put(AlertJobRunner.ALERT_JOB_CONTEXT, jobContext);
+    JobDetail job = JobBuilder.newJob(AlertJobRunnerV2.class).withIdentity(jobKey).build();
+    job.getJobDataMap().put(AlertJobRunnerV2.ALERT_JOB_CONTEXT_V2, jobContext);
     try {
       quartzScheduler.scheduleJob(job, trigger);
     } catch (SchedulerException e) {

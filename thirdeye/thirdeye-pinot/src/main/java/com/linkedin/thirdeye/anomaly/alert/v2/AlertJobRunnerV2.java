@@ -15,6 +15,7 @@ import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import org.joda.time.DateTime;
 import org.quartz.Job;
@@ -29,15 +30,16 @@ public class AlertJobRunnerV2 implements Job {
       LOG = LoggerFactory.getLogger(com.linkedin.thirdeye.anomaly.alert.AlertJobRunner.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-  public static final String ALERT_JOB_CONTEXT = "ALERT_JOB_CONTEXT";
+  public static final String ALERT_JOB_CONTEXT_V2 = "ALERT_JOB_CONTEXT_V2";
   public static final String ALERT_JOB_MONITORING_WINDOW_START_TIME = "ALERT_JOB_MONITORING_WINDOW_START_TIME";
   public static final String ALERT_JOB_MONITORING_WINDOW_END_TIME = "ALERT_JOB_MONITORING_WINDOW_END_TIME";
 
-  private JobManager jobDAO;
-  private TaskManager taskDAO;
-  private AlertJobContext alertJobContext;
+  private JobManager jobDAO = DAORegistry.getInstance().getJobDAO();
+  private TaskManager taskDAO = DAORegistry.getInstance().getTaskDAO();
   private AlertConfigManager alertConfigDAO = DAORegistry.getInstance().getAlertConfigDAO();
+
   private TaskGenerator taskGenerator;
+  private AlertJobContext alertJobContext;
 
   public AlertJobRunnerV2() {
     taskGenerator = new TaskGenerator();
@@ -46,11 +48,7 @@ public class AlertJobRunnerV2 implements Job {
   @Override
   public void execute(JobExecutionContext jobExecutionContext) throws JobExecutionException {
     LOG.info("Running " + jobExecutionContext.getJobDetail().getKey().toString());
-
-    alertJobContext = (AlertJobContext) jobExecutionContext.getJobDetail().getJobDataMap()
-        .get(ALERT_JOB_CONTEXT);
-    jobDAO = alertJobContext.getJobDAO();
-    taskDAO = alertJobContext.getTaskDAO();
+    alertJobContext = (AlertJobContext) jobExecutionContext.getJobDetail().getJobDataMap().get(ALERT_JOB_CONTEXT_V2);
     long alertConfigId = alertJobContext.getAlertConfigId();
 
     AlertConfigDTO alertConfig = alertConfigDAO.findById(alertConfigId);
@@ -61,27 +59,20 @@ public class AlertJobRunnerV2 implements Job {
 
       DateTime monitoringWindowStartTime =
           (DateTime) jobExecutionContext.getJobDetail().getJobDataMap().get(ALERT_JOB_MONITORING_WINDOW_START_TIME);
+
       DateTime monitoringWindowEndTime =
           (DateTime) jobExecutionContext.getJobDetail().getJobDataMap().get(ALERT_JOB_MONITORING_WINDOW_END_TIME);
 
-/*      // Compute window end
+      // TODO :remove this monitoring window logic; alert v2 is not based on monitoring window.
+       // Compute window end
       if (monitoringWindowEndTime == null) {
-        long delayMillis = 0;
-        if (alertConfig.getWindowDelay() != null) {
-          delayMillis = TimeUnit.MILLISECONDS.convert(alertConfig.getWindowDelay(),
-              alertConfig.getWindowDelayUnit());
-        }
         Date scheduledFireTime = jobExecutionContext.getScheduledFireTime();
-        monitoringWindowEndTime = new DateTime(scheduledFireTime).minus(delayMillis);
+        monitoringWindowEndTime = new DateTime(scheduledFireTime);
       }
-
       // Compute window start according to window end
       if (monitoringWindowStartTime == null) {
-        int windowSize = alertConfig.getWindowSize();
-        TimeUnit windowUnit = alertConfig.getWindowUnit();
-        long windowMillis = TimeUnit.MILLISECONDS.convert(windowSize, windowUnit);
-        monitoringWindowStartTime = monitoringWindowEndTime.minus(windowMillis);
-      }*/
+        monitoringWindowStartTime = monitoringWindowEndTime;
+      }
 
       // write to alert_jobs
       Long jobExecutionId = createJob(monitoringWindowStartTime, monitoringWindowEndTime);
@@ -89,6 +80,7 @@ public class AlertJobRunnerV2 implements Job {
 
       // write to alert_tasks
       List<Long> taskIds = createTasks(monitoringWindowStartTime, monitoringWindowEndTime);
+      LOG.info("Alert V2 tasks created : {}", taskIds);
     }
   }
 

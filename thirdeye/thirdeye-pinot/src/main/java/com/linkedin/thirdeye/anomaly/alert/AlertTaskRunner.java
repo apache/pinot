@@ -6,7 +6,6 @@ import com.linkedin.thirdeye.anomaly.alert.util.EmailHelper;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewResponse;
-import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
 import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilter;

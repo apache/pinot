@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.dashboard.resources;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.client.DAORegistry;
+import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
@@ -9,6 +10,7 @@ import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AbstractDTO;
+import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
@@ -45,6 +47,7 @@ public class EntityManagerResource {
   private final MetricConfigManager metricConfigManager;
   private final DatasetConfigManager datasetConfigManager;
   private final OverrideConfigManager overrideConfigManager;
+  private final AlertConfigManager alertConfigManager;
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
@@ -58,11 +61,12 @@ public class EntityManagerResource {
     this.metricConfigManager = DAO_REGISTRY.getMetricConfigDAO();
     this.datasetConfigManager = DAO_REGISTRY.getDatasetConfigDAO();
     this.overrideConfigManager = DAO_REGISTRY.getOverrideConfigDAO();
+    this.alertConfigManager = DAO_REGISTRY.getAlertConfigDAO();
   }
 
   private enum EntityType {
     ANOMALY_FUNCTION, EMAIL_CONFIGURATION, DASHBOARD_CONFIG, DATASET_CONFIG, METRIC_CONFIG,
-    OVERRIDE_CONFIG
+    OVERRIDE_CONFIG, ALERT_CONFIG
   }
 
   @GET
@@ -93,6 +97,9 @@ public class EntityManagerResource {
       break;
     case OVERRIDE_CONFIG:
       results.addAll(overrideConfigManager.findAll());
+      break;
+    case ALERT_CONFIG:
+      results.addAll(alertConfigManager.findAll());
       break;
     default:
       throw new WebApplicationException("Unknown entity type : " + entityType);
@@ -136,6 +143,14 @@ public class EntityManagerResource {
           overrideConfigManager.save(overrideConfigDTO);
         } else {
           overrideConfigManager.update(overrideConfigDTO);
+        }
+        break;
+      case ALERT_CONFIG:
+        AlertConfigDTO alertConfigDTO = OBJECT_MAPPER.readValue(jsonPayload, AlertConfigDTO.class);
+        if (alertConfigDTO.getId() == null) {
+          alertConfigManager.save(alertConfigDTO);
+        } else {
+          alertConfigManager.update(alertConfigDTO);
         }
         break;
       }

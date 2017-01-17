@@ -158,7 +158,7 @@ public class AlertJobScheduler implements JobScheduler, Runnable {
     startJob(alertConfig, jobKey);
   }
 
-  public void startJob(EmailConfigurationDTO alertConfig, String jobKey) throws SchedulerException {
+  private void startJob(EmailConfigurationDTO alertConfig, String jobKey) throws SchedulerException {
 
     if (quartzScheduler.checkExists(JobKey.jobKey(jobKey))) {
       throw new IllegalStateException("Alert config  " + jobKey + " is already scheduled");

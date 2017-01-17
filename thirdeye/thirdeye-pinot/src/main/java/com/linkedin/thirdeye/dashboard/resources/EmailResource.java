@@ -122,6 +122,9 @@ public class EmailResource {
     return emailDAO.findByFunctionId(functionId);
   }
 
+  // TODO : add end points for AlertConfig
+
+
   @GET
   @Path("generate/datasets/{startTime}/{endTime}")
   public Response generateAndSendAlertForDatasets(@PathParam("startTime") Long startTime,
@@ -156,7 +159,7 @@ public class EmailResource {
     configuration.setSmtpConfiguration(smtpConfiguration);
     configuration.setDashboardHost(teHost);
 
-    anomalyReportGenerator.buildReport(startTime, endTime, anomalies, configuration, includeSentAnomaliesOnly, toAddr);
+    anomalyReportGenerator.buildReport(startTime, endTime, anomalies, configuration, includeSentAnomaliesOnly, toAddr, fromAddr);
     return Response.ok().build();
   }
 
@@ -194,7 +197,7 @@ public class EmailResource {
     configuration.setSmtpConfiguration(smtpConfiguration);
     configuration.setDashboardHost(teHost);
 
-    anomalyReportGenerator.buildReport(startTime, endTime, anomalies, configuration, includeSentAnomaliesOnly, toAddr);
+    anomalyReportGenerator.buildReport(startTime, endTime, anomalies, configuration, includeSentAnomaliesOnly, toAddr, fromAddr);
     return Response.ok().build();
   }
 }

@@ -10,9 +10,27 @@ public class AlertConfigBean extends AbstractBean {
   boolean active;
   EmailConfig emailConfig;
   ReportConfig reportConfig;
+  String recipients;
+  String fromAddress;
 
   public String getCronExpression() {
     return cronExpression;
+  }
+
+  public String getFromAddress() {
+    return fromAddress;
+  }
+
+  public void setFromAddress(String fromAddress) {
+    this.fromAddress = fromAddress;
+  }
+
+  public String getRecipients() {
+    return recipients;
+  }
+
+  public void setRecipients(String recipients) {
+    this.recipients = recipients;
   }
 
   public void setCronExpression(String cronExpression) {
