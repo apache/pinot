@@ -47,6 +47,7 @@ import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.linkedin.pinot.common.utils.ServiceStatus;
 
 
 /**
@@ -120,6 +121,11 @@ public class HelixBrokerStarter {
     _helixManager.connect();
     _helixAdmin = _helixManager.getClusterManagmentTool();
     addInstanceTagIfNeeded(helixClusterName, brokerId);
+
+
+    // Register the service status handler
+    ServiceStatus.setServiceStatusCallback(
+        new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixAdmin, helixClusterName, brokerId));
 
     ClusterChangeMediator clusterChangeMediator = new ClusterChangeMediator(_helixExternalViewBasedRouting,
         _brokerServerBuilder.getBrokerMetrics());
