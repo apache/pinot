@@ -156,7 +156,7 @@ public class AnomalyReportGenerator {
   void buildEmailTemplateAndSendAlert(Map<String, Object> paramMap,
       SmtpConfiguration smtpConfiguration, String emailRecipients, String fromEmail) {
     if (Strings.isNullOrEmpty(fromEmail)) {
-      fromEmail = "thirdeye-dev@linkedin.com";
+      throw new IllegalArgumentException("Invalid sender's email");
     }
     HtmlEmail email = new HtmlEmail();
     ByteArrayOutputStream baos = new ByteArrayOutputStream();

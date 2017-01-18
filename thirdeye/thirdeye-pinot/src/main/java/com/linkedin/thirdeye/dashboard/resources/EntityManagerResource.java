@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.base.Strings;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
@@ -109,6 +110,9 @@ public class EntityManagerResource {
 
   @POST
   public Response updateEntity(@QueryParam("entityType") String entityTypeStr, String jsonPayload) {
+    if (Strings.isNullOrEmpty(entityTypeStr)) {
+      throw new WebApplicationException("EntryType can not be null");
+    }
     EntityType entityType = EntityType.valueOf(entityTypeStr);
     try {
       switch (entityType) {

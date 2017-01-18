@@ -71,7 +71,7 @@ public class AlertConfigBean extends AbstractBean {
 
   public static class EmailConfig {
     boolean sendAlertOnZeroAnomaly;
-    long lastNotifiedAnomalyId;
+    long lastNotifiedAnomalyId = 0l;
     List<Long> functionIds;
 
     public List<Long> getFunctionIds() {
@@ -125,14 +125,6 @@ public class AlertConfigBean extends AbstractBean {
       return metricIds;
     }
 
-    public COMPARE_MODE getCompareMode() {
-      return compareMode;
-    }
-
-    public void setCompareMode(COMPARE_MODE compareMode) {
-      this.compareMode = compareMode;
-    }
-
     public void setMetricIds(List<Long> metricIds) {
       this.metricIds = metricIds;
     }
@@ -140,5 +132,18 @@ public class AlertConfigBean extends AbstractBean {
 
   public static enum COMPARE_MODE {
     WoW, Wo2W, Wo3W
+  }
+
+  @Override
+  public String toString() {
+    return "AlertConfigBean{" +
+        "active=" + active +
+        ", name='" + name + '\'' +
+        ", cronExpression='" + cronExpression + '\'' +
+        ", emailConfig=" + emailConfig +
+        ", reportConfig=" + reportConfig +
+        ", recipients='" + recipients + '\'' +
+        ", fromAddress='" + fromAddress + '\'' +
+        '}';
   }
 }

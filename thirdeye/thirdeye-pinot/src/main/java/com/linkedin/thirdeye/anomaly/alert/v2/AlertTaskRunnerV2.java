@@ -20,14 +20,22 @@ import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
+import freemarker.template.Configuration;
+import freemarker.template.Template;
+import freemarker.template.TemplateExceptionHandler;
+import java.io.ByteArrayOutputStream;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TimeZone;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.commons.mail.EmailException;
 import org.apache.commons.mail.HtmlEmail;
+import org.joda.time.DateTimeZone;
 import org.quartz.JobExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,13 +43,14 @@ import org.slf4j.LoggerFactory;
 public class AlertTaskRunnerV2 implements TaskRunner {
 
   private static final Logger LOG = LoggerFactory.getLogger(AlertTaskRunner.class);
+  public static final TimeZone DEFAULT_TIME_ZONE = TimeZone.getTimeZone("America/Los_Angeles");
+  public static final String CHARSET = "UTF-8";
 
   private final MergedAnomalyResultManager anomalyMergedResultDAO;
   private final AlertConfigManager alertConfigDAO;
   private final MetricConfigManager metricConfigManager;
 
   private AlertConfigDTO alertConfig;
-
   private ThirdEyeAnomalyConfiguration thirdeyeConfig;
 
   public AlertTaskRunnerV2() {
@@ -78,6 +87,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
       List<MergedAnomalyResultDTO> mergedAnomaliesAllResults = new ArrayList<>();
       long lastNotifiedAnomaly = emailConfig.getLastNotifiedAnomalyId();
       for (Long functionId : functionIds) {
+        // TODO : FIXME
         mergedAnomaliesAllResults.addAll(anomalyMergedResultDAO.findByFunctionIdAndIdGreaterThan(functionId, lastNotifiedAnomaly));
       }
       // apply filtration rule
@@ -106,7 +116,6 @@ public class AlertTaskRunnerV2 implements TaskRunner {
       }
     }
 
-    // TODO: separate Summary report from email report
     AlertConfigBean.ReportConfig reportConfig = alertConfig.getReportConfig();
     if (reportConfig != null && reportConfig.isEnabled()) {
       if (reportConfig.getMetricIds()!= null) {
@@ -134,8 +143,25 @@ public class AlertTaskRunnerV2 implements TaskRunner {
           }
           reportStartTs = reports.get(0).getTimeBuckets().get(0).getCurrentStart();
           metricDimensionValueReports = DataReportHelper.getDimensionReportList(reports);
+          Configuration freemarkerConfig = new Configuration(Configuration.VERSION_2_3_21);
+          freemarkerConfig.setClassForTemplateLoading(getClass(), "/com/linkedin/thirdeye/detector/");
+          freemarkerConfig.setDefaultEncoding(CHARSET);
+          freemarkerConfig.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);
           Map<String, Object> templateData = new HashMap<>();
-          // TODO : setup template and send data report email;
+          templateData.put("dashboardHost", thirdeyeConfig.getDashboardHost());
+          templateData.put("fromEmail", alertConfig.getFromAddress());
+          templateData.put("reportStartDateTime", reportStartTs);
+          templateData.put("metricDimensionValueReports", metricDimensionValueReports);
+          DateTimeZone timeZone = DateTimeZone.forTimeZone(DEFAULT_TIME_ZONE);
+          DataReportHelper.DateFormatMethod dateFormatMethod = new DataReportHelper.DateFormatMethod(timeZone);
+          templateData.put("timeZone", timeZone);
+          ByteArrayOutputStream baos = new ByteArrayOutputStream();
+          try (Writer out = new OutputStreamWriter(baos, CHARSET)) {
+            Template template = freemarkerConfig.getTemplate("data-report-by-metric-dimension.ftl");
+            template.process(templateData, out);
+          } catch (Exception e) {
+            throw new JobExecutionException(e);
+          }
         }
       }
     }

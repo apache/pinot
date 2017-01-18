@@ -37,10 +37,11 @@ public class TaskInfoFactory {
           taskInfo = OBJECT_MAPPER.readValue(taskInfoString, MonitorTaskInfo.class);
           break;
         case ALERT:
+        case ALERT2:
           taskInfo = OBJECT_MAPPER.readValue(taskInfoString, AlertTaskInfo.class);
           break;
         default:
-          LOG.error("TaskType must be one of ANOMALY_DETECTION, MONITOR, ALERT");
+          LOG.error("TaskType must be one of ANOMALY_DETECTION, MONITOR, ALERT, ALERT2");
           break;
       }
     } catch (Exception e) {
