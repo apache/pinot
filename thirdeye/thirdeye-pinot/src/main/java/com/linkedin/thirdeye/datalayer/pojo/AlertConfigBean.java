@@ -103,6 +103,7 @@ public class AlertConfigBean extends AbstractBean {
     boolean enabled = true;
     List<Long> metricIds;
     List<List<String>> metricDimensions;
+    COMPARE_MODE compareMode = COMPARE_MODE.Wo2W;
 
     public boolean isEnabled() {
       return enabled;
@@ -124,8 +125,20 @@ public class AlertConfigBean extends AbstractBean {
       return metricIds;
     }
 
+    public COMPARE_MODE getCompareMode() {
+      return compareMode;
+    }
+
+    public void setCompareMode(COMPARE_MODE compareMode) {
+      this.compareMode = compareMode;
+    }
+
     public void setMetricIds(List<Long> metricIds) {
       this.metricIds = metricIds;
     }
+  }
+
+  public static enum COMPARE_MODE {
+    WoW, Wo2W, Wo3W
   }
 }

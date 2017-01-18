@@ -3,20 +3,28 @@ package com.linkedin.thirdeye.anomaly.alert.v2;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.alert.AlertTaskInfo;
 import com.linkedin.thirdeye.anomaly.alert.AlertTaskRunner;
+import com.linkedin.thirdeye.anomaly.alert.template.pojo.MetricDimensionReport;
 import com.linkedin.thirdeye.anomaly.alert.util.AnomalyReportGenerator;
+import com.linkedin.thirdeye.anomaly.alert.util.DataReportHelper;
 import com.linkedin.thirdeye.anomaly.alert.util.EmailHelper;
 import com.linkedin.thirdeye.anomaly.task.TaskContext;
 import com.linkedin.thirdeye.anomaly.task.TaskInfo;
 import com.linkedin.thirdeye.anomaly.task.TaskResult;
 import com.linkedin.thirdeye.anomaly.task.TaskRunner;
 import com.linkedin.thirdeye.client.DAORegistry;
+import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewResponse;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.commons.mail.EmailException;
 import org.apache.commons.mail.HtmlEmail;
@@ -30,13 +38,16 @@ public class AlertTaskRunnerV2 implements TaskRunner {
 
   private final MergedAnomalyResultManager anomalyMergedResultDAO;
   private final AlertConfigManager alertConfigDAO;
+  private final MetricConfigManager metricConfigManager;
 
   private AlertConfigDTO alertConfig;
+
   private ThirdEyeAnomalyConfiguration thirdeyeConfig;
 
   public AlertTaskRunnerV2() {
     anomalyMergedResultDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
     alertConfigDAO = DAORegistry.getInstance().getAlertConfigDAO();
+    metricConfigManager = DAORegistry.getInstance().getMetricConfigDAO();
   }
 
   @Override
@@ -98,7 +109,35 @@ public class AlertTaskRunnerV2 implements TaskRunner {
     // TODO: separate Summary report from email report
     AlertConfigBean.ReportConfig reportConfig = alertConfig.getReportConfig();
     if (reportConfig != null && reportConfig.isEnabled()) {
-     // TODO: build data summary report
+      if (reportConfig.getMetricIds()!= null) {
+        if (reportConfig.getMetricIds().size()  != reportConfig.getMetricDimensions().size()) {
+          LOG.error("Metric List vs DimensionList size mismatch, please update the config");
+        } else {
+
+          long reportStartTs = 0;
+          List<MetricDimensionReport> metricDimensionValueReports;
+          List<ContributorViewResponse> reports = new ArrayList<>();
+          for (int i = 0; i < reportConfig.getMetricIds().size(); i++) {
+            MetricConfigDTO metricConfig =
+                metricConfigManager.findById(reportConfig.getMetricIds().get(i));
+            List<String> dimensions = reportConfig.getMetricDimensions().get(i);
+            if (dimensions != null && dimensions.size() > 0) {
+              for (String dimension : dimensions) {
+                ContributorViewResponse report = EmailHelper
+                    .getContributorData(metricConfig.getDataset(), metricConfig.getName(),
+                        Arrays.asList(dimension));
+                if (report != null) {
+                  reports.add(report);
+                }
+              }
+            }
+          }
+          reportStartTs = reports.get(0).getTimeBuckets().get(0).getCurrentStart();
+          metricDimensionValueReports = DataReportHelper.getDimensionReportList(reports);
+          Map<String, Object> templateData = new HashMap<>();
+          // TODO : setup template and send data report email;
+        }
+      }
     }
   }
 

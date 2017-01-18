@@ -45,6 +45,9 @@ import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.detector.email.AnomalyGraphGenerator;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
+/**
+ * Stateless class to provide util methods to help build anomaly report
+ */
 import static com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper.FILTER_TYPE_KEY;
 
 public abstract class EmailHelper {
@@ -200,6 +203,8 @@ public abstract class EmailHelper {
 
   public static ContributorViewResponse getContributorData(String collection, String metric, List<String> dimensions)
       throws Exception {
+
+    // TODO : add support to Comparision mode eg : WoW or Wo2W etc
 
     ContributorViewRequest request = new ContributorViewRequest();
     request.setCollection(collection);

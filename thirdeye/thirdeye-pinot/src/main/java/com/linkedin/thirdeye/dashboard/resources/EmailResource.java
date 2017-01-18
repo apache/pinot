@@ -4,6 +4,8 @@ import com.google.common.base.Strings;
 import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.alert.util.AnomalyReportGenerator;
+import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.Arrays;
 import java.util.List;
@@ -33,11 +35,13 @@ public class EmailResource {
 
   private final AnomalyFunctionManager functionDAO;
   private final EmailConfigurationManager emailDAO;
+  private final AlertConfigManager alertDAO;
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   public EmailResource() {
     this.functionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.emailDAO = DAO_REGISTRY.getEmailConfigurationDAO();
+    this.alertDAO = DAO_REGISTRY.getAlertConfigDAO();
   }
 
   @POST
@@ -58,6 +62,27 @@ public class EmailResource {
   @Path("{id}")
   public EmailConfigurationDTO getEmailConfigById (@PathParam("id") Long id) {
     return emailDAO.findById(id);
+  }
+
+
+  @POST
+  @Path("alert")
+  public Response createAlertConfig(AlertConfigDTO alertConfigDTO) {
+    Long id = alertDAO.save(alertConfigDTO);
+    return Response.ok(id).build();
+  }
+
+  @GET
+  @Path("alert/{id}")
+  public AlertConfigDTO getAlertConfigById (@PathParam("id") Long id) {
+    return alertDAO.findById(id);
+  }
+
+  @DELETE
+  @Path("alert/{alertId}")
+  public Response deleteByAlertId(@PathParam("alertId") Long alertId) {
+    alertDAO.deleteById(alertId);
+    return Response.ok().build();
   }
 
   @GET

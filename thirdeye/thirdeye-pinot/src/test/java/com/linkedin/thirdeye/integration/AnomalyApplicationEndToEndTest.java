@@ -14,6 +14,8 @@ import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.quartz.SchedulerException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -54,7 +56,7 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 
 public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
-
+  private static final Logger LOG = LoggerFactory.getLogger(AnomalyApplicationEndToEndTest.class);
   private DetectionJobScheduler detectionJobScheduler = null;
   private TaskDriver taskDriver = null;
   private MonitorJobScheduler monitorJobScheduler = null;
@@ -79,7 +81,8 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
     DAO_REGISTRY
         .registerDAOs(anomalyFunctionDAO, emailConfigurationDAO, rawResultDAO, mergedResultDAO,
             jobDAO, taskDAO, datasetConfigDAO, metricConfigDAO, dashboardConfigDAO,
-            ingraphMetricConfigDAO, ingraphDashboardConfigDAO, overrideConfigDAO, alertConfigManager);
+            ingraphMetricConfigDAO, ingraphDashboardConfigDAO, overrideConfigDAO,
+            alertConfigManager);
 
     // Mock query cache
     ThirdEyeClient mockThirdeyeClient = Mockito.mock(ThirdEyeClient.class);
@@ -121,6 +124,9 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
 
     // create test email configuration
     emailConfigurationDAO.save(getTestEmailConfiguration(metric, collection));
+
+    // create test alert configuration
+    alertConfigManager.save(getTestAlertConfiguration("test alert v2"));
 
     // create test dataset config
     datasetConfigDAO.save(getTestDatasetConfig(collection));
@@ -251,8 +257,11 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
     jobs = jobDAO.findAll();
     int completedJobCount = 0;
     for (JobDTO job : jobs) {
-      if (!job.getStatus().equals(JobStatus.COMPLETED)) {
+      int attempt = 0;
+      while (attempt < 3 && !job.getStatus().equals(JobStatus.COMPLETED)) {
+        LOG.info("Checking job status with attempt : {}", attempt + 1);
         Thread.sleep(5_000);
+        attempt++;
       }
       if (job.getStatus().equals(JobStatus.COMPLETED)) {
         completedJobCount ++;
