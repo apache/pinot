@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.anomaly.alert;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import java.util.Objects;
 
 import org.joda.time.DateTime;
@@ -12,6 +14,7 @@ import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.util.CustomDateDeserializer;
 import com.linkedin.thirdeye.util.CustomDateSerializer;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class AlertTaskInfo implements TaskInfo {
 
   private long jobExecutionId;
@@ -24,13 +27,15 @@ public class AlertTaskInfo implements TaskInfo {
   @JsonDeserialize(using = CustomDateDeserializer.class)
   private DateTime windowEndTime;
   private EmailConfigurationDTO alertConfig;
+  private AlertConfigDTO alertConfigDTO;
 
   public AlertTaskInfo(long jobExecutionId, DateTime windowStartTime,
-      DateTime windowEndTime, EmailConfigurationDTO alertConfig) {
+      DateTime windowEndTime, EmailConfigurationDTO alertConfig, AlertConfigDTO alertConfigDTO) {
     this.jobExecutionId = jobExecutionId;
     this.windowStartTime = windowStartTime;
     this.windowEndTime = windowEndTime;
     this.alertConfig = alertConfig;
+    this.alertConfigDTO = alertConfigDTO;
   }
 
   public AlertTaskInfo() {
@@ -65,10 +70,17 @@ public class AlertTaskInfo implements TaskInfo {
     return alertConfig;
   }
 
-  public void setAlertConfig(EmailConfigurationDTO alertConfig) {
-    this.alertConfig = alertConfig;
+  public void setAlertConfig(EmailConfigurationDTO emailConfig) {
+    this.alertConfig = emailConfig;
   }
 
+  public AlertConfigDTO getAlertConfigDTO() {
+    return alertConfigDTO;
+  }
+
+  public void setAlertConfigDTO(AlertConfigDTO alertConfig) {
+    this.alertConfigDTO = alertConfig;
+  }
 
   @Override
   public boolean equals(Object o) {
@@ -84,13 +96,12 @@ public class AlertTaskInfo implements TaskInfo {
 
   @Override
   public int hashCode() {
-    return Objects.hash(jobExecutionId, windowStartTime, windowEndTime, alertConfig);
+    return Objects.hash(jobExecutionId, windowStartTime, windowEndTime, alertConfig, alertConfigDTO);
   }
 
   @Override
   public String toString() {
     return MoreObjects.toStringHelper(this).add("jobExecutionId", jobExecutionId)
-        .add("windowStartTime", windowStartTime).add("windowEndTime", windowEndTime)
-        .add("alertConfig", alertConfig).toString();
+        .add("windowStartTime", windowStartTime).add("windowEndTime", windowEndTime).toString();
   }
 }

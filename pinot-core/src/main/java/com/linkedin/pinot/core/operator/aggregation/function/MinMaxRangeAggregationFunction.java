@@ -19,15 +19,14 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.ObjectAggregationResultHolder;
+import com.linkedin.pinot.core.operator.aggregation.function.customobject.MinMaxRangePair;
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupByResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.groupby.ObjectGroupByResultHolder;
-import com.linkedin.pinot.core.query.aggregation.function.MinMaxRangeAggregationFunction.MinMaxRangePair;
 import javax.annotation.Nonnull;
 
 
 public class MinMaxRangeAggregationFunction implements AggregationFunction<MinMaxRangePair, Double> {
   private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.MINMAXRANGE.getName();
-  private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
 
   @Nonnull
   @Override
@@ -78,17 +77,11 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction<MinMa
 
   protected void setAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder, double min,
       double max) {
-    // TODO: make a class for the pair which implements comparable and stores mutable primitive values.
     MinMaxRangePair minMaxRangePair = aggregationResultHolder.getResult();
     if (minMaxRangePair == null) {
       aggregationResultHolder.setValue(new MinMaxRangePair(min, max));
     } else {
-      if (min < minMaxRangePair.getFirst()) {
-        minMaxRangePair.setFirst(min);
-      }
-      if (max > minMaxRangePair.getSecond()) {
-        minMaxRangePair.setSecond(max);
-      }
+      minMaxRangePair.apply(min, max);
     }
   }
 
@@ -120,12 +113,7 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction<MinMa
     if (minMaxRangePair == null) {
       groupByResultHolder.setValueForKey(groupKey, new MinMaxRangePair(min, max));
     } else {
-      if (min < minMaxRangePair.getFirst()) {
-        minMaxRangePair.setFirst(min);
-      }
-      if (max > minMaxRangePair.getSecond()) {
-        minMaxRangePair.setSecond(max);
-      }
+      minMaxRangePair.apply(min, max);
     }
   }
 
@@ -155,14 +143,7 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction<MinMa
   @Override
   public MinMaxRangePair merge(@Nonnull MinMaxRangePair intermediateResult1,
       @Nonnull MinMaxRangePair intermediateResult2) {
-    double min = intermediateResult2.getFirst();
-    if (min < intermediateResult1.getFirst()) {
-      intermediateResult1.setFirst(min);
-    }
-    double max = intermediateResult2.getSecond();
-    if (max > intermediateResult1.getSecond()) {
-      intermediateResult1.setSecond(max);
-    }
+    intermediateResult1.apply(intermediateResult2);
     return intermediateResult1;
   }
 
@@ -175,12 +156,6 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction<MinMa
   @Nonnull
   @Override
   public Double extractFinalResult(@Nonnull MinMaxRangePair intermediateResult) {
-    double min = intermediateResult.getFirst();
-    double max = intermediateResult.getSecond();
-    if (min > max) {
-      return DEFAULT_FINAL_RESULT;
-    } else {
-      return max - min;
-    }
+    return intermediateResult.getMax() - intermediateResult.getMin();
   }
 }

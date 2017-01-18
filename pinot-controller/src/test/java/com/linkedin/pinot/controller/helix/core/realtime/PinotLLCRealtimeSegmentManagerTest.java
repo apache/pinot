@@ -472,7 +472,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     IndexingConfig indexingConfig = mock(IndexingConfig.class);
     when(indexingConfig.getStreamConfigs()).thenReturn(streamPropMap);
     when(tableConfig.getIndexingConfig()).thenReturn(indexingConfig);
-    List<Integer> nonConsumingPartitions = new ArrayList<>(1);
+    Set<Integer> nonConsumingPartitions = new HashSet<>(1);
     nonConsumingPartitions.add(partitionToBeFixed);
     nonConsumingPartitions.add(partitionWithHigherOffset);
     nonConsumingPartitions.add(emptyPartition);
@@ -543,7 +543,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     // Now, if we make 'partitionToBeFixed' a non-consuming partition, a second one should get added with the same start offset as
     // as the first one, since the kafka offset to return has not changed.
-    List<Integer> ncPartitions = new ArrayList<>(1);
+    Set<Integer> ncPartitions = new HashSet<>(1);
     ncPartitions.add(partitionToBeFixed);
     segmentManager.createConsumingSegment(rtTableName, ncPartitions, segmentManager.getExistingSegments(rtTableName), tableConfig);
     Assert.assertEquals(segmentManager._paths.size(), 4);

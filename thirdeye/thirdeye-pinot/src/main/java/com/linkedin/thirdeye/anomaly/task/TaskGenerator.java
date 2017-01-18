@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomaly.task;
 
+import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -51,16 +52,30 @@ public class TaskGenerator {
 
   }
 
-  public List<AlertTaskInfo> createAlertTasks(AlertJobContext alertJobContext, DateTime monitoringWindowStartTime,
-      DateTime monitoringWindowEndTime)
-      throws Exception{
+  public List<AlertTaskInfo> createAlertTasks(AlertJobContext alertJobContext,
+      DateTime monitoringWindowStartTime, DateTime monitoringWindowEndTime) throws Exception {
 
     List<AlertTaskInfo> tasks = new ArrayList<>();
     EmailConfigurationDTO alertConfig = alertJobContext.getAlertConfig();
     long jobExecutionId = alertJobContext.getJobExecutionId();
 
+    AlertTaskInfo taskInfo =
+        new AlertTaskInfo(jobExecutionId, monitoringWindowStartTime, monitoringWindowEndTime,
+            alertConfig, null);
+    tasks.add(taskInfo);
+    return tasks;
+  }
 
-    AlertTaskInfo taskInfo = new AlertTaskInfo(jobExecutionId, monitoringWindowStartTime, monitoringWindowEndTime, alertConfig);
+  public List<AlertTaskInfo> createAlertTasksV2(AlertJobContext alertJobContext,
+      DateTime monitoringWindowStartTime, DateTime monitoringWindowEndTime) throws Exception {
+
+    List<AlertTaskInfo> tasks = new ArrayList<>();
+    AlertConfigDTO alertConfig = alertJobContext.getAlertConfigDTO();
+    long jobExecutionId = alertJobContext.getJobExecutionId();
+
+    AlertTaskInfo taskInfo =
+        new AlertTaskInfo(jobExecutionId, monitoringWindowStartTime, monitoringWindowEndTime, null,
+            alertConfig);
     tasks.add(taskInfo);
     return tasks;
   }

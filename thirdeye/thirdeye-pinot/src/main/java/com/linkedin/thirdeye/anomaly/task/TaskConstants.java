@@ -5,8 +5,11 @@ public class TaskConstants {
   public enum TaskType {
     ANOMALY_DETECTION,
     MERGE,
+
+    // todo : mark ALERT deprecated
     ALERT,
-    MONITOR,
+    ALERT2,
+    MONITOR, 
     DATA_COMPLETENESS
   }
 

@@ -20,7 +20,6 @@ import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunction
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunctionFactory;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
 import com.linkedin.pinot.core.operator.docvalsets.ProjectionBlockValSet;
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -48,10 +47,6 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
     _resultHolderArray = new AggregationResultHolder[_numAggrFunc];
   }
 
-  /**
-   * {@inheritDoc}
-   * Must be called before the first call to 'aggregate'.
-   */
   @Override
   public void init() {
     if (_inited) {
@@ -64,17 +59,10 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
     _inited = true;
   }
 
-  /**
-   * {@inheritDoc}
-   * Perform aggregation on a given docIdSet.
-   * Asserts that 'init' has be called before calling this method.
-   *
-   * @param projectionBlock Projection block upon which to perform aggregation.
-   */
   @Override
   public void aggregate(ProjectionBlock projectionBlock) {
-    Preconditions
-        .checkState(_inited, "Method 'aggregate' cannot be called before 'init' for class " + getClass().getName());
+    Preconditions.checkState(_inited,
+        "Method 'aggregate' cannot be called before 'init' for class " + getClass().getName());
 
     for (int i = 0; i < _numAggrFunc; i++) {
       aggregateColumn(projectionBlock, _aggrFuncContextArray[i], _resultHolderArray[i]);
@@ -104,30 +92,20 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
     }
   }
 
-  /**
-   * {@inheritDoc}
-   * Must be called after all calls to 'process' are done, and before getResult() can be called.
-   */
   @Override
   public void finish() {
-    Preconditions
-        .checkState(_inited, "Method 'finish' cannot be called before 'init' for class " + getClass().getName());
+    Preconditions.checkState(_inited,
+        "Method 'finish' cannot be called before 'init' for class " + getClass().getName());
 
     _finished = true;
   }
 
-  /**
-   * {@inheritDoc}
-   * Asserts that 'finish' has been called before calling getResult().
-   *
-   * @return list of aggregation results.
-   */
   @Override
-  public List<Serializable> getResult() {
-    Preconditions
-        .checkState(_finished, "Method 'getResult' cannot be called before 'finish' for class " + getClass().getName());
+  public List<Object> getResult() {
+    Preconditions.checkState(_finished,
+        "Method 'getResult' cannot be called before 'finish' for class " + getClass().getName());
 
-    List<Serializable> aggregationResults = new ArrayList<>(_numAggrFunc);
+    List<Object> aggregationResults = new ArrayList<>(_numAggrFunc);
 
     for (int i = 0; i < _numAggrFunc; i++) {
       AggregationFunction aggregationFunction = _aggrFuncContextArray[i].getAggregationFunction();

@@ -18,6 +18,7 @@ package com.linkedin.pinot.controller.validation;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -220,7 +221,7 @@ public class ValidationManager {
     Map<String, List<String>> partitionToHostsMap = partitionAssignment.getListFields();
     // Keep a set of kafka partitions, and remove the partition when we find a segment in CONSUMING state in
     // that partition.
-    List<Integer> nonConsumingKafkaPartitions = new ArrayList<>(partitionToHostsMap.size());
+    Set<Integer> nonConsumingKafkaPartitions = new HashSet<>(partitionToHostsMap.size());
     for (String partitionStr : partitionToHostsMap.keySet()) {
       nonConsumingKafkaPartitions.add(Integer.valueOf(partitionStr));
     }
@@ -254,7 +255,7 @@ public class ValidationManager {
         }
         if (foundConsuming) {
           LLCSegmentName llcSegmentName = new LLCSegmentName(segmentId);
-          nonConsumingKafkaPartitions.remove(nonConsumingKafkaPartitions.indexOf(llcSegmentName.getPartitionId()));
+          nonConsumingKafkaPartitions.remove(llcSegmentName.getPartitionId());
         }
       }
      }

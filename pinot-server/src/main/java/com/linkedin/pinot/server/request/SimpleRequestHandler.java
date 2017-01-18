@@ -25,16 +25,13 @@ import com.linkedin.pinot.common.query.QueryExecutor;
 import com.linkedin.pinot.common.query.QueryRequest;
 import com.linkedin.pinot.common.query.context.TimerContext;
 import com.linkedin.pinot.common.request.InstanceRequest;
-import com.linkedin.pinot.common.response.ProcessingException;
 import com.linkedin.pinot.common.utils.DataTable;
-import com.linkedin.pinot.common.utils.DataTableBuilder;
+import com.linkedin.pinot.core.common.datatable.DataTableImplV2;
 import com.linkedin.pinot.serde.SerDe;
 import com.linkedin.pinot.transport.netty.NettyServer.RequestHandler;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import java.net.InetSocketAddress;
-import java.util.ArrayList;
-import java.util.List;
 import org.apache.thrift.protocol.TCompactProtocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,7 +74,7 @@ public class SimpleRequestHandler implements RequestHandler {
         // the deserialize method logs and suppresses exception
         LOGGER.error("Failed to deserialize query request from broker ip: {}",
            ((InetSocketAddress) channelHandlerContext.channel().remoteAddress()).getAddress().getHostAddress());
-        DataTable result = new DataTable();
+        DataTable result = new DataTableImplV2();
         result.addException(QueryException.INTERNAL_ERROR);
         _serverMetrics.addMeteredGlobalValue(ServerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS, 1);
         queryRequest = new QueryRequest(null, _serverMetrics);
@@ -100,7 +97,7 @@ public class SimpleRequestHandler implements RequestHandler {
       LOGGER.error("Got exception while processing request. Returning error response for requestId: {}, brokerId: {}",
           instanceRequest.getRequestId(), instanceRequest.getBrokerId(), e);
       _serverMetrics.addMeteredGlobalValue(ServerMeter.UNCAUGHT_EXCEPTIONS, 1);
-      instanceResponse = new DataTable();
+      instanceResponse = new DataTableImplV2();
       instanceResponse.addException(QueryException.getException(QueryException.INTERNAL_ERROR, e));
     }
 

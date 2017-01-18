@@ -17,17 +17,17 @@ package com.linkedin.pinot.queries;
 
 import com.linkedin.pinot.core.operator.ExecutionStatistics;
 import com.linkedin.pinot.core.operator.aggregation.AggregationOperator;
+import com.linkedin.pinot.core.operator.aggregation.function.customobject.AvgPair;
 import com.linkedin.pinot.core.operator.aggregation.groupby.AggregationGroupByOperator;
 import com.linkedin.pinot.core.operator.aggregation.groupby.AggregationGroupByResult;
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupKeyGenerator;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
-import com.linkedin.pinot.core.query.aggregation.function.AvgAggregationFunction;
-import java.io.Serializable;
 import java.util.List;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
+@SuppressWarnings("ConstantConditions")
 public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleValueQueriesTest {
   private static final String AGGREGATION = " COUNT(*), SUM(column1), MAX(column3), MIN(column6), AVG(column7)";
 
@@ -51,14 +51,14 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 120000L);
     Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 30000L);
-    List<Serializable> aggregationResult = resultsBlock.getAggregationResult();
+    List<Object> aggregationResult = resultsBlock.getAggregationResult();
     Assert.assertEquals(((Number) aggregationResult.get(0)).longValue(), 30000L);
     Assert.assertEquals(((Number) aggregationResult.get(1)).longValue(), 32317185437847L);
     Assert.assertEquals(((Number) aggregationResult.get(2)).intValue(), 2147419555);
     Assert.assertEquals(((Number) aggregationResult.get(3)).intValue(), 1689277);
-    AvgAggregationFunction.AvgPair avgResult = (AvgAggregationFunction.AvgPair) aggregationResult.get(4);
-    Assert.assertEquals(avgResult.getFirst().longValue(), 28175373944314L);
-    Assert.assertEquals(avgResult.getSecond().longValue(), 30000L);
+    AvgPair avgResult = (AvgPair) aggregationResult.get(4);
+    Assert.assertEquals((long) avgResult.getSum(), 28175373944314L);
+    Assert.assertEquals(avgResult.getCount(), 30000L);
 
     // Test query with filter.
     aggregationOperator = getOperatorForQueryWithFilter(query);
@@ -73,9 +73,9 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     Assert.assertEquals(((Number) aggregationResult.get(1)).longValue(), 6875947596072L);
     Assert.assertEquals(((Number) aggregationResult.get(2)).intValue(), 999813884);
     Assert.assertEquals(((Number) aggregationResult.get(3)).intValue(), 1980174);
-    avgResult = (AvgAggregationFunction.AvgPair) aggregationResult.get(4);
-    Assert.assertEquals(avgResult.getFirst().longValue(), 4699510391301L);
-    Assert.assertEquals(avgResult.getSecond().longValue(), 6129L);
+    avgResult = (AvgPair) aggregationResult.get(4);
+    Assert.assertEquals((long) avgResult.getSum(), 4699510391301L);
+    Assert.assertEquals(avgResult.getCount(), 6129L);
   }
 
   @Test
@@ -99,10 +99,9 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 1)).longValue(), 815409257L);
     Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 2)).intValue(), 1215316262);
     Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 3)).intValue(), 1328642550);
-    AvgAggregationFunction.AvgPair avgResult =
-        (AvgAggregationFunction.AvgPair) aggregationGroupByResult.getResultForKey(firstGroupKey, 4);
-    Assert.assertEquals(avgResult.getFirst().longValue(), 788414092L);
-    Assert.assertEquals(avgResult.getSecond().longValue(), 1L);
+    AvgPair avgResult = (AvgPair) aggregationGroupByResult.getResultForKey(firstGroupKey, 4);
+    Assert.assertEquals((long) avgResult.getSum(), 788414092L);
+    Assert.assertEquals(avgResult.getCount(), 1L);
 
     // Test query with filter.
     aggregationGroupByOperator = getOperatorForQueryWithFilter(query);
@@ -119,9 +118,9 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 1)).longValue(), 4348938306L);
     Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 2)).intValue(), 407993712);
     Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 3)).intValue(), 296467636);
-    avgResult = (AvgAggregationFunction.AvgPair) aggregationGroupByResult.getResultForKey(firstGroupKey, 4);
-    Assert.assertEquals(avgResult.getFirst().longValue(), 5803888725L);
-    Assert.assertEquals(avgResult.getSecond().longValue(), 3L);
+    avgResult = (AvgPair) aggregationGroupByResult.getResultForKey(firstGroupKey, 4);
+    Assert.assertEquals((long) avgResult.getSum(), 5803888725L);
+    Assert.assertEquals(avgResult.getCount(), 3L);
   }
 
   @Test
@@ -145,10 +144,9 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 1)).longValue(), 1211410535L);
     Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 2)).intValue(), 1720170285);
     Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 3)).intValue(), 1585725369);
-    AvgAggregationFunction.AvgPair avgResult =
-        (AvgAggregationFunction.AvgPair) aggregationGroupByResult.getResultForKey(firstGroupKey, 4);
-    Assert.assertEquals(avgResult.getFirst().longValue(), 8398774425L);
-    Assert.assertEquals(avgResult.getSecond().longValue(), 5L);
+    AvgPair avgResult = (AvgPair) aggregationGroupByResult.getResultForKey(firstGroupKey, 4);
+    Assert.assertEquals((long) avgResult.getSum(), 8398774425L);
+    Assert.assertEquals(avgResult.getCount(), 5L);
 
     // Test query with filter.
     aggregationGroupByOperator = getOperatorForQueryWithFilter(query);
@@ -166,9 +164,9 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
         13531749490L);
     Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 2)).intValue(), 478007592);
     Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 3)).intValue(), 394608493);
-    avgResult = (AvgAggregationFunction.AvgPair) aggregationGroupByResult.getResultForKey(firstGroupKey, 4);
-    Assert.assertEquals(avgResult.getFirst().longValue(), 1229066783L);
-    Assert.assertEquals(avgResult.getSecond().longValue(), 7L);
+    avgResult = (AvgPair) aggregationGroupByResult.getResultForKey(firstGroupKey, 4);
+    Assert.assertEquals((long) avgResult.getSum(), 1229066783L);
+    Assert.assertEquals(avgResult.getCount(), 7L);
   }
 
   @Test
@@ -193,10 +191,9 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 1)).longValue(), 1784773968L);
     Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 2)).intValue(), 204243323);
     Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 3)).intValue(), 628170461);
-    AvgAggregationFunction.AvgPair avgResult =
-        (AvgAggregationFunction.AvgPair) aggregationGroupByResult.getResultForKey(firstGroupKey, 4);
-    Assert.assertEquals(avgResult.getFirst().longValue(), 1985159279L);
-    Assert.assertEquals(avgResult.getSecond().longValue(), 1L);
+    AvgPair avgResult = (AvgPair) aggregationGroupByResult.getResultForKey(firstGroupKey, 4);
+    Assert.assertEquals((long) avgResult.getSum(), 1985159279L);
+    Assert.assertEquals(avgResult.getCount(), 1L);
 
     // Test query with filter.
     aggregationGroupByOperator = getOperatorForQueryWithFilter(query);
@@ -214,8 +211,8 @@ public class InnerSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
     Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 1)).longValue(), 1361199163L);
     Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 2)).intValue(), 178133991);
     Assert.assertEquals(((Number) aggregationGroupByResult.getResultForKey(firstGroupKey, 3)).intValue(), 296467636);
-    avgResult = (AvgAggregationFunction.AvgPair) aggregationGroupByResult.getResultForKey(firstGroupKey, 4);
-    Assert.assertEquals(avgResult.getFirst().longValue(), 788414092L);
-    Assert.assertEquals(avgResult.getSecond().longValue(), 1L);
+    avgResult = (AvgPair) aggregationGroupByResult.getResultForKey(firstGroupKey, 4);
+    Assert.assertEquals((long) avgResult.getSum(), 788414092L);
+    Assert.assertEquals(avgResult.getCount(), 1L);
   }
 }
