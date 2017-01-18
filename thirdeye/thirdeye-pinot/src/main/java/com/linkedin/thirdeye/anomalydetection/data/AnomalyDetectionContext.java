@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.anomalydetection.data;
 
-import com.linkedin.thirdeye.anomalydetection.model.AnomalyDetectionFunction;
+import com.linkedin.thirdeye.anomalydetection.function.AnomalyDetectionFunction;
 import com.linkedin.thirdeye.anomalydetection.model.prediction.PredictionModel;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import java.util.List;

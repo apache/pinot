@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.anomalydetection.data;
 
 import java.util.Map;
 import java.util.Set;
+import org.joda.time.Interval;
 
 /**
  * Time series for anomaly detection, which contains the pairs of timestamp and data values from
@@ -10,6 +11,7 @@ import java.util.Set;
 public class TimeSeries {
 
   private Map<Long, Double> timeSeries;
+  private Interval timeSeriesInterval;
 
 
   /**
@@ -19,7 +21,7 @@ public class TimeSeries {
    *
    * @return data value of the specified timestamp
    */
-  Double get(long timestamp) {
+  public Double get(long timestamp) {
     return timeSeries.get(timestamp);
   }
 
@@ -29,14 +31,14 @@ public class TimeSeries {
    * @param timestamp the specified timestamp.
    * @param value     the data value of the specified timestamp.
    */
-  void set(long timestamp, double value) {
+  public void set(long timestamp, double value) {
     timeSeries.put(timestamp, value);
   }
 
   /**
    * Removes data value of the specified timestamp
    */
-  void remove(long timeStamp) {
+  public void remove(long timeStamp) {
     timeSeries.remove(timeStamp);
   }
 
@@ -47,7 +49,7 @@ public class TimeSeries {
    *
    * @return true if the specified timestamp exists
    */
-  boolean hasTimestamp(long timestamp) {
+  public boolean hasTimestamp(long timestamp) {
     return timeSeries.containsKey(timestamp);
   }
 
@@ -56,7 +58,7 @@ public class TimeSeries {
    *
    * @return timestamp set
    */
-  Set<Long> timestampSet() {
+  public Set<Long> timestampSet() {
     return timeSeries.keySet();
   }
 
@@ -65,8 +67,22 @@ public class TimeSeries {
    *
    * @return the number of timestamps in this time series
    */
-  int size() {
+  public int size() {
     return timeSeries.size();
+  }
+
+  /**
+   * Returns the interval of the time series, which provides the max and min timestamps.
+   */
+  public Interval getTimeSeriesInterval() {
+    return timeSeriesInterval;
+  }
+
+  /**
+   * Sets the interval of the time series, which provides the max and min timestamps.
+   */
+  public void setTimeSeriesInterval(Interval timeSeriesInterval) {
+    this.timeSeriesInterval = timeSeriesInterval;
   }
 }
 

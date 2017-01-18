@@ -1,8 +1,9 @@
-package com.linkedin.thirdeye.anomalydetection.model;
+package com.linkedin.thirdeye.anomalydetection.function;
 
-import com.linkedin.thirdeye.anomalydetection.model.detection.AnomalyDetectionModel;
+import com.linkedin.thirdeye.anomalydetection.model.detection.DetectionModel;
 import com.linkedin.thirdeye.anomalydetection.model.prediction.PredictionModel;
 import com.linkedin.thirdeye.anomalydetection.model.transform.TransformationFunction;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import java.util.List;
 import org.joda.time.Interval;
 
@@ -12,6 +13,16 @@ import org.joda.time.Interval;
  * time series from various metric and dimensions.
  */
 public interface AnomalyDetectionFunction {
+  /**
+   * Initializes this function with its configuration, call before analyze
+   */
+  void init(AnomalyFunctionDTO spec) throws Exception;
+
+  /**
+   * Returns the specification for this function instance.
+   */
+  AnomalyFunctionDTO getSpec();
+
   /**
    * Returns the intervals of time series that is used by this anomaly function. This method is
    * useful when additional time series are needed for predicting the expected time series.
@@ -48,5 +59,5 @@ public interface AnomalyDetectionFunction {
    * @return the anomaly detection model that defines the anomaly upon the current and baseline
    * time series.
    */
-  AnomalyDetectionModel getAnomalyDetectionModel();
+  DetectionModel getAnomalyDetectionModel();
 }
