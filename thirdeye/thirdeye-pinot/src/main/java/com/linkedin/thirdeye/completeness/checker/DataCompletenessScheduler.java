@@ -7,6 +7,9 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * The scheduler which will run periodically and schedule jobs and tasks for data completeness
+ */
 public class DataCompletenessScheduler {
 
   private static final Logger LOG = LoggerFactory.getLogger(DataCompletenessScheduler.class);

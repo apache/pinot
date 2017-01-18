@@ -6,6 +6,9 @@ import com.google.common.base.MoreObjects;
 import com.linkedin.thirdeye.anomaly.task.TaskInfo;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessConstants.DataCompletenessType;
 
+/**
+ * This class contains the information needed by a task of data completeness type
+ */
 public class DataCompletenessTaskInfo implements TaskInfo {
 
   private DataCompletenessType dataCompletenessType;

@@ -24,6 +24,9 @@ import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 
+/** job runner for data completeness job
+ *
+ */
 public class DataCompletenessJobRunner implements JobRunner {
 
   private static final Logger LOG = LoggerFactory.getLogger(DataCompletenessJobRunner.class);

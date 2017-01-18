@@ -2,6 +2,9 @@ package com.linkedin.thirdeye.completeness.checker;
 
 import java.util.concurrent.TimeUnit;
 
+/**
+ * Constants needed for data completeness checker
+ */
 public class DataCompletenessConstants {
 
   public enum DataCompletenessType {

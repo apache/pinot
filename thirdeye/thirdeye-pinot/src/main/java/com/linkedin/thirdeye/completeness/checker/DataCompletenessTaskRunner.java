@@ -13,6 +13,9 @@ import com.linkedin.thirdeye.completeness.checker.DataCompletenessConstants.Data
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 
+/**
+ * Task runnner for data completeness tasks
+ */
 public class DataCompletenessTaskRunner implements TaskRunner {
 
   private static final Logger LOG = LoggerFactory.getLogger(DataCompletenessTaskRunner.class);
