@@ -13,14 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.operator.groupby.result;
+package com.linkedin.pinot.operator.aggregation.groupby.result;
 
-import com.linkedin.pinot.common.utils.Pairs.*;
+import com.linkedin.pinot.common.utils.Pairs.IntDoubleComparator;
+import com.linkedin.pinot.common.utils.Pairs.IntDoublePair;
 import com.linkedin.pinot.core.operator.aggregation.groupby.DoubleGroupByResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupByResultHolder;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
 import org.testng.Assert;

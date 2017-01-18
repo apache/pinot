@@ -16,12 +16,12 @@
 package com.linkedin.pinot.queries;
 
 import com.linkedin.pinot.core.operator.ExecutionStatistics;
-import com.linkedin.pinot.core.operator.aggregation.AggregationOperator;
 import com.linkedin.pinot.core.operator.aggregation.function.customobject.AvgPair;
-import com.linkedin.pinot.core.operator.aggregation.groupby.AggregationGroupByOperator;
 import com.linkedin.pinot.core.operator.aggregation.groupby.AggregationGroupByResult;
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupKeyGenerator;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
+import com.linkedin.pinot.core.operator.query.AggregationGroupByOperator;
+import com.linkedin.pinot.core.operator.query.AggregationOperator;
 import java.util.List;
 import org.testng.Assert;
 import org.testng.annotations.Test;
