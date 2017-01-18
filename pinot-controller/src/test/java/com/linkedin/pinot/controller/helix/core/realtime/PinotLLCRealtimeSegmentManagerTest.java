@@ -715,7 +715,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    protected void writeSegmentsToPropertyStore(List<String> paths, List<ZNRecord> records) {
+    protected void writeSegmentsToPropertyStore(List<String> paths, List<ZNRecord> records, String realtimeTableName) {
       _paths.addAll(paths);
       _records.addAll(records);
       for (int i = 0; i < paths.size(); i++) {
