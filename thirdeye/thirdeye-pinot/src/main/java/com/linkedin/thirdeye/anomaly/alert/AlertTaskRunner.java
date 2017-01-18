@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.anomaly.alert;
 
 import com.linkedin.thirdeye.anomaly.alert.template.pojo.MetricDimensionReport;
+import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import com.linkedin.thirdeye.anomaly.alert.util.DataReportHelper;
 import com.linkedin.thirdeye.anomaly.alert.util.EmailHelper;
 import com.linkedin.thirdeye.api.DimensionMap;
@@ -96,7 +97,7 @@ public class AlertTaskRunner implements TaskRunner {
             alertConfig.getId());
 
     // apply filtration rule
-    List<MergedAnomalyResultDTO> results = EmailHelper.applyFiltrationRule(allResults);
+    List<MergedAnomalyResultDTO> results = AlertFilterHelper.applyFiltrationRule(allResults);
 
     if (results.isEmpty() && !alertConfig.isSendZeroAnomalyEmail()) {
       LOG.info("Zero anomalies found, skipping sending email");

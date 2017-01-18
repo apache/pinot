@@ -4,6 +4,7 @@ import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.alert.AlertTaskInfo;
 import com.linkedin.thirdeye.anomaly.alert.AlertTaskRunner;
 import com.linkedin.thirdeye.anomaly.alert.template.pojo.MetricDimensionReport;
+import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import com.linkedin.thirdeye.anomaly.alert.util.AnomalyReportGenerator;
 import com.linkedin.thirdeye.anomaly.alert.util.DataReportHelper;
 import com.linkedin.thirdeye.anomaly.alert.util.EmailHelper;
@@ -87,19 +88,20 @@ public class AlertTaskRunnerV2 implements TaskRunner {
       List<MergedAnomalyResultDTO> mergedAnomaliesAllResults = new ArrayList<>();
       long lastNotifiedAnomaly = emailConfig.getLastNotifiedAnomalyId();
       for (Long functionId : functionIds) {
-        // TODO : FIXME
-        mergedAnomaliesAllResults.addAll(anomalyMergedResultDAO.findByFunctionIdAndIdGreaterThan(functionId, lastNotifiedAnomaly));
+        List<MergedAnomalyResultDTO> resultsForFunction = anomalyMergedResultDAO
+            .findByFunctionIdAndIdGreaterThan(functionId, lastNotifiedAnomaly);
+        if (resultsForFunction != null && resultsForFunction.size() > 0) {
+          mergedAnomaliesAllResults.addAll(resultsForFunction);
+        }
       }
       // apply filtration rule
-      List<MergedAnomalyResultDTO> results = EmailHelper.applyFiltrationRule(mergedAnomaliesAllResults);
+      List<MergedAnomalyResultDTO> results = AlertFilterHelper.applyFiltrationRule(mergedAnomaliesAllResults);
 
       if (results.isEmpty() && !alertConfig.getEmailConfig().isSendAlertOnZeroAnomaly()) {
         LOG.info("Zero anomalies found, skipping sending email");
         return;
       }
-      AnomalyReportGenerator.getInstance()
-          .buildReport(results, thirdeyeConfig, alertConfig.getRecipients(),
-              alertConfig.getFromAddress());
+      AnomalyReportGenerator.getInstance().buildReport(results, thirdeyeConfig, alertConfig);
 
       updateNotifiedStatus(results);
 
@@ -148,13 +150,14 @@ public class AlertTaskRunnerV2 implements TaskRunner {
           freemarkerConfig.setDefaultEncoding(CHARSET);
           freemarkerConfig.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);
           Map<String, Object> templateData = new HashMap<>();
+          DateTimeZone timeZone = DateTimeZone.forTimeZone(DEFAULT_TIME_ZONE);
+          DataReportHelper.DateFormatMethod dateFormatMethod = new DataReportHelper.DateFormatMethod(timeZone);
+          templateData.put("timeZone", timeZone);
+          templateData.put("dateFormat", dateFormatMethod);
           templateData.put("dashboardHost", thirdeyeConfig.getDashboardHost());
           templateData.put("fromEmail", alertConfig.getFromAddress());
           templateData.put("reportStartDateTime", reportStartTs);
           templateData.put("metricDimensionValueReports", metricDimensionValueReports);
-          DateTimeZone timeZone = DateTimeZone.forTimeZone(DEFAULT_TIME_ZONE);
-          DataReportHelper.DateFormatMethod dateFormatMethod = new DataReportHelper.DateFormatMethod(timeZone);
-          templateData.put("timeZone", timeZone);
           ByteArrayOutputStream baos = new ByteArrayOutputStream();
           try (Writer out = new OutputStreamWriter(baos, CHARSET)) {
             Template template = freemarkerConfig.getTemplate("data-report-by-metric-dimension.ftl");
