@@ -43,7 +43,7 @@ public class DataCompletenessTaskRunner implements TaskRunner {
   private void executeCheckerTask(DataCompletenessTaskInfo dataCompletenessTaskInfo) {
     LOG.info("Execute data completeness checker task {}", dataCompletenessTaskInfo);
     try {
-
+      // TODO: checker task for data completeness
     } catch (Exception e) {
       LOG.error("Exception in data completeness checker task", e);
     }
@@ -52,7 +52,7 @@ public class DataCompletenessTaskRunner implements TaskRunner {
   private void executeCleanupTask(DataCompletenessTaskInfo dataCompletenessTaskInfo) {
     LOG.info("Execute data completeness cleanup {}", dataCompletenessTaskInfo);
     try {
-
+      // TODO: cleanup task for data completeness
     } catch (Exception e) {
       LOG.error("Exception data completeness cleanup task", e);
     }
