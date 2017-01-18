@@ -1,7 +1,5 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
-import java.util.List;
-
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
