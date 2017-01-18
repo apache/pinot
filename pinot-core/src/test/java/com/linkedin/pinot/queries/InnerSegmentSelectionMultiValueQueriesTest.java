@@ -16,7 +16,7 @@
 package com.linkedin.pinot.queries;
 
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.utils.DataTableBuilder;
+import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.core.operator.ExecutionStatistics;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
 import com.linkedin.pinot.core.operator.query.MSelectionOnlyOperator;
@@ -28,6 +28,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 
+@SuppressWarnings("ConstantConditions")
 public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQueriesTest {
   private static final String SELECTION = " column1, column5, column6";
   private static final String ORDER_BY = " ORDER BY column5, column9";
@@ -44,7 +45,7 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 100L);
     Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 100000L);
-    DataTableBuilder.DataSchema selectionDataSchema = resultsBlock.getSelectionDataSchema();
+    DataSchema selectionDataSchema = resultsBlock.getSelectionDataSchema();
     Assert.assertEquals(selectionDataSchema.size(), 10);
     Assert.assertEquals(selectionDataSchema.getColumnName(0), "column1");
     Assert.assertEquals(selectionDataSchema.getColumnName(5), "column6");
@@ -90,7 +91,7 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 30L);
     Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 100000L);
-    DataTableBuilder.DataSchema selectionDataSchema = resultsBlock.getSelectionDataSchema();
+    DataSchema selectionDataSchema = resultsBlock.getSelectionDataSchema();
     Assert.assertEquals(selectionDataSchema.size(), 3);
     Assert.assertEquals(selectionDataSchema.getColumnName(0), "column1");
     Assert.assertEquals(selectionDataSchema.getColumnName(2), "column6");
@@ -137,7 +138,7 @@ public class InnerSegmentSelectionMultiValueQueriesTest extends BaseMultiValueQu
     Assert.assertEquals(executionStatistics.getNumEntriesScannedInFilter(), 0L);
     Assert.assertEquals(executionStatistics.getNumEntriesScannedPostFilter(), 400000L);
     Assert.assertEquals(executionStatistics.getNumTotalRawDocs(), 100000L);
-    DataTableBuilder.DataSchema selectionDataSchema = resultsBlock.getSelectionDataSchema();
+    DataSchema selectionDataSchema = resultsBlock.getSelectionDataSchema();
     Assert.assertEquals(selectionDataSchema.size(), 4);
     Assert.assertEquals(selectionDataSchema.getColumnName(0), "column5");
     Assert.assertEquals(selectionDataSchema.getColumnName(3), "column6");

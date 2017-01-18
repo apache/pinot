@@ -19,7 +19,6 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupByResultHolder;
-import java.io.Serializable;
 import javax.annotation.Nonnull;
 
 
@@ -29,8 +28,7 @@ import javax.annotation.Nonnull;
  * @param <IntermediateResult> intermediate result generated from segment.
  * @param <FinalResult> final result used in broker response.
  */
-// TODO: revisit whether Serializable is necessary.
-public interface AggregationFunction<IntermediateResult extends Serializable, FinalResult> {
+public interface AggregationFunction<IntermediateResult, FinalResult extends Comparable> {
 
   /**
    * Get the name of the aggregation function.

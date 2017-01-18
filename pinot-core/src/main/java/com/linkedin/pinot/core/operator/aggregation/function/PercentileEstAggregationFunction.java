@@ -19,9 +19,9 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.ObjectAggregationResultHolder;
+import com.linkedin.pinot.core.operator.aggregation.function.customobject.QuantileDigest;
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupByResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.groupby.ObjectGroupByResultHolder;
-import com.linkedin.pinot.core.query.aggregation.function.quantile.digest.QuantileDigest;
 import javax.annotation.Nonnull;
 
 

@@ -20,7 +20,6 @@ import com.linkedin.pinot.core.operator.aggregation.AggregationFunctionContext;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunctionFactory;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunctionUtils;
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -84,11 +83,10 @@ public class AggregationGroupByTrimmingService {
    * desired size and put them into a list of maps from group key to intermediate result for each aggregation function.
    */
   @Nonnull
-  public List<Map<String, Serializable>> trimIntermediateResultsMap(
-      @Nonnull Map<String, Serializable[]> intermediateResultsMap) {
-    List<Map<String, Serializable>> trimmedResults = new ArrayList<>(_numAggregationFunctions);
+  public List<Map<String, Object>> trimIntermediateResultsMap(@Nonnull Map<String, Object[]> intermediateResultsMap) {
+    List<Map<String, Object>> trimmedResults = new ArrayList<>(_numAggregationFunctions);
     for (int i = 0; i < _numAggregationFunctions; i++) {
-      trimmedResults.add(new HashMap<String, Serializable>());
+      trimmedResults.add(new HashMap<String, Object>());
     }
 
     if (intermediateResultsMap.isEmpty()) {
@@ -101,7 +99,7 @@ public class AggregationGroupByTrimmingService {
       // Construct the priority queues.
       @SuppressWarnings("unchecked")
       PriorityQueue<GroupKeyResultPair>[] priorityQueues = new PriorityQueue[_numAggregationFunctions];
-      Serializable[] sampleResults = intermediateResultsMap.values().iterator().next();
+      Object[] sampleResults = intermediateResultsMap.values().iterator().next();
       for (int i = 0; i < _numAggregationFunctions; i++) {
         if (sampleResults[i] instanceof Comparable) {
           priorityQueues[i] = new PriorityQueue<>(_trimSize + 1, getGroupKeyResultPairComparator(_minOrders[i]));
@@ -109,9 +107,9 @@ public class AggregationGroupByTrimmingService {
       }
 
       // Fill results into the priority queues.
-      for (Map.Entry<String, Serializable[]> entry : intermediateResultsMap.entrySet()) {
+      for (Map.Entry<String, Object[]> entry : intermediateResultsMap.entrySet()) {
         String groupKey = entry.getKey();
-        Serializable[] intermediateResults = entry.getValue();
+        Object[] intermediateResults = entry.getValue();
         for (int i = 0; i < _numAggregationFunctions; i++) {
           PriorityQueue<GroupKeyResultPair> priorityQueue = priorityQueues[i];
           if (priorityQueue == null) {
@@ -131,15 +129,15 @@ public class AggregationGroupByTrimmingService {
         if (priorityQueue != null) {
           while (!priorityQueue.isEmpty()) {
             GroupKeyResultPair groupKeyResultPair = priorityQueue.poll();
-            trimmedResults.get(i).put(groupKeyResultPair._groupKey, (Serializable) groupKeyResultPair._result);
+            trimmedResults.get(i).put(groupKeyResultPair._groupKey, groupKeyResultPair._result);
           }
         }
       }
     } else {
       // No need to trim.
-      for (Map.Entry<String, Serializable[]> entry : intermediateResultsMap.entrySet()) {
+      for (Map.Entry<String, Object[]> entry : intermediateResultsMap.entrySet()) {
         String groupKey = entry.getKey();
-        Serializable[] intermediateResults = entry.getValue();
+        Object[] intermediateResults = entry.getValue();
         for (int i = 0; i < _numAggregationFunctions; i++) {
           trimmedResults.get(i).put(groupKey, intermediateResults[i]);
         }
@@ -154,13 +152,13 @@ public class AggregationGroupByTrimmingService {
    */
   @SuppressWarnings("unchecked")
   @Nonnull
-  public List<GroupByResult>[] trimFinalResults(@Nonnull Map<String, Object>[] finalResultMaps) {
+  public List<GroupByResult>[] trimFinalResults(@Nonnull Map<String, Comparable>[] finalResultMaps) {
     List<GroupByResult>[] trimmedResults = new List[_numAggregationFunctions];
 
     for (int i = 0; i < _numAggregationFunctions; i++) {
       LinkedList<GroupByResult> groupByResults = new LinkedList<>();
       trimmedResults[i] = groupByResults;
-      Map<String, Object> finalResultMap = finalResultMaps[i];
+      Map<String, Comparable> finalResultMap = finalResultMaps[i];
       if (finalResultMap.isEmpty()) {
         continue;
       }
@@ -170,10 +168,10 @@ public class AggregationGroupByTrimmingService {
           new PriorityQueue<>(_groupByTopN + 1, getGroupKeyResultPairComparator(_minOrders[i]));
 
       // Fill results into the priority queues.
-      for (Map.Entry<String, Object> entry : finalResultMap.entrySet()) {
+      for (Map.Entry<String, Comparable> entry : finalResultMap.entrySet()) {
         String groupKey = entry.getKey();
-        Object finalResult = entry.getValue();
-        priorityQueue.add(new GroupKeyResultPair(groupKey, (Comparable) finalResult));
+        Comparable finalResult = entry.getValue();
+        priorityQueue.add(new GroupKeyResultPair(groupKey, finalResult));
         if (priorityQueue.size() > _groupByTopN) {
           priorityQueue.poll();
         }

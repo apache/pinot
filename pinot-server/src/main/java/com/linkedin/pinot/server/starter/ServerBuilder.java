@@ -19,12 +19,10 @@ import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.core.operator.transform.function.TransformFunctionFactory;
-import com.linkedin.pinot.common.utils.DataTableSerDeRegistry;
 import com.linkedin.pinot.core.data.manager.offline.TableDataManagerProvider;
 import com.linkedin.pinot.core.operator.transform.TransformUtils;
+import com.linkedin.pinot.core.operator.transform.function.TransformFunctionFactory;
 import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
-import com.linkedin.pinot.core.util.DataTableCustomSerDe;
 import com.linkedin.pinot.server.conf.NettyServerConfig;
 import com.linkedin.pinot.server.conf.ServerConf;
 import com.linkedin.pinot.server.request.SimpleRequestHandlerFactory;
@@ -134,9 +132,6 @@ public class ServerBuilder {
     LOGGER.info("Trying to Load Instance DataManager by Class : " + className);
     DataManager instanceDataManager = (DataManager) Class.forName(className).newInstance();
     instanceDataManager.init(_serverConf.getInstanceDataManagerConfig());
-
-    // Register the custom ser/de for DataTable on the server side.
-    DataTableSerDeRegistry.getInstance().register(new DataTableCustomSerDe());
     return instanceDataManager;
   }
 

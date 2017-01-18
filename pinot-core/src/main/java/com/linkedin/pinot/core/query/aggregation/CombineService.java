@@ -18,7 +18,7 @@ package com.linkedin.pinot.core.query.aggregation;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.common.response.ProcessingException;
-import com.linkedin.pinot.common.utils.DataTableBuilder;
+import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.core.operator.aggregation.AggregationFunctionContext;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
@@ -56,7 +56,7 @@ public class CombineService {
         // Combine aggregation only result.
 
         // Might be null if caught exception during query execution.
-        List<Serializable> aggregationResultToMerge = blockToMerge.getAggregationResult();
+        List<Object> aggregationResultToMerge = blockToMerge.getAggregationResult();
         if (aggregationResultToMerge == null) {
           // No data in block to merge.
           return;
@@ -70,7 +70,7 @@ public class CombineService {
         }
 
         // Merge two block.
-        List<Serializable> mergedAggregationResult = mergedBlock.getAggregationResult();
+        List<Object> mergedAggregationResult = mergedBlock.getAggregationResult();
         int numAggregationFunctions = mergedAggregationFunctionContexts.length;
         for (int i = 0; i < numAggregationFunctions; i++) {
           mergedAggregationResult.set(i, mergedAggregationFunctionContexts[i].getAggregationFunction()
@@ -85,8 +85,8 @@ public class CombineService {
 
       // Data schema will be null if exceptions caught during query processing.
       // Result set size will be zero if no row matches the predicate.
-      DataTableBuilder.DataSchema mergedBlockSchema = mergedBlock.getSelectionDataSchema();
-      DataTableBuilder.DataSchema blockToMergeSchema = blockToMerge.getSelectionDataSchema();
+      DataSchema mergedBlockSchema = mergedBlock.getSelectionDataSchema();
+      DataSchema blockToMergeSchema = blockToMerge.getSelectionDataSchema();
       Collection<Serializable[]> mergedBlockResultSet = mergedBlock.getSelectionResult();
       Collection<Serializable[]> blockToMergeResultSet = blockToMerge.getSelectionResult();
 

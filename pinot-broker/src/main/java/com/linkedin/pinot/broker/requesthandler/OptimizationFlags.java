@@ -13,8 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-package com.linkedin.pinot.requestHandler;
+package com.linkedin.pinot.broker.requesthandler;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Splitter;
