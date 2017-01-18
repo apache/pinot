@@ -10,6 +10,7 @@ import javax.validation.constraints.NotNull;
 import org.hibernate.validator.constraints.Email;
 import com.google.common.base.MoreObjects;
 
+@Deprecated
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class EmailConfigurationBean extends AbstractBean {
 

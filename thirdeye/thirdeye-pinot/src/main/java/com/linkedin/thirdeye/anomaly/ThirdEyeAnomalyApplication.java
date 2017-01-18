@@ -1,8 +1,8 @@
 package com.linkedin.thirdeye.anomaly;
 
+import com.linkedin.thirdeye.anomaly.alert.v2.AlertJobSchedulerV2;
 import com.linkedin.thirdeye.dashboard.resources.AnomalyFunctionResource;
 
-import com.linkedin.thirdeye.util.SeverityComputationUtil;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -33,6 +33,7 @@ public class ThirdEyeAnomalyApplication
   private TaskDriver taskDriver = null;
   private MonitorJobScheduler monitorJobScheduler = null;
   private AlertJobScheduler alertJobScheduler = null;
+  private AlertJobSchedulerV2 alertJobSchedulerV2;
   private AnomalyFunctionFactory anomalyFunctionFactory = null;
   private AnomalyMergeExecutor anomalyMergeExecutor = null;
   private AutoLoadPinotMetricsService autoLoadPinotMetricsService = null;
@@ -89,6 +90,11 @@ public class ThirdEyeAnomalyApplication
         if (config.isAlert()) {
           alertJobScheduler = new AlertJobScheduler();
           alertJobScheduler.start();
+
+          // start alert scheduler v2
+          alertJobSchedulerV2 = new AlertJobSchedulerV2();
+          alertJobSchedulerV2.start();
+
           environment.jersey()
           .register(new AlertJobResource(alertJobScheduler, emailConfigurationDAO));
         }
@@ -121,6 +127,7 @@ public class ThirdEyeAnomalyApplication
         }
         if (config.isAlert()) {
           alertJobScheduler.shutdown();
+          alertJobSchedulerV2.shutdown();
         }
         if (config.isMerger()) {
           anomalyMergeExecutor.stop();

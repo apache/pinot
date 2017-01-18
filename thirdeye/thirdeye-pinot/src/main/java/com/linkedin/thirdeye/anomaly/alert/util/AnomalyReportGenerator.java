@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.anomaly.alert.util;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
 import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
@@ -33,23 +34,28 @@ public class AnomalyReportGenerator {
 
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyReportGenerator.class);
 
-  private static  final AnomalyReportGenerator INSTANCE = new AnomalyReportGenerator();
+  private static final AnomalyReportGenerator INSTANCE = new AnomalyReportGenerator();
+
   public static AnomalyReportGenerator getInstance() {
     return INSTANCE;
   }
 
-  MergedAnomalyResultManager anomalyResultManager = DAORegistry.getInstance().getMergedAnomalyResultDAO();
+  MergedAnomalyResultManager anomalyResultManager =
+      DAORegistry.getInstance().getMergedAnomalyResultDAO();
   MetricConfigManager metricConfigManager = DAORegistry.getInstance().getMetricConfigDAO();
 
-  public List<MergedAnomalyResultDTO> getAnomaliesForDatasets(List<String> collections, long startTime, long endTime) {
+  public List<MergedAnomalyResultDTO> getAnomaliesForDatasets(List<String> collections,
+      long startTime, long endTime) {
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
     for (String collection : collections) {
-      anomalies.addAll(anomalyResultManager.findByCollectionTime(collection, startTime, endTime, false));
+      anomalies
+          .addAll(anomalyResultManager.findByCollectionTime(collection, startTime, endTime, false));
     }
     return anomalies;
   }
 
-  public List<MergedAnomalyResultDTO> getAnomaliesForMetrics(List<String> metrics, long startTime, long endTime) {
+  public List<MergedAnomalyResultDTO> getAnomaliesForMetrics(List<String> metrics, long startTime,
+      long endTime) {
     List<MergedAnomalyResultDTO> anomalies = new ArrayList<>();
     LOG.info("fetching anomalies for metrics : " + metrics);
     for (String metric : metrics) {
@@ -65,11 +71,26 @@ public class AnomalyReportGenerator {
     return anomalies;
   }
 
- public void buildReport(long startTime, long endTime, List<MergedAnomalyResultDTO> anomalies,
+  public void buildReport(List<MergedAnomalyResultDTO> anomalies,
+      ThirdEyeAnomalyConfiguration configuration, String emailRecipients, String fromEmail) {
+    long startTime = System.currentTimeMillis();
+    long endTime = 0;
+    for (MergedAnomalyResultDTO anomaly : anomalies) {
+      if (anomaly.getStartTime() < startTime) {
+        startTime = anomaly.getStartTime();
+      }
+      if (anomaly.getEndTime() > endTime) {
+        endTime = anomaly.getEndTime();
+      }
+    }
+    buildReport(startTime, endTime, anomalies, configuration, false, emailRecipients, fromEmail);
+  }
+
+  public void buildReport(long startTime, long endTime, List<MergedAnomalyResultDTO> anomalies,
       ThirdEyeAnomalyConfiguration configuration, boolean includeSentAnomaliesOnly,
-      String emailRecipients) {
+      String emailRecipients, String fromEmail) {
     if (anomalies == null || anomalies.size() == 0) {
-      LOG.info("No anomalies found, please check the parameters.. exiting");
+      LOG.info("No anomalies found to send email, please check the parameters.. exiting");
     } else {
       Set<String> metrics = new HashSet<>();
       int alertedAnomalies = 0;
@@ -128,12 +149,15 @@ public class AnomalyReportGenerator {
       templateData.put("nonActionableCount", nonActionable);
       templateData.put("anomalyDetails", anomalyReportDTOList);
       buildEmailTemplateAndSendAlert(templateData, configuration.getSmtpConfiguration(),
-          emailRecipients);
+          emailRecipients, fromEmail);
     }
   }
 
   void buildEmailTemplateAndSendAlert(Map<String, Object> paramMap,
-      SmtpConfiguration smtpConfiguration, String emailRecipients) {
+      SmtpConfiguration smtpConfiguration, String emailRecipients, String fromEmail) {
+    if (Strings.isNullOrEmpty(fromEmail)) {
+      throw new IllegalArgumentException("Invalid sender's email");
+    }
     HtmlEmail email = new HtmlEmail();
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     try (Writer out = new OutputStreamWriter(baos, AlertTaskRunner.CHARSET)) {
@@ -146,8 +170,9 @@ public class AnomalyReportGenerator {
 
       String alertEmailSubject = "Thirdeye : Daily anomaly report";
       String alertEmailHtml = new String(baos.toByteArray(), AlertTaskRunner.CHARSET);
-      EmailHelper.sendEmailWithHtml(email, smtpConfiguration, alertEmailSubject, alertEmailHtml,
-          "thirdeye-dev@linkedin.com", emailRecipients);
+      EmailHelper
+          .sendEmailWithHtml(email, smtpConfiguration, alertEmailSubject, alertEmailHtml, fromEmail,
+              emailRecipients);
     } catch (Exception e) {
       Throwables.propagate(e);
     }
@@ -176,8 +201,7 @@ public class AnomalyReportGenerator {
             anomalyResultDTO.getStartTime(), anomalyResultDTO.getEndTime());
   }
 
-  @JsonIgnoreProperties(ignoreUnknown = true)
-  public static class AnomalyReportDTO {
+  @JsonIgnoreProperties(ignoreUnknown = true) public static class AnomalyReportDTO {
     String metric;
     String startDateTime;
     String windowSize;

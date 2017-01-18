@@ -10,9 +10,27 @@ public class AlertConfigBean extends AbstractBean {
   boolean active;
   EmailConfig emailConfig;
   ReportConfig reportConfig;
+  String recipients;
+  String fromAddress;
 
   public String getCronExpression() {
     return cronExpression;
+  }
+
+  public String getFromAddress() {
+    return fromAddress;
+  }
+
+  public void setFromAddress(String fromAddress) {
+    this.fromAddress = fromAddress;
+  }
+
+  public String getRecipients() {
+    return recipients;
+  }
+
+  public void setRecipients(String recipients) {
+    this.recipients = recipients;
   }
 
   public void setCronExpression(String cronExpression) {
@@ -53,7 +71,7 @@ public class AlertConfigBean extends AbstractBean {
 
   public static class EmailConfig {
     boolean sendAlertOnZeroAnomaly;
-    long lastNotifiedAnomalyId;
+    long lastNotifiedAnomalyId = 0l;
     List<Long> functionIds;
 
     public List<Long> getFunctionIds() {
@@ -85,6 +103,7 @@ public class AlertConfigBean extends AbstractBean {
     boolean enabled = true;
     List<Long> metricIds;
     List<List<String>> metricDimensions;
+    COMPARE_MODE compareMode = COMPARE_MODE.Wo2W;
 
     public boolean isEnabled() {
       return enabled;
@@ -109,5 +128,22 @@ public class AlertConfigBean extends AbstractBean {
     public void setMetricIds(List<Long> metricIds) {
       this.metricIds = metricIds;
     }
+  }
+
+  public static enum COMPARE_MODE {
+    WoW, Wo2W, Wo3W
+  }
+
+  @Override
+  public String toString() {
+    return "AlertConfigBean{" +
+        "active=" + active +
+        ", name='" + name + '\'' +
+        ", cronExpression='" + cronExpression + '\'' +
+        ", emailConfig=" + emailConfig +
+        ", reportConfig=" + reportConfig +
+        ", recipients='" + recipients + '\'' +
+        ", fromAddress='" + fromAddress + '\'' +
+        '}';
   }
 }

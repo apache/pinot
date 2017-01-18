@@ -4,7 +4,7 @@ import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-public class TestAnomalyConfigManager extends AbstractManagerTestBase {
+public class TestAlertConfigManager extends AbstractManagerTestBase {
 
   Long alertConfigid;
 
@@ -32,8 +32,4 @@ public class TestAnomalyConfigManager extends AbstractManagerTestBase {
     alertConfigManager.deleteById(alertConfigid);
     Assert.assertEquals(alertConfigManager.findAll().size(), 0);
   }
-
-  // TODO: add tests for Email Config
-
-  // TODO: add tests for Report Config
 }

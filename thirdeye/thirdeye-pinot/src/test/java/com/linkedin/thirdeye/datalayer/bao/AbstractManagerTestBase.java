@@ -15,8 +15,9 @@ import com.linkedin.thirdeye.datalayer.bao.jdbc.MetricConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.OverrideConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.RawAnomalyResultManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.TaskManagerImpl;
-import com.linkedin.thirdeye.datalayer.bao.jdbc.WebappConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
+import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 
 import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
@@ -59,7 +60,6 @@ public abstract class AbstractManagerTestBase {
   protected TaskManager taskDAO;
   protected EmailConfigurationManager emailConfigurationDAO;
   protected MergedAnomalyResultManager mergedResultDAO;
-  protected WebappConfigManager webappConfigDAO;
   protected DatasetConfigManager datasetConfigDAO;
   protected MetricConfigManager metricConfigDAO;
   protected DashboardConfigManager dashboardConfigDAO;
@@ -143,7 +143,6 @@ public abstract class AbstractManagerTestBase {
     taskDAO = managerProvider.getInstance(TaskManagerImpl.class);
     emailConfigurationDAO = managerProvider.getInstance(EmailConfigurationManagerImpl.class);
     mergedResultDAO = managerProvider.getInstance(MergedAnomalyResultManagerImpl.class);
-    webappConfigDAO = managerProvider.getInstance(WebappConfigManagerImpl.class);
     datasetConfigDAO = managerProvider.getInstance(DatasetConfigManagerImpl.class);
     metricConfigDAO = managerProvider.getInstance(MetricConfigManagerImpl.class);
     dashboardConfigDAO = managerProvider.getInstance(DashboardConfigManagerImpl.class);
@@ -176,6 +175,23 @@ public abstract class AbstractManagerTestBase {
     functionSpec.setProperties("baseline=w/w;changeThreshold=0.001");
     functionSpec.setIsActive(true);
     return functionSpec;
+  }
+
+  protected AlertConfigDTO getTestAlertConfiguration(String name) {
+    AlertConfigDTO alertConfigDTO = new AlertConfigDTO();
+    alertConfigDTO.setName(name);
+    alertConfigDTO.setActive(true);
+    alertConfigDTO.setFromAddress("te@linkedin.com");
+    alertConfigDTO.setRecipients("anomaly@linedin.com");
+    alertConfigDTO.setCronExpression("0/10 * * * * ?");
+    AlertConfigBean.EmailConfig emailConfig = new AlertConfigBean.EmailConfig();
+    emailConfig.setLastNotifiedAnomalyId(0l);
+    emailConfig.setSendAlertOnZeroAnomaly(true);
+    alertConfigDTO.setEmailConfig(emailConfig);
+    AlertConfigBean.ReportConfig reportConfig = new AlertConfigBean.ReportConfig();
+    reportConfig.setEnabled(true);
+    alertConfigDTO.setReportConfig(reportConfig);
+    return alertConfigDTO;
   }
 
   protected EmailConfigurationDTO getTestEmailConfiguration(String metricName, String collection) {
