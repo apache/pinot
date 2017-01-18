@@ -356,7 +356,7 @@ public class PinotLLCRealtimeSegmentManager {
           }
         }, RetryPolicies.fixedDelayRetryPolicy(10, 500L));
       } catch (Exception e) {
-        LOGGER.error("Failed to update idealstate for table {}", realtimeTableName, e);
+        LOGGER.error("Failed to update idealstate for table {} entries {}", realtimeTableName, idealStateEntries, e);
         _controllerMetrics.addMeteredGlobalValue(ControllerMeter.LLC_ZOOKEPER_UPDATE_FAILURES, 1);
         throw e;
       }
@@ -374,7 +374,8 @@ public class PinotLLCRealtimeSegmentManager {
         }
       }, RetryPolicies.fixedDelayRetryPolicy(10, 500L));
     } catch (Exception e) {
-      LOGGER.error("Failed to update idealstate for table {}", realtimeTableName, e);
+      LOGGER.error("Failed to update idealstate for table {}, old segment {}, new segment {}, newInstances {}",
+          realtimeTableName, oldSegmentNameStr, newSegmentNameStr, newInstances, e);
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.LLC_ZOOKEPER_UPDATE_FAILURES, 1);
       throw e;
     }
@@ -433,7 +434,7 @@ public class PinotLLCRealtimeSegmentManager {
     try {
       _propertyStore.setChildren(paths, records, AccessOption.PERSISTENT);
     } catch (Exception e) {
-      LOGGER.error("Failed to update idealstate for table {}", realtimeTableName, e);
+      LOGGER.error("Failed to update idealstate for table {} for paths {}", realtimeTableName, paths, e);
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.LLC_ZOOKEPER_UPDATE_FAILURES, 1);
       throw e;
     }
@@ -862,7 +863,7 @@ public class PinotLLCRealtimeSegmentManager {
         }
       }, RetryPolicies.fixedDelayRetryPolicy(10, 500L));
     } catch (Exception e) {
-      LOGGER.error("Failed to update idealstate for table {}", realtimeTableName, e);
+      LOGGER.error("Failed to update idealstate for table {} instance {} segment {}", realtimeTableName, instance, segmentNameStr, e);
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.LLC_ZOOKEPER_UPDATE_FAILURES, 1);
       throw e;
     }
