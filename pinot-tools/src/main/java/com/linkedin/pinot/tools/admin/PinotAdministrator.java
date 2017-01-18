@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.tools.admin;
 
+import com.linkedin.pinot.tools.admin.command.MoveReplicaGroup;
 import java.lang.reflect.Field;
 import org.kohsuke.args4j.Argument;
 import org.kohsuke.args4j.CmdLineException;
@@ -83,7 +84,8 @@ public class PinotAdministrator {
       @SubCommand(name = "ChangeNumReplicas", impl = ChangeNumReplicasCommand.class),
       @SubCommand(name = "ValidateConfig", impl = ValidateConfigCommand.class),
       @SubCommand(name = "VerifySegmentState", impl = VerifySegmentState.class),
-      @SubCommand(name = "ConvertPinotSegment", impl = PinotSegmentConvertCommand.class)
+      @SubCommand(name = "ConvertPinotSegment", impl = PinotSegmentConvertCommand.class),
+      @SubCommand(name = "MoveReplicaGroup", impl = MoveReplicaGroup.class)
   })
   Command _subCommand;
   // @formatter:on
