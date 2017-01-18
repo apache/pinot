@@ -299,7 +299,7 @@ public class PinotLLCRealtimeSegmentManager {
       records.add(record);
     }
 
-    writeSegmentsToPropertyStore(paths, records);
+    writeSegmentsToPropertyStore(paths, records, realtimeTableName);
     LOGGER.info("Added {} segments to propertyStore for table {}", paths.size(), realtimeTableName);
 
     updateHelixIdealState(idealState, realtimeTableName, idealStateEntries, create, nReplicas);
@@ -347,25 +347,38 @@ public class PinotLLCRealtimeSegmentManager {
       addLLCRealtimeSegmentsInIdealState(idealState, idealStateEntries);
       _helixAdmin.addResource(_clusterName, realtimeTableName, idealState);
     } else {
-      HelixHelper.updateIdealState(_helixManager, realtimeTableName, new Function<IdealState, IdealState>() {
-        @Override
-        public IdealState apply(IdealState idealState) {
-          idealState.setReplicas(Integer.toString(nReplicas));
-          return addLLCRealtimeSegmentsInIdealState(idealState, idealStateEntries);
-        }
-      }, RetryPolicies.exponentialBackoffRetryPolicy(5, 500L, 2.0f));
+      try {
+        HelixHelper.updateIdealState(_helixManager, realtimeTableName, new Function<IdealState, IdealState>() {
+          @Override
+          public IdealState apply(IdealState idealState) {
+            idealState.setReplicas(Integer.toString(nReplicas));
+            return addLLCRealtimeSegmentsInIdealState(idealState, idealStateEntries);
+          }
+        }, RetryPolicies.fixedDelayRetryPolicy(10, 500L));
+      } catch (Exception e) {
+        LOGGER.error("Failed to update idealstate for table {} entries {}", realtimeTableName, idealStateEntries, e);
+        _controllerMetrics.addMeteredGlobalValue(ControllerMeter.LLC_ZOOKEPER_UPDATE_FAILURES, 1);
+        throw e;
+      }
     }
   }
 
   // Update the helix state when an old segment commits and a new one is to be started.
   protected void updateHelixIdealState(final String realtimeTableName, final List<String> newInstances,
       final String oldSegmentNameStr, final String newSegmentNameStr) {
-    HelixHelper.updateIdealState(_helixManager, realtimeTableName, new Function<IdealState, IdealState>() {
-      @Override
-      public IdealState apply(IdealState idealState) {
-        return updateForNewRealtimeSegment(idealState, newInstances, oldSegmentNameStr, newSegmentNameStr);
-      }
-    }, RetryPolicies.exponentialBackoffRetryPolicy(5, 500L, 2.0f));
+    try {
+      HelixHelper.updateIdealState(_helixManager, realtimeTableName, new Function<IdealState, IdealState>() {
+        @Override
+        public IdealState apply(IdealState idealState) {
+          return updateForNewRealtimeSegment(idealState, newInstances, oldSegmentNameStr, newSegmentNameStr);
+        }
+      }, RetryPolicies.fixedDelayRetryPolicy(10, 500L));
+    } catch (Exception e) {
+      LOGGER.error("Failed to update idealstate for table {}, old segment {}, new segment {}, newInstances {}",
+          realtimeTableName, oldSegmentNameStr, newSegmentNameStr, newInstances, e);
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.LLC_ZOOKEPER_UPDATE_FAILURES, 1);
+      throw e;
+    }
   }
 
   protected static IdealState updateForNewRealtimeSegment(IdealState idealState,
@@ -417,8 +430,14 @@ public class PinotLLCRealtimeSegmentManager {
 
   }
 
-  protected void writeSegmentsToPropertyStore(List<String> paths, List<ZNRecord> records) {
-    _propertyStore.setChildren(paths, records, AccessOption.PERSISTENT);
+  protected void writeSegmentsToPropertyStore(List<String> paths, List<ZNRecord> records, final String realtimeTableName) {
+    try {
+      _propertyStore.setChildren(paths, records, AccessOption.PERSISTENT);
+    } catch (Exception e) {
+      LOGGER.error("Failed to update idealstate for table {} for paths {}", realtimeTableName, paths, e);
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.LLC_ZOOKEPER_UPDATE_FAILURES, 1);
+      throw e;
+    }
   }
 
   protected List<String> getAllRealtimeTables() {
@@ -508,7 +527,7 @@ public class PinotLLCRealtimeSegmentManager {
      * If the controller fails after step-2, we are fine because the idealState has the new segments.
      * If the controller fails before step-1, the server will see this as an upload failure, and will re-try.
      */
-    writeSegmentsToPropertyStore(paths, records);
+    writeSegmentsToPropertyStore(paths, records, realtimeTableName);
 
     // TODO Introduce a controller failure here for integration testing
 
@@ -800,7 +819,7 @@ public class PinotLLCRealtimeSegmentManager {
     propStorePaths.add(newZnodePath);
     propStoreEntries.add(newZnRecord);
 
-    writeSegmentsToPropertyStore(propStorePaths, propStoreEntries);
+    writeSegmentsToPropertyStore(propStorePaths, propStoreEntries, realtimeTableName);
 
     updateHelixIdealState(realtimeTableName, serverInstances, null, newSegmentNameStr);
 
@@ -826,22 +845,28 @@ public class PinotLLCRealtimeSegmentManager {
    * Mark the state of the segment to be OFFLINE in idealstate.
    * When all replicas of this segment are marked offline, the ValidationManager, in its next
    * run, will auto-create a new segment with the appropriate offset.
-   * See {@link #createConsumingSegment(String, List, List, AbstractTableConfig)}
+   * See {@link #createConsumingSegment(String, Set, List, AbstractTableConfig)}
   */
   public void segmentStoppedConsuming(final LLCSegmentName segmentName, final String instance) {
     String rawTableName = segmentName.getTableName();
     String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(rawTableName);
     final String segmentNameStr = segmentName.getSegmentName();
-    HelixHelper.updateIdealState(_helixManager, realtimeTableName, new Function<IdealState, IdealState>() {
-      @Override
-      public IdealState apply(IdealState idealState) {
-        idealState.setPartitionState(segmentNameStr, instance,
-            CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.OFFLINE);
-        Map<String, String> instanceStateMap = idealState.getInstanceStateMap(segmentNameStr);
-        LOGGER.info("Attempting to mark {} offline. Current map:{}", segmentNameStr, instanceStateMap.toString());
-        return idealState;
-      }
-    }, RetryPolicies.exponentialBackoffRetryPolicy(5, 500L, 2.0f));
+    try {
+      HelixHelper.updateIdealState(_helixManager, realtimeTableName, new Function<IdealState, IdealState>() {
+        @Override
+        public IdealState apply(IdealState idealState) {
+          idealState.setPartitionState(segmentNameStr, instance,
+              CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.OFFLINE);
+          Map<String, String> instanceStateMap = idealState.getInstanceStateMap(segmentNameStr);
+          LOGGER.info("Attempting to mark {} offline. Current map:{}", segmentNameStr, instanceStateMap.toString());
+          return idealState;
+        }
+      }, RetryPolicies.fixedDelayRetryPolicy(10, 500L));
+    } catch (Exception e) {
+      LOGGER.error("Failed to update idealstate for table {} instance {} segment {}", realtimeTableName, instance, segmentNameStr, e);
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.LLC_ZOOKEPER_UPDATE_FAILURES, 1);
+      throw e;
+    }
     LOGGER.info("Successfully marked {} offline for instance {} since it stopped consuming", segmentNameStr, instance);
   }
 
