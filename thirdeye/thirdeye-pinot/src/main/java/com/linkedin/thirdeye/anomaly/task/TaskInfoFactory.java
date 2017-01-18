@@ -12,6 +12,7 @@ import com.linkedin.thirdeye.anomaly.alert.AlertTaskInfo;
 import com.linkedin.thirdeye.anomaly.detection.DetectionTaskInfo;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorTaskInfo;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
+import com.linkedin.thirdeye.completeness.checker.DataCompletenessTaskInfo;
 
 /**
  * This class returns deserializes the task info json and returns the TaskInfo,
@@ -39,6 +40,8 @@ public class TaskInfoFactory {
         case ALERT:
           taskInfo = OBJECT_MAPPER.readValue(taskInfoString, AlertTaskInfo.class);
           break;
+        case DATA_COMPLETENESS:
+          taskInfo = OBJECT_MAPPER.readValue(taskInfoString, DataCompletenessTaskInfo.class);
         default:
           LOG.error("TaskType must be one of ANOMALY_DETECTION, MONITOR, ALERT");
           break;

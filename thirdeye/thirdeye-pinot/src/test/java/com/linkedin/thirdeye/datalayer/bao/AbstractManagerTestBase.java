@@ -5,6 +5,7 @@ import com.linkedin.thirdeye.anomaly.override.OverrideConfigHelper;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.AlertConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.DashboardConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.DataCompletenessConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.DatasetConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.EmailConfigurationManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.IngraphDashboardConfigManagerImpl;
@@ -18,8 +19,8 @@ import com.linkedin.thirdeye.datalayer.bao.jdbc.TaskManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.WebappConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
-
 import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
+
 import java.io.File;
 import java.io.FileReader;
 import java.net.URL;
@@ -32,6 +33,8 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.tomcat.jdbc.pool.DataSource;
 import org.joda.time.DateTime;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 
@@ -42,6 +45,7 @@ import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.datalayer.ScriptRunner;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.datalayer.dto.IngraphDashboardConfigDTO;
@@ -67,6 +71,7 @@ public abstract class AbstractManagerTestBase {
   protected IngraphMetricConfigManager ingraphMetricConfigDAO;
   protected OverrideConfigManager overrideConfigDAO;
   protected AlertConfigManager alertConfigManager;
+  protected DataCompletenessConfigManager dataCompletenessConfigDAO;
 
   private ManagerProvider managerProvider;
   private PersistenceConfig configuration;
@@ -152,6 +157,7 @@ public abstract class AbstractManagerTestBase {
     ingraphMetricConfigDAO = managerProvider.getInstance(IngraphMetricConfigManagerImpl.class);
     overrideConfigDAO = managerProvider.getInstance(OverrideConfigManagerImpl.class);
     alertConfigManager = managerProvider.getInstance(AlertConfigManagerImpl.class);
+    dataCompletenessConfigDAO = managerProvider.getInstance(DataCompletenessConfigManagerImpl.class);
   }
 
   @AfterClass(alwaysRun = true)
@@ -283,5 +289,19 @@ public abstract class AbstractManagerTestBase {
     overrideConfigDTO.setTargetLevel(overrideTarget);
 
     return overrideConfigDTO;
+  }
+
+  protected DataCompletenessConfigDTO getTestDataCompletenessConfig(String dataset, long dateToCheckInMS,
+      boolean dataComplete) {
+    DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern("yyyyMMddHHmm");
+    DataCompletenessConfigDTO dataCompletenessConfigDTO = new DataCompletenessConfigDTO();
+    dataCompletenessConfigDTO.setDataset(dataset);
+    dataCompletenessConfigDTO.setDateToCheckInMS(dateToCheckInMS);
+    dataCompletenessConfigDTO.setDateToCheckInSDF(dateTimeFormatter.print(dateToCheckInMS));
+    dataCompletenessConfigDTO.setDataComplete(dataComplete);
+    dataCompletenessConfigDTO.setCountStar(2000);
+    dataCompletenessConfigDTO.setPercentComplete(79);
+    dataCompletenessConfigDTO.setNumAttempts(3);
+    return dataCompletenessConfigDTO;
   }
 }

@@ -222,3 +222,21 @@ create table if not exists alert_config_index (
     version int(10)
 ) ENGINE=InnoDB;
 
+
+create table if not exists data_completeness_config_index (
+    dataset varchar(200) not null,
+    date_to_check_in_ms bigint(20) not null,
+    date_to_check_in_sdf varchar(20),
+    data_complete boolean,
+    base_id bigint(20) not null,
+    create_time timestamp,
+    update_time timestamp default current_timestamp,
+    version int(10)
+) ENGINE=InnoDB;
+ALTER TABLE `data_completeness_config_index` ADD UNIQUE `data_completeness_config_unique_index`(`dataset`, `date_to_check_in_ms`);
+create index data_completeness_config_dataset_idx on data_completeness_config_index(dataset);
+create index data_completeness_config_date_idx on data_completeness_config_index(date_to_check_in_ms);
+create index data_completeness_config_sdf_idx on data_completeness_config_index(date_to_check_in_sdf);
+create index data_completeness_config_complete_idx on data_completeness_config_index(data_complete);
+
+

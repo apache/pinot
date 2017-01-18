@@ -6,7 +6,8 @@ public class TaskConstants {
     ANOMALY_DETECTION,
     MERGE,
     ALERT,
-    MONITOR
+    MONITOR,
+    DATA_COMPLETENESS
   }
 
   public enum TaskStatus {
