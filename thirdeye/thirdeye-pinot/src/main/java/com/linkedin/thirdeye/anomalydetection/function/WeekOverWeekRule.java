@@ -1,9 +1,10 @@
 package com.linkedin.thirdeye.anomalydetection.function;
 
 import com.linkedin.thirdeye.anomalydetection.model.data.SeasonalDataModel;
-import com.linkedin.thirdeye.anomalydetection.model.detection.SimpleThreshold;
+import com.linkedin.thirdeye.anomalydetection.model.detection.SimpleThresholdDetectionModel;
 import com.linkedin.thirdeye.anomalydetection.model.prediction.SeasonalAveragePredictionModel;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import java.util.Properties;
 import org.apache.commons.lang3.StringUtils;
 
 public class WeekOverWeekRule extends AbstractAnomalyDetectionFunction {
@@ -12,6 +13,11 @@ public class WeekOverWeekRule extends AbstractAnomalyDetectionFunction {
   @Override
   public void init(AnomalyFunctionDTO spec) throws Exception {
     super.init(spec);
+    this.init(this.properties);
+  }
+
+  public void init(Properties properties) {
+    this.properties = properties;
 
     String baselineProp = this.properties.getProperty(BASELINE);
     if (StringUtils.isNotBlank(baselineProp)) {
@@ -27,10 +33,11 @@ public class WeekOverWeekRule extends AbstractAnomalyDetectionFunction {
     }
 
     predictionModel = new SeasonalAveragePredictionModel();
+    predictionModel.init(this.properties);
 
-    detectionModel = new SimpleThreshold();
+    detectionModel = new SimpleThresholdDetectionModel();
+    detectionModel.init(this.properties);
   }
-
 
   private void initPropertiesForDataModel(String baselineProp) {
     // The basic settings for w/w

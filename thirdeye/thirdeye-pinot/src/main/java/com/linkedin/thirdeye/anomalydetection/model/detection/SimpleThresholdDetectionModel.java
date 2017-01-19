@@ -14,15 +14,15 @@ import org.joda.time.Interval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class SimpleThreshold extends AbstractDetectionModel {
-  private static final Logger LOGGER = LoggerFactory.getLogger(SimpleThreshold.class);
+public class SimpleThresholdDetectionModel extends AbstractDetectionModel {
+  private static final Logger LOGGER = LoggerFactory.getLogger(SimpleThresholdDetectionModel.class);
 
   public static final String CHANGE_THRESHOLD = "changeThreshold";
   public static final String AVERAGE_VOLUME_THRESHOLD = "averageVolumeThreshold";
   public static final String BUCKET_SIZE = "bucketSize";
   public static final String BUCKET_UNIT = "bucketUnit";
 
-  public static final String DEFAULT_MESSAGE_TEMPLATE = "change : %.2f %%, currentVal : %.2f, baseLineVal : %.2f, threshold : %s, baseLineProp : %s";
+  public static final String DEFAULT_MESSAGE_TEMPLATE = "change : %.2f %%, currentVal : %.2f, baseLineVal : %.2f, threshold : %s";
 
   @Override
   public List<RawAnomalyResultDTO> detect(AnomalyDetectionContext anomalyDetectionContext) {
@@ -63,7 +63,7 @@ public class SimpleThreshold extends AbstractDetectionModel {
 
     PredictionModel predictionModel = anomalyDetectionContext.getTrainedPredictionModel();
     if (!(predictionModel instanceof ExpectedTimeSeriesPredictionModel)) {
-      LOGGER.info("SimpleThreshold detection model expects a ExpectedTimeSeriesPredictionModel but the trained prediction model in anomaly detection context is not.");
+      LOGGER.info("SimpleThresholdDetectionModel detection model expects an ExpectedTimeSeriesPredictionModel but the trained prediction model in anomaly detection context is not.");
       return anomalyResults; // empty list
     }
     ExpectedTimeSeriesPredictionModel expectedTimeSeriesPredictionModel = (ExpectedTimeSeriesPredictionModel) predictionModel;
@@ -71,28 +71,26 @@ public class SimpleThreshold extends AbstractDetectionModel {
     TimeSeries expectedTimeSeries = expectedTimeSeriesPredictionModel.getExpectedTimeSeries();
     Interval expectedTSInterval = expectedTimeSeries.getTimeSeriesInterval();
     long expectedStart = expectedTSInterval.getStartMillis();
-    long expectedEnd = expectedTSInterval.getEndMillis();
-    for (int i = 0; i < numBuckets; ++i) {
-      long offset = i * bucketSizeInMillis;
-      long currentTimestamp = currentStart + offset;
-      long expectedTimestamp = expectedStart + offset;
-      if (expectedTimestamp >= expectedEnd) {
+    long seasonalOffset = currentStart - expectedStart;
+    for (long currentTimestamp : currentTimeSeries.timestampSet()) {
+      long expectedTimestamp = currentTimestamp - seasonalOffset;
+      if (!expectedTimeSeries.hasTimestamp(expectedTimestamp)) {
         break;
       }
+      double expectedValue = expectedTimeSeries.get(expectedTimestamp);
       double currentValue = currentTimeSeries.get(currentTimestamp);
-      double baselineValue = expectedTimeSeries.get(expectedTimestamp);
-      if (isAnomaly(currentValue, baselineValue, changeThreshold)) {
+      if (isAnomaly(currentValue, expectedValue, changeThreshold)) {
         RawAnomalyResultDTO anomalyResult = new RawAnomalyResultDTO();
         anomalyResult.setDimensions(dimensionMap);
         anomalyResult.setProperties(getProperties().toString());
         anomalyResult.setStartTime(currentTimestamp);
         anomalyResult.setEndTime(currentTimestamp + bucketSizeInMillis); // point-in-time
         anomalyResult.setScore(averageValue);
-        anomalyResult.setWeight(calculateChange(currentValue, baselineValue));
-        String message = getAnomalyResultMessage(changeThreshold, currentValue, baselineValue);
+        anomalyResult.setWeight(calculateChange(currentValue, expectedValue));
+        String message = getAnomalyResultMessage(changeThreshold, currentValue, expectedValue);
         anomalyResult.setMessage(message);
         anomalyResults.add(anomalyResult);
-        if (currentValue == 0.0 || baselineValue == 0.0) {
+        if (currentValue == 0.0 || expectedValue == 0.0) {
           anomalyResult.setDataMissing(true);
         }
       }

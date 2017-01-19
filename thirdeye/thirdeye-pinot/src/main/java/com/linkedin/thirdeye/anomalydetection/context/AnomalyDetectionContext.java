@@ -10,6 +10,7 @@ import java.util.List;
  * dimension and metric.
  */
 public class AnomalyDetectionContext {
+  // The followings are inputs
   private AnomalyDetectionFunction anomalyDetectionFunction;
 
   private TimeSeriesKey timeSeriesKey;
@@ -17,6 +18,7 @@ public class AnomalyDetectionContext {
   private TimeSeries current;
   private List<TimeSeries> baselines;
 
+  // The followings are generated during anomaly detection
   private TimeSeries transformedCurrent;
   private List<TimeSeries> transformedBaselines;
 

@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomalydetection.context;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import org.joda.time.Interval;
@@ -10,7 +11,7 @@ import org.joda.time.Interval;
  */
 public class TimeSeries {
 
-  private Map<Long, Double> timeSeries;
+  private Map<Long, Double> timeSeries = new HashMap<>();
   private Interval timeSeriesInterval;
 
 

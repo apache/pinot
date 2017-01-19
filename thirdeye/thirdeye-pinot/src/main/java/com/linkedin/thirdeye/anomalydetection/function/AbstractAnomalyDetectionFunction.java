@@ -2,7 +2,10 @@ package com.linkedin.thirdeye.anomalydetection.function;
 
 import com.linkedin.thirdeye.anomalydetection.Utils;
 import com.linkedin.thirdeye.anomalydetection.model.data.DataModel;
+import com.linkedin.thirdeye.anomalydetection.model.data.NoopDataModel;
 import com.linkedin.thirdeye.anomalydetection.model.detection.DetectionModel;
+import com.linkedin.thirdeye.anomalydetection.model.detection.NoopDetectionModel;
+import com.linkedin.thirdeye.anomalydetection.model.prediction.NoopPredictionModel;
 import com.linkedin.thirdeye.anomalydetection.model.prediction.PredictionModel;
 import com.linkedin.thirdeye.anomalydetection.model.transform.TransformationFunction;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
@@ -19,11 +22,11 @@ public abstract class AbstractAnomalyDetectionFunction implements AnomalyDetecti
   protected AnomalyFunctionDTO spec;
   protected Properties properties;
 
-  protected DataModel dataModel;
+  protected DataModel dataModel = new NoopDataModel();
   protected List<TransformationFunction> currentTimeSeriesTransformationChain = new ArrayList<>();
   protected List<TransformationFunction> baselineSeriesTransformationChain = new ArrayList<>();
-  protected PredictionModel predictionModel;
-  protected DetectionModel detectionModel;
+  protected PredictionModel predictionModel = new NoopPredictionModel();
+  protected DetectionModel detectionModel = new NoopDetectionModel();
 
   @Override
   public void init(AnomalyFunctionDTO spec) throws Exception {
