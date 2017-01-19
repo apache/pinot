@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.anomaly.alert.template.pojo;
 import java.util.Map;
 
 public class MetricDimensionReport {
+  String dataset;
   String metricName;
   String dimensionName;
   long currentStartTime;
@@ -17,6 +18,14 @@ public class MetricDimensionReport {
 
   public String getCompareMode() {
     return compareMode;
+  }
+
+  public String getDataset() {
+    return dataset;
+  }
+
+  public void setDataset(String dataset) {
+    this.dataset = dataset;
   }
 
   public void setCompareMode(String compareMode) {

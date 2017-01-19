@@ -37,10 +37,6 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
       "where collection=:collection and metric=:metric "
           + "and (startTime < :endTime and endTime > :startTime) order by endTime desc";
 
-  // find a conflicting window
-  private static final String FIND_BY_COLLECTION_TIME = "where collection=:collection "
-      + "and (startTime < :endTime and endTime > :startTime) order by endTime desc";
-
   private static final String FIND_BY_FUNCTION_ID = "where functionId=:functionId";
 
   private static final String FIND_LATEST_CONFLICT_BY_FUNCTION_AND_DIMENSIONS =
@@ -148,7 +144,7 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
 
   @Override
   public List<MergedAnomalyResultDTO> findByFunctionIdAndIdGreaterThan(Long functionId, Long anomalyId) {
-    Predicate predicate = Predicate.AND(Predicate.EQ("functionId", functionId), Predicate.GT("id", anomalyId));
+    Predicate predicate = Predicate.AND(Predicate.EQ("functionId", functionId), Predicate.GT("baseId", anomalyId));
     List<MergedAnomalyResultBean> list = genericPojoDao.get(predicate, MergedAnomalyResultBean.class);
     return batchConvertMergedAnomalyBean2DTO(list, true);
   }
@@ -196,13 +192,11 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
   @Override
   public List<MergedAnomalyResultDTO> findByCollectionTime(String collection, long startTime,
       long endTime, boolean loadRawAnomalies) {
-    Map<String, Object> filterParams = new HashMap<>();
-    filterParams.put("collection", collection);
-    filterParams.put("startTime", startTime);
-    filterParams.put("endTime", endTime);
+    Predicate predicate = Predicate
+        .AND(Predicate.EQ("collection", collection), Predicate.GT("startTime", startTime),
+            Predicate.LT("endTime", endTime));
 
-    List<MergedAnomalyResultBean> list = genericPojoDao.executeParameterizedSQL(
-        FIND_BY_COLLECTION_TIME, filterParams, MergedAnomalyResultBean.class);
+    List<MergedAnomalyResultBean> list = genericPojoDao.get(predicate, MergedAnomalyResultBean.class);
     return batchConvertMergedAnomalyBean2DTO(list, loadRawAnomalies);
   }
 

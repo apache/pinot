@@ -2,8 +2,11 @@ package com.linkedin.thirdeye.anomaly.alert.util;
 
 import com.linkedin.thirdeye.anomaly.alert.template.pojo.MetricDimensionReport;
 import com.linkedin.thirdeye.api.DimensionMap;
+import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewResponse;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import freemarker.template.TemplateMethodModelEx;
 import freemarker.template.TemplateModelException;
 import freemarker.template.TemplateNumberModel;
@@ -12,7 +15,6 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TimeZone;
 import java.util.TreeMap;
 import org.apache.commons.collections.MapUtils;
 import org.joda.time.DateTime;
@@ -21,27 +23,37 @@ import org.joda.time.DateTimeZone;
 /**
  * Stateless class to provide util methods to help build data report
  */
-public abstract class DataReportHelper {
+public final class DataReportHelper {
   private static final String DIMENSION_VALUE_SEPARATOR = ", ";
   private static final String EQUALS = "=";
 
-  public static final TimeZone DEFAULT_TIME_ZONE = TimeZone.getTimeZone("America/Los_Angeles");
-  public static final String CHARSET = "UTF-8";
   public static final String DECIMAL_FORMATTER = "%+.1f";
   public static final String OVER_ALL = "OverAll";
-  private DataReportHelper() {
 
+  private static DataReportHelper INSTANCE = new DataReportHelper();
+  private final MetricConfigManager metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
+
+  private DataReportHelper() {
+  }
+
+  public static DataReportHelper getInstance() {
+    return INSTANCE;
   }
 
   // report list metric vs groupByKey vs dimensionVal vs timeBucket vs values
-  public static List<MetricDimensionReport> getDimensionReportList(
-      List<ContributorViewResponse> reports) {
+  public List<MetricDimensionReport> getDimensionReportList(List<ContributorViewResponse> reports) {
     List<MetricDimensionReport> ultimateResult = new ArrayList<>();
     for (ContributorViewResponse report : reports) {
       MetricDimensionReport metricDimensionReport = new MetricDimensionReport();
       String metric = report.getMetrics().get(0);
+      List<MetricConfigDTO> metricConfigs = metricDAO.findByMetricName(metric);
+      String dataset = "Unknown";
+      if (metricConfigs.size() > 0) {
+        dataset = metricConfigs.get(0).getDataset();
+      }
       String groupByDimension = report.getDimensions().get(0);
       metricDimensionReport.setMetricName(metric);
+      metricDimensionReport.setDataset(dataset);
       metricDimensionReport.setDimensionName(groupByDimension);
       int valIndex =
           report.getResponseData().getSchema().getColumnsToIndexMapping().get("percentageChange");

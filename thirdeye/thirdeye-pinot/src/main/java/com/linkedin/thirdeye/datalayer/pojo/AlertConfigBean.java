@@ -69,8 +69,8 @@ public class AlertConfigBean extends AbstractBean {
     this.reportConfig = reportConfig;
   }
 
+  @JsonIgnoreProperties(ignoreUnknown = true)
   public static class EmailConfig {
-    boolean sendAlertOnZeroAnomaly;
     long lastNotifiedAnomalyId = 0l;
     List<Long> functionIds;
 
@@ -90,21 +90,22 @@ public class AlertConfigBean extends AbstractBean {
       this.lastNotifiedAnomalyId = lastNotifiedAnomalyId;
     }
 
-    public boolean isSendAlertOnZeroAnomaly() {
-      return sendAlertOnZeroAnomaly;
-    }
-
-    public void setSendAlertOnZeroAnomaly(boolean sendAlertOnZeroAnomaly) {
-      this.sendAlertOnZeroAnomaly = sendAlertOnZeroAnomaly;
+    @Override
+    public String toString() {
+      return "EmailConfig{" +
+          "functionIds=" + functionIds +
+          ", lastNotifiedAnomalyId=" + lastNotifiedAnomalyId +
+          '}';
     }
   }
 
+  @JsonIgnoreProperties(ignoreUnknown = true)
   public static class ReportConfig {
-    boolean enabled = true;
+    boolean enabled = false;
     List<Long> metricIds;
     List<List<String>> metricDimensions;
     COMPARE_MODE compareMode = COMPARE_MODE.Wo2W;
-
+    String contactEmail;
     public boolean isEnabled() {
       return enabled;
     }
@@ -128,9 +129,35 @@ public class AlertConfigBean extends AbstractBean {
     public void setMetricIds(List<Long> metricIds) {
       this.metricIds = metricIds;
     }
+
+    public String getContactEmail() {
+      return contactEmail;
+    }
+
+    public void setContactEmail(String contactEmail) {
+      this.contactEmail = contactEmail;
+    }
+
+    @Override
+    public String toString() {
+      return "ReportConfig{" +
+          "compareMode=" + compareMode +
+          ", enabled=" + enabled +
+          ", metricIds=" + metricIds +
+          ", metricDimensions=" + metricDimensions +
+          '}';
+    }
+
+    public COMPARE_MODE getCompareMode() {
+      return compareMode;
+    }
+
+    public void setCompareMode(COMPARE_MODE compareMode) {
+      this.compareMode = compareMode;
+    }
   }
 
-  public static enum COMPARE_MODE {
+  public enum COMPARE_MODE {
     WoW, Wo2W, Wo3W
   }
 
