@@ -29,8 +29,12 @@ public class AlertFilterHelper {
   }
 
   /**
+   * Each function has a filtration rule which let alert module decide if an anomaly should be
+   * included in the alert email. This method applies respective filtration rule on list of
+   * anomalies.
    *
    * @param results
+   *
    * @return
    */
   public static List<MergedAnomalyResultDTO> applyFiltrationRule(List<MergedAnomalyResultDTO> results) {
