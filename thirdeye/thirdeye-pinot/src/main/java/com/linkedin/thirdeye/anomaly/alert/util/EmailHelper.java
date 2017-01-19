@@ -42,8 +42,6 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
 /**
  * Stateless class to provide util methods to help build anomaly report
  */
-import static com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper.FILTER_TYPE_KEY;
-
 public abstract class EmailHelper {
 
   private static final Logger LOG = LoggerFactory.getLogger(EmailHelper.class);

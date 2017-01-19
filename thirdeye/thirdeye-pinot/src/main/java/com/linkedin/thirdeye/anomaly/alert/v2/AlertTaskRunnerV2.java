@@ -61,7 +61,8 @@ public class AlertTaskRunnerV2 implements TaskRunner {
   }
 
   @Override
-  public List<TaskResult> execute(TaskInfo taskInfo, TaskContext taskContext) throws Exception {
+  public List<TaskResult> execute(TaskInfo taskInfo, TaskContext taskContext)
+      throws Exception {
     List<TaskResult> taskResult = new ArrayList<>();
     AlertTaskInfo alertTaskInfo = (AlertTaskInfo) taskInfo;
     alertConfig = alertTaskInfo.getAlertConfigDTO();
@@ -81,7 +82,13 @@ public class AlertTaskRunnerV2 implements TaskRunner {
 
   // TODO : separate code path for new vs old alert config !
   private void runTask() throws Exception {
-    LOG.info("Starting email report {}", alertConfig.getId());
+    LOG.info("Starting email report for id : {}, name : {} ", alertConfig.getId(),
+        alertConfig.getName());
+    sendAnomalyReport();
+    sendScheduledDataReport();
+  }
+
+  private void sendAnomalyReport() {
     AlertConfigBean.EmailConfig emailConfig = alertConfig.getEmailConfig();
     if (emailConfig != null && emailConfig.getFunctionIds() != null) {
       List<Long> functionIds = alertConfig.getEmailConfig().getFunctionIds();
@@ -95,37 +102,41 @@ public class AlertTaskRunnerV2 implements TaskRunner {
         }
       }
       // apply filtration rule
-      List<MergedAnomalyResultDTO> results = AlertFilterHelper.applyFiltrationRule(mergedAnomaliesAllResults);
+      List<MergedAnomalyResultDTO> results =
+          AlertFilterHelper.applyFiltrationRule(mergedAnomaliesAllResults);
 
-      if (results.isEmpty() && !alertConfig.getEmailConfig().isSendAlertOnZeroAnomaly()) {
+      if (results.isEmpty()) {
         LOG.info("Zero anomalies found, skipping sending email");
-        return;
-      }
-      AnomalyReportGenerator.getInstance().buildReport(results, thirdeyeConfig, alertConfig);
+      } else {
+        AnomalyReportGenerator.getInstance().buildReport(results, thirdeyeConfig, alertConfig);
 
-      updateNotifiedStatus(results);
+        updateNotifiedStatus(results);
 
-      // update anomaly watermark in alertConfig
-      long lastNotifiedAlertId = emailConfig.getLastNotifiedAnomalyId();
-      for (MergedAnomalyResultDTO anomalyResult : results) {
-        if (anomalyResult.getId() > lastNotifiedAlertId) {
-          lastNotifiedAlertId = anomalyResult.getId();
+        // update anomaly watermark in alertConfig
+        long lastNotifiedAlertId = emailConfig.getLastNotifiedAnomalyId();
+        for (MergedAnomalyResultDTO anomalyResult : results) {
+          if (anomalyResult.getId() > lastNotifiedAlertId) {
+            lastNotifiedAlertId = anomalyResult.getId();
+          }
+        }
+      /* TODO: change watermark to last updated timestamp instead of baseId as Id would not work in when
+       an anomaly which was not sent because of filtration rule, got updated later by a merge.
+       */
+        if (lastNotifiedAlertId != emailConfig.getLastNotifiedAnomalyId()) {
+          alertConfig.getEmailConfig().setLastNotifiedAnomalyId(lastNotifiedAlertId);
+          alertConfigDAO.update(alertConfig);
         }
       }
-      if (lastNotifiedAlertId != emailConfig.getLastNotifiedAnomalyId()) {
-        alertConfig.getEmailConfig().setLastNotifiedAnomalyId(lastNotifiedAlertId);
-        alertConfigDAO.update(alertConfig);
-      }
     }
+  }
 
+  private void sendScheduledDataReport () throws Exception {
     AlertConfigBean.ReportConfig reportConfig = alertConfig.getReportConfig();
     if (reportConfig != null && reportConfig.isEnabled()) {
-      if (reportConfig.getMetricIds()!= null) {
-        if (reportConfig.getMetricIds().size()  != reportConfig.getMetricDimensions().size()) {
+      if (reportConfig.getMetricIds() != null) {
+        if (reportConfig.getMetricIds().size() != reportConfig.getMetricDimensions().size()) {
           LOG.error("Metric List vs DimensionList size mismatch, please update the config");
         } else {
-
-          long reportStartTs = 0;
           List<MetricDimensionReport> metricDimensionValueReports;
           List<ContributorViewResponse> reports = new ArrayList<>();
           for (int i = 0; i < reportConfig.getMetricIds().size(); i++) {
@@ -143,25 +154,35 @@ public class AlertTaskRunnerV2 implements TaskRunner {
               }
             }
           }
-          reportStartTs = reports.get(0).getTimeBuckets().get(0).getCurrentStart();
-          metricDimensionValueReports = DataReportHelper.getDimensionReportList(reports);
+          long reportStartTs = reports.get(0).getTimeBuckets().get(0).getCurrentStart();
+          metricDimensionValueReports = DataReportHelper.getInstance().getDimensionReportList(reports);
           Configuration freemarkerConfig = new Configuration(Configuration.VERSION_2_3_21);
-          freemarkerConfig.setClassForTemplateLoading(getClass(), "/com/linkedin/thirdeye/detector/");
+          freemarkerConfig
+              .setClassForTemplateLoading(getClass(), "/com/linkedin/thirdeye/detector/");
           freemarkerConfig.setDefaultEncoding(CHARSET);
           freemarkerConfig.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);
           Map<String, Object> templateData = new HashMap<>();
           DateTimeZone timeZone = DateTimeZone.forTimeZone(DEFAULT_TIME_ZONE);
-          DataReportHelper.DateFormatMethod dateFormatMethod = new DataReportHelper.DateFormatMethod(timeZone);
+          DataReportHelper.DateFormatMethod dateFormatMethod =
+              new DataReportHelper.DateFormatMethod(timeZone);
           templateData.put("timeZone", timeZone);
           templateData.put("dateFormat", dateFormatMethod);
           templateData.put("dashboardHost", thirdeyeConfig.getDashboardHost());
           templateData.put("fromEmail", alertConfig.getFromAddress());
+          templateData.put("contactEmail", alertConfig.getReportConfig().getContactEmail());
           templateData.put("reportStartDateTime", reportStartTs);
           templateData.put("metricDimensionValueReports", metricDimensionValueReports);
           ByteArrayOutputStream baos = new ByteArrayOutputStream();
           try (Writer out = new OutputStreamWriter(baos, CHARSET)) {
             Template template = freemarkerConfig.getTemplate("data-report-by-metric-dimension.ftl");
             template.process(templateData, out);
+
+            // Send email
+            HtmlEmail email = new HtmlEmail();
+            String alertEmailSubject = String .format("Thirdeye data report : %s", alertConfig.getName());
+            String alertEmailHtml = new String(baos.toByteArray(), CHARSET);
+            EmailHelper.sendEmailWithHtml(email, thirdeyeConfig.getSmtpConfiguration(), alertEmailSubject, alertEmailHtml, alertConfig.getFromAddress(), alertConfig.getRecipients());
+
           } catch (Exception e) {
             throw new JobExecutionException(e);
           }

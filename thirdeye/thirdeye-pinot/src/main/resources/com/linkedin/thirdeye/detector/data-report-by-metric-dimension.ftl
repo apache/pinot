@@ -22,9 +22,11 @@
   <#list metricDimensionValueReports as metricReport>
     <tr>
       <td><b>
-      ${reportCount} - <a href="${dashboardHost}/dashboard#view=compare&dataset=${collection}&metrics=${metricReport.metricName}&dimensions=${metricReport.dimensionName}&compareMode=WoW&aggTimeGranularity=HOURS&currentStart=${metricReport.currentStartTime?c}&currentEnd=${metricReport.currentEndTime?c}&baselineStart=${metricReport.baselineStartTime?c}&baselineEnd=${metricReport.baselineEndTime?c}">
-      ${metric} by ${metricReport.dimensionName}
-      </a>
+        <p>${reportCount} - <a
+            href="${dashboardHost}/dashboard#view=compare&dataset=${metricReport.dataset}&metrics=${metricReport.metricName}&dimensions=${metricReport.dimensionName}&compareMode=WoW&aggTimeGranularity=HOURS&currentStart=${metricReport.currentStartTime?c}&currentEnd=${metricReport.currentEndTime?c}&baselineStart=${metricReport.baselineStartTime?c}&baselineEnd=${metricReport.baselineEndTime?c}">
+        ${metricReport.metricName} by ${metricReport.dimensionName}
+        </p>
+        </a>
       </b></td>
     </tr>
     <#assign subDimensionValueMap = metricReport.subDimensionValueMap >
@@ -75,8 +77,7 @@
       <hr/>
       <br/>
       <p>If you have any questions regarding this report, please email <a
-          href="mailto:'${fromEmail}'" target="_top">${fromEmail}</a></p>
-      <p> Report generated at: ${dateFormat(reportGenerationTimeMillis)}</p>
+          href="mailto:'${contactEmail}'" target="_top">${contactEmail}</a></p>
       <p>
         Thanks,<br>
         ThirdEye Team

@@ -145,7 +145,6 @@ public class AlertTaskRunner implements TaskRunner {
     DateTimeZone timeZone = DateTimeZone.forTimeZone(DEFAULT_TIME_ZONE);
     DataReportHelper.DateFormatMethod dateFormatMethod = new DataReportHelper.DateFormatMethod(timeZone);
 
-    HtmlEmail email = new HtmlEmail();
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
     try (Writer out = new OutputStreamWriter(baos, CHARSET)) {
@@ -181,7 +180,7 @@ public class AlertTaskRunner implements TaskRunner {
           }
         }
         reportStartTs = reports.get(0).getTimeBuckets().get(0).getCurrentStart();
-        metricDimensionValueReports = DataReportHelper.getDimensionReportList(reports);
+        metricDimensionValueReports = DataReportHelper.getInstance().getDimensionReportList(reports);
         templateData.put("metricDimensionValueReports", metricDimensionValueReports);
         templateData.put("reportStartDateTime", reportStartTs);
       }
@@ -204,7 +203,7 @@ public class AlertTaskRunner implements TaskRunner {
         alertEmailSubject = String
             .format("Thirdeye data report : %s: %s", alertConfig.getMetric(), collectionAlias);
       }
-
+      HtmlEmail email = new HtmlEmail();
       String alertEmailHtml = new String(baos.toByteArray(), CHARSET);
       EmailHelper.sendEmailWithHtml(email, thirdeyeConfig.getSmtpConfiguration(), alertEmailSubject,
           alertEmailHtml, alertConfig.getFromAddress(), alertConfig.getToAddresses());

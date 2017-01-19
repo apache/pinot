@@ -192,7 +192,6 @@ public abstract class AbstractManagerTestBase {
     alertConfigDTO.setCronExpression("0/10 * * * * ?");
     AlertConfigBean.EmailConfig emailConfig = new AlertConfigBean.EmailConfig();
     emailConfig.setLastNotifiedAnomalyId(0l);
-    emailConfig.setSendAlertOnZeroAnomaly(true);
     alertConfigDTO.setEmailConfig(emailConfig);
     AlertConfigBean.ReportConfig reportConfig = new AlertConfigBean.ReportConfig();
     reportConfig.setEnabled(true);
