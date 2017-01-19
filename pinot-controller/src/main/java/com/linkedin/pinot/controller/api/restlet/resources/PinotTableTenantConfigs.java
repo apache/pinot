@@ -1,5 +1,6 @@
 package com.linkedin.pinot.controller.api.restlet.resources;
 
+import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 import java.io.File;
 import java.io.IOException;
 
@@ -67,8 +68,7 @@ public class PinotTableTenantConfigs extends BasePinotControllerRestletResource 
   public Representation post(Representation entity) {
     final String tableName = (String) getRequest().getAttributes().get("tableName");
     try {
-      rebuildBrokerResourceFromHelixTags(tableName);
-      return new StringRepresentation("ok");
+      return rebuildBrokerResourceFromHelixTags(tableName);
     } catch (Exception e) {
       setStatus(Status.SERVER_ERROR_INTERNAL);
       return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
@@ -82,10 +82,16 @@ public class PinotTableTenantConfigs extends BasePinotControllerRestletResource 
       "/tables/{tableName}/rebuildBrokerResourceFromHelixTags"
   })
   private Representation rebuildBrokerResourceFromHelixTags(
-      @Parameter(name = "tableName", in = "path", description = "The name of the table for which to rebuild the broker mapping", required = true)
+      @Parameter(name = "tableName", in = "path", description = "The name of the table for which to rebuild the broker mapping (eg. myTable_OFFLINE or myTable_REALTIME)", required = true)
       String tableName
   ) {
-    return new StringRepresentation(
-        _pinotHelixResourceManager.rebuildBrokerResourceFromHelixTags(tableName).toString());
+    final PinotResourceManagerResponse pinotResourceManagerResponse =
+        _pinotHelixResourceManager.rebuildBrokerResourceFromHelixTags(tableName);
+
+    if (!pinotResourceManagerResponse.isSuccessful()) {
+      setStatus(Status.SERVER_ERROR_INTERNAL);
+    }
+
+    return new StringRepresentation(pinotResourceManagerResponse.toString());
   }
 }
