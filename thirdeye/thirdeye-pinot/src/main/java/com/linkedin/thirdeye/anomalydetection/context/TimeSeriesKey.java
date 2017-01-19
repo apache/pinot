@@ -1,12 +1,28 @@
-package com.linkedin.thirdeye.anomalydetection.data;
+package com.linkedin.thirdeye.anomalydetection.context;
 
 import com.linkedin.thirdeye.api.DimensionMap;
 import java.util.Objects;
 import org.apache.commons.lang.ObjectUtils;
 
 public class TimeSeriesKey {
-  String metricName;
-  DimensionMap dimensionMap;
+  private String metricName;
+  private DimensionMap dimensionMap;
+
+  public String getMetricName() {
+    return metricName;
+  }
+
+  public void setMetricName(String metricName) {
+    this.metricName = metricName;
+  }
+
+  public DimensionMap getDimensionMap() {
+    return dimensionMap;
+  }
+
+  public void setDimensionMap(DimensionMap dimensionMap) {
+    this.dimensionMap = dimensionMap;
+  }
 
   @Override
   public boolean equals(Object o) {

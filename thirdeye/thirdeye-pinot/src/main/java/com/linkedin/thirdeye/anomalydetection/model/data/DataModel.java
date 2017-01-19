@@ -12,6 +12,11 @@ public interface DataModel {
   void init(Properties properties);
 
   /**
+   * Returns properties of this model.
+   */
+  Properties getProperties();
+
+  /**
    * Given the interval of the observed (current) time series, returns the intervals of time series
    * that are used by this prediction model for training purpose.
    *

@@ -15,10 +15,10 @@ public class SeasonalDataModel extends AbstractDataModel {
   public List<Interval> getTrainingDataIntervals(long monitoringWindowStartTime,
       long monitoringWindowEndTime) {
     Interval currentInterval = new Interval(monitoringWindowStartTime, monitoringWindowEndTime);
-    int baselineCount = Integer.valueOf(this.properties.getProperty("seasonalPeriod"));
+    int baselineCount = Integer.valueOf(getProperties().getProperty("seasonalPeriod"));
     // Gap between each season
-    int seasonalSize = Integer.valueOf(this.properties.getProperty("seasonalSize"));
-    TimeUnit seasonalUnit = TimeUnit.valueOf(this.properties.getProperty("seasonalUnit"));
+    int seasonalSize = Integer.valueOf(getProperties().getProperty("seasonalSize"));
+    TimeUnit seasonalUnit = TimeUnit.valueOf(getProperties().getProperty("seasonalUnit"));
     Duration gap = new Duration(seasonalUnit.toMillis(seasonalSize));
     // Compute the baseline intervals
     List<Interval> baselineIntervals = getBaselineIntervals(currentInterval, baselineCount, gap);

@@ -58,7 +58,7 @@ public abstract class AbstractAnomalyDetectionFunction implements AnomalyDetecti
   }
 
   @Override
-  public DetectionModel getAnomalyDetectionModel() {
+  public DetectionModel getDetectionModel() {
     return detectionModel;
   }
 }

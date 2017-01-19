@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.anomalydetection.model.transform;
 
-import com.linkedin.thirdeye.anomalydetection.data.TimeSeries;
+import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
 
 /**
  * A stateless transformation function for generating the transformed time series from the given

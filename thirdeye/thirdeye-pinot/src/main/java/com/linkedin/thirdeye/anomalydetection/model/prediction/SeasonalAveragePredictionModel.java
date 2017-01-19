@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.anomalydetection.model.prediction;
 
-import com.linkedin.thirdeye.anomalydetection.data.TimeSeries;
+import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.collections.CollectionUtils;
@@ -15,34 +15,43 @@ public class SeasonalAveragePredictionModel extends ExpectedTimeSeriesPrediction
   @Override
   public void train(List<TimeSeries> baselineTimeSeries) {
     expectedTimeSeries = new TimeSeries();
+
     if (CollectionUtils.isNotEmpty(baselineTimeSeries)) {
-      int bucketSize = Integer.valueOf(this.properties.getProperty(BUCKET_SIZE));
-      TimeUnit bucketUnit = TimeUnit.valueOf(this.properties.getProperty(BUCKET_UNIT));
+      TimeSeries baseTimeSeries = getLatestTimeSeries(baselineTimeSeries);
+      Interval baseInterval = baseTimeSeries.getTimeSeriesInterval();
+
+      int bucketSize = Integer.valueOf(getProperties().getProperty(BUCKET_SIZE));
+      TimeUnit bucketUnit = TimeUnit.valueOf(getProperties().getProperty(BUCKET_UNIT));
       long bucketSizeInMillis = bucketUnit.toMillis(bucketSize);
 
-      TimeSeries baseTimeSeries = baselineTimeSeries.get(0);
-      Interval baseInteval = baseTimeSeries.getTimeSeriesInterval();
-      long baseStart = baseInteval.getStartMillis();
-      long baseEnd = baseInteval.getEndMillis();
+      long baseStart = baseInterval.getStartMillis();
+      long baseEnd = baseInterval.getEndMillis();
       int bucketCount = (int) ((baseEnd - baseStart) / bucketSizeInMillis);
-      expectedTimeSeries.setTimeSeriesInterval(baseInteval);
+      expectedTimeSeries.setTimeSeriesInterval(baseInterval);
 
-      for (int i = 0; i < bucketCount; ++i) {
-        double sum = 0d;
-        int count = 0;
-        long timeOffset = i * bucketSizeInMillis;
-        for (TimeSeries ts : baselineTimeSeries) {
-          long timestamp = ts.getTimeSeriesInterval().getStartMillis() + timeOffset;
-          Double value = ts.get(timestamp);
-          if (value != null) {
-            sum += value;
-            ++count;
+      if (baselineTimeSeries.size() > 1) {
+        for (int i = 0; i < bucketCount; ++i) {
+          double sum = 0d;
+          int count = 0;
+          long timeOffset = i * bucketSizeInMillis;
+          for (TimeSeries ts : baselineTimeSeries) {
+            long timestamp = ts.getTimeSeriesInterval().getStartMillis() + timeOffset;
+            Double value = ts.get(timestamp);
+            if (value != null) {
+              sum += value;
+              ++count;
+            }
+          }
+          if (count != 0) {
+            long timestamp = baseStart + timeOffset;
+            double avgValue = sum / (double) count;
+            expectedTimeSeries.set(timestamp, avgValue);
           }
         }
-        if (count != 0) {
-          long timestamp = baseStart + timeOffset;
-          double avgValue = sum / count;
-          expectedTimeSeries.set(timestamp, avgValue);
+      } else {
+        for (int i = 0; i < bucketCount; ++i) {
+          long timestamp = baseStart + i * bucketSizeInMillis;
+          expectedTimeSeries.set(timestamp, baseTimeSeries.get(timestamp));
         }
       }
     }
@@ -50,6 +59,33 @@ public class SeasonalAveragePredictionModel extends ExpectedTimeSeriesPrediction
 
   @Override
   public TimeSeries getExpectedTimeSeries() {
-    return null;
+    return expectedTimeSeries;
+  }
+
+  /**
+   * Returns the time series that has the largest start millis.
+   *
+   * @param baselineTimeSeries the set of baselines
+   * @return the time series that has the largest start millis.
+   */
+  private TimeSeries getLatestTimeSeries(List<TimeSeries> baselineTimeSeries) {
+    if (CollectionUtils.isNotEmpty(baselineTimeSeries)) {
+      if (baselineTimeSeries.size() > 1) {
+        TimeSeries latestTimeSeries = baselineTimeSeries.get(0);
+        Interval latestInterval = latestTimeSeries.getTimeSeriesInterval();
+        for (TimeSeries ts : baselineTimeSeries) {
+          Interval currentInterval = ts.getTimeSeriesInterval();
+          if (latestInterval.getStartMillis() < currentInterval.getStartMillis()) {
+            latestTimeSeries = ts;
+            latestInterval = currentInterval;
+          }
+        }
+        return latestTimeSeries;
+      } else {
+        return baselineTimeSeries.get(0);
+      }
+    } else {
+      return null;
+    }
   }
 }

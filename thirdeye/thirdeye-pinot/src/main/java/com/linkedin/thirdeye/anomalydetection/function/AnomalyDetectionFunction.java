@@ -59,5 +59,5 @@ public interface AnomalyDetectionFunction {
    * @return the anomaly detection model that defines the anomaly upon the current and baseline
    * time series.
    */
-  DetectionModel getAnomalyDetectionModel();
+  DetectionModel getDetectionModel();
 }

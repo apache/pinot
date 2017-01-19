@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.anomalydetection.function;
 
 import com.linkedin.thirdeye.anomalydetection.model.data.SeasonalDataModel;
+import com.linkedin.thirdeye.anomalydetection.model.detection.SimpleThreshold;
 import com.linkedin.thirdeye.anomalydetection.model.prediction.SeasonalAveragePredictionModel;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import org.apache.commons.lang3.StringUtils;
@@ -20,14 +21,16 @@ public class WeekOverWeekRule extends AbstractAnomalyDetectionFunction {
     dataModel.init(this.properties);
 
     if (this.properties.contains("enableSmoothing")) {
-      //TODO: currentTimeSeriesTransformationChain.add(AverageSmoothingTransformationFunction);
+      //TODO: Add transformation functions
+      // currentTimeSeriesTransformationChain.add(AverageSmoothingTransformationFunction);
       // baselineTimeSeriesTransformationChain.add(AverageSmoothingTransformationFunction);
     }
 
     predictionModel = new SeasonalAveragePredictionModel();
 
-    // TODO: detectionModel = new SomeDetectionModel();
+    detectionModel = new SimpleThreshold();
   }
+
 
   private void initPropertiesForDataModel(String baselineProp) {
     // The basic settings for w/w

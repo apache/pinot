@@ -1,7 +1,7 @@
 package com.linkedin.thirdeye.anomalydetection.control;
 
-import com.linkedin.thirdeye.anomalydetection.data.AnomalyDetectionContext;
-import com.linkedin.thirdeye.anomalydetection.data.TimeSeries;
+import com.linkedin.thirdeye.anomalydetection.context.AnomalyDetectionContext;
+import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
 import com.linkedin.thirdeye.anomalydetection.function.AnomalyDetectionFunction;
 import com.linkedin.thirdeye.anomalydetection.model.detection.DetectionModel;
 import com.linkedin.thirdeye.anomalydetection.model.prediction.PredictionModel;
@@ -40,7 +40,7 @@ public class AnomalyDetectionExecutor {
 
     // Detect anomalies
     AnomalyDetectionFunction anomalyDetectionFunction = anomalyDetectionContext.getAnomalyDetectionFunction();
-    DetectionModel detectionModel = anomalyDetectionFunction.getAnomalyDetectionModel();
+    DetectionModel detectionModel = anomalyDetectionFunction.getDetectionModel();
     List<RawAnomalyResultDTO> rawAnomalies = detectionModel.detect(anomalyDetectionContext);
 
     return rawAnomalies;
@@ -114,7 +114,7 @@ public class AnomalyDetectionExecutor {
       anomalyDetectionContext.setTransformedBaselines(anomalyDetectionContext.getBaselines());
     }
     List<TransformationFunction> baselineTransformationChain =
-        anomalyDetectionFunction.getCurrentTimeSeriesTransformationChain();
+        anomalyDetectionFunction.getBaselineTimeSeriesTransformationChain();
     if (CollectionUtils.isNotEmpty(baselineTransformationChain)) {
       for (TransformationFunction tf : baselineTransformationChain) {
         List<TimeSeries> transformedBaselines = new ArrayList<>();

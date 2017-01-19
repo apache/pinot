@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.anomalydetection.data;
+package com.linkedin.thirdeye.anomalydetection.context;
 
 import java.util.Map;
 import java.util.Set;

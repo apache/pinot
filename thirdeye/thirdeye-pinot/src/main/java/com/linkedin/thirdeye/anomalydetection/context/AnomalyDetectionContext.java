@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.anomalydetection.data;
+package com.linkedin.thirdeye.anomalydetection.context;
 
 import com.linkedin.thirdeye.anomalydetection.function.AnomalyDetectionFunction;
 import com.linkedin.thirdeye.anomalydetection.model.prediction.PredictionModel;

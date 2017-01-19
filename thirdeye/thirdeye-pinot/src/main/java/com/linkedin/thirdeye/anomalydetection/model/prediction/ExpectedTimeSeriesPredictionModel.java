@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.anomalydetection.model.prediction;
 
-import com.linkedin.thirdeye.anomalydetection.data.TimeSeries;
+import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
 
 public abstract class ExpectedTimeSeriesPredictionModel extends AbstractPredictionModel {
   /**
@@ -8,5 +8,5 @@ public abstract class ExpectedTimeSeriesPredictionModel extends AbstractPredicti
    *
    * @return the expected (predicted) time series of this prediction model.
    */
-  abstract TimeSeries getExpectedTimeSeries();
+  public abstract TimeSeries getExpectedTimeSeries();
 }

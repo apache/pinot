@@ -1,8 +1,8 @@
-package com.linkedin.thirdeye.anomalydetection.model.prediction;
+package com.linkedin.thirdeye.anomalydetection.model.detection;
 
 import java.util.Properties;
 
-public abstract class AbstractPredictionModel implements PredictionModel {
+public abstract class AbstractDetectionModel implements DetectionModel {
   protected Properties properties;
 
   @Override
