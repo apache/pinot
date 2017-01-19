@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,6 +10,8 @@ import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.anomaly.utils.DetectionResourceHttpUtils;
+import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -17,6 +20,8 @@ import java.util.Map;
 
 import javax.ws.rs.*;
 import javax.ws.rs.core.MediaType;
+
+import org.joda.time.DateTime;
 
 @Path("/onboard")
 @Produces(MediaType.APPLICATION_JSON)
@@ -215,6 +220,102 @@ public class OnboardResource {
       LOG.debug("clone merged anomaly {} to {}", oldId, newId);
     }
     return true;
+  }
+
+  /**
+   * Delete raw or merged anomalies whose start time is located in the given time ranges, except
+   * the following two cases:
+   *
+   * 1. If a raw anomaly belongs to a merged anomaly whose start time is not located in the given
+   * time ranges, then the raw anomaly will not be deleted.
+   *
+   * 2. If a raw anomaly belongs to a merged anomaly whose start time is located in the given
+   * time ranges, then it is deleted regardless its start time.
+   *
+   * If monitoringWindowStartTime is not given, then start time is set to 0.
+   * If monitoringWindowEndTime is not given, then end time is set to Long.MAX_VALUE.
+   * @param monitoringWindowStartTime The start time of the monitoring window (in milli-second)
+   * @param monitoringWindowEndTime The start time of the monitoring window (in milli-second)
+   */
+  @POST
+  @Path("function/{id}/deleteExistingAnomalies")
+  public int deleteExistingAnomalies(@PathParam("id") String id,
+      @QueryParam("monitoringWindowStartTime") long monitoringWindowStartTime,
+      @QueryParam("monitoringWindowEndTime") long monitoringWindowEndTime) {
+    LOG.info("Deleting anomalies in the time range: {} -- {}", new DateTime(monitoringWindowStartTime), new
+        DateTime(monitoringWindowEndTime));
+
+    long functionId = Long.valueOf(id);
+
+    int mergedAnomaliesDeleted = 0;
+    AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
+    LOG.info("Beginning cleanup of functionId {} collection {} metric {}",
+        functionId, anomalyFunction.getCollection(), anomalyFunction.getMetric());
+    // Find merged anomalies and delete them first
+    List<MergedAnomalyResultDTO> mergedResults =
+        mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(monitoringWindowStartTime, monitoringWindowEndTime, functionId);
+    if (CollectionUtils.isNotEmpty(mergedResults)) {
+      mergedAnomaliesDeleted = deleteMergedResults(mergedResults);
+    }
+
+    LOG.info("Deleted {} merged anomalies", mergedAnomaliesDeleted);
+    return mergedAnomaliesDeleted;
+  }
+
+  // Delete merged anomalies from mergedAnomalyResultDAO
+  private int deleteMergedResults(List<MergedAnomalyResultDTO> mergedResults) {
+    LOG.info("Deleting merged results");
+    int mergedAnomaliesDeleted = 0;
+    for (MergedAnomalyResultDTO mergedResult : mergedResults) {
+      // Delete raw anomalies of the merged anomaly
+      List<RawAnomalyResultDTO> rawAnomalyResultDTOs = mergedResult.getAnomalyResults();
+      //deleteRawResults(rawAnomalyResultDTOs);
+
+      LOG.info(".....Deleting id {} for functionId {}", mergedResult.getId(), mergedResult.getFunctionId());
+      mergedAnomalyResultDAO.delete(mergedResult);
+      mergedAnomaliesDeleted++;
+    }
+    return mergedAnomaliesDeleted;
+  }
+
+  /**
+   * Breaks down the given range into consecutive monitoring windows as per function definition
+   * Regenerates anomalies for each window separately
+   * @param id anomaly function id
+   * @param detectionHost the host of anomaly detection function
+   * @param detectionPort the port of anomaly detection function
+   * @param monitoringWindowStartTime The start time of the monitoring window (in milli-second)
+   * @param monitoringWindowEndTime The start time of the monitoring window (in milli-second)
+   * @param isForceBackfill determine if it should backfill
+   * @return
+   * @throws Exception
+   */
+  @POST
+  @Path("function/{id}/regenerateAnomaliesInRange")
+  public String regenerateAnomaliesInRange(@PathParam("id") String id,
+      @QueryParam("detectionHost") String detectionHost,
+      @QueryParam("detectionHost") int detectionPort,
+      @QueryParam("monitoringWindowStartTime") long monitoringWindowStartTime,
+      @QueryParam("monitoringWindowEndTime") long monitoringWindowEndTime,
+      @QueryParam("isForceBackfill") @DefaultValue("false") String isForceBackfill) throws Exception {
+    long functionId = Long.valueOf(id);
+    DetectionResourceHttpUtils detectionResourceHttpUtils = new DetectionResourceHttpUtils(detectionHost, detectionPort);
+
+    AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
+    if (!anomalyFunction.getIsActive()) {
+      LOG.info("Skipping deactivated function {}", functionId);
+      return null;
+    }
+    else{
+      LOG.info("Sending backfill function {} for range {} to {}", functionId, monitoringWindowStartTime, monitoringWindowEndTime);
+      String response = detectionResourceHttpUtils.runBackfillAnomalyFunction(
+          String.valueOf(functionId),
+          Long.toString(monitoringWindowStartTime),
+          Long.toString(monitoringWindowEndTime),
+          Boolean.valueOf(isForceBackfill));
+      LOG.info("Response {}", response);
+      return response;
+    }
   }
 
 }
