@@ -50,7 +50,7 @@ public class SegmentPushControllerAPIs {
   private static String HOURLY_SCHEDULE = "HOURLY";
   private static String SEGMENTS_ENDPOINT = "segments/";
   private static String TABLES_ENDPOINT = "tables/";
-  private static String DROP_PARAMETERS = "?state=drop";
+  private static String DROP_PARAMETERS = "?state=drop&type=offline";
   private static String UTF_8 = "UTF-8";
   private static long TIMEOUT = 120000;
   private static String SUCCESS = "success";
