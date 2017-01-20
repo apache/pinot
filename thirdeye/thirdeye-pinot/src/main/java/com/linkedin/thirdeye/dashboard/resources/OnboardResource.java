@@ -1,5 +1,8 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
+import com.google.common.primitives.Floats;
+import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -29,6 +32,7 @@ import org.joda.time.DateTime;
 public class OnboardResource {
   private final AnomalyFunctionManager anomalyFunctionDAO;
   private final MergedAnomalyResultManager mergedAnomalyResultDAO;
+  private final RawAnomalyResultManager rawAnomalyResultDAO;
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final Logger LOG = LoggerFactory.getLogger(OnboardResource.class);
@@ -36,6 +40,7 @@ public class OnboardResource {
   public OnboardResource() {
     this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
+    this.rawAnomalyResultDAO = DAO_REGISTRY.getRawAnomalyResultDAO();
   }
 
   // endpoint clone function Ids to append a name defined in nameTags
@@ -74,6 +79,7 @@ public class OnboardResource {
       @PathParam("tag") String tag,
       @QueryParam("cloneAnomaly")@DefaultValue("false") String cloneAnomaly)
       throws Exception {
+    LOG.info("Prepare to clone functionId {} with tag {} and cloneAnomaly {}", id, tag, cloneAnomaly);
     try {
       return cloneAnomalyFunctionById(id, tag, Boolean.valueOf(cloneAnomaly));
     } catch (Exception e) {
@@ -206,16 +212,21 @@ public class OnboardResource {
     LOG.info("clone merged anomaly results from source anomaly function id {} to id {}", srcId, destId);
 
     List<MergedAnomalyResultDTO> mergedAnomalyResultDTOs = mergedAnomalyResultDAO.findByFunctionId(srcId);
-    if (mergedAnomalyResultDTOs == null) {
+    if (mergedAnomalyResultDTOs == null || mergedAnomalyResultDTOs.isEmpty()) {
       LOG.error("No merged anomaly results found for anomaly function Id: {}", srcId);
       return false;
     }
 
+    LOG.info("{} merged anomaly results has found with functionId {}. Prepare to copy to dest. functionId {}",
+        mergedAnomalyResultDTOs.size(), srcId, destId);
+
+    // TODO: MergedAnomalyResults aren't copied to the new destination
     for (MergedAnomalyResultDTO mergedAnomalyResultDTO : mergedAnomalyResultDTOs) {
       long oldId = mergedAnomalyResultDTO.getId();
       mergedAnomalyResultDTO.setId(null);  // clean the Id, then will create a new Id when save
       mergedAnomalyResultDTO.setRawAnomalyIdList(null);
       mergedAnomalyResultDTO.setFunctionId(destId);
+      mergedAnomalyResultDTO.setFunction(destAnomalyFunction);
       long newId = mergedAnomalyResultDAO.save(mergedAnomalyResultDTO);
       LOG.debug("clone merged anomaly {} to {}", oldId, newId);
     }
@@ -239,30 +250,103 @@ public class OnboardResource {
    */
   @POST
   @Path("function/{id}/deleteExistingAnomalies")
-  public int deleteExistingAnomalies(@PathParam("id") String id,
-      @QueryParam("monitoringWindowStartTime") long monitoringWindowStartTime,
-      @QueryParam("monitoringWindowEndTime") long monitoringWindowEndTime) {
-    LOG.info("Deleting anomalies in the time range: {} -- {}", new DateTime(monitoringWindowStartTime), new
-        DateTime(monitoringWindowEndTime));
-
+  public Map<String, Integer> deleteExistingAnomalies(@PathParam("id") String id,
+      @QueryParam("start") long monitoringWindowStartTime,
+      @QueryParam("end") long monitoringWindowEndTime) {
     long functionId = Long.valueOf(id);
-
-    int mergedAnomaliesDeleted = 0;
     AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
-    LOG.info("Beginning cleanup of functionId {} collection {} metric {}",
+    if(anomalyFunction == null){
+      LOG.info("Anomaly functionId {} is not found", functionId);
+      return null;
+    }
+    HashMap<String, Integer> returnInfo = new HashMap<>();
+
+    // Find merged anomaly result and delete them first
+    LOG.info("Deleting merged anomaly results in the time range: {} -- {}", new DateTime(monitoringWindowStartTime), new
+        DateTime(monitoringWindowEndTime));
+    LOG.info("Beginning cleanup merged anomaly results of functionId {} collection {} metric {}",
         functionId, anomalyFunction.getCollection(), anomalyFunction.getMetric());
-    // Find merged anomalies and delete them first
+    int mergedAnomaliesDeleted = 0;
     List<MergedAnomalyResultDTO> mergedResults =
         mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(monitoringWindowStartTime, monitoringWindowEndTime, functionId);
     if (CollectionUtils.isNotEmpty(mergedResults)) {
       mergedAnomaliesDeleted = deleteMergedResults(mergedResults);
     }
+    returnInfo.put("mergedAnomaliesDeleted", mergedAnomaliesDeleted);
+    LOG.info("{} merged anomaly results have been deleted", mergedAnomaliesDeleted);
 
-    LOG.info("Deleted {} merged anomalies", mergedAnomaliesDeleted);
-    return mergedAnomaliesDeleted;
+    // Find raw anomaly results and delete them
+    LOG.info("Deleting raw anomaly results in the time range: {} -- {}", new DateTime(monitoringWindowStartTime), new
+        DateTime(monitoringWindowEndTime));
+    LOG.info("Beginning cleanup merged anomaly results of functionId {} collection {} metric {}",
+        functionId, anomalyFunction.getCollection(), anomalyFunction.getMetric());
+    int rawAnomaliesDeleted = 0;
+    List<RawAnomalyResultDTO> rawResults =
+        rawAnomalyResultDAO.findAllByTimeAndFunctionId(monitoringWindowStartTime, monitoringWindowEndTime, functionId);
+    if (CollectionUtils.isNotEmpty(rawResults)){
+      rawAnomaliesDeleted = deleteRawResults(rawResults);
+    }
+    returnInfo.put("rawAnomaliesDeleted", rawAnomaliesDeleted);
+    LOG.info("{} raw anomaly results have been deleted", rawAnomaliesDeleted);
+
+    return returnInfo;
   }
 
-  // Delete merged anomalies from mergedAnomalyResultDAO
+  /**
+   * Show the content of merged anomalies whose start time is located in the given time ranges
+   *
+   * @param monitoringWindowStartTime The start time of the monitoring window (in milli-second)
+   * @param monitoringWindowEndTime The start time of the monitoring window (in milli-second)
+   */
+  @POST
+  @Path("function/{id}/getExistingRawAnomalies")
+  public List<RawAnomalyResultDTO> getExistingRawAnomalies(@PathParam("id") String id,
+      @QueryParam("start") long monitoringWindowStartTime,
+      @QueryParam("end") long monitoringWindowEndTime) {
+    LOG.info("Retrieving merged anomaly results in the time range: {} -- {}", new DateTime(monitoringWindowStartTime), new
+        DateTime(monitoringWindowEndTime));
+
+    List<RawAnomalyResultDTO> rawResults = null;
+
+    long functionId = Long.valueOf(id);
+    AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
+    if(anomalyFunction == null){
+      LOG.info("Anomaly functionId {} is not found", functionId);
+      return rawResults;
+    }
+    rawResults = rawAnomalyResultDAO.findAllByTimeAndFunctionId(monitoringWindowStartTime,
+        monitoringWindowEndTime, functionId);
+    return rawResults;
+  }
+
+  /**
+   * Show the content of raw anomalies whose start time is located in the given time ranges
+   *
+   * @param monitoringWindowStartTime The start time of the monitoring window (in milli-second)
+   * @param monitoringWindowEndTime The start time of the monitoring window (in milli-second)
+   */
+  @POST
+  @Path("function/{id}/getExistingMergedAnomalies")
+  public List<MergedAnomalyResultDTO> getExistingMergedAnomalies(@PathParam("id") String id,
+      @QueryParam("start") long monitoringWindowStartTime,
+      @QueryParam("end") long monitoringWindowEndTime) {
+    LOG.info("Retrieving merged anomaly results in the time range: {} -- {}", new DateTime(monitoringWindowStartTime), new
+        DateTime(monitoringWindowEndTime));
+
+    List<MergedAnomalyResultDTO> mergedResults = null;
+
+    long functionId = Long.valueOf(id);
+    AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
+    if(anomalyFunction == null){
+      LOG.info("Anomaly functionId {} is not found", functionId);
+      return mergedResults;
+    }
+    mergedResults = mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(monitoringWindowStartTime,
+        monitoringWindowEndTime, functionId);
+    return mergedResults;
+  }
+
+  // Delete merged anomaly results from mergedAnomalyResultDAO
   private int deleteMergedResults(List<MergedAnomalyResultDTO> mergedResults) {
     LOG.info("Deleting merged results");
     int mergedAnomaliesDeleted = 0;
@@ -271,11 +355,23 @@ public class OnboardResource {
       List<RawAnomalyResultDTO> rawAnomalyResultDTOs = mergedResult.getAnomalyResults();
       //deleteRawResults(rawAnomalyResultDTOs);
 
-      LOG.info(".....Deleting id {} for functionId {}", mergedResult.getId(), mergedResult.getFunctionId());
+      LOG.info(".....Deleting merged result id {} for functionId {}", mergedResult.getId(), mergedResult.getFunctionId());
       mergedAnomalyResultDAO.delete(mergedResult);
       mergedAnomaliesDeleted++;
     }
     return mergedAnomaliesDeleted;
+  }
+
+  // Delete raw anomaly results from rawResultDAO
+  private int deleteRawResults(List<RawAnomalyResultDTO> rawResults){
+    LOG.info("Deleting raw anomaly results...");
+    int rawAnomaliesDeleted = 0;
+    for(RawAnomalyResultDTO rawResult : rawResults){
+      LOG.info("...Deleting raw anomaly result id {} for functionId {}", rawResult.getId(), rawResult.getFunctionId());
+      rawAnomalyResultDAO.delete(rawResult);
+      rawAnomaliesDeleted++;
+    }
+    return rawAnomaliesDeleted;
   }
 
   /**
@@ -286,25 +382,41 @@ public class OnboardResource {
    * @param detectionPort the port of anomaly detection function
    * @param monitoringWindowStartTime The start time of the monitoring window (in milli-second)
    * @param monitoringWindowEndTime The start time of the monitoring window (in milli-second)
-   * @param isForceBackfill determine if it should backfill
-   * @return
+   * @param isForceBackfill false to resume backfill from the latest left off
+   * @return HTTP response of this request
    * @throws Exception
    */
+  //TODO: Make detection host available
+  private final String detectionHost = "localhost";
+  private final int detectionPort = 1867;
   @POST
   @Path("function/{id}/regenerateAnomaliesInRange")
   public String regenerateAnomaliesInRange(@PathParam("id") String id,
-      @QueryParam("detectionHost") String detectionHost,
-      @QueryParam("detectionHost") int detectionPort,
-      @QueryParam("monitoringWindowStartTime") long monitoringWindowStartTime,
-      @QueryParam("monitoringWindowEndTime") long monitoringWindowEndTime,
-      @QueryParam("isForceBackfill") @DefaultValue("false") String isForceBackfill) throws Exception {
+//      @QueryParam("detectionHost") String detectionHost,
+//      @QueryParam("detectionPort") int detectionPort,
+      @QueryParam("start") long monitoringWindowStartTime,
+      @QueryParam("end") long monitoringWindowEndTime,
+      @QueryParam("forceBackfill") @DefaultValue("false") String isForceBackfill) throws Exception {
     long functionId = Long.valueOf(id);
+    AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
+    if(anomalyFunction == null){
+      LOG.info("Anomaly functionId {} is not found", functionId);
+      return String.format("Anomaly Function %s is not found", id);
+    }
+
+    // Check if the merged anomaly results has been cleaned up before regeneration
+    List<MergedAnomalyResultDTO> mergedResults =
+        mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(monitoringWindowStartTime, monitoringWindowEndTime, functionId);
+    if(!mergedResults.isEmpty()){
+      LOG.info("Merged anomaly results of functionId {} should be cleaned up before regeneration", id);
+      return String.format("Merged anomaly results of functionId %s should be cleaned up before regeneration", id);
+    }
+
     DetectionResourceHttpUtils detectionResourceHttpUtils = new DetectionResourceHttpUtils(detectionHost, detectionPort);
 
-    AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
     if (!anomalyFunction.getIsActive()) {
       LOG.info("Skipping deactivated function {}", functionId);
-      return null;
+      return String.format("Skipping deactivated function %s", id);
     }
     else{
       LOG.info("Sending backfill function {} for range {} to {}", functionId, monitoringWindowStartTime, monitoringWindowEndTime);
