@@ -173,7 +173,7 @@ $(document).ready( function() {
             },
             "propertyDef": {
                 "SPLINE_REGRESSION|historicalDataLength":[90,"int"],
-                "SPLINE_REGRESSION|historicalDataMaxLength":[90,"int"],
+                "SPLINE_REGRESSION|historicalDataMaxLength":[100,"int"],
                 "SPLINE_REGRESSION|historicalDataMinLength":[60,"int"],
                 "SPLINE_REGRESSION|degree":[3,"int"],
                 "SPLINE_REGRESSION|pValueThreshold":[0.001,"double"],
