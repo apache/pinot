@@ -10,6 +10,7 @@ import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewHandler;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewRequest;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewResponse;
+import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -192,11 +193,10 @@ public abstract class EmailHelper {
       LOG.error("No email config provided for email with subject [{}]!", subject);
     }
   }
-
-  public static ContributorViewResponse getContributorData(String collection, String metric, List<String> dimensions)
+  public static ContributorViewResponse getContributorData(String collection, String metric, List<String> dimensions, AlertConfigBean.COMPARE_MODE compareMode, long offsetDelayMillis)
       throws Exception {
 
-    // TODO : add support to Comparison mode eg : WoW or Wo2W etc
+    long baselineOffset = getBaselineOffset(compareMode);
 
     ContributorViewRequest request = new ContributorViewRequest();
     request.setCollection(collection);
@@ -207,14 +207,14 @@ public abstract class EmailHelper {
     long currentEnd = System.currentTimeMillis();
     long maxDataTime = collectionMaxDataTimeCache.get(collection);
     if (currentEnd > maxDataTime) {
-      long delta = currentEnd - maxDataTime;
-      currentEnd = currentEnd - delta;
+      currentEnd = maxDataTime;
     }
 
     // align to nearest hour
-    currentEnd = currentEnd - (currentEnd % HOUR_MILLIS);
+    currentEnd = (currentEnd - (currentEnd % HOUR_MILLIS)) - offsetDelayMillis;
 
     String aggTimeGranularity = "HOURS";
+    // TODO : implement intraday option
     long currentStart = currentEnd - DAY_MILLIS;
 
     DatasetConfigDTO datasetConfigDTO = datasetConfigManager.findByDataset(collection);
@@ -224,8 +224,8 @@ public abstract class EmailHelper {
       currentStart = currentEnd - WEEK_MILLIS;
     }
 
-    long baselineStart = currentStart - WEEK_MILLIS ;
-    long baselineEnd = currentEnd - WEEK_MILLIS;
+    long baselineStart = currentStart - baselineOffset ;
+    long baselineEnd = currentEnd - baselineOffset;
 
     String timeZone = datasetConfigDTO.getTimezone();
     request.setBaselineStart(new DateTime(baselineStart, DateTimeZone.forID(timeZone)));
@@ -239,4 +239,20 @@ public abstract class EmailHelper {
     return response;
   }
 
+  public static ContributorViewResponse getContributorData(String collection, String metric, List<String> dimensions)
+      throws Exception {
+    return getContributorData(collection, metric, dimensions, AlertConfigBean.COMPARE_MODE.WoW, 2 * 36_00_000); // add 2 hours delay
+  }
+
+  private static long getBaselineOffset(AlertConfigBean.COMPARE_MODE compareMode) {
+    switch (compareMode) {
+    case Wo2W:
+      return 2 * WEEK_MILLIS;
+    case Wo3W:
+      return 3 * WEEK_MILLIS;
+    case WoW:
+      default:
+      return WEEK_MILLIS;
+    }
+  }
 }

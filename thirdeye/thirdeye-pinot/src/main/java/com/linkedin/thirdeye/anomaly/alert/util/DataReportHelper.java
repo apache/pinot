@@ -2,11 +2,8 @@ package com.linkedin.thirdeye.anomaly.alert.util;
 
 import com.linkedin.thirdeye.anomaly.alert.template.pojo.MetricDimensionReport;
 import com.linkedin.thirdeye.api.DimensionMap;
-import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewResponse;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import freemarker.template.TemplateMethodModelEx;
 import freemarker.template.TemplateModelException;
 import freemarker.template.TemplateNumberModel;
@@ -31,7 +28,6 @@ public final class DataReportHelper {
   public static final String OVER_ALL = "OverAll";
 
   private static DataReportHelper INSTANCE = new DataReportHelper();
-  private final MetricConfigManager metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
 
   private DataReportHelper() {
   }
@@ -46,14 +42,8 @@ public final class DataReportHelper {
     for (ContributorViewResponse report : reports) {
       MetricDimensionReport metricDimensionReport = new MetricDimensionReport();
       String metric = report.getMetrics().get(0);
-      List<MetricConfigDTO> metricConfigs = metricDAO.findByMetricName(metric);
-      String dataset = "Unknown";
-      if (metricConfigs.size() > 0) {
-        dataset = metricConfigs.get(0).getDataset();
-      }
       String groupByDimension = report.getDimensions().get(0);
       metricDimensionReport.setMetricName(metric);
-      metricDimensionReport.setDataset(dataset);
       metricDimensionReport.setDimensionName(groupByDimension);
       int valIndex =
           report.getResponseData().getSchema().getColumnsToIndexMapping().get("percentageChange");
