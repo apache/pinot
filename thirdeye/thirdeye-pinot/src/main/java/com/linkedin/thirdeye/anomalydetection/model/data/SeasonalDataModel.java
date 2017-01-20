@@ -21,8 +21,7 @@ public class SeasonalDataModel extends AbstractDataModel {
     TimeUnit seasonalUnit = TimeUnit.valueOf(getProperties().getProperty("seasonalUnit"));
     Duration gap = new Duration(seasonalUnit.toMillis(seasonalSize));
     // Compute the baseline intervals
-    List<Interval> baselineIntervals = getBaselineIntervals(currentInterval, baselineCount, gap);
-    return baselineIntervals;
+    return getBaselineIntervals(currentInterval, baselineCount, gap);
   }
 
   /**

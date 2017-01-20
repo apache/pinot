@@ -118,7 +118,7 @@ public class AnomalyDetectionExecutor {
     if (CollectionUtils.isNotEmpty(baselineTransformationChain)) {
       for (TransformationFunction tf : baselineTransformationChain) {
         List<TimeSeries> transformedBaselines = new ArrayList<>();
-        for (TimeSeries ts : transformedBaselines) {
+        for (TimeSeries ts : anomalyDetectionContext.getTransformedBaselines()) {
           TimeSeries transformedTS = tf.transform(ts);
           transformedBaselines.add(transformedTS);
         }

@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomalydetection.model.detection;
 
+import com.linkedin.thirdeye.anomalydetection.Utils;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyDetectionContext;
 import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
 import com.linkedin.thirdeye.anomalydetection.model.prediction.ExpectedTimeSeriesPredictionModel;
@@ -35,10 +36,7 @@ public class SimpleThresholdDetectionModel extends AbstractDetectionModel {
       volumeThreshold = Double.valueOf(getProperties().getProperty(AVERAGE_VOLUME_THRESHOLD));
     }
 
-    // Calculate bucket size
-    int bucketSize = Integer.valueOf(getProperties().getProperty(BUCKET_SIZE));
-    TimeUnit bucketUnit = TimeUnit.valueOf(getProperties().getProperty(BUCKET_UNIT));
-    long bucketSizeInMillis = bucketUnit.toMillis(bucketSize);
+    long bucketSizeInMillis = Utils.getBucketInMillis(BUCKET_SIZE, BUCKET_UNIT, getProperties());
 
     // Compute the weight of this time series (average across whole)
     TimeSeries currentTimeSeries = anomalyDetectionContext.getTransformedCurrent();

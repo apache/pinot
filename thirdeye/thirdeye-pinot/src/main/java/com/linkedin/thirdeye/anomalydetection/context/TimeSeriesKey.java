@@ -5,8 +5,8 @@ import java.util.Objects;
 import org.apache.commons.lang.ObjectUtils;
 
 public class TimeSeriesKey {
-  private String metricName;
-  private DimensionMap dimensionMap;
+  private String metricName = "";
+  private DimensionMap dimensionMap = new DimensionMap();
 
   public String getMetricName() {
     return metricName;

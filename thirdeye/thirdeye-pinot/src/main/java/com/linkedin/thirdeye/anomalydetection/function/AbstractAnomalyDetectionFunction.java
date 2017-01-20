@@ -24,7 +24,7 @@ public abstract class AbstractAnomalyDetectionFunction implements AnomalyDetecti
 
   protected DataModel dataModel = new NoopDataModel();
   protected List<TransformationFunction> currentTimeSeriesTransformationChain = new ArrayList<>();
-  protected List<TransformationFunction> baselineSeriesTransformationChain = new ArrayList<>();
+  protected List<TransformationFunction> baselineTimeSeriesTransformationChain = new ArrayList<>();
   protected PredictionModel predictionModel = new NoopPredictionModel();
   protected DetectionModel detectionModel = new NoopDetectionModel();
 
@@ -52,7 +52,7 @@ public abstract class AbstractAnomalyDetectionFunction implements AnomalyDetecti
 
   @Override
   public List<TransformationFunction> getBaselineTimeSeriesTransformationChain() {
-    return baselineSeriesTransformationChain;
+    return baselineTimeSeriesTransformationChain;
   }
 
   @Override

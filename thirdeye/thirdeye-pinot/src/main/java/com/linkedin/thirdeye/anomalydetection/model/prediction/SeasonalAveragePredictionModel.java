@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomalydetection.model.prediction;
 
+import com.linkedin.thirdeye.anomalydetection.Utils;
 import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -20,9 +21,7 @@ public class SeasonalAveragePredictionModel extends ExpectedTimeSeriesPrediction
       TimeSeries baseTimeSeries = getLatestTimeSeries(baselineTimeSeries);
       Interval baseInterval = baseTimeSeries.getTimeSeriesInterval();
 
-      int bucketSize = Integer.valueOf(getProperties().getProperty(BUCKET_SIZE));
-      TimeUnit bucketUnit = TimeUnit.valueOf(getProperties().getProperty(BUCKET_UNIT));
-      long bucketSizeInMillis = bucketUnit.toMillis(bucketSize);
+      long bucketSizeInMillis = Utils.getBucketInMillis(BUCKET_SIZE, BUCKET_UNIT, getProperties());
 
       long baseStart = baseInterval.getStartMillis();
       long baseEnd = baseInterval.getEndMillis();

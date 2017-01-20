@@ -11,8 +11,20 @@ import org.joda.time.Interval;
  */
 public class TimeSeries {
 
+  /**
+   * Timestamps to values.
+   */
   private Map<Long, Double> timeSeries = new HashMap<>();
+
+  /**
+   * The max and min timestamp of this time series; both are inclusive.
+   */
   private Interval timeSeriesInterval;
+
+  /**
+   * The time series key, which provides metric name and dimension maps, of this time series.
+   */
+  private TimeSeriesKey timeSeriesKey = new TimeSeriesKey();
 
 
   /**
@@ -56,8 +68,6 @@ public class TimeSeries {
 
   /**
    * Returns timestamp set
-   *
-   * @return timestamp set
    */
   public Set<Long> timestampSet() {
     return timeSeries.keySet();
@@ -65,15 +75,13 @@ public class TimeSeries {
 
   /**
    * Returns the number of timestamps in this time series
-   *
-   * @return the number of timestamps in this time series
    */
   public int size() {
     return timeSeries.size();
   }
 
   /**
-   * Returns the interval of the time series, which provides the max and min timestamps.
+   * Returns the interval of the time series, which provides the max and min timestamps (inclusive).
    */
   public Interval getTimeSeriesInterval() {
     return timeSeriesInterval;
@@ -84,6 +92,20 @@ public class TimeSeries {
    */
   public void setTimeSeriesInterval(Interval timeSeriesInterval) {
     this.timeSeriesInterval = timeSeriesInterval;
+  }
+
+  /**
+   * Returns this time series' key, which contains the metric name and dimension map.
+   */
+  public TimeSeriesKey getTimeSeriesKey() {
+    return timeSeriesKey;
+  }
+
+  /**
+   * Sets this time series' key.
+   */
+  public void setTimeSeriesKey(TimeSeriesKey timeSeriesKey) {
+    this.timeSeriesKey = timeSeriesKey;
   }
 }
 

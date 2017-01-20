@@ -3,12 +3,15 @@ package com.linkedin.thirdeye.anomalydetection.function;
 import com.linkedin.thirdeye.anomalydetection.model.data.SeasonalDataModel;
 import com.linkedin.thirdeye.anomalydetection.model.detection.SimpleThresholdDetectionModel;
 import com.linkedin.thirdeye.anomalydetection.model.prediction.SeasonalAveragePredictionModel;
+import com.linkedin.thirdeye.anomalydetection.model.transform.MovingAverageSmoothingFunction;
+import com.linkedin.thirdeye.anomalydetection.model.transform.TransformationFunction;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import java.util.Properties;
 import org.apache.commons.lang3.StringUtils;
 
 public class WeekOverWeekRule extends AbstractAnomalyDetectionFunction {
   public static final String BASELINE = "baseline";
+  public static final String ENABLE_SMOOTHING = "enableSmoothing";
 
   @Override
   public void init(AnomalyFunctionDTO spec) throws Exception {
@@ -26,10 +29,11 @@ public class WeekOverWeekRule extends AbstractAnomalyDetectionFunction {
     dataModel = new SeasonalDataModel();
     dataModel.init(this.properties);
 
-    if (this.properties.contains("enableSmoothing")) {
-      //TODO: Add transformation functions
-      // currentTimeSeriesTransformationChain.add(AverageSmoothingTransformationFunction);
-      // baselineTimeSeriesTransformationChain.add(AverageSmoothingTransformationFunction);
+    if (this.properties.containsKey(ENABLE_SMOOTHING)) {
+      TransformationFunction movingAverageSoothingFunction = new MovingAverageSmoothingFunction();
+      movingAverageSoothingFunction.init(this.properties);
+      currentTimeSeriesTransformationChain.add(movingAverageSoothingFunction);
+      baselineTimeSeriesTransformationChain.add(movingAverageSoothingFunction);
     }
 
     predictionModel = new SeasonalAveragePredictionModel();
