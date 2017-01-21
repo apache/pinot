@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.anomalydetection.function;
 
-import com.linkedin.thirdeye.anomalydetection.Utils;
 import com.linkedin.thirdeye.anomalydetection.model.data.DataModel;
 import com.linkedin.thirdeye.anomalydetection.model.data.NoopDataModel;
 import com.linkedin.thirdeye.anomalydetection.model.detection.DetectionModel;
@@ -31,7 +30,7 @@ public abstract class AbstractAnomalyDetectionFunction implements AnomalyDetecti
   @Override
   public void init(AnomalyFunctionDTO spec) throws Exception {
     this.spec = spec;
-    this.properties = Utils.parseSpec(this.spec);
+    this.properties = spec.toProperties();
   }
 
   @Override

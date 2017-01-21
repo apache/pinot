@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.anomalydetection.model.transform;
 
-import com.linkedin.thirdeye.anomalydetection.Utils;
+import com.linkedin.thirdeye.anomalydetection.AnomalyDetectionUtils;
+import com.linkedin.thirdeye.anomalydetection.context.AnomalyDetectionContext;
 import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
 import com.linkedin.thirdeye.api.DimensionMap;
 import org.joda.time.Interval;
@@ -28,16 +29,18 @@ public class MovingAverageSmoothingFunction extends AbstractTransformationFuncti
    * average and thus it is discarded.
    *
    * @param timeSeries the time series that provides the data points to be transformed.
-   *
+   * @param anomalyDetectionContext the anomaly detection context that could provide additional
+   *                                information for the transformation.
    * @return a time series that is smoothed using moving average.
    */
   @Override
-  public TimeSeries transform(TimeSeries timeSeries) {
+  public TimeSeries transform(TimeSeries timeSeries, AnomalyDetectionContext anomalyDetectionContext) {
     Interval timeSeriesInterval = timeSeries.getTimeSeriesInterval();
     long startTime = timeSeriesInterval.getStartMillis();
     long endTime = timeSeriesInterval.getEndMillis();
 
-    long bucketSizeInMillis = Utils.getBucketInMillis(BUCKET_SIZE, BUCKET_UNIT, getProperties());
+    long bucketSizeInMillis = AnomalyDetectionUtils
+        .getBucketInMillis(BUCKET_SIZE, BUCKET_UNIT, getProperties());
 
     int movingAverageWindowSize =
         Integer.valueOf(getProperties().getProperty(MOVING_AVERAGE_SMOOTHING_WINDOW_SIZE));
@@ -45,8 +48,8 @@ public class MovingAverageSmoothingFunction extends AbstractTransformationFuncti
     // Check if the moving average window size is larger than the time series itself
     long transformedStartTime = startTime + bucketSizeInMillis * (movingAverageWindowSize - 1);
     if (transformedStartTime > endTime) {
-      String metricName = timeSeries.getTimeSeriesKey().getMetricName();
-      DimensionMap dimensionMap = timeSeries.getTimeSeriesKey().getDimensionMap();
+      String metricName = anomalyDetectionContext.getTimeSeriesKey().getMetricName();
+      DimensionMap dimensionMap = anomalyDetectionContext.getTimeSeriesKey().getDimensionMap();
       LOGGER.warn(
           "Input time series (Metric:{}, Dimension:{}) is shorter than the moving average "
               + "smoothing window; therefore, smoothing is not applied on this time series.",
@@ -55,7 +58,6 @@ public class MovingAverageSmoothingFunction extends AbstractTransformationFuncti
     }
 
     TimeSeries transformedTimeSeries = new TimeSeries();
-    transformedTimeSeries.setTimeSeriesKey(timeSeries.getTimeSeriesKey());
     Interval transformedInterval = new Interval(transformedStartTime, endTime);
     transformedTimeSeries.setTimeSeriesInterval(transformedInterval);
 

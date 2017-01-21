@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.anomalydetection.model.detection;
 
-import com.linkedin.thirdeye.anomalydetection.Utils;
+import com.linkedin.thirdeye.anomalydetection.AnomalyDetectionUtils;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyDetectionContext;
 import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
 import com.linkedin.thirdeye.anomalydetection.model.prediction.ExpectedTimeSeriesPredictionModel;
@@ -10,7 +10,6 @@ import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import org.joda.time.Interval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,7 +35,8 @@ public class SimpleThresholdDetectionModel extends AbstractDetectionModel {
       volumeThreshold = Double.valueOf(getProperties().getProperty(AVERAGE_VOLUME_THRESHOLD));
     }
 
-    long bucketSizeInMillis = Utils.getBucketInMillis(BUCKET_SIZE, BUCKET_UNIT, getProperties());
+    long bucketSizeInMillis = AnomalyDetectionUtils
+        .getBucketInMillis(BUCKET_SIZE, BUCKET_UNIT, getProperties());
 
     // Compute the weight of this time series (average across whole)
     TimeSeries currentTimeSeries = anomalyDetectionContext.getTransformedCurrent();

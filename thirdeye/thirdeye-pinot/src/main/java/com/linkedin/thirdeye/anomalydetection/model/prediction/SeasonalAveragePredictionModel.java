@@ -1,9 +1,8 @@
 package com.linkedin.thirdeye.anomalydetection.model.prediction;
 
-import com.linkedin.thirdeye.anomalydetection.Utils;
+import com.linkedin.thirdeye.anomalydetection.AnomalyDetectionUtils;
 import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.collections.CollectionUtils;
 import org.joda.time.Interval;
 
@@ -11,7 +10,7 @@ public class SeasonalAveragePredictionModel extends ExpectedTimeSeriesPrediction
   public static final String BUCKET_SIZE = "bucketSize";
   public static final String BUCKET_UNIT = "bucketUnit";
 
-  TimeSeries expectedTimeSeries;
+  private TimeSeries expectedTimeSeries;
 
   @Override
   public void train(List<TimeSeries> baselineTimeSeries) {
@@ -21,7 +20,8 @@ public class SeasonalAveragePredictionModel extends ExpectedTimeSeriesPrediction
       TimeSeries baseTimeSeries = getLatestTimeSeries(baselineTimeSeries);
       Interval baseInterval = baseTimeSeries.getTimeSeriesInterval();
 
-      long bucketSizeInMillis = Utils.getBucketInMillis(BUCKET_SIZE, BUCKET_UNIT, getProperties());
+      long bucketSizeInMillis = AnomalyDetectionUtils
+          .getBucketInMillis(BUCKET_SIZE, BUCKET_UNIT, getProperties());
 
       long baseStart = baseInterval.getStartMillis();
       long baseEnd = baseInterval.getEndMillis();
@@ -62,10 +62,10 @@ public class SeasonalAveragePredictionModel extends ExpectedTimeSeriesPrediction
   }
 
   /**
-   * Returns the time series that has the largest start millis.
+   * Returns the time series, which has the largest start millis, from a set of time series.
    *
    * @param baselineTimeSeries the set of baselines
-   * @return the time series that has the largest start millis.
+   * @return the time series, which has the largest start millis, from a set of time series.
    */
   private TimeSeries getLatestTimeSeries(List<TimeSeries> baselineTimeSeries) {
     if (CollectionUtils.isNotEmpty(baselineTimeSeries)) {

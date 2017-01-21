@@ -1,8 +1,8 @@
 package com.linkedin.thirdeye.anomalydetection.context;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import org.joda.time.Interval;
 
 /**
@@ -12,19 +12,14 @@ import org.joda.time.Interval;
 public class TimeSeries {
 
   /**
-   * Timestamps to values.
+   * Timestamps to values. Timestamps are sorted.
    */
-  private Map<Long, Double> timeSeries = new HashMap<>();
+  private Map<Long, Double> timeSeries = new TreeMap<>();
 
   /**
    * The max and min timestamp of this time series; both are inclusive.
    */
-  private Interval timeSeriesInterval;
-
-  /**
-   * The time series key, which provides metric name and dimension maps, of this time series.
-   */
-  private TimeSeriesKey timeSeriesKey = new TimeSeriesKey();
+  private Interval timeSeriesInterval = new Interval(0L, 0L);
 
 
   /**
@@ -67,7 +62,7 @@ public class TimeSeries {
   }
 
   /**
-   * Returns timestamp set
+   * Returns a sorted timestamp set
    */
   public Set<Long> timestampSet() {
     return timeSeries.keySet();
@@ -92,20 +87,6 @@ public class TimeSeries {
    */
   public void setTimeSeriesInterval(Interval timeSeriesInterval) {
     this.timeSeriesInterval = timeSeriesInterval;
-  }
-
-  /**
-   * Returns this time series' key, which contains the metric name and dimension map.
-   */
-  public TimeSeriesKey getTimeSeriesKey() {
-    return timeSeriesKey;
-  }
-
-  /**
-   * Sets this time series' key.
-   */
-  public void setTimeSeriesKey(TimeSeriesKey timeSeriesKey) {
-    this.timeSeriesKey = timeSeriesKey;
   }
 }
 

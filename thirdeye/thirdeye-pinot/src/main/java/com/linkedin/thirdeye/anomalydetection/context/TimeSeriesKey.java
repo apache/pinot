@@ -28,7 +28,8 @@ public class TimeSeriesKey {
   public boolean equals(Object o) {
     if (o instanceof TimeSeriesKey) {
       TimeSeriesKey other = (TimeSeriesKey) o;
-      return ObjectUtils.equals(this, other);
+      return ObjectUtils.equals(metricName, other.metricName)
+          && ObjectUtils.equals(dimensionMap, other.dimensionMap);
     } else {
       return false;
     }

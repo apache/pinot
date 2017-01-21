@@ -43,6 +43,15 @@ public class WeekOverWeekRule extends AbstractAnomalyDetectionFunction {
     detectionModel.init(this.properties);
   }
 
+  /**
+   * The strings in the format of "w/w" is defined to be backward compatible with old anomaly
+   * detection framework. These strings should be deprecated after the migration.
+   *
+   * TODO: Replace the w/w strings with ENUM.
+   *
+   * @param baselineProp The human readable string of baseline property for setting up
+   *                     SEASONAL_PERIOD and SEASONAL_SIZE.
+   */
   private void initPropertiesForDataModel(String baselineProp) {
     // The basic settings for w/w
     this.properties.setProperty(SeasonalDataModel.SEASONAL_PERIOD, "1");

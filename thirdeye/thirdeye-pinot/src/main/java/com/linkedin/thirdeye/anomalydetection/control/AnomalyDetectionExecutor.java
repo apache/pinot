@@ -105,7 +105,8 @@ public class AnomalyDetectionExecutor {
     if (CollectionUtils.isNotEmpty(currentTransformationChain)) {
       for (TransformationFunction tf : currentTransformationChain) {
         anomalyDetectionContext
-            .setTransformedCurrent(tf.transform(anomalyDetectionContext.getTransformedCurrent()));
+            .setTransformedCurrent(tf.transform(anomalyDetectionContext.getTransformedCurrent(),
+                anomalyDetectionContext));
       }
     }
 
@@ -119,7 +120,7 @@ public class AnomalyDetectionExecutor {
       for (TransformationFunction tf : baselineTransformationChain) {
         List<TimeSeries> transformedBaselines = new ArrayList<>();
         for (TimeSeries ts : anomalyDetectionContext.getTransformedBaselines()) {
-          TimeSeries transformedTS = tf.transform(ts);
+          TimeSeries transformedTS = tf.transform(ts, anomalyDetectionContext);
           transformedBaselines.add(transformedTS);
         }
         anomalyDetectionContext.setTransformedBaselines(transformedBaselines);
