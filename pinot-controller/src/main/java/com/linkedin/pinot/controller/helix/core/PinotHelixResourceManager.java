@@ -479,6 +479,20 @@ public class PinotHelixResourceManager {
           "Failed to fetch broker tag for table " + tableName + " due to exception: " + e.getMessage(), false);
     }
 
+    // If we add a new broker, we want to rebuild the broker resource.
+    HelixAdmin helixAdmin = getHelixAdmin();
+    String clusterName = getHelixClusterName();
+    IdealState brokerIdealState = HelixHelper.getBrokerIdealStates(helixAdmin, clusterName);
+    String brokerTenantName = tenantConfig.getBroker();
+
+    Set<String> brokerTenantInstances = getAllInstancesForBrokerTenant(brokerTenantName);
+    Set<String> idealStateBrokerInstances = brokerIdealState.getInstanceSet(tableName);
+
+    if(idealStateBrokerInstances.equals(brokerTenantInstances)) {
+      return new PinotResourceManagerResponse(
+          "Broker resource is not rebuilt because ideal state is the same for table {} " + tableName, false);
+    }
+
     brokerTag = tenantConfig.getBroker();
 
     // Look for all instances tagged with this broker tag
