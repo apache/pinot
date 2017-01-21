@@ -1,10 +1,12 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
 import com.google.common.primitives.Floats;
+import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.joda.time.format.ISODateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -373,61 +375,4 @@ public class OnboardResource {
     }
     return rawAnomaliesDeleted;
   }
-
-  /**
-   * Breaks down the given range into consecutive monitoring windows as per function definition
-   * Regenerates anomalies for each window separately
-   * @param id anomaly function id
-   * @param detectionHost the host of anomaly detection function
-   * @param detectionPort the port of anomaly detection function
-   * @param monitoringWindowStartTime The start time of the monitoring window (in milli-second)
-   * @param monitoringWindowEndTime The start time of the monitoring window (in milli-second)
-   * @param isForceBackfill false to resume backfill from the latest left off
-   * @return HTTP response of this request
-   * @throws Exception
-   */
-  //TODO: Make detection host available
-  private final String detectionHost = "localhost";
-  private final int detectionPort = 1867;
-  @POST
-  @Path("function/{id}/regenerateAnomaliesInRange")
-  public String regenerateAnomaliesInRange(@PathParam("id") String id,
-//      @QueryParam("detectionHost") String detectionHost,
-//      @QueryParam("detectionPort") int detectionPort,
-      @QueryParam("start") long monitoringWindowStartTime,
-      @QueryParam("end") long monitoringWindowEndTime,
-      @QueryParam("forceBackfill") @DefaultValue("false") String isForceBackfill) throws Exception {
-    long functionId = Long.valueOf(id);
-    AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
-    if(anomalyFunction == null){
-      LOG.info("Anomaly functionId {} is not found", functionId);
-      return String.format("Anomaly Function %s is not found", id);
-    }
-
-    // Check if the merged anomaly results has been cleaned up before regeneration
-    List<MergedAnomalyResultDTO> mergedResults =
-        mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(monitoringWindowStartTime, monitoringWindowEndTime, functionId);
-    if(!mergedResults.isEmpty()){
-      LOG.info("Merged anomaly results of functionId {} should be cleaned up before regeneration", id);
-      return String.format("Merged anomaly results of functionId %s should be cleaned up before regeneration", id);
-    }
-
-    DetectionResourceHttpUtils detectionResourceHttpUtils = new DetectionResourceHttpUtils(detectionHost, detectionPort);
-
-    if (!anomalyFunction.getIsActive()) {
-      LOG.info("Skipping deactivated function {}", functionId);
-      return String.format("Skipping deactivated function %s", id);
-    }
-    else{
-      LOG.info("Sending backfill function {} for range {} to {}", functionId, monitoringWindowStartTime, monitoringWindowEndTime);
-      String response = detectionResourceHttpUtils.runBackfillAnomalyFunction(
-          String.valueOf(functionId),
-          Long.toString(monitoringWindowStartTime),
-          Long.toString(monitoringWindowEndTime),
-          Boolean.valueOf(isForceBackfill));
-      LOG.info("Response {}", response);
-      return response;
-    }
-  }
-
 }
