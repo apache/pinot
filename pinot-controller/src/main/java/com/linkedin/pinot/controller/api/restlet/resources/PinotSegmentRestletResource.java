@@ -25,6 +25,7 @@ import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.restlet.swagger.Response;
 import com.linkedin.pinot.common.restlet.swagger.Responses;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
+import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
 import com.linkedin.pinot.common.restlet.swagger.Parameter;
@@ -33,6 +34,7 @@ import com.linkedin.pinot.common.restlet.swagger.Summary;
 import com.linkedin.pinot.common.restlet.swagger.Tags;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.helix.ZNRecord;
@@ -230,19 +232,32 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
 
     JSONArray ret = new JSONArray();
     String tableNameWithType = null;
-    if ((tableType == null || TableType.OFFLINE.name().equalsIgnoreCase(tableType))
+    List<String> segmentsToToggle;
+
+    if (segmentName != null) {
+      segmentsToToggle = Collections.singletonList(segmentName);
+    } else {
+      segmentsToToggle = _pinotHelixResourceManager.getAllSegmentsForResource(tableName);
+    }
+    if ((tableType == null
+        && SegmentName.getSegmentType(segmentsToToggle.get(0)).equals(SegmentName.RealtimeSegmentType.UNSUPPORTED)
+        || TableType.OFFLINE.name().equalsIgnoreCase(tableType))
         && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
       tableNameWithType = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
 
     }
 
-    if ((tableType == null || TableType.REALTIME.name().equalsIgnoreCase(tableType))
+    if ((tableType == null
+        && !SegmentName.getSegmentType(segmentsToToggle.get(0)).equals(SegmentName.RealtimeSegmentType.UNSUPPORTED)
+        || TableType.REALTIME.name().equalsIgnoreCase(tableType))
         && _pinotHelixResourceManager.hasRealtimeTable(tableName)) {
       tableNameWithType = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
     }
 
+
     if (tableNameWithType != null) {
-      PinotResourceManagerResponse resourceManagerResponse = toggleSegmentsForTable(tableNameWithType, segmentName, state);
+
+      PinotResourceManagerResponse resourceManagerResponse = toggleSegmentsForTable(segmentsToToggle, tableNameWithType, segmentName, state);
       setStatus(resourceManagerResponse.isSuccessful() ? Status.SUCCESS_OK : Status.SERVER_ERROR_INTERNAL);
       ret.put(resourceManagerResponse);
     }
@@ -253,22 +268,16 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
    * Helper method to toggle state of segment for a given table. The tableName expected is the internally
    * stored name (with offline/realtime annotation).
    *
+   * @param segmentsToToggle: segments that we want to perform operations on
    * @param tableName: Internal name (created by TableNameBuilder) for the table
    * @param segmentName: Segment to set the state for.
    * @param state: Value of state to set.
    * @return
    * @throws JSONException
    */
-  private PinotResourceManagerResponse toggleSegmentsForTable(String tableName, String segmentName, String state) throws JSONException {
-    List<String> segmentsToToggle;
-
+  private PinotResourceManagerResponse toggleSegmentsForTable(List<String> segmentsToToggle, String tableName, String segmentName, String state) throws JSONException {
     long timeOutInSeconds = 10L;
-    if (segmentName != null) {
-      segmentsToToggle = new ArrayList<String>();
-      segmentsToToggle.add(segmentName);
-    } else {
-      segmentsToToggle = _pinotHelixResourceManager.getAllSegmentsForResource(tableName);
-
+    if (segmentName == null) {
       // For enable, allow 5 seconds per segment for an instance as timeout.
       if (StateType.ENABLE.name().equalsIgnoreCase(state)) {
         int instanceCount = _pinotHelixResourceManager.getAllInstanceNames().size();
