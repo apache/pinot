@@ -53,7 +53,6 @@ public class SegmentPushControllerAPIs {
   private static String DROP_PARAMETERS = "?state=drop&type=offline";
   private static String UTF_8 = "UTF-8";
   private static long TIMEOUT = 120000;
-  private static String SUCCESS = "success";
   private static String DATE_JOINER = "-";
 
   SegmentPushControllerAPIs(String[] controllerHosts, String controllerPort) {
@@ -66,7 +65,7 @@ public class SegmentPushControllerAPIs {
       for (String controllerHost : controllerHosts) {
         controllerHttpHost = new HttpHost(controllerHost, controllerPort);
 
-        LOGGER.info("Getting overlapped segments*************");
+        LOGGER.info("Getting overlapped segments for {}*************", segmentName);
         List<String> overlappingSegments = getOverlappingSegments(tableName, segmentName);
 
         if (overlappingSegments.isEmpty()) {
@@ -145,28 +144,59 @@ public class SegmentPushControllerAPIs {
     return allSegments;
   }
 
+  private boolean isDeleteSuccessful(String tablename, String segmentName) throws IOException {
+
+    boolean deleteSuccessful = false;
+    HttpClient controllerClient = new DefaultHttpClient();
+    // this endpoint gets from ideal state
+    HttpGet req = new HttpGet(TABLES_ENDPOINT + URLEncoder.encode(tablename, UTF_8) + "/" + SEGMENTS_ENDPOINT);
+    HttpResponse res = controllerClient.execute(controllerHttpHost, req);
+    try {
+      if (res.getStatusLine().getStatusCode() != 200) {
+        throw new IllegalStateException(res.getStatusLine().toString());
+      }
+      InputStream content = res.getEntity().getContent();
+      String response = IOUtils.toString(content);
+      LOGGER.info("All segments from ideal state {}", response);
+      if (!response.contains("\\\""+segmentName+"\\\"")) {
+        deleteSuccessful = true;
+        LOGGER.info("Delete successful");
+      } else {
+        LOGGER.info("Delete failed");
+      }
+    } finally {
+      if (res.getEntity() != null) {
+        EntityUtils.consume(res.getEntity());
+      }
+
+    }
+    return deleteSuccessful;
+
+  }
+
   private List<String> getSegmentsFromResponse(String response) {
     String[] allSegments = response.replaceAll("\\[|\\]|\"", "").split(",");
     return Arrays.asList(allSegments);
   }
 
+
   private void deleteOverlappingSegments(String tablename, List<String> overlappingSegments) throws IOException {
 
     for (String segment : overlappingSegments) {
-      String response = "";
+      boolean deleteSuccessful = false;
       long elapsedTime = 0;
       long startTimeMillis = System.currentTimeMillis();
-      while (elapsedTime < TIMEOUT && !response.toLowerCase().contains(SUCCESS)) {
-        response = deleteSegment(tablename, segment);
-        LOGGER.info("Response {} while deleting segment {} from table {}", response, segment, tablename);
+      while (elapsedTime < TIMEOUT && !deleteSuccessful) {
+        deleteSuccessful = deleteSegment(tablename, segment);
+        LOGGER.info("Response {} while deleting segment {} from table {}", deleteSuccessful, segment, tablename);
         long currentTimeMillis = System.currentTimeMillis();
         elapsedTime = elapsedTime + (currentTimeMillis - startTimeMillis);
       }
     }
   }
 
-  private String deleteSegment(String tablename, String segmentName) throws IOException {
-    String response = null;
+  private boolean deleteSegment(String tablename, String segmentName) throws IOException {
+    boolean deleteSuccessful = false;
 
     HttpClient controllerClient = new DefaultHttpClient();
     HttpGet req = new HttpGet(TABLES_ENDPOINT + URLEncoder.encode(tablename, UTF_8)
@@ -174,18 +204,18 @@ public class SegmentPushControllerAPIs {
         + DROP_PARAMETERS);
     HttpResponse res = controllerClient.execute(controllerHttpHost, req);
     try {
-      if (res == null || res.getStatusLine() == null || res.getStatusLine().getStatusCode() != 200) {
-        response = "Exception in deleting segment, trying again";
+      if (res == null || res.getStatusLine() == null || res.getStatusLine().getStatusCode() != 200
+          || !isDeleteSuccessful(tablename, segmentName)) {
+        LOGGER.info("Exception in deleting segment, trying again {}", res);
       } else {
-        InputStream content = res.getEntity().getContent();
-        response = IOUtils.toString(content);
+        deleteSuccessful = true;
       }
     } finally {
       if (res.getEntity() != null) {
         EntityUtils.consume(res.getEntity());
       }
     }
-    return response;
+    return deleteSuccessful;
   }
 
 }
