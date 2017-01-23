@@ -28,6 +28,15 @@ public interface BlockValSet {
   DataType getValueType();
 
   /**
+   * Number of docs in the block val set.
+   * For completely filled blocks it is {@link com.linkedin.pinot.core.plan.DocIdSetPlanNode#MAX_DOC_PER_CALL}.
+   * For partially filled blocks it will be less than that.
+   *
+   * @return Number of docs in the blockVal set.
+   */
+  int getNumDocs();
+
+  /**
    * Get Integer values for the given docIds.
    *
    * @param inDocIds Input docIds

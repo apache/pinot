@@ -10,13 +10,8 @@ import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewHandler;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewRequest;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewResponse;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
-import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
-import com.linkedin.thirdeye.detector.email.filter.AlertFilterType;
+import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -48,8 +43,6 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
 /**
  * Stateless class to provide util methods to help build anomaly report
  */
-import static com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper.FILTER_TYPE_KEY;
-
 public abstract class EmailHelper {
 
   private static final Logger LOG = LoggerFactory.getLogger(EmailHelper.class);
@@ -200,11 +193,10 @@ public abstract class EmailHelper {
       LOG.error("No email config provided for email with subject [{}]!", subject);
     }
   }
-
-  public static ContributorViewResponse getContributorData(String collection, String metric, List<String> dimensions)
+  public static ContributorViewResponse getContributorData(String collection, String metric, List<String> dimensions, AlertConfigBean.COMPARE_MODE compareMode, long offsetDelayMillis)
       throws Exception {
 
-    // TODO : add support to Comparision mode eg : WoW or Wo2W etc
+    long baselineOffset = getBaselineOffset(compareMode);
 
     ContributorViewRequest request = new ContributorViewRequest();
     request.setCollection(collection);
@@ -215,14 +207,14 @@ public abstract class EmailHelper {
     long currentEnd = System.currentTimeMillis();
     long maxDataTime = collectionMaxDataTimeCache.get(collection);
     if (currentEnd > maxDataTime) {
-      long delta = currentEnd - maxDataTime;
-      currentEnd = currentEnd - delta;
+      currentEnd = maxDataTime;
     }
 
     // align to nearest hour
-    currentEnd = currentEnd - (currentEnd % HOUR_MILLIS);
+    currentEnd = (currentEnd - (currentEnd % HOUR_MILLIS)) - offsetDelayMillis;
 
     String aggTimeGranularity = "HOURS";
+    // TODO : implement intraday option
     long currentStart = currentEnd - DAY_MILLIS;
 
     DatasetConfigDTO datasetConfigDTO = datasetConfigManager.findByDataset(collection);
@@ -232,8 +224,8 @@ public abstract class EmailHelper {
       currentStart = currentEnd - WEEK_MILLIS;
     }
 
-    long baselineStart = currentStart - WEEK_MILLIS ;
-    long baselineEnd = currentEnd - WEEK_MILLIS;
+    long baselineStart = currentStart - baselineOffset ;
+    long baselineEnd = currentEnd - baselineOffset;
 
     String timeZone = datasetConfigDTO.getTimezone();
     request.setBaselineStart(new DateTime(baselineStart, DateTimeZone.forID(timeZone)));
@@ -247,64 +239,20 @@ public abstract class EmailHelper {
     return response;
   }
 
-  /**
-   *
-   * @param results
-   * @return
-   */
-  public static List<MergedAnomalyResultDTO> applyFiltrationRule(List<MergedAnomalyResultDTO> results) {
-    if (results.size() == 0) {
-      return results;
-    }
-    // Function ID to Alert Filter
-    Map<Long, AlertFilter> functionAlertFilter = new HashMap<>();
-
-    List<MergedAnomalyResultDTO> qualifiedAnomalies = new ArrayList<>();
-    for (MergedAnomalyResultDTO result : results) {
-      // Lazy initiates alert filter for anomalies of the same anomaly function
-      AnomalyFunctionBean anomalyFunctionSpec = result.getFunction();
-      long functionId = anomalyFunctionSpec.getId();
-      AlertFilter alertFilter = functionAlertFilter.get(functionId);
-      if (alertFilter == null) {
-        // Get filtration rule from anomaly function configuration
-        alertFilter = initiateAlertFilter(anomalyFunctionSpec);
-        functionAlertFilter.put(functionId, alertFilter);
-        LOG.info("Using filter {} for anomaly function {} (dataset: {}, metric: {})", alertFilter,
-            functionId, anomalyFunctionSpec.getCollection(), anomalyFunctionSpec.getMetric());
-      }
-      if (alertFilter.isQualified(result)) {
-        qualifiedAnomalies.add(result);
-      }
-    }
-    LOG.info(
-        "Found [{}] anomalies qualified to alert after applying filtration rule on [{}] anomalies",
-        qualifiedAnomalies.size(), results.size());
-    return qualifiedAnomalies;
+  public static ContributorViewResponse getContributorData(String collection, String metric, List<String> dimensions)
+      throws Exception {
+    return getContributorData(collection, metric, dimensions, AlertConfigBean.COMPARE_MODE.WoW, 2 * 36_00_000); // add 2 hours delay
   }
 
-  /**
-   * Initiates an alert filter for the given anomaly function.
-   *
-   * @param anomalyFunctionSpec the anomaly function that contains the alert filter spec.
-   *
-   * @return the alert filter specified by the alert filter spec or a dummy filter if the function
-   * does not have an alert filter spec or this method fails to initiates an alert filter from the
-   * spec.
-   */
-  static AlertFilter initiateAlertFilter(AnomalyFunctionBean anomalyFunctionSpec) {
-    Map<String, String> alertFilterInfo = anomalyFunctionSpec.getAlertFilter();
-    if (alertFilterInfo == null) {
-      alertFilterInfo = Collections.emptyMap();
+  private static long getBaselineOffset(AlertConfigBean.COMPARE_MODE compareMode) {
+    switch (compareMode) {
+    case Wo2W:
+      return 2 * WEEK_MILLIS;
+    case Wo3W:
+      return 3 * WEEK_MILLIS;
+    case WoW:
+      default:
+      return WEEK_MILLIS;
     }
-    AlertFilter alertFilter;
-    if (alertFilterInfo.containsKey(FILTER_TYPE_KEY)) {
-      AlertFilterType type = AlertFilterType.valueOf(alertFilterInfo.get(FILTER_TYPE_KEY).toUpperCase());
-      alertFilter = AlertFilterHelper.getAlertFilter(type);
-      alertFilter.setParameters(alertFilterInfo);
-    } else {
-      // Every anomaly triggers an alert by default
-      alertFilter = AlertFilterHelper.getAlertFilter(AlertFilterType.DUMMY);
-    }
-    return alertFilter;
   }
 }

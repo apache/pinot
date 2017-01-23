@@ -160,9 +160,7 @@ $(document).ready( function() {
             "pValueThreshold","complementaryPattern","complementaryLevel","seasonal","minIncrement","minWindowLength","maxWindowLength","bootstrap","numSimulations",
             "notEqualEpsilon","proportionAnomalyInTraining","enableSTL","robust","periodic","enableOfflineTrain","numOfOfflineAnomalies","filterOnSeverity","targetPattern","targetLevel"
         ],
-        SPLINE_REGRESSION:[
-            "historical_data_length", "historical_data_max_length", "historical_data_min_length", "degree", "p_value_threshold", "log_transformation", "anomaly_removal_severity_threshold", "timezone"
-        ]
+        SPLINE_REGRESSION: ["historicalDataLength","historicalDataMaxLength", "historicalDataMinLength","degree","pValueThreshold","logTransform","timezone"]
     }
 
         //Adding property defaults and datatypes from: https://gitli.corp.linkedin.com/ars-projects/anomaly-detection/source/bdafe93d4b4e57a439b16a8ca82c5b4119218ddd:anomaly-detection/src/main/java/com/linkedin/anomaly/api
@@ -174,14 +172,13 @@ $(document).ready( function() {
                  "description": 2
             },
             "propertyDef": {
-                "SPLINE_REGRESSION|historical_data_length": [90, "int"],
-                "SPLINE_REGRESSION|historical_data_max_length": [100, "int"],
-                "SPLINE_REGRESSION|historical_data_min_length": [60, "int"],
-                "SPLINE_REGRESSION|degree": [3, "int"],
-                "SPLINE_REGRESSION|p_value_threshold": [0.001, "double"],
-                "SPLINE_REGRESSION|log_transformation": [false, "boolean"],
-                "SPLINE_REGRESSION|anomaly_removal_severity_threshold": [0.5, "double"],
-                "SPLINE_REGRESSION|timezone": ["America/Los_Angeles", "string"],
+                "SPLINE_REGRESSION|historicalDataLength":[90,"int"],
+                "SPLINE_REGRESSION|historicalDataMaxLength":[100,"int"],
+                "SPLINE_REGRESSION|historicalDataMinLength":[60,"int"],
+                "SPLINE_REGRESSION|degree":[3,"int"],
+                "SPLINE_REGRESSION|pValueThreshold":[0.001,"double"],
+                "SPLINE_REGRESSION|logTransform":[false,"boolean"],
+                "SPLINE_REGRESSION|timezone":["America/Los_Angeles","string"],
                 "KALMAN_FILTER|knob": [10000, "double"],
                 "KALMAN_FILTER|order": [1, "int"],
                 "KALMAN_FILTER|pValueThreshold": [0.05, "double"],

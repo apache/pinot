@@ -22,9 +22,10 @@
   <#list metricDimensionValueReports as metricReport>
     <tr>
       <td><b>
-      ${reportCount} - <a href="${dashboardHost}/dashboard#view=compare&dataset=${collection}&metrics=${metricReport.metricName}&dimensions=${metricReport.dimensionName}&compareMode=WoW&aggTimeGranularity=HOURS&currentStart=${metricReport.currentStartTime?c}&currentEnd=${metricReport.currentEndTime?c}&baselineStart=${metricReport.baselineStartTime?c}&baselineEnd=${metricReport.baselineEndTime?c}">
-      ${metric} by ${metricReport.dimensionName}
-      </a>
+        <p>${reportCount} - <a
+            href="${dashboardHost}/dashboard#view=compare&dataset=${metricReport.dataset}&metrics=${metricReport.metricName}&dimensions=${metricReport.dimensionName}&compareMode=${metricReport.compareMode}&aggTimeGranularity=HOURS&currentStart=${metricReport.currentStartTime?c}&currentEnd=${metricReport.currentEndTime?c}&baselineStart=${metricReport.baselineStartTime?c}&baselineEnd=${metricReport.baselineEndTime?c}">
+        ${metricReport.metricName} by ${metricReport.dimensionName}</a>  (baseline : ${metricReport.compareMode})
+        </p>
       </b></td>
     </tr>
     <#assign subDimensionValueMap = metricReport.subDimensionValueMap >
@@ -34,15 +35,15 @@
                style="width:100%;border-collapse: collapse; border-spacing: 0 margin-bottom:15px;border-color:#ddd;"
                cellspacing="0px" cellpadding="4px">
           <tr>
-            <td>${metricReport.dimensionName}</td>
-            <td>Share</td>
-            <td>Total</td>
+            <td style="background-color: #e0e0eb;">${metricReport.dimensionName}</td>
+            <td style="background-color: #e0e0eb;">Share</td>
+            <td style="background-color: #e0e0eb;">Total</td>
             <#assign itrCount = 1 >
             <#list subDimensionValueMap?keys as groupByDimension>
               <#assign timeBucketValueMap = subDimensionValueMap[groupByDimension]>
               <#if itrCount == 1>
                 <#list timeBucketValueMap?keys as timeBucket>
-                  <td>
+                  <td style="background-color: #e0e0eb;">
                   ${timeBucket?number?number_to_time?string("HH:mm")}
                   </td>
                 </#list>
@@ -52,14 +53,40 @@
           </tr>
           <#list subDimensionValueMap?keys as dimensionKey>
             <tr>
-              <td>
+              <td style="background-color: #e0e0eb;">
               ${dimensionKey}
               </td>
-              <td>${metricReport.subDimensionShareValueMap[dimensionKey]}</td>
-              <td>${metricReport.subDimensionTotalValueMap[dimensionKey]}</td>
+              <#assign value = metricReport.subDimensionShareValueMap[dimensionKey]?number >
+              <td
+                <#if (value> 35) > style="background-color: #3333ff;" </#if>
+                <#if (value > 15) > style="background-color: #8080ff;" </#if>
+                <#if (value > 5) > style="background-color: #e6e6ff;" </#if>
+                <#if (value < -35) > style="background-color: #ff0080;" </#if>
+                <#if (value < -15) > style="background-color: #ff80bf;" </#if>
+                <#if (value < -5) > style="background-color: #ffe6f2;" </#if>
+              > ${value}%</td>
+
+              <#assign value = metricReport.subDimensionTotalValueMap[dimensionKey]?number >
+              <td
+                <#if (value> 35) > style="background-color: #3333ff;" </#if>
+                <#if (value > 15) > style="background-color: #8080ff;" </#if>
+                <#if (value > 5) > style="background-color: #e6e6ff;" </#if>
+                <#if (value < -35) > style="background-color: #ff0080;" </#if>
+                <#if (value < -15) > style="background-color: #ff80bf;" </#if>
+                <#if (value < -5) > style="background-color: #ffe6f2;" </#if>
+              > ${value}%</td>
+
               <#assign timevalmap = subDimensionValueMap[dimensionKey] >
               <#list timevalmap?keys as timebucketkey>
-                <td> ${timevalmap[timebucketkey]}%</td>
+                <#assign value = timevalmap[timebucketkey]?number >
+                <td
+                  <#if (value> 35) > style="background-color: #3333ff;" </#if>
+                  <#if (value > 15) > style="background-color: #8080ff;" </#if>
+                  <#if (value > 5) > style="background-color: #e6e6ff;" </#if>
+                  <#if (value < -35) > style="background-color: #ff0080;" </#if>
+                  <#if (value < -15) > style="background-color: #ff80bf;" </#if>
+                  <#if (value < -5) > style="background-color: #ffe6f2;" </#if>
+                > ${value}%</td>
               </#list>
             </tr>
           </#list>
@@ -75,8 +102,7 @@
       <hr/>
       <br/>
       <p>If you have any questions regarding this report, please email <a
-          href="mailto:'${fromEmail}'" target="_top">${fromEmail}</a></p>
-      <p> Report generated at: ${dateFormat(reportGenerationTimeMillis)}</p>
+          href="mailto:'${contactEmail}'" target="_top">${contactEmail}</a></p>
       <p>
         Thanks,<br>
         ThirdEye Team

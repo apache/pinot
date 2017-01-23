@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.operator.blocks;
 
-import com.linkedin.pinot.core.operator.transform.result.TransformResult;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockDocIdValueSet;
@@ -23,21 +22,25 @@ import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Predicate;
+import java.util.Map;
 
 
-// TODO: Implement the class, currently added for unit testing purposes.
+/**
+ * Transform Block holds blocks of transformed columns. In absence of transforms,
+ * it servers as a pass-through to projection block.
+ */
 public class TransformBlock implements Block {
+  private final Map<String, BlockValSet> _transformBlockValSetMap;
   private ProjectionBlock _projectionBlock;
-  private TransformResult _transformResult;
+
+  public TransformBlock(ProjectionBlock projectionBlock, Map<String, BlockValSet> transformBlockValSetMap) {
+    _projectionBlock = projectionBlock;
+    _transformBlockValSetMap = transformBlockValSetMap;
+  }
 
   @Override
   public boolean applyPredicate(Predicate predicate) {
-  throw new UnsupportedOperationException();
-}
-
-  public TransformBlock(ProjectionBlock projectionBlock, TransformResult transformResult) {
-    _projectionBlock = projectionBlock;
-    _transformResult = transformResult;
+    throw new UnsupportedOperationException();
   }
 
   @Override
@@ -65,9 +68,22 @@ public class TransformBlock implements Block {
     return _projectionBlock.getMetadata();
   }
 
-  // Added for unit test purposes, until feature implementation is complete, will be removed after that.
-  @Deprecated
-  public TransformResult getTransformResult() {
-    return _transformResult;
+  public BlockValSet getBlockValueSet(String column) {
+    BlockValSet transformBlockValSet = (_transformBlockValSetMap != null) ? _transformBlockValSetMap.get(column) : null;
+    return (transformBlockValSet != null) ? transformBlockValSet : _projectionBlock.getBlockValueSet(column);
+  }
+
+  public BlockMetadata getBlockMetadata(String column) {
+    BlockValSet transformBlockValSet = (_transformBlockValSetMap != null) ? _transformBlockValSetMap.get(column) : null;
+    return (transformBlockValSet != null) ? new TransformBlockMetadata(transformBlockValSet.getNumDocs(),
+        transformBlockValSet.getValueType()) : _projectionBlock.getMetadata(column);
+  }
+
+  public DocIdSetBlock getDocIdSetBlock() {
+    return _projectionBlock.getDocIdSetBlock();
+  }
+
+  public int getNumDocs() {
+    return _projectionBlock.getNumDocs();
   }
 }

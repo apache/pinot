@@ -471,7 +471,7 @@ public class PinotHelixResourceManager {
       } else if (tableType == TableType.REALTIME) {
         tenantConfig = ZKMetadataProvider.getRealtimeTableConfig(getPropertyStore(), tableName).getTenantConfig();
       } else {
-        throw new RuntimeException("Don't know how to handle table of type " + tableType);
+        return new PinotResourceManagerResponse("Table " + tableName + " does not have a table type", false);
       }
     } catch (Exception e) {
       LOGGER.warn("Caught exception while rebuilding broker resource from Helix tags for table {}", e, tableName);

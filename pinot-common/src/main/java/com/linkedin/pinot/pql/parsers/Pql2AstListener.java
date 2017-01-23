@@ -234,8 +234,7 @@ public class Pql2AstListener extends PQL2BaseListener {
 
   @Override
   public void enterGroupBy(@NotNull PQL2Parser.GroupByContext ctx) {
-    String groupByExpression = _expression.substring(ctx.getStart().getStartIndex(), ctx.getStop().getStopIndex() + 1);
-    pushNode(new GroupByAstNode(groupByExpression));
+    pushNode(new GroupByAstNode());
   }
 
   @Override

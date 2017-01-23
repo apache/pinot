@@ -191,12 +191,12 @@ public abstract class AbstractManagerTestBase {
     alertConfigDTO.setRecipients("anomaly@linedin.com");
     alertConfigDTO.setCronExpression("0/10 * * * * ?");
     AlertConfigBean.EmailConfig emailConfig = new AlertConfigBean.EmailConfig();
-    emailConfig.setLastNotifiedAnomalyId(0l);
-    emailConfig.setSendAlertOnZeroAnomaly(true);
+    emailConfig.setAnomalyWatermark(0l);
     alertConfigDTO.setEmailConfig(emailConfig);
-    AlertConfigBean.ReportConfig reportConfig = new AlertConfigBean.ReportConfig();
-    reportConfig.setEnabled(true);
-    alertConfigDTO.setReportConfig(reportConfig);
+    AlertConfigBean.ReportConfigCollection
+        reportConfigCollection = new AlertConfigBean.ReportConfigCollection();
+    reportConfigCollection.setEnabled(true);
+    alertConfigDTO.setReportConfigCollection(reportConfigCollection);
     return alertConfigDTO;
   }
 

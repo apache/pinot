@@ -39,6 +39,7 @@ import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.common.metrics.ValidationMetrics;
+import com.linkedin.pinot.common.utils.ServiceStatus;
 import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import com.linkedin.pinot.controller.helix.SegmentStatusChecker;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -189,6 +190,29 @@ public class ControllerStarter {
           }
         } else {
           return DATA_DIRECTORY_MISSING_VALUE;
+        }
+      }
+    });
+
+    ServiceStatus.setServiceStatusCallback(new ServiceStatus.ServiceStatusCallback() {
+      private boolean _isStarted = false;
+      @Override
+      public ServiceStatus.Status getServiceStatus() {
+        if(_isStarted) {
+          // If we've connected to Helix at some point, the instance status depends on being connected to ZK
+          if (helixResourceManager.getHelixZkManager().isConnected()) {
+            return ServiceStatus.Status.GOOD;
+          } else {
+            return ServiceStatus.Status.BAD;
+          }
+        }
+
+        // Return starting until zk is connected
+        if (!helixResourceManager.getHelixZkManager().isConnected()) {
+          return ServiceStatus.Status.STARTING;
+        } else {
+          _isStarted = true;
+          return ServiceStatus.Status.GOOD;
         }
       }
     });

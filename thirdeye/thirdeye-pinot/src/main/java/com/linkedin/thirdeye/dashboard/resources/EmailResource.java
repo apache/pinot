@@ -184,7 +184,9 @@ public class EmailResource {
     configuration.setSmtpConfiguration(smtpConfiguration);
     configuration.setDashboardHost(teHost);
 
-    anomalyReportGenerator.buildReport(startTime, endTime, anomalies, configuration, includeSentAnomaliesOnly, toAddr, fromAddr);
+    anomalyReportGenerator
+        .buildReport(startTime, endTime, anomalies, "Thirdeye Anomaly Report", configuration,
+            includeSentAnomaliesOnly, toAddr, fromAddr, "UI-Generated");
     return Response.ok().build();
   }
 
@@ -222,7 +224,9 @@ public class EmailResource {
     configuration.setSmtpConfiguration(smtpConfiguration);
     configuration.setDashboardHost(teHost);
 
-    anomalyReportGenerator.buildReport(startTime, endTime, anomalies, configuration, includeSentAnomaliesOnly, toAddr, fromAddr);
+    anomalyReportGenerator
+        .buildReport(startTime, endTime, anomalies, "Thirdeye Anomaly Report", configuration,
+            includeSentAnomaliesOnly, toAddr, fromAddr, "UI-Generated");
     return Response.ok().build();
   }
 }

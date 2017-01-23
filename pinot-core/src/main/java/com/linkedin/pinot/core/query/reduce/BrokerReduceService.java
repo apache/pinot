@@ -372,7 +372,11 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     List<AggregationResult> aggregationResults = new ArrayList<>(numAggregationFunctions);
     for (int i = 0; i < numAggregationFunctions; i++) {
       List<GroupByResult> groupByResultList = groupByResultLists[i];
-      aggregationResults.add(new AggregationResult(groupByResultList, groupBy.getColumns(), columnNames[i]));
+      List<String> groupByColumns = groupBy.getExpressions();
+      if (groupByColumns == null) {
+        groupByColumns = groupBy.getColumns();
+      }
+      aggregationResults.add(new AggregationResult(groupByResultList, groupByColumns, columnNames[i]));
     }
     brokerResponseNative.setAggregationResults(aggregationResults);
   }

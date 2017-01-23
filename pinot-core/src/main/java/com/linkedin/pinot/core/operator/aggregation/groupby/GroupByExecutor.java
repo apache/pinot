@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.operator.aggregation.groupby;
 
-import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
+import com.linkedin.pinot.core.operator.blocks.TransformBlock;
 
 
 /**
@@ -29,11 +29,11 @@ public interface GroupByExecutor {
   void init();
 
   /**
-   * Performs the actual group-by aggregation on the given projection block.
+   * Performs the actual group-by aggregation on the given transform block.
    *
-   * @param projectionBlock Projection block to process
+   * @param transformBlock Block to process
    */
-  void process(ProjectionBlock projectionBlock);
+  void process(TransformBlock transformBlock);
 
   /**
    * Post processing (if any) to be done after all docIdSets have been processed, and

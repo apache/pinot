@@ -45,6 +45,7 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.MmapUtils;
 import com.linkedin.pinot.common.utils.NetUtil;
+import com.linkedin.pinot.common.utils.ServiceStatus;
 import com.linkedin.pinot.common.utils.ZkUtils;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadataLoader;
 import com.linkedin.pinot.server.conf.ServerConf;
@@ -141,6 +142,11 @@ public class HelixServerStarter {
             _serverInstance.getServerMetrics().addMeteredGlobalValue(ServerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L);
           }
         });
+
+    // Register the service status handler
+    ServiceStatus.setServiceStatusCallback(
+        new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixAdmin, _helixClusterName,
+            _instanceId));
 
     ControllerLeaderLocator.create(_helixManager);
 

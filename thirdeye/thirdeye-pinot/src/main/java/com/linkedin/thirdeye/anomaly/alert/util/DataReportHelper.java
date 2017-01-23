@@ -12,7 +12,6 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TimeZone;
 import java.util.TreeMap;
 import org.apache.commons.collections.MapUtils;
 import org.joda.time.DateTime;
@@ -21,21 +20,24 @@ import org.joda.time.DateTimeZone;
 /**
  * Stateless class to provide util methods to help build data report
  */
-public abstract class DataReportHelper {
+public final class DataReportHelper {
   private static final String DIMENSION_VALUE_SEPARATOR = ", ";
   private static final String EQUALS = "=";
 
-  public static final TimeZone DEFAULT_TIME_ZONE = TimeZone.getTimeZone("America/Los_Angeles");
-  public static final String CHARSET = "UTF-8";
   public static final String DECIMAL_FORMATTER = "%+.1f";
   public static final String OVER_ALL = "OverAll";
-  private DataReportHelper() {
 
+  private static DataReportHelper INSTANCE = new DataReportHelper();
+
+  private DataReportHelper() {
+  }
+
+  public static DataReportHelper getInstance() {
+    return INSTANCE;
   }
 
   // report list metric vs groupByKey vs dimensionVal vs timeBucket vs values
-  public static List<MetricDimensionReport> getDimensionReportList(
-      List<ContributorViewResponse> reports) {
+  public List<MetricDimensionReport> getDimensionReportList(List<ContributorViewResponse> reports) {
     List<MetricDimensionReport> ultimateResult = new ArrayList<>();
     for (ContributorViewResponse report : reports) {
       MetricDimensionReport metricDimensionReport = new MetricDimensionReport();

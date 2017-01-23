@@ -15,8 +15,8 @@
  */
 package com.linkedin.pinot.query.transform;
 
-import com.linkedin.pinot.core.operator.transform.function.TransformFunction;
 import com.linkedin.pinot.core.operator.transform.function.DivisionTransform;
+import com.linkedin.pinot.core.operator.transform.function.TransformFunction;
 import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -51,7 +51,8 @@ public class DivisionTransformTest {
     }
 
     TransformFunction function = new DivisionTransform();
-    double[] actual = function.transform(NUM_ROWS, input1, input2).getResultArray();
+    double[] actual = function.transform(NUM_ROWS, new TransformTestUtils.TestBlockValSet(input1, NUM_ROWS),
+        new TransformTestUtils.TestBlockValSet(input2, NUM_ROWS));
 
     for (int i = 0; i < NUM_ROWS; i++) {
       Assert.assertEquals(actual[i], expected[i], EPSILON, ("Random seed: " + seed));
