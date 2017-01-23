@@ -50,16 +50,16 @@ public class TransformExpressionTreeTest {
 
     TransformExpressionTree firstChild = firstChildren.get(0);
     Assert.assertEquals(firstChild.getTransformName(), "bar");
-    Assert.assertEquals(firstChildren.get(1).getColumn(), "e");
+    Assert.assertEquals(firstChildren.get(1).toString(), "e");
 
     List<TransformExpressionTree> secondChildren = firstChild.getChildren();
     Assert.assertEquals(secondChildren.size(), 2);
-    Assert.assertEquals(secondChildren.get(0).getLiteral(), "a");
+    Assert.assertEquals(secondChildren.get(0).toString(), "a");
     Assert.assertEquals(secondChildren.get(1).getTransformName(), "foo");
 
     List<TransformExpressionTree> thirdChildren = secondChildren.get(1).getChildren();
-    Assert.assertEquals(thirdChildren.get(0).getColumn(), "b");
-    Assert.assertEquals(thirdChildren.get(1).getLiteral(), "c");
-    Assert.assertEquals(thirdChildren.get(2).getColumn(), "d");
+    Assert.assertEquals(thirdChildren.get(0).toString(), "b");
+    Assert.assertEquals(thirdChildren.get(1).toString(), "c");
+    Assert.assertEquals(thirdChildren.get(2).toString(), "d");
   }
 }

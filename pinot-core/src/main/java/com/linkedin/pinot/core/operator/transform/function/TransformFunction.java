@@ -15,7 +15,8 @@
  */
 package com.linkedin.pinot.core.operator.transform.function;
 
-import com.linkedin.pinot.core.operator.transform.result.TransformResult;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.common.BlockValSet;
 
 
 /**
@@ -35,9 +36,16 @@ public interface TransformFunction {
    *
    * @param length Length of doc ids to process
    * @param input Array of input values
-   * @return TransformResult object containing transformed values.
+   * @return BlockValSet containing transformed values.
    */
-  TransformResult transform(int length, Object... input);
+    <T> T transform(int length, BlockValSet... input);
+
+  /**
+   * Returns the data type of transform's output.
+   *
+   * @return Data type of the output.
+   */
+  FieldSpec.DataType getOutputType();
 
   /**
    * This method returns the name of the transform function.

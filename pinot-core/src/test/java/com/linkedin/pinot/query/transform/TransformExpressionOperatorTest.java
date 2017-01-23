@@ -19,8 +19,8 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
-import com.linkedin.pinot.core.operator.transform.function.TransformFunctionFactory;
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.FileFormat;
@@ -37,6 +37,7 @@ import com.linkedin.pinot.core.operator.transform.function.AdditionTransform;
 import com.linkedin.pinot.core.operator.transform.function.DivisionTransform;
 import com.linkedin.pinot.core.operator.transform.function.MultiplicationTransform;
 import com.linkedin.pinot.core.operator.transform.function.SubtractionTransform;
+import com.linkedin.pinot.core.operator.transform.function.TransformFunctionFactory;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
@@ -127,13 +128,15 @@ public class TransformExpressionOperatorTest {
     final MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
 
     Pql2Compiler compiler = new Pql2Compiler();
-    TransformExpressionTree expressionTree = compiler.compileToExpressionTree(expression);
+    List<TransformExpressionTree> expressionTrees = new ArrayList<>(1);
+    expressionTrees.add(compiler.compileToExpressionTree(expression));
 
     TransformExpressionOperator transformOperator =
-        new TransformExpressionOperator(projectionOperator, expressionTree);
+        new TransformExpressionOperator(projectionOperator, expressionTrees);
     transformOperator.open();
     TransformBlock transformBlock = (TransformBlock) transformOperator.getNextBlock();
-    double[] actual = transformBlock.getTransformResult().getResultArray();
+    BlockValSet blockValueSet = transformBlock.getBlockValueSet(expression);
+    double[] actual = blockValueSet.getDoubleValuesSV();
     transformOperator.close();
     return actual;
   }

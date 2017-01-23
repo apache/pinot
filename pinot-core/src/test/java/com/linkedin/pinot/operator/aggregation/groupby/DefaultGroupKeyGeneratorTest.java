@@ -20,6 +20,7 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.common.Block;
+import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.common.DataFetcher;
 import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.data.GenericRow;
@@ -31,6 +32,7 @@ import com.linkedin.pinot.core.operator.aggregation.groupby.DefaultGroupKeyGener
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupKeyGenerator;
 import com.linkedin.pinot.core.operator.blocks.DocIdSetBlock;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
+import com.linkedin.pinot.core.operator.blocks.TransformBlock;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.util.TestDataRecordReader;
@@ -61,7 +63,7 @@ public class DefaultGroupKeyGeneratorTest {
   private final long _randomSeed = System.currentTimeMillis();
   private final Random _random = new Random(_randomSeed);
   private final String _errorMessage = "Random seed is: " + _randomSeed;
-  ProjectionBlock _projectionBlock;
+  TransformBlock _transformBlock;
 
   private static final int TEST_LENGTH = 20;
   private final int[] _testDocIdSet = new int[TEST_LENGTH];
@@ -139,8 +141,8 @@ public class DefaultGroupKeyGeneratorTest {
 
     DataFetcher dataFetcher = new DataFetcher(dataSourceMap);
     DocIdSetBlock docIdSetBlock = new DocIdSetBlock(_testDocIdSet, _testDocIdSet.length);
-    _projectionBlock = new ProjectionBlock(blockMap, new DataBlockCache(dataFetcher), docIdSetBlock);
-
+    ProjectionBlock projectionBlock = new ProjectionBlock(blockMap, new DataBlockCache(dataFetcher), docIdSetBlock);
+    _transformBlock = new TransformBlock(projectionBlock, new HashMap<String, BlockValSet>());
   }
 
   @Test
@@ -149,12 +151,12 @@ public class DefaultGroupKeyGeneratorTest {
     String[] groupByColumns = {"s1"};
 
     // Test initial status.
-    DefaultGroupKeyGenerator defaultGroupKeyGenerator = new DefaultGroupKeyGenerator(_projectionBlock, groupByColumns);
+    DefaultGroupKeyGenerator defaultGroupKeyGenerator = new DefaultGroupKeyGenerator(_transformBlock, groupByColumns);
     Assert.assertEquals(defaultGroupKeyGenerator.getGlobalGroupKeyUpperBound(), UNIQUE_ROWS, _errorMessage);
     Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), UNIQUE_ROWS, _errorMessage);
 
     // Test group key generation.
-    defaultGroupKeyGenerator.generateKeysForBlock(_projectionBlock, _singleValueGroupKeyBuffer);
+    defaultGroupKeyGenerator.generateKeysForBlock(_transformBlock, _singleValueGroupKeyBuffer);
     Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 100, _errorMessage);
     compareSingleValueBuffer();
     testGetUniqueGroupKeys(defaultGroupKeyGenerator.getUniqueGroupKeys(), 2);
@@ -167,12 +169,12 @@ public class DefaultGroupKeyGeneratorTest {
 
     // Test initial status.
     long expected = (long) Math.pow(UNIQUE_ROWS, groupByColumns.length);
-    DefaultGroupKeyGenerator defaultGroupKeyGenerator = new DefaultGroupKeyGenerator(_projectionBlock, groupByColumns);
+    DefaultGroupKeyGenerator defaultGroupKeyGenerator = new DefaultGroupKeyGenerator(_transformBlock, groupByColumns);
     Assert.assertEquals(defaultGroupKeyGenerator.getGlobalGroupKeyUpperBound(), expected, _errorMessage);
     Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
 
     // Test group key generation.
-    defaultGroupKeyGenerator.generateKeysForBlock(_projectionBlock, _singleValueGroupKeyBuffer);
+    defaultGroupKeyGenerator.generateKeysForBlock(_transformBlock, _singleValueGroupKeyBuffer);
     Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 2, _errorMessage);
     compareSingleValueBuffer();
     testGetUniqueGroupKeys(defaultGroupKeyGenerator.getUniqueGroupKeys(), 2);
@@ -184,12 +186,12 @@ public class DefaultGroupKeyGeneratorTest {
     String[] groupByColumns = {"s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10"};
 
     // Test initial status.
-    DefaultGroupKeyGenerator defaultGroupKeyGenerator = new DefaultGroupKeyGenerator(_projectionBlock, groupByColumns);
+    DefaultGroupKeyGenerator defaultGroupKeyGenerator = new DefaultGroupKeyGenerator(_transformBlock, groupByColumns);
     Assert.assertEquals(defaultGroupKeyGenerator.getGlobalGroupKeyUpperBound(), Integer.MAX_VALUE, _errorMessage);
     Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
 
     // Test group key generation.
-    defaultGroupKeyGenerator.generateKeysForBlock(_projectionBlock, _singleValueGroupKeyBuffer);
+    defaultGroupKeyGenerator.generateKeysForBlock(_transformBlock, _singleValueGroupKeyBuffer);
     Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 2, _errorMessage);
     compareSingleValueBuffer();
     testGetUniqueGroupKeys(defaultGroupKeyGenerator.getUniqueGroupKeys(), 2);
@@ -215,12 +217,12 @@ public class DefaultGroupKeyGeneratorTest {
     String[] groupByColumns = {"m1"};
 
     // Test initial status.
-    DefaultGroupKeyGenerator defaultGroupKeyGenerator = new DefaultGroupKeyGenerator(_projectionBlock, groupByColumns);
+    DefaultGroupKeyGenerator defaultGroupKeyGenerator = new DefaultGroupKeyGenerator(_transformBlock, groupByColumns);
     int groupKeyUpperBound = defaultGroupKeyGenerator.getGlobalGroupKeyUpperBound();
     Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), groupKeyUpperBound, _errorMessage);
 
     // Test group key generation.
-    defaultGroupKeyGenerator.generateKeysForBlock(_projectionBlock, _multiValueGroupKeyBuffer);
+    defaultGroupKeyGenerator.generateKeysForBlock(_transformBlock, _multiValueGroupKeyBuffer);
     int numUniqueKeys = _multiValueGroupKeyBuffer[0].length + _multiValueGroupKeyBuffer[1].length;
     Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), groupKeyUpperBound, _errorMessage);
     compareMultiValueBuffer();
@@ -233,11 +235,11 @@ public class DefaultGroupKeyGeneratorTest {
     String[] groupByColumns = {"m1", "m2", "s1", "s2"};
 
     // Test initial status.
-    DefaultGroupKeyGenerator defaultGroupKeyGenerator = new DefaultGroupKeyGenerator(_projectionBlock, groupByColumns);
+    DefaultGroupKeyGenerator defaultGroupKeyGenerator = new DefaultGroupKeyGenerator(_transformBlock, groupByColumns);
     Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
 
     // Test group key generation.
-    defaultGroupKeyGenerator.generateKeysForBlock(_projectionBlock, _multiValueGroupKeyBuffer);
+    defaultGroupKeyGenerator.generateKeysForBlock(_transformBlock, _multiValueGroupKeyBuffer);
     int numUniqueKeys = _multiValueGroupKeyBuffer[0].length + _multiValueGroupKeyBuffer[1].length;
     Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), numUniqueKeys, _errorMessage);
     compareMultiValueBuffer();
@@ -250,11 +252,11 @@ public class DefaultGroupKeyGeneratorTest {
     String[] groupByColumns = {"m1", "m2", "s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9", "s10"};
 
     // Test initial status.
-    DefaultGroupKeyGenerator defaultGroupKeyGenerator = new DefaultGroupKeyGenerator(_projectionBlock, groupByColumns);
+    DefaultGroupKeyGenerator defaultGroupKeyGenerator = new DefaultGroupKeyGenerator(_transformBlock, groupByColumns);
     Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 0, _errorMessage);
 
     // Test group key generation.
-    defaultGroupKeyGenerator.generateKeysForBlock(_projectionBlock, _multiValueGroupKeyBuffer);
+    defaultGroupKeyGenerator.generateKeysForBlock(_transformBlock, _multiValueGroupKeyBuffer);
     int numUniqueKeys = _multiValueGroupKeyBuffer[0].length + _multiValueGroupKeyBuffer[1].length;
     Assert.assertEquals(defaultGroupKeyGenerator.getCurrentGroupKeyUpperBound(), numUniqueKeys, _errorMessage);
     compareMultiValueBuffer();

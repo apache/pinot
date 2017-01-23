@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.operator.aggregation.groupby;
 
-import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
+import com.linkedin.pinot.core.operator.blocks.TransformBlock;
 import com.linkedin.pinot.core.query.utils.Pair;
 import java.util.Iterator;
 
@@ -39,20 +39,20 @@ public interface GroupKeyGenerator {
    * Generate group keys for a given docId set and return the mapping in the passed in docIdToGroupKey array.
    * This interface is for situation where all the group-by columns are single valued.
    *
-   * @param projectionBlock Projection block for which to generate keys.
+   * @param transformBlock Transform block for which to generate keys.
    * @param docIdToGroupKey buffer to return the results.
    */
-  void generateKeysForBlock(ProjectionBlock projectionBlock, int[] docIdToGroupKey);
+  void generateKeysForBlock(TransformBlock transformBlock, int[] docIdToGroupKey);
 
   /**
    * Generate group keys for the given docId set and return a mapping from docId to group keys(int[]) in the passed in
    * docIdToGroupKeys array.
    * This interface is for situation where at least one group-by columns are multi valued.
    *
-   * @param projectionBlock Projection block for which to generate keys
+   * @param transformBlock Transform block for which to generate keys
    * @param docIdToGroupKeys buffer to return the results.
    */
-  void generateKeysForBlock(ProjectionBlock projectionBlock, int[][] docIdToGroupKeys);
+  void generateKeysForBlock(TransformBlock transformBlock, int[][] docIdToGroupKeys);
 
   /**
    * Get the current upper bound of the group key. All group keys already generated should be less than this value. This

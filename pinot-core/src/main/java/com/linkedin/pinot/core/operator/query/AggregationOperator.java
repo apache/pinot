@@ -19,12 +19,12 @@ import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.ExecutionStatistics;
-import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.aggregation.AggregationExecutor;
 import com.linkedin.pinot.core.operator.aggregation.AggregationFunctionContext;
 import com.linkedin.pinot.core.operator.aggregation.DefaultAggregationExecutor;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
-import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
+import com.linkedin.pinot.core.operator.blocks.TransformBlock;
+import com.linkedin.pinot.core.operator.transform.TransformExpressionOperator;
 import javax.annotation.Nonnull;
 
 
@@ -33,20 +33,20 @@ import javax.annotation.Nonnull;
  */
 public class AggregationOperator extends BaseOperator {
   private final AggregationFunctionContext[] _aggregationFunctionContexts;
-  private final MProjectionOperator _projectionOperator;
+  private final TransformExpressionOperator _transformOperator;
   private final long _numTotalRawDocs;
   private ExecutionStatistics _executionStatistics;
 
   public AggregationOperator(@Nonnull AggregationFunctionContext[] aggregationFunctionContexts,
-      @Nonnull MProjectionOperator projectionOperator, long numTotalRawDocs) {
+      @Nonnull TransformExpressionOperator transformOperator, long numTotalRawDocs) {
     _aggregationFunctionContexts = aggregationFunctionContexts;
-    _projectionOperator = projectionOperator;
+    _transformOperator = transformOperator;
     _numTotalRawDocs = numTotalRawDocs;
   }
 
   @Override
   public boolean open() {
-    _projectionOperator.open();
+    _transformOperator.open();
     return true;
   }
 
@@ -57,16 +57,16 @@ public class AggregationOperator extends BaseOperator {
     // Perform aggregation on all the blocks.
     AggregationExecutor aggregationExecutor = new DefaultAggregationExecutor(_aggregationFunctionContexts);
     aggregationExecutor.init();
-    ProjectionBlock projectionBlock;
-    while ((projectionBlock = (ProjectionBlock) _projectionOperator.nextBlock()) != null) {
-      numDocsScanned += projectionBlock.getNumDocs();
-      aggregationExecutor.aggregate(projectionBlock);
+    TransformBlock transformBlock;
+    while ((transformBlock = (TransformBlock) _transformOperator.nextBlock()) != null) {
+      numDocsScanned += transformBlock.getNumDocs();
+      aggregationExecutor.aggregate(transformBlock);
     }
     aggregationExecutor.finish();
 
     // Create execution statistics.
-    long numEntriesScannedInFilter = _projectionOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
-    long numEntriesScannedPostFilter = numDocsScanned * _projectionOperator.getNumProjectionColumns();
+    long numEntriesScannedInFilter = _transformOperator.getExecutionStatistics().getNumEntriesScannedInFilter();
+    long numEntriesScannedPostFilter = numDocsScanned * _transformOperator.getNumProjectionColumns();
     _executionStatistics =
         new ExecutionStatistics(numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
             _numTotalRawDocs);
@@ -82,7 +82,7 @@ public class AggregationOperator extends BaseOperator {
 
   @Override
   public boolean close() {
-    _projectionOperator.close();
+    _transformOperator.close();
     return true;
   }
 

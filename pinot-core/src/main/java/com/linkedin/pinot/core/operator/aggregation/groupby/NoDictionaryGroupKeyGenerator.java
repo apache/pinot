@@ -17,7 +17,7 @@ package com.linkedin.pinot.core.operator.aggregation.groupby;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
+import com.linkedin.pinot.core.operator.blocks.TransformBlock;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -55,15 +55,15 @@ public class NoDictionaryGroupKeyGenerator implements GroupKeyGenerator {
   }
 
   @Override
-  public void generateKeysForBlock(ProjectionBlock projectionBlock, int[] docIdToGroupKey) {
+  public void generateKeysForBlock(TransformBlock transformBlock, int[] docIdToGroupKey) {
     int numGroupByColumns = _groupByColumns.length;
-    int numDocs = projectionBlock.getNumDocs();
+    int numDocs = transformBlock.getNumDocs();
 
     Object[] values = new Object[numGroupByColumns];
     FieldSpec.DataType[] dataTypes = new FieldSpec.DataType[numGroupByColumns];
 
     for (int i = 0; i < numGroupByColumns; i++) {
-      BlockValSet blockValSet = projectionBlock.getBlockValueSet(_groupByColumns[i]);
+      BlockValSet blockValSet = transformBlock.getBlockValueSet(_groupByColumns[i]);
       dataTypes[i] = blockValSet.getValueType();
       values[i] = getValuesFromBlockValSet(blockValSet, dataTypes[i]);
     }
@@ -117,7 +117,7 @@ public class NoDictionaryGroupKeyGenerator implements GroupKeyGenerator {
   }
 
   @Override
-  public void generateKeysForBlock(ProjectionBlock projectionBlock, int[][] docIdToGroupKeys) {
+  public void generateKeysForBlock(TransformBlock transformBlock, int[][] docIdToGroupKeys) {
     // TODO: Support generating keys for multi-valued columns.
     throw new UnsupportedOperationException("Operation not supported");
   }

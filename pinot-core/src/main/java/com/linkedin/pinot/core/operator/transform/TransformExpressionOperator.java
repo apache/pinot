@@ -19,11 +19,14 @@ import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
+import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.ExecutionStatistics;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
 import com.linkedin.pinot.core.operator.blocks.TransformBlock;
+import java.util.List;
+import java.util.Map;
 
 
 /**
@@ -39,22 +42,27 @@ public class TransformExpressionOperator extends BaseOperator {
    * Constructor for the class
    *
    * @param projectionOperator Projection operator
-   * @param expressionTree Expression tree to evaluate
+   * @param expressionTrees Expression tree to evaluate
    */
-  public TransformExpressionOperator(MProjectionOperator projectionOperator, TransformExpressionTree expressionTree) {
-
+  public TransformExpressionOperator(MProjectionOperator projectionOperator,
+      List<TransformExpressionTree> expressionTrees) {
     Preconditions.checkArgument((projectionOperator != null));
-    Preconditions.checkArgument((expressionTree != null));
 
     _projectionOperator = projectionOperator;
-    _expressionEvaluator = new DefaultExpressionEvaluator(expressionTree);
+    _expressionEvaluator = (expressionTrees != null) ? new DefaultExpressionEvaluator(expressionTrees) : null;
   }
 
   @Override
   public Block getNextBlock() {
     ProjectionBlock projectionBlock = _projectionOperator.getNextBlock();
-    _expressionEvaluator.evaluate(projectionBlock);
-    return new TransformBlock(projectionBlock, _expressionEvaluator.getResult());
+    if (projectionBlock == null) {
+      return null;
+    }
+
+    Map<String, BlockValSet> expressionResults =
+        (_expressionEvaluator != null) ? _expressionEvaluator.evaluate(projectionBlock) : null;
+
+    return new TransformBlock(projectionBlock, expressionResults);
   }
 
   @Override
@@ -80,5 +88,9 @@ public class TransformExpressionOperator extends BaseOperator {
   @Override
   public ExecutionStatistics getExecutionStatistics() {
     return _projectionOperator.getExecutionStatistics();
+  }
+
+  public int getNumProjectionColumns() {
+    return _projectionOperator.getNumProjectionColumns();
   }
 }

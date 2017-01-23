@@ -26,6 +26,7 @@ import com.linkedin.pinot.core.operator.aggregation.DataBlockCache;
 import com.linkedin.pinot.core.operator.docvalsets.ProjectionBlockValSet;
 import java.util.Map;
 
+
 /**
  * ProjectionBlock holds a column name to Block Map.
  * It provides DocIdSetBlock for a given column.
@@ -79,6 +80,10 @@ public class ProjectionBlock implements Block {
 
   public BlockValSet getBlockValueSet(String column) {
     return new ProjectionBlockValSet(_dataBlockCache, column);
+  }
+
+  public BlockMetadata getMetadata(String column) {
+    return _blockMap.get(column).getMetadata();
   }
 
   public DocIdSetBlock getDocIdSetBlock() {
