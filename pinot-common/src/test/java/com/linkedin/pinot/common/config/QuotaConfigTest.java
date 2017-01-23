@@ -16,6 +16,7 @@
 package com.linkedin.pinot.common.config;
 
 import java.io.IOException;
+import org.apache.commons.configuration.ConfigurationRuntimeException;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -49,6 +50,14 @@ public class QuotaConfigTest {
       Assert.assertNotNull(quotaConfig.getStorage());
       Assert.assertEquals(quotaConfig.storageSizeBytes(), -1);
     }
+  }
+
+  @Test(expectedExceptions = ConfigurationRuntimeException.class)
+  public void testBadConfig()
+      throws IOException {
+    String quotaConfigStr = "{\"storage\":\"-1M\"}";
+    QuotaConfig quotaConfig = new ObjectMapper().readValue(quotaConfigStr, QuotaConfig.class);
+    quotaConfig.validate();
   }
 
 }
