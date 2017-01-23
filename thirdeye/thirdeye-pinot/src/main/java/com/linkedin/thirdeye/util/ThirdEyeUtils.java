@@ -180,6 +180,18 @@ public abstract class ThirdEyeUtils {
     return sortedFilters;
   }
 
+  public static TimeSpec getTimeSpecFromDataset(String dataset) {
+
+    TimeSpec timespec = null;
+    try {
+      DatasetConfigDTO datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(dataset);
+      timespec = getTimeSpecFromDatasetConfig(datasetConfig);
+    } catch (ExecutionException e) {
+      LOG.error("Exception when fetching datasetconfig from cache", e);
+    }
+    return timespec;
+  }
+
   public static TimeSpec getTimeSpecFromDatasetConfig(DatasetConfigDTO datasetConfig) {
     String timeFormat = datasetConfig.getTimeFormat();
     if (timeFormat.startsWith(TimeFormat.SIMPLE_DATE_FORMAT.toString())) {

@@ -37,6 +37,14 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
       "where collection=:collection and metric=:metric "
           + "and (startTime < :endTime and endTime > :startTime) order by endTime desc";
 
+
+  // find a conflicting window
+  private static final String FIND_BY_COLLECTION_TIME = "where collection=:collection "
+      + "and (startTime < :endTime and endTime > :startTime) order by endTime desc";
+
+  private static final String FIND_BY_TIME = "where (startTime < :endTime and endTime > :startTime) "
+      + "order by endTime desc";
+
   private static final String FIND_BY_FUNCTION_ID = "where functionId=:functionId";
 
   private static final String FIND_LATEST_CONFLICT_BY_FUNCTION_AND_DIMENSIONS =
@@ -45,6 +53,7 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
 
   private static final String FIND_BY_FUNCTION_AND_NULL_DIMENSION =
       "where functionId=:functionId " + "and dimensions is null order by endTime desc";
+
 
   private ExecutorService executorService = Executors.newFixedThreadPool(10);
 
@@ -201,6 +210,17 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
   }
 
   @Override
+  public List<MergedAnomalyResultDTO> findByTime(long startTime, long endTime) {
+    Map<String, Object> filterParams = new HashMap<>();
+    filterParams.put("startTime", startTime);
+    filterParams.put("endTime", endTime);
+
+    List<MergedAnomalyResultBean> list =
+        genericPojoDao.executeParameterizedSQL(FIND_BY_TIME, filterParams, MergedAnomalyResultBean.class);
+    return batchConvertMergedAnomalyBean2DTO(list, false);
+  }
+
+  @Override
   public MergedAnomalyResultDTO findLatestConflictByFunctionIdDimensions(Long functionId, String dimensions,
       long conflictWindowStart, long conflictWindowEnd) {
     Map<String, Object> filterParams = new HashMap<>();
@@ -327,4 +347,5 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
 
     return mergedAnomalyResultDTOList;
   }
+
 }

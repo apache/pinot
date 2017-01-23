@@ -1,83 +1,94 @@
 function DashboardView(dashboardModel) {
+  this.dashboardModel = dashboardModel;
+  this.tabClickEvent = new Event(this);
+  this.onDashboardSelectionEvent = new Event(this);
 
+  // Compile HTML template
+  var dashboard_template = $("#dashboard-template").html();
+  this.dashboard_template_compiled = Handlebars.compile(dashboard_template);
+  this.inited = false;
 }
 
 DashboardView.prototype = {
-  init : function() {
-
-  },
-
   render : function() {
-    var result_dashboard_template_compiled = dashboard_template_compiled({});
-    $("#dashboard-place-holder").html(result_dashboard_template_compiled);
-    renderDashboardTab();
-  }
-
-}
-
-function renderDashboardTab() {
-
-  // DASHBOARD SELECTION
-  var countries = [ {
-    value : 'Andorra',
-    data : 'AD'
-  },
-  {
-    value : 'Zimbabwe',
-    data : 'ZZ'
-  } ];
-  $('#dashboard-input').autocomplete({
-    lookup : countries,
-    onSelect : function(suggestion) {
-      alert('You selected: ' + suggestion.value + ', ' + suggestion.data);
+    if(!this.inited){
+      this.init();
+      this.inited = false;
     }
-  });
+  },
+  init : function() {
+    var self = this;
+    console.log(self.dashboardModel);
+    var result = self.dashboard_template_compiled(self.dashboardModel);
 
-  // TIME RANGE SELECTION
-  var start = moment().subtract(1, 'days');
-  var end = moment();
+    // autocomplete
+    $("#dashboard-place-holder").html(result);
+    if(HASH_SERVICE.get(HASH_PARAMS.DASHBOARD_DASHBOARD_NAME) != null) {
+      $("#dashboard-content").show();
+    }
+    console.log("this.dashboardModel.tabSelected:" + self.dashboardModel.tabSelected);
+    $('#dashboard-tabs a[href="#' + self.dashboardModel.tabSelected + '"]').tab('show');
 
-  function dashboard_range_cb(start, end) {
-    $('#dashboard-time-range span').addClass("time-range").html(start.format('MMM D, ') + start.format('hh:mm a') + '  &mdash;  ' + end.format('MMM D, ') + end.format('hh:mm a'));
+    // DASHBOARD SELECTION
+    $('#dashboard-name-input').select2({
+      theme : "bootstrap",
+      placeholder : "Search for Dashboard",
+      ajax : {
+        url : constants.DASHBOARD_AUTOCOMPLETE_ENDPOINT,
+        minimumInputLength : 3,
+        delay : 250,
+        data : function(params) {
+          var query = {
+            name : params.term,
+            page : params.page
+          }
+          // Query paramters will be ?name=[term]&page=[page]
+          return query;
+        },
+        processResults : function(data) {
+          var results = [];
+          $.each(data, function(index, item) {
+            results.push({
+              id : item.id,
+              text : item.name
+            });
+          });
+          return {
+            results : results
+          };
+        }
+      }
+    }).on("select2:select", function(e) {
+      var selectedElement = $(e.currentTarget);
+      var selectedData = selectedElement.select2("data")[0];
+      var selectedDashboardName = selectedData.text;
+      var selectedDashboardId = selectedData.id;
+      var args = {
+        dashboardName : selectedDashboardName,
+        summaryDashboardId : selectedDashboardId
+      };
+
+      if (self.dashboardModel.dashboardName != selectedDashboardName) {
+       self.onDashboardSelectionEvent.notify(args);
+      }
+    });
+
+    this.setupListeners();
+  },
+
+  setupListeners : function() {
+    var self = this;
+    var tabSelectionEventHandler = function(e) {
+      console.log("Switching tabs")
+      var targetTab = $(e.target).attr('href');
+      var previousTab = $(e.relatedTarget).attr('href');
+      var args = {
+        targetTab : targetTab,
+        previousTab : previousTab
+      };
+      self.tabClickEvent.notify(args);
+      e.preventDefault();
+    };
+    $('#dashboard-tabs a').click(tabSelectionEventHandler);
   }
-
-  $('#dashboard-time-range').daterangepicker({
-    startDate : start,
-    endDate : end,
-    dateLimit : {
-      days : 60
-    },
-    showDropdowns : true,
-    showWeekNumbers : true,
-    timePicker : true,
-    timePickerIncrement : 5,
-    timePicker12Hour : true,
-    ranges : {
-      'Last 24 Hours' : [ moment(), moment() ],
-      'Yesterday' : [ moment().subtract(1, 'days'), moment().subtract(1, 'days') ],
-      'Last 7 Days' : [ moment().subtract(6, 'days'), moment() ],
-      'Last 30 Days' : [ moment().subtract(29, 'days'), moment() ],
-      'This Month' : [ moment().startOf('month'), moment().endOf('month') ],
-      'Last Month' : [ moment().subtract(1, 'month').startOf('month'), moment().subtract(1, 'month').endOf('month') ]
-    },
-    buttonClasses : [ 'btn', 'btn-sm' ],
-    applyClass : 'btn-primary',
-    cancelClass : 'btn-default'
-  }, dashboard_range_cb);
-
-  dashboard_range_cb(start, end);
-  $('#dashboard-tabs a').click(function(e) {
-    console.log("asdasd")
-    e.preventDefault();
-    $(this).tab('show');
-  });
-  $('#dashboard-tabs a[data-toggle="tab"]').on('shown.bs.tab', function(e) {
-    e.target // newly activated tab
-    e.relatedTarget // previous active tab
-    tabId = $(e.target).attr("href")
-    console.log("tab clicked " + tabId);
-  });
-
-  $('#dashboard-tabs a:first').click();
-
-}
+};
