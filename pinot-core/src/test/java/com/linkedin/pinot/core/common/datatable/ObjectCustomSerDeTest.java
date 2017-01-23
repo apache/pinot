@@ -15,8 +15,8 @@
  */
 package com.linkedin.pinot.core.common.datatable;
 
-import com.linkedin.pinot.core.operator.aggregation.function.customobject.AvgPair;
-import com.linkedin.pinot.core.operator.aggregation.function.customobject.MinMaxRangePair;
+import com.linkedin.pinot.core.query.aggregation.function.customobject.AvgPair;
+import com.linkedin.pinot.core.query.aggregation.function.customobject.MinMaxRangePair;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import java.io.IOException;

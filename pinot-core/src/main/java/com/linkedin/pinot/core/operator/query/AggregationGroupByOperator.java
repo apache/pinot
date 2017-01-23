@@ -20,12 +20,12 @@ import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.ExecutionStatistics;
-import com.linkedin.pinot.core.operator.aggregation.AggregationFunctionContext;
-import com.linkedin.pinot.core.operator.aggregation.groupby.DefaultGroupByExecutor;
-import com.linkedin.pinot.core.operator.aggregation.groupby.GroupByExecutor;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
 import com.linkedin.pinot.core.operator.blocks.TransformBlock;
 import com.linkedin.pinot.core.operator.transform.TransformExpressionOperator;
+import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
+import com.linkedin.pinot.core.query.aggregation.groupby.DefaultGroupByExecutor;
+import com.linkedin.pinot.core.query.aggregation.groupby.GroupByExecutor;
 import javax.annotation.Nonnull;
 
 
