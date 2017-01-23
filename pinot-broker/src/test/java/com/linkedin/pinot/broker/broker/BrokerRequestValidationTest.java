@@ -15,9 +15,9 @@
  */
 package com.linkedin.pinot.broker.broker;
 
+import com.linkedin.pinot.broker.requesthandler.BrokerRequestHandler;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
-import com.linkedin.pinot.requestHandler.BrokerRequestHandler;
 import java.io.File;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.testng.Assert;

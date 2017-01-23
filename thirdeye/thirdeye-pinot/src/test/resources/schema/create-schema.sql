@@ -120,18 +120,6 @@ create index merged_anomaly_result_feedback_idx on merged_anomaly_result_index(a
 create index merged_anomaly_result_metric_idx on merged_anomaly_result_index(metric_id);
 create index merged_anomaly_result_start_time_idx on merged_anomaly_result_index(start_time);
 
-
-create table if not exists webapp_config_index (
-    name varchar(200) not null,
-    collection varchar(200) not null,
-    type varchar(100) not null,
-    base_id bigint(20) not null,
-    create_time timestamp,
-    update_time timestamp default current_timestamp,
-    version int(10)
-) ENGINE=InnoDB;
-ALTER TABLE `webapp_config_index` ADD UNIQUE `webapp_config_unique_index`(`name`, `collection`, `type`);
-
 create table if not exists dataset_config_index (
     dataset varchar(200) not null,
     active boolean,
@@ -211,3 +199,32 @@ create table if not exists override_config_index (
 ) ENGINE=InnoDB;
 create index override_config_target_entity_idx on override_config_index(target_entity);
 create index override_config_target_start_time_idx on override_config_index(start_time);
+
+
+create table if not exists alert_config_index (
+    active boolean,
+    name varchar(500) not null,
+    base_id bigint(20) not null,
+    create_time timestamp,
+    update_time timestamp default current_timestamp,
+    version int(10)
+) ENGINE=InnoDB;
+
+
+create table if not exists data_completeness_config_index (
+    dataset varchar(200) not null,
+    date_to_check_in_ms bigint(20) not null,
+    date_to_check_in_sdf varchar(20),
+    data_complete boolean,
+    base_id bigint(20) not null,
+    create_time timestamp,
+    update_time timestamp default current_timestamp,
+    version int(10)
+) ENGINE=InnoDB;
+ALTER TABLE `data_completeness_config_index` ADD UNIQUE `data_completeness_config_unique_index`(`dataset`, `date_to_check_in_ms`);
+create index data_completeness_config_dataset_idx on data_completeness_config_index(dataset);
+create index data_completeness_config_date_idx on data_completeness_config_index(date_to_check_in_ms);
+create index data_completeness_config_sdf_idx on data_completeness_config_index(date_to_check_in_sdf);
+create index data_completeness_config_complete_idx on data_completeness_config_index(data_complete);
+
+

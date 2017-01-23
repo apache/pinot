@@ -40,7 +40,7 @@ public class FixedBitWidthRowColDataFileReaderTest {
   public void testReadIntFromByteBuffer() {
     int maxBits = 1;
     while (maxBits < 32) {
-      System.out.println("START MAX BITS:" + maxBits);
+//      System.out.println("START MAX BITS:" + maxBits);
       int numElements = 100;
       CustomBitSet customBitSet = CustomBitSet.withBitLength(numElements
           * maxBits);
@@ -72,7 +72,7 @@ public class FixedBitWidthRowColDataFileReaderTest {
         }
         Assert.assertEquals(readInt, values[i]);
       }
-      System.out.println("END MAX BITS:" + maxBits);
+//      System.out.println("END MAX BITS:" + maxBits);
       maxBits = maxBits + 1;
       customBitSet.close();
     }
@@ -92,7 +92,7 @@ public class FixedBitWidthRowColDataFileReaderTest {
       File file = new File(fileName);
       CustomBitSet bitset = null;
       try {
-        System.out.println("START MAX BITS:" + maxBits);
+//        System.out.println("START MAX BITS:" + maxBits);
         int numElements = 100;
         bitset = CustomBitSet.withBitLength(numElements * maxBits);
         int max = (int) Math.pow(2, maxBits);
@@ -136,7 +136,7 @@ public class FixedBitWidthRowColDataFileReaderTest {
         mmapReader.close();
         dataBuffer.close();
 
-        System.out.println("END MAX BITS:" + maxBits);
+//        System.out.println("END MAX BITS:" + maxBits);
       } finally {
         file.delete();
         bitset.close();
@@ -158,7 +158,7 @@ public class FixedBitWidthRowColDataFileReaderTest {
       File file = new File(fileName);
       CustomBitSet bitset = null;
       try {
-        System.out.println("START MAX BITS:" + maxBits);
+//        System.out.println("START MAX BITS:" + maxBits);
         int numElements = 100;
         int requiredBits = maxBits + 1;
         bitset = CustomBitSet.withBitLength(numElements * requiredBits);
@@ -207,7 +207,7 @@ public class FixedBitWidthRowColDataFileReaderTest {
         mmapReader.close();
         mmapBuffer.close();
 
-        System.out.println("END MAX BITS:" + maxBits);
+//        System.out.println("END MAX BITS:" + maxBits);
       } finally {
         file.delete();
         bitset.close();

@@ -26,6 +26,7 @@ import com.linkedin.pinot.common.query.context.TimerContext;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.utils.DataTable;
+import com.linkedin.pinot.core.common.datatable.DataTableImplV2;
 import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.data.manager.offline.TableDataManager;
@@ -111,7 +112,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       nPrunedSegments = queryableSegmentDataManagerList.size();
       LOGGER.debug("Matched {} segments! ", nPrunedSegments);
       if (queryableSegmentDataManagerList.isEmpty()) {
-        return null;
+        return new DataTableImplV2();
       }
 
       TimerContext.Timer planBuildTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.BUILD_QUERY_PLAN);
@@ -137,9 +138,11 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       LOGGER.debug("Searching Instance for Request Id - {}, browse took: {}", instanceRequest.getRequestId(),
           queryProcessingTimer.getDurationNs());
       LOGGER.debug("InstanceResponse for Request Id - {} : {}", instanceRequest.getRequestId(), dataTable.toString());
-      dataTable.getMetadata().put("timeUsedMs", Long.toString(queryProcessingTimer.getDurationMs()));
-      dataTable.getMetadata().put("requestId", Long.toString(instanceRequest.getRequestId()));
-      dataTable.getMetadata().put("traceInfo", TraceContext.getTraceInfoOfRequestId(instanceRequest.getRequestId()));
+      dataTable.getMetadata()
+          .put(DataTable.TIME_USED_MS_METADATA_KEY, Long.toString(queryProcessingTimer.getDurationMs()));
+      dataTable.getMetadata().put(DataTable.REQUEST_ID_METADATA_KEY, Long.toString(instanceRequest.getRequestId()));
+      dataTable.getMetadata()
+          .put(DataTable.TRACE_INFO_METADATA_KEY, TraceContext.getTraceInfoOfRequestId(instanceRequest.getRequestId()));
       LOGGER.info("Processed requestId {},reqSegments={},prunedToSegmentCount={},planTime={},planExecTime={},totalTimeUsed={},broker={}",
           requestId, nSegmentsInQuery, nPrunedSegments,
           planBuildTimer.getDurationMs(),
@@ -150,16 +153,18 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     } catch (Exception e) {
       _serverMetrics.addMeteredQueryValue(instanceRequest.getQuery(), ServerMeter.QUERY_EXECUTION_EXCEPTIONS, 1);
       LOGGER.error("Exception processing requestId {}", requestId, e);
-      dataTable = new DataTable();
+      dataTable = new DataTableImplV2();
       dataTable.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
       TraceContext.logException("ServerQueryExecutorV1Impl", "Exception occurs in processQuery");
       queryProcessingTimer.stopAndRecord();
 
       LOGGER.info("Searching Instance for Request Id - {}, browse took: {}, instanceResponse: {}", requestId,
           queryProcessingTimer.getDurationMs(), dataTable.toString());
-      dataTable.getMetadata().put("timeUsedMs", Long.toString(queryProcessingTimer.getDurationNs()));
-      dataTable.getMetadata().put("requestId", Long.toString(instanceRequest.getRequestId()));
-      dataTable.getMetadata().put("traceInfo", TraceContext.getTraceInfoOfRequestId(instanceRequest.getRequestId()));
+      dataTable.getMetadata()
+          .put(DataTable.TIME_USED_MS_METADATA_KEY, Long.toString(queryProcessingTimer.getDurationNs()));
+      dataTable.getMetadata().put(DataTable.REQUEST_ID_METADATA_KEY, Long.toString(instanceRequest.getRequestId()));
+      dataTable.getMetadata()
+          .put(DataTable.TRACE_INFO_METADATA_KEY, TraceContext.getTraceInfoOfRequestId(instanceRequest.getRequestId()));
       return dataTable;
     } finally {
       if (_instanceDataManager.getTableDataManager(instanceRequest.getQuery().getQuerySource().getTableName()) != null) {

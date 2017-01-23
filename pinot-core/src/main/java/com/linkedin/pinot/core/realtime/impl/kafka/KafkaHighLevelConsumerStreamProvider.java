@@ -72,10 +72,10 @@ public class KafkaHighLevelConsumerStreamProvider implements StreamProvider {
   }
 
   @Override
-  public GenericRow next() {
+  public GenericRow next(GenericRow destination) {
     if (kafkaIterator.hasNext()) {
       try {
-        GenericRow row = decoder.decode(kafkaIterator.next().message());
+        destination = decoder.decode(kafkaIterator.next().message(), destination);
         serverMetrics.addMeteredTableValue(tableAndStreamName, ServerMeter.REALTIME_ROWS_CONSUMED, 1L);
         serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_ROWS_CONSUMED, 1L);
         ++currentCount;
@@ -94,7 +94,7 @@ public class KafkaHighLevelConsumerStreamProvider implements StreamProvider {
           lastCount = currentCount;
           lastLogTime = now;
         }
-        return row;
+        return destination;
       } catch (Exception e) {
         INSTANCE_LOGGER.warn("Caught exception while consuming events", e);
         serverMetrics.addMeteredTableValue(tableAndStreamName, ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, 1L);

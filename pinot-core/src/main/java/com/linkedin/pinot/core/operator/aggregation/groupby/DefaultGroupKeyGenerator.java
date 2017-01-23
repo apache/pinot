@@ -15,12 +15,9 @@
  */
 package com.linkedin.pinot.core.operator.aggregation.groupby;
 
-import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.operator.aggregation.ResultHolderFactory;
-import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
-import com.linkedin.pinot.core.query.aggregation.groupby.GroupByConstants;
+import com.linkedin.pinot.core.operator.blocks.TransformBlock;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import it.unimi.dsi.fastutil.ints.Int2LongOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
@@ -55,8 +52,6 @@ import java.util.NoSuchElementException;
  * All the logic is maintained internally, and to the outside world, the group keys are always int type.
  */
 public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
-  private static final int INVALID_ID = -1;
-
   public enum StorageType {
     ARRAY_BASED,
     LONG_MAP_BASED,
@@ -68,12 +63,11 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
   private final int[] _cardinalities;
   private long _cardinalityProduct = 1L;
   private final boolean[] _isSingleValueGroupByColumn;
-  private boolean _hasMultiValueGroupByColumn = false;
   private final StorageType _storageType;
 
   private final Dictionary[] _dictionaries;
 
-  // For projectionBlockValSet of columns.
+  // For transformBlockValSet of columns.
   private final BlockValSet[] _blockValSets;
 
   // Reusable arrays for single value columns.
@@ -112,10 +106,10 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
   /**
    * Constructor for the class. Initializes data members (reusable arrays).
    *
-   * @param projectionBlock Projection block for which to generate group keys
+   * @param transformBlock Transform block for which to generate group keys
    * @param groupByColumns group-by columns.
    */
-  public DefaultGroupKeyGenerator(ProjectionBlock projectionBlock, String[] groupByColumns) {
+  public DefaultGroupKeyGenerator(TransformBlock transformBlock, String[] groupByColumns) {
     _numGroupByColumns = groupByColumns.length;
     _groupByColumns = groupByColumns;
 
@@ -130,10 +124,9 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
 
     boolean longOverflow = false;
     for (int i = 0; i < _numGroupByColumns; i++) {
-      Block block = projectionBlock.getBlock(groupByColumns[i]);
+      BlockMetadata blockMetadata = transformBlock.getBlockMetadata(groupByColumns[i]);
 
       // Store group-by column cardinalities and update cardinality product.
-      BlockMetadata blockMetadata = block.getMetadata();
       _dictionaries[i] = blockMetadata.getDictionary();
       int cardinality = _dictionaries[i].length();
       _cardinalities[i] = cardinality;
@@ -149,9 +142,6 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
       // Store single/multi value group-by columns, allocate reusable resources based on that.
       boolean isSingleValueGroupByColumn = blockMetadata.isSingleValue();
       _isSingleValueGroupByColumn[i] = isSingleValueGroupByColumn;
-      if (!isSingleValueGroupByColumn) {
-        _hasMultiValueGroupByColumn = true;
-      }
 
       if (!isSingleValueGroupByColumn) {
         maxNumMultiValues = Math.max(maxNumMultiValues, blockMetadata.getMaxNumberOfMultiValues());
@@ -172,7 +162,7 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
       _arrayGroupKeyToId.defaultReturnValue(INVALID_ID);
       _idToArrayGroupKey = null;
     } else {
-      if (_cardinalityProduct > ResultHolderFactory.MAX_INITIAL_RESULT_HOLDER_CAPACITY) {
+      if (_cardinalityProduct > DefaultGroupByExecutor.MAX_INITIAL_RESULT_HOLDER_CAPACITY) {
         // Long map based storage type.
         _storageType = StorageType.LONG_MAP_BASED;
         _groupKeyToId = new Long2IntOpenHashMap();
@@ -200,25 +190,16 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
 
   /**
    * {@inheritDoc}
-   */
-  @Override
-  public boolean hasMultiValueGroupByColumn() {
-    return _hasMultiValueGroupByColumn;
-  }
-
-  /**
-   * {@inheritDoc}
    *
    */
   @Override
-  public void generateKeysForBlock(ProjectionBlock projectionBlock, int[] outGroupKeys) {
+  public void generateKeysForBlock(TransformBlock transformBlock, int[] outGroupKeys) {
     int startIndex = 0;
-    int length = projectionBlock.getNumDocs();
+    int length = transformBlock.getNumDocs();
 
     // Fetch all dictionary ids according to the document id set for all group-by columns.
     for (int i = 0; i < _numGroupByColumns; i++) {
-      Block dataBlock = projectionBlock.getDataBlock(_groupByColumns[i]);
-      BlockValSet blockValueSet = dataBlock.getBlockValueSet();
+      BlockValSet blockValueSet = transformBlock.getBlockValueSet(_groupByColumns[i]);
       _reusableSingleDictIds[i] = blockValueSet.getDictionaryIds();
     }
 
@@ -265,16 +246,14 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
    * {@inheritDoc}
    */
   @Override
-  public void generateKeysForBlock(ProjectionBlock projectionBlock, int[][] outGroupKeys) {
+  public void generateKeysForBlock(TransformBlock transformBlock, int[][] outGroupKeys) {
     int startIndex = 0;
-    int length = projectionBlock.getNumDocs();
-    int[] docIdSet = projectionBlock.getDocIdSetBlock().getDocIdSet();
+    int length = transformBlock.getNumDocs();
+    int[] docIdSet = transformBlock.getDocIdSetBlock().getDocIdSet();
 
     // Fetch all dictionary ids according to the document id set for all single value group-by columns.
     for (int i = 0; i < _numGroupByColumns; i++) {
-      Block dataBlock = projectionBlock.getDataBlock(_groupByColumns[i]);
-      _blockValSets[i] = dataBlock.getBlockValueSet();
-
+      _blockValSets[i] = transformBlock.getBlockValueSet(_groupByColumns[i]);
       if (_isSingleValueGroupByColumn[i]) {
         _reusableSingleDictIds[i] = _blockValSets[i].getDictionaryIds();
       }
@@ -718,7 +697,7 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
       StringBuilder builder = new StringBuilder(_dictionaries[0].get(groupKey % cardinality).toString());
       groupKey /= cardinality;
       for (int i = 1; i < _numGroupByColumns; i++) {
-        builder.append(GroupByConstants.GroupByDelimiter.groupByMultiDelimeter);
+        builder.append(AggregationGroupByTrimmingService.GROUP_KEY_DELIMITER);
         cardinality = _cardinalities[i];
         builder.append(_dictionaries[i].get(groupKey % cardinality));
         groupKey /= cardinality;
@@ -745,7 +724,7 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
       StringBuilder builder = new StringBuilder(_dictionaries[0].get((int) (rawKey % cardinality)).toString());
       rawKey /= cardinality;
       for (int i = 1; i < _numGroupByColumns; i++) {
-        builder.append(GroupByConstants.GroupByDelimiter.groupByMultiDelimeter);
+        builder.append(AggregationGroupByTrimmingService.GROUP_KEY_DELIMITER);
         cardinality = _cardinalities[i];
         builder.append(_dictionaries[i].get((int) (rawKey % cardinality)));
         rawKey /= cardinality;
@@ -766,7 +745,7 @@ public class DefaultGroupKeyGenerator implements GroupKeyGenerator {
     int[] rawKeyArray = rawKey.elements();
     StringBuilder builder = new StringBuilder(_dictionaries[0].get(rawKeyArray[0]).toString());
     for (int i = 1; i < _numGroupByColumns; i++) {
-      builder.append(GroupByConstants.GroupByDelimiter.groupByMultiDelimeter);
+      builder.append(AggregationGroupByTrimmingService.GROUP_KEY_DELIMITER);
       builder.append(_dictionaries[i].get(rawKeyArray[i]).toString());
     }
     return builder.toString();

@@ -40,6 +40,7 @@ public class QueryException {
   public static final int QUERY_EXECUTION_ERROR_CODE = 200;
   public static final int EXECUTION_TIMEOUT_ERROR_CODE = 250;
   public static final int BROKER_GATHER_ERROR_CODE = 300;
+  public static final int DATA_TABLE_DESERIALIZATION_ERROR_CODE = 310;
   public static final int FUTURE_CALL_ERROR_CODE = 350;
   public static final int BROKER_TIMEOUT_ERROR_CODE = 400;
   public static final int BROKER_RESOURCE_MISSING_ERROR_CODE = 410;
@@ -62,6 +63,8 @@ public class QueryException {
   public static final ProcessingException EXECUTION_TIMEOUT_ERROR =
       new ProcessingException(EXECUTION_TIMEOUT_ERROR_CODE);
   public static final ProcessingException BROKER_GATHER_ERROR = new ProcessingException(BROKER_GATHER_ERROR_CODE);
+  public static final ProcessingException DATA_TABLE_DESERIALIZATION_ERROR =
+      new ProcessingException(DATA_TABLE_DESERIALIZATION_ERROR_CODE);
   public static final ProcessingException FUTURE_CALL_ERROR = new ProcessingException(FUTURE_CALL_ERROR_CODE);
   public static final ProcessingException BROKER_TIMEOUT_ERROR = new ProcessingException(BROKER_TIMEOUT_ERROR_CODE);
   public static final ProcessingException BROKER_RESOURCE_MISSING_ERROR =
@@ -86,6 +89,7 @@ public class QueryException {
     QUERY_EXECUTION_ERROR.setMessage("QueryExecutionError");
     EXECUTION_TIMEOUT_ERROR.setMessage("ExecutionTimeoutError");
     BROKER_GATHER_ERROR.setMessage("BrokerGatherError");
+    DATA_TABLE_DESERIALIZATION_ERROR.setMessage("DataTableDeserializationError");
     FUTURE_CALL_ERROR.setMessage("FutureCallError");
     BROKER_TIMEOUT_ERROR.setMessage("BrokerTimeoutError");
     BROKER_RESOURCE_MISSING_ERROR.setMessage("BrokerResourceMissingError");

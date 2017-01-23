@@ -32,9 +32,11 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang.StringUtils;
 import org.codehaus.jackson.annotate.JsonIgnore;
@@ -51,6 +53,7 @@ public class SegmentGeneratorConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGeneratorConfig.class);
 
   private Map<String, String> _customProperties = new HashMap<>();
+  private Set<String> _rawIndexCreationColumns = new HashSet<>();
   private List<String> _invertedIndexCreationColumns = new ArrayList<>();
   private String _dataDir = null;
   private String _inputFilePath = null;
@@ -83,6 +86,7 @@ public class SegmentGeneratorConfig {
   public SegmentGeneratorConfig(SegmentGeneratorConfig config) {
     Preconditions.checkNotNull(config);
     _customProperties.putAll(config._customProperties);
+    _rawIndexCreationColumns.addAll(config._rawIndexCreationColumns);
     _invertedIndexCreationColumns.addAll(config._invertedIndexCreationColumns);
     _dataDir = config._dataDir;
     _inputFilePath = config._inputFilePath;
@@ -128,8 +132,17 @@ public class SegmentGeneratorConfig {
     return _customProperties.containsKey(key);
   }
 
+  public Set<String> getRawIndexCreationColumns() {
+    return _rawIndexCreationColumns;
+  }
+
   public List<String> getInvertedIndexCreationColumns() {
     return _invertedIndexCreationColumns;
+  }
+
+  public void setRawIndexCreationColumns(List<String> rawIndexCreationColumns) {
+    Preconditions.checkNotNull(rawIndexCreationColumns);
+    _rawIndexCreationColumns.addAll(rawIndexCreationColumns);
   }
 
   public void setInvertedIndexCreationColumns(List<String> indexCreationColumns) {

@@ -16,10 +16,14 @@
 package com.linkedin.pinot.integration.tests;
 
 import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.common.utils.ServiceStatus;
+import com.linkedin.pinot.common.utils.ZkStarter;
+import com.linkedin.pinot.controller.helix.ControllerTestUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
-import java.io.FileInputStream;
+import java.io.InputStream;
+import java.net.URL;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -27,13 +31,22 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
+import org.apache.helix.HelixAdmin;
+import org.apache.helix.manager.zk.ZKHelixAdmin;
+import org.apache.helix.manager.zk.ZNRecordSerializer;
+import org.apache.helix.manager.zk.ZkClient;
 import org.json.JSONArray;
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+
 
 /**
  * Integration test that converts Avro data for 12 segments and runs queries against it.
@@ -44,6 +57,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
   private final File _tmpDir = new File("/tmp/OfflineClusterIntegrationTest");
   private final File _segmentDir = new File("/tmp/OfflineClusterIntegrationTest/segmentDir");
   private final File _tarDir = new File("/tmp/OfflineClusterIntegrationTest/tarDir");
+  private ServiceStatus.ServiceStatusCallback _brokerServiceStatusCallback;
+  private ServiceStatus.ServiceStatusCallback _serverServiceStatusCallback;
 
   private static final int SEGMENT_COUNT = 12;
 
@@ -85,6 +100,32 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
 
     createTable();
 
+    // Get the list of instances through the REST API
+    URL url = new URL("http://" + ControllerTestUtils.DEFAULT_CONTROLLER_HOST + ":"
+        + ControllerTestUtils.DEFAULT_CONTROLLER_API_PORT + "/instances");
+    InputStream inputStream = url.openConnection().getInputStream();
+    String instanceApiResponseString = IOUtils.toString(inputStream);
+    IOUtils.closeQuietly(inputStream);
+    JSONObject instanceApiResponse = new JSONObject(instanceApiResponseString);
+    JSONArray instanceArray = instanceApiResponse.getJSONArray("instances");
+
+    HelixAdmin helixAdmin = new ZKHelixAdmin(new ZkClient(ZkStarter.DEFAULT_ZK_STR, 10000, 10000, new ZNRecordSerializer()));
+    for (int i = 0; i < instanceArray.length(); i++) {
+      String instance = instanceArray.getString(i);
+
+      if (instance.startsWith("Server_")) {
+        _serverServiceStatusCallback =
+            new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(helixAdmin, getHelixClusterName(),
+                instance);
+      }
+
+      if (instance.startsWith("Broker_")) {
+        _brokerServiceStatusCallback =
+            new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(helixAdmin, getHelixClusterName(),
+                instance, Collections.singletonList("brokerResource"));
+      }
+    }
+
     // Load data into H2
     ExecutorService executor = Executors.newCachedThreadPool();
     setupH2AndInsertAvro(avroFiles, executor);
@@ -104,7 +145,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     // Upload the segments
     int i = 0;
     for (String segmentName : _tarDir.list()) {
-      System.out.println("Uploading segment " + (i++) + " : " + segmentName);
+//      System.out.println("Uploading segment " + (i++) + " : " + segmentName);
       File file = new File(_tarDir, segmentName);
       FileUploadUtils.sendSegmentFile("localhost", "8998", segmentName, file, file.length());
     }
@@ -115,13 +156,22 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     long timeInTwoMinutes = System.currentTimeMillis() + 2 * 60 * 1000L;
     long numDocs;
     while ((numDocs = getCurrentServingNumDocs("mytable")) < TOTAL_DOCS) {
-      System.out.println("Current number of documents: " + numDocs);
+//      System.out.println("Current number of documents: " + numDocs);
       if (System.currentTimeMillis() < timeInTwoMinutes) {
         Thread.sleep(1000);
       } else {
         Assert.fail("Segments were not completely loaded within two minutes");
       }
     }
+  }
+
+  @Test
+  public void testInstancesStarted() {
+    assertEquals(_serverServiceStatusCallback.getServiceStatus(), ServiceStatus.Status.GOOD,
+        "Server status is not GOOD");
+
+    assertEquals(_brokerServiceStatusCallback.getServiceStatus(), ServiceStatus.Status.GOOD,
+        "Broker status is not GOOD");
   }
 
   /**

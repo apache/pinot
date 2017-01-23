@@ -15,16 +15,6 @@
  */
 package com.linkedin.pinot.controller.api.restlet.resources;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.pinot.common.request.helper.ControllerRequestBuilder;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource;
-import com.linkedin.pinot.common.utils.ZkStarter;
-import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
-import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
-import com.linkedin.pinot.controller.helix.ControllerTest;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -36,7 +26,16 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
-
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.pinot.common.request.helper.ControllerRequestBuilder;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource;
+import com.linkedin.pinot.common.utils.ZkStarter;
+import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
+import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
+import com.linkedin.pinot.controller.helix.ControllerTest;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
@@ -92,7 +91,7 @@ public class TableViewsTest extends ControllerTest {
     metadata.put(DataSource.STREAM_PREFIX + "." + DataSource.Realtime.Kafka.ZK_BROKER_URL, "fakeUrl");
     metadata.put(DataSource.STREAM_PREFIX + "." + DataSource.Realtime.Kafka.HighLevelConsumer.ZK_CONNECTION_STRING, "potato");
     metadata.put(DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE, Integer.toString(1234));
-    metadata.put(DataSource.STREAM_PREFIX + "." + DataSource.Realtime.Kafka.KAFKA_CONSUMER_PROPS_PREFIX + "." + "auto.offset.reset",
+    metadata.put(DataSource.STREAM_PREFIX + "." + DataSource.Realtime.Kafka.KAFKA_CONSUMER_PROPS_PREFIX + "." + DataSource.Realtime.Kafka.AUTO_OFFSET_RESET,
         "smallest");
     request = ControllerRequestBuilder.buildCreateRealtimeTableJSON(TABLE_NAME, "default", "default",
         "potato", "DAYS", "DAYS", "5", 2, "BalanceNumSegmentAssignmentStrategy", metadata, "fakeSchema", "fakeColumn",

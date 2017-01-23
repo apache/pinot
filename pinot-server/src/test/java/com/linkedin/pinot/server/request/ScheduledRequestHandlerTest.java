@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.server.request;
 
 import com.google.common.util.concurrent.ListenableFuture;
@@ -23,14 +22,18 @@ import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.query.QueryRequest;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
+import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.common.utils.DataTable;
-import com.linkedin.pinot.common.utils.DataTableBuilder;
+import com.linkedin.pinot.core.common.datatable.DataTableBuilder;
+import com.linkedin.pinot.core.common.datatable.DataTableFactory;
+import com.linkedin.pinot.core.common.datatable.DataTableImplV2;
 import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
 import com.linkedin.pinot.serde.SerDe;
 import com.yammer.metrics.core.MetricsRegistry;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
 import java.util.concurrent.Callable;
@@ -87,7 +90,7 @@ public class ScheduledRequestHandlerTest {
     Assert.assertTrue(response.isDone());
     byte[] responseBytes = response.get();
     Assert.assertTrue(responseBytes.length > 0);
-    DataTable expectedDT = new DataTable();
+    DataTable expectedDT = new DataTableImplV2();
     expectedDT.addException(QueryException.INTERNAL_ERROR);
     Assert.assertEquals(responseBytes, expectedDT.toBytes());
   }
@@ -129,14 +132,14 @@ public class ScheduledRequestHandlerTest {
     byte[] bytes = responseFuture.get(2, TimeUnit.SECONDS);
     // we get DataTable with exception information in case of query processing exception
     Assert.assertTrue(bytes.length > 0);
-    DataTable expectedDT = new DataTable();
+    DataTable expectedDT = new DataTableImplV2();
     expectedDT.addException(QueryException.INTERNAL_ERROR);
     Assert.assertEquals(bytes, expectedDT.toBytes());
   }
 
   @Test
   public void testValidQueryResponse()
-      throws InterruptedException, ExecutionException, TimeoutException {
+      throws InterruptedException, ExecutionException, TimeoutException, IOException {
     ScheduledRequestHandler handler = new ScheduledRequestHandler(new QueryScheduler(null) {
       @Override
       public ListenableFuture<DataTable> submit(QueryRequest queryRequest) {
@@ -149,10 +152,9 @@ public class ScheduledRequestHandlerTest {
               FieldSpec.DataType.STRING,
               FieldSpec.DataType.INT
             };
-            DataTableBuilder.DataSchema dataSchema = new DataTableBuilder.DataSchema(
+            DataSchema dataSchema = new DataSchema(
                 columns, columnTypes);
             DataTableBuilder dtBuilder = new DataTableBuilder(dataSchema);
-            dtBuilder.open();
             dtBuilder.startRow();
             dtBuilder.setColumn(0, "mars");
             dtBuilder.setColumn(1, 10);
@@ -161,7 +163,6 @@ public class ScheduledRequestHandlerTest {
             dtBuilder.setColumn(0, "jupiter");
             dtBuilder.setColumn(1, 100);
             dtBuilder.finishRow();
-            dtBuilder.seal();
             return dtBuilder.build();
           }
         });
@@ -171,7 +172,7 @@ public class ScheduledRequestHandlerTest {
     ByteBuf requestBuf = getSerializedInstanceRequest(getInstanceRequest());
     ListenableFuture<byte[]> responseFuture = handler.processRequest(channelHandlerContext, requestBuf);
     byte[] responseBytes = responseFuture.get(2, TimeUnit.SECONDS);
-    DataTable responseDT = new DataTable(responseBytes);
+    DataTable responseDT = DataTableFactory.getDataTable(responseBytes);
     Assert.assertEquals(responseDT.getNumberOfRows(), 2);
     Assert.assertEquals(responseDT.getString(0, 0), "mars");
     Assert.assertEquals(responseDT.getInt(0, 1), 10);

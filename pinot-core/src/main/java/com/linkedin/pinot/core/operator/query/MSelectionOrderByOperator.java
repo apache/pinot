@@ -17,7 +17,7 @@ package com.linkedin.pinot.core.operator.query;
 
 import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.common.request.SelectionSort;
-import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
+import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
@@ -106,10 +106,7 @@ public class MSelectionOrderByOperator extends BaseOperator {
         new ExecutionStatistics(numDocsScanned, numEntriesScannedInFilter, numEntriesScannedPostFilter,
             numTotalRawDocs);
 
-    IntermediateResultsBlock resultBlock = new IntermediateResultsBlock();
-    resultBlock.setSelectionResult(_selectionOperatorService.getRowEventsSet());
-    resultBlock.setSelectionDataSchema(_selectionOperatorService.getDataSchema());
-    return resultBlock;
+    return new IntermediateResultsBlock(_selectionOperatorService.getDataSchema(), _selectionOperatorService.getRows());
   }
 
   @Override

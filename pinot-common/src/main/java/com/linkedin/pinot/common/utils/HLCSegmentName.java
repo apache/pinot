@@ -140,4 +140,9 @@ public class HLCSegmentName extends SegmentName {
   public RealtimeSegmentType getSegmentType() {
     return _segmentType;
   }
+
+  @Override
+  public String toString() {
+    return getSegmentName();
+  }
 }

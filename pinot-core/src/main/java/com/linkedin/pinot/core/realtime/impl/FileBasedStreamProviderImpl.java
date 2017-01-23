@@ -53,7 +53,7 @@ public class FileBasedStreamProviderImpl implements StreamProvider {
   }
 
   @Override
-  public GenericRow next() {
+  public GenericRow next(GenericRow destination) {
     if (reader.hasNext()) {
       count++;
       return reader.next();

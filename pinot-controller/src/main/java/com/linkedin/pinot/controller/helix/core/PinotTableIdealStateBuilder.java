@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.helix.core;
 
+import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -56,13 +57,11 @@ public class PinotTableIdealStateBuilder {
    * Building an empty idealState for a given table.
    * Used when creating a new table.
    *
-   * @param tableName
-   * @param helixAdmin
-   * @param helixClusterName
+   * @param tableName resource name
+   * @param numCopies is the number of replicas
    * @return
    */
-  public static IdealState buildEmptyIdealStateFor(String tableName, int numCopies, HelixAdmin helixAdmin,
-      String helixClusterName) {
+  public static IdealState buildEmptyIdealStateFor(String tableName, int numCopies) {
     final CustomModeISBuilder customModeIdealStateBuilder = new CustomModeISBuilder(tableName);
     final int replicas = numCopies;
     customModeIdealStateBuilder
@@ -209,15 +208,15 @@ public class PinotTableIdealStateBuilder {
     final KafkaStreamMetadata kafkaMetadata = new KafkaStreamMetadata(realtimeTableConfig.getIndexingConfig().getStreamConfigs());
     final String topicName = kafkaMetadata.getKafkaTopicName();
     final PinotLLCRealtimeSegmentManager segmentManager = PinotLLCRealtimeSegmentManager.getInstance();
-    final int nPartitions = getPartitionsCount(kafkaMetadata);
+    final int nPartitions = getPartitionCount(kafkaMetadata);
     LOGGER.info("Assigning {} partitions to instances for simple consumer for table {}", nPartitions, realtimeTableName);
 
     segmentManager.setupHelixEntries(topicName, realtimeTableName, nPartitions, realtimeInstances, nReplicas,
-        kafkaMetadata.getKafkaConsumerProperties().get("auto.offset.reset"), kafkaMetadata.getBootstrapHosts(),
-        idealState, create);
+        kafkaMetadata.getKafkaConsumerProperties().get(Helix.DataSource.Realtime.Kafka.AUTO_OFFSET_RESET), kafkaMetadata.getBootstrapHosts(),
+        idealState, create, PinotLLCRealtimeSegmentManager.getRealtimeTableFlushSize(realtimeTableConfig));
   }
 
-  private static int getPartitionsCount(KafkaStreamMetadata kafkaMetadata) {
+  public static int getPartitionCount(KafkaStreamMetadata kafkaMetadata) {
     String bootstrapHosts = kafkaMetadata.getBootstrapHosts();
     if (bootstrapHosts == null || bootstrapHosts.isEmpty()) {
       throw new RuntimeException("Invalid value for " + Helix.DataSource.Realtime.Kafka.KAFKA_BROKER_LIST);

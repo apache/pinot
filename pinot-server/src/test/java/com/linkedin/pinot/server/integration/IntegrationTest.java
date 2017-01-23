@@ -124,7 +124,7 @@ public class IntegrationTest {
 
       _indexSegmentList.add(ColumnarSegmentLoader.load(new File(new File(INDEXES_DIR, "segment_" + String.valueOf(i)), driver.getSegmentName()), ReadMode.mmap));
 
-      System.out.println("built at : " + segmentDir.getAbsolutePath());
+//      System.out.println("built at : " + segmentDir.getAbsolutePath());
     }
 
   }
@@ -145,8 +145,8 @@ public class IntegrationTest {
     try {
       QueryRequest queryRequest = new QueryRequest(instanceRequest, _serverInstance.getServerMetrics());
       DataTable instanceResponse = _queryExecutor.processQuery(queryRequest);
-      System.out.println(instanceResponse.getLong(0, 0));
-      System.out.println(instanceResponse.getMetadata().get("timeUsedMs"));
+//      System.out.println(instanceResponse.getLong(0, 0));
+//      System.out.println(instanceResponse.getMetadata().get(DataTable.TIME_USED_MS_METADATA_KEY));
     } catch (Exception e) {
       e.printStackTrace();
       throw new RuntimeException(e);
@@ -166,8 +166,8 @@ public class IntegrationTest {
     try {
       QueryRequest queryRequest = new QueryRequest(instanceRequest, _serverInstance.getServerMetrics());
       DataTable instanceResponse = _queryExecutor.processQuery(queryRequest);
-      System.out.println(instanceResponse.getLong(0, 0));
-      System.out.println(instanceResponse.getMetadata().get("timeUsedMs"));
+//      System.out.println(instanceResponse.getLong(0, 0));
+//      System.out.println(instanceResponse.getMetadata().get(DataTable.TIME_USED_MS_METADATA_KEY));
     } catch (Exception e) {
       e.printStackTrace();
       throw new RuntimeException(e);
@@ -191,8 +191,8 @@ public class IntegrationTest {
     try {
       QueryRequest queryRequest = new QueryRequest(instanceRequest, _serverInstance.getServerMetrics());
       DataTable instanceResponse = _queryExecutor.processQuery(queryRequest);
-      System.out.println(instanceResponse.getDouble(0, 0));
-      System.out.println(instanceResponse.getMetadata().get("timeUsedMs"));
+//      System.out.println(instanceResponse.getDouble(0, 0));
+//      System.out.println(instanceResponse.getMetadata().get(DataTable.TIME_USED_MS_METADATA_KEY));
     } catch (Exception e) {
       e.printStackTrace();
       throw new RuntimeException(e);
@@ -213,8 +213,8 @@ public class IntegrationTest {
     try {
       QueryRequest queryRequest = new QueryRequest(instanceRequest, _serverInstance.getServerMetrics());
       DataTable instanceResponse = _queryExecutor.processQuery(queryRequest);
-      System.out.println(instanceResponse.getDouble(0, 0));
-      System.out.println(instanceResponse.getMetadata().get("timeUsedMs"));
+//      System.out.println(instanceResponse.getDouble(0, 0));
+//      System.out.println(instanceResponse.getMetadata().get(DataTable.TIME_USED_MS_METADATA_KEY));
     } catch (Exception e) {
       e.printStackTrace();
       throw new RuntimeException(e);
@@ -233,8 +233,8 @@ public class IntegrationTest {
     try {
       QueryRequest queryRequest = new QueryRequest(instanceRequest, _serverInstance.getServerMetrics());
       DataTable instanceResponse = _queryExecutor.processQuery(queryRequest);
-      System.out.println(instanceResponse.getDouble(0, 0));
-      System.out.println(instanceResponse.getMetadata().get("timeUsedMs"));
+//      System.out.println(instanceResponse.getDouble(0, 0));
+//      System.out.println(instanceResponse.getMetadata().get(DataTable.TIME_USED_MS_METADATA_KEY));
     } catch (Exception e) {
       e.printStackTrace();
       throw new RuntimeException(e);

@@ -118,11 +118,8 @@ public class DataFetcherTest {
       docIds[length++] = i;
     }
 
-    int[] dictIds = new int[length];
     int[] intValues = new int[length];
-
-    _dataFetcher.fetchSingleDictIds(INT_METRIC_NAME, docIds, 0, length, dictIds, 0);
-    _dataFetcher.fetchSingleIntValues(INT_METRIC_NAME, dictIds, 0, length, intValues, 0);
+    _dataFetcher.fetchIntValues(INT_METRIC_NAME, docIds, 0, length, intValues, 0);
 
     for (int i = 0; i < length; i++) {
       Assert.assertEquals(intValues[i], _intMetricValues[docIds[i]], _errorMessage);
@@ -137,11 +134,8 @@ public class DataFetcherTest {
       docIds[length++] = i;
     }
 
-    int[] dictIds = new int[length];
     long[] longValues = new long[length];
-
-    _dataFetcher.fetchSingleDictIds(LONG_METRIC_NAME, docIds, 0, length, dictIds, 0);
-    _dataFetcher.fetchSingleLongValues(LONG_METRIC_NAME, dictIds, 0, length, longValues, 0);
+    _dataFetcher.fetchLongValues(LONG_METRIC_NAME, docIds, 0, length, longValues, 0);
 
     for (int i = 0; i < length; i++) {
       Assert.assertEquals(longValues[i], _longMetricValues[docIds[i]], _errorMessage);
@@ -156,11 +150,8 @@ public class DataFetcherTest {
       docIds[length++] = i;
     }
 
-    int[] dictIds = new int[length];
     float[] floatValues = new float[length];
-
-    _dataFetcher.fetchSingleDictIds(FLOAT_METRIC_NAME, docIds, 0, length, dictIds, 0);
-    _dataFetcher.fetchSingleFloatValues(FLOAT_METRIC_NAME, dictIds, 0, length, floatValues, 0);
+    _dataFetcher.fetchFloatValues(FLOAT_METRIC_NAME, docIds, 0, length, floatValues, 0);
 
     for (int i = 0; i < length; i++) {
       Assert.assertEquals(floatValues[i], _floatMetricValues[docIds[i]], _errorMessage);
@@ -175,11 +166,8 @@ public class DataFetcherTest {
       docIds[length++] = i;
     }
 
-    int[] dictIds = new int[length];
     double[] doubleValues = new double[length];
-
-    _dataFetcher.fetchSingleDictIds(DOUBLE_METRIC_NAME, docIds, 0, length, dictIds, 0);
-    _dataFetcher.fetchSingleDoubleValues(DOUBLE_METRIC_NAME, dictIds, 0, length, doubleValues, 0);
+    _dataFetcher.fetchDoubleValues(DOUBLE_METRIC_NAME, docIds, 0, length, doubleValues, 0);
 
     for (int i = 0; i < length; i++) {
       Assert.assertEquals(doubleValues[i], _doubleMetricValues[docIds[i]], _errorMessage);
@@ -194,33 +182,11 @@ public class DataFetcherTest {
       docIds[length++] = i;
     }
 
-    int[] dictIds = new int[length];
     String[] stringValues = new String[length];
-
-    _dataFetcher.fetchSingleDictIds(DIMENSION_NAME, docIds, 0, length, dictIds, 0);
-    _dataFetcher.fetchSingleStringValues(DIMENSION_NAME, dictIds, 0, length, stringValues, 0);
+    _dataFetcher.fetchStringValues(DIMENSION_NAME, docIds, 0, length, stringValues, 0);
 
     for (int i = 0; i < length; i++) {
       Assert.assertEquals(stringValues[i], _dimensionValues[docIds[i]], _errorMessage);
-    }
-  }
-
-  @Test
-  public void testFetchSingleHashCodes() {
-    int[] docIds = new int[NUM_ROWS];
-    int length = 0;
-    for (int i = _random.nextInt(MAX_STEP_LENGTH); i < NUM_ROWS; i += _random.nextInt(MAX_STEP_LENGTH) + 1) {
-      docIds[length++] = i;
-    }
-
-    int[] dictIds = new int[length];
-    double[] hashCodes = new double[length];
-
-    _dataFetcher.fetchSingleDictIds(DIMENSION_NAME, docIds, 0, length, dictIds, 0);
-    _dataFetcher.fetchSingleHashCodes(DIMENSION_NAME, dictIds, 0, length, hashCodes, 0);
-
-    for (int i = 0; i < length; i++) {
-      Assert.assertEquals((int) hashCodes[i], _dimensionValues[docIds[i]].hashCode(), _errorMessage);
     }
   }
 

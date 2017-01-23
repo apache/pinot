@@ -206,4 +206,8 @@ public class CompositeFuture<K, V> extends AbstractCompositeListenableFuture<K, 
   public String getName() {
     return _name;
   }
+
+  public int getNumFutures() {
+    return _futures.size();
+  }
 }

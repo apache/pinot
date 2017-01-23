@@ -18,18 +18,17 @@ package com.linkedin.pinot.queries;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.common.Operator;
+import com.linkedin.pinot.core.data.manager.offline.OfflineSegmentDataManager;
+import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV2;
-import com.linkedin.pinot.core.plan.maker.PlanMaker;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import java.io.File;
 import java.net.URL;
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.testng.Assert;
@@ -58,12 +57,10 @@ import org.testng.annotations.BeforeTest;
  *   <li>daysSinceEpoch, TIME, INT, 2, T, F</li>
  * </ul>
  */
-public abstract class BaseSingleValueQueriesTest {
+public abstract class BaseSingleValueQueriesTest extends BaseQueriesTest {
   private static final String AVRO_DATA = "data/test_data-sv.avro";
   private static final String SEGMENT_NAME = "testTable_126164076_167572854_";
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "SingleValueQueriesTest");
-  private static final Pql2Compiler COMPILER = new Pql2Compiler();
-  private static final PlanMaker PLAN_MAKER = new InstancePlanMakerImplV2();
 
   // Hard-coded query filter.
   private static final String QUERY_FILTER =
@@ -74,6 +71,8 @@ public abstract class BaseSingleValueQueriesTest {
           + " AND daysSinceEpoch = 126164076";
 
   private IndexSegment _indexSegment;
+  // Contains 2 identical index segments.
+  private List<SegmentDataManager> _segmentDataManagers;
 
   @BeforeTest
   public void buildSegment()
@@ -117,8 +116,9 @@ public abstract class BaseSingleValueQueriesTest {
   @BeforeClass
   public void loadSegment()
       throws Exception {
-    File indexSegmentDir = new File(INDEX_DIR, SEGMENT_NAME);
-    _indexSegment = ColumnarSegmentLoader.load(indexSegmentDir, ReadMode.heap);
+    _indexSegment = ColumnarSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), ReadMode.heap);
+    _segmentDataManagers = Arrays.<SegmentDataManager>asList(new OfflineSegmentDataManager(_indexSegment),
+        new OfflineSegmentDataManager(_indexSegment));
   }
 
   @AfterClass
@@ -131,24 +131,18 @@ public abstract class BaseSingleValueQueriesTest {
     FileUtils.deleteQuietly(INDEX_DIR);
   }
 
-  /**
-   * Run query on the single index segment.
-   *
-   * @param query PQL query.
-   * @return query operator.
-   */
-  @SuppressWarnings("unchecked")
-  protected <T extends Operator> T getOperatorForQuery(String query) {
-    return (T) PLAN_MAKER.makeInnerSegmentPlan(_indexSegment, COMPILER.compileToBrokerRequest(query)).run();
+  @Override
+  protected String getFilter() {
+    return QUERY_FILTER;
   }
 
-  /**
-   * Run query with hard-coded filter on the single index segment.
-   *
-   * @param query PQL query without any filter.
-   * @return query operator.
-   */
-  protected <T extends Operator> T getOperatorForQueryWithFilter(String query) {
-    return getOperatorForQuery(query + QUERY_FILTER);
+  @Override
+  protected IndexSegment getIndexSegment() {
+    return _indexSegment;
+  }
+
+  @Override
+  protected List<SegmentDataManager> getSegmentDataManagers() {
+    return _segmentDataManagers;
   }
 }

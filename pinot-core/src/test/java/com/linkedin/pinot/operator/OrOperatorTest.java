@@ -124,7 +124,7 @@ public class OrOperatorTest {
       final BlockDocIdIterator iterator = blockDocIdSet.iterator();
       int docId;
       while ((docId = iterator.next()) != Constants.EOF) {
-        System.out.println(docId);
+//        System.out.println(docId);
         Assert.assertEquals(expectedIterator.next().intValue(), docId);
       }
     }

@@ -15,13 +15,12 @@
  */
 package com.linkedin.pinot.core.query.selection;
 
-import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.common.request.SelectionSort;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.response.broker.SelectionResults;
+import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.common.utils.DataTable;
-import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.Constants;
@@ -31,10 +30,13 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
+import java.util.Set;
 import javax.annotation.Nonnull;
 
 
@@ -64,124 +66,167 @@ import javax.annotation.Nonnull;
  * </ul>
  */
 public class SelectionOperatorService {
-
   private final List<String> _selectionColumns;
   private final List<SelectionSort> _sortSequence;
   private final DataSchema _dataSchema;
   private final int _selectionOffset;
-  private final int _maxRowSize;
-  private final PriorityQueue<Serializable[]> _rowEventsSet;
+  private final int _maxNumRows;
+  private final PriorityQueue<Serializable[]> _rows;
 
   private long _numDocsScanned = 0;
 
   /**
-   * Constructor for <code>SelectionOperatorService</code> with {@link IndexSegment}. (Server side)
+   * Constructor for <code>SelectionOperatorService</code> with {@link IndexSegment}. (Inner segment)
    *
    * @param selection selection query.
    * @param indexSegment index segment.
    */
   public SelectionOperatorService(@Nonnull Selection selection, @Nonnull IndexSegment indexSegment) {
     _selectionColumns = SelectionOperatorUtils.getSelectionColumns(selection.getSelectionColumns(), indexSegment);
-    _sortSequence = selection.getSelectionSortSequence();
-    // For highest performance, only allow selection queries with ORDER BY.
-    Preconditions.checkState(_sortSequence != null && !_sortSequence.isEmpty());
+    _sortSequence = getSortSequence(selection.getSelectionSortSequence());
     _dataSchema = SelectionOperatorUtils.extractDataSchema(_sortSequence, _selectionColumns, indexSegment);
-
-    // TODO: selectionSize should never be 0 on this layer, address LIMIT 0 selection queries on upper layer.
-    int selectionSize = selection.getSize();
-    if (selectionSize == 0) {
-      // No need to select any row.
-      _selectionOffset = 0;
-      _maxRowSize = 0;
-      _rowEventsSet = new PriorityQueue<>(1);
-    } else {
-      // Select rows from offset to offset + size.
-      _selectionOffset = selection.getOffset();
-      _maxRowSize = _selectionOffset + selectionSize;
-      _rowEventsSet = new PriorityQueue<>(_maxRowSize, getComparator());
-    }
+    // Select rows from offset to offset + size.
+    _selectionOffset = selection.getOffset();
+    _maxNumRows = _selectionOffset + selection.getSize();
+    _rows = new PriorityQueue<>(_maxNumRows, getStrictComparator());
   }
 
   /**
-   * Constructor for <code>SelectionOperatorService</code> with {@link DataSchema}. (Broker side)
+   * Constructor for <code>SelectionOperatorService</code> with {@link DataSchema}. (Inter segment)
    *
    * @param selection selection query.
    * @param dataSchema data schema.
    */
   public SelectionOperatorService(@Nonnull Selection selection, @Nonnull DataSchema dataSchema) {
     _selectionColumns = SelectionOperatorUtils.getSelectionColumns(selection.getSelectionColumns(), dataSchema);
-    _sortSequence = selection.getSelectionSortSequence();
-    // For highest performance, only allow selection queries with ORDER BY.
-    Preconditions.checkState(_sortSequence != null && !_sortSequence.isEmpty());
+    _sortSequence = getSortSequence(selection.getSelectionSortSequence());
     _dataSchema = dataSchema;
-
-    // TODO: selectionSize should never be 0 on this layer, address LIMIT 0 selection queries on upper layer.
-    int selectionSize = selection.getSize();
-    if (selectionSize == 0) {
-      // No need to select any row.
-      _selectionOffset = 0;
-      _maxRowSize = 0;
-      _rowEventsSet = new PriorityQueue<>(1);
-    } else {
-      // Select rows from offset to offset + size.
-      _selectionOffset = selection.getOffset();
-      _maxRowSize = _selectionOffset + selectionSize;
-      _rowEventsSet = new PriorityQueue<>(_maxRowSize, getComparator());
-    }
+    // Select rows from offset to offset + size.
+    _selectionOffset = selection.getOffset();
+    _maxNumRows = _selectionOffset + selection.getSize();
+    _rows = new PriorityQueue<>(_maxNumRows, getTypeCompatibleComparator());
   }
 
   /**
-   * Helper method to get the {@link Comparator} for selection rows.
+   * Helper method to handle duplicate sort columns.
    *
-   * @return {@link Comparator} for selection rows.
+   * @return de-duplicated list of sort sequences.
    */
-  private Comparator<Serializable[]> getComparator() {
+  @Nonnull
+  private List<SelectionSort> getSortSequence(List<SelectionSort> selectionSorts) {
+    List<SelectionSort> deDupedSelectionSorts = new ArrayList<>();
+    Set<String> sortColumns = new HashSet<>();
+    for (SelectionSort selectionSort : selectionSorts) {
+      String sortColumn = selectionSort.getColumn();
+      if (!sortColumns.contains(sortColumn)) {
+        deDupedSelectionSorts.add(selectionSort);
+        sortColumns.add(sortColumn);
+      }
+    }
+    return deDupedSelectionSorts;
+  }
+
+  /**
+   * Helper method to get the strict {@link Comparator} for selection rows. (Inner segment)
+   * <p>Strict comparator does not allow any schema mismatch (more performance driven).
+   *
+   * @return strict {@link Comparator} for selection rows.
+   */
+  @Nonnull
+  private Comparator<Serializable[]> getStrictComparator() {
     return new Comparator<Serializable[]>() {
       @Override
       public int compare(Serializable[] o1, Serializable[] o2) {
         int numSortColumns = _sortSequence.size();
         for (int i = 0; i < numSortColumns; i++) {
           int ret = 0;
+          SelectionSort selectionSort = _sortSequence.get(i);
+          Serializable v1 = o1[i];
+          Serializable v2 = o2[i];
+
           // Only compare single-value columns.
           switch (_dataSchema.getColumnType(i)) {
             case INT:
-              if (!_sortSequence.get(i).isIsAsc()) {
-                ret = ((Integer) o1[i]).compareTo((Integer) o2[i]);
+              if (!selectionSort.isIsAsc()) {
+                ret = ((Integer) v1).compareTo((Integer) v2);
               } else {
-                ret = ((Integer) o2[i]).compareTo((Integer) o1[i]);
+                ret = ((Integer) v2).compareTo((Integer) v1);
               }
               break;
             case LONG:
-              if (!_sortSequence.get(i).isIsAsc()) {
-                ret = ((Long) o1[i]).compareTo((Long) o2[i]);
+              if (!selectionSort.isIsAsc()) {
+                ret = ((Long) v1).compareTo((Long) v2);
               } else {
-                ret = ((Long) o2[i]).compareTo((Long) o1[i]);
+                ret = ((Long) v2).compareTo((Long) v1);
               }
               break;
             case FLOAT:
-              if (!_sortSequence.get(i).isIsAsc()) {
-                ret = ((Float) o1[i]).compareTo((Float) o2[i]);
+              if (!selectionSort.isIsAsc()) {
+                ret = ((Float) v1).compareTo((Float) v2);
               } else {
-                ret = ((Float) o2[i]).compareTo((Float) o1[i]);
+                ret = ((Float) v2).compareTo((Float) v1);
               }
               break;
             case DOUBLE:
-              if (!_sortSequence.get(i).isIsAsc()) {
-                ret = ((Double) o1[i]).compareTo((Double) o2[i]);
+              if (!selectionSort.isIsAsc()) {
+                ret = ((Double) v1).compareTo((Double) v2);
               } else {
-                ret = ((Double) o2[i]).compareTo((Double) o1[i]);
+                ret = ((Double) v2).compareTo((Double) v1);
               }
               break;
             case STRING:
-              if (!_sortSequence.get(i).isIsAsc()) {
-                ret = ((String) o1[i]).compareTo((String) o2[i]);
+              if (!selectionSort.isIsAsc()) {
+                ret = ((String) v1).compareTo((String) v2);
               } else {
-                ret = ((String) o2[i]).compareTo((String) o1[i]);
+                ret = ((String) v2).compareTo((String) v1);
               }
               break;
             default:
               break;
           }
+
+          if (ret != 0) {
+            return ret;
+          }
+        }
+        return 0;
+      }
+    };
+  }
+
+  /**
+   * Helper method to get the type-compatible {@link Comparator} for selection rows. (Inter segment)
+   * <p>Type-compatible comparator allows compatible types to compare with each other.
+   *
+   * @return flexible {@link Comparator} for selection rows.
+   */
+  @Nonnull
+  private Comparator<Serializable[]> getTypeCompatibleComparator() {
+    return new Comparator<Serializable[]>() {
+      @Override
+      public int compare(Serializable[] o1, Serializable[] o2) {
+        int numSortColumns = _sortSequence.size();
+        for (int i = 0; i < numSortColumns; i++) {
+          int ret = 0;
+          SelectionSort selectionSort = _sortSequence.get(i);
+          Serializable v1 = o1[i];
+          Serializable v2 = o2[i];
+
+          // Only compare single-value columns.
+          if (v1 instanceof Number) {
+            if (!selectionSort.isIsAsc()) {
+              ret = Double.compare(((Number) v1).doubleValue(), ((Number) v2).doubleValue());
+            } else {
+              ret = Double.compare(((Number) v2).doubleValue(), ((Number) v1).doubleValue());
+            }
+          } else if (v1 instanceof String) {
+            if (!selectionSort.isIsAsc()) {
+              ret = ((String) v1).compareTo((String) v2);
+            } else {
+              ret = ((String) v2).compareTo((String) v1);
+            }
+          }
+
           if (ret != 0) {
             return ret;
           }
@@ -196,6 +241,7 @@ public class SelectionOperatorService {
    *
    * @return data schema.
    */
+  @Nonnull
   public DataSchema getDataSchema() {
     return _dataSchema;
   }
@@ -205,12 +251,13 @@ public class SelectionOperatorService {
    *
    * @return selection results.
    */
-  public PriorityQueue<Serializable[]> getRowEventsSet() {
-    return _rowEventsSet;
+  @Nonnull
+  public PriorityQueue<Serializable[]> getRows() {
+    return _rows;
   }
 
   /**
-   * Get number of documents scanned.
+   * Get number of documents scanned. (Inner segment)
    *
    * @return number of documents scanned.
    */
@@ -220,99 +267,104 @@ public class SelectionOperatorService {
 
   /**
    * Iterate over {@link Block}s, extract values from them and merge the values to the selection results for selection
-   * queries with <code>ORDER BY</code>. (Server side)
+   * queries with <code>ORDER BY</code>. (Inner segment)
    *
    * @param blockDocIdIterator block document id iterator.
    * @param blocks {@link Block} array.
    */
   public void iterateOnBlocksWithOrdering(@Nonnull BlockDocIdIterator blockDocIdIterator, @Nonnull Block[] blocks) {
-    if (_maxRowSize > 0) {
-      Comparator<Integer> rowDocIdComparator = new CompositeDocIdValComparator(_sortSequence, blocks);
-      PriorityQueue<Integer> rowDocIdPriorityQueue = new PriorityQueue<>(_maxRowSize, rowDocIdComparator);
-      int docId;
-      while ((docId = blockDocIdIterator.next()) != Constants.EOF) {
-        _numDocsScanned++;
-        addToPriorityQueue(docId, rowDocIdPriorityQueue);
-      }
-
-      SelectionFetcher selectionFetcher = new SelectionFetcher(blocks, _dataSchema);
-      Collection<Serializable[]> rowEventsSet = new ArrayList<>(rowDocIdPriorityQueue.size());
-      for (int rowDocId : rowDocIdPriorityQueue) {
-        rowEventsSet.add(selectionFetcher.getRow(rowDocId));
-      }
-      mergeWithOrdering(_rowEventsSet, rowEventsSet);
+    Comparator<Integer> rowDocIdComparator = new CompositeDocIdValComparator(_sortSequence, blocks);
+    PriorityQueue<Integer> rowDocIdPriorityQueue = new PriorityQueue<>(_maxNumRows, rowDocIdComparator);
+    int docId;
+    while ((docId = blockDocIdIterator.next()) != Constants.EOF) {
+      _numDocsScanned++;
+      SelectionOperatorUtils.addToPriorityQueue(docId, rowDocIdPriorityQueue, _maxNumRows);
     }
+
+    SelectionFetcher selectionFetcher = new SelectionFetcher(blocks, _dataSchema);
+    Collection<Serializable[]> rows = new ArrayList<>(rowDocIdPriorityQueue.size());
+    for (int rowDocId : rowDocIdPriorityQueue) {
+      rows.add(selectionFetcher.getRow(rowDocId));
+    }
+    SelectionOperatorUtils.mergeWithOrdering(_rows, rows, _maxNumRows);
   }
 
   /**
-   * Merge two partial results for selection queries with <code>ORDER BY</code>. (Server side)
-   *
-   * @param mergedRowEventsSet partial results 1.
-   * @param toMergeRowEventsSet partial results 2.
-   */
-  public void mergeWithOrdering(@Nonnull Collection<Serializable[]> mergedRowEventsSet,
-      @Nonnull Collection<Serializable[]> toMergeRowEventsSet) {
-    if (_maxRowSize > 0) {
-      PriorityQueue<Serializable[]> mergedPriorityQueue = (PriorityQueue<Serializable[]>) mergedRowEventsSet;
-      for (Serializable[] row : toMergeRowEventsSet) {
-        addToPriorityQueue(row, mergedPriorityQueue);
-      }
-    }
-  }
-
-  /**
-   * Reduce a collection of {@link DataTable}s to selection results for selection queries with <code>ORDER BY</code>.
+   * Reduce a collection of {@link DataTable}s to selection rows for selection queries with <code>ORDER BY</code>.
    * (Broker side)
    *
    * @param selectionResults {@link Map} from {@link ServerInstance} to {@link DataTable}.
-   * @return reduced results.
    */
-  public PriorityQueue<Serializable[]> reduceWithOrdering(@Nonnull Map<ServerInstance, DataTable> selectionResults) {
-    if (_maxRowSize > 0) {
-      for (DataTable dataTable : selectionResults.values()) {
-        int numRows = dataTable.getNumberOfRows();
-        for (int rowId = 0; rowId < numRows; rowId++) {
-          Serializable[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
-          addToPriorityQueue(row, _rowEventsSet);
-        }
+  public void reduceWithOrdering(@Nonnull Map<ServerInstance, DataTable> selectionResults) {
+    for (DataTable dataTable : selectionResults.values()) {
+      int numRows = dataTable.getNumberOfRows();
+      for (int rowId = 0; rowId < numRows; rowId++) {
+        Serializable[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
+        SelectionOperatorUtils.addToPriorityQueue(row, _rows, _maxNumRows);
       }
     }
-    return _rowEventsSet;
   }
 
   /**
-   * Render the final selection results to a {@link SelectionResults} object for selection queries with
+   * Render the unformatted selection rows to a formatted {@link SelectionResults} object for selection queries with
    * <code>ORDER BY</code>. (Broker side)
-   * <p>{@link SelectionResults} object will be used in building the BrokerResponse.
+   * <p>{@link SelectionResults} object will be used to build the broker response.
+   * <p>Should be called after method "reduceWithOrdering()".
    *
-   * @param finalResults final selection results.
    * @return {@link SelectionResults} object results.
    */
-  public SelectionResults renderSelectionResultsWithOrdering(@Nonnull Collection<Serializable[]> finalResults) {
-    LinkedList<Serializable[]> rowEventsSet = new LinkedList<>();
+  @Nonnull
+  public SelectionResults renderSelectionResultsWithOrdering() {
+    LinkedList<Serializable[]> rowsInSelectionResults = new LinkedList<>();
 
-    PriorityQueue<Serializable[]> finalResultsPriorityQueue = (PriorityQueue<Serializable[]>) finalResults;
-    while (finalResultsPriorityQueue.size() > _selectionOffset) {
-      rowEventsSet.addFirst(
-          SelectionOperatorUtils.getFormattedRow(finalResultsPriorityQueue.poll(), _selectionColumns, _dataSchema));
+    int[] columnIndices = getColumnIndices();
+    while (_rows.size() > _selectionOffset) {
+      rowsInSelectionResults.addFirst(getFormattedRowWithOrdering(_rows.poll(), columnIndices));
     }
 
-    return new SelectionResults(_selectionColumns, rowEventsSet);
+    return new SelectionResults(_selectionColumns, rowsInSelectionResults);
   }
 
   /**
-   * Helper method to add a value to a {@link PriorityQueue}.
+   * Helper method to get each selection column index in data schema.
    *
-   * @param value value to be added.
-   * @param queue priority queue.
-   * @param <T> type for the value.
+   * @return column indices.
    */
-  private <T> void addToPriorityQueue(@Nonnull T value, @Nonnull PriorityQueue<T> queue) {
-    if (queue.size() < _maxRowSize) {
-      queue.add(value);
-    } else if (queue.comparator().compare(queue.peek(), value) < 0) {
-      queue.poll();
-      queue.add(value);
+  private int[] getColumnIndices() {
+    int numSelectionColumns = _selectionColumns.size();
+    int[] columnIndices = new int[numSelectionColumns];
+
+    int numColumnsInDataSchema = _dataSchema.size();
+    Map<String, Integer> dataSchemaIndices = new HashMap<>(numColumnsInDataSchema);
+    for (int i = 0; i < numColumnsInDataSchema; i++) {
+      dataSchemaIndices.put(_dataSchema.getColumnName(i), i);
     }
+
+    for (int i = 0; i < numSelectionColumns; i++) {
+      columnIndices[i] = dataSchemaIndices.get(_selectionColumns.get(i));
+    }
+
+    return columnIndices;
+  }
+
+  /**
+   * Helper method to format a selection row, make all values string or string array type based on data schema passed in
+   * for selection queries with <code>ORDER BY</code>. (Broker side)
+   * <p>Formatted row is used to build the {@link SelectionResults}.
+   *
+   * @param row selection row to be formatted.
+   * @param columnIndices column indices of original rows.
+   * @return formatted selection row.
+   */
+  @Nonnull
+  private Serializable[] getFormattedRowWithOrdering(@Nonnull Serializable[] row, @Nonnull int[] columnIndices) {
+    int numColumns = columnIndices.length;
+    Serializable[] formattedRow = new Serializable[numColumns];
+    for (int i = 0; i < numColumns; i++) {
+      int columnIndex = columnIndices[i];
+      formattedRow[i] =
+          SelectionOperatorUtils.getFormattedValue(row[columnIndex], _dataSchema.getColumnType(columnIndex));
+    }
+    return formattedRow;
   }
 }

@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.integration.tests;
 
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import java.io.File;
 import java.sql.ResultSet;
 import java.sql.Statement;
@@ -24,12 +22,14 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import kafka.server.KafkaServerStartable;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.utils.KafkaStarterUtils;
+import kafka.server.KafkaServerStartable;
 
 
 /**
@@ -39,11 +39,11 @@ import org.testng.annotations.BeforeClass;
 public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeClusterIntegrationTest.class);
   private final File _tmpDir = new File("/tmp/RealtimeClusterIntegrationTest");
-  private static final String KAFKA_TOPIC = "realtime-integration-test";
+  protected static final String KAFKA_TOPIC = "realtime-integration-test";
 
   private static final int SEGMENT_COUNT = 12;
   protected static final int ROW_COUNT_FOR_REALTIME_SEGMENT_FLUSH = 20000;
-  private List<KafkaServerStartable> kafkaStarters;
+  protected List<KafkaServerStartable> kafkaStarters;
 
   protected void setUpTable(String tableName, String timeColumnName, String timeColumnType, String kafkaZkUrl,
       String kafkaTopic, File schemaFile, File avroFile) throws Exception {
@@ -53,16 +53,20 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
         null, null, avroFile, ROW_COUNT_FOR_REALTIME_SEGMENT_FLUSH, "Carrier");
   }
 
-  @BeforeClass
-  public void setUp() throws Exception {
-    // Start ZK and Kafka
-    startZk();
+  protected void startKafka() {
     kafkaStarters =
         KafkaStarterUtils.startServers(getKafkaBrokerCount(), KafkaStarterUtils.DEFAULT_KAFKA_PORT,
             KafkaStarterUtils.DEFAULT_ZK_STR, KafkaStarterUtils.getDefaultKafkaConfiguration());
 
     // Create Kafka topic
     createKafkaTopic(KAFKA_TOPIC, KafkaStarterUtils.DEFAULT_ZK_STR);
+  }
+
+  @BeforeClass
+  public void setUp() throws Exception {
+    // Start ZK and Kafka
+    startZk();
+    startKafka();
 
     // Start the Pinot cluster
     startController();

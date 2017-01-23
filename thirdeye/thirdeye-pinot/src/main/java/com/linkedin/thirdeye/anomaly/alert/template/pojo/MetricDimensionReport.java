@@ -1,20 +1,40 @@
 package com.linkedin.thirdeye.anomaly.alert.template.pojo;
 
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class MetricDimensionReport {
+  long metricId;
+  String dataset;
   String metricName;
   String dimensionName;
   long currentStartTime;
   long currentEndTime;
   long baselineStartTime;
   long baselineEndTime;
-  Map<String, Map<String, String>> subDimensionValueMap = new LinkedHashMap<>();
+  Map<String, Map<String, String>> subDimensionValueMap;
+  Map<String, String> subDimensionTotalValueMap;
+  Map<String, String> subDimensionShareValueMap;
+
   String compareMode = "WoW";
+
+  public long getMetricId() {
+    return metricId;
+  }
+
+  public void setMetricId(long metricId) {
+    this.metricId = metricId;
+  }
 
   public String getCompareMode() {
     return compareMode;
+  }
+
+  public String getDataset() {
+    return dataset;
+  }
+
+  public void setDataset(String dataset) {
+    this.dataset = dataset;
   }
 
   public void setCompareMode(String compareMode) {
@@ -75,5 +95,21 @@ public class MetricDimensionReport {
 
   public void setMetricName(String metricName) {
     this.metricName = metricName;
+  }
+
+  public Map<String, String> getSubDimensionShareValueMap() {
+    return subDimensionShareValueMap;
+  }
+
+  public void setSubDimensionShareValueMap(Map<String, String> subDimensionShareValueMap) {
+    this.subDimensionShareValueMap = subDimensionShareValueMap;
+  }
+
+  public Map<String, String> getSubDimensionTotalValueMap() {
+    return subDimensionTotalValueMap;
+  }
+
+  public void setSubDimensionTotalValueMap(Map<String, String> subDimensionTotalValueMap) {
+    this.subDimensionTotalValueMap = subDimensionTotalValueMap;
   }
 }

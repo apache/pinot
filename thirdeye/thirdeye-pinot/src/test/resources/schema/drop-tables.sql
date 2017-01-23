@@ -11,6 +11,7 @@ DROP TABLE if EXISTS merged_anomaly_result_index;
 DROP table if EXISTS anomaly_feedback_index;
 DROP TABLE if EXISTS ingraph_dashboard_config_index;
 DROP TABLE if EXISTS ingraph_metric_config_index;
-DROP TABLE if EXISTS webapp_config_index;
 DROP TABLE if EXISTS override_config_index;
+DROP TABLE if EXISTS alert_config_index;
+DROP TABLE if EXISTS data_completeness_config_index;
 SET FOREIGN_KEY_CHECKS = 1;

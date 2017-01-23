@@ -21,14 +21,11 @@ import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.blocks.IntermediateResultsBlock;
-import com.linkedin.pinot.core.query.aggregation.CombineService;
-import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByOperatorService;
+import com.linkedin.pinot.core.query.reduce.CombineService;
 import com.linkedin.pinot.core.util.trace.TraceCallable;
 import com.linkedin.pinot.core.util.trace.TraceRunnable;
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
@@ -58,9 +55,9 @@ public class MCombineOperator extends BaseOperator {
 
   static {
     int numCores = Runtime.getRuntime().availableProcessors();
-    MIN_THREADS_PER_QUERY = Math.max(1, (int)(numCores * .5));
+    MIN_THREADS_PER_QUERY = Math.max(1, (int) (numCores * .5));
     //Dont have more than 10 threads per query
-    MAX_THREADS_PER_QUERY = Math.min(MAX_THREADS_PER_QUERY, (int)(numCores * .5));
+    MAX_THREADS_PER_QUERY = Math.min(MAX_THREADS_PER_QUERY, (int) (numCores * .5));
   }
 
   public MCombineOperator(List<Operator> operators, ExecutorService executorService, long timeOutMs,
@@ -78,7 +75,6 @@ public class MCombineOperator extends BaseOperator {
     }
     return true;
   }
-
 
   @Override
   public Block getNextBlock() {
@@ -108,11 +104,17 @@ public class MCombineOperator extends BaseOperator {
               if (mergedBlock == null) {
                 mergedBlock = blockToMerge;
               } else {
-                CombineService.mergeTwoBlocks(_brokerRequest, mergedBlock, blockToMerge);
+                try {
+                  CombineService.mergeTwoBlocks(_brokerRequest, mergedBlock, blockToMerge);
+                } catch (Exception e) {
+                  LOGGER.error("Caught exception while merging two blocks (step 1).", e);
+                  mergedBlock.addToProcessingExceptions(
+                      QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, e));
+                }
               }
             }
           } catch (Exception e) {
-            LOGGER.error("exception in the MCombine operator ", e);
+            LOGGER.error("Caught exception while executing query.", e);
             mergedBlock = new IntermediateResultsBlock(e);
           }
           blockingQueue.offer(mergedBlock);
@@ -149,8 +151,9 @@ public class MCombineOperator extends BaseOperator {
                     LOGGER.debug("Merged response from operator {} after: {}", mergedBlocksNumber,
                         (System.currentTimeMillis() - startTime));
                   } catch (Exception e) {
-                    mergedBlock.getExceptions()
-                        .add(QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, e));
+                    LOGGER.error("Caught exception while merging two blocks (step 2).", e);
+                    mergedBlock.addToProcessingExceptions(
+                        QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, e));
                   }
                   mergedBlocksNumber++;
                 }
@@ -176,12 +179,6 @@ public class MCombineOperator extends BaseOperator {
           new IntermediateResultsBlock(QueryException.getException(QueryException.EXECUTION_TIMEOUT_ERROR, e));
     }
 
-    // Trim merged results.
-    if ((_brokerRequest.getAggregationsInfoSize() > 0) && (_brokerRequest.getGroupBy() != null)
-        && (_brokerRequest.getGroupBy().getColumnsSize() > 0)) {
-      trimToSize(_brokerRequest, mergedBlock);
-    }
-
     // Update execution statistics.
     ExecutionStatistics executionStatistics = new ExecutionStatistics();
     for (Operator operator : _operators) {
@@ -193,17 +190,9 @@ public class MCombineOperator extends BaseOperator {
     mergedBlock.setNumDocsScanned(executionStatistics.getNumDocsScanned());
     mergedBlock.setNumEntriesScannedInFilter(executionStatistics.getNumEntriesScannedInFilter());
     mergedBlock.setNumEntriesScannedPostFilter(executionStatistics.getNumEntriesScannedPostFilter());
-    mergedBlock.setTotalRawDocs(executionStatistics.getNumTotalRawDocs());
+    mergedBlock.setNumTotalRawDocs(executionStatistics.getNumTotalRawDocs());
 
     return mergedBlock;
-  }
-
-  private void trimToSize(BrokerRequest brokerRequest, IntermediateResultsBlock mergedBlock) {
-    AggregationGroupByOperatorService aggregationGroupByOperatorService =
-        new AggregationGroupByOperatorService(brokerRequest.getAggregationsInfo(), brokerRequest.getGroupBy());
-    List<Map<String, Serializable>> trimmedResults =
-        aggregationGroupByOperatorService.trimToSize(mergedBlock.getAggregationGroupByOperatorResult());
-    mergedBlock.setAggregationGroupByResult(trimmedResults);
   }
 
   @Override

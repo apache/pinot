@@ -15,10 +15,8 @@
  */
 package com.linkedin.pinot.core.operator.aggregation;
 
-import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
-import java.io.Serializable;
+import com.linkedin.pinot.core.operator.blocks.TransformBlock;
 import java.util.List;
-import java.util.Map;
 
 
 /**
@@ -38,9 +36,9 @@ public interface AggregationExecutor {
    * Performs the actual aggregation on the given docId's of a segment.
    * Asserts that 'init' has been called before calling this method.
    *
-   * @param projectionBlock Projection block on which to perform aggregation.
+   * @param transformBlock Block on which to perform aggregation.
    */
-  void aggregate(ProjectionBlock projectionBlock);
+  void aggregate(TransformBlock transformBlock);
 
   /**
    * Post processing (if any) to be done after all docIdSets have been processed, and
@@ -54,7 +52,7 @@ public interface AggregationExecutor {
    * Returns the result of aggregation.
    * Asserts that 'finish' has been called before calling getResult().
    *
-   * @return
+   * @return Result of aggregation
    */
-  List<Serializable> getResult();
+  List<Object> getResult();
 }

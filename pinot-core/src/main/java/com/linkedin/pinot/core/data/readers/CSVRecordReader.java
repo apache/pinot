@@ -82,8 +82,12 @@ public class CSVRecordReader extends BaseRecordReader {
 
   @Override
   public GenericRow next() {
+    return next(new GenericRow());
+  }
+
+  @Override
+  public GenericRow next(GenericRow row) {
     CSVRecord record = _iterator.next();
-    Map<String, Object> fieldMap = new HashMap<String, Object>();
 
     for (final FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       String column = fieldSpec.getName();
@@ -100,12 +104,10 @@ public class CSVRecordReader extends BaseRecordReader {
         value = RecordReaderUtils.convertToDataTypeArray(tokens, fieldSpec.getDataType());
       }
 
-      fieldMap.put(column, value);
+      row.putField(column, value);
     }
 
-    GenericRow genericRow = new GenericRow();
-    genericRow.init(fieldMap);
-    return genericRow;
+    return row;
   }
 
   @Override

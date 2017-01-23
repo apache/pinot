@@ -15,6 +15,22 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl;
 
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.mutable.MutableLong;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.google.common.collect.HashBiMap;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
@@ -47,22 +63,6 @@ import com.linkedin.pinot.core.startree.StarTreeSerDe;
 import com.linkedin.pinot.core.startree.hll.HllConfig;
 import com.linkedin.pinot.core.startree.hll.HllUtil;
 import com.linkedin.pinot.core.util.CrcUtils;
-import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.mutable.MutableLong;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Implementation of an index segment creator.
@@ -113,7 +113,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       HllConfig hllConfig = config.getHllConfig();
       // create hll index is true only if we're provided with columns to
       // generate HLL fields
-      if (hllConfig.getColumnsToDeriveHllFields() != null) {
+      if (hllConfig.getColumnsToDeriveHllFields() != null && !hllConfig.getColumnsToDeriveHllFields().isEmpty()) {
         if (!createStarTree) {
           throw new IllegalArgumentException("Derived HLL fields generation will not work if StarTree is not enabled.");
         } else {
@@ -227,13 +227,15 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     recordReader.rewind();
     LOGGER.info("Start append raw data to star tree builder!");
     totalDocs = 0;
+    GenericRow readRow = new GenericRow();
+    GenericRow transformedRow = new GenericRow();
     while (recordReader.hasNext()) {
       //PlainFieldExtractor conducts necessary type conversions
-      GenericRow row = readNextRowSanitized();
+      transformedRow = readNextRowSanitized(readRow, transformedRow);
       //must be called after previous step since type conversion for derived values is unnecessary
-      populateDefaultDerivedColumnValues(row);
-      starTreeBuilder.append(row);
-      statsCollector.collectRow(row);
+      populateDefaultDerivedColumnValues(transformedRow);
+      starTreeBuilder.append(transformedRow);
+      statsCollector.collectRow(transformedRow);
       totalRawDocs++;
       totalDocs++;
     }
@@ -350,13 +352,15 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     // Count the number of documents and gather per-column statistics
     LOGGER.debug("Start building StatsCollector!");
     totalDocs = 0;
+    GenericRow readRow = new GenericRow();
+    GenericRow transformedRow = new GenericRow();
     while (recordReader.hasNext()) {
       totalDocs++;
       totalRawDocs++;
       long start = System.currentTimeMillis();
-      GenericRow row = readNextRowSanitized();
+      transformedRow = readNextRowSanitized(readRow, transformedRow);
       long stop = System.currentTimeMillis();
-      statsCollector.collectRow(row);
+      statsCollector.collectRow(transformedRow);
       long stop1 = System.currentTimeMillis();
       totalRecordReadTime += (stop - start);
       totalStatsCollectorTime += (stop1 - stop);
@@ -373,9 +377,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     LOGGER.info("Start building IndexCreator!");
     while (recordReader.hasNext()) {
       long start = System.currentTimeMillis();
-      GenericRow row = readNextRowSanitized();
+      transformedRow = readNextRowSanitized(readRow, transformedRow);
       long stop = System.currentTimeMillis();
-      indexCreator.indexRow(row);
+      indexCreator.indexRow(transformedRow);
       long stop1 = System.currentTimeMillis();
       totalRecordReadTime += (stop - start);
       totalIndexTime += (stop1 - stop);
@@ -416,8 +420,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       if (timeColumn != null && timeColumn.length() > 0) {
         final Object minTimeValue = statsCollector.getColumnProfileFor(timeColumn).getMinValue();
         final Object maxTimeValue = statsCollector.getColumnProfileFor(timeColumn).getMaxValue();
-        segmentName = SegmentNameBuilder.buildBasic(config.getTableName(), minTimeValue, maxTimeValue,
-            config.getSegmentNamePostfix());
+        segmentName = SegmentNameBuilder
+            .buildBasic(config.getTableName(), minTimeValue, maxTimeValue, config.getSegmentNamePostfix());
       } else {
         segmentName = SegmentNameBuilder.buildBasic(config.getTableName(), config.getSegmentNamePostfix());
       }
@@ -507,7 +511,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
           InvertedIndexType.ROARING_BITMAPS, statsCollector.getColumnProfileFor(column).isSorted(),
           statsCollector.getColumnProfileFor(column).hasNull(),
           statsCollector.getColumnProfileFor(column).getTotalNumberOfEntries(),
-          statsCollector.getColumnProfileFor(column).getMaxNumberOfMultiValues(), false/*isAutoGenerated*/,
+          statsCollector.getColumnProfileFor(column).getMaxNumberOfMultiValues(),
+          statsCollector.getColumnProfileFor(column).getLengthOfLargestElement(), false/*isAutoGenerated*/,
           dataSchema.getFieldSpecFor(column).getDefaultNullValue()));
     }
     segmentIndexCreationInfo.setTotalDocs(totalDocs);
@@ -528,9 +533,11 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     return segmentName;
   }
 
-  private GenericRow readNextRowSanitized() {
-    GenericRow rowOrig = recordReader.next();
-    return extractor.transform(rowOrig);
+  private GenericRow readNextRowSanitized(GenericRow readRow, GenericRow transformedRow) {
+    readRow = GenericRow.createOrReuseRow(readRow);
+    readRow = recordReader.next(readRow);
+    transformedRow = GenericRow.createOrReuseRow(transformedRow);
+    return extractor.transform(readRow, transformedRow);
   }
 
   /**

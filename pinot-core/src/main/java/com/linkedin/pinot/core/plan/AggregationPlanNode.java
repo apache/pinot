@@ -17,16 +17,14 @@ package com.linkedin.pinot.core.plan;
 
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.operator.MProjectionOperator;
-import com.linkedin.pinot.core.operator.aggregation.AggregationOperator;
-import com.linkedin.pinot.core.query.aggregation.AggregationFunctionUtils;
-import com.linkedin.pinot.core.startree.hll.HllConstants;
-import java.util.Arrays;
-import java.util.HashSet;
+import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunctionUtils;
+import com.linkedin.pinot.core.operator.query.AggregationOperator;
+import com.linkedin.pinot.core.operator.transform.TransformExpressionOperator;
 import java.util.List;
-import java.util.Set;
+import javax.annotation.Nonnull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,34 +38,21 @@ public class AggregationPlanNode implements PlanNode {
 
   private final IndexSegment _indexSegment;
   private final List<AggregationInfo> _aggregationInfos;
-  private final ProjectionPlanNode _projectionPlanNode;
+  private final TransformPlanNode _transformPlanNode;
 
-  public AggregationPlanNode(IndexSegment indexSegment, BrokerRequest brokerRequest) {
+  public AggregationPlanNode(@Nonnull IndexSegment indexSegment, @Nonnull BrokerRequest brokerRequest) {
     _indexSegment = indexSegment;
     _aggregationInfos = brokerRequest.getAggregationsInfo();
-    _projectionPlanNode = new ProjectionPlanNode(_indexSegment, getAggregationRelatedColumns(),
-        new DocIdSetPlanNode(_indexSegment, brokerRequest));
-    for (AggregationInfo aggregationInfo : _aggregationInfos) {
-      AggregationFunctionUtils.ensureAggregationColumnsAreSingleValued(aggregationInfo, _indexSegment);
-    }
-  }
-
-  private String[] getAggregationRelatedColumns() {
-    Set<String> aggregationRelatedColumns = new HashSet<>();
-    for (AggregationInfo aggregationInfo : _aggregationInfos) {
-      if (!aggregationInfo.getAggregationType().equalsIgnoreCase("count")) {
-        String columns = aggregationInfo.getAggregationParams().get("column").trim();
-        aggregationRelatedColumns.addAll(Arrays.asList(columns.split(",")));
-      }
-    }
-    return aggregationRelatedColumns.toArray(new String[aggregationRelatedColumns.size()]);
+    _transformPlanNode = new TransformPlanNode(_indexSegment, brokerRequest);
   }
 
   @Override
   public Operator run() {
-    MProjectionOperator projectionOperator = (MProjectionOperator) _projectionPlanNode.run();
-    return new AggregationOperator(_aggregationInfos, projectionOperator,
-        _indexSegment.getSegmentMetadata().getTotalRawDocs());
+    TransformExpressionOperator transformOperator = (TransformExpressionOperator) _transformPlanNode.run();
+    SegmentMetadata segmentMetadata = _indexSegment.getSegmentMetadata();
+    return new AggregationOperator(
+        AggregationFunctionUtils.getAggregationFunctionContexts(_aggregationInfos, segmentMetadata), transformOperator,
+        segmentMetadata.getTotalRawDocs());
   }
 
   @Override
@@ -76,7 +61,7 @@ public class AggregationPlanNode implements PlanNode {
     LOGGER.debug(prefix + "Operator: AggregationOperator");
     LOGGER.debug(prefix + "Argument 0: IndexSegment - " + _indexSegment.getSegmentName());
     LOGGER.debug(prefix + "Argument 1: Aggregations - " + _aggregationInfos);
-    LOGGER.debug(prefix + "Argument 2: Projection -");
-    _projectionPlanNode.showTree(prefix + "    ");
+    LOGGER.debug(prefix + "Argument 2: Transform -");
+    _transformPlanNode.showTree(prefix + "    ");
   }
 }

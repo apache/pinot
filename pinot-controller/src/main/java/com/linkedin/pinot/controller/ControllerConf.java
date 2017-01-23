@@ -108,8 +108,8 @@ public class ControllerConf extends PropertiesConfiguration {
     setProperty(DATA_DIR, dataDir);
   }
 
-  public void setRealtimeSegmentCommitTimeoutSeconds(int timoeutSec) {
-    setProperty(SEGMENT_COMMIT_TIMEOUT_SECONDS, Integer.toString(timoeutSec));
+  public void setRealtimeSegmentCommitTimeoutSeconds(int timeoutSec) {
+    setProperty(SEGMENT_COMMIT_TIMEOUT_SECONDS, Integer.toString(timeoutSec));
   }
 
   public void setUpdateSegmentStateModel(String updateStateModel) {

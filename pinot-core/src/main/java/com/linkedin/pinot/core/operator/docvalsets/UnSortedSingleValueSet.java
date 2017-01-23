@@ -15,34 +15,24 @@
  */
 package com.linkedin.pinot.core.operator.docvalsets;
 
+import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.core.common.BaseBlockValSet;
 import com.linkedin.pinot.core.common.BlockValIterator;
-import com.linkedin.pinot.core.common.BlockValSet;
+import com.linkedin.pinot.core.io.reader.ReaderContext;
 import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
 import com.linkedin.pinot.core.operator.docvaliterators.UnSortedSingleValueIterator;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 
-public final class UnSortedSingleValueSet implements BlockValSet {
+
+public final class UnSortedSingleValueSet extends BaseBlockValSet {
   final SingleColumnSingleValueReader sVReader;
   final ColumnMetadata columnMetadata;
 
-  public UnSortedSingleValueSet(SingleColumnSingleValueReader sVReader,
-      ColumnMetadata columnMetadata) {
+  public UnSortedSingleValueSet(SingleColumnSingleValueReader sVReader, ColumnMetadata columnMetadata) {
     super();
     this.sVReader = sVReader;
     this.columnMetadata = columnMetadata;
-  }
-
-  @Override
-  public <T> T getSingleValues() {
-    throw new UnsupportedOperationException(
-        "Reading a batch of values is not supported for unsorted single-value BlockValSet.");
-  }
-
-  @Override
-  public <T> T getMultiValues() {
-    throw new UnsupportedOperationException(
-        "Reading a batch of values is not supported for unsorted single-value BlockValSet.");
   }
 
   @Override
@@ -55,20 +45,68 @@ public final class UnSortedSingleValueSet implements BlockValSet {
     return this.columnMetadata.getDataType();
   }
 
+  /**
+   * Reads double values for the given docIds and returns in the passed in double[].
+   * Compatible types (int, float, long) can also be read in as double.
+   *
+   * @param inDocIds DocIds for which to get the values
+   * @param inStartPos start index in the inDocIds array
+   * @param inDocIdsSize size of docIds to read
+   * @param outValues Array where output is written
+   * @param outStartPos start index into output array
+   */
   @Override
-  public void getDictionaryIds(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outDictionaryIds, int outStartPos) {
+  public void getDoubleValues(int[] inDocIds, int inStartPos, int inDocIdsSize, double[] outValues, int outStartPos) {
+    int inEndPos = inStartPos + inDocIdsSize;
+    ReaderContext context = sVReader.createContext();
+
+    switch (columnMetadata.getDataType()) {
+      case INT:
+        for (int i = inStartPos; i < inEndPos; i++) {
+          outValues[outStartPos++] = sVReader.getInt(inDocIds[i], context);
+        }
+        break;
+
+      case LONG:
+        for (int i = inStartPos; i < inEndPos; i++) {
+          outValues[outStartPos++] = sVReader.getLong(inDocIds[i], context);
+        }
+        break;
+
+      case FLOAT:
+        for (int i = inStartPos; i < inEndPos; i++) {
+          outValues[outStartPos++] = sVReader.getFloat(inDocIds[i], context);
+        }
+        break;
+
+      case DOUBLE:
+        for (int i = inStartPos; i < inEndPos; i++) {
+          outValues[outStartPos++] = sVReader.getDouble(inDocIds[i], context);
+        }
+        break;
+
+      default:
+        throw new UnsupportedOperationException(
+            "Cannot fetch double values for column: " + columnMetadata.getColumnName());
+    }
+  }
+
+  @Override
+  public void getStringValues(int[] inDocIds, int inStartPos, int inDocIdsSize, String[] outValues, int outStartPos) {
+    ReaderContext context = sVReader.createContext();
+    int inEndPos = inStartPos + inDocIdsSize;
+    try {
+      for (int i = inStartPos; i < inEndPos; i++) {
+        outValues[outStartPos++] = sVReader.getString(inDocIds[i], context);
+      }
+    } catch (Exception e) {
+      Utils.rethrowException(e);
+    }
+  }
+
+  @Override
+  public void getDictionaryIds(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outDictionaryIds,
+      int outStartPos) {
     sVReader.readValues(inDocIds, inStartPos, inDocIdsSize, outDictionaryIds, outStartPos);
-  }
-
-  @Override
-  public int[] getDictionaryIds() {
-    throw new UnsupportedOperationException(
-        "Unsupported operation 'getDictionaryIds' for unsorted single-value BlockValSet.");
-  }
-
-  @Override
-  public int getDictionaryIdsForDocId(int docId, int[] outputDictIds) {
-    throw new UnsupportedOperationException(
-        "Reading value for a given docId not supported for unsorted single-value BlockValset.");
   }
 }

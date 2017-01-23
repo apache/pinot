@@ -15,159 +15,164 @@
  */
 package com.linkedin.pinot.core.operator.aggregation.function;
 
-import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.aggregation.AggregationResultHolder;
+import com.linkedin.pinot.core.operator.aggregation.ObjectAggregationResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupByResultHolder;
+import com.linkedin.pinot.core.operator.aggregation.groupby.ObjectGroupByResultHolder;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
-import java.util.List;
+import java.util.Collections;
+import javax.annotation.Nonnull;
 
 
-/**
- * Class to implement the 'percentileXX' aggregation function.
- */
-public class PercentileAggregationFunction implements AggregationFunction {
-  private final String FUNCTION_NAME;
-  private static final ResultDataType RESULT_DATA_TYPE = ResultDataType.PERCENTILE_LIST;
+public class PercentileAggregationFunction implements AggregationFunction<DoubleArrayList, Double> {
+  private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
+
+  private final String _name;
   private final int _percentile;
 
   public PercentileAggregationFunction(int percentile) {
     switch (percentile) {
       case 50:
-        FUNCTION_NAME = AggregationFunctionFactory.PERCENTILE50_AGGREGATION_FUNCTION;
+        _name = AggregationFunctionFactory.AggregationFunctionType.PERCENTILE50.getName();
         break;
       case 90:
-        FUNCTION_NAME = AggregationFunctionFactory.PERCENTILE90_AGGREGATION_FUNCTION;
+        _name = AggregationFunctionFactory.AggregationFunctionType.PERCENTILE90.getName();
         break;
       case 95:
-        FUNCTION_NAME = AggregationFunctionFactory.PERCENTILE95_AGGREGATION_FUNCTION;
+        _name = AggregationFunctionFactory.AggregationFunctionType.PERCENTILE95.getName();
         break;
       case 99:
-        FUNCTION_NAME = AggregationFunctionFactory.PERCENTILE99_AGGREGATION_FUNCTION;
+        _name = AggregationFunctionFactory.AggregationFunctionType.PERCENTILE99.getName();
         break;
       default:
-        throw new RuntimeException("Invalid percentile for PercentileAggregationFunction: " + percentile);
+        throw new UnsupportedOperationException(
+            "Unsupported percentile for PercentileAggregationFunction: " + percentile);
     }
     _percentile = percentile;
   }
 
-  /**
-   * Performs 'percentile' aggregation on the input array.
-   *
-   * {@inheritDoc}
-   *
-   * @param length
-   * @param resultHolder
-   * @param valueArray
-   */
-  @Override
-  public void aggregate(int length, AggregationResultHolder resultHolder, Object... valueArray) {
-    Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkArgument(valueArray[0] instanceof double[]);
-    final double[] values = (double[]) valueArray[0];
-    Preconditions.checkState(length <= values.length);
-
-    DoubleArrayList valueList = resultHolder.getResult();
-    if (valueList == null) {
-      valueList = new DoubleArrayList();
-      resultHolder.setValue(valueList);
-    }
-
-    for (int i = 0; i < length; i++) {
-      valueList.add(values[i]);
-    }
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * While the interface allows for variable number of valueArrays, we do not support
-   * multiple columns within one aggregation function right now.
-   *
-   * @param length
-   * @param groupKeys
-   * @param resultHolder
-   * @param valueArray
-   */
-  @Override
-  public void aggregateGroupBySV(int length, int[] groupKeys, GroupByResultHolder resultHolder, Object... valueArray) {
-    Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkArgument(valueArray[0] instanceof double[]);
-    final double[] values = (double[]) valueArray[0];
-    Preconditions.checkState(length <= values.length);
-
-    for (int i = 0; i < length; i++) {
-      int groupKey = groupKeys[i];
-      DoubleArrayList valueList = resultHolder.getResult(groupKey);
-      if (valueList == null) {
-        valueList = new DoubleArrayList();
-        resultHolder.setValueForKey(groupKey, valueList);
-      }
-      valueList.add(values[i]);
-    }
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @param length
-   * @param docIdToGroupKeys
-   * @param resultHolder
-   * @param valueArray
-   */
-  @Override
-  public void aggregateGroupByMV(int length, int[][] docIdToGroupKeys, GroupByResultHolder resultHolder,
-      Object... valueArray) {
-    Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkArgument(valueArray[0] instanceof double[]);
-    final double[] values = (double[]) valueArray[0];
-    Preconditions.checkState(length <= values.length);
-
-    for (int i = 0; i < length; ++i) {
-      double value = values[i];
-      for (int groupKey : docIdToGroupKeys[i]) {
-        DoubleArrayList valueList = resultHolder.getResult(groupKey);
-        if (valueList == null) {
-          valueList = new DoubleArrayList();
-          resultHolder.setValueForKey(groupKey, valueList);
-        }
-        valueList.add(value);
-      }
-    }
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @return
-   */
-  @Override
-  public double getDefaultValue() {
-    throw new RuntimeException("Unsupported method getDefaultValue() for class " + getClass().getName());
-  }
-
-  /**
-   * {@inheritDoc}
-   * @return
-   */
-  @Override
-  public ResultDataType getResultDataType() {
-    return RESULT_DATA_TYPE;
-  }
-
+  @Nonnull
   @Override
   public String getName() {
-    return FUNCTION_NAME;
+    return _name;
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * @param combinedResult
-   * @return
-   */
+  @Nonnull
   @Override
-  public Double reduce(List<Object> combinedResult) {
-    throw new RuntimeException(
-        "Unsupported method reduce(List<Object> combinedResult) for class " + getClass().getName());
+  public String getColumnName(@Nonnull String[] columns) {
+    return _name + "_" + columns[0];
+  }
+
+  @Override
+  public void accept(@Nonnull AggregationFunctionVisitorBase visitor) {
+    visitor.visit(this);
+  }
+
+  @Nonnull
+  @Override
+  public AggregationResultHolder createAggregationResultHolder() {
+    return new ObjectAggregationResultHolder();
+  }
+
+  @Nonnull
+  @Override
+  public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity, int trimSize) {
+    return new ObjectGroupByResultHolder(initialCapacity, maxCapacity, trimSize);
+  }
+
+  @Override
+  public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
+      @Nonnull BlockValSet... blockValSets) {
+    double[] valueArray = blockValSets[0].getDoubleValuesSV();
+    DoubleArrayList doubleArrayList = aggregationResultHolder.getResult();
+    if (doubleArrayList == null) {
+      doubleArrayList = new DoubleArrayList();
+      aggregationResultHolder.setValue(doubleArrayList);
+    }
+    for (int i = 0; i < length; i++) {
+      doubleArrayList.add(valueArray[i]);
+    }
+  }
+
+  @Override
+  public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+    double[] valueArray = blockValSets[0].getDoubleValuesSV();
+    for (int i = 0; i < length; i++) {
+      int groupKey = groupKeyArray[i];
+      DoubleArrayList doubleArrayList = groupByResultHolder.getResult(groupKey);
+      if (doubleArrayList == null) {
+        doubleArrayList = new DoubleArrayList();
+        groupByResultHolder.setValueForKey(groupKey, doubleArrayList);
+      }
+      doubleArrayList.add(valueArray[i]);
+    }
+  }
+
+  @Override
+  public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+    double[] valueArray = blockValSets[0].getDoubleValuesSV();
+    for (int i = 0; i < length; i++) {
+      double value = valueArray[i];
+      for (int groupKey : groupKeysArray[i]) {
+        DoubleArrayList doubleArrayList = groupByResultHolder.getResult(groupKey);
+        if (doubleArrayList == null) {
+          doubleArrayList = new DoubleArrayList();
+          groupByResultHolder.setValueForKey(groupKey, doubleArrayList);
+        }
+        doubleArrayList.add(value);
+      }
+    }
+  }
+
+  @Nonnull
+  @Override
+  public DoubleArrayList extractAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder) {
+    DoubleArrayList doubleArrayList = aggregationResultHolder.getResult();
+    if (doubleArrayList == null) {
+      return new DoubleArrayList();
+    } else {
+      return doubleArrayList;
+    }
+  }
+
+  @Nonnull
+  @Override
+  public DoubleArrayList extractGroupByResult(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
+    DoubleArrayList doubleArrayList = groupByResultHolder.getResult(groupKey);
+    if (doubleArrayList == null) {
+      return new DoubleArrayList();
+    } else {
+      return doubleArrayList;
+    }
+  }
+
+  @Nonnull
+  @Override
+  public DoubleArrayList merge(@Nonnull DoubleArrayList intermediateResult1,
+      @Nonnull DoubleArrayList intermediateResult2) {
+    intermediateResult1.addAll(intermediateResult2);
+    return intermediateResult1;
+  }
+
+  @Nonnull
+  @Override
+  public FieldSpec.DataType getIntermediateResultDataType() {
+    return FieldSpec.DataType.OBJECT;
+  }
+
+  @Nonnull
+  @Override
+  public Double extractFinalResult(@Nonnull DoubleArrayList intermediateResult) {
+    int size = intermediateResult.size();
+    if (size == 0) {
+      return DEFAULT_FINAL_RESULT;
+    } else {
+      Collections.sort(intermediateResult);
+      return intermediateResult.get(intermediateResult.size() * _percentile / 100);
+    }
   }
 }

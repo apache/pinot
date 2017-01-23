@@ -531,7 +531,9 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     // fileNameBuilder.append("_").append(segmentVersion);
     // }
     if (columnMetadata.isSingleValue()) {
-      if (columnMetadata.isSorted()) {
+      if (!columnMetadata.hasDictionary()) {
+        fileNameBuilder.append(V1Constants.Indexes.RAW_SV_FWD_IDX_FILE_EXTENTION);
+      } else if (columnMetadata.isSorted()) {
         fileNameBuilder.append(V1Constants.Indexes.SORTED_FWD_IDX_FILE_EXTENTION);
       } else {
         fileNameBuilder.append(V1Constants.Indexes.UN_SORTED_SV_FWD_IDX_FILE_EXTENTION);

@@ -18,44 +18,72 @@ package com.linkedin.pinot.core.io.reader;
 import java.io.IOException;
 
 public abstract class BaseSingleColumnSingleValueReader<T extends ReaderContext>
-    implements SingleColumnSingleValueReader {
+    implements SingleColumnSingleValueReader<T> {
+  @Override
   public T createContext() {
     throw new UnsupportedOperationException();
   }
 
-  public void read(T context) {
-    throw new UnsupportedOperationException();
-  }
-
+  @Override
   public void close() throws IOException {
     throw new UnsupportedOperationException();
   }
 
+  @Override
   public char getChar(int row) {
     throw new UnsupportedOperationException();
   }
 
+  @Override
   public short getShort(int row) {
     throw new UnsupportedOperationException();
   }
 
+  @Override
   public int getInt(int row) {
     throw new UnsupportedOperationException();
   }
 
+  @Override
+  public int getInt(int rowId, T context) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public long getLong(int row) {
     throw new UnsupportedOperationException();
   }
 
+  @Override
+  public long getLong(int rowId, T context) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public float getFloat(int row) {
     throw new UnsupportedOperationException();
   }
 
+  @Override
+  public float getFloat(int rowId, T context) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public double getDouble(int row) {
     throw new UnsupportedOperationException();
   }
 
+  @Override
+  public double getDouble(int rowId, T context) {
+    throw new UnsupportedOperationException();
+  }
+
   public String getString(int row) {
+    throw new UnsupportedOperationException();
+  }
+
+  public String getString(int row, T context) {
     throw new UnsupportedOperationException();
   }
 
@@ -67,9 +95,4 @@ public abstract class BaseSingleColumnSingleValueReader<T extends ReaderContext>
   public void readValues(int[] rows, int rowStartPos, int rowSize, int[] values, int valuesStartPos) {
     throw new UnsupportedOperationException("not supported");
   }
-
-  public int getInt(int rowId, T context) {
-    throw new UnsupportedOperationException();
-  }
-
 }

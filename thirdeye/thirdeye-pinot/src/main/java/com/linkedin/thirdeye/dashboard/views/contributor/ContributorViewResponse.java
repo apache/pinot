@@ -14,6 +14,9 @@ public class ContributorViewResponse implements ViewResponse {
   List<TimeBucket> timeBuckets;
   Map<String, String> summary;
   GenericResponse responseData;
+  // metrics vs dimension vs subDimension, aggValue
+  Map<String, Map<String, Map<String, Double>>> baselineTotalMapPerDimensionValue;
+  Map<String, Map<String, Map<String, Double>>> currentTotalMapPerDimensionValue;
 
   public ContributorViewResponse() {
     super();
@@ -65,5 +68,23 @@ public class ContributorViewResponse implements ViewResponse {
 
   public void setDimensionValuesMap(Map<String, List<String>> dimensionValuesMap) {
     this.dimensionValuesMap = dimensionValuesMap;
+  }
+
+  public Map<String, Map<String, Map<String, Double>>> getBaselineTotalMapPerDimensionValue() {
+    return baselineTotalMapPerDimensionValue;
+  }
+
+  public void setBaselineTotalMapPerDimensionValue(
+      Map<String, Map<String, Map<String, Double>>> baselineTotalMapPerDimensionValue) {
+    this.baselineTotalMapPerDimensionValue = baselineTotalMapPerDimensionValue;
+  }
+
+  public Map<String, Map<String, Map<String, Double>>> getCurrentTotalMapPerDimensionValue() {
+    return currentTotalMapPerDimensionValue;
+  }
+
+  public void setCurrentTotalMapPerDimensionValue(
+      Map<String, Map<String, Map<String, Double>>> currentTotalMapPerDimensionValue) {
+    this.currentTotalMapPerDimensionValue = currentTotalMapPerDimensionValue;
   }
 }

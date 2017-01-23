@@ -15,122 +15,100 @@
  */
 package com.linkedin.pinot.core.operator.aggregation.function;
 
-import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.aggregation.AggregationResultHolder;
+import com.linkedin.pinot.core.operator.aggregation.DoubleAggregationResultHolder;
+import com.linkedin.pinot.core.operator.aggregation.groupby.DoubleGroupByResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupByResultHolder;
-import java.util.List;
+import javax.annotation.Nonnull;
 
 
-/**
- * Class to perform the 'count' aggregation function.
- */
-public class CountAggregationFunction implements AggregationFunction {
-  private static final String FUNCTION_NAME = AggregationFunctionFactory.COUNT_AGGREGATION_FUNCTION;
-  private static final double DEFAULT_VALUE = 0.0;
-  private static final ResultDataType RESULT_DATA_TYPE = ResultDataType.LONG;
+public class CountAggregationFunction implements AggregationFunction<Long, Long> {
+  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.COUNT.getName();
+  private static final double DEFAULT_INITIAL_VALUE = 0.0;
 
-  /**
-   * Performs 'count' aggregation on the input array.
-   * Returns {@value #DEFAULT_VALUE} if the input array is empty.
-   *
-   * {@inheritDoc}
-   *
-   * @param length
-   * @param resultHolder
-   * @param valueArray
-   */
+  @Nonnull
   @Override
-  public void aggregate(int length, AggregationResultHolder resultHolder, Object... valueArray) {
-    // Should never call count with a valueArray.
-    Preconditions.checkArgument(valueArray.length == 0);
-
-    resultHolder.setValue(resultHolder.getDoubleResult() + length);
+  public String getName() {
+    return NAME;
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * While the interface allows for variable number of valueArrays, we do not support
-   * multiple columns within one aggregation function right now.
-   *
-   * @param length
-   * @param groupKeys
-   * @param resultHolder
-   * @param valueArray
-   */
+  @Nonnull
   @Override
-  public void aggregateGroupBySV(int length, int[] groupKeys, GroupByResultHolder resultHolder, Object... valueArray) {
-    Preconditions.checkArgument(valueArray.length == 0);
+  public String getColumnName(@Nonnull String[] columns) {
+    return NAME + "_star";
+  }
 
+  @Override
+  public void accept(@Nonnull AggregationFunctionVisitorBase visitor) {
+    visitor.visit(this);
+  }
+
+  @Nonnull
+  @Override
+  public AggregationResultHolder createAggregationResultHolder() {
+    return new DoubleAggregationResultHolder(DEFAULT_INITIAL_VALUE);
+  }
+
+  @Nonnull
+  @Override
+  public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity, int trimSize) {
+    return new DoubleGroupByResultHolder(initialCapacity, maxCapacity, trimSize, DEFAULT_INITIAL_VALUE);
+  }
+
+  @Override
+  public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
+      @Nonnull BlockValSet... blockValSets) {
+    aggregationResultHolder.setValue(aggregationResultHolder.getDoubleResult() + length);
+  }
+
+  @Override
+  public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
     for (int i = 0; i < length; i++) {
-      int groupKey = groupKeys[i];
-      double oldValue = resultHolder.getDoubleResult(groupKey);
-      resultHolder.setValueForKey(groupKey, (oldValue + 1));
+      int groupKey = groupKeyArray[i];
+      groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + 1);
     }
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * @param length
-   * @param docIdToGroupKey
-   * @param resultHolder
-   * @param valueArray
-   */
   @Override
-  public void aggregateGroupByMV(int length, int[][] docIdToGroupKey, GroupByResultHolder resultHolder,
-      Object... valueArray) {
-    Preconditions.checkArgument(valueArray.length == 0);
-    for (int i = 0; i < length; ++i) {
-      for (int groupKey : docIdToGroupKey[i]) {
-        double oldValue = resultHolder.getDoubleResult(groupKey);
-        resultHolder.setValueForKey(groupKey, oldValue + 1);
+  public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+    for (int i = 0; i < length; i++) {
+      for (int groupKey : groupKeysArray[i]) {
+        groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + 1);
       }
     }
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * @return
-   */
+  @Nonnull
   @Override
-  public double getDefaultValue() {
-    return DEFAULT_VALUE;
+  public Long extractAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder) {
+    return (long) aggregationResultHolder.getDoubleResult();
   }
 
-  /**
-   * {@inheritDoc}
-   * @return
-   */
+  @Nonnull
   @Override
-  public ResultDataType getResultDataType() {
-    return RESULT_DATA_TYPE;
+  public Long extractGroupByResult(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
+    return (long) groupByResultHolder.getDoubleResult(groupKey);
   }
 
-  /**
-   * {@inheritDoc}
-   * @return
-   */
+  @Nonnull
   @Override
-  public String getName() {
-    return FUNCTION_NAME;
+  public Long merge(@Nonnull Long intermediateResult1, @Nonnull Long intermediateResult2) {
+    return intermediateResult1 + intermediateResult2;
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * @param combinedResult
-   * @return
-   */
+  @Nonnull
   @Override
-  public Double reduce(List<Object> combinedResult) {
-    double reducedResult = DEFAULT_VALUE;
+  public FieldSpec.DataType getIntermediateResultDataType() {
+    return FieldSpec.DataType.LONG;
+  }
 
-    for (Object object : combinedResult) {
-      double result = (Double) object;
-      reducedResult += result;
-    }
-    return reducedResult;
+  @Nonnull
+  @Override
+  public Long extractFinalResult(@Nonnull Long intermediateResult) {
+    return intermediateResult;
   }
 }

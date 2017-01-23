@@ -124,7 +124,11 @@ public class PlainFieldExtractor implements FieldExtractor {
 
   @Override
   public GenericRow transform(GenericRow row) {
-    Map<String, Object> fieldMap = new HashMap<>();
+    return transform(row, new GenericRow());
+  }
+
+  @Override
+  public GenericRow transform(GenericRow row, GenericRow destinationRow) {
     boolean hasError = false;
     boolean hasNull = false;
     boolean hasConversion = false;
@@ -221,7 +225,7 @@ public class PlainFieldExtractor implements FieldExtractor {
         }
       }
 
-      fieldMap.put(column, value);
+      destinationRow.putField(column, value);
     }
 
     if (hasError) {
@@ -234,8 +238,7 @@ public class PlainFieldExtractor implements FieldExtractor {
       _totalConversions++;
     }
 
-    row.init(fieldMap);
-    return row;
+    return destinationRow;
   }
 
   public Map<String, Integer> getErrorCount() {

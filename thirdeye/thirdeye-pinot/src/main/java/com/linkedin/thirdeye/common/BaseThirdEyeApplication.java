@@ -1,6 +1,8 @@
 package com.linkedin.thirdeye.common;
 
+import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.AlertConfigManagerImpl;
 import java.io.File;
 
 import org.slf4j.Logger;
@@ -37,7 +39,7 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
   protected IngraphDashboardConfigManager ingraphDashboardConfigDAO;
   protected IngraphMetricConfigManager ingraphMetricConfigDAO;
   protected OverrideConfigManager overrideConfigDAO;
-
+  protected AlertConfigManager alertConfigDAO;
 
   public void initDAOs() {
     String persistenceConfig = System.getProperty("dw.rootDir") + "/persistence.yml";
@@ -67,8 +69,10 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
             .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.IngraphMetricConfigManagerImpl.class);
     overrideConfigDAO = DaoProviderUtil
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.OverrideConfigManagerImpl.class);
-    DAORegistry.registerDAOs(anomalyFunctionDAO, emailConfigurationDAO, rawAnomalyResultDAO, mergedAnomalyResultDAO,
-        jobDAO, taskDAO, datasetConfigDAO, metricConfigDAO, dashboardConfigDAO, ingraphMetricConfigDAO,
-        ingraphDashboardConfigDAO, overrideConfigDAO);
+    alertConfigDAO = DaoProviderUtil.getInstance(AlertConfigManagerImpl.class);
+    DAORegistry.registerDAOs(anomalyFunctionDAO, emailConfigurationDAO, rawAnomalyResultDAO,
+            mergedAnomalyResultDAO, jobDAO, taskDAO, datasetConfigDAO, metricConfigDAO,
+            dashboardConfigDAO, ingraphMetricConfigDAO, ingraphDashboardConfigDAO,
+            overrideConfigDAO, alertConfigDAO);
   }
 }

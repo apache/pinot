@@ -15,7 +15,10 @@
  */
 package com.linkedin.pinot.core.io.reader;
 
-public interface SingleColumnSingleValueReader extends DataFileReader {
+import java.io.IOException;
+
+
+public interface SingleColumnSingleValueReader<T extends ReaderContext> extends DataFileReader {
 
   /**
    * fetch the char at a row
@@ -37,11 +40,15 @@ public interface SingleColumnSingleValueReader extends DataFileReader {
    */
   int getInt(int row);
 
+  int getInt(int row, T context);
+
   /**
    * @param row
    * @return
    */
   long getLong(int row);
+
+  long getLong(int row, T context);
 
   /**
    * @param row
@@ -49,11 +56,15 @@ public interface SingleColumnSingleValueReader extends DataFileReader {
    */
   float getFloat(int row);
 
+  float getFloat(int row, T context);
+
   /**
    * @param row
    * @return
    */
   double getDouble(int row);
+
+  double getDouble(int row, T context);
 
   /**
    * @param row
@@ -62,10 +73,24 @@ public interface SingleColumnSingleValueReader extends DataFileReader {
   String getString(int row);
 
   /**
+   *
+   * @param row Row for which to get the string.
+   * @param context Reader context.
+   * @return String at the given row
+   */
+  String getString(int row, T context);
+
+  /**
    * @param row
    * @return
    */
   byte[] getBytes(int row);
 
   void readValues(int[] rows, int rowStartPos, int rowSize, int[] values, int valuesStartPos);
+
+  /**
+   * Create reader context.
+   * @return Reader context
+   */
+  T createContext();
 }

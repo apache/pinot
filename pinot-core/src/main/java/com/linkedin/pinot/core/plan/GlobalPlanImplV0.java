@@ -63,7 +63,7 @@ public class GlobalPlanImplV0 extends Plan {
       long endTime3 = System.currentTimeMillis();
       LOGGER.debug("Converting to InstanceResponseBlock to DataTable took :{}", (endTime3 - endTime2));
       long endTime = System.currentTimeMillis();
-      _instanceResponseDataTable.getMetadata().put("timeUsedMs", "" + (endTime - startTime));
+      _instanceResponseDataTable.getMetadata().put(DataTable.TIME_USED_MS_METADATA_KEY, "" + (endTime - startTime));
     } finally {
       operator.close();
     }

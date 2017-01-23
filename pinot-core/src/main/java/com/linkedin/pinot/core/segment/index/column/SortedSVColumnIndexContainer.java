@@ -54,6 +54,11 @@ public class SortedSVColumnIndexContainer extends ColumnIndexContainer {
   }
 
   @Override
+  public boolean hasDictionary() {
+    return columnMetadata.hasDictionary();
+  }
+
+  @Override
   public ImmutableDictionaryReader getDictionary() {
     return dictionaryReader;
   }

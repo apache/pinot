@@ -34,7 +34,7 @@ public class FloatMutableDictionary extends MutableDictionaryReader {
       return;
     }
     if (rawValue instanceof String) {
-      Float e = new Float(Float.parseFloat(rawValue.toString()));
+      Float e = Float.parseFloat(rawValue.toString());
       addToDictionaryBiMap(e);
       updateMinMax(e);
       return;
@@ -50,15 +50,15 @@ public class FloatMutableDictionary extends MutableDictionaryReader {
 
       for (Object o : (Object[]) rawValue) {
         if (o instanceof String) {
-          addToDictionaryBiMap(new Float(Float.parseFloat(o.toString())));
-          updateMinMax(new Float(Float.parseFloat(o.toString())));
+          final Float floatValue = Float.parseFloat(o.toString());
+          addToDictionaryBiMap(floatValue);
+          updateMinMax(floatValue);
           continue;
         }
 
         if (o instanceof Float) {
           addToDictionaryBiMap(o);
           updateMinMax((Float) o);
-          continue;
         }
       }
     }
@@ -79,7 +79,7 @@ public class FloatMutableDictionary extends MutableDictionaryReader {
       return hasNull;
     }
     if (rawValue instanceof String) {
-      return dictionaryIdBiMap.inverse().containsKey(new Float(Float.parseFloat(rawValue.toString())));
+      return dictionaryIdBiMap.inverse().containsKey(Float.parseFloat(rawValue.toString()));
     }
     return dictionaryIdBiMap.inverse().containsKey(rawValue);
   }
@@ -87,7 +87,7 @@ public class FloatMutableDictionary extends MutableDictionaryReader {
   @Override
   public int indexOf(Object rawValue) {
     if (rawValue instanceof String) {
-      return getIndexOfFromBiMap(new Float(Float.parseFloat(rawValue.toString())));
+      return getIndexOfFromBiMap(Float.parseFloat(rawValue.toString()));
     }
     return getIndexOfFromBiMap(rawValue);
   }
@@ -119,7 +119,7 @@ public class FloatMutableDictionary extends MutableDictionaryReader {
 
   @Override
   public String toString(int dictionaryId) {
-    return ((Float) getRawValueFromBiMap(dictionaryId)).toString();
+    return (getRawValueFromBiMap(dictionaryId)).toString();
   }
 
   @Override
@@ -158,11 +158,11 @@ public class FloatMutableDictionary extends MutableDictionaryReader {
 
   @Override
   public String getStringValue(int dictionaryId) {
-    return ((Double) getRawValueFromBiMap(dictionaryId)).toString();
+    return (getRawValueFromBiMap(dictionaryId)).toString();
   }
 
   private float getFloat(int dictionaryId) {
-    return ((Float) dictionaryIdBiMap.get(new Integer(dictionaryId))).floatValue();
+    return (Float) dictionaryIdBiMap.get(dictionaryId);
   }
 
   @Override

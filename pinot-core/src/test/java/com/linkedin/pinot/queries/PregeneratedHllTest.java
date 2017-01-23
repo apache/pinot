@@ -26,6 +26,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.apache.avro.Schema;
 import org.apache.avro.file.DataFileStream;
@@ -36,6 +37,7 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -43,7 +45,7 @@ import org.testng.annotations.Test;
 
 public class PregeneratedHllTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(PregeneratedHllTest.class);
-  private static final HllConfig hllConfig = new HllConfig(8 /*log2m*/);
+  private static final HllConfig hllConfig = new HllConfig(12 /*log2m*/);
   private TestHelper testHelper;
   private SegmentWithHllIndexCreateHelper helper;
   private static final double approximationThreshold = 0.001;
@@ -61,9 +63,8 @@ public class PregeneratedHllTest {
     testHelper.close();
   }
 
-  public File createAvroWithHll(File destinationDir, String inputAvro, String column, int log2m)
+  public File createAvroWithHll(File newAvroFile, String inputAvro, String column, int log2m)
       throws IOException {
-    File newAvroFile = new File(destinationDir, "data.avro");
     String filePath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(inputAvro));
     try( DataFileStream<GenericRecord> avroReader = AvroUtils.getAvroReader(new File(filePath))) {
       Schema currentSchema = avroReader.getSchema();
@@ -92,18 +93,26 @@ public class PregeneratedHllTest {
     return newAvroFile;
   }
 
+  private void createLoadSegment(String segmentName, File destinationDir)
+      throws Exception {
+    final String column = "column1";
+    File newAvroFile = new File(destinationDir, segmentName + ".avro");
+    createAvroWithHll(newAvroFile, testHelper.AVRO_DATA, column, hllConfig.getHllLog2m());
+    helper = testHelper.buildHllSegment(testHelper.tableName, newAvroFile.getAbsolutePath(), testHelper.TIME_COLUMN,
+        testHelper.TIME_UNIT, segmentName, hllConfig, false);
+    testHelper.loadSegment(helper.getSegmentDirectory());
+  }
+
   @Test
   public void testHllOnPregeneratedColumn()
       throws Exception {
     File destinationDir = null;
     try {
       destinationDir = Files.createTempDirectory(PregeneratedHllTest.class.getName()).toFile();
-      final String column = "column1";
-      File newAvroFile = createAvroWithHll(destinationDir, testHelper.AVRO_DATA, column, hllConfig.getHllLog2m());
+
       final String segmentName = "pregeneratedHllSegment";
-      helper = testHelper.buildHllSegment(testHelper.tableName, newAvroFile.getAbsolutePath(), testHelper.TIME_COLUMN,
-          testHelper.TIME_UNIT, segmentName, hllConfig, false);
-      testHelper.loadSegment(helper.getSegmentDirectory());
+      createLoadSegment(segmentName, destinationDir);
+
       // Init Query Executor
       final List<AvroQueryGenerator.TestSimpleAggreationQuery> aggCalls = new ArrayList<>();
       aggCalls.add(
@@ -113,9 +122,30 @@ public class PregeneratedHllTest {
           "select distinctcounthll(column1) from " + testHelper.tableName +
               " where column1 > 100000 limit 0", 0.0));
 
+      // we give high value of 1000 because this test also runs with log2m different from distinctCounthll
+      // function. There is no guarantee about counts or accuracy. I want to make sure these are valid values
       ApproximateQueryTestUtil
-          .runApproximationQueries(testHelper.queryExecutor, helper.getSegmentName(), aggCalls, approximationThreshold,
+          .runApproximationQueries(testHelper.queryExecutor, helper.getSegmentName(), aggCalls, 1000,
               testHelper.serverMetrics);
+
+      Double val1 = (Double)ApproximateQueryTestUtil
+          .runQuery(testHelper.queryExecutor, Arrays.asList(helper.getSegmentName()), aggCalls.get(0),
+              testHelper.serverMetrics);
+      // 5000, because we know
+      Assert.assertTrue(val1 > 5000);
+      // add one more segment. Goal to verify that combine works correctly
+      // across multiple segments. Not interested in exact values
+      final String secondSegmentName = "segment2";
+      createLoadSegment(secondSegmentName, destinationDir);
+      ApproximateQueryTestUtil
+          .runApproximationQueries(testHelper.queryExecutor, Arrays.asList(helper.getSegmentName(), secondSegmentName),
+              aggCalls, 1000, testHelper.serverMetrics);
+      Double val2 = (Double)ApproximateQueryTestUtil
+          .runQuery(testHelper.queryExecutor, Arrays.asList(helper.getSegmentName(), secondSegmentName), aggCalls.get(0),
+              testHelper.serverMetrics);
+      // both segments are same....distinct count should be same
+      Assert.assertEquals(val1, val2);
+
     } finally {
       FileUtils.deleteQuietly(destinationDir);
     }

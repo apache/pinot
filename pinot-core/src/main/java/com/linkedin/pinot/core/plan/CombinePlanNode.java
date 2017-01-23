@@ -15,18 +15,15 @@
  */
 package com.linkedin.pinot.core.plan;
 
-import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.MCombineGroupByOperator;
 import com.linkedin.pinot.core.operator.MCombineOperator;
-import com.linkedin.pinot.core.util.trace.TraceRunnable;
+import com.linkedin.pinot.core.util.trace.TraceCallable;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,7 +36,7 @@ public class CombinePlanNode implements PlanNode {
   private static final Logger LOGGER = LoggerFactory.getLogger(CombinePlanNode.class);
 
   private static final int NUM_PLAN_NODES_THRESHOLD_FOR_PARALLEL_RUN = 10;
-  private static final int TIME_OUT_IN_SECONDS_FOR_PARALLEL_RUN = 10;
+  private static final int TIME_OUT_IN_MILLISECONDS_FOR_PARALLEL_RUN = 10_000;
 
   private final List<PlanNode> _planNodes;
   private final BrokerRequest _brokerRequest;
@@ -76,37 +73,39 @@ public class CombinePlanNode implements PlanNode {
       }
     } else {
       // Large number of plan nodes, run them parallel.
-      final CountDownLatch latch = new CountDownLatch(numPlanNodes);
-      final Queue<Operator> globalQueue = new ConcurrentLinkedQueue<>();
-      for (final PlanNode planNode : _planNodes) {
-        _executorService.execute(new TraceRunnable() {
-          @Override
-          public void runJob() {
-            try {
-              Operator operator = planNode.run();
-              globalQueue.add(operator);
-            } catch (Exception e) {
-              LOGGER.error("Caught exception while executing segment plan.", e);
-            } finally {
-              latch.countDown();
-            }
-          }
-        });
-      }
-      try {
-        // Check if count reached zero in the time limit.
-        if (!latch.await(TIME_OUT_IN_SECONDS_FOR_PARALLEL_RUN, TimeUnit.SECONDS)) {
-          throw new RuntimeException(QueryException.COMBINE_SEGMENT_PLAN_TIMEOUT_ERROR);
-        }
 
-        // Check if all plans succeeded.
-        if (globalQueue.size() == numPlanNodes) {
-          operators.addAll(globalQueue);
-        } else {
-          throw new RuntimeException(QueryException.SEGMENT_PLAN_EXECUTION_ERROR);
+      // Calculate the timeout timestamp.
+      long timeout = start + TIME_OUT_IN_MILLISECONDS_FOR_PARALLEL_RUN;
+
+      // Submit all jobs.
+      List<Future<Operator>> futures = new ArrayList<>(numPlanNodes);
+      for (final PlanNode planNode : _planNodes) {
+        futures.add(_executorService.submit(new TraceCallable<Operator>() {
+          @Override
+          public Operator callJob()
+              throws Exception {
+            return planNode.run();
+          }
+        }));
+      }
+
+      // Try to get results from all jobs. Cancel all remaining jobs if caught any exception.
+      int index = 0;
+      try {
+        while (index < numPlanNodes) {
+          Future<Operator> future = futures.get(index);
+          try {
+            operators.add(future.get(timeout - System.currentTimeMillis(), TimeUnit.MILLISECONDS));
+          } catch (Exception e) {
+            throw new RuntimeException("Caught exception while running CombinePlanNode.", e);
+          }
+          index++;
         }
-      } catch (InterruptedException e) {
-        throw new RuntimeException(QueryException.INTERNAL_ERROR);
+      } finally {
+        while (index < numPlanNodes) {
+          futures.get(index).cancel(true);
+          index++;
+        }
       }
     }
 

@@ -16,9 +16,15 @@
 
 package com.linkedin.pinot.broker.broker.helix;
 
+import com.linkedin.pinot.common.metrics.BrokerMetrics;
+import com.linkedin.pinot.common.metrics.BrokerTimer;
 import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.ExternalViewChangeListener;
 import org.apache.helix.InstanceConfigChangeListener;
 import org.apache.helix.LiveInstanceChangeListener;
@@ -37,64 +43,72 @@ public class ClusterChangeMediator implements LiveInstanceChangeListener, Extern
   private static final Logger LOGGER = LoggerFactory.getLogger(ClusterChangeMediator.class);
   private final HelixExternalViewBasedRouting _helixExternalViewBasedRouting;
 
-  private final AtomicInteger _externalViewChangeCount = new AtomicInteger(0);
-  private final AtomicInteger _instanceConfigChangeCount = new AtomicInteger(0);
-  private long _lastExternalViewUpdateTime = 0L;
-  private long _lastInstanceConfigUpdateTime = 0L;
-  private static final long MAX_TIME_BEFORE_IMMEDIATE_UPDATE_MILLIS = 30000L;
+  private enum UpdateType {
+    EXTERNAL_VIEW,
+    INSTANCE_CONFIG
+  }
+
+  private final LinkedBlockingQueue<Pair<UpdateType, Long>> _clusterChangeQueue = new LinkedBlockingQueue<>(1000);
 
   private Thread _deferredClusterUpdater = null;
 
-  public ClusterChangeMediator(HelixExternalViewBasedRouting helixExternalViewBasedRouting) {
+  public ClusterChangeMediator(HelixExternalViewBasedRouting helixExternalViewBasedRouting,
+      final BrokerMetrics brokerMetrics) {
     _helixExternalViewBasedRouting = helixExternalViewBasedRouting;
 
     // Simple thread that polls every 10 seconds to check if there are any cluster updates to apply
     _deferredClusterUpdater = new Thread("Deferred cluster state updater") {
       @Override
       public void run() {
-        int lastExternalViewChangeCount = 0;
-        int lastInstanceConfigChangeCount = 0;
-
         while (true) {
-          // Check if we need to update the external view
-          final int currentExternalViewChangeCount = _externalViewChangeCount.get();
-          if (currentExternalViewChangeCount != lastExternalViewChangeCount) {
-            try {
-              _helixExternalViewBasedRouting.processExternalViewChange();
-              _lastExternalViewUpdateTime = System.currentTimeMillis();
-            } catch (Exception e) {
-              LOGGER.warn("Caught exception when processing external view change", e);
-            }
-
-            lastExternalViewChangeCount = currentExternalViewChangeCount;
-          }
-
-          // Check if we need to update the instance configs
-          final int currentInstanceConfigChangeCount = _instanceConfigChangeCount.get();
-          if (currentInstanceConfigChangeCount != lastInstanceConfigChangeCount) {
-            try {
-              _helixExternalViewBasedRouting.processInstanceConfigChange();
-              _lastInstanceConfigUpdateTime = System.currentTimeMillis();
-            } catch (Exception e) {
-              LOGGER.warn("Caught exception when processing instance config change", e);
-            }
-
-            lastInstanceConfigChangeCount = currentInstanceConfigChangeCount;
-          }
-
-          // Sleep for a bit
           try {
-            Thread.sleep(10000);
+            // Wait for at least one update
+            Pair<UpdateType, Long> firstUpdate = _clusterChangeQueue.take();
+
+            // Update the queue time metrics
+            long queueTime = System.currentTimeMillis() - firstUpdate.getValue();
+            brokerMetrics.addTimedValue(BrokerTimer.ROUTING_TABLE_UPDATE_QUEUE_TIME, queueTime, TimeUnit.MILLISECONDS);
+
+            // Take all other updates also present
+            List<Pair<UpdateType, Long>> allUpdates = new ArrayList<>();
+            allUpdates.add(firstUpdate);
+            _clusterChangeQueue.drainTo(allUpdates);
+
+            // Gather all update types
+            boolean externalViewUpdated = false;
+            boolean instanceConfigUpdated = false;
+
+            for (Pair<UpdateType, Long> update : allUpdates) {
+              if (update.getKey() == UpdateType.EXTERNAL_VIEW) {
+                externalViewUpdated = true;
+              } else if (update.getKey() == UpdateType.INSTANCE_CONFIG) {
+                instanceConfigUpdated = true;
+              }
+            }
+
+            if (externalViewUpdated) {
+              try {
+                _helixExternalViewBasedRouting.processExternalViewChange();
+              } catch (Exception e) {
+                LOGGER.warn("Caught exception while updating external view", e);
+              }
+            }
+
+            if (instanceConfigUpdated) {
+              try {
+                _helixExternalViewBasedRouting.processInstanceConfigChange();
+              } catch (Exception e) {
+                LOGGER.warn("Caught exception while processing instance config", e);
+              }
+            }
           } catch (InterruptedException e) {
-            LOGGER.info("Exiting deferred cluster state thread due to interruption", e);
-
-            // Mark the deferred cluster updating thread as defunct, in case some non shutdown-related interruption
-            // causes this thread to be stopped. This will disable update deferrals but will keep on working otherwise.
-            _deferredClusterUpdater = null;
-
+            LOGGER.warn("Was interrupted while waiting for a cluster change", e);
             break;
           }
         }
+
+        LOGGER.warn("Stopping deferred cluster state update thread");
+        _deferredClusterUpdater = null;
       }
     };
 
@@ -103,13 +117,13 @@ public class ClusterChangeMediator implements LiveInstanceChangeListener, Extern
 
   @Override
   public void onExternalViewChange(List<ExternalView> externalViewList, NotificationContext changeContext) {
-    // If it's been a while since we last updated the external view, update the routing table immediately
-    if (MAX_TIME_BEFORE_IMMEDIATE_UPDATE_MILLIS < System.currentTimeMillis() - _lastExternalViewUpdateTime) {
-      _helixExternalViewBasedRouting.processExternalViewChange();
-      _lastExternalViewUpdateTime = System.currentTimeMillis();
-    } else if (_deferredClusterUpdater != null && _deferredClusterUpdater.isAlive()) {
-      // Otherwise defer the update
-      _externalViewChangeCount.incrementAndGet();
+    // If the deferred update thread is alive, defer the update
+    if (_deferredClusterUpdater != null && _deferredClusterUpdater.isAlive()) {
+      try {
+        _clusterChangeQueue.put(new ImmutablePair<>(UpdateType.EXTERNAL_VIEW, System.currentTimeMillis()));
+      } catch (InterruptedException e) {
+        LOGGER.warn("Was interrupted while trying to add external view change to queue", e);
+      }
     } else {
       LOGGER.warn("Deferred cluster updater thread is null or stopped, not deferring external view routing table rebuild");
       _helixExternalViewBasedRouting.processExternalViewChange();
@@ -118,13 +132,13 @@ public class ClusterChangeMediator implements LiveInstanceChangeListener, Extern
 
   @Override
   public void onInstanceConfigChange(List<InstanceConfig> instanceConfigs, NotificationContext context) {
-    // If it's been a while since we last updated the instance configs, update the routing table immediately
-    if (MAX_TIME_BEFORE_IMMEDIATE_UPDATE_MILLIS < System.currentTimeMillis() - _lastInstanceConfigUpdateTime) {
-      _helixExternalViewBasedRouting.processInstanceConfigChange();
-      _lastInstanceConfigUpdateTime = System.currentTimeMillis();
-    } else if (_deferredClusterUpdater != null && _deferredClusterUpdater.isAlive()) {
-      // Otherwise defer the update
-      _instanceConfigChangeCount.incrementAndGet();
+    // If the deferred update thread is alive, defer the update
+    if (_deferredClusterUpdater != null && _deferredClusterUpdater.isAlive()) {
+      try {
+        _clusterChangeQueue.put(new ImmutablePair<>(UpdateType.INSTANCE_CONFIG, System.currentTimeMillis()));
+      } catch (InterruptedException e) {
+        LOGGER.warn("Was interrupted while trying to add external view change to queue", e);
+      }
     } else {
       LOGGER.warn("Deferred cluster updater thread is null or stopped, not deferring instance config change notification");
       _helixExternalViewBasedRouting.processInstanceConfigChange();

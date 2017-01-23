@@ -62,6 +62,11 @@ public class UnsortedSVColumnIndexContainer extends ColumnIndexContainer {
   }
 
   @Override
+  public boolean hasDictionary() {
+    return columnMetadata.hasDictionary();
+  }
+
+  @Override
   public ColumnMetadata getColumnMetadata() {
     return columnMetadata;
   }

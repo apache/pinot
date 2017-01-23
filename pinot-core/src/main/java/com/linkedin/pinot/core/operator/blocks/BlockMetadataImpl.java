@@ -71,7 +71,7 @@ public final class BlockMetadataImpl implements BlockMetadata {
 
   @Override
   public boolean hasDictionary() {
-    return true;
+    return columnMetadata.hasDictionary();
   }
 
   @Override

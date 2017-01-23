@@ -15,40 +15,6 @@
  */
 package com.linkedin.pinot.controller.helix.core;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.Callable;
-import java.util.concurrent.TimeUnit;
-import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.collections.Predicate;
-import org.apache.helix.AccessOption;
-import org.apache.helix.ClusterMessagingService;
-import org.apache.helix.Criteria;
-import org.apache.helix.HelixAdmin;
-import org.apache.helix.HelixDataAccessor;
-import org.apache.helix.HelixManager;
-import org.apache.helix.InstanceType;
-import org.apache.helix.PropertyKey;
-import org.apache.helix.PropertyKey.Builder;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.model.CurrentState;
-import org.apache.helix.model.ExternalView;
-import org.apache.helix.model.IdealState;
-import org.apache.helix.model.InstanceConfig;
-import org.apache.helix.model.LiveInstance;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.codehaus.jackson.JsonGenerationException;
-import org.codehaus.jackson.JsonParseException;
-import org.codehaus.jackson.JsonProcessingException;
-import org.codehaus.jackson.map.JsonMappingException;
-import org.json.JSONException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
@@ -96,8 +62,44 @@ import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
 import com.linkedin.pinot.controller.helix.core.util.ZKMetadataUtils;
 import com.linkedin.pinot.controller.helix.starter.HelixConfig;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.Predicate;
+import org.apache.commons.lang.StringUtils;
+import org.apache.helix.AccessOption;
+import org.apache.helix.ClusterMessagingService;
+import org.apache.helix.Criteria;
+import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixDataAccessor;
+import org.apache.helix.HelixManager;
+import org.apache.helix.InstanceType;
+import org.apache.helix.PropertyKey;
+import org.apache.helix.PropertyKey.Builder;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.model.CurrentState;
+import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
+import org.apache.helix.model.InstanceConfig;
+import org.apache.helix.model.LiveInstance;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.codehaus.jackson.JsonGenerationException;
+import org.codehaus.jackson.JsonParseException;
+import org.codehaus.jackson.JsonProcessingException;
+import org.codehaus.jackson.map.JsonMappingException;
+import org.json.JSONException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class PinotHelixResourceManager {
@@ -353,33 +355,34 @@ public class PinotHelixResourceManager {
   }
 
   /**
-   * TODO : Due to the issue of helix, if remove the segment from idealState directly, the node won't get transaction,
-   * so we first disable the segment, then remove it from idealState, then enable the segment. This will trigger transactions.
-   * After the helix patch, we can refine the logic here by directly drop the segment from idealState.
-   *
-   * @param tableName
-   * @param segmentId
+   * Deletes segment from helix idealstate and drop it from local storage
+   * @param tableName Segment's table name
+   * @param segmentName segment name
    * @return
    */
-  public synchronized PinotResourceManagerResponse deleteSegment(final String tableName, final String segmentId) {
-    LOGGER.info("Trying to delete segment: {} for table: {} ", segmentId, tableName);
+  public synchronized PinotResourceManagerResponse deleteSegment(final String tableName, final String segmentName) {
+    return deleteSegments(tableName, Arrays.asList(segmentName));
+  }
+
+  /**
+   * Deletes a list of segments from idealstate and drop those from the local storage
+   * @param tableName Name of segment's table
+   * @param segments List of segment names
+   * @return
+   */
+  public synchronized PinotResourceManagerResponse deleteSegments(final String tableName, final List<String> segments) {
+    LOGGER.info("Trying to delete segments: {} for table: {} ", StringUtils.join(segments, ','), tableName);
     final PinotResourceManagerResponse res = new PinotResourceManagerResponse();
     try {
-      IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableName);
-      if (idealState == null || idealState.getPartitionSet() == null || !idealState.getPartitionSet().contains(segmentId)) {
-        res.message = "Segment " + segmentId + " not in IDEALSTATE.";
-        LOGGER.info("Segment: {} is not in IDEALSTATE", segmentId);
-      } else {
-        LOGGER.info("Trying to delete segment: {} from IdealStates", segmentId);
-        HelixHelper.removeSegmentFromIdealState(_helixZkManager, tableName, segmentId);
-        res.message = "";
+      HelixHelper.removeSegmentsFromIdealState(_helixZkManager, tableName, segments);
+      for (String segment : segments) {
+        _segmentDeletionManager.deleteSegment(tableName, segment);
       }
-      _segmentDeletionManager.deleteSegment(tableName, segmentId);
 
-      res.message += "Segment " + segmentId + " successfully deleted.";
+      res.message += "Segment " + StringUtils.join(segments, ',') + " successfully deleted.";
       res.status = ResponseStatus.success;
     } catch (final Exception e) {
-      LOGGER.error("Caught exception while deleting segment {} of table {}", segmentId, tableName, e);
+      LOGGER.error("Caught exception while deleting segment {} of table {}", StringUtils.join(segments, ','), tableName, e);
       res.status = ResponseStatus.failure;
       res.message = e.getMessage();
     }
@@ -468,7 +471,7 @@ public class PinotHelixResourceManager {
       } else if (tableType == TableType.REALTIME) {
         tenantConfig = ZKMetadataProvider.getRealtimeTableConfig(getPropertyStore(), tableName).getTenantConfig();
       } else {
-        throw new RuntimeException("Don't know how to handle table of type " + tableType);
+        return new PinotResourceManagerResponse("Table " + tableName + " does not have a table type", false);
       }
     } catch (Exception e) {
       LOGGER.warn("Caught exception while rebuilding broker resource from Helix tags for table {}", e, tableName);
@@ -981,7 +984,7 @@ public class PinotHelixResourceManager {
         LOGGER.info("building empty ideal state for table : " + offlineTableName);
         final IdealState offlineIdealState =
             PinotTableIdealStateBuilder.buildEmptyIdealStateFor(offlineTableName,
-                Integer.parseInt(segmentsConfig.getReplication()), _helixAdmin, _helixClusterName);
+                Integer.parseInt(segmentsConfig.getReplication()));
         LOGGER.info("adding table via the admin");
         _helixAdmin.addResource(_helixClusterName, offlineTableName, offlineIdealState);
         LOGGER.info("successfully added the table : " + offlineTableName + " to the cluster");
@@ -1650,29 +1653,6 @@ public class PinotHelixResourceManager {
         new PinotResourceManagerResponse("Error: Timed out. External view not completely updated", false);
   }
 
-  /**
-   * Drop the provided list of segments.
-   *
-   * @param tableName Table to which the segments belong
-   * @param segments List of segments to dropped
-   * @return
-   */
-  public PinotResourceManagerResponse dropSegments(String tableName, List<String> segments, long timeOutInSeconds) {
-    PinotResourceManagerResponse deleteResponse = toggleSegmentState(tableName, segments, false, timeOutInSeconds);
-    if (!deleteResponse.isSuccessful()) {
-      return deleteResponse;
-    }
-
-    boolean ret = true;
-    for (String segment : segments) {
-      if (!deleteSegment(tableName, segment).isSuccessful()) {
-        ret = false;
-      }
-    }
-    return (ret) ? new PinotResourceManagerResponse("Success: Deleted segment(s) list", true) :
-        new PinotResourceManagerResponse("Error: Failed to delete at least one segment before time out ", false);
-  }
-
   public boolean hasRealtimeTable(String tableName) {
     String actualTableName = tableName + "_REALTIME";
     return getAllPinotTableNames().contains(actualTableName);
@@ -1681,6 +1661,11 @@ public class PinotHelixResourceManager {
   public boolean hasOfflineTable(String tableName) {
     String actualTableName = tableName + "_OFFLINE";
     return getAllPinotTableNames().contains(actualTableName);
+  }
+
+  public AbstractTableConfig getOfflineTableConfig(String offlineTableName) throws JsonParseException,
+      JsonMappingException, JsonProcessingException, JSONException, IOException {
+    return ZKMetadataProvider.getOfflineTableConfig(getPropertyStore(), offlineTableName);
   }
 
   public AbstractTableConfig getRealtimeTableConfig(String realtimeTableName) throws JsonParseException,

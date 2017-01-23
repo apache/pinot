@@ -15,6 +15,22 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import org.apache.avro.file.DataFileStream;
+import org.apache.avro.generic.GenericData;
+import org.apache.avro.generic.GenericDatumReader;
+import org.apache.avro.generic.GenericRecord;
+import org.apache.avro.io.DatumReader;
+import org.apache.avro.io.DecoderFactory;
+import org.apache.commons.configuration.Configuration;
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.broker.broker.BrokerTestUtils;
 import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
 import com.linkedin.pinot.common.data.Schema;
@@ -33,26 +49,9 @@ import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
 import com.linkedin.pinot.core.realtime.impl.kafka.AvroRecordToPinotRowGenerator;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaMessageDecoder;
 import com.linkedin.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
 import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
-import java.io.File;
-import java.io.FileInputStream;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import org.apache.avro.file.DataFileStream;
-import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumReader;
-import org.apache.avro.generic.GenericRecord;
-import org.apache.avro.io.DatumReader;
-import org.apache.avro.io.DecoderFactory;
-import org.apache.commons.configuration.Configuration;
-import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -64,6 +63,14 @@ public abstract class ClusterTest extends ControllerTest {
   protected List<HelixBrokerStarter> _brokerStarters = new ArrayList<HelixBrokerStarter>();
   protected List<HelixServerStarter> _serverStarters = new ArrayList<HelixServerStarter>();
 
+  protected int getRealtimeSegmentFlushSize(boolean useLlc) {
+    if (useLlc) {
+      return 5000;
+    } else {
+      return 20000;
+    }
+  }
+
   protected void startBroker() {
     startBrokers(1);
   }
@@ -74,7 +81,7 @@ public abstract class ClusterTest extends ControllerTest {
         final String helixClusterName = getHelixClusterName();
         Configuration configuration = BrokerTestUtils.getDefaultBrokerConfiguration();
         configuration.setProperty("pinot.broker.timeoutMs", 100 * 1000L);
-        configuration.setProperty("pinot.broker.client.queryPort", Integer.toString(18099 + i));
+        configuration.setProperty("pinot.broker.client.queryPort", Integer.toString(BROKER_PORT + i));
         configuration.setProperty("pinot.broker.routing.table.builder.class", "random");
         overrideBrokerConf(configuration);
         _brokerStarters.add(BrokerTestUtils.startBroker(helixClusterName, ZkStarter.DEFAULT_ZK_STR, configuration));
@@ -186,16 +193,16 @@ public abstract class ClusterTest extends ControllerTest {
     }
 
     @Override
-    public GenericRow decode(byte[] payload) {
-      return decode(payload, 0, payload.length);
+    public GenericRow decode(byte[] payload, GenericRow destination) {
+      return decode(payload, 0, payload.length, destination);
     }
 
     @Override
-    public GenericRow decode(byte[] payload, int offset, int length) {
+    public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
       try {
         GenericData.Record avroRecord =
             _reader.read(null, _decoderFactory.binaryDecoder(payload, offset, length, null));
-        return _rowGenerator.transform(avroRecord, _avroSchema);
+        return _rowGenerator.transform(avroRecord, _avroSchema, destination);
       } catch (Exception e) {
         LOGGER.error("Caught exception", e);
         throw new RuntimeException(e);
@@ -226,7 +233,7 @@ public abstract class ClusterTest extends ControllerTest {
     streamConfig.put(DataSource.STREAM_PREFIX + "." + Kafka.ZK_BROKER_URL, kafkaZkUrl);
     streamConfig.put(DataSource.STREAM_PREFIX + "." + Kafka.HighLevelConsumer.ZK_CONNECTION_STRING, kafkaZkUrl);
     streamConfig.put(DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE, Integer.toString(realtimeSegmentFlushSize));
-    streamConfig.put(DataSource.STREAM_PREFIX + "." + Kafka.KAFKA_CONSUMER_PROPS_PREFIX + "." + "auto.offset.reset",
+    streamConfig.put(DataSource.STREAM_PREFIX + "." + Kafka.KAFKA_CONSUMER_PROPS_PREFIX + "." + Kafka.AUTO_OFFSET_RESET,
         "smallest");
 
     AvroFileSchemaKafkaAvroMessageDecoder.avroFile = avroFile;
@@ -248,9 +255,8 @@ public abstract class ClusterTest extends ControllerTest {
     metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.DECODER_CLASS,
         AvroFileSchemaKafkaAvroMessageDecoder.class.getName());
     metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.KAFKA_BROKER_LIST, kafkaBrokerList);
-    metadata.put(DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE, Integer.toString(1)); // jfim: Invalid value to ensure the test fails if we don't pick the LLC override
-    metadata.put(DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE + KafkaLowLevelStreamProviderConfig.LLC_PROPERTY_SUFFIX, Integer.toString(realtimeSegmentFlushSize));
-    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.KAFKA_CONSUMER_PROPS_PREFIX + "." + "auto.offset.reset",
+    metadata.put(DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE, Integer.toString(realtimeSegmentFlushSize));
+    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.KAFKA_CONSUMER_PROPS_PREFIX + "." + Kafka.AUTO_OFFSET_RESET,
         "smallest");
 
     AvroFileSchemaKafkaAvroMessageDecoder.avroFile = avroFile;
@@ -267,12 +273,12 @@ public abstract class ClusterTest extends ControllerTest {
     String retentionTimeUnit = "";
     if (useLlc) {
       addLLCRealtimeTable(tableName, timeColumnName, timeColumnType, retentionDays, retentionTimeUnit, KafkaStarterUtils.DEFAULT_KAFKA_BROKER,
-          kafkaTopic, schemaName, serverTenant, brokerTenant, avroFile, 5000,
+          kafkaTopic, schemaName, serverTenant, brokerTenant, avroFile, getRealtimeSegmentFlushSize(useLlc),
           sortedColumn, invertedIndexColumns, loadMode);
     } else {
       addRealtimeTable(tableName, timeColumnName, timeColumnType, retentionDays, retentionTimeUnit, kafkaZkUrl,
-          kafkaTopic, schemaName, serverTenant, brokerTenant, avroFile, 20000, sortedColumn, invertedIndexColumns,
-          loadMode);
+          kafkaTopic, schemaName, serverTenant, brokerTenant, avroFile, getRealtimeSegmentFlushSize(useLlc),
+          sortedColumn, invertedIndexColumns, loadMode);
     }
     addOfflineTable(timeColumnName, timeColumnType, retentionDays, retentionTimeUnit, brokerTenant, serverTenant,
         invertedIndexColumns, loadMode, tableName, SegmentVersion.v1);

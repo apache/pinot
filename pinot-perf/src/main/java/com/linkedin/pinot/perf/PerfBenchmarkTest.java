@@ -18,6 +18,7 @@ package com.linkedin.pinot.perf;
 import com.google.common.collect.Lists;
 import com.linkedin.pinot.tools.perf.PerfBenchmarkDriver;
 import com.linkedin.pinot.tools.perf.PerfBenchmarkDriverConf;
+import com.linkedin.pinot.tools.perf.QueryRunner;
 import java.util.ArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,7 +48,7 @@ public class PerfBenchmarkTest {
     conf.setRunQueries(true);
     conf.setConfigureResources(false);
 
-    QueryRunner.singleThreadedQueryRunner(conf, queryFile);
+    QueryRunner.singleThreadedQueryRunner(conf, queryFile, 1, 3000, 10);
     LOGGER.info("Running queries completed.");
   }
 

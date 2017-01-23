@@ -95,7 +95,7 @@ public class HLRealtimeSegmentDataManager extends SegmentDataManager {
     super();
     _realtimeTableDataManager = realtimeTableDataManager;
     final String segmentVersionStr = tableConfig.getIndexingConfig().getSegmentFormatVersion();
-    _segmentVersion = SegmentVersion.fromStringOrDefault(segmentVersionStr);
+    _segmentVersion = SegmentVersion.fromString(segmentVersionStr, SegmentVersion.DEFAULT_TABLE_VERSION);
     this.schema = schema;
     this.extractor = (PlainFieldExtractor) FieldExtractorFactory.getPlainFieldExtractor(schema);
     this.serverMetrics =serverMetrics;
@@ -176,13 +176,19 @@ public class HLRealtimeSegmentDataManager extends SegmentDataManager {
         segmentLogger.info("Starting to collect rows");
 
         do {
+          GenericRow readRow = null;
+          GenericRow transformedRow = null;
           GenericRow row = null;
           try {
-            row = kafkaStreamProvider.next();
+            readRow = GenericRow.createOrReuseRow(readRow);
+            readRow = kafkaStreamProvider.next(readRow);
+            row = readRow;
 
-            if (row != null) {
-              row = extractor.transform(row);
-              notFull = realtimeSegment.index(row);
+            if (readRow != null) {
+              transformedRow = GenericRow.createOrReuseRow(transformedRow);
+              transformedRow = extractor.transform(readRow, transformedRow);
+              row = transformedRow;
+              notFull = realtimeSegment.index(transformedRow);
               exceptionSleepMillis = 50L;
             }
           } catch (Exception e) {

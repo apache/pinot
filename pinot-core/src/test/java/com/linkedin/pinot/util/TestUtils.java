@@ -15,25 +15,24 @@
  */
 package com.linkedin.pinot.util;
 
+import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.response.broker.GroupByResult;
+import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.data.readers.RecordReader;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.util.HashMap;
-
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import javax.annotation.Nonnull;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.mutable.MutableLong;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
-
-import static org.testng.Assert.assertEquals;
 
 
 /**
@@ -86,7 +85,10 @@ public class TestUtils {
         errorRate = Math.abs((actual - estimate) / actual);
       }
       LOGGER.debug("estimate: " + estimate + " actual: " + actual + " error (in rate): " + errorRate);
-      Assert.assertEquals(errorRate < precision, true);
+      if (errorRate >= precision) {
+        System.out.println("Found it: " + actual + " " +  estimate);
+      }
+      Assert.assertTrue(errorRate < precision);
     }
   }
 
@@ -152,5 +154,64 @@ public class TestUtils {
           array.getJSONObject(i).getDouble("value"));
     }
     return map;
+  }
+
+  /**
+   * Utility class for reading generic row records
+   */
+  public static class GenericRowRecordReader implements RecordReader {
+
+    private final Schema _schema;
+    private final List<GenericRow> _data;
+    int counter = 0;
+
+    // Constructor for the class.
+    public GenericRowRecordReader(final Schema schema, final List<GenericRow> data) {
+      _schema = schema;
+      _data = data;
+    }
+
+    @Override
+    public void rewind()
+        throws Exception {
+      counter = 0;
+    }
+
+    @Override
+    public GenericRow next() {
+      return _data.get(counter++);
+    }
+
+    @Override
+    public GenericRow next(GenericRow row) {
+      return next();
+    }
+
+    @Override
+    public void init()
+        throws Exception {
+
+    }
+
+    @Override
+    public boolean hasNext() {
+      return counter < _data.size();
+    }
+
+    @Override
+    public Schema getSchema() {
+      return _schema;
+    }
+
+    @Override
+    public Map<String, MutableLong> getNullCountMap() {
+      return null;
+    }
+
+    @Override
+    public void close()
+        throws Exception {
+
+    }
   }
 }

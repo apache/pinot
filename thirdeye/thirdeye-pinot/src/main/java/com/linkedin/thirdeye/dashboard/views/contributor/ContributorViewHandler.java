@@ -19,7 +19,6 @@ import org.joda.time.DateTime;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.cache.QueryCache;
@@ -34,25 +33,13 @@ import com.linkedin.thirdeye.dashboard.views.GenericResponse.Info;
 import com.linkedin.thirdeye.dashboard.views.GenericResponse.ResponseSchema;
 import com.linkedin.thirdeye.dashboard.views.TimeBucket;
 import com.linkedin.thirdeye.dashboard.views.ViewHandler;
-import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 public class ContributorViewHandler implements
     ViewHandler<ContributorViewRequest, ContributorViewResponse> {
 
-  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY = ThirdEyeCacheRegistry.getInstance();
-
-  private final Comparator<DateTime> dateTimeComparator = new Comparator<DateTime>() {
-    @Override
-    public int compare(DateTime dateTime1, DateTime dateTime2) {
-      long millisSinceEpoch1 = dateTime1.getMillis();
-      long millisSinceEpoch2 = dateTime2.getMillis();
-      return (millisSinceEpoch1 < millisSinceEpoch2) ? -1
-          : (millisSinceEpoch1 == millisSinceEpoch2) ? 0 : 1;
-    }
-  };
 
   private final Comparator<Row> rowComparator = new Comparator<Row>() {
     @Override
@@ -65,11 +52,9 @@ public class ContributorViewHandler implements
   };
 
   private final QueryCache queryCache;
-  private DatasetConfigManager datasetConfigDAO;
 
   public ContributorViewHandler(QueryCache queryCache) {
     this.queryCache = queryCache;
-    this.datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
   }
 
   private TimeOnTimeComparisonRequest generateTimeOnTimeComparisonRequest(
@@ -262,6 +247,8 @@ public class ContributorViewHandler implements
     }
     contributorViewResponse.setDimensionValuesMap(dimensionValuesMap);
     contributorViewResponse.setResponseData(genericResponse);
+    contributorViewResponse.setCurrentTotalMapPerDimensionValue(currentTotalMapPerDimensionValue);
+    contributorViewResponse.setBaselineTotalMapPerDimensionValue(baselineTotalMapPerDimensionValue);
     return contributorViewResponse;
   }
 

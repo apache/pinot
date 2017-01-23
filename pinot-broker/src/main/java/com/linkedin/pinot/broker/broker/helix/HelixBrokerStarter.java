@@ -15,6 +15,17 @@
  */
 package com.linkedin.pinot.broker.broker.helix;
 
+import com.linkedin.pinot.broker.broker.BrokerServerBuilder;
+import com.linkedin.pinot.broker.requesthandler.BrokerRequestHandler;
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.metrics.BrokerMeter;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
+import com.linkedin.pinot.common.utils.NetUtil;
+import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
+import com.linkedin.pinot.routing.RoutingTableSelector;
+import com.linkedin.pinot.routing.RoutingTableSelectorFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -36,17 +47,7 @@ import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.broker.broker.BrokerServerBuilder;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.metrics.BrokerMeter;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
-import com.linkedin.pinot.common.utils.NetUtil;
-import com.linkedin.pinot.common.utils.StringUtil;
-import com.linkedin.pinot.requestHandler.BrokerRequestHandler;
-import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
-import com.linkedin.pinot.routing.RoutingTableSelector;
-import com.linkedin.pinot.routing.RoutingTableSelectorFactory;
+import com.linkedin.pinot.common.utils.ServiceStatus;
 
 
 /**
@@ -71,6 +72,9 @@ public class HelixBrokerStarter {
 
   private static final String ROUTING_TABLE_SELECTOR_SUBSET_KEY =
       "pinot.broker.routing.table.selector";
+
+  private static final String ROUTING_TABLE_PARAMS_SUBSET_KEY =
+      "pinot.broker.routing.table";
 
   public HelixBrokerStarter(String helixClusterName, String zkServer, Configuration pinotHelixProperties)
       throws Exception {
@@ -106,7 +110,8 @@ public class HelixBrokerStarter {
     // _brokerServerBuilder = startBroker();
     _helixManager =
         HelixManagerFactory.getZKHelixManager(helixClusterName, brokerId, InstanceType.PARTICIPANT, zkServers);
-    _helixExternalViewBasedRouting = new HelixExternalViewBasedRouting(_propertyStore, selector, _helixManager);
+    _helixExternalViewBasedRouting = new HelixExternalViewBasedRouting(_propertyStore, selector, _helixManager,
+        pinotHelixProperties.subset(ROUTING_TABLE_PARAMS_SUBSET_KEY));
     _brokerServerBuilder = startBroker(_pinotHelixProperties);
     final StateMachineEngine stateMachineEngine = _helixManager.getStateMachineEngine();
     final StateModelFactory<?> stateModelFactory =
@@ -117,7 +122,13 @@ public class HelixBrokerStarter {
     _helixAdmin = _helixManager.getClusterManagmentTool();
     addInstanceTagIfNeeded(helixClusterName, brokerId);
 
-    ClusterChangeMediator clusterChangeMediator = new ClusterChangeMediator(_helixExternalViewBasedRouting);
+
+    // Register the service status handler
+    ServiceStatus.setServiceStatusCallback(
+        new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixAdmin, helixClusterName, brokerId));
+
+    ClusterChangeMediator clusterChangeMediator = new ClusterChangeMediator(_helixExternalViewBasedRouting,
+        _brokerServerBuilder.getBrokerMetrics());
     _helixManager.addExternalViewChangeListener(clusterChangeMediator);
     _helixManager.addInstanceConfigChangeListener(clusterChangeMediator);
 
@@ -199,7 +210,7 @@ public class HelixBrokerStarter {
    * @param helixClusterName
    * @return the full property store path
    *
-   * @see org.apache.zookeeper.Zookeeper#Zookeeper(String, int, org.apache.zookeeper.Watcher)
+   * @see org.apache.zookeeper.ZooKeeper#ZooKeeper(String, int, org.apache.zookeeper.Watcher)
    */
   public static String getZkAddressForBroker(String zkServers, String helixClusterName) {
     List tokens = new ArrayList<String>();

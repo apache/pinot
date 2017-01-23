@@ -16,6 +16,7 @@
 package com.linkedin.pinot.perf;
 
 import com.google.common.util.concurrent.Uninterruptibles;
+import com.linkedin.pinot.broker.requesthandler.OptimizationFlags;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.tools.perf.PerfBenchmarkDriver;
@@ -54,7 +55,7 @@ public class BenchmarkQueryEngine {
   };
 
   /** List of optimization flags to test,
-   * see {@link com.linkedin.pinot.requestHandler.OptimizationFlags#getOptimizationFlags(BrokerRequest)} for the syntax
+   * see {@link OptimizationFlags#getOptimizationFlags(BrokerRequest)} for the syntax
    * used here. */
   @Param({"", "-multipleOrEqualitiesToInClause"})
   public String optimizationFlags;

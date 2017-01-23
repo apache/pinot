@@ -73,7 +73,7 @@ public class FixedByteSingleValueWriter implements
   }
 
   @Override
-  public void setString(int row, String string) throws Exception {
+  public void setString(int row, String string) {
     throw new UnsupportedOperationException(
         "Only int data type is supported in fixedbit format");
 

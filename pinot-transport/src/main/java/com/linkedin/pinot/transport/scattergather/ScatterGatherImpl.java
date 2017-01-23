@@ -15,27 +15,13 @@
  */
 package com.linkedin.pinot.transport.scattergather;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import com.google.common.util.concurrent.MoreExecutors;
 import com.linkedin.pinot.common.metrics.BrokerMeter;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
+import com.linkedin.pinot.common.metrics.BrokerQueryPhase;
 import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.common.metrics.MetricsHelper.TimerContext;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.transport.common.BucketingSelection;
 import com.linkedin.pinot.transport.common.CompositeFuture;
 import com.linkedin.pinot.transport.common.CompositeFuture.GatherModeOnError;
 import com.linkedin.pinot.transport.common.KeyedFuture;
@@ -50,6 +36,21 @@ import com.yammer.metrics.core.Histogram;
 import com.yammer.metrics.core.MetricName;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -76,11 +77,13 @@ public class ScatterGatherImpl implements ScatterGather {
     _executorService = service;
   }
 
+  @Nonnull
   @Override
-  public CompositeFuture<ServerInstance, ByteBuf> scatterGather(ScatterGatherRequest scatterRequest,
-      final ScatterGatherStats scatterGatherStats, final BrokerMetrics brokerMetrics)
+  public CompositeFuture<ServerInstance, ByteBuf> scatterGather(@Nonnull ScatterGatherRequest scatterGatherRequest,
+      @Nonnull ScatterGatherStats scatterGatherStats, @Nullable Boolean isOfflineTable,
+      @Nonnull BrokerMetrics brokerMetrics)
       throws InterruptedException {
-    ScatterGatherRequestContext ctxt = new ScatterGatherRequestContext(scatterRequest);
+    ScatterGatherRequestContext ctxt = new ScatterGatherRequestContext(scatterGatherRequest);
 
     // Build services to segmentId group map
     buildInvertedMap(ctxt);
@@ -90,7 +93,15 @@ public class ScatterGatherImpl implements ScatterGather {
     // do Selection for each segment-set/segmentId
     selectServices(ctxt);
 
-    return sendRequest(ctxt, scatterGatherStats, brokerMetrics);
+    return sendRequest(ctxt, scatterGatherStats, isOfflineTable, brokerMetrics);
+  }
+
+  @Nonnull
+  @Override
+  public CompositeFuture<ServerInstance, ByteBuf> scatterGather(@Nonnull ScatterGatherRequest scatterGatherRequest,
+      @Nonnull ScatterGatherStats scatterGatherStats, @Nonnull BrokerMetrics brokerMetrics)
+      throws InterruptedException {
+    return scatterGather(scatterGatherRequest, scatterGatherStats, null, brokerMetrics);
   }
 
   /**
@@ -98,13 +109,14 @@ public class ScatterGatherImpl implements ScatterGather {
    * Helper Function to send scatter-request. This method should be called after the servers are selected
    *
    * @param ctxt Scatter-Gather Request context with selected servers for each request.
-   * @param scatterGatherStats
-   * @param brokerMetrics for updating stats
+   * @param scatterGatherStats scatter-gather statistics.
+   * @param isOfflineTable whether the scatter-gather target is an OFFLINE table.
+   * @param brokerMetrics broker metrics to track execution statistics.
    * @return a composite future representing the gather process.
    * @throws InterruptedException
    */
   protected CompositeFuture<ServerInstance, ByteBuf> sendRequest(ScatterGatherRequestContext ctxt,
-      final ScatterGatherStats scatterGatherStats, final BrokerMetrics brokerMetrics)
+      ScatterGatherStats scatterGatherStats, Boolean isOfflineTable, BrokerMetrics brokerMetrics)
       throws InterruptedException {
     TimerContext t = MetricsHelper.startTimer();
 
@@ -116,11 +128,19 @@ public class ScatterGatherImpl implements ScatterGather {
     // async checkout of connections and then dispatch of request
     List<SingleRequestHandler> handlers = new ArrayList<SingleRequestHandler>(mp.size());
 
-    int i = 0;
     for (Entry<ServerInstance, SegmentIdSet> e : mp.entrySet()) {
-      scatterGatherStats.initServer(e.getKey().toString());
+      ServerInstance server = e.getKey();
+      String serverName = server.toString();
+      if (isOfflineTable != null) {
+        if (isOfflineTable) {
+          serverName += ScatterGatherStats.OFFLINE_TABLE_SUFFIX;
+        } else {
+          serverName += ScatterGatherStats.REALTIME_TABLE_SUFFIX;
+        }
+      }
+      scatterGatherStats.initServer(serverName);
       SingleRequestHandler handler =
-          new SingleRequestHandler(_connPool, e.getKey(), ctxt.getRequest(), e.getValue(), ctxt.getTimeRemaining(),
+          new SingleRequestHandler(_connPool, server, ctxt.getRequest(), e.getValue(), ctxt.getTimeRemaining(),
               requestDispatchLatch, brokerMetrics);
       // Submit to thread-pool for checking-out and sending request
       _executorService.submit(handler);
@@ -140,10 +160,17 @@ public class ScatterGatherImpl implements ScatterGather {
           new ArrayList<KeyedFuture<ServerInstance, ByteBuf>>();
       for (SingleRequestHandler h : handlers) {
         responseFutures.add(h.getResponseFuture());
-        final String server = h.getServer().toString();
-        scatterGatherStats.setSendStartTimeMillis(server, h.getConnStartTimeMillis());
-        scatterGatherStats.setConnStartTimeMillis(server, h.getStartDelayMillis());
-        scatterGatherStats.setSendCompletionTimeMillis(server, h.getSendCompletionTimeMillis());
+        String serverName = h.getServer().toString();
+        if (isOfflineTable != null) {
+          if (isOfflineTable) {
+            serverName += ScatterGatherStats.OFFLINE_TABLE_SUFFIX;
+          } else {
+            serverName += ScatterGatherStats.REALTIME_TABLE_SUFFIX;
+          }
+        }
+        scatterGatherStats.setSendStartTimeMillis(serverName, h.getConnStartTimeMillis());
+        scatterGatherStats.setConnStartTimeMillis(serverName, h.getStartDelayMillis());
+        scatterGatherStats.setSendCompletionTimeMillis(serverName, h.getSendCompletionTimeMillis());
       }
       response.start(responseFutures);
     } else {
@@ -422,7 +449,8 @@ public class ScatterGatherImpl implements ScatterGather {
       boolean gotConnection = false;
       boolean error = true;
       long timeRemainingMillis = _timeoutMS - (System.currentTimeMillis() - _startTime);
-      long timeWaitedMillis = 0;
+      final long _startTimeNs = System.nanoTime();
+      long timeWaitedNs = 0;
       try {
         keyedFuture = _connPool.checkoutObject(_server);
 
@@ -435,7 +463,7 @@ public class ScatterGatherImpl implements ScatterGather {
           }
           conn = keyedFuture.getOne(timeRemainingMillis, TimeUnit.MILLISECONDS);
           if (conn != null && conn.validate()) {
-            timeWaitedMillis = System.currentTimeMillis() - _startTime;
+            timeWaitedNs = System.nanoTime() - _startTimeNs;
             gotConnection = true;
             break;
           }
@@ -477,7 +505,7 @@ public class ScatterGatherImpl implements ScatterGather {
       } finally {
         _requestDispatchLatch.countDown();
         BrokerRequest brokerRequest = (BrokerRequest) _request.getBrokerRequest();
-        _brokerMetrics.addMeteredQueryValue(brokerRequest, BrokerMeter.REQUEST_CONNECTION_WAIT_TIME_IN_MILLIS, timeWaitedMillis);
+        _brokerMetrics.addPhaseTiming(brokerRequest, BrokerQueryPhase.REQUEST_CONNECTION_WAIT, timeWaitedNs);
         if (timeRemainingMillis < 0) {
           _brokerMetrics.addMeteredQueryValue(brokerRequest, BrokerMeter.REQUEST_CONNECTION_TIMEOUTS, 1);
         }

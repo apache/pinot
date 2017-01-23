@@ -16,6 +16,7 @@
 package com.linkedin.pinot.common.data;
 
 import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.utils.DataSchema;
 import javax.annotation.Nonnull;
 import org.apache.avro.Schema.Type;
 import org.json.JSONArray;
@@ -201,7 +202,7 @@ public abstract class FieldSpec {
 
   /**
    * The <code>DataType</code> enum is used to demonstrate the data type of a column.
-   * <p>Array <code>DataType</code> is only used in {@link com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema}.
+   * <p>Array <code>DataType</code> is only used in {@link DataSchema}.
    * <p>In {@link Schema}, use non-array <code>DataType</code> only.
    * <p>In pinot, we store data using 5 <code>DataType</code>s: INT, LONG, FLOAT, DOUBLE, STRING. All other
    * <code>DataType</code>s will be converted to one of them.
@@ -255,6 +256,66 @@ public abstract class FieldSpec {
 
     public boolean isSingleValue() {
       return this.ordinal() < BYTE_ARRAY.ordinal();
+    }
+
+    public DataType toMultiValue() {
+      switch (this) {
+        case BYTE:
+          return BYTE_ARRAY;
+        case CHAR:
+          return CHAR_ARRAY;
+        case INT:
+          return INT_ARRAY;
+        case LONG:
+          return LONG_ARRAY;
+        case FLOAT:
+          return FLOAT_ARRAY;
+        case DOUBLE:
+          return DOUBLE_ARRAY;
+        case STRING:
+          return STRING_ARRAY;
+        default:
+          throw new UnsupportedOperationException("Unsupported toMultiValue for data type: " + this);
+      }
+    }
+
+    public DataType toSingleValue() {
+      switch (this) {
+        case BYTE_ARRAY:
+          return BYTE;
+        case CHAR_ARRAY:
+          return CHAR;
+        case INT_ARRAY:
+          return INT;
+        case LONG_ARRAY:
+          return LONG;
+        case FLOAT_ARRAY:
+          return FLOAT;
+        case DOUBLE_ARRAY:
+          return DOUBLE;
+        case STRING_ARRAY:
+          return STRING;
+        default:
+          throw new UnsupportedOperationException("Unsupported toSingleValue for data type: " + this);
+      }
+    }
+
+    public boolean isCompatible(DataType anotherDataType) {
+      // Single-value is not compatible with multi-value.
+      if (isSingleValue() != anotherDataType.isSingleValue()) {
+        return false;
+      }
+      // Number is not compatible with String.
+      if (isSingleValue()) {
+        if (isNumber() != anotherDataType.isNumber()) {
+          return false;
+        }
+      } else {
+        if (toSingleValue().isNumber() != anotherDataType.toSingleValue().isNumber()) {
+          return false;
+        }
+      }
+      return true;
     }
 
     /**
@@ -321,7 +382,8 @@ public abstract class FieldSpec {
       }
     }
 
-    public JSONObject toJSONSchemaFor(String column) throws JSONException {
+    public JSONObject toJSONSchemaFor(String column)
+        throws JSONException {
       final JSONObject ret = new JSONObject();
       ret.put("name", column);
       ret.put("doc", "data sample from load generator");

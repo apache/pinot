@@ -16,12 +16,15 @@
 package com.linkedin.pinot.controller;
 
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
+import org.apache.commons.io.FileUtils;
 import org.apache.helix.PreConnectCallback;
 import org.restlet.Application;
 import org.restlet.Component;
@@ -29,12 +32,14 @@ import org.restlet.Context;
 import org.restlet.data.Protocol;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.google.common.primitives.Longs;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.common.metrics.ValidationMetrics;
+import com.linkedin.pinot.common.utils.ServiceStatus;
 import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import com.linkedin.pinot.controller.helix.SegmentStatusChecker;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -47,13 +52,16 @@ import com.yammer.metrics.core.MetricsRegistry;
 public class ControllerStarter {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerStarter.class);
   private static final String MetricsRegistryName = "pinot.controller.metrics";
+  private static final Long DATA_DIRECTORY_MISSING_VALUE = 1000000L;
+  private static final Long DATA_DIRECTORY_EXCEPTION_VALUE = 1100000L;
+
   private final ControllerConf config;
 
   private final Component component;
   private final Application controllerRestApp;
   private final PinotHelixResourceManager helixResourceManager;
   private final RetentionManager retentionManager;
-  private final ValidationManager validationManager;
+  private ValidationManager validationManager;
   private final MetricsRegistry _metricsRegistry;
   private final PinotRealtimeSegmentManager realtimeSegmentsManager;
   private final SegmentStatusChecker segmentStatusChecker;
@@ -66,8 +74,6 @@ public class ControllerStarter {
     helixResourceManager = new PinotHelixResourceManager(config);
     retentionManager = new RetentionManager(helixResourceManager, config.getRetentionControllerFrequencyInSeconds());
     _metricsRegistry = new MetricsRegistry();
-    ValidationMetrics validationMetrics = new ValidationMetrics(_metricsRegistry);
-    validationManager = new ValidationManager(validationMetrics, helixResourceManager, config);
     realtimeSegmentsManager = new PinotRealtimeSegmentManager(helixResourceManager);
     segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config);
     executorService = Executors.newCachedThreadPool(
@@ -76,6 +82,10 @@ public class ControllerStarter {
 
   public PinotHelixResourceManager getHelixResourceManager() {
     return helixResourceManager;
+  }
+
+  public ValidationManager getValidationManager() {
+    return validationManager;
   }
 
   public void start() {
@@ -111,6 +121,8 @@ public class ControllerStarter {
       helixResourceManager.start();
       // Helix resource manager must be started in order to create PinotLLCRealtimeSegmentManager
       PinotLLCRealtimeSegmentManager.create(helixResourceManager, config, controllerMetrics);
+      ValidationMetrics validationMetrics = new ValidationMetrics(_metricsRegistry);
+      validationManager = new ValidationManager(validationMetrics, helixResourceManager, config, PinotLLCRealtimeSegmentManager.getInstance());
       LOGGER.info("Starting Pinot REST API component");
       component.start();
       LOGGER.info("Starting retention manager");
@@ -147,6 +159,63 @@ public class ControllerStarter {
                 return helixResourceManager.getHelixZkManager().isLeader() ? 1L : 0L;
               }
             });
+
+    controllerMetrics.addCallbackGauge("dataDir.exists", new Callable<Long>() {
+      @Override
+      public Long call() throws Exception {
+        return new File(config.getDataDir()).exists() ? 1L : 0L;
+      }
+    });
+
+    controllerMetrics.addCallbackGauge("dataDir.fileOpLatencyMs", new Callable<Long>() {
+      @Override
+      public Long call() throws Exception {
+        File dataDir = new File(config.getDataDir());
+
+        if (dataDir.exists()) {
+          try {
+            long startTime = System.currentTimeMillis();
+            final File testFile = new File(dataDir, config.getControllerHost());
+            FileOutputStream outputStream = new FileOutputStream(testFile, false);
+            outputStream.write(Longs.toByteArray(System.currentTimeMillis()));
+            outputStream.flush();
+            outputStream.close();
+            FileUtils.deleteQuietly(testFile);
+            long endTime = System.currentTimeMillis();
+
+            return endTime - startTime;
+          } catch (IOException e) {
+            LOGGER.warn("Caught exception while checking the data directory operation latency", e);
+            return DATA_DIRECTORY_EXCEPTION_VALUE;
+          }
+        } else {
+          return DATA_DIRECTORY_MISSING_VALUE;
+        }
+      }
+    });
+
+    ServiceStatus.setServiceStatusCallback(new ServiceStatus.ServiceStatusCallback() {
+      private boolean _isStarted = false;
+      @Override
+      public ServiceStatus.Status getServiceStatus() {
+        if(_isStarted) {
+          // If we've connected to Helix at some point, the instance status depends on being connected to ZK
+          if (helixResourceManager.getHelixZkManager().isConnected()) {
+            return ServiceStatus.Status.GOOD;
+          } else {
+            return ServiceStatus.Status.BAD;
+          }
+        }
+
+        // Return starting until zk is connected
+        if (!helixResourceManager.getHelixZkManager().isConnected()) {
+          return ServiceStatus.Status.STARTING;
+        } else {
+          _isStarted = true;
+          return ServiceStatus.Status.GOOD;
+        }
+      }
+    });
 
     helixResourceManager.getHelixZkManager().addPreConnectCallback(new PreConnectCallback() {
       @Override

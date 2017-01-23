@@ -34,7 +34,6 @@ import org.slf4j.LoggerFactory;
  * local hostname.
  */
 public class ServerInstance implements Comparable<ServerInstance> {
-
   protected static final Logger LOGGER = LoggerFactory.getLogger(ServerInstance.class);
 
   public static final String NAME_PORT_DELIMITER = ":";
@@ -64,8 +63,8 @@ public class ServerInstance implements Comparable<ServerInstance> {
   }
 
   public ServerInstance(String name, int port, int seq) {
-    super();
     InetAddress ipAddr = null;
+
     try {
       ipAddr = InetAddress.getByName(name);
     } catch (UnknownHostException e) {

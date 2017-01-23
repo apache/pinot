@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.segment.creator.impl.stats;
 
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
+import java.nio.charset.Charset;
 import java.util.Arrays;
 
 import com.linkedin.pinot.common.data.FieldSpec;
@@ -29,10 +30,11 @@ import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
  */
 
 public class StringColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
+  private static final Charset UTF_8 = Charset.forName("UTF-8");
 
   private String min = V1Constants.Str.NULL_STRING;
   private String max = V1Constants.Str.NULL_STRING;
-  private final int longestStringLength = 0;
+  private int longestStringLength = 0;
   private final ObjectSet<String> rawStringSet;
   private final ObjectSet<String> aggregatedStringSet;
   private String[] sortedStringList;
@@ -58,7 +60,9 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
 
     if (entry instanceof Object[]) {
       for (final Object e : (Object[]) entry) {
-        set.add(e.toString());
+        String value = e.toString();
+        set.add(value);
+        longestStringLength = Math.max(longestStringLength, value.getBytes(UTF_8).length);
       }
       if (maxNumberOfMultiValues < ((Object[]) entry).length) {
         maxNumberOfMultiValues = ((Object[]) entry).length;
@@ -74,6 +78,7 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
       }
       addressSorted(value);
       set.add(value);
+      longestStringLength = Math.max(longestStringLength, value.getBytes(UTF_8).length);
       totalNumberOfEntries++;
     }
   }

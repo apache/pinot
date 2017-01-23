@@ -16,8 +16,6 @@
 
 package com.linkedin.pinot.controller.helix.core.realtime;
 
-import com.linkedin.pinot.common.metrics.ControllerMetrics;
-import com.yammer.metrics.core.MetricsRegistry;
 import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Map;
@@ -27,10 +25,12 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.controller.ControllerConf;
+import com.yammer.metrics.core.MetricsRegistry;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -87,10 +87,143 @@ public class SegmentCompletionTest {
   }
 
   @Test
-  public void testHappyPath() throws Exception {
+  public void testStoppedConsumeDuringCompletion() throws Exception {
     SegmentCompletionProtocol.Response response;
+    final String reason = "IAmLazy";
+
     // s1 sends offset of 20, gets HOLD at t = 5s;
     segmentCompletionMgr._secconds = 5;
+    response = segmentCompletionMgr.segmentConsumed(segmentNameStr, s1, s1Offset);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
+    // s2 sends offset of 40, gets HOLD
+    segmentCompletionMgr._secconds += 1;
+    response = segmentCompletionMgr.segmentConsumed(segmentNameStr, s2, s2Offset);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
+    // s3 sends offset of 30, gets catchup to 40
+    segmentCompletionMgr._secconds += 1;
+    response = segmentCompletionMgr.segmentStoppedConsuming(segmentNameStr, s3, s3Offset, reason);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED);
+    Assert.assertEquals(new LLCSegmentName(segmentNameStr), segmentManager._stoppedSegmentName);
+    Assert.assertEquals(s3, segmentManager._stoppedInstance);
+    segmentManager._stoppedSegmentName = null;
+    segmentManager._stoppedInstance = null;
+
+    // Now s1 comes back, and is asked to catchup.
+    segmentCompletionMgr._secconds += 1;
+    response = segmentCompletionMgr.segmentConsumed(segmentNameStr, s1, s1Offset);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.CATCH_UP);
+    // s2 is asked to commit.
+    segmentCompletionMgr._secconds += 1;
+    response = segmentCompletionMgr.segmentConsumed(segmentNameStr, s2, s2Offset);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
+    // s3 comes back with new caught up offset, it should get a HOLD, since commit is not done yet.
+    segmentCompletionMgr._secconds += 1;
+    response = segmentCompletionMgr.segmentConsumed(segmentNameStr, s3, s2Offset);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
+    // s2 executes a succesful commit
+    segmentCompletionMgr._secconds += 1;
+    response = segmentCompletionMgr.segmentCommitStart(segmentNameStr, s2, s2Offset);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE);
+
+    segmentCompletionMgr._secconds += 5;
+    response = segmentCompletionMgr.segmentCommitEnd(segmentNameStr, s2, s2Offset, true);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
+
+    // Now the FSM should have disappeared from the map
+    Assert.assertFalse(fsmMap.containsKey(segmentNameStr));
+
+    // Now if s3 or s1 come back, they are asked to keep the segment they have.
+    segmentCompletionMgr._secconds += 1;
+    response = segmentCompletionMgr.segmentConsumed(segmentNameStr, s2, s2Offset);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.KEEP);
+
+    // And the FSM should be removed.
+    Assert.assertFalse(fsmMap.containsKey(segmentNameStr));
+  }
+
+  @Test
+  public void testStoppedConsumeBeforeHold() throws Exception {
+    SegmentCompletionProtocol.Response response;
+    final String reason = "IAmLazy";
+    // s1 stops consuming at t = 5;
+    segmentCompletionMgr._secconds = 5;
+    response = segmentCompletionMgr.segmentStoppedConsuming(segmentNameStr, s1, s1Offset, reason);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED);
+    Assert.assertEquals(new LLCSegmentName(segmentNameStr), segmentManager._stoppedSegmentName);
+    Assert.assertEquals(s1, segmentManager._stoppedInstance);
+    segmentManager._stoppedSegmentName = null;
+    segmentManager._stoppedInstance = null;
+
+    // s2 sends offset of 40, gets HOLD
+    segmentCompletionMgr._secconds += 1;
+    response = segmentCompletionMgr.segmentConsumed(segmentNameStr, s2, s2Offset);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
+
+    // s3 sends offset of 30, gets catchup to 40, s2 should have been decided as the winner now
+    // since we are never expecting to hear back from s1
+    segmentCompletionMgr._secconds += 1;
+    response = segmentCompletionMgr.segmentConsumed(segmentNameStr, s3, s3Offset);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.CATCH_UP);
+    Assert.assertEquals(response.getOffset(), s2Offset);
+
+    // s3 happens to come back (after catchup to s2offset) before s2 should get a hold since s2 has been decided as
+    // the winner.
+    // TODO Can optimize here since s2 is not notified yet.
+    segmentCompletionMgr._secconds += 1;
+    response = segmentCompletionMgr.segmentConsumed(segmentNameStr, s3, s2Offset);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
+    Assert.assertEquals(response.getOffset(), s2Offset);
+    // s2 is asked to commit.
+    segmentCompletionMgr._secconds += 1;
+    response = segmentCompletionMgr.segmentConsumed(segmentNameStr, s2, s2Offset);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
+
+    // s2 executes a succesful commit
+    segmentCompletionMgr._secconds += 1;
+    response = segmentCompletionMgr.segmentCommitStart(segmentNameStr, s2, s2Offset);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE);
+
+    segmentCompletionMgr._secconds += 5;
+    response = segmentCompletionMgr.segmentCommitEnd(segmentNameStr, s2, s2Offset, true);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
+
+    // Now the FSM should have disappeared from the map
+    Assert.assertFalse(fsmMap.containsKey(segmentNameStr));
+
+    // Now if s3 or s1 come back, they are asked to keep the segment they have.
+    segmentCompletionMgr._secconds += 1;
+    response = segmentCompletionMgr.segmentConsumed(segmentNameStr, s2, s2Offset);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.KEEP);
+
+    // And the FSM should be removed.
+    Assert.assertFalse(fsmMap.containsKey(segmentNameStr));
+  }
+
+  // s2 sends stoppedConsuming message, but then may have gotten restarted, so eventually we complete the segment.
+  @Test
+  public void testHappyPathAfterStoppedConsuming() throws Exception {
+    SegmentCompletionProtocol.Response response;
+    segmentCompletionMgr._secconds = 5;
+
+    response = segmentCompletionMgr.segmentStoppedConsuming(segmentNameStr, s2, s2Offset, "some reason");
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED);
+    Assert.assertEquals(new LLCSegmentName(segmentNameStr), segmentManager._stoppedSegmentName);
+    Assert.assertEquals(s2, segmentManager._stoppedInstance);
+    segmentManager._stoppedSegmentName = null;
+    segmentManager._stoppedInstance = null;
+
+    testHappyPath(6L);
+  }
+
+  @Test
+  public void testHappyPath() throws Exception {
+    testHappyPath(5L);
+  }
+
+  public void testHappyPath(long startTime) throws  Exception {
+    SegmentCompletionProtocol.Response response;
+    // s1 sends offset of 20, gets HOLD at t = 5s;
+    segmentCompletionMgr._secconds = startTime;
     response = segmentCompletionMgr.segmentConsumed(segmentNameStr, s1, s1Offset);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
     // s2 sends offset of 40, gets HOLD
@@ -307,6 +440,8 @@ public class SegmentCompletionTest {
     public LLCRealtimeSegmentZKMetadata _segmentMetadata;
     public MockSegmentCompletionManager _segmentCompletionMgr;
     private static final ControllerConf CONTROLLER_CONF = new ControllerConf();
+    public LLCSegmentName _stoppedSegmentName;
+    public String _stoppedInstance;
 
     protected MockPinotLLCRealtimeSegmentManager() {
       super(null, clusterName, null, null, null, CONTROLLER_CONF, new ControllerMetrics(new MetricsRegistry()));
@@ -328,8 +463,14 @@ public class SegmentCompletionTest {
     }
 
     @Override
-    protected void writeSegmentsToPropertyStore(List<String> paths, List<ZNRecord> records) {
+    protected void writeSegmentsToPropertyStore(List<String> paths, List<ZNRecord> records, String realtimeTableName) {
       _segmentMetadata = new LLCRealtimeSegmentZKMetadata(records.get(0));  // Updated record that we are writing to ZK
+    }
+
+    @Override
+    public void segmentStoppedConsuming(final LLCSegmentName segmentName, final String instance) {
+      _stoppedSegmentName = segmentName;
+      _stoppedInstance = instance;
     }
   }
 

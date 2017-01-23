@@ -1,6 +1,8 @@
 package com.linkedin.thirdeye.datalayer.util;
 
+import com.linkedin.thirdeye.datalayer.entity.AlertConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.OverrideConfigIndex;
+
 import io.dropwizard.configuration.ConfigurationFactory;
 import io.dropwizard.jackson.Jackson;
 
@@ -19,6 +21,7 @@ import com.linkedin.thirdeye.datalayer.dto.AbstractDTO;
 import com.linkedin.thirdeye.datalayer.entity.AnomalyFeedbackIndex;
 import com.linkedin.thirdeye.datalayer.entity.AnomalyFunctionIndex;
 import com.linkedin.thirdeye.datalayer.entity.DashboardConfigIndex;
+import com.linkedin.thirdeye.datalayer.entity.DataCompletenessConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.DatasetConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.EmailConfigurationIndex;
 import com.linkedin.thirdeye.datalayer.entity.GenericJsonEntity;
@@ -29,7 +32,6 @@ import com.linkedin.thirdeye.datalayer.entity.MergedAnomalyResultIndex;
 import com.linkedin.thirdeye.datalayer.entity.MetricConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.RawAnomalyResultIndex;
 import com.linkedin.thirdeye.datalayer.entity.TaskIndex;
-import com.linkedin.thirdeye.datalayer.entity.WebappConfigIndex;
 
 public abstract class DaoProviderUtil {
 
@@ -105,8 +107,6 @@ public abstract class DaoProviderUtil {
             convertCamelCaseToUnderscore(TaskIndex.class.getSimpleName()));
         entityMappingHolder.register(conn, EmailConfigurationIndex.class,
             convertCamelCaseToUnderscore(EmailConfigurationIndex.class.getSimpleName()));
-        entityMappingHolder.register(conn, WebappConfigIndex.class,
-            convertCamelCaseToUnderscore(WebappConfigIndex.class.getSimpleName()));
         entityMappingHolder.register(conn, DatasetConfigIndex.class,
             convertCamelCaseToUnderscore(DatasetConfigIndex.class.getSimpleName()));
         entityMappingHolder.register(conn, MetricConfigIndex.class,
@@ -119,6 +119,10 @@ public abstract class DaoProviderUtil {
             convertCamelCaseToUnderscore(IngraphMetricConfigIndex.class.getSimpleName()));
         entityMappingHolder.register(conn, OverrideConfigIndex.class,
             convertCamelCaseToUnderscore(OverrideConfigIndex.class.getSimpleName()));
+        entityMappingHolder.register(conn, AlertConfigIndex.class,
+            convertCamelCaseToUnderscore(AlertConfigIndex.class.getSimpleName()));
+        entityMappingHolder.register(conn, DataCompletenessConfigIndex.class,
+            convertCamelCaseToUnderscore(DataCompletenessConfigIndex.class.getSimpleName()));
       } catch (Exception e) {
         throw new RuntimeException(e);
       }

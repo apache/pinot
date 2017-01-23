@@ -15,10 +15,18 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.ZkStarter;
 import java.io.File;
 import java.util.Collections;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.KafkaStarterUtils;
+import java.util.List;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.manager.zk.ZNRecordSerializer;
+import org.apache.helix.manager.zk.ZkClient;
+import org.testng.Assert;
+import org.testng.annotations.Test;
 
 
 /**
@@ -38,6 +46,22 @@ public class LLCRealtimeClusterIntegrationTest extends RealtimeClusterIntegratio
 
   protected void createKafkaTopic(String kafkaTopic, String zkStr) {
     KafkaStarterUtils.createTopic(kafkaTopic, zkStr, KAFKA_PARTITION_COUNT);
+  }
+
+  @Test
+  public void testSegmentFlushSize() {
+    ZkClient zkClient = new ZkClient(ZkStarter.DEFAULT_ZK_STR, 10000);
+    zkClient.setZkSerializer(new ZNRecordSerializer());
+    String zkPath = "/LLCRealtimeClusterIntegrationTest/PROPERTYSTORE/SEGMENTS/mytable_REALTIME";
+    List<String> segmentNames =
+        zkClient.getChildren(zkPath);
+    for (String segmentName : segmentNames) {
+      ZNRecord znRecord = zkClient.<ZNRecord>readData(zkPath + "/" + segmentName);
+      Assert.assertEquals(znRecord.getSimpleField(CommonConstants.Segment.FLUSH_THRESHOLD_SIZE),
+          Integer.toString(ROW_COUNT_FOR_REALTIME_SEGMENT_FLUSH / KAFKA_PARTITION_COUNT), "Segment " + segmentName +
+              " does not have the expected flush size");
+    }
+    zkClient.close();
   }
 
   @Override

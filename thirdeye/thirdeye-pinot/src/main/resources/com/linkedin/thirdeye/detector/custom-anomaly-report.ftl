@@ -9,10 +9,15 @@
     </td>
   </tr>
   <tr>
+    <td style="min-height: 30px; font-family: 'Proxima Nova','Arial', 'Helvetica Neue',Helvetica, sans-serif;font-size:16px;font-weight:300; width:100%;display:inline;">
+      <p>Hello,</p>
+      <p>You are receiving this email because you have subscribed to ThirdEye Alert Service : '${alertConfigName}'.<br/></p>
+  </td>
+  </tr>
+  <tr>
     <td style="min-height: 30px; padding:10px 15px; font-family: 'Proxima Nova','Arial', 'Helvetica Neue',Helvetica, sans-serif;font-size:16px;font-weight:300; width:100%;display:inline;">
-      <p> Datasets : [${datasets}] </p>
-      <p>Analysis Start : ${startTime} </p>
-      <p>Analysis End : ${endTime} </p>
+      <br/>Analysis Start : ${startTime?date}
+      <br/>Analysis End : ${endTime?date}
     </td>
   </tr>
   <tr>
@@ -70,4 +75,17 @@
     </td>
   </tr>
 </#if>
+  <tr>
+    <td style="font-family:font-family: 'Proxima Nova','Arial', 'Helvetica Neue',Helvetica, sans-serif;font-size:16px;font-weight:300; width:100%;display:inline;">
+      <br/>
+      <hr/>
+      <p>If you have any questions regarding this report, please email <a
+          href="mailto:ask_thirdeye@linkedin.com" target="_top">ask_thirdeye@linkedin.com</a></p>
+      <p> Report generated at: ${dateFormat(reportGenerationTimeMillis)}</p>
+      <p>
+        Thanks,<br>
+        ThirdEye Team
+      </p>
+    </td>
+  </tr>
 </table>

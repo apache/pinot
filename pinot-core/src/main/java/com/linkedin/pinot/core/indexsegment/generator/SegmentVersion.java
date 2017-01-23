@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.indexsegment.generator;
 
-import com.linkedin.pinot.common.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,6 +29,10 @@ public enum SegmentVersion {
   v3 (3);
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentVersion.class);
+
+  public static SegmentVersion DEFAULT_TABLE_VERSION = SegmentVersion.v3;
+  public static SegmentVersion DEFAULT_SERVER_VERSION = SegmentVersion.v3;
+
   int versionNumber;
   SegmentVersion(int versionNum) {
     this.versionNumber = versionNum;
@@ -47,21 +50,21 @@ public enum SegmentVersion {
   }
 
   /**
-   * This is null-safe version of valueOf method
-   * @param inputVersion
-   * @return
+   * Get the segment format version from string or return the default value
+   * @param inputVersion input segment format version to read
+   * @param defaultVal default value to use
+   * @return SegmentVersion for inputVersion of defaultVal if inputVersion is empty or bad value
    */
-  public static SegmentVersion fromStringOrDefault(String inputVersion) {
-    String version = inputVersion;
+  public static SegmentVersion fromString(String inputVersion, SegmentVersion defaultVal) {
     if (inputVersion == null) {
-      version = CommonConstants.Server.DEFAULT_SEGMENT_FORMAT_VERSION;
+      return defaultVal;
     }
     try {
-      return SegmentVersion.valueOf(version);
+      return SegmentVersion.valueOf(inputVersion);
     } catch (IllegalArgumentException e) {
-      LOGGER.error("Invalid argument for segment version, input: {}, Returning default version: {}",
-          inputVersion, CommonConstants.Server.DEFAULT_SEGMENT_FORMAT_VERSION, e);
-      return SegmentVersion.valueOf(CommonConstants.Server.DEFAULT_SEGMENT_FORMAT_VERSION);
+      LOGGER.error("Invalid argument for segment version input: {}, Returning default value: {}",
+          inputVersion, defaultVal);
+      return defaultVal;
     }
   }
 }

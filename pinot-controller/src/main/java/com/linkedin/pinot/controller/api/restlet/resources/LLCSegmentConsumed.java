@@ -41,7 +41,7 @@ public class LLCSegmentConsumed extends ServerResource {
   @Override
   @HttpVerb("get")
   @Description("Receives the consumed offset for a partition to be committed")
-  @Summary("Reveies the consumed offset for a partition from the server")
+  @Summary("Receives the consumed offset for a partition from the server")
   @Paths({"/" + SegmentCompletionProtocol.MSG_TYPE_CONSUMED})
   public Representation get() {
     final String offset = getReference().getQueryAsForm().getValues(SegmentCompletionProtocol.PARAM_OFFSET);

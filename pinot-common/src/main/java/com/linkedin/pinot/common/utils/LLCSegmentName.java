@@ -153,4 +153,9 @@ public class LLCSegmentName extends SegmentName implements Comparable {
     result = 31 * result + (_segmentName != null ? _segmentName.hashCode() : 0);
     return result;
   }
+
+  @Override
+  public String toString() {
+    return getSegmentName();
+  }
 }

@@ -15,163 +15,144 @@
  */
 package com.linkedin.pinot.core.operator.aggregation.function;
 
-import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.aggregation.AggregationResultHolder;
+import com.linkedin.pinot.core.operator.aggregation.ObjectAggregationResultHolder;
+import com.linkedin.pinot.core.operator.aggregation.function.customobject.AvgPair;
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupByResultHolder;
-import com.linkedin.pinot.core.query.utils.Pair;
-import java.util.List;
+import com.linkedin.pinot.core.operator.aggregation.groupby.ObjectGroupByResultHolder;
+import javax.annotation.Nonnull;
 
 
-/**
- * Class to implement the 'avg' aggregation function.
- */
-public class AvgAggregationFunction implements AggregationFunction {
-  private static final String FUNCTION_NAME = AggregationFunctionFactory.AVG_AGGREGATION_FUNCTION;
-  private static final double DEFAULT_VALUE = 0.0;
-  private static final ResultDataType RESULT_DATA_TYPE = ResultDataType.AVERAGE_PAIR;
+public class AvgAggregationFunction implements AggregationFunction<AvgPair, Double> {
+  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.AVG.getName();
+  private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
 
-  /**
-   * Performs 'avg' aggregation on the input array.
-   * Returns {@value #DEFAULT_VALUE} if the input array is empty.
-   *
-   * While the interface allows for variable number of valueArrays, we do not support
-   * multiple columns within one aggregation function right now.
-   *
-   * {@inheritDoc}
-   *
-   * @param length
-   * @param resultHolder
-   * @param valueArray
-   */
-  @Override
-  public void aggregate(int length, AggregationResultHolder resultHolder, Object... valueArray) {
-    Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkArgument(valueArray[0] instanceof double[]);
-    final double[] values = (double[]) valueArray[0];
-    Preconditions.checkState(length <= values.length);
-
-    double sum = 0.0;
-    for (int i = 0; i < length; ++i) {
-      sum += values[i];
-    }
-    Pair<Double, Long> avgValue = resultHolder.getResult();
-    if (avgValue == null) {
-      avgValue = new Pair<>(sum, (long) length);
-      resultHolder.setValue(avgValue);
-    } else {
-      avgValue.setFirst(avgValue.getFirst() + sum);
-      avgValue.setSecond(avgValue.getSecond() + length);
-    }
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * While the interface allows for variable number of valueArrays, we do not support
-   * multiple columns within one aggregation function right now.
-   *
-   * @param length
-   * @param groupKeys
-   * @param resultHolder
-   * @param valueArray
-   */
-  @Override
-  public void aggregateGroupBySV(int length, int[] groupKeys, GroupByResultHolder resultHolder, Object... valueArray) {
-    Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkArgument(valueArray[0] instanceof double[]);
-    final double[] values = (double[]) valueArray[0];
-    Preconditions.checkState(length <= values.length);
-
-    for (int i = 0; i < length; ++i) {
-      int groupKey = groupKeys[i];
-      double value = values[i];
-      Pair<Double, Long> avgValue = resultHolder.getResult(groupKey);
-      if (avgValue == null) {
-        avgValue = new Pair<>(value, 1L);
-        resultHolder.setValueForKey(groupKey, avgValue);
-      } else {
-        avgValue.setFirst(avgValue.getFirst() + values[i]);
-        avgValue.setSecond(avgValue.getSecond() + 1);
-      }
-    }
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @param length
-   * @param docIdToGroupKeys
-   * @param resultHolder
-   * @param valueArray
-   */
-  @Override
-  public void aggregateGroupByMV(int length, int[][] docIdToGroupKeys, GroupByResultHolder resultHolder,
-      Object... valueArray) {
-    Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkArgument(valueArray[0] instanceof double[]);
-    final double[] values = (double[]) valueArray[0];
-    Preconditions.checkState(length <= values.length);
-
-    for (int i = 0; i < length; ++i) {
-      double value = values[i];
-      for (int groupKey : docIdToGroupKeys[i]) {
-        Pair<Double, Long> avgValue = resultHolder.getResult(groupKey);
-        if (avgValue == null) {
-          avgValue = new Pair<>(value, 1L);
-          resultHolder.setValueForKey(groupKey, avgValue);
-        } else {
-          avgValue.setFirst(avgValue.getFirst() + values[i]);
-          avgValue.setSecond(avgValue.getSecond() + 1);
-        }
-      }
-    }
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @return
-   */
-  @Override
-  public double getDefaultValue() {
-    return DEFAULT_VALUE;
-  }
-
-  /**
-   * {@inheritDoc}
-   * @return
-   */
-  @Override
-  public AggregationFunction.ResultDataType getResultDataType() {
-    return RESULT_DATA_TYPE;
-  }
-
+  @Nonnull
   @Override
   public String getName() {
-    return FUNCTION_NAME;
+    return NAME;
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * @param combinedResult
-   * @return
-   */
+  @Nonnull
   @Override
-  public Double reduce(List<Object> combinedResult) {
-    double reducedSumResult = 0;
-    long reducedCntResult = 0;
+  public String getColumnName(@Nonnull String[] columns) {
+    return NAME + "_" + columns[0];
+  }
 
-    for (Object object : combinedResult) {
-      Pair resultPair = (Pair) object;
-      reducedSumResult += (double) resultPair.getFirst();
-      reducedCntResult += (long) resultPair.getSecond();
+  @Override
+  public void accept(@Nonnull AggregationFunctionVisitorBase visitor) {
+    visitor.visit(this);
+  }
+
+  @Nonnull
+  @Override
+  public AggregationResultHolder createAggregationResultHolder() {
+    return new ObjectAggregationResultHolder();
+  }
+
+  @Nonnull
+  @Override
+  public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity, int trimSize) {
+    return new ObjectGroupByResultHolder(initialCapacity, maxCapacity, trimSize);
+  }
+
+  @Override
+  public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
+      @Nonnull BlockValSet... blockValSets) {
+    double[] valueArray = blockValSets[0].getDoubleValuesSV();
+    double sum = 0.0;
+    for (int i = 0; i < length; i++) {
+      sum += valueArray[i];
     }
+    setAggregationResult(aggregationResultHolder, sum, (long) length);
+  }
 
-    if (reducedCntResult > 0) {
-      return reducedSumResult / reducedCntResult;
+  protected void setAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder, double sum,
+      long count) {
+    AvgPair avgPair = aggregationResultHolder.getResult();
+    if (avgPair == null) {
+      aggregationResultHolder.setValue(new AvgPair(sum, count));
     } else {
-      return DEFAULT_VALUE;
+      avgPair.apply(sum, count);
+    }
+  }
+
+  @Override
+  public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+    double[] valueArray = blockValSets[0].getDoubleValuesSV();
+    for (int i = 0; i < length; i++) {
+      setGroupByResult(groupKeyArray[i], groupByResultHolder, valueArray[i], 1L);
+    }
+  }
+
+  @Override
+  public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+    double[] valueArray = blockValSets[0].getDoubleValuesSV();
+    for (int i = 0; i < length; i++) {
+      double value = valueArray[i];
+      for (int groupKey : groupKeysArray[i]) {
+        setGroupByResult(groupKey, groupByResultHolder, value, 1L);
+      }
+    }
+  }
+
+  protected void setGroupByResult(int groupKey, @Nonnull GroupByResultHolder groupByResultHolder, double sum,
+      long count) {
+    AvgPair avgPair = groupByResultHolder.getResult(groupKey);
+    if (avgPair == null) {
+      groupByResultHolder.setValueForKey(groupKey, new AvgPair(sum, count));
+    } else {
+      avgPair.apply(sum, count);
+    }
+  }
+
+  @Nonnull
+  @Override
+  public AvgPair extractAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder) {
+    AvgPair avgPair = aggregationResultHolder.getResult();
+    if (avgPair == null) {
+      return new AvgPair(0.0, 0L);
+    } else {
+      return avgPair;
+    }
+  }
+
+  @Nonnull
+  @Override
+  public AvgPair extractGroupByResult(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
+    AvgPair avgPair = groupByResultHolder.getResult(groupKey);
+    if (avgPair == null) {
+      return new AvgPair(0.0, 0L);
+    } else {
+      return avgPair;
+    }
+  }
+
+  @Nonnull
+  @Override
+  public AvgPair merge(@Nonnull AvgPair intermediateResult1, @Nonnull AvgPair intermediateResult2) {
+    intermediateResult1.apply(intermediateResult2);
+    return intermediateResult1;
+  }
+
+  @Nonnull
+  @Override
+  public FieldSpec.DataType getIntermediateResultDataType() {
+    return FieldSpec.DataType.OBJECT;
+  }
+
+  @Nonnull
+  @Override
+  public Double extractFinalResult(@Nonnull AvgPair intermediateResult) {
+    long count = intermediateResult.getCount();
+    if (count == 0L) {
+      return DEFAULT_FINAL_RESULT;
+    } else {
+      return intermediateResult.getSum() / count;
     }
   }
 }

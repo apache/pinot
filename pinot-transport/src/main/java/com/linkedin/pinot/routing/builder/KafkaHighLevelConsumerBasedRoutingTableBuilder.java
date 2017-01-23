@@ -25,8 +25,8 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.HLCSegmentName;
 import com.linkedin.pinot.common.utils.SegmentName;
-import com.linkedin.pinot.common.utils.SegmentNameBuilder;
 import com.linkedin.pinot.routing.ServerToSegmentSetMap;
 
 
@@ -57,7 +57,8 @@ public class KafkaHighLevelConsumerBasedRoutingTableBuilder implements RoutingTa
         if (!SegmentName.isHighLevelConsumerSegmentName(segment))
           continue;
 
-        String groupId = SegmentNameBuilder.Realtime.extractGroupIdName(segment);
+        HLCSegmentName hlcSegmentName = new HLCSegmentName(segment);
+        String groupId = hlcSegmentName.getGroupId();
         if (!groupIdToRouting.containsKey(groupId)) {
           groupIdToRouting.put(groupId, new HashMap<String, Set<String>>());
         }

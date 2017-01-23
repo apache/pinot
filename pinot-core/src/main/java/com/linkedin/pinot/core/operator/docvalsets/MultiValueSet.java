@@ -16,13 +16,14 @@
 package com.linkedin.pinot.core.operator.docvalsets;
 
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.core.common.BaseBlockValSet;
 import com.linkedin.pinot.core.common.BlockValIterator;
-import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
 import com.linkedin.pinot.core.operator.docvaliterators.MultiValueIterator;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 
-public final class MultiValueSet implements BlockValSet {
+
+public final class MultiValueSet extends BaseBlockValSet {
   private ColumnMetadata columnMetadata;
   private SingleColumnMultiValueReader mVReader;
 
@@ -33,16 +34,6 @@ public final class MultiValueSet implements BlockValSet {
   }
 
   @Override
-  public <T> T getSingleValues() {
-    throw new UnsupportedOperationException("Reading a batch of values is not supported for multi-value BlockValSet.");
-  }
-
-  @Override
-  public <T> T getMultiValues() {
-    throw new UnsupportedOperationException("Reading a batch of values is not supported for multi-value BlockValSet.");
-  }
-
-  @Override
   public BlockValIterator iterator() {
     return new MultiValueIterator(mVReader, columnMetadata);
   }
@@ -50,20 +41,5 @@ public final class MultiValueSet implements BlockValSet {
   @Override
   public DataType getValueType() {
     return columnMetadata.getDataType();
-  }
-
-  @Override
-  public void getDictionaryIds(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outDictionaryIds, int outStartPos) {
-    throw new UnsupportedOperationException("Reading a batch of values is not supported for multi-value BlockValSet");
-  }
-
-  @Override
-  public int[] getDictionaryIds() {
-    throw new UnsupportedOperationException("Reading a batch of dictionary id is not supported for multi-value BlockValSet");
-  }
-
-  @Override
-  public int getDictionaryIdsForDocId(int docId, int[] outputDictIds) {
-    throw new UnsupportedOperationException("Reading a single values is not supported for multi-value BlockValSet");
   }
 }

@@ -36,8 +36,7 @@ public abstract class MutableDictionaryReader implements Dictionary {
 
   protected void addToDictionaryBiMap(Object val) {
     if (!dictionaryIdBiMap.inverse().containsKey(val)) {
-      dictionaryIdBiMap.put(new Integer(dictionaryIdGenerator.incrementAndGet()), val);
-      return;
+      dictionaryIdBiMap.put(dictionaryIdGenerator.incrementAndGet(), val);
     }
   }
 

@@ -85,6 +85,7 @@ struct AggregationInfo {
 struct GroupBy {
   1: optional list<string> columns;
   2: optional i64 topN;
+  3: optional list<string> expressions;
 }
 
 /**

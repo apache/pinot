@@ -15,114 +15,84 @@
  */
 package com.linkedin.pinot.transport.scattergather;
 
+import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
+import javax.annotation.concurrent.NotThreadSafe;
 
 
 /**
  * A class to record statistics for scatter-gather requests, on a per-server basis.
- * NOTE: Assumes there will not be more than one thread updating stats for a server.
  */
+@NotThreadSafe
 public class ScatterGatherStats {
-  private ConcurrentMap<String, PerServerStats> _perServerStatsMap;
+  public static final String OFFLINE_TABLE_SUFFIX = "_O";
+  public static final String REALTIME_TABLE_SUFFIX = "_R";
 
-  public void setSendStartTimeMillis(String server, long millis) {
-    PerServerStats perServerStats = _perServerStatsMap.get(server);
-    if (perServerStats != null) {
-      perServerStats.setSendStartTimeMillis(millis);
-    }
-  }
-
-  public void setConnStartTimeMillis(String server, long millis) {
-    PerServerStats perServerStats = _perServerStatsMap.get(server);
-    if (perServerStats != null) {
-      perServerStats.setConnStartDelayMillis(millis);
-    }
-  }
-
-  public void setSendCompletionTimeMillis(String server, long millis) {
-    PerServerStats perServerStats = _perServerStatsMap.get(server);
-    if (perServerStats != null) {
-      perServerStats.setSendCompletionTimeMillis(millis);
-    }
-  }
-
-  public void setResponseTimeMillis(Map<String, Long> responseTimesMap) {
-    for (Map.Entry<String, Long> entry : responseTimesMap.entrySet()) {
-      PerServerStats perServerStats = _perServerStatsMap.get(entry.getKey());
-      if (perServerStats != null) {
-        perServerStats.setResponseTimeMillis(entry.getValue());
-      }
-    }
-  }
+  private Map<String, PerServerStats> _perServerStatsMap;
 
   public ScatterGatherStats() {
-    _perServerStatsMap = new ConcurrentHashMap<>(10);
+    _perServerStatsMap = new HashMap<>();
   }
 
   public void initServer(String server) {
-    PerServerStats perServerStats = new PerServerStats();
-    _perServerStatsMap.put(server, perServerStats);
+    _perServerStatsMap.put(server, new PerServerStats());
+  }
+
+  public void setSendStartTimeMillis(String server, long millis) {
+    _perServerStatsMap.get(server).setSendStartTimeMillis(millis);
+  }
+
+  public void setConnStartTimeMillis(String server, long millis) {
+    _perServerStatsMap.get(server).setConnStartDelayMillis(millis);
+  }
+
+  public void setSendCompletionTimeMillis(String server, long millis) {
+    _perServerStatsMap.get(server).setSendCompletionTimeMillis(millis);
+  }
+
+  public void setResponseTimeMillis(Map<String, Long> responseTimeMap, boolean isOfflineTable) {
+    for (Map.Entry<String, Long> entry : responseTimeMap.entrySet()) {
+      String serverName = entry.getKey();
+      if (isOfflineTable) {
+        serverName += OFFLINE_TABLE_SUFFIX;
+      } else {
+        serverName += REALTIME_TABLE_SUFFIX;
+      }
+      _perServerStatsMap.get(serverName).setResponseTimeMillis(entry.getValue());
+    }
   }
 
   @Override
   public String toString() {
-    StringBuilder builder = new StringBuilder();
+    StringBuilder stringBuilder = new StringBuilder();
+    boolean isFirstEntry = true;
     for (Map.Entry<String, PerServerStats> entry : _perServerStatsMap.entrySet()) {
-      builder.append(entry.getKey().split("\\.")[0]).append("=").append(entry.getValue()).append(":");
+      if (isFirstEntry) {
+        isFirstEntry = false;
+      } else {
+        stringBuilder.append(';');
+      }
+      stringBuilder.append(entry.getKey()).append('=').append(entry.getValue());
     }
-    return builder.toString();
-  }
-
-  // Merge statistics from 'other' to this one (for new servers)
-  public void merge(ScatterGatherStats other) {
-    Map<String, PerServerStats> perServerStatsMap = other.getPerServerStatMap();
-    for (Map.Entry<String, PerServerStats> entry : perServerStatsMap.entrySet()) {
-      _perServerStatsMap.putIfAbsent(entry.getKey(), entry.getValue());
-    }
-  }
-
-  private Map<String, PerServerStats> getPerServerStatMap() {
-    return _perServerStatsMap;
+    return stringBuilder.toString();
   }
 
   private class PerServerStats {
-    // All times are relative to 0 when the request starts.
     private long _connStartDelayMillis;
     private long _sendStartTimeMillis;
     private long _sendCompletionTimeMillis;
     private long _responseTimeMillis;
 
-    private PerServerStats() {
-    }
-
-    private long getConnStartDelayMillis() {
-      return _connStartDelayMillis;
-    }
-
     private void setConnStartDelayMillis(long connStartDelayMillis) {
       _connStartDelayMillis = connStartDelayMillis;
-    }
-
-    private long getSendStartTimeMillis() {
-      return _sendStartTimeMillis;
     }
 
     private void setSendStartTimeMillis(long sendStartTimeMillis) {
       _sendStartTimeMillis = sendStartTimeMillis;
     }
 
-    private long getSendCompletionTimeMillis() {
-      return _sendCompletionTimeMillis;
-    }
-
     private void setSendCompletionTimeMillis(long sendCompletionTimeMillis) {
       _sendCompletionTimeMillis = sendCompletionTimeMillis;
-    }
-
-    private long getResponseTimeMillis() {
-      return _responseTimeMillis;
     }
 
     private void setResponseTimeMillis(long responseTimeMillis) {
@@ -131,7 +101,8 @@ public class ScatterGatherStats {
 
     @Override
     public String toString() {
-      return String.format("%d,%d,%d,%d", getConnStartDelayMillis(), getSendStartTimeMillis(), getSendCompletionTimeMillis(), getResponseTimeMillis());
+      return String.format("%d,%d,%d,%d", _connStartDelayMillis, _sendStartTimeMillis, _sendCompletionTimeMillis,
+          _responseTimeMillis);
     }
   }
 }

@@ -15,41 +15,56 @@
  */
 package com.linkedin.pinot.core.operator.aggregation.function;
 
-import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.aggregation.AggregationResultHolder;
+import com.linkedin.pinot.core.operator.aggregation.ObjectAggregationResultHolder;
+import com.linkedin.pinot.core.operator.aggregation.function.customobject.MinMaxRangePair;
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupByResultHolder;
-import com.linkedin.pinot.core.query.utils.Pair;
-import java.util.List;
+import com.linkedin.pinot.core.operator.aggregation.groupby.ObjectGroupByResultHolder;
+import javax.annotation.Nonnull;
 
 
-/**
- * Class to implement the 'minmaxrange' aggregation function.
- */
-public class MinMaxRangeAggregationFunction implements AggregationFunction {
-  private static final String FUNCTION_NAME = AggregationFunctionFactory.MINMAXRANGE_AGGREGATION_FUNCTION;
-  private static final ResultDataType RESULT_DATA_TYPE = ResultDataType.MINMAXRANGE_PAIR;
+public class MinMaxRangeAggregationFunction implements AggregationFunction<MinMaxRangePair, Double> {
+  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.MINMAXRANGE.getName();
 
-  /**
-   * Performs 'minmaxrange' aggregation on the input array.
-   *
-   * {@inheritDoc}
-   *
-   * @param length
-   * @param resultHolder
-   * @param valueArray
-   */
+  @Nonnull
   @Override
-  public void aggregate(int length, AggregationResultHolder resultHolder, Object... valueArray) {
-    Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkArgument(valueArray[0] instanceof double[]);
-    final double[] values = (double[]) valueArray[0];
-    Preconditions.checkState(length <= values.length);
+  public String getName() {
+    return NAME;
+  }
 
+  @Nonnull
+  @Override
+  public String getColumnName(@Nonnull String[] columns) {
+    return NAME + "_" + columns[0];
+  }
+
+  @Override
+  public void accept(@Nonnull AggregationFunctionVisitorBase visitor) {
+    visitor.visit(this);
+  }
+
+  @Nonnull
+  @Override
+  public AggregationResultHolder createAggregationResultHolder() {
+    return new ObjectAggregationResultHolder();
+  }
+
+  @Nonnull
+  @Override
+  public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity, int trimSize) {
+    return new ObjectGroupByResultHolder(initialCapacity, maxCapacity, trimSize);
+  }
+
+  @Override
+  public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
+      @Nonnull BlockValSet... blockValSets) {
+    double[] valueArray = blockValSets[0].getDoubleValuesSV();
     double min = Double.POSITIVE_INFINITY;
     double max = Double.NEGATIVE_INFINITY;
-
     for (int i = 0; i < length; i++) {
-      double value = values[i];
+      double value = valueArray[i];
       if (value < min) {
         min = value;
       }
@@ -57,125 +72,90 @@ public class MinMaxRangeAggregationFunction implements AggregationFunction {
         max = value;
       }
     }
+    setAggregationResult(aggregationResultHolder, min, max);
+  }
 
-    Pair<Double, Double> rangeValue = resultHolder.getResult();
-    if (rangeValue == null) {
-      rangeValue = new Pair<>(min, max);
-      resultHolder.setValue(rangeValue);
+  protected void setAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder, double min,
+      double max) {
+    MinMaxRangePair minMaxRangePair = aggregationResultHolder.getResult();
+    if (minMaxRangePair == null) {
+      aggregationResultHolder.setValue(new MinMaxRangePair(min, max));
     } else {
-      if (min < rangeValue.getFirst()) {
-        rangeValue.setFirst(min);
-      }
-      if (max > rangeValue.getSecond()) {
-        rangeValue.setSecond(max);
-      }
+      minMaxRangePair.apply(min, max);
     }
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * While the interface allows for variable number of valueArrays, we do not support
-   * multiple columns within one aggregation function right now.
-   *
-   * @param length
-   * @param groupKeys
-   * @param resultHolder
-   * @param valueArray
-   */
   @Override
-  public void aggregateGroupBySV(int length, int[] groupKeys, GroupByResultHolder resultHolder, Object... valueArray) {
-    Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkArgument(valueArray[0] instanceof double[]);
-    final double[] values = (double[]) valueArray[0];
-    Preconditions.checkState(length <= values.length);
-
+  public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+    double[] valueArray = blockValSets[0].getDoubleValuesSV();
     for (int i = 0; i < length; i++) {
-      int groupKey = groupKeys[i];
-      double value = values[i];
-      Pair<Double, Double> rangeValue = resultHolder.getResult(groupKey);
-      if (rangeValue == null) {
-        rangeValue = new Pair<>(value, value);
-        resultHolder.setValueForKey(groupKey, rangeValue);
-      } else {
-        if (value < rangeValue.getFirst()) {
-          rangeValue.setFirst(value);
-        }
-        if (value > rangeValue.getSecond()) {
-          rangeValue.setSecond(value);
-        }
+      double value = valueArray[i];
+      setGroupByResult(groupKeyArray[i], groupByResultHolder, value, value);
+    }
+  }
+
+  @Override
+  public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+    double[] valueArray = blockValSets[0].getDoubleValuesSV();
+    for (int i = 0; i < length; i++) {
+      double value = valueArray[i];
+      for (int groupKey : groupKeysArray[i]) {
+        setGroupByResult(groupKey, groupByResultHolder, value, value);
       }
     }
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * @param length
-   * @param docIdToGroupKeys
-   * @param resultHolder
-   * @param valueArray
-   */
-  @Override
-  public void aggregateGroupByMV(int length, int[][] docIdToGroupKeys, GroupByResultHolder resultHolder,
-      Object... valueArray) {
-    Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkArgument(valueArray[0] instanceof double[]);
-    final double[] values = (double[]) valueArray[0];
-    Preconditions.checkState(length <= values.length);
-
-    for (int i = 0; i < length; ++i) {
-      double value = values[i];
-      for (int groupKey : docIdToGroupKeys[i]) {
-        Pair<Double, Double> rangeValue = resultHolder.getResult(groupKey);
-        if (rangeValue == null) {
-          rangeValue = new Pair<>(value, value);
-          resultHolder.setValueForKey(groupKey, rangeValue);
-        } else {
-          if (value < rangeValue.getFirst()) {
-            rangeValue.setFirst(value);
-          }
-          if (value > rangeValue.getSecond()) {
-            rangeValue.setSecond(value);
-          }
-        }
-      }
+  protected void setGroupByResult(int groupKey, @Nonnull GroupByResultHolder groupByResultHolder, double min,
+      double max) {
+    MinMaxRangePair minMaxRangePair = groupByResultHolder.getResult(groupKey);
+    if (minMaxRangePair == null) {
+      groupByResultHolder.setValueForKey(groupKey, new MinMaxRangePair(min, max));
+    } else {
+      minMaxRangePair.apply(min, max);
     }
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * @return
-   */
+  @Nonnull
   @Override
-  public double getDefaultValue() {
-    throw new RuntimeException("Unsupported method getDefaultValue() for class " + getClass().getName());
+  public MinMaxRangePair extractAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder) {
+    MinMaxRangePair minMaxRangePair = aggregationResultHolder.getResult();
+    if (minMaxRangePair == null) {
+      return new MinMaxRangePair(Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY);
+    } else {
+      return minMaxRangePair;
+    }
   }
 
-  /**
-   * {@inheritDoc}
-   * @return
-   */
+  @Nonnull
   @Override
-  public ResultDataType getResultDataType() {
-    return RESULT_DATA_TYPE;
+  public MinMaxRangePair extractGroupByResult(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
+    MinMaxRangePair minMaxRangePair = groupByResultHolder.getResult(groupKey);
+    if (minMaxRangePair == null) {
+      return new MinMaxRangePair(Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY);
+    } else {
+      return minMaxRangePair;
+    }
   }
 
+  @Nonnull
   @Override
-  public String getName() {
-    return FUNCTION_NAME;
+  public MinMaxRangePair merge(@Nonnull MinMaxRangePair intermediateResult1,
+      @Nonnull MinMaxRangePair intermediateResult2) {
+    intermediateResult1.apply(intermediateResult2);
+    return intermediateResult1;
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * @param combinedResult
-   * @return
-   */
+  @Nonnull
   @Override
-  public Double reduce(List<Object> combinedResult) {
-    throw new RuntimeException(
-        "Unsupported method reduce(List<Object> combinedResult) for class " + getClass().getName());
+  public FieldSpec.DataType getIntermediateResultDataType() {
+    return FieldSpec.DataType.OBJECT;
+  }
+
+  @Nonnull
+  @Override
+  public Double extractFinalResult(@Nonnull MinMaxRangePair intermediateResult) {
+    return intermediateResult.getMax() - intermediateResult.getMin();
   }
 }

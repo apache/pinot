@@ -93,7 +93,21 @@ public class CommonConstants {
         public static final String STREAM_TYPE = "streamType";
         // Time threshold that will keep the realtime segment open for before we convert it into an offline segment
         public static final String REALTIME_SEGMENT_FLUSH_TIME = "realtime.segment.flush.threshold.time";
-        // Num records threshold in the realtime segment
+        /**
+         * Row count flush threshold for realtime segments. This behaves in a similar way for HLC and LLC. For HLC,
+         * since there is only one consumer per server, this size is used as the size of the consumption buffer and
+         * determines after how many rows we flush to disk. For example, if this threshold is set to two million rows,
+         * then a high level consumer would have a buffer size of two million.
+         *
+         * For LLC, this size is divided across all the segments assigned to a given server and is set on a per segment
+         * basis. Assuming a low level consumer server is assigned four Kafka partitions to consume from and a flush
+         * size of two million, then each consuming segment would have a flush size of five hundred thousand rows, for a
+         * total of two million rows in memory.
+         *
+         * Keep in mind that this NOT a hard threshold, as other tables can also be assigned to this server, and that in
+         * certain conditions (eg. if the number of servers, replicas of Kafka partitions changes) where Kafka partition
+         * to server assignment changes, it's possible to end up with more (or less) than this number of rows in memory.
+         */
         public static final String REALTIME_SEGMENT_FLUSH_SIZE = "realtime.segment.flush.threshold.size";
 
         public static enum StreamType {
@@ -116,6 +130,9 @@ public class CommonConstants {
           public static final String KAFKA_FETCH_TIMEOUT_MILLIS = "kafka.fetch.timeout.ms";
           public static final String ZK_BROKER_URL = "kafka.zk.broker.url";
           public static final String KAFKA_BROKER_LIST = "kafka.broker.list";
+
+          // Consumer properties
+          public static final String AUTO_OFFSET_RESET = "auto.offset.reset";
 
           public static String getDecoderPropertyKeyFor(String key) {
             return StringUtils.join(new String[] { DECODER_PROPS_PREFIX, key }, ".");

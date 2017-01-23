@@ -133,7 +133,9 @@ public class SegmentV1V2ToV3FormatConverter implements SegmentFormatConverter {
 
         for (String column : allColumns) {
           LOGGER.debug("Converting segment: {} , column: {}", v2Directory, column);
-          copyDictionary(v2DataReader, v3DataWriter, column);
+          if (v2Metadata.hasDictionary(column)) {
+            copyDictionary(v2DataReader, v3DataWriter, column);
+          }
           copyForwardIndex(v2DataReader, v3DataWriter, column);
         }
 

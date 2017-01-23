@@ -245,7 +245,7 @@ public class RealtimeQueriesSentinelTest {
 
   private void setUpTestQueries(String table) throws FileNotFoundException, IOException {
     final String filePath = TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(AVRO_DATA));
-    System.out.println(filePath);
+//    System.out.println(filePath);
     final List<String> dims = new ArrayList<String>();
     dims.add("column1");
     dims.add("column2");
@@ -279,17 +279,19 @@ public class RealtimeQueriesSentinelTest {
       DataFileStream<GenericRecord> avroReader =
           AvroUtils.getAvroReader(new File(TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(
               AVRO_DATA))));
+      GenericRow genericRow = null;
       while (avroReader.hasNext()) {
         GenericRecord avroRecord = avroReader.next();
-        GenericRow genericRow = AVRO_RECORD_TRANSFORMER.transform(avroRecord);
+        genericRow = GenericRow.createOrReuseRow(genericRow);
+        genericRow = AVRO_RECORD_TRANSFORMER.transform(avroRecord, genericRow);
         // System.out.println(genericRow);
         realtimeSegmentImpl.index(genericRow);
       }
     } catch (Exception e) {
       e.printStackTrace();
     }
-    System.out.println("Current raw events indexed: " + realtimeSegmentImpl.getRawDocumentCount() + ", totalDocs = "
-        + realtimeSegmentImpl.getSegmentMetadata().getTotalDocs());
+//    System.out.println("Current raw events indexed: " + realtimeSegmentImpl.getRawDocumentCount() + ", totalDocs = "
+//        + realtimeSegmentImpl.getSegmentMetadata().getTotalDocs());
     realtimeSegmentImpl.setSegmentMetadata(getRealtimeSegmentZKMetadata());
     return realtimeSegmentImpl;
 

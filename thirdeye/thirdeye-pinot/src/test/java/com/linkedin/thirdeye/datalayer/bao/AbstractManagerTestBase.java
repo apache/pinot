@@ -3,10 +3,25 @@ package com.linkedin.thirdeye.datalayer.bao;
 import com.google.common.collect.Lists;
 import com.linkedin.thirdeye.anomaly.override.OverrideConfigHelper;
 import com.linkedin.thirdeye.api.DimensionMap;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.AlertConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.DashboardConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.DataCompletenessConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.DatasetConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.EmailConfigurationManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.IngraphDashboardConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.IngraphMetricConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.JobManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.MetricConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.OverrideConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.RawAnomalyResultManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.TaskManagerImpl;
+import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
+import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
-
 import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
+
 import java.io.File;
 import java.io.FileReader;
 import java.net.URL;
@@ -19,6 +34,8 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.tomcat.jdbc.pool.DataSource;
 import org.joda.time.DateTime;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 
@@ -29,6 +46,7 @@ import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.datalayer.ScriptRunner;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.datalayer.dto.IngraphDashboardConfigDTO;
@@ -46,13 +64,14 @@ public abstract class AbstractManagerTestBase {
   protected TaskManager taskDAO;
   protected EmailConfigurationManager emailConfigurationDAO;
   protected MergedAnomalyResultManager mergedResultDAO;
-  protected WebappConfigManager webappConfigDAO;
   protected DatasetConfigManager datasetConfigDAO;
   protected MetricConfigManager metricConfigDAO;
   protected DashboardConfigManager dashboardConfigDAO;
   protected IngraphDashboardConfigManager ingraphDashboardConfigDAO;
   protected IngraphMetricConfigManager ingraphMetricConfigDAO;
   protected OverrideConfigManager overrideConfigDAO;
+  protected AlertConfigManager alertConfigManager;
+  protected DataCompletenessConfigManager dataCompletenessConfigDAO;
 
   private ManagerProvider managerProvider;
   private PersistenceConfig configuration;
@@ -60,7 +79,8 @@ public abstract class AbstractManagerTestBase {
   private DataSource ds;
   private String dbId = System.currentTimeMillis() + "" + Math.random();
 
-  @BeforeClass(alwaysRun = true) public void init() throws Exception {
+  @BeforeClass(alwaysRun = true)
+  public void init() throws Exception {
     URL url = AbstractManagerTestBase.class.getResource("/persistence-local.yml");
     File configFile = new File(url.toURI());
     configuration = DaoProviderUtil.createConfiguration(configFile);
@@ -120,35 +140,23 @@ public abstract class AbstractManagerTestBase {
 
   public void initManagers() throws Exception {
     managerProvider = new ManagerProvider(ds);
-    Class<AnomalyFunctionManagerImpl> c =
-        com.linkedin.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl.class;
+    Class<AnomalyFunctionManagerImpl> c = AnomalyFunctionManagerImpl.class;
     System.out.println(c);
-    anomalyFunctionDAO = (AnomalyFunctionManager) managerProvider
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl.class);
-    rawResultDAO = (RawAnomalyResultManager) managerProvider
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.RawAnomalyResultManagerImpl.class);
-    jobDAO = (JobManager) managerProvider
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.JobManagerImpl.class);
-    taskDAO = (TaskManager) managerProvider
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.TaskManagerImpl.class);
-    emailConfigurationDAO = (EmailConfigurationManager) managerProvider
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.EmailConfigurationManagerImpl.class);
-    mergedResultDAO = (MergedAnomalyResultManager) managerProvider
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl.class);
-    webappConfigDAO = (WebappConfigManager) managerProvider
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.WebappConfigManagerImpl.class);
-    datasetConfigDAO = (DatasetConfigManager) managerProvider
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.DatasetConfigManagerImpl.class);
-    metricConfigDAO = (MetricConfigManager) managerProvider
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.MetricConfigManagerImpl.class);
-    dashboardConfigDAO = (DashboardConfigManager) managerProvider
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.DashboardConfigManagerImpl.class);
-    ingraphDashboardConfigDAO = (IngraphDashboardConfigManager) managerProvider
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.IngraphDashboardConfigManagerImpl.class);
-    ingraphMetricConfigDAO = (IngraphMetricConfigManager) managerProvider
-            .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.IngraphMetricConfigManagerImpl.class);
-    overrideConfigDAO = (OverrideConfigManager) managerProvider
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.OverrideConfigManagerImpl.class);
+    anomalyFunctionDAO = managerProvider.getInstance(AnomalyFunctionManagerImpl.class);
+    rawResultDAO = managerProvider.getInstance(RawAnomalyResultManagerImpl.class);
+    jobDAO = managerProvider.getInstance(JobManagerImpl.class);
+    taskDAO = managerProvider.getInstance(TaskManagerImpl.class);
+    emailConfigurationDAO = managerProvider.getInstance(EmailConfigurationManagerImpl.class);
+    mergedResultDAO = managerProvider.getInstance(MergedAnomalyResultManagerImpl.class);
+    datasetConfigDAO = managerProvider.getInstance(DatasetConfigManagerImpl.class);
+    metricConfigDAO = managerProvider.getInstance(MetricConfigManagerImpl.class);
+    dashboardConfigDAO = managerProvider.getInstance(DashboardConfigManagerImpl.class);
+    ingraphDashboardConfigDAO =
+        managerProvider.getInstance(IngraphDashboardConfigManagerImpl.class);
+    ingraphMetricConfigDAO = managerProvider.getInstance(IngraphMetricConfigManagerImpl.class);
+    overrideConfigDAO = managerProvider.getInstance(OverrideConfigManagerImpl.class);
+    alertConfigManager = managerProvider.getInstance(AlertConfigManagerImpl.class);
+    dataCompletenessConfigDAO = managerProvider.getInstance(DataCompletenessConfigManagerImpl.class);
   }
 
   @AfterClass(alwaysRun = true)
@@ -173,6 +181,23 @@ public abstract class AbstractManagerTestBase {
     functionSpec.setProperties("baseline=w/w;changeThreshold=0.001");
     functionSpec.setIsActive(true);
     return functionSpec;
+  }
+
+  protected AlertConfigDTO getTestAlertConfiguration(String name) {
+    AlertConfigDTO alertConfigDTO = new AlertConfigDTO();
+    alertConfigDTO.setName(name);
+    alertConfigDTO.setActive(true);
+    alertConfigDTO.setFromAddress("te@linkedin.com");
+    alertConfigDTO.setRecipients("anomaly@linedin.com");
+    alertConfigDTO.setCronExpression("0/10 * * * * ?");
+    AlertConfigBean.EmailConfig emailConfig = new AlertConfigBean.EmailConfig();
+    emailConfig.setAnomalyWatermark(0l);
+    alertConfigDTO.setEmailConfig(emailConfig);
+    AlertConfigBean.ReportConfigCollection
+        reportConfigCollection = new AlertConfigBean.ReportConfigCollection();
+    reportConfigCollection.setEnabled(true);
+    alertConfigDTO.setReportConfigCollection(reportConfigCollection);
+    return alertConfigDTO;
   }
 
   protected EmailConfigurationDTO getTestEmailConfiguration(String metricName, String collection) {
@@ -280,5 +305,19 @@ public abstract class AbstractManagerTestBase {
     overrideConfigDTO.setTargetLevel(overrideTarget);
 
     return overrideConfigDTO;
+  }
+
+  protected DataCompletenessConfigDTO getTestDataCompletenessConfig(String dataset, long dateToCheckInMS,
+      boolean dataComplete) {
+    DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern("yyyyMMddHHmm");
+    DataCompletenessConfigDTO dataCompletenessConfigDTO = new DataCompletenessConfigDTO();
+    dataCompletenessConfigDTO.setDataset(dataset);
+    dataCompletenessConfigDTO.setDateToCheckInMS(dateToCheckInMS);
+    dataCompletenessConfigDTO.setDateToCheckInSDF(dateTimeFormatter.print(dateToCheckInMS));
+    dataCompletenessConfigDTO.setDataComplete(dataComplete);
+    dataCompletenessConfigDTO.setCountStar(2000);
+    dataCompletenessConfigDTO.setPercentComplete(79);
+    dataCompletenessConfigDTO.setNumAttempts(3);
+    return dataCompletenessConfigDTO;
   }
 }

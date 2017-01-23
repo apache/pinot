@@ -18,6 +18,8 @@ package com.linkedin.pinot.server.starter;
 import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.lang.reflect.InvocationTargetException;
+import org.apache.commons.configuration.BaseConfiguration;
+import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,6 +80,10 @@ public class ServerInstance {
 
     LOGGER.info("Trying to build RequestHandlerFactory");
     setRequestHandlerFactory(serverBuilder.buildRequestHandlerFactory(_queryScheduler));
+
+    LOGGER.info("Trying to build TransformFunctionFactory");
+    serverBuilder.init(_serverConf);
+
     LOGGER.info("Trying to build NettyServer");
     _nettyServer = serverBuilder.buildNettyServer(_serverConf.getNettyConfig(), _requestHandlerFactory);
     setServerThread(new Thread(_nettyServer));

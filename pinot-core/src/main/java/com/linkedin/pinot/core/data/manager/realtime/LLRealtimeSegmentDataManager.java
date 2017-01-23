@@ -124,6 +124,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   private static final long TIME_THRESHOLD_FOR_LOG_MINUTES = 1;
   private static final long TIME_EXTENSION_ON_EMPTY_SEGMENT_HOURS = 1;
   private static final int MSG_COUNT_THRESHOLD_FOR_LOG = 100000;
+  private final int MAX_CONSECUTIVE_ERROR_COUNT = 5;
 
   private final LLCRealtimeSegmentZKMetadata _segmentZKMetadata;
   private final AbstractTableConfig _tableConfig;
@@ -138,6 +139,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   private volatile long _currentOffset;
   private volatile State _state;
   private volatile int _numRowsConsumed = 0;
+  private volatile int consecutiveErrorCount = 0;
   private long _startTimeMs = 0;
   private final String _segmentNameStr;
   private final SegmentVersion _segmentVersion;
@@ -145,7 +147,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   // Segment end criteria
   private volatile long _consumeEndTime = 0;
   private volatile long _finalOffset = -1;
-  private volatile boolean _receivedStop = false;
+  private volatile boolean _shouldStop = false;
 
   // It takes 30s to locate controller leader, and more if there are multiple controller failures.
   // For now, we let 31s pass for this state transition.
@@ -157,7 +159,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   final String _clientId;
   private final LLCSegmentName _segmentName;
   private final PlainFieldExtractor _fieldExtractor;
-  private final SimpleConsumerWrapper _consumerWrapper;
+  private SimpleConsumerWrapper _consumerWrapper = null;
   private final File _resourceTmpDir;
   private final String _tableName;
   private final List<String> _invertedIndexColumns;
@@ -170,6 +172,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   private final long _consumeStartTime;
   private final long _startOffset;
   private final KafkaStreamMetadata _kafkaStreamMetadata;
+  private final String _kafkaBootstrapNodes;
 
   private long _lastLogTime = 0;
   private int _lastConsumedCount = 0;
@@ -235,12 +238,24 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  protected void consumeLoop() {
+  private void handleTransientKafkaErrors(Exception e) throws  Exception {
+    consecutiveErrorCount++;
+    if (consecutiveErrorCount > MAX_CONSECUTIVE_ERROR_COUNT) {
+      segmentLogger.warn("Kafka transient exception when fetching messages, stopping consumption after {} attempts", consecutiveErrorCount, e);
+      throw e;
+    } else {
+      segmentLogger.warn("Kafka transient exception when fetching messages, retrying (count={})", consecutiveErrorCount, e);
+      Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
+      makeConsumerWrapper();
+    }
+  }
+
+  protected boolean consumeLoop() throws Exception {
     _fieldExtractor.resetCounters();
 
     final long _endOffset = Long.MAX_VALUE; // No upper limit on Kafka offset
     segmentLogger.info("Starting consumption loop start offset {}, finalOffset {}", _currentOffset, _finalOffset);
-    while(!_receivedStop && !endCriteriaReached()) {
+    while(!_shouldStop && !endCriteriaReached()) {
       // Consume for the next _kafkaReadTime ms, or we get to final offset, whichever happens earlier,
       // Update _currentOffset upon return from this method
       Iterable<MessageAndOffset> messagesAndOffsets = null;
@@ -249,71 +264,26 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
         Pair<Iterable<MessageAndOffset>, Long> messagesAndWatermark =
             _consumerWrapper.fetchMessagesAndHighWatermark(_currentOffset, _endOffset,
                 _kafkaStreamMetadata.getKafkaFetchTimeoutMillis());
+        consecutiveErrorCount = 0;
         messagesAndOffsets = messagesAndWatermark.getLeft();
         highWatermark = messagesAndWatermark.getRight();
       } catch (TimeoutException e) {
-        segmentLogger.warn("Timed out when fetching messages from Kafka, retrying");
+        handleTransientKafkaErrors(e);
+        continue;
+      } catch (SimpleConsumerWrapper.TransientConsumerException e) {
+        handleTransientKafkaErrors(e);
+        continue;
+      } catch (SimpleConsumerWrapper.PermanentConsumerException e) {
+        segmentLogger.warn("Kafka permanent exception when fetching messages, stopping consumption", e);
+        throw e;
+      } catch (Exception e) {
+        // Unknown exception from Kafka. Treat as a transient exception.
+        // One such exception seen so far is java.net.SocketTimeoutException
+        handleTransientKafkaErrors(e);
         continue;
       }
 
-      Iterator<MessageAndOffset> msgIterator = messagesAndOffsets.iterator();
-
-      int indexedMessageCount = 0;
-      int kafkaMessageCount = 0;
-      while (!_receivedStop && !endCriteriaReached() && msgIterator.hasNext()) {
-        // Get a batch of messages from Kafka
-        // Index each message
-        MessageAndOffset messageAndOffset = msgIterator.next();
-        byte[] array = messageAndOffset.message().payload().array();
-        int offset = messageAndOffset.message().payload().arrayOffset();
-        int length = messageAndOffset.message().payloadSize();
-        GenericRow row = _messageDecoder.decode(array, offset, length);
-
-        // Update lag metric on the first message of each batch
-        if (kafkaMessageCount == 0) {
-          long messageOffset = messageAndOffset.offset();
-          long offsetDifference = highWatermark - messageOffset;
-          _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.KAFKA_PARTITION_OFFSET_LAG, offsetDifference);
-        }
-
-        if (row != null) {
-          row = _fieldExtractor.transform(row);
-
-          if (row != null) {
-            _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.REALTIME_ROWS_CONSUMED, 1);
-            indexedMessageCount++;
-          } else {
-            _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1);
-          }
-
-          boolean canTakeMore = _realtimeSegment.index(row);  // Ignore the boolean return
-          if (!canTakeMore) {
-            //TODO
-            // This condition can happen when we are catching up, (due to certain failure scenarios in kafka where
-            // offsets get changed with higher generation numbers for some pinot servers but not others).
-            // Also, it may be that we push in a row into the realtime segment, but it fails to index that row
-            // for some reason., so we may end up with less number of rows in the real segment. Actually, even 0 rows.
-            // In that case, we will see an exception when generating the segment.
-            // TODO We need to come up with how the system behaves in these cases and document/handle them
-            segmentLogger.warn("We got full during indexing");
-          }
-        } else {
-          _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1);
-        }
-
-        _currentOffset = messageAndOffset.nextOffset();
-        _numRowsConsumed++;
-        kafkaMessageCount++;
-      }
-      updateCurrentDocumentCountMetrics();
-      if (kafkaMessageCount != 0) {
-        segmentLogger.debug("Indexed {} messages ({} messages read from Kafka) current offset {}", indexedMessageCount,
-            kafkaMessageCount, _currentOffset);
-      } else {
-        // If there were no messages to be fetched from Kafka, wait for a little bit as to avoid hammering the
-        // Kafka broker
-        Uninterruptibles.sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
-      }
+      processKafkaEvents(messagesAndOffsets, highWatermark);
     }
 
     _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.ROWS_WITH_ERRORS,
@@ -324,6 +294,81 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
         (long) _fieldExtractor.getTotalNulls());
     _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.COLUMNS_WITH_NULL_VALUES,
         (long) _fieldExtractor.getTotalNullCols());
+    return true;
+  }
+
+  private void processKafkaEvents(Iterable<MessageAndOffset> messagesAndOffsets, Long highWatermark) {
+    Iterator<MessageAndOffset> msgIterator = messagesAndOffsets.iterator();
+
+    int indexedMessageCount = 0;
+    int kafkaMessageCount = 0;
+    boolean canTakeMore = true;
+    GenericRow decodedRow = null;
+    GenericRow transformedRow = null;
+    while (!_shouldStop && !endCriteriaReached() && msgIterator.hasNext()) {
+      if (!canTakeMore) {
+        // The RealtimeSegmentImpl that we are pushing rows into has indicated that it cannot accept any more
+        // rows. This can happen in one of two conditions:
+        // 1. We are in INITIAL_CONSUMING state, and we somehow exceeded the max number of rows we are allowed to consume
+        //    for this row. Something is seriously wrong, because endCriteriaReached() should have returned true when
+        //    we hit the row limit.
+        //    Throw an exception.
+        //
+        // 2. We are in CATCHING_UP state, and we legally hit this error due to Kafka unclean leader election where
+        //    offsets get changed with higher generation numbers for some pinot servers but not others. So, if another
+        //    server (who got a larger kafka offset) asked us to catch up to that offset, but we are connected to a
+        //    broker who has smaller offsets, then we may try to push more rows into the buffer than maximum. This
+        //    is a rare case, and we really don't know how to handle this at this time.
+        //    Throw an exception.
+        //
+        segmentLogger.error("Buffer full with {} rows consumed (row limit {})", _numRowsConsumed, _segmentMaxRowCount);
+        throw new RuntimeException("Realtime segment full");
+      }
+      // Index each message
+      MessageAndOffset messageAndOffset = msgIterator.next();
+      byte[] array = messageAndOffset.message().payload().array();
+      int offset = messageAndOffset.message().payload().arrayOffset();
+      int length = messageAndOffset.message().payloadSize();
+      decodedRow = GenericRow.createOrReuseRow(decodedRow);
+      decodedRow = _messageDecoder.decode(array, offset, length, decodedRow);
+
+      // Update lag metric on the first message of each batch
+      if (kafkaMessageCount == 0) {
+        long messageOffset = messageAndOffset.offset();
+        long offsetDifference = highWatermark - messageOffset;
+        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.KAFKA_PARTITION_OFFSET_LAG, offsetDifference);
+      }
+
+      if (decodedRow != null) {
+        transformedRow = GenericRow.createOrReuseRow(transformedRow);
+        transformedRow = _fieldExtractor.transform(decodedRow, transformedRow);
+
+        if (transformedRow != null) {
+          _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.REALTIME_ROWS_CONSUMED, 1);
+          indexedMessageCount++;
+        } else {
+          _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1);
+        }
+
+        canTakeMore = _realtimeSegment.index(transformedRow);
+      } else {
+        _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1);
+      }
+
+      _currentOffset = messageAndOffset.nextOffset();
+      _numRowsConsumed++;
+      kafkaMessageCount++;
+    }
+    updateCurrentDocumentCountMetrics();
+    if (kafkaMessageCount != 0) {
+      segmentLogger.debug("Indexed {} messages ({} messages read from Kafka) current offset {}", indexedMessageCount,
+          kafkaMessageCount, _currentOffset);
+      _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_KAFKA_OFFSET_CONSUMED, _currentOffset);
+    } else {
+      // If there were no messages to be fetched from Kafka, wait for a little bit as to avoid hammering the
+      // Kafka broker
+      Uninterruptibles.sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
+    }
   }
 
   public class PartitionConsumer implements Runnable {
@@ -337,7 +382,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
           if (_state.shouldConsume()) {
             consumeLoop();  // Consume until we reached the end criteria, or we are stopped.
           }
-          if (_receivedStop) {
+          if (_shouldStop) {
             break;
           }
 
@@ -428,7 +473,10 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
         }
       } catch (Exception e) {
         segmentLogger.error("Exception while in work", e);
+        postStopConsumedMsg(e.getClass().getName());
         _state = State.ERROR;
+        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_KAFKA_OFFSET_CONSUMED, 0L);
+        return;
       }
 
       if (initialConsumptionEnd != 0L) {
@@ -530,6 +578,19 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
+  // Inform the controller that the server had to stop consuming due to an error.
+  protected void postStopConsumedMsg(String reason) {
+    do {
+      SegmentCompletionProtocol.Response response = _protocolHandler.segmentStoppedConsuming(_segmentNameStr, _currentOffset, reason);
+      if (response.getStatus() == SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED) {
+        LOGGER.info("Got response {}", response.toJsonString());
+        break;
+      }
+      Uninterruptibles.sleepUninterruptibly(10, TimeUnit.SECONDS);
+      LOGGER.info("Retrying after response {}", response.toJsonString());
+    } while (!_shouldStop);
+  }
+
   protected SegmentCompletionProtocol.Response postSegmentConsumedMsg() {
     // Post segmentConsumed to current leader.
     // Retry maybe once if leader is not found.
@@ -599,8 +660,14 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     _finalOffset = endOffset;
     _consumeEndTime = now() + timeoutMs;
     _state = State.CONSUMING_TO_ONLINE;
-    _receivedStop = false;
-    consumeLoop();
+    _shouldStop = false;
+    try {
+      consumeLoop();
+    } catch (Exception e) {
+      // We will end up downloading the segment, so this is not a serious problem
+      segmentLogger.warn("Exception when catching up to final offset", e);
+      return false;
+    }
     if (_currentOffset != endOffset) {
       // Timeout?
       segmentLogger.error("Could not consume up to {} (current offset {})", endOffset, _currentOffset);
@@ -634,7 +701,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
    * Stop the consuming thread.
    */
   public void stop() throws InterruptedException {
-    _receivedStop = true;
+    _shouldStop = true;
     // This method could be called either when we get an ONLINE transition or
     // when we commit a segment and replace the realtime segment with a committed
     // one. In the latter case, we don't want to call join.
@@ -663,7 +730,8 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     _resourceDataDir = resourceDataDir;
     _schema = schema;
     _serverMetrics = serverMetrics;
-    _segmentVersion = SegmentVersion.fromStringOrDefault(tableConfig.getIndexingConfig().getSegmentFormatVersion());
+    _segmentVersion = SegmentVersion.fromString(tableConfig.getIndexingConfig().getSegmentFormatVersion(),
+        SegmentVersion.DEFAULT_TABLE_VERSION);
     _instance = _realtimeTableDataManager.getServerInstance();
     _protocolHandler = new ServerSegmentCompletionProtocolHandler(_instance);
 
@@ -672,7 +740,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     _kafkaStreamMetadata = new KafkaStreamMetadata(indexingConfig.getStreamConfigs());
     KafkaLowLevelStreamProviderConfig kafkaStreamProviderConfig = createStreamProviderConfig();
     kafkaStreamProviderConfig.init(tableConfig, instanceZKMetadata, schema);
-    final String bootstrapNodes = indexingConfig.getStreamConfigs()
+    _kafkaBootstrapNodes = indexingConfig.getStreamConfigs()
         .get(CommonConstants.Helix.DataSource.STREAM_PREFIX + "." + CommonConstants.Helix.DataSource.Realtime.Kafka.KAFKA_BROKER_LIST);
     _kafkaTopic = kafkaStreamProviderConfig.getTopicName();
     _segmentNameStr = _segmentZKMetadata.getSegmentName();
@@ -729,9 +797,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
 
     // Create field extractor
     _fieldExtractor = (PlainFieldExtractor) FieldExtractorFactory.getPlainFieldExtractor(schema);
-    _consumerWrapper = SimpleConsumerWrapper.forPartitionConsumption(new KafkaSimpleConsumerFactoryImpl(),
-        bootstrapNodes, _clientId, _kafkaTopic, _kafkaPartitionId,
-        _kafkaStreamMetadata.getKafkaConnectionTimeoutMillis());
+    makeConsumerWrapper();
     _startOffset = _segmentZKMetadata.getStartOffset();
     _currentOffset = _startOffset;
     _resourceTmpDir = new File(resourceDataDir, "_tmp");
@@ -772,6 +838,20 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
           ServerMeter.COLUMNS_WITH_NULL_VALUES, (long) numNullCols);
       segmentLogger.info("{} columns had null values", numNullCols);
     }
+  }
+
+  private void makeConsumerWrapper() {
+    if (_consumerWrapper != null) {
+      try {
+        _consumerWrapper.close();
+      } catch (Exception e) {
+        segmentLogger.warn("Could not close Kafka consumer wrapper");
+      }
+    }
+    segmentLogger.info("Creating new Kafka consumer wrapper");
+    _consumerWrapper = SimpleConsumerWrapper.forPartitionConsumption(new KafkaSimpleConsumerFactoryImpl(),
+        _kafkaBootstrapNodes, _clientId, _kafkaTopic, _kafkaPartitionId,
+        _kafkaStreamMetadata.getKafkaConnectionTimeoutMillis());
   }
 
   // This should be done during commit? We may not always commit when we build a segment....

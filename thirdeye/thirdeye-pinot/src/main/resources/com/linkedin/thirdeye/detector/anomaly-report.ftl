@@ -11,8 +11,7 @@
   <tr>
     <td style="min-height: 30px; font-family: 'Proxima Nova','Arial', 'Helvetica Neue',Helvetica, sans-serif;font-size:16px;font-weight:300; width:100%;display:inline;">
       <p>Hello,</p>
-      <p>You are receiving this email because you have subscribed to ThirdEye Anomaly detection
-        service for '${collection}:${metric}'.<br/></p>
+      <p>You are receiving this email because you have subscribed to ThirdEye service for '${collection}:${metric}'.<br/></p>
     <#if (anomalyCount > 0)>
       <p> ThirdEye has analyzed your dataset for time range ${dateFormat(startTime)}
         to ${dateFormat(endTime)} (${timeZone}) and has detected
@@ -79,7 +78,7 @@
     <td>
       <hr/>
       <p>
-        Report start time : ${reportStartDateTime}
+        Report start time : ${dateFormat(reportStartDateTime)}
       </p>
     </td>
   </tr>
@@ -100,6 +99,8 @@
                cellspacing="0px" cellpadding="4px">
           <tr>
             <td>${metricReport.dimensionName}</td>
+            <td>Share</td>
+            <td>Total</td>
             <#assign itrCount = 1 >
             <#list subDimensionValueMap?keys as groupByDimension>
               <#assign timeBucketValueMap = subDimensionValueMap[groupByDimension]>
@@ -118,6 +119,8 @@
               <td>
               ${dimensionKey}
               </td>
+              <td>${metricReport.subDimensionShareValueMap[dimensionKey]}</td>
+              <td>${metricReport.subDimensionTotalValueMap[dimensionKey]}</td>
               <#assign timevalmap = subDimensionValueMap[dimensionKey] >
               <#list timevalmap?keys as timebucketkey>
                 <td> ${timevalmap[timebucketkey]}%</td>

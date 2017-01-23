@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.server.request;
 
 import com.google.common.base.Function;
@@ -25,9 +24,9 @@ import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.metrics.ServerQueryPhase;
 import com.linkedin.pinot.common.query.QueryRequest;
 import com.linkedin.pinot.common.query.context.TimerContext;
-import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.utils.DataTable;
+import com.linkedin.pinot.core.common.datatable.DataTableImplV2;
 import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
 import com.linkedin.pinot.serde.SerDe;
 import com.linkedin.pinot.transport.netty.NettyServer;
@@ -67,7 +66,7 @@ public class ScheduledRequestHandler implements NettyServer.RequestHandler {
     if (! serDe.deserialize(instanceRequest, byteArray)) {
       LOGGER.error("Failed to deserialize query request from broker ip: {}",
           ((InetSocketAddress) channelHandlerContext.channel().remoteAddress()).getAddress().getHostAddress());
-      DataTable result = new DataTable();
+      DataTable result = new DataTableImplV2();
       result.addException(QueryException.INTERNAL_ERROR);
       serverMetrics.addMeteredGlobalValue(ServerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS, 1);
       QueryRequest queryRequest = new QueryRequest(null, serverMetrics);
@@ -93,7 +92,7 @@ public class ScheduledRequestHandler implements NettyServer.RequestHandler {
           public DataTable apply(@Nullable Throwable input) {
             // this is called iff queryTask fails with unhandled exception
             serverMetrics.addMeteredGlobalValue(ServerMeter.UNCAUGHT_EXCEPTIONS, 1);
-            DataTable result = new DataTable();
+            DataTable result = new DataTableImplV2();
             result.addException(QueryException.INTERNAL_ERROR);
             return result;
           }

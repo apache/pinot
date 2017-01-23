@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.operator.aggregation;
 
-import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunctionFactory;
 
@@ -27,15 +27,16 @@ public class AggregationFunctionContext {
   private final AggregationFunction _aggregationFunction;
   private final String[] _aggrColumns;
 
-  /**
-   * Constructor for the class.
-   *
-   * @param aggFuncName
-   * @param aggrColumns
-   */
-  public AggregationFunctionContext(String aggFuncName, String[] aggrColumns) {
-    _aggregationFunction = AggregationFunctionFactory.getAggregationFunction(aggFuncName);
-    _aggrColumns = aggrColumns;
+  public static AggregationFunctionContext instantiate(AggregationInfo aggregationInfo) {
+    String[] aggrColumns = aggregationInfo.getAggregationParams().get("column").trim().split(",");
+    String functionName = aggregationInfo.getAggregationType();
+    AggregationFunction aggregationFunction = AggregationFunctionFactory.getAggregationFunction(functionName);
+    return new AggregationFunctionContext(aggrColumns, aggregationFunction);
+  }
+
+  public AggregationFunctionContext(String[] aggrColumns, AggregationFunction aggregationFunction) {
+    this._aggrColumns = aggrColumns;
+    this._aggregationFunction = aggregationFunction;
   }
 
   /**

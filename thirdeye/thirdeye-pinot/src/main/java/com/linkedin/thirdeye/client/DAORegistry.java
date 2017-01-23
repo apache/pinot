@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.client;
 
+import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
@@ -16,6 +17,7 @@ import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 public class DAORegistry {
   private static AnomalyFunctionManager anomalyFunctionDAO;
   private static EmailConfigurationManager emailConfigurationDAO;
+  private static AlertConfigManager alertConfigDAO;
   private static RawAnomalyResultManager rawAnomalyResultDAO;
   private static MergedAnomalyResultManager mergedAnomalyResultDAO;
   private static JobManager jobDAO;
@@ -26,7 +28,6 @@ public class DAORegistry {
   private static IngraphDashboardConfigManager ingraphDashboardConfigDAO;
   private static IngraphMetricConfigManager ingraphMetricConfigDAO;
   private static OverrideConfigManager overrideConfigDAO;
-
 
   private static class Holder {
     static final DAORegistry INSTANCE = new DAORegistry();
@@ -42,7 +43,7 @@ public class DAORegistry {
       DatasetConfigManager datasetConfigDAO, MetricConfigManager metricConfigDAO,
       DashboardConfigManager dashboardConfigDAO, IngraphMetricConfigManager ingraphMetricConfigDAO,
       IngraphDashboardConfigManager ingraphDashboardConfigDAO,
-      OverrideConfigManager overrideConfigDAO) {
+      OverrideConfigManager overrideConfigDAO, AlertConfigManager alertConfigDAO) {
 
     DAORegistry daoRegistry = DAORegistry.getInstance();
     daoRegistry.registerAnomalyFunctionDAO(anomalyFunctionDAO);
@@ -57,6 +58,7 @@ public class DAORegistry {
     daoRegistry.registerIngraphDashboardConfigDAO(ingraphDashboardConfigDAO);
     daoRegistry.registerIngraphMetricConfigDAO(ingraphMetricConfigDAO);
     daoRegistry.registerOverrideConfigDAO(overrideConfigDAO);
+    daoRegistry.setAlertConfigDAO(alertConfigDAO);
   }
 
   public AnomalyFunctionManager getAnomalyFunctionDAO() {
@@ -155,4 +157,11 @@ public class DAORegistry {
     return DAORegistry.overrideConfigDAO;
   }
 
+  public AlertConfigManager getAlertConfigDAO() {
+    return alertConfigDAO;
+  }
+
+  public void setAlertConfigDAO(AlertConfigManager alertConfigDAO) {
+    DAORegistry.alertConfigDAO = alertConfigDAO;
+  }
 }

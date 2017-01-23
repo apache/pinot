@@ -15,24 +15,11 @@
  */
 package com.linkedin.pinot.core.operator.aggregation;
 
-import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.common.utils.primitive.MutableLongValue;
-import com.linkedin.pinot.core.common.Block;
+import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunctionFactory;
-import com.linkedin.pinot.core.operator.aggregation.function.PercentileestAggregationFunction;
-import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
-import com.linkedin.pinot.core.operator.docvalsets.ProjectionBlockValSet;
-import com.linkedin.pinot.core.query.aggregation.function.AvgAggregationFunction;
-import com.linkedin.pinot.core.query.aggregation.function.MinMaxRangeAggregationFunction;
-import com.linkedin.pinot.core.query.aggregation.function.quantile.digest.QuantileDigest;
-import com.linkedin.pinot.core.query.utils.Pair;
-import com.linkedin.pinot.core.startree.hll.HllConstants;
-import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
-import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
-import java.io.Serializable;
+import com.linkedin.pinot.core.operator.blocks.TransformBlock;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -51,25 +38,15 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
   boolean _inited = false;
   boolean _finished = false;
 
-  public DefaultAggregationExecutor(List<AggregationInfo> aggregationInfoList) {
-    Preconditions.checkNotNull(aggregationInfoList);
-    Preconditions.checkArgument(aggregationInfoList.size() > 0);
+  public DefaultAggregationExecutor(AggregationFunctionContext[] aggrFuncContextArray) {
+    Preconditions.checkNotNull(aggrFuncContextArray);
+    Preconditions.checkArgument(aggrFuncContextArray.length > 0);
 
-    _numAggrFunc = aggregationInfoList.size();
-    _aggrFuncContextArray = new AggregationFunctionContext[_numAggrFunc];
-    for (int i = 0; i < _numAggrFunc; i++) {
-      AggregationInfo aggregationInfo = aggregationInfoList.get(i);
-      String[] columns = aggregationInfo.getAggregationParams().get("column").trim().split(",");
-      _aggrFuncContextArray[i] = new AggregationFunctionContext(
-          aggregationInfo.getAggregationType(), columns);
-    }
+    _numAggrFunc = aggrFuncContextArray.length;
+    _aggrFuncContextArray = aggrFuncContextArray;
     _resultHolderArray = new AggregationResultHolder[_numAggrFunc];
   }
 
-  /**
-   * {@inheritDoc}
-   * Must be called before the first call to 'aggregate'.
-   */
   @Override
   public void init() {
     if (_inited) {
@@ -77,8 +54,7 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
     }
 
     for (int i = 0; i < _numAggrFunc; i++) {
-      AggregationFunction aggregationFunction = _aggrFuncContextArray[i].getAggregationFunction();
-      _resultHolderArray[i] = ResultHolderFactory.getAggregationResultHolder(aggregationFunction);
+      _resultHolderArray[i] = _aggrFuncContextArray[i].getAggregationFunction().createAggregationResultHolder();
     }
     _inited = true;
   }
@@ -88,15 +64,15 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
    * Perform aggregation on a given docIdSet.
    * Asserts that 'init' has be called before calling this method.
    *
-   * @param projectionBlock Projection block upon which to perform aggregation.
+   * @param transformBlock Block upon which to perform aggregation.
    */
   @Override
-  public void aggregate(ProjectionBlock projectionBlock) {
-    Preconditions
-        .checkState(_inited, "Method 'aggregate' cannot be called before 'init' for class " + getClass().getName());
+  public void aggregate(TransformBlock transformBlock) {
+    Preconditions.checkState(_inited,
+        "Method 'aggregate' cannot be called before 'init' for class " + getClass().getName());
 
     for (int i = 0; i < _numAggrFunc; i++) {
-      aggregateColumn(projectionBlock, _aggrFuncContextArray[i], _resultHolderArray[i]);
+      aggregateColumn(transformBlock, _aggrFuncContextArray[i], _resultHolderArray[i]);
     }
   }
 
@@ -107,198 +83,41 @@ public class DefaultAggregationExecutor implements AggregationExecutor {
    * @param resultHolder result holder.
    */
   @SuppressWarnings("ConstantConditions")
-  private void aggregateColumn(ProjectionBlock projectionBlock, AggregationFunctionContext aggrFuncContext,
+  private void aggregateColumn(TransformBlock transformBlock, AggregationFunctionContext aggrFuncContext,
       AggregationResultHolder resultHolder) {
     AggregationFunction aggregationFunction = aggrFuncContext.getAggregationFunction();
-    String[] aggrColumns = aggrFuncContext.getAggregationColumns();
-    String aggrFuncName = aggregationFunction.getName();
+    String[] aggregationColumns = aggrFuncContext.getAggregationColumns();
+    Preconditions.checkState(aggregationColumns.length == 1);
+    int length = transformBlock.getNumDocs();
 
-    Preconditions.checkState(aggrColumns.length == 1);
-    String aggrColumn = aggrColumns[0];
-
-    ProjectionBlockValSet blockValueSet = null;
-    if (!aggrFuncName.equals(AggregationFunctionFactory.COUNT_AGGREGATION_FUNCTION)) {
-      Block dataBlock = projectionBlock.getDataBlock(aggrColumn);
-      blockValueSet = (ProjectionBlockValSet) dataBlock.getBlockValueSet();
-    }
-
-    int length = projectionBlock.getNumDocs();
-    switch (aggrFuncName) {
-      case AggregationFunctionFactory.COUNT_AGGREGATION_FUNCTION:
-        aggregationFunction.aggregate(length, resultHolder);
-        break;
-      case AggregationFunctionFactory.COUNT_MV_AGGREGATION_FUNCTION:
-        aggregationFunction.aggregate(length, resultHolder,
-            (Object) blockValueSet.getNumberOfMVEntriesArray());
-        break;
-
-      case AggregationFunctionFactory.DISTINCTCOUNT_AGGREGATION_FUNCTION:
-      case AggregationFunctionFactory.DISTINCTCOUNTHLL_AGGREGATION_FUNCTION:
-        aggregationFunction.aggregate(length, resultHolder,
-            (Object) blockValueSet.getSVHashCodeArray());
-        break;
-
-      case AggregationFunctionFactory.DISTINCTCOUNT_MV_AGGREGATION_FUNCTION:
-      case AggregationFunctionFactory.DISTINCTCOUNTHLL_MV_AGGREGATION_FUNCTION:
-        aggregationFunction.aggregate(length, resultHolder,
-            (Object) blockValueSet.getMVHashCodeArray());
-        break;
-
-      case AggregationFunctionFactory.FASTHLL_AGGREGATION_FUNCTION:
-        aggregationFunction.aggregate(length, resultHolder,
-            (Object) blockValueSet.getSingleValues());
-        break;
-
-      case AggregationFunctionFactory.SUM_AGGREGATION_FUNCTION:
-      case AggregationFunctionFactory.AVG_AGGREGATION_FUNCTION:
-      case AggregationFunctionFactory.MAX_AGGREGATION_FUNCTION:
-      case AggregationFunctionFactory.MIN_AGGREGATION_FUNCTION:
-      case AggregationFunctionFactory.MINMAXRANGE_AGGREGATION_FUNCTION:
-      case AggregationFunctionFactory.PERCENTILE50_AGGREGATION_FUNCTION:
-      case AggregationFunctionFactory.PERCENTILE90_AGGREGATION_FUNCTION:
-      case AggregationFunctionFactory.PERCENTILE95_AGGREGATION_FUNCTION:
-      case AggregationFunctionFactory.PERCENTILE99_AGGREGATION_FUNCTION:
-      case AggregationFunctionFactory.PERCENTILEEST50_AGGREGATION_FUNCTION:
-      case AggregationFunctionFactory.PERCENTILEEST90_AGGREGATION_FUNCTION:
-      case AggregationFunctionFactory.PERCENTILEEST95_AGGREGATION_FUNCTION:
-      case AggregationFunctionFactory.PERCENTILEEST99_AGGREGATION_FUNCTION:
-        aggregationFunction.aggregate(length, resultHolder,
-            (Object) blockValueSet.getSingleValues());
-        break;
-
-      case AggregationFunctionFactory.SUM_MV_AGGREGATION_FUNCTION:
-      case AggregationFunctionFactory.AVG_MV_AGGREGATION_FUNCTION:
-      case AggregationFunctionFactory.MAX_MV_AGGREGATION_FUNCTION:
-      case AggregationFunctionFactory.MIN_MV_AGGREGATION_FUNCTION:
-      case AggregationFunctionFactory.MINMAXRANGE_MV_AGGREGATION_FUNCTION:
-      case AggregationFunctionFactory.PERCENTILE50_MV_AGGREGATION_FUNCTION:
-      case AggregationFunctionFactory.PERCENTILE90_MV_AGGREGATION_FUNCTION:
-      case AggregationFunctionFactory.PERCENTILE95_MV_AGGREGATION_FUNCTION:
-      case AggregationFunctionFactory.PERCENTILE99_MV_AGGREGATION_FUNCTION:
-      case AggregationFunctionFactory.PERCENTILEEST50_MV_AGGREGATION_FUNCTION:
-      case AggregationFunctionFactory.PERCENTILEEST90_MV_AGGREGATION_FUNCTION:
-      case AggregationFunctionFactory.PERCENTILEEST95_MV_AGGREGATION_FUNCTION:
-      case AggregationFunctionFactory.PERCENTILEEST99_MV_AGGREGATION_FUNCTION:
-        aggregationFunction.aggregate(length, resultHolder,
-            (Object) blockValueSet.getMultiValues());
-        break;
-
-      default:
-        throw new RuntimeException("Not supported function  " + aggrFuncName + aggrColumn);
+    if (!aggregationFunction.getName().equals(AggregationFunctionFactory.AggregationFunctionType.COUNT.getName())) {
+      BlockValSet blockValSet = transformBlock.getBlockValueSet(aggregationColumns[0]);
+      aggregationFunction.aggregate(length, resultHolder, blockValSet);
+    } else {
+      aggregationFunction.aggregate(length, resultHolder);
     }
   }
 
-  /**
-   * {@inheritDoc}
-   * Must be called after all calls to 'process' are done, and before getResult() can be called.
-   */
   @Override
   public void finish() {
-    Preconditions
-        .checkState(_inited, "Method 'finish' cannot be called before 'init' for class " + getClass().getName());
+    Preconditions.checkState(_inited,
+        "Method 'finish' cannot be called before 'init' for class " + getClass().getName());
 
     _finished = true;
   }
 
-  /**
-   * {@inheritDoc}
-   * Asserts that 'finish' has been called before calling getResult().
-   *
-   * @return list of aggregation results.
-   */
   @Override
-  public List<Serializable> getResult() {
-    Preconditions
-        .checkState(_finished, "Method 'getResult' cannot be called before 'finish' for class " + getClass().getName());
+  public List<Object> getResult() {
+    Preconditions.checkState(_finished,
+        "Method 'getResult' cannot be called before 'finish' for class " + getClass().getName());
 
-    List<Serializable> aggregationResults = new ArrayList<>(_numAggrFunc);
+    List<Object> aggregationResults = new ArrayList<>(_numAggrFunc);
 
     for (int i = 0; i < _numAggrFunc; i++) {
       AggregationFunction aggregationFunction = _aggrFuncContextArray[i].getAggregationFunction();
-      Serializable result = getAggregationResult(_resultHolderArray[i], aggregationFunction.getResultDataType());
-      aggregationResults.add(result);
+      aggregationResults.add(aggregationFunction.extractAggregationResult(_resultHolderArray[i]));
     }
 
     return aggregationResults;
-  }
-
-  /**
-   * Helper method to get the aggregation result.
-   *
-   * @param resultHolder result holder.
-   * @param resultDataType result data type.
-   * @return aggregation result.
-   */
-  private Serializable getAggregationResult(AggregationResultHolder resultHolder,
-      AggregationFunction.ResultDataType resultDataType) {
-
-    switch (resultDataType) {
-      case LONG:
-        return new MutableLongValue((long) resultHolder.getDoubleResult());
-
-      case DOUBLE:
-        return resultHolder.getDoubleResult();
-
-      case AVERAGE_PAIR:
-        Pair<Double, Long> doubleLongPair = resultHolder.getResult();
-        if (doubleLongPair == null) {
-          return new AvgAggregationFunction.AvgPair(0.0, 0L);
-        } else {
-          return new AvgAggregationFunction.AvgPair(doubleLongPair.getFirst(), doubleLongPair.getSecond());
-        }
-
-      case MINMAXRANGE_PAIR:
-        Pair<Double, Double> doubleDoublePair = resultHolder.getResult();
-        if (doubleDoublePair == null) {
-          return new MinMaxRangeAggregationFunction.MinMaxRangePair(Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY);
-        } else {
-          return new MinMaxRangeAggregationFunction.MinMaxRangePair(doubleDoublePair.getFirst(),
-              doubleDoublePair.getSecond());
-        }
-
-      case DISTINCTCOUNT_SET:
-        IntOpenHashSet intOpenHashSet = resultHolder.getResult();
-        if (intOpenHashSet == null) {
-          return new IntOpenHashSet();
-        } else {
-          return intOpenHashSet;
-        }
-
-      case DISTINCTCOUNTHLL_HYPERLOGLOG:
-        HyperLogLog hyperLogLog = resultHolder.getResult();
-        if (hyperLogLog == null) {
-          return new HyperLogLog(HllConstants.DEFAULT_LOG2M);
-        } else {
-          return hyperLogLog;
-        }
-
-      case HLL_PREAGGREGATED:
-        HyperLogLog hllPreaggregated = resultHolder.getResult();
-        if (hllPreaggregated == null) {
-          return new HyperLogLog(HllConstants.DEFAULT_LOG2M);
-        } else {
-          return hllPreaggregated;
-        }
-
-      case PERCENTILE_LIST:
-        DoubleArrayList doubleArrayList = resultHolder.getResult();
-        if (doubleArrayList == null) {
-          return new DoubleArrayList();
-        } else {
-          return doubleArrayList;
-        }
-
-      case PERCENTILEEST_QUANTILEDIGEST:
-        QuantileDigest quantileDigest = resultHolder.getResult();
-        if (quantileDigest == null) {
-          return new QuantileDigest(PercentileestAggregationFunction.DEFAULT_MAX_ERROR);
-        } else {
-          return quantileDigest;
-        }
-
-      default:
-        throw new RuntimeException(
-            "Unsupported result data type " + resultDataType + " in class " + getClass().getName());
-    }
   }
 }

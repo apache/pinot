@@ -17,6 +17,7 @@ package com.linkedin.pinot.common.config;
 
 import java.io.IOException;
 
+import org.antlr.v4.runtime.misc.Nullable;
 import org.codehaus.jackson.JsonGenerationException;
 import org.codehaus.jackson.map.JsonMappingException;
 import org.codehaus.jackson.map.ObjectMapper;
@@ -30,7 +31,7 @@ public class RealtimeTableConfig extends AbstractTableConfig {
 
   protected RealtimeTableConfig(String tableName, String tableType,
       SegmentsValidationAndRetentionConfig validationConfig, TenantConfig tenantConfig,
-      TableCustomConfig customConfigs, IndexingConfig indexConfig, QuotaConfig quotaConfig) {
+      TableCustomConfig customConfigs, IndexingConfig indexConfig, @Nullable QuotaConfig quotaConfig) {
     super(tableName, tableType, validationConfig, tenantConfig, customConfigs, quotaConfig);
     this.indexConfig = indexConfig;
   }

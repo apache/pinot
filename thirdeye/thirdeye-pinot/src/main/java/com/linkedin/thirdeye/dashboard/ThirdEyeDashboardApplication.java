@@ -19,6 +19,7 @@ import com.linkedin.thirdeye.dashboard.resources.OverrideConfigResource;
 import com.linkedin.thirdeye.dashboard.resources.SummaryResource;
 import com.linkedin.thirdeye.dashboard.resources.ThirdEyeResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.AnomaliesResource;
+import com.linkedin.thirdeye.dashboard.resources.OnboardResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.DataResource;
 
 import com.linkedin.thirdeye.dashboard.resources.v2.TimeSeriesResource;
@@ -75,6 +76,7 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new DataResource());
     env.jersey().register(new AnomaliesResource());
     env.jersey().register(new TimeSeriesResource());
+    env.jersey().register(new OnboardResource());
   }
 
   public static void main(String[] args) throws Exception {

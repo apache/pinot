@@ -15,168 +15,70 @@
  */
 package com.linkedin.pinot.core.operator.aggregation.function;
 
-import com.google.common.base.Preconditions;
+import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupByResultHolder;
-import com.linkedin.pinot.core.query.utils.Pair;
-import java.util.List;
+import javax.annotation.Nonnull;
 
 
-/**
- * Class to implement the 'avg' aggregation function.
- */
-public class AvgMVAggregationFunction implements AggregationFunction {
-  private static final String FUNCTION_NAME = AggregationFunctionFactory.AVG_MV_AGGREGATION_FUNCTION;
-  private static final double DEFAULT_VALUE = 0.0;
-  private static final ResultDataType RESULT_DATA_TYPE = ResultDataType.AVERAGE_PAIR;
+public class AvgMVAggregationFunction extends AvgAggregationFunction {
+  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.AVGMV.getName();
 
-  /**
-   * Performs 'avg' aggregation on the input array.
-   * Returns {@value #DEFAULT_VALUE} if the input array is empty.
-   *
-   * While the interface allows for variable number of valueArrays, we do not support
-   * multiple columns within one aggregation function right now.
-   *
-   * {@inheritDoc}
-   *
-   * @param length
-   * @param resultHolder
-   * @param valueArrayArray
-   */
-  @Override
-  public void aggregate(int length, AggregationResultHolder resultHolder, Object... valueArrayArray) {
-    Preconditions.checkArgument(valueArrayArray.length == 1);
-    Preconditions.checkArgument(valueArrayArray[0] instanceof double[][]);
-    final double[][] values = (double[][]) valueArrayArray[0];
-    Preconditions.checkState(length <= values.length);
-
-    double sum = 0.0;
-    int cnt = 0;
-    for (int i = 0; i < length; ++i) {
-      for (int j = 0; j < values[i].length; ++j) {
-        sum += values[i][j];
-      }
-      cnt += values[i].length;
-    }
-    Pair<Double, Long> avgValue = resultHolder.getResult();
-    if (avgValue == null) {
-      avgValue = new Pair<>(sum, (long) cnt);
-      resultHolder.setValue(avgValue);
-    } else {
-      avgValue.setFirst(avgValue.getFirst() + sum);
-      avgValue.setSecond(avgValue.getSecond() + cnt);
-    }
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * While the interface allows for variable number of valueArrays, we do not support
-   * multiple columns within one aggregation function right now.
-   *
-   * @param length
-   * @param groupKeys
-   * @param resultHolder
-   * @param valueArray
-   */
-  @Override
-  public void aggregateGroupBySV(int length, int[] groupKeys, GroupByResultHolder resultHolder, Object... valueArray) {
-    Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkArgument(valueArray[0] instanceof double[][]);
-    final double[][] values = (double[][]) valueArray[0];
-    Preconditions.checkState(length <= values.length);
-
-    for (int i = 0; i < length; ++i) {
-      int groupKey = groupKeys[i];
-      for (double value : values[i]) {
-        Pair<Double, Long> avgValue = resultHolder.getResult(groupKey);
-        if (avgValue == null) {
-          avgValue = new Pair<>(value, 1L);
-          resultHolder.setValueForKey(groupKey, avgValue);
-        } else {
-          avgValue.setFirst(avgValue.getFirst() + value);
-          avgValue.setSecond(avgValue.getSecond() + 1);
-        }
-      }
-    }
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @param length
-   * @param docIdToGroupKeys
-   * @param resultHolder
-   * @param valueArray
-   */
-  @Override
-  public void aggregateGroupByMV(int length, int[][] docIdToGroupKeys, GroupByResultHolder resultHolder,
-      Object... valueArray) {
-    Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkArgument(valueArray[0] instanceof double[][]);
-    final double[][] values = (double[][]) valueArray[0];
-    Preconditions.checkState(length <= values.length);
-    for (int i = 0; i < length; ++i) {
-      for (int groupKey : docIdToGroupKeys[i]) {
-        Pair<Double, Long> avgValue = resultHolder.getResult(groupKey);
-        for (double value : values[i]) {
-          if (avgValue == null) {
-            avgValue = new Pair<>(value, 1L);
-            resultHolder.setValueForKey(groupKey, avgValue);
-          } else {
-            avgValue.setFirst(avgValue.getFirst() + value);
-            avgValue.setSecond(avgValue.getSecond() + 1);
-          }
-        }
-      }
-    }
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @return
-   */
-  @Override
-  public double getDefaultValue() {
-    return DEFAULT_VALUE;
-  }
-
-  /**
-   * {@inheritDoc}
-   * @return
-   */
-  @Override
-  public AggregationFunction.ResultDataType getResultDataType() {
-    return RESULT_DATA_TYPE;
-  }
-
+  @Nonnull
   @Override
   public String getName() {
-    return FUNCTION_NAME;
+    return NAME;
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * @param combinedResult
-   * @return
-   */
+  @Nonnull
   @Override
-  public Double reduce(List<Object> combinedResult) {
-    double reducedSumResult = 0;
-    long reducedCntResult = 0;
+  public String getColumnName(@Nonnull String[] columns) {
+    return NAME + "_" + columns[0];
+  }
 
-    for (Object object : combinedResult) {
-      Pair resultPair = (Pair) object;
-      reducedSumResult += (double) resultPair.getFirst();
-      reducedCntResult += (long) resultPair.getSecond();
+  @Override
+  public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
+      @Nonnull BlockValSet... blockValSets) {
+    double[][] valuesArray = blockValSets[0].getDoubleValuesMV();
+    double sum = 0.0;
+    long count = 0L;
+    for (int i = 0; i < length; i++) {
+      double[] values = valuesArray[i];
+      for (double value : values) {
+        sum += value;
+      }
+      count += values.length;
     }
+    setAggregationResult(aggregationResultHolder, sum, count);
+  }
 
-    if (reducedCntResult > 0) {
-      return reducedSumResult / reducedCntResult;
-    } else {
-      return DEFAULT_VALUE;
+  @Override
+  public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+    double[][] valuesArray = blockValSets[0].getDoubleValuesMV();
+    for (int i = 0; i < length; i++) {
+      aggregateOnGroupKey(groupKeyArray[i], groupByResultHolder, valuesArray[i]);
     }
+  }
+
+  @Override
+  public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+    double[][] valuesArray = blockValSets[0].getDoubleValuesMV();
+    for (int i = 0; i < length; i++) {
+      double[] values = valuesArray[i];
+      for (int groupKey : groupKeysArray[i]) {
+        aggregateOnGroupKey(groupKey, groupByResultHolder, values);
+      }
+    }
+  }
+
+  private void aggregateOnGroupKey(int groupKey, @Nonnull GroupByResultHolder groupByResultHolder, double[] values) {
+    double sum = 0.0;
+    for (double value : values) {
+      sum += value;
+    }
+    long count = values.length;
+    setGroupByResult(groupKey, groupByResultHolder, sum, count);
   }
 }

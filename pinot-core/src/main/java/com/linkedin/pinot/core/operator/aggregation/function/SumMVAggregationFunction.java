@@ -15,147 +15,67 @@
  */
 package com.linkedin.pinot.core.operator.aggregation.function;
 
-import java.util.List;
-
-import com.google.common.base.Preconditions;
+import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupByResultHolder;
+import javax.annotation.Nonnull;
 
 
-/**
- * Class to perform the 'sum' aggregation function.
- */
-public class SumMVAggregationFunction implements AggregationFunction {
-  private static final String FUNCTION_NAME = AggregationFunctionFactory.SUM_MV_AGGREGATION_FUNCTION;
-  private static final double DEFAULT_VALUE = 0.0;
-  private static final ResultDataType RESULT_DATA_TYPE = ResultDataType.DOUBLE;
+public class SumMVAggregationFunction extends SumAggregationFunction {
+  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.SUMMV.getName();
 
-  /**
-   * Performs 'sum' aggregation on the input array.
-   * Returns {@value #DEFAULT_VALUE} if the input array is empty.
-   *
-   * While the interface allows for variable number of valueArrays, we do not support
-   * multiple columns within one aggregation function right now.
-   * {@inheritDoc}
-   *
-   * @param length
-   * @param resultHolder
-   * @param valueArrayArray
-   */
-  @Override
-  public void aggregate(int length, AggregationResultHolder resultHolder, Object... valueArrayArray) {
-    Preconditions.checkArgument(valueArrayArray.length == 1);
-    Preconditions.checkArgument(valueArrayArray[0] instanceof double[][]);
-    final double[][] values = (double[][]) valueArrayArray[0];
-    Preconditions.checkState(length <= values.length);
-
-    double sum = 0.0;
-    for (int i = 0; i < length; i++) {
-      for (int j = 0; j < values[i].length; ++j) {
-        sum += values[i][j];
-      }
-    }
-    resultHolder.setValue(resultHolder.getDoubleResult() + sum);
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * While the interface allows for variable number of valueArrays, we do not support
-   * multiple columns within one aggregation function right now.
-   *
-   * @param length
-   * @param groupKeys
-   * @param resultHolder
-   * @param valueArray
-   */
-  @Override
-  public void aggregateGroupBySV(int length, int[] groupKeys, GroupByResultHolder resultHolder, Object... valueArray) {
-    Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkArgument(valueArray[0] instanceof double[][]);
-    final double[][] values = (double[][]) valueArray[0];
-    Preconditions.checkState(length <= values.length);
-
-    for (int i = 0; i < length; i++) {
-      int groupKey = groupKeys[i];
-      double oldValue = resultHolder.getDoubleResult(groupKey);
-      for (double value : values[i]) {
-        oldValue += value;
-      }
-      resultHolder.setValueForKey(groupKey, oldValue);
-    }
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @param length
-   * @param docIdToGroupKey
-   * @param resultHolder
-   * @param valueArray
-   */
-  @Override
-  public void aggregateGroupByMV(int length, int[][] docIdToGroupKey, GroupByResultHolder resultHolder,
-      Object... valueArray) {
-    Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkArgument(valueArray[0] instanceof double[][]);
-    final double[][] values = (double[][]) valueArray[0];
-    Preconditions.checkState(length <= values.length);
-
-    for (int i = 0; i < length; ++i) {
-      for (int groupKey : docIdToGroupKey[i]) {
-        double oldValue = resultHolder.getDoubleResult(groupKey);
-        double newValue = oldValue;
-        for (double value : values[i]) {
-          newValue += value;
-        }
-        resultHolder.setValueForKey(groupKey, newValue);
-      }
-    }
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @return
-   */
-  @Override
-  public double getDefaultValue() {
-    return DEFAULT_VALUE;
-  }
-
-  /**
-   * {@inheritDoc}
-   * @return
-   */
-  @Override
-  public ResultDataType getResultDataType() {
-    return RESULT_DATA_TYPE;
-  }
-
-  /**
-   * {@inheritDoc}
-   * @return
-   */
+  @Nonnull
   @Override
   public String getName() {
-    return FUNCTION_NAME;
+    return NAME;
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * @param combinedResult
-   * @return
-   */
+  @Nonnull
   @Override
-  public Double reduce(List<Object> combinedResult) {
-    double reducedResult = DEFAULT_VALUE;
+  public String getColumnName(@Nonnull String[] columns) {
+    return NAME + "_" + columns[0];
+  }
 
-    for (Object object : combinedResult) {
-      double result = (Double) object;
-      reducedResult += result;
+  @Override
+  public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
+      @Nonnull BlockValSet... blockValSets) {
+    double[][] valuesArray = blockValSets[0].getDoubleValuesMV();
+    double sum = aggregationResultHolder.getDoubleResult();
+    for (int i = 0; i < length; i++) {
+      for (double value : valuesArray[i]) {
+        sum += value;
+      }
     }
-    return reducedResult;
+    aggregationResultHolder.setValue(sum);
+  }
+
+  @Override
+  public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+    double[][] valuesArray = blockValSets[0].getDoubleValuesMV();
+    for (int i = 0; i < length; i++) {
+      int groupKey = groupKeyArray[i];
+      double sum = groupByResultHolder.getDoubleResult(groupKey);
+      for (double value : valuesArray[i]) {
+        sum += value;
+      }
+      groupByResultHolder.setValueForKey(groupKey, sum);
+    }
+  }
+
+  @Override
+  public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+    double[][] valuesArray = blockValSets[0].getDoubleValuesMV();
+    for (int i = 0; i < length; i++) {
+      double[] values = valuesArray[i];
+      for (int groupKey : groupKeysArray[i]) {
+        double sum = groupByResultHolder.getDoubleResult(groupKey);
+        for (double value : values) {
+          sum += value;
+        }
+        groupByResultHolder.setValueForKey(groupKey, sum);
+      }
+    }
   }
 }

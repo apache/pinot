@@ -1,10 +1,12 @@
 package com.linkedin.thirdeye.anomaly.task;
 
+import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
+
 import com.linkedin.thirdeye.anomaly.alert.AlertJobContext;
 import com.linkedin.thirdeye.anomaly.alert.AlertTaskInfo;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobContext;
@@ -13,6 +15,9 @@ import com.linkedin.thirdeye.anomaly.monitor.MonitorConfiguration;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorConstants.MonitorType;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorJobContext;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorTaskInfo;
+import com.linkedin.thirdeye.completeness.checker.DataCompletenessConstants.DataCompletenessType;
+import com.linkedin.thirdeye.completeness.checker.DataCompletenessJobContext;
+import com.linkedin.thirdeye.completeness.checker.DataCompletenessTaskInfo;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 
@@ -47,16 +52,30 @@ public class TaskGenerator {
 
   }
 
-  public List<AlertTaskInfo> createAlertTasks(AlertJobContext alertJobContext, DateTime monitoringWindowStartTime,
-      DateTime monitoringWindowEndTime)
-      throws Exception{
+  public List<AlertTaskInfo> createAlertTasks(AlertJobContext alertJobContext,
+      DateTime monitoringWindowStartTime, DateTime monitoringWindowEndTime) throws Exception {
 
     List<AlertTaskInfo> tasks = new ArrayList<>();
     EmailConfigurationDTO alertConfig = alertJobContext.getAlertConfig();
     long jobExecutionId = alertJobContext.getJobExecutionId();
 
+    AlertTaskInfo taskInfo =
+        new AlertTaskInfo(jobExecutionId, monitoringWindowStartTime, monitoringWindowEndTime,
+            alertConfig, null);
+    tasks.add(taskInfo);
+    return tasks;
+  }
 
-    AlertTaskInfo taskInfo = new AlertTaskInfo(jobExecutionId, monitoringWindowStartTime, monitoringWindowEndTime, alertConfig);
+  public List<AlertTaskInfo> createAlertTasksV2(AlertJobContext alertJobContext,
+      DateTime monitoringWindowStartTime, DateTime monitoringWindowEndTime) throws Exception {
+
+    List<AlertTaskInfo> tasks = new ArrayList<>();
+    AlertConfigDTO alertConfig = alertJobContext.getAlertConfigDTO();
+    long jobExecutionId = alertJobContext.getJobExecutionId();
+
+    AlertTaskInfo taskInfo =
+        new AlertTaskInfo(jobExecutionId, monitoringWindowStartTime, monitoringWindowEndTime, null,
+            alertConfig);
     tasks.add(taskInfo);
     return tasks;
   }
@@ -76,6 +95,25 @@ public class TaskGenerator {
     expireTaskInfo.setMonitorType(MonitorType.EXPIRE);
     expireTaskInfo.setExpireDaysAgo(monitorConfiguration.getExpireDaysAgo());
     tasks.add(expireTaskInfo);
+
+    return tasks;
+  }
+
+
+  public List<DataCompletenessTaskInfo> createDataCompletenessTasks(DataCompletenessJobContext dataCompletenessJobContext) {
+    List<DataCompletenessTaskInfo> tasks = new ArrayList<>();
+
+    // create 1 task, which will get data and perform check
+    DataCompletenessTaskInfo dataCompletenessCheck = new DataCompletenessTaskInfo();
+    dataCompletenessCheck.setDataCompletenessType(DataCompletenessType.CHECKER);
+    dataCompletenessCheck.setDataCompletenessStartTime(dataCompletenessJobContext.getCheckDurationStartTime());
+    dataCompletenessCheck.setDataCompletenessEndTime(dataCompletenessJobContext.getCheckDurationEndTime());
+    tasks.add(dataCompletenessCheck);
+
+    // create 1 task, for cleanup
+    DataCompletenessTaskInfo cleanup = new DataCompletenessTaskInfo();
+    cleanup.setDataCompletenessType(DataCompletenessType.CLEANUP);
+    tasks.add(cleanup);
 
     return tasks;
   }

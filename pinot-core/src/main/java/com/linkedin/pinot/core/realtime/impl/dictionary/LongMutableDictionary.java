@@ -35,7 +35,7 @@ public class LongMutableDictionary extends MutableDictionaryReader {
     }
 
     if (rawValue instanceof String) {
-      Long e = new Long(Long.parseLong(rawValue.toString()));
+      Long e = Long.parseLong(rawValue.toString());
       addToDictionaryBiMap(e);
       updateMinMax(e);
       return;
@@ -50,15 +50,15 @@ public class LongMutableDictionary extends MutableDictionaryReader {
     if (rawValue instanceof Object[]) {
       for (Object o : (Object[]) rawValue) {
         if (o instanceof String) {
-          addToDictionaryBiMap(new Long(Long.parseLong(o.toString())));
-          updateMinMax(new Long(Long.parseLong(o.toString())));
+          final Long longValue = Long.parseLong(o.toString());
+          addToDictionaryBiMap(longValue);
+          updateMinMax(longValue);
           continue;
         }
 
         if (o instanceof Long) {
           addToDictionaryBiMap(o);
           updateMinMax((Long) o);
-          continue;
         }
       }
     }
@@ -79,7 +79,7 @@ public class LongMutableDictionary extends MutableDictionaryReader {
       return hasNull;
     }
     if (rawValue instanceof String) {
-      return dictionaryIdBiMap.inverse().containsKey(new Long(Long.parseLong(rawValue.toString())));
+      return dictionaryIdBiMap.inverse().containsKey(Long.parseLong((String) rawValue));
     }
     return dictionaryIdBiMap.inverse().containsKey(rawValue);
   }
@@ -87,7 +87,7 @@ public class LongMutableDictionary extends MutableDictionaryReader {
   @Override
   public int indexOf(Object rawValue) {
     if (rawValue instanceof String) {
-      return getIndexOfFromBiMap(new Long(Long.parseLong(rawValue.toString())));
+      return getIndexOfFromBiMap(Long.parseLong(rawValue.toString()));
     }
     return getIndexOfFromBiMap(rawValue);
   }
@@ -99,7 +99,7 @@ public class LongMutableDictionary extends MutableDictionaryReader {
 
   @Override
   public long getLongValue(int dictionaryId) {
-    return ((Long) getRawValueFromBiMap(dictionaryId)).longValue();
+    return (Long) getRawValueFromBiMap(dictionaryId);
   }
 
   @Override
@@ -159,11 +159,11 @@ public class LongMutableDictionary extends MutableDictionaryReader {
 
   @Override
   public String getStringValue(int dictionaryId) {
-    return ((Long) getRawValueFromBiMap(dictionaryId)).toString();
+    return getRawValueFromBiMap(dictionaryId).toString();
   }
 
   private long getLong(int dictionaryId) {
-    return ((Long) dictionaryIdBiMap.get(new Integer(dictionaryId))).longValue();
+    return (Long) dictionaryIdBiMap.get(dictionaryId);
   }
 
   @Override

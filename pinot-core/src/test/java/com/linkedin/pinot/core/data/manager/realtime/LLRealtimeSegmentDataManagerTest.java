@@ -20,6 +20,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.LinkedList;
+import org.apache.kafka.common.protocol.Errors;
 import org.json.JSONObject;
 import org.mockito.Mockito;
 import org.testng.annotations.Test;
@@ -34,6 +35,7 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
+import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import com.yammer.metrics.core.MetricsRegistry;
 import junit.framework.Assert;
 import static org.mockito.Matchers.any;
@@ -327,22 +329,18 @@ public class LLRealtimeSegmentDataManagerTest {
     Assert.assertEquals(segmentDataManager._state.get(segmentDataManager), LLRealtimeSegmentDataManager.State.HOLDING);
   }
 
-  // Tests to go online from consuming state
-
   @Test
-  public void testOnlineTransitionOnStopTakingTooLong() throws Exception {
+  public void testConsumingException() throws Exception {
     FakeLLRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager();
-    LLCRealtimeSegmentZKMetadata metadata = new LLCRealtimeSegmentZKMetadata();
-    metadata.setEndOffset(_startOffset+600);
-    segmentDataManager._stopWaitTimeMs = segmentDataManager.getMaxTimeForConsumingToOnlineSec() * 1000 + 300;
-    try {
-      segmentDataManager.goOnlineFromConsuming(metadata);
-      Assert.fail();
-    } catch (RuntimeException e) {
-      // We should see an exception here
-    }
-    Assert.assertFalse(segmentDataManager._downloadAndReplaceCalled);
+    LLRealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
+
+    segmentDataManager._throwExceptionFromConsume = true;
+    segmentDataManager._postConsumeStoppedCalled = false;
+    consumer.run();
+    Assert.assertTrue(segmentDataManager._postConsumeStoppedCalled);
   }
+
+  // Tests to go online from consuming state
 
   // If the state is is COMMITTED or RETAINED, nothing to do
   // If discarded or error state, then downloadAndReplace the segment
@@ -523,7 +521,7 @@ public class LLRealtimeSegmentDataManagerTest {
   public static class FakeLLRealtimeSegmentDataManager extends LLRealtimeSegmentDataManager {
 
     public Field _state;
-    public Field _receivedStop;
+    public Field _shouldStop;
     public LinkedList<Long> _consumeOffsets = new LinkedList<>();
     public LinkedList<SegmentCompletionProtocol.Response> _responses = new LinkedList<>();
     public boolean _commitSegmentCalled = false;
@@ -531,6 +529,8 @@ public class LLRealtimeSegmentDataManagerTest {
     public boolean _buildAndReplaceCalled = false;
     public int _stopWaitTimeMs = 100;
     private boolean _downloadAndReplaceCalled = false;
+    public boolean _throwExceptionFromConsume = false;
+    public boolean _postConsumeStoppedCalled = false;
 
     public FakeLLRealtimeSegmentDataManager(RealtimeSegmentZKMetadata segmentZKMetadata,
         AbstractTableConfig tableConfig, InstanceZKMetadata instanceZKMetadata,
@@ -541,8 +541,8 @@ public class LLRealtimeSegmentDataManagerTest {
           serverMetrics);
       _state = LLRealtimeSegmentDataManager.class.getDeclaredField("_state");
       _state.setAccessible(true);
-      _receivedStop = LLRealtimeSegmentDataManager.class.getDeclaredField("_receivedStop");
-      _receivedStop.setAccessible(true);
+      _shouldStop = LLRealtimeSegmentDataManager.class.getDeclaredField("_shouldStop");
+      _shouldStop.setAccessible(true);
     }
 
     public PartitionConsumer createPartitionConsumer() {
@@ -553,7 +553,7 @@ public class LLRealtimeSegmentDataManagerTest {
     private void terminateLoopIfNecessary() {
       if (_consumeOffsets.isEmpty() && _responses.isEmpty()) {
         try {
-          _receivedStop.set(this, true);
+          _shouldStop.set(this, true);
         } catch (Exception e) {
           Assert.fail();
         }
@@ -566,9 +566,13 @@ public class LLRealtimeSegmentDataManagerTest {
     }
 
     @Override
-    protected void consumeLoop() {
+    protected boolean consumeLoop() throws Exception {
+      if (_throwExceptionFromConsume) {
+        throw new SimpleConsumerWrapper.PermanentConsumerException(Errors.OFFSET_OUT_OF_RANGE);
+      }
       setCurrentOffset(_consumeOffsets.remove());
       terminateLoopIfNecessary();
+      return true;
     }
 
     @Override
@@ -576,6 +580,11 @@ public class LLRealtimeSegmentDataManagerTest {
       SegmentCompletionProtocol.Response response = _responses.remove();
       terminateLoopIfNecessary();
       return response;
+    }
+
+    @Override
+    protected void postStopConsumedMsg(String reason) {
+      _postConsumeStoppedCalled = true;
     }
 
     @Override

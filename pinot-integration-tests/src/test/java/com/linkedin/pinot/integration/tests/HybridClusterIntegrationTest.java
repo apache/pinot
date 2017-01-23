@@ -16,7 +16,6 @@
 package com.linkedin.pinot.integration.tests;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.ArrayList;
@@ -39,6 +38,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
@@ -46,6 +47,7 @@ import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.util.TestUtils;
+import junit.framework.Assert;
 import kafka.server.KafkaServerStartable;
 
 
@@ -61,12 +63,14 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
   protected final File _segmentDir = new File("/tmp/HybridClusterIntegrationTest/segmentDir");
   protected final File _tarDir = new File("/tmp/HybridClusterIntegrationTest/tarDir");
   protected static final String KAFKA_TOPIC = "hybrid-integration-test";
+  private static final String TABLE_NAME = "mytable";
 
   private int segmentCount = 12;
   private int offlineSegmentCount = 8;
   private int realtimeSegmentCount = 6;
   private Random random = new Random();
   private Schema schema;
+  private String tableName;
 
   private KafkaServerStartable kafkaStarter;
 
@@ -86,12 +90,18 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     return offlineSegmentCount;
   }
 
+  // In case inherited tests set up a different table name they can override this method.
+  protected String getTableName() {
+    return tableName;
+  }
+
   @BeforeClass
   public void setUp() throws Exception {
     //Clean up
     ensureDirectoryExistsAndIsEmpty(_tmpDir);
     ensureDirectoryExistsAndIsEmpty(_segmentDir);
     ensureDirectoryExistsAndIsEmpty(_tarDir);
+    tableName = TABLE_NAME;
 
     // Start Zk, Kafka and Pinot
     startHybridCluster(10);
@@ -112,7 +122,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     final String sortedColumn = makeSortedColumn();
 
     // Create Pinot table
-    addHybridTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", KafkaStarterUtils.DEFAULT_ZK_STR, KAFKA_TOPIC,
+    addHybridTable(tableName, "DaysSinceEpoch", "daysSinceEpoch", KafkaStarterUtils.DEFAULT_ZK_STR, KAFKA_TOPIC,
         schema.getSchemaName(), TENANT_NAME, TENANT_NAME, avroFiles.get(0), sortedColumn, invertedIndexColumns, null,
         false);
     LOGGER.info("Running with Sorted column=" + sortedColumn + " and inverted index columns = " + invertedIndexColumns);
@@ -127,7 +137,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
 
     // Create segments from Avro data
     LOGGER.info("Creating offline segments from avro files " + offlineAvroFiles);
-    buildSegmentsFromAvro(offlineAvroFiles, executor, 0, _segmentDir, _tarDir, "mytable", false, null);
+    buildSegmentsFromAvro(offlineAvroFiles, executor, 0, _segmentDir, _tarDir, tableName, false, null);
 
     // Initialize query generator
     setupQueryGenerator(avroFiles, executor);
@@ -145,7 +155,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
       @Override
       public void onExternalViewChange(List<ExternalView> externalViewList, NotificationContext changeContext) {
         for (ExternalView externalView : externalViewList) {
-          if (externalView.getId().contains("mytable")) {
+          if (externalView.getId().contains(tableName)) {
 
             Set<String> partitionSet = externalView.getPartitionSet();
             if (partitionSet.size() == offlineSegmentCount) {
@@ -159,7 +169,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
               }
 
               if (onlinePartitionCount == offlineSegmentCount) {
-                System.out.println("Got " + offlineSegmentCount + " online tables, unlatching the main thread");
+//                System.out.println("Got " + offlineSegmentCount + " online tables, unlatching the main thread");
                 latch.countDown();
               }
             }
@@ -171,7 +181,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     // Upload the segments
     int i = 0;
     for (String segmentName : _tarDir.list()) {
-      System.out.println("Uploading segment " + (i++) + " : " + segmentName);
+//      System.out.println("Uploading segment " + (i++) + " : " + segmentName);
       File file = new File(_tarDir, segmentName);
       FileUploadUtils.sendSegmentFile("localhost", "8998", segmentName, file, file.length());
     }
@@ -188,7 +198,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     long timeInFiveMinutes = System.currentTimeMillis() + 5 * 60 * 1000L;
 
     Statement statement = _connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
-    statement.execute("select count(*) from mytable");
+    statement.execute("select count(*) from " + tableName);
     ResultSet rs = statement.getResultSet();
     rs.first();
     h2RecordCount = rs.getInt(1);
@@ -301,6 +311,20 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     createBrokerTenant(TENANT_NAME, 1);
     createServerTenant(TENANT_NAME, 1, 1);
   }
+
+  @Test
+  public void testBrokerDebugOutput() throws Exception {
+    if (getTableName() != null) {
+      Assert.assertNotNull(getDebugInfo("debug/timeBoundary" + ""));
+      Assert.assertNotNull(getDebugInfo("debug/timeBoundary/" + tableName));
+      Assert.assertNotNull(getDebugInfo("debug/timeBoundary/" + TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName)));
+      Assert.assertNotNull(getDebugInfo("debug/timeBoundary/" + TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName)));
+      Assert.assertNotNull(getDebugInfo("debug/routingTable/" + tableName));
+      Assert.assertNotNull(getDebugInfo("debug/routingTable/" + TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName)));
+      Assert.assertNotNull(getDebugInfo("debug/routingTable/" + TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName)));
+    }
+  }
+
 
   @AfterClass
   public void tearDown() throws Exception {

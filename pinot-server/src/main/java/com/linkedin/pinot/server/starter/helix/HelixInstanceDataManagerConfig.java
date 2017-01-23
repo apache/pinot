@@ -50,6 +50,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   public static final String READ_MODE = "readMode";
   // Key of the segment format this server can read
   public static final String SEGMENT_FORMAT_VERSION = "segment.format.version";
+
   // Key of whether to enable default columns
   private static final String ENABLE_DEFAULT_COLUMNS = "enable.default.columns";
 

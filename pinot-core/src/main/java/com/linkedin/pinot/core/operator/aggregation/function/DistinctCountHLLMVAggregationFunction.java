@@ -16,143 +16,238 @@
 package com.linkedin.pinot.core.operator.aggregation.function;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
-import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupByResultHolder;
 import com.linkedin.pinot.core.startree.hll.HllConstants;
-import java.util.List;
+import javax.annotation.Nonnull;
 
 
-/**
- * Class to implement the 'distinctcounthll' aggregation function.
- */
-public class DistinctCountHLLMVAggregationFunction implements AggregationFunction {
-  private static final String FUNCTION_NAME = AggregationFunctionFactory.DISTINCTCOUNTHLL_MV_AGGREGATION_FUNCTION;
-  private static final ResultDataType RESULT_DATA_TYPE = ResultDataType.DISTINCTCOUNTHLL_HYPERLOGLOG;
+public class DistinctCountHLLMVAggregationFunction extends DistinctCountHLLAggregationFunction {
+  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.DISTINCTCOUNTHLLMV.getName();
 
-  private static final int log2m = HllConstants.DEFAULT_LOG2M;
-
-  /**
-   * Performs 'distinctcounthll' aggregation on the input array.
-   *
-   * {@inheritDoc}
-   *
-   * @param length
-   * @param resultHolder
-   * @param valueArray
-   */
-  @Override
-  public void aggregate(int length, AggregationResultHolder resultHolder, Object... valueArray) {
-    Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkArgument(valueArray[0] instanceof double[][]);
-    final double[][] values = (double[][]) valueArray[0];
-    Preconditions.checkState(length <= values.length);
-
-    HyperLogLog hll = resultHolder.getResult();
-    if (hll == null) {
-      hll = new HyperLogLog(log2m);
-      resultHolder.setValue(hll);
-    }
-
-    for (int i = 0; i < length; i++) {
-      for (int j = 0; j < values[i].length; ++j) {
-        hll.offer((int) values[i][j]);
-      }
-    }
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * While the interface allows for variable number of valueArrays, we do not support
-   * multiple columns within one aggregation function right now.
-   *
-   * @param length
-   * @param groupKeys
-   * @param resultHolder
-   * @param valueArray
-   */
-  @Override
-  public void aggregateGroupBySV(int length, int[] groupKeys, GroupByResultHolder resultHolder, Object... valueArray) {
-    Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkArgument(valueArray[0] instanceof double[][]);
-    final double[][] values = (double[][]) valueArray[0];
-    Preconditions.checkState(length <= values.length);
-    for (int i = 0; i < length; i++) {
-      int groupKey = groupKeys[i];
-      HyperLogLog hll = resultHolder.getResult(groupKey);
-      if (hll == null) {
-        hll = new HyperLogLog(log2m);
-        resultHolder.setValueForKey(groupKey, hll);
-      }
-      for (double value : values[i]) {
-        hll.offer((int) value);
-      }
-    }
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @param length
-   * @param docIdToGroupKeys
-   * @param resultHolder
-   * @param valueArray
-   */
-  @Override
-  public void aggregateGroupByMV(int length, int[][] docIdToGroupKeys, GroupByResultHolder resultHolder,
-      Object... valueArray) {
-    Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkArgument(valueArray[0] instanceof double[][]);
-    final double[][] values = (double[][]) valueArray[0];
-    Preconditions.checkState(length <= values.length);
-    for (int i = 0; i < length; i++) {
-      for (int groupKey : docIdToGroupKeys[i]) {
-        HyperLogLog hll = resultHolder.getResult(groupKey);
-        if (hll == null) {
-          hll = new HyperLogLog(log2m);
-          resultHolder.setValueForKey(groupKey, hll);
-        }
-        for (double value : values[i]) {
-          hll.offer((int) value);
-        }
-      }
-    }
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @return
-   */
-  @Override
-  public double getDefaultValue() {
-    throw new RuntimeException("Unsupported method getDefaultValue() for class " + getClass().getName());
-  }
-
-  /**
-   * {@inheritDoc}
-   * @return
-   */
-  @Override
-  public ResultDataType getResultDataType() {
-    return RESULT_DATA_TYPE;
-  }
-
+  @Nonnull
   @Override
   public String getName() {
-    return FUNCTION_NAME;
+    return NAME;
+  }
+
+  @Nonnull
+  @Override
+  public String getColumnName(@Nonnull String[] columns) {
+    return NAME + "_" + columns[0];
+  }
+
+  @Override
+  public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
+      @Nonnull BlockValSet... blockValSets) {
+
+    HyperLogLog hyperLogLog = aggregationResultHolder.getResult();
+    if (hyperLogLog == null) {
+      hyperLogLog = new HyperLogLog(HllConstants.DEFAULT_LOG2M);
+      aggregationResultHolder.setValue(hyperLogLog);
+    }
+
+    FieldSpec.DataType valueType = blockValSets[0].getValueType();
+    switch (valueType) {
+      case INT:
+        int[][] intValues = blockValSets[0].getIntValuesMV();
+        for (int i = 0; i < length; i++) {
+          for (int value : intValues[i]) {
+            hyperLogLog.offer(value);
+          }
+        }
+        break;
+
+      case LONG:
+        long[][] longValues = blockValSets[0].getLongValuesMV();
+        for (int i = 0; i < length; i++) {
+          for (long value : longValues[i]) {
+            hyperLogLog.offer(Long.valueOf(value).hashCode());
+          }
+        }
+        break;
+
+      case FLOAT:
+        float[][] floatValues = blockValSets[0].getFloatValuesMV();
+        for (int i = 0; i < length; i++) {
+          for (float value : floatValues[i]) {
+            hyperLogLog.offer(Float.valueOf(value).hashCode());
+          }
+        }
+        break;
+
+      case DOUBLE:
+        double[][] doubleValues = blockValSets[0].getDoubleValuesMV();
+        for (int i = 0; i < length; i++) {
+          for (double value : doubleValues[i]) {
+            hyperLogLog.offer(Double.valueOf(value).hashCode());
+          }
+        }
+        break;
+
+      case STRING:
+        String[][] stringValues = blockValSets[0].getStringValuesMV();
+        for (int i = 0; i < length; i++) {
+          for (String value : stringValues[i]) {
+            hyperLogLog.offer(value.hashCode());
+          }
+        }
+        break;
+
+      default:
+        throw new IllegalArgumentException("Illegal data type for distinct count aggregation function: " + valueType);
+    }
+  }
+
+  @Override
+  public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+
+    FieldSpec.DataType valueType = blockValSets[0].getValueType();
+    switch (valueType) {
+      case INT:
+        int[][] intValues = blockValSets[0].getIntValuesMV();
+        for (int i = 0; i < length; i++) {
+          HyperLogLog hyperLogLog = getOrCreateHLLForKey(groupByResultHolder, groupKeyArray[i]);
+          for (int value : intValues[i]) {
+            hyperLogLog.offer(value);
+          }
+        }
+        break;
+
+      case LONG:
+        long[][] longValues = blockValSets[0].getLongValuesMV();
+        for (int i = 0; i < length; i++) {
+          HyperLogLog hyperLogLog = getOrCreateHLLForKey(groupByResultHolder, groupKeyArray[i]);
+          for (long value : longValues[i]) {
+            hyperLogLog.offer(Long.valueOf(value).hashCode());
+          }
+        }
+        break;
+
+      case FLOAT:
+        float[][] floatValues = blockValSets[0].getFloatValuesMV();
+        for (int i = 0; i < length; i++) {
+          HyperLogLog hyperLogLog = getOrCreateHLLForKey(groupByResultHolder, groupKeyArray[i]);
+          for (float value : floatValues[i]) {
+            hyperLogLog.offer(Float.valueOf(value).hashCode());
+          }
+        }
+        break;
+
+      case DOUBLE:
+        double[][] doubleValues = blockValSets[0].getDoubleValuesMV();
+        for (int i = 0; i < length; i++) {
+          HyperLogLog hyperLogLog = getOrCreateHLLForKey(groupByResultHolder, groupKeyArray[i]);
+          for (double value : doubleValues[i]) {
+            hyperLogLog.offer(Double.valueOf(value).hashCode());
+          }
+        }
+        break;
+
+      case STRING:
+        String[][] stringValues = blockValSets[0].getStringValuesMV();
+        for (int i = 0; i < length; i++) {
+          HyperLogLog hyperLogLog = getOrCreateHLLForKey(groupByResultHolder, groupKeyArray[i]);
+          for (String value : stringValues[i]) {
+            hyperLogLog.offer(value.hashCode());
+          }
+        }
+        break;
+
+      default:
+        throw new IllegalArgumentException("Illegal data type for distinct count aggregation function: " + valueType);
+    }
+  }
+
+  @Override
+  public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+
+    FieldSpec.DataType valueType = blockValSets[0].getValueType();
+    switch (valueType) {
+      case INT:
+        int[][] intValues = blockValSets[0].getIntValuesMV();
+        for (int i = 0; i < length; i++) {
+          for (int groupKey : groupKeysArray[i]) {
+            HyperLogLog hyperLogLog = getOrCreateHLLForKey(groupByResultHolder, groupKey);
+            for (int value : intValues[i]) {
+              hyperLogLog.offer(value);
+            }
+          }
+        }
+        break;
+
+      case LONG:
+        long[][] longValues = blockValSets[0].getLongValuesMV();
+        for (int i = 0; i < length; i++) {
+          for (int groupKey : groupKeysArray[i]) {
+            HyperLogLog hyperLogLog = getOrCreateHLLForKey(groupByResultHolder, groupKey);
+            for (long value : longValues[i]) {
+              hyperLogLog.offer(Long.valueOf(value).hashCode());
+            }
+          }
+        }
+        break;
+
+      case FLOAT:
+        float[][] floatValues = blockValSets[0].getFloatValuesMV();
+        for (int i = 0; i < length; i++) {
+          for (int groupKey : groupKeysArray[i]) {
+            HyperLogLog hyperLogLog = getOrCreateHLLForKey(groupByResultHolder, groupKey);
+            for (float value : floatValues[i]) {
+              hyperLogLog.offer(Float.valueOf(value).hashCode());
+            }
+          }
+        }
+        break;
+
+      case DOUBLE:
+        double[][] doubleMVValues = blockValSets[0].getDoubleValuesMV();
+        for (int i = 0; i < length; i++) {
+          double[] doubleValues = doubleMVValues[i];
+          for (int groupKey : groupKeysArray[i]) {
+            HyperLogLog hyperLogLog = getOrCreateHLLForKey(groupByResultHolder, groupKey);
+            for (double value : doubleValues) {
+              hyperLogLog.offer(Double.valueOf(value).hashCode());
+            }
+          }
+        }
+        break;
+
+      case STRING:
+        String[][] stringMVValues = blockValSets[0].getStringValuesMV();
+        for (int i = 0; i < length; i++) {
+          String[] stringValues = stringMVValues[i];
+          for (int groupKey : groupKeysArray[i]) {
+            HyperLogLog hyperLogLog = getOrCreateHLLForKey(groupByResultHolder, groupKey);
+            for (String value : stringValues) {
+              hyperLogLog.offer(value.hashCode());
+            }
+          }
+        }
+        break;
+
+      default:
+        throw new IllegalArgumentException("Illegal data type for distinct count aggregation function: " + valueType);
+    }
   }
 
   /**
-   * {@inheritDoc}
+   * Returns the HLL for the given key. If one does not exist, creates a new one and returns that.
    *
-   * @param combinedResult
-   * @return
+   * @param groupByResultHolder Result holder
+   * @param groupKey Group key for which to return the HLL
+   * @return HLL for the group key
    */
-  @Override
-  public Double reduce(List<Object> combinedResult) {
-    throw new RuntimeException(
-        "Unsupported method reduce(List<Object> combinedResult) for class " + getClass().getName());
+  private HyperLogLog getOrCreateHLLForKey(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
+    HyperLogLog hyperLogLog = groupByResultHolder.getResult(groupKey);
+    if (hyperLogLog == null) {
+      hyperLogLog = new HyperLogLog(HllConstants.DEFAULT_LOG2M);
+      groupByResultHolder.setValueForKey(groupKey, hyperLogLog);
+    }
+    return hyperLogLog;
   }
 }

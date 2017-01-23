@@ -84,10 +84,10 @@ public class RealtimeFileBasedReaderTest {
 
     realtimeSegment = new RealtimeSegmentImpl(schema, 100000, tableName, segmentName, AVRO_DATA, new
         ServerMetrics(new MetricsRegistry()));
-    GenericRow row = provider.next();
+    GenericRow row = provider.next(new GenericRow());
     while (row != null) {
       realtimeSegment.index(row);
-      row = provider.next();
+      row = provider.next(row);
     }
 
     provider.shutdown();

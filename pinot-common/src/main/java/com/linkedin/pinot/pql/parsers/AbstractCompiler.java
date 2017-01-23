@@ -16,10 +16,12 @@
 package com.linkedin.pinot.pql.parsers;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 
 /**
  * Interface for PQL compilers.
  */
 public interface AbstractCompiler {
   BrokerRequest compileToBrokerRequest(String expression);
+  TransformExpressionTree compileToExpressionTree(String expression);
 }

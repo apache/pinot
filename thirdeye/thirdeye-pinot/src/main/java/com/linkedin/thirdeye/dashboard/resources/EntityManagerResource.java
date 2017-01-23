@@ -1,19 +1,24 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.base.Strings;
 import com.linkedin.thirdeye.client.DAORegistry;
+import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AbstractDTO;
+import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -42,6 +47,8 @@ public class EntityManagerResource {
   private final DashboardConfigManager dashboardConfigManager;
   private final MetricConfigManager metricConfigManager;
   private final DatasetConfigManager datasetConfigManager;
+  private final OverrideConfigManager overrideConfigManager;
+  private final AlertConfigManager alertConfigManager;
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
@@ -54,10 +61,13 @@ public class EntityManagerResource {
     this.dashboardConfigManager = DAO_REGISTRY.getDashboardConfigDAO();
     this.metricConfigManager = DAO_REGISTRY.getMetricConfigDAO();
     this.datasetConfigManager = DAO_REGISTRY.getDatasetConfigDAO();
+    this.overrideConfigManager = DAO_REGISTRY.getOverrideConfigDAO();
+    this.alertConfigManager = DAO_REGISTRY.getAlertConfigDAO();
   }
 
   private enum EntityType {
-    ANOMALY_FUNCTION, EMAIL_CONFIGURATION, DASHBOARD_CONFIG, DATASET_CONFIG, METRIC_CONFIG
+    ANOMALY_FUNCTION, EMAIL_CONFIGURATION, DASHBOARD_CONFIG, DATASET_CONFIG, METRIC_CONFIG,
+    OVERRIDE_CONFIG, ALERT_CONFIG
   }
 
   @GET
@@ -86,6 +96,12 @@ public class EntityManagerResource {
     case METRIC_CONFIG:
       results.addAll(metricConfigManager.findAll());
       break;
+    case OVERRIDE_CONFIG:
+      results.addAll(overrideConfigManager.findAll());
+      break;
+    case ALERT_CONFIG:
+      results.addAll(alertConfigManager.findAll());
+      break;
     default:
       throw new WebApplicationException("Unknown entity type : " + entityType);
     }
@@ -94,13 +110,19 @@ public class EntityManagerResource {
 
   @POST
   public Response updateEntity(@QueryParam("entityType") String entityTypeStr, String jsonPayload) {
+    if (Strings.isNullOrEmpty(entityTypeStr)) {
+      throw new WebApplicationException("EntryType can not be null");
+    }
     EntityType entityType = EntityType.valueOf(entityTypeStr);
     try {
       switch (entityType) {
       case ANOMALY_FUNCTION:
-        AnomalyFunctionDTO anomalyFunctionDTO =
-            OBJECT_MAPPER.readValue(jsonPayload, AnomalyFunctionDTO.class);
-        anomalyFunctionManager.update(anomalyFunctionDTO);
+        AnomalyFunctionDTO anomalyFunctionDTO = OBJECT_MAPPER.readValue(jsonPayload, AnomalyFunctionDTO.class);
+        if (anomalyFunctionDTO.getId() == null) {
+          anomalyFunctionManager.save(anomalyFunctionDTO);
+        } else {
+          anomalyFunctionManager.update(anomalyFunctionDTO);
+        }
         break;
       case EMAIL_CONFIGURATION:
         EmailConfigurationDTO emailConfigurationDTO =
@@ -118,6 +140,22 @@ public class EntityManagerResource {
       case METRIC_CONFIG:
         MetricConfigDTO metricConfigDTO = OBJECT_MAPPER.readValue(jsonPayload, MetricConfigDTO.class);
         metricConfigManager.update(metricConfigDTO);
+        break;
+      case OVERRIDE_CONFIG:
+        OverrideConfigDTO overrideConfigDTO = OBJECT_MAPPER.readValue(jsonPayload, OverrideConfigDTO.class);
+        if (overrideConfigDTO.getId() == null) {
+          overrideConfigManager.save(overrideConfigDTO);
+        } else {
+          overrideConfigManager.update(overrideConfigDTO);
+        }
+        break;
+      case ALERT_CONFIG:
+        AlertConfigDTO alertConfigDTO = OBJECT_MAPPER.readValue(jsonPayload, AlertConfigDTO.class);
+        if (alertConfigDTO.getId() == null) {
+          alertConfigManager.save(alertConfigDTO);
+        } else {
+          alertConfigManager.update(alertConfigDTO);
+        }
         break;
       }
     } catch (IOException e) {

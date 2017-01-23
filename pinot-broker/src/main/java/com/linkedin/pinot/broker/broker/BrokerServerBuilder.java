@@ -16,9 +16,11 @@
 package com.linkedin.pinot.broker.broker;
 
 import com.linkedin.pinot.broker.broker.helix.LiveInstancesChangeListenerImpl;
+import com.linkedin.pinot.broker.requesthandler.BrokerRequestHandler;
 import com.linkedin.pinot.broker.servlet.PinotBrokerHealthCheckServlet;
 import com.linkedin.pinot.broker.servlet.PinotBrokerRoutingTableDebugServlet;
 import com.linkedin.pinot.broker.servlet.PinotBrokerServletContextChangeListener;
+import com.linkedin.pinot.broker.servlet.PinotBrokerTimeBoundaryDebugServlet;
 import com.linkedin.pinot.broker.servlet.PinotClientRequestServlet;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
@@ -26,10 +28,7 @@ import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.common.query.ReduceServiceRegistry;
 import com.linkedin.pinot.common.response.BrokerResponseFactory;
 import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.common.utils.DataTableSerDeRegistry;
 import com.linkedin.pinot.core.query.reduce.BrokerReduceService;
-import com.linkedin.pinot.core.util.DataTableCustomSerDe;
-import com.linkedin.pinot.requestHandler.BrokerRequestHandler;
 import com.linkedin.pinot.routing.CfgBasedRouting;
 import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
 import com.linkedin.pinot.routing.RoutingTable;
@@ -170,9 +169,6 @@ public class BrokerServerBuilder {
     _requestHandler = new BrokerRequestHandler(_routingTable, _timeBoundaryService, _scatterGather,
         reduceServiceRegistry, _brokerMetrics, _config);
 
-    // Register SerDe for data-table.
-    DataTableSerDeRegistry.getInstance().register(new DataTableCustomSerDe(_brokerMetrics));
-
     LOGGER.info("Network initialized !!");
   }
 
@@ -200,6 +196,7 @@ public class BrokerServerBuilder {
     context.addServlet(PinotClientRequestServlet.class, "/query");
     context.addServlet(PinotBrokerHealthCheckServlet.class, "/health");
     context.addServlet(PinotBrokerRoutingTableDebugServlet.class, "/debug/routingTable/*");
+    context.addServlet(PinotBrokerTimeBoundaryDebugServlet.class, "/debug/timeBoundary/*");
 
     if (clientConfig.enableConsole()) {
       context.setResourceBase(clientConfig.getConsoleWebappPath());
@@ -207,7 +204,7 @@ public class BrokerServerBuilder {
       context.setResourceBase("");
     }
 
-    context.addEventListener(new PinotBrokerServletContextChangeListener(_requestHandler, _brokerMetrics));
+    context.addEventListener(new PinotBrokerServletContextChangeListener(_requestHandler, _brokerMetrics, _timeBoundaryService));
     context.setAttribute(BrokerServerBuilder.class.toString(), this);
     _server.setHandler(context);
   }

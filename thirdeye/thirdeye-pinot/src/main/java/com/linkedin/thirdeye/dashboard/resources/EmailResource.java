@@ -1,5 +1,13 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
+import com.google.common.base.Strings;
+import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
+import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
+import com.linkedin.thirdeye.anomaly.alert.util.AnomalyReportGenerator;
+import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import java.util.Arrays;
 import java.util.List;
 
 import javax.ws.rs.DELETE;
@@ -9,6 +17,7 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
@@ -26,11 +35,13 @@ public class EmailResource {
 
   private final AnomalyFunctionManager functionDAO;
   private final EmailConfigurationManager emailDAO;
+  private final AlertConfigManager alertDAO;
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   public EmailResource() {
     this.functionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.emailDAO = DAO_REGISTRY.getEmailConfigurationDAO();
+    this.alertDAO = DAO_REGISTRY.getAlertConfigDAO();
   }
 
   @POST
@@ -51,6 +62,27 @@ public class EmailResource {
   @Path("{id}")
   public EmailConfigurationDTO getEmailConfigById (@PathParam("id") Long id) {
     return emailDAO.findById(id);
+  }
+
+
+  @POST
+  @Path("alert")
+  public Response createAlertConfig(AlertConfigDTO alertConfigDTO) {
+    Long id = alertDAO.save(alertConfigDTO);
+    return Response.ok(id).build();
+  }
+
+  @GET
+  @Path("alert/{id}")
+  public AlertConfigDTO getAlertConfigById (@PathParam("id") Long id) {
+    return alertDAO.findById(id);
+  }
+
+  @DELETE
+  @Path("alert/{alertId}")
+  public Response deleteByAlertId(@PathParam("alertId") Long alertId) {
+    alertDAO.deleteById(alertId);
+    return Response.ok().build();
   }
 
   @GET
@@ -113,5 +145,88 @@ public class EmailResource {
   @Path("email-config/{functionId}")
   public List<EmailConfigurationDTO> findEmailIdsByFunction(@PathParam("functionId") Long functionId) {
     return emailDAO.findByFunctionId(functionId);
+  }
+
+  // TODO : add end points for AlertConfig
+
+
+  @GET
+  @Path("generate/datasets/{startTime}/{endTime}")
+  public Response generateAndSendAlertForDatasets(@PathParam("startTime") Long startTime,
+      @PathParam("endTime") Long endTime, @QueryParam("datasets") String datasets,
+      @QueryParam("from") String fromAddr, @QueryParam("to") String toAddr,
+      @QueryParam("includeSentAnomaliesOnly") boolean includeSentAnomaliesOnly,
+      @QueryParam("teHost") String teHost,  @QueryParam("smtpHost") String smtpHost, @QueryParam("smtpPort") int smtpPort) {
+    if (Strings.isNullOrEmpty(datasets)) {
+      throw new WebApplicationException("datasets null or empty : " + datasets);
+    }
+    String [] dataSetArr = datasets.split(",");
+    if (dataSetArr.length == 0) {
+      throw new WebApplicationException("Datasets empty : " + datasets);
+    }
+    if (Strings.isNullOrEmpty(toAddr)) {
+      throw new WebApplicationException("Empty : list of recipients" + toAddr);
+    }
+    if(Strings.isNullOrEmpty(teHost)) {
+      throw new WebApplicationException("Invalid TE host" + teHost);
+    }
+    if (Strings.isNullOrEmpty(smtpHost)) {
+      throw new WebApplicationException("invalid smtp host" + smtpHost);
+    }
+    AnomalyReportGenerator anomalyReportGenerator = AnomalyReportGenerator.getInstance();
+    List<MergedAnomalyResultDTO> anomalies = anomalyReportGenerator
+        .getAnomaliesForDatasets(Arrays.asList(dataSetArr), startTime, endTime);
+    ThirdEyeAnomalyConfiguration configuration = new ThirdEyeAnomalyConfiguration();
+    SmtpConfiguration smtpConfiguration = new SmtpConfiguration();
+    smtpConfiguration.setSmtpHost(smtpHost);
+    smtpConfiguration.setSmtpPort(smtpPort);
+
+    configuration.setSmtpConfiguration(smtpConfiguration);
+    configuration.setDashboardHost(teHost);
+
+    anomalyReportGenerator
+        .buildReport(startTime, endTime, anomalies, "Thirdeye Anomaly Report", configuration,
+            includeSentAnomaliesOnly, toAddr, fromAddr, "UI-Generated");
+    return Response.ok().build();
+  }
+
+  @GET
+  @Path("generate/metrics/{startTime}/{endTime}")
+  public Response generateAndSendAlertForMetrics(@PathParam("startTime") Long startTime,
+      @PathParam("endTime") Long endTime, @QueryParam("metrics") String metrics,
+      @QueryParam("from") String fromAddr, @QueryParam("to") String toAddr,
+      @QueryParam("includeSentAnomaliesOnly") boolean includeSentAnomaliesOnly,
+      @QueryParam("teHost") String teHost,  @QueryParam("smtpHost") String smtpHost, @QueryParam("smtpPort") int smtpPort) {
+    if (Strings.isNullOrEmpty(metrics)) {
+      throw new WebApplicationException("metrics null or empty: " + metrics);
+    }
+    String [] metricsArr = metrics.split(",");
+    if (metricsArr.length == 0) {
+      throw new WebApplicationException("metrics empty : " + metricsArr);
+    }
+    if (Strings.isNullOrEmpty(toAddr)) {
+      throw new WebApplicationException("Empty : list of recipients" + toAddr);
+    }
+    if(Strings.isNullOrEmpty(teHost)) {
+      throw new WebApplicationException("Invalid TE host" + teHost);
+    }
+    if (Strings.isNullOrEmpty(smtpHost)) {
+      throw new WebApplicationException("invalid smtp host" + smtpHost);
+    }
+    AnomalyReportGenerator anomalyReportGenerator = AnomalyReportGenerator.getInstance();
+    List<MergedAnomalyResultDTO> anomalies = anomalyReportGenerator
+        .getAnomaliesForMetrics(Arrays.asList(metricsArr), startTime, endTime);
+    ThirdEyeAnomalyConfiguration configuration = new ThirdEyeAnomalyConfiguration();
+    SmtpConfiguration smtpConfiguration = new SmtpConfiguration();
+    smtpConfiguration.setSmtpHost(smtpHost);
+    smtpConfiguration.setSmtpPort(smtpPort);
+
+    configuration.setSmtpConfiguration(smtpConfiguration);
+    configuration.setDashboardHost(teHost);
+
+    anomalyReportGenerator
+        .buildReport(startTime, endTime, anomalies, "Thirdeye Anomaly Report", configuration,
+            includeSentAnomaliesOnly, toAddr, fromAddr, "UI-Generated");
+    return Response.ok().build();
   }
 }

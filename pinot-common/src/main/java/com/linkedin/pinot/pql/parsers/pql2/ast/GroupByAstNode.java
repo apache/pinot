@@ -17,22 +17,29 @@ package com.linkedin.pinot.pql.parsers.pql2.ast;
 
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.GroupBy;
-import com.linkedin.pinot.pql.parsers.Pql2CompilationException;
 
 
 /**
  * AST node for GROUP BY clauses.
  */
 public class GroupByAstNode extends BaseAstNode {
+
   @Override
   public void updateBrokerRequest(BrokerRequest brokerRequest) {
     GroupBy groupBy = new GroupBy();
     for (AstNode astNode : getChildren()) {
       if (astNode instanceof IdentifierAstNode) {
         IdentifierAstNode node = (IdentifierAstNode) astNode;
-        groupBy.addToColumns(node.getName());
+        String groupByColumnName = node.getName();
+        groupBy.addToColumns(groupByColumnName);
+
+        // List of expression contains columns as well as expressions to maintain ordering of group by columns.
+        groupBy.addToExpressions(groupByColumnName);
       } else {
-        throw new Pql2CompilationException("Child of group by clause is not an identifier.");
+        FunctionCallAstNode functionCallAstNode = (FunctionCallAstNode) astNode;
+
+        // Remove all white-space until we start compiling expressions on broker side.
+        groupBy.addToExpressions(functionCallAstNode.getExpression().replaceAll("\\s", ""));
       }
     }
     brokerRequest.setGroupBy(groupBy);

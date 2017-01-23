@@ -28,12 +28,36 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   HEALTHCHECK_BAD_CALLS("healthcheck", true),
   HEALTHCHECK_OK_CALLS("healthcheck", true),
   QUERIES("queries", false),
+
+  // These metrics track the exceptions caught during query execution in broker side.
+  // PQL compile phase.
   REQUEST_COMPILATION_EXCEPTIONS("exceptions", true),
-  REQUEST_FETCH_EXCEPTIONS("exceptions", false),
-  REQUEST_DESERIALIZATION_EXCEPTIONS("exceptions", false),
+  // Query validation phase.
+  QUERY_VALIDATION_EXCEPTIONS("exceptions", false),
+  // Scatter phase.
+  RESOURCE_MISSING_EXCEPTIONS("exceptions", false),
+  NO_SERVER_FOUND_EXCEPTIONS("exceptions", false),
+  // Gather phase.
+  RESPONSE_FETCH_EXCEPTIONS("exceptions", false),
+  // Response deserialize phase.
+  DATA_TABLE_DESERIALIZATION_EXCEPTIONS("exceptions", false),
+  // Reduce responses phase.
+  RESPONSE_MERGE_EXCEPTIONS("exceptions", false),
+
+  // These metrics track the number of bad broker responses.
+  // This metric track the number of broker responses with processing exceptions inside.
+  // The processing exceptions could be caught from both server side and broker side.
+  BROKER_RESPONSES_WITH_PROCESSING_EXCEPTIONS("badResponses", false),
+  // This metric track the number of broker responses with not all servers responded.
+  // (numServersQueried > numServersResponded)
+  BROKER_RESPONSES_WITH_PARTIAL_SERVERS_RESPONDED("badResponses", false),
+
+  // These metrics track the cost of the query.
   DOCUMENTS_SCANNED("documents", false),
+  ENTRIES_SCANNED_IN_FILTER("documents", false),
+  ENTRIES_SCANNED_POST_FILTER("documents", false),
+
   REQUEST_CONNECTION_TIMEOUTS("timeouts", false),
-  REQUEST_CONNECTION_WAIT_TIME_IN_MILLIS("waits", false),
   HELIX_ZOOKEEPER_RECONNECTS("reconnects", true),
 
   // This metric tracks the number of requests dropped by the broker after we get a connection to the server.
@@ -51,12 +75,7 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   LLC_QUERY_COUNT("queries", false),
   HLC_QUERY_COUNT("queries", false),
 
-  // This metric is emitted when DataTableCustomSerDe falls back to Java based de-serialization.
-  // This implies that we have identified an object for which we have not implemented custom ser/de.
-  DATA_TABLE_OBJECT_DESERIALIZATION("dataTableObjectDeserialization", true),
-
-  ROUTING_TABLE_REBUILD_FAILURES("failures", false),
-  ;
+  ROUTING_TABLE_REBUILD_FAILURES("failures", false);
 
   private final String brokerMeterName;
   private final String unit;

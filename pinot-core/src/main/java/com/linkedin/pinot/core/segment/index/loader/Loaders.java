@@ -122,10 +122,10 @@ public class Loaders {
 
     private static SegmentVersion getSegmentVersionToLoad(IndexLoadingConfigMetadata indexLoadingConfigMetadata) {
       if (indexLoadingConfigMetadata == null) {
-        return SegmentVersion.fromStringOrDefault(CommonConstants.Server.DEFAULT_SEGMENT_FORMAT_VERSION);
+        return SegmentVersion.DEFAULT_TABLE_VERSION;
       }
       String versionName = indexLoadingConfigMetadata.segmentVersionToLoad();
-      return SegmentVersion.fromStringOrDefault(versionName);
+      return SegmentVersion.fromString(versionName, SegmentVersion.DEFAULT_TABLE_VERSION);
     }
 
     /**

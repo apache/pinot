@@ -85,6 +85,9 @@ public class SegmentCompletionProtocol {
 
     /** Never sent by the controller, but locally used by the controller during the segmentCommit() processing */
     COMMIT_CONTINUE,
+
+    /** Sent by controller as an acknowledgement to the SegmentStoppedConsuming message */
+    PROCESSED,
   }
 
   public static final String STATUS_KEY = "status";
@@ -92,10 +95,12 @@ public class SegmentCompletionProtocol {
 
   public static final String MSG_TYPE_CONSUMED = "segmentConsumed";
   public static final String MSG_TYPE_COMMMIT = "segmentCommit";
+  public static final String MSG_TYPE_STOPPED_CONSUMING = "segmentStoppedConsuming";
 
   public static final String PARAM_SEGMENT_NAME = "name";
   public static final String PARAM_OFFSET = "offset";
   public static final String PARAM_INSTANCE_ID = "instance";
+  public static final String PARAM_REASON = "reason";
 
   // Canned responses
   public static final Response RESP_NOT_LEADER = new Response(ControllerResponseStatus.NOT_LEADER, -1L);
@@ -103,6 +108,7 @@ public class SegmentCompletionProtocol {
   public static final Response RESP_DISCARD = new Response(ControllerResponseStatus.DISCARD, -1L);
   public static final Response RESP_COMMIT_SUCCESS = new Response(ControllerResponseStatus.COMMIT_SUCCESS, -1L);
   public static final Response RESP_COMMIT_CONTINUE = new Response(ControllerResponseStatus.COMMIT_CONTINUE, -1L);
+  public static final Response RESP_PROCESSED = new Response(ControllerResponseStatus.PROCESSED, -1L);
 
   public static long getMaxSegmentCommitTimeMs() {
     return MAX_SEGMENT_COMMIT_TIME_MS;
@@ -120,11 +126,13 @@ public class SegmentCompletionProtocol {
     final String _segmentName;
     final long _offset;
     final String _instanceId;
+    final String _reason;
 
-    public Request(String segmentName, long offset, String instanceId) {
+    public Request(String segmentName, long offset, String instanceId, String reason) {
       _segmentName = segmentName;
       _instanceId = instanceId;
       _offset = offset;
+      _reason = reason;
     }
 
     public abstract String getUrl(String hostPort);
@@ -133,7 +141,8 @@ public class SegmentCompletionProtocol {
       return "/" + msgType + "?" +
         PARAM_SEGMENT_NAME + "=" + _segmentName + "&" +
         PARAM_OFFSET + "=" + _offset + "&" +
-        PARAM_INSTANCE_ID + "=" + _instanceId;
+        PARAM_INSTANCE_ID + "=" + _instanceId +
+          (_reason == null ? "" : ("&" + PARAM_REASON + "=" + _reason));
     }
   }
 
@@ -145,7 +154,7 @@ public class SegmentCompletionProtocol {
      * @param instanceId Name of the instance reporting this event.
      */
     public SegmentConsumedRequest(String segmentName, long offset, String instanceId) {
-      super(segmentName, offset, instanceId);
+      super(segmentName, offset, instanceId, null);
     }
     @Override
       public String getUrl(final String hostPort) {
@@ -161,12 +170,23 @@ public class SegmentCompletionProtocol {
      * @param instanceId Name of the instance reporting this event.
      */
     public SegmentCommitRequest(String segmentName, long offset, String instanceId) {
-      super(segmentName, offset, instanceId);
+      super(segmentName, offset, instanceId, null);
     }
     @Override
       public String getUrl(final String hostPort) {
         return "http://" + hostPort + getUri(MSG_TYPE_COMMMIT);
       }
+  }
+
+  public static class SegmentStoppedConsuming extends Request {
+
+    public SegmentStoppedConsuming(String segmentName, long offset, String instanceId, String reason) {
+      super(segmentName, offset, instanceId, reason);
+    }
+    @Override
+    public String getUrl(final String hostPort) {
+      return "http://" + hostPort + getUri(MSG_TYPE_STOPPED_CONSUMING);
+    }
   }
 
   public static class Response {

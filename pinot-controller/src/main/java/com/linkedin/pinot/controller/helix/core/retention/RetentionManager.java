@@ -15,7 +15,18 @@
  */
 package com.linkedin.pinot.controller.helix.core.retention;
 
+import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
+import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
+import com.linkedin.pinot.controller.helix.core.retention.strategy.TimeRetentionStrategy;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -24,20 +35,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-
+import javax.annotation.Nonnull;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.linkedin.pinot.common.config.AbstractTableConfig;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
-import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
-import com.linkedin.pinot.controller.helix.core.retention.strategy.TimeRetentionStrategy;
 
 
 /**
@@ -48,28 +50,23 @@ import com.linkedin.pinot.controller.helix.core.retention.strategy.TimeRetention
  *
  */
 public class RetentionManager {
-
   public static final Logger LOGGER = LoggerFactory.getLogger(RetentionManager.class);
 
   private final PinotHelixResourceManager _pinotHelixResourceManager;
 
-  private final Map<String, RetentionStrategy> _tableDeletionStrategy = new HashMap<String, RetentionStrategy>();
-  private final Map<String, List<SegmentZKMetadata>> _segmentMetadataMap = new HashMap<String, List<SegmentZKMetadata>>();
+  private final Map<String, RetentionStrategy> _tableDeletionStrategy = new HashMap<>();
+  private final Map<String, List<SegmentZKMetadata>> _segmentMetadataMap = new HashMap<>();
   private final Object _lock = new Object();
 
   private final ScheduledExecutorService _executorService;
   private final int _runFrequencyInSeconds;
 
-  /**
-   * @param pinotHelixResourceManager
-   * @param runFrequencyInSeconds
-   */
   public RetentionManager(PinotHelixResourceManager pinotHelixResourceManager, int runFrequencyInSeconds) {
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _runFrequencyInSeconds = runFrequencyInSeconds;
     _executorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
       @Override
-      public Thread newThread(Runnable runnable) {
+      public Thread newThread(@Nonnull Runnable runnable) {
         Thread thread = new Thread(runnable);
         thread.setName("PinotRetentionManagerExecutorService");
         return thread;
@@ -141,97 +138,126 @@ public class RetentionManager {
   private void updateDeletionStrategiesForEntireCluster() {
     List<String> tableNames = _pinotHelixResourceManager.getAllPinotTableNames();
     for (String tableName : tableNames) {
-      _tableDeletionStrategy.putAll(retrieveDeletionStrategiesForTable(tableName));
+      updateDeletionStrategyForTable(tableName);
+    }
+  }
+
+  private void updateDeletionStrategyForTable(String tableName) {
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+    assert tableType != null;
+    switch (tableType) {
+      case OFFLINE:
+        updateDeletionStrategyForOfflineTable(tableName);
+        break;
+      case REALTIME:
+        updateDeletionStrategyForRealtimeTable(tableName);
+        break;
+      default:
+        throw new IllegalArgumentException("No table type matches table name: " + tableName);
     }
   }
 
   /**
-   *
-   * @param tableName
-   * @return tableName to RetentionStrategy mapping
+   * Update deletion strategy for offline table.
+   * <ul>
+   *   <li>Keep the current deletion strategy when one of the followings happened:
+   *     <ul>
+   *       <li>Failed to fetch the retention config.</li>
+   *       <li>Push type is not valid (neither 'APPEND' nor 'REFRESH').</li>
+   *     </ul>
+   *   <li>
+   *     Remove the deletion strategy when one of the followings happened:
+   *     <ul>
+   *       <li>Push type is set to 'REFRESH'.</li>
+   *       <li>No valid retention time is set.</li>
+   *     </ul>
+   *   </li>
+   *   <li>Update the deletion strategy when push type is set to 'APPEND' and valid retention time is set.</li>
+   * </ul>
    */
-  private Map<String, RetentionStrategy> retrieveDeletionStrategiesForTable(String tableName) {
-
-    switch (TableNameBuilder.getTableTypeFromTableName(tableName)) {
-      case OFFLINE:
-        return handleOfflineDeletionStrategy(tableName);
-      case REALTIME:
-        return handleRealtimeDeletionStrategy(tableName);
-      default:
-        break;
+  private void updateDeletionStrategyForOfflineTable(String offlineTableName) {
+    // Fetch table config.
+    AbstractTableConfig offlineTableConfig;
+    try {
+      offlineTableConfig =
+          ZKMetadataProvider.getOfflineTableConfig(_pinotHelixResourceManager.getPropertyStore(), offlineTableName);
+      if (offlineTableConfig == null) {
+        LOGGER.error("Table config is null, skip updating deletion strategy for table: {}.", offlineTableName);
+        return;
+      }
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while fetching table config, skip updating deletion strategy for table: {}.",
+          offlineTableName, e);
+      return;
     }
-    throw new UnsupportedOperationException("Not support resource type for table name - " + tableName);
+
+    // Fetch validation config.
+    SegmentsValidationAndRetentionConfig validationConfig = offlineTableConfig.getValidationConfig();
+    if (validationConfig == null) {
+      LOGGER.error("Validation config is null, skip updating deletion strategy for table: {}.", offlineTableName);
+      return;
+    }
+
+    // Fetch push type.
+    String segmentPushType = validationConfig.getSegmentPushType();
+    if ((segmentPushType == null)
+        || (!segmentPushType.equalsIgnoreCase("APPEND") && !segmentPushType.equalsIgnoreCase("REFRESH"))) {
+      LOGGER.error(
+          "Segment push type: {} is not valid ('APPEND' or 'REFRESH'), skip updating deletion strategy for table: {}.",
+          segmentPushType, offlineTableName);
+      return;
+    }
+    if (segmentPushType.equalsIgnoreCase("REFRESH")) {
+      LOGGER.info("Segment push type is set to 'REFRESH', remove deletion strategy for table: {}.", offlineTableName);
+      _tableDeletionStrategy.remove(offlineTableName);
+      return;
+    }
+
+    // Fetch retention time unit and value.
+    String retentionTimeUnit = validationConfig.getRetentionTimeUnit();
+    String retentionTimeValue = validationConfig.getRetentionTimeValue();
+    if (((retentionTimeUnit == null) || retentionTimeUnit.isEmpty())
+        || ((retentionTimeValue == null) || retentionTimeValue.isEmpty())) {
+      LOGGER.info("Retention time unit/value is not set, remove deletion strategy for table: {}.", offlineTableName);
+      _tableDeletionStrategy.remove(offlineTableName);
+      return;
+    }
+
+    // Update time retention strategy.
+    try {
+      TimeRetentionStrategy timeRetentionStrategy = new TimeRetentionStrategy(retentionTimeUnit, retentionTimeValue);
+      _tableDeletionStrategy.put(offlineTableName, timeRetentionStrategy);
+      LOGGER.info("Updated deletion strategy for table: {} using retention time: {} {}.", offlineTableName,
+          retentionTimeValue, retentionTimeUnit);
+    } catch (Exception e) {
+      LOGGER.error(
+          "Caught exception while building deletion strategy with retention time: {} {], remove deletion strategy for table: {}.",
+          retentionTimeValue, retentionTimeUnit, offlineTableName);
+      _tableDeletionStrategy.remove(offlineTableName);
+    }
   }
 
-  private Map<String, RetentionStrategy> handleOfflineDeletionStrategy(String offlineTableName) {
-    Map<String, RetentionStrategy> tableToDeletionStrategyMap = new HashMap<String, RetentionStrategy>();
-
+  /**
+   * Update deletion strategy for realtime table.
+   * <ul>
+   *   <li>Keep the current deletion strategy when failed to get a valid retention time</li>
+   *   <li>Update the deletion strategy when valid retention time is set.</li>
+   * </ul>
+   * The reason for this is that we don't allow realtime table without deletion strategy.
+   */
+  private void updateDeletionStrategyForRealtimeTable(String realtimeTableName) {
     try {
-      AbstractTableConfig offlineTableConfig;
-
-      try {
-        offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_pinotHelixResourceManager.getPropertyStore(), offlineTableName);
-      } catch (Exception e) {
-        LOGGER.error("Error getting offline table config from property store!", e);
-        return tableToDeletionStrategyMap;
-      }
-
-      if (offlineTableConfig == null || offlineTableConfig.getValidationConfig() == null) {
-        LOGGER.info("Table config null for table: {}, treating it as refresh only table.", offlineTableName);
-        return tableToDeletionStrategyMap;
-      }
-
-      SegmentsValidationAndRetentionConfig validationConfig = offlineTableConfig.getValidationConfig();
-
-      if (validationConfig.getSegmentPushType() == null || validationConfig.getSegmentPushType().isEmpty()) {
-        LOGGER.info("Segment push type for table {} is empty, skipping retention processing", offlineTableName);
-        return tableToDeletionStrategyMap;
-      }
-
-      if ("REFRESH".equalsIgnoreCase(validationConfig.getSegmentPushType())) {
-        LOGGER.info("Table: {} is a refresh only table.", offlineTableName);
-        return tableToDeletionStrategyMap;
-      }
-
-      LOGGER.info("Building retention strategy for table {} with configuration {}", offlineTableName, validationConfig);
-
-      final String retentionTimeUnit = validationConfig.getRetentionTimeUnit();
-      final String retentionTimeValue = validationConfig.getRetentionTimeValue();
-
-      if (retentionTimeUnit == null || retentionTimeUnit.isEmpty() || retentionTimeValue == null || retentionTimeValue.isEmpty()) {
-        LOGGER.info("Table {} has an invalid retention period of {} {}, skipping", offlineTableName,
-            retentionTimeValue, retentionTimeUnit);
-        return tableToDeletionStrategyMap;
-      }
-
-      TimeRetentionStrategy timeRetentionStrategy = new TimeRetentionStrategy(retentionTimeUnit,
-          retentionTimeValue);
-      tableToDeletionStrategyMap.put(offlineTableName, timeRetentionStrategy);
+      AbstractTableConfig realtimeTableConfig =
+          ZKMetadataProvider.getRealtimeTableConfig(_pinotHelixResourceManager.getPropertyStore(), realtimeTableName);
+      assert realtimeTableConfig != null;
+      SegmentsValidationAndRetentionConfig validationConfig = realtimeTableConfig.getValidationConfig();
+      TimeRetentionStrategy timeRetentionStrategy =
+          new TimeRetentionStrategy(validationConfig.getRetentionTimeUnit(), validationConfig.getRetentionTimeValue());
+      _tableDeletionStrategy.put(realtimeTableName, timeRetentionStrategy);
     } catch (Exception e) {
-      LOGGER.error("Error creating TimeRetentionStrategy for table: {}", offlineTableName, e);
+      LOGGER.error("Caught exception while updating deletion strategy, skip updating deletion strategy for table: {}.",
+          realtimeTableName, e);
     }
-
-    return tableToDeletionStrategyMap;
-  }
-
-  private Map<String, RetentionStrategy> handleRealtimeDeletionStrategy(String realtimeTableName) {
-    Map<String, RetentionStrategy> tableToDeletionStrategyMap = new HashMap<String, RetentionStrategy>();
-
-    AbstractTableConfig realtimeTableConfig;
-    try {
-      realtimeTableConfig = ZKMetadataProvider.getRealtimeTableConfig(_pinotHelixResourceManager.getPropertyStore(), realtimeTableName);
-    } catch (Exception e) {
-      LOGGER.error("Error getting realtime table config from property store!", e);
-      return tableToDeletionStrategyMap;
-    }
-    try {
-      TimeRetentionStrategy timeRetentionStrategy = new TimeRetentionStrategy(realtimeTableConfig.getValidationConfig().getRetentionTimeUnit(),
-          realtimeTableConfig.getValidationConfig().getRetentionTimeValue());
-      tableToDeletionStrategyMap.put(realtimeTableName, timeRetentionStrategy);
-    } catch (Exception e) {
-      LOGGER.error("Error creating TimeRetentionStrategy for table {}", realtimeTableName, e);
-    }
-    return tableToDeletionStrategyMap;
   }
 
   private void updateSegmentMetadataForEntireCluster() {
@@ -242,31 +268,32 @@ public class RetentionManager {
   }
 
   private List<SegmentZKMetadata> retrieveSegmentMetadataForTable(String tableName) {
-    List<SegmentZKMetadata> segmentMetadataList = new ArrayList<SegmentZKMetadata>();
-    switch (TableNameBuilder.getTableTypeFromTableName(tableName)) {
+    List<SegmentZKMetadata> segmentMetadataList = new ArrayList<>();
+    ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+    assert tableType != null;
+    switch (tableType) {
       case OFFLINE:
         List<OfflineSegmentZKMetadata> offlineSegmentZKMetadatas =
-            ZKMetadataProvider.getOfflineSegmentZKMetadataListForTable(_pinotHelixResourceManager.getPropertyStore(), tableName);
+            ZKMetadataProvider.getOfflineSegmentZKMetadataListForTable(propertyStore, tableName);
         for (OfflineSegmentZKMetadata offlineSegmentZKMetadata : offlineSegmentZKMetadatas) {
           segmentMetadataList.add(offlineSegmentZKMetadata);
         }
         break;
       case REALTIME:
         List<RealtimeSegmentZKMetadata> realtimeSegmentZKMetadatas =
-            ZKMetadataProvider.getRealtimeSegmentZKMetadataListForTable(_pinotHelixResourceManager.getPropertyStore(), tableName);
+            ZKMetadataProvider.getRealtimeSegmentZKMetadataListForTable(propertyStore, tableName);
         for (RealtimeSegmentZKMetadata realtimeSegmentZKMetadata : realtimeSegmentZKMetadatas) {
           segmentMetadataList.add(realtimeSegmentZKMetadata);
         }
         break;
       default:
-        break;
+        throw new IllegalArgumentException("No table type matches table name: " + tableName);
     }
     return segmentMetadataList;
   }
 
   public void stop() {
     _executorService.shutdown();
-
   }
-
 }

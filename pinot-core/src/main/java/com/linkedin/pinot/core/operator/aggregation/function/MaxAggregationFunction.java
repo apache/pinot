@@ -15,151 +15,120 @@
  */
 package com.linkedin.pinot.core.operator.aggregation.function;
 
-import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.aggregation.AggregationResultHolder;
+import com.linkedin.pinot.core.operator.aggregation.DoubleAggregationResultHolder;
+import com.linkedin.pinot.core.operator.aggregation.groupby.DoubleGroupByResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupByResultHolder;
-import java.util.List;
+import javax.annotation.Nonnull;
 
 
-/**
- * Aggregation function to perform the 'max' operation.
- *
- */
-public class MaxAggregationFunction implements AggregationFunction {
-  private static final String FUNCTION_NAME = AggregationFunctionFactory.MAX_AGGREGATION_FUNCTION;
-  private static final double DEFAULT_VALUE = Double.NEGATIVE_INFINITY;
-  private static final ResultDataType RESULT_DATA_TYPE = ResultDataType.DOUBLE;
+public class MaxAggregationFunction implements AggregationFunction<Double, Double> {
+  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.MAX.getName();
+  private static final double DEFAULT_INITIAL_VALUE = Double.NEGATIVE_INFINITY;
 
-  /**
-   * Performs 'max' aggregation on the input array.
-   * Returns {@value #DEFAULT_VALUE} if the input array is empty.
-   *
-   * While the interface allows for variable number of valueArrays, we do not support
-   * multiple columns within one aggregation function right now.
-   *
-   * {@inheritDoc}
-   *
-   * @param length
-   * @param resultHolder
-   * @param valueArray
-   */
+  @Nonnull
   @Override
-  public void aggregate(int length, AggregationResultHolder resultHolder, Object... valueArray) {
-    Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkArgument(valueArray[0] instanceof double[]);
-    final double[] values = (double[]) valueArray[0];
-    Preconditions.checkState(length <= values.length);
-
-    double max = DEFAULT_VALUE;
-    for (int i = 0; i < length; i++) {
-      if (values[i] > max) {
-        max = values[i];
-      }
-    }
-
-    double oldValue = resultHolder.getDoubleResult();
-    if (max > oldValue) {
-      resultHolder.setValue(max);
-    }
+  public String getName() {
+    return NAME;
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * While the interface allows for variable number of valueArrays, we do not support
-   * multiple columns within one aggregation function right now.
-   *
-   * @param length
-   * @param groupKeys
-   * @param resultHolder
-   * @param valueArray
-   */
+  @Nonnull
   @Override
-  public void aggregateGroupBySV(int length, int[] groupKeys, GroupByResultHolder resultHolder, Object... valueArray) {
-    Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkArgument(valueArray[0] instanceof double[]);
-    final double[] values = (double[]) valueArray[0];
-    Preconditions.checkState(length <= values.length);
+  public String getColumnName(@Nonnull String[] columns) {
+    return NAME + "_" + columns[0];
+  }
 
+  @Override
+  public void accept(@Nonnull AggregationFunctionVisitorBase visitor) {
+    visitor.visit(this);
+  }
+
+  @Nonnull
+  @Override
+  public AggregationResultHolder createAggregationResultHolder() {
+    return new DoubleAggregationResultHolder(DEFAULT_INITIAL_VALUE);
+  }
+
+  @Nonnull
+  @Override
+  public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity, int trimSize) {
+    return new DoubleGroupByResultHolder(initialCapacity, maxCapacity, trimSize, DEFAULT_INITIAL_VALUE);
+  }
+
+  @Override
+  public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
+      @Nonnull BlockValSet... blockValSets) {
+    double[] valueArray = blockValSets[0].getDoubleValuesSV();
+    double max = aggregationResultHolder.getDoubleResult();
     for (int i = 0; i < length; i++) {
-      int groupKey = groupKeys[i];
-      double oldValue = resultHolder.getDoubleResult(groupKey);
-      if (values[i] > oldValue) {
-        resultHolder.setValueForKey(groupKey, values[i]);
+      double value = valueArray[i];
+      if (value > max) {
+        max = value;
+      }
+    }
+    aggregationResultHolder.setValue(max);
+  }
+
+  @Override
+  public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+    double[] valueArray = blockValSets[0].getDoubleValuesSV();
+    for (int i = 0; i < length; i++) {
+      double value = valueArray[i];
+      int groupKey = groupKeyArray[i];
+      if (value > groupByResultHolder.getDoubleResult(groupKey)) {
+        groupByResultHolder.setValueForKey(groupKey, value);
       }
     }
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * @param length
-   * @param docIdToGroupKey
-   * @param resultHolder
-   * @param valueArray
-   */
   @Override
-  public void aggregateGroupByMV(int length, int[][] docIdToGroupKey, GroupByResultHolder resultHolder,
-      Object... valueArray) {
-    Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkArgument(valueArray[0] instanceof double[]);
-    final double[] values = (double[]) valueArray[0];
-    Preconditions.checkState(length <= values.length);
-
-    for (int i = 0; i < length; ++i) {
-      for (int groupKey : docIdToGroupKey[i]) {
-        double oldValue = resultHolder.getDoubleResult(groupKey);
-        if (values[i] > oldValue) {
-          resultHolder.setValueForKey(groupKey, values[i]);
+  public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+    double[] valueArray = blockValSets[0].getDoubleValuesSV();
+    for (int i = 0; i < length; i++) {
+      double value = valueArray[i];
+      for (int groupKey : groupKeysArray[i]) {
+        if (value > groupByResultHolder.getDoubleResult(groupKey)) {
+          groupByResultHolder.setValueForKey(groupKey, value);
         }
       }
     }
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * @param combinedResult
-   * @return
-   */
+  @Nonnull
   @Override
-  public Double reduce(List<Object> combinedResult) {
-    double reducedResult = DEFAULT_VALUE;
+  public Double extractAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder) {
+    return aggregationResultHolder.getDoubleResult();
+  }
 
-    for (Object object : combinedResult) {
-      double result = (Double) object;
-      if (result > reducedResult) {
-        reducedResult = result;
-      }
+  @Nonnull
+  @Override
+  public Double extractGroupByResult(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
+    return groupByResultHolder.getDoubleResult(groupKey);
+  }
+
+  @Nonnull
+  @Override
+  public Double merge(@Nonnull Double intermediateResult1, @Nonnull Double intermediateResult2) {
+    if (intermediateResult1 > intermediateResult2) {
+      return intermediateResult1;
+    } else {
+      return intermediateResult2;
     }
-    return reducedResult;
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * @return
-   */
+  @Nonnull
   @Override
-  public double getDefaultValue() {
-    return DEFAULT_VALUE;
+  public FieldSpec.DataType getIntermediateResultDataType() {
+    return FieldSpec.DataType.DOUBLE;
   }
 
-  /**
-   * {@inheritDoc}
-   * @return
-   */
+  @Nonnull
   @Override
-  public ResultDataType getResultDataType() {
-    return RESULT_DATA_TYPE;
-  }
-
-  /**
-   * {@inheritDoc}
-   * @return
-   */
-  @Override
-  public String getName() {
-    return FUNCTION_NAME;
+  public Double extractFinalResult(@Nonnull Double intermediateResult) {
+    return intermediateResult;
   }
 }

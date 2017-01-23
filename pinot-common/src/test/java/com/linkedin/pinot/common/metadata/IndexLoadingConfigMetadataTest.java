@@ -34,7 +34,7 @@ public class IndexLoadingConfigMetadataTest {
     IndexLoadingConfigMetadata indexLoadingConfigMetadata = new IndexLoadingConfigMetadata(resourceMetadata);
     Set<String> loadingInvertedIndexColumns = indexLoadingConfigMetadata.getLoadingInvertedIndexColumns();
 
-    System.out.println("loadingInvertedIndexColumns is " + Arrays.toString(loadingInvertedIndexColumns.toArray(new String[0])));
+//    System.out.println("loadingInvertedIndexColumns is " + Arrays.toString(loadingInvertedIndexColumns.toArray(new String[0])));
     Assert.assertEquals(10, loadingInvertedIndexColumns.size());
     for (int j = 0; j < 10; ++j) {
       String columnName = "col" + j;

@@ -19,16 +19,16 @@
 <suite name="pinot-core">
   <test name="SingleValueQueriesTest">
     <classes>
-      <class name="com.linkedin.pinot.queries.BaseSingleValueQueriesTest"/>
-      <class name="com.linkedin.pinot.queries.AggregationSingleValueQueriesTest"/>
-      <class name="com.linkedin.pinot.queries.SelectionSingleValueQueriesTest"/>
+      <class name="com.linkedin.pinot.queries.InnerSegmentSelectionSingleValueQueriesTest"/>
+      <class name="com.linkedin.pinot.queries.InnerSegmentAggregationSingleValueQueriesTest"/>
+      <class name="com.linkedin.pinot.queries.InterSegmentAggregationSingleValueQueriesTest"/>
     </classes>
   </test>
   <test name="MultiValueQueriesTest">
     <classes>
-      <class name="com.linkedin.pinot.queries.BaseMultiValueQueriesTest"/>
-      <class name="com.linkedin.pinot.queries.AggregationMultiValueQueriesTest"/>
-      <class name="com.linkedin.pinot.queries.SelectionMultiValueQueriesTest"/>
+      <class name="com.linkedin.pinot.queries.InnerSegmentSelectionMultiValueQueriesTest"/>
+      <class name="com.linkedin.pinot.queries.InnerSegmentAggregationMultiValueQueriesTest"/>
+      <class name="com.linkedin.pinot.queries.InterSegmentAggregationMultiValueQueriesTest"/>
     </classes>
   </test>
 </suite>

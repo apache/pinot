@@ -85,13 +85,18 @@ public class RealtimeSegmentRecordReader extends BaseRecordReader {
 
   @Override
   public GenericRow next() {
+    return next(new GenericRow());
+  }
+
+  @Override
+  public GenericRow next(GenericRow row) {
     if (docIdIterator == null) {
-      GenericRow row = realtimeSegment.getRawValueRowAt(counter);
+      row = realtimeSegment.getRawValueRowAt(counter, row);
       counter++;
       return row;
     }
     int docId = docIdIterator.next();
-    return realtimeSegment.getRawValueRowAt(docId);
+    return realtimeSegment.getRawValueRowAt(docId, row);
   }
 
   @Override

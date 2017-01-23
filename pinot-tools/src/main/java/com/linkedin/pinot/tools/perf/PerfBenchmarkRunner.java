@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import org.kohsuke.args4j.CmdLineParser;
 import org.kohsuke.args4j.Option;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -87,7 +88,7 @@ public class PerfBenchmarkRunner extends AbstractBaseCommand implements Command 
 
   @Override
   public String description() {
-    return "Start Pinot cluster with optional preloaded segments";
+    return "Start Pinot cluster with optional preloaded segments.";
   }
 
   @Override
@@ -164,6 +165,25 @@ public class PerfBenchmarkRunner extends AbstractBaseCommand implements Command 
         tableConfigured = true;
       }
       driver.addSegment(segmentMetadata);
+    }
+  }
+
+  /**
+   * Main method for the class.
+   *
+   * @param args arguments for the perf benchmark runner.
+   * @throws Exception
+   */
+  public static void main(String[] args)
+      throws Exception {
+    PerfBenchmarkRunner perfBenchmarkRunner = new PerfBenchmarkRunner();
+    CmdLineParser parser = new CmdLineParser(perfBenchmarkRunner);
+    parser.parseArgument(args);
+
+    if (perfBenchmarkRunner._help) {
+      perfBenchmarkRunner.printUsage();
+    } else {
+      perfBenchmarkRunner.execute();
     }
   }
 }

@@ -27,7 +27,7 @@ public final class UnSortedSingleValueIterator extends BlockSingleValIterator {
   private ColumnMetadata columnMetadata;
   private SingleColumnSingleValueReader sVReader;
 
-  
+
   public UnSortedSingleValueIterator(SingleColumnSingleValueReader sVReader,
       ColumnMetadata columnMetadata) {
     super();
@@ -58,6 +58,14 @@ public final class UnSortedSingleValueIterator extends BlockSingleValIterator {
     }
 
     return sVReader.getInt(counter++);
+  }
+
+  @Override
+  public String nextStringVal() {
+    if (counter >= columnMetadata.getTotalDocs()) {
+      return null;
+    }
+    return sVReader.getString(counter++);
   }
 
   @Override

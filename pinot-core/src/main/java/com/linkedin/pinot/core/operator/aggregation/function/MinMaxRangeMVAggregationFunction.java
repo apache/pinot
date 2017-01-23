@@ -15,42 +15,36 @@
  */
 package com.linkedin.pinot.core.operator.aggregation.function;
 
-import com.google.common.base.Preconditions;
+import com.linkedin.pinot.core.common.BlockValSet;
 import com.linkedin.pinot.core.operator.aggregation.AggregationResultHolder;
 import com.linkedin.pinot.core.operator.aggregation.groupby.GroupByResultHolder;
-import com.linkedin.pinot.core.query.utils.Pair;
-import java.util.List;
+import javax.annotation.Nonnull;
 
 
-/**
- * Class to implement the 'minmaxrange' aggregation function.
- */
-public class MinMaxRangeMVAggregationFunction implements AggregationFunction {
-  private static final String FUNCTION_NAME = AggregationFunctionFactory.MINMAXRANGE_MV_AGGREGATION_FUNCTION;
-  private static final ResultDataType RESULT_DATA_TYPE = ResultDataType.MINMAXRANGE_PAIR;
+public class MinMaxRangeMVAggregationFunction extends MinMaxRangeAggregationFunction {
+  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.MINMAXRANGEMV.getName();
 
-  /**
-   * Performs 'minmaxrange' aggregation on the input array.
-   *
-   * {@inheritDoc}
-   *
-   * @param length
-   * @param resultHolder
-   * @param valueArrayArray
-   */
+  @Nonnull
   @Override
-  public void aggregate(int length, AggregationResultHolder resultHolder, Object... valueArrayArray) {
-    Preconditions.checkArgument(valueArrayArray.length == 1);
-    Preconditions.checkArgument(valueArrayArray[0] instanceof double[][]);
-    final double[][] values = (double[][]) valueArrayArray[0];
-    Preconditions.checkState(length <= values.length);
+  public String getName() {
+    return NAME;
+  }
 
+  @Nonnull
+  @Override
+  public String getColumnName(@Nonnull String[] columns) {
+    return NAME + "_" + columns[0];
+  }
+
+  @Override
+  public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
+      @Nonnull BlockValSet... blockValSets) {
+    double[][] valuesArray = blockValSets[0].getDoubleValuesMV();
     double min = Double.POSITIVE_INFINITY;
     double max = Double.NEGATIVE_INFINITY;
-
     for (int i = 0; i < length; i++) {
-      for (int j = 0; j < values[i].length; ++j) {
-        double value = values[i][j];
+      double[] values = valuesArray[i];
+      for (double value : values) {
         if (value < min) {
           min = value;
         }
@@ -59,126 +53,41 @@ public class MinMaxRangeMVAggregationFunction implements AggregationFunction {
         }
       }
     }
-
-    Pair<Double, Double> rangeValue = resultHolder.getResult();
-    if (rangeValue == null) {
-      rangeValue = new Pair<>(min, max);
-      resultHolder.setValue(rangeValue);
-    } else {
-      if (min < rangeValue.getFirst()) {
-        rangeValue.setFirst(min);
-      }
-      if (max > rangeValue.getSecond()) {
-        rangeValue.setSecond(max);
-      }
-    }
+    setAggregationResult(aggregationResultHolder, min, max);
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * While the interface allows for variable number of valueArrays, we do not support
-   * multiple columns within one aggregation function right now.
-   *
-   * @param length
-   * @param groupKeys
-   * @param resultHolder
-   * @param valueArray
-   */
   @Override
-  public void aggregateGroupBySV(int length, int[] groupKeys, GroupByResultHolder resultHolder, Object... valueArray) {
-    Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkArgument(valueArray[0] instanceof double[][]);
-    final double[][] values = (double[][]) valueArray[0];
-    Preconditions.checkState(length <= values.length);
-
+  public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+    double[][] valuesArray = blockValSets[0].getDoubleValuesMV();
     for (int i = 0; i < length; i++) {
-      int groupKey = groupKeys[i];
-      for (double value : values[i]) {
-        Pair<Double, Double> rangeValue = resultHolder.getResult(groupKey);
-        if (rangeValue == null) {
-          rangeValue = new Pair<>(value, value);
-          resultHolder.setValueForKey(groupKey, rangeValue);
-        } else {
-          if (value < rangeValue.getFirst()) {
-            rangeValue.setFirst(value);
-          }
-          if (value > rangeValue.getSecond()) {
-            rangeValue.setSecond(value);
-          }
-        }
+      aggregateOnGroupKey(groupKeyArray[i], groupByResultHolder, valuesArray[i]);
+    }
+  }
+
+  @Override
+  public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+    double[][] valuesArray = blockValSets[0].getDoubleValuesMV();
+    for (int i = 0; i < length; i++) {
+      double[] values = valuesArray[i];
+      for (int groupKey : groupKeysArray[i]) {
+        aggregateOnGroupKey(groupKey, groupByResultHolder, values);
       }
     }
   }
 
-  /**
-   * {@inheritDoc}
-   *
-   * @param length
-   * @param docIdToGroupKeys
-   * @param resultHolder
-   * @param valueArray
-   */
-  @Override
-  public void aggregateGroupByMV(int length, int[][] docIdToGroupKeys, GroupByResultHolder resultHolder,
-      Object... valueArray) {
-    Preconditions.checkArgument(valueArray.length == 1);
-    Preconditions.checkArgument(valueArray[0] instanceof double[][]);
-    final double[][] values = (double[][]) valueArray[0];
-    Preconditions.checkState(length <= values.length);
-    for (int i = 0; i < length; ++i) {
-      for (double value : values[i]) {
-        for (int groupKey : docIdToGroupKeys[i]) {
-          Pair<Double, Double> rangeValue = resultHolder.getResult(groupKey);
-          if (rangeValue == null) {
-            rangeValue = new Pair<>(value, value);
-            resultHolder.setValueForKey(groupKey, rangeValue);
-          } else {
-            if (value < rangeValue.getFirst()) {
-              rangeValue.setFirst(value);
-            }
-            if (value > rangeValue.getSecond()) {
-              rangeValue.setSecond(value);
-            }
-          }
-        }
+  private void aggregateOnGroupKey(int groupKey, @Nonnull GroupByResultHolder groupByResultHolder, double[] values) {
+    double min = Double.POSITIVE_INFINITY;
+    double max = Double.NEGATIVE_INFINITY;
+    for (double value : values) {
+      if (value < min) {
+        min = value;
+      }
+      if (value > max) {
+        max = value;
       }
     }
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @return
-   */
-  @Override
-  public double getDefaultValue() {
-    throw new RuntimeException("Unsupported method getDefaultValue() for class " + getClass().getName());
-  }
-
-  /**
-   * {@inheritDoc}
-   * @return
-   */
-  @Override
-  public ResultDataType getResultDataType() {
-    return RESULT_DATA_TYPE;
-  }
-
-  @Override
-  public String getName() {
-    return FUNCTION_NAME;
-  }
-
-  /**
-   * {@inheritDoc}
-   *
-   * @param combinedResult
-   * @return
-   */
-  @Override
-  public Double reduce(List<Object> combinedResult) {
-    throw new RuntimeException(
-        "Unsupported method reduce(List<Object> combinedResult) for class " + getClass().getName());
+    setGroupByResult(groupKey, groupByResultHolder, min, max);
   }
 }

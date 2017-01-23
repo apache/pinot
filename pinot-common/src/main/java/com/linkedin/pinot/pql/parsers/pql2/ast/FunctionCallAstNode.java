@@ -24,13 +24,19 @@ import com.linkedin.pinot.pql.parsers.Pql2CompilationException;
  */
 public class FunctionCallAstNode extends BaseAstNode {
   private final String _name;
+  private String _expression;
 
-  public FunctionCallAstNode(String name) {
+  public FunctionCallAstNode(String name, String expression) {
     _name = name;
+    _expression = expression;
   }
 
   public String getName() {
     return _name;
+  }
+
+  public String getExpression() {
+    return _expression;
   }
 
   public AggregationInfo buildAggregationInfo() {

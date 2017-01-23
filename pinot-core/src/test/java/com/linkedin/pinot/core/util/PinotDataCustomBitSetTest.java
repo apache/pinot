@@ -51,8 +51,8 @@ public class PinotDataCustomBitSetTest {
     bitset.setBit(0);
     bitset.setBit(100);
     bitset.setBit(250);
-    System.out.println(bitset.findNthBitSetAfter(0, 1));
-    System.out.println(bitset.findNthBitSetAfter(100, 1));
+//    System.out.println(bitset.findNthBitSetAfter(0, 1));
+//    System.out.println(bitset.findNthBitSetAfter(100, 1));
     bitset.close();
 
   }
@@ -132,7 +132,7 @@ public class PinotDataCustomBitSetTest {
 
       long nthBitSetAfter = bitset.findNthBitSetAfter(startSearchIndex, nthBitToFind);
       if (nthBitSetAfter != expectedIndex) {
-        System.out.println("Bits set " + bitsOnCopy + ", searching for " + nthBitToFind + "th bit from " + startSearchIndex);
+//        System.out.println("Bits set " + bitsOnCopy + ", searching for " + nthBitToFind + "th bit from " + startSearchIndex);
         nthBitSetAfter = bitset.findNthBitSetAfter(startSearchIndex, nthBitToFind);
       }
       Assert.assertEquals(nthBitSetAfter, expectedIndex, "Bits set " +

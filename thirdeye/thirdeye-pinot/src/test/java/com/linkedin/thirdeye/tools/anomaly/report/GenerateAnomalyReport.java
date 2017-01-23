@@ -6,7 +6,7 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.alert.AlertTaskRunner;
-import com.linkedin.thirdeye.anomaly.alert.EmailHelper;
+import com.linkedin.thirdeye.anomaly.alert.util.EmailHelper;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
@@ -107,61 +107,61 @@ public class GenerateAnomalyReport {
 
     if (anomalies.size() == 0) {
       System.out.println("No anomalies found, please check the report config... exiting");
-      System.exit(-1);
     }
+    else {
+      Set<String> metrics = new HashSet<>();
+      int alertedAnomalies = 0;
+      int feedbackCollected = 0;
+      int trueAlert = 0;
+      int falseAlert = 0;
+      int nonActionable = 0;
 
-    Set<String> metrics = new HashSet<>();
-    int alertedAnomalies = 0;
-    int feedbackCollected = 0;
-    int trueAlert = 0;
-    int falseAlert = 0;
-    int nonActionable = 0;
+      List<AnomalyReportDTO> anomalyReportDTOList = new ArrayList<>();
 
-    List<AnomalyReportDTO> anomalyReportDTOList = new ArrayList<>();
-
-    for (MergedAnomalyResultDTO anomaly : anomalies) {
-      metrics.add(anomaly.getMetric());
-      if (anomaly.getFeedback() != null) {
-        feedbackCollected++;
-        if (anomaly.getFeedback().getFeedbackType().equals(AnomalyFeedbackType.ANOMALY)) {
-          trueAlert++;
-        } else if (anomaly.getFeedback().getFeedbackType().equals(AnomalyFeedbackType.NOT_ANOMALY)) {
-          falseAlert++;
-        } else {
-          nonActionable++;
+      for (MergedAnomalyResultDTO anomaly : anomalies) {
+        metrics.add(anomaly.getMetric());
+        if (anomaly.getFeedback() != null) {
+          feedbackCollected++;
+          if (anomaly.getFeedback().getFeedbackType().equals(AnomalyFeedbackType.ANOMALY)) {
+            trueAlert++;
+          } else if (anomaly.getFeedback().getFeedbackType().equals(AnomalyFeedbackType.NOT_ANOMALY)) {
+            falseAlert++;
+          } else {
+            nonActionable++;
+          }
         }
-      }
-      // include notified alerts only in the email
-      if (anomaly.isNotified()) {
-        alertedAnomalies++;
-
         String feedbackVal = getFeedback(
             anomaly.getFeedback() == null ? "NA" : anomaly.getFeedback().getFeedbackType().name());
 
         AnomalyReportDTO anomalyReportDTO =
             new AnomalyReportDTO(String.valueOf(anomaly.getId()), feedbackVal,
-                String.format("%+.2f",anomaly.getWeight()), anomaly.getMetric(),
-                new Date(anomaly.getStartTime()).toString(),
-                String.format("%.2f",getTimeDiffInHours(anomaly.getStartTime(), anomaly.getEndTime())),
+                String.format("%+.2f", anomaly.getWeight()), anomaly.getMetric(), new Date(anomaly.getStartTime()).toString(),
+                String.format("%.2f", getTimeDiffInHours(anomaly.getStartTime(), anomaly.getEndTime())),
                 getAnomalyURL(anomaly));
 
-        anomalyReportDTOList.add(anomalyReportDTO);
-      }
-    }
+       // anomalyReportDTOList.add(anomalyReportDTO);
 
-    Map<String, Object> templateData = new HashMap<>();
-    templateData.put("startTime", startTime.toString());
-    templateData.put("endTime", endTime.toString());
-    templateData.put("anomalyCount", anomalies.size());
-    templateData.put("metricsCount", metrics.size());
-    templateData.put("notifiedCount", alertedAnomalies);
-    templateData.put("feedbackCount", feedbackCollected);
-    templateData.put("trueAlertCount", trueAlert);
-    templateData.put("falseAlertCount", falseAlert);
-    templateData.put("nonActionableCount", nonActionable);
-    templateData.put("datasets", String.join(", ", collections));
-    templateData.put("anomalyDetails", anomalyReportDTOList);
-    buildEmailTemplateAndSendAlert(templateData);
+        // include notified alerts only in the email
+        if (anomaly.isNotified()) {
+          alertedAnomalies++;
+          anomalyReportDTOList.add(anomalyReportDTO);
+        }
+      }
+
+      Map<String, Object> templateData = new HashMap<>();
+      templateData.put("startTime", startTime.toString());
+      templateData.put("endTime", endTime.toString());
+      templateData.put("anomalyCount", anomalies.size());
+      templateData.put("metricsCount", metrics.size());
+      templateData.put("notifiedCount", alertedAnomalies);
+      templateData.put("feedbackCount", feedbackCollected);
+      templateData.put("trueAlertCount", trueAlert);
+      templateData.put("falseAlertCount", falseAlert);
+      templateData.put("nonActionableCount", nonActionable);
+      templateData.put("datasets", String.join(", ", collections));
+      templateData.put("anomalyDetails", anomalyReportDTOList);
+      buildEmailTemplateAndSendAlert(templateData);
+    }
   }
 
   void buildEmailTemplateAndSendAlert(Map<String, Object> paramMap) {
@@ -176,10 +176,10 @@ public class GenerateAnomalyReport {
       template.process(paramMap, out);
 
       String alertEmailSubject =
-          "Thirdeye custom report for collections : " + paramMap.get("datasets");
+          "Thirdeye : Daily anomaly report";
       String alertEmailHtml = new String(baos.toByteArray(), AlertTaskRunner.CHARSET);
       EmailHelper.sendEmailWithHtml(email, smtpConfiguration, alertEmailSubject, alertEmailHtml,
-          "thirdeye-no-reply@linkedin.com", emailRecipients);
+          "thirdeye-dev@linkedin.com", emailRecipients);
     } catch (Exception e) {
       e.printStackTrace();
     }
@@ -243,7 +243,7 @@ public class GenerateAnomalyReport {
     reportGenerator.buildReport();
     //    reportGenerator.listMetric();
     //    reportGenerator.updateEmailConfig();
-    System.exit(-1);
+    return;
   }
 
   @JsonIgnoreProperties(ignoreUnknown = true)

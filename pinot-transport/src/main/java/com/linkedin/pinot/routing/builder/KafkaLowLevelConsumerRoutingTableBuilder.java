@@ -16,11 +16,6 @@
 
 package com.linkedin.pinot.routing.builder;
 
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.LLCSegmentName;
-import com.linkedin.pinot.common.utils.SegmentName;
-import com.linkedin.pinot.common.utils.SegmentNameBuilder;
-import com.linkedin.pinot.routing.ServerToSegmentSetMap;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -39,14 +34,19 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.LLCSegmentName;
+import com.linkedin.pinot.common.utils.SegmentName;
+import com.linkedin.pinot.routing.ServerToSegmentSetMap;
 
 
 /**
  * Routing table builder for the Kafka low level consumer.
  */
-public class KafkaLowLevelConsumerRoutingTableBuilder implements RoutingTableBuilder {
+public class KafkaLowLevelConsumerRoutingTableBuilder extends AbstractRoutingTableBuilder {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaLowLevelConsumerRoutingTableBuilder.class);
   private static final int routingTableCount = 10;
+  private final Random _random = new Random();
 
   @Override
   public void init(Configuration configuration) {
@@ -105,7 +105,7 @@ public class KafkaLowLevelConsumerRoutingTableBuilder implements RoutingTableBui
     Map<String, SortedSet<SegmentName>> sortedSegmentsByKafkaPartition = new HashMap<String, SortedSet<SegmentName>>();
     for (String helixPartitionName : externalView.getPartitionSet()) {
       // Ignore segments that are not low level consumer segments
-      if (!SegmentNameBuilder.Realtime.isRealtimeV2Name(helixPartitionName)) {
+      if (!SegmentName.isLowLevelConsumerSegmentName(helixPartitionName)) {
         continue;
       }
 
@@ -242,7 +242,7 @@ public class KafkaLowLevelConsumerRoutingTableBuilder implements RoutingTableBui
         String segment = segmentAndValidReplicaSet.getKey();
         Set<String> validReplicaSet = segmentAndValidReplicaSet.getValue();
 
-        String replica = pickWeightedRandomReplica(validReplicaSet, instanceToSegmentSetMap);
+        String replica = pickWeightedRandomReplica(validReplicaSet, instanceToSegmentSetMap, _random);
         if (replica != null) {
           Set<String> segmentsForInstance = instanceToSegmentSetMap.get(replica);
 
@@ -259,64 +259,5 @@ public class KafkaLowLevelConsumerRoutingTableBuilder implements RoutingTableBui
     }
 
     return routingTables;
-  }
-
-  private String pickWeightedRandomReplica(Set<String> validReplicaSet,
-      Map<String, Set<String>> instanceToSegmentSetMap) {
-    Random random = new Random();
-
-    // No replicas?
-    if (validReplicaSet.isEmpty()) {
-      return null;
-    }
-
-    // Only one valid replica?
-    if (validReplicaSet.size() == 1) {
-      return validReplicaSet.iterator().next();
-    }
-
-    // Find maximum segment count assigned to a replica
-    String[] replicas = validReplicaSet.toArray(new String[validReplicaSet.size()]);
-    int[] replicaSegmentCounts = new int[validReplicaSet.size()];
-
-    int maxSegmentCount = 0;
-    for (int i = 0; i < replicas.length; i++) {
-      String replica = replicas[i];
-
-      if (!instanceToSegmentSetMap.containsKey(replica)) {
-        instanceToSegmentSetMap.put(replica, new HashSet<String>());
-      }
-
-      int replicaSegmentCount = instanceToSegmentSetMap.get(replica).size();
-      replicaSegmentCounts[i] = replicaSegmentCount;
-
-      if (maxSegmentCount < replicaSegmentCount) {
-        maxSegmentCount = replicaSegmentCount;
-      }
-    }
-
-    // Compute replica weights
-    int[] replicaWeights = new int[validReplicaSet.size()];
-    int totalReplicaWeights = 0;
-    for (int i = 0; i < replicas.length; i++) {
-      int replicaWeight = maxSegmentCount - replicaSegmentCounts[i];
-      replicaWeights[i] = replicaWeight;
-      totalReplicaWeights += replicaWeight;
-    }
-
-    // If all replicas are equal, just pick a random replica
-    if (totalReplicaWeights == 0) {
-      return replicas[random.nextInt(replicas.length)];
-    }
-
-    // Pick the proper replica given their respective weights
-    int randomValue = random.nextInt(totalReplicaWeights);
-    int i = 0;
-    while(replicaWeights[i] == 0 || replicaWeights[i] <= randomValue) {
-      randomValue -= replicaWeights[i];
-      ++i;
-    }
-
-    return replicas[i];
   }
 }
