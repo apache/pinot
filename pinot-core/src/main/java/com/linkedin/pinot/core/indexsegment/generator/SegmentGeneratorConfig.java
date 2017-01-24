@@ -68,7 +68,7 @@ public class SegmentGeneratorConfig {
   private String _segmentCreationTime = null;
   private String _segmentStartTime = null;
   private String _segmentEndTime = null;
-  private SegmentVersion _segmentVersion = SegmentVersion.v1;
+  private SegmentVersion _segmentVersion = SegmentVersion.v3;
   private String _schemaFile = null;
   private Schema _schema = null;
   private String _readerConfigFile = null;
@@ -78,6 +78,7 @@ public class SegmentGeneratorConfig {
   private StarTreeIndexSpec _starTreeIndexSpec = null;
   private String _creatorVersion = null;
   private char _paddingCharacter = V1Constants.Str.DEFAULT_STRING_PAD_CHAR;
+
   private HllConfig _hllConfig = null;
 
   public SegmentGeneratorConfig() {
@@ -112,6 +113,7 @@ public class SegmentGeneratorConfig {
     _creatorVersion = config._creatorVersion;
     _paddingCharacter = config._paddingCharacter;
     _hllConfig = config._hllConfig;
+    _segmentVersion = config._segmentVersion;
   }
 
   public SegmentGeneratorConfig(Schema schema) {

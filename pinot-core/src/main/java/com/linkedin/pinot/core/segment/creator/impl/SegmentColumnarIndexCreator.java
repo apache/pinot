@@ -52,10 +52,7 @@ import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataK
 
 /**
  * Segment creator which writes data in a columnar form.
- *
- * Nov 9, 2014
  */
-
 public class SegmentColumnarIndexCreator implements SegmentCreator {
   private Logger LOGGER = LoggerFactory.getLogger(SegmentColumnarIndexCreator.class);
 

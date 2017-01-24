@@ -107,6 +107,14 @@ public abstract class SegmentDirectory implements AutoCloseable {
     return new SegmentLocalFSDirectory(directory, metadata, readMode);
   }
 
+  public static SegmentDirectory createFromLocalFS(File directory, ReadMode readMode)
+      throws IOException, ConfigurationException {
+    return new SegmentLocalFSDirectory(directory, readMode);
+  }
+  public static SegmentMetadataImpl loadSegmentMetadata(File directory)
+      throws IOException, ConfigurationException {
+    return SegmentLocalFSDirectory.loadSegmentMetadata(directory);
+  }
   /**
    * Get the path/URL for the directory
    * @return
