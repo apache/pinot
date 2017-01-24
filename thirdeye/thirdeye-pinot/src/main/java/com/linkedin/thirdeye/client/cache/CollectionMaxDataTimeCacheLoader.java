@@ -50,16 +50,16 @@ public class CollectionMaxDataTimeCacheLoader extends CacheLoader<String, Long> 
     try {
       DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(collection);
       // By default, query only offline, unless dataset has been marked as realtime
-      String datasetWithSuffix = ThirdEyeUtils.getDatasetWithOfflineRealtimeSuffix(collection);
+      String tableName = ThirdEyeUtils.computeTableName(collection);
       TimeSpec timeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
       long prevMaxDataTime = getPrevMaxDataTime(collection, timeSpec);
-      String maxTimePql = String.format(COLLECTION_MAX_TIME_QUERY_TEMPLATE, timeSpec.getColumnName(), datasetWithSuffix,
+      String maxTimePql = String.format(COLLECTION_MAX_TIME_QUERY_TEMPLATE, timeSpec.getColumnName(), tableName,
           timeSpec.getColumnName(), prevMaxDataTime);
-      PinotQuery maxTimePinotQuery = new PinotQuery(maxTimePql, datasetWithSuffix);
+      PinotQuery maxTimePinotQuery = new PinotQuery(maxTimePql, tableName);
       resultSetGroupCache.refresh(maxTimePinotQuery);
       ResultSetGroup resultSetGroup = resultSetGroupCache.get(maxTimePinotQuery);
       if (resultSetGroup.getResultSetCount() == 0 || resultSetGroup.getResultSet(0).getRowCount() == 0) {
-        LOGGER.info("resultSetGroup is Empty for collection {} is {}", datasetWithSuffix, resultSetGroup);
+        LOGGER.info("resultSetGroup is Empty for collection {} is {}", tableName, resultSetGroup);
         this.collectionToPrevMaxDataTimeMap.remove(collection);
       } else {
         long endTime = new Double(resultSetGroup.getResultSet(0).getDouble(0)).longValue();

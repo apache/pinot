@@ -320,12 +320,12 @@ public abstract class ThirdEyeUtils {
   }
 
   //By default, query only offline, unless dataset has been marked as realtime
-  public static String getDatasetWithOfflineRealtimeSuffix(String collection) {
+  public static String computeTableName(String collection) {
     String dataset = null;
     try {
       DatasetConfigDTO datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(collection);
       dataset = collection + DatasetConfigBean.DATASET_OFFLINE_PREFIX;
-      if (datasetConfig.isRealtime()) {
+      if (datasetConfig.queryRealtime()) {
         dataset = collection;
       }
     } catch (ExecutionException e) {

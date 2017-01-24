@@ -113,19 +113,19 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     List<ResultSetGroup> resultSetGroups = new ArrayList<>();
 
     // By default, query only offline, unless dataset has been marked as realtime
-    String datasetWithSuffix = ThirdEyeUtils.getDatasetWithOfflineRealtimeSuffix(request.getCollection());
+    String tableName = ThirdEyeUtils.computeTableName(request.getCollection());
 
     if (datasetConfig.isMetricAsDimension()) {
        List<String> pqls = PqlUtils.getMetricAsDimensionPqls(request, dataTimeSpec, datasetConfig);
        for (String pql : pqls) {
          LOG.debug("PQL isMetricAsDimension : {}", pql);
-         ResultSetGroup result = CACHE_REGISTRY_INSTANCE.getResultSetGroupCache().get(new PinotQuery(pql, datasetWithSuffix));
+         ResultSetGroup result = CACHE_REGISTRY_INSTANCE.getResultSetGroupCache().get(new PinotQuery(pql, tableName));
          resultSetGroups.add(result);
        }
     } else {
       String sql = PqlUtils.getPql(request, dataTimeSpec);
       LOG.debug("PQL: {}", sql);
-      ResultSetGroup result = CACHE_REGISTRY_INSTANCE.getResultSetGroupCache().get(new PinotQuery(sql, datasetWithSuffix));
+      ResultSetGroup result = CACHE_REGISTRY_INSTANCE.getResultSetGroupCache().get(new PinotQuery(sql, tableName));
       resultSetGroups.add(result);
       if (LOG.isDebugEnabled()) {
         LOG.debug("Result for: {} {}", sql, format(result));
