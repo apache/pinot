@@ -2,13 +2,10 @@ package com.linkedin.thirdeye.client.pinot;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
-
-import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormat;
@@ -28,6 +25,7 @@ import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 /**
  * Util class for generated PQL queries (pinot).
@@ -102,7 +100,9 @@ public class PqlUtils {
     StringBuilder sb = new StringBuilder();
     String selectionClause = getMetricAsDimensionSelectionClause(metricFunction, metricValuesColumn);
 
-    sb.append("SELECT ").append(selectionClause).append(" FROM ").append(collection);
+    String tableName = ThirdEyeUtils.computeTableName(collection);
+
+    sb.append("SELECT ").append(selectionClause).append(" FROM ").append(tableName);
     String betweenClause = getBetweenClause(startTime, endTimeExclusive, dataTimeSpec, collection);
     sb.append(" WHERE ").append(betweenClause);
 
@@ -129,7 +129,9 @@ public class PqlUtils {
     StringBuilder sb = new StringBuilder();
     String selectionClause = getSelectionClause(metricFunctions);
 
-    sb.append("SELECT ").append(selectionClause).append(" FROM ").append(collection);
+    String tableName = ThirdEyeUtils.computeTableName(collection);
+
+    sb.append("SELECT ").append(selectionClause).append(" FROM ").append(tableName);
     String betweenClause = getBetweenClause(startTime, endTimeExclusive, dataTimeSpec, collection);
     sb.append(" WHERE ").append(betweenClause);
 

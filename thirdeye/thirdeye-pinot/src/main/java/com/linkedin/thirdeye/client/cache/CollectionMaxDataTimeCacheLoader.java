@@ -2,11 +2,12 @@ package com.linkedin.thirdeye.client.cache;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListenableFutureTask;
+
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormat;
@@ -22,6 +23,7 @@ import com.linkedin.thirdeye.client.pinot.PinotQuery;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.datalayer.pojo.DatasetConfigBean;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 public class CollectionMaxDataTimeCacheLoader extends CacheLoader<String, Long> {
@@ -47,15 +49,17 @@ public class CollectionMaxDataTimeCacheLoader extends CacheLoader<String, Long> 
     long maxTime = 0;
     try {
       DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(collection);
+      // By default, query only offline, unless dataset has been marked as realtime
+      String tableName = ThirdEyeUtils.computeTableName(collection);
       TimeSpec timeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
       long prevMaxDataTime = getPrevMaxDataTime(collection, timeSpec);
-      String maxTimePql = String.format(COLLECTION_MAX_TIME_QUERY_TEMPLATE, timeSpec.getColumnName(), collection, timeSpec.getColumnName(),
-          prevMaxDataTime);
-      PinotQuery maxTimePinotQuery = new PinotQuery(maxTimePql, collection);
+      String maxTimePql = String.format(COLLECTION_MAX_TIME_QUERY_TEMPLATE, timeSpec.getColumnName(), tableName,
+          timeSpec.getColumnName(), prevMaxDataTime);
+      PinotQuery maxTimePinotQuery = new PinotQuery(maxTimePql, tableName);
       resultSetGroupCache.refresh(maxTimePinotQuery);
       ResultSetGroup resultSetGroup = resultSetGroupCache.get(maxTimePinotQuery);
       if (resultSetGroup.getResultSetCount() == 0 || resultSetGroup.getResultSet(0).getRowCount() == 0) {
-        LOGGER.info("resultSetGroup is Empty for collection {} is {}", collection, resultSetGroup);
+        LOGGER.info("resultSetGroup is Empty for collection {} is {}", tableName, resultSetGroup);
         this.collectionToPrevMaxDataTimeMap.remove(collection);
       } else {
         long endTime = new Double(resultSetGroup.getResultSet(0).getDouble(0)).longValue();

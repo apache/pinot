@@ -13,6 +13,7 @@ import com.linkedin.thirdeye.api.TimeSpec;
 public class DatasetConfigBean extends AbstractBean {
 
   public static String DEFAULT_PREAGGREGATED_DIMENSION_VALUE = "all";
+  public static String DATASET_OFFLINE_PREFIX = "_OFFLINE";
 
   private String dataset;
 
@@ -44,6 +45,8 @@ public class DatasetConfigBean extends AbstractBean {
   private String preAggregatedKeyword = DEFAULT_PREAGGREGATED_DIMENSION_VALUE;
   private Integer nonAdditiveBucketSize;
   private String nonAdditiveBucketUnit;
+
+  private boolean realtime = false;
 
   public String getDataset() {
     return dataset;
@@ -182,6 +185,15 @@ public class DatasetConfigBean extends AbstractBean {
     this.nonAdditiveBucketUnit = nonAdditiveBucketUnit;
   }
 
+
+  public boolean queryRealtime() {
+    return realtime;
+  }
+
+  public void setRealtime(boolean realtime) {
+    this.realtime = realtime;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (!(o instanceof DatasetConfigBean)) {
@@ -205,14 +217,15 @@ public class DatasetConfigBean extends AbstractBean {
         && Objects.equals(dimensionsHaveNoPreAggregation, dc.getDimensionsHaveNoPreAggregation())
         && Objects.equals(preAggregatedKeyword, dc.getPreAggregatedKeyword())
         && Objects.equals(nonAdditiveBucketUnit, dc.getNonAdditiveBucketUnit())
-        && Objects.equals(nonAdditiveBucketSize, dc.getNonAdditiveBucketSize());
+        && Objects.equals(nonAdditiveBucketSize, dc.getNonAdditiveBucketSize())
+        && Objects.equals(realtime, dc.queryRealtime());
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(getId(), dataset, dimensions, timeColumn, timeUnit, timeDuration, timeFormat, timezone,
         metricAsDimension, metricNamesColumn, metricValuesColumn, autoDiscoverMetrics, active, additive,
-        dimensionsHaveNoPreAggregation, preAggregatedKeyword, nonAdditiveBucketSize, nonAdditiveBucketUnit);
+        dimensionsHaveNoPreAggregation, preAggregatedKeyword, nonAdditiveBucketSize, nonAdditiveBucketUnit, realtime);
   }
 
   @Override
@@ -224,6 +237,6 @@ public class DatasetConfigBean extends AbstractBean {
         .add("autoDiscoverMetrics", autoDiscoverMetrics).add("active", active).add("additive", additive)
         .add("dimensionsHaveNoPreAggregation", dimensionsHaveNoPreAggregation)
         .add("preAggregatedKeyword", preAggregatedKeyword).add("nonAdditiveBucketSize", nonAdditiveBucketSize)
-        .add("nonAdditiveBucketUnit", nonAdditiveBucketUnit).toString();
+        .add("nonAdditiveBucketUnit", nonAdditiveBucketUnit).add("offlineOnly", realtime).toString();
   }
 }

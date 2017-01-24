@@ -44,6 +44,7 @@ import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.DashboardConfigBean;
+import com.linkedin.thirdeye.datalayer.pojo.DatasetConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 
 
@@ -316,6 +317,21 @@ public abstract class ThirdEyeUtils {
   public static String getDefaultDashboardName(String dataset) {
     String dashboardName = DashboardConfigBean.DEFAULT_DASHBOARD_PREFIX + dataset;
     return dashboardName;
+  }
+
+  //By default, query only offline, unless dataset has been marked as realtime
+  public static String computeTableName(String collection) {
+    String dataset = null;
+    try {
+      DatasetConfigDTO datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(collection);
+      dataset = collection + DatasetConfigBean.DATASET_OFFLINE_PREFIX;
+      if (datasetConfig.queryRealtime()) {
+        dataset = collection;
+      }
+    } catch (ExecutionException e) {
+      LOG.error("Exception in getting dataset name {}", collection, e);
+    }
+    return dataset;
   }
 
 }
