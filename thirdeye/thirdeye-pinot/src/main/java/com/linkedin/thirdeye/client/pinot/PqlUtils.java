@@ -2,13 +2,10 @@ package com.linkedin.thirdeye.client.pinot;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
-
-import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormat;
@@ -52,7 +49,7 @@ public class PqlUtils {
     // TODO handle request.getFilterClause()
     return getPql(request.getCollection(), request.getMetricFunctions(),
         request.getStartTimeInclusive(), request.getEndTimeExclusive(), request.getFilterSet(),
-        request.getGroupBy(), request.getGroupByTimeGranularity(), dataTimeSpec);
+        request.getFilterClause(), request.getGroupBy(), request.getGroupByTimeGranularity(), dataTimeSpec);
   }
 
   /**
@@ -74,28 +71,28 @@ public class PqlUtils {
 
     List<String> metricAsDimensionPqls = getMetricAsDimensionPqls(request.getCollection(), request.getMetricFunctions(),
         request.getStartTimeInclusive(), request.getEndTimeExclusive(), request.getFilterSet(),
-        request.getGroupBy(), request.getGroupByTimeGranularity(), dataTimeSpec,
+        request.getFilterClause(), request.getGroupBy(), request.getGroupByTimeGranularity(), dataTimeSpec,
         metricValuesColumn, metricNamesColumn);
 
     return metricAsDimensionPqls;
   }
 
   static List<String> getMetricAsDimensionPqls(String collection, List<MetricFunction> metricFunctions, DateTime startTime,
-      DateTime endTimeExclusive, Multimap<String, String> filterSet, List<String> groupBy,
+      DateTime endTimeExclusive, Multimap<String, String> filterSet, String filterClause, List<String> groupBy,
       TimeGranularity timeGranularity, TimeSpec dataTimeSpec, String metricValuesColumn,
       String metricNamesColumn) throws ExecutionException {
 
     List<String> metricAsDimensionPqls = new ArrayList<>();
     for (MetricFunction metricFunction : metricFunctions) {
-      String metricAsDimensionPql = getMetricAsDimensionPql(collection, metricFunction, startTime, endTimeExclusive, filterSet, groupBy, timeGranularity,
-          dataTimeSpec, metricValuesColumn, metricNamesColumn);
+      String metricAsDimensionPql = getMetricAsDimensionPql(collection, metricFunction, startTime, endTimeExclusive,
+          filterSet, filterClause, groupBy, timeGranularity, dataTimeSpec, metricValuesColumn, metricNamesColumn);
       metricAsDimensionPqls.add(metricAsDimensionPql);
     }
     return metricAsDimensionPqls;
   }
 
   static String getMetricAsDimensionPql(String collection, MetricFunction metricFunction, DateTime startTime,
-      DateTime endTimeExclusive, Multimap<String, String> filterSet, List<String> groupBy,
+      DateTime endTimeExclusive, Multimap<String, String> filterSet, String filterClause, List<String> groupBy,
       TimeGranularity timeGranularity, TimeSpec dataTimeSpec, String metricValuesColumn,
       String metricNamesColumn) throws ExecutionException {
 
@@ -113,6 +110,10 @@ public class PqlUtils {
     if (StringUtils.isNotBlank(dimensionWhereClause)) {
       sb.append(" AND ").append(dimensionWhereClause);
     }
+    if (StringUtils.isNotBlank(filterClause)) {
+      sb.append(" AND ").append("(").append(filterClause).append(")");
+    }
+
     String groupByClause = getDimensionGroupByClause(groupBy, timeGranularity, dataTimeSpec);
     if (StringUtils.isNotBlank(groupByClause)) {
       sb.append(" ").append(groupByClause);
@@ -123,7 +124,7 @@ public class PqlUtils {
   }
 
   static String getPql(String collection, List<MetricFunction> metricFunctions, DateTime startTime,
-      DateTime endTimeExclusive, Multimap<String, String> filterSet, List<String> groupBy,
+      DateTime endTimeExclusive, Multimap<String, String> filterSet, String filterClause, List<String> groupBy,
       TimeGranularity timeGranularity, TimeSpec dataTimeSpec) throws ExecutionException {
 
     StringBuilder sb = new StringBuilder();
@@ -136,6 +137,9 @@ public class PqlUtils {
     String dimensionWhereClause = getDimensionWhereClause(filterSet);
     if (StringUtils.isNotBlank(dimensionWhereClause)) {
       sb.append(" AND ").append(dimensionWhereClause);
+    }
+    if (StringUtils.isNotBlank(filterClause)) {
+      sb.append(" AND ").append("(").append(filterClause).append(")");
     }
     String groupByClause = getDimensionGroupByClause(groupBy, timeGranularity, dataTimeSpec);
     if (StringUtils.isNotBlank(groupByClause)) {

@@ -87,7 +87,7 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
         .registerDAOs(anomalyFunctionDAO, emailConfigurationDAO, rawResultDAO, mergedResultDAO,
             jobDAO, taskDAO, datasetConfigDAO, metricConfigDAO, dashboardConfigDAO,
             ingraphMetricConfigDAO, ingraphDashboardConfigDAO, overrideConfigDAO,
-            alertConfigManager);
+            alertConfigManager, dataCompletenessConfigDAO);
 
     // Mock query cache
     ThirdEyeClient mockThirdeyeClient = Mockito.mock(ThirdEyeClient.class);

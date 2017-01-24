@@ -1,9 +1,8 @@
 package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import org.apache.commons.collections.CollectionUtils;
 
 import com.linkedin.thirdeye.datalayer.bao.DataCompletenessConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
@@ -25,8 +24,35 @@ public class DataCompletenessConfigManagerImpl extends AbstractManagerImpl<DataC
   }
 
   @Override
+  public DataCompletenessConfigDTO findByDatasetAndDateSDF(String dataset, String dateToCheckInSDF) {
+    Predicate predicate =
+        Predicate.AND(Predicate.EQ("dataset", dataset), Predicate.EQ("dateToCheckInSDF", dateToCheckInSDF));
+
+    List<DataCompletenessConfigBean> list = genericPojoDao.get(predicate, DataCompletenessConfigBean.class);
+    DataCompletenessConfigDTO result = null;
+    if (CollectionUtils.isNotEmpty(list)) {
+      result = MODEL_MAPPER.map(list.get(0), DataCompletenessConfigDTO.class);
+    }
+    return result;
+  }
+
+
+  @Override
+  public DataCompletenessConfigDTO findByDatasetAndDateMS(String dataset, Long dateToCheckInMS) {
+    Predicate predicate =
+        Predicate.AND(Predicate.EQ("dataset", dataset), Predicate.EQ("dateToCheckInMS", dateToCheckInMS));
+
+    List<DataCompletenessConfigBean> list = genericPojoDao.get(predicate, DataCompletenessConfigBean.class);
+    DataCompletenessConfigDTO result = null;
+    if (CollectionUtils.isNotEmpty(list)) {
+      result = MODEL_MAPPER.map(list.get(0), DataCompletenessConfigDTO.class);
+    }
+    return result;
+  }
+
+  @Override
   public List<DataCompletenessConfigDTO> findAllInTimeRange(long startTime, long endTime) {
-    Predicate timePredicate = Predicate.AND(Predicate.GT("dateToCheckInMS", startTime), Predicate.LT("dateToCheckInMS", endTime));
+    Predicate timePredicate = Predicate.AND(Predicate.GE("dateToCheckInMS", startTime), Predicate.LT("dateToCheckInMS", endTime));
     List<DataCompletenessConfigBean> list =
         genericPojoDao.get(timePredicate, DataCompletenessConfigBean.class);
     return convertListOfBeanToDTO(list);
@@ -34,10 +60,22 @@ public class DataCompletenessConfigManagerImpl extends AbstractManagerImpl<DataC
 
   @Override
   public List<DataCompletenessConfigDTO> findAllByDatasetAndInTimeRange(String dataset, long startTime, long endTime) {
-    Predicate timePredicate = Predicate.AND(Predicate.GT("dateToCheckInMS", startTime), Predicate.LT("dateToCheckInMS", endTime));
+    Predicate timePredicate = Predicate.AND(Predicate.GE("dateToCheckInMS", startTime), Predicate.LT("dateToCheckInMS", endTime));
     Predicate datasetPredicate = Predicate.EQ("dataset", dataset);
     List<DataCompletenessConfigBean> list =
         genericPojoDao.get(Predicate.AND(datasetPredicate, timePredicate), DataCompletenessConfigBean.class);
+    return convertListOfBeanToDTO(list);
+  }
+
+  @Override
+  public List<DataCompletenessConfigDTO> findAllByDatasetAndInTimeRangeAndPercentCompleteGT(String dataset,
+      long startTime, long endTime, double percentComplete) {
+    Predicate timePredicate = Predicate.AND(Predicate.GE("dateToCheckInMS", startTime), Predicate.LT("dateToCheckInMS", endTime));
+    Predicate datasetPredicate = Predicate.EQ("dataset", dataset);
+    Predicate percentCompletePrediate = Predicate.GT("percentComplete", percentComplete);
+    List<DataCompletenessConfigBean> list =
+        genericPojoDao.get(Predicate.AND(datasetPredicate, timePredicate, percentCompletePrediate),
+            DataCompletenessConfigBean.class);
     return convertListOfBeanToDTO(list);
   }
 

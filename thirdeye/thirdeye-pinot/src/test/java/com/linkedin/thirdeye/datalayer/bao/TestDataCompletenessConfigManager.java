@@ -3,6 +3,8 @@ package com.linkedin.thirdeye.datalayer.bao;
 import java.util.List;
 
 import org.joda.time.DateTime;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -14,16 +16,18 @@ public class TestDataCompletenessConfigManager extends AbstractManagerTestBase {
   private Long dataCompletenessConfigId2;
   private static String collection1 = "my dataset1";
   private DateTime now = new DateTime();
+  private DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern("yyyyMMddHHmm");
+
 
 
   @Test
   public void testCreate() {
 
     dataCompletenessConfigId1 = dataCompletenessConfigDAO.
-        save(getTestDataCompletenessConfig(collection1, now.getMillis(), true));
+        save(getTestDataCompletenessConfig(collection1, now.getMillis(), dateTimeFormatter.print(now.getMillis()), true));
 
     dataCompletenessConfigId2 = dataCompletenessConfigDAO.
-        save(getTestDataCompletenessConfig(collection1, now.minusHours(1).getMillis(), false));
+        save(getTestDataCompletenessConfig(collection1, now.minusHours(1).getMillis(), dateTimeFormatter.print(now.minusHours(1).getMillis()), false));
 
     Assert.assertNotNull(dataCompletenessConfigId1);
     Assert.assertNotNull(dataCompletenessConfigId2);
@@ -48,6 +52,15 @@ public class TestDataCompletenessConfigManager extends AbstractManagerTestBase {
     dataCompletenessConfigDTOs =
         dataCompletenessConfigDAO.findAllByTimeOlderThanAndStatus(new DateTime().getMillis(), true);
     Assert.assertEquals(dataCompletenessConfigDTOs.size(), 1);
+
+    DataCompletenessConfigDTO config =
+        dataCompletenessConfigDAO.findByDatasetAndDateSDF(collection1, dateTimeFormatter.print(now.getMillis()));
+    Assert.assertNotNull(config);
+    Assert.assertEquals(config.getId(), dataCompletenessConfigId1);
+
+    config = dataCompletenessConfigDAO.findByDatasetAndDateMS(collection1, now.minusHours(1).getMillis());
+    Assert.assertNotNull(config);
+    Assert.assertEquals(config.getId(), dataCompletenessConfigId2);
 
 
   }

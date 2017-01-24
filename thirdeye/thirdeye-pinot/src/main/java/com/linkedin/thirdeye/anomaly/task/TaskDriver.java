@@ -16,11 +16,6 @@ import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
 import com.linkedin.thirdeye.client.DAORegistry;
-import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.JobManager;
-import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
@@ -37,7 +32,7 @@ public class TaskDriver {
   private final Set<TaskStatus> allowedOldTaskStatus = new HashSet<>();
 
   private volatile boolean shutdown = false;
-  private static final int MAX_PARALLEL_TASK = 5;
+  private static final int MAX_PARALLEL_TASK = 1;
   private static final int NO_TASK_IDLE_DELAY_MILLIS = 15_000; // 15 seconds
   private static final int TASK_FAILURE_DELAY_MILLIS = 2 * 60_000; // 2 minutes
   private static final int TASK_FETCH_SIZE = 50;

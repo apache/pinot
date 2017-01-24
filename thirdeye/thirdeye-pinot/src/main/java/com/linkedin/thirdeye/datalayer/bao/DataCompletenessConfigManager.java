@@ -11,5 +11,9 @@ public interface DataCompletenessConfigManager extends AbstractManager<DataCompl
   List<DataCompletenessConfigDTO> findAllByDatasetAndInTimeRange(String dataset, long startTime, long endTime);
   List<DataCompletenessConfigDTO> findAllByTimeOlderThan(long time);
   List<DataCompletenessConfigDTO> findAllByTimeOlderThanAndStatus(long time, boolean dataComplete);
+  List<DataCompletenessConfigDTO> findAllByDatasetAndInTimeRangeAndPercentCompleteGT(String dataset, long startTime,
+      long endTime, double percentComplete);
+  DataCompletenessConfigDTO findByDatasetAndDateSDF(String dataset, String dateToCheckInSDF);
+  DataCompletenessConfigDTO findByDatasetAndDateMS(String dataset, Long dateToCheckInMS);
 
 }

@@ -19,6 +19,7 @@ import com.linkedin.thirdeye.anomaly.task.TaskDriver;
 import com.linkedin.thirdeye.autoload.pinot.metrics.AutoLoadPinotMetricsService;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
+import com.linkedin.thirdeye.completeness.checker.DataCompletenessScheduler;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
 import io.dropwizard.assets.AssetsBundle;
@@ -37,6 +38,7 @@ public class ThirdEyeAnomalyApplication
   private AnomalyFunctionFactory anomalyFunctionFactory = null;
   private AnomalyMergeExecutor anomalyMergeExecutor = null;
   private AutoLoadPinotMetricsService autoLoadPinotMetricsService = null;
+  private DataCompletenessScheduler dataCompletenessScheduler = null;
 
   public static void main(final String[] args) throws Exception {
     List<String> argList = new ArrayList<>(Arrays.asList(args));
@@ -112,6 +114,10 @@ public class ThirdEyeAnomalyApplication
           autoLoadPinotMetricsService = new AutoLoadPinotMetricsService(config);
           autoLoadPinotMetricsService.start();
         }
+        if (config.isDataCompleteness()) {
+          dataCompletenessScheduler = new DataCompletenessScheduler();
+          dataCompletenessScheduler.start();
+        }
       }
 
       @Override
@@ -134,6 +140,9 @@ public class ThirdEyeAnomalyApplication
         }
         if (config.isAutoload()) {
           autoLoadPinotMetricsService.shutdown();
+        }
+        if (config.isDataCompleteness()) {
+          dataCompletenessScheduler.shutdown();
         }
       }
     });

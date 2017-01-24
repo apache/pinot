@@ -10,6 +10,7 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
   private boolean alert = false;
   private boolean merger = false;
   private boolean autoload = false;
+  private boolean dataCompleteness = false;
 
   private long id;
   private String dashboardHost;
@@ -92,6 +93,14 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
 
   public void setAutoload(boolean autoload) {
     this.autoload = autoload;
+  }
+
+  public boolean isDataCompleteness() {
+    return dataCompleteness;
+  }
+
+  public void setDataCompleteness(boolean dataCompleteness) {
+    this.dataCompleteness = dataCompleteness;
   }
 
   public void setSmtpConfiguration(SmtpConfiguration smtpConfiguration) {
