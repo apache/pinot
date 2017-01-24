@@ -62,7 +62,7 @@ public class MovingAverageSmoothingFunction extends AbstractTransformationFuncti
     transformedTimeSeries.setTimeSeriesInterval(transformedInterval);
 
     for (long timeKeyToTransform : timeSeries.timestampSet()) {
-      if (timeKeyToTransform < transformedStartTime) {
+      if (!transformedInterval.contains(timeKeyToTransform)) {
         continue;
       }
       double sum = 0d;

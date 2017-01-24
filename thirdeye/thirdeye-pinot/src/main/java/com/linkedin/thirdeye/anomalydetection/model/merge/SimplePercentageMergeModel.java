@@ -8,6 +8,7 @@ import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import java.util.List;
 import org.apache.commons.collections.CollectionUtils;
+import org.joda.time.Interval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,14 +55,19 @@ public class SimplePercentageMergeModel extends AbstractMergeModel {
     double avgObserved = 0d;
     double avgExpected = 0d;
     int count = 0;
-    for (long observedTimestamp : observedTimeSeries.timestampSet()) {
-      long offset = observedTimestamp - observedStartTime;
-      long expectedTimestamp = expectedStartTime + offset;
+    Interval anomalyInterval =
+        new Interval(anomalyToUpdated.getStartTime(), anomalyToUpdated.getEndTime());
 
-      if (expectedTimeSeries.hasTimestamp(expectedTimestamp)) {
-        avgObserved += observedTimeSeries.get(observedTimestamp);
-        avgExpected += expectedTimeSeries.get(expectedTimestamp);
-        ++count;
+    for (long observedTimestamp : observedTimeSeries.timestampSet()) {
+      if (anomalyInterval.contains(observedTimestamp)) {
+        long offset = observedTimestamp - observedStartTime;
+        long expectedTimestamp = expectedStartTime + offset;
+
+        if (expectedTimeSeries.hasTimestamp(expectedTimestamp)) {
+          avgObserved += observedTimeSeries.get(observedTimestamp);
+          avgExpected += expectedTimeSeries.get(expectedTimestamp);
+          ++count;
+        }
       }
     }
 

@@ -91,16 +91,14 @@ public class WeekOverWeekRule extends AbstractModularizedAnomalyFunction {
    * @param wowString a string.
    * @return the integer of a WoW string.
    */
-  private static String parseWowString(String wowString) {
+  public static String parseWowString(String wowString) {
     if (StringUtils.isBlank(wowString)) {
       return "1";
     }
 
     char[] chars = wowString.toCharArray();
     int head = -1;
-    int tail = -1;
-    int idx = 0;
-    for (; idx < chars.length; ++idx) {
+    for (int idx = 0; idx < chars.length; ++idx) {
       if ('0' <= chars[idx] && chars[idx] <= '9') {
         head = idx;
         break;
@@ -109,14 +107,11 @@ public class WeekOverWeekRule extends AbstractModularizedAnomalyFunction {
     if (head < 0) {
       return "1";
     }
-    for (++idx; idx < chars.length; ++idx) {
-      if (chars[idx] <= '0' || '9' <= chars[idx]) {
-        tail = idx;
+    int tail = head + 1;
+    for (; tail < chars.length; ++tail) {
+      if (chars[tail] <= '0' || '9' <= chars[tail]) {
         break;
       }
-    }
-    if (tail < 0) {
-      tail = chars.length;
     }
     return wowString.substring(head, tail);
   }
