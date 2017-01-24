@@ -52,6 +52,7 @@ public class SplineRegressionAnomalyTimeSeriesView extends BaseAnomalyTimeSeries
   public static final String DEFAULT_TIMEZONE = "America/Los_Angeles";
   private static final String DEFAULT_ANOMALY_REMOVAL_SEVERITY_THRESHOLD = "0.5";
   private static final String DEFAULT_LOG_TRANSFORM = "False";
+  private static final String DEFAULT_TIME_SERIES_LATENCY = "9";
   private static final long DAY_LENGTH = 86400000;
   private static final Logger LOG = LoggerFactory.getLogger(SplineRegressionAnomalyTimeSeriesView.class);
 
@@ -148,7 +149,9 @@ public class SplineRegressionAnomalyTimeSeriesView extends BaseAnomalyTimeSeries
 
     double[] observed = baselineData.getObserved();
     double[] expected = baselineData.getExpected();
-    for(int i = 0; i < timelist.size(); i++){
+    int begin_timestamp = timelist.size() - Integer.valueOf(DEFAULT_TIME_SERIES_LATENCY);
+    begin_timestamp = Math.max(0, begin_timestamp);
+    for(int i = begin_timestamp; i < timelist.size(); i++){
       long timestamp = timelist.get(i);
       TimeBucket timeBucket = new TimeBucket(timestamp, timestamp+DAY_LENGTH,
           timestamp, timestamp+DAY_LENGTH);
