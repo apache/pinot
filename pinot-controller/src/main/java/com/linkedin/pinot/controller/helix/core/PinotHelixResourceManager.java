@@ -484,6 +484,18 @@ public class PinotHelixResourceManager {
     // Look for all instances tagged with this broker tag
     final Set<String> brokerInstances = getAllInstancesForBrokerTenant(brokerTag);
 
+    // If we add a new broker, we want to rebuild the broker resource.
+    HelixAdmin helixAdmin = getHelixAdmin();
+    String clusterName = getHelixClusterName();
+    IdealState brokerIdealState = HelixHelper.getBrokerIdealStates(helixAdmin, clusterName);
+
+    Set<String> idealStateBrokerInstances = brokerIdealState.getInstanceSet(tableName);
+
+    if(idealStateBrokerInstances.equals(brokerInstances)) {
+      return new PinotResourceManagerResponse(
+          "Broker resource is not rebuilt because ideal state is the same for table {} " + tableName, false);
+    }
+
     // Reset ideal state with the instance list
     try {
       HelixHelper.updateIdealState(getHelixZkManager(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE, new Function<IdealState, IdealState>() {

@@ -138,23 +138,16 @@ public class ValidationManager {
     // Fetch the list of tables
     List<String> allTableNames = _pinotHelixResourceManager.getAllPinotTableNames();
     ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
-    HelixAdmin helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
-    String clusterName = _pinotHelixResourceManager.getHelixClusterName();
-    IdealState brokerIdealState = HelixHelper.getBrokerIdealStates(helixAdmin, clusterName);
+
     for (String tableName : allTableNames) {
       List<SegmentMetadata> segmentMetadataList = new ArrayList<SegmentMetadata>();
 
       TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
       AbstractTableConfig tableConfig = null;
+      _pinotHelixResourceManager.rebuildBrokerResourceFromHelixTags(tableName);
       // For each table, fetch the metadata for all its segments
       if (tableType.equals(TableType.OFFLINE)) {
         validateOfflineSegmentPush(propertyStore, tableName, segmentMetadataList);
-        try {
-          tableConfig = _pinotHelixResourceManager.getOfflineTableConfig(tableName);
-          rebuildBrokerResourceWhenBrokerAdded(tableConfig, brokerIdealState);
-        } catch (Exception e) {
-          LOGGER.warn("Cannot get offline tableconfig for {}", tableName);
-        }
       } else if (tableType.equals(TableType.REALTIME)) {
         LOGGER.info("Starting to validate table {}", tableName);
         List<RealtimeSegmentZKMetadata> realtimeSegmentZKMetadatas = ZKMetadataProvider.getRealtimeSegmentZKMetadataListForTable(propertyStore, tableName);
@@ -162,7 +155,6 @@ public class ValidationManager {
         KafkaStreamMetadata streamMetadata = null;
         try {
           tableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName);
-          rebuildBrokerResourceWhenBrokerAdded(tableConfig, brokerIdealState);
           streamMetadata = new KafkaStreamMetadata(tableConfig.getIndexingConfig().getStreamConfigs());
           if (streamMetadata.hasSimpleKafkaConsumerType() && !streamMetadata.hasHighLevelKafkaConsumerType()) {
             countHLCSegments = false;
@@ -191,22 +183,6 @@ public class ValidationManager {
       }
     }
     LOGGER.info("Validation completed");
-  }
-
-  // If we add a new broker, we want to rebuild the broker resource.
-  void rebuildBrokerResourceWhenBrokerAdded(AbstractTableConfig tableConfig, IdealState brokerIdealState) {
-    String brokerTenantName = tableConfig.getTenantConfig().getBroker();
-    String tableName = tableConfig.getTableName();
-
-    Set<String> brokerTenantInstances = _pinotHelixResourceManager.getAllInstancesForBrokerTenant(brokerTenantName);
-    Set<String> idealStateBrokerInstances = brokerIdealState.getInstanceSet(tableName);
-
-    if(!idealStateBrokerInstances.equals(brokerTenantInstances)) {
-      LOGGER.info("Rebuilding broker resource for table {}", tableName);
-      _pinotHelixResourceManager.rebuildBrokerResourceFromHelixTags(tableName);
-    } else {
-      LOGGER.info("Broker resource is not rebuilt for table {}", tableName);
-    }
   }
 
   // For LLC segments, validate that there is at least one segment in CONSUMING state for every partition.
