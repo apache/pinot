@@ -3,7 +3,6 @@ package com.linkedin.thirdeye.anomalydetection.function;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyDetectionContext;
 import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
 import com.linkedin.thirdeye.anomalydetection.context.TimeSeriesKey;
-import com.linkedin.thirdeye.anomalydetection.control.AnomalyDetectionExecutor;
 import com.linkedin.thirdeye.anomalydetection.model.detection.SimpleThresholdDetectionModel;
 import com.linkedin.thirdeye.anomalydetection.model.prediction.SeasonalAveragePredictionModel;
 import com.linkedin.thirdeye.anomalydetection.model.transform.MovingAverageSmoothingFunction;
@@ -115,7 +114,7 @@ public class TestWeekOverWeekRuleFunction {
     anomalyDetectionContext.setBaselines(baselines);
     anomalyDetectionContext.setTimeSeriesKey(timeSeriesKey);
 
-    List<RawAnomalyResultDTO> rawAnomalyResults = AnomalyDetectionExecutor.analyze(anomalyDetectionContext);
+    List<RawAnomalyResultDTO> rawAnomalyResults = function.analyze(anomalyDetectionContext);
     Assert.assertEquals(rawAnomalyResults.size(), expectedRawAnomalies.size());
     for (int i = 0; i < rawAnomalyResults.size(); ++i) {
       RawAnomalyResultDTO actualAnomaly = rawAnomalyResults.get(i);
@@ -143,7 +142,7 @@ public class TestWeekOverWeekRuleFunction {
     anomalyDetectionContext.setBaselines(baselines);
     anomalyDetectionContext.setTimeSeriesKey(timeSeriesKey);
 
-    List<RawAnomalyResultDTO> rawAnomalyResults = AnomalyDetectionExecutor.analyze(anomalyDetectionContext);
+    List<RawAnomalyResultDTO> rawAnomalyResults = function.analyze(anomalyDetectionContext);
     // The transformed observed time series is resized from 5 to 3 due to moving average algorithm
     Assert.assertEquals(anomalyDetectionContext.getTransformedCurrent().size(), 3);
     // No anomalies after smoothing the time series

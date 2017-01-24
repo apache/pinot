@@ -2,16 +2,20 @@ package com.linkedin.thirdeye.anomalydetection.function;
 
 import com.linkedin.thirdeye.anomalydetection.model.data.SeasonalDataModel;
 import com.linkedin.thirdeye.anomalydetection.model.detection.SimpleThresholdDetectionModel;
+import com.linkedin.thirdeye.anomalydetection.model.merge.MergeModel;
+import com.linkedin.thirdeye.anomalydetection.model.merge.SimplePercentageMergeModel;
 import com.linkedin.thirdeye.anomalydetection.model.prediction.SeasonalAveragePredictionModel;
 import com.linkedin.thirdeye.anomalydetection.model.transform.MovingAverageSmoothingFunction;
 import com.linkedin.thirdeye.anomalydetection.model.transform.TransformationFunction;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.Properties;
 import org.apache.commons.lang3.StringUtils;
 
-public class WeekOverWeekRule extends AbstractAnomalyDetectionFunction {
+public class WeekOverWeekRule extends AbstractModularizedAnomalyFunction {
   public static final String BASELINE = "baseline";
   public static final String ENABLE_SMOOTHING = "enableSmoothing";
+  public static final String DEFAULT_MESSAGE_TEMPLATE = "change : %.2f %%, currentVal : %.2f, baseLineVal : %.2f";
 
   @Override
   public void init(AnomalyFunctionDTO spec) throws Exception {
@@ -41,6 +45,24 @@ public class WeekOverWeekRule extends AbstractAnomalyDetectionFunction {
 
     detectionModel = new SimpleThresholdDetectionModel();
     detectionModel.init(this.properties);
+
+    mergeModel = new SimplePercentageMergeModel();
+    mergeModel.init(this.properties);
+  }
+
+  protected void writeMergedAnomalyInfo(MergeModel computedMergeModel,
+      MergedAnomalyResultDTO anomalyToBeUpdated) {
+    SimplePercentageMergeModel simplePercentageMergeModel =
+        (SimplePercentageMergeModel) computedMergeModel;
+    double weight = simplePercentageMergeModel.getWeight();
+    double score = simplePercentageMergeModel.getScore();
+    double avgObserved = simplePercentageMergeModel.getAvgObserved();
+    double avgExpected = simplePercentageMergeModel.getAvgExpected();
+
+    anomalyToBeUpdated.setWeight(weight);
+    anomalyToBeUpdated.setScore(score);
+    anomalyToBeUpdated.setMessage(
+        String.format(DEFAULT_MESSAGE_TEMPLATE, weight * 100, avgObserved, avgExpected));
   }
 
   /**

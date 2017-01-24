@@ -1,10 +1,17 @@
 package com.linkedin.thirdeye.anomalydetection.function;
 
+import com.linkedin.thirdeye.anomalydetection.context.AnomalyDetectionContext;
+import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
 import com.linkedin.thirdeye.anomalydetection.model.detection.DetectionModel;
 import com.linkedin.thirdeye.anomalydetection.model.prediction.PredictionModel;
 import com.linkedin.thirdeye.anomalydetection.model.transform.TransformationFunction;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import org.apache.commons.collections.CollectionUtils;
 import org.joda.time.Interval;
 
 /**
@@ -35,29 +42,27 @@ public interface AnomalyDetectionFunction {
   List<Interval> getTimeSeriesIntervals(long monitoringWindowStartTime, long monitoringWindowEndTime);
 
   /**
-   * Returns the chain of transformation functions for the current time series.
-   * @return the chain of transformation functions for the current time series.
+   * The anomaly detection is executed in the following flow:
+   * 1. Transform current and baseline time series.
+   * 2. Train prediction model using the baseline time series.
+   * 3. Detect anomalies on the observed (current) time series against the expected time series,
+   * which is computed by the prediction model.
+   *
+   * @return a list of raw anomalies
+   *
+   * @throws Exception
    */
-  List<TransformationFunction> getCurrentTimeSeriesTransformationChain();
+  List<RawAnomalyResultDTO> analyze(AnomalyDetectionContext anomalyDetectionContext) throws Exception;
 
   /**
-   * Returns the chain of transformation functions for baseline time series.
-   * @return the chain of transformation functions for baseline time series.
+   * Updates the information of the given merged anomaly.
+   *
+   * @param anomalyDetectionContext
+   * @param anomalyToUpdated
+   *
+   * @throws Exception
    */
-  List<TransformationFunction> getBaselineTimeSeriesTransformationChain();
+  void updateMergedAnomalyInfo(AnomalyDetectionContext anomalyDetectionContext,
+      MergedAnomalyResultDTO anomalyToUpdated) throws Exception;
 
-  /**
-   * Returns the prediction model for computing the expected time series using the provided history
-   * time series.
-   * @return the prediction model for computing the expected time series.
-   */
-  PredictionModel getPredictionModel();
-
-  /**
-   * Returns the anomaly detection model that defines the anomaly upon the current and baseline
-   * time series.
-   * @return the anomaly detection model that defines the anomaly upon the current and baseline
-   * time series.
-   */
-  DetectionModel getDetectionModel();
 }
