@@ -35,61 +35,105 @@ import com.linkedin.pinot.core.operator.transform.TransformExpressionOperator;
 import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
 import com.linkedin.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
-import com.linkedin.pinot.core.query.aggregation.groupby.NoDictionaryGroupKeyGenerator;
+import com.linkedin.pinot.core.query.aggregation.groupby.NoDictionaryMultiColumnGroupKeyGenerator;
+import com.linkedin.pinot.core.query.aggregation.groupby.NoDictionarySingleColumnGroupKeyGenerator;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import org.testng.Assert;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
 /**
- * Unit test for {@link NoDictionaryGroupKeyGenerator}
+ * Unit test for {@link NoDictionaryMultiColumnGroupKeyGenerator}
  */
 public class NoDictionaryGroupKeyGeneratorTest {
   private static final String SEGMENT_DIR_NAME = System.getProperty("java.io.tmpdir") + File.separator + "rawIndexPerf";
   private static final String SEGMENT_NAME = "perfTestSegment";
-  private static final int NUM_COLUMNS = 2;
-  private static final int NUM_ROWS = 10000;
 
-  /**
-   * This test builds a segment with two columns, one without dictionary, and the other with dictionary.
-   * It then uses {@link NoDictionaryGroupKeyGenerator} to ensure that all group keys are generated correctly.
-   *
-   * @throws Exception
-   */
-  @Test
-  public void test()
+  private static final String STRING_DICT_COLUMN = "string_dict_column";
+  private static final String[] COLUMN_NAMES =
+      {"int_column", "long_column", "float_column", "double_column", "string_column", STRING_DICT_COLUMN};
+  private static final String[] NO_DICT_COLUMN_NAMES =
+      {"int_column", "long_column", "float_column", "double_column", "string_column"};
+
+  private static final FieldSpec.DataType[] DATA_TYPES =
+      {FieldSpec.DataType.INT, FieldSpec.DataType.LONG, FieldSpec.DataType.FLOAT, FieldSpec.DataType.DOUBLE, FieldSpec.DataType.STRING, FieldSpec.DataType.STRING};
+
+  private static final int NUM_COLUMNS = DATA_TYPES.length;
+  private static final int NUM_ROWS = 1;
+  private TestRecordReader _recordReader;
+  private Map<String, BaseOperator> _dataSourceMap;
+  private IndexSegment _indexSegment;
+
+  @BeforeClass
+  public void setup()
       throws Exception {
-    Set<String> expectedGroupKeys = buildSegment();
+    buildSegment();
 
     // Load the segment.
     File segment = new File(SEGMENT_DIR_NAME, SEGMENT_NAME);
-    IndexSegment indexSegment = Loaders.IndexSegment.load(segment, ReadMode.heap);
-
-    // Build the group key generator.
-    GroupKeyGenerator groupKeyGenerator = new NoDictionaryGroupKeyGenerator(indexSegment.getColumnNames());
+    _indexSegment = Loaders.IndexSegment.load(segment, ReadMode.heap);
 
     // Build the data source map
-    Map<String, BaseOperator> dataSourceMap = new HashMap<>();
-    for (String column : indexSegment.getColumnNames()) {
-      DataSource dataSource = indexSegment.getDataSource(column);
-      dataSourceMap.put(column, dataSource);
+    _dataSourceMap = new HashMap<>();
+    for (String column : _indexSegment.getColumnNames()) {
+      DataSource dataSource = _indexSegment.getDataSource(column);
+      _dataSourceMap.put(column, dataSource);
     }
+  }
 
+  /**
+   * Unit test for {@link com.linkedin.pinot.core.query.aggregation.groupby.NoDictionarySingleColumnGroupKeyGenerator}
+   * @throws Exception
+   */
+  @Test
+  public void testSingleColumnGroupKeyGenerator()
+      throws Exception {
+    for (int i = 0; i < COLUMN_NAMES.length; i++) {
+      testGroupKeyGenerator(new String[]{COLUMN_NAMES[i]}, new FieldSpec.DataType[]{DATA_TYPES[i]});
+    }
+  }
+
+  /**
+   * Unit test for {@link NoDictionaryMultiColumnGroupKeyGenerator}
+   * @throws Exception
+   */
+  @Test
+  public void testMultiColumnGroupKeyGenerator()
+      throws Exception {
+    testGroupKeyGenerator(_indexSegment.getColumnNames(), DATA_TYPES);
+  }
+
+  /**
+   * Tests multi-column group key generator when at least one column as dictionary, and others don't.
+   */
+  @Test
+  public void testMultiColumnHybridGroupKeyGenerator()
+      throws Exception {
+    for (int i = 0; i < NO_DICT_COLUMN_NAMES.length; i++) {
+      testGroupKeyGenerator(new String[]{NO_DICT_COLUMN_NAMES[i], STRING_DICT_COLUMN},
+          new FieldSpec.DataType[]{DATA_TYPES[i], FieldSpec.DataType.STRING});
+    }
+  }
+
+  private void testGroupKeyGenerator(String[] groupByColumns, FieldSpec.DataType[] dataTypes)
+      throws Exception {
     // Build the projection operator.
     MatchEntireSegmentOperator matchEntireSegmentOperator = new MatchEntireSegmentOperator(NUM_ROWS);
     BReusableFilteredDocIdSetOperator docIdSetOperator =
         new BReusableFilteredDocIdSetOperator(matchEntireSegmentOperator, NUM_ROWS, 10000);
-    MProjectionOperator projectionOperator = new MProjectionOperator(dataSourceMap, docIdSetOperator);
+    MProjectionOperator projectionOperator = new MProjectionOperator(_dataSourceMap, docIdSetOperator);
     TransformExpressionOperator transformOperator =
         new TransformExpressionOperator(projectionOperator, new ArrayList<TransformExpressionTree>());
 
@@ -97,11 +141,20 @@ public class NoDictionaryGroupKeyGeneratorTest {
     TransformBlock transformBlock;
     int[] docIdToGroupKeys = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
 
+    GroupKeyGenerator groupKeyGenerator = null;
     while ((transformBlock = (TransformBlock) transformOperator.nextBlock()) != null) {
+      if (groupKeyGenerator == null) {
+        // Build the group key generator.
+        groupKeyGenerator =
+            (groupByColumns.length == 1) ? new NoDictionarySingleColumnGroupKeyGenerator(groupByColumns[0],
+                dataTypes[0]) : new NoDictionaryMultiColumnGroupKeyGenerator(transformBlock, groupByColumns);
+      }
       groupKeyGenerator.generateKeysForBlock(transformBlock, docIdToGroupKeys);
     }
 
     // Assert total number of group keys is as expected
+    Assert.assertTrue(groupKeyGenerator != null);
+    Set<String> expectedGroupKeys = getExpectedGroupKeys(_recordReader, groupByColumns);
     Assert.assertEquals(groupKeyGenerator.getCurrentGroupKeyUpperBound(), expectedGroupKeys.size(),
         "Number of group keys mis-match.");
 
@@ -112,6 +165,34 @@ public class NoDictionaryGroupKeyGeneratorTest {
       String actual = groupKey.getStringKey();
       Assert.assertTrue(expectedGroupKeys.contains(actual), "Unexpected group key: " + actual);
     }
+  }
+
+  /**
+   * Helper method to build group keys for a given array of group-by columns.
+   *
+   * @param groupByColumns Group-by columns for which to generate the group-keys.
+   * @return Set of unique group keys.
+   * @throws Exception
+   */
+  private Set<String> getExpectedGroupKeys(RecordReader recordReader, String[] groupByColumns)
+      throws Exception {
+    Set<String> groupKeys = new HashSet<>();
+    StringBuilder stringBuilder = new StringBuilder();
+
+    recordReader.rewind();
+    while (recordReader.hasNext()) {
+      GenericRow row = recordReader.next();
+
+      stringBuilder.setLength(0);
+      for (int i = 0; i < groupByColumns.length; i++) {
+        stringBuilder.append(row.getValue(groupByColumns[i]));
+        if (i < groupByColumns.length - 1) {
+          stringBuilder.append(AggregationGroupByTrimmingService.GROUP_KEY_DELIMITER);
+        }
+      }
+      groupKeys.add(stringBuilder.toString());
+    }
+    return groupKeys;
   }
 
   /**
@@ -127,46 +208,55 @@ public class NoDictionaryGroupKeyGeneratorTest {
    *
    * @throws Exception
    */
-  private Set<String> buildSegment()
+  private TestRecordReader buildSegment()
       throws Exception {
     Schema schema = new Schema();
 
-    for (int i = 0; i < NUM_COLUMNS; i++) {
-      String column = "column_" + i;
-      FieldSpec.DataType dataType = ((i & 0x1) == 1) ? FieldSpec.DataType.STRING : FieldSpec.DataType.INT;
-      DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec(column, dataType, true);
+    for (int i = 0; i < COLUMN_NAMES.length; i++) {
+      DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec(COLUMN_NAMES[i], DATA_TYPES[i], true);
       schema.addField(dimensionFieldSpec);
     }
 
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
-    config.setRawIndexCreationColumns(new ArrayList<String>(schema.getColumnNames()));
+    config.setRawIndexCreationColumns(Arrays.asList(NO_DICT_COLUMN_NAMES));
 
     config.setOutDir(SEGMENT_DIR_NAME);
     config.setSegmentName(SEGMENT_NAME);
 
+    Random random = new Random();
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
-    Set<String> keys = new HashSet<>(NUM_ROWS);
-    StringBuilder stringBuilder = new StringBuilder();
-
     for (int i = 0; i < NUM_ROWS; i++) {
       Map<String, Object> map = new HashMap<>(NUM_COLUMNS);
 
-      int j = 0;
-      stringBuilder.setLength(0);
       for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
         String column = fieldSpec.getName();
 
-        if (fieldSpec.getDataType() == FieldSpec.DataType.STRING) {
-          map.put(column, "value_" + i);
-        } else {
-          map.put(column, NUM_ROWS - i - 1);
-        }
-        stringBuilder.append(map.get(column));
-        if (j++ < NUM_COLUMNS - 1) {
-          stringBuilder.append(AggregationGroupByTrimmingService.GROUP_KEY_DELIMITER);
+        FieldSpec.DataType dataType = fieldSpec.getDataType();
+        switch (dataType) {
+          case INT:
+            map.put(column, random.nextInt());
+            break;
+
+          case LONG:
+            map.put(column, random.nextLong());
+            break;
+
+          case FLOAT:
+            map.put(column, random.nextFloat());
+            break;
+
+          case DOUBLE:
+            map.put(column, random.nextDouble());
+            break;
+
+          case STRING:
+            map.put(column, "value_" + i);
+            break;
+
+          default:
+            throw new IllegalArgumentException("Illegal data type specified: " + dataType);
         }
       }
-      keys.add(stringBuilder.toString());
 
       GenericRow genericRow = new GenericRow();
       genericRow.init(map);
@@ -174,11 +264,11 @@ public class NoDictionaryGroupKeyGeneratorTest {
     }
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    RecordReader recordReader = new TestRecordReader(rows, schema);
+    _recordReader = new TestRecordReader(rows, schema);
 
-    driver.init(config, recordReader);
+    driver.init(config, _recordReader);
     driver.build();
 
-    return keys;
+    return _recordReader;
   }
 }
