@@ -16,9 +16,9 @@
 package com.linkedin.pinot.core.common.datatable;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
-import com.linkedin.pinot.core.operator.aggregation.function.customobject.AvgPair;
-import com.linkedin.pinot.core.operator.aggregation.function.customobject.MinMaxRangePair;
-import com.linkedin.pinot.core.operator.aggregation.function.customobject.QuantileDigest;
+import com.linkedin.pinot.core.query.aggregation.function.customobject.AvgPair;
+import com.linkedin.pinot.core.query.aggregation.function.customobject.MinMaxRangePair;
+import com.linkedin.pinot.core.query.aggregation.function.customobject.QuantileDigest;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import it.unimi.dsi.fastutil.ints.IntIterator;

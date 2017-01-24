@@ -19,8 +19,8 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.BaseBlockValSet;
 import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.common.BlockValIterator;
+import com.linkedin.pinot.core.common.DataBlockCache;
 import com.linkedin.pinot.core.operator.MProjectionOperator;
-import com.linkedin.pinot.core.operator.aggregation.DataBlockCache;
 
 
 /**

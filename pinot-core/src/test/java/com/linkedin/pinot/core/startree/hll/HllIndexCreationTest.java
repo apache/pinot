@@ -17,11 +17,11 @@ package com.linkedin.pinot.core.startree.hll;
 
 import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.common.DataBlockCache;
 import com.linkedin.pinot.core.common.DataFetcher;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.operator.BaseOperator;
-import com.linkedin.pinot.core.operator.aggregation.DataBlockCache;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
