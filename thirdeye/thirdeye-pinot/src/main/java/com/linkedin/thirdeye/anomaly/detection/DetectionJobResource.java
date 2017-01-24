@@ -83,42 +83,6 @@ public class DetectionJobResource {
     return Response.ok().build();
   }
 
-  /**
-   * Asynchronous call to a backfill procedure
-   * @param id
-   * @param startTimeIso
-   * @param endTimeIso
-   * @return
-   * @throws Exception
-   */
-  @POST
-  @Path("/{id}/backfill")
-  public Response backfill(@PathParam("id") Long id, @QueryParam("start") String startTimeIso,
-      @QueryParam("end") String endTimeIso, @DefaultValue("false") @QueryParam("force") boolean force) throws Exception {
-    DateTime startTime = null;
-    DateTime endTime = null;
-    if (StringUtils.isNotBlank(startTimeIso)) {
-      startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso);
-    }
-    if (StringUtils.isNotBlank(endTimeIso)) {
-      endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso);
-    }
-
-    if (startTime != null && endTime != null) {
-      DateTime innerStartTime = startTime;
-      DateTime innerEndTime = endTime;
-
-      new Thread(new Runnable() {
-        @Override
-        public void run() {
-          detectionJobScheduler.runBackfill(id, innerStartTime, innerEndTime, force);
-        }
-      }).start();
-    }
-
-    return Response.ok().build();
-  }
-
   @DELETE
   @Path("/{id}")
   public Response disable(@PathParam("id") Long id) throws Exception {
@@ -208,22 +172,18 @@ public class DetectionJobResource {
    *
    * As the anomaly result regeneration is a heavy job, we move the function from Dashboard to worker
    * @param id anomaly function id
-   * @param monitoringWindowStartTime The start time of the monitoring window (in milli-second)
-   * @param monitoringWindowEndTime The start time of the monitoring window (in milli-second)
+   * @param startTimeIso The start time of the monitoring window (in ISO Format), ex: 2016-5-23T00:00:00Z
+   * @param endTimeIso The start time of the monitoring window (in ISO Format)
    * @param isForceBackfill false to resume backfill from the latest left off
    * @return HTTP response of this request
    * @throws Exception
    */
-  //private final String detectionHost = "localhost";
-  //private final int detectionPort = 1867;
   @POST
-  @Path("/{id}/regenerateAnomaliesInRange")
-  public Response regenerateAnomaliesInRange(@PathParam("id") String id,
-//      @QueryParam("detectionHost") String detectionHost,
-//      @QueryParam("detectionPort") int detectionPort,
-      @QueryParam("start") long monitoringWindowStartTime,
-      @QueryParam("end") long monitoringWindowEndTime,
-      @QueryParam("forceBackfill") @DefaultValue("false") String isForceBackfill) throws Exception {
+  @Path("/{id}/generateAnomaliesInRange")
+  public Response generateAnomaliesInRange(@PathParam("id") String id,
+      @QueryParam("start") String startTimeIso,
+      @QueryParam("end") String endTimeIso,
+      @QueryParam("force") @DefaultValue("false") String isForceBackfill) throws Exception {
     long functionId = Long.valueOf(id);
     AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
     if (anomalyFunction == null) {
@@ -234,15 +194,15 @@ public class DetectionJobResource {
     // Check if the timestamps are available
     DateTime startTime = null;
     DateTime endTime = null;
-    if (monitoringWindowStartTime < 0) {
+    if (startTimeIso == null || startTimeIso.isEmpty()) {
       throw new IllegalArgumentException(String.format("[functionId %s] Monitoring start time is not found", id));
     }
-    if (monitoringWindowEndTime < 0) {
+    if (endTimeIso == null || endTimeIso.isEmpty()) {
       throw new IllegalArgumentException(String.format("[functionId %s] Monitoring end time is not found", id));
     }
 
-    startTime = new DateTime(monitoringWindowStartTime);
-    endTime = new DateTime(monitoringWindowEndTime);
+    startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso);
+    endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso);;
 
     if(startTime.isAfter(endTime)){
       throw new IllegalArgumentException(String.format(
