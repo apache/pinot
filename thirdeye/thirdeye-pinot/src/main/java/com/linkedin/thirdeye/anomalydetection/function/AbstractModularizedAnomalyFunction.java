@@ -3,7 +3,6 @@ package com.linkedin.thirdeye.anomalydetection.function;
 import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyDetectionContext;
 import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
-import com.linkedin.thirdeye.anomalydetection.context.TimeSeriesKey;
 import com.linkedin.thirdeye.anomalydetection.model.data.DataModel;
 import com.linkedin.thirdeye.anomalydetection.model.data.NoopDataModel;
 import com.linkedin.thirdeye.anomalydetection.model.detection.DetectionModel;
@@ -38,8 +37,6 @@ import org.slf4j.LoggerFactory;
 public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunction implements AnomalyDetectionFunction {
   protected final Logger LOGGER = LoggerFactory.getLogger(this.getClass());
 
-  public static final String DEFAULT_MESSAGE_TEMPLATE = "weight: %.2f, score: %.2f";
-
   protected AnomalyFunctionDTO spec;
   protected Properties properties;
 
@@ -71,6 +68,8 @@ public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunc
   public List<RawAnomalyResultDTO> analyze(AnomalyDetectionContext anomalyDetectionContext)
       throws Exception {
     if (!checkPrecondition(anomalyDetectionContext)) {
+      LOGGER.error("The precondition of anomaly detection context does not hold: please make sure"
+          + "the observed time series and anomaly function are not null.");
       return Collections.emptyList();
     }
 
@@ -91,27 +90,12 @@ public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunc
         // Transform current and baseline time series and train the prediction model
         preparePredictionModel(anomalyDetectionContext);
       } else {
+        LOGGER.error("The precondition of anomaly detection context does not hold: please make sure"
+            + "the observed time series and anomaly function are not null.");
         return;
       }
     }
     mergeModel.update(anomalyDetectionContext, anomalyToUpdated);
-    this.writeMergedAnomalyInfo(mergeModel, anomalyToUpdated);
-  }
-
-  /**
-   * This method is invoked after updateMergedAnomalyInfo. The method should define the actions
-   * to update the values in computed merge model to the anomaly to be updated.
-   *
-   * @param computedMergeModel a computed merge model.
-   * @param anomalyToBeUpdated the anomaly to be updated.
-   */
-  protected void writeMergedAnomalyInfo(MergeModel computedMergeModel,
-      MergedAnomalyResultDTO anomalyToBeUpdated) {
-    double weight = computedMergeModel.getWeight();
-    double score = computedMergeModel.getScore();
-    anomalyToBeUpdated.setWeight(weight);
-    anomalyToBeUpdated.setScore(score);
-    anomalyToBeUpdated.setMessage(String.format(DEFAULT_MESSAGE_TEMPLATE, weight, score));
   }
 
   /**
@@ -177,7 +161,7 @@ public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunc
     anomalyDetectionContext.setTrainedPredictionModel(predictionModel);
   }
 
-  //////////////////// Methods for backward compatibility /////////////////////////
+  //////////////////// Wrapper methods for backward compatibility /////////////////////////
   @Override
   public List<Pair<Long, Long>> getDataRangeIntervals(Long monitoringWindowStartTime,
       Long monitoringWindowEndTime) {
@@ -190,24 +174,10 @@ public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunc
   public List<RawAnomalyResultDTO> analyze(DimensionMap exploredDimensions, MetricTimeSeries timeSeries,
       DateTime windowStart, DateTime windowEnd, List<MergedAnomalyResultDTO> knownAnomalies)
       throws Exception {
-    // Create the anomaly detection context for the new modularized anomaly function
-    AnomalyDetectionContext anomalyDetectionContext = new AnomalyDetectionContext();
-    anomalyDetectionContext.setAnomalyDetectionFunction(this);
+    AnomalyDetectionContext anomalyDetectionContext = BackwardAnomalyFunctionUtils
+        .buildAnomalyDetectionContext(this, timeSeries, spec.getMetric(), exploredDimensions,
+            windowStart, windowEnd);
 
-    TimeSeriesKey timeSeriesKey = new TimeSeriesKey();
-    timeSeriesKey.setDimensionMap(exploredDimensions);
-    timeSeriesKey.setMetricName(spec.getMetric());
-    anomalyDetectionContext.setTimeSeriesKey(timeSeriesKey);
-
-    List<Interval> intervals = this.getTimeSeriesIntervals(windowStart.getMillis(), windowEnd.getMillis());
-    List<TimeSeries> timeSeriesList =
-        BackwardAnomalyFunctionUtils.splitSetsOfTimeSeries(timeSeries, spec.getMetric(), intervals);
-
-    anomalyDetectionContext.setCurrent(timeSeriesList.get(0));
-    timeSeriesList.remove(0);
-    anomalyDetectionContext.setBaselines(timeSeriesList);
-
-    // Detect anomalies using the method from the new modularized anomaly function
     return this.analyze(anomalyDetectionContext);
   }
 
@@ -215,6 +185,14 @@ public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunc
   public void updateMergedAnomalyInfo(MergedAnomalyResultDTO anomalyToUpdated,
       MetricTimeSeries timeSeries, DateTime windowStart, DateTime windowEnd,
       List<MergedAnomalyResultDTO> knownAnomalies) throws Exception {
+    AnomalyDetectionContext anomalyDetectionContext = null;
 
+    if (!(mergeModel instanceof NoPredictionMergeModel)) {
+      anomalyDetectionContext = BackwardAnomalyFunctionUtils
+          .buildAnomalyDetectionContext(this, timeSeries, spec.getMetric(),
+              anomalyToUpdated.getDimensions(), windowStart, windowEnd);
+    }
+
+    updateMergedAnomalyInfo(anomalyDetectionContext, anomalyToUpdated);
   }
 }

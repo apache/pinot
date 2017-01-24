@@ -1,12 +1,16 @@
 package com.linkedin.thirdeye.anomalydetection.function;
 
 import com.linkedin.pinot.pql.parsers.utils.Pair;
+import com.linkedin.thirdeye.anomalydetection.context.AnomalyDetectionContext;
 import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
+import com.linkedin.thirdeye.anomalydetection.context.TimeSeriesKey;
+import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import org.joda.time.DateTime;
 import org.joda.time.Interval;
 
 public class BackwardAnomalyFunctionUtils {
@@ -55,6 +59,43 @@ public class BackwardAnomalyFunctionUtils {
       }
     }
     return timeSeriesList;
+  }
+
+  /**
+   * Returns an anomaly detection context from the given information.
+   *
+   * @param anomalyFunction the anomaly function for anomaly detection.
+   * @param timeSeries the given time series.
+   * @param metric the metric name of the given time series.
+   * @param exploredDimensions the dimension map of the given time series.
+   * @param windowStart the start of the interval of the time series.
+   * @param windowEnd the end of the interval of the time series.
+   *
+   * @return an anomaly detection context from the given information.
+   */
+  public static AnomalyDetectionContext buildAnomalyDetectionContext(
+      AnomalyDetectionFunction anomalyFunction, MetricTimeSeries timeSeries, String metric,
+      DimensionMap exploredDimensions, DateTime windowStart, DateTime windowEnd) {
+    // Create the anomaly detection context for the new modularized anomaly function
+    AnomalyDetectionContext anomalyDetectionContext = new AnomalyDetectionContext();
+    anomalyDetectionContext.setAnomalyDetectionFunction(anomalyFunction);
+
+    // Construct TimeSeriesKey
+    TimeSeriesKey timeSeriesKey = new TimeSeriesKey();
+    timeSeriesKey.setDimensionMap(exploredDimensions);
+    timeSeriesKey.setMetricName(metric);
+    anomalyDetectionContext.setTimeSeriesKey(timeSeriesKey);
+
+    // Split metric time series to observed time series and baselines
+    List<Interval> intervals =
+        anomalyFunction.getTimeSeriesIntervals(windowStart.getMillis(), windowEnd.getMillis());
+    List<TimeSeries> timeSeriesList =
+        BackwardAnomalyFunctionUtils.splitSetsOfTimeSeries(timeSeries, metric, intervals);
+    anomalyDetectionContext.setCurrent(timeSeriesList.get(0));
+    timeSeriesList.remove(0);
+    anomalyDetectionContext.setBaselines(timeSeriesList);
+
+    return anomalyDetectionContext;
   }
 
   /**

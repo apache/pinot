@@ -2,20 +2,17 @@ package com.linkedin.thirdeye.anomalydetection.function;
 
 import com.linkedin.thirdeye.anomalydetection.model.data.SeasonalDataModel;
 import com.linkedin.thirdeye.anomalydetection.model.detection.SimpleThresholdDetectionModel;
-import com.linkedin.thirdeye.anomalydetection.model.merge.MergeModel;
 import com.linkedin.thirdeye.anomalydetection.model.merge.SimplePercentageMergeModel;
 import com.linkedin.thirdeye.anomalydetection.model.prediction.SeasonalAveragePredictionModel;
 import com.linkedin.thirdeye.anomalydetection.model.transform.MovingAverageSmoothingFunction;
 import com.linkedin.thirdeye.anomalydetection.model.transform.TransformationFunction;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.Properties;
 import org.apache.commons.lang3.StringUtils;
 
 public class WeekOverWeekRule extends AbstractModularizedAnomalyFunction {
   public static final String BASELINE = "baseline";
   public static final String ENABLE_SMOOTHING = "enableSmoothing";
-  public static final String DEFAULT_MESSAGE_TEMPLATE = "change : %.2f %%, currentVal : %.2f, baseLineVal : %.2f";
 
   @Override
   public void init(AnomalyFunctionDTO spec) throws Exception {
@@ -50,29 +47,17 @@ public class WeekOverWeekRule extends AbstractModularizedAnomalyFunction {
     mergeModel.init(this.properties);
   }
 
-  protected void writeMergedAnomalyInfo(MergeModel computedMergeModel,
-      MergedAnomalyResultDTO anomalyToBeUpdated) {
-    SimplePercentageMergeModel simplePercentageMergeModel =
-        (SimplePercentageMergeModel) computedMergeModel;
-    double weight = simplePercentageMergeModel.getWeight();
-    double score = simplePercentageMergeModel.getScore();
-    double avgObserved = simplePercentageMergeModel.getAvgObserved();
-    double avgExpected = simplePercentageMergeModel.getAvgExpected();
-
-    anomalyToBeUpdated.setWeight(weight);
-    anomalyToBeUpdated.setScore(score);
-    anomalyToBeUpdated.setMessage(
-        String.format(DEFAULT_MESSAGE_TEMPLATE, weight * 100, avgObserved, avgExpected));
-  }
-
   /**
-   * The strings in the format of "w/w" is defined to be backward compatible with old anomaly
-   * detection framework. These strings should be deprecated after the migration.
+   * Parses the human readable string of baseline property and sets up SEASONAL_PERIOD and
+   * SEASONAL_SIZE.
    *
-   * TODO: Replace the w/w strings with ENUM.
+   * The string should be given in this regex format: [wW][/o][0-9]?[wW]. For example, this string
+   * "Wo2W" means comparing the current week with the 2 week prior.
    *
-   * @param baselineProp The human readable string of baseline property for setting up
-   *                     SEASONAL_PERIOD and SEASONAL_SIZE.
+   * If the string ends with "Avg", then the property becomes week-over-weeks-average. For instance,
+   * "W/4wAvg" means comparing the current week with the average of the past 4 weeks.
+   *
+   * @param baselineProp The human readable string of baseline property.
    */
   private void initPropertiesForDataModel(String baselineProp) {
     // The basic settings for w/w
@@ -80,18 +65,59 @@ public class WeekOverWeekRule extends AbstractModularizedAnomalyFunction {
     this.properties.setProperty(SeasonalDataModel.SEASONAL_SIZE, "7");
     this.properties.setProperty(SeasonalDataModel.SEASONAL_UNIT, "DAYS");
     // Change the setting for different w/w types
-    if ("w/2w".equals(baselineProp)) {
-      this.properties.setProperty(SeasonalDataModel.SEASONAL_SIZE, "14");
-    } else if ("w/3w".equals(baselineProp)) {
-      this.properties.setProperty(SeasonalDataModel.SEASONAL_SIZE, "21");
-    } else if ("w/4w".equals(baselineProp)) {
-      this.properties.setProperty(SeasonalDataModel.SEASONAL_SIZE, "28");
-    } else if ("w/2wAvg".equals(baselineProp)) {
-      this.properties.setProperty(SeasonalDataModel.SEASONAL_PERIOD, "2");
-    } else if ("w/3wAvg".equals(baselineProp)) {
-      this.properties.setProperty(SeasonalDataModel.SEASONAL_PERIOD, "3");
-    } else if ("w/4wAvg".equals(baselineProp)) {
-      this.properties.setProperty(SeasonalDataModel.SEASONAL_PERIOD, "4");
+    if (StringUtils.isBlank(baselineProp)) {
+      return;
     }
+    String intString = parseWowString(baselineProp);
+    if (baselineProp.endsWith("Avg")) { // Week-Over-Weeks_Average
+      // example: "w/4wAvg" --> SeasonalDataModel.SEASONAL_PERIOD = "4"
+      this.properties.setProperty(SeasonalDataModel.SEASONAL_PERIOD, intString);
+    } else { // Week-Over-Week
+      // example: "w/2w" --> SeasonalDataModel.SEASONAL_SIZE = "14"
+      this.properties.setProperty(SeasonalDataModel.SEASONAL_SIZE, intString);
+    }
+  }
+
+  /**
+   * Returns the first integer of a string; returns 1 if no integer could be found.
+   *
+   * Examples:
+   * 1. "w/w": returns 1
+   * 2. "Wo4W": returns 4
+   * 3. "W/343wABCD": returns 343
+   * 4. "2abc": returns 2
+   * 5. "A Random string 34 and it is 54 a long one": returns 34
+   *
+   * @param wowString a string.
+   * @return the integer of a WoW string.
+   */
+  private static String parseWowString(String wowString) {
+    if (StringUtils.isBlank(wowString)) {
+      return "1";
+    }
+
+    char[] chars = wowString.toCharArray();
+    int head = -1;
+    int tail = -1;
+    int idx = 0;
+    for (; idx < chars.length; ++idx) {
+      if ('0' <= chars[idx] && chars[idx] <= '9') {
+        head = idx;
+        break;
+      }
+    }
+    if (head < 0) {
+      return "1";
+    }
+    for (++idx; idx < chars.length; ++idx) {
+      if (chars[idx] <= '0' || '9' <= chars[idx]) {
+        tail = idx;
+        break;
+      }
+    }
+    if (tail < 0) {
+      tail = chars.length;
+    }
+    return wowString.substring(head, tail);
   }
 }

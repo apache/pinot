@@ -18,7 +18,7 @@ public interface MergeModel {
 
   /**
    * Computes the information, e.g., weight, score, average current values, average baseline values,
-   * etc., of the given anomaly.
+   * etc., of the given anomaly and update the information to the anomaly.
    *
    * @param anomalyDetectionContext the context that provides the trained prediction model for
    *                                update the information of the given (merged) anomaly.
@@ -26,16 +26,4 @@ public interface MergeModel {
    * @param anomalyToUpdated the anomaly of which the information is updated.
    */
   void update(AnomalyDetectionContext anomalyDetectionContext, MergedAnomalyResultDTO anomalyToUpdated);
-
-  /**
-   * Returns the updated weight of the merged anomaly.
-   * @return the updated weight of the merged anomaly.
-   */
-  double getWeight();
-
-  /**
-   * Returns the updated score of the merged anomaly.
-   * @return the updated score of the merged anomaly.
-   */
-  double getScore();
 }

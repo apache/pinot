@@ -14,8 +14,7 @@ import org.slf4j.LoggerFactory;
 public class SimplePercentageMergeModel extends AbstractMergeModel {
   private static final Logger LOGGER = LoggerFactory.getLogger(SimplePercentageMergeModel.class);
 
-  private double avgObserved;
-  private double avgExpected;
+  private static final String DEFAULT_MESSAGE_TEMPLATE = "change : %.2f %%, currentVal : %.2f, baseLineVal : %.2f";
 
   /**
    * The weight of the merged anomaly is calculated by this equation:
@@ -40,6 +39,7 @@ public class SimplePercentageMergeModel extends AbstractMergeModel {
     PredictionModel predictionModel = anomalyDetectionContext.getTrainedPredictionModel();
     if (!(predictionModel instanceof ExpectedTimeSeriesPredictionModel)) {
       LOGGER.error("SimplePercentageMergeModel expects an ExpectedTimeSeriesPredictionModel but the trained model is not one.");
+      return;
     }
 
     ExpectedTimeSeriesPredictionModel expectedTimeSeriesPredictionModel =
@@ -51,8 +51,8 @@ public class SimplePercentageMergeModel extends AbstractMergeModel {
     TimeSeries observedTimeSeries = anomalyDetectionContext.getCurrent();
     long observedStartTime = observedTimeSeries.getTimeSeriesInterval().getStartMillis();
 
-    avgObserved = 0d;
-    avgExpected = 0d;
+    double avgObserved = 0d;
+    double avgExpected = 0d;
     int count = 0;
     for (long observedTimestamp : observedTimeSeries.timestampSet()) {
       long offset = observedTimestamp - observedStartTime;
@@ -65,6 +65,7 @@ public class SimplePercentageMergeModel extends AbstractMergeModel {
       }
     }
 
+    double weight = 0d;
     if (count != 0 && avgExpected != 0d) {
       weight = (avgObserved - avgExpected) / avgExpected;
       avgObserved /= count;
@@ -74,8 +75,8 @@ public class SimplePercentageMergeModel extends AbstractMergeModel {
     }
 
     // Average score of raw anomalies
-    List<RawAnomalyResultDTO> rawAnomalyResultDTOs = anomalyDetectionContext.getRawAnomalies();
-    score = 0d;
+    List<RawAnomalyResultDTO> rawAnomalyResultDTOs = anomalyToUpdated.getAnomalyResults();
+    double score = 0d;
     if (CollectionUtils.isNotEmpty(rawAnomalyResultDTOs)) {
       for (RawAnomalyResultDTO rawAnomaly : rawAnomalyResultDTOs) {
         score += rawAnomaly.getScore();
@@ -84,13 +85,10 @@ public class SimplePercentageMergeModel extends AbstractMergeModel {
     } else {
       score = anomalyToUpdated.getScore();
     }
-  }
 
-  public double getAvgObserved() {
-    return avgObserved;
-  }
-
-  public double getAvgExpected() {
-    return avgExpected;
+    anomalyToUpdated.setWeight(weight);
+    anomalyToUpdated.setScore(score);
+    anomalyToUpdated.setMessage(
+        String.format(DEFAULT_MESSAGE_TEMPLATE, weight * 100, avgObserved, avgExpected));
   }
 }

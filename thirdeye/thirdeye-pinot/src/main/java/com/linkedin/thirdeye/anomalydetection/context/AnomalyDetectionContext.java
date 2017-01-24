@@ -1,16 +1,13 @@
 package com.linkedin.thirdeye.anomalydetection.context;
 
 import com.linkedin.thirdeye.anomalydetection.function.AnomalyDetectionFunction;
-import com.linkedin.thirdeye.anomalydetection.model.merge.MergeModel;
 import com.linkedin.thirdeye.anomalydetection.model.prediction.PredictionModel;
-import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import java.util.List;
 
 /**
  * The context for performing an anomaly detection on the sets of time series from the same
  * dimension and metric. The context also provides field, to which the anomaly function can appends
- * the intermediate results such as transformed time series, trained prediction model, raw
- * anomalies, etc.
+ * the intermediate results such as transformed time series, trained prediction model, etc.
  */
 public class AnomalyDetectionContext {
   // The followings are inputs for anomaly detection
@@ -23,13 +20,11 @@ public class AnomalyDetectionContext {
 
   //TODO: Add DAO for accessing historical anomalies or scaling factor
 
-  // The followings are appended during anomaly detection
+  // The followings are intermediate results and are appended during anomaly detection
   private TimeSeries transformedCurrent;
   private List<TimeSeries> transformedBaselines;
 
   private PredictionModel trainedPredictionModel;
-
-  private List<RawAnomalyResultDTO> rawAnomalies;
 
   /**
    * Returns the key of the time series, which contains metric name and dimension map.
@@ -134,19 +129,5 @@ public class AnomalyDetectionContext {
    */
   public void setTrainedPredictionModel(PredictionModel trainedPredictionModel) {
     this.trainedPredictionModel = trainedPredictionModel;
-  }
-
-  /**
-   * Returns the list of raw anomalies after anomaly detection.
-   */
-  public List<RawAnomalyResultDTO> getRawAnomalies() {
-    return rawAnomalies;
-  }
-
-  /**
-   * Sets the lists of raw anomalies. This method is supposed to be used by Detection Model.
-   */
-  public void setRawAnomalies(List<RawAnomalyResultDTO> rawAnomalies) {
-    this.rawAnomalies = rawAnomalies;
   }
 }

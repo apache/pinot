@@ -7,6 +7,8 @@ import java.util.List;
 import org.apache.commons.collections.CollectionUtils;
 
 public class AverageAnomalyMergeModel extends AbstractMergeModel {
+  private static final String DEFAULT_MESSAGE_TEMPLATE = "weight: %.2f, score: %.2f";
+
   /**
    * The weight and score is the average weight and score, respectively, of the raw anomalies of
    * the given merged anomaly. If the merged anomaly could not provides the list of its raw
@@ -24,8 +26,8 @@ public class AverageAnomalyMergeModel extends AbstractMergeModel {
     }
     List<RawAnomalyResultDTO> rawAnomalyResultDTOs = anomalyToUpdated.getAnomalyResults();
 
-    weight = 0d;
-    score = 0d;
+    double weight = 0d;
+    double score = 0d;
     for (RawAnomalyResultDTO rawAnomaly : rawAnomalyResultDTOs) {
       weight += rawAnomaly.getWeight();
       score += rawAnomaly.getScore();
@@ -35,5 +37,9 @@ public class AverageAnomalyMergeModel extends AbstractMergeModel {
       weight /= size;
       score /= size;
     }
+
+    anomalyToUpdated.setWeight(weight);
+    anomalyToUpdated.setScore(score);
+    anomalyToUpdated.setMessage(String.format(DEFAULT_MESSAGE_TEMPLATE, weight, score));
   }
 }
