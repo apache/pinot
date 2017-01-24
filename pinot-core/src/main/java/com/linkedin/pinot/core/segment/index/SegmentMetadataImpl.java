@@ -86,8 +86,11 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private char _paddingCharacter = V1Constants.Str.DEFAULT_STRING_PAD_CHAR;
   private int _hllLog2m = HllConstants.DEFAULT_LOG2M;
   private final Map<String, String> _hllDerivedColumnMap = new HashMap<>();
+  private int _totalDocs;
+  private int _totalRawDocs;
 
-  public SegmentMetadataImpl(File indexDir) throws ConfigurationException, IOException {
+  public SegmentMetadataImpl(File indexDir)
+      throws ConfigurationException, IOException {
     LOGGER.debug("SegmentMetadata location: {}", indexDir);
     File tmpMetadataFile = SegmentDirectoryPaths.findMetadataFile(indexDir);
     if (tmpMetadataFile == null) {
@@ -108,6 +111,9 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
     setTimeIntervalAndGranularity();
     LOGGER.debug("loaded metadata for {}", indexDir.getName());
+    _totalDocs = _segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS);
+    _totalRawDocs = _segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_RAW_DOCS,
+        _totalDocs);
   }
 
   public SegmentMetadataImpl(OfflineSegmentZKMetadata offlineSegmentZKMetadata) {
@@ -115,7 +121,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
     _segmentMetadataPropertiesConfiguration.addProperty(Segment.SEGMENT_CREATOR_VERSION, null);
 
-    _segmentMetadataPropertiesConfiguration.addProperty(Segment.SEGMENT_PADDING_CHARACTER, V1Constants.Str.DEFAULT_STRING_PAD_CHAR);
+    _segmentMetadataPropertiesConfiguration.addProperty(Segment.SEGMENT_PADDING_CHARACTER,
+        V1Constants.Str.DEFAULT_STRING_PAD_CHAR);
 
     _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME,
         Long.toString(offlineSegmentZKMetadata.getStartTime()));
@@ -146,6 +153,9 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     _allColumns = new HashSet<String>();
     _indexDir = null;
     _metadataFile = null;
+    _totalDocs = _segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS);
+    _totalRawDocs = _segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_RAW_DOCS,
+        _totalDocs);
   }
 
   public SegmentMetadataImpl(RealtimeSegmentZKMetadata segmentMetadata) {
@@ -154,7 +164,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
     _segmentMetadataPropertiesConfiguration.addProperty(Segment.SEGMENT_CREATOR_VERSION, null);
 
-    _segmentMetadataPropertiesConfiguration.addProperty(Segment.SEGMENT_PADDING_CHARACTER, V1Constants.Str.DEFAULT_STRING_PAD_CHAR);
+    _segmentMetadataPropertiesConfiguration.addProperty(Segment.SEGMENT_PADDING_CHARACTER,
+        V1Constants.Str.DEFAULT_STRING_PAD_CHAR);
 
     _segmentMetadataPropertiesConfiguration.addProperty(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME,
         Long.toString(segmentMetadata.getStartTime()));
@@ -182,6 +193,9 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     _allColumns = new HashSet<String>();
     _indexDir = null;
     _metadataFile = null;
+    _totalDocs = _segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS);
+    _totalRawDocs = _segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_RAW_DOCS,
+        _totalDocs);
   }
 
   public SegmentMetadataImpl(RealtimeSegmentZKMetadata segmentMetadata, Schema schema) {
@@ -222,7 +236,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     }
   }
 
-  private void loadCreationMeta(File crcFile) throws IOException {
+  private void loadCreationMeta(File crcFile)
+      throws IOException {
     if (crcFile.exists()) {
       final DataInputStream ds = new DataInputStream(new FileInputStream(crcFile));
       _crc = ds.readLong();
@@ -245,8 +260,9 @@ public class SegmentMetadataImpl implements SegmentMetadata {
       _paddingCharacter = StringEscapeUtils.unescapeJava(padding).charAt(0);
     }
 
-    String versionString = _segmentMetadataPropertiesConfiguration
-        .getString(V1Constants.MetadataKeys.Segment.SEGMENT_VERSION, SegmentVersion.v1.toString());
+    String versionString =
+        _segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Segment.SEGMENT_VERSION,
+            SegmentVersion.v1.toString());
     _segmentVersion = SegmentVersion.valueOf(versionString);
 
     final Iterator<String> metrics =
@@ -317,8 +333,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
     // Set the maxLeafRecords
     String maxLeafRecordsString =
-        _segmentMetadataPropertiesConfiguration.getString(
-            MetadataKeys.StarTree.STAR_TREE_MAX_LEAF_RECORDS);
+        _segmentMetadataPropertiesConfiguration.getString(MetadataKeys.StarTree.STAR_TREE_MAX_LEAF_RECORDS);
     if (maxLeafRecordsString != null) {
       _starTreeMetadata.setMaxLeafRecords(Long.valueOf(maxLeafRecordsString));
     }
@@ -416,12 +431,12 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   @Override
   public int getTotalDocs() {
-    return _segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS);
+    return _totalDocs;
   }
 
   @Override
   public int getTotalRawDocs() {
-    return _segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_RAW_DOCS, getTotalDocs());
+    return _totalRawDocs;
   }
 
   @Override
@@ -599,15 +614,14 @@ public class SegmentMetadataImpl implements SegmentMetadata {
       TimeZone timeZone = TimeZone.getTimeZone("UTC");
       DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss:SSS' UTC'");
       dateFormat.setTimeZone(timeZone);
-      String creationTimeStr = _creationTime != Long.MIN_VALUE  ? dateFormat.format(new Date(_creationTime)) : "";
+      String creationTimeStr = _creationTime != Long.MIN_VALUE ? dateFormat.format(new Date(_creationTime)) : "";
       rootMeta.put("creationTimeReadable", creationTimeStr);
       rootMeta.put("timeGranularitySec", _timeGranularity != null ? _timeGranularity.getStandardSeconds() : null);
       if (_timeInterval == null) {
-        rootMeta.put("startTimeMillis", (String)null);
+        rootMeta.put("startTimeMillis", (String) null);
         rootMeta.put("startTimeReadable", "null");
-        rootMeta.put("endTimeMillis", (String)null);
+        rootMeta.put("endTimeMillis", (String) null);
         rootMeta.put("endTimeReadable", "null");
-
       } else {
         rootMeta.put("startTimeMillis", _timeInterval.getStartMillis());
         rootMeta.put("startTimeReadable", _timeInterval.getStart().toString());
