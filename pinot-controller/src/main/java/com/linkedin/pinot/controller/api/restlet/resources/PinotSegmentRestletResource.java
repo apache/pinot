@@ -232,12 +232,18 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
 
     JSONArray ret = new JSONArray();
     String tableNameWithType = null;
-    List<String> segmentsToToggle;
+    List<String> segmentsToToggle = new ArrayList<>();
+    String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
+    String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
 
     if (segmentName != null) {
       segmentsToToggle = Collections.singletonList(segmentName);
     } else {
-      segmentsToToggle = _pinotHelixResourceManager.getAllSegmentsForResource(tableName);
+      // Check if there is a realtime table. If there is, remove all segments for realtime
+      if (_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
+        segmentsToToggle.addAll(_pinotHelixResourceManager.getAllSegmentsForResource(realtimeTableName));
+      }
+      segmentsToToggle.addAll(_pinotHelixResourceManager.getAllSegmentsForResource(offlineTableName));
     }
     if ((tableType == null
         && SegmentName.getSegmentType(segmentsToToggle.get(0)).equals(SegmentName.RealtimeSegmentType.UNSUPPORTED)
