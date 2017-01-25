@@ -564,9 +564,10 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
     try {
       final String tableName = (String) getRequest().getAttributes().get("tableName");
       final String segmentName = (String) getRequest().getAttributes().get("segmentName");
+      final String tableType = getReference().getQueryAsForm().getValues(TABLE_TYPE);
 
       LOGGER.info("Getting segment deletion request, tableName: " + tableName + " segmentName: " + segmentName);
-      rep = deleteOneSegment(tableName, segmentName);
+      rep = deleteOneSegment(tableName, segmentName, tableType);
     } catch (final Exception e) {
       rep = exceptionToStringRepresentation(e);
       LOGGER.error("Caught exception while processing delete request", e);
@@ -584,10 +585,12 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
       @Parameter(name = "tableName", in = "path", description = "The name of the table in which the segment resides",
           required = true) String tableName,
       @Parameter(name = "segmentName", in = "path", description = "The name of the segment to delete",
-          required = true) String segmentName)
+          required = true) String segmentName,
+      @Parameter(name = "type", in = "query", description = "Type of table {offline|realtime}",
+          required = true) String tableType)
       throws JsonProcessingException, JSONException {
 
-    return new PinotSegmentRestletResource().toggleSegmentState(tableName, segmentName, "drop", null);
+    return new PinotSegmentRestletResource().toggleSegmentState(tableName, segmentName, "drop", tableType);
   }
 
   @HttpVerb("delete")
@@ -596,10 +599,12 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
   @Paths({ "/segments/{tableName}", "/segments/{tableName}/" })
   private Representation deleteAllSegments(
       @Parameter(name = "tableName", in = "path", description = "The name of the table in which the segment resides",
-          required = true) String tableName)
+          required = true) String tableName,
+      @Parameter(name = "type", in = "query", description = "Type of table {offline|realtime}",
+      required = true) String tableType)
       throws JsonProcessingException, JSONException {
 
-    return new PinotSegmentRestletResource().toggleSegmentState(tableName, null, "drop", null);
+    return new PinotSegmentRestletResource().toggleSegmentState(tableName, null, "drop", tableType);
   }
 
   /**

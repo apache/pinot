@@ -36,6 +36,7 @@ import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import javax.annotation.Nonnull;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -227,46 +228,42 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
    * @throws JsonProcessingException
    * @throws JSONException
    */
-  protected Representation toggleSegmentState(String tableName, String segmentName, String state, String tableType)
+  protected Representation toggleSegmentState(String tableName, String segmentName, String state, @Nonnull String tableType)
       throws JsonProcessingException, JSONException {
 
     JSONArray ret = new JSONArray();
-    String tableNameWithType = null;
     List<String> segmentsToToggle = new ArrayList<>();
     String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
     String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
+    String tableNameWithType = "";
 
-    if (segmentName != null) {
-      segmentsToToggle = Collections.singletonList(segmentName);
-    } else {
-      // Check if there is a realtime table. If there is, remove all segments for realtime
+    if (TableType.REALTIME.name().equalsIgnoreCase(tableType)) {
       if (_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
-        segmentsToToggle.addAll(_pinotHelixResourceManager.getAllSegmentsForResource(realtimeTableName));
+        tableNameWithType = realtimeTableName;
+        if (segmentName != null) {
+          segmentsToToggle = Collections.singletonList(segmentName);
+        } else {
+          segmentsToToggle.addAll(_pinotHelixResourceManager.getAllSegmentsForResource(realtimeTableName));
+        }
+      } else {
+        throw new UnsupportedOperationException("There is no realtime table for " + tableName);
       }
-      segmentsToToggle.addAll(_pinotHelixResourceManager.getAllSegmentsForResource(offlineTableName));
-    }
-    if ((tableType == null
-        && SegmentName.getSegmentType(segmentsToToggle.get(0)).equals(SegmentName.RealtimeSegmentType.UNSUPPORTED)
-        || TableType.OFFLINE.name().equalsIgnoreCase(tableType))
-        && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
-      tableNameWithType = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
-
-    }
-
-    if ((tableType == null
-        && !SegmentName.getSegmentType(segmentsToToggle.get(0)).equals(SegmentName.RealtimeSegmentType.UNSUPPORTED)
-        || TableType.REALTIME.name().equalsIgnoreCase(tableType))
-        && _pinotHelixResourceManager.hasRealtimeTable(tableName)) {
-      tableNameWithType = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
+    } else {
+      if (_pinotHelixResourceManager.hasOfflineTable(tableName)) {
+        tableNameWithType = offlineTableName;
+        if (segmentName != null) {
+          segmentsToToggle = Collections.singletonList(segmentName);
+        } else {
+          segmentsToToggle.addAll(_pinotHelixResourceManager.getAllSegmentsForResource(offlineTableName));
+        }
+      } else {
+        throw new UnsupportedOperationException("There is no offline table for " + tableName);
+      }
     }
 
-
-    if (tableNameWithType != null) {
-
-      PinotResourceManagerResponse resourceManagerResponse = toggleSegmentsForTable(segmentsToToggle, tableNameWithType, segmentName, state);
-      setStatus(resourceManagerResponse.isSuccessful() ? Status.SUCCESS_OK : Status.SERVER_ERROR_INTERNAL);
-      ret.put(resourceManagerResponse);
-    }
+    PinotResourceManagerResponse resourceManagerResponse = toggleSegmentsForTable(segmentsToToggle, tableNameWithType, segmentName, state);
+    setStatus(resourceManagerResponse.isSuccessful() ? Status.SUCCESS_OK : Status.SERVER_ERROR_INTERNAL);
+    ret.put(resourceManagerResponse);
     return new StringRepresentation(ret.toString());
   }
 
