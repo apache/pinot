@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.completeness.checker;
 
 import java.lang.reflect.Constructor;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -157,7 +158,7 @@ public class DataCompletenessTaskRunner implements TaskRunner {
           DataCompletenessConfigDTO configToUpdate = dataCompletenessConfigDAO.findByDatasetAndDateSDF(dataset, bucketName);
           configToUpdate.setCountStar(currentCount);
           configToUpdate.setDataComplete(dataComplete);
-          configToUpdate.setPercentComplete(percentComplete);
+          configToUpdate.setPercentComplete(Double.parseDouble(new DecimalFormat("##.##").format(percentComplete)));
           configToUpdate.setNumAttempts(configToUpdate.getNumAttempts() + 1);
           dataCompletenessConfigDAO.update(configToUpdate);
           LOG.info("Updated data completeness config id:{} with count *:{} dataComplete:{} percentComplete:{} "
