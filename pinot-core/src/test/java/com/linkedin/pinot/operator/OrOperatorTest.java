@@ -133,6 +133,13 @@ public class OrOperatorTest {
 
   public BaseFilterOperator makeFilterOperator(final int[] list) {
     return new BaseFilterOperator() {
+      public static final String OPERATOR_NAME = "Anonymous";
+
+      @Override
+      public String getOperatorName() {
+        return OPERATOR_NAME;
+      }
+
       boolean alreadyInvoked = false;
 
       @Override

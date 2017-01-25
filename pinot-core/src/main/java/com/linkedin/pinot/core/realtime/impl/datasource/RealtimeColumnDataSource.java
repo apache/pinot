@@ -39,6 +39,7 @@ import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 
 public class RealtimeColumnDataSource extends DataSource {
+  private static final String OPERATOR_NAME = "RealtimeColumnDataSource";
 
   private static final int REALTIME_DICTIONARY_INIT_ID = 1;
   private Predicate predicate;
@@ -100,6 +101,11 @@ public class RealtimeColumnDataSource extends DataSource {
       blockReturned = false;
     }
     return getBlock();
+  }
+
+  @Override
+  public String getOperatorName() {
+    return OPERATOR_NAME;
   }
 
   @Override

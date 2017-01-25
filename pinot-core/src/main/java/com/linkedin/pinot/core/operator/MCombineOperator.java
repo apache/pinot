@@ -42,6 +42,7 @@ import org.slf4j.LoggerFactory;
  */
 public class MCombineOperator extends BaseOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MCombineOperator.class);
+  private static final String OPERATOR_NAME = "MCombineOperator";
 
   private final List<Operator> _operators;
   private final BrokerRequest _brokerRequest;
@@ -198,6 +199,11 @@ public class MCombineOperator extends BaseOperator {
   @Override
   public Block getNextBlock(BlockId blockId) {
     throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public String getOperatorName() {
+    return OPERATOR_NAME;
   }
 
   @Override

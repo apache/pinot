@@ -31,6 +31,7 @@ import com.linkedin.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 
 public class OrOperator extends BaseFilterOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(OrOperator.class);
+  private static final String OPERATOR_NAME = "OrOperator";
 
   private List<Operator> operators;
   private OrBlock orBlock;
@@ -65,5 +66,10 @@ public class OrOperator extends BaseFilterOperator {
       operator.close();
     }
     return true;
+  }
+
+  @Override
+  public String getOperatorName() {
+    return OPERATOR_NAME;
   }
 }

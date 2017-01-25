@@ -32,6 +32,7 @@ import javax.annotation.Nonnull;
  * The <code>AggregationOperator</code> class provides the operator for aggregation only query on a single segment.
  */
 public class AggregationOperator extends BaseOperator {
+  private static final String OPERATOR_NAME = "AggregationOperator";
   private final AggregationFunctionContext[] _aggregationFunctionContexts;
   private final TransformExpressionOperator _transformOperator;
   private final long _numTotalRawDocs;
@@ -78,6 +79,11 @@ public class AggregationOperator extends BaseOperator {
   @Override
   public Block getNextBlock(BlockId blockId) {
     throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public String getOperatorName() {
+    return OPERATOR_NAME;
   }
 
   @Override

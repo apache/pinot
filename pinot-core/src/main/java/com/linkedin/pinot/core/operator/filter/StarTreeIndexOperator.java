@@ -52,6 +52,8 @@ import com.linkedin.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 
 public class StarTreeIndexOperator extends BaseFilterOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(StarTreeIndexOperator.class);
+  private static final String OPERATOR_NAME = "StarTreeIndexOperator";
+
   private final int numRawDocs;
   private IndexSegment segment;
 
@@ -237,6 +239,12 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
 
   private BaseFilterOperator createFilterOperator(final MutableRoaringBitmap answer) {
     return new BaseFilterOperator() {
+      private static final String OPERATOR_NAME = "Anonymous";
+
+      @Override
+      public String getOperatorName() {
+        return OPERATOR_NAME;
+      }
 
       @Override
       public boolean open() {
@@ -475,6 +483,11 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
     newEntry.remainingPredicateColumns = predicateColumns;
     newEntry.remainingGroupByColumns = groupByColumns;
     searchQueue.add(newEntry);
+  }
+
+  @Override
+  public String getOperatorName() {
+    return OPERATOR_NAME;
   }
 
   class SearchEntry {

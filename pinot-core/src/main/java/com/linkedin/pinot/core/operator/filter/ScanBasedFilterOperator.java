@@ -37,6 +37,7 @@ import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 public class ScanBasedFilterOperator extends BaseFilterOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(ScanBasedFilterOperator.class);
+  private static final String OPERATOR_NAME = "ScanBasedFilterOperator";
 
   private DataSource dataSource;
   private Integer startDocId;
@@ -92,6 +93,11 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
   public boolean close() {
     dataSource.close();
     return true;
+  }
+
+  @Override
+  public String getOperatorName() {
+    return OPERATOR_NAME;
   }
 
   public static class ScanBlock extends BaseFilterBlock {

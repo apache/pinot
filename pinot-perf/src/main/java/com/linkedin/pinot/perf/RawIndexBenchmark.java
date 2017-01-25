@@ -291,6 +291,7 @@ public class RawIndexBenchmark {
    * Helper class to generate doc id's for lookup
    */
   class TestFilterOperator extends BaseFilterOperator {
+    private static final String OPERATOR_NAME = "TestFilterOperator";
     private int[] _filteredDocIds;
 
     public TestFilterOperator(int[] filteredDocIds) {
@@ -310,6 +311,11 @@ public class RawIndexBenchmark {
     @Override
     public boolean close() {
       return true;
+    }
+
+    @Override
+    public String getOperatorName() {
+      return OPERATOR_NAME;
     }
   }
 

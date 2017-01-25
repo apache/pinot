@@ -41,6 +41,7 @@ import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SortedInvertedIndexBasedFilterOperator.class);
+  private static final String OPERATOR_NAME = "SortedInvertedIndexBasedFilterOperator";
 
   private DataSource dataSource;
 
@@ -195,6 +196,11 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
   @Override
   public boolean close() {
     return true;
+  }
+
+  @Override
+  public String getOperatorName() {
+    return OPERATOR_NAME;
   }
 
   public static class SortedBlock extends BaseFilterBlock {

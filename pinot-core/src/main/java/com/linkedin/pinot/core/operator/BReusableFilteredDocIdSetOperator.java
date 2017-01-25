@@ -32,6 +32,8 @@ import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
  * for many ColumnarReaderDataSource.
  */
 public class BReusableFilteredDocIdSetOperator extends BaseOperator {
+  private static final String OPERATOR_NAME = "BReusableFilteredDocIdSetOperator";
+
   private static final ThreadLocal<int[]> DOC_ID_ARRAY = new ThreadLocal<int[]>() {
     @Override
     protected int[] initialValue() {
@@ -95,6 +97,11 @@ public class BReusableFilteredDocIdSetOperator extends BaseOperator {
   @Override
   public Block getNextBlock(BlockId blockId) {
     throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public String getOperatorName() {
+    return OPERATOR_NAME;
   }
 
   @Override
