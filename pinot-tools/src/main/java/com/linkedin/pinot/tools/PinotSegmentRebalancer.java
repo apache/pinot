@@ -87,7 +87,13 @@ public class PinotSegmentRebalancer extends PinotZKChanger {
     String rawTenantName = tenantName.replaceAll("_OFFLINE", "").replace("_REALTIME", "");
     int nRebalances = 0;
     for (ZNRecord znRecord : tableConfigs) {
-      AbstractTableConfig tableConfig = AbstractTableConfig.fromZnRecord(znRecord);
+      AbstractTableConfig tableConfig;
+      try {
+        tableConfig = AbstractTableConfig.fromZnRecord(znRecord);
+      } catch (Exception e) {
+        LOGGER.warn("Failed to parse table configuration for ZnRecord id: {}. Skipping", znRecord.getId());
+        continue;
+      }
       if (tableConfig.getTenantConfig().getServer().equals(rawTenantName)) {
         LOGGER.info(tableConfig.getTableName() + ":" + tableConfig.getTenantConfig().getServer());
         nRebalances++;

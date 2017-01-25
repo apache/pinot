@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.commons.configuration.ConfigurationRuntimeException;
 import org.apache.helix.ZNRecord;
 import org.codehaus.jackson.JsonGenerationException;
 import org.codehaus.jackson.JsonNode;
@@ -70,8 +71,13 @@ public abstract class AbstractTableConfig {
         loadIndexingConfig(new ObjectMapper().readTree(tableJson.getJSONObject("tableIndexConfig").toString()));
     QuotaConfig quotaConfig = null;
     if (tableJson.has(QuotaConfig.QUOTA_SECTION_NAME)) {
-      quotaConfig = loadQuotaConfig(new ObjectMapper().readTree(
-          tableJson.getJSONObject(QuotaConfig.QUOTA_SECTION_NAME).toString()));
+      try {
+        quotaConfig = loadQuotaConfig(
+            new ObjectMapper().readTree(tableJson.getJSONObject(QuotaConfig.QUOTA_SECTION_NAME).toString()));
+      } catch(ConfigurationRuntimeException e) {
+        LOGGER.error("Invalid quota configuration value for table: {}", tableName);
+        throw e;
+      }
     }
 
     if (tableType.equals("offline")) {
