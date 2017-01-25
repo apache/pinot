@@ -43,8 +43,9 @@ public class TaskInfoFactory {
           break;
         case DATA_COMPLETENESS:
           taskInfo = OBJECT_MAPPER.readValue(taskInfoString, DataCompletenessTaskInfo.class);
+          break;
         default:
-          LOG.error("TaskType must be one of ANOMALY_DETECTION, MONITOR, ALERT, ALERT2");
+          LOG.error("TaskType must be one of ANOMALY_DETECTION, MONITOR, ALERT, ALERT2, DATA_COMPLETENESS");
           break;
       }
     } catch (Exception e) {

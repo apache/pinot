@@ -216,6 +216,7 @@ create table if not exists data_completeness_config_index (
     date_to_check_in_ms bigint(20) not null,
     date_to_check_in_sdf varchar(20),
     data_complete boolean,
+    percent_complete double,
     base_id bigint(20) not null,
     create_time timestamp,
     update_time timestamp default current_timestamp,
@@ -226,5 +227,6 @@ create index data_completeness_config_dataset_idx on data_completeness_config_in
 create index data_completeness_config_date_idx on data_completeness_config_index(date_to_check_in_ms);
 create index data_completeness_config_sdf_idx on data_completeness_config_index(date_to_check_in_sdf);
 create index data_completeness_config_complete_idx on data_completeness_config_index(data_complete);
+create index data_completeness_config_percent_idx on data_completeness_config_index(percent_complete);
 
 

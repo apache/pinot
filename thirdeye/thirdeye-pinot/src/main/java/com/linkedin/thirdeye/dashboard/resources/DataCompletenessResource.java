@@ -25,17 +25,19 @@ public class DataCompletenessResource {
     Long currentCount = input.getCurrentCount();
 
     double percentCompleteness = 0;
-    double baselineCount = 0;
+    double baselineTotalCount = 0;
     switch (algorithm) {
       case WO4W_AVERAGE:
       default:
         for (Long baseline : baselineCounts) {
-          baselineCount = baselineCount + baseline;
+          baselineTotalCount = baselineTotalCount + baseline;
         }
-        baselineCount = baselineCount/baselineCounts.size();
+        baselineTotalCount = baselineTotalCount/baselineCounts.size();
         break;
     }
-    percentCompleteness = new Double(currentCount * 100) / baselineCount;
+    if (baselineTotalCount != 0) {
+      percentCompleteness = new Double(currentCount * 100) / baselineTotalCount;
+    }
     return percentCompleteness;
   }
 

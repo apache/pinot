@@ -48,7 +48,7 @@ public class DataCompletenessTaskUtils {
    * @param dataCompletenessStartTime
    * @return
    */
-  public static long getAdjustedStartForDataset(TimeSpec timeSpec, long dataCompletenessStartTime) {
+  public static long getAdjustedTimeForDataset(TimeSpec timeSpec, long dataCompletenessStartTime) {
     DateTime adjustedDateTime = new DateTime(dataCompletenessStartTime);
     TimeUnit unit = timeSpec.getDataGranularity().getUnit();
     switch (unit) {
@@ -57,11 +57,11 @@ public class DataCompletenessTaskUtils {
         break;
       case MINUTES:
         int roundedMinutes = (adjustedDateTime.getMinuteOfHour()/MINUTES_LEVEL_ROUNDING) * MINUTES_LEVEL_ROUNDING;
-        adjustedDateTime = adjustedDateTime.minuteOfHour().setCopy(roundedMinutes);
+        adjustedDateTime = adjustedDateTime.withTime(adjustedDateTime.getHourOfDay(), roundedMinutes, 0, 0);
         break;
       case HOURS:
       default:
-        adjustedDateTime = adjustedDateTime.minuteOfHour().setCopy(0);
+        adjustedDateTime = adjustedDateTime.withTime(adjustedDateTime.getHourOfDay(), 0, 0, 0);
         break;
     }
     return adjustedDateTime.getMillis();
@@ -184,7 +184,7 @@ public class DataCompletenessTaskUtils {
       delimiter = " OR ";
       sb.append(String.format("%s='%s'", timeSpec.getColumnName(), timeValue));
     }
-    long top = getTopForDataset(timeSpec);
+    long top = bucketNameToTimeValues.values().size();
     String pql = String.format("select count(*) from %s where %s group by %s top %s",
         dataset, sb.toString(), timeSpec.getColumnName(), top);
     Map<Long, Long> timeValueToCount = new HashMap<>();
@@ -212,33 +212,6 @@ public class DataCompletenessTaskUtils {
     }
 
     return bucketNameToCountStar;
-  }
-
-
-  /**
-   * The number of values returned by pinot query for a lookback period will change based on the granularity of the table
-   * This method will calculate the required value for the "top" clause, plus some padding
-   * @param timeSpec
-   * @return
-   */
-  public static long getTopForDataset(TimeSpec timeSpec) {
-    long top = 0;
-    long lookbackMillis = TimeUnit.MILLISECONDS.
-        convert(DataCompletenessConstants.LOOKBACK_TIME_DURATION, DataCompletenessConstants.LOOKBACK_TIMEUNIT);
-    TimeUnit unit = timeSpec.getDataGranularity().getUnit();
-    switch (unit) {
-      case DAYS:
-        top = lookbackMillis/(TimeUnit.MILLISECONDS.convert(1, TimeUnit.DAYS)) + 10;
-        break;
-      case MINUTES:
-        top = lookbackMillis/(TimeUnit.MILLISECONDS.convert(MINUTES_LEVEL_ROUNDING, TimeUnit.MINUTES)) + 100;
-        break;
-      case HOURS:
-      default:
-        top = lookbackMillis/(TimeUnit.MILLISECONDS.convert(1, TimeUnit.HOURS)) + 24;
-        break;
-    }
-    return top;
   }
 
 

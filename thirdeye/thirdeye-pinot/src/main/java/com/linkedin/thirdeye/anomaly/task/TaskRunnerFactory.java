@@ -5,6 +5,7 @@ import com.linkedin.thirdeye.anomaly.alert.v2.AlertTaskRunnerV2;
 import com.linkedin.thirdeye.anomaly.detection.DetectionTaskRunner;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorTaskRunner;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
+import com.linkedin.thirdeye.completeness.checker.DataCompletenessTaskRunner;
 
 /**
  * This class returns an instance of the task runner depending on the task type
@@ -24,6 +25,9 @@ public class TaskRunnerFactory {
       break;
     case ALERT:
       taskRunner = new AlertTaskRunner();
+      break;
+    case DATA_COMPLETENESS:
+      taskRunner = new DataCompletenessTaskRunner();
       break;
     case ALERT2:
       taskRunner = new AlertTaskRunnerV2();

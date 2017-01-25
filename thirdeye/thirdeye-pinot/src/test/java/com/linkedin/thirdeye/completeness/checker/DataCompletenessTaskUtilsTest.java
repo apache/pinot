@@ -33,7 +33,7 @@ public class DataCompletenessTaskUtilsTest {
     TimeGranularity timeGranularity = new TimeGranularity(1, TimeUnit.DAYS);
     String timeFormat = "SIMPLE_DATE_FORMAT:yyyyMMdd";
     TimeSpec timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
-    long adjustedStartTime = DataCompletenessTaskUtils.getAdjustedStartForDataset(timeSpec, startTime);
+    long adjustedStartTime = DataCompletenessTaskUtils.getAdjustedTimeForDataset(timeSpec, startTime);
     Assert.assertEquals(adjustedStartTime, new DateTime(2017, 01, 12, 0, 0).getMillis());
 
     // EPOCH
@@ -41,27 +41,27 @@ public class DataCompletenessTaskUtilsTest {
     // HOURS
     timeGranularity = new TimeGranularity(1, TimeUnit.HOURS);
     timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
-    adjustedStartTime = DataCompletenessTaskUtils.getAdjustedStartForDataset(timeSpec, startTime);
+    adjustedStartTime = DataCompletenessTaskUtils.getAdjustedTimeForDataset(timeSpec, startTime);
     Assert.assertEquals(adjustedStartTime, new DateTime(2017, 01, 12, 15, 0).getMillis());
 
     // DEFAULT
     timeGranularity = new TimeGranularity(1, TimeUnit.MILLISECONDS);
     timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
-    adjustedStartTime = DataCompletenessTaskUtils.getAdjustedStartForDataset(timeSpec, startTime);
+    adjustedStartTime = DataCompletenessTaskUtils.getAdjustedTimeForDataset(timeSpec, startTime);
     Assert.assertEquals(adjustedStartTime, new DateTime(2017, 01, 12, 15, 0).getMillis());
 
     // MINUTES
     timeGranularity = new TimeGranularity(5, TimeUnit.MINUTES);
     timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
-    adjustedStartTime = DataCompletenessTaskUtils.getAdjustedStartForDataset(timeSpec, startTime);
+    adjustedStartTime = DataCompletenessTaskUtils.getAdjustedTimeForDataset(timeSpec, startTime);
     Assert.assertEquals(adjustedStartTime, new DateTime(2017, 01, 12, 15, 30).getMillis());
 
     startTime = dateTime2.getMillis();
-    adjustedStartTime = DataCompletenessTaskUtils.getAdjustedStartForDataset(timeSpec, startTime);
+    adjustedStartTime = DataCompletenessTaskUtils.getAdjustedTimeForDataset(timeSpec, startTime);
     Assert.assertEquals(adjustedStartTime, new DateTime(2017, 01, 12, 15, 0).getMillis());
 
     startTime = dateTime3.getMillis();
-    adjustedStartTime = DataCompletenessTaskUtils.getAdjustedStartForDataset(timeSpec, startTime);
+    adjustedStartTime = DataCompletenessTaskUtils.getAdjustedTimeForDataset(timeSpec, startTime);
     Assert.assertEquals(adjustedStartTime, new DateTime(2017, 01, 12, 15, 0).getMillis());
   }
 
@@ -192,36 +192,7 @@ public class DataCompletenessTaskUtilsTest {
       Collections.sort(timeValues);
       Assert.assertEquals(timeValues, expectedValuesList.get(bucketName));
     }
-
   }
 
-  @Test
-  public void testGetTopForDataset() throws Exception {
-    String columnName = "Date";
-    // DAYS bucket
-    TimeGranularity timeGranularity = new TimeGranularity(1, TimeUnit.DAYS);
-    String timeFormat = TimeSpec.SINCE_EPOCH_FORMAT;
-    TimeSpec timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
-    long top = DataCompletenessTaskUtils.getTopForDataset(timeSpec);
-    Assert.assertEquals(top, 3);
-
-    // HOURS bucket
-    timeGranularity = new TimeGranularity(1, TimeUnit.HOURS);
-    timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
-    top = DataCompletenessTaskUtils.getTopForDataset(timeSpec);
-    Assert.assertEquals(top, 72);
-
-    // MINUTES bucket
-    timeGranularity = new TimeGranularity(1, TimeUnit.MINUTES);
-    timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
-    top = DataCompletenessTaskUtils.getTopForDataset(timeSpec);
-    Assert.assertEquals(top, 144);
-
-    // DEFAULT bucket
-    timeGranularity = new TimeGranularity(1, TimeUnit.MILLISECONDS);
-    timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
-    top = DataCompletenessTaskUtils.getTopForDataset(timeSpec);
-    Assert.assertEquals(top, 72);
-  }
 
 }

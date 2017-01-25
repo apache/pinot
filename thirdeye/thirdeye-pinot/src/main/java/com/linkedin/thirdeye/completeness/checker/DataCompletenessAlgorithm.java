@@ -1,6 +1,11 @@
 package com.linkedin.thirdeye.completeness.checker;
 
 import java.util.List;
+import java.util.Map;
+
+import org.joda.time.format.DateTimeFormatter;
+
+import com.linkedin.thirdeye.api.TimeSpec;
 
 /**
  * This will serve as the interface for any algorithm we plug in to the completeness checker
@@ -41,6 +46,19 @@ public interface DataCompletenessAlgorithm {
    * @return
    */
   public double getConsiderCompleteAfter();
+
+  /**
+   * This method will help in the case of cold start.
+   * When system starts, or a new dataset is added, baseline entries will not be present.
+   * This method checks if required baseline entries are available,
+   * and if not available, computes and stores them, for the rest of the computation to use
+   * @param dataset
+   * @param bucketNameToBucketValueMS
+   * @param bucketNameToTimeValues
+   * @param timeSpec
+   */
+  public void computeBaselineCountsIfNotPresent(String dataset, Map<String, Long> bucketNameToBucketValueMS,
+      DateTimeFormatter dateTimeFormatter, TimeSpec timeSpec);
 
 
 }
