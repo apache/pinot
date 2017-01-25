@@ -156,13 +156,14 @@ public class LargeClusterRoutingTableBuilder extends GeneratorBasedRoutingTableB
       final String targetServerCountPerQuery = configuration.getString("offlineTargetServerCountPerQuery");
       try {
         TARGET_SERVER_COUNT_PER_QUERY = Integer.parseInt(targetServerCountPerQuery);
+        LOGGER.info("Using offline target server count of {}", TARGET_SERVER_COUNT_PER_QUERY);
       } catch (Exception e) {
         LOGGER.warn(
-            "Could not get the target server count per query from configuration value {}, keeping default value {}",
+            "Could not get the offline target server count per query from configuration value {}, keeping default value {}",
             targetServerCountPerQuery, TARGET_SERVER_COUNT_PER_QUERY, e);
       }
     } else {
-      LOGGER.info("Using default value for target server count of {}", TARGET_SERVER_COUNT_PER_QUERY);
+      LOGGER.info("Using default value for offline target server count of {}", TARGET_SERVER_COUNT_PER_QUERY);
     }
   }
 }
