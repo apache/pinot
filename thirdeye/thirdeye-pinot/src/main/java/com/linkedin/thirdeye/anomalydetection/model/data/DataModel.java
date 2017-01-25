@@ -17,11 +17,20 @@ public interface DataModel {
   Properties getProperties();
 
   /**
+   * Given the interval of the observed (current) time series, returns all intervals of time series
+   * that are used by this anomaly detection.
+   * @param monitoringWindowStartTime inclusive milliseconds
+   * @param monitoringWindowEndTime exclusive milliseconds
+   * @return all intervals of time series that are used by this anomaly detection.
+   */
+  List<Interval> getAllDataIntervals(long monitoringWindowStartTime, long monitoringWindowEndTime);
+
+  /**
    * Given the interval of the observed (current) time series, returns the intervals of time series
    * that are used by this prediction model for training purpose.
    *
-   * @param monitoringWindowStartTime inclusive
-   * @param monitoringWindowEndTime exclusive
+   * @param monitoringWindowStartTime inclusive milliseconds
+   * @param monitoringWindowEndTime exclusive milliseconds
    *
    * @return intervals of time series that are used for training.
    */

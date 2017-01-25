@@ -61,7 +61,7 @@ public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunc
   @Override
   public List<Interval> getTimeSeriesIntervals(long monitoringWindowStartTime,
       long monitoringWindowEndTime) {
-    return dataModel.getTrainingDataIntervals(monitoringWindowStartTime, monitoringWindowEndTime);
+    return dataModel.getAllDataIntervals(monitoringWindowStartTime, monitoringWindowEndTime);
   }
 
   @Override

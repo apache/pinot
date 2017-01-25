@@ -12,6 +12,16 @@ public class SeasonalDataModel extends AbstractDataModel {
   public static final String SEASONAL_UNIT = "seasonalUnit";
 
   @Override
+  public List<Interval> getAllDataIntervals(long monitoringWindowStartTime,
+      long monitoringWindowEndTime) {
+    List<Interval> intervals =
+        getTrainingDataIntervals(monitoringWindowStartTime, monitoringWindowEndTime);
+    Interval currentInterval = new Interval(monitoringWindowStartTime, monitoringWindowEndTime);
+    intervals.add(0, currentInterval);
+    return intervals;
+  }
+
+  @Override
   public List<Interval> getTrainingDataIntervals(long monitoringWindowStartTime,
       long monitoringWindowEndTime) {
     Interval currentInterval = new Interval(monitoringWindowStartTime, monitoringWindowEndTime);
@@ -43,8 +53,8 @@ public class SeasonalDataModel extends AbstractDataModel {
     long currentStart = currentInterval.getStartMillis();
     long currentEnd = currentInterval.getEndMillis();
     for (int i = 0; i < baselineCount; ++i) {
-      long baselineStart = currentStart - gap.getMillis();
-      long baselineEnd = currentEnd - gap.getMillis();
+      long baselineStart = currentStart - gap.getMillis() * (i + 1);
+      long baselineEnd = currentEnd - gap.getMillis() * (i + 1);
       Interval baselineInterval = new Interval(baselineStart, baselineEnd);
       baselineIntervals.add(baselineInterval);
     }
