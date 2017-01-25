@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -519,16 +520,16 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
 
     // Remove table from all instances
     synchronized (_tablesForInstance) {
-      for (String instanceName : _brokerRoutingTable.keySet()) {
-        Set<String> tablesForCurrentInstance = _tablesForInstance.get(instanceName);
-        if (tablesForCurrentInstance.contains(tableName)) {
-          tablesForCurrentInstance.remove(tableName);
-        }
-
-        if (tablesForCurrentInstance.isEmpty()) {
-          _lastKnownInstanceConfigs.remove(instanceName);
+      Iterator<Map.Entry<String, Set<String>>> iterator = _tablesForInstance.entrySet().iterator();
+      while (iterator.hasNext()) {
+        Map.Entry<String, Set<String>> entry = iterator.next();
+        entry.getValue().remove(tableName);
+        if (entry.getValue().isEmpty()) {
+          _lastKnownInstanceConfigs.remove(entry.getKey());
+          iterator.remove();
         }
       }
+
     }
   }
 
