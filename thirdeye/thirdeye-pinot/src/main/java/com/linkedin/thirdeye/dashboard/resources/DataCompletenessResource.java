@@ -7,6 +7,8 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 
+import org.apache.commons.collections.CollectionUtils;
+
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessConstants.DataCompletenessAlgorithmName;
 import com.linkedin.thirdeye.completeness.checker.PercentCompletenessFunctionInput;
 
@@ -26,17 +28,22 @@ public class DataCompletenessResource {
 
     double percentCompleteness = 0;
     double baselineTotalCount = 0;
-    switch (algorithm) {
-      case WO4W_AVERAGE:
-      default:
-        for (Long baseline : baselineCounts) {
-          baselineTotalCount = baselineTotalCount + baseline;
-        }
-        baselineTotalCount = baselineTotalCount/baselineCounts.size();
-        break;
+    if (CollectionUtils.isNotEmpty(baselineCounts)) {
+      switch (algorithm) {
+        case WO4W_AVERAGE:
+        default:
+          for (Long baseline : baselineCounts) {
+            baselineTotalCount = baselineTotalCount + baseline;
+          }
+          baselineTotalCount = baselineTotalCount/baselineCounts.size();
+          break;
+      }
     }
     if (baselineTotalCount != 0) {
       percentCompleteness = new Double(currentCount * 100) / baselineTotalCount;
+    }
+    if (baselineTotalCount == 0 && currentCount != 0) {
+      percentCompleteness = 100;
     }
     return percentCompleteness;
   }

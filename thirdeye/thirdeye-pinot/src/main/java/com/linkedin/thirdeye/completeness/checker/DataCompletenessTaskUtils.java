@@ -198,7 +198,7 @@ public class DataCompletenessTaskUtils {
       }
 
     } catch (ExecutionException e) {
-      LOG.error("Exception in getting count *", e);
+      LOG.error("Exception in getting count *. PQL:{}", pql, e);
     }
 
     // parse response to get counts

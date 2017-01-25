@@ -47,7 +47,7 @@ public class Wo4WAvgDataCompletenessAlgorithm implements DataCompletenessAlgorit
     // look for the past 4 weeks
     for (int i = 0; i < 4; i ++) {
       long baselineOffset = weekInMillis * (i+1);
-      LOG.info("Checking for {} week ago", (i+1));
+      LOG.info("Checking for {} week ago for dataset {}", (i+1), dataset);
 
       // check if baseline is present in database
       Map<String, Long> baselineBucketNameToBucketValueMS = new HashMap<>();
@@ -61,7 +61,7 @@ public class Wo4WAvgDataCompletenessAlgorithm implements DataCompletenessAlgorit
         }
       }
       // for all baseline values not present in database, fetch their counts, and update in database
-      LOG.info("Missing baseline buckets {}", baselineBucketNameToBucketValueMS.keySet());
+      LOG.info("Missing baseline buckets {} for dataset {}", baselineBucketNameToBucketValueMS.keySet(), dataset);
       if (!baselineBucketNameToBucketValueMS.isEmpty()) {
 
         ListMultimap<String, Long> baselineBucketNameToTimeValues =
@@ -82,7 +82,8 @@ public class Wo4WAvgDataCompletenessAlgorithm implements DataCompletenessAlgorit
           createBaselineConfig.setCountStar(baselineBucketCount);
           dataCompletenessConfigDAO.save(createBaselineConfig);
         }
-        LOG.info("Saved {} number of baseline counts in database", baselineCountsForBuckets.size());
+        LOG.info("Saved {} number of baseline counts in database for dataset {}",
+            baselineCountsForBuckets.size(), dataset);
       }
     }
   }

@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.completeness.checker;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.slf4j.Logger;
@@ -20,9 +21,9 @@ public class PercentCompletenessFunctionInput {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final Logger LOG = LoggerFactory.getLogger(PercentCompletenessFunctionInput.class);
 
-  private List<Long> baselineCounts;
-  private Long currentCount;
-  private DataCompletenessAlgorithmName algorithm;
+  private List<Long> baselineCounts = new ArrayList<>();
+  private Long currentCount = 0L;
+  private DataCompletenessAlgorithmName algorithm = DataCompletenessAlgorithmName.WO4W_AVERAGE;
 
   public List<Long> getBaselineCounts() {
     return baselineCounts;
