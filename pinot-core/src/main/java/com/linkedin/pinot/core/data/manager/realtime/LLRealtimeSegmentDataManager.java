@@ -553,10 +553,11 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
         return false;
       }
       _realtimeTableDataManager.replaceLLSegment(_segmentNameStr);
-      FileUtils.deleteQuietly(new File(segTarFileName));
     } catch (FileNotFoundException e) {
       segmentLogger.error("Tar file {} not found", segTarFileName, e);
       return false;
+    } finally {
+      FileUtils.deleteQuietly(new File(segTarFileName));
     }
     return true;
   }
