@@ -52,7 +52,7 @@ public class SplineRegressionAnomalyTimeSeriesView extends BaseAnomalyTimeSeries
   public static final String DEFAULT_TIMEZONE = "America/Los_Angeles";
   private static final String DEFAULT_ANOMALY_REMOVAL_SEVERITY_THRESHOLD = "0.5";
   private static final String DEFAULT_LOG_TRANSFORM = "False";
-  private static final String DEFAULT_TIME_SERIES_LATENCY = "9";
+  private static final String DEFAULT_TIME_SERIES_LATENCY = "90";
   private static final long DAY_LENGTH = 86400000;
   private static final Logger LOG = LoggerFactory.getLogger(SplineRegressionAnomalyTimeSeriesView.class);
 
@@ -128,10 +128,12 @@ public class SplineRegressionAnomalyTimeSeriesView extends BaseAnomalyTimeSeries
     List<Double> metricValue = new ArrayList<>();
     for(Long timestamp : timelist){
       timestamps.add(timestamp);
-      metricValue.add(timeSeries.get(timestamp, metric).doubleValue());
+      double value = timeSeries.get(timestamp, metric).doubleValue();
+      metricValue.add(value);
     }
 
     SplineRegressionBaselineData baselineData = null;
+    boolean logTransform = Boolean.valueOf(properties.getProperty(LOG_TRANSFORM, DEFAULT_LOG_TRANSFORM));
     try {
       series = new MapMetricTimeSeries(timestamps, metricValue);
       baselineData = SplineRegressionAnomalyDetectionFunction.baselineEstimate(series, monitorTimeRange,
@@ -140,8 +142,7 @@ public class SplineRegressionAnomalyTimeSeriesView extends BaseAnomalyTimeSeries
           Integer.valueOf(properties.getProperty(HISTORICAL_DATA_MAX_LENGTH, DEFAULT_HISTORICAL_DATA_MAX_LENGTH)),
           Integer.valueOf(properties.getProperty(HISTORICAL_DATA_MIN_LENGTH, DEFAULT_HISTORICAL_DATA_MIN_LENGTH)),
           Integer.valueOf(properties.getProperty(DEGREE, DEFAULT_DEGREE)),
-          Boolean.valueOf(properties.getProperty(LOG_TRANSFORM, DEFAULT_LOG_TRANSFORM)),
-          properties.getProperty(TIMEZONE, DEFAULT_TIMEZONE));
+          logTransform, properties.getProperty(TIMEZONE, DEFAULT_TIMEZONE));
     }
     catch(Exception e){
       LOG.error("{}", e.getMessage());
@@ -156,8 +157,14 @@ public class SplineRegressionAnomalyTimeSeriesView extends BaseAnomalyTimeSeries
       TimeBucket timeBucket = new TimeBucket(timestamp, timestamp+DAY_LENGTH,
           timestamp, timestamp+DAY_LENGTH);
       anomalyTimelinesView.addTimeBuckets(timeBucket);
-      anomalyTimelinesView.addCurrentValues(observed[i]);
-      anomalyTimelinesView.addBaselineValues(expected[i]);
+      if(logTransform) {
+        anomalyTimelinesView.addCurrentValues((double)Math.round(Math.exp(observed[i])));
+        anomalyTimelinesView.addBaselineValues((double)Math.round(Math.exp(expected[i])));
+      }
+      else{
+        anomalyTimelinesView.addCurrentValues(observed[i]);
+        anomalyTimelinesView.addBaselineValues(expected[i]);
+      }
     }
 
     return anomalyTimelinesView;

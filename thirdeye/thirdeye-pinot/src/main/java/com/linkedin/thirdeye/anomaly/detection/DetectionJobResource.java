@@ -83,6 +83,42 @@ public class DetectionJobResource {
     return Response.ok().build();
   }
 
+  /**
+   * Asynchronous call to a backfill procedure
+   * @param id
+   * @param startTimeIso
+   * @param endTimeIso
+   * @return
+   * @throws Exception
+   */
+  @Deprecated
+  @POST
+  @Path("/{id}/backfill")
+  public Response backfill(@PathParam("id") Long id, @QueryParam("start") String startTimeIso,
+      @QueryParam("end") String endTimeIso, @DefaultValue("false") @QueryParam("force") boolean force) throws Exception {
+    DateTime startTime = null;
+    DateTime endTime = null;
+    if (StringUtils.isNotBlank(startTimeIso)) {
+      startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso);
+    }
+    if (StringUtils.isNotBlank(endTimeIso)) {
+      endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso);
+    }
+
+    if (startTime != null && endTime != null) {
+      DateTime innerStartTime = startTime;
+      DateTime innerEndTime = endTime;
+
+      new Thread(new Runnable() {
+        @Override
+        public void run() {
+          detectionJobScheduler.runBackfill(id, innerStartTime, innerEndTime, force);
+        }
+      }).start();
+    }
+
+    return Response.ok().build();
+  }
   @DELETE
   @Path("/{id}")
   public Response disable(@PathParam("id") Long id) throws Exception {
@@ -202,7 +238,7 @@ public class DetectionJobResource {
     }
 
     startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso);
-    endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso);;
+    endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso);
 
     if(startTime.isAfter(endTime)){
       throw new IllegalArgumentException(String.format(
