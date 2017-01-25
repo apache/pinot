@@ -27,6 +27,7 @@ import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.Validate;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.joda.time.Interval;
@@ -563,6 +564,7 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
           required = true) String tableType)
       throws JsonProcessingException, JSONException {
 
+    Validate.notNull(tableType, "tableType can't be null");
     return new PinotSegmentRestletResource().toggleSegmentState(tableName, segmentName, "drop", tableType);
   }
 
@@ -577,6 +579,7 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
       required = true) String tableType)
       throws JsonProcessingException, JSONException {
 
+    Validate.notNull(tableType, "tableType can't be null");
     return new PinotSegmentRestletResource().toggleSegmentState(tableName, null, "drop", tableType);
   }
 
