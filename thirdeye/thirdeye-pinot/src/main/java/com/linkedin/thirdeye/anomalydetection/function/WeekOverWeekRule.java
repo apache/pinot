@@ -14,6 +14,14 @@ public class WeekOverWeekRule extends AbstractModularizedAnomalyFunction {
   public static final String BASELINE = "baseline";
   public static final String ENABLE_SMOOTHING = "enableSmoothing";
 
+  public static String[] getPropertyKeys() {
+    return new String[] { BASELINE, ENABLE_SMOOTHING,
+        MovingAverageSmoothingFunction.MOVING_AVERAGE_SMOOTHING_WINDOW_SIZE,
+        SimpleThresholdDetectionModel.AVERAGE_VOLUME_THRESHOLD,
+        SimpleThresholdDetectionModel.CHANGE_THRESHOLD
+    };
+  }
+
   @Override
   public void init(AnomalyFunctionDTO spec) throws Exception {
     super.init(spec);

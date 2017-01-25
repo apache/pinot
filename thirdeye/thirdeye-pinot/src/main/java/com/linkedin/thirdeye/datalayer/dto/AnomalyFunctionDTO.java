@@ -21,8 +21,8 @@ public class AnomalyFunctionDTO extends AnomalyFunctionBean {
   public Properties toProperties() {
     Properties props = new Properties();
 
-    props.put(BUCKET_SIZE, getBucketSize());
-    props.put(BUCKET_UNIT, getBucketUnit());
+    props.setProperty(BUCKET_SIZE, getBucketSize().toString());
+    props.setProperty(BUCKET_UNIT, getBucketUnit().toString());
 
     if (this.getProperties() != null) {
       String[] tokens = getProperties().split(";");
