@@ -11,6 +11,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessConstants.DataCompletenessAlgorithmName;
 
+/**
+ * This class serves as the input for the call to the endpoint which determines percent completeness
+ */
 @JsonIgnoreProperties(ignoreUnknown=true)
 public class PercentCompletenessFunctionInput {
 

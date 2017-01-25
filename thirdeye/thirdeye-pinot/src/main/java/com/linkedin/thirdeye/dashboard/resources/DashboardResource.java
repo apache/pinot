@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
-import com.linkedin.thirdeye.completeness.checker.DataCompletenessTaskUtils;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 
 import java.io.IOException;
@@ -11,7 +10,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.TreeSet;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -38,7 +36,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.google.common.base.Joiner;
 import com.google.common.cache.LoadingCache;
-import com.google.common.collect.ListMultimap;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.DAORegistry;
@@ -106,30 +103,6 @@ public class DashboardResource {
     return new DashboardView();
   }
 
-  @GET
-  @Path(value = "/data/test")
-  @Produces(MediaType.APPLICATION_JSON)
-  public Map<String, Long> getTest() throws Exception {
-    String dataset = "mny-ads-su-kpi-alerts";
-    TimeGranularity dataGranularity = new TimeGranularity(5, TimeUnit.MINUTES);
-    TimeSpec timeSpec = new TimeSpec("Date", dataGranularity, TimeSpec.SINCE_EPOCH_FORMAT);
-    Map<String, Long> bucketNameToBucketValue = new HashMap<>();
-    bucketNameToBucketValue.put("201601120000", new DateTime(2017, 1, 12, 0, 0).getMillis());
-    bucketNameToBucketValue.put("201601120030", new DateTime(2017, 1, 12, 0, 30).getMillis());
-    bucketNameToBucketValue.put("201601120100", new DateTime(2017, 1, 12, 1, 0).getMillis());
-    bucketNameToBucketValue.put("201601120130", new DateTime(2017, 1, 12, 1, 30).getMillis());
-    bucketNameToBucketValue.put("201601120200", new DateTime(2017, 1, 12, 2, 0).getMillis());
-    bucketNameToBucketValue.put("201601120230", new DateTime(2017, 1, 12, 2, 30).getMillis());
-    bucketNameToBucketValue.put("201601120300", new DateTime(2017, 1, 12, 3, 0).getMillis());
-    bucketNameToBucketValue.put("201601120330", new DateTime(2017, 1, 12, 3, 30).getMillis());
-    bucketNameToBucketValue.put("201601120400", new DateTime(2017, 1, 12, 4, 0).getMillis());
-    bucketNameToBucketValue.put("201601120430", new DateTime(2017, 1, 12, 4, 30).getMillis());
-    ListMultimap<String, Long> bucketNameToTimeValues =
-        DataCompletenessTaskUtils.getBucketNameToTimeValuesMap(timeSpec, bucketNameToBucketValue);
-    Map<String, Long> counts =
-        DataCompletenessTaskUtils.getCountsForBucketsOfDataset(dataset, timeSpec, bucketNameToTimeValues);
-    return counts;
-  }
 
   @GET
   @Path(value = "/data/datasets")
