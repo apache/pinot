@@ -41,8 +41,6 @@ public class FetchFromThirdEye {
     init(persistenceFile);
   }
 
-  public FetchFromThirdEye(){ }
-
   // Private class for storing and sorting results
   public class ResultNode implements Comparable<ResultNode>{
     long functionId;
@@ -87,6 +85,11 @@ public class FetchFromThirdEye {
     }
   }
 
+  /**
+   * Initialize DAOs
+   * @param persistenceFile path to the persistence file
+   * @throws Exception
+   */
   public void init(File persistenceFile) throws Exception {
     DaoProviderUtil.init(persistenceFile);
     anomalyFunctionDAO = DaoProviderUtil
@@ -96,6 +99,15 @@ public class FetchFromThirdEye {
     mergedAnomalyResultDAO = DaoProviderUtil
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl.class);
   }
+
+  /**
+   * Fetch merged anomaly results from thirdeye db
+   * @param collection database/collection name
+   * @param metric metric name
+   * @param startTimeISO start time of the requested data in ISO format
+   * @param endTimeISO end time of the requested data in ISO format
+   * @return List of merged anomaly results
+   */
   public List<ResultNode> fetchMergedAnomalies (String collection, String metric, String startTimeISO, String endTimeISO){
     DateTime startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeISO);
     DateTime endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeISO);
@@ -124,6 +136,14 @@ public class FetchFromThirdEye {
     return resultNodes;
   }
 
+  /**
+   * Fetch raw anomaly results from thirdeye db
+   * @param collection database/collection name
+   * @param metric metric name
+   * @param startTimeISO start time of the requested data in ISO format
+   * @param endTimeISO end time of the requested data in ISO format
+   * @return List of raw anomaly results
+   */
   public List<ResultNode> fetchRawAnomalies(String collection, String metric, String startTimeISO, String endTimeISO){
     DateTime startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeISO);
     DateTime endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeISO);
@@ -157,7 +177,6 @@ public class FetchFromThirdEye {
 
 
   private final String DEFAULT_PATH_TO_TIMESERIES = "/dashboard/data/timeseries?";
-
   private final String DATASET = "dataset";
   private final String METRIC = "metrics";
   private final String VIEW = "view";
@@ -179,14 +198,29 @@ public class FetchFromThirdEye {
       return this.timeGranularity;
     }
   }
-  public Map<String, Map<DateTime, Integer>> fetchMetric(String host, String port, String dataset, String metric, String startTimeISO,
+
+  /**
+   * Fetch metric from thirdeye
+   * @param host host name (includes http://)
+   * @param port port number
+   * @param dataset dataset/collection name
+   * @param metric metric name
+   * @param startTimeISO start time of requested data in ISO format
+   * @param endTimeISO end time of requested data in ISO format
+   * @param timeGranularity the time granularity
+   * @param dimensions the list of dimensions
+   * @param filterJson filters, in JSON
+   * @return {dimension-> {DateTime: value}}
+   * @throws IOException
+   */
+  public Map<String, Map<DateTime, Integer>> fetchMetric(String host, int port, String dataset, String metric, String startTimeISO,
       String endTimeISO, TimeGranularity timeGranularity, String dimensions, String filterJson)
       throws  IOException{
     HttpClient client = HttpClientBuilder.create().build();
     DateTime startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeISO);
     DateTime endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeISO);
     // format http GET command
-    StringBuilder urlBuilder = new StringBuilder(host + ":" + Integer.valueOf(port) + DEFAULT_PATH_TO_TIMESERIES);
+    StringBuilder urlBuilder = new StringBuilder(host + ":" + port + DEFAULT_PATH_TO_TIMESERIES);
     urlBuilder.append(DATASET + "=" + dataset + "&");
     urlBuilder.append(METRIC + "=" + metric + "&");
     urlBuilder.append(VIEW + "=" + DEFAULT_VIEW + "&");
