@@ -3,14 +3,8 @@ package com.linkedin.thirdeye.anomalydetection.function;
 import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyDetectionContext;
 import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
-import com.linkedin.thirdeye.anomalydetection.model.data.DataModel;
-import com.linkedin.thirdeye.anomalydetection.model.data.NoopDataModel;
-import com.linkedin.thirdeye.anomalydetection.model.detection.DetectionModel;
-import com.linkedin.thirdeye.anomalydetection.model.detection.NoopDetectionModel;
 import com.linkedin.thirdeye.anomalydetection.model.merge.MergeModel;
 import com.linkedin.thirdeye.anomalydetection.model.merge.NoPredictionMergeModel;
-import com.linkedin.thirdeye.anomalydetection.model.merge.NoopMergeModel;
-import com.linkedin.thirdeye.anomalydetection.model.prediction.NoopPredictionModel;
 import com.linkedin.thirdeye.anomalydetection.model.prediction.PredictionModel;
 import com.linkedin.thirdeye.anomalydetection.model.transform.TransformationFunction;
 import com.linkedin.thirdeye.api.DimensionMap;
@@ -34,18 +28,12 @@ import org.slf4j.LoggerFactory;
  * with the given anomaly detection module; the actions can be anomaly detection, information update
  * of merged anomalies, etc.
  */
-public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunction implements AnomalyDetectionFunction {
+public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunction implements AnomalyDetectionFunction,
+    ModularizedAnomalyFunctionModelProvider {
   protected final Logger LOGGER = LoggerFactory.getLogger(this.getClass());
 
   protected AnomalyFunctionDTO spec;
   protected Properties properties;
-
-  protected DataModel dataModel = new NoopDataModel();
-  protected List<TransformationFunction> currentTimeSeriesTransformationChain = new ArrayList<>();
-  protected List<TransformationFunction> baselineTimeSeriesTransformationChain = new ArrayList<>();
-  protected PredictionModel predictionModel = new NoopPredictionModel();
-  protected DetectionModel detectionModel = new NoopDetectionModel();
-  protected MergeModel mergeModel = new NoopMergeModel();
 
   @Override
   public void init(AnomalyFunctionDTO spec) throws Exception {
@@ -61,7 +49,7 @@ public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunc
   @Override
   public List<Interval> getTimeSeriesIntervals(long monitoringWindowStartTime,
       long monitoringWindowEndTime) {
-    return dataModel.getAllDataIntervals(monitoringWindowStartTime, monitoringWindowEndTime);
+    return getDataModel().getAllDataIntervals(monitoringWindowStartTime, monitoringWindowEndTime);
   }
 
   @Override
@@ -74,21 +62,20 @@ public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunc
     }
 
     // Transform current and baseline time series and train the prediction model
-    preparePredictionModel(anomalyDetectionContext);
+    transformAndPredictTimeSeries(anomalyDetectionContext);
 
     // Detect anomalies
-    List<RawAnomalyResultDTO> rawAnomalies = detectionModel.detect(anomalyDetectionContext);
-
-    return rawAnomalies;
+    return getDetectionModel().detect(anomalyDetectionContext);
   }
 
   @Override
   public void updateMergedAnomalyInfo(AnomalyDetectionContext anomalyDetectionContext,
       MergedAnomalyResultDTO anomalyToUpdated) throws Exception {
+    MergeModel mergeModel = getMergeModel();
     if (!(mergeModel instanceof NoPredictionMergeModel)) {
       if (checkPrecondition(anomalyDetectionContext)) {
         // Transform current and baseline time series and train the prediction model
-        preparePredictionModel(anomalyDetectionContext);
+        transformAndPredictTimeSeries(anomalyDetectionContext);
       } else {
         LOGGER.error("The precondition of anomaly detection context does not hold: please make sure"
             + "the observed time series and anomaly function are not null.");
@@ -128,11 +115,30 @@ public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunc
    * @param anomalyDetectionContext anomaly detection context that contains the necessary time
    *                                series for preparing the prediction model
    */
-  protected void preparePredictionModel(AnomalyDetectionContext anomalyDetectionContext) {
+  public void transformAndPredictTimeSeries(AnomalyDetectionContext anomalyDetectionContext) {
+    transformTimeSeries(anomalyDetectionContext);
+
+    // Train Prediction Model
+    PredictionModel predictionModel = getPredictionModel();
+    predictionModel.train(anomalyDetectionContext.getTransformedBaselines(), anomalyDetectionContext);
+    anomalyDetectionContext.setTrainedPredictionModel(predictionModel);
+  }
+
+  /**
+   * Transform the current time series and baselines.
+   *
+   * TODO: Apply Chain-of-Responsibility on the transformation chain
+   *
+   * @param anomalyDetectionContext anomaly detection context that contains the time series to be
+   *                                transformed.
+   */
+  private void transformTimeSeries(AnomalyDetectionContext anomalyDetectionContext) {
     // Transform the observed (current) time series
     if (anomalyDetectionContext.getTransformedCurrent() == null) {
       anomalyDetectionContext.setTransformedCurrent(anomalyDetectionContext.getCurrent());
     }
+    List<TransformationFunction> currentTimeSeriesTransformationChain =
+        getCurrentTimeSeriesTransformationChain();
     if (CollectionUtils.isNotEmpty(currentTimeSeriesTransformationChain)) {
       for (TransformationFunction tf : currentTimeSeriesTransformationChain) {
         anomalyDetectionContext
@@ -145,6 +151,8 @@ public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunc
     if (anomalyDetectionContext.getTransformedBaselines() == null) {
       anomalyDetectionContext.setTransformedBaselines(anomalyDetectionContext.getBaselines());
     }
+    List<TransformationFunction> baselineTimeSeriesTransformationChain =
+        getBaselineTimeSeriesTransformationChain();
     if (CollectionUtils.isNotEmpty(baselineTimeSeriesTransformationChain)) {
       for (TransformationFunction tf : baselineTimeSeriesTransformationChain) {
         List<TimeSeries> transformedBaselines = new ArrayList<>();
@@ -155,10 +163,6 @@ public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunc
         anomalyDetectionContext.setTransformedBaselines(transformedBaselines);
       }
     }
-
-    // Train Prediction Model
-    predictionModel.train(anomalyDetectionContext.getTransformedBaselines());
-    anomalyDetectionContext.setTrainedPredictionModel(predictionModel);
   }
 
   //////////////////// Wrapper methods for backward compatibility /////////////////////////
@@ -176,7 +180,7 @@ public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunc
       throws Exception {
     AnomalyDetectionContext anomalyDetectionContext = BackwardAnomalyFunctionUtils
         .buildAnomalyDetectionContext(this, timeSeries, spec.getMetric(), exploredDimensions,
-            windowStart, windowEnd);
+            spec.getBucketSize(), spec.getBucketUnit(), windowStart, windowEnd);
 
     return this.analyze(anomalyDetectionContext);
   }
@@ -187,10 +191,11 @@ public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunc
       List<MergedAnomalyResultDTO> knownAnomalies) throws Exception {
     AnomalyDetectionContext anomalyDetectionContext = null;
 
-    if (!(mergeModel instanceof NoPredictionMergeModel)) {
+    if (!(getMergeModel() instanceof NoPredictionMergeModel)) {
       anomalyDetectionContext = BackwardAnomalyFunctionUtils
           .buildAnomalyDetectionContext(this, timeSeries, spec.getMetric(),
-              anomalyToUpdated.getDimensions(), windowStart, windowEnd);
+              anomalyToUpdated.getDimensions(), spec.getBucketSize(), spec.getBucketUnit(),
+              windowStart, windowEnd);
     }
 
     updateMergedAnomalyInfo(anomalyDetectionContext, anomalyToUpdated);

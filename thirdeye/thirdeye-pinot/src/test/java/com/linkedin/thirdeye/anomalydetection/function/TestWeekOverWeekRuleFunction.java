@@ -25,8 +25,7 @@ public class TestWeekOverWeekRuleFunction {
   public Object[][] timeSeriesDataProvider() {
     // The properties for the testing time series
     Properties properties = new Properties();
-    properties.put(SeasonalAveragePredictionModel.BUCKET_SIZE, "1");
-    properties.put(SeasonalAveragePredictionModel.BUCKET_UNIT, TimeUnit.SECONDS.toString());
+    long bucketSizeInMS = TimeUnit.SECONDS.toMillis(1);
 
     // Set up time series key for the testing time series
     TimeSeriesKey timeSeriesKey = new TimeSeriesKey();
@@ -80,7 +79,7 @@ public class TestWeekOverWeekRuleFunction {
     }
     baselines.add(baseline2TimeSeries);
 
-    // Expected RawAnomalies
+    // Expected RawAnomalies without smoothing
     List<RawAnomalyResultDTO> expectedRawAnomalies = new ArrayList<>();
     RawAnomalyResultDTO rawAnomaly1 = new RawAnomalyResultDTO();
     rawAnomaly1.setStartTime(observedStartTime + bucketMillis * 2);
@@ -96,13 +95,14 @@ public class TestWeekOverWeekRuleFunction {
     rawAnomaly2.setScore(15d);
     expectedRawAnomalies.add(rawAnomaly2);
 
-    return new Object[][] { {properties, timeSeriesKey, observedTimeSeries, baselines, expectedRawAnomalies} };
+    return new Object[][] { {properties, timeSeriesKey, bucketSizeInMS, observedTimeSeries, baselines, expectedRawAnomalies} };
   }
 
   @Test(dataProvider = "timeSeriesDataProvider") public void analyze(Properties properties,
-      TimeSeriesKey timeSeriesKey, TimeSeries observedTimeSeries, List<TimeSeries> baselines,
-      List<RawAnomalyResultDTO> expectedRawAnomalies) throws Exception {
+      TimeSeriesKey timeSeriesKey, long bucketSizeInMs, TimeSeries observedTimeSeries,
+      List<TimeSeries> baselines, List<RawAnomalyResultDTO> expectedRawAnomalies) throws Exception {
     AnomalyDetectionContext anomalyDetectionContext = new AnomalyDetectionContext();
+    anomalyDetectionContext.setBucketSizeInMS(bucketSizeInMs);
 
     // Append properties for anomaly function specific setting
     properties.put(WeekOverWeekRule.BASELINE, "w/2wAvg");
@@ -126,9 +126,11 @@ public class TestWeekOverWeekRuleFunction {
   }
 
   @Test(dataProvider = "timeSeriesDataProvider") public void analyzeSmoothedTimeSeries(
-      Properties properties, TimeSeriesKey timeSeriesKey, TimeSeries observedTimeSeries,
-      List<TimeSeries> baselines, List<RawAnomalyResultDTO> expectedRawAnomalies) throws Exception {
+      Properties properties, TimeSeriesKey timeSeriesKey, long bucketSizeInMs,
+      TimeSeries observedTimeSeries, List<TimeSeries> baselines,
+      List<RawAnomalyResultDTO> expectedRawAnomalies) throws Exception {
     AnomalyDetectionContext anomalyDetectionContext = new AnomalyDetectionContext();
+    anomalyDetectionContext.setBucketSizeInMS(bucketSizeInMs);
 
     // Append properties for anomaly function specific setting
     properties.put(WeekOverWeekRule.BASELINE, "w/2wAvg");
@@ -151,9 +153,11 @@ public class TestWeekOverWeekRuleFunction {
   }
 
   @Test(dataProvider = "timeSeriesDataProvider") public void recomputeMergedAnomalyWeight(
-      Properties properties, TimeSeriesKey timeSeriesKey, TimeSeries observedTimeSeries,
-      List<TimeSeries> baselines, List<RawAnomalyResultDTO> expectedRawAnomalies) throws Exception {
+      Properties properties, TimeSeriesKey timeSeriesKey, long bucketSizeInMs,
+      TimeSeries observedTimeSeries, List<TimeSeries> baselines,
+      List<RawAnomalyResultDTO> expectedRawAnomalies) throws Exception {
     AnomalyDetectionContext anomalyDetectionContext = new AnomalyDetectionContext();
+    anomalyDetectionContext.setBucketSizeInMS(bucketSizeInMs);
 
     // Append properties for anomaly function specific setting
     properties.put(WeekOverWeekRule.BASELINE, "w/2wAvg");

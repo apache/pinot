@@ -1,8 +1,9 @@
 package com.linkedin.thirdeye.anomalydetection.context;
 
-import java.util.Map;
-import java.util.Set;
+import java.util.NavigableMap;
+import java.util.SortedSet;
 import java.util.TreeMap;
+import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.joda.time.Interval;
 
 /**
@@ -14,7 +15,7 @@ public class TimeSeries {
   /**
    * Timestamps to values. Timestamps are sorted.
    */
-  private Map<Long, Double> timeSeries = new TreeMap<>();
+  private NavigableMap<Long, Double> timeSeries = new TreeMap<>();
 
   /**
    * The max and min timestamp of this time series; both are inclusive.
@@ -64,8 +65,8 @@ public class TimeSeries {
   /**
    * Returns a sorted timestamp set
    */
-  public Set<Long> timestampSet() {
-    return timeSeries.keySet();
+  public SortedSet<Long> timestampSet() {
+    return timeSeries.navigableKeySet();
   }
 
   /**
@@ -87,6 +88,13 @@ public class TimeSeries {
    */
   public void setTimeSeriesInterval(Interval timeSeriesInterval) {
     this.timeSeriesInterval = timeSeriesInterval;
+  }
+
+  @Override
+  public String toString() {
+    return new ToStringBuilder(this).
+        append("Interval", timeSeriesInterval).
+        append("Time-Values", timeSeries).toString();
   }
 }
 

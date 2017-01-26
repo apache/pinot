@@ -14,6 +14,7 @@ public class AnomalyDetectionContext {
   private AnomalyDetectionFunction anomalyDetectionFunction;
 
   private TimeSeriesKey timeSeriesKey;
+  private long bucketSizeInMS; // the bucket size, gap between timestamps, in millisecond
 
   private TimeSeries current;
   private List<TimeSeries> baselines;
@@ -49,7 +50,6 @@ public class AnomalyDetectionContext {
 
   /**
    * Set the current (observed) time series.
-   * @param current
    */
   public void setCurrent(TimeSeries current) {
     this.current = current;
@@ -67,6 +67,20 @@ public class AnomalyDetectionContext {
    */
   public void setBaselines(List<TimeSeries> baselines) {
     this.baselines = baselines;
+  }
+
+  /**
+   * Returns the bucket size, the gap between timestamps, in milliseconds.
+   */
+  public long getBucketSizeInMS() {
+    return bucketSizeInMS;
+  }
+
+  /**
+   * Sets the bucket size, the gap between timestamps, in milliseconds.
+   */
+  public void setBucketSizeInMS(long bucketSizeInMS) {
+    this.bucketSizeInMS = bucketSizeInMS;
   }
 
   /**

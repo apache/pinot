@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomalydetection.model.prediction;
 
+import com.linkedin.thirdeye.anomalydetection.context.AnomalyDetectionContext;
 import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
 import java.util.List;
 import java.util.Properties;
@@ -21,6 +22,7 @@ public interface PredictionModel {
    * dynamic threshold that is computed using the given baselines.
    *
    * @param historicalTimeSeries the history time series for training this model.
+   * @param anomalyDetectionContext
    */
-  void train(List<TimeSeries> historicalTimeSeries);
+  void train(List<TimeSeries> historicalTimeSeries, AnomalyDetectionContext anomalyDetectionContext);
 }

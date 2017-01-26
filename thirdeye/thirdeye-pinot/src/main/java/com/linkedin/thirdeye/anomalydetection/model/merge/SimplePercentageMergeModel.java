@@ -15,7 +15,7 @@ import org.slf4j.LoggerFactory;
 public class SimplePercentageMergeModel extends AbstractMergeModel {
   private static final Logger LOGGER = LoggerFactory.getLogger(SimplePercentageMergeModel.class);
 
-  private static final String DEFAULT_MESSAGE_TEMPLATE = "change : %.2f %%, currentVal : %.2f, baseLineVal : %.2f";
+  private static final String DEFAULT_MESSAGE_TEMPLATE = "change : %.2f %%, currentVal : %.2f, baseLineVal : %.2f, score : %.2f";
 
   /**
    * The weight of the merged anomaly is calculated by this equation:
@@ -49,7 +49,7 @@ public class SimplePercentageMergeModel extends AbstractMergeModel {
     TimeSeries expectedTimeSeries = expectedTimeSeriesPredictionModel.getExpectedTimeSeries();
     long expectedStartTime = expectedTimeSeries.getTimeSeriesInterval().getStartMillis();
 
-    TimeSeries observedTimeSeries = anomalyDetectionContext.getCurrent();
+    TimeSeries observedTimeSeries = anomalyDetectionContext.getTransformedCurrent();
     long observedStartTime = observedTimeSeries.getTimeSeriesInterval().getStartMillis();
 
     double avgObserved = 0d;
@@ -95,6 +95,6 @@ public class SimplePercentageMergeModel extends AbstractMergeModel {
     anomalyToUpdated.setWeight(weight);
     anomalyToUpdated.setScore(score);
     anomalyToUpdated.setMessage(
-        String.format(DEFAULT_MESSAGE_TEMPLATE, weight * 100, avgObserved, avgExpected));
+        String.format(DEFAULT_MESSAGE_TEMPLATE, weight * 100, avgObserved, avgExpected, score));
   }
 }

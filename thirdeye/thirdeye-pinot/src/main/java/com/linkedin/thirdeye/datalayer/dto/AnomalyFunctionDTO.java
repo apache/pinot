@@ -10,9 +10,6 @@ import org.slf4j.LoggerFactory;
 public class AnomalyFunctionDTO extends AnomalyFunctionBean {
   private static final Logger LOGGER = LoggerFactory.getLogger(AnomalyFunctionDTO.class);
 
-  public static final String BUCKET_SIZE = "bucketSize";
-  public static final String BUCKET_UNIT = "bucketUnit";
-
   /**
    * Parses the properties of String and returns the corresponding Properties object.
    *
@@ -20,9 +17,6 @@ public class AnomalyFunctionDTO extends AnomalyFunctionBean {
    */
   public Properties toProperties() {
     Properties props = new Properties();
-
-    props.setProperty(BUCKET_SIZE, getBucketSize().toString());
-    props.setProperty(BUCKET_UNIT, getBucketUnit().toString());
 
     if (this.getProperties() != null) {
       String[] tokens = getProperties().split(";");

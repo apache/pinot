@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.anomalydetection.model.detection;
 
-import com.linkedin.thirdeye.anomalydetection.AnomalyDetectionUtils;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyDetectionContext;
 import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
 import com.linkedin.thirdeye.anomalydetection.model.prediction.ExpectedTimeSeriesPredictionModel;
@@ -19,8 +18,6 @@ public class SimpleThresholdDetectionModel extends AbstractDetectionModel {
 
   public static final String CHANGE_THRESHOLD = "changeThreshold";
   public static final String AVERAGE_VOLUME_THRESHOLD = "averageVolumeThreshold";
-  public static final String BUCKET_SIZE = "bucketSize";
-  public static final String BUCKET_UNIT = "bucketUnit";
 
   public static final String DEFAULT_MESSAGE_TEMPLATE = "change : %.2f %%, currentVal : %.2f, baseLineVal : %.2f, threshold : %s";
 
@@ -35,8 +32,7 @@ public class SimpleThresholdDetectionModel extends AbstractDetectionModel {
       volumeThreshold = Double.valueOf(getProperties().getProperty(AVERAGE_VOLUME_THRESHOLD));
     }
 
-    long bucketSizeInMillis = AnomalyDetectionUtils
-        .getBucketInMillis(BUCKET_SIZE, BUCKET_UNIT, getProperties());
+    long bucketSizeInMillis = anomalyDetectionContext.getBucketSizeInMS();
 
     // Compute the weight of this time series (average across whole)
     TimeSeries currentTimeSeries = anomalyDetectionContext.getTransformedCurrent();
@@ -73,7 +69,7 @@ public class SimpleThresholdDetectionModel extends AbstractDetectionModel {
     for (long currentTimestamp : currentTimeSeries.timestampSet()) {
       long expectedTimestamp = currentTimestamp - seasonalOffset;
       if (!expectedTimeSeries.hasTimestamp(expectedTimestamp)) {
-        break;
+        continue;
       }
       double expectedValue = expectedTimeSeries.get(expectedTimestamp);
       double currentValue = currentTimeSeries.get(currentTimestamp);

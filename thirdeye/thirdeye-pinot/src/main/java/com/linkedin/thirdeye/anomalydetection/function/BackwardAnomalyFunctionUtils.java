@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.anomalydetection.function;
 
 import com.linkedin.pinot.pql.parsers.utils.Pair;
+import com.linkedin.thirdeye.anomalydetection.AnomalyDetectionUtils;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyDetectionContext;
 import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
 import com.linkedin.thirdeye.anomalydetection.context.TimeSeriesKey;
@@ -10,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import org.joda.time.DateTime;
 import org.joda.time.Interval;
 
@@ -75,9 +77,12 @@ public class BackwardAnomalyFunctionUtils {
    */
   public static AnomalyDetectionContext buildAnomalyDetectionContext(
       AnomalyDetectionFunction anomalyFunction, MetricTimeSeries timeSeries, String metric,
-      DimensionMap exploredDimensions, DateTime windowStart, DateTime windowEnd) {
+      DimensionMap exploredDimensions, int bucketSize, TimeUnit bucketUnit, DateTime windowStart,
+      DateTime windowEnd) {
     // Create the anomaly detection context for the new modularized anomaly function
     AnomalyDetectionContext anomalyDetectionContext = new AnomalyDetectionContext();
+    anomalyDetectionContext
+        .setBucketSizeInMS(AnomalyDetectionUtils.getBucketInMillis(bucketSize, bucketUnit));
     anomalyDetectionContext.setAnomalyDetectionFunction(anomalyFunction);
 
     // Construct TimeSeriesKey
