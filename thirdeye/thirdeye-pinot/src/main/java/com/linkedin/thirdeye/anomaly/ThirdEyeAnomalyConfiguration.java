@@ -11,6 +11,7 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
   private boolean merger = false;
   private boolean autoload = false;
   private boolean dataCompleteness = false;
+  private String datasetsToCheck = "";
 
   private long id;
   private String dashboardHost;
@@ -101,6 +102,14 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
 
   public void setDataCompleteness(boolean dataCompleteness) {
     this.dataCompleteness = dataCompleteness;
+  }
+
+  public String getDatasetsToCheck() {
+    return datasetsToCheck;
+  }
+
+  public void setDatasetsToCheck(String datasetsToCheck) {
+    this.datasetsToCheck = datasetsToCheck;
   }
 
   public void setSmtpConfiguration(SmtpConfiguration smtpConfiguration) {

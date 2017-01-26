@@ -69,9 +69,7 @@ public class DataCompletenessTaskRunner implements TaskRunner {
   private void executeCheckerTask(DataCompletenessTaskInfo dataCompletenessTaskInfo) {
     LOG.info("Execute data completeness checker task {}", dataCompletenessTaskInfo);
     try {
-      // get all dataset names
-      // TODO: for now we only look at whitelist, possibly extend this to all datasets in future, or use specific config
-      List<String> datasets = CACHE_REGISTRY.getCollectionsCache().getCollections();
+      List<String> datasets = dataCompletenessTaskInfo.getDatasetsToCheck();
       LOG.info("Datasets {}", datasets);
 
       // get start and end time

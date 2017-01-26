@@ -108,6 +108,7 @@ public class TaskGenerator {
     dataCompletenessCheck.setDataCompletenessType(DataCompletenessType.CHECKER);
     dataCompletenessCheck.setDataCompletenessStartTime(dataCompletenessJobContext.getCheckDurationStartTime());
     dataCompletenessCheck.setDataCompletenessEndTime(dataCompletenessJobContext.getCheckDurationEndTime());
+    dataCompletenessCheck.setDatasetsToCheck(dataCompletenessJobContext.getDatasetsToCheck());
     tasks.add(dataCompletenessCheck);
 
     // create 1 task, for cleanup

@@ -115,7 +115,7 @@ public class ThirdEyeAnomalyApplication
           autoLoadPinotMetricsService.start();
         }
         if (config.isDataCompleteness()) {
-          dataCompletenessScheduler = new DataCompletenessScheduler();
+          dataCompletenessScheduler = new DataCompletenessScheduler(config.getDatasetsToCheck());
           dataCompletenessScheduler.start();
         }
       }
