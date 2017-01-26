@@ -73,7 +73,7 @@ public class SimpleThresholdDetectionModel extends AbstractDetectionModel {
     for (long currentTimestamp : currentTimeSeries.timestampSet()) {
       long expectedTimestamp = currentTimestamp - seasonalOffset;
       if (!expectedTimeSeries.hasTimestamp(expectedTimestamp)) {
-        break;
+        continue;
       }
       double expectedValue = expectedTimeSeries.get(expectedTimestamp);
       double currentValue = currentTimeSeries.get(currentTimestamp);

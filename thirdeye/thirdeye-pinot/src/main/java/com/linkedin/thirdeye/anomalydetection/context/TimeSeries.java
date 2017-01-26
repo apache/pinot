@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.anomalydetection.context;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.joda.time.Interval;
 
 /**
@@ -87,6 +88,13 @@ public class TimeSeries {
    */
   public void setTimeSeriesInterval(Interval timeSeriesInterval) {
     this.timeSeriesInterval = timeSeriesInterval;
+  }
+
+  @Override
+  public String toString() {
+    return new ToStringBuilder(this).
+        append("Interval", timeSeriesInterval).
+        append("Time-Values", timeSeries).toString();
   }
 }
 

@@ -6,7 +6,7 @@ import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import java.util.List;
 import org.apache.commons.collections.CollectionUtils;
 
-public class AverageAnomalyMergeModel extends AbstractMergeModel {
+public class AverageAnomalyMergeModel extends AbstractMergeModel implements NoPredictionMergeModel {
   private static final String DEFAULT_MESSAGE_TEMPLATE = "weight: %.2f, score: %.2f";
 
   /**

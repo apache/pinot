@@ -1,18 +1,36 @@
 package com.linkedin.thirdeye.anomalydetection.function;
 
+import com.linkedin.thirdeye.anomalydetection.model.data.DataModel;
+import com.linkedin.thirdeye.anomalydetection.model.data.NoopDataModel;
 import com.linkedin.thirdeye.anomalydetection.model.data.SeasonalDataModel;
+import com.linkedin.thirdeye.anomalydetection.model.detection.DetectionModel;
+import com.linkedin.thirdeye.anomalydetection.model.detection.NoopDetectionModel;
 import com.linkedin.thirdeye.anomalydetection.model.detection.SimpleThresholdDetectionModel;
+import com.linkedin.thirdeye.anomalydetection.model.merge.MergeModel;
+import com.linkedin.thirdeye.anomalydetection.model.merge.NoopMergeModel;
 import com.linkedin.thirdeye.anomalydetection.model.merge.SimplePercentageMergeModel;
+import com.linkedin.thirdeye.anomalydetection.model.prediction.NoopPredictionModel;
+import com.linkedin.thirdeye.anomalydetection.model.prediction.PredictionModel;
 import com.linkedin.thirdeye.anomalydetection.model.prediction.SeasonalAveragePredictionModel;
 import com.linkedin.thirdeye.anomalydetection.model.transform.MovingAverageSmoothingFunction;
 import com.linkedin.thirdeye.anomalydetection.model.transform.TransformationFunction;
+import com.linkedin.thirdeye.anomalydetection.model.transform.ZeroRemovalFunction;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 import org.apache.commons.lang3.StringUtils;
 
 public class WeekOverWeekRule extends AbstractModularizedAnomalyFunction {
   public static final String BASELINE = "baseline";
   public static final String ENABLE_SMOOTHING = "enableSmoothing";
+
+  private DataModel dataModel = new NoopDataModel();
+  private List<TransformationFunction> currentTimeSeriesTransformationChain = new ArrayList<>();
+  private List<TransformationFunction> baselineTimeSeriesTransformationChain = new ArrayList<>();
+  private PredictionModel predictionModel = new NoopPredictionModel();
+  private DetectionModel detectionModel = new NoopDetectionModel();
+  private MergeModel mergeModel = new NoopMergeModel();
 
   public static String[] getPropertyKeys() {
     return new String[] { BASELINE, ENABLE_SMOOTHING,
@@ -37,6 +55,11 @@ public class WeekOverWeekRule extends AbstractModularizedAnomalyFunction {
     }
     dataModel = new SeasonalDataModel();
     dataModel.init(this.properties);
+
+    // Removes zeros from time series, which currently mean empty values in ThirdEye.
+    TransformationFunction zeroRemover = new ZeroRemovalFunction();
+    currentTimeSeriesTransformationChain.add(zeroRemover);
+    baselineTimeSeriesTransformationChain.add(zeroRemover);
 
     if (this.properties.containsKey(ENABLE_SMOOTHING)) {
       TransformationFunction movingAverageSoothingFunction = new MovingAverageSmoothingFunction();
@@ -122,5 +145,29 @@ public class WeekOverWeekRule extends AbstractModularizedAnomalyFunction {
       }
     }
     return wowString.substring(head, tail);
+  }
+
+  @Override public DataModel getDataModel() {
+    return dataModel;
+  }
+
+  @Override public List<TransformationFunction> getCurrentTimeSeriesTransformationChain() {
+    return currentTimeSeriesTransformationChain;
+  }
+
+  @Override public List<TransformationFunction> getBaselineTimeSeriesTransformationChain() {
+    return baselineTimeSeriesTransformationChain;
+  }
+
+  @Override public PredictionModel getPredictionModel() {
+    return predictionModel;
+  }
+
+  @Override public DetectionModel getDetectionModel() {
+    return detectionModel;
+  }
+
+  @Override public MergeModel getMergeModel() {
+    return mergeModel;
   }
 }
