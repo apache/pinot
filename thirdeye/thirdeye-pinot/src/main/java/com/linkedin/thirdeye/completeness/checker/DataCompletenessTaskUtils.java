@@ -8,6 +8,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
@@ -46,10 +47,11 @@ public class DataCompletenessTaskUtils {
    * and 12:50pm on any MINUTE level dataset should be treated as 12:30pm
    * @param timeSpec
    * @param dataCompletenessStartTime
+   * @param dateTimeZone
    * @return
    */
-  public static long getAdjustedTimeForDataset(TimeSpec timeSpec, long dataCompletenessStartTime) {
-    DateTime adjustedDateTime = new DateTime(dataCompletenessStartTime);
+  public static long getAdjustedTimeForDataset(TimeSpec timeSpec, long dataCompletenessStartTime, DateTimeZone zone) {
+    DateTime adjustedDateTime = new DateTime(dataCompletenessStartTime, zone);
     TimeUnit unit = timeSpec.getDataGranularity().getUnit();
     switch (unit) {
       case DAYS:
@@ -98,7 +100,7 @@ public class DataCompletenessTaskUtils {
    * @param timeSpec
    * @return
    */
-  public static DateTimeFormatter getDateTimeFormatterForDataset(TimeSpec timeSpec) {
+  public static DateTimeFormatter getDateTimeFormatterForDataset(TimeSpec timeSpec, DateTimeZone zone) {
     String pattern = null;
     TimeUnit unit = timeSpec.getDataGranularity().getUnit();
     switch (unit) {
@@ -113,7 +115,7 @@ public class DataCompletenessTaskUtils {
         pattern = HOUR_FORMAT;
         break;
     }
-    DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern(pattern);
+    DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern(pattern).withZone(zone);
     return dateTimeFormatter;
   }
 
@@ -169,11 +171,28 @@ public class DataCompletenessTaskUtils {
   /**
    * Get count * of buckets
    * @param dataset
+   * @param bucketNameToBucketValueMS
    * @param bucketNameToBucketValue
    * @return
    */
   public static Map<String, Long> getCountsForBucketsOfDataset(String dataset, TimeSpec timeSpec,
+      Map<String, Long> bucketNameToBucketValueMS) {
+
+    // get time values according to dataset timeSpec schema (epoch or sdf values in proper granularity)
+    // dateToCheckInSDF -> timeValues as present in segments
+    // This is a multimap because for nMinutesSinceEpoch, a bucket (30 minutes) can have more than 1 time values in the 30 minutes
+    // e.g.: For 5 minutes granularity data, the checker will round to 30 minutes,
+    // but count * should be taken from 6 time values in that 30 minutes
+    ListMultimap<String, Long> bucketNameToTimeValues = getBucketNameToTimeValuesMap(timeSpec, bucketNameToBucketValueMS);
+    LOG.info("Bucket name to time values {}", bucketNameToTimeValues);
+
+    Map<String, Long> bucketNameToCountStarMap = getBucketNameToCountStarMap(dataset, timeSpec, bucketNameToTimeValues);
+    return bucketNameToCountStarMap;
+  }
+
+  private static Map<String, Long> getBucketNameToCountStarMap(String dataset, TimeSpec timeSpec,
       ListMultimap<String, Long> bucketNameToTimeValues) {
+
     Map<String, Long> bucketNameToCountStar = new HashMap<>();
 
     // generate request
@@ -213,6 +232,7 @@ public class DataCompletenessTaskUtils {
 
     return bucketNameToCountStar;
   }
+
 
 
 }

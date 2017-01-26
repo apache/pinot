@@ -7,11 +7,13 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.TimeUnit;
 
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.joda.time.Period;
 import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.common.collect.ListMultimap;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessConstants.DataCompletenessAlgorithmName;
@@ -40,20 +42,18 @@ public class Wo4WAvgDataCompletenessAlgorithm implements DataCompletenessAlgorit
 
   @Override
   public void computeBaselineCountsIfNotPresent(String dataset, Map<String, Long> bucketNameToBucketValueMS,
-      DateTimeFormatter dateTimeFormatter, TimeSpec timeSpec) {
-
-    long weekInMillis = TimeUnit.MILLISECONDS.convert(7, TimeUnit.DAYS);
+      DateTimeFormatter dateTimeFormatter, TimeSpec timeSpec, DateTimeZone zone) {
 
     // look for the past 4 weeks
     for (int i = 0; i < 4; i ++) {
-      long baselineOffset = weekInMillis * (i+1);
+      Period baselineOffsetPeriod = new Period(0, 0, 0, 7*(i+1), 0, 0, 0, 0);
       LOG.info("Checking for {} week ago for dataset {}", (i+1), dataset);
 
       // check if baseline is present in database
       Map<String, Long> baselineBucketNameToBucketValueMS = new HashMap<>();
       for (Entry<String, Long> entry : bucketNameToBucketValueMS.entrySet()) {
-        Long bucketValueMS = entry.getValue();
-        Long baselineBucketValueMS = bucketValueMS - baselineOffset;
+        DateTime bucketValueDateTime = new DateTime(entry.getValue(), zone);
+        Long baselineBucketValueMS = bucketValueDateTime.minus(baselineOffsetPeriod).getMillis();
         String baselineBucketName = dateTimeFormatter.print(baselineBucketValueMS);
         DataCompletenessConfigDTO configDTO = dataCompletenessConfigDAO.findByDatasetAndDateSDF(dataset, baselineBucketName);
         if (configDTO == null) {
@@ -64,10 +64,8 @@ public class Wo4WAvgDataCompletenessAlgorithm implements DataCompletenessAlgorit
       LOG.info("Missing baseline buckets {} for dataset {}", baselineBucketNameToBucketValueMS.keySet(), dataset);
       if (!baselineBucketNameToBucketValueMS.isEmpty()) {
 
-        ListMultimap<String, Long> baselineBucketNameToTimeValues =
-            DataCompletenessTaskUtils.getBucketNameToTimeValuesMap(timeSpec, baselineBucketNameToBucketValueMS);
         Map<String, Long> baselineCountsForBuckets =
-            DataCompletenessTaskUtils.getCountsForBucketsOfDataset(dataset, timeSpec, baselineBucketNameToTimeValues);
+            DataCompletenessTaskUtils.getCountsForBucketsOfDataset(dataset, timeSpec, baselineBucketNameToBucketValueMS);
         LOG.info("Baseline bucket counts {}", baselineCountsForBuckets);
 
         for (Entry<String, Long> entry : baselineCountsForBuckets.entrySet()) {

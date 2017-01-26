@@ -1,18 +1,20 @@
 package com.linkedin.thirdeye.completeness.checker;
 
+
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessConstants.DataCompletenessAlgorithmName;
 
 public class DataCompletenessAlgorithmFactory {
 
-  public static String getDataCompletenessAlgorithmClass(DataCompletenessAlgorithmName algorithmName) {
-    String dataCompletenessAlgorithmClass = null;
+
+  public static DataCompletenessAlgorithm getDataCompletenessAlgorithmFromName(DataCompletenessAlgorithmName algorithmName) {
+    DataCompletenessAlgorithm dataCompletenessAlgorithm = null;
     switch (algorithmName) {
       case WO4W_AVERAGE:
       default:
-        dataCompletenessAlgorithmClass = Wo4WAvgDataCompletenessAlgorithm.class.getName();
+        dataCompletenessAlgorithm = new Wo4WAvgDataCompletenessAlgorithm();
         break;
     }
-    return dataCompletenessAlgorithmClass;
+    return dataCompletenessAlgorithm;
   }
 
 }

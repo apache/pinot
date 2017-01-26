@@ -8,6 +8,7 @@ import java.util.Map.Entry;
 import java.util.concurrent.TimeUnit;
 
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormatter;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -26,6 +27,7 @@ public class DataCompletenessTaskUtilsTest {
     DateTime dateTime1 = new DateTime(2017, 01, 12, 15, 46);
     DateTime dateTime2 = new DateTime(2017, 01, 12, 15, 00);
     DateTime dateTime3 = new DateTime(2017, 01, 12, 15, 03);
+    DateTimeZone zone = DateTimeZone.forID("America/Los_Angeles");
 
     // SDF, DAYS
     long startTime = dateTime1.getMillis();
@@ -33,35 +35,36 @@ public class DataCompletenessTaskUtilsTest {
     TimeGranularity timeGranularity = new TimeGranularity(1, TimeUnit.DAYS);
     String timeFormat = "SIMPLE_DATE_FORMAT:yyyyMMdd";
     TimeSpec timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
-    long adjustedStartTime = DataCompletenessTaskUtils.getAdjustedTimeForDataset(timeSpec, startTime);
-    Assert.assertEquals(adjustedStartTime, new DateTime(2017, 01, 12, 0, 0).getMillis());
+    long adjustedStartTime = DataCompletenessTaskUtils.getAdjustedTimeForDataset(timeSpec, startTime, zone);
+    Assert.assertEquals(adjustedStartTime, new DateTime(2017, 01, 12, 0, 0, zone).getMillis());
 
     // EPOCH
     timeFormat = TimeSpec.SINCE_EPOCH_FORMAT;
     // HOURS
+    zone = DateTimeZone.UTC;
     timeGranularity = new TimeGranularity(1, TimeUnit.HOURS);
     timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
-    adjustedStartTime = DataCompletenessTaskUtils.getAdjustedTimeForDataset(timeSpec, startTime);
+    adjustedStartTime = DataCompletenessTaskUtils.getAdjustedTimeForDataset(timeSpec, startTime, zone);
     Assert.assertEquals(adjustedStartTime, new DateTime(2017, 01, 12, 15, 0).getMillis());
 
     // DEFAULT
     timeGranularity = new TimeGranularity(1, TimeUnit.MILLISECONDS);
     timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
-    adjustedStartTime = DataCompletenessTaskUtils.getAdjustedTimeForDataset(timeSpec, startTime);
+    adjustedStartTime = DataCompletenessTaskUtils.getAdjustedTimeForDataset(timeSpec, startTime, zone);
     Assert.assertEquals(adjustedStartTime, new DateTime(2017, 01, 12, 15, 0).getMillis());
 
     // MINUTES
     timeGranularity = new TimeGranularity(5, TimeUnit.MINUTES);
     timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
-    adjustedStartTime = DataCompletenessTaskUtils.getAdjustedTimeForDataset(timeSpec, startTime);
+    adjustedStartTime = DataCompletenessTaskUtils.getAdjustedTimeForDataset(timeSpec, startTime, zone);
     Assert.assertEquals(adjustedStartTime, new DateTime(2017, 01, 12, 15, 30).getMillis());
 
     startTime = dateTime2.getMillis();
-    adjustedStartTime = DataCompletenessTaskUtils.getAdjustedTimeForDataset(timeSpec, startTime);
+    adjustedStartTime = DataCompletenessTaskUtils.getAdjustedTimeForDataset(timeSpec, startTime, zone);
     Assert.assertEquals(adjustedStartTime, new DateTime(2017, 01, 12, 15, 0).getMillis());
 
     startTime = dateTime3.getMillis();
-    adjustedStartTime = DataCompletenessTaskUtils.getAdjustedTimeForDataset(timeSpec, startTime);
+    adjustedStartTime = DataCompletenessTaskUtils.getAdjustedTimeForDataset(timeSpec, startTime, zone);
     Assert.assertEquals(adjustedStartTime, new DateTime(2017, 01, 12, 15, 0).getMillis());
   }
 
@@ -98,32 +101,42 @@ public class DataCompletenessTaskUtilsTest {
   @Test
   public void testGetDateTimeFormatterForDataset() {
 
-    long dateTimeInMS = new DateTime(2017, 01, 12, 15, 30).getMillis();
+    DateTimeZone zone = DateTimeZone.UTC;
+    long dateTimeInMS = new DateTime(2017, 01, 12, 15, 30, zone).getMillis();
 
     String columnName = "Date";
     // DAYS bucket
     TimeGranularity timeGranularity = new TimeGranularity(1, TimeUnit.DAYS);
     String timeFormat = TimeSpec.SINCE_EPOCH_FORMAT;
     TimeSpec timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
-    DateTimeFormatter dateTimeFormatter = DataCompletenessTaskUtils.getDateTimeFormatterForDataset(timeSpec);
+    DateTimeFormatter dateTimeFormatter = DataCompletenessTaskUtils.getDateTimeFormatterForDataset(timeSpec, zone);
     Assert.assertEquals(dateTimeFormatter.print(dateTimeInMS), "20170112");
 
+    long dateTimeInMS1 = new DateTime(2017, 01, 12, 05, 30, zone).getMillis();
+    zone = DateTimeZone.forID("America/Los_Angeles");
+    // DAYS bucket
+    timeGranularity = new TimeGranularity(1, TimeUnit.DAYS);
+    timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
+    dateTimeFormatter = DataCompletenessTaskUtils.getDateTimeFormatterForDataset(timeSpec, zone);
+    Assert.assertEquals(dateTimeFormatter.print(dateTimeInMS1), "20170111");
+
     // HOURS bucket
+    zone = DateTimeZone.UTC;
     timeGranularity = new TimeGranularity(1, TimeUnit.HOURS);
     timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
-    dateTimeFormatter = DataCompletenessTaskUtils.getDateTimeFormatterForDataset(timeSpec);
+    dateTimeFormatter = DataCompletenessTaskUtils.getDateTimeFormatterForDataset(timeSpec, zone);
     Assert.assertEquals(dateTimeFormatter.print(dateTimeInMS), "2017011215");
 
     // MINUTES bucket
     timeGranularity = new TimeGranularity(1, TimeUnit.MINUTES);
     timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
-    dateTimeFormatter = DataCompletenessTaskUtils.getDateTimeFormatterForDataset(timeSpec);
+    dateTimeFormatter = DataCompletenessTaskUtils.getDateTimeFormatterForDataset(timeSpec, zone);
     Assert.assertEquals(dateTimeFormatter.print(dateTimeInMS), "201701121530");
 
     // DEFAULT bucket
     timeGranularity = new TimeGranularity(1, TimeUnit.MILLISECONDS);
     timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
-    dateTimeFormatter = DataCompletenessTaskUtils.getDateTimeFormatterForDataset(timeSpec);
+    dateTimeFormatter = DataCompletenessTaskUtils.getDateTimeFormatterForDataset(timeSpec, zone);
     Assert.assertEquals(dateTimeFormatter.print(dateTimeInMS), "2017011215");
   }
 

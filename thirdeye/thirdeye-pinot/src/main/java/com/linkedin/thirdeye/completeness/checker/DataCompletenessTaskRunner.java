@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.completeness.checker;
 
-import java.lang.reflect.Constructor;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -10,12 +9,12 @@ import java.util.Map.Entry;
 import java.util.concurrent.TimeUnit;
 
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.cache.LoadingCache;
-import com.google.common.collect.ListMultimap;
 import com.linkedin.thirdeye.anomaly.task.TaskContext;
 import com.linkedin.thirdeye.anomaly.task.TaskInfo;
 import com.linkedin.thirdeye.anomaly.task.TaskResult;
@@ -23,9 +22,9 @@ import com.linkedin.thirdeye.anomaly.task.TaskRunner;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.completeness.checker.DataCompletenessConstants.DataCompletenessType;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessConstants.DataCompletenessAlgorithmName;
-import com.linkedin.thirdeye.completeness.checker.DataCompletenessConstants;
+import com.linkedin.thirdeye.completeness.checker.DataCompletenessConstants.DataCompletenessType;
+import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.bao.DataCompletenessConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
@@ -81,11 +80,9 @@ public class DataCompletenessTaskRunner implements TaskRunner {
       LOG.info("StartTime {} i.e. {}", dataCompletenessStartTime, new DateTime(dataCompletenessStartTime));
       LOG.info("EndTime {} i.e. {}", dataCompletenessEndTime, new DateTime(dataCompletenessEndTime));
 
-      // for each dataset,
       for (String dataset : datasets) {
 
         DatasetConfigDTO datasetConfig = datasetConfigCache.get(dataset);
-        TimeSpec timeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
         LOG.info("Dataset {} {}", dataset, datasetConfig);
 
         // TODO: get this from datasetConfig
@@ -94,16 +91,19 @@ public class DataCompletenessTaskRunner implements TaskRunner {
         // TODO: get this form datasetConfig
         // Double expectedCompleteness = datasetConfig.getExpectedCompleteness();
         Double expectedCompleteness = null;
-        String dataCompletenessAlgorithmClass = DataCompletenessAlgorithmFactory.getDataCompletenessAlgorithmClass(algorithmName);
-        Constructor<?> constructor = Class.forName(dataCompletenessAlgorithmClass).getConstructor();
-        DataCompletenessAlgorithm dataCompletenessAlgorithm = (DataCompletenessAlgorithm) constructor.newInstance();
-        LOG.info("DataCompletenessAlgorithmClass: {}", dataCompletenessAlgorithmClass);
+        DataCompletenessAlgorithm dataCompletenessAlgorithm = DataCompletenessAlgorithmFactory.getDataCompletenessAlgorithmFromName(algorithmName);
+        LOG.info("DataCompletenessAlgorithmClass: {}", algorithmName);
 
         // get adjusted start time, bucket size and date time formatter, according to dataset granularity
-        long adjustedStart = DataCompletenessTaskUtils.getAdjustedTimeForDataset(timeSpec, dataCompletenessStartTime);
-        long adjustedEnd = DataCompletenessTaskUtils.getAdjustedTimeForDataset(timeSpec, dataCompletenessEndTime);
+        TimeSpec timeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
+        DateTimeZone dateTimeZone = Utils.getDataTimeZone(dataset);
+        long adjustedStart =
+            DataCompletenessTaskUtils.getAdjustedTimeForDataset(timeSpec, dataCompletenessStartTime, dateTimeZone);
+        long adjustedEnd =
+            DataCompletenessTaskUtils.getAdjustedTimeForDataset(timeSpec, dataCompletenessEndTime, dateTimeZone);
         long bucketSize = DataCompletenessTaskUtils.getBucketSizeInMSForDataset(timeSpec);
-        DateTimeFormatter dateTimeFormatter = DataCompletenessTaskUtils.getDateTimeFormatterForDataset(timeSpec);
+        DateTimeFormatter dateTimeFormatter =
+            DataCompletenessTaskUtils.getDateTimeFormatterForDataset(timeSpec, dateTimeZone);
         LOG.info("Adjusted start:{} i.e. {} Adjusted end:{} i.e. {} and Bucket size:{}",
             adjustedStart, new DateTime(adjustedStart), adjustedEnd, new DateTime(adjustedEnd), bucketSize);
 
@@ -112,61 +112,28 @@ public class DataCompletenessTaskRunner implements TaskRunner {
             dataCompletenessAlgorithm, dateTimeFormatter, bucketSize);
         LOG.info("Got {} buckets to process", bucketNameToBucketValueMS.size());
 
-        // create current entries in database if not already present
-        int numEntriesCreated = createEntriesInDatabaseIfNotPresent(dataset, bucketNameToBucketValueMS);
-        LOG.info("Created {} new entries in database", numEntriesCreated);
+        if (!bucketNameToBucketValueMS.isEmpty()) {
+          // create current entries in database if not already present
+          int numEntriesCreated = createEntriesInDatabaseIfNotPresent(dataset, bucketNameToBucketValueMS);
+          LOG.info("Created {} new entries in database", numEntriesCreated);
 
-        // get time values according to dataset timeSpec schema (epoch or sdf values in proper granularity)
-        // dateToCheckInSDF -> timeValues as present in segments
-        // This is a multimap because for nMinutesSinceEpoch, a bucket (30 minutes) can have more than 1 time values in the 30 minutes
-        // e.g.: For 5 minutes granularity data, the checker will round to 30 minutes,
-        // but count * should be taken from 6 time values in that 30 minutes
-        ListMultimap<String, Long> bucketNameToTimeValues =
-            DataCompletenessTaskUtils.getBucketNameToTimeValuesMap(timeSpec, bucketNameToBucketValueMS);
-        LOG.info("Bucket name to time values {}", bucketNameToTimeValues);
+          // coldstart: compute and store in db the counts for baseline, if not already present
+          LOG.info("Checking for baseline counts in database, or fetching them if not present");
+          dataCompletenessAlgorithm.computeBaselineCountsIfNotPresent(dataset, bucketNameToBucketValueMS,
+              dateTimeFormatter, timeSpec, dateTimeZone);
 
-        // get current counts for all buckets to process
-        Map<String, Long> bucketNameToCount =
-            DataCompletenessTaskUtils.getCountsForBucketsOfDataset(dataset, timeSpec, bucketNameToTimeValues);
-        LOG.info("Bucket name to count {}", bucketNameToCount);
+          // get current counts for all current buckets to process
+          Map<String, Long> bucketNameToCount =
+              DataCompletenessTaskUtils.getCountsForBucketsOfDataset(dataset, timeSpec, bucketNameToBucketValueMS);
+          LOG.info("Bucket name to count {}", bucketNameToCount);
 
-        // coldstart: compute and store in db the counts for baseline, if not already present
-        LOG.info("Checking for baseline counts in database, or fetching them if not present");
-        dataCompletenessAlgorithm.computeBaselineCountsIfNotPresent(dataset, bucketNameToBucketValueMS,
-            dateTimeFormatter, timeSpec);
-
-        // This block of code should now have all entries (current + baselines) in the database
-        for (Entry<String, Long> entry : bucketNameToBucketValueMS.entrySet()) {
-          String bucketName = entry.getKey();
-          Long bucketValue = entry.getValue();
-          Long currentCount = bucketNameToCount.getOrDefault(bucketName, 0L);
-          LOG.info("Bucket name:{} Current count:{}", bucketName, currentCount);
-
-          // get baseline counts for this bucket
-          List<Long> baselineCounts = dataCompletenessAlgorithm.getBaselineCounts(dataset, bucketValue);
-          LOG.info("Baseline counts:{}", baselineCounts);
-
-          // call api with counts, algo, expectation
-          double percentComplete = dataCompletenessAlgorithm.getPercentCompleteness(baselineCounts, currentCount);
-          LOG.info("Percent complete:{}", percentComplete);
-
-          // calculate if data is complete
-          boolean dataComplete = dataCompletenessAlgorithm.isDataComplete(percentComplete, expectedCompleteness);
-          LOG.info("IsDataComplete:{}", dataComplete);
-
-          // update count, dataComplete, percentComplete, numAttempts in database
-          DataCompletenessConfigDTO configToUpdate = dataCompletenessConfigDAO.findByDatasetAndDateSDF(dataset, bucketName);
-          configToUpdate.setCountStar(currentCount);
-          configToUpdate.setDataComplete(dataComplete);
-          configToUpdate.setPercentComplete(Double.parseDouble(new DecimalFormat("##.##").format(percentComplete)));
-          configToUpdate.setNumAttempts(configToUpdate.getNumAttempts() + 1);
-          dataCompletenessConfigDAO.update(configToUpdate);
-          LOG.info("Updated data completeness config id:{} with count *:{} dataComplete:{} percentComplete:{} "
-              + "and numAttempts:{}", configToUpdate.getId(), configToUpdate.getCountStar(),
-              configToUpdate.isDataComplete(), configToUpdate.getPercentComplete(), configToUpdate.getNumAttempts());
+          // run completeness check for all buckets
+          runCompletenessCheck(dataset, bucketNameToBucketValueMS, bucketNameToCount,
+              dataCompletenessAlgorithm, expectedCompleteness);
         }
 
         // TODO: notify logic
+
 
       }
     } catch (Exception e) {
@@ -215,6 +182,12 @@ public class DataCompletenessTaskRunner implements TaskRunner {
   }
 
 
+  /**
+   * Creates the current bucket entries in the table
+   * @param dataset
+   * @param bucketNameToBucketValueMS
+   * @return
+   */
   private int createEntriesInDatabaseIfNotPresent(String dataset, Map<String, Long> bucketNameToBucketValueMS) {
     int numEntriesCreated = 0;
     for (Entry<String, Long> entry : bucketNameToBucketValueMS.entrySet()) {
@@ -236,6 +209,16 @@ public class DataCompletenessTaskRunner implements TaskRunner {
 
   }
 
+  /**
+   * Gets all the buckets that need to be checked
+   * @param dataset
+   * @param adjustedStart
+   * @param adjustedEnd
+   * @param dataCompletenessAlgorithm
+   * @param dateTimeFormatter
+   * @param bucketSize
+   * @return
+   */
   private Map<String, Long> getBucketsToProcess(String dataset, long adjustedStart, long adjustedEnd,
       DataCompletenessAlgorithm dataCompletenessAlgorithm, DateTimeFormatter dateTimeFormatter, long bucketSize) {
     // find completed buckets from database in timerange, for dataset, and percentComplete >= 95%
@@ -267,6 +250,48 @@ public class DataCompletenessTaskRunner implements TaskRunner {
 
     return bucketNameToBucketValueMS;
 
+  }
+
+  /**
+   * Checks completeness for each bucket of every dataset and updates the completeness percentage in the database
+   * @param dataset
+   * @param bucketNameToBucketValueMS
+   * @param bucketNameToCount
+   * @param dataCompletenessAlgorithm
+   * @param expectedCompleteness
+   */
+  private void runCompletenessCheck(String dataset, Map<String, Long> bucketNameToBucketValueMS,
+      Map<String, Long> bucketNameToCount, DataCompletenessAlgorithm dataCompletenessAlgorithm,
+      Double expectedCompleteness) {
+    for (Entry<String, Long> entry : bucketNameToBucketValueMS.entrySet()) {
+      String bucketName = entry.getKey();
+      Long bucketValue = entry.getValue();
+      Long currentCount = bucketNameToCount.getOrDefault(bucketName, 0L);
+      LOG.info("Bucket name:{} Current count:{}", bucketName, currentCount);
+
+      // get baseline counts for this bucket
+      List<Long> baselineCounts = dataCompletenessAlgorithm.getBaselineCounts(dataset, bucketValue);
+      LOG.info("Baseline counts:{}", baselineCounts);
+
+      // call api with counts, algo, expectation
+      double percentComplete = dataCompletenessAlgorithm.getPercentCompleteness(baselineCounts, currentCount);
+      LOG.info("Percent complete:{}", percentComplete);
+
+      // calculate if data is complete
+      boolean dataComplete = dataCompletenessAlgorithm.isDataComplete(percentComplete, expectedCompleteness);
+      LOG.info("IsDataComplete:{}", dataComplete);
+
+      // update count, dataComplete, percentComplete, numAttempts in database
+      DataCompletenessConfigDTO configToUpdate = dataCompletenessConfigDAO.findByDatasetAndDateSDF(dataset, bucketName);
+      configToUpdate.setCountStar(currentCount);
+      configToUpdate.setDataComplete(dataComplete);
+      configToUpdate.setPercentComplete(Double.parseDouble(new DecimalFormat("##.##").format(percentComplete)));
+      configToUpdate.setNumAttempts(configToUpdate.getNumAttempts() + 1);
+      dataCompletenessConfigDAO.update(configToUpdate);
+      LOG.info("Updated data completeness config id:{} with count *:{} dataComplete:{} percentComplete:{} "
+          + "and numAttempts:{}", configToUpdate.getId(), configToUpdate.getCountStar(),
+          configToUpdate.isDataComplete(), configToUpdate.getPercentComplete(), configToUpdate.getNumAttempts());
+    }
   }
 
 

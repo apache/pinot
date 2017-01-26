@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.completeness.checker;
 import java.util.List;
 import java.util.Map;
 
+import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormatter;
 
 import com.linkedin.thirdeye.api.TimeSpec;
@@ -58,7 +59,7 @@ public interface DataCompletenessAlgorithm {
    * @param timeSpec
    */
   public void computeBaselineCountsIfNotPresent(String dataset, Map<String, Long> bucketNameToBucketValueMS,
-      DateTimeFormatter dateTimeFormatter, TimeSpec timeSpec);
+      DateTimeFormatter dateTimeFormatter, TimeSpec timeSpec, DateTimeZone zone);
 
 
 }
