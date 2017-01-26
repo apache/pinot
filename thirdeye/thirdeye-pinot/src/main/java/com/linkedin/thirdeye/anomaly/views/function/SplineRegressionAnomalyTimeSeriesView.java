@@ -142,7 +142,7 @@ public class SplineRegressionAnomalyTimeSeriesView extends BaseAnomalyTimeSeries
           Integer.valueOf(properties.getProperty(HISTORICAL_DATA_MAX_LENGTH, DEFAULT_HISTORICAL_DATA_MAX_LENGTH)),
           Integer.valueOf(properties.getProperty(HISTORICAL_DATA_MIN_LENGTH, DEFAULT_HISTORICAL_DATA_MIN_LENGTH)),
           Integer.valueOf(properties.getProperty(DEGREE, DEFAULT_DEGREE)),
-          logTransform, properties.getProperty(TIMEZONE, DEFAULT_TIMEZONE));
+          logTransform, properties.getProperty(TIMEZONE, DEFAULT_TIMEZONE), true);
     }
     catch(Exception e){
       LOG.error("{}", e.getMessage());
