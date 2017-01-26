@@ -21,7 +21,7 @@ import com.linkedin.pinot.core.operator.blocks.MatchEntireSegmentDocIdSetBlock;
 
 
 public class MatchEntireSegmentOperator extends BaseFilterOperator {
-
+  private static final String OPERATOR_NAME = "MatchEntireSegmentOperator";
   private int _totalDocs;
 
   public MatchEntireSegmentOperator(int totalDocs) {
@@ -41,5 +41,10 @@ public class MatchEntireSegmentOperator extends BaseFilterOperator {
   @Override
   public BaseFilterBlock nextFilterBlock(BlockId blockId) {
     return new MatchEntireSegmentDocIdSetBlock(_totalDocs);
+  }
+
+  @Override
+  public String getOperatorName() {
+    return OPERATOR_NAME;
   }
 }

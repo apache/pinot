@@ -31,6 +31,7 @@ import java.util.Map;
  *
  */
 public class MProjectionOperator extends BaseOperator {
+  private static final String OPERATOR_NAME = "MProjectionOperator";
 
   private final BReusableFilteredDocIdSetOperator _docIdSetOperator;
   private final Map<String, BaseOperator> _columnToDataSourceMap;
@@ -83,6 +84,11 @@ public class MProjectionOperator extends BaseOperator {
   @Override
   public Block getNextBlock(BlockId blockId) {
     throw new UnsupportedOperationException("Not supported in MProjectionOperator!");
+  }
+
+  @Override
+  public String getOperatorName() {
+    return OPERATOR_NAME;
   }
 
   // TODO: remove this method.

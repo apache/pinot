@@ -144,6 +144,13 @@ public class AndOperatorTest {
   public BaseFilterOperator makeFilterOperator(final int[] list) {
 
     return new BaseFilterOperator() {
+      private static final String OPERATOR_NAME = "Anonymous";
+
+      @Override
+      public String getOperatorName() {
+        return OPERATOR_NAME;
+      }
+
       boolean alreadyInvoked = false;
 
       @Override

@@ -49,6 +49,7 @@ import org.slf4j.LoggerFactory;
  */
 public class MCombineGroupByOperator extends BaseOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MCombineGroupByOperator.class);
+  private static final String OPERATOR_NAME = "MCombineGroupByOperator";
 
   // TODO: check whether it is better to use thread local.
   // Choose a proper prime number for the number of locks.
@@ -248,6 +249,11 @@ public class MCombineGroupByOperator extends BaseOperator {
   @Override
   public Block getNextBlock(BlockId blockId) {
     throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public String getOperatorName() {
+    return OPERATOR_NAME;
   }
 
   @Override

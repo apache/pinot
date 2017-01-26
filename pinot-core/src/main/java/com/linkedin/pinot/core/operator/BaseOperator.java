@@ -29,7 +29,7 @@ import org.slf4j.LoggerFactory;
 public abstract class BaseOperator implements Operator {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseOperator.class);
 
-  private final String _operatorName = getClass().getSimpleName();
+  private final String _operatorName = getOperatorName();
 
   @Override
   public final Block nextBlock() {
@@ -55,9 +55,9 @@ public abstract class BaseOperator implements Operator {
 
   public abstract Block getNextBlock(BlockId blockId);
 
-  public String getOperatorName() {
-    return _operatorName;
-  }
+  // Enforcing sub-class to implement the getOperatorName(), as they can just return a static final,
+  // as opposed to this super class calling getClass().getSimpleName().
+  public abstract String getOperatorName();
 
   @Override
   public ExecutionStatistics getExecutionStatistics() {

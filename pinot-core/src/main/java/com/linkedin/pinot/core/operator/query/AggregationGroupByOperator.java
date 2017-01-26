@@ -33,6 +33,8 @@ import javax.annotation.Nonnull;
  * The <code>AggregationOperator</code> class provides the operator for aggregation group-by query on a single segment.
  */
 public class AggregationGroupByOperator extends BaseOperator {
+  private static final String OPERATOR_NAME = "AggregationGroupByOperator";
+
   private final AggregationFunctionContext[] _aggregationFunctionContexts;
   private final GroupBy _groupBy;
   private final int _numGroupsLimit;
@@ -85,6 +87,11 @@ public class AggregationGroupByOperator extends BaseOperator {
   @Override
   public Block getNextBlock(BlockId blockId) {
     throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public String getOperatorName() {
+    return OPERATOR_NAME;
   }
 
   @Override

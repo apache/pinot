@@ -33,6 +33,7 @@ import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 public class BitmapBasedFilterOperator extends BaseFilterOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(BitmapBasedFilterOperator.class);
+  private static final String OPERATOR_NAME = "BitmapBasedFilterOperator";
 
   private DataSource dataSource;
   private BitmapBlock bitmapBlock;
@@ -42,7 +43,7 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
   private int endDocId;
 
   /**
-   * 
+   *
    * @param dataSource
    * @param startDocId inclusive
    * @param endDocId inclusive
@@ -96,4 +97,8 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
     return true;
   }
 
+  @Override
+  public String getOperatorName() {
+    return OPERATOR_NAME;
+  }
 }

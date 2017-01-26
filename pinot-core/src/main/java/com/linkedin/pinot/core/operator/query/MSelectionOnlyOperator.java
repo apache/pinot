@@ -45,6 +45,7 @@ import org.slf4j.LoggerFactory;
  */
 public class MSelectionOnlyOperator extends BaseOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MSelectionOnlyOperator.class);
+  private static final String OPERATOR_NAME = "MSelectionOnlyOperator";
 
   private final IndexSegment _indexSegment;
   private final MProjectionOperator _projectionOperator;
@@ -107,6 +108,11 @@ public class MSelectionOnlyOperator extends BaseOperator {
   @Override
   public Block getNextBlock(BlockId blockId) {
     throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public String getOperatorName() {
+    return OPERATOR_NAME;
   }
 
   @Override
