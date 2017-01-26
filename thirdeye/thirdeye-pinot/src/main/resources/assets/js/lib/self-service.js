@@ -364,6 +364,7 @@ function addSelfServiceListeners() {
 
         var functionType = $(target).attr("id");
         $(".function-type-fields").addClass("uk-hidden");
+	$(".dimension-selection-fields").removeClass("uk-hidden");
         $("." + functionType + "-fields").removeClass("uk-hidden");
 
         //Hide autoPopulated UASER_RULE and MIN_MAX_THRESHOLD to populate only the hard coded customized fields
