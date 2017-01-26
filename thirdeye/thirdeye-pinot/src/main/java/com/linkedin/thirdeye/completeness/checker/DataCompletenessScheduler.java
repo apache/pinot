@@ -11,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.Lists;
+import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 
 /**
  * The scheduler which will run periodically and schedule jobs and tasks for data completeness
@@ -23,11 +24,14 @@ public class DataCompletenessScheduler {
   private DataCompletenessJobRunner dataCompletenessJobRunner;
   private DataCompletenessJobContext dataCompletenessJobContext;
   private List<String> datasetsToCheck = new ArrayList<>();
+  private static final ThirdEyeCacheRegistry CACHE_REGISTRY = ThirdEyeCacheRegistry.getInstance();
 
   public DataCompletenessScheduler(String datasetsToCheck) {
     scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
     if (StringUtils.isNotBlank(datasetsToCheck)) {
       this.datasetsToCheck = Lists.newArrayList(datasetsToCheck.split(","));
+    } else {
+      this.datasetsToCheck = CACHE_REGISTRY.getCollectionsCache().getCollections();
     }
   }
 
