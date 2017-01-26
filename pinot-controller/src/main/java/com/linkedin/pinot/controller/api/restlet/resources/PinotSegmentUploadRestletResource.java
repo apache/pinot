@@ -34,6 +34,7 @@ import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixAdmin;
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.Validate;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
@@ -583,7 +584,7 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
   @Tags({"segment", "table"})
   @Paths({ "/segments/{tableName}/{segmentName}", "/segments/{tableName}/{segmentName}/" })
   private Representation deleteOneSegment(
-      @Parameter(name = "tableName", in = "path", description = "The name of the table in which the segment resides",
+      @Parameter(name = "tableName", in = "path", description = "The raw table name in which the segment resides",
           required = true) String tableName,
       @Parameter(name = "segmentName", in = "path", description = "The name of the segment to delete",
           required = true) String segmentName,
@@ -591,6 +592,7 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
           required = true) String tableType)
       throws JsonProcessingException, JSONException {
 
+    Validate.isTrue(!StringUtils.containsIgnoreCase(tableName, "_OFFLINE") && !StringUtils.containsIgnoreCase(tableName, "_REALTIME"));
     Validate.notNull(tableType, "tableType can't be null");
     return new PinotSegmentRestletResource().toggleSegmentState(tableName, segmentName, "drop", tableType);
   }
@@ -600,12 +602,13 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
   @Tags({"segment", "table"})
   @Paths({ "/segments/{tableName}", "/segments/{tableName}/" })
   private Representation deleteAllSegments(
-      @Parameter(name = "tableName", in = "path", description = "The name of the table in which the segment resides",
+      @Parameter(name = "tableName", in = "path", description = "The raw table name in which the segment resides",
           required = true) String tableName,
       @Parameter(name = "type", in = "query", description = "Type of table {offline|realtime}",
       required = true) String tableType)
       throws JsonProcessingException, JSONException {
 
+    Validate.isTrue(!StringUtils.containsIgnoreCase(tableName, "_OFFLINE") && !StringUtils.containsIgnoreCase(tableName, "_REALTIME"));
     Validate.notNull(tableType, "tableType can't be null");
     return new PinotSegmentRestletResource().toggleSegmentState(tableName, null, "drop", tableType);
   }
