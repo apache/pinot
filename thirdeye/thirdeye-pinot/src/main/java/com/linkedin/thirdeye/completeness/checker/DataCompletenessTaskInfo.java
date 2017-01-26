@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.completeness.checker;
 
+import java.util.List;
 import java.util.Objects;
 
 import com.google.common.base.MoreObjects;
@@ -14,6 +15,7 @@ public class DataCompletenessTaskInfo implements TaskInfo {
   private DataCompletenessType dataCompletenessType;
   private long dataCompletenessStartTime;
   private long dataCompletenessEndTime;
+  private List<String> datasetsToCheck;
 
   public DataCompletenessTaskInfo() {
 
@@ -44,6 +46,16 @@ public class DataCompletenessTaskInfo implements TaskInfo {
   }
 
 
+
+
+  public List<String> getDatasetsToCheck() {
+    return datasetsToCheck;
+  }
+
+  public void setDatasetsToCheck(List<String> datasetsToCheck) {
+    this.datasetsToCheck = datasetsToCheck;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (!(o instanceof DataCompletenessTaskInfo)) {
@@ -52,17 +64,19 @@ public class DataCompletenessTaskInfo implements TaskInfo {
     DataCompletenessTaskInfo dc = (DataCompletenessTaskInfo) o;
     return Objects.equals(dataCompletenessType, dc.getDataCompletenessType())
         && Objects.equals(dataCompletenessStartTime, dc.getDataCompletenessStartTime())
-        && Objects.equals(dataCompletenessEndTime, dc.getDataCompletenessEndTime());
+        && Objects.equals(dataCompletenessEndTime, dc.getDataCompletenessEndTime())
+        && Objects.equals(datasetsToCheck, dc.getDatasetsToCheck());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(dataCompletenessType, dataCompletenessStartTime, dataCompletenessEndTime);
+    return Objects.hash(dataCompletenessType, dataCompletenessStartTime, dataCompletenessEndTime, datasetsToCheck);
   }
 
   @Override
   public String toString() {
     return MoreObjects.toStringHelper(this).add("dataCompletenessType", dataCompletenessType)
-        .add("startTime", dataCompletenessStartTime).add("endTime", dataCompletenessEndTime).toString();
+        .add("startTime", dataCompletenessStartTime).add("endTime", dataCompletenessEndTime)
+        .add("datasetsToCheck", datasetsToCheck).toString();
   }
 }
