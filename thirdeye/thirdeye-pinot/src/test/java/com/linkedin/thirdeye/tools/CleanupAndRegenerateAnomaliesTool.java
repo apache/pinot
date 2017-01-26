@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.tools;
 
+import com.linkedin.thirdeye.dashboard.resources.OnboardResource;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -122,25 +123,11 @@ public class CleanupAndRegenerateAnomaliesTool {
       AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
       LOG.info("Beginning cleanup of functionId {} collection {} metric {}",
           functionId, anomalyFunction.getCollection(), anomalyFunction.getMetric());
-      // Find merged anomalies and delete them first
-      List<MergedAnomalyResultDTO> mergedResults =
-          mergedResultDAO.findByStartTimeInRangeAndFunctionId(startTime, endTime, functionId);
-      if (CollectionUtils.isNotEmpty(mergedResults)) {
-        deleteMergedResults(mergedResults);
-      }
-      // Just in case unmerged raw anomalies exist and hence are not deleted in the previous step
-      List<RawAnomalyResultDTO> rawResults = rawResultDAO.findAllByTimeAndFunctionId(startTime, endTime, functionId);
-      if (CollectionUtils.isNotEmpty(rawResults)) {
-        for (int i = rawResults.size() -1; i >= 0; --i) {
-          if (!rawResults.get(i).isMerged()) {
-            rawResults.remove(i);
-          }
-        }
-        deleteRawResults(rawResults);
-      }
+
+      // Clean up merged and raw anomaly of functionID
+      OnboardResource onboardResource = new OnboardResource();
+      onboardResource.deleteExistingAnomalies(Long.toString(functionId), startTime, endTime);
     }
-    LOG.info("Deleted {} raw anomalies", rawAnomaliesDeleted);
-    LOG.info("Deleted {} merged anomalies", mergedAnomaliesDeleted);
   }
 
 

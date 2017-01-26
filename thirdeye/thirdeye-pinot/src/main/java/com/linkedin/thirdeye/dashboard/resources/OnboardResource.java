@@ -230,6 +230,65 @@ public class OnboardResource {
   }
 
   /**
+   * Delete raw or merged anomalies whose start time is located in the given time ranges, except
+   * the following two cases:
+   *
+   * 1. If a raw anomaly belongs to a merged anomaly whose start time is not located in the given
+   * time ranges, then the raw anomaly will not be deleted.
+   *
+   * 2. If a raw anomaly belongs to a merged anomaly whose start time is located in the given
+   * time ranges, then it is deleted regardless its start time.
+   *
+   * If monitoringWindowStartTime is not given, then start time is set to 0.
+   * If monitoringWindowEndTime is not given, then end time is set to Long.MAX_VALUE.
+   * @param monitoringWindowStartTime The start time of the monitoring window (in milli-second)
+   * @param monitoringWindowEndTime The start time of the monitoring window (in milli-second)
+   */
+  @POST
+  @Path("function/{id}/deleteExistingAnomalies")
+  public Map<String, Integer> deleteExistingAnomalies(@PathParam("id") String id,
+      @QueryParam("start") long monitoringWindowStartTime,
+      @QueryParam("end") long monitoringWindowEndTime) {
+    long functionId = Long.valueOf(id);
+    AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
+    if(anomalyFunction == null){
+      LOG.info("Anomaly functionId {} is not found", functionId);
+      return null;
+    }
+    HashMap<String, Integer> returnInfo = new HashMap<>();
+
+    // Find merged anomaly result and delete them first
+    LOG.info("Deleting merged anomaly results in the time range: {} -- {}", new DateTime(monitoringWindowStartTime), new
+        DateTime(monitoringWindowEndTime));
+    LOG.info("Beginning cleanup merged anomaly results of functionId {} collection {} metric {}",
+        functionId, anomalyFunction.getCollection(), anomalyFunction.getMetric());
+    int mergedAnomaliesDeleted = 0;
+    List<MergedAnomalyResultDTO> mergedResults =
+        mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(monitoringWindowStartTime, monitoringWindowEndTime, functionId);
+    if (CollectionUtils.isNotEmpty(mergedResults)) {
+      mergedAnomaliesDeleted = deleteMergedResults(mergedResults);
+    }
+    returnInfo.put("mergedAnomaliesDeleted", mergedAnomaliesDeleted);
+    LOG.info("{} merged anomaly results have been deleted", mergedAnomaliesDeleted);
+
+    // Find raw anomaly results and delete them
+    LOG.info("Deleting raw anomaly results in the time range: {} -- {}", new DateTime(monitoringWindowStartTime), new
+        DateTime(monitoringWindowEndTime));
+    LOG.info("Beginning cleanup merged anomaly results of functionId {} collection {} metric {}",
+        functionId, anomalyFunction.getCollection(), anomalyFunction.getMetric());
+    int rawAnomaliesDeleted = 0;
+    List<RawAnomalyResultDTO> rawResults =
+        rawAnomalyResultDAO.findAllByTimeAndFunctionId(monitoringWindowStartTime, monitoringWindowEndTime, functionId);
+    if (CollectionUtils.isNotEmpty(rawResults)){
+      rawAnomaliesDeleted = deleteRawResults(rawResults);
+    }
+    returnInfo.put("rawAnomaliesDeleted", rawAnomaliesDeleted);
+    LOG.info("{} raw anomaly results have been deleted", rawAnomaliesDeleted);
+
+    return returnInfo;
+  }
+
+  /**
    * Show the content of merged anomalies whose start time is located in the given time ranges
    *
    * @param monitoringWindowStartTime The start time of the monitoring window (in milli-second)
