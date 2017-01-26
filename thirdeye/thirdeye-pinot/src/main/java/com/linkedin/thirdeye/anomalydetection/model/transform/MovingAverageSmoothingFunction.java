@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.anomalydetection.model.transform;
 
-import com.linkedin.thirdeye.anomalydetection.AnomalyDetectionUtils;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyDetectionContext;
 import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
 import com.linkedin.thirdeye.api.DimensionMap;
@@ -12,8 +11,6 @@ public class MovingAverageSmoothingFunction extends AbstractTransformationFuncti
   private static final Logger LOGGER =
       LoggerFactory.getLogger(MovingAverageSmoothingFunction.class);
 
-  public static final String BUCKET_SIZE = "bucketSize";
-  public static final String BUCKET_UNIT = "bucketUnit";
   public static final String MOVING_AVERAGE_SMOOTHING_WINDOW_SIZE = "movingAverageSmoothingWindowSize";
 
   /**
@@ -39,8 +36,7 @@ public class MovingAverageSmoothingFunction extends AbstractTransformationFuncti
     long startTime = timeSeriesInterval.getStartMillis();
     long endTime = timeSeriesInterval.getEndMillis();
 
-    long bucketSizeInMillis = AnomalyDetectionUtils
-        .getBucketInMillis(BUCKET_SIZE, BUCKET_UNIT, getProperties());
+    long bucketSizeInMillis = anomalyDetectionContext.getBucketSizeInMS();
 
     int movingAverageWindowSize =
         Integer.valueOf(getProperties().getProperty(MOVING_AVERAGE_SMOOTHING_WINDOW_SIZE));

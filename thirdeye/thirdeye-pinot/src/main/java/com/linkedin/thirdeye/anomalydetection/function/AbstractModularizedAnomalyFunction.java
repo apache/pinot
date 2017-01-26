@@ -120,7 +120,7 @@ public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunc
 
     // Train Prediction Model
     PredictionModel predictionModel = getPredictionModel();
-    predictionModel.train(anomalyDetectionContext.getTransformedBaselines());
+    predictionModel.train(anomalyDetectionContext.getTransformedBaselines(), anomalyDetectionContext);
     anomalyDetectionContext.setTrainedPredictionModel(predictionModel);
   }
 
@@ -180,7 +180,7 @@ public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunc
       throws Exception {
     AnomalyDetectionContext anomalyDetectionContext = BackwardAnomalyFunctionUtils
         .buildAnomalyDetectionContext(this, timeSeries, spec.getMetric(), exploredDimensions,
-            windowStart, windowEnd);
+            spec.getBucketSize(), spec.getBucketUnit(), windowStart, windowEnd);
 
     return this.analyze(anomalyDetectionContext);
   }
@@ -194,7 +194,8 @@ public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunc
     if (!(getMergeModel() instanceof NoPredictionMergeModel)) {
       anomalyDetectionContext = BackwardAnomalyFunctionUtils
           .buildAnomalyDetectionContext(this, timeSeries, spec.getMetric(),
-              anomalyToUpdated.getDimensions(), windowStart, windowEnd);
+              anomalyToUpdated.getDimensions(), spec.getBucketSize(), spec.getBucketUnit(),
+              windowStart, windowEnd);
     }
 
     updateMergedAnomalyInfo(anomalyDetectionContext, anomalyToUpdated);
