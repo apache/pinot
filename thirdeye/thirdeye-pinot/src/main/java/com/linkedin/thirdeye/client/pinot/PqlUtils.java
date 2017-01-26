@@ -85,8 +85,8 @@ public class PqlUtils {
 
     List<String> metricAsDimensionPqls = new ArrayList<>();
     for (MetricFunction metricFunction : metricFunctions) {
-      String metricAsDimensionPql = getMetricAsDimensionPql(collection, metricFunction, startTime, endTimeExclusive, filterSet, groupBy, timeGranularity,
-          dataTimeSpec, metricValuesColumn, metricNamesColumn);
+      String metricAsDimensionPql = getMetricAsDimensionPql(collection, metricFunction, startTime, endTimeExclusive,
+          filterSet, groupBy, timeGranularity, dataTimeSpec, metricValuesColumn, metricNamesColumn);
       metricAsDimensionPqls.add(metricAsDimensionPql);
     }
     return metricAsDimensionPqls;
@@ -113,6 +113,7 @@ public class PqlUtils {
     if (StringUtils.isNotBlank(dimensionWhereClause)) {
       sb.append(" AND ").append(dimensionWhereClause);
     }
+
     String groupByClause = getDimensionGroupByClause(groupBy, timeGranularity, dataTimeSpec);
     if (StringUtils.isNotBlank(groupByClause)) {
       sb.append(" ").append(groupByClause);
@@ -139,6 +140,7 @@ public class PqlUtils {
     if (StringUtils.isNotBlank(dimensionWhereClause)) {
       sb.append(" AND ").append(dimensionWhereClause);
     }
+
     String groupByClause = getDimensionGroupByClause(groupBy, timeGranularity, dataTimeSpec);
     if (StringUtils.isNotBlank(groupByClause)) {
       sb.append(" ").append(groupByClause);

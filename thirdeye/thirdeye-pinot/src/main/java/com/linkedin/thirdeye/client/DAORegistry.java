@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.client;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.DataCompletenessConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
 import com.linkedin.thirdeye.datalayer.bao.IngraphDashboardConfigManager;
@@ -28,6 +29,7 @@ public class DAORegistry {
   private static IngraphDashboardConfigManager ingraphDashboardConfigDAO;
   private static IngraphMetricConfigManager ingraphMetricConfigDAO;
   private static OverrideConfigManager overrideConfigDAO;
+  private static DataCompletenessConfigManager dataCompletenessConfigDAO;
 
   private static class Holder {
     static final DAORegistry INSTANCE = new DAORegistry();
@@ -43,7 +45,8 @@ public class DAORegistry {
       DatasetConfigManager datasetConfigDAO, MetricConfigManager metricConfigDAO,
       DashboardConfigManager dashboardConfigDAO, IngraphMetricConfigManager ingraphMetricConfigDAO,
       IngraphDashboardConfigManager ingraphDashboardConfigDAO,
-      OverrideConfigManager overrideConfigDAO, AlertConfigManager alertConfigDAO) {
+      OverrideConfigManager overrideConfigDAO, AlertConfigManager alertConfigDAO,
+      DataCompletenessConfigManager dataCompletenessConfigDAO) {
 
     DAORegistry daoRegistry = DAORegistry.getInstance();
     daoRegistry.registerAnomalyFunctionDAO(anomalyFunctionDAO);
@@ -58,7 +61,8 @@ public class DAORegistry {
     daoRegistry.registerIngraphDashboardConfigDAO(ingraphDashboardConfigDAO);
     daoRegistry.registerIngraphMetricConfigDAO(ingraphMetricConfigDAO);
     daoRegistry.registerOverrideConfigDAO(overrideConfigDAO);
-    daoRegistry.setAlertConfigDAO(alertConfigDAO);
+    daoRegistry.registerAlertConfigDAO(alertConfigDAO);
+    daoRegistry.registerDataCompletenessConfigDAO(dataCompletenessConfigDAO);
   }
 
   public AnomalyFunctionManager getAnomalyFunctionDAO() {
@@ -161,7 +165,15 @@ public class DAORegistry {
     return alertConfigDAO;
   }
 
-  public void setAlertConfigDAO(AlertConfigManager alertConfigDAO) {
+  private void registerAlertConfigDAO(AlertConfigManager alertConfigDAO) {
     DAORegistry.alertConfigDAO = alertConfigDAO;
+  }
+
+  public DataCompletenessConfigManager getDataCompletenessConfigDAO() {
+    return dataCompletenessConfigDAO;
+  }
+
+  private void registerDataCompletenessConfigDAO(DataCompletenessConfigManager dataCompletenessConfigDAO) {
+    DAORegistry.dataCompletenessConfigDAO = dataCompletenessConfigDAO;
   }
 }

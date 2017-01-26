@@ -15,7 +15,6 @@ public class DataCompletenessTaskInfo implements TaskInfo {
   private long dataCompletenessStartTime;
   private long dataCompletenessEndTime;
 
-
   public DataCompletenessTaskInfo() {
 
   }
@@ -43,6 +42,7 @@ public class DataCompletenessTaskInfo implements TaskInfo {
   public void setDataCompletenessEndTime(long dataCompletenessEndTime) {
     this.dataCompletenessEndTime = dataCompletenessEndTime;
   }
+
 
   @Override
   public boolean equals(Object o) {

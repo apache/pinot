@@ -96,7 +96,7 @@ public class DataCompletenessJobRunner implements JobRunner {
       LOG.info("Creating data completeness checker tasks");
       List<DataCompletenessTaskInfo> dataCompletenessTasks =
           taskGenerator.createDataCompletenessTasks(dataCompletenessJobContext);
-      LOG.info("Monitor tasks {}", dataCompletenessTasks);
+      LOG.info("DataCompleteness tasks {}", dataCompletenessTasks);
       for (DataCompletenessTaskInfo taskInfo : dataCompletenessTasks) {
         String taskInfoJson = null;
         try {

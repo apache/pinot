@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.common;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.AlertConfigManagerImpl;
+
 import java.io.File;
 
 import org.slf4j.Logger;
@@ -11,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.DataCompletenessConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
 import com.linkedin.thirdeye.datalayer.bao.IngraphDashboardConfigManager;
@@ -40,6 +42,7 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
   protected IngraphMetricConfigManager ingraphMetricConfigDAO;
   protected OverrideConfigManager overrideConfigDAO;
   protected AlertConfigManager alertConfigDAO;
+  protected DataCompletenessConfigManager dataCompletenessConfigDAO;
 
   public void initDAOs() {
     String persistenceConfig = System.getProperty("dw.rootDir") + "/persistence.yml";
@@ -70,9 +73,12 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
     overrideConfigDAO = DaoProviderUtil
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.OverrideConfigManagerImpl.class);
     alertConfigDAO = DaoProviderUtil.getInstance(AlertConfigManagerImpl.class);
+    dataCompletenessConfigDAO = DaoProviderUtil
+        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.DataCompletenessConfigManagerImpl.class);
+
     DAORegistry.registerDAOs(anomalyFunctionDAO, emailConfigurationDAO, rawAnomalyResultDAO,
             mergedAnomalyResultDAO, jobDAO, taskDAO, datasetConfigDAO, metricConfigDAO,
             dashboardConfigDAO, ingraphMetricConfigDAO, ingraphDashboardConfigDAO,
-            overrideConfigDAO, alertConfigDAO);
+            overrideConfigDAO, alertConfigDAO, dataCompletenessConfigDAO);
   }
 }

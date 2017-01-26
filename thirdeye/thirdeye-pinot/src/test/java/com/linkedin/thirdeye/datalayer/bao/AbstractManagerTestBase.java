@@ -34,8 +34,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.tomcat.jdbc.pool.DataSource;
 import org.joda.time.DateTime;
-import org.joda.time.format.DateTimeFormat;
-import org.joda.time.format.DateTimeFormatter;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 
@@ -308,12 +306,11 @@ public abstract class AbstractManagerTestBase {
   }
 
   protected DataCompletenessConfigDTO getTestDataCompletenessConfig(String dataset, long dateToCheckInMS,
-      boolean dataComplete) {
-    DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern("yyyyMMddHHmm");
+      String dateToCheckInSDF, boolean dataComplete) {
     DataCompletenessConfigDTO dataCompletenessConfigDTO = new DataCompletenessConfigDTO();
     dataCompletenessConfigDTO.setDataset(dataset);
     dataCompletenessConfigDTO.setDateToCheckInMS(dateToCheckInMS);
-    dataCompletenessConfigDTO.setDateToCheckInSDF(dateTimeFormatter.print(dateToCheckInMS));
+    dataCompletenessConfigDTO.setDateToCheckInSDF(dateToCheckInSDF);
     dataCompletenessConfigDTO.setDataComplete(dataComplete);
     dataCompletenessConfigDTO.setCountStar(2000);
     dataCompletenessConfigDTO.setPercentComplete(79);
