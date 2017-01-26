@@ -2,6 +2,10 @@ package com.linkedin.thirdeye.anomaly.detection;
 
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
+import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.util.SeverityComputationUtil;
 import java.util.List;
 
@@ -19,6 +23,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.NullArgumentException;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
@@ -34,12 +39,18 @@ import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 public class DetectionJobResource {
   private final DetectionJobScheduler detectionJobScheduler;
   private final AnomalyFunctionManager anomalyFunctionSpecDAO;
+  private final AnomalyFunctionManager anomalyFunctionDAO;
+  private final MergedAnomalyResultManager mergedAnomalyResultDAO;
+  private final RawAnomalyResultManager rawAnomalyResultDAO;
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
 
   public DetectionJobResource(DetectionJobScheduler detectionJobScheduler) {
     this.detectionJobScheduler = detectionJobScheduler;
     this.anomalyFunctionSpecDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
+    this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
+    this.mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
+    this.rawAnomalyResultDAO = DAO_REGISTRY.getRawAnomalyResultDAO();
   }
 
   @GET
@@ -69,42 +80,6 @@ public class DetectionJobResource {
       endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso);
     }
     detectionJobScheduler.runAdHoc(id, startTime, endTime);
-    return Response.ok().build();
-  }
-
-  /**
-   * Asynchronous call to a backfill procedure
-   * @param id
-   * @param startTimeIso
-   * @param endTimeIso
-   * @return
-   * @throws Exception
-   */
-  @POST
-  @Path("/{id}/backfill")
-  public Response backfill(@PathParam("id") Long id, @QueryParam("start") String startTimeIso,
-      @QueryParam("end") String endTimeIso, @DefaultValue("false") @QueryParam("force") boolean force) throws Exception {
-    DateTime startTime = null;
-    DateTime endTime = null;
-    if (StringUtils.isNotBlank(startTimeIso)) {
-      startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso);
-    }
-    if (StringUtils.isNotBlank(endTimeIso)) {
-      endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso);
-    }
-
-    if (startTime != null && endTime != null) {
-      DateTime innerStartTime = startTime;
-      DateTime innerEndTime = endTime;
-
-      new Thread(new Runnable() {
-        @Override
-        public void run() {
-          detectionJobScheduler.runBackfill(id, innerStartTime, innerEndTime, force);
-        }
-      }).start();
-    }
-
     return Response.ok().build();
   }
 
@@ -189,5 +164,89 @@ public class DetectionJobResource {
         util.computeSeverity(currentWindowStart, currentWindowEnd, seasonalPeriodMillis, seasonCountInt);
 
     return Response.ok(severity.toString(), MediaType.TEXT_PLAIN_TYPE).build();
+  }
+
+  /**
+   * Breaks down the given range into consecutive monitoring windows as per function definition
+   * Regenerates anomalies for each window separately
+   *
+   * As the anomaly result regeneration is a heavy job, we move the function from Dashboard to worker
+   * @param id anomaly function id
+   * @param startTimeIso The start time of the monitoring window (in ISO Format), ex: 2016-5-23T00:00:00Z
+   * @param endTimeIso The start time of the monitoring window (in ISO Format)
+   * @param isForceBackfill false to resume backfill from the latest left off
+   * @return HTTP response of this request
+   * @throws Exception
+   */
+  @POST
+  @Path("/{id}/generateAnomaliesInRange")
+  public Response generateAnomaliesInRange(@PathParam("id") String id,
+      @QueryParam("start") String startTimeIso,
+      @QueryParam("end") String endTimeIso,
+      @QueryParam("force") @DefaultValue("false") String isForceBackfill) throws Exception {
+    long functionId = Long.valueOf(id);
+    AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
+    if (anomalyFunction == null) {
+      return Response.noContent().build();
+
+    }
+
+    // Check if the timestamps are available
+    DateTime startTime = null;
+    DateTime endTime = null;
+    if (startTimeIso == null || startTimeIso.isEmpty()) {
+      throw new IllegalArgumentException(String.format("[functionId %s] Monitoring start time is not found", id));
+    }
+    if (endTimeIso == null || endTimeIso.isEmpty()) {
+      throw new IllegalArgumentException(String.format("[functionId %s] Monitoring end time is not found", id));
+    }
+
+    startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso);
+    endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso);
+
+    if(startTime.isAfter(endTime)){
+      throw new IllegalArgumentException(String.format(
+          "[functionId %s] Monitoring start time is after monitoring end time", id));
+    }
+    if(endTime.isAfterNow()){
+      throw new IllegalArgumentException(String.format(
+          "[functionId %s] Monitor end time {} should not be in the future", id, endTime.toString()));
+    }
+
+    // Check if the merged anomaly results have been cleaned up before regeneration
+    List<MergedAnomalyResultDTO> mergedResults =
+        mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(startTime.getMillis(), endTime.getMillis(),
+            functionId);
+    if (CollectionUtils.isNotEmpty(mergedResults)) {
+      throw new IllegalArgumentException(String.format(
+          "[functionId %s] Merged anomaly results should be cleaned up before regeneration", id));
+    }
+
+    //  Check if the raw anomaly results have been cleaned up before regeneration
+    List<RawAnomalyResultDTO> rawResults =
+        rawAnomalyResultDAO.findAllByTimeAndFunctionId(startTime.getMillis(), endTime.getMillis(), functionId);
+    if(CollectionUtils.isNotEmpty(rawResults)){
+      throw new IllegalArgumentException(String.format(
+          "[functionId {}] Raw anomaly results should be cleaned up before regeneration", id));
+    }
+
+    // Check if the anomaly function is active
+    if (!anomalyFunction.getIsActive()) {
+      throw new IllegalArgumentException(String.format("Skipping deactivated function %s", id));
+    }
+
+    String response = null;
+
+    DateTime innerStartTime = startTime;
+    DateTime innerEndTime = endTime;
+
+    new Thread(new Runnable() {
+      @Override
+      public void run() {
+        detectionJobScheduler.runBackfill(functionId, innerStartTime, innerEndTime, Boolean.valueOf(isForceBackfill));
+      }
+    }).start();
+
+    return Response.ok().build();
   }
 }
