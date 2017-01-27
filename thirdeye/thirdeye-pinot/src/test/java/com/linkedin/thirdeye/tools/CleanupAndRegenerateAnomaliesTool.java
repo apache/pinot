@@ -179,28 +179,6 @@ public class CleanupAndRegenerateAnomaliesTool {
     LOG.info("Response {}", response);
   }
 
-  private void deleteRawResults(List<RawAnomalyResultDTO> rawResults) {
-    LOG.info("Deleting raw results");
-    for (RawAnomalyResultDTO rawResult : rawResults) {
-      LOG.info("......Deleting id {} for functionId {}", rawResult.getId(), rawResult.getFunctionId());
-      rawResultDAO.delete(rawResult);
-      rawAnomaliesDeleted++;
-    }
-  }
-
-  private void deleteMergedResults(List<MergedAnomalyResultDTO> mergedResults) {
-    LOG.info("Deleting merged results");
-    for (MergedAnomalyResultDTO mergedResult : mergedResults) {
-      // Delete raw anomalies of the merged anomaly
-      List<RawAnomalyResultDTO> rawAnomalyResultDTOs = mergedResult.getAnomalyResults();
-      deleteRawResults(rawAnomalyResultDTOs);
-
-      LOG.info(".....Deleting id {} for functionId {}", mergedResult.getId(), mergedResult.getFunctionId());
-      mergedResultDAO.delete(mergedResult);
-      mergedAnomaliesDeleted++;
-    }
-  }
-
   public static void main(String[] args) throws Exception {
 
     if (args.length != 2) {
