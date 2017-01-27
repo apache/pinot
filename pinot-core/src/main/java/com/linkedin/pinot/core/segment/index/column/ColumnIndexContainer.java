@@ -27,9 +27,7 @@ import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader
 import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitMultiValueReader;
 import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
 import com.linkedin.pinot.core.io.reader.impl.v1.FixedByteChunkSingleValueReader;
-import com.linkedin.pinot.core.io.reader.impl.v1.FixedByteSingleValueReader;
 import com.linkedin.pinot.core.io.reader.impl.v1.VarByteChunkSingleValueReader;
-import com.linkedin.pinot.core.segment.creator.impl.fwd.SingleValueFixedByteRawIndexCreator;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.readers.BitmapInvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.DoubleDictionary;
@@ -68,14 +66,11 @@ public abstract class ColumnIndexContainer {
 
     if (metadata.isSorted() && metadata.isSingleValue()) {
       return loadSorted(column, segmentReader, metadata, dictionary);
-      //return loadSorted(column, indexDir, metadata, dictionary, mode);
     }
 
     if (metadata.isSingleValue()) {
       return loadUnsorted(column, segmentReader, metadata, dictionary, loadInverted);
-      //return loadUnsorted(column, indexDir, metadata, dictionary, mode, loadInverted);
     }
-    //return loadMultiValue(column, indexDir, metadata, dictionary, mode, loadInverted);
     return loadMultiValue(column, segmentReader, metadata, dictionary, loadInverted);
   }
 
