@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import javax.xml.transform.Result;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
@@ -115,6 +116,34 @@ public class FetchMetricDataAndExistingAnomaliesTool {
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl.class);
   }
 
+  public List<ResultNode> fetchMergedAnomaliesInRangeByFunctionId(long functionId, String startTimeISO, String endTimeISO){
+    DateTime startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeISO);
+    DateTime endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeISO);
+    AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
+    System.out.println(String.format("Loading merged anaomaly results of functionId %l from db...", functionId));
+    List<ResultNode> resultNodes = new ArrayList<>();
+
+    if(anomalyFunction == null){ // no such function
+      return  resultNodes;
+    }
+
+    List<MergedAnomalyResultDTO> mergedResults =
+        mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(startTime.getMillis(), endTime.getMillis(), functionId);
+    for(MergedAnomalyResultDTO mergedResult : mergedResults){
+      ResultNode res = new ResultNode();
+      res.functionId = functionId;
+      res.functionName = anomalyFunction.getFunctionName();
+      res.startTime = new DateTime(mergedResult.getStartTime());
+      res.endTime = new DateTime(mergedResult.getEndTime());
+      res.dimensions = mergedResult.getDimensions();
+      res.setFilters(anomalyFunction.getFilters());
+      res.severity = mergedResult.getWeight();
+      AnomalyFeedbackDTO feedback = mergedResult.getFeedback();
+      res._feedbackType = (feedback == null)? null : feedback.getFeedbackType();
+      resultNodes.add(res);
+    }
+    return resultNodes;
+  }
   /**
    * Fetch merged anomaly results from thirdeye db
    * @param collection database/collection name
@@ -123,33 +152,45 @@ public class FetchMetricDataAndExistingAnomaliesTool {
    * @param endTimeISO end time of the requested data in ISO format
    * @return List of merged anomaly results
    */
-  public List<ResultNode> fetchMergedAnomalies (String collection, String metric, String startTimeISO, String endTimeISO){
-    DateTime startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeISO);
-    DateTime endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeISO);
+  public List<ResultNode> fetchMergedAnomaliesInRange (String collection, String metric, String startTimeISO, String endTimeISO){
     List<AnomalyFunctionDTO> anomalyFunctions = anomalyFunctionDAO.findAllByCollection(collection);
     System.out.println("Loading merged anaomaly results from db...");
     List<ResultNode> resultNodes = new ArrayList<>();
     for(AnomalyFunctionDTO anomalyDto : anomalyFunctions){
       if(!anomalyDto.getMetric().equals(metric)) continue;
 
-      long id = anomalyDto.getId();
-      List<MergedAnomalyResultDTO> mergedResults =
-          mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(startTime.getMillis(), endTime.getMillis(), id);
-      for(MergedAnomalyResultDTO mergedResult : mergedResults){
-        ResultNode res = new ResultNode();
-        res.functionId = id;
-        res.functionName = anomalyDto.getFunctionName();
-        res.startTime = new DateTime(mergedResult.getStartTime());
-        res.endTime = new DateTime(mergedResult.getEndTime());
-        res.dimensions = mergedResult.getDimensions();
-        res.setFilters(anomalyDto.getFilters());
-        res.severity = mergedResult.getWeight();
-        AnomalyFeedbackDTO feedback = mergedResult.getFeedback();
-        res._feedbackType = (feedback == null)? null : feedback.getFeedbackType();
-        resultNodes.add(res);
-      }
+      resultNodes.addAll(fetchMergedAnomaliesInRangeByFunctionId(anomalyDto.getId(), startTimeISO, endTimeISO));
     }
     Collections.sort(resultNodes);
+    return resultNodes;
+  }
+
+  public List<ResultNode> fetchRawAnomaliesInRangeByFunctionId(long functionId, String startTimeISO, String endTimeISO){
+    DateTime startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeISO);
+    DateTime endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeISO);
+    AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
+    System.out.println(String.format("Loading raw anaomaly results of functionId %l from db...", functionId));
+    List<ResultNode> resultNodes = new ArrayList<>();
+
+    if(anomalyFunction == null){ // no such function
+      return  resultNodes;
+    }
+
+    List<RawAnomalyResultDTO> rawResults =
+        rawAnomalyResultDAO.findAllByTimeAndFunctionId(startTime.getMillis(), endTime.getMillis(), functionId);
+    for(RawAnomalyResultDTO rawdResult : rawResults){
+      ResultNode res = new ResultNode();
+      res.functionId = functionId;
+      res.functionName = anomalyFunction.getFunctionName();
+      res.startTime = new DateTime(rawdResult.getStartTime());
+      res.endTime = new DateTime(rawdResult.getEndTime());
+      res.dimensions = rawdResult.getDimensions();
+      res.setFilters(anomalyFunction.getFilters());
+      res.severity = rawdResult.getWeight();
+      AnomalyFeedbackDTO feedback = rawdResult.getFeedback();
+      res._feedbackType = (feedback == null)? null : feedback.getFeedbackType();
+      resultNodes.add(res);
+    }
     return resultNodes;
   }
 
@@ -162,8 +203,6 @@ public class FetchMetricDataAndExistingAnomaliesTool {
    * @return List of raw anomaly results
    */
   public List<ResultNode> fetchRawAnomalies(String collection, String metric, String startTimeISO, String endTimeISO){
-    DateTime startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeISO);
-    DateTime endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeISO);
     List<AnomalyFunctionDTO> anomalyFunctions = anomalyFunctionDAO.findAllByCollection(collection);
     System.out.println("Loading raw anaomaly results from db...");
     List<ResultNode> resultNodes = new ArrayList<>();
@@ -173,21 +212,7 @@ public class FetchMetricDataAndExistingAnomaliesTool {
       if(!anomalyDto.getMetric().equals(metric)) continue;
 
       long id = anomalyDto.getId();
-      List<RawAnomalyResultDTO> rawResults =
-          rawAnomalyResultDAO.findAllByTimeAndFunctionId(startTime.getMillis(), endTime.getMillis(), id);
-      for(RawAnomalyResultDTO rawResult : rawResults){
-        ResultNode res = new ResultNode();
-        res.functionId = id;
-        res.functionName = anomalyDto.getFunctionName();
-        res.startTime = new DateTime(rawResult.getStartTime());
-        res.endTime = new DateTime(rawResult.getEndTime());
-        res.dimensions = rawResult.getDimensions();
-        res.setFilters(anomalyDto.getFilters());
-        res.severity = rawResult.getWeight();;
-        AnomalyFeedbackDTO feedback = rawResult.getFeedback();
-        res._feedbackType = (feedback == null)? null : feedback.getFeedbackType();
-        resultNodes.add(res);
-      }
+      resultNodes.addAll(fetchRawAnomaliesInRangeByFunctionId(id, startTimeISO, endTimeISO));
     }
     Collections.sort(resultNodes);
     return resultNodes;
