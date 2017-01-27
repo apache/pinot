@@ -124,7 +124,6 @@ public class TimerContext {
 
   void recordPhaseTime(Timer phaseTimer) {
     serverMetrics.addPhaseTiming(brokerRequest, phaseTimer.queryPhase, phaseTimer.getDurationNs());
-    phaseTimers.remove(phaseTimer.queryPhase);
   }
 
   // for logging

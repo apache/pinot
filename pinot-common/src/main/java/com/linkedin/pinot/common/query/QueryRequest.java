@@ -47,6 +47,7 @@ public class QueryRequest {
   private ListeningExecutorService queryWorkers;
 
   private final ServerMetrics serverMetrics;
+  private int segmentCountAfterPruning;
 
   public QueryRequest(InstanceRequest request, ServerMetrics serverMetrics) {
     this.instanceRequest = request;
@@ -120,5 +121,13 @@ public class QueryRequest {
 
   public void setQueryWorkers(ListeningExecutorService queryWorkers) {
     this.queryWorkers = queryWorkers;
+  }
+
+  public void setSegmentCountAfterPruning(int segmentCountAfterPruning) {
+    this.segmentCountAfterPruning = segmentCountAfterPruning;
+  }
+
+  public int getSegmentCountAfterPruning() {
+    return segmentCountAfterPruning;
   }
 }
