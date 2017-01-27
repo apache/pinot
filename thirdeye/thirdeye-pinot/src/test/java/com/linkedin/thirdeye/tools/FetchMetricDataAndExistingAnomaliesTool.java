@@ -3,10 +3,12 @@ package com.linkedin.thirdeye.tools;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.linkedin.thirdeye.api.DimensionMap;
+import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
@@ -45,13 +47,25 @@ public class FetchMetricDataAndExistingAnomaliesTool {
   public class ResultNode implements Comparable<ResultNode>{
     long functionId;
     String functionName;
-    String filters;
+    private String filters;
     DimensionMap dimensions;
     DateTime startTime;
     DateTime endTime;
     double severity;
+    AnomalyFeedbackType _feedbackType;
 
     public ResultNode(){}
+
+    public void setFilters(String filterStr){
+      if(filterStr == null || filterStr.isEmpty()){
+        filters = "";
+        return;
+      }
+      String[] filterArray = filterStr.split(",");
+      StringBuilder fs = new StringBuilder();
+      fs.append(String.join(";", filterArray));
+      this.filters = fs.toString();
+    }
 
     @Override
     public int compareTo(ResultNode o){
@@ -74,14 +88,15 @@ public class FetchMetricDataAndExistingAnomaliesTool {
 
     public String[] getSchema(){
       return new String[]{
-          "StartDate", "EndDate", "Dimensions", "Filters", "FunctionID", "FunctionName", "Severity"
+          "StartDate", "EndDate", "Dimensions", "Filters", "FunctionID", "FunctionName", "Severity, feedbackType"
       };
     }
     public String toString(){
       DateTimeFormatter fmt = DateTimeFormat.forPattern("yyyy-MM-dd");
-      return String.format("%s,%s,%s,%s,%s,%s,%s", fmt.print(startTime), fmt.print(endTime),
+      return String.format("%s,%s,%s,%s,%s,%s,%s,%s", fmt.print(startTime), fmt.print(endTime),
           dimensionString(), (filters == null)? "":filters,
-          Long.toString(functionId), functionName, Double.toString(severity*100.0));
+          Long.toString(functionId), functionName, Double.toString(severity*100.0),
+          (_feedbackType == null)? "N/A" : _feedbackType.toString());
     }
   }
 
@@ -127,8 +142,10 @@ public class FetchMetricDataAndExistingAnomaliesTool {
         res.startTime = new DateTime(mergedResult.getStartTime());
         res.endTime = new DateTime(mergedResult.getEndTime());
         res.dimensions = mergedResult.getDimensions();
-        res.filters = anomalyDto.getFilters();
+        res.setFilters(anomalyDto.getFilters());
         res.severity = mergedResult.getWeight();
+        AnomalyFeedbackDTO feedback = mergedResult.getFeedback();
+        res._feedbackType = (feedback == null)? null : feedback.getFeedbackType();
         resultNodes.add(res);
       }
     }
@@ -165,8 +182,10 @@ public class FetchMetricDataAndExistingAnomaliesTool {
         res.startTime = new DateTime(rawResult.getStartTime());
         res.endTime = new DateTime(rawResult.getEndTime());
         res.dimensions = rawResult.getDimensions();
-        res.filters = anomalyDto.getFilters();
-        res.severity = rawResult.getWeight();
+        res.setFilters(anomalyDto.getFilters());
+        res.severity = rawResult.getWeight();;
+        AnomalyFeedbackDTO feedback = rawResult.getFeedback();
+        res._feedbackType = (feedback == null)? null : feedback.getFeedbackType();
         resultNodes.add(res);
       }
     }

@@ -29,7 +29,7 @@ import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.ISODateTimeFormat;
 
 public class FetchAnomaliesInRangeAndOutputCSV {
-  private static final String DEFAULT_OUTPUT_FOLDER = "/home/";
+  private static final String DEFAULT_OUTPUT_FOLDER = "/home/ychung/Desktop/";
 
   private static AnomalyFunctionManager anomalyFunctionDAO;
   private static MergedAnomalyResultManager mergedAnomalyResultDAO;
@@ -76,10 +76,10 @@ public class FetchAnomaliesInRangeAndOutputCSV {
    * @param args List of arguments
    *             0: path to persistence file
    *             1: collection name
-   *             2: start time in ISO format
-   *             3: end time in ISO format
-   *             4: output file name
-   *             5 (optional): Output path
+   *             2: metric name
+   *             3: start time in ISO format
+   *             4: end time in ISO format
+   *             5: (optional): Output path
    */
   public static void main(String args[]){
     if(args.length < 5){
@@ -102,8 +102,8 @@ public class FetchAnomaliesInRangeAndOutputCSV {
     DateTime startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(args[3]);
     DateTime endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(args[4]);
     DateTimeFormatter fmt = DateTimeFormat.forPattern("yyyy-MM-dd");
-    if(args.length >= 5 && (new File(args[4])).exists()){
-      output_folder = args[4];
+    if(args.length >= 6 && (new File(args[5])).exists()){
+      output_folder = args[5];
     }
 
 
@@ -125,7 +125,7 @@ public class FetchAnomaliesInRangeAndOutputCSV {
 
     resultNodes.clear();
     // Print Raw Results
-    resultNodes = thirdEyeDAO.fetchRawAnomalies(collection, metric, args[3], args[4]);;
+    resultNodes = thirdEyeDAO.fetchRawAnomalies(collection, metric, args[3], args[4]);
 
     System.out.println("Printing raw anaomaly results from db...");
     outputname = output_folder +
