@@ -41,6 +41,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.core.data.readers.CSVRecordReaderConfig;
 import com.linkedin.pinot.hadoop.job.mapper.HadoopSegmentCreationMapReduceJob.HadoopSegmentCreationMapper;
 
 
@@ -51,6 +52,7 @@ public class SegmentCreationJob extends Configured {
   private static final String PATH_TO_OUTPUT = "path.to.output";
   private static final String PATH_TO_SCHEMA = "path.to.schema";
   private static final String PATH_TO_INPUT = "path.to.input";
+  private static final String PATH_TO_READER_CONFIG = "path.to.reader.config";
   private static final String SEGMENT_TABLE_NAME = "segment.table.name";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentCreationJob.class);
@@ -63,6 +65,7 @@ public class SegmentCreationJob extends Configured {
   private final Schema _dataSchema;
   private final String _depsJarPath;
   private final String _outputDir;
+  private final CSVRecordReaderConfig _readerConfig;
 
   public SegmentCreationJob(String jobName, Properties properties) throws Exception {
     super(new Configuration());
@@ -75,6 +78,9 @@ public class SegmentCreationJob extends Configured {
     _outputDir = _properties.getProperty(PATH_TO_OUTPUT);
     _stagingDir = new File(_outputDir, TEMP).getAbsolutePath();
     _depsJarPath = _properties.getProperty(PATH_TO_DEPS_JAR, null);
+    String readerConfigFilePath = _properties.getProperty(PATH_TO_READER_CONFIG, null);
+    _readerConfig = (null == readerConfigFilePath) ? null
+                    : new ObjectMapper().readValue(new File(readerConfigFilePath), CSVRecordReaderConfig.class);
 
     Utils.logVersions();
 
@@ -85,6 +91,7 @@ public class SegmentCreationJob extends Configured {
     LOGGER.info("path.to.schema: {}", schemaFilePath);
     _dataSchema = Schema.fromFile(new File(schemaFilePath));
     LOGGER.info("schema: {}", _dataSchema);
+    LOGGER.info("reader config: {}", _readerConfig);
     LOGGER.info("*********************************************************************");
 
     if (getConf().get(SEGMENT_TABLE_NAME, null) == null) {
@@ -150,6 +157,7 @@ public class SegmentCreationJob extends Configured {
 
     job.getConfiguration().setInt(JobContext.NUM_MAPS, inputDataFiles.size());
     job.getConfiguration().set("data.schema", new ObjectMapper().writeValueAsString(_dataSchema));
+    job.getConfiguration().set("reader.config", new ObjectMapper().writeValueAsString(_readerConfig));
 
     job.setMaxReduceAttempts(1);
     job.setMaxMapAttempts(0);

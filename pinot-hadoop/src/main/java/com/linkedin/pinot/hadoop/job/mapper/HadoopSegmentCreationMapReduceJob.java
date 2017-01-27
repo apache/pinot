@@ -49,6 +49,7 @@ public class HadoopSegmentCreationMapReduceJob {
     private String _outputPath;
     private String _tableName;
     private String _postfix;
+    private String _readerConfig;
 
     private Path _currentHdfsWorkDir;
     private String _currentDiskWorkDir;
@@ -84,6 +85,7 @@ public class HadoopSegmentCreationMapReduceJob {
       _outputPath = _properties.get("path.to.output");
       _tableName = _properties.get("segment.table.name");
       _postfix = _properties.get("segment.name.postfix", null);
+      _readerConfig = _properties.get("reader.config", null);
       if (_outputPath == null || _tableName == null) {
         throw new RuntimeException(
             "Missing configs: " +
@@ -200,11 +202,12 @@ public class HadoopSegmentCreationMapReduceJob {
       return segmentName;
     }
 
-    private RecordReaderConfig getReaderConfig(FileFormat fileFormat) {
+    private RecordReaderConfig getReaderConfig(FileFormat fileFormat) throws IOException {
       RecordReaderConfig readerConfig = null;
       switch (fileFormat) {
         case CSV:
-          readerConfig = new CSVRecordReaderConfig();
+          readerConfig = (null == _readerConfig) ? new CSVRecordReaderConfig()
+                         : new ObjectMapper().readValue(_readerConfig, CSVRecordReaderConfig.class);
           break;
         case AVRO:
           break;
