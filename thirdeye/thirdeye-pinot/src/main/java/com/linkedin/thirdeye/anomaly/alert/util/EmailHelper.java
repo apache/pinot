@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.anomaly.alert.util;
 import com.google.common.cache.LoadingCache;
 import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 
+import com.linkedin.thirdeye.anomaly.alert.v2.AlertTaskRunnerV2;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
@@ -193,7 +194,10 @@ public abstract class EmailHelper {
       LOG.error("No email config provided for email with subject [{}]!", subject);
     }
   }
-  public static ContributorViewResponse getContributorData(String collection, String metric, List<String> dimensions, AlertConfigBean.COMPARE_MODE compareMode, long offsetDelayMillis)
+
+  public static ContributorViewResponse getContributorDataForDataReport(String collection,
+      String metric, List<String> dimensions, AlertConfigBean.COMPARE_MODE compareMode,
+      long offsetDelayMillis, boolean intraday)
       throws Exception {
 
     long baselineOffset = getBaselineOffset(compareMode);
@@ -214,8 +218,17 @@ public abstract class EmailHelper {
     currentEnd = (currentEnd - (currentEnd % HOUR_MILLIS)) - offsetDelayMillis;
 
     String aggTimeGranularity = "HOURS";
-    // TODO : implement intraday option
     long currentStart = currentEnd - DAY_MILLIS;
+
+    // intraday option
+    if (intraday) {
+      DateTimeZone timeZone = DateTimeZone.forTimeZone(AlertTaskRunnerV2.DEFAULT_TIME_ZONE);
+      DateTime endDate = new DateTime(currentEnd, timeZone);
+      DateTime intraDayStartTime = new DateTime(endDate.toString().split("T")[0], timeZone);
+      if (intraDayStartTime.getMillis() != currentEnd) {
+        currentStart = intraDayStartTime.getMillis();
+      }
+    }
 
     DatasetConfigDTO datasetConfigDTO = datasetConfigManager.findByDataset(collection);
     if (datasetConfigDTO.getTimeUnit().toString().equals("DAYS")) {
@@ -239,9 +252,9 @@ public abstract class EmailHelper {
     return response;
   }
 
-  public static ContributorViewResponse getContributorData(String collection, String metric, List<String> dimensions)
+  public static ContributorViewResponse getContributorDataForDataReport(String collection, String metric, List<String> dimensions)
       throws Exception {
-    return getContributorData(collection, metric, dimensions, AlertConfigBean.COMPARE_MODE.WoW, 2 * 36_00_000); // add 2 hours delay
+    return getContributorDataForDataReport(collection, metric, dimensions, AlertConfigBean.COMPARE_MODE.WoW, 2 * 36_00_000, false); // add 2 hours delay
   }
 
   private static long getBaselineOffset(AlertConfigBean.COMPARE_MODE compareMode) {

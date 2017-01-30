@@ -134,8 +134,19 @@ public class AlertConfigBean extends AbstractBean {
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   public static class ReportConfigCollection {
-    boolean enabled = false;
+    boolean enabled;
+    boolean intraDay;
     long delayOffsetMillis = 2 * 36_00_000; // 2 hours
+    List<ReportMetricConfig> reportMetricConfigs = new ArrayList<>();
+    String contactEmail;
+
+    public boolean isIntraDay() {
+      return intraDay;
+    }
+
+    public void setIntraDay(boolean intraDay) {
+      this.intraDay = intraDay;
+    }
 
     public long getDelayOffsetMillis() {
       return delayOffsetMillis;
@@ -145,8 +156,6 @@ public class AlertConfigBean extends AbstractBean {
       this.delayOffsetMillis = delayOffsetMillis;
     }
 
-    List<ReportMetricConfig> reportMetricConfigs = new ArrayList<>();
-    String contactEmail;
     public boolean isEnabled() {
       return enabled;
     }
