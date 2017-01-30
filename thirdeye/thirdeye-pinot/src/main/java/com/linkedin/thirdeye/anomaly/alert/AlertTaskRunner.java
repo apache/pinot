@@ -174,7 +174,7 @@ public class AlertTaskRunner implements TaskRunner {
         List<ContributorViewResponse> reports = new ArrayList<>();
         for (String dimension : alertConfig.getDimensions()) {
           ContributorViewResponse report = EmailHelper
-              .getContributorData(collectionAlias, alertConfig.getMetric(), Arrays.asList(dimension));
+              .getContributorDataForDataReport(collectionAlias, alertConfig.getMetric(), Arrays.asList(dimension));
           if(report != null) {
             reports.add(report);
           }
