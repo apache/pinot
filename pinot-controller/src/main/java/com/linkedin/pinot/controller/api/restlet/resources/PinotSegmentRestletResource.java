@@ -25,7 +25,6 @@ import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.restlet.swagger.Response;
 import com.linkedin.pinot.common.restlet.swagger.Responses;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
-import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
 import com.linkedin.pinot.common.restlet.swagger.Parameter;
@@ -33,10 +32,10 @@ import com.linkedin.pinot.common.restlet.swagger.Paths;
 import com.linkedin.pinot.common.restlet.swagger.Summary;
 import com.linkedin.pinot.common.restlet.swagger.Tags;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
+import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import javax.annotation.Nonnull;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -91,7 +90,10 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
     StringRepresentation presentation = null;
     try {
       final String tableName = (String) getRequest().getAttributes().get(TABLE_NAME);
-      final String segmentName = (String) getRequest().getAttributes().get(SEGMENT_NAME);
+      String segmentName = (String) getRequest().getAttributes().get(SEGMENT_NAME);
+      if (segmentName != null) {
+        segmentName = URLDecoder.decode(segmentName, "UTF-8");
+      }
       final String state = getReference().getQueryAsForm().getValues(STATE);
       final String tableType = getReference().getQueryAsForm().getValues(TABLE_TYPE);
 
@@ -183,7 +185,7 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
   @Summary("Enable, disable or drop a segment from a table")
   @Tags({ "segment", "table" })
   @Paths({ "/tables/{tableName}/segments/{segmentName}", "/tables/{tableName}/segments/{segmentName}/" })
-  protected Representation toggleOneSegmentState(
+  public Representation toggleOneSegmentState(
       @Parameter(name = "tableName", in = "path", description = "The name of the table to which segment belongs",
           required = true) String tableName,
       @Parameter(name = "segmentName", in = "path", description = "Segment to enable, disable or drop",
@@ -193,6 +195,21 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
       @Parameter(name = "type", in = "query", description = "Type of table {offline|realtime}",
           required = false) String tableType)
       throws JsonProcessingException, JSONException {
+    String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
+    String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
+    List<String> offlineSegments = _pinotHelixResourceManager.getAllSegmentsForResource(offlineTableName);
+    List<String> realtimeSegments = _pinotHelixResourceManager.getAllSegmentsForResource(realtimeTableName);
+
+    if (tableType == null) {
+      if(offlineSegments.contains(segmentName)) {
+        tableType = "OFFLINE";
+      } else if (realtimeSegments.contains(segmentName)) {
+        tableType = "REALTIME";
+      } else {
+        throw new UnsupportedOperationException(segmentName + " does not exist");
+      }
+    }
+
     return toggleSegmentState(tableName, segmentName, state, tableType);
   }
 
@@ -206,7 +223,7 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
   @Summary("Enable, disable or drop *ALL* segments from a table")
   @Tags({ "segment", "table" })
   @Paths({ "/tables/{tableName}/segments", "/tables/{tableName}/segments/" })
-  protected Representation toggleAllSegmentsState(
+  public Representation toggleAllSegmentsState(
         @Parameter(name = "tableName", in = "path", description = "The name of the table to which segment belongs",
             required = true) String tableName,
         @Parameter(name = "state", in = "query", description = "state to set for segment {enable|disable|drop}",
@@ -228,7 +245,7 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
    * @throws JsonProcessingException
    * @throws JSONException
    */
-  protected Representation toggleSegmentState(String tableName, String segmentName, String state, @Nonnull String tableType)
+  protected Representation toggleSegmentState(String tableName, String segmentName, String state, String tableType)
       throws JsonProcessingException, JSONException {
 
     JSONArray ret = new JSONArray();
@@ -236,6 +253,8 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
     String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
     String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
     String tableNameWithType = "";
+    List<String> realtimeSegments = _pinotHelixResourceManager.getAllSegmentsForResource(realtimeTableName);
+    List<String> offlineSegments = _pinotHelixResourceManager.getAllSegmentsForResource(offlineTableName);
 
     if (TableType.REALTIME.name().equalsIgnoreCase(tableType)) {
       if (_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
@@ -243,22 +262,26 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
         if (segmentName != null) {
           segmentsToToggle = Collections.singletonList(segmentName);
         } else {
-          segmentsToToggle.addAll(_pinotHelixResourceManager.getAllSegmentsForResource(realtimeTableName));
+          segmentsToToggle.addAll(realtimeSegments);
         }
       } else {
         throw new UnsupportedOperationException("There is no realtime table for " + tableName);
       }
-    } else {
+    } else if (TableType.OFFLINE.name().equalsIgnoreCase(tableType)) {
       if (_pinotHelixResourceManager.hasOfflineTable(tableName)) {
         tableNameWithType = offlineTableName;
         if (segmentName != null) {
           segmentsToToggle = Collections.singletonList(segmentName);
         } else {
-          segmentsToToggle.addAll(_pinotHelixResourceManager.getAllSegmentsForResource(offlineTableName));
+          segmentsToToggle.addAll(offlineSegments);
         }
       } else {
         throw new UnsupportedOperationException("There is no offline table for " + tableName);
       }
+    } else {
+      // tableType is null, which means it comes from the get API to toggle all segments
+      segmentsToToggle.addAll(realtimeSegments);
+      segmentsToToggle.addAll(offlineSegments);
     }
 
     PinotResourceManagerResponse resourceManagerResponse = toggleSegmentsForTable(segmentsToToggle, tableNameWithType, segmentName, state);
