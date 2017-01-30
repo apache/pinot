@@ -9,7 +9,7 @@ public class EventDataProviderManager {
   EventDataProvider<HolidayEvent> holidayEventDataProvider;
   EventDataProvider<DeploymentEvent> deploymentEventDataProvider;
 
-  void registerEventDataProvider(EventType eventType,
+  public void registerEventDataProvider(EventType eventType,
       EventDataProvider<? extends ExternalEvent> eventDataProvider) {
     switch (eventType) {
     case HOLIDAY:
@@ -21,7 +21,7 @@ public class EventDataProviderManager {
     }
   }
 
-  List<? extends ExternalEvent> getEvents(EventFilter eventFilter) {
+  public List<? extends ExternalEvent> getEvents(EventFilter eventFilter) {
     if (eventFilter == null || eventFilter.getEventType() == null) {
       throw new NullArgumentException("Event filter or event type found null ");
     }
