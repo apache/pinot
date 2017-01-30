@@ -63,7 +63,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
   protected final File _segmentDir = new File("/tmp/HybridClusterIntegrationTest/segmentDir");
   protected final File _tarDir = new File("/tmp/HybridClusterIntegrationTest/tarDir");
   protected static final String KAFKA_TOPIC = "hybrid-integration-test";
-  public static final String TABLE_NAME = "mytable";
+  private static final String TABLE_NAME = "mytable";
 
   private int segmentCount = 12;
   private int offlineSegmentCount = 8;

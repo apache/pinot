@@ -110,9 +110,8 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
         ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forListAllSegments(TABLE_NAME));
     JSONArray offlineSegmentsList = getSegmentsFromJson(segmentList, "offline");
 
-    String response = sendGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).
+    sendGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).
         forDeleteSegmentWithGetAPI(TABLE_NAME, offlineSegmentsList.get(0).toString(), "offline"));
-    System.out.println(response);
     Thread.sleep(5000);
 
     String postDeleteSegmentList = sendGetRequest(

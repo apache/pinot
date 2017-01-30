@@ -545,7 +545,11 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
       final String tableType = getReference().getQueryAsForm().getValues(TABLE_TYPE);
 
       LOGGER.info("Getting segment deletion request, tableName: " + tableName + " segmentName: " + segmentName);
-      rep = deleteOneSegment(tableName, segmentName, tableType);
+      if (segmentName != null) {
+        rep = deleteOneSegment(tableName, segmentName, tableType);
+      } else {
+        rep = deleteAllSegments(tableName, tableType);
+      }
     } catch (final Exception e) {
       rep = exceptionToStringRepresentation(e);
       LOGGER.error("Caught exception while processing delete request", e);
@@ -559,7 +563,7 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
   @Summary("Delete a segment from a table")
   @Tags({"segment", "table"})
   @Paths({ "/segments/{tableName}/{segmentName}", "/segments/{tableName}/{segmentName}/" })
-  public Representation deleteOneSegment(
+  private Representation deleteOneSegment(
       @Parameter(name = "tableName", in = "path", description = "The raw table name in which the segment resides",
           required = true) String tableName,
       @Parameter(name = "segmentName", in = "path", description = "The name of the segment to delete",
@@ -577,7 +581,7 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
   @Summary("Delete *ALL* segments from a table")
   @Tags({"segment", "table"})
   @Paths({ "/segments/{tableName}", "/segments/{tableName}/" })
-  public Representation deleteAllSegments(
+  private Representation deleteAllSegments(
       @Parameter(name = "tableName", in = "path", description = "The raw table name in which the segment resides",
           required = true) String tableName,
       @Parameter(name = "type", in = "query", description = "Type of table {offline|realtime}",

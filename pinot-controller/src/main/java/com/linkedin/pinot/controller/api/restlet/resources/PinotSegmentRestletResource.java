@@ -109,7 +109,11 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
           setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
           return new StringRepresentation(INVALID_STATE_ERROR);
         } else {
-          return toggleSegmentState(tableName, segmentName, state, tableType);
+          if (segmentName != null) {
+            return toggleOneSegmentState(tableName, segmentName, state, tableType);
+          } else {
+            return toggleAllSegmentsState(tableName, state, tableType);
+          }
         }
       } else if (segmentName != null) {
         return getSegmentMetadataForTable(tableName, segmentName, tableType);
@@ -185,7 +189,7 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
   @Summary("Enable, disable or drop a segment from a table")
   @Tags({ "segment", "table" })
   @Paths({ "/tables/{tableName}/segments/{segmentName}", "/tables/{tableName}/segments/{segmentName}/" })
-  public Representation toggleOneSegmentState(
+  private Representation toggleOneSegmentState(
       @Parameter(name = "tableName", in = "path", description = "The name of the table to which segment belongs",
           required = true) String tableName,
       @Parameter(name = "segmentName", in = "path", description = "Segment to enable, disable or drop",
@@ -223,7 +227,7 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
   @Summary("Enable, disable or drop *ALL* segments from a table")
   @Tags({ "segment", "table" })
   @Paths({ "/tables/{tableName}/segments", "/tables/{tableName}/segments/" })
-  public Representation toggleAllSegmentsState(
+  private Representation toggleAllSegmentsState(
         @Parameter(name = "tableName", in = "path", description = "The name of the table to which segment belongs",
             required = true) String tableName,
         @Parameter(name = "state", in = "query", description = "state to set for segment {enable|disable|drop}",
