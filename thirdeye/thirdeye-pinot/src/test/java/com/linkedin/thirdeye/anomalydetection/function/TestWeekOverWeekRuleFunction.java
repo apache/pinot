@@ -4,7 +4,6 @@ import com.linkedin.thirdeye.anomalydetection.context.AnomalyDetectionContext;
 import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
 import com.linkedin.thirdeye.anomalydetection.context.TimeSeriesKey;
 import com.linkedin.thirdeye.anomalydetection.model.detection.SimpleThresholdDetectionModel;
-import com.linkedin.thirdeye.anomalydetection.model.prediction.SeasonalAveragePredictionModel;
 import com.linkedin.thirdeye.anomalydetection.model.transform.MovingAverageSmoothingFunction;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -105,10 +104,10 @@ public class TestWeekOverWeekRuleFunction {
     anomalyDetectionContext.setBucketSizeInMS(bucketSizeInMs);
 
     // Append properties for anomaly function specific setting
-    properties.put(WeekOverWeekRule.BASELINE, "w/2wAvg");
+    properties.put(WeekOverWeekRuleFunction.BASELINE, "w/2wAvg");
     properties.put(SimpleThresholdDetectionModel.CHANGE_THRESHOLD, "0.2");
 
-    WeekOverWeekRule function = new WeekOverWeekRule();
+    WeekOverWeekRuleFunction function = new WeekOverWeekRuleFunction();
     function.init(properties);
     anomalyDetectionContext.setAnomalyDetectionFunction(function);
     anomalyDetectionContext.setCurrent(observedTimeSeries);
@@ -133,12 +132,12 @@ public class TestWeekOverWeekRuleFunction {
     anomalyDetectionContext.setBucketSizeInMS(bucketSizeInMs);
 
     // Append properties for anomaly function specific setting
-    properties.put(WeekOverWeekRule.BASELINE, "w/2wAvg");
+    properties.put(WeekOverWeekRuleFunction.BASELINE, "w/2wAvg");
     properties.put(SimpleThresholdDetectionModel.CHANGE_THRESHOLD, "0.2");
-    properties.put(WeekOverWeekRule.ENABLE_SMOOTHING, "true");
+    properties.put(WeekOverWeekRuleFunction.ENABLE_SMOOTHING, "true");
     properties.put(MovingAverageSmoothingFunction.MOVING_AVERAGE_SMOOTHING_WINDOW_SIZE, "3");
 
-    WeekOverWeekRule function = new WeekOverWeekRule();
+    WeekOverWeekRuleFunction function = new WeekOverWeekRuleFunction();
     function.init(properties);
     anomalyDetectionContext.setAnomalyDetectionFunction(function);
     anomalyDetectionContext.setCurrent(observedTimeSeries);
@@ -160,10 +159,10 @@ public class TestWeekOverWeekRuleFunction {
     anomalyDetectionContext.setBucketSizeInMS(bucketSizeInMs);
 
     // Append properties for anomaly function specific setting
-    properties.put(WeekOverWeekRule.BASELINE, "w/2wAvg");
+    properties.put(WeekOverWeekRuleFunction.BASELINE, "w/2wAvg");
     properties.put(SimpleThresholdDetectionModel.CHANGE_THRESHOLD, "0.2");
 
-    WeekOverWeekRule function = new WeekOverWeekRule();
+    WeekOverWeekRuleFunction function = new WeekOverWeekRuleFunction();
     function.init(properties);
     anomalyDetectionContext.setAnomalyDetectionFunction(function);
     anomalyDetectionContext.setCurrent(observedTimeSeries);
@@ -212,21 +211,21 @@ public class TestWeekOverWeekRuleFunction {
   @Test
   public void testParseWowString() {
     String testString = "w/w";
-    Assert.assertEquals(WeekOverWeekRule.parseWowString(testString), "1");
+    Assert.assertEquals(WeekOverWeekRuleFunction.parseWowString(testString), "1");
 
     testString = "Wo4W";
-    Assert.assertEquals(WeekOverWeekRule.parseWowString(testString), "4");
+    Assert.assertEquals(WeekOverWeekRuleFunction.parseWowString(testString), "4");
 
     testString = "W/243wABCD";
-    Assert.assertEquals(WeekOverWeekRule.parseWowString(testString), "243");
+    Assert.assertEquals(WeekOverWeekRuleFunction.parseWowString(testString), "243");
 
     testString = "2abc";
-    Assert.assertEquals(WeekOverWeekRule.parseWowString(testString), "2");
+    Assert.assertEquals(WeekOverWeekRuleFunction.parseWowString(testString), "2");
 
     testString = "W/243";
-    Assert.assertEquals(WeekOverWeekRule.parseWowString(testString), "243");
+    Assert.assertEquals(WeekOverWeekRuleFunction.parseWowString(testString), "243");
 
     testString = "A Random string 34 and it is 54 a long one";
-    Assert.assertEquals(WeekOverWeekRule.parseWowString(testString), "34");
+    Assert.assertEquals(WeekOverWeekRuleFunction.parseWowString(testString), "34");
   }
 }

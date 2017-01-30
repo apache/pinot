@@ -47,7 +47,10 @@ public class SeasonalAveragePredictionModel extends ExpectedTimeSeriesPrediction
       } else {
         for (int i = 0; i < bucketCount; ++i) {
           long timestamp = baseStart + i * bucketSizeInMillis;
-          expectedTimeSeries.set(timestamp, baseTimeSeries.get(timestamp));
+          Double value = baseTimeSeries.get(timestamp);
+          if (value != null) {
+            expectedTimeSeries.set(timestamp, value);
+          }
         }
       }
     }

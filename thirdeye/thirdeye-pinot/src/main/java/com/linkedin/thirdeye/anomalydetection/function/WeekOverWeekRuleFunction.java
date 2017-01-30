@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.Properties;
 import org.apache.commons.lang3.StringUtils;
 
-public class WeekOverWeekRule extends AbstractModularizedAnomalyFunction {
+public class WeekOverWeekRuleFunction extends AbstractModularizedAnomalyFunction {
   public static final String BASELINE = "baseline";
   public static final String ENABLE_SMOOTHING = "enableSmoothing";
 
