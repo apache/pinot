@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.dashboard.resources;
 
 import com.google.common.cache.LoadingCache;
 import com.linkedin.pinot.pql.parsers.utils.Pair;
+import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import com.linkedin.thirdeye.anomaly.detection.TimeSeriesUtil;
 import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
 import com.linkedin.thirdeye.anomaly.views.function.AnomalyTimeSeriesView;
@@ -25,6 +26,7 @@ import java.util.concurrent.TimeUnit;
 
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.DELETE;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -125,7 +127,8 @@ public class AnomalyResource {
       @QueryParam("startTimeIso") String startTimeIso,
       @QueryParam("endTimeIso") String endTimeIso,
       @QueryParam("metric") String metric,
-      @QueryParam("dimensions") String exploredDimensions) {
+      @QueryParam("dimensions") String exploredDimensions,
+      @DefaultValue("true") @QueryParam("applyAlertFilter") boolean applyAlertFiler) {
 
     if (StringUtils.isBlank(dataset)) {
       throw new IllegalArgumentException("dataset is a required query param");
@@ -166,6 +169,16 @@ public class AnomalyResource {
       }
     } catch (Exception e) {
       LOG.error("Exception in fetching anomalies", e);
+    }
+
+    if (applyAlertFiler) {
+      try {
+        anomalyResults = AlertFilterHelper.applyFiltrationRule(anomalyResults);
+      } catch (Exception e) {
+        LOG.warn(
+            "Failed to apply alert filters on anomalies for dataset:{}, metric:{}, start:{}, end:{}, exception:{}",
+            dataset, metric, startTimeIso, endTimeIso, e);
+      }
     }
 
     return anomalyResults;
