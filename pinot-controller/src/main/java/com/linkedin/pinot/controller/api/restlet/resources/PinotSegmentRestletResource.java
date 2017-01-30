@@ -280,8 +280,14 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
       }
     } else {
       // tableType is null, which means it comes from the get API to toggle all segments
-      segmentsToToggle.addAll(realtimeSegments);
-      segmentsToToggle.addAll(offlineSegments);
+      PinotResourceManagerResponse responseRealtime = toggleSegmentsForTable(realtimeSegments, realtimeTableName, segmentName, state);
+      PinotResourceManagerResponse responseOffline = toggleSegmentsForTable(offlineSegments, offlineTableName, segmentName, state);
+      setStatus(responseRealtime.isSuccessful() && responseOffline.isSuccessful() ? Status.SUCCESS_OK : Status.SERVER_ERROR_INTERNAL);
+      List<PinotResourceManagerResponse> responses = new ArrayList<>();
+      responses.add(responseRealtime);
+      responses.add(responseOffline);
+      ret.put(responses);
+      return new StringRepresentation(ret.toString());
     }
 
     PinotResourceManagerResponse resourceManagerResponse = toggleSegmentsForTable(segmentsToToggle, tableNameWithType, segmentName, state);
