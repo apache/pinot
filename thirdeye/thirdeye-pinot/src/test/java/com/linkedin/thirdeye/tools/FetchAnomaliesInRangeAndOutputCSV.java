@@ -109,7 +109,8 @@ public class FetchAnomaliesInRangeAndOutputCSV {
 
 
     // Print Merged Results
-    List<FetchMetricDataAndExistingAnomaliesTool.ResultNode> resultNodes = thirdEyeDAO.fetchMergedAnomalies(collection, metric, args[3], args[4]);
+    List<FetchMetricDataAndExistingAnomaliesTool.ResultNode> resultNodes = thirdEyeDAO.fetchMergedAnomaliesInRange(
+        collection, metric, args[3], args[4]);
 
     System.out.println("Printing merged anaomaly results from db...");
     String outputname = output_folder +
@@ -125,7 +126,7 @@ public class FetchAnomaliesInRangeAndOutputCSV {
 
     resultNodes.clear();
     // Print Raw Results
-    resultNodes = thirdEyeDAO.fetchRawAnomalies(collection, metric, args[3], args[4]);
+    resultNodes = thirdEyeDAO.fetchRawAnomaliesInRange(collection, metric, args[3], args[4]);
 
     System.out.println("Printing raw anaomaly results from db...");
     outputname = output_folder +

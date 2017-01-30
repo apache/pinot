@@ -120,7 +120,7 @@ public class FetchMetricDataAndExistingAnomaliesTool {
     DateTime startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeISO);
     DateTime endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeISO);
     AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
-    System.out.println(String.format("Loading merged anaomaly results of functionId %l from db...", functionId));
+    System.out.println(String.format("Loading merged anaomaly results of functionId %s from db...", Long.toString(functionId)));
     List<ResultNode> resultNodes = new ArrayList<>();
 
     if(anomalyFunction == null){ // no such function
@@ -169,7 +169,7 @@ public class FetchMetricDataAndExistingAnomaliesTool {
     DateTime startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeISO);
     DateTime endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeISO);
     AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
-    System.out.println(String.format("Loading raw anaomaly results of functionId %l from db...", functionId));
+    System.out.println(String.format("Loading raw anaomaly results of functionId %s from db...", Long.toString(functionId)));
     List<ResultNode> resultNodes = new ArrayList<>();
 
     if(anomalyFunction == null){ // no such function
@@ -202,7 +202,7 @@ public class FetchMetricDataAndExistingAnomaliesTool {
    * @param endTimeISO end time of the requested data in ISO format
    * @return List of raw anomaly results
    */
-  public List<ResultNode> fetchRawAnomalies(String collection, String metric, String startTimeISO, String endTimeISO){
+  public List<ResultNode> fetchRawAnomaliesInRange(String collection, String metric, String startTimeISO, String endTimeISO){
     List<AnomalyFunctionDTO> anomalyFunctions = anomalyFunctionDAO.findAllByCollection(collection);
     System.out.println("Loading raw anaomaly results from db...");
     List<ResultNode> resultNodes = new ArrayList<>();
@@ -232,7 +232,8 @@ public class FetchMetricDataAndExistingAnomaliesTool {
   private final String FILTERS = "filters";
   public enum TimeGranularity{
     DAYS ("DAYS"),
-    HOURS ("HOURS");
+    HOURS ("HOURS"),
+    MINUTES ("MINUTES");
 
     private String timeGranularity = null;
     private TimeGranularity(String str){
@@ -240,6 +241,15 @@ public class FetchMetricDataAndExistingAnomaliesTool {
     }
     public String toString(){
       return this.timeGranularity;
+    }
+    public static TimeGranularity fromString(String text){
+      if(text != null){
+        for(TimeGranularity tg : TimeGranularity.values()){
+          if(text.equalsIgnoreCase(tg.toString()))
+            return tg;
+        }
+      }
+      return null;
     }
   }
 

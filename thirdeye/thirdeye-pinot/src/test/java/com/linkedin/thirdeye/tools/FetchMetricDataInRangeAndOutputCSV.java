@@ -24,7 +24,7 @@ import org.joda.time.format.ISODateTimeFormat;
 
 
 public class FetchMetricDataInRangeAndOutputCSV {
-  private static final String DEFAULT_OUTPUT_FOLDER = "/home/";
+  private static final String DEFAULT_OUTPUT_FOLDER = "/home/ychung/Desktop/";
   private static final String DEFAULT_HOST = "http://localhost";
   private static final String DEFAULT_PORT = "1426";
   private static final String DEFAULT_PATH_TO_TIMESERIES = "/dashboard/data/timeseries?";
@@ -58,14 +58,14 @@ public class FetchMetricDataInRangeAndOutputCSV {
     String path2PersistenceFile = "/home/ychung/workspace/thirdeye-configs/local-configs/persistence.yml";
     String dataset = "invite_sends_v2_additive";
     String metric = "m2g_invite_sent";
-    String currentStartISO = "2016-01-01T12:00:00";
-    String currentEndISO = "2017-01-01T12:00:00";
+    String currentStartISO = "2016-02-01T12:00:00";
+    String currentEndISO = "2017-01-10T12:00:00";
     String aggTimeGranularity = "DAYS";
-    String dimensions = "product";
-    String filters = "{\"channel\":[\"guest-email\",\"guest-sms\"]}";
+    String dimensions = "subproduct";
+    String filters = "{\"channel\":[\"guest-email\"]}";
     DateTimeFormatter fmt = DateTimeFormat.forPattern("yyyy-MM-dd HH:mm");
 
-    if(!aggTimeGranularity.equals("DAYS") && !aggTimeGranularity.equals("HOURS")){
+    if(!aggTimeGranularity.equals("DAYS") && !aggTimeGranularity.equals("HOURS") && !aggTimeGranularity.equals("MINUTES")){
       System.out.println("Illegal time granularity");
       return;
     }
@@ -76,14 +76,34 @@ public class FetchMetricDataInRangeAndOutputCSV {
     try {
       FetchMetricDataAndExistingAnomaliesTool thirdEyeDAO = new FetchMetricDataAndExistingAnomaliesTool(new File(path2PersistenceFile));
       metricContent = thirdEyeDAO.fetchMetric(DEFAULT_HOST, Integer.valueOf(DEFAULT_PORT), dataset,
-          metric, currentStartISO, currentEndISO, FetchMetricDataAndExistingAnomaliesTool.TimeGranularity.DAYS, dimensions, filters);
+          metric, currentStartISO, currentEndISO,
+          FetchMetricDataAndExistingAnomaliesTool.TimeGranularity.fromString(aggTimeGranularity), dimensions, filters);
+
+      String fname = metric + "_" + currentStartISO + "_" + currentEndISO + ".csv";
+      BufferedWriter bw = new BufferedWriter(new FileWriter(DEFAULT_OUTPUT_FOLDER + fname));
+
+      List<String> keys = new ArrayList<>(metricContent.keySet());
+      List<DateTime> dateTimes = new ArrayList<>(metricContent.get(keys.get(0)).keySet());
+      Collections.sort(dateTimes);
+
+      // Print Header
+      for(String str: keys){
+        bw.write("," + str);
+      }
+      bw.newLine();
+
+      for(DateTime dt : dateTimes){
+        bw.write(fmt.print(dt));
+        for(String key : keys){
+          Map<DateTime, Integer> map = metricContent.get(key);
+          bw.write("," + map.get(dt));
+        }
+        bw.newLine();
+      }
+      bw.close();
     }
     catch (Exception e){
       System.out.println(e.getMessage());
     }
-
-
-
-
   }
 }
