@@ -4,6 +4,7 @@ import com.google.common.primitives.Floats;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.format.ISODateTimeFormat;
@@ -42,6 +43,14 @@ public class OnboardResource {
     this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     this.rawAnomalyResultDAO = DAO_REGISTRY.getRawAnomalyResultDAO();
+  }
+
+  public OnboardResource(AnomalyFunctionManager anomalyFunctionManager,
+      MergedAnomalyResultManager mergedAnomalyResultManager,
+      RawAnomalyResultManager rawAnomalyResultManager){
+    this.anomalyFunctionDAO = anomalyFunctionManager;
+    this.mergedAnomalyResultDAO = mergedAnomalyResultManager;
+    this.rawAnomalyResultDAO = rawAnomalyResultManager;
   }
 
   // endpoint clone function Ids to append a name defined in nameTags
