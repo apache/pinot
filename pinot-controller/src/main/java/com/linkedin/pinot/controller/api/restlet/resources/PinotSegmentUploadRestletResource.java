@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.controller.api.restlet.resources;
 
+import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -27,7 +29,10 @@ import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.HelixAdmin;
 import org.apache.helix.ZNRecord;
+import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.joda.time.Interval;
 import org.json.JSONArray;
@@ -187,27 +192,32 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
     Representation presentation;
     final JSONArray ret = new JSONArray();
 
+    String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
+    String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
+
     if (activeOnly) {
-      String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
       List<String> segmentList = _pinotHelixResourceManager.getAllSegmentsForResource(offlineTableName);
       ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
 
+      if (_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
+        for (String segmentName : _pinotHelixResourceManager.getAllSegmentsForResource(realtimeTableName)) {
+          RealtimeSegmentZKMetadata realtimeSegmentZKMetadata =
+              ZKMetadataProvider.getRealtimeSegmentZKMetadata(propertyStore, tableName, segmentName);
+          ret.put(realtimeSegmentZKMetadata.getSegmentName());
+        }
+      }
       for (String segmentName : segmentList) {
         OfflineSegmentZKMetadata offlineSegmentZKMetadata =
             ZKMetadataProvider.getOfflineSegmentZKMetadata(propertyStore, tableName, segmentName);
-        ret.put(offlineSegmentZKMetadata.getDownloadUrl());
+        ret.put(offlineSegmentZKMetadata.getSegmentName());
       }
     } else {
-      File tableDir = new File(baseDataDir, tableName);
+      ExternalView offlineExternalView = HelixHelper.getExternalViewForResource(_pinotHelixResourceManager.getHelixAdmin(), _pinotHelixResourceManager.getHelixClusterName(), offlineTableName);
+      ret.put(offlineExternalView.getPartitionSet());
 
-      if (tableDir.exists()) {
-        for (final File file : tableDir.listFiles()) {
-	  final String url = _controllerConf.generateVipUrl() + "/segments/" + tableName + "/" + file.getName();
-          ret.put(url);
-        }
-      } else {
-        LOGGER.error("Error: Table {} not found.", tableName);
-        setStatus(Status.CLIENT_ERROR_NOT_FOUND);
+      if (_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
+        ExternalView realtimeExternalView = HelixHelper.getExternalViewForResource(_pinotHelixResourceManager.getHelixAdmin(), _pinotHelixResourceManager.getHelixClusterName(), realtimeTableName);
+        ret.put(realtimeExternalView.getPartitionSet());
       }
     }
 
