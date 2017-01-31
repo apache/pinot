@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.api.restlet.resources;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
@@ -23,6 +24,7 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.URLDecoder;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
@@ -124,13 +126,13 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
     try {
       final String tableName = (String) getRequest().getAttributes().get("tableName");
       final String segmentName = (String) getRequest().getAttributes().get("segmentName");
-      final String active = getReference().getQueryAsForm().getValues("active");
+      final String tableType = getReference().getQueryAsForm().getValues("type");
 
       if ((tableName == null) && (segmentName == null)) {
         return getAllSegments();
 
       } else if ((tableName != null) && (segmentName == null)) {
-        return getSegmentsForTable(tableName, !"false".equalsIgnoreCase(active));
+        return getSegmentsForTable(tableName, tableType);
       }
 
       presentation = getSegmentFile(tableName, segmentName);
@@ -188,45 +190,69 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
   private Representation getSegmentsForTable(
       @Parameter(name = "tableName", in = "path", description = "The name of the table for which to list segments", required = true)
       String tableName,
-      @Parameter(name = "active", in = "query", description = "true = show active segments (in Helix), false = all segments (on filesystem)", required = false)
-      boolean activeOnly
-      ) {
+      @Parameter(name = "tableType", in = "query", description = "Type of table {offline|realtime}", required = false)
+      String type
+      ) throws Exception {
     Representation presentation;
-    final JSONArray ret = new JSONArray();
+    JSONArray ret = new JSONArray();
+    final String realtime = "REALTIME";
+    final String offline = "OFFLINE";
 
-    String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
-    String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
-
-    List<String> segmentList = _pinotHelixResourceManager.getAllSegmentsForResource(offlineTableName);
-    ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
-
-    IdealState realtimeIdealState =
-        HelixHelper.getTableIdealState(_pinotHelixResourceManager.getHelixZkManager(), realtimeTableName);
-    IdealState offlineIdealState =
-        HelixHelper.getTableIdealState(_pinotHelixResourceManager.getHelixZkManager(), offlineTableName);
-
-    if (_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
-      for (String segmentName : _pinotHelixResourceManager.getAllSegmentsForResource(realtimeTableName)) {
-        if (!realtimeIdealState.getInstanceStateMap(segmentName)
-            .containsValue(PinotHelixSegmentOnlineOfflineStateModelGenerator.OFFLINE_STATE)) {
-          RealtimeSegmentZKMetadata realtimeSegmentZKMetadata =
-              ZKMetadataProvider.getRealtimeSegmentZKMetadata(propertyStore, tableName, segmentName);
-          ret.put(realtimeSegmentZKMetadata.getSegmentName());
-        }
-      }
-    }
-
-    for (String segmentName : segmentList) {
-      if (!offlineIdealState.getInstanceStateMap(segmentName)
-          .containsValue(PinotHelixSegmentOnlineOfflineStateModelGenerator.OFFLINE_STATE)) {
-        OfflineSegmentZKMetadata offlineSegmentZKMetadata =
-            ZKMetadataProvider.getOfflineSegmentZKMetadata(propertyStore, tableName, segmentName);
-        ret.put(offlineSegmentZKMetadata.getSegmentName());
-      }
+    if (type == null) {
+      ret.put(formatSegments(tableName, offline));
+      ret.put(formatSegments(tableName, realtime));
+    } else if (type.equalsIgnoreCase(realtime)) {
+      ret.put(formatSegments(tableName, realtime));
+    } else {
+      ret.put(formatSegments(tableName, offline));
     }
 
     presentation = new StringRepresentation(ret.toString());
     return presentation;
+  }
+
+  private org.json.JSONObject formatSegments(String tableName, String tableType) throws Exception {
+    String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
+    String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
+
+    String tableNameWithType;
+    if (tableType.equalsIgnoreCase("REALTIME")) {
+      tableNameWithType = realtimeTableName;
+    } else {
+      tableNameWithType = offlineTableName;
+    }
+
+    org.json.JSONObject obj = new org.json.JSONObject();
+    obj.put(TABLE_NAME, tableNameWithType);
+    obj.put("segments", getSegments(tableName, tableType));
+    return obj;
+  }
+  private JSONArray getSegments(String tableName, String tableType) {
+
+    final JSONArray ret = new JSONArray();
+
+    String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
+    String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
+
+    String tableNameWithType;
+    if (tableType.equalsIgnoreCase("REALTIME")) {
+      tableNameWithType = realtimeTableName;
+    } else {
+      tableNameWithType = offlineTableName;
+    }
+
+    List<String> segmentList = _pinotHelixResourceManager.getAllSegmentsForResource(tableNameWithType);
+    IdealState idealState =
+        HelixHelper.getTableIdealState(_pinotHelixResourceManager.getHelixZkManager(), tableNameWithType);
+
+    for (String segmentName : segmentList) {
+      if (!idealState.getInstanceStateMap(segmentName)
+          .containsValue(PinotHelixSegmentOnlineOfflineStateModelGenerator.OFFLINE_STATE)) {
+        ret.put(segmentName);
+      }
+    }
+
+    return ret;
   }
 
   @HttpVerb("get")
