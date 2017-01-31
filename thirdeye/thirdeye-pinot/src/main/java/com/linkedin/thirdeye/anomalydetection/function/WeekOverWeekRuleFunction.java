@@ -105,7 +105,8 @@ public class WeekOverWeekRuleFunction extends AbstractModularizedAnomalyFunction
       this.properties.setProperty(SeasonalDataModel.SEASONAL_PERIOD, intString);
     } else { // Week-Over-Week
       // example: "w/2w" --> SeasonalDataModel.SEASONAL_SIZE = "14"
-      this.properties.setProperty(SeasonalDataModel.SEASONAL_SIZE, intString);
+      int seasonalSize = Integer.valueOf(intString) * 7;
+      this.properties.setProperty(SeasonalDataModel.SEASONAL_SIZE, Integer.toString(seasonalSize));
     }
   }
 
