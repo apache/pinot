@@ -24,7 +24,6 @@ import org.joda.time.format.ISODateTimeFormat;
 
 
 public class FetchMetricDataInRangeAndOutputCSV {
-  private static final String DEFAULT_OUTPUT_FOLDER = "/home/ychung/Desktop/";
   private static final String DEFAULT_HOST = "http://localhost";
   private static final String DEFAULT_PORT = "1426";
   private static final String DEFAULT_PATH_TO_TIMESERIES = "/dashboard/data/timeseries?";
@@ -39,6 +38,7 @@ public class FetchMetricDataInRangeAndOutputCSV {
   private static final String DIMENSIONS = "dimensions"; // separate by comma
   private static final String FILTERS = "filters";
 
+  private static final String DEFAULT_OUTPUT_FOLDER = "/home/ychung/Desktop/";
   /**
    * Fetch metric historical data from server and parse the json object
    * @param args List of arguments
@@ -58,14 +58,14 @@ public class FetchMetricDataInRangeAndOutputCSV {
     String path2PersistenceFile = "/home/ychung/workspace/thirdeye-configs/local-configs/persistence.yml";
     String dataset = "invite_sends_v2_additive";
     String metric = "m2g_invite_sent";
-    String currentStartISO = "2016-02-01T12:00:00";
+    String currentStartISO = "2016-01-01T12:00:00";
     String currentEndISO = "2017-01-10T12:00:00";
     String aggTimeGranularity = "DAYS";
-    String dimensions = "subproduct";
+    String dimensions = "product";
     String filters = "{\"channel\":[\"guest-email\"]}";
     DateTimeFormatter fmt = DateTimeFormat.forPattern("yyyy-MM-dd HH:mm");
 
-    if(!aggTimeGranularity.equals("DAYS") && !aggTimeGranularity.equals("HOURS") && !aggTimeGranularity.equals("MINUTES")){
+    if(FetchMetricDataAndExistingAnomaliesTool.TimeGranularity.fromString(aggTimeGranularity) == null){
       System.out.println("Illegal time granularity");
       return;
     }
