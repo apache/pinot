@@ -17,6 +17,7 @@ package com.linkedin.pinot.controller.api.restlet.resources;
 
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
+import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -25,6 +26,7 @@ import java.net.URLDecoder;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
@@ -198,19 +200,31 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
     List<String> segmentList = _pinotHelixResourceManager.getAllSegmentsForResource(offlineTableName);
     ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
 
+    IdealState realtimeIdealState =
+        HelixHelper.getTableIdealState(_pinotHelixResourceManager.getHelixZkManager(), realtimeTableName);
+    IdealState offlineIdealState =
+        HelixHelper.getTableIdealState(_pinotHelixResourceManager.getHelixZkManager(), offlineTableName);
+
     if (_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
       for (String segmentName : _pinotHelixResourceManager.getAllSegmentsForResource(realtimeTableName)) {
-        RealtimeSegmentZKMetadata realtimeSegmentZKMetadata =
-            ZKMetadataProvider.getRealtimeSegmentZKMetadata(propertyStore, tableName, segmentName);
-        ret.put(realtimeSegmentZKMetadata.getSegmentName());
+        if (!realtimeIdealState.getInstanceStateMap(segmentName)
+            .containsValue(PinotHelixSegmentOnlineOfflineStateModelGenerator.OFFLINE_STATE)) {
+          RealtimeSegmentZKMetadata realtimeSegmentZKMetadata =
+              ZKMetadataProvider.getRealtimeSegmentZKMetadata(propertyStore, tableName, segmentName);
+          ret.put(realtimeSegmentZKMetadata.getSegmentName());
+        }
       }
     }
+
     for (String segmentName : segmentList) {
-      OfflineSegmentZKMetadata offlineSegmentZKMetadata =
-          ZKMetadataProvider.getOfflineSegmentZKMetadata(propertyStore, tableName, segmentName);
-      ret.put(offlineSegmentZKMetadata.getSegmentName());
+      if (!offlineIdealState.getInstanceStateMap(segmentName)
+          .containsValue(PinotHelixSegmentOnlineOfflineStateModelGenerator.OFFLINE_STATE)) {
+        OfflineSegmentZKMetadata offlineSegmentZKMetadata =
+            ZKMetadataProvider.getOfflineSegmentZKMetadata(propertyStore, tableName, segmentName);
+        ret.put(offlineSegmentZKMetadata.getSegmentName());
+      }
     }
-    
+
     presentation = new StringRepresentation(ret.toString());
     return presentation;
   }
