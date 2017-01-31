@@ -195,32 +195,22 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
     String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
     String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
 
-    if (activeOnly) {
-      List<String> segmentList = _pinotHelixResourceManager.getAllSegmentsForResource(offlineTableName);
-      ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
+    List<String> segmentList = _pinotHelixResourceManager.getAllSegmentsForResource(offlineTableName);
+    ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
 
-      if (_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
-        for (String segmentName : _pinotHelixResourceManager.getAllSegmentsForResource(realtimeTableName)) {
-          RealtimeSegmentZKMetadata realtimeSegmentZKMetadata =
-              ZKMetadataProvider.getRealtimeSegmentZKMetadata(propertyStore, tableName, segmentName);
-          ret.put(realtimeSegmentZKMetadata.getSegmentName());
-        }
-      }
-      for (String segmentName : segmentList) {
-        OfflineSegmentZKMetadata offlineSegmentZKMetadata =
-            ZKMetadataProvider.getOfflineSegmentZKMetadata(propertyStore, tableName, segmentName);
-        ret.put(offlineSegmentZKMetadata.getSegmentName());
-      }
-    } else {
-      ExternalView offlineExternalView = HelixHelper.getExternalViewForResource(_pinotHelixResourceManager.getHelixAdmin(), _pinotHelixResourceManager.getHelixClusterName(), offlineTableName);
-      ret.put(offlineExternalView.getPartitionSet());
-
-      if (_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
-        ExternalView realtimeExternalView = HelixHelper.getExternalViewForResource(_pinotHelixResourceManager.getHelixAdmin(), _pinotHelixResourceManager.getHelixClusterName(), realtimeTableName);
-        ret.put(realtimeExternalView.getPartitionSet());
+    if (_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
+      for (String segmentName : _pinotHelixResourceManager.getAllSegmentsForResource(realtimeTableName)) {
+        RealtimeSegmentZKMetadata realtimeSegmentZKMetadata =
+            ZKMetadataProvider.getRealtimeSegmentZKMetadata(propertyStore, tableName, segmentName);
+        ret.put(realtimeSegmentZKMetadata.getSegmentName());
       }
     }
-
+    for (String segmentName : segmentList) {
+      OfflineSegmentZKMetadata offlineSegmentZKMetadata =
+          ZKMetadataProvider.getOfflineSegmentZKMetadata(propertyStore, tableName, segmentName);
+      ret.put(offlineSegmentZKMetadata.getSegmentName());
+    }
+    
     presentation = new StringRepresentation(ret.toString());
     return presentation;
   }
