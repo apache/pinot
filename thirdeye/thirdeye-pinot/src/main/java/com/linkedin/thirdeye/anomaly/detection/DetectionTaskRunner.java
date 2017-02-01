@@ -7,9 +7,6 @@ import com.linkedin.thirdeye.anomaly.override.OverrideConfigHelper;
 import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.client.DAORegistry;
-import com.linkedin.thirdeye.datalayer.bao.DataCompletenessConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -34,8 +31,6 @@ import com.linkedin.thirdeye.anomaly.task.TaskResult;
 import com.linkedin.thirdeye.anomaly.task.TaskRunner;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
-import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
@@ -55,9 +50,6 @@ public class DetectionTaskRunner implements TaskRunner {
   private List<RawAnomalyResultDTO> existingRawAnomalies;
   private BaseAnomalyFunction anomalyFunction;
 
-  public DetectionTaskRunner() {
-  }
-
   public List<TaskResult> execute(TaskInfo taskInfo, TaskContext taskContext) throws Exception {
     DetectionTaskInfo detectionTaskInfo = (DetectionTaskInfo) taskInfo;
     List<TaskResult> taskResult = new ArrayList<>();
@@ -72,23 +64,9 @@ public class DetectionTaskRunner implements TaskRunner {
     String dataset = anomalyFunctionSpec.getCollection();
     DatasetConfigDTO datasetConfig = DAO_REGISTRY.getDatasetConfigDAO().findByDataset(dataset);
 
-    if(!datasetConfig.isRequiresCompletenessCheck()) {
-      LOG.info("Dataset {} does not require completeness check", dataset);
-
-    } else {
+    if(datasetConfig.isRequiresCompletenessCheck()) {
       LOG.info("Dataset {} requires completeness check", dataset);
-
-      List<DataCompletenessConfigDTO> completed =
-          DAO_REGISTRY.getDataCompletenessConfigDAO().findAllByDatasetAndInTimeRangeAndStatus(
-              dataset, windowStart.getMillis(), windowEnd.getMillis(), true);
-
-      LOG.debug("Found {} dataCompleteness records for dataset {} from {} to {}",
-          completed.size(), dataset, windowStart.getMillis(), windowEnd.getMillis());
-
-      if (completed.size() <= 0) {
-        LOG.warn("Dataset {} is incomplete. Skipping anomaly detection.", dataset);
-        throw new IllegalStateException(String.format("Dataset %s incomplete", dataset));
-      }
+      assertCompletenessCheck(dataset);
     }
 
     LOG.info(
@@ -96,7 +74,7 @@ public class DetectionTaskRunner implements TaskRunner {
         anomalyFunctionSpec.getFunctionName(), anomalyFunctionSpec.getMetric(),
         anomalyFunctionSpec.getCollection());
 
-    collectionDimensions = DAO_REGISTRY.getDatasetConfigDAO().findByDataset(anomalyFunctionSpec.getCollection()).getDimensions();
+    collectionDimensions = datasetConfig.getDimensions();
 
     // Get existing anomalies for this time range and this function id for all combinations of dimensions
     if (anomalyFunction.useHistoryAnomaly()) {
@@ -110,13 +88,10 @@ public class DetectionTaskRunner implements TaskRunner {
       knownMergedAnomalies = getKnownMergedAnomalies(anomalyFunctionSpec.getId(), currentTimeRange);
     }
     // We always find existing raw anomalies to prevent duplicate raw anomalies are generated
-    existingRawAnomalies =
-        getExistingRawAnomalies(anomalyFunctionSpec.getId(), windowStart.getMillis(), windowEnd.getMillis());
+    existingRawAnomalies = getExistingRawAnomalies(anomalyFunctionSpec.getId(), windowStart.getMillis(), windowEnd.getMillis());
 
-    List<Pair<Long, Long>> startEndTimeRanges =
-        anomalyFunction.getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis());
-    Map<DimensionKey, MetricTimeSeries> dimensionKeyMetricTimeSeriesMap =
-        TimeSeriesUtil.getTimeSeriesForAnomalyDetection(anomalyFunctionSpec, startEndTimeRanges);
+    List<Pair<Long, Long>> startEndTimeRanges = anomalyFunction.getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis());
+    Map<DimensionKey, MetricTimeSeries> dimensionKeyMetricTimeSeriesMap = TimeSeriesUtil.getTimeSeriesForAnomalyDetection(anomalyFunctionSpec, startEndTimeRanges);
 
     scalingFactors = OverrideConfigHelper
         .getTimeSeriesScalingFactors(DAO_REGISTRY.getOverrideConfigDAO(), anomalyFunctionSpec.getCollection(),
@@ -141,6 +116,20 @@ public class DetectionTaskRunner implements TaskRunner {
     syncAnomalyMergeExecutor.synchronousMergeBasedOnFunctionIdAndDimension(anomalyFunctionSpec, isBackfill);
 
     return taskResult;
+  }
+
+  protected void assertCompletenessCheck(String dataset) {
+    List<DataCompletenessConfigDTO> completed =
+        DAO_REGISTRY.getDataCompletenessConfigDAO().findAllByDatasetAndInTimeRangeAndStatus(
+            dataset, windowStart.getMillis(), windowEnd.getMillis(), true);
+
+    LOG.debug("Found {} dataCompleteness records for dataset {} from {} to {}",
+        completed.size(), dataset, windowStart.getMillis(), windowEnd.getMillis());
+
+    if (completed.size() <= 0) {
+      LOG.warn("Dataset {} is incomplete. Skipping anomaly detection.", dataset);
+      throw new IllegalStateException(String.format("Dataset %s incomplete", dataset));
+    }
   }
 
   private void exploreDimensionsAndAnalyze(Map<DimensionKey, MetricTimeSeries> dimensionKeyMetricTimeSeriesMap) {
