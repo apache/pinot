@@ -33,14 +33,11 @@ public class DataCompletenessJobRunner implements JobRunner {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
-  private TaskGenerator taskGenerator;
   private DataCompletenessJobContext dataCompletenessJobContext;
   private DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern("yyyyMMddHHmm");
 
   public DataCompletenessJobRunner(DataCompletenessJobContext dataCompletenessJobContext) {
     this.dataCompletenessJobContext = dataCompletenessJobContext;
-
-    taskGenerator = new TaskGenerator();
   }
 
   @Override
@@ -85,13 +82,31 @@ public class DataCompletenessJobRunner implements JobRunner {
     return jobExecutionId;
   }
 
+  protected List<DataCompletenessTaskInfo> createDataCompletenessTasks(DataCompletenessJobContext dataCompletenessJobContext) {
+    List<DataCompletenessTaskInfo> tasks = new ArrayList<>();
+
+    // create 1 task, which will get data and perform check
+    DataCompletenessTaskInfo dataCompletenessCheck = new DataCompletenessTaskInfo();
+    dataCompletenessCheck.setDataCompletenessType(DataCompletenessConstants.DataCompletenessType.CHECKER);
+    dataCompletenessCheck.setDataCompletenessStartTime(dataCompletenessJobContext.getCheckDurationStartTime());
+    dataCompletenessCheck.setDataCompletenessEndTime(dataCompletenessJobContext.getCheckDurationEndTime());
+    dataCompletenessCheck.setDatasetsToCheck(dataCompletenessJobContext.getDatasetsToCheck());
+    tasks.add(dataCompletenessCheck);
+
+    // create 1 task, for cleanup
+    DataCompletenessTaskInfo cleanup = new DataCompletenessTaskInfo();
+    cleanup.setDataCompletenessType(DataCompletenessConstants.DataCompletenessType.CLEANUP);
+    tasks.add(cleanup);
+
+    return tasks;
+  }
 
   public List<Long> createTasks() {
     List<Long> taskIds = new ArrayList<>();
     try {
       LOG.info("Creating data completeness checker tasks");
       List<DataCompletenessTaskInfo> dataCompletenessTasks =
-          taskGenerator.createDataCompletenessTasks(dataCompletenessJobContext);
+          createDataCompletenessTasks(dataCompletenessJobContext);
       LOG.info("DataCompleteness tasks {}", dataCompletenessTasks);
       for (DataCompletenessTaskInfo taskInfo : dataCompletenessTasks) {
         String taskInfoJson = null;
