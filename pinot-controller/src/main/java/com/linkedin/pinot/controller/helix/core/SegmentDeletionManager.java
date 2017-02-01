@@ -117,7 +117,7 @@ public class SegmentDeletionManager {
     }
 
     int nSegmentsDeleted = 0;
-    if (segmentsToDelete.size() > 0) {
+    if (!segmentsToDelete.isEmpty()) {
       for (String segmentId : segmentsToDelete) {
         String segmentPropertyStorePath = ZKMetadataProvider.constructPropertyStorePathForSegment(tableName, segmentId);
         LOGGER.info("Trying to delete segment : {} from Property store.", segmentId);
