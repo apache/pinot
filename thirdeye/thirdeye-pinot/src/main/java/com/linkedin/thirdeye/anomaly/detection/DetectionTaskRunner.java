@@ -6,8 +6,10 @@ import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeExecutor;
 import com.linkedin.thirdeye.anomaly.override.OverrideConfigHelper;
 import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
 import com.linkedin.thirdeye.api.DimensionMap;
+import com.linkedin.thirdeye.datalayer.bao.DataCompletenessConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 
@@ -44,6 +46,7 @@ public class DetectionTaskRunner implements TaskRunner {
   private MergedAnomalyResultManager mergedResultDAO;
   private RawAnomalyResultManager rawAnomalyDAO;
   private OverrideConfigManager overrideConfigDAO;
+  private DataCompletenessConfigManager dataCompletenessConfigDAO;
 
   private List<String> collectionDimensions;
   private DateTime windowStart;
@@ -65,11 +68,27 @@ public class DetectionTaskRunner implements TaskRunner {
     rawAnomalyDAO = taskContext.getResultDAO();
     datasetConfigDAO = taskContext.getDatasetConfigDAO();
     overrideConfigDAO = taskContext.getOverrideConfigDAO();
+    dataCompletenessConfigDAO = taskContext.getDataCompletenessConfigDAO();
+
     AnomalyFunctionFactory anomalyFunctionFactory = taskContext.getAnomalyFunctionFactory();
     AnomalyFunctionDTO anomalyFunctionSpec = detectionTaskInfo.getAnomalyFunctionSpec();
     anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
     windowStart = detectionTaskInfo.getWindowStartTime();
     windowEnd = detectionTaskInfo.getWindowEndTime();
+
+    String dataset = anomalyFunctionSpec.getCollection();
+    List<DataCompletenessConfigDTO> completed =
+        dataCompletenessConfigDAO.findAllByDatasetAndInTimeRangeAndStatus(
+            dataset, windowStart.getMillis(), windowEnd.getMillis(), true);
+
+    LOG.info("found {} dataCompleteness records for dataset {} from {} to {}",
+        completed.size(), dataset, windowStart.getMillis(), windowEnd.getMillis());
+
+    if(completed.size() <= 0) {
+      LOG.info("Skipping anomaly detection task due to incomplete data with metricFunction: [{}], metric [{}], collection: [{}]",
+          anomalyFunctionSpec.getFunctionName(), anomalyFunctionSpec.getMetric(), dataset);
+      throw new IllegalStateException(String.format("Dataset %s incomplete", dataset));
+    }
 
     LOG.info(
         "Running anomaly detection job with metricFunction: [{}], metric [{}], collection: [{}]",
