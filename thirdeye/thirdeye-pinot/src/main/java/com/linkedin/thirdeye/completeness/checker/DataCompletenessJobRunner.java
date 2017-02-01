@@ -33,8 +33,6 @@ public class DataCompletenessJobRunner implements JobRunner {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
-  private JobManager jobDAO;
-  private TaskManager taskDAO;
   private TaskGenerator taskGenerator;
   private DataCompletenessJobContext dataCompletenessJobContext;
   private DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern("yyyyMMddHHmm");
@@ -43,8 +41,6 @@ public class DataCompletenessJobRunner implements JobRunner {
     this.dataCompletenessJobContext = dataCompletenessJobContext;
 
     taskGenerator = new TaskGenerator();
-    jobDAO = DAO_REGISTRY.getJobDAO();
-    taskDAO = DAO_REGISTRY.getTaskDAO();
   }
 
   @Override
@@ -80,7 +76,7 @@ public class DataCompletenessJobRunner implements JobRunner {
       jobSpec.setJobName(dataCompletenessJobContext.getJobName());
       jobSpec.setScheduleStartTime(System.currentTimeMillis());
       jobSpec.setStatus(JobStatus.SCHEDULED);
-      jobExecutionId = jobDAO.save(jobSpec);
+      jobExecutionId = DAO_REGISTRY.getJobDAO().save(jobSpec);
       LOG.info("Created JobSpec {} with jobExecutionId {}", jobSpec,
           jobExecutionId);
     } catch (Exception e) {
@@ -112,7 +108,7 @@ public class DataCompletenessJobRunner implements JobRunner {
         taskSpec.setStartTime(System.currentTimeMillis());
         taskSpec.setTaskInfo(taskInfoJson);
         taskSpec.setJobId(dataCompletenessJobContext.getJobExecutionId());
-        long taskId = taskDAO.save(taskSpec);
+        long taskId = DAO_REGISTRY.getTaskDAO().save(taskSpec);
         taskIds.add(taskId);
         LOG.info("Created dataCompleteness task {} with taskId {}", taskSpec, taskId);
       }
