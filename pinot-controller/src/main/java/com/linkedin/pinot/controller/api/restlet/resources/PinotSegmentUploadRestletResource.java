@@ -212,19 +212,8 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
   }
 
   private org.json.JSONObject formatSegments(String tableName, String tableType) throws Exception {
-    String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
-    String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
-
-    String tableNameWithType;
-    if (tableType.equalsIgnoreCase("REALTIME")) {
-      tableNameWithType = realtimeTableName;
-    } else {
-      tableNameWithType = offlineTableName;
-    }
-
     org.json.JSONObject obj = new org.json.JSONObject();
-    obj.put(TABLE_NAME, tableNameWithType);
-    obj.put("segments", getSegments(tableName, tableType));
+    obj.put(tableType, getSegments(tableName, tableType));
     return obj;
   }
   private JSONArray getSegments(String tableName, String tableType) {
