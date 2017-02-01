@@ -199,21 +199,19 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
     final String offline = "OFFLINE";
 
     if (type == null) {
-      ret.put(formatSegments(tableName, offline));
-      ret.put(formatSegments(tableName, realtime));
-    } else if (type.equalsIgnoreCase(realtime)) {
-      ret.put(formatSegments(tableName, realtime));
+      ret.put(formatSegments(tableName, CommonConstants.Helix.TableType.valueOf(offline)));
+      ret.put(formatSegments(tableName, CommonConstants.Helix.TableType.valueOf(realtime)));
     } else {
-      ret.put(formatSegments(tableName, offline));
+      ret.put(formatSegments(tableName, CommonConstants.Helix.TableType.valueOf(type)));
     }
 
     presentation = new StringRepresentation(ret.toString());
     return presentation;
   }
 
-  private org.json.JSONObject formatSegments(String tableName, String tableType) throws Exception {
+  private org.json.JSONObject formatSegments(String tableName, CommonConstants.Helix.TableType tableType) throws Exception {
     org.json.JSONObject obj = new org.json.JSONObject();
-    obj.put(tableType, getSegments(tableName, tableType));
+    obj.put(tableType.toString(), getSegments(tableName, tableType.toString()));
     return obj;
   }
   private JSONArray getSegments(String tableName, String tableType) {
@@ -224,7 +222,7 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
     String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
 
     String tableNameWithType;
-    if (tableType.equalsIgnoreCase("REALTIME")) {
+    if (CommonConstants.Helix.TableType.valueOf(tableType).toString().equals("REALTIME")) {
       tableNameWithType = realtimeTableName;
     } else {
       tableNameWithType = offlineTableName;
