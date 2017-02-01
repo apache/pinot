@@ -84,7 +84,7 @@ public class PinotSegmentRebalancer extends PinotZKChanger {
     String tableConfigPath = "/CONFIGS/TABLE";
     List<Stat> stats = new ArrayList<>();
     List<ZNRecord> tableConfigs = propertyStore.getChildren(tableConfigPath, stats, 0);
-    String rawTenantName = tenantName.replaceAll("_OFFLINE", "").replace("_REALTIME", "");
+    String rawTenantName = getRawTenantName(tenantName);
     int nRebalances = 0;
     for (ZNRecord znRecord : tableConfigs) {
       AbstractTableConfig tableConfig;
@@ -94,7 +94,7 @@ public class PinotSegmentRebalancer extends PinotZKChanger {
         LOGGER.warn("Failed to parse table configuration for ZnRecord id: {}. Skipping", znRecord.getId());
         continue;
       }
-      if (tableConfig.getTenantConfig().getServer().equals(rawTenantName)) {
+      if (getRawTenantName(tableConfig.getTenantConfig().getServer()).equals(rawTenantName)) {
         LOGGER.info(tableConfig.getTableName() + ":" + tableConfig.getTenantConfig().getServer());
         nRebalances++;
         rebalanceTable(tableConfig.getTableName(), tenantName);
@@ -115,8 +115,7 @@ public class PinotSegmentRebalancer extends PinotZKChanger {
     Stat stat = new Stat();
     ZNRecord znRecord = propertyStore.get(tableConfigPath, stat, 0);
     AbstractTableConfig tableConfig = AbstractTableConfig.fromZnRecord(znRecord);
-    String tenantName = tableConfig.getTenantConfig().getServer().replaceAll(TableType.OFFLINE.toString(), "")
-        .replace(TableType.OFFLINE.toString(), "");
+    String tenantName = getRawTenantName(tableConfig.getTenantConfig().getServer());
     rebalanceTable(tableName, tenantName);
   }
 
@@ -194,6 +193,10 @@ public class PinotSegmentRebalancer extends PinotZKChanger {
         LOGGER.info("Successfully rebalanced table:" + tableName);
       }
     }
+  }
+
+  private static String getRawTenantName(String tenantName) {
+    return tenantName.replaceAll("_" + TableType.OFFLINE.toString(), "").replace("_" + TableType.REALTIME.toString(), "");
   }
 
   private static void usage() {
