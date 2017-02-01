@@ -15,6 +15,18 @@
  */
 package com.linkedin.pinot.controller.helix.core.retention;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
@@ -27,19 +39,7 @@ import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
 import com.linkedin.pinot.controller.helix.core.retention.strategy.TimeRetentionStrategy;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -115,6 +115,7 @@ public class RetentionManager {
   private void scanSegmentMetadataAndPurge() {
     for (String tableName : _segmentMetadataMap.keySet()) {
       List<SegmentZKMetadata> segmentZKMetadataList = _segmentMetadataMap.get(tableName);
+      List<String> segmentsToDelete = new ArrayList<>(128);
       for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
         RetentionStrategy deletionStrategy;
         deletionStrategy = _tableDeletionStrategy.get(tableName);
@@ -128,9 +129,13 @@ public class RetentionManager {
           }
         }
         if (deletionStrategy.isPurgeable(segmentZKMetadata)) {
-          LOGGER.info("Trying to delete segment: {}", segmentZKMetadata.getSegmentName());
-          _pinotHelixResourceManager.deleteSegment(tableName, segmentZKMetadata.getSegmentName());
+          LOGGER.info("Marking segment to delete: {}", segmentZKMetadata.getSegmentName());
+          segmentsToDelete.add(segmentZKMetadata.getSegmentName());
         }
+      }
+      if (segmentsToDelete.size() > 0) {
+        LOGGER.info("Trying to delete {} segments for table {}", segmentsToDelete.size(), tableName);
+        _pinotHelixResourceManager.deleteSegments(tableName, segmentsToDelete);
       }
     }
   }
