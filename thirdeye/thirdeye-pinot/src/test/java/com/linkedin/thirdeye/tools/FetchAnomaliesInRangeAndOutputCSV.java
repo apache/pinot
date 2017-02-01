@@ -31,8 +31,6 @@ import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.ISODateTimeFormat;
 
 public class FetchAnomaliesInRangeAndOutputCSV {
-  private static final String DEFAULT_OUTPUT_FOLDER = "/home/ychung/Desktop/";
-
   private static AnomalyFunctionManager anomalyFunctionDAO;
   private static MergedAnomalyResultManager mergedAnomalyResultDAO;
   private static RawAnomalyResultManager rawAnomalyResultDAO;
@@ -85,7 +83,7 @@ public class FetchAnomaliesInRangeAndOutputCSV {
    *             6: (optional): Output path
    */
   public static void main(String args[]){
-    if(args.length < 6){
+    if(args.length < 7){
       System.out.println("Insufficient number of arguments");
       return;
     }
@@ -101,7 +99,7 @@ public class FetchAnomaliesInRangeAndOutputCSV {
 
     String collection = args[1];
     String metric = args[2];
-    String output_folder = DEFAULT_OUTPUT_FOLDER;
+    String output_folder = args[7];
     DateTimeZone dateTimeZone = DateTimeZone.forID(args[4]);
     DateTime monitoringWindowStartTime = ISODateTimeFormat.dateTimeParser().parseDateTime(args[3]).withZone(dateTimeZone);
     Period period = new Period(0, 0, 0, Integer.valueOf(args[5]), 0, 0, 0, 0);

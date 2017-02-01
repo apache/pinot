@@ -24,6 +24,8 @@ import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.ISODateTimeFormat;
 
+import com.linkedin.thirdeye.tools.FetchMetricDataAndExistingAnomaliesTool.TimeGranularity;
+
 
 public class FetchMetricDataInRangeAndOutputCSV {
   private static final String DEFAULT_HOST = "http://localhost";
@@ -40,44 +42,57 @@ public class FetchMetricDataInRangeAndOutputCSV {
   private static final String DIMENSIONS = "dimensions"; // separate by comma
   private static final String FILTERS = "filters";
 
-  private static final String DEFAULT_OUTPUT_FOLDER = "/home/ychung/Desktop/";
   /**
    * Fetch metric historical data from server and parse the json object
    * @param args List of arguments
-   *             0: dataset/collection name
-   *             1: metric name
-   *             2: retrieval start time in ISO format, e.g. 2016-01-01T12:00:00
-   *             3: retrieval end time in ISO format
-   *             4: Aggregation time granularity, DAYS, HOURS,
-   *             5: dimensions drill down, ex: product,channel
-   *             6: filter in json format, ex: {"channel":["guest-email","guest-sms"]}
+   *             0: Path to the persistence file
+   *             1: dataset/collection name
+   *             2: metric name
+   *             3: retrieval start time in ISO format, e.g. 2016-01-01T12:00:00
+   *             4: timezone code
+   *             5: Duration
+   *             6: Aggregation time granularity, DAYS, HOURS,
+   *             7: dimensions drill down, ex: product,channel
+   *             8: filter in json format, ex: {"channel":["guest-email","guest-sms"]}
+   *             9: Output path
    */
   public static void main(String[] args){
-//    if(args.length < 5){
-//      System.out.println("Error: Insufficient number of arguments");
-//      return;
-//    }
-    String path2PersistenceFile = "/home/ychung/workspace/thirdeye-configs/local-configs/persistence.yml";
-    String dataset = "invite_sends_v2_additive";
-    String metric = "m2g_invite_sent";
-//    String currentStartUTC = "2016-02-21T08:00:00Z";
-//    String currentEndUTC = "2016-06-11T08:00:00Z";
-    // Training data range
-    Period period = new Period(0, 0, 0, 365, 0, 0, 0, 0);
-    String timezone = "America/Los_Angeles";
-    DateTimeZone dateTimeZone = DateTimeZone.forID(timezone);
-    DateTime monitoringWindowStartTime = new DateTime(2017, 1, 1, 0, 0, dateTimeZone);
-    DateTime dataRangeStart = monitoringWindowStartTime.minus(period); // inclusive start
-    DateTime dataRangeEnd = monitoringWindowStartTime; // exclusive end
-    String aggTimeGranularity = "DAYS";
-    String dimensions = "";
-    String filters = "{}";
-    DateTimeFormatter fmt = DateTimeFormat.forPattern("yyyy-MM-dd HH:mm");
+    if(args.length < 10){
+      System.out.println("Error: Insufficient number of arguments");
+      return;
+    }
+    String path2PersistenceFile = args[0];
+    String dataset = args[1];
+    String metric = args[2];
+    String aggTimeGranularity = args[6];
+    TimeGranularity timeGranularity = TimeGranularity.fromString(aggTimeGranularity);
 
-    if(FetchMetricDataAndExistingAnomaliesTool.TimeGranularity.fromString(aggTimeGranularity) == null){
+    if(timeGranularity == null){
       System.out.println("Illegal time granularity");
       return;
     }
+    // Training data range
+    Period period = null;
+    switch (timeGranularity) {
+      case DAYS:
+        period = new Period(0, 0, 0, Integer.valueOf(args[5]), 0, 0, 0, 0);
+        break;
+      case HOURS:
+        period = new Period(0, 0, 0, 0, Integer.valueOf(args[5]), 0, 0, 0);
+        break;
+      case MINUTES:
+        period = new Period(0, 0, 0, 0, 0, Integer.valueOf(args[5]), 0, 0);
+        break;
+
+    }
+    DateTimeZone dateTimeZone = DateTimeZone.forID(args[4]);
+    DateTime monitoringWindowStartTime = ISODateTimeFormat.dateTimeParser().parseDateTime(args[3]).withZone(dateTimeZone);
+    DateTime dataRangeStart = monitoringWindowStartTime.minus(period); // inclusive start
+    DateTime dataRangeEnd = monitoringWindowStartTime; // exclusive end
+    String dimensions = args[7];
+    String filters = args[8];
+    DateTimeFormatter fmt = DateTimeFormat.forPattern("yyyy-MM-dd HH:mm");
+
 
 
     String fname = metric + "_" + fmt.print(dataRangeStart) + "_" + fmt.print(dataRangeEnd) + ".csv";
@@ -87,9 +102,9 @@ public class FetchMetricDataInRangeAndOutputCSV {
       metricContent = thirdEyeDAO.fetchMetric(DEFAULT_HOST, Integer.valueOf(DEFAULT_PORT), dataset,
           metric, dataRangeStart, dataRangeEnd,
           FetchMetricDataAndExistingAnomaliesTool.TimeGranularity.fromString(aggTimeGranularity), dimensions,
-          filters, timezone);
+          filters, dateTimeZone.getID());
 
-      BufferedWriter bw = new BufferedWriter(new FileWriter(DEFAULT_OUTPUT_FOLDER + fname));
+      BufferedWriter bw = new BufferedWriter(new FileWriter(args[9] + fname));
 
       List<String> keys = new ArrayList<>(metricContent.keySet());
       List<Long> dateTimes = new ArrayList<>(metricContent.get(keys.get(0)).keySet());
