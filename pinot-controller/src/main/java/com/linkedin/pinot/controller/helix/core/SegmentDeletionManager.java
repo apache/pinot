@@ -118,19 +118,30 @@ public class SegmentDeletionManager {
 
     int nSegmentsDeleted = 0;
     if (!segmentsToDelete.isEmpty()) {
+      List<String> propStorePathList = new ArrayList<>(segmentsToDelete.size());
       for (String segmentId : segmentsToDelete) {
         String segmentPropertyStorePath = ZKMetadataProvider.constructPropertyStorePathForSegment(tableName, segmentId);
-        LOGGER.info("Trying to delete segment : {} from Property store.", segmentId);
-        boolean deletionFromPropertyStoreSuccessful = true;
-        if (_propertyStore.exists(segmentPropertyStorePath, AccessOption.PERSISTENT)) {
-          deletionFromPropertyStoreSuccessful = _propertyStore.remove(segmentPropertyStorePath, AccessOption.PERSISTENT);
-        }
+        propStorePathList.add(segmentPropertyStorePath);
+      }
 
-        if (deletionFromPropertyStoreSuccessful) {
+      boolean[] status = _propertyStore.remove(propStorePathList, AccessOption.PERSISTENT);
+      int nPropstoreDeleteFailed = 0;
+      for (int i = 0; i < status.length; i++) {
+        if (!status[i]) {
+          // remove API can fail because the prop store entry did not exist, so check first.
+          if (_propertyStore.exists(propStorePathList.get(i), AccessOption.PERSISTENT)) {
+            nPropstoreDeleteFailed++;
+            LOGGER.info("Could not delete {} from propertystore", propStorePathList.get(i));
+            segmentsToRetryLater.add(segmentsToDelete.get(i));
+          }
+        }
+      }
+
+      for (String segmentId : segmentsToDelete) {
+        if (segmentsToRetryLater.indexOf(segmentId) < 0) {
+          // This segment does NOT appear in retry.
           removeSegmentFromStore(tableName, segmentId);
           nSegmentsDeleted++;
-        } else {
-          segmentsToRetryLater.add(segmentId);
         }
       }
     }

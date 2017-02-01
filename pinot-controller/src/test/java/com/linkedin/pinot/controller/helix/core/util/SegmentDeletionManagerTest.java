@@ -22,17 +22,18 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 import org.testng.annotations.Test;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.controller.helix.core.SegmentDeletionManager;
 import junit.framework.Assert;
 import static org.mockito.Matchers.anyInt;
+import static org.mockito.Matchers.anyList;
 import static org.mockito.Matchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -62,7 +63,8 @@ public class SegmentDeletionManagerTest {
 
   ZkHelixPropertyStore<ZNRecord> makePropertyStore() {
     ZkHelixPropertyStore store = mock(ZkHelixPropertyStore.class);
-    List<String> failedSegs = segmentsFailingPropStore();
+    final List<String> failedSegs = segmentsFailingPropStore();
+    /*
     for (String segment : failedSegs) {
       String propStorePath = ZKMetadataProvider.constructPropertyStorePathForSegment(tableName, segment);
       when(store.remove(propStorePath, AccessOption.PERSISTENT)).thenReturn(false);
@@ -72,8 +74,27 @@ public class SegmentDeletionManagerTest {
       String propStorePath = ZKMetadataProvider.constructPropertyStorePathForSegment(tableName, segment);
       when(store.remove(propStorePath, AccessOption.PERSISTENT)).thenReturn(true);
     }
+    */
+    when(store.remove(anyList(), anyInt())).thenAnswer(new Answer<boolean[]>() {
+      @Override
+      public boolean[] answer(InvocationOnMock invocationOnMock)
+          throws Throwable {
+        List<String> propStoreList = (List<String>) (invocationOnMock.getArguments()[0]);
+        boolean[] result = new boolean[propStoreList.size()];
+        for (int i = 0; i < result.length; i++) {
+          final String path = propStoreList.get(i);
+          final String segmentId = path.substring((path.lastIndexOf('/') + 1));
+          if (failedSegs.indexOf(segmentId) < 0) {
+            result[i] = true;
+          } else {
+            result[i] = false;
+          }
+        }
+        return result;
+      }
+    });
 
-    when(store.exists(anyString(), anyInt())).thenReturn(true);
+        when(store.exists(anyString(), anyInt())).thenReturn(true);
     return store;
   }
 
@@ -111,17 +132,42 @@ public class SegmentDeletionManagerTest {
     segments.addAll(segmentsFailingPropStore());
     deletionManager.deleteSegmenetsFromPropertyStoreAndLocal(tableName, segments);
 
-    for (String segment : segmentsFailingPropStore()) {
-      Assert.assertTrue(deletionManager.segmentsToRetry.contains(segment));
-    }
+    Assert.assertTrue(deletionManager.segmentsToRetry.containsAll(segmentsFailingPropStore()));
+    Assert.assertTrue(deletionManager.segmentsToRetry.containsAll(segmentsInIdealStateOrExtView()));
+    Assert.assertTrue(deletionManager.segmentsRemovedFromStore.containsAll(segmentsThatShouldBeDeleted()));
+  }
 
-    for (String segment : segmentsInIdealStateOrExtView()) {
-      Assert.assertTrue(deletionManager.segmentsToRetry.contains(segment));
-    }
+  @Test
+  public void testAllFailed() throws Exception {
+    testAllFailed(segmentsFailingPropStore());
+    testAllFailed(segmentsInIdealStateOrExtView());
+    List<String> segments = segmentsFailingPropStore();
+    segments.addAll(segmentsInIdealStateOrExtView());
+    testAllFailed(segments);
+  }
 
-    for (String segment : segmentsThatShouldBeDeleted()) {
-      Assert.assertTrue(deletionManager.segmentsRemovedFromStore.contains(segment));
-    }
+  @Test
+  public void allPassed() throws Exception {
+    HelixAdmin helixAdmin =  makeHelixAdmin();
+    ZkHelixPropertyStore<ZNRecord> propertyStore = makePropertyStore();
+    FakeDeletionManager deletionManager = new FakeDeletionManager(helixAdmin, propertyStore);
+    List<String> segments = segmentsThatShouldBeDeleted();
+    deletionManager.deleteSegmenetsFromPropertyStoreAndLocal(tableName, segments);
+
+    Assert.assertEquals(deletionManager.segmentsToRetry.size(), 0);
+    Assert.assertEquals(deletionManager.segmentsRemovedFromStore.size(), segments.size());
+    Assert.assertTrue(deletionManager.segmentsRemovedFromStore.containsAll(segments));
+  }
+
+  private void testAllFailed(List<String> segments) throws Exception {
+    HelixAdmin helixAdmin =  makeHelixAdmin();
+    ZkHelixPropertyStore<ZNRecord> propertyStore = makePropertyStore();
+    FakeDeletionManager deletionManager = new FakeDeletionManager(helixAdmin, propertyStore);
+    deletionManager.deleteSegmenetsFromPropertyStoreAndLocal(tableName, segments);
+
+    Assert.assertTrue(deletionManager.segmentsToRetry.containsAll(segments));
+    Assert.assertEquals(deletionManager.segmentsToRetry.size(), segments.size());
+    Assert.assertEquals(deletionManager.segmentsRemovedFromStore.size(), 0);
   }
 
   public static class FakeDeletionManager extends SegmentDeletionManager {
