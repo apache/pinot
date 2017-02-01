@@ -1,7 +1,9 @@
 package com.linkedin.thirdeye.tools;
 
-import com.alibaba.fastjson.JSONArray;
-import com.alibaba.fastjson.JSONObject;
+import java.util.Iterator;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
@@ -13,9 +15,7 @@ import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URLEncoder;
@@ -24,19 +24,21 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
-import javax.xml.transform.Result;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
-import org.joda.time.format.ISODateTimeFormat;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class FetchMetricDataAndExistingAnomaliesTool {
+  private static final Logger LOG = LoggerFactory.getLogger(FetchMetricDataAndExistingAnomaliesTool.class);
   private AnomalyFunctionManager anomalyFunctionDAO;
   private MergedAnomalyResultManager mergedAnomalyResultDAO;
   private RawAnomalyResultManager rawAnomalyResultDAO;
@@ -54,12 +56,12 @@ public class FetchMetricDataAndExistingAnomaliesTool {
     DateTime startTime;
     DateTime endTime;
     double severity;
-    AnomalyFeedbackType _feedbackType;
+    AnomalyFeedbackType feedbackType;
 
     public ResultNode(){}
 
     public void setFilters(String filterStr){
-      if(filterStr == null || filterStr.isEmpty()){
+      if(StringUtils.isNotBlank(filterStr)){
         filters = "";
         return;
       }
@@ -87,7 +89,6 @@ public class FetchMetricDataAndExistingAnomaliesTool {
       sb.append("]");
       return sb.toString();
     }
-
     public String[] getSchema(){
       return new String[]{
           "StartDate", "EndDate", "Dimensions", "Filters", "FunctionID", "FunctionName", "Severity, feedbackType"
@@ -98,7 +99,7 @@ public class FetchMetricDataAndExistingAnomaliesTool {
       return String.format("%s,%s,%s,%s,%s,%s,%s,%s", fmt.print(startTime), fmt.print(endTime),
           dimensionString(), (filters == null)? "":filters,
           Long.toString(functionId), functionName, Double.toString(severity*100.0),
-          (_feedbackType == null)? "N/A" : _feedbackType.toString());
+          (feedbackType == null)? "N/A" : feedbackType.toString());
     }
   }
 
@@ -138,7 +139,7 @@ public class FetchMetricDataAndExistingAnomaliesTool {
       res.setFilters(anomalyFunction.getFilters());
       res.severity = mergedResult.getWeight();
       AnomalyFeedbackDTO feedback = mergedResult.getFeedback();
-      res._feedbackType = (feedback == null)? null : feedback.getFeedbackType();
+      res.feedbackType = (feedback == null)? null : feedback.getFeedbackType();
       resultNodes.add(res);
     }
     return resultNodes;
@@ -153,7 +154,7 @@ public class FetchMetricDataAndExistingAnomaliesTool {
    */
   public List<ResultNode> fetchMergedAnomaliesInRange (String collection, String metric, DateTime startTime, DateTime endTime){
     List<AnomalyFunctionDTO> anomalyFunctions = anomalyFunctionDAO.findAllByCollection(collection);
-    System.out.println("Loading merged anaomaly results from db...");
+    LOG.info("Loading merged anaomaly results from db...");
     List<ResultNode> resultNodes = new ArrayList<>();
     for(AnomalyFunctionDTO anomalyDto : anomalyFunctions){
       if(!anomalyDto.getMetric().equals(metric)) continue;
@@ -175,17 +176,17 @@ public class FetchMetricDataAndExistingAnomaliesTool {
 
     List<RawAnomalyResultDTO> rawResults =
         rawAnomalyResultDAO.findAllByTimeAndFunctionId(startTime.getMillis(), endTime.getMillis(), functionId);
-    for(RawAnomalyResultDTO rawdResult : rawResults){
+    for(RawAnomalyResultDTO rawResult : rawResults){
       ResultNode res = new ResultNode();
       res.functionId = functionId;
       res.functionName = anomalyFunction.getFunctionName();
-      res.startTime = new DateTime(rawdResult.getStartTime());
-      res.endTime = new DateTime(rawdResult.getEndTime());
-      res.dimensions = rawdResult.getDimensions();
+      res.startTime = new DateTime(rawResult.getStartTime());
+      res.endTime = new DateTime(rawResult.getEndTime());
+      res.dimensions = rawResult.getDimensions();
       res.setFilters(anomalyFunction.getFilters());
-      res.severity = rawdResult.getWeight();
-      AnomalyFeedbackDTO feedback = rawdResult.getFeedback();
-      res._feedbackType = (feedback == null)? null : feedback.getFeedbackType();
+      res.severity = rawResult.getWeight();
+      AnomalyFeedbackDTO feedback = rawResult.getFeedback();
+      res.feedbackType = (feedback == null)? null : feedback.getFeedbackType();
       resultNodes.add(res);
     }
     return resultNodes;
@@ -264,7 +265,7 @@ public class FetchMetricDataAndExistingAnomaliesTool {
    * @return {dimension-> {DateTime: value}}
    * @throws IOException
    */
-  public Map<String, Map<Long, Long>> fetchMetric(String host, int port, String dataset, String metric, DateTime startTime,
+  public Map<String, Map<Long, String>> fetchMetric(String host, int port, String dataset, String metric, DateTime startTime,
       DateTime endTime, TimeGranularity timeGranularity, String dimensions, String filterJson, String timezone)
       throws  IOException{
     HttpClient client = HttpClientBuilder.create().build();
@@ -302,23 +303,31 @@ public class FetchMetricDataAndExistingAnomaliesTool {
     while ((line = rd.readLine()) != null) {
       content.append(line);
     }
-    JSONObject jsonObject = JSONObject.parseObject(content.toString());
-    JSONObject timeSeriesData = (JSONObject) jsonObject.get("timeSeriesData");
-    JSONArray timeArray = (JSONArray) timeSeriesData.get("time");
+    Map<String, Map<Long, String>> resultMap = null;
+    try {
+      JSONObject jsonObject = new JSONObject(content.toString());
+      JSONObject timeSeriesData = (JSONObject) jsonObject.get("timeSeriesData");
+      JSONArray timeArray = (JSONArray) timeSeriesData.get("time");
 
-    Map<String, Map<Long, Long>> resultMap = new HashMap<>();
-    for (String key : timeSeriesData.keySet()) {
-      if (key.equalsIgnoreCase("time")) {
-        continue;
+      resultMap = new HashMap<>();
+      Iterator<String> timeSeriesDataIterator = timeSeriesData.keys();
+      while(timeSeriesDataIterator.hasNext()) {
+        String key = timeSeriesDataIterator.next();
+        if (key.equalsIgnoreCase("time")) {
+          continue;
+        }
+        Map<Long, String> entry = new HashMap<>();
+        JSONArray observed = (JSONArray) timeSeriesData.get(key);
+        for (int i = 0; i < timeArray.length(); i++) {
+          long timestamp = (long) timeArray.get(i);
+          String observedValue = observed.get(i).toString();
+          entry.put(timestamp, observedValue);
+        }
+        resultMap.put(key, entry);
       }
-      Map<Long, Long> entry = new HashMap<>();
-      JSONArray observed = (JSONArray) timeSeriesData.get(key);
-      for (int i = 0; i < timeArray.size(); i++) {
-        long timestamp = (long) timeArray.get(i);
-        long observedValue = Long.valueOf(observed.get(i).toString());
-        entry.put(timestamp, observedValue);
-      }
-      resultMap.put(key, entry);
+    }
+    catch (JSONException e){
+      LOG.error("Unable to resolve JSON string {}", e);
     }
     return resultMap;
   }
