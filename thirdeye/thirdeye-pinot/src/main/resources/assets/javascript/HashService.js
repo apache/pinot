@@ -112,10 +112,41 @@ HashService.prototype = {
     this.currentController = this.controllerNameToControllerMap[controllerName];
     this.refreshWindowHashForRouting(controllerName);
   },
-  onHashChangeEventHandler : function() {
-    console.log('OnHashChangeEventhandler');
-    console.log(this.params);
-    console.log(this.currentController);
-    this.currentController.handleAppEvent();
+
+  /**
+   * determine based on the hash change event if a transition is needed
+   * @param  {string} options.oldURL [oldURL of hash change event]
+   * @param  {string} options.newURL [newURL of hash change event]
+   * @return {boolean} - returns true if a transition is needed]
+   */
+  shouldTransition({ oldURL, newURL }) {
+    const [_1, transitionFrom, paramsFrom]= oldURL.split(/(?:[#?]|[&]*rand)/);
+    const [_2, transitionTo, paramsTo] = newURL.split(/(?:[#?]|[&]*rand)/);
+    const currentTab = HASH_SERVICE.get('tab');
+
+    if ((currentTab != transitionTo)) {
+      return true;
+    } else if (paramsTo) {
+      for (let param of paramsTo.split('&')){
+        const [key, value] = param.split('=');
+        if (this.params[key] != value) {
+          return true;
+        }
+      }
+    }
+    return false;
+  },
+  onHashChangeEventHandler : function(event) {
+    const transitionTo = this.shouldTransition(event);
+
+    if (transitionTo) {
+      this.setHashParamsFromUrl();
+      this.routeTo('app');
+    } else {
+      console.log('OnHashChangeEventhandler');
+      console.log(this.params);
+      console.log(this.currentController);
+      this.currentController.handleAppEvent();
+    }
   }
 };
