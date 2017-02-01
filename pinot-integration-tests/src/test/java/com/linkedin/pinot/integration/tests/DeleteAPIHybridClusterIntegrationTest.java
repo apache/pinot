@@ -39,45 +39,64 @@ import junit.framework.Assert;
  */
 public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrationTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeClusterIntegrationTest.class);
-  private static final String TABLE_NAME = "mytable";
-  private static final String TENANT_NAME = "TestTenant";
-  private static int nRows;
+  private String TABLE_NAME;
+  private int nOfflineRows;
+  private int nRealtimeRows;
 
   @BeforeClass
   public void setUp() throws Exception {
     super.setUp();
-    org.json.JSONObject response = postQuery("select count(*) from 'mytable'");
-    org.json.JSONArray aggregationResultsArray = response.getJSONArray("aggregationResults");
-    org.json.JSONObject firstAggregationResult = aggregationResultsArray.getJSONObject(0);
-    String pinotValue = firstAggregationResult.getString("value");
-    nRows = Integer.parseInt(pinotValue);
+    TABLE_NAME = super.getTableName();
+    nOfflineRows = numRowsReturned("REALTIME");
+    nRealtimeRows = numRowsReturned("OFFLINE");
   }
 
-  private int numRowsReturned() throws Exception{
-    org.json.JSONObject response = postQuery("select count(*) from 'mytable'");
-    org.json.JSONArray aggregationResultsArray = response.getJSONArray("aggregationResults");
-    org.json.JSONObject firstAggregationResult = aggregationResultsArray.getJSONObject(0);
-    String pinotValue = firstAggregationResult.getString("value");
-    return Integer.parseInt(pinotValue);
+  private int numRowsReturned(String tableType) throws Exception {
+    org.json.JSONObject response = postQuery("select count(*) from '" + TABLE_NAME + "_" + tableType + "'");
+    long start = System.currentTimeMillis();
+    long end = start + 60 * 1000;
+    while (System.currentTimeMillis() < end) {
+      if (!response.get("numDocsScanned").equals(new Integer(0))) {
+        String pinotValue = ((org.json.JSONArray) response.get("aggregationResults")).getJSONObject(0).get("value").toString();
+        return Integer.parseInt(pinotValue);
+      }
+      Thread.sleep(200);
+    }
+    return 0;
+  }
+
+  private boolean checkAllRowsDeleted(String tableType) throws Exception {
+    org.json.JSONObject response = postQuery("select count(*) from '" + TABLE_NAME + "_" + tableType + "'");
+    long start = System.currentTimeMillis();
+    long end = start + 60 * 1000;
+    while (System.currentTimeMillis() < end) {
+      if (response.get("numDocsScanned").equals(new Integer(0))) {
+        return true;
+      }
+      Thread.sleep(200);
+    }
+    return false;
   }
 
   private void waitForTableReady() throws Exception {
-    while (true) {
-      int curOfflineRows = numRowsReturned();
-      if (curOfflineRows != nRows) {
-        Thread.sleep(1000);
-      }
-      else {
+    long start = System.currentTimeMillis();
+    long end = start + 60 * 1000;
+    while (System.currentTimeMillis() < end) {
+      int curOfflineRows = numRowsReturned("offline");
+      if (curOfflineRows != nOfflineRows) {
+        Thread.sleep(200);
+      } else {
         break;
       }
     }
   }
 
-  // @Test Commenting this out for now because of HLC/LLC
+  // @Test TODO: Add back when we use LLC only
   public void deleteAllRealtimeSegmentsFromGetAPI() throws Exception{
     sendGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).
         forDeleteAllSegmentsWithTypeWithGetAPI(TABLE_NAME, "realtime"));
-    Thread.sleep(3000);
+
+    checkAllRowsDeleted("REALTIME");
 
     String postDeleteSegmentList = sendGetRequest(
         ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forListAllSegments(TABLE_NAME));
@@ -87,11 +106,31 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
     repushRealtimeSegments();
   }
 
+  private boolean checkOneRowDeleted(String tableType) throws Exception {
+    org.json.JSONObject response = postQuery("select count(*) from '" + TABLE_NAME + "_" + tableType + "'");
+    long start = System.currentTimeMillis();
+    long end = start + 60 * 1000;
+    while (System.currentTimeMillis() < end) {
+      if (tableType.equals("REALTIME")) {
+        if (Integer.parseInt(((org.json.JSONArray) response.get("aggregationResults")).getJSONObject(0).get("value").toString()) != nRealtimeRows) {
+          return true;
+        }
+      } else {
+        if (Integer.parseInt(((org.json.JSONArray) response.get("aggregationResults")).getJSONObject(0).get("value").toString()) != nOfflineRows) {
+          return true;
+        }
+      }
+      Thread.sleep(200);
+    }
+    return false;
+  }
+
   @Test
   public void deleteAllOfflineSegmentsFromGetAPI() throws Exception{
     sendGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).
         forDeleteAllSegmentsWithTypeWithGetAPI(TABLE_NAME, "offline"));
-    Thread.sleep(3000);
+
+    checkAllRowsDeleted("OFFLINE");
 
     String postDeleteSegmentList = sendGetRequest(
         ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forListAllSegments(TABLE_NAME));
@@ -101,7 +140,7 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
     repushOfflineSegments();
   }
 
-  @Override
+  @Override // Leaving this out because it is done in the superclass
   public void testHardcodedQuerySet() {}
 
   @Test
@@ -110,18 +149,21 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
         ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forListAllSegments(TABLE_NAME));
     JSONArray offlineSegmentsList = getSegmentsFromJson(segmentList, "offline");
 
+    String removedSegment = offlineSegmentsList.get(0).toString();
+
     sendGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).
-        forDeleteSegmentWithGetAPI(TABLE_NAME, offlineSegmentsList.get(0).toString(), "offline"));
-    Thread.sleep(5000);
+        forDeleteSegmentWithGetAPI(TABLE_NAME, removedSegment, "offline"));
+
+    checkOneRowDeleted("OFFLINE");
 
     String postDeleteSegmentList = sendGetRequest(
         ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forListAllSegments(TABLE_NAME));
     JSONArray offlineSegmentsListReturn = getSegmentsFromJson(postDeleteSegmentList, "offline");
-    offlineSegmentsList.remove(0);
+    offlineSegmentsList.remove(removedSegment);
     Assert.assertEquals(offlineSegmentsListReturn, offlineSegmentsList);
   }
 
-  @Override
+  @Override // Leaving this out because it is done in the superclass
   public void testGeneratedQueriesWithMultiValues() {}
 
   @Test
@@ -130,22 +172,26 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
         ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forListAllSegments(TABLE_NAME));
     JSONArray realtimeSegmentsList = getSegmentsFromJson(segmentList, "realtime");
 
+    String removedSegment = realtimeSegmentsList.get(0).toString();
+
     sendGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).
-        forDeleteSegmentWithGetAPI(TABLE_NAME, realtimeSegmentsList.get(0).toString(), "realtime"));
-    Thread.sleep(3000);
+        forDeleteSegmentWithGetAPI(TABLE_NAME, removedSegment, "realtime"));
+
+    checkOneRowDeleted("REALTIME");
 
     String postDeleteSegmentList = sendGetRequest(
         ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forListAllSegments(TABLE_NAME));
     JSONArray realtimeSegmentsListReturn = getSegmentsFromJson(postDeleteSegmentList, "realtime");
-    realtimeSegmentsList.remove(0);
+    realtimeSegmentsList.remove(removedSegment);
     Assert.assertEquals(realtimeSegmentsListReturn, realtimeSegmentsList);
   }
 
-  // @Test Commenting this out for now because of HLC/LLC
+  // @Test TODO: Add back when we use LLC only
   public void deleteAllRealtimeSegmentsFromDeleteAPI() throws Exception{
     sendDeleteRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).
         forSegmentDeleteAllAPI(TABLE_NAME, "realtime"));
-    Thread.sleep(3000);
+
+    checkAllRowsDeleted("REALTIME");
 
     String postDeleteSegmentList = sendGetRequest(
         ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forListAllSegments(TABLE_NAME));
@@ -159,7 +205,8 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
     public void deleteAllOfflineSegmentsFromDeleteAPI() throws Exception{
       sendDeleteRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).
           forSegmentDeleteAllAPI(TABLE_NAME, "offline"));
-      Thread.sleep(3000);
+
+      checkAllRowsDeleted("OFFLINE");
 
       String postDeleteSegmentList = sendGetRequest(
           ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forListAllSegments(TABLE_NAME));
@@ -175,14 +222,17 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
           ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forListAllSegments(TABLE_NAME));
       JSONArray offlineSegmentsList = getSegmentsFromJson(segmentList, "offline");
 
+      String removedSegment = offlineSegmentsList.get(0).toString();
+
       sendDeleteRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).
-          forSegmentDeleteAPI(TABLE_NAME, offlineSegmentsList.get(0).toString(), "offline"));
-      Thread.sleep(3000);
+          forSegmentDeleteAPI(TABLE_NAME, removedSegment, "offline"));
+
+      checkOneRowDeleted("OFFLINE");
 
       String postDeleteSegmentList = sendGetRequest(
           ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forListAllSegments(TABLE_NAME));
       JSONArray offlineSegmentsListReturn = getSegmentsFromJson(postDeleteSegmentList, "offline");
-      offlineSegmentsList.remove(0);
+      offlineSegmentsList.remove(removedSegment);
       Assert.assertEquals(offlineSegmentsListReturn, offlineSegmentsList);
     }
 
@@ -192,14 +242,17 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
         ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forListAllSegments(TABLE_NAME));
     JSONArray realtimeSegmentsList = getSegmentsFromJson(segmentList, "realtime");
 
+    String removedSegment = realtimeSegmentsList.get(0).toString();
+
     sendDeleteRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).
-        forSegmentDeleteAPI(TABLE_NAME, realtimeSegmentsList.get(0).toString(), "realtime"));
-    Thread.sleep(3000);
+        forSegmentDeleteAPI(TABLE_NAME, removedSegment, "realtime"));
+
+    checkOneRowDeleted("REALTIME");
 
     String postDeleteSegmentList = sendGetRequest(
         ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forListAllSegments(TABLE_NAME));
     JSONArray realtimeSegmentsListReturn = getSegmentsFromJson(postDeleteSegmentList, "realtime");
-    realtimeSegmentsList.remove(0);
+    realtimeSegmentsList.remove(removedSegment);
     Assert.assertEquals(realtimeSegmentsListReturn, realtimeSegmentsList);
   }
 
@@ -224,7 +277,7 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
     waitForTableReady();
   }
 
-  @Override
+  @Override // Leaving this out because it is done in the superclass
   public void testBrokerDebugOutput() {}
 
 
