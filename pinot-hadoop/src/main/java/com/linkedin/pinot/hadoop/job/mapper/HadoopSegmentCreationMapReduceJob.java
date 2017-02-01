@@ -130,6 +130,7 @@ public class HadoopSegmentCreationMapReduceJob {
       LOGGER.info("local disk segment path: {}", _localDiskSegmentDirectory);
       LOGGER.info("local disk segment tar path: {}", _localDiskSegmentTarPath);
       LOGGER.info("data schema: {}", _localDiskSegmentTarPath);
+      LOGGER.info("reader config: {}", _readerConfig);
       LOGGER.info("*********************************************************************");
 
       try {

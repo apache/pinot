@@ -18,6 +18,8 @@ package com.linkedin.pinot.hadoop.job;
 import com.linkedin.pinot.common.Utils;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -41,7 +43,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.core.data.readers.CSVRecordReaderConfig;
 import com.linkedin.pinot.hadoop.job.mapper.HadoopSegmentCreationMapReduceJob.HadoopSegmentCreationMapper;
 
 
@@ -65,7 +66,7 @@ public class SegmentCreationJob extends Configured {
   private final Schema _dataSchema;
   private final String _depsJarPath;
   private final String _outputDir;
-  private final CSVRecordReaderConfig _readerConfig;
+  private final String _readerConfig;
 
   public SegmentCreationJob(String jobName, Properties properties) throws Exception {
     super(new Configuration());
@@ -80,7 +81,7 @@ public class SegmentCreationJob extends Configured {
     _depsJarPath = _properties.getProperty(PATH_TO_DEPS_JAR, null);
     String readerConfigFilePath = _properties.getProperty(PATH_TO_READER_CONFIG, null);
     _readerConfig = (null == readerConfigFilePath) ? null
-                    : new ObjectMapper().readValue(new File(readerConfigFilePath), CSVRecordReaderConfig.class);
+                    : new String(Files.readAllBytes(Paths.get(readerConfigFilePath)));
 
     Utils.logVersions();
 
@@ -157,7 +158,7 @@ public class SegmentCreationJob extends Configured {
 
     job.getConfiguration().setInt(JobContext.NUM_MAPS, inputDataFiles.size());
     job.getConfiguration().set("data.schema", new ObjectMapper().writeValueAsString(_dataSchema));
-    job.getConfiguration().set("reader.config", new ObjectMapper().writeValueAsString(_readerConfig));
+    job.getConfiguration().set("reader.config", _readerConfig);
 
     job.setMaxReduceAttempts(1);
     job.setMaxMapAttempts(0);
