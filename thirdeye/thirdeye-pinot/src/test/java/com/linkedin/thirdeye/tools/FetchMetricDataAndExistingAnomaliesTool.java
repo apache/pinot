@@ -30,6 +30,7 @@ import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.ISODateTimeFormat;
@@ -116,9 +117,7 @@ public class FetchMetricDataAndExistingAnomaliesTool {
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl.class);
   }
 
-  public List<ResultNode> fetchMergedAnomaliesInRangeByFunctionId(long functionId, String startTimeISO, String endTimeISO){
-    DateTime startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeISO);
-    DateTime endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeISO);
+  public List<ResultNode> fetchMergedAnomaliesInRangeByFunctionId(long functionId, DateTime startTime, DateTime endTime){
     AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
     System.out.println(String.format("Loading merged anaomaly results of functionId %s from db...", Long.toString(functionId)));
     List<ResultNode> resultNodes = new ArrayList<>();
@@ -148,26 +147,24 @@ public class FetchMetricDataAndExistingAnomaliesTool {
    * Fetch merged anomaly results from thirdeye db
    * @param collection database/collection name
    * @param metric metric name
-   * @param startTimeISO start time of the requested data in ISO format
-   * @param endTimeISO end time of the requested data in ISO format
+   * @param startTime start time of the requested data in DateTime format
+   * @param endTime end time of the requested data in DateTime format
    * @return List of merged anomaly results
    */
-  public List<ResultNode> fetchMergedAnomaliesInRange (String collection, String metric, String startTimeISO, String endTimeISO){
+  public List<ResultNode> fetchMergedAnomaliesInRange (String collection, String metric, DateTime startTime, DateTime endTime){
     List<AnomalyFunctionDTO> anomalyFunctions = anomalyFunctionDAO.findAllByCollection(collection);
     System.out.println("Loading merged anaomaly results from db...");
     List<ResultNode> resultNodes = new ArrayList<>();
     for(AnomalyFunctionDTO anomalyDto : anomalyFunctions){
       if(!anomalyDto.getMetric().equals(metric)) continue;
 
-      resultNodes.addAll(fetchMergedAnomaliesInRangeByFunctionId(anomalyDto.getId(), startTimeISO, endTimeISO));
+      resultNodes.addAll(fetchMergedAnomaliesInRangeByFunctionId(anomalyDto.getId(), startTime, endTime));
     }
     Collections.sort(resultNodes);
     return resultNodes;
   }
 
-  public List<ResultNode> fetchRawAnomaliesInRangeByFunctionId(long functionId, String startTimeISO, String endTimeISO){
-    DateTime startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeISO);
-    DateTime endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeISO);
+  public List<ResultNode> fetchRawAnomaliesInRangeByFunctionId(long functionId, DateTime startTime, DateTime endTime){
     AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
     System.out.println(String.format("Loading raw anaomaly results of functionId %s from db...", Long.toString(functionId)));
     List<ResultNode> resultNodes = new ArrayList<>();
@@ -198,11 +195,11 @@ public class FetchMetricDataAndExistingAnomaliesTool {
    * Fetch raw anomaly results from thirdeye db
    * @param collection database/collection name
    * @param metric metric name
-   * @param startTimeISO start time of the requested data in ISO format
-   * @param endTimeISO end time of the requested data in ISO format
+   * @param startTime start time of the requested data in DateTime format
+   * @param endTime end time of the requested data in DateTime format
    * @return List of raw anomaly results
    */
-  public List<ResultNode> fetchRawAnomaliesInRange(String collection, String metric, String startTimeISO, String endTimeISO){
+  public List<ResultNode> fetchRawAnomaliesInRange(String collection, String metric, DateTime startTime, DateTime endTime){
     List<AnomalyFunctionDTO> anomalyFunctions = anomalyFunctionDAO.findAllByCollection(collection);
     System.out.println("Loading raw anaomaly results from db...");
     List<ResultNode> resultNodes = new ArrayList<>();
@@ -212,7 +209,7 @@ public class FetchMetricDataAndExistingAnomaliesTool {
       if(!anomalyDto.getMetric().equals(metric)) continue;
 
       long id = anomalyDto.getId();
-      resultNodes.addAll(fetchRawAnomaliesInRangeByFunctionId(id, startTimeISO, endTimeISO));
+      resultNodes.addAll(fetchRawAnomaliesInRangeByFunctionId(id, startTime, endTime));
     }
     Collections.sort(resultNodes);
     return resultNodes;
@@ -259,20 +256,21 @@ public class FetchMetricDataAndExistingAnomaliesTool {
    * @param port port number
    * @param dataset dataset/collection name
    * @param metric metric name
-   * @param startTimeISO start time of requested data in ISO format
-   * @param endTimeISO end time of requested data in ISO format
+   * @param startTime start time of requested data in ISO format
+   * @param endTime end time of requested data in ISO format
    * @param timeGranularity the time granularity
    * @param dimensions the list of dimensions
    * @param filterJson filters, in JSON
    * @return {dimension-> {DateTime: value}}
    * @throws IOException
    */
-  public Map<String, Map<DateTime, Integer>> fetchMetric(String host, int port, String dataset, String metric, String startTimeISO,
-      String endTimeISO, TimeGranularity timeGranularity, String dimensions, String filterJson)
+  public Map<String, Map<Long, Long>> fetchMetric(String host, int port, String dataset, String metric, DateTime startTime,
+      DateTime endTime, TimeGranularity timeGranularity, String dimensions, String filterJson, String timezone)
       throws  IOException{
     HttpClient client = HttpClientBuilder.create().build();
-    DateTime startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeISO);
-    DateTime endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeISO);
+    DateTimeZone dateTimeZone = DateTimeZone.forID(timezone);
+    startTime = new DateTime(startTime, dateTimeZone);
+    endTime = new DateTime(endTime, dateTimeZone);
     // format http GET command
     StringBuilder urlBuilder = new StringBuilder(host + ":" + port + DEFAULT_PATH_TO_TIMESERIES);
     urlBuilder.append(DATASET + "=" + dataset + "&");
@@ -308,17 +306,17 @@ public class FetchMetricDataAndExistingAnomaliesTool {
     JSONObject timeSeriesData = (JSONObject) jsonObject.get("timeSeriesData");
     JSONArray timeArray = (JSONArray) timeSeriesData.get("time");
 
-    Map<String, Map<DateTime, Integer>> resultMap = new HashMap<>();
+    Map<String, Map<Long, Long>> resultMap = new HashMap<>();
     for (String key : timeSeriesData.keySet()) {
       if (key.equalsIgnoreCase("time")) {
         continue;
       }
-      Map<DateTime, Integer> entry = new HashMap<>();
+      Map<Long, Long> entry = new HashMap<>();
       JSONArray observed = (JSONArray) timeSeriesData.get(key);
       for (int i = 0; i < timeArray.size(); i++) {
         long timestamp = (long) timeArray.get(i);
-        int observedValue = (int) observed.get(i);
-        entry.put(new DateTime(timestamp), observedValue);
+        long observedValue = Long.valueOf(observed.get(i).toString());
+        entry.put(timestamp, observedValue);
       }
       resultMap.put(key, entry);
     }

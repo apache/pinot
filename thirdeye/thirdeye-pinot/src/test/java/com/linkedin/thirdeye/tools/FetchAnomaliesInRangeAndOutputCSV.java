@@ -23,7 +23,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.HashSet;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.joda.time.Days;
+import org.joda.time.Period;
 import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.ISODateTimeFormat;
@@ -77,12 +79,13 @@ public class FetchAnomaliesInRangeAndOutputCSV {
    *             0: path to persistence file
    *             1: collection name
    *             2: metric name
-   *             3: start time in ISO format
-   *             4: end time in ISO format
-   *             5: (optional): Output path
+   *             3: monitoring start time in ISO format
+   *             4: timezone code
+   *             5: monitoring length in days
+   *             6: (optional): Output path
    */
   public static void main(String args[]){
-    if(args.length < 5){
+    if(args.length < 6){
       System.out.println("Insufficient number of arguments");
       return;
     }
@@ -99,22 +102,25 @@ public class FetchAnomaliesInRangeAndOutputCSV {
     String collection = args[1];
     String metric = args[2];
     String output_folder = DEFAULT_OUTPUT_FOLDER;
-    DateTime startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(args[3]);
-    DateTime endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(args[4]);
-    DateTimeFormatter fmt = DateTimeFormat.forPattern("yyyy-MM-dd");
+    DateTimeZone dateTimeZone = DateTimeZone.forID(args[4]);
+    DateTime monitoringWindowStartTime = ISODateTimeFormat.dateTimeParser().parseDateTime(args[3]).withZone(dateTimeZone);
+    Period period = new Period(0, 0, 0, Integer.valueOf(args[5]), 0, 0, 0, 0);
+    DateTime dataRangeStart = monitoringWindowStartTime.minus(period); // inclusive start
+    DateTime dataRangeEnd = monitoringWindowStartTime; // exclusive end
+
     if(args.length >= 6 && (new File(args[5])).exists()){
       output_folder = args[5];
     }
 
-
+    DateTimeFormatter fmt = DateTimeFormat.forPattern("yyyy-MM-dd HH:mm");
 
     // Print Merged Results
     List<FetchMetricDataAndExistingAnomaliesTool.ResultNode> resultNodes = thirdEyeDAO.fetchMergedAnomaliesInRange(
-        collection, metric, args[3], args[4]);
+        collection, metric, dataRangeStart, dataRangeEnd);
 
     System.out.println("Printing merged anaomaly results from db...");
     String outputname = output_folder +
-        "merged_" + args[1] + "_" + fmt.print(startTime) + "_" + fmt.print(endTime) + ".csv";
+        "merged_" + args[1] + "_" + fmt.print(dataRangeStart) + "_" + fmt.print(dataRangeEnd) + ".csv";
     try {
       outputResultNodesToFile(new File(outputname), resultNodes);
     }
@@ -126,11 +132,11 @@ public class FetchAnomaliesInRangeAndOutputCSV {
 
     resultNodes.clear();
     // Print Raw Results
-    resultNodes = thirdEyeDAO.fetchRawAnomaliesInRange(collection, metric, args[3], args[4]);
+    resultNodes = thirdEyeDAO.fetchRawAnomaliesInRange(collection, metric, dataRangeStart, dataRangeEnd);
 
     System.out.println("Printing raw anaomaly results from db...");
     outputname = output_folder +
-        "raw_" + args[1] + "_" + fmt.print(startTime) + "_" + fmt.print(endTime) + ".csv";
+        "raw_" + args[1] + "_" + fmt.print(dataRangeStart) + "_" + fmt.print(dataRangeEnd) + ".csv";
     try {
       outputResultNodesToFile(new File(outputname), resultNodes);
     }
@@ -141,7 +147,7 @@ public class FetchAnomaliesInRangeAndOutputCSV {
 
     // Print date vs dimension table
     outputname = output_folder +
-        "date_dimension_" + args[1] + "_" + fmt.print(startTime) + "_" + fmt.print(endTime) + ".csv";
+        "date_dimension_" + args[1] + "_" + fmt.print(dataRangeStart) + "_" + fmt.print(dataRangeEnd) + ".csv";
 
     Set<String> dimensions = new HashSet<>();
     Map<String, Map<String, Double>> dimensionDateSeverity = new HashMap<>();
@@ -164,7 +170,7 @@ public class FetchAnomaliesInRangeAndOutputCSV {
       Collections.sort(schemas);
 
       // Write Schema
-      for(DateTime curr = startTime; curr.isBefore(endTime); curr = curr.plusDays(1)){
+      for(DateTime curr = dataRangeStart; curr.isBefore(dataRangeEnd); curr = curr.plusDays(1)){
         String currDate = fmt.print(curr);
         bw.write("," + currDate);
       }
@@ -173,7 +179,7 @@ public class FetchAnomaliesInRangeAndOutputCSV {
       for (String schema : schemas){
         bw.write(schema);
         Map<String, Double> targetMap = dimensionDateSeverity.get(schema);
-        for (DateTime curr = startTime; curr.isBefore(endTime); curr = curr.plusDays(1)) {
+        for (DateTime curr = dataRangeStart; curr.isBefore(dataRangeEnd); curr = curr.plusDays(1)) {
           String currDate = fmt.print(curr);
           bw.write(",");
           if(targetMap.containsKey(currDate)){

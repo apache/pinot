@@ -18,6 +18,8 @@ import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.joda.time.Period;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.ISODateTimeFormat;
@@ -58,11 +60,18 @@ public class FetchMetricDataInRangeAndOutputCSV {
     String path2PersistenceFile = "/home/ychung/workspace/thirdeye-configs/local-configs/persistence.yml";
     String dataset = "invite_sends_v2_additive";
     String metric = "m2g_invite_sent";
-    String currentStartISO = "2016-01-01T12:00:00";
-    String currentEndISO = "2017-01-10T12:00:00";
+//    String currentStartUTC = "2016-02-21T08:00:00Z";
+//    String currentEndUTC = "2016-06-11T08:00:00Z";
+    // Training data range
+    Period period = new Period(0, 0, 0, 365, 0, 0, 0, 0);
+    String timezone = "America/Los_Angeles";
+    DateTimeZone dateTimeZone = DateTimeZone.forID(timezone);
+    DateTime monitoringWindowStartTime = new DateTime(2017, 1, 1, 0, 0, dateTimeZone);
+    DateTime dataRangeStart = monitoringWindowStartTime.minus(period); // inclusive start
+    DateTime dataRangeEnd = monitoringWindowStartTime; // exclusive end
     String aggTimeGranularity = "DAYS";
-    String dimensions = "product";
-    String filters = "{\"channel\":[\"guest-email\"]}";
+    String dimensions = "";
+    String filters = "{}";
     DateTimeFormatter fmt = DateTimeFormat.forPattern("yyyy-MM-dd HH:mm");
 
     if(FetchMetricDataAndExistingAnomaliesTool.TimeGranularity.fromString(aggTimeGranularity) == null){
@@ -71,19 +80,19 @@ public class FetchMetricDataInRangeAndOutputCSV {
     }
 
 
-    String filename = metric + "_" + currentStartISO + "_" + currentEndISO + ".csv";
-    Map<String, Map<DateTime, Integer>> metricContent;
+    String fname = metric + "_" + fmt.print(dataRangeStart) + "_" + fmt.print(dataRangeEnd) + ".csv";
+    Map<String, Map<Long, Long>> metricContent;
     try {
       FetchMetricDataAndExistingAnomaliesTool thirdEyeDAO = new FetchMetricDataAndExistingAnomaliesTool(new File(path2PersistenceFile));
       metricContent = thirdEyeDAO.fetchMetric(DEFAULT_HOST, Integer.valueOf(DEFAULT_PORT), dataset,
-          metric, currentStartISO, currentEndISO,
-          FetchMetricDataAndExistingAnomaliesTool.TimeGranularity.fromString(aggTimeGranularity), dimensions, filters);
+          metric, dataRangeStart, dataRangeEnd,
+          FetchMetricDataAndExistingAnomaliesTool.TimeGranularity.fromString(aggTimeGranularity), dimensions,
+          filters, timezone);
 
-      String fname = metric + "_" + currentStartISO + "_" + currentEndISO + ".csv";
       BufferedWriter bw = new BufferedWriter(new FileWriter(DEFAULT_OUTPUT_FOLDER + fname));
 
       List<String> keys = new ArrayList<>(metricContent.keySet());
-      List<DateTime> dateTimes = new ArrayList<>(metricContent.get(keys.get(0)).keySet());
+      List<Long> dateTimes = new ArrayList<>(metricContent.get(keys.get(0)).keySet());
       Collections.sort(dateTimes);
 
       // Print Header
@@ -92,10 +101,10 @@ public class FetchMetricDataInRangeAndOutputCSV {
       }
       bw.newLine();
 
-      for(DateTime dt : dateTimes){
-        bw.write(fmt.print(dt));
+      for(Long dt : dateTimes){
+        bw.write(Long.toString(dt));
         for(String key : keys){
-          Map<DateTime, Integer> map = metricContent.get(key);
+          Map<Long, Long> map = metricContent.get(key);
           bw.write("," + map.get(dt));
         }
         bw.newLine();
