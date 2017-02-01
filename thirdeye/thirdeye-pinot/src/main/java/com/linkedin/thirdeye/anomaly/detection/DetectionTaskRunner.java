@@ -10,6 +10,7 @@ import com.linkedin.thirdeye.datalayer.bao.DataCompletenessConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 
@@ -77,17 +78,25 @@ public class DetectionTaskRunner implements TaskRunner {
     windowEnd = detectionTaskInfo.getWindowEndTime();
 
     String dataset = anomalyFunctionSpec.getCollection();
-    List<DataCompletenessConfigDTO> completed =
-        dataCompletenessConfigDAO.findAllByDatasetAndInTimeRangeAndStatus(
-            dataset, windowStart.getMillis(), windowEnd.getMillis(), true);
+    DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(dataset);
 
-    LOG.info("found {} dataCompleteness records for dataset {} from {} to {}",
-        completed.size(), dataset, windowStart.getMillis(), windowEnd.getMillis());
+    if(!datasetConfig.isRequiresCompletenessCheck()) {
+      LOG.info("Dataset {} does not require completeness check", dataset);
 
-    if(completed.size() <= 0) {
-      LOG.info("Skipping anomaly detection task due to incomplete data with metricFunction: [{}], metric [{}], collection: [{}]",
-          anomalyFunctionSpec.getFunctionName(), anomalyFunctionSpec.getMetric(), dataset);
-      throw new IllegalStateException(String.format("Dataset %s incomplete", dataset));
+    } else {
+      LOG.info("Dataset {} requires completeness check", dataset);
+
+      List<DataCompletenessConfigDTO> completed =
+          dataCompletenessConfigDAO.findAllByDatasetAndInTimeRangeAndStatus(
+              dataset, windowStart.getMillis(), windowEnd.getMillis(), true);
+
+      LOG.debug("Found {} dataCompleteness records for dataset {} from {} to {}",
+          completed.size(), dataset, windowStart.getMillis(), windowEnd.getMillis());
+
+      if (completed.size() <= 0) {
+        LOG.warn("Dataset {} is incomplete. Skipping anomaly detection.", dataset);
+        throw new IllegalStateException(String.format("Dataset %s incomplete", dataset));
+      }
     }
 
     LOG.info(
