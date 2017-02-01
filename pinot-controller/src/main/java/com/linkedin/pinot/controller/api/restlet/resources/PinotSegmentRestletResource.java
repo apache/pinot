@@ -36,6 +36,7 @@ import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import javax.annotation.Nonnull;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -260,7 +261,17 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
     List<String> realtimeSegments = _pinotHelixResourceManager.getAllSegmentsForResource(realtimeTableName);
     List<String> offlineSegments = _pinotHelixResourceManager.getAllSegmentsForResource(offlineTableName);
 
-    if (TableType.REALTIME.name().equalsIgnoreCase(tableType)) {
+    if (tableType == null) {
+      PinotResourceManagerResponse responseRealtime = toggleSegmentsForTable(realtimeSegments, realtimeTableName, segmentName, state);
+      PinotResourceManagerResponse responseOffline = toggleSegmentsForTable(offlineSegments, offlineTableName, segmentName, state);
+      setStatus(responseRealtime.isSuccessful() && responseOffline.isSuccessful() ? Status.SUCCESS_OK : Status.SERVER_ERROR_INTERNAL);
+      List<PinotResourceManagerResponse> responses = new ArrayList<>();
+      responses.add(responseRealtime);
+      responses.add(responseOffline);
+      ret.put(responses);
+      return new StringRepresentation(ret.toString());
+    }
+    else if (TableType.REALTIME.name().equalsIgnoreCase(tableType)) {
       if (_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
         tableNameWithType = realtimeTableName;
         if (segmentName != null) {
@@ -271,7 +282,7 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
       } else {
         throw new UnsupportedOperationException("There is no realtime table for " + tableName);
       }
-    } else if (TableType.OFFLINE.name().equalsIgnoreCase(tableType)) {
+    } else {
       if (_pinotHelixResourceManager.hasOfflineTable(tableName)) {
         tableNameWithType = offlineTableName;
         if (segmentName != null) {
@@ -282,16 +293,6 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
       } else {
         throw new UnsupportedOperationException("There is no offline table for " + tableName);
       }
-    } else {
-      // tableType is null, which means it comes from the get API to toggle all segments
-      PinotResourceManagerResponse responseRealtime = toggleSegmentsForTable(realtimeSegments, realtimeTableName, segmentName, state);
-      PinotResourceManagerResponse responseOffline = toggleSegmentsForTable(offlineSegments, offlineTableName, segmentName, state);
-      setStatus(responseRealtime.isSuccessful() && responseOffline.isSuccessful() ? Status.SUCCESS_OK : Status.SERVER_ERROR_INTERNAL);
-      List<PinotResourceManagerResponse> responses = new ArrayList<>();
-      responses.add(responseRealtime);
-      responses.add(responseOffline);
-      ret.put(responses);
-      return new StringRepresentation(ret.toString());
     }
 
     PinotResourceManagerResponse resourceManagerResponse = toggleSegmentsForTable(segmentsToToggle, tableNameWithType, segmentName, state);
@@ -311,7 +312,7 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
    * @return
    * @throws JSONException
    */
-  private PinotResourceManagerResponse toggleSegmentsForTable(List<String> segmentsToToggle, String tableName, String segmentName, String state) throws JSONException {
+  private PinotResourceManagerResponse toggleSegmentsForTable(@Nonnull List<String> segmentsToToggle, @Nonnull String tableName, String segmentName, @Nonnull String state) throws JSONException {
     long timeOutInSeconds = 10L;
     if (segmentName == null) {
       // For enable, allow 5 seconds per segment for an instance as timeout.
