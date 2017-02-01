@@ -48,6 +48,8 @@ public class DatasetConfigBean extends AbstractBean {
 
   private boolean realtime = false;
 
+  private boolean requiresCompletenessCheck = false;
+
   public String getDataset() {
     return dataset;
   }
@@ -194,6 +196,14 @@ public class DatasetConfigBean extends AbstractBean {
     this.realtime = realtime;
   }
 
+  public boolean isRequiresCompletenessCheck() {
+    return requiresCompletenessCheck;
+  }
+
+  public void setRequiresCompletenessCheck(boolean requiresCompletenessCheck) {
+    this.requiresCompletenessCheck = requiresCompletenessCheck;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (!(o instanceof DatasetConfigBean)) {
@@ -218,7 +228,8 @@ public class DatasetConfigBean extends AbstractBean {
         && Objects.equals(preAggregatedKeyword, dc.getPreAggregatedKeyword())
         && Objects.equals(nonAdditiveBucketUnit, dc.getNonAdditiveBucketUnit())
         && Objects.equals(nonAdditiveBucketSize, dc.getNonAdditiveBucketSize())
-        && Objects.equals(realtime, dc.queryRealtime());
+        && Objects.equals(realtime, dc.queryRealtime())
+        && Objects.equals(requiresCompletenessCheck, dc.queryRealtime());
   }
 
   @Override
