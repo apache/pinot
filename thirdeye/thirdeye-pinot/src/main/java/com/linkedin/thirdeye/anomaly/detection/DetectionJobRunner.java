@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
+import com.linkedin.thirdeye.client.DAORegistry;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -46,14 +47,8 @@ public class DetectionJobRunner implements Job {
   public static final String DETECTION_JOB_MONITORING_WINDOW_END_TIME = "DETECTION_JOB_MONITORING_WINDOW_END_TIME";
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
 
-  private JobManager jobDAO;
-  private TaskManager taskDAO;
-  private AnomalyFunctionManager anomalyFunctionSpecDAO;
-  private DatasetConfigManager datasetConfigDAO;
-  private MetricConfigManager metricConfigDAO;
-  private long anomalyFunctionId;
-  private DateTime windowStartTime;
-  private DateTime windowEndTime;
+  private final static DAORegistry DB = DAORegistry.getInstance();
+
   private DetectionJobContext detectionJobContext;
 
   private TaskGenerator taskGenerator;
@@ -68,11 +63,6 @@ public class DetectionJobRunner implements Job {
 
     detectionJobContext = (DetectionJobContext) jobExecutionContext.getJobDetail().getJobDataMap()
         .get(DETECTION_JOB_CONTEXT);
-    jobDAO = detectionJobContext.getJobDAO();
-    taskDAO = detectionJobContext.getTaskDAO();
-    anomalyFunctionSpecDAO = detectionJobContext.getAnomalyFunctionDAO();
-    datasetConfigDAO = detectionJobContext.getDatasetConfigDAO();
-    metricConfigDAO = detectionJobContext.getMetricConfigDAO();
     long anomalyFunctionId = detectionJobContext.getAnomalyFunctionId();
 
     AnomalyFunctionDTO anomalyFunctionSpec = getAnomalyFunctionSpec(anomalyFunctionId);
@@ -120,7 +110,7 @@ public class DetectionJobRunner implements Job {
   private DateTime alignTimestampsToDataTimezone(DateTime inputDateTime, String collection) {
 
     try {
-      DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(collection);
+      DatasetConfigDTO datasetConfig = DB.getDatasetConfigDAO().findByDataset(collection);
       TimeSpec timespec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
       TimeGranularity dataGranularity = timespec.getDataGranularity();
       String timeFormat = timespec.getFormat();
@@ -148,7 +138,7 @@ public class DetectionJobRunner implements Job {
       jobSpec.setWindowEndTime(monitoringWindowEndTime.getMillis());
       jobSpec.setScheduleStartTime(System.currentTimeMillis());
       jobSpec.setStatus(JobStatus.SCHEDULED);
-      jobExecutionId = jobDAO.save(jobSpec);
+      jobExecutionId = DB.getJobDAO().save(jobSpec);
 
       LOG.info("Created anomalyJobSpec {} with jobExecutionId {}", jobSpec,
           jobExecutionId);
@@ -180,7 +170,7 @@ public class DetectionJobRunner implements Job {
         taskSpec.setStartTime(System.currentTimeMillis());
         taskSpec.setTaskInfo(taskInfoJson);
         taskSpec.setJobId(detectionJobContext.getJobExecutionId());
-        long taskId = taskDAO.save(taskSpec);
+        long taskId = DB.getTaskDAO().save(taskSpec);
         taskIds.add(taskId);
         LOG.info("Created anomalyTask {} with taskId {}", taskSpec, taskId);
       }
@@ -193,7 +183,7 @@ public class DetectionJobRunner implements Job {
   private AnomalyFunctionDTO getAnomalyFunctionSpec(Long anomalyFunctionId) {
     AnomalyFunctionDTO anomalyFunctionSpec = null;
     try {
-      anomalyFunctionSpec = anomalyFunctionSpecDAO.findById(anomalyFunctionId);
+      anomalyFunctionSpec = DB.getAnomalyFunctionDAO().findById(anomalyFunctionId);
     } catch (Exception e)  {
       LOG.error("Exception in getting anomalyFunctionSpec by id", e);
     }
