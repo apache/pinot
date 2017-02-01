@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomalydetection.function;
 
+import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
 import com.linkedin.thirdeye.anomalydetection.model.data.DataModel;
 import com.linkedin.thirdeye.anomalydetection.model.data.NoopDataModel;
 import com.linkedin.thirdeye.anomalydetection.model.data.SeasonalDataModel;
@@ -15,7 +16,9 @@ import com.linkedin.thirdeye.anomalydetection.model.prediction.SeasonalAveragePr
 import com.linkedin.thirdeye.anomalydetection.model.transform.MovingAverageSmoothingFunction;
 import com.linkedin.thirdeye.anomalydetection.model.transform.TransformationFunction;
 import com.linkedin.thirdeye.anomalydetection.model.transform.ZeroRemovalFunction;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
