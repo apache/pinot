@@ -617,7 +617,7 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
 
     Validate.isTrue(!StringUtils.containsIgnoreCase(tableName, "_OFFLINE") && !StringUtils.containsIgnoreCase(tableName, "_REALTIME"));
     Validate.notNull(tableType, "tableType can't be null");
-    return new PinotSegmentRestletResource().toggleSegmentState(tableName, null, "drop", tableType);
+    return new PinotSegmentRestletResource().toggleSegmentState(tableName, null, StateType.DROP.toString(), tableType);
   }
 
   /**
