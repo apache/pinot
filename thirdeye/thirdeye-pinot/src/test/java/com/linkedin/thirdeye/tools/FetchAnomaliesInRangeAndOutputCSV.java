@@ -45,11 +45,16 @@ public class FetchAnomaliesInRangeAndOutputCSV {
     throws IOException{
     BufferedWriter bw = new BufferedWriter(new FileWriter(outputFile));
 
-    bw.write(String.join(",", resultNodes.get(0).getSchema()));
-    bw.newLine();
-    for (FetchMetricDataAndExistingAnomaliesTool.ResultNode n : resultNodes){
-      bw.write(n.toString());
+    int rowCount = 0;
+    if(resultNodes.size() > 0) {
+      bw.write(String.join(",", resultNodes.get(0).getSchema()));
       bw.newLine();
+      for (FetchMetricDataAndExistingAnomaliesTool.ResultNode n : resultNodes) {
+        bw.write(n.toString());
+        bw.newLine();
+        rowCount++;
+      }
+      LOG.info("{} anomaly results has been written...", rowCount);
     }
     bw.close();
   }
@@ -81,7 +86,7 @@ public class FetchAnomaliesInRangeAndOutputCSV {
 
     String collection = args[1];
     String metric = args[2];
-    String output_folder = args[7];
+    String output_folder = args[6];
     DateTimeZone dateTimeZone = DateTimeZone.forID(args[4]);
     DateTime monitoringWindowStartTime = ISODateTimeFormat.dateTimeParser().parseDateTime(args[3]).withZone(dateTimeZone);
     Period period = new Period(0, 0, 0, Integer.valueOf(args[5]), 0, 0, 0, 0);

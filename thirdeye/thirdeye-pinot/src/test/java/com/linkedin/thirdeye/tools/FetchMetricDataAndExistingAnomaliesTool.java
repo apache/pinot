@@ -61,7 +61,7 @@ public class FetchMetricDataAndExistingAnomaliesTool {
     public ResultNode(){}
 
     public void setFilters(String filterStr){
-      if(StringUtils.isNotBlank(filterStr)){
+      if(StringUtils.isBlank(filterStr)){
         filters = "";
         return;
       }
