@@ -27,6 +27,8 @@ import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang.Validate;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.joda.time.Interval;
@@ -536,10 +538,18 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
     Representation rep;
     try {
       final String tableName = (String) getRequest().getAttributes().get("tableName");
-      final String segmentName = (String) getRequest().getAttributes().get("segmentName");
+      String segmentName =(String) getRequest().getAttributes().get("segmentName");
+      if (segmentName != null) {
+        segmentName = URLDecoder.decode(segmentName, "UTF-8");
+      }
+      final String tableType = getReference().getQueryAsForm().getValues(TABLE_TYPE);
 
       LOGGER.info("Getting segment deletion request, tableName: " + tableName + " segmentName: " + segmentName);
-      rep = deleteOneSegment(tableName, segmentName);
+      if (segmentName != null) {
+        rep = deleteOneSegment(tableName, segmentName, tableType);
+      } else {
+        rep = deleteAllSegments(tableName, tableType);
+      }
     } catch (final Exception e) {
       rep = exceptionToStringRepresentation(e);
       LOGGER.error("Caught exception while processing delete request", e);
@@ -554,13 +564,17 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
   @Tags({"segment", "table"})
   @Paths({ "/segments/{tableName}/{segmentName}", "/segments/{tableName}/{segmentName}/" })
   private Representation deleteOneSegment(
-      @Parameter(name = "tableName", in = "path", description = "The name of the table in which the segment resides",
+      @Parameter(name = "tableName", in = "path", description = "The raw table name in which the segment resides",
           required = true) String tableName,
       @Parameter(name = "segmentName", in = "path", description = "The name of the segment to delete",
-          required = true) String segmentName)
+          required = true) String segmentName,
+      @Parameter(name = "type", in = "query", description = "Type of table {offline|realtime}",
+          required = true) String tableType)
       throws JsonProcessingException, JSONException {
 
-    return new PinotSegmentRestletResource().toggleSegmentState(tableName, segmentName, "drop", null);
+    Validate.isTrue(!StringUtils.containsIgnoreCase(tableName, "_OFFLINE") && !StringUtils.containsIgnoreCase(tableName, "_REALTIME"));
+    Validate.notNull(tableType, "tableType can't be null");
+    return new PinotSegmentRestletResource().toggleSegmentState(tableName, segmentName, "drop", tableType);
   }
 
   @HttpVerb("delete")
@@ -568,11 +582,15 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
   @Tags({"segment", "table"})
   @Paths({ "/segments/{tableName}", "/segments/{tableName}/" })
   private Representation deleteAllSegments(
-      @Parameter(name = "tableName", in = "path", description = "The name of the table in which the segment resides",
-          required = true) String tableName)
+      @Parameter(name = "tableName", in = "path", description = "The raw table name in which the segment resides",
+          required = true) String tableName,
+      @Parameter(name = "type", in = "query", description = "Type of table {offline|realtime}",
+      required = true) String tableType)
       throws JsonProcessingException, JSONException {
 
-    return new PinotSegmentRestletResource().toggleSegmentState(tableName, null, "drop", null);
+    Validate.isTrue(!StringUtils.containsIgnoreCase(tableName, "_OFFLINE") && !StringUtils.containsIgnoreCase(tableName, "_REALTIME"));
+    Validate.notNull(tableType, "tableType can't be null");
+    return new PinotSegmentRestletResource().toggleSegmentState(tableName, null, StateType.DROP.toString(), tableType);
   }
 
   /**
