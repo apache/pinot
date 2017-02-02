@@ -130,15 +130,6 @@ public class FetchAnomaliesInRangeAndOutputCSV {
    *             6: Output path
    */
   public static void main(String args[]){
-    args = new String[]{
-        "/home/ychung/workspace/thirdeye-configs/local-configs/persistence.yml",
-        "invite_sends_v2_additive",
-        "m2g_invite_sent",
-        "2017-01-23",
-        "America/Los_Angeles",
-        "250",
-        "/home/ychung/Desktop/anomalyResults/"
-    };
     if(args.length < 7){
       LOG.error("Insufficient number of arguments");
       return;
