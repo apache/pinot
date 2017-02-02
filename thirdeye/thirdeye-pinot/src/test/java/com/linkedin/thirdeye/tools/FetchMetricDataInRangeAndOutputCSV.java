@@ -5,6 +5,7 @@ import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.joda.time.DateTime;
@@ -43,41 +44,64 @@ public class FetchMetricDataInRangeAndOutputCSV {
       System.out.println("Error: Insufficient number of arguments");
       return;
     }
-    String path2PersistenceFile = args[0];
-    String dataset = args[1];
-    String metric = args[2];
-    String aggTimeGranularity = args[6];
+
+
+    // Put arguments in Map
+    Map<String, String> argMap = new HashMap<>();
+    argMap.put("persistenceFile", args[0]);
+    argMap.put("collectionName", args[1]);
+    argMap.put("metricName", args[2]);
+    argMap.put("monitoringTime", args[3]);
+    argMap.put("timezone", args[4]);
+    argMap.put("monitorLength", args[5]);
+    argMap.put("timeGranularity", args[6]);
+    argMap.put("dimensions", args[7]);
+    argMap.put("filterJson", args[8]);
+    argMap.put("outputPath", args[9]);
+
+    String path2PersistenceFile = argMap.get("persistenceFile");
+    String dataset = argMap.get("collectionName");;
+    String metric = argMap.get("metricName");;
+    String aggTimeGranularity = argMap.get("timeGranularity");;
     TimeGranularity timeGranularity = TimeGranularity.fromString(aggTimeGranularity);
+    File output_folder = new File(argMap.get("outputPath"));
+
+    if(!output_folder.exists() || !output_folder.canWrite()){
+      LOG.error("{} is not accessible", output_folder.getAbsoluteFile());
+      return;
+    }
 
     if(timeGranularity == null){
       LOG.error("Illegal time granularity");
       return;
     }
+
     // Training data range
     Period period = null;
     switch (timeGranularity) {
       case DAYS:
-        period = new Period(0, 0, 0, Integer.valueOf(args[5]), 0, 0, 0, 0);
+        period = new Period(0, 0, 0, Integer.valueOf(argMap.get("monitorLength")), 0, 0, 0, 0);
         break;
       case HOURS:
-        period = new Period(0, 0, 0, 0, Integer.valueOf(args[5]), 0, 0, 0);
+        period = new Period(0, 0, 0, 0, Integer.valueOf(argMap.get("monitorLength")), 0, 0, 0);
         break;
       case MINUTES:
-        period = new Period(0, 0, 0, 0, 0, Integer.valueOf(args[5]), 0, 0);
+        period = new Period(0, 0, 0, 0, 0, Integer.valueOf(argMap.get("monitorLength")), 0, 0);
         break;
 
     }
-    DateTimeZone dateTimeZone = DateTimeZone.forID(args[4]);
-    DateTime monitoringWindowStartTime = ISODateTimeFormat.dateTimeParser().parseDateTime(args[3]).withZone(dateTimeZone);
+    DateTimeZone dateTimeZone = DateTimeZone.forID(argMap.get("timezone"));
+    DateTime monitoringWindowStartTime = ISODateTimeFormat.dateTimeParser()
+        .parseDateTime(argMap.get("monitoringTime")).withZone(dateTimeZone);
     DateTime dataRangeStart = monitoringWindowStartTime.minus(period); // inclusive start
     DateTime dataRangeEnd = monitoringWindowStartTime; // exclusive end
-    String dimensions = args[7];
-    String filters = args[8];
+    String dimensions = argMap.get("dimensions");
+    String filters = argMap.get("filterJson");
     DateTimeFormatter fmt = DateTimeFormat.forPattern("yyyy-MM-dd HH:mm");
 
 
 
-    String fname = metric + "_" + fmt.print(dataRangeStart) + "_" + fmt.print(dataRangeEnd) + ".csv";
+    String fname = output_folder.getAbsolutePath() + metric + "_" + fmt.print(dataRangeStart) + "_" + fmt.print(dataRangeEnd) + ".csv";
     Map<String, Map<Long, String>> metricContent;
     try {
       FetchMetricDataAndExistingAnomaliesTool thirdEyeDAO = new FetchMetricDataAndExistingAnomaliesTool(new File(path2PersistenceFile));
@@ -86,7 +110,7 @@ public class FetchMetricDataInRangeAndOutputCSV {
           FetchMetricDataAndExistingAnomaliesTool.TimeGranularity.fromString(aggTimeGranularity), dimensions,
           filters, dateTimeZone.getID());
 
-      BufferedWriter bw = new BufferedWriter(new FileWriter(args[9] + fname));
+      BufferedWriter bw = new BufferedWriter(new FileWriter(fname));
 
       List<String> keys = new ArrayList<>(metricContent.keySet());
       List<Long> dateTimes = new ArrayList<>(metricContent.get(keys.get(0)).keySet());

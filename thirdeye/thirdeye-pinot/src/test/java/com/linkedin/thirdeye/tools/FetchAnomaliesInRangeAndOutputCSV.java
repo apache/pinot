@@ -30,6 +30,9 @@ public class FetchAnomaliesInRangeAndOutputCSV {
   private static AnomalyFunctionManager anomalyFunctionDAO;
   private static MergedAnomalyResultManager mergedAnomalyResultDAO;
   private static RawAnomalyResultManager rawAnomalyResultDAO;
+  private static DateTime dataRangeStart;
+  private static DateTime dataRangeEnd;
+  private static DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern("yyyy-MM-dd HH:mm");
 
   public static void init(File persistenceFile) throws Exception {
     DaoProviderUtil.init(persistenceFile);
@@ -41,22 +44,79 @@ public class FetchAnomaliesInRangeAndOutputCSV {
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl.class);
   }
 
-  public static void outputResultNodesToFile(File outputFile, List<FetchMetricDataAndExistingAnomaliesTool.ResultNode> resultNodes)
-    throws IOException{
-    BufferedWriter bw = new BufferedWriter(new FileWriter(outputFile));
+  public static void outputResultNodesToFile(File outputFile,
+      List<FetchMetricDataAndExistingAnomaliesTool.ResultNode> resultNodes){
+    try{
+      BufferedWriter bw = new BufferedWriter(new FileWriter(outputFile));
 
-    int rowCount = 0;
-    if(resultNodes.size() > 0) {
-      bw.write(String.join(",", resultNodes.get(0).getSchema()));
-      bw.newLine();
-      for (FetchMetricDataAndExistingAnomaliesTool.ResultNode n : resultNodes) {
-        bw.write(n.toString());
+      int rowCount = 0;
+      if(resultNodes.size() > 0) {
+        bw.write(String.join(",", resultNodes.get(0).getSchema()));
         bw.newLine();
-        rowCount++;
+        for (FetchMetricDataAndExistingAnomaliesTool.ResultNode n : resultNodes) {
+          bw.write(n.toString());
+          bw.newLine();
+          rowCount++;
+        }
+        LOG.info("{} anomaly results has been written...", rowCount);
       }
-      LOG.info("{} anomaly results has been written...", rowCount);
+      bw.close();
     }
-    bw.close();
+    catch (IOException e){
+      LOG.error("Unable to write date-dimension anomaly results to given file {}", e);
+    }
+  }
+
+  public static void outputDimensionDateTableToFile(File outputFile,
+      List<FetchMetricDataAndExistingAnomaliesTool.ResultNode> resultNodes){
+    Set<String> functionIdDimension = new HashSet<>();
+    Map<String, Map<String, Double>> functionIdDimension_VS_Date_Severity = new HashMap<>();
+
+    LOG.info("Loading date-dimension anomaly results from db...");
+
+    for (FetchMetricDataAndExistingAnomaliesTool.ResultNode n : resultNodes){
+      String key = n.functionId + "," + n.dimensionString();
+      String anomalyStartTime = dateTimeFormatter.print(n.startTime);
+      if(!functionIdDimension_VS_Date_Severity.containsKey(key)){
+        functionIdDimension_VS_Date_Severity.put(key, new HashMap<String, Double>());
+      }
+      Map<String, Double> targetMap = functionIdDimension_VS_Date_Severity.get(key);
+      targetMap.put(anomalyStartTime, n.severity);
+      functionIdDimension.add(key);
+    }
+
+    try {
+      BufferedWriter bw = new BufferedWriter(new FileWriter(outputFile));
+      List<String> schemas = new ArrayList<>(functionIdDimension);
+      Collections.sort(schemas);
+
+      LOG.info("Printing raw anomaly results from db...");
+
+      // Write Schema
+      bw.write("functionId,dimension");
+      for (DateTime curr = dataRangeStart; curr.isBefore(dataRangeEnd); curr = curr.plusDays(1)) {
+        String currDate = dateTimeFormatter.print(curr);
+        bw.write("," + currDate);
+      }
+      bw.newLine();
+
+      for (String schema : schemas) {
+        bw.write(schema);
+        Map<String, Double> targetMap = functionIdDimension_VS_Date_Severity.get(schema);
+        for (DateTime curr = dataRangeStart; curr.isBefore(dataRangeEnd); curr = curr.plusDays(1)) {
+          String currDate = dateTimeFormatter.print(curr);
+          bw.write(",");
+          if (targetMap.containsKey(currDate)) {
+            bw.write(Double.toString(targetMap.get(currDate) * 100));
+          }
+        }
+        bw.newLine();
+      }
+      bw.close();
+    }
+    catch (IOException e){
+      LOG.error("Unable to write date-dimension anomaly results to given file {}", e);
+    }
   }
   /**
    * Ouput merged anomaly results for given metric and time range
@@ -74,113 +134,71 @@ public class FetchAnomaliesInRangeAndOutputCSV {
       LOG.error("Insufficient number of arguments");
       return;
     }
+    // Put arguments in Map
+    Map<String, String> argMap = new HashMap<>();
+    argMap.put("persistenceFile", args[0]);
+    argMap.put("collectionName", args[1]);
+    argMap.put("metricName", args[2]);
+    argMap.put("monitoringTime", args[3]);
+    argMap.put("timezone", args[4]);
+    argMap.put("monitorLength", args[5]);
+    argMap.put("outputPath", args[6]);
 
     FetchMetricDataAndExistingAnomaliesTool thirdEyeDAO = null;
     try {
-      thirdEyeDAO = new FetchMetricDataAndExistingAnomaliesTool(new File(args[0]));
+      thirdEyeDAO = new FetchMetricDataAndExistingAnomaliesTool(new File(argMap.get("persistenceFile")));
     }
     catch (Exception e){
       LOG.error("Error in loading the persistence file: {}", e);
       return;
     }
 
-    String collection = args[1];
-    String metric = args[2];
-    String output_folder = args[6];
-    DateTimeZone dateTimeZone = DateTimeZone.forID(args[4]);
+    String collection = argMap.get("collectionName");
+    String metric = argMap.get("metricName");
+    File output_folder = new File(argMap.get("outputPath"));
+    DateTimeZone dateTimeZone = DateTimeZone.forID(argMap.get("timezone"));
     DateTime monitoringWindowStartTime = ISODateTimeFormat.dateTimeParser().parseDateTime(args[3]).withZone(dateTimeZone);
-    Period period = new Period(0, 0, 0, Integer.valueOf(args[5]), 0, 0, 0, 0);
-    DateTime dataRangeStart = monitoringWindowStartTime.minus(period); // inclusive start
-    DateTime dataRangeEnd = monitoringWindowStartTime; // exclusive end
+    Period period = new Period(0, 0, 0, Integer.valueOf(argMap.get("monitorLength")), 0, 0, 0, 0);
+    dataRangeStart = monitoringWindowStartTime.minus(period); // inclusive start
+    dataRangeEnd = monitoringWindowStartTime; // exclusive end
 
-    if(args.length >= 6 && (new File(args[5])).exists()){
-      output_folder = args[5];
+    if(!output_folder.exists() || !output_folder.canWrite()){
+      LOG.error("{} is not accessible", output_folder.getAbsoluteFile());
+      return;
     }
 
-    DateTimeFormatter fmt = DateTimeFormat.forPattern("yyyy-MM-dd HH:mm");
 
     // Print Merged Results
     List<FetchMetricDataAndExistingAnomaliesTool.ResultNode> resultNodes = thirdEyeDAO.fetchMergedAnomaliesInRange(
         collection, metric, dataRangeStart, dataRangeEnd);
 
-    LOG.info("Printing merged anaomaly results from db...");
-    String outputname = output_folder +
-        "merged_" + args[1] + "_" + fmt.print(dataRangeStart) + "_" + fmt.print(dataRangeEnd) + ".csv";
-    try {
-      outputResultNodesToFile(new File(outputname), resultNodes);
-    }
-    catch (IOException e){
-      LOG.error("Unable to output merged anomaly results to given file {}", e);
-    }
-    LOG.info("Finish job of printing merged anaomaly results from db...");
+    LOG.info("Printing merged anomaly results from db...");
+    String outputname = output_folder.getAbsolutePath() +
+        "merged_" + args[1] + "_" + dateTimeFormatter.print(dataRangeStart) +
+        "_" + dateTimeFormatter.print(dataRangeEnd) + ".csv";
+    outputResultNodesToFile(new File(outputname), resultNodes);
+    LOG.info("Finish job and print merged anomaly results from db in {}...", outputname);
 
 
     resultNodes.clear();
     // Print Raw Results
     resultNodes = thirdEyeDAO.fetchRawAnomaliesInRange(collection, metric, dataRangeStart, dataRangeEnd);
 
-    LOG.info("Printing raw anaomaly results from db...");
-    outputname = output_folder +
-        "raw_" + args[1] + "_" + fmt.print(dataRangeStart) + "_" + fmt.print(dataRangeEnd) + ".csv";
-    try {
-      outputResultNodesToFile(new File(outputname), resultNodes);
-    }
-    catch (IOException e){
-      LOG.error("Unable to output raw anomaly results to given file {}", e);
-    }
-    LOG.info("Finish job of printing raw anaomaly results from db...");
+    LOG.info("Printing raw anomaly results from db...");
+    outputname = output_folder.getAbsolutePath() +
+        "raw_" + args[1] + "_" + dateTimeFormatter.print(dataRangeStart) +
+        "_" + dateTimeFormatter.print(dataRangeEnd) + ".csv";
+    outputResultNodesToFile(new File(outputname), resultNodes);
+    LOG.info("Finish job and print raw anomaly results from db in {}...", outputname);
 
     // Print date vs dimension table
-    outputname = output_folder +
-        "date_dimension_" + args[1] + "_" + fmt.print(dataRangeStart) + "_" + fmt.print(dataRangeEnd) + ".csv";
+    outputname = output_folder.getAbsolutePath() +
+        "date_dimension_" + args[1] + "_" + dateTimeFormatter.print(dataRangeStart) +
+        "_" + dateTimeFormatter.print(dataRangeEnd) + ".csv";
 
-    Set<String> functionIdDimension = new HashSet<>();
-    Map<String, Map<String, Double>> functionIdDimension_VS_Date_Severity = new HashMap<>();
-
-    LOG.info("Loading date-dimension anaomaly results from db...");
-    for (FetchMetricDataAndExistingAnomaliesTool.ResultNode n : resultNodes){
-      String key = n.functionId + "," + n.dimensionString();
-      String anomalyStartTime = fmt.print(n.startTime);
-      if(!functionIdDimension_VS_Date_Severity.containsKey(key)){
-        functionIdDimension_VS_Date_Severity.put(key, new HashMap<String, Double>());
-      }
-      Map<String, Double> targetMap = functionIdDimension_VS_Date_Severity.get(key);
-      targetMap.put(anomalyStartTime, n.severity);
-      functionIdDimension.add(key);
-    }
-
-    LOG.info("Printing date-dimension anaomaly results from db...");
-    try {
-      BufferedWriter bw = new BufferedWriter(new FileWriter(outputname));
-      List<String> schemas = new ArrayList<>(functionIdDimension);
-      Collections.sort(schemas);
-
-      // Write Schema
-      bw.write("functionId,dimension");
-      for(DateTime curr = dataRangeStart; curr.isBefore(dataRangeEnd); curr = curr.plusDays(1)){
-        String currDate = fmt.print(curr);
-        bw.write("," + currDate);
-      }
-      bw.newLine();
-
-      for (String schema : schemas){
-        bw.write(schema);
-        Map<String, Double> targetMap = functionIdDimension_VS_Date_Severity.get(schema);
-        for (DateTime curr = dataRangeStart; curr.isBefore(dataRangeEnd); curr = curr.plusDays(1)) {
-          String currDate = fmt.print(curr);
-          bw.write(",");
-          if(targetMap.containsKey(currDate)){
-            bw.write(Double.toString(targetMap.get(currDate)*100));
-          }
-        }
-        bw.newLine();
-      }
-      bw.close();
-    }
-    catch (IOException e){
-      LOG.error("Unable to write date-dimension anomaly results to given file {}", e);
-    }
-    LOG.info("Finish job of printing date-dimension anaomaly results from db...");
+    LOG.info("Printing date-dimension anomaly results from db...");
+    outputDimensionDateTableToFile(new File(outputname), resultNodes);
+    LOG.info("Finish job and print date-dimension anomaly results from db in {}...", outputname);
     return;
   }
 

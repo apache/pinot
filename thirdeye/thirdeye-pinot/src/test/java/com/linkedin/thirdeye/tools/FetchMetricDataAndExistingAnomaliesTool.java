@@ -228,6 +228,8 @@ public class FetchMetricDataAndExistingAnomaliesTool {
   private final String GRANULARITY = "aggTimeGranularity";
   private final String DIMENSIONS = "dimensions"; // separate by comma
   private final String FILTERS = "filters";
+  private final String EQUALS = "=";
+  private final String AND = "&";
   public enum TimeGranularity{
     DAYS ("DAYS"),
     HOURS ("HOURS"),
@@ -274,17 +276,17 @@ public class FetchMetricDataAndExistingAnomaliesTool {
     endTime = new DateTime(endTime, dateTimeZone);
     // format http GET command
     StringBuilder urlBuilder = new StringBuilder(host + ":" + port + DEFAULT_PATH_TO_TIMESERIES);
-    urlBuilder.append(DATASET + "=" + dataset + "&");
-    urlBuilder.append(METRIC + "=" + metric + "&");
-    urlBuilder.append(VIEW + "=" + DEFAULT_VIEW + "&");
-    urlBuilder.append(TIME_START + "=" + Long.toString(startTime.getMillis()) + "&");
-    urlBuilder.append(TIME_END + "=" + Long.toString(endTime.getMillis()) + "&");
-    urlBuilder.append(GRANULARITY + "=" + timeGranularity.toString() + "&");
+    urlBuilder.append(DATASET + EQUALS + dataset + AND);
+    urlBuilder.append(METRIC + EQUALS + metric + AND);
+    urlBuilder.append(VIEW + EQUALS + DEFAULT_VIEW + AND);
+    urlBuilder.append(TIME_START + EQUALS + Long.toString(startTime.getMillis()) + AND);
+    urlBuilder.append(TIME_END + EQUALS + Long.toString(endTime.getMillis()) + AND);
+    urlBuilder.append(GRANULARITY + EQUALS + timeGranularity.toString() + AND);
     if (dimensions != null || !dimensions.isEmpty()) {
-      urlBuilder.append(DIMENSIONS + "=" + dimensions + "&");
+      urlBuilder.append(DIMENSIONS + EQUALS + dimensions + AND);
     }
     if (filterJson != null || !filterJson.isEmpty()) {
-      urlBuilder.append(FILTERS + "=" + URLEncoder.encode(filterJson, "UTF-8"));
+      urlBuilder.append(FILTERS + EQUALS + URLEncoder.encode(filterJson, "UTF-8"));
     }
 
     HttpGet httpGet = new HttpGet(urlBuilder.toString());
