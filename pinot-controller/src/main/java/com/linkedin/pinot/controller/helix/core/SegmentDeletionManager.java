@@ -18,8 +18,11 @@ package com.linkedin.pinot.controller.helix.core;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
@@ -71,11 +74,11 @@ public class SegmentDeletionManager {
     _executorService.shutdownNow();
   }
 
-  public void deleteSegments(final String tableName, final List<String> segmentIds) {
+  public void deleteSegments(final String tableName, final Collection<String> segmentIds) {
     deleteSegmentsWithDelay(tableName, segmentIds, DEFAULT_DELETION_DELAY_SECONDS);
   }
 
-  protected void deleteSegmentsWithDelay(final String tableName, final List<String> segmentIds,
+  protected void deleteSegmentsWithDelay(final String tableName, final Collection<String> segmentIds,
       final long deletionDelaySeconds) {
     _executorService.schedule(new Runnable() {
       @Override
@@ -85,7 +88,7 @@ public class SegmentDeletionManager {
     }, deletionDelaySeconds, TimeUnit.SECONDS);
   }
 
-  protected synchronized void deleteSegmentFromPropertyStoreAndLocal(String tableName, List<String> segmentIds, long deletionDelay) {
+  protected synchronized void deleteSegmentFromPropertyStoreAndLocal(String tableName, Collection<String> segmentIds, long deletionDelay) {
     // Check if segment got removed from ExternalView and IdealStates
     if (_helixAdmin.getResourceExternalView(_helixClusterName, tableName) == null
         || _helixAdmin.getResourceIdealState(_helixClusterName, tableName) == null) {
@@ -94,7 +97,7 @@ public class SegmentDeletionManager {
     }
 
     List<String> segmentsToDelete = new ArrayList<>(segmentIds.size());
-    List<String> segmentsToRetryLater = new ArrayList<>(segmentIds.size());
+    Set<String> segmentsToRetryLater = new HashSet<>(segmentIds.size());
 
     try {
       ExternalView externalView = _helixAdmin.getResourceExternalView(_helixClusterName, tableName);
@@ -112,7 +115,8 @@ public class SegmentDeletionManager {
       }
     } catch (Exception e) {
       LOGGER.warn("Caught exception while checking helix states for table {} " + tableName, e);
-      segmentsToDelete = segmentIds;
+      segmentsToDelete.clear();
+      segmentsToDelete.addAll(segmentIds);
       segmentsToRetryLater.clear();
     }
 
@@ -124,13 +128,11 @@ public class SegmentDeletionManager {
         propStorePathList.add(segmentPropertyStorePath);
       }
 
-      boolean[] status = _propertyStore.remove(propStorePathList, AccessOption.PERSISTENT);
-      int nPropstoreDeleteFailed = 0;
-      for (int i = 0; i < status.length; i++) {
-        if (!status[i]) {
+      boolean[] deleteSuccessful = _propertyStore.remove(propStorePathList, AccessOption.PERSISTENT);
+      for (int i = 0; i < deleteSuccessful.length; i++) {
+        if (!deleteSuccessful[i]) {
           // remove API can fail because the prop store entry did not exist, so check first.
           if (_propertyStore.exists(propStorePathList.get(i), AccessOption.PERSISTENT)) {
-            nPropstoreDeleteFailed++;
             LOGGER.info("Could not delete {} from propertystore", propStorePathList.get(i));
             segmentsToRetryLater.add(segmentsToDelete.get(i));
           }
@@ -138,7 +140,7 @@ public class SegmentDeletionManager {
       }
 
       for (String segmentId : segmentsToDelete) {
-        if (segmentsToRetryLater.indexOf(segmentId) < 0) {
+        if (!segmentsToRetryLater.contains(segmentId)) {
           // This segment does NOT appear in retry.
           removeSegmentFromStore(tableName, segmentId);
           nSegmentsDeleted++;

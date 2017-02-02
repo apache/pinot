@@ -17,6 +17,7 @@
 package com.linkedin.pinot.controller.helix.core.util;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -188,7 +189,7 @@ public class SegmentDeletionManagerTest {
       segmentsRemovedFromStore.add(segmentId);
     }
     @Override
-    protected void deleteSegmentsWithDelay(final String tableName, final List<String> segmentIds,
+    protected void deleteSegmentsWithDelay(final String tableName, final Collection<String> segmentIds,
         final long deletionDelaySeconds) {
       segmentsToRetry.addAll(segmentIds);
     }
