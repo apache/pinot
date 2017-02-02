@@ -16,11 +16,12 @@
 
 package com.linkedin.pinot.common.utils;
 
+import com.google.common.collect.ComparisonChain;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 
 
-public class LLCSegmentName extends SegmentName implements Comparable {
+public class LLCSegmentName extends SegmentName implements Comparable<LLCSegmentName> {
   private final static String DATE_FORMAT = "yyyyMMdd'T'HHmm'Z'";
   private final String _tableName;
   private final int _partitionId;
@@ -94,28 +95,18 @@ public class LLCSegmentName extends SegmentName implements Comparable {
   }
 
   @Override
-  public int compareTo(Object o) {
-    LLCSegmentName other = (LLCSegmentName)o;
+  public int compareTo(final LLCSegmentName other) {
     if (!this.getTableName().equals(other.getTableName())) {
-      throw new RuntimeException("Cannot compare segment names " + this.getSegmentName() + " and " + other.getSegmentName());
+      throw new RuntimeException(
+          "Cannot compare segment names from different tables: " + this.getSegmentName() + " and "
+              + other.getSegmentName());
     }
-    if (this.getPartitionId() > other.getPartitionId()) {
-      return 1;
-    } else if (this.getPartitionId() < other.getPartitionId()) {
-      return -1;
-    } else {
-      if (this.getSequenceNumber() > other.getSequenceNumber()) {
-        return 1;
-      } else if (this.getSequenceNumber() < other.getSequenceNumber()) {
-        return -1;
-      } else {
-        if (!this.getCreationTime().equals(other.getCreationTime())) {
-          // If sequence number is the same, time cannot be different.
-          throw new RuntimeException("Cannot compare segment names " + this.getSegmentName() + " and " + other.getSegmentName());
-        }
-        return 0;
-      }
-    }
+
+    return ComparisonChain.start()
+        .compare(this.getPartitionId(), other.getPartitionId())
+        .compare(this.getSequenceNumber(), other.getSequenceNumber())
+        .compare(this.getCreationTime(), other.getCreationTime())
+        .result();
   }
 
   @Override
