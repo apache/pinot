@@ -23,6 +23,7 @@ import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.ISODateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import scala.Int;
 
 
 public class FetchAnomaliesInRangeAndOutputCSV {
@@ -134,31 +135,26 @@ public class FetchAnomaliesInRangeAndOutputCSV {
       LOG.error("Insufficient number of arguments");
       return;
     }
-    // Put arguments in Map
-    Map<String, String> argMap = new HashMap<>();
-    argMap.put("persistenceFile", args[0]);
-    argMap.put("collectionName", args[1]);
-    argMap.put("metricName", args[2]);
-    argMap.put("monitoringTime", args[3]);
-    argMap.put("timezone", args[4]);
-    argMap.put("monitorLength", args[5]);
-    argMap.put("outputPath", args[6]);
+
+    String persistencePath = args[0];
+    String collection = args[1];
+    String metric = args[2];
+    String monitoringDateTime = args[3];
+    DateTimeZone dateTimeZone = DateTimeZone.forID(args[4]);
+    int monitoringLength = Integer.valueOf(args[5]);
+    File output_folder = new File(args[6]);
 
     FetchMetricDataAndExistingAnomaliesTool thirdEyeDAO = null;
     try {
-      thirdEyeDAO = new FetchMetricDataAndExistingAnomaliesTool(new File(argMap.get("persistenceFile")));
+      thirdEyeDAO = new FetchMetricDataAndExistingAnomaliesTool(new File(persistencePath));
     }
     catch (Exception e){
       LOG.error("Error in loading the persistence file: {}", e);
       return;
     }
 
-    String collection = argMap.get("collectionName");
-    String metric = argMap.get("metricName");
-    File output_folder = new File(argMap.get("outputPath"));
-    DateTimeZone dateTimeZone = DateTimeZone.forID(argMap.get("timezone"));
-    DateTime monitoringWindowStartTime = ISODateTimeFormat.dateTimeParser().parseDateTime(args[3]).withZone(dateTimeZone);
-    Period period = new Period(0, 0, 0, Integer.valueOf(argMap.get("monitorLength")), 0, 0, 0, 0);
+    DateTime monitoringWindowStartTime = ISODateTimeFormat.dateTimeParser().parseDateTime(monitoringDateTime).withZone(dateTimeZone);
+    Period period = new Period(0, 0, 0, monitoringLength, 0, 0, 0, 0);
     dataRangeStart = monitoringWindowStartTime.minus(period); // inclusive start
     dataRangeEnd = monitoringWindowStartTime; // exclusive end
 
@@ -174,7 +170,7 @@ public class FetchAnomaliesInRangeAndOutputCSV {
 
     LOG.info("Printing merged anomaly results from db...");
     String outputname = output_folder.getAbsolutePath() + "/" +
-        "merged_" + args[1] + "_" + dateTimeFormatter.print(dataRangeStart) +
+        "merged_" + metric + "_" + dateTimeFormatter.print(dataRangeStart) +
         "_" + dateTimeFormatter.print(dataRangeEnd) + ".csv";
     outputResultNodesToFile(new File(outputname), resultNodes);
     LOG.info("Finish job and print merged anomaly results from db in {}...", outputname);
@@ -186,14 +182,14 @@ public class FetchAnomaliesInRangeAndOutputCSV {
 
     LOG.info("Printing raw anomaly results from db...");
     outputname = output_folder.getAbsolutePath() + "/" +
-        "raw_" + args[1] + "_" + dateTimeFormatter.print(dataRangeStart) +
+        "raw_" + metric + "_" + dateTimeFormatter.print(dataRangeStart) +
         "_" + dateTimeFormatter.print(dataRangeEnd) + ".csv";
     outputResultNodesToFile(new File(outputname), resultNodes);
     LOG.info("Finish job and print raw anomaly results from db in {}...", outputname);
 
     // Print date vs dimension table
     outputname = output_folder.getAbsolutePath() + "/" +
-        "date_dimension_" + args[1] + "_" + dateTimeFormatter.print(dataRangeStart) +
+        "date_dimension_" + metric + "_" + dateTimeFormatter.print(dataRangeStart) +
         "_" + dateTimeFormatter.print(dataRangeEnd) + ".csv";
 
     LOG.info("Printing date-dimension anomaly results from db...");
