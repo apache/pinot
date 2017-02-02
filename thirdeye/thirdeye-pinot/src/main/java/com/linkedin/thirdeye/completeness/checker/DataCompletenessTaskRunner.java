@@ -38,7 +38,7 @@ public class DataCompletenessTaskRunner implements TaskRunner {
   private static final Logger LOG = LoggerFactory.getLogger(DataCompletenessTaskRunner.class);
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
-  private static DataCompletenessConfigManager DC = DAO_REGISTRY.getDataCompletenessConfigDAO();
+  private static final DataCompletenessConfigManager DC = DAO_REGISTRY.getDataCompletenessConfigDAO();
 
   @Override
   public List<TaskResult> execute(TaskInfo taskInfo, TaskContext taskContext) throws Exception {
