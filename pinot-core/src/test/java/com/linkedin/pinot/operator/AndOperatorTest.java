@@ -15,20 +15,17 @@
  */
 package com.linkedin.pinot.operator;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import org.testng.annotations.Test;
-
 import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Constants;
-import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
 import com.linkedin.pinot.core.operator.filter.AndOperator;
 import com.linkedin.pinot.core.operator.filter.BaseFilterOperator;
 import com.linkedin.pinot.core.operator.filter.OrOperator;
+import java.util.ArrayList;
+import java.util.List;
+import org.testng.annotations.Test;
 
 
 public class AndOperatorTest {
@@ -37,7 +34,7 @@ public class AndOperatorTest {
   public void testIntersectionForTwoLists() {
     int[] list1 = new int[] { 2, 3, 10, 15, 16, 28 };
     int[] list2 = new int[] { 3, 6, 8, 20, 28 };
-    List<Operator> operators = new ArrayList<Operator>();
+    List<BaseFilterOperator> operators = new ArrayList<>();
     operators.add(makeFilterOperator(list1));
     operators.add(makeFilterOperator(list2));
     final AndOperator andOperator = new AndOperator(operators);
@@ -61,7 +58,7 @@ public class AndOperatorTest {
     int[] list2 = new int[] { 3, 6, 8, 20, 28 };
     int[] list3 = new int[] { 1, 2, 3, 6, 30 };
 
-    List<Operator> operators = new ArrayList<Operator>();
+    List<BaseFilterOperator> operators = new ArrayList<BaseFilterOperator>();
     operators.add(makeFilterOperator(list1));
     operators.add(makeFilterOperator(list2));
     operators.add(makeFilterOperator(list3));
@@ -87,12 +84,12 @@ public class AndOperatorTest {
     int[] list2 = new int[] { 3, 6, 8, 20, 28 };
     int[] list3 = new int[] { 1, 2, 3, 6, 30 };
 
-    List<Operator> operators = new ArrayList<Operator>();
+    List<BaseFilterOperator> operators = new ArrayList<>();
     operators.add(makeFilterOperator(list1));
     operators.add(makeFilterOperator(list2));
 
     final AndOperator andOperator1 = new AndOperator(operators);
-    List<Operator> operators1 = new ArrayList<Operator>();
+    List<BaseFilterOperator> operators1 = new ArrayList<>();
     operators1.add(andOperator1);
     operators1.add(makeFilterOperator(list3));
 
@@ -117,12 +114,12 @@ public class AndOperatorTest {
     int[] list2 = new int[] { 3, 6, 8, 20, 28 };
     int[] list3 = new int[] { 1, 2, 3, 6, 30 };
 
-    List<Operator> operators = new ArrayList<Operator>();
+    List<BaseFilterOperator> operators = new ArrayList<>();
     operators.add(makeFilterOperator(list3));
     operators.add(makeFilterOperator(list2));
 
     final OrOperator orOperator = new OrOperator(operators);
-    List<Operator> operators1 = new ArrayList<Operator>();
+    List<BaseFilterOperator> operators1 = new ArrayList<>();
     operators1.add(orOperator);
     operators1.add(makeFilterOperator(list1));
 
@@ -174,6 +171,11 @@ public class AndOperatorTest {
         alreadyInvoked = true;
 
         return new ArrayBasedFilterBlock(list);
+      }
+
+      @Override
+      public boolean isResultEmpty() {
+        return false;
       }
     };
   }

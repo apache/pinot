@@ -304,6 +304,11 @@ public class RawIndexBenchmark {
     }
 
     @Override
+    public boolean isResultEmpty() {
+      return false;
+    }
+
+    @Override
     public boolean open() {
       return true;
     }

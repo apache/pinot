@@ -15,24 +15,6 @@
  */
 package com.linkedin.pinot.core.operator.filter;
 
-import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
-import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import com.linkedin.pinot.core.startree.StarTreeIndexNodeInterf;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Queue;
-import java.util.Set;
-
-import org.roaringbitmap.buffer.MutableRoaringBitmap;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.google.common.collect.HashBiMap;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.GroupBy;
@@ -48,6 +30,22 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
 import com.linkedin.pinot.core.operator.dociditerators.BitmapDocIdIterator;
 import com.linkedin.pinot.core.operator.docidsets.FilterBlockDocIdSet;
+import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
+import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
+import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import com.linkedin.pinot.core.startree.StarTreeIndexNodeInterf;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Queue;
+import java.util.Set;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class StarTreeIndexOperator extends BaseFilterOperator {
@@ -142,7 +140,7 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
       return createBaseFilterBlock(bitmapDocIdIterator);
     }
 
-    List<Operator> matchingLeafOperators = buildMatchingLeafOperators();
+    List<BaseFilterOperator> matchingLeafOperators = buildMatchingLeafOperators();
     if (matchingLeafOperators.size() == 1) {
       BaseFilterOperator baseFilterOperator = (BaseFilterOperator) matchingLeafOperators.get(0);
       return baseFilterOperator.nextFilterBlock(blockId);
@@ -152,13 +150,18 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
     }
   }
 
+  @Override
+  public boolean isResultEmpty() {
+    return false;
+  }
+
   /**
    * Helper method to build a list of operators for matching leaf nodes.
    * - Finds all leaf nodes that match the predicates
    * - Iterates over all the matching leaf nodes, and generate a list of matching ranges
    * @return
    */
-  private List<Operator> buildMatchingLeafOperators() {
+  private List<BaseFilterOperator> buildMatchingLeafOperators() {
     int totalDocsToScan = 0;
     int numExactlyMatched = 0;
     long start = System.currentTimeMillis();
@@ -167,9 +170,9 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
     Queue<SearchEntry> matchedEntries = findMatchingLeafNodes();
 
     // Iterate over the matching nodes. For each column, generate the list of ranges.
-    List<Operator> matchingLeafOperators = new ArrayList<>();
+    List<BaseFilterOperator> matchingLeafOperators = new ArrayList<>();
     for (SearchEntry matchedEntry : matchedEntries) {
-      Operator matchingLeafOperator = null;
+      BaseFilterOperator matchingLeafOperator = null;
       StarTreeIndexNodeInterf matchedLeafNode = matchedEntry.starTreeIndexnode;
 
       int startDocId = matchedLeafNode.getStartDocumentId();
@@ -189,7 +192,7 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
         }
       } else {
         Map<String, PredicateEntry> remainingPredicatesMap = computeRemainingPredicates(matchedEntry);
-        List<Operator> filterOperators =
+        List<BaseFilterOperator> filterOperators =
             createFilterOperatorsForRemainingPredicates(matchedEntry, remainingPredicatesMap);
 
         if (filterOperators.size() == 0) {
@@ -260,6 +263,11 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
       public BaseFilterBlock nextFilterBlock(BlockId blockId) {
         return createBaseFilterBlock(new BitmapDocIdIterator(answer.getIntIterator()));
       }
+
+      @Override
+      public boolean isResultEmpty() {
+        return false;
+      }
     };
   }
 
@@ -270,12 +278,12 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
    * @param remainingPredicatesMap
    * @return
    */
-  private List<Operator> createFilterOperatorsForRemainingPredicates(SearchEntry matchedEntry,
+  private List<BaseFilterOperator> createFilterOperatorsForRemainingPredicates(SearchEntry matchedEntry,
       Map<String, PredicateEntry> remainingPredicatesMap) {
     int startDocId = matchedEntry.starTreeIndexnode.getStartDocumentId();
     int endDocId = matchedEntry.starTreeIndexnode.getEndDocumentId();
 
-    List<Operator> childOperators = new ArrayList<>();
+    List<BaseFilterOperator> childOperators = new ArrayList<>();
     for (String column : remainingPredicatesMap.keySet()) {
       PredicateEntry predicateEntry = remainingPredicatesMap.get(column);
 
@@ -310,16 +318,16 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
     DataSource dataSource = segment.getDataSource(column);
     DataSourceMetadata dataSourceMetadata = dataSource.getDataSourceMetadata();
     BaseFilterOperator childOperator;
+    Predicate predicate = predicateEntry.predicate;
     if (dataSourceMetadata.hasInvertedIndex()) {
       if (dataSourceMetadata.isSorted()) {
-        childOperator = new SortedInvertedIndexBasedFilterOperator(dataSource, startDocId, endDocId);
+        childOperator = new SortedInvertedIndexBasedFilterOperator(predicate, dataSource, startDocId, endDocId);
       } else {
-        childOperator = new BitmapBasedFilterOperator(dataSource, startDocId, endDocId);
+        childOperator = new BitmapBasedFilterOperator(predicate, dataSource, startDocId, endDocId);
       }
     } else {
-      childOperator = new ScanBasedFilterOperator(dataSource, startDocId, endDocId);
+      childOperator = new ScanBasedFilterOperator(predicate, dataSource, startDocId, endDocId);
     }
-    childOperator.setPredicate(predicateEntry.predicate);
     return childOperator;
   }
 
