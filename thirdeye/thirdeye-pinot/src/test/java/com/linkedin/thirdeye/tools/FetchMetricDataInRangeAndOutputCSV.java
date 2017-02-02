@@ -45,7 +45,6 @@ public class FetchMetricDataInRangeAndOutputCSV {
       return;
     }
 
-
     // Put arguments in Map
     Map<String, String> argMap = new HashMap<>();
     argMap.put("persistenceFile", args[0]);
@@ -101,10 +100,12 @@ public class FetchMetricDataInRangeAndOutputCSV {
 
 
 
-    String fname = output_folder.getAbsolutePath() + metric + "_" + fmt.print(dataRangeStart) + "_" + fmt.print(dataRangeEnd) + ".csv";
+    String fname = output_folder.getAbsolutePath() +  "/" +
+        metric + "_" + fmt.print(dataRangeStart) + "_" + fmt.print(dataRangeEnd) + ".csv";
     Map<String, Map<Long, String>> metricContent;
     try {
-      FetchMetricDataAndExistingAnomaliesTool thirdEyeDAO = new FetchMetricDataAndExistingAnomaliesTool(new File(path2PersistenceFile));
+      FetchMetricDataAndExistingAnomaliesTool thirdEyeDAO =
+          new FetchMetricDataAndExistingAnomaliesTool(new File(path2PersistenceFile));
       metricContent = thirdEyeDAO.fetchMetric(DEFAULT_HOST, Integer.valueOf(DEFAULT_PORT), dataset,
           metric, dataRangeStart, dataRangeEnd,
           FetchMetricDataAndExistingAnomaliesTool.TimeGranularity.fromString(aggTimeGranularity), dimensions,

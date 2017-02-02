@@ -130,6 +130,15 @@ public class FetchAnomaliesInRangeAndOutputCSV {
    *             6: Output path
    */
   public static void main(String args[]){
+    args = new String[]{
+        "/home/ychung/workspace/thirdeye-configs/local-configs/persistence.yml",
+        "invite_sends_v2_additive",
+        "m2g_invite_sent",
+        "2017-01-23",
+        "America/Los_Angeles",
+        "250",
+        "/home/ychung/Desktop/anomalyResults/"
+    };
     if(args.length < 7){
       LOG.error("Insufficient number of arguments");
       return;
@@ -173,7 +182,7 @@ public class FetchAnomaliesInRangeAndOutputCSV {
         collection, metric, dataRangeStart, dataRangeEnd);
 
     LOG.info("Printing merged anomaly results from db...");
-    String outputname = output_folder.getAbsolutePath() +
+    String outputname = output_folder.getAbsolutePath() + "/" +
         "merged_" + args[1] + "_" + dateTimeFormatter.print(dataRangeStart) +
         "_" + dateTimeFormatter.print(dataRangeEnd) + ".csv";
     outputResultNodesToFile(new File(outputname), resultNodes);
@@ -185,14 +194,14 @@ public class FetchAnomaliesInRangeAndOutputCSV {
     resultNodes = thirdEyeDAO.fetchRawAnomaliesInRange(collection, metric, dataRangeStart, dataRangeEnd);
 
     LOG.info("Printing raw anomaly results from db...");
-    outputname = output_folder.getAbsolutePath() +
+    outputname = output_folder.getAbsolutePath() + "/" +
         "raw_" + args[1] + "_" + dateTimeFormatter.print(dataRangeStart) +
         "_" + dateTimeFormatter.print(dataRangeEnd) + ".csv";
     outputResultNodesToFile(new File(outputname), resultNodes);
     LOG.info("Finish job and print raw anomaly results from db in {}...", outputname);
 
     // Print date vs dimension table
-    outputname = output_folder.getAbsolutePath() +
+    outputname = output_folder.getAbsolutePath() + "/" +
         "date_dimension_" + args[1] + "_" + dateTimeFormatter.print(dataRangeStart) +
         "_" + dateTimeFormatter.print(dataRangeEnd) + ".csv";
 
