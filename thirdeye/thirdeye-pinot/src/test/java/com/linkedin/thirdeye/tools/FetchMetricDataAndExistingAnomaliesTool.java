@@ -257,8 +257,8 @@ public class FetchMetricDataAndExistingAnomaliesTool {
    * @param port port number
    * @param dataset dataset/collection name
    * @param metric metric name
-   * @param startTime start time of requested data in ISO format
-   * @param endTime end time of requested data in ISO format
+   * @param startTime start time of requested data in DateTime
+   * @param endTime end time of requested data in DateTime
    * @param timeGranularity the time granularity
    * @param dimensions the list of dimensions
    * @param filterJson filters, in JSON

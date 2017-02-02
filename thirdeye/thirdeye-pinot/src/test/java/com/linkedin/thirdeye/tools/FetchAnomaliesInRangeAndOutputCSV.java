@@ -67,7 +67,7 @@ public class FetchAnomaliesInRangeAndOutputCSV {
    *             3: monitoring start time in ISO format
    *             4: timezone code
    *             5: monitoring length in days
-   *             6: (optional): Output path
+   *             6: Output path
    */
   public static void main(String args[]){
     if(args.length < 7){
@@ -134,27 +134,29 @@ public class FetchAnomaliesInRangeAndOutputCSV {
     outputname = output_folder +
         "date_dimension_" + args[1] + "_" + fmt.print(dataRangeStart) + "_" + fmt.print(dataRangeEnd) + ".csv";
 
-    Set<String> dimensions = new HashSet<>();
-    Map<String, Map<String, Double>> dimensionDateSeverity = new HashMap<>();
+    Set<String> functionIdDimension = new HashSet<>();
+    Map<String, Map<String, Double>> functionIdDimension_VS_Date_Severity = new HashMap<>();
 
     LOG.info("Loading date-dimension anaomaly results from db...");
     for (FetchMetricDataAndExistingAnomaliesTool.ResultNode n : resultNodes){
+      String key = n.functionId + "," + n.dimensionString();
       String anomalyStartTime = fmt.print(n.startTime);
-      if(!dimensionDateSeverity.containsKey(n.dimensionString())){
-        dimensionDateSeverity.put(n.dimensionString(), new HashMap<String, Double>());
+      if(!functionIdDimension_VS_Date_Severity.containsKey(key)){
+        functionIdDimension_VS_Date_Severity.put(key, new HashMap<String, Double>());
       }
-      Map<String, Double> targetMap = dimensionDateSeverity.get(n.dimensionString());
+      Map<String, Double> targetMap = functionIdDimension_VS_Date_Severity.get(key);
       targetMap.put(anomalyStartTime, n.severity);
-      dimensions.add(n.dimensionString());
+      functionIdDimension.add(key);
     }
 
     LOG.info("Printing date-dimension anaomaly results from db...");
     try {
       BufferedWriter bw = new BufferedWriter(new FileWriter(outputname));
-      List<String> schemas = new ArrayList<>(dimensions);
+      List<String> schemas = new ArrayList<>(functionIdDimension);
       Collections.sort(schemas);
 
       // Write Schema
+      bw.write("functionId,dimension");
       for(DateTime curr = dataRangeStart; curr.isBefore(dataRangeEnd); curr = curr.plusDays(1)){
         String currDate = fmt.print(curr);
         bw.write("," + currDate);
@@ -163,7 +165,7 @@ public class FetchAnomaliesInRangeAndOutputCSV {
 
       for (String schema : schemas){
         bw.write(schema);
-        Map<String, Double> targetMap = dimensionDateSeverity.get(schema);
+        Map<String, Double> targetMap = functionIdDimension_VS_Date_Severity.get(schema);
         for (DateTime curr = dataRangeStart; curr.isBefore(dataRangeEnd); curr = curr.plusDays(1)) {
           String currDate = fmt.print(curr);
           bw.write(",");
@@ -179,6 +181,7 @@ public class FetchAnomaliesInRangeAndOutputCSV {
       LOG.error("Unable to write date-dimension anomaly results to given file {}", e);
     }
     LOG.info("Finish job of printing date-dimension anaomaly results from db...");
+    return;
   }
 
 }

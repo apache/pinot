@@ -120,6 +120,10 @@ public class CleanupAndRegenerateAnomaliesTool {
 
     for (Long functionId : functionIds) {
       AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
+      if(anomalyFunction == null){
+        LOG.info("Requested functionId {} doesn't exist", functionId);
+        continue;
+      }
       LOG.info("Beginning cleanup of functionId {} collection {} metric {}",
           functionId, anomalyFunction.getCollection(), anomalyFunction.getMetric());
       // Find merged anomalies and delete them first
