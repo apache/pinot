@@ -374,7 +374,7 @@ public class HelixHelper {
         try {
           targetInstances = getInstancesForSegment.call();
         } catch (Exception e) {
-          LOGGER.error("Unable to get new instances for uploading segment {}, table {}", segmentName, tableName);
+          LOGGER.error("Unable to get new instances for uploading segment {}, table {}", segmentName, tableName, e);
           return null;
         }
 
