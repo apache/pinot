@@ -41,7 +41,7 @@ public class FetchMetricDataInRangeAndOutputCSV {
    */
   public static void main(String[] args){
     if(args.length < 10){
-      System.out.println("Error: Insufficient number of arguments");
+      LOG.error("Error: Insufficient number of arguments", new IllegalArgumentException());
       return;
     }
 
@@ -134,7 +134,7 @@ public class FetchMetricDataInRangeAndOutputCSV {
       bw.close();
     }
     catch (Exception e){
-      System.out.println(e.getMessage());
+      LOG.error("Unable to access file {}", fname, e);
     }
   }
 }

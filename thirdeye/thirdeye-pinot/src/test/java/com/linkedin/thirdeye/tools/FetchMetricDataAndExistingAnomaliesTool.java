@@ -120,7 +120,7 @@ public class FetchMetricDataAndExistingAnomaliesTool {
 
   public List<ResultNode> fetchMergedAnomaliesInRangeByFunctionId(long functionId, DateTime startTime, DateTime endTime){
     AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
-    System.out.println(String.format("Loading merged anaomaly results of functionId %s from db...", Long.toString(functionId)));
+    LOG.info("Loading merged anaomaly results of functionId {} from db...", functionId);
     List<ResultNode> resultNodes = new ArrayList<>();
 
     if(anomalyFunction == null){ // no such function
@@ -167,7 +167,7 @@ public class FetchMetricDataAndExistingAnomaliesTool {
 
   public List<ResultNode> fetchRawAnomaliesInRangeByFunctionId(long functionId, DateTime startTime, DateTime endTime){
     AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
-    System.out.println(String.format("Loading raw anaomaly results of functionId %s from db...", Long.toString(functionId)));
+    LOG.info(String.format("Loading raw anaomaly results of functionId {} from db...", Long.toString(functionId)));
     List<ResultNode> resultNodes = new ArrayList<>();
 
     if(anomalyFunction == null){ // no such function
@@ -202,7 +202,7 @@ public class FetchMetricDataAndExistingAnomaliesTool {
    */
   public List<ResultNode> fetchRawAnomaliesInRange(String collection, String metric, DateTime startTime, DateTime endTime){
     List<AnomalyFunctionDTO> anomalyFunctions = anomalyFunctionDAO.findAllByCollection(collection);
-    System.out.println("Loading raw anaomaly results from db...");
+    LOG.info("Loading raw anaomaly results from db...");
     List<ResultNode> resultNodes = new ArrayList<>();
 
 
@@ -296,7 +296,7 @@ public class FetchMetricDataAndExistingAnomaliesTool {
 
     HttpResponse response = client.execute(httpGet);
 
-    System.out.println("Response Code : " + response.getStatusLine().getStatusCode());
+    LOG.info("Response Code : {}", response.getStatusLine().getStatusCode());
 
     BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
 
