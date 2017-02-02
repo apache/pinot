@@ -22,18 +22,22 @@ DashboardController.prototype = {
 
   handleAppEvent : function() {
     console.log("DashboardController.handleAppEvent");
-    mode = HASH_SERVICE.get(HASH_PARAMS.DASHBOARD_MODE);
+    const mode = HASH_SERVICE.get(HASH_PARAMS.DASHBOARD_MODE);
     console.log("tabName:" + tabName + " mode: " + mode);
-    var controllerName;
-    if (mode == constants.DASHBOARD_MODE_METRIC_SUMMARY) {
-      this.dashboardModel.tabSelected = "dashboard_metric-summary-tab";
-      controllerName = 'metricSummary';
-    } else if (mode == constants.DASHBOARD_MODE_ANOMALY_SUMMARY) {
-      this.dashboardModel.tabSelected = "dashboard_anomaly-summary-tab";
-      controllerName = 'anomalySummary';
-    } else if (mode == constants.DASHBOARD_MODE_WOW_SUMMARY) {
-      this.dashboardModel.tabSelected = "dashboard_wow-summary-tab";
-      controllerName = 'wowSummary';
+    let controllerName;
+    switch(mode){
+      case constants.DASHBOARD_MODE_METRIC_SUMMARY:
+        this.dashboardModel.tabSelected = 'dashboard_metric-summary-tab';
+        controllerName = 'metricSummary';
+        break;
+      case constants.DASHBOARD_MODE_WOW_SUMMARY:
+        this.dashboardModel.tabSelected = 'dashboard_wow-summary-tab';
+        controllerName = 'wowSummary';
+        break;
+      default:
+        this.dashboardModel.tabSelected = 'dashboard_anomaly-summary-tab';
+        controllerName = 'anomalySummary';
+        break;
     }
     this.dashboardModel.dashboardName = HASH_SERVICE.get(HASH_PARAMS.DASHBOARD_DASHBOARD_NAME);
     this.dashboardModel.summaryDashboardId = HASH_SERVICE.get(HASH_PARAMS.DASHBOARD_SUMMARY_DASHBOARD_ID);
@@ -59,12 +63,14 @@ DashboardController.prototype = {
     }
     this.dashboardModel.mode = mode;
     HASH_SERVICE.set(HASH_PARAMS.DASHBOARD_MODE, mode);
+    HASH_SERVICE.refreshWindowHashForRouting('dashboard');
     HASH_SERVICE.routeTo('dashboard');
   },
 
   onDashboardSelectionEventHandler : function(sender, args) {
     console.log('dashboard selection event handler');
     HASH_SERVICE.update(args);
+    HASH_SERVICE.refreshWindowHashForRouting('dashboard');
     HASH_SERVICE.routeTo('dashboard');
   }
 

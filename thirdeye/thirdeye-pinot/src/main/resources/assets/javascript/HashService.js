@@ -110,26 +110,25 @@ HashService.prototype = {
     console.log('routeTo' + controllerName);
     this.currentControllerName = controllerName;
     this.currentController = this.controllerNameToControllerMap[controllerName];
-    this.refreshWindowHashForRouting(controllerName);
+    this.currentController.handleAppEvent();
   },
 
   /**
    * determine based on the hash change event if a transition is needed
-   * @param  {string} options.oldURL [oldURL of hash change event]
    * @param  {string} options.newURL [newURL of hash change event]
    * @return {boolean} - returns true if a transition is needed]
    */
-  shouldTransition({ oldURL, newURL }) {
-    const [_1, transitionFrom, paramsFrom]= oldURL.split(/(?:[#?]|[&]*rand)/);
-    const [_2, transitionTo, paramsTo] = newURL.split(/(?:[#?]|[&]*rand)/);
+  shouldTransition({ newURL }) {
+    const [, transitionTo, paramsTo] = newURL.split(/(?:[#?]|[&]*rand)/);
     const currentTab = HASH_SERVICE.get('tab');
+    const params = this.getParams();
 
-    if ((currentTab != transitionTo)) {
+    if ((currentTab !== transitionTo)) {
       return true;
     } else if (paramsTo) {
       for (let param of paramsTo.split('&')){
         const [key, value] = param.split('=');
-        if (this.params[key] != value) {
+        if (params[key] != value) {
           return true;
         }
       }
@@ -146,7 +145,6 @@ HashService.prototype = {
       console.log('OnHashChangeEventhandler');
       console.log(this.params);
       console.log(this.currentController);
-      this.currentController.handleAppEvent();
     }
   }
 };

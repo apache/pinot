@@ -61,6 +61,7 @@ AppController.prototype = {
     if (args.targetTab != args.previousTab) {
       args.targetTab = args.targetTab.replace("#", "");
       HASH_SERVICE.set("tab", args.targetTab);
+      HASH_SERVICE.refreshWindowHashForRouting('app');
       HASH_SERVICE.routeTo('app');
     }
   }
