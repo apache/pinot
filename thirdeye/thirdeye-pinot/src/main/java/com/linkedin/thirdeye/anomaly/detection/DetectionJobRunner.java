@@ -47,7 +47,7 @@ public class DetectionJobRunner implements Job {
   public static final String DETECTION_JOB_MONITORING_WINDOW_END_TIME = "DETECTION_JOB_MONITORING_WINDOW_END_TIME";
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
 
-  private final static DAORegistry DB = DAORegistry.getInstance();
+  private final static DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   private DetectionJobContext detectionJobContext;
 
@@ -110,7 +110,7 @@ public class DetectionJobRunner implements Job {
   private DateTime alignTimestampsToDataTimezone(DateTime inputDateTime, String collection) {
 
     try {
-      DatasetConfigDTO datasetConfig = DB.getDatasetConfigDAO().findByDataset(collection);
+      DatasetConfigDTO datasetConfig = DAO_REGISTRY.getDatasetConfigDAO().findByDataset(collection);
       TimeSpec timespec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
       TimeGranularity dataGranularity = timespec.getDataGranularity();
       String timeFormat = timespec.getFormat();
@@ -138,7 +138,7 @@ public class DetectionJobRunner implements Job {
       jobSpec.setWindowEndTime(monitoringWindowEndTime.getMillis());
       jobSpec.setScheduleStartTime(System.currentTimeMillis());
       jobSpec.setStatus(JobStatus.SCHEDULED);
-      jobExecutionId = DB.getJobDAO().save(jobSpec);
+      jobExecutionId = DAO_REGISTRY.getJobDAO().save(jobSpec);
 
       LOG.info("Created anomalyJobSpec {} with jobExecutionId {}", jobSpec,
           jobExecutionId);
@@ -170,7 +170,7 @@ public class DetectionJobRunner implements Job {
         taskSpec.setStartTime(System.currentTimeMillis());
         taskSpec.setTaskInfo(taskInfoJson);
         taskSpec.setJobId(detectionJobContext.getJobExecutionId());
-        long taskId = DB.getTaskDAO().save(taskSpec);
+        long taskId = DAO_REGISTRY.getTaskDAO().save(taskSpec);
         taskIds.add(taskId);
         LOG.info("Created anomalyTask {} with taskId {}", taskSpec, taskId);
       }
@@ -183,7 +183,7 @@ public class DetectionJobRunner implements Job {
   private AnomalyFunctionDTO getAnomalyFunctionSpec(Long anomalyFunctionId) {
     AnomalyFunctionDTO anomalyFunctionSpec = null;
     try {
-      anomalyFunctionSpec = DB.getAnomalyFunctionDAO().findById(anomalyFunctionId);
+      anomalyFunctionSpec = DAO_REGISTRY.getAnomalyFunctionDAO().findById(anomalyFunctionId);
     } catch (Exception e)  {
       LOG.error("Exception in getting anomalyFunctionSpec by id", e);
     }

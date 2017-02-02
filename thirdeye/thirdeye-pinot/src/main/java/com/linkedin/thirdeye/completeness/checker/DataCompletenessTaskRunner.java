@@ -38,8 +38,6 @@ public class DataCompletenessTaskRunner implements TaskRunner {
   private static final Logger LOG = LoggerFactory.getLogger(DataCompletenessTaskRunner.class);
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
-  private static final DataCompletenessConfigManager DC = DAO_REGISTRY.getDataCompletenessConfigDAO();
-
   @Override
   public List<TaskResult> execute(TaskInfo taskInfo, TaskContext taskContext) throws Exception {
     DataCompletenessTaskInfo dataCompletenessTaskInfo = (DataCompletenessTaskInfo) taskInfo;
@@ -146,12 +144,12 @@ public class DataCompletenessTaskRunner implements TaskRunner {
           DataCompletenessConstants.CLEANUP_TIMEUNIT);
       long cleanupOlderThanMillis = new DateTime().minus(cleanupOlderThanDuration).getMillis();
       List<DataCompletenessConfigDTO> findAllByTimeOlderThan =
-          DC.findAllByTimeOlderThan(cleanupOlderThanMillis);
+          DAO_REGISTRY.getDataCompletenessConfigDAO().findAllByTimeOlderThan(cleanupOlderThanMillis);
 
       LOG.info("Deleting {} entries older than {} i.e. {}",
           findAllByTimeOlderThan.size(), cleanupOlderThanMillis, new DateTime(cleanupOlderThanMillis));
       for (DataCompletenessConfigDTO config : findAllByTimeOlderThan) {
-        DC.delete(config);
+        DAO_REGISTRY.getDataCompletenessConfigDAO().delete(config);
       }
 
       // find all entries older than LOOKBACK and still dataComplete=false, mark timedOut
@@ -159,13 +157,13 @@ public class DataCompletenessTaskRunner implements TaskRunner {
           convert(DataCompletenessConstants.LOOKBACK_TIME_DURATION, DataCompletenessConstants.LOOKBACK_TIMEUNIT);
       long timeOutOlderThanMillis = new DateTime().minus(timeOutOlderThanDuration).getMillis();
       List<DataCompletenessConfigDTO> findAllByTimeOlderThanAndStatus =
-          DC.findAllByTimeOlderThanAndStatus(timeOutOlderThanMillis, false);
+          DAO_REGISTRY.getDataCompletenessConfigDAO().findAllByTimeOlderThanAndStatus(timeOutOlderThanMillis, false);
 
       LOG.info("Timing out {} entries older than {} i.e. {} and still not complete",
           findAllByTimeOlderThanAndStatus.size(), timeOutOlderThanMillis, new DateTime(timeOutOlderThanMillis));
       for (DataCompletenessConfigDTO config : findAllByTimeOlderThanAndStatus) {
         config.setTimedOut(true);
-        DC.update(config);
+        DAO_REGISTRY.getDataCompletenessConfigDAO().update(config);
       }
     } catch (Exception e) {
       LOG.error("Exception data completeness cleanup task", e);
@@ -184,13 +182,13 @@ public class DataCompletenessTaskRunner implements TaskRunner {
     for (Entry<String, Long> entry : bucketNameToBucketValueMS.entrySet()) {
       String bucketName = entry.getKey();
       Long bucketValue = entry.getValue();
-      DataCompletenessConfigDTO checkOrCreateConfig = DC.findByDatasetAndDateSDF(dataset, bucketName);
+      DataCompletenessConfigDTO checkOrCreateConfig = DAO_REGISTRY.getDataCompletenessConfigDAO().findByDatasetAndDateSDF(dataset, bucketName);
       if (checkOrCreateConfig == null) {
         checkOrCreateConfig = new DataCompletenessConfigDTO();
         checkOrCreateConfig.setDataset(dataset);
         checkOrCreateConfig.setDateToCheckInSDF(bucketName);
         checkOrCreateConfig.setDateToCheckInMS(bucketValue);
-        DC.save(checkOrCreateConfig);
+        DAO_REGISTRY.getDataCompletenessConfigDAO().save(checkOrCreateConfig);
         numEntriesCreated++;
         // NOTE: Decided to not store timeValue in the DataCompletenessConfig, because one bucket can have multiple
         // timeValues (5 MINUTES bucketed into 30 MINUTES case)
@@ -217,7 +215,7 @@ public class DataCompletenessTaskRunner implements TaskRunner {
     // even after we marked it complete, in case the percentage changes
     // But instead of checking it for anything other than 100%, setting a limit called CONSIDER_COMPLETE_AFTER
     List<DataCompletenessConfigDTO> completeEntries =
-        DC.findAllByDatasetAndInTimeRangeAndPercentCompleteGT(
+        DAO_REGISTRY.getDataCompletenessConfigDAO().findAllByDatasetAndInTimeRangeAndPercentCompleteGT(
         dataset, adjustedStart, adjustedEnd, dataCompletenessAlgorithm.getConsiderCompleteAfter());
     List<String> completeBuckets = new ArrayList<>();
     for (DataCompletenessConfigDTO entry : completeEntries) {
@@ -273,12 +271,12 @@ public class DataCompletenessTaskRunner implements TaskRunner {
       LOG.info("IsDataComplete:{}", dataComplete);
 
       // update count, dataComplete, percentComplete, numAttempts in database
-      DataCompletenessConfigDTO configToUpdate = DC.findByDatasetAndDateSDF(dataset, bucketName);
+      DataCompletenessConfigDTO configToUpdate = DAO_REGISTRY.getDataCompletenessConfigDAO().findByDatasetAndDateSDF(dataset, bucketName);
       configToUpdate.setCountStar(currentCount);
       configToUpdate.setDataComplete(dataComplete);
       configToUpdate.setPercentComplete(Double.parseDouble(new DecimalFormat("##.##").format(percentComplete)));
       configToUpdate.setNumAttempts(configToUpdate.getNumAttempts() + 1);
-      DC.update(configToUpdate);
+      DAO_REGISTRY.getDataCompletenessConfigDAO().update(configToUpdate);
       LOG.info("Updated data completeness config id:{} with count *:{} dataComplete:{} percentComplete:{} "
           + "and numAttempts:{}", configToUpdate.getId(), configToUpdate.getCountStar(),
           configToUpdate.isDataComplete(), configToUpdate.getPercentComplete(), configToUpdate.getNumAttempts());
