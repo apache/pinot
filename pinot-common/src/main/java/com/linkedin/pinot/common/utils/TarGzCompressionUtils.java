@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.utils;
 
+import com.linkedin.pinot.common.Utils;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayInputStream;
@@ -57,7 +58,8 @@ public class TarGzCompressionUtils {
    * @param directoryPath
    *          The path to the directory to create an archive of
    * @param tarGzPath
-   *          The path to the archive to create
+   *          The path to the archive to create. The file may not exist but
+   *          it's parent must exist and the parent must be a directory
    * @return tarGzPath
    * @throws IOException
    *           If anything goes wrong
@@ -83,13 +85,23 @@ public class TarGzCompressionUtils {
       tOut = new TarArchiveOutputStream(gzOut);
       tOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_GNU);
       addFileToTarGz(tOut, directoryPath, entryPrefix);
+    } catch (IOException e) {
+      LOGGER.error("Failed to create tar.gz file for {} at path: {}", directoryPath, tarGzPath, e);
+      Utils.rethrowException(e);
     } finally {
-      tOut.finish();
-
-      tOut.close();
-      gzOut.close();
-      bOut.close();
-      fOut.close();
+      if (tOut != null) {
+        tOut.finish();
+        tOut.close();
+      }
+      if (gzOut != null) {
+        gzOut.close();
+      }
+      if (bOut != null) {
+        bOut.close();
+      }
+      if (fOut != null) {
+        fOut.close();
+      }
     }
     return tarGzPath;
   }
