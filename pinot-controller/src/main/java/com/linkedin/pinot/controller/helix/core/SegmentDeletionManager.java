@@ -96,8 +96,8 @@ public class SegmentDeletionManager {
       return;
     }
 
-    List<String> segmentsToDelete = new ArrayList<>(segmentIds.size());
-    Set<String> segmentsToRetryLater = new HashSet<>(segmentIds.size());
+    List<String> segmentsToDelete = new ArrayList<>(segmentIds.size()); // Has the segments that will be deleted
+    Set<String> segmentsToRetryLater = new HashSet<>(segmentIds.size());  // List of segments that we need to retry
 
     try {
       ExternalView externalView = _helixAdmin.getResourceExternalView(_helixClusterName, tableName);
@@ -120,7 +120,6 @@ public class SegmentDeletionManager {
       segmentsToRetryLater.clear();
     }
 
-    int nSegmentsDeleted = 0;
     if (!segmentsToDelete.isEmpty()) {
       List<String> propStorePathList = new ArrayList<>(segmentsToDelete.size());
       for (String segmentId : segmentsToDelete) {
@@ -129,30 +128,31 @@ public class SegmentDeletionManager {
       }
 
       boolean[] deleteSuccessful = _propertyStore.remove(propStorePathList, AccessOption.PERSISTENT);
+      List<String> propStoreFailedSegs = new ArrayList<>(segmentsToDelete.size());
       for (int i = 0; i < deleteSuccessful.length; i++) {
+        final String segmentId = segmentsToDelete.get(i);
         if (!deleteSuccessful[i]) {
           // remove API can fail because the prop store entry did not exist, so check first.
           if (_propertyStore.exists(propStorePathList.get(i), AccessOption.PERSISTENT)) {
             LOGGER.info("Could not delete {} from propertystore", propStorePathList.get(i));
-            segmentsToRetryLater.add(segmentsToDelete.get(i));
+            segmentsToRetryLater.add(segmentId);
+            propStoreFailedSegs.add(segmentId);
           }
         }
       }
+      segmentsToDelete.removeAll(propStoreFailedSegs);
 
       for (String segmentId : segmentsToDelete) {
-        if (!segmentsToRetryLater.contains(segmentId)) {
-          // This segment does NOT appear in retry.
-          removeSegmentFromStore(tableName, segmentId);
-          nSegmentsDeleted++;
-        }
+        removeSegmentFromStore(tableName, segmentId);
       }
     }
 
-    LOGGER.info("Deleted {} segments from table {}", nSegmentsDeleted, tableName);
+    LOGGER.info("Deleted {} segments from table {}:{}", segmentsToDelete.size(), tableName,
+        segmentsToDelete.size() <= 5 ? segmentsToDelete : "");
 
     if (segmentsToRetryLater.size() > 0) {
       long effectiveDeletionDelay = Math.min(deletionDelay * 2, MAX_DELETION_DELAY_SECONDS);
-      LOGGER.info("Postponing deletion of {} segments from table {}", nSegmentsDeleted, tableName);
+      LOGGER.info("Postponing deletion of {} segments from table {}", segmentsToRetryLater.size(), tableName);
       deleteSegmentsWithDelay(tableName, segmentsToRetryLater, effectiveDeletionDelay);
       return;
     }

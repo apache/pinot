@@ -125,10 +125,22 @@ public class SegmentDeletionManagerTest {
 
   @Test
   public void testBulkDeleteWithFailures() throws Exception {
+    testBulkDeleteWithFailures(true);
+    testBulkDeleteWithFailures(false);
+  }
+
+  public void testBulkDeleteWithFailures(boolean useSet) throws Exception {
     HelixAdmin helixAdmin =  makeHelixAdmin();
     ZkHelixPropertyStore<ZNRecord> propertyStore = makePropertyStore();
     FakeDeletionManager deletionManager = new FakeDeletionManager(helixAdmin, propertyStore);
-    List<String> segments = segmentsThatShouldBeDeleted();
+    Collection<String> segments;
+    if (useSet) {
+      segments = new HashSet<String>();
+    } else {
+      segments = new ArrayList<String>();
+    }
+
+    segments.addAll(segmentsThatShouldBeDeleted());
     segments.addAll(segmentsInIdealStateOrExtView());
     segments.addAll(segmentsFailingPropStore());
     deletionManager.deleteSegmenetsFromPropertyStoreAndLocal(tableName, segments);
@@ -152,7 +164,8 @@ public class SegmentDeletionManagerTest {
     HelixAdmin helixAdmin =  makeHelixAdmin();
     ZkHelixPropertyStore<ZNRecord> propertyStore = makePropertyStore();
     FakeDeletionManager deletionManager = new FakeDeletionManager(helixAdmin, propertyStore);
-    List<String> segments = segmentsThatShouldBeDeleted();
+    Set<String> segments = new HashSet<>();
+    segments.addAll(segmentsThatShouldBeDeleted());
     deletionManager.deleteSegmenetsFromPropertyStoreAndLocal(tableName, segments);
 
     Assert.assertEquals(deletionManager.segmentsToRetry.size(), 0);
@@ -180,7 +193,7 @@ public class SegmentDeletionManagerTest {
       super(null, helixAdmin, clusterName, propertyStore);
     }
 
-    public void deleteSegmenetsFromPropertyStoreAndLocal(String tableName, List<String> segments) {
+    public void deleteSegmenetsFromPropertyStoreAndLocal(String tableName, Collection<String> segments) {
       super.deleteSegmentFromPropertyStoreAndLocal(tableName, segments, 0L);
     }
 
