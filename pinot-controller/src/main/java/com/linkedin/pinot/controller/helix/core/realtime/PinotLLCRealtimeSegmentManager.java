@@ -64,6 +64,7 @@ import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
+import com.linkedin.pinot.core.realtime.impl.kafka.KafkaHighLevelStreamProviderConfig;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaSimpleConsumerFactoryImpl;
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
@@ -307,9 +308,9 @@ public class PinotLLCRealtimeSegmentManager {
 
   void updateFlushThresholdForSegmentMetadata(LLCRealtimeSegmentZKMetadata segmentZKMetadata,
       ZNRecord partitionAssignment, int tableFlushSize) {
-    // Only update the flush threshold if there is a valid table flush size
+    // If config does not have a flush threshold, use the default.
     if (tableFlushSize < 1) {
-      return;
+      tableFlushSize = KafkaHighLevelStreamProviderConfig.getDefaultMaxRealtimeRowsCount();
     }
 
     // Gather list of instances for this partition
@@ -863,7 +864,8 @@ public class PinotLLCRealtimeSegmentManager {
         }
       }, RetryPolicies.fixedDelayRetryPolicy(10, 500L));
     } catch (Exception e) {
-      LOGGER.error("Failed to update idealstate for table {} instance {} segment {}", realtimeTableName, instance, segmentNameStr, e);
+      LOGGER.error("Failed to update idealstate for table {} instance {} segment {}", realtimeTableName, instance,
+          segmentNameStr, e);
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.LLC_ZOOKEPER_UPDATE_FAILURES, 1);
       throw e;
     }
