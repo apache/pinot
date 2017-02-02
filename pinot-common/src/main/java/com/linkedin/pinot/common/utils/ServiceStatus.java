@@ -121,28 +121,32 @@ public class ServiceStatus {
           return Status.STARTING;
         }
 
+        // If the resource is disabled, ignore it
+        if (!idealState.isEnabled()) {
+          continue;
+        }
+
+        // Check that all partitions that are supposed to be in any state other than OFFLINE have the same status in the
+        // external view or went to ERROR state (which means that we tried to load the segments/resources but failed for
+        // some reason)
         for (String partition : idealState.getPartitionSet()) {
-          // If this partition is not in the external view, then it hasn't finished starting up
-          if (!externalView.getPartitionSet().contains(partition)) {
-            return Status.STARTING;
-          }
+          final String idealStateStatus = idealState.getInstanceStateMap(partition).get(_instanceName);
 
-          String idealStateStatus = idealState.getInstanceStateMap(partition).get(_instanceName);
-          String externalViewStatus = externalView.getStateMap(partition).get(_instanceName);
-
-          // Skip this partition if it is not assigned to this instance
-          if (idealStateStatus == null) {
+          // Skip this partition if it is not assigned to this instance or if the instance should be offline
+          if (idealStateStatus == null || "OFFLINE".equals(idealStateStatus)) {
             continue;
           }
 
           // If this instance state is not in the external view, then it hasn't finished starting up
-          if (externalViewStatus == null) {
+          if (!externalView.getPartitionSet().contains(partition)) {
             return Status.STARTING;
           }
 
+          final String externalViewStatus = externalView.getStateMap(partition).get(_instanceName);
+
           // If the instance state is not ERROR and is not the same as what's expected from the ideal state, then it
           // hasn't finished starting up
-          if (!externalViewStatus.equals("ERROR") && !externalViewStatus.equals(idealStateStatus)) {
+          if (!"ERROR".equals(externalViewStatus) && !idealStateStatus.equals(externalViewStatus)) {
             return Status.STARTING;
           }
         }
