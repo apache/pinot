@@ -26,16 +26,10 @@ import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 import com.linkedin.pinot.controller.helix.ControllerTestUtils;
 import java.io.File;
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.List;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
-import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import junit.framework.Assert;
 
 
@@ -46,10 +40,8 @@ import junit.framework.Assert;
  *
  */
 public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrationTest {
-  private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeClusterIntegrationTest.class);
   private String TABLE_NAME;
   private long nOfflineRows;
-  private long nRealtimeRows;
   ControllerConf config;
 
   @BeforeClass
@@ -57,7 +49,6 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
     super.setUp();
     TABLE_NAME = super.getTableName();
     nOfflineRows = numRowsReturned(CommonConstants.Helix.TableType.OFFLINE);
-    nRealtimeRows = numRowsReturned(CommonConstants.Helix.TableType.REALTIME);
     config = ControllerTestUtils.getDefaultControllerConfiguration();
   }
 
@@ -73,34 +64,33 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
     }
   }
 
-  private boolean waitForNumRows(long numRows, CommonConstants.Helix.TableType tableType) throws Exception {
+  // TODO: Find ways to refactor waitForNumRows and waitForSegmentsToBeInDeleteDirectory
+  private void waitForNumRows(long numRows, CommonConstants.Helix.TableType tableType) throws Exception {
     long start = System.currentTimeMillis();
     long end = start + 60 * 1000;
     while (System.currentTimeMillis() < end) {
       if (numRowsReturned(tableType) == numRows) {
-        return true;
-      }
-      Thread.sleep(600);
-    }
-    Assert.fail("Operation took too long");
-    return false;
-  }
-
-  private long getNumRows(CommonConstants.Helix.TableType type) throws Exception{
-    org.json.JSONObject response = postQuery("select count(*) from '" + TABLE_NAME + "_" + type + "'");
-
-    long start = System.currentTimeMillis();
-    long end = start + 60 * 1000;
-    while (System.currentTimeMillis() < end) {
-      if (!response.get("numDocsScanned").equals(new Integer(0))) {
-        // Throws a null pointer exception when there are no rows because it can't find "aggregationResults"
-        String pinotValue = ((org.json.JSONArray) response.get("aggregationResults")).getJSONObject(0).get("value").toString();
-        return Long.parseLong(pinotValue);
+        return;
       }
       Thread.sleep(200);
     }
-    return 0L;
+    Assert.fail("Operation took too long");
   }
+
+  private void waitForSegmentsToBeInDeleteDirectory() throws Exception{
+    long start = System.currentTimeMillis();
+    long end = start + 60 * 1000;
+    while (System.currentTimeMillis() < end) {
+      if (ZKMetadataProvider.getOfflineSegmentZKMetadataListForTable(_propertyStore, TABLE_NAME).size() == 0) {
+        // Wait for actual file to be deleted. This doesn't currently work because .tar.gz files don't get deleted.
+        Thread.sleep(300);
+        return;
+      }
+      Thread.sleep(200);
+    }
+    Assert.fail("Operation took too long");
+  }
+
   @Override // Leaving this out because it is done in the superclass
   public void testGeneratedQueriesWithMultiValues() {}
 
@@ -112,7 +102,7 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
 
   @Test
   public void deleteRealtimeSegmentFromGetAPI() throws Exception {
-    long currRealtimeRows = getNumRows(CommonConstants.Helix.TableType.REALTIME);
+    long currRealtimeRows = numRowsReturned(CommonConstants.Helix.TableType.REALTIME);
 
     String segmentList = sendGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).
         forSegmentListAPIWithTableType(TABLE_NAME, CommonConstants.Helix.TableType.REALTIME.toString()));
@@ -136,7 +126,7 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
 
   @Test
   public void deleteRealtimeSegmentFromDeleteAPI() throws Exception {
-    long currRealtimeRows = getNumRows(CommonConstants.Helix.TableType.REALTIME);
+    long currRealtimeRows = numRowsReturned(CommonConstants.Helix.TableType.REALTIME);
 
     String segmentList = sendGetRequest(
         ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forSegmentListAPIWithTableType(TABLE_NAME, CommonConstants.Helix.TableType.REALTIME.toString()));
@@ -160,34 +150,10 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
   }
 
   // @Test TODO: Add back when we use LLC only
-  public void deleteAllRealtimeSegmentsFromGetAPI() throws Exception {
-    sendGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).
-        forDeleteAllSegmentsWithTypeWithGetAPI(TABLE_NAME, CommonConstants.Helix.TableType.REALTIME.toString()));
-
-    waitForNumRows(0, CommonConstants.Helix.TableType.REALTIME);
-
-    String postDeleteSegmentList = sendGetRequest(
-        ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forListAllSegments(TABLE_NAME));
-    Assert.assertEquals(getSegmentsFromJsonSegmentAPI(postDeleteSegmentList, CommonConstants.Helix.TableType.REALTIME.toString()).size(), 1);
-    Assert.assertNotSame(getSegmentsFromJsonSegmentAPI(postDeleteSegmentList, CommonConstants.Helix.TableType.OFFLINE.toString()).size(), 0);
-
-    repushRealtimeSegments();
-  }
+  public void deleteAllRealtimeSegmentsFromGetAPI() throws Exception {}
 
   // @Test TODO: Add back when we use LLC only
-  public void deleteAllRealtimeSegmentsFromDeleteAPI() throws Exception {
-    sendDeleteRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).
-        forSegmentDeleteAllAPI(TABLE_NAME, CommonConstants.Helix.TableType.REALTIME.toString()));
-
-    waitForNumRows(0, CommonConstants.Helix.TableType.REALTIME);
-
-    String postDeleteSegmentList = sendGetRequest(
-        ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forListAllSegments(TABLE_NAME));
-    Assert.assertEquals(getSegmentsFromJsonSegmentAPI(postDeleteSegmentList, CommonConstants.Helix.TableType.REALTIME.toString()).size(), 1);
-    Assert.assertNotSame(getSegmentsFromJsonSegmentAPI(postDeleteSegmentList, CommonConstants.Helix.TableType.OFFLINE.toString()).size(), 0);
-
-    repushRealtimeSegments();
-  }
+  public void deleteAllRealtimeSegmentsFromDeleteAPI() throws Exception {}
 
   @Test
   public void deleteFromDeleteAPI() throws Exception {
@@ -211,6 +177,7 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
     offlineSegmentsList.remove(removedSegment);
     Assert.assertEquals(offlineSegmentsListReturn, offlineSegmentsList);
 
+    // Testing Delete All API here
     sendDeleteRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).
         forSegmentDeleteAllAPI(TABLE_NAME, CommonConstants.Helix.TableType.OFFLINE.toString()));
 
@@ -249,6 +216,7 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
     offlineSegmentsList.remove(removedSegment);
     Assert.assertEquals(offlineSegmentsListReturn, offlineSegmentsList);
 
+    // Testing Delete All API here
     sendGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).
         forDeleteAllSegmentsWithTypeWithGetAPI(TABLE_NAME, CommonConstants.Helix.TableType.OFFLINE.toString()));
 
@@ -263,16 +231,6 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
     repushOfflineSegments();
   }
 
-  private void waitForSegmentsToBeInDeleteDirectory() throws Exception{
-    long start = System.currentTimeMillis();
-    long end = start + 60 * 1000;
-    while (System.currentTimeMillis() < end) {
-      if (config.getDataDir().length() == 8) {
-        break;
-      }
-      Thread.sleep(200);
-    }
-  }
   private long getNumRowsFromOfflineMetadata(String segmentName) throws Exception {
     OfflineSegmentZKMetadata segmentZKMetadata = ZKMetadataProvider.getOfflineSegmentZKMetadata(_propertyStore, TABLE_NAME, segmentName);
     return segmentZKMetadata.getTotalRawDocs();
@@ -285,16 +243,7 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
 
   private com.alibaba.fastjson.JSONArray getSegmentsFromJsonSegmentAPI(String json, String type) throws Exception {
     JSONObject tableTypeAndSegments = (JSONObject)JSON.parseArray(json).get(0);
-    long start = System.currentTimeMillis();
-    long end = start + 60 * 1000;
-    while (System.currentTimeMillis() < end) {
-      if (tableTypeAndSegments.get(type) != null) {
-        return (JSONArray) tableTypeAndSegments.get(type);
-      }
-      Thread.sleep(200);
-    }
-
-    return null;
+    return (JSONArray) tableTypeAndSegments.get(type);
   }
 
   private void repushOfflineSegments() throws Exception {
@@ -303,22 +252,5 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
       FileUploadUtils.sendSegmentFile("localhost", "8998", segmentName, file, file.length());
     }
     waitForNumRows(nOfflineRows, CommonConstants.Helix.TableType.OFFLINE);
-  }
-
-  private void repushRealtimeSegments() throws Exception {
-    File schemaFile = getSchemaFile();
-    Schema schema = Schema.fromFile(schemaFile);
-    addSchema(schemaFile, schema.getSchemaName());
-    final List<String> invertedIndexColumns = makeInvertedIndexColumns();
-    final String sortedColumn = makeSortedColumn();
-    final List<File> avroFiles = getAllAvroFiles();
-
-    // delete the realtime table and re-create it
-    sendDeleteRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forDeleteTableWithType(TABLE_NAME, CommonConstants.Helix.TableType.REALTIME.toString()));
-    addRealtimeTable("mytable", "DaysSinceEpoch", "daysSinceEpoch", 900, "Days", KafkaStarterUtils.DEFAULT_ZK_STR,
-        KAFKA_TOPIC, schema.getSchemaName(), "TestTenant", "TestTenant",
-        avroFiles.get(0), 1000000, sortedColumn, new ArrayList<String>(), null);
-
-    waitForNumRows(nRealtimeRows, CommonConstants.Helix.TableType.REALTIME);
   }
 }
