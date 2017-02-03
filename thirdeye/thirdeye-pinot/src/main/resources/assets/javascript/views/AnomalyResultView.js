@@ -166,6 +166,7 @@ AnomalyResultView.prototype = {
     var pageSize = this.anomalyResultModel.pageSize;
     var pageNumber = this.anomalyResultModel.pageNumber;
     var numPages = totalAnomalies / pageSize + 1;
+
     $('#pagination').twbsPagination({
       totalPages: numPages,
       visiblePages: 7,

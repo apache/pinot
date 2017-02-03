@@ -36,8 +36,18 @@ HashService.prototype = {
     console.log('hash service.clear')
     this.params = {};
   },
-  set : function(key, value) {
-    console.log('set ' + key + ' ' + value)
+  set(key, value) {
+    console.log('set ' + key + ' ' + value);
+    // casting the value to the correct type
+    switch (key) {
+      case HASH_PARAMS.ANOMALIES_START_DATE:
+      case HASH_PARAMS.ANOMALIES_END_DATE:
+        value = moment(value);
+        break;
+      case HASH_PARAMS.ANOMALIES_PAGE_NUMBER:
+        value = Number(value);
+        break;
+    }
     this.params[key] = value;
   },
   get : function(key) {
@@ -88,19 +98,18 @@ HashService.prototype = {
   },
   setHashParamsFromUrl : function() {
     console.log("Hash Params from URL:");
-
     console.log(window.location);
-    var self = this;
+
     if (window.location.hash) {
       this.clear();
       var paramsUrl = window.location.hash.replace('#', '');
-      var paramsUrlTokens = paramsUrl.split('?');
-      if (paramsUrlTokens.length > 1) {
-        self.set(HASH_PARAMS.TAB, paramsUrlTokens[0]);
-        paramsUrl = paramsUrlTokens[1];
-        paramsUrl.split("&").forEach(function(part) {
-          var pair = part.split("=");
-          self.set(pair[0], decodeURIComponent(pair[1]));
+      const [newTab, newParams] = paramsUrl.split('?');
+      if (newParams) {
+        this.set(HASH_PARAMS.TAB, newTab);
+
+        newParams.split('&').forEach((part) => {
+          const [key, value] = part.split('=');
+          this.set(key, decodeURIComponent(value));
         });
         console.log(this.params);
       }
@@ -119,20 +128,35 @@ HashService.prototype = {
    * @return {boolean} - returns true if a transition is needed]
    */
   shouldTransition({ newURL }) {
-    const [, transitionTo, paramsTo] = newURL.split(/(?:[#?]|[&]*rand)/);
     const currentTab = HASH_SERVICE.get('tab');
     const params = this.getParams();
+    const [, newHash] = newURL.split('#');
+    // getting the tab and params from the hash
+    const [newTab, newParams] = newHash.split('?');
+    // getting rid of 'rand' or '&rand' params
+    const [paramsToCheck] = newParams.split(/[&]*rand/);
 
-    if ((currentTab !== transitionTo)) {
+    if ((currentTab !== newTab)) {
       return true;
-    } else if (paramsTo) {
-      for (let param of paramsTo.split('&')){
-        const [key, value] = param.split('=');
-        if (params[key] != value) {
+    }
+    if (!paramsToCheck) {
+      return false;
+    }
+
+    for (let param of paramsToCheck.split('&')){
+      const [key, value] = param.split('=');
+      const currentValue = params[key];
+      const isMoment = moment.isMoment(currentValue);
+
+      if (isMoment) {
+        if(!currentValue.isSame(value, 'day')) {
           return true;
         }
+      } else if (currentValue != value) {
+        return true;
       }
     }
+
     return false;
   },
   onHashChangeEventHandler : function(event) {

@@ -37,7 +37,6 @@ DashboardController.prototype = {
       default:
         this.dashboardModel.tabSelected = 'dashboard_anomaly-summary-tab';
         controllerName = 'anomalySummary';
-        break;
     }
     this.dashboardModel.dashboardName = HASH_SERVICE.get(HASH_PARAMS.DASHBOARD_DASHBOARD_NAME);
     this.dashboardModel.summaryDashboardId = HASH_SERVICE.get(HASH_PARAMS.DASHBOARD_SUMMARY_DASHBOARD_ID);
