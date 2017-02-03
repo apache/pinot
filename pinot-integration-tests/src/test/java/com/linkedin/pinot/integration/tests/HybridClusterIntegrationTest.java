@@ -207,6 +207,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     rs.close();
 
     waitForRecordCountToStabilizeToExpectedCount(h2RecordCount, timeInFiveMinutes);
+
   }
 
   protected boolean shouldUseLlc() {
@@ -219,7 +220,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
    *
    * @return sorted column name or null if none is to be used for this run.
    */
-  private String makeSortedColumn() {
+  protected String makeSortedColumn() {
     List<String> dimensions = schema.getDimensionNames();
     final int nDimensions = dimensions.size();
     int ntries = nDimensions;
@@ -250,7 +251,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
    *
    * @return list of inverted index columns or null is no inv index is to be used for this run
    */
-  private List<String> makeInvertedIndexColumns() {
+  protected List<String> makeInvertedIndexColumns() {
     List<String> dimensions = schema.getDimensionNames();
     final int nDimensions = dimensions.size();
     int dimPos = random.nextInt(dimensions.size()+1);
