@@ -235,8 +235,11 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
         HelixHelper.getTableIdealState(_pinotHelixResourceManager.getHelixZkManager(), tableNameWithType);
 
     for (String segmentName : segmentList) {
-      if (!idealState.getInstanceStateMap(segmentName)
-          .containsValue(PinotHelixSegmentOnlineOfflineStateModelGenerator.OFFLINE_STATE)) {
+      Map<String, String> map = idealState.getInstanceStateMap(segmentName);
+      if (map == null) {
+        continue;
+      }
+      if (!map.containsValue(PinotHelixSegmentOnlineOfflineStateModelGenerator.OFFLINE_STATE)) {
         ret.put(segmentName);
       }
     }
@@ -591,7 +594,7 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
   @Tags({"segment", "table"})
   @Paths({ "/segments/{tableName}/{segmentName}", "/segments/{tableName}/{segmentName}/" })
   private Representation deleteOneSegment(
-      @Parameter(name = "tableName", in = "path", description = "The raw table name in which the segment resides",
+      @Parameter(name = "tableName", in = "path", description = "The table name in which the segment resides",
           required = true) String tableName,
       @Parameter(name = "segmentName", in = "path", description = "The name of the segment to delete",
           required = true) String segmentName,
@@ -609,13 +612,13 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
   @Tags({"segment", "table"})
   @Paths({ "/segments/{tableName}", "/segments/{tableName}/" })
   private Representation deleteAllSegments(
-      @Parameter(name = "tableName", in = "path", description = "The raw table name in which the segment resides",
+      @Parameter(name = "tableName", in = "path", description = "The table name in which the segment resides",
           required = true) String tableName,
       @Parameter(name = "type", in = "query", description = "Type of table {offline|realtime}",
       required = true) String tableType)
       throws JsonProcessingException, JSONException {
 
-    Validate.isTrue(!StringUtils.containsIgnoreCase(tableName, "_OFFLINE") && !StringUtils.containsIgnoreCase(tableName, "_REALTIME"));
+    Validate.isTrue(!StringUtils.containsIgnoreCase(tableName, "_OFFLINE") && !StringUtils.containsIgnoreCase(tableName, "_REALTIME"), "Invaild table name");
     Validate.notNull(tableType, "tableType can't be null");
     return new PinotSegmentRestletResource().toggleSegmentState(tableName, null, StateType.DROP.toString(), tableType);
   }

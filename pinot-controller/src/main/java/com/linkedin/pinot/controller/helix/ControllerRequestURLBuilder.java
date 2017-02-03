@@ -184,6 +184,9 @@ public class ControllerRequestURLBuilder {
 
   public String forDeleteAllSegmentsWithTypeWithGetAPI(String tableName, String tableType) {
     return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables", tableName, "segments" + "?state=drop&" + "type=" + tableType);
+  }
 
+  public String forSegmentListAPIWithTableType(String tableName, String tableType) {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "segments", tableName + "?type=" + tableType);
   }
 }
