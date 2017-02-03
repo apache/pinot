@@ -187,8 +187,7 @@ public class DatasetConfigBean extends AbstractBean {
     this.nonAdditiveBucketUnit = nonAdditiveBucketUnit;
   }
 
-
-  public boolean queryRealtime() {
+  public boolean isRealtime() {
     return realtime;
   }
 
@@ -228,8 +227,7 @@ public class DatasetConfigBean extends AbstractBean {
         && Objects.equals(preAggregatedKeyword, dc.getPreAggregatedKeyword())
         && Objects.equals(nonAdditiveBucketUnit, dc.getNonAdditiveBucketUnit())
         && Objects.equals(nonAdditiveBucketSize, dc.getNonAdditiveBucketSize())
-        && Objects.equals(realtime, dc.queryRealtime())
-        && Objects.equals(requiresCompletenessCheck, dc.queryRealtime());
+        && Objects.equals(realtime, dc.isRealtime());
   }
 
   @Override
