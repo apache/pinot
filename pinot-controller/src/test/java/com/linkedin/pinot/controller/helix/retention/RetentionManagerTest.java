@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.controller.helix.retention;
 
-import com.linkedin.pinot.common.data.MetricFieldSpec;
-import com.linkedin.pinot.core.startree.hll.HllConstants;
 import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -40,6 +38,7 @@ import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
@@ -53,6 +52,7 @@ import com.linkedin.pinot.controller.helix.core.retention.RetentionManager;
 import com.linkedin.pinot.controller.helix.core.util.ZKMetadataUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.startree.hll.HllConstants;
 import javax.annotation.Nullable;
 
 
@@ -113,9 +113,7 @@ public class RetentionManagerTest {
 
   public void cleanupSegments() throws InterruptedException {
     _retentionManager.stop();
-    for (String segmentId : _pinotHelixResourceManager.getAllSegmentsForResource(_offlineTableName)) {
-      _pinotHelixResourceManager.deleteSegment(_offlineTableName, segmentId);
-    }
+    _pinotHelixResourceManager.deleteSegments(_offlineTableName, _pinotHelixResourceManager.getAllSegmentsForResource(_offlineTableName));
     while (_helixZkManager.getHelixPropertyStore()
         .getChildNames(ZKMetadataProvider.constructPropertyStorePathForResource(_offlineTableName),
             AccessOption.PERSISTENT)

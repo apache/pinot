@@ -6,11 +6,13 @@ import java.util.concurrent.TimeUnit;
 
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
+import org.joda.time.Days;
 import org.joda.time.Duration;
 
 import com.google.common.collect.Range;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeRange;
+import org.joda.time.Hours;
 
 /**
  * Not to be confused with {@link TimeRange}. This class handles splitting time windows into
@@ -58,6 +60,44 @@ public class TimeRangeUtils {
       throw new IllegalArgumentException("Timegranularity:" + granularity + " not supported");
     }
     return output;
+  }
+
+  /**
+   * Given time granularity and start time (with local time zone information), returns the bucket
+   * index of the current time (with local time zone information).
+   *
+   * The reason to use this method to calculate the bucket index is to align the shifted data point
+   * due to daylight saving time to the correct bucket index. Note that this method have no effect
+   * if the input time use UTC timezone.
+   *
+   * For instance, considering March 13th 2016, the day DST takes effect. Assume that our daily
+   * data whose timestamp is aligned at 0 am at each day, then the data point on March 14th would
+   * be actually aligned to 13th's bucket. Because the two data point only has 23 hours difference.
+   * Therefore, we cannot calculate the bucket index simply divide the difference between timestamps
+   * by millis of 24 hours.
+   *
+   * We don't need to consider the case of HOURS because the size of a bucket does not change when
+   * the time granularity is smaller than DAYS. In DAYS, the bucket size could be 23, 24, or 25
+   * hours due to DST. In HOURS or anything smaller, the bucket size does not change. Hence, we
+   * simply compute the bucket index using one fixed bucket size (i.e., interval).
+   *
+   * @param granularity the time granularity of the bucket
+   * @param start the start time of the first bucket
+   * @param current the current time
+   * @return the bucket index of current time
+   */
+  public static int computeBucketIndex(TimeGranularity granularity, DateTime start, DateTime current) {
+    int index = -1;
+    switch (granularity.getUnit()) {
+    case DAYS:
+      Days d = Days.daysBetween(start.toLocalDate(), current.toLocalDate());
+      index = d.getDays() / granularity.getSize();
+      break;
+    default:
+      long interval = granularity.toMillis();
+      index = (int) ((current.getMillis() - start.getMillis()) / interval);
+    }
+    return index;
   }
 
   public static void main(String[] args) {
