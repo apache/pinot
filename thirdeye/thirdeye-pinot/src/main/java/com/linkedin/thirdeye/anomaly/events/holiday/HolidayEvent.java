@@ -1,8 +1,8 @@
 package com.linkedin.thirdeye.anomaly.events.holiday;
 
-import com.linkedin.thirdeye.anomaly.events.ExternalEvent;
+import com.linkedin.thirdeye.anomaly.events.Event;
 
-public class HolidayEvent extends ExternalEvent {
+public class HolidayEvent extends Event {
   String name;
 
   public String getName() {

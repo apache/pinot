@@ -3,13 +3,18 @@ package com.linkedin.thirdeye.anomaly.events;
 import java.util.List;
 import java.util.Map;
 
-public class EventFilter {
-  EventType eventType;
-  String serviceName;
-  String metricName;
+public abstract class Event {
+  String metric;
+  String service;
+
   long startTime;
   long endTime;
+
   Map<String, List<String>> targetDimensionMap;
+
+  public String getMetric() {
+    return metric;
+  }
 
   public Map<String, List<String>> getTargetDimensionMap() {
     return targetDimensionMap;
@@ -19,12 +24,16 @@ public class EventFilter {
     this.targetDimensionMap = targetDimensionMap;
   }
 
-  public String getMetricName() {
-    return metricName;
+  public void setMetric(String metric) {
+    this.metric = metric;
   }
 
-  public void setMetricName(String metricName) {
-    this.metricName = metricName;
+  public String getService() {
+    return service;
+  }
+
+  public void setService(String service) {
+    this.service = service;
   }
 
   public long getEndTime() {
@@ -33,22 +42,6 @@ public class EventFilter {
 
   public void setEndTime(long endTime) {
     this.endTime = endTime;
-  }
-
-  public EventType getEventType() {
-    return eventType;
-  }
-
-  public void setEventType(EventType eventType) {
-    this.eventType = eventType;
-  }
-
-  public String getServiceName() {
-    return serviceName;
-  }
-
-  public void setServiceName(String serviceName) {
-    this.serviceName = serviceName;
   }
 
   public long getStartTime() {
