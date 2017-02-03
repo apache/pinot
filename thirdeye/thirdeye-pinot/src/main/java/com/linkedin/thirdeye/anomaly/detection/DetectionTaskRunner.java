@@ -103,7 +103,7 @@ public class DetectionTaskRunner implements TaskRunner {
     boolean isBackfill = false;
     // If the current job is a backfill (adhoc) detection job, set notified flag to true so the merged anomalies do not
     // induce alerts and emails.
-    String jobName = taskContext.getJobDAO().getJobNameByJobId(detectionTaskInfo.getJobExecutionId());
+    String jobName = DAO_REGISTRY.getJobDAO().getJobNameByJobId(detectionTaskInfo.getJobExecutionId());
     if (jobName != null && jobName.toLowerCase().startsWith(BACKFILL_PREFIX)) {
       isBackfill = true;
     }

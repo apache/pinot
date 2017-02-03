@@ -45,14 +45,7 @@ public class TaskDriver {
     this.anomalyTaskDAO = DAO_REGISTRY.getTaskDAO();
     taskExecutorService = Executors.newFixedThreadPool(MAX_PARALLEL_TASK);
     taskContext = new TaskContext();
-    taskContext.setJobDAO(DAO_REGISTRY.getJobDAO());
-    taskContext.setTaskDAO(anomalyTaskDAO);
-    taskContext.setResultDAO(DAO_REGISTRY.getRawAnomalyResultDAO());
     taskContext.setAnomalyFunctionFactory(anomalyFunctionFactory);
-    taskContext.setMergedResultDAO(DAO_REGISTRY.getMergedAnomalyResultDAO());
-    taskContext.setDatasetConfigDAO(DAO_REGISTRY.getDatasetConfigDAO());
-    taskContext.setMetricConfigDAO(DAO_REGISTRY.getMetricConfigDAO());
-    taskContext.setOverrideConfigDAO(DAO_REGISTRY.getOverrideConfigDAO());
     taskContext.setThirdEyeAnomalyConfiguration(thirdEyeAnomalyConfiguration);
     allowedOldTaskStatus.add(TaskStatus.FAILED);
     allowedOldTaskStatus.add(TaskStatus.WAITING);

@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomaly.monitor;
 
+import com.linkedin.thirdeye.client.DAORegistry;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -23,14 +24,10 @@ public class MonitorTaskRunner implements TaskRunner {
 
   private static final Logger LOG = LoggerFactory.getLogger(MonitorJobRunner.class);
 
-  private JobManager jobDAO;
-  private TaskManager taskDAO;
+  private DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   @Override
   public List<TaskResult> execute(TaskInfo taskInfo, TaskContext taskContext) throws Exception {
-
-    jobDAO = taskContext.getJobDAO();
-    taskDAO = taskContext.getTaskDAO();
 
     MonitorTaskInfo monitorTaskInfo = (MonitorTaskInfo) taskInfo;
     MonitorType monitorType = monitorTaskInfo.getMonitorType();
@@ -58,7 +55,7 @@ public class MonitorTaskRunner implements TaskRunner {
       scheduledJobIds.removeAll(incompleteScheduledJobIds);
 
       if (!scheduledJobIds.isEmpty()) {
-        jobDAO.updateStatusAndJobEndTimeForJobIds(scheduledJobIds, JobStatus.COMPLETED, System.currentTimeMillis());
+        DAO_REGISTRY.getJobDAO().updateStatusAndJobEndTimeForJobIds(scheduledJobIds, JobStatus.COMPLETED, System.currentTimeMillis());
         LOG.info("COMPLETED jobs {}", scheduledJobIds);
       }
 
@@ -72,8 +69,8 @@ public class MonitorTaskRunner implements TaskRunner {
     try {
       int expireDaysAgo = monitorTaskInfo.getExpireDaysAgo();
       // fist delete tasks then jobs, as task has a foreign key
-      int numAnomalyTasksDeleted = taskDAO.deleteRecordsOlderThanDaysWithStatus(expireDaysAgo, TaskStatus.COMPLETED);
-      int numAnomalyJobsDeleted = jobDAO.deleteRecordsOlderThanDaysWithStatus(expireDaysAgo, JobStatus.COMPLETED);
+      int numAnomalyTasksDeleted = DAO_REGISTRY.getTaskDAO().deleteRecordsOlderThanDaysWithStatus(expireDaysAgo, TaskStatus.COMPLETED);
+      int numAnomalyJobsDeleted = DAO_REGISTRY.getJobDAO().deleteRecordsOlderThanDaysWithStatus(expireDaysAgo, JobStatus.COMPLETED);
       LOG.info("Deleted {} anomaly jobs and {} anomaly tasks", numAnomalyJobsDeleted, numAnomalyTasksDeleted);
     } catch (Exception e) {
       LOG.error("Exception in monitor expire task", e);
@@ -84,7 +81,7 @@ public class MonitorTaskRunner implements TaskRunner {
   private Set<Long> findAllJobsWithStatusScheduled() {
     Set<Long> scheduledJobIds = new HashSet<>();
     try {
-      List<JobDTO> scheduledJobs = jobDAO.findByStatus(JobStatus.SCHEDULED);
+      List<JobDTO> scheduledJobs = DAO_REGISTRY.getJobDAO().findByStatus(JobStatus.SCHEDULED);
       for (JobDTO job : scheduledJobs) {
         scheduledJobIds.add(job.getId());
       }
@@ -96,7 +93,7 @@ public class MonitorTaskRunner implements TaskRunner {
 
   private Set<Long> findIncompleteJobsWithStatusScheduled() {
     Set<Long> incompleteScheduledJobIds = new HashSet<>();
-    List<TaskDTO> incompleteTasks = taskDAO.findByStatusNotIn(TaskStatus.COMPLETED);
+    List<TaskDTO> incompleteTasks = DAO_REGISTRY.getTaskDAO().findByStatusNotIn(TaskStatus.COMPLETED);
     for (TaskDTO task : incompleteTasks) {
       incompleteScheduledJobIds.add(task.getJobId());
     }
