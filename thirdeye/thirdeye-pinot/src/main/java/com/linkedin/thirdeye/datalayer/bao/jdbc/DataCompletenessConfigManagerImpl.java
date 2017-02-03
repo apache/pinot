@@ -95,6 +95,17 @@ public class DataCompletenessConfigManagerImpl extends AbstractManagerImpl<DataC
     return convertListOfBeanToDTO(list);
   }
 
+  @Override
+  public List<DataCompletenessConfigDTO> findAllByDatasetAndInTimeRangeAndStatus(String dataset, long startTime,
+      long endTime, boolean dataComplete) {
+    Predicate timePredicate = Predicate.AND(Predicate.GE("dateToCheckInMS", startTime), Predicate.LT("dateToCheckInMS", endTime));
+    Predicate datasetPredicate = Predicate.EQ("dataset", dataset);
+    Predicate statusPredicate = Predicate.EQ("dataComplete", dataComplete);
+    List<DataCompletenessConfigBean> list =
+        genericPojoDao.get(Predicate.AND(datasetPredicate, timePredicate, statusPredicate), DataCompletenessConfigBean.class);
+    return convertListOfBeanToDTO(list);
+  }
+
   private List<DataCompletenessConfigDTO> convertListOfBeanToDTO(List<DataCompletenessConfigBean> list) {
     List<DataCompletenessConfigDTO> results = new ArrayList<>();
     for (DataCompletenessConfigBean abstractBean : list) {
