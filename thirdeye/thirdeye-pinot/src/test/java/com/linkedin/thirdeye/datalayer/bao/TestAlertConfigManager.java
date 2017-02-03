@@ -13,7 +13,7 @@ public class TestAlertConfigManager extends AbstractManagerTestBase {
     AlertConfigDTO request = new AlertConfigDTO();
     request.setActive(true);
     request.setName("my alert config");
-    alertConfigid = alertConfigManager.save(request);
+    alertConfigid = alertConfigDAO.save(request);
     Assert.assertTrue(alertConfigid > 0);
 
   }
@@ -21,15 +21,15 @@ public class TestAlertConfigManager extends AbstractManagerTestBase {
   @Test (dependsOnMethods = {"testCreateAlertConfig"})
   public void testFetchAlertConfig() {
     // find by id
-    AlertConfigDTO response = alertConfigManager.findById(alertConfigid);
+    AlertConfigDTO response = alertConfigDAO.findById(alertConfigid);
     Assert.assertNotNull(response);
     Assert.assertEquals(response.getId(), alertConfigid);
-    Assert.assertEquals(alertConfigManager.findAll().size(), 1);
+    Assert.assertEquals(alertConfigDAO.findAll().size(), 1);
   }
 
   @Test (dependsOnMethods = {"testFetchAlertConfig"})
   public void testDeleteAlertConfig() {
-    alertConfigManager.deleteById(alertConfigid);
-    Assert.assertEquals(alertConfigManager.findAll().size(), 0);
+    alertConfigDAO.deleteById(alertConfigid);
+    Assert.assertEquals(alertConfigDAO.findAll().size(), 0);
   }
 }

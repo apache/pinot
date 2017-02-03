@@ -28,9 +28,9 @@ public class TestMergedAnomalyResultManager extends AbstractManagerTestBase {
     // create anomaly result
     RawAnomalyResultDTO result = getAnomalyResult();
     result.setFunction(function);
-    rawResultDAO.save(result);
+    rawAnomalyResultDAO.save(result);
 
-    RawAnomalyResultDTO resultRet = rawResultDAO.findById(result.getId());
+    RawAnomalyResultDTO resultRet = rawAnomalyResultDAO.findById(result.getId());
     Assert.assertEquals(resultRet.getFunction(), function);
 
     anomalyResultId = result.getId();
@@ -51,16 +51,16 @@ public class TestMergedAnomalyResultManager extends AbstractManagerTestBase {
     // Let's persist the merged result
     mergedResults.get(0).setDimensions(result.getDimensions());
 
-    mergedResultDAO.save(mergedResults.get(0));
+    mergedAnomalyResultDAO.save(mergedResults.get(0));
     mergedResult = mergedResults.get(0);
     Assert.assertNotNull(mergedResult.getId());
 
     // verify the merged result
-    MergedAnomalyResultDTO mergedResultById = mergedResultDAO.findById(mergedResult.getId());
+    MergedAnomalyResultDTO mergedResultById = mergedAnomalyResultDAO.findById(mergedResult.getId());
     Assert.assertEquals(mergedResultById.getAnomalyResults(), rawResults);
     Assert.assertEquals(mergedResultById.getAnomalyResults().get(0).getId(), anomalyResultId);
 
-    List<MergedAnomalyResultDTO> mergedResultsByMetricDimensionsTime = mergedResultDAO
+    List<MergedAnomalyResultDTO> mergedResultsByMetricDimensionsTime = mergedAnomalyResultDAO
         .findByCollectionMetricDimensionsTime(mergedResult.getCollection(), mergedResult.getMetric(),
             mergedResult.getDimensions().toString(), 0, System.currentTimeMillis(), true);
 
@@ -69,17 +69,17 @@ public class TestMergedAnomalyResultManager extends AbstractManagerTestBase {
 
   @Test(dependsOnMethods = {"testMergedResultCRUD"})
   public void testFeedback() {
-    MergedAnomalyResultDTO anomalyMergedResult = mergedResultDAO.findById(mergedResult.getId());
+    MergedAnomalyResultDTO anomalyMergedResult = mergedAnomalyResultDAO.findById(mergedResult.getId());
     AnomalyFeedbackDTO feedback = new AnomalyFeedbackDTO();
     feedback.setComment("this is a good find");
     feedback.setFeedbackType(AnomalyFeedbackType.ANOMALY);
     feedback.setStatus(FeedbackStatus.NEW);
     anomalyMergedResult.setFeedback(feedback);
     // now we need to make explicit call to anomaly update in order to update the feedback
-    mergedResultDAO.updateAnomalyFeedback(anomalyMergedResult);
+    mergedAnomalyResultDAO.updateAnomalyFeedback(anomalyMergedResult);
 
     //verify feedback
-    MergedAnomalyResultDTO mergedResult1 = mergedResultDAO.findById(mergedResult.getId());
+    MergedAnomalyResultDTO mergedResult1 = mergedAnomalyResultDAO.findById(mergedResult.getId());
     Assert.assertEquals(mergedResult1.getAnomalyResults().get(0).getId(), anomalyResultId);
     Assert.assertEquals(mergedResult1.getFeedback().getFeedbackType(), AnomalyFeedbackType.ANOMALY);
   }
