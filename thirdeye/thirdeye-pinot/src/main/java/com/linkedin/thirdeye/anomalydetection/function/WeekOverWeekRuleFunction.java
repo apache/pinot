@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomalydetection.function;
 
+import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
 import com.linkedin.thirdeye.anomalydetection.model.data.DataModel;
 import com.linkedin.thirdeye.anomalydetection.model.data.NoopDataModel;
 import com.linkedin.thirdeye.anomalydetection.model.data.SeasonalDataModel;
@@ -15,13 +16,15 @@ import com.linkedin.thirdeye.anomalydetection.model.prediction.SeasonalAveragePr
 import com.linkedin.thirdeye.anomalydetection.model.transform.MovingAverageSmoothingFunction;
 import com.linkedin.thirdeye.anomalydetection.model.transform.TransformationFunction;
 import com.linkedin.thirdeye.anomalydetection.model.transform.ZeroRemovalFunction;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import org.apache.commons.lang3.StringUtils;
 
-public class WeekOverWeekRule extends AbstractModularizedAnomalyFunction {
+public class WeekOverWeekRuleFunction extends AbstractModularizedAnomalyFunction {
   public static final String BASELINE = "baseline";
   public static final String ENABLE_SMOOTHING = "enableSmoothing";
 
@@ -105,7 +108,8 @@ public class WeekOverWeekRule extends AbstractModularizedAnomalyFunction {
       this.properties.setProperty(SeasonalDataModel.SEASONAL_PERIOD, intString);
     } else { // Week-Over-Week
       // example: "w/2w" --> SeasonalDataModel.SEASONAL_SIZE = "14"
-      this.properties.setProperty(SeasonalDataModel.SEASONAL_SIZE, intString);
+      int seasonalSize = Integer.valueOf(intString) * 7;
+      this.properties.setProperty(SeasonalDataModel.SEASONAL_SIZE, Integer.toString(seasonalSize));
     }
   }
 

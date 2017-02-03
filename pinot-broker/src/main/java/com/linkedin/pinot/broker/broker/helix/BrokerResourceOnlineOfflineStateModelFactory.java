@@ -74,13 +74,13 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
       try {
         LOGGER.info("BrokerResourceOnlineOfflineStateModel.onBecomeOnlineFromOffline() : " + message);
         Builder keyBuilder = _helixManager.getHelixDataAccessor().keyBuilder();
-        String resourceName = message.getPartitionName();
+        String tableName = message.getPartitionName();
         HelixDataAccessor helixDataAccessor = _helixManager.getHelixDataAccessor();
         List<InstanceConfig> instanceConfigList = helixDataAccessor.getChildValues(keyBuilder.instanceConfigs());
 
         _helixExternalViewBasedRouting.markDataResourceOnline(
-            resourceName,
-            HelixHelper.getExternalViewForResource(_helixAdmin, _helixManager.getClusterName(), resourceName),
+            tableName,
+            HelixHelper.getExternalViewForResource(_helixAdmin, _helixManager.getClusterName(), tableName),
             instanceConfigList);
       } catch (Exception e) {
         LOGGER.error("Caught exception during OFFLINE -> ONLINE transition", e);
@@ -95,8 +95,8 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
 
       try {
         LOGGER.info("BrokerResourceOnlineOfflineStateModel.onBecomeOfflineFromOnline() : " + message);
-        String resourceName = message.getResourceName();
-        _helixExternalViewBasedRouting.markDataResourceOffline(resourceName);
+        String tableName = message.getPartitionName();
+        _helixExternalViewBasedRouting.markDataResourceOffline(tableName);
       } catch (Exception e) {
         LOGGER.error("Caught exception during ONLINE -> OFFLINE transition", e);
         Utils.rethrowException(e);
@@ -110,8 +110,8 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
 
       try {
         LOGGER.info("BrokerResourceOnlineOfflineStateModel.onBecomeDroppedFromOffline() : " + message);
-        String resourceName = message.getResourceName();
-        _helixExternalViewBasedRouting.markDataResourceOffline(resourceName);
+        String tableName = message.getPartitionName();
+        _helixExternalViewBasedRouting.markDataResourceOffline(tableName);
       } catch (Exception e) {
         LOGGER.error("Caught exception during OFFLINE -> DROPPED transition", e);
         Utils.rethrowException(e);
@@ -125,8 +125,8 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
 
       try {
         LOGGER.info("BrokerResourceOnlineOfflineStateModel.onBecomeDroppedFromOnline() : " + message);
-        String resourceName = message.getResourceName();
-        _helixExternalViewBasedRouting.markDataResourceOffline(resourceName);
+        String tableName = message.getPartitionName();
+        _helixExternalViewBasedRouting.markDataResourceOffline(tableName);
       } catch (Exception e) {
         LOGGER.error("Caught exception during ONLINE -> DROPPED transition", e);
         Utils.rethrowException(e);

@@ -48,6 +48,8 @@ public class DatasetConfigBean extends AbstractBean {
 
   private boolean realtime = false;
 
+  private boolean requiresCompletenessCheck = false;
+
   public String getDataset() {
     return dataset;
   }
@@ -191,6 +193,14 @@ public class DatasetConfigBean extends AbstractBean {
 
   public void setRealtime(boolean realtime) {
     this.realtime = realtime;
+  }
+
+  public boolean isRequiresCompletenessCheck() {
+    return requiresCompletenessCheck;
+  }
+
+  public void setRequiresCompletenessCheck(boolean requiresCompletenessCheck) {
+    this.requiresCompletenessCheck = requiresCompletenessCheck;
   }
 
   @Override

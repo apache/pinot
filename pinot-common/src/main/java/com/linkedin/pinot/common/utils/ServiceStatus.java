@@ -122,6 +122,11 @@ public class ServiceStatus {
         }
 
         for (String partition : idealState.getPartitionSet()) {
+          // If this partition is not in the external view, then it hasn't finished starting up
+          if (!externalView.getPartitionSet().contains(partition)) {
+            return Status.STARTING;
+          }
+
           String idealStateStatus = idealState.getInstanceStateMap(partition).get(_instanceName);
           String externalViewStatus = externalView.getStateMap(partition).get(_instanceName);
 

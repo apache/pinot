@@ -154,9 +154,10 @@ public class AlertTaskRunnerV2 implements TaskRunner {
             if (dimensions != null && dimensions.size() > 0) {
               for (String dimension : dimensions) {
                 ContributorViewResponse report = EmailHelper
-                    .getContributorData(metricConfig.getDataset(), metricConfig.getName(),
+                    .getContributorDataForDataReport(metricConfig.getDataset(), metricConfig.getName(),
                         Arrays.asList(dimension), reportMetricConfig.getCompareMode(),
-                        alertConfig.getReportConfigCollection().getDelayOffsetMillis());
+                        alertConfig.getReportConfigCollection().getDelayOffsetMillis(),
+                        alertConfig.getReportConfigCollection().isIntraDay());
                 if (report != null) {
                   metricMap.put(metricConfig.getName(), metricConfig);
                   reports.add(report);

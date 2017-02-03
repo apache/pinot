@@ -4,7 +4,6 @@ import com.linkedin.thirdeye.anomalydetection.context.AnomalyDetectionContext;
 import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
 import com.linkedin.thirdeye.anomalydetection.context.TimeSeriesKey;
 import com.linkedin.thirdeye.anomalydetection.model.detection.SimpleThresholdDetectionModel;
-import com.linkedin.thirdeye.anomalydetection.model.prediction.SeasonalAveragePredictionModel;
 import com.linkedin.thirdeye.anomalydetection.model.transform.MovingAverageSmoothingFunction;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -21,6 +20,12 @@ import org.testng.annotations.Test;
 public class TestWeekOverWeekRuleFunction {
   private final static double EPSILON = 0.00001d;
 
+  private final static long oneWeekInMillis = TimeUnit.DAYS.toMillis(7);
+  private final static long bucketMillis = TimeUnit.SECONDS.toMillis(1);
+  private final static long observedStartTime = 1000 + oneWeekInMillis * 2;
+  private final static long baseline1StartTime = 1000 + oneWeekInMillis;
+  private final static long baseline2StartTime = 1000;
+
   @DataProvider(name = "timeSeriesDataProvider")
   public Object[][] timeSeriesDataProvider() {
     // The properties for the testing time series
@@ -36,11 +41,8 @@ public class TestWeekOverWeekRuleFunction {
     dimensionMap.put("dimensionName2", "dimensionValue2");
     timeSeriesKey.setDimensionMap(dimensionMap);
 
-    long oneWeekInMillis = TimeUnit.DAYS.toMillis(7);
-    long bucketMillis = TimeUnit.SECONDS.toMillis(1);
 
     TimeSeries observedTimeSeries = new TimeSeries();
-    long observedStartTime = 1000 + oneWeekInMillis * 2;
     {
       observedTimeSeries.set(observedStartTime, 10d);
       observedTimeSeries.set(observedStartTime + bucketMillis, 15d);
@@ -55,7 +57,6 @@ public class TestWeekOverWeekRuleFunction {
     List<TimeSeries> baselines = new ArrayList<>();
     TimeSeries baseline1TimeSeries = new TimeSeries();
     {
-      long baseline1StartTime = 1000 + oneWeekInMillis;
       baseline1TimeSeries.set(baseline1StartTime, 10d);
       baseline1TimeSeries.set(baseline1StartTime + bucketMillis, 20d);
       baseline1TimeSeries.set(baseline1StartTime + bucketMillis * 2, 15d);
@@ -68,7 +69,6 @@ public class TestWeekOverWeekRuleFunction {
 
     TimeSeries baseline2TimeSeries = new TimeSeries();
     {
-      long baseline2StartTime = 1000;
       baseline2TimeSeries.set(baseline2StartTime, 10d);
       baseline2TimeSeries.set(baseline2StartTime + bucketMillis, 10d);
       baseline2TimeSeries.set(baseline2StartTime + bucketMillis * 2, 5d);
@@ -79,6 +79,67 @@ public class TestWeekOverWeekRuleFunction {
     }
     baselines.add(baseline2TimeSeries);
 
+    return new Object[][] { {properties, timeSeriesKey, bucketSizeInMS, observedTimeSeries, baselines} };
+  }
+
+  @Test(dataProvider = "timeSeriesDataProvider") public void analyzeWoW(
+      Properties properties, TimeSeriesKey timeSeriesKey, long bucketSizeInMs,
+      TimeSeries observedTimeSeries, List<TimeSeries> baselines) throws Exception {
+    // Expected RawAnomalies without smoothing
+    List<RawAnomalyResultDTO> expectedRawAnomalies = new ArrayList<>();
+    RawAnomalyResultDTO rawAnomaly1 = new RawAnomalyResultDTO();
+    rawAnomaly1.setStartTime(observedStartTime + bucketMillis);
+    rawAnomaly1.setEndTime(observedStartTime + bucketMillis * 2);
+    rawAnomaly1.setWeight(-0.25d);
+    rawAnomaly1.setScore(15d);
+    expectedRawAnomalies.add(rawAnomaly1);
+
+    RawAnomalyResultDTO rawAnomaly2 = new RawAnomalyResultDTO();
+    rawAnomaly2.setStartTime(observedStartTime + bucketMillis * 4);
+    rawAnomaly2.setEndTime(observedStartTime + bucketMillis * 5);
+    rawAnomaly2.setWeight(-0.2857142857d);
+    rawAnomaly2.setScore(15d);
+    expectedRawAnomalies.add(rawAnomaly2);
+
+    AnomalyDetectionContext anomalyDetectionContext = new AnomalyDetectionContext();
+    anomalyDetectionContext.setBucketSizeInMS(bucketSizeInMs);
+
+    // Append properties for anomaly function specific setting
+    properties.put(WeekOverWeekRuleFunction.BASELINE, "w/w");
+    properties.put(SimpleThresholdDetectionModel.CHANGE_THRESHOLD, "-0.2");
+
+    WeekOverWeekRuleFunction function = new WeekOverWeekRuleFunction();
+    function.init(properties);
+    anomalyDetectionContext.setAnomalyDetectionFunction(function);
+    anomalyDetectionContext.setCurrent(observedTimeSeries);
+    List<TimeSeries> singleBaseline = new ArrayList<>();
+    singleBaseline.add(baselines.get(0));
+    anomalyDetectionContext.setBaselines(singleBaseline);
+    anomalyDetectionContext.setTimeSeriesKey(timeSeriesKey);
+
+    List<RawAnomalyResultDTO> rawAnomalyResults = function.analyze(anomalyDetectionContext);
+    Assert.assertEquals(rawAnomalyResults.size(), expectedRawAnomalies.size());
+    for (int i = 0; i < rawAnomalyResults.size(); ++i) {
+      RawAnomalyResultDTO actualAnomaly = rawAnomalyResults.get(i);
+      RawAnomalyResultDTO expectedAnomaly = rawAnomalyResults.get(i);
+      Assert.assertEquals(actualAnomaly.getWeight(), expectedAnomaly.getWeight(), EPSILON);
+      Assert.assertEquals(actualAnomaly.getScore(), expectedAnomaly.getScore(), EPSILON);
+    }
+
+    // Test data model
+    List<Interval> expectedDataRanges = new ArrayList<>();
+    expectedDataRanges.add(new Interval(observedStartTime, observedStartTime + bucketMillis * 5));
+    expectedDataRanges.add(new Interval(observedStartTime - oneWeekInMillis,
+        observedStartTime + bucketMillis * 5 - oneWeekInMillis));
+
+    List<Interval> actualDataRanges = function.getDataModel()
+        .getAllDataIntervals(observedStartTime, observedStartTime + bucketMillis * 5);
+    Assert.assertEquals(actualDataRanges, expectedDataRanges);
+  }
+
+  @Test(dataProvider = "timeSeriesDataProvider") public void analyzeWo2WAvg(
+      Properties properties, TimeSeriesKey timeSeriesKey, long bucketSizeInMs,
+      TimeSeries observedTimeSeries, List<TimeSeries> baselines) throws Exception {
     // Expected RawAnomalies without smoothing
     List<RawAnomalyResultDTO> expectedRawAnomalies = new ArrayList<>();
     RawAnomalyResultDTO rawAnomaly1 = new RawAnomalyResultDTO();
@@ -95,20 +156,14 @@ public class TestWeekOverWeekRuleFunction {
     rawAnomaly2.setScore(15d);
     expectedRawAnomalies.add(rawAnomaly2);
 
-    return new Object[][] { {properties, timeSeriesKey, bucketSizeInMS, observedTimeSeries, baselines, expectedRawAnomalies} };
-  }
-
-  @Test(dataProvider = "timeSeriesDataProvider") public void analyze(Properties properties,
-      TimeSeriesKey timeSeriesKey, long bucketSizeInMs, TimeSeries observedTimeSeries,
-      List<TimeSeries> baselines, List<RawAnomalyResultDTO> expectedRawAnomalies) throws Exception {
     AnomalyDetectionContext anomalyDetectionContext = new AnomalyDetectionContext();
     anomalyDetectionContext.setBucketSizeInMS(bucketSizeInMs);
 
     // Append properties for anomaly function specific setting
-    properties.put(WeekOverWeekRule.BASELINE, "w/2wAvg");
+    properties.put(WeekOverWeekRuleFunction.BASELINE, "w/2wAvg");
     properties.put(SimpleThresholdDetectionModel.CHANGE_THRESHOLD, "0.2");
 
-    WeekOverWeekRule function = new WeekOverWeekRule();
+    WeekOverWeekRuleFunction function = new WeekOverWeekRuleFunction();
     function.init(properties);
     anomalyDetectionContext.setAnomalyDetectionFunction(function);
     anomalyDetectionContext.setCurrent(observedTimeSeries);
@@ -123,22 +178,34 @@ public class TestWeekOverWeekRuleFunction {
       Assert.assertEquals(actualAnomaly.getWeight(), expectedAnomaly.getWeight(), EPSILON);
       Assert.assertEquals(actualAnomaly.getScore(), expectedAnomaly.getScore(), EPSILON);
     }
+
+
+    // Test data model
+    List<Interval> expectedDataRanges = new ArrayList<>();
+    expectedDataRanges.add(new Interval(observedStartTime, observedStartTime + bucketMillis * 5));
+    expectedDataRanges.add(new Interval(observedStartTime - oneWeekInMillis,
+        observedStartTime + bucketMillis * 5 - oneWeekInMillis));
+    expectedDataRanges.add(new Interval(observedStartTime - oneWeekInMillis * 2,
+        observedStartTime + bucketMillis * 5 - oneWeekInMillis * 2));
+
+    List<Interval> actualDataRanges = function.getDataModel()
+        .getAllDataIntervals(observedStartTime, observedStartTime + bucketMillis * 5);
+    Assert.assertEquals(actualDataRanges, expectedDataRanges);
   }
 
-  @Test(dataProvider = "timeSeriesDataProvider") public void analyzeSmoothedTimeSeries(
+  @Test(dataProvider = "timeSeriesDataProvider") public void analyzeWo2WAvgSmoothedTimeSeries(
       Properties properties, TimeSeriesKey timeSeriesKey, long bucketSizeInMs,
-      TimeSeries observedTimeSeries, List<TimeSeries> baselines,
-      List<RawAnomalyResultDTO> expectedRawAnomalies) throws Exception {
+      TimeSeries observedTimeSeries, List<TimeSeries> baselines) throws Exception {
     AnomalyDetectionContext anomalyDetectionContext = new AnomalyDetectionContext();
     anomalyDetectionContext.setBucketSizeInMS(bucketSizeInMs);
 
     // Append properties for anomaly function specific setting
-    properties.put(WeekOverWeekRule.BASELINE, "w/2wAvg");
+    properties.put(WeekOverWeekRuleFunction.BASELINE, "w/2wAvg");
     properties.put(SimpleThresholdDetectionModel.CHANGE_THRESHOLD, "0.2");
-    properties.put(WeekOverWeekRule.ENABLE_SMOOTHING, "true");
+    properties.put(WeekOverWeekRuleFunction.ENABLE_SMOOTHING, "true");
     properties.put(MovingAverageSmoothingFunction.MOVING_AVERAGE_SMOOTHING_WINDOW_SIZE, "3");
 
-    WeekOverWeekRule function = new WeekOverWeekRule();
+    WeekOverWeekRuleFunction function = new WeekOverWeekRuleFunction();
     function.init(properties);
     anomalyDetectionContext.setAnomalyDetectionFunction(function);
     anomalyDetectionContext.setCurrent(observedTimeSeries);
@@ -154,16 +221,31 @@ public class TestWeekOverWeekRuleFunction {
 
   @Test(dataProvider = "timeSeriesDataProvider") public void recomputeMergedAnomalyWeight(
       Properties properties, TimeSeriesKey timeSeriesKey, long bucketSizeInMs,
-      TimeSeries observedTimeSeries, List<TimeSeries> baselines,
-      List<RawAnomalyResultDTO> expectedRawAnomalies) throws Exception {
+      TimeSeries observedTimeSeries, List<TimeSeries> baselines) throws Exception {
+    // Expected RawAnomalies without smoothing
+    List<RawAnomalyResultDTO> expectedRawAnomalies = new ArrayList<>();
+    RawAnomalyResultDTO rawAnomaly1 = new RawAnomalyResultDTO();
+    rawAnomaly1.setStartTime(observedStartTime + bucketMillis * 2);
+    rawAnomaly1.setEndTime(observedStartTime + bucketMillis * 3);
+    rawAnomaly1.setWeight(0.3d);
+    rawAnomaly1.setScore(15d);
+    expectedRawAnomalies.add(rawAnomaly1);
+
+    RawAnomalyResultDTO rawAnomaly2 = new RawAnomalyResultDTO();
+    rawAnomaly2.setStartTime(observedStartTime + bucketMillis * 3);
+    rawAnomaly2.setEndTime(observedStartTime + bucketMillis * 4);
+    rawAnomaly2.setWeight(0.22727272727272727);
+    rawAnomaly2.setScore(15d);
+    expectedRawAnomalies.add(rawAnomaly2);
+
     AnomalyDetectionContext anomalyDetectionContext = new AnomalyDetectionContext();
     anomalyDetectionContext.setBucketSizeInMS(bucketSizeInMs);
 
     // Append properties for anomaly function specific setting
-    properties.put(WeekOverWeekRule.BASELINE, "w/2wAvg");
+    properties.put(WeekOverWeekRuleFunction.BASELINE, "w/2wAvg");
     properties.put(SimpleThresholdDetectionModel.CHANGE_THRESHOLD, "0.2");
 
-    WeekOverWeekRule function = new WeekOverWeekRule();
+    WeekOverWeekRuleFunction function = new WeekOverWeekRuleFunction();
     function.init(properties);
     anomalyDetectionContext.setAnomalyDetectionFunction(function);
     anomalyDetectionContext.setCurrent(observedTimeSeries);
@@ -212,21 +294,21 @@ public class TestWeekOverWeekRuleFunction {
   @Test
   public void testParseWowString() {
     String testString = "w/w";
-    Assert.assertEquals(WeekOverWeekRule.parseWowString(testString), "1");
+    Assert.assertEquals(WeekOverWeekRuleFunction.parseWowString(testString), "1");
 
     testString = "Wo4W";
-    Assert.assertEquals(WeekOverWeekRule.parseWowString(testString), "4");
+    Assert.assertEquals(WeekOverWeekRuleFunction.parseWowString(testString), "4");
 
     testString = "W/243wABCD";
-    Assert.assertEquals(WeekOverWeekRule.parseWowString(testString), "243");
+    Assert.assertEquals(WeekOverWeekRuleFunction.parseWowString(testString), "243");
 
     testString = "2abc";
-    Assert.assertEquals(WeekOverWeekRule.parseWowString(testString), "2");
+    Assert.assertEquals(WeekOverWeekRuleFunction.parseWowString(testString), "2");
 
     testString = "W/243";
-    Assert.assertEquals(WeekOverWeekRule.parseWowString(testString), "243");
+    Assert.assertEquals(WeekOverWeekRuleFunction.parseWowString(testString), "243");
 
     testString = "A Random string 34 and it is 54 a long one";
-    Assert.assertEquals(WeekOverWeekRule.parseWowString(testString), "34");
+    Assert.assertEquals(WeekOverWeekRuleFunction.parseWowString(testString), "34");
   }
 }

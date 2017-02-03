@@ -24,17 +24,13 @@ public class DataCompletenessScheduler {
   private DataCompletenessJobRunner dataCompletenessJobRunner;
   private DataCompletenessJobContext dataCompletenessJobContext;
   private List<String> datasetsToCheck = new ArrayList<>();
-  private static final ThirdEyeCacheRegistry CACHE_REGISTRY = ThirdEyeCacheRegistry.getInstance();
 
   public DataCompletenessScheduler(String datasetsToCheck) {
     scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
     if (StringUtils.isNotBlank(datasetsToCheck)) {
       this.datasetsToCheck = Lists.newArrayList(datasetsToCheck.split(","));
-    } else {
-      this.datasetsToCheck = CACHE_REGISTRY.getCollectionsCache().getCollections();
     }
   }
-
 
   public void start() {
 

@@ -1,14 +1,17 @@
 package com.linkedin.thirdeye.anomalydetection.function;
 
 import com.linkedin.pinot.pql.parsers.utils.Pair;
+import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyDetectionContext;
 import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
 import com.linkedin.thirdeye.anomalydetection.model.merge.MergeModel;
 import com.linkedin.thirdeye.anomalydetection.model.merge.NoPredictionMergeModel;
+import com.linkedin.thirdeye.anomalydetection.model.prediction.ExpectedTimeSeriesPredictionModel;
 import com.linkedin.thirdeye.anomalydetection.model.prediction.PredictionModel;
 import com.linkedin.thirdeye.anomalydetection.model.transform.TransformationFunction;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
+import com.linkedin.thirdeye.dashboard.views.TimeBucket;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
@@ -199,5 +202,48 @@ public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunc
     }
 
     updateMergedAnomalyInfo(anomalyDetectionContext, anomalyToUpdated);
+  }
+
+  // TODO: Generate time series view using ViewModel
+  @Override
+  public AnomalyTimelinesView getTimeSeriesView(MetricTimeSeries timeSeries,
+      long bucketMillis, String metric, long viewWindowStartTime, long viewWindowEndTime,
+      List<RawAnomalyResultDTO> knownAnomalies) {
+    AnomalyDetectionContext anomalyDetectionContext = BackwardAnomalyFunctionUtils
+        .buildAnomalyDetectionContext(this, timeSeries, spec.getMetric(), null,
+            spec.getBucketSize(), spec.getBucketUnit(), new DateTime(viewWindowStartTime),
+            new DateTime(viewWindowEndTime));
+
+    this.transformAndPredictTimeSeries(anomalyDetectionContext);
+
+    TimeSeries observedTS = anomalyDetectionContext.getTransformedCurrent();
+    TimeSeries expectedTS =
+        ((ExpectedTimeSeriesPredictionModel) anomalyDetectionContext.getTrainedPredictionModel())
+            .getExpectedTimeSeries();
+    long expectedTSStartTime = expectedTS.getTimeSeriesInterval().getStartMillis();
+
+    // Construct AnomalyTimelinesView
+    AnomalyTimelinesView anomalyTimelinesView = new AnomalyTimelinesView();
+    int bucketCount = (int) ((viewWindowEndTime - viewWindowStartTime) / bucketMillis);
+    for (int i = 0; i < bucketCount; ++i) {
+      long currentBucketMillis = viewWindowStartTime + i * bucketMillis;
+      long baselineBucketMillis = expectedTSStartTime + i * bucketMillis;
+      double observedValue = 0d;
+      if (observedTS.hasTimestamp(currentBucketMillis)) {
+        observedValue = observedTS.get(currentBucketMillis);
+      }
+      double expectedValue = 0d;
+      if (expectedTS.hasTimestamp(baselineBucketMillis)) {
+        expectedValue = expectedTS.get(baselineBucketMillis);
+      }
+      TimeBucket timebucket =
+          new TimeBucket(currentBucketMillis, currentBucketMillis + bucketMillis, baselineBucketMillis,
+              baselineBucketMillis + bucketMillis);
+      anomalyTimelinesView.addTimeBuckets(timebucket);
+      anomalyTimelinesView.addCurrentValues(observedValue);
+      anomalyTimelinesView.addBaselineValues(expectedValue);
+    }
+
+    return anomalyTimelinesView;
   }
 }

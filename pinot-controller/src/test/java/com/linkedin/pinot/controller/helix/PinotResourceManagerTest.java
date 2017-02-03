@@ -18,26 +18,21 @@ package com.linkedin.pinot.controller.helix;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
-import java.nio.file.Files;
-import java.util.Collections;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-
-import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
-import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
-
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
@@ -203,11 +198,9 @@ public class PinotResourceManagerTest {
           _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME,
               TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(TABLE_NAME));
 
-      for (final String segmentId : externalView.getPartitionSet()) {
-        deleteOneSegment(TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(TABLE_NAME), segmentId);
-        // Waiting for the external view to update
-        Thread.sleep(2000);
-      }
+      List<String> segmentsList = new ArrayList<>(externalView.getPartitionSet().size());
+      segmentsList.addAll(externalView.getPartitionSet());
+      _pinotHelixResourceManager.deleteSegments(TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(TABLE_NAME), segmentsList);
     }
     assert(!segmentFile.exists());
   }
