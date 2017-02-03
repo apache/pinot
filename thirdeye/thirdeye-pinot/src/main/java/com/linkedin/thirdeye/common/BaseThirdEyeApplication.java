@@ -44,6 +44,8 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
   protected AlertConfigManager alertConfigDAO;
   protected DataCompletenessConfigManager dataCompletenessConfigDAO;
 
+  protected DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
+
   public void initDAOs() {
     String persistenceConfig = System.getProperty("dw.rootDir") + "/persistence.yml";
     LOG.info("Loading persistence config from [{}]", persistenceConfig);
@@ -76,9 +78,19 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
     dataCompletenessConfigDAO = DaoProviderUtil
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.DataCompletenessConfigManagerImpl.class);
 
-    DAORegistry.registerDAOs(anomalyFunctionDAO, emailConfigurationDAO, rawAnomalyResultDAO,
-            mergedAnomalyResultDAO, jobDAO, taskDAO, datasetConfigDAO, metricConfigDAO,
-            dashboardConfigDAO, ingraphMetricConfigDAO, ingraphDashboardConfigDAO,
-            overrideConfigDAO, alertConfigDAO, dataCompletenessConfigDAO);
+    DAO_REGISTRY.setAnomalyFunctionDAO(anomalyFunctionDAO);
+    DAO_REGISTRY.setEmailConfigurationDAO(emailConfigurationDAO);
+    DAO_REGISTRY.setRawAnomalyResultDAO(rawAnomalyResultDAO);
+    DAO_REGISTRY.setMergedAnomalyResultDAO(mergedAnomalyResultDAO);
+    DAO_REGISTRY.setJobDAO(jobDAO);
+    DAO_REGISTRY.setTaskDAO(taskDAO);
+    DAO_REGISTRY.setDatasetConfigDAO(datasetConfigDAO);
+    DAO_REGISTRY.setMetricConfigDAO(metricConfigDAO);
+    DAO_REGISTRY.setDashboardConfigDAO(dashboardConfigDAO);
+    DAO_REGISTRY.setIngraphMetricConfigDAO(ingraphMetricConfigDAO);
+    DAO_REGISTRY.setIngraphDashboardConfigDAO(ingraphDashboardConfigDAO);
+    DAO_REGISTRY.setOverrideConfigDAO(overrideConfigDAO);
+    DAO_REGISTRY.setAlertConfigDAO(alertConfigDAO);
+    DAO_REGISTRY.setDataCompletenessConfigDAO(dataCompletenessConfigDAO);
   }
 }

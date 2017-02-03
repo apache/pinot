@@ -31,9 +31,6 @@ public class AutoloadPinotMetricsServiceTest  extends AbstractManagerTestBase {
 
 
   private void setup() throws IOException {
-    DAORegistry.registerDAOs(anomalyFunctionDAO, emailConfigurationDAO, rawResultDAO, mergedResultDAO,
-        jobDAO, taskDAO, datasetConfigDAO, metricConfigDAO, dashboardConfigDAO, ingraphMetricConfigDAO,
-        ingraphDashboardConfigDAO, overrideConfigDAO, alertConfigManager, dataCompletenessConfigDAO);
     testAutoLoadPinotMetricsService = new AutoLoadPinotMetricsService();
     schema = Schema.fromInputSteam(ClassLoader.getSystemResourceAsStream("sample-pinot-schema.json"));
   }
