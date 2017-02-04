@@ -44,6 +44,11 @@ public class MatchEntireSegmentOperator extends BaseFilterOperator {
   }
 
   @Override
+  public boolean isResultEmpty() {
+    return false;
+  }
+
+  @Override
   public String getOperatorName() {
     return OPERATOR_NAME;
   }

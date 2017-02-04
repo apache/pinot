@@ -33,10 +33,10 @@ public class OrOperator extends BaseFilterOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(OrOperator.class);
   private static final String OPERATOR_NAME = "OrOperator";
 
-  private List<Operator> operators;
+  private List<BaseFilterOperator> operators;
   private OrBlock orBlock;
 
-  public OrOperator(List<Operator> operators) {
+  public OrOperator(List<BaseFilterOperator> operators) {
     this.operators = operators;
   }
 
@@ -58,6 +58,16 @@ public class OrOperator extends BaseFilterOperator {
     }
     orBlock = new OrBlock(blockDocIdSets);
     return orBlock;
+  }
+
+  @Override
+  public boolean isResultEmpty() {
+    for (BaseFilterOperator operator : operators) {
+      if (!operator.isResultEmpty()) {
+        return false;
+      }
+    }
+    return true;
   }
 
   @Override
