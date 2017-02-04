@@ -9,6 +9,7 @@ import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.client.ResponseParserUtils;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 
@@ -148,6 +149,22 @@ public class DetectionTaskRunner implements TaskRunner {
     String metricName = anomalyFunction.getSpec().getMetric();
     for (Map.Entry<DimensionKey, MetricTimeSeries> entry : dimensionKeyMetricTimeSeriesMap.entrySet()) {
       DimensionKey dimensionKey = entry.getKey();
+
+      // If the current time series belongs to OTHER dimension, which consists of time series whose
+      // sum of all its values belows 1% of sum of all time series values, then its anomaly is
+      // meaningless and hence we don't want to detection anomalies on it.
+      String[] dimensionValues = dimensionKey.getDimensionValues();
+      boolean isOTHERDimension = false;
+      for (String dimensionValue : dimensionValues) {
+        if (dimensionValue.equals(ResponseParserUtils.OTHER)) {
+          isOTHERDimension = true;
+          break;
+        }
+      }
+      if (isOTHERDimension) {
+        continue;
+      }
+
       DimensionMap exploredDimensions = DimensionMap.fromDimensionKey(dimensionKey, collectionDimensions);
 
       if (entry.getValue().getTimeWindowSet().size() < 1) {

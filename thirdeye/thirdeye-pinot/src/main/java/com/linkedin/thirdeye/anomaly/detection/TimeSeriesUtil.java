@@ -8,6 +8,7 @@ import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.MetricExpression;
+import com.linkedin.thirdeye.client.ResponseParserUtils;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesHandler;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesRequest;
@@ -126,7 +127,7 @@ public abstract class TimeSeriesUtil {
 
     boolean hasOTHERDimensionName = false;
     for (String dimensionValue : dimensionMap.values()) {
-      if (dimensionValue.equalsIgnoreCase("other")) {
+      if (dimensionValue.equals(ResponseParserUtils.OTHER)) {
         hasOTHERDimensionName = true;
         break;
       }
@@ -185,7 +186,7 @@ public abstract class TimeSeriesUtil {
           boolean foundOTHER = false;
           for (String dimensionValue : dimensionKey.getDimensionValues()) {
 
-            if (dimensionValue.equalsIgnoreCase("OTHER")) {
+            if (dimensionValue.equals(ResponseParserUtils.OTHER)) {
               metricTimeSeries = entry.getValue();
               foundOTHER = true;
               break;
