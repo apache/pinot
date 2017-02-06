@@ -229,4 +229,17 @@ create index data_completeness_config_sdf_idx on data_completeness_config_index(
 create index data_completeness_config_complete_idx on data_completeness_config_index(data_complete);
 create index data_completeness_config_percent_idx on data_completeness_config_index(percent_complete);
 
-
+create table if not exists event_index (
+  name VARCHAR (100),
+  event_type VARCHAR (100),
+  start_time bigint(20) not null,
+  end_time bigint(20) not null,
+  metric_name VARCHAR(200),
+  service_name VARCHAR (200),
+    base_id bigint(20) not null,
+    create_time timestamp,
+    update_time timestamp default current_timestamp,
+    version int(10)
+) ENGINE=InnoDB;
+create index event_event_type_idx on event_index(event_type);
+create index event_start_time_idx on event_index(start_time);

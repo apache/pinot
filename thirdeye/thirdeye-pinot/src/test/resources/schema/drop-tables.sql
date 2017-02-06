@@ -14,4 +14,5 @@ DROP TABLE if EXISTS ingraph_metric_config_index;
 DROP TABLE if EXISTS override_config_index;
 DROP TABLE if EXISTS alert_config_index;
 DROP TABLE if EXISTS data_completeness_config_index;
+drop table if EXISTS event_index;
 SET FOREIGN_KEY_CHECKS = 1;

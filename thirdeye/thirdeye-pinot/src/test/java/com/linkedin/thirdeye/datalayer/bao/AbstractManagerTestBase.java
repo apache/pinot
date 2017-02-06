@@ -8,6 +8,7 @@ import com.linkedin.thirdeye.datalayer.bao.jdbc.DashboardConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.DataCompletenessConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.DatasetConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.EmailConfigurationManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.EventManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.IngraphDashboardConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.IngraphMetricConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.JobManagerImpl;
@@ -70,6 +71,7 @@ public abstract class AbstractManagerTestBase {
   protected OverrideConfigManager overrideConfigDAO;
   protected AlertConfigManager alertConfigManager;
   protected DataCompletenessConfigManager dataCompletenessConfigDAO;
+  protected EventManager eventManager;
 
   private ManagerProvider managerProvider;
   private PersistenceConfig configuration;
@@ -155,6 +157,7 @@ public abstract class AbstractManagerTestBase {
     overrideConfigDAO = managerProvider.getInstance(OverrideConfigManagerImpl.class);
     alertConfigManager = managerProvider.getInstance(AlertConfigManagerImpl.class);
     dataCompletenessConfigDAO = managerProvider.getInstance(DataCompletenessConfigManagerImpl.class);
+    eventManager = managerProvider.getInstance(EventManagerImpl.class);
   }
 
   @AfterClass(alwaysRun = true)
