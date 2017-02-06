@@ -69,7 +69,7 @@
 				</div>
 			</div>
 			<div class="col-md-2" id="apply-button">
-				<input type="button" class="btn btn-info" value="Apply" />
+				<input type="button" class="btn btn-primary btn-sm" value="Apply" />
 			</div>
 		</div>
 	</div>

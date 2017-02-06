@@ -12,7 +12,9 @@
           <div id="show-details-{{anomalyIndex}}" class="col-md-3">
             <label>{{this.anomalyId}}<a href="#"> show details</a></label>
           </div>
-          <div class="col-md-6"></div>
+          <div id="root-cause-analysis-button-{{anomalyIndex}}" class="col-md-6">
+            <button type="button" class="btn btn-primary btn-sm">Root Cause Analysis</button>
+          </div>
           <div class="col-md-1">
             <span class="pull-right">______</span>
           </div>
@@ -64,23 +66,20 @@
             <label>Anomaly Function Details:</label><br /> <label>{{this.anomalyFunctionName}}</label> <br /> <label>{{this.anomalyFunctionType}}</label>
           </div>
         </div>
-        <div class="row">
-          <div id="anomaly-feedback-{{anomalyIndex}}" class="col-md-3">
+        <div class="row row-footer">
+          <div id="anomaly-feedback-{{anomalyIndex}}" class="col-xs-12">
+            <label>This anomaly is as</label>
             <select data-placeholder="Provide Anomaly Feedback" style="width: 250px; border: 0px" class="chosen-select">
               <option>False Alarm</option>
               <option>Confirmed Anomaly</option>
               <option>Confirmed - Not Actionable</option>
             </select>
           </div>
-          <div class="col-md-6"></div>
-          <div id="root-cause-analysis-button-{{anomalyIndex}}" class="col-md-3">
-            <button type="button" class="btn btn-primary btn-sm">Root Cause Analysis</button>
-          </div>
         </div>
       </div>
     </div>
     {{/each}}
-    <div class="container">
+    <div class="container text-center">
       <nav aria-label="Page navigation">
         <ul id="pagination" class="pagination-sm"></ul>
       </nav>

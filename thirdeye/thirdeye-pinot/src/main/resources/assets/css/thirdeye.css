@@ -386,3 +386,9 @@ text {
   margin: 0;
   font-size: 13px;
 }
+
+.row-footer {
+    border-top: 1px solid #CCC;
+    padding-top: 20px;
+    margin-top: 20px;
+}
