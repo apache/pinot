@@ -33,10 +33,10 @@ public class AndOperator extends BaseFilterOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(AndOperator.class);
   private static final String OPERATOR_NAME = "AndOperator";
 
-  private List<Operator> operators;
+  private List<BaseFilterOperator> operators;
   private AndBlock andBlock;
 
-  public AndOperator(List<Operator> operators) {
+  public AndOperator(List<BaseFilterOperator> operators) {
     this.operators = operators;
   }
 
@@ -58,6 +58,16 @@ public class AndOperator extends BaseFilterOperator {
     }
     andBlock = new AndBlock(blockDocIdSets);
     return andBlock;
+  }
+
+  @Override
+  public boolean isResultEmpty() {
+    for (BaseFilterOperator operator : operators) {
+      if (operator.isResultEmpty()) {
+        return true;
+      }
+    }
+    return false;
   }
 
   @Override

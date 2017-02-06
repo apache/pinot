@@ -25,9 +25,9 @@ import com.linkedin.pinot.core.operator.blocks.CompositeBaseFilterBlock;
 
 public class CompositeOperator extends BaseFilterOperator{
   private static final String OPERATOR_NAME = "CompositeOperator";
-  private List<Operator> operators;
+  private List<BaseFilterOperator> operators;
 
-  public CompositeOperator(List<Operator> operators) {
+  public CompositeOperator(List<BaseFilterOperator> operators) {
     this.operators = operators;
   }
 
@@ -48,6 +48,16 @@ public class CompositeOperator extends BaseFilterOperator{
       blocks.add((BaseFilterBlock) operator.nextBlock());
     }
     return new CompositeBaseFilterBlock(blocks);
+  }
+
+  @Override
+  public boolean isResultEmpty() {
+    for (BaseFilterOperator operator : operators) {
+      if (!operator.isResultEmpty()) {
+        return false;
+      }
+    }
+    return true;
   }
 
   @Override

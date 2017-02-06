@@ -19,7 +19,8 @@ AnalysisController.prototype = {
 
   handleApplyAnalysisEvent: function (viewObject) {
     HASH_SERVICE.update(viewObject.viewParams);
+    HASH_SERVICE.refreshWindowHashForRouting('analysis');
     this.timeSeriesCompareController.handleAppEvent(HASH_SERVICE.getParams());
   }
-}
+};
 

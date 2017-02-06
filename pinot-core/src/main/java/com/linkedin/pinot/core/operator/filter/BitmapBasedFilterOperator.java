@@ -35,6 +35,9 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(BitmapBasedFilterOperator.class);
   private static final String OPERATOR_NAME = "BitmapBasedFilterOperator";
 
+  private final PredicateEvaluator predicateEvaluator;
+  private final Predicate predicate;
+
   private DataSource dataSource;
   private BitmapBlock bitmapBlock;
 
@@ -43,12 +46,14 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
   private int endDocId;
 
   /**
-   *
+   * @param predicate
    * @param dataSource
    * @param startDocId inclusive
    * @param endDocId inclusive
    */
-  public BitmapBasedFilterOperator(DataSource dataSource, int startDocId, int endDocId) {
+  public BitmapBasedFilterOperator(Predicate predicate, DataSource dataSource, int startDocId, int endDocId) {
+    this.predicate = predicate;
+    this.predicateEvaluator = PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, dataSource.getDictionary());
     this.dataSource = dataSource;
     this.startDocId = startDocId;
     this.endDocId = endDocId;
@@ -61,24 +66,21 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
 
   @Override
   public BaseFilterBlock nextFilterBlock(BlockId BlockId) {
-    Predicate predicate = getPredicate();
     InvertedIndexReader invertedIndex = dataSource.getInvertedIndex();
     Block dataSourceBlock = dataSource.nextBlock();
-    Dictionary dictionary = dataSource.getDictionary();
-    PredicateEvaluator evaluator = PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, dictionary);
     int[] dictionaryIds;
     boolean exclusion = false;
     switch (predicate.getType()) {
       case EQ:
       case IN:
       case RANGE:
-        dictionaryIds = evaluator.getMatchingDictionaryIds();
+        dictionaryIds = predicateEvaluator.getMatchingDictionaryIds();
         break;
 
       case NEQ:
       case NOT_IN:
         exclusion = true;
-        dictionaryIds = evaluator.getNonMatchingDictionaryIds();
+        dictionaryIds = predicateEvaluator.getNonMatchingDictionaryIds();
         break;
       case REGEX:
       default:
@@ -90,6 +92,11 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
     }
     bitmapBlock = new BitmapBlock(dataSource.getOperatorName(), dataSourceBlock.getMetadata(), startDocId, endDocId, bitmaps, exclusion);
     return bitmapBlock;
+  }
+
+  @Override
+  public boolean isResultEmpty() {
+    return predicateEvaluator.alwaysFalse();
   }
 
   @Override

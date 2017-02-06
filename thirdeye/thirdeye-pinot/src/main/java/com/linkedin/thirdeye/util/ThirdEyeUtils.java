@@ -325,7 +325,7 @@ public abstract class ThirdEyeUtils {
     try {
       DatasetConfigDTO datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(collection);
       dataset = collection + DatasetConfigBean.DATASET_OFFLINE_PREFIX;
-      if (datasetConfig.queryRealtime()) {
+      if (datasetConfig.isRealtime()) {
         dataset = collection;
       }
     } catch (ExecutionException e) {

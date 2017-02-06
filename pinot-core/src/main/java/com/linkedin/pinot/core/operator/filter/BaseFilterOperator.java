@@ -17,8 +17,6 @@ package com.linkedin.pinot.core.operator.filter;
 
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
-import com.linkedin.pinot.core.common.Operator;
-import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
 
@@ -29,16 +27,7 @@ import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
  */
 public abstract class BaseFilterOperator extends BaseOperator {
 
-  private Predicate predicate;
   private int nextBlockCallCounter = 0;
-
-  public void setPredicate(Predicate predicate) {
-    this.predicate = predicate;
-  }
-
-  public Predicate getPredicate() {
-    return predicate;
-  }
 
   @Override
   public final BaseFilterBlock getNextBlock() {
@@ -56,4 +45,6 @@ public abstract class BaseFilterOperator extends BaseOperator {
   }
 
   public abstract BaseFilterBlock nextFilterBlock(BlockId blockId);
+
+  public abstract boolean isResultEmpty();
 }
