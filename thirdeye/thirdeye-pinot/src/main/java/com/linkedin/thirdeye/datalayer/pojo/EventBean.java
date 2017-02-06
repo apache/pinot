@@ -10,7 +10,7 @@ public class EventBean extends AbstractBean {
   String name;
   String metric;
   String service;
-  EventType eventType;
+  String eventType;
 
   long startTime;
   long endTime;
@@ -35,11 +35,11 @@ public class EventBean extends AbstractBean {
     this.targetDimensionMap = targetDimensionMap;
   }
 
-  public EventType getEventType() {
+  public String getEventType() {
     return eventType;
   }
 
-  public void setEventType(EventType eventType) {
+  public void setEventType(String eventType) {
     this.eventType = eventType;
   }
 

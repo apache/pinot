@@ -236,10 +236,14 @@ create table if not exists event_index (
   end_time bigint(20) not null,
   metric_name VARCHAR(200),
   service_name VARCHAR (200),
-    base_id bigint(20) not null,
-    create_time timestamp,
-    update_time timestamp default current_timestamp,
-    version int(10)
+  base_id bigint(20) not null,
+  create_time timestamp,
+  update_time timestamp default current_timestamp,
+  version int(10)
 ) ENGINE=InnoDB;
 create index event_event_type_idx on event_index(event_type);
 create index event_start_time_idx on event_index(start_time);
+create index event_end_time_idx on event_index(end_time);
+
+
+

@@ -92,6 +92,7 @@ public abstract class AbstractManagerTestBase {
   void initializeDs(PersistenceConfig configuration) {
     ds = new DataSource();
     ds.setUrl(configuration.getDatabaseConfiguration().getUrl() + dbId);
+    System.out.println("Creating db with connection url : " + ds.getUrl());
     ds.setPassword(configuration.getDatabaseConfiguration().getPassword());
     ds.setUsername(configuration.getDatabaseConfiguration().getUser());
     ds.setDriverClassName(configuration.getDatabaseConfiguration().getProperties()
