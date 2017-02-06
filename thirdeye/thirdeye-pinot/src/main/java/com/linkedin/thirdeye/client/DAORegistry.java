@@ -34,7 +34,7 @@ public class DAORegistry {
   private OverrideConfigManager overrideConfigDAO;
   private DataCompletenessConfigManager dataCompletenessConfigDAO;
 
-  private static DAORegistry singleton = new DAORegistry();
+  private static final DAORegistry singleton = new DAORegistry();
 
   /****************************************************************************
    * SINGLETON
