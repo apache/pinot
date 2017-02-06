@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
+import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -23,6 +24,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
+import java.util.concurrent.Callable;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericData.Record;
 import org.apache.avro.generic.GenericDatumReader;
@@ -39,13 +41,12 @@ import com.linkedin.pinot.core.data.GenericRow;
 public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaAvroMessageDecoder.class);
 
-  public static final String SCHEMA_REGISTRY_REST_URL = "schema.registry.rest.url";
-  public static final String SCHEMA_REGISTRY_SCHEMA_NAME = "schema.registry.schema.name";
+  private static final String SCHEMA_REGISTRY_REST_URL = "schema.registry.rest.url";
+  private static final String SCHEMA_REGISTRY_SCHEMA_NAME = "schema.registry.schema.name";
   private org.apache.avro.Schema defaultAvroSchema;
   private Map<String, org.apache.avro.Schema> md5ToAvroSchemaMap;
 
   private String schemaRegistryBaseUrl;
-  private String kafkaTopicName;
   private DecoderFactory decoderFactory;
   private AvroRecordToPinotRowGenerator avroRecordConvetrer;
 
@@ -56,13 +57,16 @@ public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
   private static final int SCHEMA_HASH_START_OFFSET = MAGIC_BYTE_LENGTH;
   private static final int SCHEMA_HASH_END_OFFSET = SCHEMA_HASH_START_OFFSET + SCHEMA_HASH_LENGTH;
 
+  private static final int MAXIMUM_SCHEMA_FETCH_RETRY_COUNT = 5;
+  private static final int MINIMUM_SCHEMA_FETCH_RETRY_TIME_MILLIS = 500;
+  private static final float SCHEMA_FETCH_RETRY_EXPONENTIAL_BACKOFF_FACTOR = 2.0f;
+
   @Override
   public void init(Map<String, String> props, Schema indexingSchema, String topicName) throws Exception {
     schemaRegistryBaseUrl = props.get(SCHEMA_REGISTRY_REST_URL);
     StringUtils.chomp(schemaRegistryBaseUrl, "/");
-    kafkaTopicName = topicName;
 
-    String avroSchemaName = kafkaTopicName;
+    String avroSchemaName = topicName;
     if(props.containsKey(SCHEMA_REGISTRY_SCHEMA_NAME) && props.get(SCHEMA_REGISTRY_SCHEMA_NAME) != null &&
         !props.get(SCHEMA_REGISTRY_SCHEMA_NAME).isEmpty()) {
       avroSchemaName = props.get(SCHEMA_REGISTRY_SCHEMA_NAME);
@@ -112,10 +116,10 @@ public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
     }
   }
 
-  public static String hex(byte[] bytes) {
+  private String hex(byte[] bytes) {
     StringBuilder builder = new StringBuilder(2 * bytes.length);
-    for (int i = 0; i < bytes.length; i++) {
-      String hexString = Integer.toHexString(0xFF & bytes[i]);
+    for (byte aByte : bytes) {
+      String hexString = Integer.toHexString(0xFF & aByte);
       if (hexString.length() < 2) {
         hexString = "0" + hexString;
       }
@@ -124,15 +128,49 @@ public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
     return builder.toString();
   }
 
-  public static org.apache.avro.Schema fetchSchema(URL url) throws Exception {
-    BufferedReader reader = null;
+  private static class SchemaFetcher implements Callable<Boolean> {
+    private org.apache.avro.Schema _schema;
+    private URL url;
 
-    reader = new BufferedReader(new InputStreamReader(url.openStream(), "UTF-8"));
-    StringBuilder queryResp = new StringBuilder();
-    for (String respLine; (respLine = reader.readLine()) != null;) {
-      queryResp.append(respLine);
+    SchemaFetcher(URL url) {
+      this.url = url;
     }
-    return org.apache.avro.Schema.parse(queryResp.toString());
+
+    @Override
+    public Boolean call() throws Exception {
+      try {
+        BufferedReader reader = null;
+
+        reader = new BufferedReader(new InputStreamReader(url.openStream(), "UTF-8"));
+        StringBuilder queryResp = new StringBuilder();
+        for (String respLine; (respLine = reader.readLine()) != null; ) {
+          queryResp.append(respLine);
+        }
+        _schema = org.apache.avro.Schema.parse(queryResp.toString());
+
+        return Boolean.TRUE;
+      } catch (Exception e) {
+        LOGGER.warn("Caught exception while fetching schema", e);
+        return Boolean.FALSE;
+      }
+    }
+
+    public org.apache.avro.Schema getSchema() {
+      return _schema;
+    }
   }
 
+  private org.apache.avro.Schema fetchSchema(URL url) throws Exception {
+    SchemaFetcher schemaFetcher = new SchemaFetcher(url);
+
+    boolean successful = RetryPolicies.exponentialBackoffRetryPolicy(MAXIMUM_SCHEMA_FETCH_RETRY_COUNT,
+        MINIMUM_SCHEMA_FETCH_RETRY_TIME_MILLIS, SCHEMA_FETCH_RETRY_EXPONENTIAL_BACKOFF_FACTOR).attempt(schemaFetcher);
+
+    if (successful) {
+      return schemaFetcher.getSchema();
+    } else {
+      throw new RuntimeException(
+          "Failed to fetch schema from " + url + " after " + MAXIMUM_SCHEMA_FETCH_RETRY_COUNT + "retries");
+    }
+  }
 }
