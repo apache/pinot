@@ -127,7 +127,7 @@ public abstract class TimeSeriesUtil {
 
     boolean hasOTHERDimensionName = false;
     for (String dimensionValue : dimensionMap.values()) {
-      if (dimensionValue.equals(ResponseParserUtils.OTHER)) {
+      if (dimensionValue.equalsIgnoreCase(ResponseParserUtils.OTHER)) {
         hasOTHERDimensionName = true;
         break;
       }
@@ -186,7 +186,7 @@ public abstract class TimeSeriesUtil {
           boolean foundOTHER = false;
           for (String dimensionValue : dimensionKey.getDimensionValues()) {
 
-            if (dimensionValue.equals(ResponseParserUtils.OTHER)) {
+            if (dimensionValue.equalsIgnoreCase(ResponseParserUtils.OTHER)) {
               metricTimeSeries = entry.getValue();
               foundOTHER = true;
               break;

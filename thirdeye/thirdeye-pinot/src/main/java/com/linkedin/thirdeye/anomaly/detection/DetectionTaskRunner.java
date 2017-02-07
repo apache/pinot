@@ -156,7 +156,8 @@ public class DetectionTaskRunner implements TaskRunner {
       String[] dimensionValues = dimensionKey.getDimensionValues();
       boolean isOTHERDimension = false;
       for (String dimensionValue : dimensionValues) {
-        if (dimensionValue.equals(ResponseParserUtils.OTHER)) {
+        if (dimensionValue.equalsIgnoreCase(ResponseParserUtils.OTHER) ||
+            dimensionValue.equalsIgnoreCase(ResponseParserUtils.UNKNOWN)) {
           isOTHERDimension = true;
           break;
         }
