@@ -231,8 +231,8 @@ public abstract class EmailHelper {
     }
 
     DatasetConfigDTO datasetConfigDTO = datasetConfigManager.findByDataset(collection);
-    if (datasetConfigDTO.getTimeUnit().toString().equals("DAYS")) {
-      aggTimeGranularity = datasetConfigDTO.getTimeUnit().toString();
+    if (datasetConfigDTO != null && TimeUnit.DAYS.equals(datasetConfigDTO.getTimeUnit())) {
+      aggTimeGranularity = datasetConfigDTO.getTimeUnit().name();
       currentEnd = currentEnd - (currentEnd % DAY_MILLIS);
       currentStart = currentEnd - WEEK_MILLIS;
     }
@@ -248,8 +248,7 @@ public abstract class EmailHelper {
     request.setTimeGranularity(Utils.getAggregationTimeGranularity(aggTimeGranularity, collection));
     request.setGroupByDimensions(dimensions);
     ContributorViewHandler handler = new ContributorViewHandler(queryCache);
-    ContributorViewResponse response = handler.process(request);
-    return response;
+    return handler.process(request);
   }
 
   public static ContributorViewResponse getContributorDataForDataReport(String collection, String metric, List<String> dimensions)

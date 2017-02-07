@@ -23,11 +23,24 @@ public class EventManagerImpl extends AbstractManagerImpl<EventDTO> implements E
     return results;
   }
 
-  public List<EventDTO> findEventsBetweenTimeRange(String eventType, long start,
-      long end) {
+  public List<EventDTO> findEventsBetweenTimeRange(String eventType, long start, long end) {
     Predicate predicate = Predicate
         .AND(Predicate.EQ("eventType", eventType), Predicate.GT("endTime", start),
             Predicate.LT("startTime", end));
+    List<EventBean> list = genericPojoDao.get(predicate, EventBean.class);
+    List<EventDTO> results = new ArrayList<>();
+    for (EventBean event : list) {
+      EventDTO eventDTO = MODEL_MAPPER.map(event, EventDTO.class);
+      results.add(eventDTO);
+    }
+    return results;
+  }
+
+  public List<EventDTO> findEventsBetweenTimeRangeByName(String eventType, String name, long start,
+      long end) {
+    Predicate predicate = Predicate
+        .AND(Predicate.EQ("eventType", eventType), Predicate.EQ("name", name),
+            Predicate.GT("endTime", start), Predicate.LT("startTime", end));
     List<EventBean> list = genericPojoDao.get(predicate, EventBean.class);
     List<EventDTO> results = new ArrayList<>();
     for (EventBean event : list) {

@@ -172,6 +172,25 @@
       <version>1.4.192</version>
       <scope>test</scope>
     </dependency>
+    <!-- Below are used to dump holidays; Scope : test -->
+    <dependency>
+      <groupId>com.google.api-client</groupId>
+      <artifactId>google-api-client</artifactId>
+      <version>1.22.0</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.google.oauth-client</groupId>
+      <artifactId>google-oauth-client-jetty</artifactId>
+      <version>1.22.0</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.google.apis</groupId>
+      <artifactId>google-api-services-calendar</artifactId>
+      <version>v3-rev230-1.22.0</version>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>
