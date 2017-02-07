@@ -23,13 +23,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 
 public abstract class MutableDictionaryReader implements Dictionary {
+  private final String column;
   protected BiMap<Integer, Object> dictionaryIdBiMap;
-  protected FieldSpec spec;
   protected boolean hasNull = false;
   private final AtomicInteger dictionaryIdGenerator;
 
-  public MutableDictionaryReader(FieldSpec spec) {
-    this.spec = spec;
+  public MutableDictionaryReader(String column) {
+    this.column = column;
     this.dictionaryIdBiMap = HashBiMap.<Integer, Object> create();
     dictionaryIdGenerator = new AtomicInteger(-1);
   }
@@ -174,7 +174,7 @@ public abstract class MutableDictionaryReader implements Dictionary {
   public abstract String toString(int dictionaryId);
 
   public void print() {
-    System.out.println("************* printing dictionary for column : " + spec.getName() + " ***************");
+    System.out.println("************* printing dictionary for column : " + column + " ***************");
     for (Integer key : dictionaryIdBiMap.keySet()) {
       System.out.println(key + "," + dictionaryIdBiMap.get(key));
     }

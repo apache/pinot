@@ -15,16 +15,13 @@
  */
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-
-
 public class IntMutableDictionary extends MutableDictionaryReader {
 
   private Integer min = Integer.MAX_VALUE;
   private Integer max = Integer.MIN_VALUE;
 
-  public IntMutableDictionary(FieldSpec spec) {
-    super(spec);
+  public IntMutableDictionary(String column) {
+    super(column);
   }
 
   @Override
