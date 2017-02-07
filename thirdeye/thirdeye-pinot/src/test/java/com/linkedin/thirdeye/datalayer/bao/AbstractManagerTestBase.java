@@ -29,7 +29,6 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.joda.time.DateTime;
 
-
 public abstract class AbstractManagerTestBase {
   protected static DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
@@ -155,6 +154,8 @@ public abstract class AbstractManagerTestBase {
     datasetConfigDTO.setTimeColumn("time");
     datasetConfigDTO.setTimeDuration(1);
     datasetConfigDTO.setTimeUnit(TimeUnit.HOURS);
+    datasetConfigDTO.setActive(true);
+    datasetConfigDTO.setRequiresCompletenessCheck(false);
     return datasetConfigDTO;
   }
 

@@ -1,14 +1,12 @@
 package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import org.apache.commons.collections.CollectionUtils;
-
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.DatasetConfigBean;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
+import java.util.ArrayList;
+import java.util.List;
+import org.apache.commons.collections.CollectionUtils;
 
 public class DatasetConfigManagerImpl extends AbstractManagerImpl<DatasetConfigDTO>
     implements DatasetConfigManager {
@@ -41,4 +39,16 @@ public class DatasetConfigManagerImpl extends AbstractManagerImpl<DatasetConfigD
     return results;
   }
 
+  @Override
+  public List<DatasetConfigDTO> findActiveRequiresCompletenessCheck() {
+    Predicate activePredicate = Predicate.EQ("active", true);
+    Predicate completenessPredicate = Predicate.EQ("requiresCompletenessCheck", true);
+    List<DatasetConfigBean> list = genericPojoDao.get(Predicate.AND(activePredicate, completenessPredicate), DatasetConfigBean.class);
+    List<DatasetConfigDTO> results = new ArrayList<>();
+    for (DatasetConfigBean abstractBean : list) {
+      DatasetConfigDTO result = MODEL_MAPPER.map(abstractBean, DatasetConfigDTO.class);
+      results.add(result);
+    }
+    return results;
+  }
 }

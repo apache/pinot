@@ -123,6 +123,7 @@ create index merged_anomaly_result_start_time_idx on merged_anomaly_result_index
 create table if not exists dataset_config_index (
     dataset varchar(200) not null,
     active boolean,
+    requires_completeness_check boolean,
     base_id bigint(20) not null,
     create_time timestamp,
     update_time timestamp default current_timestamp,
@@ -131,6 +132,10 @@ create table if not exists dataset_config_index (
 ) ENGINE=InnoDB;
 create index dataset_config_dataset_idx on dataset_config_index(dataset);
 create index dataset_config_active_idx on dataset_config_index(active);
+create index dataset_config_requires_completeness_check_idx on dataset_config_index(requires_completeness_check);
+
+-- ALTER TABLE dataset_config_index ADD COLUMN requires_completeness_check boolean;
+-- UPDATE dataset_config_index SET requires_completeness_check = 0;
 
 create table if not exists metric_config_index (
     name varchar(200) not null,

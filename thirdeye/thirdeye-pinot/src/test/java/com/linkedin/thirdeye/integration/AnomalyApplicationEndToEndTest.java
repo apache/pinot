@@ -323,7 +323,7 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
   }
 
   private void startDataCompletenessScheduler() throws Exception {
-    dataCompletenessScheduler = new DataCompletenessScheduler(collection);
+    dataCompletenessScheduler = new DataCompletenessScheduler();
     dataCompletenessScheduler.start();
   }
 
