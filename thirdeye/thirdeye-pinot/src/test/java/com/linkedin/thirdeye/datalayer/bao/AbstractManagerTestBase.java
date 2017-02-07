@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.datalayer.bao;
 import com.google.common.collect.Lists;
 import com.linkedin.thirdeye.anomaly.override.OverrideConfigHelper;
 import com.linkedin.thirdeye.api.DimensionMap;
+import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.AlertConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.DashboardConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.DataCompletenessConfigManagerImpl;
@@ -58,20 +59,22 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 public abstract class AbstractManagerTestBase {
   protected AnomalyFunctionManager anomalyFunctionDAO;
-  protected RawAnomalyResultManager rawResultDAO;
+  protected RawAnomalyResultManager rawAnomalyResultDAO;
   protected JobManager jobDAO;
   protected TaskManager taskDAO;
   protected EmailConfigurationManager emailConfigurationDAO;
-  protected MergedAnomalyResultManager mergedResultDAO;
+  protected MergedAnomalyResultManager mergedAnomalyResultDAO;
   protected DatasetConfigManager datasetConfigDAO;
   protected MetricConfigManager metricConfigDAO;
   protected DashboardConfigManager dashboardConfigDAO;
   protected IngraphDashboardConfigManager ingraphDashboardConfigDAO;
   protected IngraphMetricConfigManager ingraphMetricConfigDAO;
   protected OverrideConfigManager overrideConfigDAO;
-  protected AlertConfigManager alertConfigManager;
+  protected AlertConfigManager alertConfigDAO;
   protected DataCompletenessConfigManager dataCompletenessConfigDAO;
   protected EventManager eventManager;
+
+  protected static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   private ManagerProvider managerProvider;
   private PersistenceConfig configuration;
@@ -85,6 +88,7 @@ public abstract class AbstractManagerTestBase {
     File configFile = new File(url.toURI());
     configuration = DaoProviderUtil.createConfiguration(configFile);
 
+    DAORegistry.reset();
     initializeDs(configuration);
     initJDBC();
   }
@@ -143,27 +147,43 @@ public abstract class AbstractManagerTestBase {
     managerProvider = new ManagerProvider(ds);
     Class<AnomalyFunctionManagerImpl> c = AnomalyFunctionManagerImpl.class;
     System.out.println(c);
+
     anomalyFunctionDAO = managerProvider.getInstance(AnomalyFunctionManagerImpl.class);
-    rawResultDAO = managerProvider.getInstance(RawAnomalyResultManagerImpl.class);
+    rawAnomalyResultDAO = managerProvider.getInstance(RawAnomalyResultManagerImpl.class);
     jobDAO = managerProvider.getInstance(JobManagerImpl.class);
     taskDAO = managerProvider.getInstance(TaskManagerImpl.class);
     emailConfigurationDAO = managerProvider.getInstance(EmailConfigurationManagerImpl.class);
-    mergedResultDAO = managerProvider.getInstance(MergedAnomalyResultManagerImpl.class);
+    mergedAnomalyResultDAO = managerProvider.getInstance(MergedAnomalyResultManagerImpl.class);
     datasetConfigDAO = managerProvider.getInstance(DatasetConfigManagerImpl.class);
     metricConfigDAO = managerProvider.getInstance(MetricConfigManagerImpl.class);
     dashboardConfigDAO = managerProvider.getInstance(DashboardConfigManagerImpl.class);
-    ingraphDashboardConfigDAO =
-        managerProvider.getInstance(IngraphDashboardConfigManagerImpl.class);
+    ingraphDashboardConfigDAO = managerProvider.getInstance(IngraphDashboardConfigManagerImpl.class);
     ingraphMetricConfigDAO = managerProvider.getInstance(IngraphMetricConfigManagerImpl.class);
     overrideConfigDAO = managerProvider.getInstance(OverrideConfigManagerImpl.class);
-    alertConfigManager = managerProvider.getInstance(AlertConfigManagerImpl.class);
+    alertConfigDAO = managerProvider.getInstance(AlertConfigManagerImpl.class);
     dataCompletenessConfigDAO = managerProvider.getInstance(DataCompletenessConfigManagerImpl.class);
     eventManager = managerProvider.getInstance(EventManagerImpl.class);
+
+    DAO_REGISTRY.setAnomalyFunctionDAO(anomalyFunctionDAO);
+    DAO_REGISTRY.setEmailConfigurationDAO(emailConfigurationDAO);
+    DAO_REGISTRY.setRawAnomalyResultDAO(rawAnomalyResultDAO);
+    DAO_REGISTRY.setMergedAnomalyResultDAO(mergedAnomalyResultDAO);
+    DAO_REGISTRY.setJobDAO(jobDAO);
+    DAO_REGISTRY.setTaskDAO(taskDAO);
+    DAO_REGISTRY.setDatasetConfigDAO(datasetConfigDAO);
+    DAO_REGISTRY.setMetricConfigDAO(metricConfigDAO);
+    DAO_REGISTRY.setDashboardConfigDAO(dashboardConfigDAO);
+    DAO_REGISTRY.setIngraphMetricConfigDAO(ingraphMetricConfigDAO);
+    DAO_REGISTRY.setIngraphDashboardConfigDAO(ingraphDashboardConfigDAO);
+    DAO_REGISTRY.setOverrideConfigDAO(overrideConfigDAO);
+    DAO_REGISTRY.setAlertConfigDAO(alertConfigDAO);
+    DAO_REGISTRY.setDataCompletenessConfigDAO(dataCompletenessConfigDAO);
   }
 
   @AfterClass(alwaysRun = true)
   public void cleanUp() throws Exception {
-      cleanUpJDBC();
+    DAORegistry.reset();
+    cleanUpJDBC();
   }
 
   protected AnomalyFunctionDTO getTestFunctionSpec(String metricName, String collection) {

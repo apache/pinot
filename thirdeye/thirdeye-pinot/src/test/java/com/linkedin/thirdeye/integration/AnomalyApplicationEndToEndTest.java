@@ -82,13 +82,6 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
 
   private void setup() throws Exception {
 
-    DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
-    DAO_REGISTRY
-        .registerDAOs(anomalyFunctionDAO, emailConfigurationDAO, rawResultDAO, mergedResultDAO,
-            jobDAO, taskDAO, datasetConfigDAO, metricConfigDAO, dashboardConfigDAO,
-            ingraphMetricConfigDAO, ingraphDashboardConfigDAO, overrideConfigDAO,
-            alertConfigManager, dataCompletenessConfigDAO);
-
     // Mock query cache
     ThirdEyeClient mockThirdeyeClient = Mockito.mock(ThirdEyeClient.class);
     Mockito.when(mockThirdeyeClient.execute(Matchers.any(ThirdEyeRequest.class)))
@@ -131,7 +124,7 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
     emailConfigurationDAO.save(getTestEmailConfiguration(metric, collection));
 
     // create test alert configuration
-    alertConfigManager.save(getTestAlertConfiguration("test alert v2"));
+    alertConfigDAO.save(getTestAlertConfiguration("test alert v2"));
 
     // create test dataset config
     datasetConfigDAO.save(getTestDatasetConfig(collection));
@@ -266,7 +259,7 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
 
     // Raw anomalies of the same function and dimensions should have been merged by the worker, so we
     // check if any raw anomalies present, whose existence means the worker fails the synchronous merge.
-    List<RawAnomalyResultDTO> rawAnomalies = rawResultDAO.findUnmergedByFunctionId(functionId);
+    List<RawAnomalyResultDTO> rawAnomalies = rawAnomalyResultDAO.findUnmergedByFunctionId(functionId);
     Assert.assertTrue(rawAnomalies.size() == 0);
 
     // start merge
@@ -274,7 +267,7 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
 
     // check merged anomalies
     // Thread.sleep(4000);
-    List<MergedAnomalyResultDTO> mergedAnomalies = mergedResultDAO.findByFunctionId(functionId);
+    List<MergedAnomalyResultDTO> mergedAnomalies = mergedAnomalyResultDAO.findByFunctionId(functionId);
     Assert.assertTrue(mergedAnomalies.size() > 0);
 
     // check for job status COMPLETED

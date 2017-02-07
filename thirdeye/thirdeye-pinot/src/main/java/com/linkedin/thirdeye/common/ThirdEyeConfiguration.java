@@ -79,10 +79,6 @@ public abstract class ThirdEyeConfiguration extends Configuration {
     return getRootDir() + "/detector-config/anomaly-functions/functions.properties";
   }
 
-  public String getAnomaliesViewConfigPath() {
-    return getRootDir() + "/webapp-config/anomaly-views/views.properties";
-  }
-
   public String getSmtpHost() {
     return smtpHost;
   }
