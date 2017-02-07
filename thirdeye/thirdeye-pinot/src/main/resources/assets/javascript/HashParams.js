@@ -14,6 +14,15 @@ function HashParams() {
   this.ANOMALIES_DASHBOARD_ID = 'dashboardId';
   this.ANOMALIES_ANOMALY_IDS = 'anomalyIds';
 
+  this.ANALYSIS_METRIC_ID = 'metricId';
+  this.ANALYSIS_CURRENT_START= 'currentStart';
+  this.ANALYSIS_CURRENT_END = 'currentEnd';
+  this.ANALYSIS_BASELINE_START = 'baselineStart';
+  this.ANALYSIS_BASELINE_END = 'baselineEnd';
+  this.ANALYSIS_FILTERS = 'filters';
+  this.ANALYSIS_GRANULARITY = 'granularity';
+  this.ANALYSIS_DIMENSION = 'dimension';
+
   this.RAND = 'rand';
 
   // this map has key = <controller name> and value = <map of param names and its default value>
@@ -81,9 +90,19 @@ HashParams.prototype = {
       this.controllerNameToParamNamesMap[this.ANOMALIES_CONTROLLER] = paramNamesToDefaultValuesMap;
 
       // analysis
-
+      paramNamesToDefaultValuesMap = {};
+      paramNamesToDefaultValuesMap[this.TAB] = constants.TAB_ANALYSIS;
+      paramNamesToDefaultValuesMap[this.ANALYSIS_CURRENT_START] = null;
+      paramNamesToDefaultValuesMap[this.ANALYSIS_CURRENT_END]= null;
+      paramNamesToDefaultValuesMap[this.ANALYSIS_METRIC_ID]= null;
+      paramNamesToDefaultValuesMap[this.ANALYSIS_BASELINE_START] = null;
+      paramNamesToDefaultValuesMap[this.ANALYSIS_BASELINE_END] = null;
+      paramNamesToDefaultValuesMap[this.ANALYSIS_FILTERS] = null;
+      paramNamesToDefaultValuesMap[this.ANALYSIS_GRANULARITY] = constants.DEFAULT_ANALYSIS_GRANULARITY;
+      paramNamesToDefaultValuesMap[this.ANALYSIS_DIMENSION] = constants.DEFAULT_ANALYSIS_DIMENSION;
+      this.controllerNameToParamNamesMap[this.ANALYSIS_CONTROLLER] = paramNamesToDefaultValuesMap;
 
       console.log('hash Params init');
       console.log(this.controllerNameToParamNamesMap);
     }
-}
+};

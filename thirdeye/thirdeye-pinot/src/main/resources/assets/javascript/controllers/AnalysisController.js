@@ -10,7 +10,7 @@ function AnalysisController(parentController) {
 
 AnalysisController.prototype = {
   handleAppEvent: function (hashParams) {
-    this.analysisModel.init(hashParams);
+    this.analysisModel.init(HASH_SERVICE.getParams());
     this.analysisModel.update(HASH_SERVICE.getParams());
     this.analysisView.init();
     this.analysisView.render();

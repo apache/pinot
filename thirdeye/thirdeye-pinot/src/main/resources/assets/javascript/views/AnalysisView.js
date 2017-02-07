@@ -46,6 +46,7 @@ AnalysisView.prototype = {
       var metricAlias = selectedData.map(function (e) {return e.text})[0];
       var metricName = selectedData.map(function (e) {return e.name})[0];
       self.viewParams['metric'] = {id: metricId, alias: metricAlias, allowClear:true, name:metricName};
+      self.viewParams['metricId'] = metricId;
 
       // Now render the dimensions and filters for selected metric
       self.renderGranularity(self.viewParams.metric.id);

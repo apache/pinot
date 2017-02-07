@@ -148,7 +148,7 @@ DataService.prototype = {
     },
 
     fetchTimeseriesCompare: function (metricId, currentStart, currentEnd, baselineStart, baselineEnd,
-        dimension, filters, granularity) {
+        dimension = "ALL", filters = {}, granularity = "DAYS") {
       var url = "/timeseries/compare/" + metricId + "/" + currentStart + "/" + currentEnd + "/"
           + baselineStart + "/" + baselineEnd + "?dimension=" + dimension + "&filters="
           + JSON.stringify(filters) + "&granularity=" + granularity;
@@ -158,7 +158,7 @@ DataService.prototype = {
     },
 
   fetchHeatmapData: function (metricId, currentStart, currentEnd, baselineStart, baselineEnd,
-      filters) {
+      filters = {}) {
     var url = "/data/heatmap/" + metricId + "/" + currentStart + "/" + currentEnd + "/"
         + baselineStart + "/" + baselineEnd + "?filters=" + JSON.stringify(filters);
     console.log("heatmap data fetch URL ----> ");

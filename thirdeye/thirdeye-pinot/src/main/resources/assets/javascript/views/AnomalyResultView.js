@@ -344,8 +344,10 @@ AnomalyResultView.prototype = {
   setupListenersOnAnomaly : function(idx, anomaly) {
     var rootCauseAnalysisParams = {
       metric : anomaly.metric,
-      rangeStart : anomaly.currentStart,
-      rangeEnd : anomaly.currentEnd,
+      currentStart : anomaly.currentStart,
+      currentEnd : anomaly.currentEnd,
+      baselineStart: anomaly.baselineStart,
+      baselineEnd: anomaly.baselineEnd,
       dimension : anomaly.anomalyFunctionDimension
     }
     $('#root-cause-analysis-button-' + idx).click(rootCauseAnalysisParams, this.dataEventHandler.bind(this));

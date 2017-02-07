@@ -42,6 +42,10 @@ HashService.prototype = {
     switch (key) {
       case HASH_PARAMS.ANOMALIES_START_DATE:
       case HASH_PARAMS.ANOMALIES_END_DATE:
+      case HASH_PARAMS.ANALYSIS_CURRENT_START:
+      case HASH_PARAMS.ANALYSIS_CURRENT_END:
+      case HASH_PARAMS.ANALYSIS_BASELINE_START:
+      case HASH_PARAMS.ANALYSIS_BASELINE_END:
         value = moment(value);
         break;
       case HASH_PARAMS.ANOMALIES_PAGE_NUMBER:
@@ -79,11 +83,11 @@ HashService.prototype = {
       }
       var defaultValue = paramNamesToDefaultValuesMap[paramName];
       var value = this.get(paramName);
-      if (value == undefined && defaultValue != undefined) { //if default value is present, use that
+      if (!value && defaultValue) { //if default value is present, use that
         value = defaultValue;
         this.set(paramName, defaultValue);
       }
-      if (value != undefined) {
+      if (value) {
         value = JSON.stringify(value);
         if (value.startsWith("\"")) {
           value = value.slice(1, -1);
