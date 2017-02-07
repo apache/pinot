@@ -2,8 +2,10 @@ package com.linkedin.thirdeye.datalayer.dao;
 
 import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
 import com.linkedin.thirdeye.datalayer.entity.AlertConfigIndex;
+import com.linkedin.thirdeye.datalayer.entity.EventIndex;
 import com.linkedin.thirdeye.datalayer.entity.OverrideConfigIndex;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
+import com.linkedin.thirdeye.datalayer.pojo.EventBean;
 import com.linkedin.thirdeye.datalayer.pojo.OverrideConfigBean;
 
 import java.sql.Connection;
@@ -104,6 +106,8 @@ public class GenericPojoDao {
 
     pojoInfoMap.put(OverrideConfigBean.class,
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, OverrideConfigIndex.class));
+
+    pojoInfoMap.put(EventBean.class, newPojoInfo(DEFAULT_BASE_TABLE_NAME, EventIndex.class));
 
     pojoInfoMap
         .put(AlertConfigBean.class, newPojoInfo(DEFAULT_BASE_TABLE_NAME, AlertConfigIndex.class));

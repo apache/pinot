@@ -9,6 +9,7 @@ import com.linkedin.thirdeye.datalayer.bao.jdbc.DashboardConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.DataCompletenessConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.DatasetConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.EmailConfigurationManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.EventManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.IngraphDashboardConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.IngraphMetricConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.JobManagerImpl;
@@ -71,6 +72,7 @@ public abstract class AbstractManagerTestBase {
   protected OverrideConfigManager overrideConfigDAO;
   protected AlertConfigManager alertConfigDAO;
   protected DataCompletenessConfigManager dataCompletenessConfigDAO;
+  protected EventManager eventManager;
 
   protected static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
@@ -94,6 +96,7 @@ public abstract class AbstractManagerTestBase {
   void initializeDs(PersistenceConfig configuration) {
     ds = new DataSource();
     ds.setUrl(configuration.getDatabaseConfiguration().getUrl() + dbId);
+    System.out.println("Creating db with connection url : " + ds.getUrl());
     ds.setPassword(configuration.getDatabaseConfiguration().getPassword());
     ds.setUsername(configuration.getDatabaseConfiguration().getUser());
     ds.setDriverClassName(configuration.getDatabaseConfiguration().getProperties()
@@ -159,6 +162,7 @@ public abstract class AbstractManagerTestBase {
     overrideConfigDAO = managerProvider.getInstance(OverrideConfigManagerImpl.class);
     alertConfigDAO = managerProvider.getInstance(AlertConfigManagerImpl.class);
     dataCompletenessConfigDAO = managerProvider.getInstance(DataCompletenessConfigManagerImpl.class);
+    eventManager = managerProvider.getInstance(EventManagerImpl.class);
 
     DAO_REGISTRY.setAnomalyFunctionDAO(anomalyFunctionDAO);
     DAO_REGISTRY.setEmailConfigurationDAO(emailConfigurationDAO);
@@ -174,7 +178,6 @@ public abstract class AbstractManagerTestBase {
     DAO_REGISTRY.setOverrideConfigDAO(overrideConfigDAO);
     DAO_REGISTRY.setAlertConfigDAO(alertConfigDAO);
     DAO_REGISTRY.setDataCompletenessConfigDAO(dataCompletenessConfigDAO);
-
   }
 
   @AfterClass(alwaysRun = true)
