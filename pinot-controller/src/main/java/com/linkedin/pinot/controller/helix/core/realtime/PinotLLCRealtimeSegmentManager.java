@@ -31,6 +31,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.helix.AccessOption;
@@ -77,6 +79,7 @@ public class PinotLLCRealtimeSegmentManager {
   private static final int KAFKA_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS = 10000;
   protected static final int STARTING_SEQUENCE_NUMBER = 0; // Initial sequence number for new table segments
   protected static final long END_OFFSET_FOR_CONSUMING_SEGMENTS = Long.MAX_VALUE;
+  private static final int NUM_LOCKS = 4;
 
   private static PinotLLCRealtimeSegmentManager INSTANCE = null;
 
@@ -88,6 +91,7 @@ public class PinotLLCRealtimeSegmentManager {
   private boolean _amILeader = false;
   private final ControllerConf _controllerConf;
   private final ControllerMetrics _controllerMetrics;
+  private final Lock[] _idealstateUpdateLocks;
 
   public static synchronized void create(PinotHelixResourceManager helixResourceManager, ControllerConf controllerConf,
       ControllerMetrics controllerMetrics) {
@@ -126,6 +130,10 @@ public class PinotLLCRealtimeSegmentManager {
     _clusterName = clusterName;
     _controllerConf = controllerConf;
     _controllerMetrics = controllerMetrics;
+    _idealstateUpdateLocks = new Lock[NUM_LOCKS];
+    for (int i = 0; i < NUM_LOCKS; i++) {
+      _idealstateUpdateLocks[i] = new ReentrantLock();
+    }
   }
 
   public static PinotLLCRealtimeSegmentManager getInstance() {
@@ -354,7 +362,7 @@ public class PinotLLCRealtimeSegmentManager {
             idealState.setReplicas(Integer.toString(nReplicas));
             return addLLCRealtimeSegmentsInIdealState(idealState, idealStateEntries);
           }
-        }, RetryPolicies.fixedDelayRetryPolicy(10, 500L));
+        }, RetryPolicies.exponentialBackoffRetryPolicy(10, 1000L, 1.2f));
       } catch (Exception e) {
         LOGGER.error("Failed to update idealstate for table {} entries {}", realtimeTableName, idealStateEntries, e);
         _controllerMetrics.addMeteredGlobalValue(ControllerMeter.LLC_ZOOKEPER_UPDATE_FAILURES, 1);
@@ -372,7 +380,7 @@ public class PinotLLCRealtimeSegmentManager {
         public IdealState apply(IdealState idealState) {
           return updateForNewRealtimeSegment(idealState, newInstances, oldSegmentNameStr, newSegmentNameStr);
         }
-      }, RetryPolicies.fixedDelayRetryPolicy(10, 500L));
+      }, RetryPolicies.exponentialBackoffRetryPolicy(10, 1000L, 1.2f));
     } catch (Exception e) {
       LOGGER.error("Failed to update idealstate for table {}, old segment {}, new segment {}, newInstances {}",
           realtimeTableName, oldSegmentNameStr, newSegmentNameStr, newInstances, e);
@@ -531,7 +539,17 @@ public class PinotLLCRealtimeSegmentManager {
 
     // TODO Introduce a controller failure here for integration testing
 
-    updateHelixIdealState(realtimeTableName, newInstances, committingSegmentNameStr, newSegmentNameStr);
+    // When multiple segments of the same table complete around the same time it is possible that
+    // the idealstate udpate fails due to contention. We serialize the updates to the idealstate
+    // to reduce this contention. We may still contend with RetentionManager, or other updates
+    // to idealstate from other controllers, but then we have the retry mechanism to get around that.
+    Lock lock = _idealstateUpdateLocks[realtimeTableName.hashCode()%NUM_LOCKS];
+    try {
+      lock.lock();
+      updateHelixIdealState(realtimeTableName, newInstances, committingSegmentNameStr, newSegmentNameStr);
+    } finally {
+      lock.unlock();
+    }
     return true;
   }
 
@@ -861,9 +879,10 @@ public class PinotLLCRealtimeSegmentManager {
           LOGGER.info("Attempting to mark {} offline. Current map:{}", segmentNameStr, instanceStateMap.toString());
           return idealState;
         }
-      }, RetryPolicies.fixedDelayRetryPolicy(10, 500L));
+      }, RetryPolicies.exponentialBackoffRetryPolicy(10, 500L, 1.2f));
     } catch (Exception e) {
-      LOGGER.error("Failed to update idealstate for table {} instance {} segment {}", realtimeTableName, instance, segmentNameStr, e);
+      LOGGER.error("Failed to update idealstate for table {} instance {} segment {}", realtimeTableName, instance,
+          segmentNameStr, e);
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.LLC_ZOOKEPER_UPDATE_FAILURES, 1);
       throw e;
     }
