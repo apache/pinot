@@ -33,7 +33,7 @@ public class MultiValueDictionaryTest {
   public void testMultiValueIndexing()
       throws Exception {
     final FieldSpec mvIntFs = new DimensionFieldSpec(COL_NAME, FieldSpec.DataType.LONG, false);
-    final LongMutableDictionary dict = new LongMutableDictionary(mvIntFs);
+    final LongMutableDictionary dict = new LongMutableDictionary(COL_NAME);
     final FixedByteSingleColumnMultiValueReaderWriter indexer =
         new FixedByteSingleColumnMultiValueReaderWriter(NROWS, Integer.SIZE / 8, MAX_N_VALUES);
 
