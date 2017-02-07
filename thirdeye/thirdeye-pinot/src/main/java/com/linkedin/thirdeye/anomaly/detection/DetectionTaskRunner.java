@@ -4,37 +4,34 @@ import com.google.common.collect.ArrayListMultimap;
 import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeExecutor;
 import com.linkedin.thirdeye.anomaly.override.OverrideConfigHelper;
+import com.linkedin.thirdeye.anomaly.task.TaskContext;
+import com.linkedin.thirdeye.anomaly.task.TaskInfo;
+import com.linkedin.thirdeye.anomaly.task.TaskResult;
+import com.linkedin.thirdeye.anomaly.task.TaskRunner;
 import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
+import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.DimensionMap;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.client.DAORegistry;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.client.ResponseParserUtils;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
+import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
-
 import com.linkedin.thirdeye.detector.metric.transfer.MetricTransfer;
 import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-
 import java.util.Properties;
 import org.apache.commons.collections.CollectionUtils;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.linkedin.thirdeye.anomaly.task.TaskContext;
-import com.linkedin.thirdeye.anomaly.task.TaskInfo;
-import com.linkedin.thirdeye.anomaly.task.TaskResult;
-import com.linkedin.thirdeye.anomaly.task.TaskRunner;
-import com.linkedin.thirdeye.api.DimensionKey;
-import com.linkedin.thirdeye.api.MetricTimeSeries;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
-import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
 public class DetectionTaskRunner implements TaskRunner {
 
@@ -43,24 +40,34 @@ public class DetectionTaskRunner implements TaskRunner {
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
-  private List<String> collectionDimensions;
   private DateTime windowStart;
   private DateTime windowEnd;
+  private AnomalyFunctionDTO anomalyFunctionSpec;
+  private long jobExecutionId;
+
+  private List<String> collectionDimensions;
   private List<MergedAnomalyResultDTO> knownMergedAnomalies;
   private List<ScalingFactor> scalingFactors;
   private List<RawAnomalyResultDTO> existingRawAnomalies;
   private BaseAnomalyFunction anomalyFunction;
 
-  public List<TaskResult> execute(TaskInfo taskInfo, TaskContext taskContext) throws Exception {
+  protected void setupTask(TaskInfo taskInfo) {
     DetectionTaskInfo detectionTaskInfo = (DetectionTaskInfo) taskInfo;
-    List<TaskResult> taskResult = new ArrayList<>();
-    LOG.info("Begin executing task {}", taskInfo);
-
-    AnomalyFunctionFactory anomalyFunctionFactory = taskContext.getAnomalyFunctionFactory();
-    AnomalyFunctionDTO anomalyFunctionSpec = detectionTaskInfo.getAnomalyFunctionSpec();
-    anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
     windowStart = detectionTaskInfo.getWindowStartTime();
     windowEnd = detectionTaskInfo.getWindowEndTime();
+    anomalyFunctionSpec = detectionTaskInfo.getAnomalyFunctionSpec();
+    jobExecutionId = detectionTaskInfo.getJobExecutionId();
+  }
+
+  public List<TaskResult> execute(TaskInfo taskInfo, TaskContext taskContext) throws Exception {
+    LOG.info("Begin executing task {}", taskInfo);
+
+    setupTask(taskInfo);
+
+    List<TaskResult> taskResult = new ArrayList<>();
+
+    AnomalyFunctionFactory anomalyFunctionFactory = taskContext.getAnomalyFunctionFactory();
+    anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
 
     String dataset = anomalyFunctionSpec.getCollection();
     DatasetConfigDTO datasetConfig = DAO_REGISTRY.getDatasetConfigDAO().findByDataset(dataset);
@@ -104,7 +111,7 @@ public class DetectionTaskRunner implements TaskRunner {
     boolean isBackfill = false;
     // If the current job is a backfill (adhoc) detection job, set notified flag to true so the merged anomalies do not
     // induce alerts and emails.
-    String jobName = taskContext.getJobDAO().getJobNameByJobId(detectionTaskInfo.getJobExecutionId());
+    String jobName = DAO_REGISTRY.getJobDAO().getJobNameByJobId(jobExecutionId);
     if (jobName != null && jobName.toLowerCase().startsWith(BACKFILL_PREFIX)) {
       isBackfill = true;
     }
