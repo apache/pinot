@@ -165,6 +165,10 @@ public class AlertTaskRunnerV2 implements TaskRunner {
               }
             }
           }
+        if (reports.size() == 0) {
+          LOG.warn("Could not fetch report data for " + alertConfig.getName());
+          return;
+        }
           long reportStartTs = reports.get(0).getTimeBuckets().get(0).getCurrentStart();
           metricDimensionValueReports = DataReportHelper.getInstance().getDimensionReportList(reports);
           for (int i = 0; i < metricDimensionValueReports.size(); i++) {

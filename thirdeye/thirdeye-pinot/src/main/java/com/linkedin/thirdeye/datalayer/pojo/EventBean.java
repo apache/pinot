@@ -78,4 +78,17 @@ public class EventBean extends AbstractBean {
   public void setStartTime(long startTime) {
     this.startTime = startTime;
   }
+
+  @Override
+  public String toString() {
+    return "EventBean{" +
+        "endTime=" + endTime +
+        ", name='" + name + '\'' +
+        ", metric='" + metric + '\'' +
+        ", service='" + service + '\'' +
+        ", eventType='" + eventType + '\'' +
+        ", startTime=" + startTime +
+        ", targetDimensionMap=" + targetDimensionMap +
+        '}';
+  }
 }

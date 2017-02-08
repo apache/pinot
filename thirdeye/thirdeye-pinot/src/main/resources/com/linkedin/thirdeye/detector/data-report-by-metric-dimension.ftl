@@ -57,14 +57,7 @@
               ${dimensionKey}
               </td>
               <#assign value = metricReport.subDimensionShareValueMap[dimensionKey]?number >
-              <td
-                <#if (value> 35) > style="background-color: #3333ff;" </#if>
-                <#if (value > 15) > style="background-color: #8080ff;" </#if>
-                <#if (value > 5) > style="background-color: #e6e6ff;" </#if>
-                <#if (value < -35) > style="background-color: #ff0080;" </#if>
-                <#if (value < -15) > style="background-color: #ff80bf;" </#if>
-                <#if (value < -5) > style="background-color: #ffe6f2;" </#if>
-              > ${value}%</td>
+              <td> ${value}%</td>
 
               <#assign value = metricReport.subDimensionTotalValueMap[dimensionKey]?number >
               <td
