@@ -21,7 +21,7 @@ public class AnomalyFunctionBean extends AbstractBean {
 
   private String functionName;
 
-  // This variable is topic metric, which is used as a search qutiria for searching anomalies
+  // This variable is topic metric, which is used as a search criteria for searching anomalies
   private String metric;
 
   // The list of metrics that have to be retrieved in order to detect anomalies for this function
