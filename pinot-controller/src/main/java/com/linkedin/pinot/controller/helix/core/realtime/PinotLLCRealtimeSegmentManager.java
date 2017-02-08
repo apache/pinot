@@ -543,7 +543,9 @@ public class PinotLLCRealtimeSegmentManager {
     // the idealstate udpate fails due to contention. We serialize the updates to the idealstate
     // to reduce this contention. We may still contend with RetentionManager, or other updates
     // to idealstate from other controllers, but then we have the retry mechanism to get around that.
-    Lock lock = _idealstateUpdateLocks[realtimeTableName.hashCode()%NUM_LOCKS];
+    // hash code can be negative, so make sure we are getting a positive lock index
+    int lockIndex = (realtimeTableName.hashCode() & Integer.MAX_VALUE) % NUM_LOCKS;
+    Lock lock = _idealstateUpdateLocks[lockIndex];
     try {
       lock.lock();
       updateHelixIdealState(realtimeTableName, newInstances, committingSegmentNameStr, newSegmentNameStr);
