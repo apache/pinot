@@ -3,6 +3,8 @@ package com.linkedin.thirdeye.datalayer.bao;
 import java.util.List;
 
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import com.linkedin.thirdeye.constant.MetricAggFunction;
@@ -13,6 +15,16 @@ public class TestAnomalyFunctionManager extends AbstractManagerTestBase {
   private Long anomalyFunctionId;
   private static String collection = "my dataset";
   private static String metricName = "__counts";
+
+  @BeforeClass
+  void beforeClass() {
+    super.init();
+  }
+
+  @AfterClass(alwaysRun = true)
+  void afterClass() {
+    super.cleanup();
+  }
 
   @Test
   public void testCreate() {

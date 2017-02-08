@@ -3,6 +3,8 @@ package com.linkedin.thirdeye.datalayer.bao;
 import java.util.List;
 
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import com.linkedin.thirdeye.datalayer.dto.IngraphDashboardConfigDTO;
@@ -13,6 +15,16 @@ public class TestIngraphDatasetConfigManager extends AbstractManagerTestBase {
   private Long ingraphDashboardConfigId2 = null;
   private static String name1 = "dashboard1";
   private static String name2 = "dashboard2";
+
+  @BeforeClass
+  void beforeClass() {
+    super.init();
+  }
+
+  @AfterClass(alwaysRun = true)
+  void afterClass() {
+    super.cleanup();
+  }
 
   @Test
   public void testCreateIngraphDashboard() {

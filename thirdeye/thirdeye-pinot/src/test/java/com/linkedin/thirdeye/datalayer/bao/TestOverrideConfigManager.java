@@ -9,11 +9,23 @@ import java.util.List;
 import java.util.Map;
 import org.joda.time.DateTime;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 public class TestOverrideConfigManager extends AbstractManagerTestBase {
   private Long overrideConfigId1 = null;
   private DateTime now = new DateTime();
+
+  @BeforeClass
+  void beforeClass() {
+    super.init();
+  }
+
+  @AfterClass(alwaysRun = true)
+  void afterClass() {
+    super.cleanup();
+  }
 
   @Test
   public void testCreate() {

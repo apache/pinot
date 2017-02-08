@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeConfig;
@@ -19,6 +21,16 @@ public class TestMergedAnomalyResultManager extends AbstractManagerTestBase {
   MergedAnomalyResultDTO mergedResult = null;
   Long anomalyResultId;
   AnomalyFunctionDTO function = getTestFunctionSpec("metric", "dataset");
+
+  @BeforeClass
+  void beforeClass() {
+    super.init();
+  }
+
+  @AfterClass(alwaysRun = true)
+  void afterClass() {
+    super.cleanup();
+  }
 
   @Test
   public void testMergedResultCRUD() {

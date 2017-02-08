@@ -6,6 +6,7 @@ import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DataCompletenessConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
+import com.linkedin.thirdeye.datalayer.bao.EventManager;
 import com.linkedin.thirdeye.datalayer.bao.IngraphDashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.IngraphMetricConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
@@ -33,6 +34,7 @@ public class DAORegistry {
   private IngraphMetricConfigManager ingraphMetricConfigDAO;
   private OverrideConfigManager overrideConfigDAO;
   private DataCompletenessConfigManager dataCompletenessConfigDAO;
+  private EventManager eventDAO;
 
   private static final DAORegistry singleton = new DAORegistry();
 
@@ -49,20 +51,29 @@ public class DAORegistry {
    * Reset registry to empty initial state.
    */
   public static void reset() {
-    singleton.anomalyFunctionDAO = null;
-    singleton.emailConfigurationDAO = null;
-    singleton.alertConfigDAO = null;
-    singleton.rawAnomalyResultDAO = null;
-    singleton.mergedAnomalyResultDAO = null;
-    singleton.jobDAO = null;
-    singleton.taskDAO = null;
-    singleton.datasetConfigDAO = null;
-    singleton.metricConfigDAO = null;
-    singleton.dashboardConfigDAO = null;
-    singleton.ingraphDashboardConfigDAO = null;
-    singleton.ingraphMetricConfigDAO = null;
-    singleton.overrideConfigDAO = null;
-    singleton.dataCompletenessConfigDAO = null;
+    singleton.reset_internal();
+  }
+
+  /****************************************************************************
+   * INTERNAL
+   */
+
+  private void reset_internal() {
+    anomalyFunctionDAO = null;
+    emailConfigurationDAO = null;
+    alertConfigDAO = null;
+    rawAnomalyResultDAO = null;
+    mergedAnomalyResultDAO = null;
+    jobDAO = null;
+    taskDAO = null;
+    datasetConfigDAO = null;
+    metricConfigDAO = null;
+    dashboardConfigDAO = null;
+    ingraphDashboardConfigDAO = null;
+    ingraphMetricConfigDAO = null;
+    overrideConfigDAO = null;
+    dataCompletenessConfigDAO = null;
+    eventDAO = null;
   }
 
   /**
@@ -198,6 +209,15 @@ public class DAORegistry {
   public void setDataCompletenessConfigDAO(DataCompletenessConfigManager dataCompletenessConfigDAO) {
     assertNull(this.dataCompletenessConfigDAO);
     this.dataCompletenessConfigDAO = dataCompletenessConfigDAO;
+  }
+
+  public EventManager getEventDAO() {
+    return assertNotNull(eventDAO);
+  }
+
+  public void setEventDAO(EventManager eventDAO) {
+    assertNull(this.eventDAO);
+    this.eventDAO = eventDAO;
   }
 
   /****************************************************************************

@@ -9,15 +9,7 @@ public class TestDaoRegistry {
 
   final DAORegistry registry = DAORegistry.getInstance();
 
-  @BeforeTest
-  void before() {
-    DAORegistry.reset();
-  }
-
-  @AfterClass
-  void after() {
-    DAORegistry.reset();
-  }
+  // NOTE: DAORegistry is reset by test listener before test start
 
   // TODO cover all getters and setters
   //    registry.getAnomalyFunctionDAO();

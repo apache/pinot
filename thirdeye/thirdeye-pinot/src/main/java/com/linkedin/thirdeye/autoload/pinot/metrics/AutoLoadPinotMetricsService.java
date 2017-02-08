@@ -44,10 +44,6 @@ public class AutoLoadPinotMetricsService implements Runnable {
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
-  private DatasetConfigManager datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
-  private MetricConfigManager metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
-  private DashboardConfigManager dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
-
   private static final String DEFAULT_INGRAPH_METRIC_NAMES_COLUMN = "metricName";
   private static final String DEFAULT_INGRAPH_METRIC_VALUES_COLUMN = "value";
 
@@ -83,7 +79,7 @@ public class AutoLoadPinotMetricsService implements Runnable {
 
         Schema schema = allSchemas.get(dataset);
         if (!isIngraphDataset(schema)) {
-          DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(dataset);
+          DatasetConfigDTO datasetConfig = DAO_REGISTRY.getDatasetConfigDAO().findByDataset(dataset);
           addPinotDataset(dataset, schema, datasetConfig);
         }
       }
@@ -121,20 +117,20 @@ public class AutoLoadPinotMetricsService implements Runnable {
     // Create DatasetConfig
     DatasetConfigDTO datasetConfigDTO = ConfigGenerator.generateDatasetConfig(dataset, schema);
     LOG.info("Creating dataset for {}", dataset);
-    datasetConfigDAO.save(datasetConfigDTO);
+    DAO_REGISTRY.getDatasetConfigDAO().save(datasetConfigDTO);
 
     // Create MetricConfig
     for (MetricFieldSpec metricFieldSpec : metricSpecs) {
       MetricConfigDTO metricConfigDTO = ConfigGenerator.generateMetricConfig(metricFieldSpec, dataset);
       LOG.info("Creating metric {} for {}", metricConfigDTO.getName(), dataset);
-      metricConfigDAO.save(metricConfigDTO);
+      DAO_REGISTRY.getMetricConfigDAO().save(metricConfigDTO);
     }
 
     // Create Default DashboardConfig
-    List<Long> metricIds = ConfigGenerator.getMetricIdsFromMetricConfigs(metricConfigDAO.findByDataset(dataset));
+    List<Long> metricIds = ConfigGenerator.getMetricIdsFromMetricConfigs(DAO_REGISTRY.getMetricConfigDAO().findByDataset(dataset));
     DashboardConfigDTO dashboardConfigDTO = ConfigGenerator.generateDefaultDashboardConfig(dataset, metricIds);
     LOG.info("Creating default dashboard for dataset {}", dataset);
-    dashboardConfigDAO.save(dashboardConfigDTO);
+    DAO_REGISTRY.getDashboardConfigDAO().save(dashboardConfigDTO);
   }
 
   /**
@@ -189,7 +185,7 @@ public class AutoLoadPinotMetricsService implements Runnable {
         datasetConfig.setDimensionsHaveNoPreAggregation(dimensionsHaveNoPreAggregation);
       }
       LOG.info("Added dimensions {}, removed {}", dimensionsToAdd, dimensionsToRemove);
-      datasetConfigDAO.update(datasetConfig);
+      DAO_REGISTRY.getDatasetConfigDAO().update(datasetConfig);
     }
   }
 
@@ -197,7 +193,7 @@ public class AutoLoadPinotMetricsService implements Runnable {
 
     LOG.info("Checking for metric changes in {}", dataset);
     List<MetricFieldSpec> schemaMetricSpecs = schema.getMetricFieldSpecs();
-    List<MetricConfigDTO> datasetMetricConfigs = metricConfigDAO.findByDataset(dataset);
+    List<MetricConfigDTO> datasetMetricConfigs = DAO_REGISTRY.getMetricConfigDAO().findByDataset(dataset);
     List<String> datasetMetricNames = new ArrayList<>();
     for (MetricConfigDTO metricConfig : datasetMetricConfigs) {
       datasetMetricNames.add(metricConfig.getName());
@@ -210,7 +206,7 @@ public class AutoLoadPinotMetricsService implements Runnable {
       if (!datasetMetricNames.contains(metricName)) {
         MetricConfigDTO metricConfigDTO = ConfigGenerator.generateMetricConfig(metricSpec, dataset);
         LOG.info("Creating metric {} for {}", metricName, dataset);
-        metricsToAdd.add(metricConfigDAO.save(metricConfigDTO));
+        metricsToAdd.add(DAO_REGISTRY.getMetricConfigDAO().save(metricConfigDTO));
       }
     }
 
@@ -218,10 +214,10 @@ public class AutoLoadPinotMetricsService implements Runnable {
     if (CollectionUtils.isNotEmpty(metricsToAdd)) {
       LOG.info("Metrics to add {}", metricsToAdd);
       String dashboardName = ThirdEyeUtils.getDefaultDashboardName(dataset);
-      DashboardConfigDTO dashboardConfig = dashboardConfigDAO.findByName(dashboardName);
+      DashboardConfigDTO dashboardConfig = DAO_REGISTRY.getDashboardConfigDAO().findByName(dashboardName);
       List<Long> metricIds = dashboardConfig.getMetricIds();
       metricIds.addAll(metricsToAdd);
-      dashboardConfigDAO.update(dashboardConfig);
+      DAO_REGISTRY.getDashboardConfigDAO().update(dashboardConfig);
     }
 
     // TODO: write a tool, which given a metric id, erases all traces of that metric from the database
@@ -297,22 +293,22 @@ public class AutoLoadPinotMetricsService implements Runnable {
     if (dimensions.contains(metricNamesColumn)) {
       dimensions.removeAll(Lists.newArrayList(metricNamesColumn));
       datasetConfigDTO.setDimensions(dimensions);
-      datasetConfigDAO.update(datasetConfigDTO);
+      DAO_REGISTRY.getDatasetConfigDAO().update(datasetConfigDTO);
     }
 
     // remove metricValuesColumn from metrics if exists
-    MetricConfigDTO metricConfigDTO = metricConfigDAO.findByMetricAndDataset(metricValuesColumn, dataset);
+    MetricConfigDTO metricConfigDTO = DAO_REGISTRY.getMetricConfigDAO().findByMetricAndDataset(metricValuesColumn, dataset);
 
     if (metricConfigDTO != null) {
       Long metricId = metricConfigDTO.getId();
-      metricConfigDAO.delete(metricConfigDTO);
+      DAO_REGISTRY.getMetricConfigDAO().delete(metricConfigDTO);
 
       // remove metricValuesColumn id from default dashboard
-      DashboardConfigDTO dashboardConfig = dashboardConfigDAO.findByName(dashboardName);
+      DashboardConfigDTO dashboardConfig = DAO_REGISTRY.getDashboardConfigDAO().findByName(dashboardName);
       List<Long> dashboardMetricIds = dashboardConfig.getMetricIds();
       dashboardMetricIds.removeAll(Lists.newArrayList(metricId));
       LOG.info("Updating dashboard config for {}", dashboardName);
-      dashboardConfigDAO.update(dashboardConfig);
+      DAO_REGISTRY.getDashboardConfigDAO().update(dashboardConfig);
     }
 
     if (datasetConfigDTO.isAutoDiscoverMetrics()) {
@@ -321,7 +317,7 @@ public class AutoLoadPinotMetricsService implements Runnable {
       List<String> allDistinctMetricNames = fetchMetricAsADimensionMetrics(dataset, metricNamesColumn);
 
       // create metrics for these metric names, if they dont exist
-      List<MetricConfigDTO> existingMetricConfigs = metricConfigDAO.findByDataset(dataset);
+      List<MetricConfigDTO> existingMetricConfigs = DAO_REGISTRY.getMetricConfigDAO().findByDataset(dataset);
       List<String> existingMetricNames = Lists.newArrayList();
       for (MetricConfigDTO existingMetricConfig : existingMetricConfigs) {
         existingMetricNames.add(existingMetricConfig.getName());
@@ -331,15 +327,15 @@ public class AutoLoadPinotMetricsService implements Runnable {
         LOG.info("Creating metric config for {}", metricName);
         MetricFieldSpec metricFieldSpec = new MetricFieldSpec(metricName, metricValuesColumnFieldSpec.getDataType());
         MetricConfigDTO metricConfig = ConfigGenerator.generateMetricConfig(metricFieldSpec, dataset);
-        metricConfigDAO.save(metricConfig);
+        DAO_REGISTRY.getMetricConfigDAO().save(metricConfig);
       }
 
       // Add metrics to default dashboard
-      List<Long> allMetricIds = ConfigGenerator.getMetricIdsFromMetricConfigs(metricConfigDAO.findByDataset(dataset));
-      DashboardConfigDTO dashboardConfig = dashboardConfigDAO.findByName(dashboardName);
+      List<Long> allMetricIds = ConfigGenerator.getMetricIdsFromMetricConfigs(DAO_REGISTRY.getMetricConfigDAO().findByDataset(dataset));
+      DashboardConfigDTO dashboardConfig = DAO_REGISTRY.getDashboardConfigDAO().findByName(dashboardName);
       dashboardConfig.setMetricIds(allMetricIds);
       LOG.info("Creating dashboard config for {}", dashboardName);
-      dashboardConfigDAO.update(dashboardConfig);
+      DAO_REGISTRY.getDashboardConfigDAO().update(dashboardConfig);
     }
   }
 
