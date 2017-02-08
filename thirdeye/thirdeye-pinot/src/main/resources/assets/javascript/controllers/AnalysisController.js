@@ -9,10 +9,11 @@ function AnalysisController(parentController) {
 }
 
 AnalysisController.prototype = {
-  handleAppEvent: function (hashParams) {
-    this.analysisModel.init(HASH_SERVICE.getParams());
-    this.analysisModel.update(HASH_SERVICE.getParams());
-    this.analysisView.init();
+  handleAppEvent: function () {
+    const hashParams = HASH_SERVICE.getParams();
+    this.analysisModel.init(hashParams);
+    this.analysisModel.update(hashParams);
+    this.analysisView.init(hashParams);
     this.analysisView.render();
     this.timeSeriesCompareController.handleAppEvent(hashParams);
   },

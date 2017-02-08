@@ -30,7 +30,7 @@ DataService.prototype = {
       spinner.spin(target);
 
       console.log("request url:", url)
-      $.ajax({
+      return $.ajax({
         url: url,
         data: data,
         type: 'get',
@@ -43,7 +43,11 @@ DataService.prototype = {
         }
       }).done(function(data) {
         spinner.stop();
-        callback(data);
+        if (callback) {
+          callback(data);
+        } else {
+          return data;
+        }
       });
     },
 
@@ -145,6 +149,17 @@ DataService.prototype = {
     fetchFiltersForMetric : function(metricId) {
       var url = "/data/autocomplete/filters/metric/" + metricId;
       return this.getDataSynchronous(url);
+    },
+
+    fetchMetricId(name) {
+      const url = "/data/data/metricId";
+      const data = {
+        name,
+      };
+
+      return this.getDataAsynchronous(url, data).then(([data]) => {
+        return data.id;
+      });
     },
 
     fetchTimeseriesCompare: function (metricId, currentStart, currentEnd, baselineStart, baselineEnd,

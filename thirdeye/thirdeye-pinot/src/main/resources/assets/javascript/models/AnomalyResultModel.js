@@ -149,5 +149,11 @@ AnomalyResultModel.prototype = {
     default:
       return feedbackType;
     }
-  }
+  },
+  getMetricIdFromName(name) {
+    if (!name) {
+      return;
+    }
+    return dataService.fetchMetricId(name);
+  },
 }

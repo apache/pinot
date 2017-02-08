@@ -348,7 +348,8 @@ AnomalyResultView.prototype = {
       currentEnd : anomaly.currentEnd,
       baselineStart: anomaly.baselineStart,
       baselineEnd: anomaly.baselineEnd,
-      dimension : anomaly.anomalyFunctionDimension
+      // not needed at the moment since it returns {}
+      // dimension : anomaly.anomalyFunctionDimension
     }
     $('#root-cause-analysis-button-' + idx).click(rootCauseAnalysisParams, this.dataEventHandler.bind(this));
     var showDetailsParams = {

@@ -32,6 +32,13 @@ AnomalyResultController.prototype = {
   rootCauseAnalysisButtonClickEventHandler: function (sender, args) {
     console.log("received root cause analysis button click event at AnomalyResultController");
     console.log(args);
+    this.anomalyResultModel.getMetricIdFromName(args.metric).then((id) => {
+      args.metricId = id;
+      HASH_SERVICE.set("tab", 'analysis');
+      HASH_SERVICE.update(args);
+      HASH_SERVICE.refreshWindowHashForRouting('analysis');
+      HASH_SERVICE.routeTo('app');
+    });
 
     // Send this event and the args to parent controller, to route to AnalysisController
   },

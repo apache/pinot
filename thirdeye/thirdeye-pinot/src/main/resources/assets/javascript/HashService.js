@@ -61,7 +61,7 @@ HashService.prototype = {
     console.log('hash service.update');
     console.log(paramsToUpdate)
     for (var key in paramsToUpdate) {
-      this.params[key] = paramsToUpdate[key];
+      this.set(key, paramsToUpdate[key]);
     }
   },
   getParams : function() {
@@ -150,13 +150,8 @@ HashService.prototype = {
     for (let param of paramsToCheck.split('&')){
       const [key, value] = param.split('=');
       const currentValue = params[key];
-      const isMoment = moment.isMoment(currentValue);
 
-      if (isMoment) {
-        if(!currentValue.isSame(value, 'day')) {
-          return true;
-        }
-      } else if (currentValue != value) {
+      if (JSON.stringify(currentValue) !== value) {
         return true;
       }
     }

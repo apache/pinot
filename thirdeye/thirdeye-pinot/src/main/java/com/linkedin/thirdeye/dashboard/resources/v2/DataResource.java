@@ -97,6 +97,14 @@ public class DataResource {
     this.anomaliesResoure = new AnomaliesResource();
   }
 
+//------------- endpoints to metric config -------------
+  @GET
+  @Path("data/metricId")
+  public List<MetricConfigDTO> getMetricsByName(@QueryParam("name") String name) {
+    List<MetricConfigDTO> metricConfigDTOs = metricConfigDAO.findByMetricName(name);
+    return metricConfigDTOs;
+  }
+
   //------------- endpoints to fetch summary -------------
   @GET
   @Path("summary/metrics")
