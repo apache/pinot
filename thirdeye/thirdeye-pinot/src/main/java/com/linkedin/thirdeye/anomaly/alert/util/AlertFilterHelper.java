@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomaly.alert.util;
 
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
@@ -47,15 +48,15 @@ public class AlertFilterHelper {
     List<MergedAnomalyResultDTO> qualifiedAnomalies = new ArrayList<>();
     for (MergedAnomalyResultDTO result : results) {
       // Lazy initiates alert filter for anomalies of the same anomaly function
-      AnomalyFunctionBean anomalyFunctionSpec = result.getFunction();
+      AnomalyFunctionDTO anomalyFunctionSpec = result.getFunction();
       long functionId = anomalyFunctionSpec.getId();
       AlertFilter alertFilter = functionAlertFilter.get(functionId);
       if (alertFilter == null) {
         // Get filtration rule from anomaly function configuration
         alertFilter = initiateAlertFilter(anomalyFunctionSpec);
         functionAlertFilter.put(functionId, alertFilter);
-        LOG.info("Using filter {} for anomaly function {} (dataset: {}, metric: {})", alertFilter,
-            functionId, anomalyFunctionSpec.getCollection(), anomalyFunctionSpec.getMetric());
+        LOG.info("Using filter {} for anomaly function {} (dataset: {}, topic metric: {})", alertFilter,
+            functionId, anomalyFunctionSpec.getCollection(), anomalyFunctionSpec.getTopicMetric());
       }
       if (alertFilter.isQualified(result)) {
         qualifiedAnomalies.add(result);

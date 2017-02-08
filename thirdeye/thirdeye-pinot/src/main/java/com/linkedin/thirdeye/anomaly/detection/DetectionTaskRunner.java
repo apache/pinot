@@ -47,7 +47,7 @@ public class DetectionTaskRunner implements TaskRunner {
 
   private List<String> collectionDimensions;
   private List<MergedAnomalyResultDTO> knownMergedAnomalies;
-  private List<ScalingFactor> scalingFactors;
+//  private List<ScalingFactor> scalingFactors;
   private List<RawAnomalyResultDTO> existingRawAnomalies;
   private BaseAnomalyFunction anomalyFunction;
 
@@ -78,11 +78,15 @@ public class DetectionTaskRunner implements TaskRunner {
     }
 
     LOG.info(
-        "Running anomaly detection job with metricFunction: [{}], metric [{}], collection: [{}]",
-        anomalyFunctionSpec.getFunctionName(), anomalyFunctionSpec.getMetric(),
+        "Running anomaly detection job with metricFunction: [{}], topic metric [{}], collection: [{}]",
+        anomalyFunctionSpec.getFunctionName(), anomalyFunctionSpec.getTopicMetric(),
         anomalyFunctionSpec.getCollection());
 
     collectionDimensions = datasetConfig.getDimensions();
+
+    // Get Time Series
+    List<Pair<Long, Long>> startEndTimeRanges = anomalyFunction.getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis());
+    Map<DimensionKey, MetricTimeSeries> dimensionKeyMetricTimeSeriesMap = TimeSeriesUtil.getTimeSeriesForAnomalyDetection(anomalyFunctionSpec, startEndTimeRanges);
 
     // Get existing anomalies for this time range and this function id for all combinations of dimensions
     if (anomalyFunction.useHistoryAnomaly()) {
@@ -98,13 +102,11 @@ public class DetectionTaskRunner implements TaskRunner {
     // We always find existing raw anomalies to prevent duplicate raw anomalies are generated
     existingRawAnomalies = getExistingRawAnomalies(anomalyFunctionSpec.getId(), windowStart.getMillis(), windowEnd.getMillis());
 
-    List<Pair<Long, Long>> startEndTimeRanges = anomalyFunction.getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis());
-    Map<DimensionKey, MetricTimeSeries> dimensionKeyMetricTimeSeriesMap = TimeSeriesUtil.getTimeSeriesForAnomalyDetection(anomalyFunctionSpec, startEndTimeRanges);
-
-    scalingFactors = OverrideConfigHelper
-        .getTimeSeriesScalingFactors(DAO_REGISTRY.getOverrideConfigDAO(), anomalyFunctionSpec.getCollection(),
-            anomalyFunctionSpec.getMetric(), anomalyFunctionSpec.getId(),
-            anomalyFunction.getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis()));
+    // TODO: Re-enable scaling factor for holiday effect
+//    scalingFactors = OverrideConfigHelper
+//        .getTimeSeriesScalingFactors(DAO_REGISTRY.getOverrideConfigDAO(), anomalyFunctionSpec.getCollection(),
+//            anomalyFunctionSpec.getMetric(), anomalyFunctionSpec.getId(),
+//            anomalyFunction.getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis()));
 
     exploreDimensionsAndAnalyze(dimensionKeyMetricTimeSeriesMap);
 
@@ -153,7 +155,7 @@ public class DetectionTaskRunner implements TaskRunner {
       dimensionNamesToKnownRawAnomalies.put(existingRawAnomaly.getDimensions(), existingRawAnomaly);
     }
 
-    String metricName = anomalyFunction.getSpec().getMetric();
+//    String metricName = anomalyFunction.getSpec().getMetric();
     for (Map.Entry<DimensionKey, MetricTimeSeries> entry : dimensionKeyMetricTimeSeriesMap.entrySet()) {
       DimensionKey dimensionKey = entry.getKey();
 
@@ -200,11 +202,11 @@ public class DetectionTaskRunner implements TaskRunner {
         AnomalyUtils.logAnomaliesOverlapWithWindow(windowStart, windowEnd, historyMergedAnomalies);
 
         // Scaling time series according to the scaling factor
-        if (CollectionUtils.isNotEmpty(scalingFactors)) {
-          Properties properties = anomalyFunction.getProperties();
-          MetricTransfer.rescaleMetric(metricTimeSeries, windowStart.getMillis(), scalingFactors,
-              metricName, properties);
-        }
+//        if (CollectionUtils.isNotEmpty(scalingFactors)) {
+//          Properties properties = anomalyFunction.getProperties();
+//          MetricTransfer.rescaleMetric(metricTimeSeries, windowStart.getMillis(), scalingFactors,
+//              metricName, properties);
+//        }
 
         List<RawAnomalyResultDTO> resultsOfAnEntry = anomalyFunction
             .analyze(exploredDimensions, metricTimeSeries, windowStart, windowEnd, historyMergedAnomalies);

@@ -157,7 +157,7 @@ public class FetchMetricDataAndExistingAnomaliesTool {
     LOG.info("Loading merged anaomaly results from db...");
     List<ResultNode> resultNodes = new ArrayList<>();
     for(AnomalyFunctionDTO anomalyDto : anomalyFunctions){
-      if(!anomalyDto.getMetric().equals(metric)) continue;
+      if(!anomalyDto.getTopicMetric().equals(metric)) continue;
 
       resultNodes.addAll(fetchMergedAnomaliesInRangeByFunctionId(anomalyDto.getId(), startTime, endTime));
     }
@@ -207,7 +207,7 @@ public class FetchMetricDataAndExistingAnomaliesTool {
 
 
     for(AnomalyFunctionDTO anomalyDto : anomalyFunctions){
-      if(!anomalyDto.getMetric().equals(metric)) continue;
+      if(!anomalyDto.getTopicMetric().equals(metric)) continue;
 
       long id = anomalyDto.getId();
       resultNodes.addAll(fetchRawAnomaliesInRangeByFunctionId(id, startTime, endTime));

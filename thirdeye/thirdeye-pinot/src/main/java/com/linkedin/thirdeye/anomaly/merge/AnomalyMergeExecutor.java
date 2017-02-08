@@ -223,8 +223,8 @@ public class AnomalyMergeExecutor implements Runnable {
       } catch (Exception e) {
         AnomalyFunctionDTO function = mergedResult.getFunction();
         LOG.warn(
-            "Unable to compute merged weight and the average weight of raw anomalies is used. Dataset: {}, Metric: {}, Function: {}, Time:{} - {}, Exception: {}",
-            function.getCollection(), function.getMetric(), function.getFunctionName(), new DateTime(mergedResult.getStartTime()), new DateTime(mergedResult.getEndTime()), e);
+            "Unable to compute merged weight and the average weight of raw anomalies is used. Dataset: {}, Topic Metric: {}, Function: {}, Time:{} - {}, Exception: {}",
+            function.getCollection(), function.getTopicMetric(), function.getFunctionName(), new DateTime(mergedResult.getStartTime()), new DateTime(mergedResult.getEndTime()), e);
       }
     }
     try {
@@ -287,16 +287,17 @@ public class AnomalyMergeExecutor implements Runnable {
         }
       }
 
+      // TODO: Re-enable scaling factor for holiday effect
       // Transform Time Series
-      List<ScalingFactor> scalingFactors = OverrideConfigHelper
-          .getTimeSeriesScalingFactors(overrideConfigDAO, anomalyFunctionSpec.getCollection(),
-              anomalyFunctionSpec.getMetric(), anomalyFunctionSpec.getId(), anomalyFunction
-                  .getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis()));
-      if (CollectionUtils.isNotEmpty(scalingFactors)) {
-        Properties properties = anomalyFunction.getProperties();
-        MetricTransfer.rescaleMetric(metricTimeSeries, windowStart.getMillis(), scalingFactors,
-            anomalyFunctionSpec.getMetric(), properties);
-      }
+//      List<ScalingFactor> scalingFactors = OverrideConfigHelper
+//          .getTimeSeriesScalingFactors(overrideConfigDAO, anomalyFunctionSpec.getCollection(),
+//              anomalyFunctionSpec.getMetric(), anomalyFunctionSpec.getId(), anomalyFunction
+//                  .getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis()));
+//      if (CollectionUtils.isNotEmpty(scalingFactors)) {
+//        Properties properties = anomalyFunction.getProperties();
+//        MetricTransfer.rescaleMetric(metricTimeSeries, windowStart.getMillis(), scalingFactors,
+//            anomalyFunctionSpec.getMetric(), properties);
+//      }
 
       anomalyFunction.updateMergedAnomalyInfo(anomalyMergedResult, metricTimeSeries, windowStart, windowEnd,
           knownAnomalies);

@@ -3,12 +3,33 @@ package com.linkedin.thirdeye.datalayer.dto;
 import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Properties;
+import org.apache.commons.collections.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class AnomalyFunctionDTO extends AnomalyFunctionBean {
   private static final Logger LOGGER = LoggerFactory.getLogger(AnomalyFunctionDTO.class);
+
+  public String getTopicMetric() {
+    return getMetric();
+  }
+
+  public void setTopicMetric(String topicMetric) {
+    setMetric(topicMetric);
+  }
+
+  // TODO: Remove this method and update the value in DB instead
+  @Override
+  public List<String> getMetrics() {
+    if (CollectionUtils.isEmpty((super.getMetrics()))) {
+      return Arrays.asList(getMetric());
+    } else {
+      return super.getMetrics();
+    }
+  }
 
   /**
    * Parses the properties of String and returns the corresponding Properties object.
