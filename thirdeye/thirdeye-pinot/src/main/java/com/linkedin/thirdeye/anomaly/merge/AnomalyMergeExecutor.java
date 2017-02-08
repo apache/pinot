@@ -289,15 +289,15 @@ public class AnomalyMergeExecutor implements Runnable {
 
       // TODO: Re-enable scaling factor for holiday effect
       // Transform Time Series
-//      List<ScalingFactor> scalingFactors = OverrideConfigHelper
-//          .getTimeSeriesScalingFactors(overrideConfigDAO, anomalyFunctionSpec.getCollection(),
-//              anomalyFunctionSpec.getMetric(), anomalyFunctionSpec.getId(), anomalyFunction
-//                  .getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis()));
-//      if (CollectionUtils.isNotEmpty(scalingFactors)) {
-//        Properties properties = anomalyFunction.getProperties();
-//        MetricTransfer.rescaleMetric(metricTimeSeries, windowStart.getMillis(), scalingFactors,
-//            anomalyFunctionSpec.getMetric(), properties);
-//      }
+      List<ScalingFactor> scalingFactors = OverrideConfigHelper
+          .getTimeSeriesScalingFactors(overrideConfigDAO, anomalyFunctionSpec.getCollection(),
+              anomalyFunctionSpec.getTopicMetric(), anomalyFunctionSpec.getId(), anomalyFunction
+                  .getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis()));
+      if (CollectionUtils.isNotEmpty(scalingFactors)) {
+        Properties properties = anomalyFunction.getProperties();
+        MetricTransfer.rescaleMetric(metricTimeSeries, windowStart.getMillis(), scalingFactors,
+            anomalyFunctionSpec.getTopicMetric(), properties);
+      }
 
       anomalyFunction.updateMergedAnomalyInfo(anomalyMergedResult, metricTimeSeries, windowStart, windowEnd,
           knownAnomalies);

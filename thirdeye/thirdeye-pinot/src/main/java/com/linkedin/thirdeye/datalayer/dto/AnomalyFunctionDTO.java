@@ -22,6 +22,12 @@ public class AnomalyFunctionDTO extends AnomalyFunctionBean {
   }
 
   // TODO: Remove this method and update the value in DB instead
+  /**
+   * Returns the list of metrics to be retrieved for anomaly detection. If the information is not
+   * provided in the DB, then it returns a list that contains only topic metric.
+   *
+   * @return a list of metrics to be retrieved for anomaly detection.
+   */
   @Override
   public List<String> getMetrics() {
     if (CollectionUtils.isEmpty((super.getMetrics()))) {
