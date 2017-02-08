@@ -234,3 +234,4 @@ public class FilterPlanNode implements PlanNode {
     LOGGER.debug(treeStructure);
   }
 }
+

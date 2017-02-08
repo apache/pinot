@@ -15,13 +15,22 @@
  */
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
+import it.unimi.dsi.fastutil.doubles.Double2IntMap;
+import it.unimi.dsi.fastutil.doubles.Double2IntOpenHashMap;
+import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import it.unimi.dsi.fastutil.doubles.DoubleSet;
+
+
 public class DoubleMutableDictionary extends MutableDictionaryReader {
 
-  private Double min = Double.MAX_VALUE;
-  private Double max = Double.MIN_VALUE;
+  private Double2IntBiMap _dictionaryIdBiMap;
+  private final String _column;
+  private double _min = Double.MAX_VALUE;
+  private double _max = Double.MIN_VALUE;
 
   public DoubleMutableDictionary(String column) {
-    super(column);
+    _column = column;
+    _dictionaryIdBiMap = new Double2IntBiMap();
   }
 
   @Override
@@ -31,42 +40,32 @@ public class DoubleMutableDictionary extends MutableDictionaryReader {
       return;
     }
 
-    if (rawValue instanceof String) {
-      Double entry = Double.parseDouble((String) rawValue);
-      addToDictionaryBiMap(entry);
-      updateMinMax(entry);
-      return;
-    }
-
-    if (rawValue instanceof Double) {
-      addToDictionaryBiMap(rawValue);
-      updateMinMax((Double) rawValue);
-      return;
-    }
-
     if (rawValue instanceof Object[]) {
       for (Object o : (Object[]) rawValue) {
-        if (o instanceof String) {
-          final Double doubleValue = Double.parseDouble(o.toString());
-          addToDictionaryBiMap(doubleValue);
-          updateMinMax(doubleValue);
-          continue;
-        }
-
-        if (o instanceof Double) {
-          addToDictionaryBiMap(o);
-          updateMinMax((Double) o);
-        }
+        indexValue(o);
       }
+    } else {
+      indexValue(rawValue);
     }
   }
 
-  private void updateMinMax(Double entry) {
-    if (entry < min) {
-      min = entry;
+  private void indexValue(Object value) {
+    if (value instanceof String) {
+      Double entry = Double.parseDouble((String) value);
+      _dictionaryIdBiMap.put(entry);
+      updateMinMax(entry);
+    } else if (value instanceof Double) {
+      Double doubleValue = (Double) value;
+      _dictionaryIdBiMap.put(doubleValue);
+      updateMinMax(doubleValue);
     }
-    if (entry > max) {
-      max = entry;
+  }
+
+  private void updateMinMax(double entry) {
+    if (entry < _min) {
+      _min = entry;
+    } else if (entry > _max) {
+      _max = entry;
     }
   }
 
@@ -76,47 +75,61 @@ public class DoubleMutableDictionary extends MutableDictionaryReader {
       return hasNull;
     }
     if (rawValue instanceof String) {
-      return dictionaryIdBiMap.inverse().containsKey(Double.parseDouble(rawValue.toString()));
+      return _dictionaryIdBiMap.containsKey(Double.parseDouble(rawValue.toString()));
+    } else if (rawValue instanceof Double) {
+      return _dictionaryIdBiMap.containsKey((Double) rawValue);
+    } else {
+      throw new IllegalArgumentException(
+          "Illegal argument type, expected double, got: " + rawValue.getClass().getName());
     }
-    return dictionaryIdBiMap.inverse().containsKey(rawValue);
   }
 
   @Override
   public int indexOf(Object rawValue) {
     if (rawValue instanceof String) {
-      return getIndexOfFromBiMap(Double.parseDouble(rawValue.toString()));
+      return _dictionaryIdBiMap.getValue(Double.parseDouble(rawValue.toString()));
     }
-    return getIndexOfFromBiMap(rawValue);
+    return _dictionaryIdBiMap.getValue((Double) rawValue);
   }
 
   @Override
   public Object get(int dictionaryId) {
-    return getRawValueFromBiMap(dictionaryId);
+    return _dictionaryIdBiMap.getKey(dictionaryId);
   }
 
   @Override
   public long getLongValue(int dictionaryId) {
-    return ((Double) getRawValueFromBiMap(dictionaryId)).longValue();
+    return (_dictionaryIdBiMap.getKey(dictionaryId)).longValue();
   }
 
   @Override
   public double getDoubleValue(int dictionaryId) {
-    return (Double) getRawValueFromBiMap(dictionaryId);
+    return _dictionaryIdBiMap.getKey(dictionaryId);
   }
 
   @Override
   public int getIntValue(int dictionaryId) {
-    return (int) getDouble(dictionaryId);
+    return (_dictionaryIdBiMap.getKey(dictionaryId)).intValue();
   }
 
   @Override
   public float getFloatValue(int dictionaryId) {
-    return (float) getDouble(dictionaryId);
+    return _dictionaryIdBiMap.getKey(dictionaryId).floatValue();
   }
 
   @Override
   public String toString(int dictionaryId) {
-    return (getRawValueFromBiMap(dictionaryId)).toString();
+    return String.valueOf(_dictionaryIdBiMap.getKey(dictionaryId));
+  }
+
+  @Override
+  public int length() {
+    return _dictionaryIdBiMap.size();
+  }
+
+  @Override
+  public boolean isEmpty() {
+    return _dictionaryIdBiMap.isEmpty();
   }
 
   @Override
@@ -126,7 +139,7 @@ public class DoubleMutableDictionary extends MutableDictionaryReader {
     double lowerInDouble = Double.parseDouble(lower);
     double upperInDouble = Double.parseDouble(upper);
 
-    double valueToCompare = getDouble(indexOfValueToCompare);
+    double valueToCompare = _dictionaryIdBiMap.getKey(indexOfValueToCompare);
 
     boolean ret = true;
 
@@ -155,20 +168,67 @@ public class DoubleMutableDictionary extends MutableDictionaryReader {
 
   @Override
   public String getStringValue(int dictionaryId) {
-    return ((Double) getRawValueFromBiMap(dictionaryId)).toString();
-  }
-
-  private double getDouble(int dictionaryId) {
-    return (Double) dictionaryIdBiMap.get(dictionaryId);
+    return String.valueOf(_dictionaryIdBiMap.getKey(dictionaryId));
   }
 
   @Override
   public Object getMinVal() {
-    return min;
+    return _min;
   }
 
   @Override
   public Object getMaxVal() {
-    return max;
+    return _max;
+  }
+
+  @Override
+  public void print() {
+    System.out.println("************* printing dictionary for column : " + _column + " ***************");
+    for (double value : _dictionaryIdBiMap.keySet()) {
+      System.out.println(value + "," + _dictionaryIdBiMap.getValue(value));
+    }
+    System.out.println("************************************");
+  }
+
+  public static class Double2IntBiMap {
+    private Double2IntMap _valueToDictIdMap;
+    private DoubleArrayList _dictIdToValueMap;
+
+    public Double2IntBiMap() {
+      _valueToDictIdMap = new Double2IntOpenHashMap();
+      _dictIdToValueMap = new DoubleArrayList();
+      _valueToDictIdMap.defaultReturnValue(INVALID_ID);
+    }
+
+    public void put(double value) {
+      if (!_valueToDictIdMap.containsKey(value)) {
+        _dictIdToValueMap.add(value);
+        _valueToDictIdMap.put(value, _dictIdToValueMap.size() - 1);
+      }
+    }
+
+    public Double getKey(int dictId) {
+      return (dictId < _dictIdToValueMap.size()) ? _dictIdToValueMap.getDouble(dictId) : null;
+    }
+
+    public int getValue(double value) {
+      return _valueToDictIdMap.get(value);
+    }
+
+    public boolean containsKey(double value) {
+      return _valueToDictIdMap.containsKey(value);
+    }
+
+    public int size() {
+      return _valueToDictIdMap.size();
+    }
+
+    public boolean isEmpty() {
+      return _valueToDictIdMap.isEmpty();
+    }
+
+    public DoubleSet keySet() {
+      return _valueToDictIdMap.keySet();
+    }
   }
 }

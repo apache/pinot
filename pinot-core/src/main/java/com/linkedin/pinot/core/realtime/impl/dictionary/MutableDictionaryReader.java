@@ -15,35 +15,13 @@
  */
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
-import com.google.common.collect.BiMap;
-import com.google.common.collect.HashBiMap;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import java.util.concurrent.atomic.AtomicInteger;
 
 
 public abstract class MutableDictionaryReader implements Dictionary {
-  private final String column;
-  protected BiMap<Integer, Object> dictionaryIdBiMap;
+  protected static final Integer INVALID_ID = -1;
   protected boolean hasNull = false;
-  private final AtomicInteger dictionaryIdGenerator;
-
-  public MutableDictionaryReader(String column) {
-    this.column = column;
-    this.dictionaryIdBiMap = HashBiMap.<Integer, Object> create();
-    dictionaryIdGenerator = new AtomicInteger(-1);
-  }
-
-  protected void addToDictionaryBiMap(Object val) {
-    if (!dictionaryIdBiMap.inverse().containsKey(val)) {
-      dictionaryIdBiMap.put(dictionaryIdGenerator.incrementAndGet(), val);
-    }
-  }
-
-  @Override
-  public int length() {
-    return dictionaryIdGenerator.get() + 1;
-  }
 
   @Override
   public void readIntValues(int[] dictionaryIds, int startPos, int limit, int[] outValues, int outStartPos) {
@@ -121,18 +99,6 @@ public abstract class MutableDictionaryReader implements Dictionary {
 
   }
 
-  protected Integer getIndexOfFromBiMap(Object val) {
-    Integer ret = dictionaryIdBiMap.inverse().get(val);
-    if (ret == null) {
-      ret = -1;
-    }
-    return ret;
-  }
-
-  protected Object getRawValueFromBiMap(int dictionaryId) {
-    return dictionaryIdBiMap.get(new Integer(dictionaryId));
-  }
-
   public boolean hasNull() {
     return hasNull;
   }
@@ -154,10 +120,6 @@ public abstract class MutableDictionaryReader implements Dictionary {
   public abstract boolean inRange(String lower, String upper, int indexOfValueToCompare, boolean includeLower,
       boolean includeUpper);
 
-  public boolean inRange(String lower, String upper, int valueToCompare) {
-    return inRange(lower, upper, valueToCompare, true, true);
-  }
-
   @Override
   public abstract long getLongValue(int dictionaryId);
 
@@ -173,15 +135,7 @@ public abstract class MutableDictionaryReader implements Dictionary {
   @Override
   public abstract String toString(int dictionaryId);
 
-  public void print() {
-    System.out.println("************* printing dictionary for column : " + column + " ***************");
-    for (Integer key : dictionaryIdBiMap.keySet()) {
-      System.out.println(key + "," + dictionaryIdBiMap.get(key));
-    }
-    System.out.println("************************************");
-  }
+  public abstract void print();
 
-  public boolean isEmpty() {
-    return dictionaryIdBiMap.isEmpty();
-  }
+  public abstract boolean isEmpty();
 }
