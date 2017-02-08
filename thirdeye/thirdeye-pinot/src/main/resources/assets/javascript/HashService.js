@@ -51,6 +51,10 @@ HashService.prototype = {
       case HASH_PARAMS.ANOMALIES_PAGE_NUMBER:
         value = Number(value);
         break;
+      case HASH_PARAMS.ANALYSIS_FILTERS:
+        if (typeof value === "string") {
+          value = JSON.parse(value);
+        }
     }
     this.params[key] = value;
   },
@@ -151,7 +155,9 @@ HashService.prototype = {
       const [key, value] = param.split('=');
       const currentValue = params[key];
 
-      if (JSON.stringify(currentValue) !== value) {
+      const isSame = HASH_PARAMS.isSame(key, currentValue, value);
+
+      if (!isSame) {
         return true;
       }
     }

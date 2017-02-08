@@ -26,10 +26,10 @@ TimeSeriesCompareModel.prototype = {
   init: function (params) {
     if (params) {
       if (params.metricId) {
-        // metric is collection of id / name / alias
         this.metricId = params.metricId;
-        // this.metricId = params.metric.id;
-        // this.metricName = params.metric.name;
+      }
+      if (params.metricName) {
+        this.metricName = params.metricName;
       }
       if (params.currentStart) {
         this.currentStart = params.currentStart;

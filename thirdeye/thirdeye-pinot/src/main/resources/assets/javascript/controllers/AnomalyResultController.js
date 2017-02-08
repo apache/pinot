@@ -34,6 +34,8 @@ AnomalyResultController.prototype = {
     console.log(args);
     this.anomalyResultModel.getMetricIdFromName(args.metric).then((id) => {
       args.metricId = id;
+
+      HASH_SERVICE.clear();
       HASH_SERVICE.set("tab", 'analysis');
       HASH_SERVICE.update(args);
       HASH_SERVICE.refreshWindowHashForRouting('analysis');

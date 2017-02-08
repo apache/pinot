@@ -34,6 +34,7 @@ function HashParams() {
   this.DASHBOARD_ANOMALY_SUMMARY_CONTROLLER = "anomalySummary";
   this.DASHBOARD_METRIC_SUMMARY_CONTROLLER = "metricSummary";
   this.DASHBOARD_WOW_SUMMARY_CONTROLLER = "wowSummary";
+
 }
 
 
@@ -104,5 +105,24 @@ HashParams.prototype = {
 
       console.log('hash Params init');
       console.log(this.controllerNameToParamNamesMap);
-    }
+    },
+
+    isSame(key, currentValue, newValue) {
+      switch(key){
+        case this.ANALYSIS_CURRENT_START:
+        case this.ANALYSIS_CURRENT_END :
+        case this.ANALYSIS_BASELINE_START :
+        case this.ANALYSIS_BASELINE_END :
+        case this.ANOMALIES_START_DATE :
+        case this.ANOMALIES_END_DATE:
+          return currentValue.isSame(newValue, 'day');
+          break;
+        case this.ANALYSIS_FILTERS:
+          return JSON.stringify(currentValue) == newValue;
+          break;
+        default:
+          return currentValue == newValue;
+      }
+    },
+
 };

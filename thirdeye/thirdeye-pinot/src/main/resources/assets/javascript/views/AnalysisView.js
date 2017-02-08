@@ -9,7 +9,7 @@ function AnalysisView(analysisModel) {
 
 AnalysisView.prototype = {
   init({metricId=""}) {
-    this.viewParams[metricId] = metricId;
+    this.viewParams.metricId = metricId;
   },
 
   render: function () {

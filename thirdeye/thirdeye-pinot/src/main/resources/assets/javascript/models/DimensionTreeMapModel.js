@@ -26,6 +26,11 @@ DimensionTreeMapModel.prototype = {
         this.metricId = params.metric.id;
         this.metricName = params.metric.name;
       }
+
+      if (params.metricId) {
+        this.metricId = params.metricId;
+      }
+
       if (params.currentStart) {
         this.currentStart = params.currentStart;
       }
