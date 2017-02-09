@@ -154,7 +154,7 @@ DataService.prototype = {
     fetchMetricId(name) {
       const url = "/data/data/metricId";
       const data = {
-        name,
+        name
       };
 
       return this.getDataAsynchronous(url, data).then(([data]) => data.id);

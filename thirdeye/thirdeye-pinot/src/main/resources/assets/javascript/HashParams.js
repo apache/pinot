@@ -116,10 +116,10 @@ HashParams.prototype = {
         case this.ANOMALIES_START_DATE :
         case this.ANOMALIES_END_DATE:
           return currentValue.isSame(newValue, 'day');
-          break;
+
         case this.ANALYSIS_FILTERS:
-          return JSON.stringify(currentValue) == newValue;
-          break;
+          return JSON.stringify(currentValue) === newValue;
+
         default:
           return currentValue == newValue;
       }

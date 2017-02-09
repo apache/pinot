@@ -42,8 +42,8 @@ AnalysisView.prototype = {
     });
 
     analysisMetricSelect.on('change', (e) => {
-      const selectedElement = $(e.currentTarget);
-      const selectedData = selectedElement.select2('data');
+      const $selectedElement = $(e.currentTarget);
+      const selectedData = $selectedElement.select2('data');
       let metricId;
       let metricAlias;
       let metricName;

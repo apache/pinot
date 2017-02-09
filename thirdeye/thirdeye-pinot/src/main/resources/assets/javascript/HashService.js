@@ -52,11 +52,15 @@ HashService.prototype = {
         value = Number(value);
         break;
       case HASH_PARAMS.ANALYSIS_FILTERS:
-        if (typeof value === "string") {
+        try {
           value = JSON.parse(value);
+        } catch (e) {
+          // if not parsable, then use original value
         }
+        break;
     }
     this.params[key] = value;
+    return value;
   },
   get : function(key) {
     return this.params[key];
@@ -64,9 +68,7 @@ HashService.prototype = {
   update : function(paramsToUpdate) {
     console.log('hash service.update');
     console.log(paramsToUpdate)
-    for (var key in paramsToUpdate) {
-      this.set(key, paramsToUpdate[key]);
-    }
+    Object.keys(paramsToUpdate).forEach(key => this.set(key, paramsToUpdate[key]));
   },
   getParams : function() {
     console.log('getParams');
@@ -86,11 +88,9 @@ HashService.prototype = {
         continue;
       }
       var defaultValue = paramNamesToDefaultValuesMap[paramName];
-      var value = this.get(paramName);
-      if (!value && defaultValue) { //if default value is present, use that
-        value = defaultValue;
-        this.set(paramName, defaultValue);
-      }
+      //if default value is present, use that
+      var value = this.get(paramName) || this.set(paramName,  paramNamesToDefaultValuesMap[paramName]);
+
       if (value) {
         value = JSON.stringify(value);
         if (value.startsWith("\"")) {

@@ -151,9 +151,6 @@ AnomalyResultModel.prototype = {
     }
   },
   getMetricIdFromName(name) {
-    if (!name) {
-      return;
-    }
-    return dataService.fetchMetricId(name);
+    return name && dataService.fetchMetricId(name);
   },
 }
