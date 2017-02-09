@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
+import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeConfig;
+import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeExecutor;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
@@ -52,6 +54,8 @@ public class AnomalyFunctionBean extends AbstractBean {
   private long metricId;
 
   private Map<String, String> alertFilter;
+
+  private AnomalyMergeConfig anomalyMergeConfig;
 
 
   public long getMetricId() {
@@ -209,6 +213,14 @@ public class AnomalyFunctionBean extends AbstractBean {
 
   public void setAlertFilter(Map<String, String> alertFilter) {
     this.alertFilter = alertFilter;
+  }
+
+  public AnomalyMergeConfig getAnomalyMergeConfig() {
+    return anomalyMergeConfig;
+  }
+
+  public void setAnomalyMergeConfig(AnomalyMergeConfig anomalyMergeConfig) {
+    this.anomalyMergeConfig = anomalyMergeConfig;
   }
 
   @Override

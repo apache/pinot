@@ -58,8 +58,8 @@ public class AnomalyMergeExecutor implements Runnable {
   private final static AnomalyMergeConfig DEFAULT_MERGE_CONFIG;
   static {
     DEFAULT_MERGE_CONFIG = new AnomalyMergeConfig();
-    DEFAULT_MERGE_CONFIG.setSequentialAllowedGap(2 * 60 * 60_000); // 2 hours
-    DEFAULT_MERGE_CONFIG.setMaxMergeDurationLength(-1); // no time based split
+    DEFAULT_MERGE_CONFIG.setSequentialAllowedGap(2 * 60 * 60_000); // merge anomalies apart 2 hours
+    DEFAULT_MERGE_CONFIG.setMaxMergeDurationLength(604_800_000); // break anomaly longer than 7 days
     DEFAULT_MERGE_CONFIG.setMergeStrategy(AnomalyMergeStrategy.FUNCTION_DIMENSIONS);
   }
 
@@ -103,7 +103,11 @@ public class AnomalyMergeExecutor implements Runnable {
       Callable<Integer> task = () -> {
         final boolean isBackfill = false;
         // TODO : move merge config within the AnomalyFunction; Every function should have its own merge config.
-        return mergeAnomalies(function, DEFAULT_MERGE_CONFIG, isBackfill);
+        AnomalyMergeConfig anomalyMergeConfig = function.getAnomalyMergeConfig();
+        if (anomalyMergeConfig == null) {
+          anomalyMergeConfig = DEFAULT_MERGE_CONFIG;
+        }
+        return mergeAnomalies(function, anomalyMergeConfig, isBackfill);
       };
       Future<Integer> taskFuture = taskExecutorService.submit(task);
       taskCallbacks.add(taskFuture);
@@ -131,7 +135,11 @@ public class AnomalyMergeExecutor implements Runnable {
    */
   public int synchronousMergeBasedOnFunctionIdAndDimension(AnomalyFunctionDTO functionSpec, boolean isBackfill) {
     if (functionSpec.getIsActive()) {
-      return mergeAnomalies(functionSpec, DEFAULT_SYNCHRONIZED_MERGE_CONFIG, isBackfill);
+      AnomalyMergeConfig anomalyMergeConfig = functionSpec.getAnomalyMergeConfig();
+      if (anomalyMergeConfig == null) {
+        anomalyMergeConfig = DEFAULT_SYNCHRONIZED_MERGE_CONFIG;
+      }
+      return mergeAnomalies(functionSpec, anomalyMergeConfig, isBackfill);
     } else {
       return 0;
     }
