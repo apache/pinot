@@ -157,9 +157,7 @@ DataService.prototype = {
         name,
       };
 
-      return this.getDataAsynchronous(url, data).then(([data]) => {
-        return data.id;
-      });
+      return this.getDataAsynchronous(url, data).then(([data]) => data.id);
     },
 
     fetchTimeseriesCompare: function (metricId, currentStart, currentEnd, baselineStart, baselineEnd,

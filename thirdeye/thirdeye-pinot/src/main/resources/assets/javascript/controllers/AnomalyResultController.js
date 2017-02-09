@@ -36,7 +36,7 @@ AnomalyResultController.prototype = {
       args.metricId = id;
 
       HASH_SERVICE.clear();
-      HASH_SERVICE.set("tab", 'analysis');
+      HASH_SERVICE.set('tab', 'analysis');
       HASH_SERVICE.update(args);
       HASH_SERVICE.refreshWindowHashForRouting('analysis');
       HASH_SERVICE.routeTo('app');

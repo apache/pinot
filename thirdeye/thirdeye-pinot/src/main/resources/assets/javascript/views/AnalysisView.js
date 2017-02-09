@@ -8,8 +8,9 @@ function AnalysisView(analysisModel) {
 }
 
 AnalysisView.prototype = {
-  init({metricId=""}) {
-    this.viewParams.metricId = metricId;
+  init(params = {}) {
+    const { metricId } = params;
+    this.viewParams.metricId = metricId || '';
   },
 
   render: function () {
@@ -40,17 +41,18 @@ AnalysisView.prototype = {
       }
     });
 
-    analysisMetricSelect.on("change", (e) => {
+    analysisMetricSelect.on('change', (e) => {
       const selectedElement = $(e.currentTarget);
-      const selectedData = selectedElement.select2("data");
+      const selectedData = selectedElement.select2('data');
       let metricId;
       let metricAlias;
       let metricName;
 
       if (selectedData.length) {
-        metricId = selectedData.map(function (e) {return e.id})[0];
-        metricAlias = selectedData.map(function (e) {return e.text})[0];
-        metricName = selectedData.map(function (e) {return e.name})[0];
+        const {id, text, name} = selectedData[0];
+        metricId = id;
+        metricAlias = text;
+        metricName = name;
       }
 
       this.viewParams['metric'] = {id: metricId, alias: metricAlias, allowClear:true, name:metricName};
