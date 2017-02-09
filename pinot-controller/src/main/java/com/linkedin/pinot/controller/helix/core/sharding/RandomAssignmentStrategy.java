@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.helix.core.sharding;
 
+import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -48,7 +49,7 @@ public class RandomAssignmentStrategy implements SegmentAssignmentStrategy {
     }
     final Random random = new Random(System.currentTimeMillis());
 
-    List<String> allInstanceList = helixAdmin.getInstancesInClusterWithTag(helixClusterName, serverTenantName);
+    List<String> allInstanceList = HelixHelper.getEnabledInstancesWithTag(helixAdmin, helixClusterName, serverTenantName);
     List<String> selectedInstanceList = new ArrayList<String>();
     for (int i = 0; i < numReplicas; ++i) {
       final int idx = random.nextInt(allInstanceList.size());

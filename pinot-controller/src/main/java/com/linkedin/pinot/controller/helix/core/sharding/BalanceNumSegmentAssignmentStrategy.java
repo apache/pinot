@@ -20,6 +20,7 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.Pairs;
 import com.linkedin.pinot.common.utils.Pairs.Number2ObjectPair;
+import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -53,7 +54,7 @@ public class BalanceNumSegmentAssignmentStrategy implements SegmentAssignmentStr
 
     List<String> selectedInstances = new ArrayList<String>();
     Map<String, Integer> currentNumSegmentsPerInstanceMap = new HashMap<String, Integer>();
-    List<String> allTaggedInstances = helixAdmin.getInstancesInClusterWithTag(helixClusterName, serverTenantName);
+    List<String> allTaggedInstances = HelixHelper.getEnabledInstancesWithTag(helixAdmin, helixClusterName, serverTenantName);
 
     for (String instance : allTaggedInstances) {
       currentNumSegmentsPerInstanceMap.put(instance, 0);
