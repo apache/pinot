@@ -9,34 +9,39 @@
     <div class="container">
       <div class="panel padding-all">
         <div class="row">
-          <div id="show-details-{{anomalyIndex}}" class="col-md-3">
-            <label>{{this.anomalyId}}<a href="#"> show details</a></label>
+          <div id="show-details-{{anomalyIndex}}" class="col-md-6">
+            <label>{{this.anomalyId}}</label>
           </div>
           <div id="root-cause-analysis-button-{{anomalyIndex}}" class="col-md-6">
-            <button type="button" class="btn btn-primary btn-sm">Root Cause Analysis</button>
-          </div>
-          <div class="col-md-1">
-            <span class="pull-right">______</span>
-          </div>
-          <div id="current-range-{{anomalyIndex}}" class="col-md-2">
-            <span class="pull-left"><label></label></span>
+            <button type="button" class="btn btn-primary btn-sm pull-right">Show Root Cause Analysis</button>
           </div>
         </div>
         <div class="row">
           <div class="col-md-3">
             <label>{{this.metric}}</label>
           </div>
-          <div class="col-md-6"></div>
-          <div class="col-md-1">
-            <span class="pull-right">--------</span>
-          </div>
-          <div id="baseline-range-{{anomalyIndex}}" class="col-md-2">
-            <span class="pull-left"><label></label></span>
-          </div>
         </div>
         <div class="row">
-          <div class="col-md-12">
+          <div class="col-xs-10">
             <div id="anomaly-chart-{{anomalyIndex}}" style="height: 200px"></div>
+          </div>
+          <div class="col-xs-2">
+            <div class="row">
+              <div class="col-xs-4">
+                <span class="pull-right">______</span>
+              </div>
+              <div id="current-range-{{anomalyIndex}}" class="col-md-8">
+                <span class="pull-left"><label></label></span>
+              </div>
+            </div>
+            <div class="row">
+              <div class="col-md-4">
+                <span class="pull-right">------</span>
+              </div>
+              <div id="baseline-range-{{anomalyIndex}}" class="col-md-8">
+                <span class="pull-left"><label></label></span>
+              </div>
+            </div>
           </div>
         </div>
         <div class="row">
