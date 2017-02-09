@@ -1,6 +1,8 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
@@ -13,6 +15,16 @@ public class TestAnomalyResultManager extends AbstractManagerTestBase {
 
   RawAnomalyResultDTO anomalyResult;
   AnomalyFunctionDTO spec = getTestFunctionSpec("metric", "dataset");
+
+  @BeforeClass
+  void beforeClass() {
+    super.init();
+  }
+
+  @AfterClass(alwaysRun = true)
+  void afterClass() {
+    super.cleanup();
+  }
 
   @Test
   public void testAnomalyResultCRUD() {

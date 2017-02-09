@@ -38,7 +38,6 @@ public class PqlUtils {
   private static final int DEFAULT_TOP = 100000;
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
-  private static MetricConfigManager metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
 
   /**
    * Returns sql to calculate the sum of all raw metrics required for <tt>request</tt>, grouped by
@@ -155,7 +154,7 @@ public class PqlUtils {
     if (!metricFunction.getMetricName().equals("*")) {
       builder.append(" AND ");
       String metricId = metricFunction.getMetricName().replaceAll(MetricConfigBean.DERIVED_METRIC_ID_PREFIX, "");
-      MetricConfigDTO metricConfig = metricConfigDAO.findById(Long.valueOf(metricId));
+      MetricConfigDTO metricConfig = DAO_REGISTRY.getMetricConfigDAO().findById(Long.valueOf(metricId));
       String metricName = metricConfig.getName();
       builder.append(String.format("%s='%s'", metricNameColumn, metricName));
     }
@@ -175,7 +174,7 @@ public class PqlUtils {
         metricName = "*";
       } else {
         String metricId = function.getMetricName().replaceAll(MetricConfigBean.DERIVED_METRIC_ID_PREFIX, "");
-        MetricConfigDTO metricConfig = metricConfigDAO.findById(Long.valueOf(metricId));
+        MetricConfigDTO metricConfig = DAO_REGISTRY.getMetricConfigDAO().findById(Long.valueOf(metricId));
         metricName = metricConfig.getName();
       }
       builder.append(function.getFunctionName()).append("(").append(metricName)

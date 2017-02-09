@@ -3,6 +3,8 @@ package com.linkedin.thirdeye.datalayer.bao;
 import java.util.List;
 
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import com.linkedin.thirdeye.datalayer.dto.IngraphMetricConfigDTO;
@@ -17,6 +19,16 @@ public class TestIngraphMetricConfigManager extends AbstractManagerTestBase {
   private static String metric2 = "metric2";
   private static String dashboard1 = "dashboard1";
   private static String dashboard2 = "dashboard2";
+
+  @BeforeClass
+  void beforeClass() {
+    super.init();
+  }
+
+  @AfterClass(alwaysRun = true)
+  void afterClass() {
+    super.cleanup();
+  }
 
   @Test
   public void testCreateIngraphMetric() {

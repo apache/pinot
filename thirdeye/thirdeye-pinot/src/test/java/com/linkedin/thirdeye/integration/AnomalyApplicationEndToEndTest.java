@@ -1,25 +1,5 @@
 package com.linkedin.thirdeye.integration;
 
-import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-
-import org.joda.time.DateTime;
-import org.mockito.Matchers;
-import org.mockito.Mockito;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
-import org.quartz.SchedulerException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.testng.Assert;
-import org.testng.annotations.Test;
-
-import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.LoadingCache;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.alert.AlertJobScheduler;
@@ -32,22 +12,18 @@ import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
 import com.linkedin.thirdeye.anomaly.task.TaskDriver;
 import com.linkedin.thirdeye.anomaly.task.TaskInfoFactory;
-import com.linkedin.thirdeye.api.CollectionSchema;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.client.ThirdEyeResponse;
-import com.linkedin.thirdeye.client.cache.MetricConfigCacheLoader;
 import com.linkedin.thirdeye.client.cache.MetricDataset;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeResponse;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessConstants.DataCompletenessType;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessScheduler;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessTaskInfo;
-import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 import com.linkedin.thirdeye.datalayer.bao.AbstractManagerTestBase;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
@@ -57,6 +33,25 @@ import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import org.joda.time.DateTime;
+import org.mockito.Matchers;
+import org.mockito.Mockito;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
+import org.quartz.SchedulerException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
 
 
 public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
@@ -79,6 +74,40 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
   private String functionPropertiesFile = "/sample-functions.properties";
   private String metric = "cost";
   private String collection = "test-collection";
+
+  @BeforeClass
+  void beforeClass() {
+    super.init();
+    Assert.assertNotNull(DAO_REGISTRY.getJobDAO());
+
+  }
+
+  @AfterClass(alwaysRun = true)
+  void afterClass() throws Exception {
+    cleanup_schedulers();
+    super.cleanup();
+  }
+
+  void cleanup_schedulers() throws SchedulerException {
+    if (detectionJobScheduler != null) {
+      detectionJobScheduler.shutdown();
+    }
+    if (alertJobScheduler != null) {
+      alertJobScheduler.shutdown();
+    }
+    if (monitorJobScheduler != null) {
+      monitorJobScheduler.stop();
+    }
+    if (anomalyMergeExecutor != null) {
+      anomalyMergeExecutor.stop();
+    }
+    if (taskDriver != null) {
+      taskDriver.stop();
+    }
+    if (dataCompletenessScheduler != null) {
+      dataCompletenessScheduler.shutdown();
+    }
+  }
 
   private void setup() throws Exception {
 
@@ -162,8 +191,12 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
   @Test(enabled=true)
   public void testThirdeyeAnomalyApplication() throws Exception {
 
+    Assert.assertNotNull(DAO_REGISTRY.getJobDAO());
+
     // setup caches and config
     setup();
+
+    Assert.assertNotNull(DAO_REGISTRY.getJobDAO());
 
     // startDataCompletenessChecker
     startDataCompletenessScheduler();
@@ -323,25 +356,4 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
     detectionJobScheduler.start();
   }
 
-
-  private void cleanup() throws SchedulerException {
-    if (detectionJobScheduler != null) {
-      detectionJobScheduler.shutdown();
-    }
-    if (alertJobScheduler != null) {
-      alertJobScheduler.shutdown();
-    }
-    if (monitorJobScheduler != null) {
-      monitorJobScheduler.stop();
-    }
-    if (anomalyMergeExecutor != null) {
-      anomalyMergeExecutor.stop();
-    }
-    if (taskDriver != null) {
-      taskDriver.stop();
-    }
-    if (dataCompletenessScheduler != null) {
-      dataCompletenessScheduler.shutdown();
-    }
-  }
 }

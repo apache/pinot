@@ -23,7 +23,6 @@ public class TestDetectionTaskRunner {
 
   @BeforeTest
   void before() {
-    DAORegistry.reset();
     runner = new DetectionTaskRunner();
 
     DataCompletenessConfigManager mock_dccm = Mockito.mock(DataCompletenessConfigManager.class);

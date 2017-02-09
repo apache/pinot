@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Set;
 import org.joda.time.DateTime;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -26,6 +28,16 @@ public class TestAnomalyTaskManager extends AbstractManagerTestBase {
   static  {
     allowedOldTaskStatus.add(TaskStatus.FAILED);
     allowedOldTaskStatus.add(TaskStatus.WAITING);
+  }
+
+  @BeforeClass
+  void beforeClass() {
+    super.init();
+  }
+
+  @AfterClass(alwaysRun = true)
+  void afterClass() {
+    super.cleanup();
   }
 
   @Test
