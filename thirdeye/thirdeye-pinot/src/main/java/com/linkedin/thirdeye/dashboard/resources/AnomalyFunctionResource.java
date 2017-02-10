@@ -1,7 +1,10 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
 import com.linkedin.pinot.pql.parsers.utils.Pair;
+import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.detection.TimeSeriesUtil;
+import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutoTune;
+import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
@@ -50,10 +53,12 @@ public class AnomalyFunctionResource {
 
   private final Map<String, Object> anomalyFunctionMetadata = new HashMap<>();
   private final AnomalyFunctionFactory anomalyFunctionFactory;
+  private final AlertFilterAutotuneFactory alertFilterAutotuneFactory;
 
-  public AnomalyFunctionResource(String functionConfigPath) {
+  public AnomalyFunctionResource(String functionConfigPath, String alertFilterAutotuneConfigPath) {
     buildFunctionMetadata(functionConfigPath);
     this.anomalyFunctionFactory = new AnomalyFunctionFactory(functionConfigPath);
+    this.alertFilterAutotuneFactory = new AlertFilterAutotuneFactory(alertFilterAutotuneConfigPath);
   }
 
   private void buildFunctionMetadata(String functionConfigPath) {

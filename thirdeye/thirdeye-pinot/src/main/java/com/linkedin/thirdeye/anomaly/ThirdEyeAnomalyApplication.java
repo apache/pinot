@@ -39,8 +39,6 @@ public class ThirdEyeAnomalyApplication
   private AlertJobScheduler alertJobScheduler = null;
   private AlertJobSchedulerV2 alertJobSchedulerV2;
   private AnomalyFunctionFactory anomalyFunctionFactory = null;
-  private AlertFilterFactory alertFilterFactory = null;
-  private AlertFilterAutotuneFactory alertFilterAutotuneFactory = null;
   private AnomalyMergeExecutor anomalyMergeExecutor = null;
   private AutoLoadPinotMetricsService autoLoadPinotMetricsService = null;
   private DataCompletenessScheduler dataCompletenessScheduler = null;
@@ -81,8 +79,6 @@ public class ThirdEyeAnomalyApplication
 
         if (config.isWorker()) {
           anomalyFunctionFactory = new AnomalyFunctionFactory(config.getFunctionConfigPath());
-          alertFilterFactory = new AlertFilterFactory(config.getAlertFilterConfigPath());
-          alertFilterAutotuneFactory = new AlertFilterAutotuneFactory(config.getFilterAutotuneConfigPath());
 
           taskDriver = new TaskDriver(config, anomalyFunctionFactory);
           taskDriver.start();
@@ -91,7 +87,8 @@ public class ThirdEyeAnomalyApplication
           detectionJobScheduler = new DetectionJobScheduler();
           detectionJobScheduler.start();
           environment.jersey().register(new DetectionJobResource(detectionJobScheduler));
-          environment.jersey().register(new AnomalyFunctionResource(config.getFunctionConfigPath()));
+          environment.jersey().register(new AnomalyFunctionResource(config.getFunctionConfigPath(),
+              config.getFilterAutotuneConfigPath()));
         }
         if (config.isMonitor()) {
           monitorJobScheduler = new MonitorJobScheduler(config.getMonitorConfiguration());
