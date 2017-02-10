@@ -122,7 +122,7 @@ public class RatioOutlierFunction extends BaseAnomalyFunction {
     }
     return anomalyResults;
   }
-  
+
   @Override
   public AnomalyTimelinesView getTimeSeriesView(MetricTimeSeries timeSeries, long bucketMillis,
       String metric, long viewWindowStartTime, long viewWindowEndTime,
