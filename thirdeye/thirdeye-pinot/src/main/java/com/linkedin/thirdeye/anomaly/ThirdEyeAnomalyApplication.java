@@ -1,8 +1,11 @@
 package com.linkedin.thirdeye.anomaly;
 
 import com.linkedin.thirdeye.anomaly.alert.v2.AlertJobSchedulerV2;
+import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import com.linkedin.thirdeye.dashboard.resources.AnomalyFunctionResource;
 
+import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
+import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -36,6 +39,8 @@ public class ThirdEyeAnomalyApplication
   private AlertJobScheduler alertJobScheduler = null;
   private AlertJobSchedulerV2 alertJobSchedulerV2;
   private AnomalyFunctionFactory anomalyFunctionFactory = null;
+  private AlertFilterFactory alertFilterFactory = null;
+  private AlertFilterAutotuneFactory alertFilterAutotuneFactory = null;
   private AnomalyMergeExecutor anomalyMergeExecutor = null;
   private AutoLoadPinotMetricsService autoLoadPinotMetricsService = null;
   private DataCompletenessScheduler dataCompletenessScheduler = null;
@@ -76,6 +81,9 @@ public class ThirdEyeAnomalyApplication
 
         if (config.isWorker()) {
           anomalyFunctionFactory = new AnomalyFunctionFactory(config.getFunctionConfigPath());
+          alertFilterFactory = new AlertFilterFactory(config.getAlertFilterConfigPath());
+          alertFilterAutotuneFactory = new AlertFilterAutotuneFactory(config.getFilterAutotuneConfigPath());
+
           taskDriver = new TaskDriver(config, anomalyFunctionFactory);
           taskDriver.start();
         }

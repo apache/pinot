@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomalydetection.alertFilterAutotune;
 
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
@@ -23,7 +24,6 @@ public class AlertFilterAutotuneFactory {
 
   public AlertFilterAutotuneFactory(String functionConfigPath) {
     props = new Properties();
-
     try {
       InputStream input = new FileInputStream(functionConfigPath);
       loadPropertiesFromInputStream(input);
@@ -53,16 +53,16 @@ public class AlertFilterAutotuneFactory {
     }
   }
 
-  public BaseAnomalyFunction fromSpec(AnomalyFunctionDTO functionSpec) throws Exception {
-    BaseAnomalyFunction anomalyFunction = null;
-    String type = functionSpec.getType();
+  public BaseAlertFilterAutotune fromSpec(AnomalyFunctionDTO anomalyFunctionSpec) throws Exception {
+    BaseAlertFilterAutotune alertFilterAutoTune = null;
+    String type = anomalyFunctionSpec.getType();
     if (!props.containsKey(type)) {
       throw new IllegalArgumentException("Unsupported type " + type);
     }
     String className = props.getProperty(type);
-    anomalyFunction = (BaseAnomalyFunction) Class.forName(className).newInstance();
+    alertFilterAutoTune = (BaseAlertFilterAutotune) Class.forName(className).newInstance();
 
-    anomalyFunction.init(functionSpec);
-    return anomalyFunction;
+    alertFilterAutoTune.init(anomalyFunctionSpec);
+    return alertFilterAutoTune;
   }
 }

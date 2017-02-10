@@ -11,8 +11,8 @@ import java.util.Properties;
 public interface AlertFilterAutoTune {
   // Tune the alert filter properties using labeled anomalies
   // precision and recall need to be improved over old setting
-  Properties tuneAlertFilter(List<MergedAnomalyResultDTO> anomalyResults, Properties currentAlertFilterProperties) throws Exception;
+  public Properties tuneAlertFilter(List<MergedAnomalyResultDTO> anomalyResults, Properties currentAlertFilterProperties) throws Exception;
 
   // True if model has been updated (improved)
-  boolean isUpdated();
+  public boolean isUpdated();
 }
