@@ -8,7 +8,9 @@ function AnalysisView(analysisModel) {
 }
 
 AnalysisView.prototype = {
-  init: function () {
+  init(params = {}) {
+    const { metricId } = params;
+    this.viewParams.metricId = metricId || '';
   },
 
   render: function () {
@@ -39,18 +41,27 @@ AnalysisView.prototype = {
       }
     });
 
-    analysisMetricSelect.on("change", function(e) {
-      var selectedElement = $(e.currentTarget);
-      var selectedData = selectedElement.select2("data");
-      var metricId = selectedData.map(function (e) {return e.id})[0];
-      var metricAlias = selectedData.map(function (e) {return e.text})[0];
-      var metricName = selectedData.map(function (e) {return e.name})[0];
-      self.viewParams['metric'] = {id: metricId, alias: metricAlias, allowClear:true, name:metricName};
+    analysisMetricSelect.on('change', (e) => {
+      const $selectedElement = $(e.currentTarget);
+      const selectedData = $selectedElement.select2('data');
+      let metricId;
+      let metricAlias;
+      let metricName;
+
+      if (selectedData.length) {
+        const {id, text, name} = selectedData[0];
+        metricId = id;
+        metricAlias = text;
+        metricName = name;
+      }
+
+      this.viewParams['metric'] = {id: metricId, alias: metricAlias, allowClear:true, name:metricName};
+      this.viewParams['metricId'] = metricId;
 
       // Now render the dimensions and filters for selected metric
-      self.renderGranularity(self.viewParams.metric.id);
-      self.renderDimensions(self.viewParams.metric.id);
-      self.renderFilters(self.viewParams.metric.id);
+      this.renderGranularity(self.viewParams.metric.id);
+      this.renderDimensions(self.viewParams.metric.id);
+      this.renderFilters(self.viewParams.metric.id);
     }).trigger('change');
 
     // TIME RANGE SELECTION
