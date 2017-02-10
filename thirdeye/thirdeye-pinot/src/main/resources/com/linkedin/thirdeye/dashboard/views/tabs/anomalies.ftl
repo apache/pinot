@@ -35,39 +35,41 @@
 <div class="container-fluid bg-white ">
 	<div class="row bg-white row-bordered">
 		<div class="container top-buffer bottom-buffer">
-			<div class="col-md-4">
-				<div>
-					<label style="font-size: 15px; font-weight: 500">Select time range: </label>
+			<div class="row">
+				<div class="col-md-4">
+					<div>
+						<label style="font-size: 15px; font-weight: 500">Select time range: </label>
+					</div>
+					<div>
+						<label style="font-size: 11px; font-weight: 500">DATE RANGE(CURRENT) </label>
+					</div>
+					<div id="anomalies-time-range">
+						<i class="glyphicon glyphicon-calendar fa fa-calendar"></i>&nbsp; <span></span> <b class="caret"></b>
+					</div>
 				</div>
-				<div>
-					<label style="font-size: 11px; font-weight: 500">DATE RANGE(CURRENT) </label>
+				<div class="col-md-4">
+					<div>
+						<label style="font-size: 15px; font-weight: 500">Filter by Function: </label>
+					</div>
+					<div>
+						<select class="form-control" id="anomaly-function-dropdown">
+						</select>
+					</div>
 				</div>
-				<div id="anomalies-time-range">
-					<i class="glyphicon glyphicon-calendar fa fa-calendar"></i>&nbsp; <span></span> <b class="caret"></b>
+				<div class="col-md-2">
+					<div>
+						<label style="font-size: 15px; font-weight: 500">Anomaly Status: </label>
+					</div>
+					<div>
+						<label class="checkbox-inline"><input type="checkbox" id="status-resolved-checkbox"><span class="label anomaly-status-label">Resolved</span></label>
+					</div>
+					<div>
+						<label class="checkbox-inline"><input type="checkbox" id="status-unresolved-checkbox"><span class="label anomaly-status-label">Unresolved</span></label>
+					</div>
 				</div>
-			</div>
-			<div class="col-md-4">
-				<div>
-					<label style="font-size: 15px; font-weight: 500">Filter by Function: </label>
+				<div class="col-md-2" id="apply-button">
+					<input type="button" class="btn btn-primary btn-sm" value="Apply" />
 				</div>
-				<div>
-					<select class="form-control" id="anomaly-function-dropdown">
-					</select>
-				</div>
-			</div>
-			<div class="col-md-2">
-				<div>
-					<label style="font-size: 15px; font-weight: 500">Anomaly Status: </label>
-				</div>
-				<div>
-					<label class="checkbox-inline"><input type="checkbox" id="status-resolved-checkbox"><span class="label anomaly-status-label">Resolved</span></label>
-				</div>
-				<div>
-					<label class="checkbox-inline"><input type="checkbox" id="status-unresolved-checkbox"><span class="label anomaly-status-label">Unresolved</span></label>
-				</div>
-			</div>
-			<div class="col-md-2" id="apply-button">
-				<input type="button" class="btn btn-primary btn-sm" value="Apply" />
 			</div>
 		</div>
 	</div>
