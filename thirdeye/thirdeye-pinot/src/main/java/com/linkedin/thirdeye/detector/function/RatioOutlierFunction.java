@@ -1,12 +1,14 @@
 package com.linkedin.thirdeye.detector.function;
 
 import com.linkedin.pinot.pql.parsers.utils.Pair;
+import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
+import com.linkedin.thirdeye.dashboard.views.TimeBucket;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
+import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -91,51 +93,83 @@ public class RatioOutlierFunction extends BaseAnomalyFunction {
       averages.put(m, averageValue);
     }
 
-    // TODO generate pairs
-    Collection<MetricPair> pairs = new ArrayList<MetricPair>();
-    pairs.add(new MetricPair(getSpec().getMetrics().get(0), getSpec().getMetrics().get(1)));
+    String m_a = getSpec().getMetrics().get(0);
+    String m_b = getSpec().getMetrics().get(1);
 
     for (Long timeBucket : timeSeries.getTimeWindowSet()) {
-      boolean isAnomaly = false;
-      double worst_case_ratio = 0.0;
-      double worst_case_deviation = 0.0;
+      double value_a = timeSeries.get(timeBucket, m_a).doubleValue();
+      double value_b = timeSeries.get(timeBucket, m_b).doubleValue();
 
-      for (MetricPair p : pairs) {
-        double value_a = timeSeries.get(timeBucket, p.a).doubleValue();
-        double value_b = timeSeries.get(timeBucket, p.b).doubleValue();
+      if (value_b == 0.0d) continue;
 
-        if (value_b == 0.0d) continue;
+      double ratio = value_a / value_b;
+      double deviationFromThreshold = getDeviationFromThreshold(ratio, min, max);
 
-        double ratio = value_a / value_b;
-        double deviationFromThreshold = getDeviationFromThreshold(ratio, min, max);
+      LOG.info("{}={}, {}={}, ratio={}, min={}, max={}, deviation={}", m_a, value_a, m_b, value_b, ratio, min, max, deviationFromThreshold);
 
-        LOG.info("{}={}, {}={}, ratio={}, min={}, max={}, deviation={}", p.a, value_a, p.b, value_b, ratio, min, max, deviationFromThreshold);
-
-        if (Math.abs(deviationFromThreshold) > Math.abs(worst_case_deviation)) {
-          worst_case_ratio = ratio;
-          worst_case_deviation = deviationFromThreshold;
-        }
-
-        if (deviationFromThreshold != 0.0) {
-          isAnomaly = true;
-          // keep going to find worst case
-        }
-      }
-
-      if (isAnomaly) {
+      if (deviationFromThreshold != 0.0) {
         RawAnomalyResultDTO anomalyResult = new RawAnomalyResultDTO();
         anomalyResult.setProperties(getSpec().getProperties());
         anomalyResult.setStartTime(timeBucket);
         anomalyResult.setEndTime(timeBucket + bucketMillis); // point-in-time
         anomalyResult.setDimensions(exploredDimensions);
-        anomalyResult.setScore(worst_case_ratio);
-        anomalyResult.setWeight(Math.abs(worst_case_deviation)); // higher change, higher the severity
-        String message = String.format(DEFAULT_MESSAGE_TEMPLATE, worst_case_deviation, worst_case_ratio, min, max);
+        anomalyResult.setScore(ratio);
+        anomalyResult.setWeight(Math.abs(deviationFromThreshold)); // higher change, higher the severity
+        String message = String.format(DEFAULT_MESSAGE_TEMPLATE, deviationFromThreshold, ratio, min, max);
         anomalyResult.setMessage(message);
         anomalyResults.add(anomalyResult);
       }
     }
     return anomalyResults;
+  }
+  
+  @Override
+  public AnomalyTimelinesView getTimeSeriesView(MetricTimeSeries timeSeries, long bucketMillis,
+      String metric, long viewWindowStartTime, long viewWindowEndTime,
+      List<RawAnomalyResultDTO> knownAnomalies) {
+
+    double min = 0.0d;
+
+    try {
+      // Parse function properties
+      Properties props = getProperties();
+
+      // Get min / max props
+      if (props.containsKey(MIN_VAL)) {
+        min = Double.valueOf(props.getProperty(MIN_VAL));
+      }
+    } catch(IOException e) {
+      LOG.warn("Error extracting min value, using 0.0 instead");
+    }
+
+    String m_a = getSpec().getMetrics().get(0);
+    String m_b = getSpec().getMetrics().get(1);
+
+    AnomalyTimelinesView view = new AnomalyTimelinesView();
+
+    int bucketCount = (int) ((viewWindowEndTime - viewWindowStartTime) / bucketMillis);
+    for (int i = 0; i < bucketCount; ++i) {
+      long currentBucketMillis = viewWindowStartTime + i * bucketMillis;
+      long baselineBucketMillis = currentBucketMillis - TimeUnit.DAYS.toMillis(7);
+      TimeBucket timebucket =
+          new TimeBucket(currentBucketMillis, currentBucketMillis + bucketMillis, baselineBucketMillis,
+              baselineBucketMillis + bucketMillis);
+      view.addTimeBuckets(timebucket);
+
+      double value_a = timeSeries.get(currentBucketMillis, m_a).doubleValue();
+      double value_b = timeSeries.get(currentBucketMillis, m_b).doubleValue();
+
+      if (value_b != 0.0d) {
+        double ratio = value_a / value_b;
+        view.addCurrentValues(ratio);
+      } else {
+        view.addCurrentValues(Double.NaN);
+      }
+
+      view.addBaselineValues(min);
+    }
+
+    return view;
   }
 
   @Override
