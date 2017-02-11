@@ -27,9 +27,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import org.apache.helix.HelixAdmin;
 import org.apache.helix.ZNRecord;
-import org.apache.helix.manager.zk.ZKHelixAdmin;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.joda.time.Duration;
@@ -248,6 +246,7 @@ public class ValidationManager {
       if (_autoCreateOnError) {
         _llcRealtimeSegmentManager.createConsumingSegment(realtimeTableName, nonConsumingKafkaPartitions, llcSegments,
             tableConfig);
+        _llcRealtimeSegmentManager.completeCommittingSegments(realtimeTableName, llcSegments);
       }
     }
     // Make this call after other validations (so that we verify that we are consistent against the existing partition

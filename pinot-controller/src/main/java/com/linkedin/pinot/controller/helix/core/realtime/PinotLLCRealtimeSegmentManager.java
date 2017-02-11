@@ -23,7 +23,7 @@ import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -46,6 +46,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.google.common.base.Function;
+import com.google.common.collect.MinMaxPriorityQueue;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
@@ -549,6 +550,7 @@ public class PinotLLCRealtimeSegmentManager {
     try {
       lock.lock();
       updateHelixIdealState(realtimeTableName, newInstances, committingSegmentNameStr, newSegmentNameStr);
+      LOGGER.info("Changed {} to ONLINE and created {} in CONSUMING", committingSegmentNameStr, newSegmentNameStr);
     } finally {
       lock.unlock();
     }
@@ -620,69 +622,76 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   protected void completeCommittingSegments(String realtimeTableName) {
-    IdealState idealState = getTableIdealState(realtimeTableName);
-    Set<String> segmentNamesIS = idealState.getPartitionSet();
     List<ZNRecord> segmentMetadataList = getExistingSegmentMetadata(realtimeTableName);
     if (segmentMetadataList == null || segmentMetadataList.isEmpty()) {
       return;
     }
-    final List<LLCSegmentName> segmentNames = new ArrayList<>(segmentMetadataList.size());
+    final List<String> segmentIds = new ArrayList<>(segmentMetadataList.size());
 
     for (ZNRecord segment : segmentMetadataList) {
       if (SegmentName.isLowLevelConsumerSegmentName(segment.getId())) {
-        segmentNames.add(new LLCSegmentName(segment.getId()));
+        segmentIds.add(segment.getId());
       }
     }
 
-    if (segmentNames.isEmpty()) {
+    if (segmentIds.isEmpty()) {
       return;
     }
 
-    Collections.sort(segmentNames, Collections.reverseOrder());
+    completeCommittingSegments(realtimeTableName, segmentIds);
+  }
 
-    int curPartition = segmentNames.get(0).getPartitionId();  // Current kafka partition we are working on.
-    final int nSegments = segmentNames.size();
+  private void completeCommittingSegments(String realtimeTableName, Map<Integer, MinMaxPriorityQueue<LLCSegmentName>> partitionToLatestSegments) {
+    IdealState idealState = getTableIdealState(realtimeTableName);
+    Set<String> segmentNamesIS = idealState.getPartitionSet();
 
-    /*
-     * We only need to look at the most recent segment in the kafka partition. If that segment is also present
-     * in the idealstate, we are good.
-     * Otherwise, we need to add that segment to the idealstate:
-     * - We find the current instance assignment for that partition and update idealstate accordingly.
-     * NOTE: It may be that the kafka assignment of instances has changed for this partition. In that case,
-     * we need to also modify the numPartitions field in the segment metadata.
-     * TODO Modify numPartitions field in segment metadata and re-write it in propertystore.
-     * The numPartitions field in the metadata is used by SegmentCompletionManager
-     */
-    for (int i = 0; i < nSegments; i++) {
-      final LLCSegmentName segmentName = segmentNames.get(i);
-      if (segmentName.getPartitionId() == curPartition) {
-        final String curSegmentNameStr = segmentName.getSegmentName();
-        if (!segmentNamesIS.contains(curSegmentNameStr)) {
-          LOGGER.info("{}:Repairing segment for partition {}. Segment {} not found in idealstate", realtimeTableName, curPartition,
-              curSegmentNameStr);
+    final ZNRecord partitionAssignment = getKafkaPartitionAssignment(realtimeTableName);
+    for (Map.Entry<Integer, MinMaxPriorityQueue<LLCSegmentName>> entry : partitionToLatestSegments.entrySet()) {
+      final LLCSegmentName segmentName = entry.getValue().pollFirst();
+      final String segmentId = segmentName.getSegmentName();
+      final int partitionId = entry.getKey();
+      if (!segmentNamesIS.contains(segmentId)) {
+        LOGGER.info("{}:Repairing segment for partition {}. Segment {} not found in idealstate", realtimeTableName,
+            partitionId, segmentId);
 
-          final ZNRecord partitionAssignment = getKafkaPartitionAssignment(realtimeTableName);
-          List<String> newInstances = partitionAssignment.getListField(Integer.toString(curPartition));
-          LOGGER.info("{}: Assigning segment {} to {}", realtimeTableName, curSegmentNameStr, newInstances);
-          // TODO Re-write num-partitions in metadata if needed.
-
-          String prevSegmentNameStr = null;
-          // If there was a prev segment in the same partition, then we need to fix it to be ONLINE.
-          if (i < nSegments-1) {
-            LLCSegmentName prevSegmentName = segmentNames.get(i+1);
-            if (prevSegmentName.getPartitionId() == segmentName.getPartitionId()) {
-              prevSegmentNameStr = prevSegmentName.getSegmentName();
-            }
-          }
-          updateHelixIdealState(realtimeTableName, newInstances, prevSegmentNameStr, curSegmentNameStr);
-          // Skip all other segments in this partition.
+        List<String> newInstances = partitionAssignment.getListField(Integer.toString(partitionId));
+        LOGGER.info("{}: Assigning segment {} to {}", realtimeTableName, segmentId, newInstances);
+        // TODO Re-write num-partitions in metadata if needed.
+        // If there was a prev segment in the same partition, then we need to fix it to be ONLINE.
+        LLCSegmentName prevSegmentName = entry.getValue().pollLast();
+        String prevSegmentNameStr = null;
+        if (prevSegmentName != null) {
+          prevSegmentNameStr = prevSegmentName.getSegmentName();
         }
-        curPartition--;
-      }
-      if (curPartition < 0) {
-        break;
+        updateHelixIdealState(realtimeTableName, newInstances, prevSegmentNameStr, segmentId);
       }
     }
+  }
+
+  public void completeCommittingSegments(String realtimeTableName, List<String> segmentIds) {
+    IdealState idealState = getTableIdealState(realtimeTableName);
+
+    Comparator<LLCSegmentName> comparator = new Comparator<LLCSegmentName>() {
+      @Override
+      public int compare(LLCSegmentName o1, LLCSegmentName o2) {
+        return o2.compareTo(o1);
+      }
+    };
+
+    Map<Integer, MinMaxPriorityQueue<LLCSegmentName>> partitionToLatestSegments = new HashMap<>(16);
+
+    for (String segmentId : segmentIds) {
+      LLCSegmentName segmentName = new LLCSegmentName(segmentId);
+      final int partitionId = segmentName.getPartitionId();
+      MinMaxPriorityQueue latestSegments = partitionToLatestSegments.get(partitionId);
+      if (latestSegments == null) {
+        latestSegments = MinMaxPriorityQueue.orderedBy(comparator).maximumSize(2).create();
+        partitionToLatestSegments.put(partitionId, latestSegments);
+      }
+      latestSegments.offer(segmentName);
+    }
+
+    completeCommittingSegments(realtimeTableName, partitionToLatestSegments);
   }
 
   protected long getKafkaPartitionOffset(KafkaStreamMetadata kafkaStreamMetadata, final String offsetCriteria,
