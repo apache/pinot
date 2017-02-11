@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
+import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomaliesSummary;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomaliesWrapper;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalyDetails;
@@ -150,6 +151,13 @@ public class AnomaliesResource {
       @PathParam("pageNumber") int pageNumber) throws Exception {
 
     List<MergedAnomalyResultDTO> mergedAnomalies = mergedAnomalyResultDAO.findByTime(startTime, endTime);
+    try {
+      mergedAnomalies = AlertFilterHelper.applyFiltrationRule(mergedAnomalies);
+    } catch (Exception e) {
+      LOG.warn(
+          "Failed to apply alert filters on anomalies in start:{}, end:{}, exception:{}",
+          new DateTime(startTime), new DateTime(endTime), e);
+    }
     AnomaliesWrapper anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(mergedAnomalies, pageNumber);
     return anomaliesWrapper;
   }
@@ -283,18 +291,22 @@ public class AnomaliesResource {
     String metric = metricConfig.getName();
     List<MergedAnomalyResultDTO> mergedAnomalies =
         mergedAnomalyResultDAO.findByCollectionMetricTime(dataset, metric, startTime, endTime, false);
+    try {
+      mergedAnomalies = AlertFilterHelper.applyFiltrationRule(mergedAnomalies);
+    } catch (Exception e) {
+      LOG.warn(
+          "Failed to apply alert filters on anomalies for metricid:{}, start:{}, end:{}, exception:{}",
+          metricId, new DateTime(startTime), new DateTime(endTime), e);
+    }
     return mergedAnomalies;
   }
 
   private List<MergedAnomalyResultDTO> getAnomaliesForMetricIdsInRange(List<Long> metricIds, Long startTime, Long endTime) {
     List<MergedAnomalyResultDTO> mergedAnomaliesForMetricIdsInRange = new ArrayList<>();
     for (Long metricId : metricIds) {
-      MetricConfigDTO metricConfig = metricConfigDAO.findById(metricId);
-      String dataset = metricConfig.getDataset();
-      String metric = metricConfig.getName();
-      List<MergedAnomalyResultDTO> mergedAnomalies =
-          mergedAnomalyResultDAO.findByCollectionMetricTime(dataset, metric, startTime, endTime, false);
-      mergedAnomaliesForMetricIdsInRange.addAll(mergedAnomalies);
+      List<MergedAnomalyResultDTO> filteredMergedAnomalies =
+          getAnomaliesForMetricIdInRange(metricId, startTime, endTime);
+      mergedAnomaliesForMetricIdsInRange.addAll(filteredMergedAnomalies);
     }
     return mergedAnomaliesForMetricIdsInRange;
   }
