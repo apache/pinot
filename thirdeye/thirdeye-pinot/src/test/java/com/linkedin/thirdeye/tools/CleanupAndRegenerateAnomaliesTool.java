@@ -1,13 +1,18 @@
 package com.linkedin.thirdeye.tools;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.linkedin.thirdeye.anomaly.utils.DetectionResourceHttpUtils;
 import com.linkedin.thirdeye.dashboard.resources.OnboardResource;
+import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
-
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.client.ClientProtocolException;
 import org.joda.time.DateTime;
@@ -15,17 +20,6 @@ import org.joda.time.format.ISODateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.collections.Lists;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import com.linkedin.thirdeye.anomaly.utils.DetectionResourceHttpUtils;
-import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
-import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 
 /**
  * Utility class to cleanup all anomalies for input datasets,
@@ -125,6 +119,7 @@ public class CleanupAndRegenerateAnomaliesTool {
         LOG.info("Requested functionId {} doesn't exist", functionId);
         continue;
       }
+
       LOG.info("Beginning cleanup of functionId {} collection {} metric {}",
           functionId, anomalyFunction.getCollection(), anomalyFunction.getMetric());
 

@@ -76,7 +76,8 @@ public abstract class AbstractManagerTestBase {
     AnomalyFunctionDTO functionSpec = new AnomalyFunctionDTO();
     functionSpec.setFunctionName("integration test function 1");
     functionSpec.setType("WEEK_OVER_WEEK_RULE");
-    functionSpec.setMetric(metricName);
+    functionSpec.setTopicMetric(metricName);
+    functionSpec.setMetrics(Arrays.asList(metricName));
     functionSpec.setCollection(collection);
     functionSpec.setMetricFunction(MetricAggFunction.SUM);
     functionSpec.setCron("0/10 * * * * ?");
