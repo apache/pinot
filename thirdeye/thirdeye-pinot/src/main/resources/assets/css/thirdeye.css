@@ -5,6 +5,11 @@ body {
     background-color: #F3F6F8;
     color: #080808
 }
+
+label {
+  font-weight: 300;
+}
+
 .label {
     color: #000000;
 }
@@ -444,4 +449,11 @@ text {
   align-self: center;
 }
 
+
+.time-range-description {
+  text-transform: uppercase;
+  font-size: 10px;
+  color: gray;
+  letter-spacing: 1px;
+}
 

@@ -239,7 +239,8 @@ AnomalyResultView.prototype = {
 
       var regionStart = moment(anomaly.anomalyRegionStart, constants.TIMESERIES_DATE_FORMAT).format(constants.DETAILS_DATE_FORMAT);
       var regionEnd = moment(anomaly.anomalyRegionEnd, constants.TIMESERIES_DATE_FORMAT).format(constants.DETAILS_DATE_FORMAT);
-      $("#region-" + idx).html(regionStart + " - " + regionEnd)
+      $(`#region-start-${idx}`).html(regionStart);
+      $(`#region-end-${idx}`).html(regionEnd);
 
       var current = anomaly.current;
       var baseline = anomaly.baseline;

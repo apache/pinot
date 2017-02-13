@@ -36,10 +36,10 @@
 			<div class="row filter-bar">
 				<div class="col-md-4">
 					<div>
-						<label style="font-size: 15px; font-weight: 500">Select time range: </label>
+						<label>Select time range: </label>
 					</div>
 					<div>
-						<label style="font-size: 11px; font-weight: 500">DATE RANGE(CURRENT) </label>
+						<label class="time-range-description">Date Range (current)</label>
 					</div>
 					<div id="anomalies-time-range">
 						<i class="glyphicon glyphicon-calendar fa fa-calendar"></i>&nbsp; <span></span> <b class="caret"></b>

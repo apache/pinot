@@ -2,7 +2,7 @@
   <div class="row row-bordered">
     <div class="container top-buffer bottom-buffer">
       <div>
-        Showing <label style="font-size: 15px; font-weight: 500"> {{this.numAnomaliesOnPage}} </label> anomalies of <label style="font-size: 15px; font-weight: 500"> {{this.totalAnomalies}}</label>
+        Showing <strong>{{this.numAnomaliesOnPage}} </strong> anomalies of <strong> {{this.totalAnomalies}}</strong>
       </div>
     </div>
     {{#each this.anomalyDetailsList as |anomalyData anomalyIndex|}}
@@ -29,24 +29,26 @@
         <div class="row">
           <div class="col-md-5">
             <div class="row">
-              <div class="col-xs-3">
-                <span class="pull-left">Dimension</span>
-              </div>
+              <div class="col-xs-3 text-right">Dimension:</div>
               <div id="dimension-{{anomalyIndex}}" class="col-xs-9">
                 <span class="pull-left"></span>
               </div>
             </div>
             <div class="row">
-              <div class="col-xs-3">Current</div>
+              <div class="col-xs-3 text-right">Current:</div>
               <div id="current-value-{{anomalyIndex}}" class="col-xs-9"></div>
             </div>
             <div class="row">
-              <div class="col-xs-3">Baseline</div>
+              <div class="col-xs-3 text-right">Baseline:</div>
               <div id="baseline-value-{{anomalyIndex}}" class="col-xs-9"></div>
             </div>
             <div class="row">
-              <div class="col-xs-3">Start-End (PDT)</div>
-              <div id="region-{{anomalyIndex}}" class="col-xs-9"></div>
+              <div class="col-xs-3 text-right">Start (PDT):</div>
+              <div id="region-start-{{anomalyIndex}}" class="col-xs-9"></div>
+            </div>
+            <div class="row">
+              <div class="col-xs-3 text-right">End PDT):</div>
+              <div id="region-end-{{anomalyIndex}}" class="col-xs-9"></div>
             </div>
           </div>
           <div class="col-md-7">
