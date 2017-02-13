@@ -669,8 +669,6 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   public void completeCommittingSegments(String realtimeTableName, List<String> segmentIds) {
-    IdealState idealState = getTableIdealState(realtimeTableName);
-
     Comparator<LLCSegmentName> comparator = new Comparator<LLCSegmentName>() {
       @Override
       public int compare(LLCSegmentName o1, LLCSegmentName o2) {
@@ -678,7 +676,7 @@ public class PinotLLCRealtimeSegmentManager {
       }
     };
 
-    Map<Integer, MinMaxPriorityQueue<LLCSegmentName>> partitionToLatestSegments = new HashMap<>(16);
+    Map<Integer, MinMaxPriorityQueue<LLCSegmentName>> partitionToLatestSegments = new HashMap<>();
 
     for (String segmentId : segmentIds) {
       LLCSegmentName segmentName = new LLCSegmentName(segmentId);
