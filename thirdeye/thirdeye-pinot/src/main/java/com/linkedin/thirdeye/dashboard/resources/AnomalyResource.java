@@ -112,7 +112,7 @@ public class AnomalyResource {
     if (StringUtils.isBlank(dataset)) {
       throw new IllegalArgumentException("dataset is a required query param");
     }
-    List<String> metrics = anomalyFunctionDAO.findDistinctMetricsByCollection(dataset);
+    List<String> metrics = anomalyFunctionDAO.findDistinctTopicMetricsByCollection(dataset);
     return metrics;
   }
 
@@ -219,7 +219,7 @@ public class AnomalyResource {
      List<AnomalyFunctionDTO> anomalyFunctions = anomalyFunctionDAO.findAllByCollection(dataset);
      List<Long> functionIds = new ArrayList<>();
      for (AnomalyFunctionDTO anomalyFunction : anomalyFunctions) {
-       if (StringUtils.isNotBlank(metric) && !anomalyFunction.getMetric().equals(metric)) {
+       if (StringUtils.isNotBlank(metric) && !anomalyFunction.getTopicMetric().equals(metric)) {
          continue;
        }
        functionIds.add(anomalyFunction.getId());
@@ -251,7 +251,7 @@ public class AnomalyResource {
     if (StringUtils.isNotEmpty(metric)) {
       anomalyFunctions = new ArrayList<>();
       for (AnomalyFunctionDTO anomalyFunctionSpec : anomalyFunctionSpecs) {
-        if (metric.equals(anomalyFunctionSpec.getMetric())) {
+        if (metric.equals(anomalyFunctionSpec.getTopicMetric())) {
           anomalyFunctions.add(anomalyFunctionSpec);
         }
       }
@@ -294,7 +294,8 @@ public class AnomalyResource {
     anomalyFunctionSpec.setMetricFunction(MetricAggFunction.valueOf(metric_function));
     anomalyFunctionSpec.setCollection(dataset);
     anomalyFunctionSpec.setFunctionName(functionName);
-    anomalyFunctionSpec.setMetric(metric);
+    anomalyFunctionSpec.setTopicMetric(metric);
+    anomalyFunctionSpec.setMetrics(Arrays.asList(metric));
     if (StringUtils.isEmpty(type)) {
       type = DEFAULT_FUNCTION_TYPE;
     }
@@ -382,7 +383,8 @@ public class AnomalyResource {
     anomalyFunctionSpec.setActive(isActive);
     anomalyFunctionSpec.setCollection(dataset);
     anomalyFunctionSpec.setFunctionName(functionName);
-    anomalyFunctionSpec.setMetric(metric);
+    anomalyFunctionSpec.setTopicMetric(metric);
+    anomalyFunctionSpec.setMetrics(Arrays.asList(metric));
     if (StringUtils.isEmpty(type)) {
       type = DEFAULT_FUNCTION_TYPE;
     }
@@ -621,7 +623,7 @@ public class AnomalyResource {
     // Known anomalies are ignored (the null parameter) because 1. we can reduce users' waiting time and 2. presentation
     // data does not need to be as accurate as the one used for detecting anomalies
     AnomalyTimelinesView anomalyTimelinesView =
-        anomalyFunction.getTimeSeriesView(metricTimeSeries, bucketMillis, anomalyFunctionSpec.getMetric(),
+        anomalyFunction.getTimeSeriesView(metricTimeSeries, bucketMillis, anomalyFunctionSpec.getTopicMetric(),
             viewWindowStartTime, viewWindowEndTime, null);
 
     // Generate summary for frontend

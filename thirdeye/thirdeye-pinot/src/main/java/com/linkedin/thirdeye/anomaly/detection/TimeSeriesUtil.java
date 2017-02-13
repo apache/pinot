@@ -212,8 +212,10 @@ public abstract class TimeSeriesUtil {
     // Seed request with top-level...
     TimeSeriesRequest request = new TimeSeriesRequest();
     request.setCollectionName(anomalyFunctionSpec.getCollection());
+    // TODO: Check low level support for multiple metrics retrieval
+    String metricsToRetrieve = String.join(",", anomalyFunctionSpec.getMetrics());
     List<MetricExpression> metricExpressions = Utils
-        .convertToMetricExpressions(anomalyFunctionSpec.getMetric(),
+        .convertToMetricExpressions(metricsToRetrieve,
             anomalyFunctionSpec.getMetricFunction(), anomalyFunctionSpec.getCollection());
     request.setMetricExpressions(metricExpressions);
     request.setAggregationTimeGranularity(timeGranularity);

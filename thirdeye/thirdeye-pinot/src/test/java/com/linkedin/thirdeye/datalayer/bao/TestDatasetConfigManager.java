@@ -1,13 +1,11 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import java.util.List;
-
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 
 public class TestDatasetConfigManager extends AbstractManagerTestBase {
 
@@ -29,11 +27,14 @@ public class TestDatasetConfigManager extends AbstractManagerTestBase {
   @Test
   public void testCreate() {
 
-    datasetConfigId1 = datasetConfigDAO.save(getTestDatasetConfig(collection1));
+    DatasetConfigDTO datasetConfig1 = getTestDatasetConfig(collection1);
+    datasetConfig1.setRequiresCompletenessCheck(true);
+    datasetConfigId1 = datasetConfigDAO.save(datasetConfig1);
     Assert.assertNotNull(datasetConfigId1);
 
     DatasetConfigDTO datasetConfig2 = getTestDatasetConfig(collection2);
     datasetConfig2.setActive(false);
+    datasetConfig2.setRequiresCompletenessCheck(true);
     datasetConfigId2 = datasetConfigDAO.save(datasetConfig2);
     Assert.assertNotNull(datasetConfigId2);
 
@@ -67,5 +68,10 @@ public class TestDatasetConfigManager extends AbstractManagerTestBase {
     datasetConfigDAO.deleteById(datasetConfigId2);
     DatasetConfigDTO datasetConfig = datasetConfigDAO.findById(datasetConfigId2);
     Assert.assertNull(datasetConfig);
+  }
+
+  @Test(dependsOnMethods = {"testCreate"})
+  public void testActiveRequiresCompletenessCheck() {
+    Assert.assertEquals(datasetConfigDAO.findActiveRequiresCompletenessCheck().size(), 1);
   }
 }

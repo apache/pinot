@@ -182,7 +182,7 @@ public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunc
       DateTime windowStart, DateTime windowEnd, List<MergedAnomalyResultDTO> knownAnomalies)
       throws Exception {
     AnomalyDetectionContext anomalyDetectionContext = BackwardAnomalyFunctionUtils
-        .buildAnomalyDetectionContext(this, timeSeries, spec.getMetric(), exploredDimensions,
+        .buildAnomalyDetectionContext(this, timeSeries, spec.getTopicMetric(), exploredDimensions,
             spec.getBucketSize(), spec.getBucketUnit(), windowStart, windowEnd);
 
     return this.analyze(anomalyDetectionContext);
@@ -196,7 +196,7 @@ public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunc
 
     if (!(getMergeModel() instanceof NoPredictionMergeModel)) {
       anomalyDetectionContext = BackwardAnomalyFunctionUtils
-          .buildAnomalyDetectionContext(this, timeSeries, spec.getMetric(),
+          .buildAnomalyDetectionContext(this, timeSeries, spec.getTopicMetric(),
               anomalyToUpdated.getDimensions(), spec.getBucketSize(), spec.getBucketUnit(),
               windowStart, windowEnd);
     }
@@ -210,7 +210,7 @@ public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunc
       long bucketMillis, String metric, long viewWindowStartTime, long viewWindowEndTime,
       List<RawAnomalyResultDTO> knownAnomalies) {
     AnomalyDetectionContext anomalyDetectionContext = BackwardAnomalyFunctionUtils
-        .buildAnomalyDetectionContext(this, timeSeries, spec.getMetric(), null,
+        .buildAnomalyDetectionContext(this, timeSeries, spec.getTopicMetric(), null,
             spec.getBucketSize(), spec.getBucketUnit(), new DateTime(viewWindowStartTime),
             new DateTime(viewWindowEndTime));
 

@@ -36,6 +36,9 @@ function Constants() {
   this.TAB_ANOMALIES = 'anomalies';
   this.TAB_ANALYSIS = 'analysis';
 
+  this.DEFAULT_ANALYSIS_GRANULARITY = 'DAYS';
+  this.DEFAULT_ANALYSIS_DIMENSION = 'ALL';
+
   this.FEEDBACK_STRING_CONFIRMED_ANOMALY = 'Confirmed Anomaly';
   this.FEEDBACK_STRING_FALSE_ALARM = 'False Alarm';
   this.FEEDBACK_STRING_CONFIRMED_NOT_ACTIONABLE = 'Confirmed - Not Actionable';

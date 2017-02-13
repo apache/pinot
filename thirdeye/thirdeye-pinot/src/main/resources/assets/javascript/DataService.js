@@ -30,7 +30,7 @@ DataService.prototype = {
       spinner.spin(target);
 
       console.log("request url:", url)
-      $.ajax({
+      return $.ajax({
         url: url,
         data: data,
         type: 'get',
@@ -43,7 +43,11 @@ DataService.prototype = {
         }
       }).done(function(data) {
         spinner.stop();
-        callback(data);
+        if (callback) {
+          callback(data);
+        } else {
+          return data;
+        }
       });
     },
 
@@ -147,8 +151,17 @@ DataService.prototype = {
       return this.getDataSynchronous(url);
     },
 
+    fetchMetricId(name) {
+      const url = "/data/data/metricId";
+      const data = {
+        name
+      };
+
+      return this.getDataAsynchronous(url, data).then(([data]) => data.id);
+    },
+
     fetchTimeseriesCompare: function (metricId, currentStart, currentEnd, baselineStart, baselineEnd,
-        dimension, filters, granularity) {
+        dimension = "ALL", filters = {}, granularity = "DAYS") {
       var url = "/timeseries/compare/" + metricId + "/" + currentStart + "/" + currentEnd + "/"
           + baselineStart + "/" + baselineEnd + "?dimension=" + dimension + "&filters="
           + JSON.stringify(filters) + "&granularity=" + granularity;
@@ -158,7 +171,7 @@ DataService.prototype = {
     },
 
   fetchHeatmapData: function (metricId, currentStart, currentEnd, baselineStart, baselineEnd,
-      filters) {
+      filters = {}) {
     var url = "/data/heatmap/" + metricId + "/" + currentStart + "/" + currentEnd + "/"
         + baselineStart + "/" + baselineEnd + "?filters=" + JSON.stringify(filters);
     console.log("heatmap data fetch URL ----> ");

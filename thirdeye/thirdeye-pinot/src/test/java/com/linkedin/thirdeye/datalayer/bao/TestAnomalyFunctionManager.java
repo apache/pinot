@@ -47,7 +47,7 @@ public class TestAnomalyFunctionManager extends AbstractManagerTestBase {
 
   @Test(dependsOnMethods = {"testFindAllByCollection"})
   public void testDistinctMetricsByCollection() {
-    List<String> metrics = anomalyFunctionDAO.findDistinctMetricsByCollection(collection);
+    List<String> metrics = anomalyFunctionDAO.findDistinctTopicMetricsByCollection(collection);
     Assert.assertEquals(metrics.get(0), metricName);
   }
 

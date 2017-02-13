@@ -28,7 +28,7 @@ public interface AnomalyFunction {
    *
    * @return the time ranges of data that is used by this anomaly function
    */
-   List<Pair<Long, Long>> getDataRangeIntervals(Long monitoringWindowStartTime, Long monitoringWindowEndTime);
+  List<Pair<Long, Long>> getDataRangeIntervals(Long monitoringWindowStartTime, Long monitoringWindowEndTime);
 
   /**
    * Analyzes a metric time series and returns any anomalous points / intervals.

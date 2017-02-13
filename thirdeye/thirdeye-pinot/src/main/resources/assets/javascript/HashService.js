@@ -42,13 +42,25 @@ HashService.prototype = {
     switch (key) {
       case HASH_PARAMS.ANOMALIES_START_DATE:
       case HASH_PARAMS.ANOMALIES_END_DATE:
+      case HASH_PARAMS.ANALYSIS_CURRENT_START:
+      case HASH_PARAMS.ANALYSIS_CURRENT_END:
+      case HASH_PARAMS.ANALYSIS_BASELINE_START:
+      case HASH_PARAMS.ANALYSIS_BASELINE_END:
         value = moment(value);
         break;
       case HASH_PARAMS.ANOMALIES_PAGE_NUMBER:
         value = Number(value);
         break;
+      case HASH_PARAMS.ANALYSIS_FILTERS:
+        try {
+          value = JSON.parse(value);
+        } catch (e) {
+          // if not parsable, then use original value
+        }
+        break;
     }
     this.params[key] = value;
+    return value;
   },
   get : function(key) {
     return this.params[key];
@@ -56,9 +68,7 @@ HashService.prototype = {
   update : function(paramsToUpdate) {
     console.log('hash service.update');
     console.log(paramsToUpdate)
-    for (var key in paramsToUpdate) {
-      this.params[key] = paramsToUpdate[key];
-    }
+    Object.keys(paramsToUpdate).forEach(key => this.set(key, paramsToUpdate[key]));
   },
   getParams : function() {
     console.log('getParams');
@@ -78,12 +88,10 @@ HashService.prototype = {
         continue;
       }
       var defaultValue = paramNamesToDefaultValuesMap[paramName];
-      var value = this.get(paramName);
-      if (value == undefined && defaultValue != undefined) { //if default value is present, use that
-        value = defaultValue;
-        this.set(paramName, defaultValue);
-      }
-      if (value != undefined) {
+      //if default value is present, use that
+      var value = this.get(paramName) || this.set(paramName,  paramNamesToDefaultValuesMap[paramName]);
+
+      if (value) {
         value = JSON.stringify(value);
         if (value.startsWith("\"")) {
           value = value.slice(1, -1);
@@ -146,13 +154,10 @@ HashService.prototype = {
     for (let param of paramsToCheck.split('&')){
       const [key, value] = param.split('=');
       const currentValue = params[key];
-      const isMoment = moment.isMoment(currentValue);
 
-      if (isMoment) {
-        if(!currentValue.isSame(value, 'day')) {
-          return true;
-        }
-      } else if (currentValue != value) {
+      const isSame = HASH_PARAMS.isSame(key, currentValue, value);
+
+      if (!isSame) {
         return true;
       }
     }

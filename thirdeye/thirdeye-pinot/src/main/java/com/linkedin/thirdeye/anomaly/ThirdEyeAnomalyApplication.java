@@ -14,6 +14,7 @@ import java.util.concurrent.ScheduledExecutorService;
 
 import com.linkedin.thirdeye.anomaly.alert.AlertJobResource;
 import com.linkedin.thirdeye.anomaly.alert.AlertJobScheduler;
+import com.linkedin.thirdeye.anomaly.alert.v2.AlertJobSchedulerV2;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobResource;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
 import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeExecutor;
@@ -23,12 +24,17 @@ import com.linkedin.thirdeye.autoload.pinot.metrics.AutoLoadPinotMetricsService;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessScheduler;
+import com.linkedin.thirdeye.dashboard.resources.AnomalyFunctionResource;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
-
 import io.dropwizard.assets.AssetsBundle;
 import io.dropwizard.lifecycle.Managed;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 public class ThirdEyeAnomalyApplication
     extends BaseThirdEyeApplication<ThirdEyeAnomalyConfiguration> {
@@ -120,7 +126,7 @@ public class ThirdEyeAnomalyApplication
           autoLoadPinotMetricsService.start();
         }
         if (config.isDataCompleteness()) {
-          dataCompletenessScheduler = new DataCompletenessScheduler(config.getDatasetsToCheck());
+          dataCompletenessScheduler = new DataCompletenessScheduler();
           dataCompletenessScheduler.start();
         }
       }

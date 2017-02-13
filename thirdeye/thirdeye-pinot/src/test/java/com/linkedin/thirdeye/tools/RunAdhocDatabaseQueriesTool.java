@@ -134,16 +134,16 @@ public class RunAdhocDatabaseQueriesTool {
     List<AnomalyFunctionDTO> anomalyFunctionDTOs =
         anomalyFunctionDAO.findAllByCollection(collection);
     for (AnomalyFunctionDTO anomalyFunctionDTO : anomalyFunctionDTOs) {
-      String metricName = anomalyFunctionDTO.getMetric();
-      if (metricList.contains(metricName)) {
+      String topicMetricName = anomalyFunctionDTO.getTopicMetric();
+      if (metricList.contains(topicMetricName)) {
         Map<String, String> alertFilter = defaultAlertFilter;
-        if (metricRuleMap.containsKey(metricName)) {
-          alertFilter = metricRuleMap.get(metricName);
+        if (metricRuleMap.containsKey(topicMetricName)) {
+          alertFilter = metricRuleMap.get(topicMetricName);
         }
         anomalyFunctionDTO.setAlertFilter(alertFilter);
         anomalyFunctionDAO.update(anomalyFunctionDTO);
-        LOG.info("Add alert filter {} to function {} (dataset: {}, metric: {})", alertFilter,
-            anomalyFunctionDTO.getId(), collection, metricName);
+        LOG.info("Add alert filter {} to function {} (dataset: {}, topic metric: {})", alertFilter,
+            anomalyFunctionDTO.getId(), collection, topicMetricName);
       }
     }
   }

@@ -13,10 +13,10 @@ import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.client.DAORegistry;
+import com.linkedin.thirdeye.client.ResponseParserUtils;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.client.ResponseParserUtils;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
@@ -78,11 +78,15 @@ public class DetectionTaskRunner implements TaskRunner {
     }
 
     LOG.info(
-        "Running anomaly detection job with metricFunction: [{}], metric [{}], collection: [{}]",
-        anomalyFunctionSpec.getFunctionName(), anomalyFunctionSpec.getMetric(),
+        "Running anomaly detection job with metricFunction: [{}], topic metric [{}], collection: [{}]",
+        anomalyFunctionSpec.getFunctionName(), anomalyFunctionSpec.getTopicMetric(),
         anomalyFunctionSpec.getCollection());
 
     collectionDimensions = datasetConfig.getDimensions();
+
+    // Get Time Series
+    List<Pair<Long, Long>> startEndTimeRanges = anomalyFunction.getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis());
+    Map<DimensionKey, MetricTimeSeries> dimensionKeyMetricTimeSeriesMap = TimeSeriesUtil.getTimeSeriesForAnomalyDetection(anomalyFunctionSpec, startEndTimeRanges);
 
     // Get existing anomalies for this time range and this function id for all combinations of dimensions
     if (anomalyFunction.useHistoryAnomaly()) {
@@ -97,9 +101,6 @@ public class DetectionTaskRunner implements TaskRunner {
     }
     // We always find existing raw anomalies to prevent duplicate raw anomalies are generated
     existingRawAnomalies = getExistingRawAnomalies(anomalyFunctionSpec.getId(), windowStart.getMillis(), windowEnd.getMillis());
-
-    List<Pair<Long, Long>> startEndTimeRanges = anomalyFunction.getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis());
-    Map<DimensionKey, MetricTimeSeries> dimensionKeyMetricTimeSeriesMap = TimeSeriesUtil.getTimeSeriesForAnomalyDetection(anomalyFunctionSpec, startEndTimeRanges);
 
     scalingFactors = OverrideConfigHelper
         .getTimeSeriesScalingFactors(DAO_REGISTRY.getOverrideConfigDAO(), anomalyFunctionSpec.getCollection(),
@@ -153,7 +154,7 @@ public class DetectionTaskRunner implements TaskRunner {
       dimensionNamesToKnownRawAnomalies.put(existingRawAnomaly.getDimensions(), existingRawAnomaly);
     }
 
-    String metricName = anomalyFunction.getSpec().getMetric();
+    String metricName = anomalyFunction.getSpec().getTopicMetric();
     for (Map.Entry<DimensionKey, MetricTimeSeries> entry : dimensionKeyMetricTimeSeriesMap.entrySet()) {
       DimensionKey dimensionKey = entry.getKey();
 

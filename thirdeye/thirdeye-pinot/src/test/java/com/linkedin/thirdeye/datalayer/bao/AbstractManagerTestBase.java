@@ -29,7 +29,6 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.joda.time.DateTime;
 
-
 public abstract class AbstractManagerTestBase {
   protected static DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
@@ -77,7 +76,8 @@ public abstract class AbstractManagerTestBase {
     AnomalyFunctionDTO functionSpec = new AnomalyFunctionDTO();
     functionSpec.setFunctionName("integration test function 1");
     functionSpec.setType("WEEK_OVER_WEEK_RULE");
-    functionSpec.setMetric(metricName);
+    functionSpec.setTopicMetric(metricName);
+    functionSpec.setMetrics(Arrays.asList(metricName));
     functionSpec.setCollection(collection);
     functionSpec.setMetricFunction(MetricAggFunction.SUM);
     functionSpec.setCron("0/10 * * * * ?");
@@ -155,6 +155,8 @@ public abstract class AbstractManagerTestBase {
     datasetConfigDTO.setTimeColumn("time");
     datasetConfigDTO.setTimeDuration(1);
     datasetConfigDTO.setTimeUnit(TimeUnit.HOURS);
+    datasetConfigDTO.setActive(true);
+    datasetConfigDTO.setRequiresCompletenessCheck(false);
     return datasetConfigDTO;
   }
 

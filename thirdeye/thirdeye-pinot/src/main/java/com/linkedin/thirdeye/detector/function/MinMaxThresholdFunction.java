@@ -48,7 +48,9 @@ public class MinMaxThresholdFunction extends BaseAnomalyFunction {
     Properties props = getProperties();
 
     // Metric
-    String metric = getSpec().getMetric();
+    String metric = getSpec().getTopicMetric();
+    // This function only detects anomalies on one metric, i.e., metrics[0]
+    assert (getSpec().getMetrics().size() == 1);
 
     // Get min / max props
     Double min = null;
@@ -116,7 +118,9 @@ public class MinMaxThresholdFunction extends BaseAnomalyFunction {
       max = Double.valueOf(props.getProperty(MAX_VAL));
     }
 
-    String metric = getSpec().getMetric();
+    String metric = getSpec().getTopicMetric();
+    assert (getSpec().getMetrics().size() == 1);
+
     long windowStartInMillis = windowStart.getMillis();
     long windowEndInMillis = windowEnd.getMillis();
 
