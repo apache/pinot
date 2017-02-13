@@ -388,7 +388,31 @@ text {
 }
 
 .row-footer {
-    border-top: 1px solid #CCC;
-    padding-top: 20px;
-    margin-top: 20px;
+  border-top: 1px solid #CCC;
+  padding-top: 20px;
+  margin-top: 20px;
+}
+
+/* anomalies page Search Bar*/
+
+.search-bar {
+  display: flex;
+}
+
+.search-field {
+  flex-grow: 1;
+  margin-left: 10px;
+}
+
+.search-select {
+  flex-basis: 150px;
+}
+
+.anomaly-function-detail {
+  border: 1px solid #CCC;
+  padding: 10px;
+  background-color: #F3F6F8;
+  display: flex;
+  justify-content: center;
+  flex-direction: column;
 }

@@ -3,28 +3,28 @@
 	<div class="row bg-white row-bordered ">
 		<div class="container top-buffer bottom-buffer">
 			<div class=row>
-				<div class="col-md-12">
-					<div style="float: left; width: auto">
-						<label for="anomalies-search-input" class="label-large-light">Search By: </label>
-					</div>
-					<div style="float:left; width: 150px">
+				<div class="col-md-12 search-bar">
+					<!-- <div> -->
+					<label for="anomalies-search-input" class="label-large-light">Search By: </label>
+<!-- 					</div> -->
+					<div class="search-select">
 						<select id="anomalies-search-mode" style="width:100%">
 							<option value="metric">Metric(s)</option>
 							<option value="dashboard">Dashboard</option>
 							<option value="id">Anomaly ID</option>
-              <option value="time" selected>Time</option>
+	            <option value="time" selected>Time</option>
 						</select>
 					</div>
-					<div id="anomalies-search-metrics-container" style="overflow:hidden; display: none;">
+					<div id="anomalies-search-metrics-container" class="search-field" style="overflow:hidden; display: none;">
 						<select style="width: 100%" id="anomalies-search-metrics-input" class="label-large-light" multiple="multiple"></select>
 					</div>
-					<div id="anomalies-search-dashboard-container"  style="overflow:hidden; display: none;">
+					<div id="anomalies-search-dashboard-container" class="search-field"  style="overflow:hidden; display: none;">
 						<select style="width: 100%;" id="anomalies-search-dashboard-input" class="label-large-light"></select>
 					</div>
-					<div id="anomalies-search-anomaly-container"  style="overflow:hidden; display: none;">
+					<div id="anomalies-search-anomaly-container" class="search-field"  style="overflow:hidden; display: none;">
 						<select style="width: 100%;" id="anomalies-search-anomaly-input" class="label-large-light" multiple="multiple"></select>
 					</div>
-          <div id="anomalies-search-time-container"  style="overflow:hidden; display: none;">
+          <div id="anomalies-search-time-container" class="search-field"  style="overflow:hidden; display: none;">
             <select style="width: 100%;" id="anomalies-search-time-input" class="label-large-light"></select>
           </div>
 				</div>

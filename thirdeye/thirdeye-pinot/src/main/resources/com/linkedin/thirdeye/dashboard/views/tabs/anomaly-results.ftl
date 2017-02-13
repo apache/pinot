@@ -45,30 +45,34 @@
           </div>
         </div>
         <div class="row">
-          <div class="col-md-7">
+          <div class="col-md-5">
             <div class="row">
-              <div class="col-md-3">
+              <div class="col-xs-3">
                 <span class="pull-left">Dimension</span>
               </div>
-              <div id="dimension-{{anomalyIndex}}" class="col-md-9">
+              <div id="dimension-{{anomalyIndex}}" class="col-xs-9">
                 <span class="pull-left"></span>
               </div>
             </div>
             <div class="row">
-              <div class="col-md-3">Current</div>
-              <div id="current-value-{{anomalyIndex}}" class="col-md-9"></div>
+              <div class="col-xs-3">Current</div>
+              <div id="current-value-{{anomalyIndex}}" class="col-xs-9"></div>
             </div>
             <div class="row">
-              <div class="col-md-3">Baseline</div>
-              <div id="baseline-value-{{anomalyIndex}}" class="col-md-9"></div>
+              <div class="col-xs-3">Baseline</div>
+              <div id="baseline-value-{{anomalyIndex}}" class="col-xs-9"></div>
             </div>
             <div class="row">
-              <div class="col-md-3">Start-End (PDT)</div>
-              <div id="region-{{anomalyIndex}}" class="col-md-9"></div>
+              <div class="col-xs-3">Start-End (PDT)</div>
+              <div id="region-{{anomalyIndex}}" class="col-xs-9"></div>
             </div>
           </div>
-          <div class="col-md-5">
-            <label>Anomaly Function Details:</label><br /> <label>{{this.anomalyFunctionName}}</label> <br /> <label>{{this.anomalyFunctionType}}</label>
+          <div class="col-md-7">
+            <label>Anomaly Function Details:</label>
+            <section class="anomaly-function-detail">
+              <div>{{this.anomalyFunctionName}}</div>
+              <div>{{this.anomalyFunctionType}}</div>
+            <section>
           </div>
         </div>
         <div class="row row-footer">
