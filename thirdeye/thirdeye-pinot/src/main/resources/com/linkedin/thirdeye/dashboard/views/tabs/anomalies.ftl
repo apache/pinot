@@ -35,7 +35,7 @@
 <div class="container-fluid bg-white ">
 	<div class="row bg-white row-bordered">
 		<div class="container top-buffer bottom-buffer">
-			<div class="row">
+			<div class="row filter-bar">
 				<div class="col-md-4">
 					<div>
 						<label style="font-size: 15px; font-weight: 500">Select time range: </label>
@@ -47,7 +47,8 @@
 						<i class="glyphicon glyphicon-calendar fa fa-calendar"></i>&nbsp; <span></span> <b class="caret"></b>
 					</div>
 				</div>
-				<div class="col-md-4">
+<!-- Hidding this until fleshed out -->
+<!-- 				<div class="col-md-4">
 					<div>
 						<label style="font-size: 15px; font-weight: 500">Filter by Function: </label>
 					</div>
@@ -66,8 +67,8 @@
 					<div>
 						<label class="checkbox-inline"><input type="checkbox" id="status-unresolved-checkbox"><span class="label anomaly-status-label">Unresolved</span></label>
 					</div>
-				</div>
-				<div class="col-md-2" id="apply-button">
+				</div> -->
+				<div class="col-md-2 filter-apply-button" id="apply-button">
 					<input type="button" class="btn btn-primary btn-sm" value="Apply" />
 				</div>
 			</div>

@@ -416,3 +416,12 @@ text {
   justify-content: center;
   flex-direction: column;
 }
+
+.filter-bar {
+  display: flex;
+  align-items: stretch;
+}
+
+.filter-apply-button {
+  align-self: center;
+}

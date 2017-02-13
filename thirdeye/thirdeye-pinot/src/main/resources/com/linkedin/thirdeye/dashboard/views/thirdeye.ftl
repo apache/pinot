@@ -177,7 +177,8 @@ var HASH_PARAMS = undefined;
 								<li class=""><a href="#analysis">Root Cause Analysis</a></li>
 							</ul>
 
-							<ul class="nav navbar-nav navbar-right">
+            <!-- Hidding this until it's fully fleshed out -->
+						<!-- 	<ul class="nav navbar-nav navbar-right">
 								<li><a href="#">Manage Anomalies</a></li>
 								<li class="dropdown"><a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Admin <span class="caret"></span></a>
 									<ul class="dropdown-menu">
@@ -189,7 +190,7 @@ var HASH_PARAMS = undefined;
 										<li class=""><a href="#entity-editor" data-toggle="tab">Entity Editor</a></li>
 									</ul></li>
 								<li><a href="#">Sign In</a></li>
-							</ul>
+							</ul> -->
 						</div>
 					</nav>
 				</div>
