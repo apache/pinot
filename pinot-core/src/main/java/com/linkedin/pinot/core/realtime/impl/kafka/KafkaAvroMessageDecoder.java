@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
-import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -23,7 +22,6 @@ import java.net.URL;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-
 import java.util.concurrent.Callable;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericData.Record;
@@ -33,8 +31,8 @@ import org.apache.avro.io.DecoderFactory;
 import org.apache.commons.lang.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.core.data.GenericRow;
 
 
@@ -101,7 +99,8 @@ public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
         md5ToAvroSchemaMap.put(md5String, schema);
       } catch (Exception e) {
         schema = defaultAvroSchema;
-        LOGGER.error("error fetching schema from md5 String", e);
+        LOGGER.error("error fetching schema from md5 String from url {}", schemaRegistryBaseUrl, e);
+        throw new RuntimeException(e);
       }
     }
     DatumReader<Record> reader = new GenericDatumReader<Record>(schema);
@@ -111,7 +110,7 @@ public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
               length - HEADER_LENGTH, null));
       return avroRecordConvetrer.transform(avroRecord, schema, destination);
     } catch (IOException e) {
-      LOGGER.error("Caught exception while reading message", e);
+      LOGGER.error("Caught exception while reading message using schema {}", schema.getName(), e);
       return null;
     }
   }
