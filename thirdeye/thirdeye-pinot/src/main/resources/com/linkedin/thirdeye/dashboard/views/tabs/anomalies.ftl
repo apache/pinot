@@ -4,9 +4,7 @@
 		<div class="container top-buffer bottom-buffer">
 			<div class=row>
 				<div class="col-md-12 search-bar">
-					<!-- <div> -->
 					<label for="anomalies-search-input" class="label-large-light">Search By: </label>
-<!-- 					</div> -->
 					<div class="search-select">
 						<select id="anomalies-search-mode" style="width:100%">
 							<option value="metric">Metric(s)</option>
@@ -47,8 +45,8 @@
 						<i class="glyphicon glyphicon-calendar fa fa-calendar"></i>&nbsp; <span></span> <b class="caret"></b>
 					</div>
 				</div>
-<!-- Hidding this until fleshed out -->
-<!-- 				<div class="col-md-4">
+				<!-- Hidding this until fleshed out -->
+				<!-- <div class="col-md-4">
 					<div>
 						<label style="font-size: 15px; font-weight: 500">Filter by Function: </label>
 					</div>
@@ -56,8 +54,8 @@
 						<select class="form-control" id="anomaly-function-dropdown">
 						</select>
 					</div>
-				</div>
-				<div class="col-md-2">
+				</div> -->
+				<!-- <div class="col-md-2">
 					<div>
 						<label style="font-size: 15px; font-weight: 500">Anomaly Status: </label>
 					</div>
