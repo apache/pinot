@@ -7,6 +7,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.commons.io.IOUtils;
@@ -20,6 +21,24 @@ import org.slf4j.LoggerFactory;
 public class AlertFilterFactory {
   private static Logger LOGGER = LoggerFactory.getLogger(AlertFilterFactory.class);
   private final Properties props;
+
+  private static final String OLD_ALERTFILTER_TYPE = "alpha_beta";
+  private static final String NEW_ALERTFILTER_TYPE = "alpha_beta_logistic";
+  private static final String ALERTFILTER_INTERCEPT = "INTERCEPT";
+  private static final String ALERTFILTER_SLOPE = "slope";
+  private static final String ALERTFILTER_BETA = "beta";
+  private static final String ALERTFILTER_THRESHOLD = "threshold";
+  private static final String ALERTFILTER_TYPE = "type";
+
+  private static Map<String, String> getDefaultAlphaBetaLogisticAlertFilter(){
+    Map<String, String> defaultParams = new HashMap<>();
+    defaultParams.put(ALERTFILTER_INTERCEPT, "1");
+    defaultParams.put(ALERTFILTER_SLOPE,"0");
+    defaultParams.put(ALERTFILTER_BETA, "0");
+    defaultParams.put(ALERTFILTER_THRESHOLD, "0.5");
+    defaultParams.put(ALERTFILTER_TYPE, NEW_ALERTFILTER_TYPE);
+    return defaultParams;
+  }
 
   public AlertFilterFactory(String functionConfigPath) {
     props = new Properties();
@@ -52,15 +71,14 @@ public class AlertFilterFactory {
     }
   }
 
-  public BaseAlertFilter fromSpec(AnomalyFunctionDTO anomalyFunctionSpec) throws Exception {
-    BaseAlertFilter alertFilter = null;
+  public AlertFilter fromSpec(AnomalyFunctionDTO anomalyFunctionSpec) throws Exception {
+    AlertFilter alertFilter = null;
     String type = anomalyFunctionSpec.getType();
     if (!props.containsKey(type)) {
       throw new IllegalArgumentException("Unsupported type " + type);
     }
     String className = props.getProperty(type);
     alertFilter = (BaseAlertFilter) Class.forName(className).newInstance();
-
     alertFilter.setParameters(anomalyFunctionSpec.getAlertFilter());
     return alertFilter;
   }

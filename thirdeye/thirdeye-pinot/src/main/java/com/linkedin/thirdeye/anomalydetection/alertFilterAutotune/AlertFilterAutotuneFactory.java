@@ -53,7 +53,7 @@ public class AlertFilterAutotuneFactory {
     }
   }
 
-  public BaseAlertFilterAutotune fromSpec(AnomalyFunctionDTO anomalyFunctionSpec) throws Exception {
+  public AlertFilterAutoTune fromSpec(AnomalyFunctionDTO anomalyFunctionSpec) throws Exception {
     BaseAlertFilterAutotune alertFilterAutoTune = null;
     String type = anomalyFunctionSpec.getType();
     if (!props.containsKey(type)) {
@@ -65,4 +65,5 @@ public class AlertFilterAutotuneFactory {
     alertFilterAutoTune.init(anomalyFunctionSpec);
     return alertFilterAutoTune;
   }
+
 }

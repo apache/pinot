@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
 import com.linkedin.pinot.pql.parsers.utils.Pair;
-import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.detection.TimeSeriesUtil;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutoTune;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
@@ -9,10 +8,16 @@ import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.client.DAORegistry;
-import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponse;
-import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponseConverter;
+import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
+import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
+import com.linkedin.thirdeye.detector.email.filter.AlertFilterUtil;
+import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
+import com.linkedin.thirdeye.detector.email.filter.AlphaBetaAlertFilter;
+import com.linkedin.thirdeye.detector.email.filter.DummyAlertFilter;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 
@@ -31,6 +36,7 @@ import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
@@ -51,14 +57,21 @@ public class AnomalyFunctionResource {
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyFunctionResource.class);
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
+  private static final String ALPHABETA_ALERTFILTER_TYPE = "alpha_beta";
+  private static final String ALPHABETALOGISTIC_ALERTFILTER_TYPE = "alpha_beta_logisitc";
+
+
   private final Map<String, Object> anomalyFunctionMetadata = new HashMap<>();
   private final AnomalyFunctionFactory anomalyFunctionFactory;
   private final AlertFilterAutotuneFactory alertFilterAutotuneFactory;
+  private final AlertFilterFactory alertFilterFactory;
 
-  public AnomalyFunctionResource(String functionConfigPath, String alertFilterAutotuneConfigPath) {
+
+  public AnomalyFunctionResource(String functionConfigPath, String alertFilterAutotuneConfigPath, String alertFilterConfigPath) {
     buildFunctionMetadata(functionConfigPath);
     this.anomalyFunctionFactory = new AnomalyFunctionFactory(functionConfigPath);
     this.alertFilterAutotuneFactory = new AlertFilterAutotuneFactory(alertFilterAutotuneConfigPath);
+    this.alertFilterFactory = new AlertFilterFactory(alertFilterConfigPath);
   }
 
   private void buildFunctionMetadata(String functionConfigPath) {
@@ -166,5 +179,45 @@ public class AnomalyFunctionResource {
       anomalyResults.addAll(validResults);
     }
     return Response.ok(anomalyResults).build();
+  }
+
+  @POST
+  @Path("/autotune/{id}")
+  @Consumes(MediaType.APPLICATION_JSON)
+  public Response tuneAlertFilter(@PathParam("id") String id,
+      @QueryParam("startTime") Long startTime, @QueryParam("endTime") Long endTime)
+      throws Exception {
+    AnomalyFunctionDTO anomalyFunctionSpec = DAO_REGISTRY.getAnomalyFunctionDAO().findById(Long.valueOf(id));
+    AnomalyFunctionManager anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
+    AlertFilterAutoTune alertFilterAutotune = alertFilterAutotuneFactory.fromSpec(anomalyFunctionSpec);
+    AlertFilter alertFilter;
+    Map<String, String> alertFilterParams = anomalyFunctionSpec.getAlertFilter();
+    if (alertFilterParams == null) {
+      alertFilter = new DummyAlertFilter();
+    } else if (alertFilterParams.get("type") == ALPHABETA_ALERTFILTER_TYPE) {
+      alertFilter = new AlphaBetaAlertFilter();
+    } else {
+      alertFilter = alertFilterFactory.fromSpec(anomalyFunctionSpec);
+    }
+    String collectionName = anomalyFunctionSpec.getCollection();
+    String metricName = anomalyFunctionSpec.getMetric();
+    MergedAnomalyResultManager anomalyMergedResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
+    List<MergedAnomalyResultDTO> anomalyResultDTOS = anomalyMergedResultDAO.findByCollectionMetricTime(collectionName, metricName, startTime, endTime, false);
+
+    AlertFilterUtil evaluator = new AlertFilterUtil(alertFilter);
+    double[] evals = evaluator.getEvalResults(anomalyResultDTOS);
+    try{
+      Map<String,String> tunedAlertFilter = alertFilterAutotune.tuneAlertFilter(anomalyResultDTOS, evals[AlertFilterUtil.PRECISION_INDEX], evals[AlertFilterUtil.RECALL_INDEX]);
+      if (alertFilterAutotune.isUpdated()){
+        anomalyFunctionSpec.setAlertFilter(tunedAlertFilter);
+        anomalyFunctionDAO.update(anomalyFunctionSpec);
+        alertFilter.setParameters(tunedAlertFilter);
+      } else {
+        LOG.info("Model hasn't been updated");
+      }
+    } catch (Exception e) {
+      LOG.warn(e.getMessage());
+    }
+    return Response.ok(alertFilter).build();
   }
 }

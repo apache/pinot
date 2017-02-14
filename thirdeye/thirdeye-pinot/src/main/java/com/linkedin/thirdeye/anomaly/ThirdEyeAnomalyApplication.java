@@ -94,7 +94,7 @@ public class ThirdEyeAnomalyApplication
           detectionJobScheduler.start();
           environment.jersey().register(new DetectionJobResource(detectionJobScheduler));
           environment.jersey().register(new AnomalyFunctionResource(config.getFunctionConfigPath(),
-              config.getFilterAutotuneConfigPath()));
+              config.getFilterAutotuneConfigPath(), config.getAlertFilterConfigPath()));
         }
         if (config.isMonitor()) {
           monitorJobScheduler = new MonitorJobScheduler(config.getMonitorConfiguration());
