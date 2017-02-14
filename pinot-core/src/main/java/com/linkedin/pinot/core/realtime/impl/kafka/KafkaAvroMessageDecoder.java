@@ -91,16 +91,25 @@ public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
 
     String md5String = hex(md5);
     org.apache.avro.Schema schema = null;
+    boolean schemaUpdateFailed = false;
     if (md5ToAvroSchemaMap.containsKey(md5String)) {
       schema = md5ToAvroSchemaMap.get(md5String);
     } else {
+      URL url;
+      final String schemaUri = schemaRegistryBaseUrl + "/id=" + md5String;
       try {
-        schema = fetchSchema(new URL(schemaRegistryBaseUrl + "/id=" + md5String));
+        url = new URL(schemaUri);
+      } catch (Exception e) {
+        LOGGER.error("Could not parse URI {}", schemaUri, e);
+        throw new RuntimeException(e);
+      }
+      try {
+        schema = fetchSchema(url);
         md5ToAvroSchemaMap.put(md5String, schema);
       } catch (Exception e) {
         schema = defaultAvroSchema;
-        LOGGER.error("error fetching schema from md5 String from url {}", schemaRegistryBaseUrl, e);
-        throw new RuntimeException(e);
+        LOGGER.error("Error fetching schema using url {}. Attempting to continue with previous schema", url.toString(), e);
+        schemaUpdateFailed = true;
       }
     }
     DatumReader<Record> reader = new GenericDatumReader<Record>(schema);
@@ -110,7 +119,8 @@ public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
               length - HEADER_LENGTH, null));
       return avroRecordConvetrer.transform(avroRecord, schema, destination);
     } catch (IOException e) {
-      LOGGER.error("Caught exception while reading message using schema {}", schema.getName(), e);
+      LOGGER.error("Caught exception while reading message using schema {}{}", (schema==null ? "null" : schema.getName()),
+          (schemaUpdateFailed? "(possibly due to schema update failure)" : ""), e);
       return null;
     }
   }
