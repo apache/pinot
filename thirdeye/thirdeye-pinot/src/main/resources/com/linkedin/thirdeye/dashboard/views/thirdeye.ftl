@@ -168,7 +168,7 @@ var HASH_PARAMS = undefined;
 							<button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
 								<span class="sr-only">Toggle navigation</span><span class="icon-bar"></span><span class="icon-bar"></span><span class="icon-bar"></span>
 							</button>
-							<a class="navbar-brand" href="#dashboard" data-toggle="tab">ThirdEye</a>
+							<a class="navbar-brand logo" href="#dashboard" data-toggle="tab">ThirdEye</a>
 						</div>
 						<div id="main-tabs" class="collapse navbar-collapse">
 							<ul class="nav navbar-nav">
@@ -178,6 +178,7 @@ var HASH_PARAMS = undefined;
 							</ul>
 
             <!-- Hidding this until it's fully fleshed out -->
+            <!-- Jira: https://jira01.corp.linkedin.com:8443/browse/THIRDEYE-1042 -->
 						<!-- 	<ul class="nav navbar-nav navbar-right">
 								<li><a href="#">Manage Anomalies</a></li>
 								<li class="dropdown"><a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Admin <span class="caret"></span></a>

@@ -46,6 +46,7 @@
 					</div>
 				</div>
 				<!-- Hidding this until fleshed out -->
+				<!-- Jira: https://jira01.corp.linkedin.com:8443/browse/THIRDEYE-1043 -->
 				<!-- <div class="col-md-4">
 					<div>
 						<label style="font-size: 15px; font-weight: 500">Filter by Function: </label>

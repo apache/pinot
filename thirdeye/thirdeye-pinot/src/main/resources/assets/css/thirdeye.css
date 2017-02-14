@@ -98,11 +98,11 @@ label {
     border: 0px;
 }
 
-.navbar-inverse .navbar-brand {
+.navbar-inverse .logo {
   color: white;
 }
 
-.navbar-brand:before {
+.logo:before {
   content: "";
   display: inline-block;
   vertical-align: middle;

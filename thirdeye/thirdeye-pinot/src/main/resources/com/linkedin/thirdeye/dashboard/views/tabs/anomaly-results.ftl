@@ -61,7 +61,7 @@
         </div>
         <div class="row row-footer">
           <div id="anomaly-feedback-{{anomalyIndex}}" class="col-xs-12">
-            <label>This anomaly is as</label>
+            <label>This anomaly is a</label>
             <select data-placeholder="Provide Anomaly Feedback" style="width: 250px; border: 0px" class="chosen-select">
               <option>False Alarm</option>
               <option>Confirmed Anomaly</option>
