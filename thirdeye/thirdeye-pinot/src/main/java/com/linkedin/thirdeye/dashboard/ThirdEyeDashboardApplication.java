@@ -58,7 +58,7 @@ public class ThirdEyeDashboardApplication
     } catch (Exception e) {
       LOG.error("Exception while loading caches", e);
     }
-    env.jersey().register(new AnomalyFunctionResource(config.getFunctionConfigPath(), config.getFilterAutotuneConfigPath()));
+    env.jersey().register(new AnomalyFunctionResource(config.getFunctionConfigPath(), config.getFilterAutotuneConfigPath(), config.getAlertFilterConfigPath()));
     env.jersey().register(new DashboardResource());
     env.jersey().register(new CacheResource());
     AnomalyFunctionFactory anomalyFunctionFactory = new AnomalyFunctionFactory(config.getFunctionConfigPath());

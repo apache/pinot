@@ -7,6 +7,7 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.commons.io.IOUtils;
@@ -29,7 +30,6 @@ public class AlertFilterFactory {
     } catch (FileNotFoundException e) {
       LOGGER.error("File {} not found", functionConfigPath, e);
     }
-
   }
 
   public AlertFilterFactory(InputStream input) {
@@ -52,15 +52,14 @@ public class AlertFilterFactory {
     }
   }
 
-  public BaseAlertFilter fromSpec(AnomalyFunctionDTO anomalyFunctionSpec) throws Exception {
-    BaseAlertFilter alertFilter = null;
+  public AlertFilter fromSpec(AnomalyFunctionDTO anomalyFunctionSpec) throws Exception {
+    AlertFilter alertFilter = null;
     String type = anomalyFunctionSpec.getType();
     if (!props.containsKey(type)) {
       throw new IllegalArgumentException("Unsupported type " + type);
     }
     String className = props.getProperty(type);
     alertFilter = (BaseAlertFilter) Class.forName(className).newInstance();
-
     alertFilter.setParameters(anomalyFunctionSpec.getAlertFilter());
     return alertFilter;
   }
