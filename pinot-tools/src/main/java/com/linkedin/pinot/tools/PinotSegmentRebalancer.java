@@ -22,7 +22,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.helix.ZNRecord;
-import org.apache.helix.controller.strategy.AutoRebalanceStrategy;
+import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
+import org.apache.helix.controller.stages.ClusterDataCache;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.zookeeper.data.Stat;
@@ -166,7 +167,8 @@ public class PinotSegmentRebalancer extends PinotZKChanger {
     LOGGER.info("New Nodes:" + instancesInClusterWithTag);
     Map<String, Map<String, String>> currentMapping = currentIdealState.getRecord().getMapFields();
     ZNRecord newZnRecord = rebalanceStrategy
-        .computePartitionAssignment(instancesInClusterWithTag, currentMapping, instancesInClusterWithTag);
+        .computePartitionAssignment(instancesInClusterWithTag, instancesInClusterWithTag, currentMapping, new ClusterDataCache());
+
     final Map<String, Map<String, String>> newMapping = newZnRecord.getMapFields();
     LOGGER.info("Current segment Assignment:");
     printSegmentAssignment(currentMapping);
