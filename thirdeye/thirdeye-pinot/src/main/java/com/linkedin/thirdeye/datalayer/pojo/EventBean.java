@@ -18,7 +18,7 @@ public class EventBean extends AbstractBean {
   /**
    * targetDimesionMap will hold metadata of the event. for example holiday event will have
    * coutntryCode --> {US, CA, ...}
-   * Deployment Event will have fabric --- > {prod-lva1, prod-ltx1..} hostname ---> {hosta, hostb,
+   * DeploymentEvent will have fabric --- > {prod-lva1, prod-ltx1..} hostname ---> {hosta, hostb,
    * hostc...}
    */
   Map<String, List<String>> targetDimensionMap;
