@@ -142,7 +142,7 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
     LOGGER.debug("Using server tenant: {}", serverTenant);
     List<String> destinationServers = readDestinationServers();
 
-    verifyNoServerOverlap(srcHosts, destinationServers);
+    verifyServerLists(srcHosts, destinationServers);
 
     Map<String, Map<String, String>> idealStateMap = helix.getResourceIdealState(zkPath, tableName)
         .getRecord().getMapFields();
@@ -260,7 +260,7 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
     return copy;
   }
 
-  private void verifyNoServerOverlap(List<String> srcHosts, List<String> taggedServers) {
+  private void verifyServerLists(List<String> srcHosts, List<String> taggedServers) {
     for (String srcHost : srcHosts) {
       if (taggedServers.contains(srcHost)) {
         LOGGER.error("Source host: {} is also present in destination list", srcHost);
@@ -268,7 +268,25 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
         System.exit(1);
       }
     }
+
+    // having disabled source hosts in okay since we are moving segments away from source
+    if (hasDisabledInstances("Destination", taggedServers)) {
+      LOGGER.error("Destination server list has disabled instances. Retry after correcting input");
+      System.exit(1);
+    }
   }
+
+  private boolean hasDisabledInstances(String logTag, List<String> instances) {
+    boolean hasDisabled = false;
+    for (String instance : instances) {
+      if (! helix.getInstanceConfig(zkPath, instance).getInstanceEnabled()) {
+        LOGGER.error("{} instance: {} is disabled", logTag, instance);
+        hasDisabled = true;
+      }
+    }
+    return hasDisabled;
+  }
+
 
   private PriorityQueue<ServerInstance> getDestinationServerQueue(Map<String, Map<String, String>> idealStateMap,
       List<String> destServers) {
@@ -405,7 +423,7 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
     if (destHostsFile.isEmpty()) {
       String serverTenant = getServerTenantName(tableName) + "_OFFLINE";
       LOGGER.debug("Using server tenant: {}", serverTenant);
-      return helix.getInstancesInClusterWithTag(zkPath, serverTenant);
+      return HelixHelper.getEnabledInstancesWithTag(helix, zkPath, serverTenant);
     } else {
       return readHostsFromFile(destHostsFile);
     }

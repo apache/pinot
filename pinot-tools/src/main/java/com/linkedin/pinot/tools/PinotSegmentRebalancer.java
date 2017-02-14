@@ -161,12 +161,16 @@ public class PinotSegmentRebalancer extends PinotZKChanger {
     AutoRebalanceStrategy rebalanceStrategy = new AutoRebalanceStrategy(tableName, partitions, states);
 
     TableNameBuilder builder = new TableNameBuilder(tableType);
-    List<String> instancesInClusterWithTag = helixAdmin.getInstancesInClusterWithTag(clusterName, builder.forTable(tenantName));
-    LOGGER.info("Current: Nodes:" + currentHosts);
-    LOGGER.info("New Nodes:" + instancesInClusterWithTag);
+    String serverTenant = builder.forTable(tenantName);
+    List<String> instancesInClusterWithTag = helixAdmin.getInstancesInClusterWithTag(clusterName, serverTenant);
+    List<String> enabledInstancesWithTag =
+        HelixHelper.getEnabledInstancesWithTag(helixAdmin, clusterName, serverTenant);
+    LOGGER.info("Current nodes: {}", currentHosts);
+    LOGGER.info("New nodes: {}", instancesInClusterWithTag);
+    LOGGER.info("Enabled nodes: {}", enabledInstancesWithTag);
     Map<String, Map<String, String>> currentMapping = currentIdealState.getRecord().getMapFields();
     ZNRecord newZnRecord = rebalanceStrategy
-        .computePartitionAssignment(instancesInClusterWithTag, currentMapping, instancesInClusterWithTag);
+        .computePartitionAssignment(enabledInstancesWithTag, currentMapping, instancesInClusterWithTag);
     final Map<String, Map<String, String>> newMapping = newZnRecord.getMapFields();
     LOGGER.info("Current segment Assignment:");
     printSegmentAssignment(currentMapping);

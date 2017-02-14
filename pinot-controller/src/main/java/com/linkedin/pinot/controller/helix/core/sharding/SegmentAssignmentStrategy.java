@@ -15,11 +15,9 @@
  */
 package com.linkedin.pinot.controller.helix.core.sharding;
 
-import java.util.List;
-
-import org.apache.helix.HelixAdmin;
-
 import com.linkedin.pinot.common.segment.SegmentMetadata;
+import java.util.List;
+import org.apache.helix.HelixAdmin;
 
 
 /**
@@ -28,6 +26,9 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
  *
  */
 public interface SegmentAssignmentStrategy {
-  public List<String> getAssignedInstances(HelixAdmin helixAdmin, String helixClusterName,
+
+  List<String> getAssignedInstances(HelixAdmin helixAdmin, String helixClusterName,
       SegmentMetadata segmentMetadata, int numReplicas, String tenantName);
+
+
 }
