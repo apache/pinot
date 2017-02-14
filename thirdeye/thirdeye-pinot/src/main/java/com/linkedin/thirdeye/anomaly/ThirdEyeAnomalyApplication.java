@@ -15,6 +15,7 @@ import com.linkedin.thirdeye.anomaly.alert.AlertJobResource;
 import com.linkedin.thirdeye.anomaly.alert.AlertJobScheduler;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobResource;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
+import com.linkedin.thirdeye.anomaly.detectionex.DetectionExJobScheduler;
 import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeExecutor;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorJobScheduler;
 import com.linkedin.thirdeye.anomaly.task.TaskDriver;
@@ -33,6 +34,7 @@ public class ThirdEyeAnomalyApplication
     extends BaseThirdEyeApplication<ThirdEyeAnomalyConfiguration> {
 
   private DetectionJobScheduler detectionJobScheduler = null;
+  private DetectionExJobScheduler detectionExJobScheduler = null;
   private TaskDriver taskDriver = null;
   private MonitorJobScheduler monitorJobScheduler = null;
   private AlertJobScheduler alertJobScheduler = null;
@@ -94,6 +96,9 @@ public class ThirdEyeAnomalyApplication
           detectionJobScheduler.start();
           environment.jersey().register(new DetectionJobResource(detectionJobScheduler, alertFilterFactory, alertFilterAutotuneFactory));
           environment.jersey().register(new AnomalyFunctionResource(config.getFunctionConfigPath()));
+
+          detectionExJobScheduler = new DetectionExJobScheduler();
+          detectionExJobScheduler.start();
         }
         if (config.isMonitor()) {
           monitorJobScheduler = new MonitorJobScheduler(config.getMonitorConfiguration());
@@ -137,6 +142,7 @@ public class ThirdEyeAnomalyApplication
         }
         if (config.isScheduler()) {
           detectionJobScheduler.shutdown();
+          detectionExJobScheduler.shutdown();
         }
         if (config.isMonitor()) {
           monitorJobScheduler.stop();

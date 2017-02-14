@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomaly.task;
 
+import com.linkedin.thirdeye.anomaly.detectionex.DetectionExTaskInfo;
 import java.io.IOException;
 
 import org.slf4j.Logger;
@@ -30,6 +31,9 @@ public class TaskInfoFactory {
       switch(taskType) {
         case ANOMALY_DETECTION:
           taskInfo = OBJECT_MAPPER.readValue(taskInfoString, DetectionTaskInfo.class);
+          break;
+        case ANOMALY_DETECTION_EX:
+          taskInfo = OBJECT_MAPPER.readValue(taskInfoString, DetectionExTaskInfo.class);
           break;
         case MERGE:
           LOG.error("TaskType MERGE not supported");
