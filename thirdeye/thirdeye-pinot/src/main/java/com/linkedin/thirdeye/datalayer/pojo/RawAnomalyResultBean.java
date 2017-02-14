@@ -27,6 +27,24 @@ public class RawAnomalyResultBean extends AbstractBean implements Comparable<Raw
   private Long creationTimeUtc;
   private boolean dataMissing;
   private boolean merged;
+  private double currentVal;
+  private double baselineVal;
+
+  public double getCurrentVal(){
+    return this.currentVal;
+  }
+
+  public double getBaselineVal(){
+    return this.baselineVal;
+  }
+
+  public void setCurrentVal(double val){
+    this.currentVal = val;
+  }
+
+  public void setBaselineVal(double val){
+    this.baselineVal = val;
+  }
 
   public RawAnomalyResultBean() {
     creationTimeUtc = DateTime.now().getMillis();
@@ -134,7 +152,8 @@ public class RawAnomalyResultBean extends AbstractBean implements Comparable<Raw
     return MoreObjects.toStringHelper(this).add("id", getId()).add("startTimeUtc", startTime)
         .add("dimensions", dimensions).add("endTimeUtc", endTime).add("score", score)
         .add("weight", weight).add("properties", properties).add("message", message)
-        .add("creationTimeUtc", creationTimeUtc).toString();
+        .add("creationTimeUtc", creationTimeUtc)
+        .add("currentVal", currentVal).add("baseLineVal", baselineVal).toString();
   }
 
   @Override

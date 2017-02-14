@@ -23,6 +23,24 @@ public class MergedAnomalyResultBean extends AbstractBean
   private Long createdTime;
   private String message;
   private boolean notified;
+  private double avgCurrentVal;
+  private double avgBaselineVal;
+
+  public double getAvgCurrentVal(){
+    return this.avgCurrentVal;
+  }
+
+  public double getAvgBaselineVal(){
+    return this.avgBaselineVal;
+  }
+
+  public void setAvgCurrentVal(double val){
+    this.avgCurrentVal = val;
+  }
+
+  public void setAvgBaselineVal(double val){
+    this.avgBaselineVal = val;
+  }
 
 
   public Long getFunctionId() {
