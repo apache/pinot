@@ -748,8 +748,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    protected void updateHelixIdealState(IdealState idealState, String realtimeTableName, Map<String, List<String>> idealStateEntries,
-        boolean create, int nReplicas) {
+    protected void updateIdealState(IdealState idealState, String realtimeTableName,
+        Map<String, List<String>> idealStateEntries, boolean create, int nReplicas) {
       _realtimeTableName = realtimeTableName;
       _idealStateEntries = idealStateEntries;
       _nReplicas = nReplicas;
@@ -759,7 +759,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       }
     }
 
-    protected void updateHelixIdealState(final String realtimeTableName, final List<String> newInstances,
+    protected void updateIdealState(final String realtimeTableName, final List<String> newInstances,
         final String oldSegmentNameStr, final String newSegmentNameStr) {
       _realtimeTableName = realtimeTableName;
       _newInstances = newInstances;

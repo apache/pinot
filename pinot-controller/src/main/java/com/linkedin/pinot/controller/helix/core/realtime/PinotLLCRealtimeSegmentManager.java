@@ -311,7 +311,7 @@ public class PinotLLCRealtimeSegmentManager {
     writeSegmentsToPropertyStore(paths, records, realtimeTableName);
     LOGGER.info("Added {} segments to propertyStore for table {}", paths.size(), realtimeTableName);
 
-    updateHelixIdealState(idealState, realtimeTableName, idealStateEntries, create, nReplicas);
+    updateIdealState(idealState, realtimeTableName, idealStateEntries, create, nReplicas);
   }
 
   void updateFlushThresholdForSegmentMetadata(LLCRealtimeSegmentZKMetadata segmentZKMetadata,
@@ -349,10 +349,12 @@ public class PinotLLCRealtimeSegmentManager {
     segmentZKMetadata.setSizeThresholdToFlushSegment(segmentFlushSize);
   }
 
-  // Update the helix idealstate when a new table is added.
-  protected void updateHelixIdealState(final IdealState idealState, String realtimeTableName, final Map<String, List<String>> idealStateEntries,
-      boolean create, final int nReplicas) {
-    if (create) {
+  // Update the helix idealstate when a new table is added. If createResource is true, then
+  // we create a helix resource before setting the idealstate to what we want it to be. Otherwise
+  // we expect that idealstate entry is already there, and we update it to what we want it to be.
+  protected void updateIdealState(final IdealState idealState, String realtimeTableName,
+      final Map<String, List<String>> idealStateEntries, boolean createResource, final int nReplicas) {
+    if (createResource) {
       addLLCRealtimeSegmentsInIdealState(idealState, idealStateEntries);
       _helixAdmin.addResource(_clusterName, realtimeTableName, idealState);
     } else {
@@ -372,8 +374,10 @@ public class PinotLLCRealtimeSegmentManager {
     }
   }
 
-  // Update the helix state when an old segment commits and a new one is to be started.
-  protected void updateHelixIdealState(final String realtimeTableName, final List<String> newInstances,
+  // Update the idealstate when an old segment commits and a new one is to be started.
+  // This method changes the the idealstate to reflect ONLINE state for old segment,
+  // and adds a new helix partition (i.e. pinot segment) in CONSUMING state.
+  protected void updateIdealState(final String realtimeTableName, final List<String> newInstances,
       final String oldSegmentNameStr, final String newSegmentNameStr) {
     try {
       HelixHelper.updateIdealState(_helixManager, realtimeTableName, new Function<IdealState, IdealState>() {
@@ -549,7 +553,7 @@ public class PinotLLCRealtimeSegmentManager {
     Lock lock = _idealstateUpdateLocks[lockIndex];
     try {
       lock.lock();
-      updateHelixIdealState(realtimeTableName, newInstances, committingSegmentNameStr, newSegmentNameStr);
+      updateIdealState(realtimeTableName, newInstances, committingSegmentNameStr, newSegmentNameStr);
       LOGGER.info("Changed {} to ONLINE and created {} in CONSUMING", committingSegmentNameStr, newSegmentNameStr);
     } finally {
       lock.unlock();
@@ -641,7 +645,8 @@ public class PinotLLCRealtimeSegmentManager {
     completeCommittingSegments(realtimeTableName, segmentIds);
   }
 
-  private void completeCommittingSegments(String realtimeTableName, Map<Integer, MinMaxPriorityQueue<LLCSegmentName>> partitionToLatestSegments) {
+  private void completeCommittingSegmentsInternal(String realtimeTableName,
+      Map<Integer, MinMaxPriorityQueue<LLCSegmentName>> partitionToLatestSegments) {
     IdealState idealState = getTableIdealState(realtimeTableName);
     Set<String> segmentNamesIS = idealState.getPartitionSet();
 
@@ -663,7 +668,7 @@ public class PinotLLCRealtimeSegmentManager {
         if (prevSegmentName != null) {
           prevSegmentNameStr = prevSegmentName.getSegmentName();
         }
-        updateHelixIdealState(realtimeTableName, newInstances, prevSegmentNameStr, segmentId);
+        updateIdealState(realtimeTableName, newInstances, prevSegmentNameStr, segmentId);
       }
     }
   }
@@ -689,7 +694,7 @@ public class PinotLLCRealtimeSegmentManager {
       latestSegments.offer(segmentName);
     }
 
-    completeCommittingSegments(realtimeTableName, partitionToLatestSegments);
+    completeCommittingSegmentsInternal(realtimeTableName, partitionToLatestSegments);
   }
 
   protected long getKafkaPartitionOffset(KafkaStreamMetadata kafkaStreamMetadata, final String offsetCriteria,
@@ -848,7 +853,7 @@ public class PinotLLCRealtimeSegmentManager {
 
     writeSegmentsToPropertyStore(propStorePaths, propStoreEntries, realtimeTableName);
 
-    updateHelixIdealState(realtimeTableName, serverInstances, null, newSegmentNameStr);
+    updateIdealState(realtimeTableName, serverInstances, null, newSegmentNameStr);
 
     LOGGER.info("Successful auto-create of CONSUMING segment {}", newSegmentNameStr);
     _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.LLC_AUTO_CREATED_PARTITIONS, 1);
