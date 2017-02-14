@@ -95,20 +95,13 @@ public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
     if (md5ToAvroSchemaMap.containsKey(md5String)) {
       schema = md5ToAvroSchemaMap.get(md5String);
     } else {
-      URL url;
       final String schemaUri = schemaRegistryBaseUrl + "/id=" + md5String;
       try {
-        url = new URL(schemaUri);
-      } catch (Exception e) {
-        LOGGER.error("Could not parse URI {}", schemaUri, e);
-        throw new RuntimeException(e);
-      }
-      try {
-        schema = fetchSchema(url);
+        schema = fetchSchema(new URL(schemaUri));
         md5ToAvroSchemaMap.put(md5String, schema);
       } catch (Exception e) {
         schema = defaultAvroSchema;
-        LOGGER.error("Error fetching schema using url {}. Attempting to continue with previous schema", url.toString(), e);
+        LOGGER.error("Error fetching schema using url {}. Attempting to continue with previous schema", schemaUri, e);
         schemaUpdateFailed = true;
       }
     }
