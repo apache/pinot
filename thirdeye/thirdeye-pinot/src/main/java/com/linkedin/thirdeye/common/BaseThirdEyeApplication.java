@@ -4,6 +4,9 @@ import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.AlertConfigManagerImpl;
 
+import com.linkedin.thirdeye.datalayer.bao.jdbc.DataCompletenessConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.EventManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.OverrideConfigManagerImpl;
 import java.io.File;
 
 import org.slf4j.Logger;
@@ -72,11 +75,9 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.IngraphDashboardConfigManagerImpl.class);
     ingraphMetricConfigDAO = DaoProviderUtil
             .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.IngraphMetricConfigManagerImpl.class);
-    overrideConfigDAO = DaoProviderUtil
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.OverrideConfigManagerImpl.class);
+    overrideConfigDAO = DaoProviderUtil.getInstance(OverrideConfigManagerImpl.class);
     alertConfigDAO = DaoProviderUtil.getInstance(AlertConfigManagerImpl.class);
-    dataCompletenessConfigDAO = DaoProviderUtil
-        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.DataCompletenessConfigManagerImpl.class);
+    dataCompletenessConfigDAO = DaoProviderUtil.getInstance(DataCompletenessConfigManagerImpl.class);
 
     DAO_REGISTRY.setAnomalyFunctionDAO(anomalyFunctionDAO);
     DAO_REGISTRY.setEmailConfigurationDAO(emailConfigurationDAO);
@@ -92,5 +93,6 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
     DAO_REGISTRY.setOverrideConfigDAO(overrideConfigDAO);
     DAO_REGISTRY.setAlertConfigDAO(alertConfigDAO);
     DAO_REGISTRY.setDataCompletenessConfigDAO(dataCompletenessConfigDAO);
+    DAO_REGISTRY.setEventDAO(DaoProviderUtil.getInstance(EventManagerImpl.class));
   }
 }

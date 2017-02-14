@@ -1,29 +1,36 @@
 package com.linkedin.thirdeye.anomaly.events;
 
-import com.linkedin.thirdeye.anomaly.events.deployment.DeploymentEvent;
-import com.linkedin.thirdeye.anomaly.events.holiday.HolidayEvent;
+import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 import java.util.List;
 import org.apache.commons.lang.NullArgumentException;
 
 public class EventDataProviderManager {
-  EventDataProvider<HolidayEvent> holidayEventDataProvider;
-  EventDataProvider<DeploymentEvent> deploymentEventDataProvider;
+  EventDataProvider<EventDTO> holidayEventDataProvider;
+  EventDataProvider<EventDTO> deploymentEventDataProvider;
 
-  public void registerEventDataProvider(EventType eventType,
-      EventDataProvider<? extends Event> eventDataProvider) {
+  private static final EventDataProviderManager INSTANCE = new EventDataProviderManager();
+
+  private EventDataProviderManager() {
+  }
+
+  public static EventDataProviderManager getInstance() {
+    return INSTANCE;
+  }
+
+  public void registerEventDataProvider(EventType eventType, EventDataProvider<EventDTO> eventDataProvider) {
     switch (eventType) {
     case HOLIDAY:
-      holidayEventDataProvider = (EventDataProvider<HolidayEvent>) eventDataProvider;
+      holidayEventDataProvider = (EventDataProvider<EventDTO>) eventDataProvider;
       break;
     case DEPLOYMENT:
-      deploymentEventDataProvider = (EventDataProvider<DeploymentEvent>) eventDataProvider;
+      deploymentEventDataProvider = (EventDataProvider<EventDTO>) eventDataProvider;
       break;
     }
   }
 
-  public List<? extends Event> getEvents(EventFilter eventFilter) {
+  public List<EventDTO> getEvents(EventFilter eventFilter) {
     if (eventFilter == null || eventFilter.getEventType() == null) {
-      throw new NullArgumentException("Event filter or event type found null ");
+      throw new NullArgumentException("EventFilter or event type found null ");
     }
     switch (eventFilter.getEventType()) {
     case HOLIDAY:

@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang.NullArgumentException;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,6 +72,13 @@ public class DetectionTaskRunner implements TaskRunner {
 
     String dataset = anomalyFunctionSpec.getCollection();
     DatasetConfigDTO datasetConfig = DAO_REGISTRY.getDatasetConfigDAO().findByDataset(dataset);
+
+    if (datasetConfig == null) {
+      LOG.error("Dataset [" + dataset + "] is not found");
+      throw new NullArgumentException(
+          "Dataset [" + dataset + "] is not found with function : " + anomalyFunctionSpec
+              .toString());
+    }
 
     if(datasetConfig.isRequiresCompletenessCheck()) {
       LOG.info("Dataset {} requires completeness check", dataset);

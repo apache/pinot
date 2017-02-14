@@ -21,6 +21,7 @@ import com.linkedin.thirdeye.dashboard.resources.v2.AnomaliesResource;
 import com.linkedin.thirdeye.dashboard.resources.OnboardResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.DataResource;
 
+import com.linkedin.thirdeye.dashboard.resources.v2.EventResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.TimeSeriesResource;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import io.dropwizard.assets.AssetsBundle;
@@ -77,6 +78,7 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new AnomaliesResource());
     env.jersey().register(new TimeSeriesResource());
     env.jersey().register(new OnboardResource());
+    env.jersey().register(new EventResource());
   }
 
   public static void main(String[] args) throws Exception {

@@ -76,8 +76,7 @@ public class TaskDriver {
             LOG.info(Thread.currentThread().getId() + " : DONE Executing task: {}",
                 anomalyTaskSpec.getId());
             // update status to COMPLETED
-            updateStatusAndTaskEndTime(anomalyTaskSpec.getId(), TaskStatus.RUNNING,
-                TaskStatus.COMPLETED);
+            updateStatusAndTaskEndTime(anomalyTaskSpec.getId(), TaskStatus.RUNNING, TaskStatus.COMPLETED);
           } catch (Exception e) {
             LOG.error("Exception in electing and executing task", e);
             try {
