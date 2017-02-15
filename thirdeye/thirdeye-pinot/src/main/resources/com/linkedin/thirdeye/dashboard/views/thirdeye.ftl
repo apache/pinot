@@ -162,13 +162,13 @@ var HASH_PARAMS = undefined;
 	<div class="container-fullwidth bg-black">
 		<div class="row">
 			<div class="col-md-12">
-				<div class="container">
-					<nav class="navbar navbar-inverse" role="navigation">
+				<nav class="navbar navbar-inverse" role="navigation">
+          <div class="container">
 						<div id="global-navbar" class="navbar-header">
 							<button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
 								<span class="sr-only">Toggle navigation</span><span class="icon-bar"></span><span class="icon-bar"></span><span class="icon-bar"></span>
 							</button>
-							<a class="navbar-brand" href="#dashboard" data-toggle="tab">ThirdEye</a>
+							<a class="navbar-brand logo" href="#dashboard" data-toggle="tab">ThirdEye</a>
 						</div>
 						<div id="main-tabs" class="collapse navbar-collapse">
 							<ul class="nav navbar-nav">
@@ -177,7 +177,9 @@ var HASH_PARAMS = undefined;
 								<li class=""><a href="#analysis">Root Cause Analysis</a></li>
 							</ul>
 
-							<ul class="nav navbar-nav navbar-right">
+            <!-- Hidding this until it's fully fleshed out -->
+            <!-- Jira: https://jira01.corp.linkedin.com:8443/browse/THIRDEYE-1042 -->
+						<!-- 	<ul class="nav navbar-nav navbar-right">
 								<li><a href="#">Manage Anomalies</a></li>
 								<li class="dropdown"><a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Admin <span class="caret"></span></a>
 									<ul class="dropdown-menu">
@@ -189,7 +191,7 @@ var HASH_PARAMS = undefined;
 										<li class=""><a href="#entity-editor" data-toggle="tab">Entity Editor</a></li>
 									</ul></li>
 								<li><a href="#">Sign In</a></li>
-							</ul>
+							</ul> -->
 						</div>
 					</nav>
 				</div>

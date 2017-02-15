@@ -20,7 +20,7 @@ function Constants() {
 
   //
   this.TIMESERIES_DATE_FORMAT = 'YYYY-MM-DD HH:mm';
-  this.DETAILS_DATE_FORMAT = 'MMM DD YYYY HH:mm';
+  this.DETAILS_DATE_FORMAT = 'MM/DD/YYYY HH:mm';
 
   // modes
   this.MODE_METRIC = 'metric';

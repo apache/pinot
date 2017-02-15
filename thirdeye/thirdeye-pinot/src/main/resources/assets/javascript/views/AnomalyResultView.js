@@ -231,17 +231,16 @@ AnomalyResultView.prototype = {
 
       var currentRange = anomaly.currentStart + " - " + anomaly.currentEnd;
       var baselineRange = anomaly.baselineStart + " - " + anomaly.baselineEnd;
-      $("#current-range-" + idx).html(currentRange);
-      $("#baseline-range-" + idx).html(baselineRange);
 
       var date = [ 'date' ].concat(anomaly.dates);
-      var currentValues = [ 'current' ].concat(anomaly.currentValues);
-      var baselineValues = [ 'baseline' ].concat(anomaly.baselineValues);
+      var currentValues = [currentRange].concat(anomaly.currentValues);
+      var baselineValues = [baselineRange].concat(anomaly.baselineValues);
       var chartColumns = [ date, currentValues, baselineValues ];
 
       var regionStart = moment(anomaly.anomalyRegionStart, constants.TIMESERIES_DATE_FORMAT).format(constants.DETAILS_DATE_FORMAT);
       var regionEnd = moment(anomaly.anomalyRegionEnd, constants.TIMESERIES_DATE_FORMAT).format(constants.DETAILS_DATE_FORMAT);
-      $("#region-" + idx).html(regionStart + " - " + regionEnd)
+      $(`#region-start-${idx}`).html(regionStart);
+      $(`#region-end-${idx}`).html(regionEnd);
 
       var current = anomaly.current;
       var baseline = anomaly.baseline;
@@ -265,8 +264,7 @@ AnomalyResultView.prototype = {
           type : 'spline'
         },
         legend : {
-          show : false,
-          position : 'top'
+          position : 'right'
         },
         axis : {
           y : {

@@ -1,9 +1,15 @@
 body {
     font-family: SourceSansPro, sans-serif;
+    font-weight: lighter;
     font-size: 14px;
     background-color: #F3F6F8;
     color: #080808
 }
+
+label {
+  font-weight: 300;
+}
+
 .label {
     color: #000000;
 }
@@ -91,6 +97,23 @@ body {
     margin-bottom: 0px;
     border: 0px;
 }
+
+.navbar-inverse .logo {
+  color: white;
+}
+
+.logo:before {
+  content: "";
+  display: inline-block;
+  vertical-align: middle;
+  height: 25px;
+  width: 30px;
+  background-size: 30px;
+  background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACsAAAAiCAQAAABsW+iDAAAA3klEQVRIx83Wuw3CMBAG4BshaahZIBUjsAKNB8gopqaiTpsRGMEjsANI3ADI+CElcTgKuLuQsyIrUvTJ+n1WDL7yJ8+pLggwH8BEM0ywEqXEbpdfLfZYA2CNvSCLDoZCJ8faCWt12HbtISht2Z+OA97QpXH9kh2zLd8D9cR2knyNZwnWxszLmvXKLyxdRbcIsgcBNgQRt+uCuzFhNotH6tDwWafMvn/FYB93FbZo0cXZxps0Gkk2opkPsBxr0rPPszRr/EaDBenVfsqW/XegO2F9dzCC7XQuohUTJq/NL1/k/oovlOCIAAAAAElFTkSuQmCC);
+  background-position: 0 0;
+  background-repeat: no-repeat;
+}
+
 .navbar-inverse .navbar-inner {
     background-image: none;
     background-color: #080808;
@@ -386,3 +409,51 @@ text {
   margin: 0;
   font-size: 13px;
 }
+
+.row-footer {
+  border-top: 1px solid #CCC;
+  padding-top: 20px;
+  margin-top: 20px;
+}
+
+/* anomalies page Search Bar*/
+
+.search-bar {
+  display: flex;
+}
+
+.search-field {
+  flex-grow: 1;
+  margin-left: 10px;
+}
+
+.search-select {
+  flex-basis: 150px;
+}
+
+.anomaly-function-detail {
+  border: 1px solid #CCC;
+  padding: 10px;
+  background-color: #F3F6F8;
+  display: flex;
+  justify-content: center;
+  flex-direction: column;
+}
+
+.filter-bar {
+  display: flex;
+  align-items: stretch;
+}
+
+.filter-apply-button {
+  align-self: center;
+}
+
+
+.time-range-description {
+  text-transform: uppercase;
+  font-size: 10px;
+  color: gray;
+  letter-spacing: 1px;
+}
+
