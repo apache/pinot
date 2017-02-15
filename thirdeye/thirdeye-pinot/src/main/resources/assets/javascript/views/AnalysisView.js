@@ -22,7 +22,7 @@ AnalysisView.prototype = {
   },
 
   render: function () {
-    const setBaselineRange = (start, end, range) => {
+    const setBaselineRange = (start, end) => {
       this.viewParams['baselineStart'] = start;
       this.viewParams['baselineEnd'] = end;
       $('#baseline-range span').addClass("time-range").html(
@@ -135,7 +135,7 @@ AnalysisView.prototype = {
       },
       buttonClasses: ['btn', 'btn-sm'],
       applyClass: 'btn-primary',
-      cancelClass: 'btn-default',
+      cancelClass: 'btn-default'
     }, callbackFun);
   },
 

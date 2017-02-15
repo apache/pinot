@@ -34,15 +34,15 @@
 	<div class="row bg-white row-bordered">
 		<div class="container top-buffer bottom-buffer">
 			<div class="row filter-bar">
-				<div class="col-md-4">
+				<div class="col-md-5">
 					<div>
 						<label>Select time range: </label>
 					</div>
 					<div>
-						<label class="time-range-description">Date Range (current)</label>
+						<label class="label-description">Date Range (current)</label>
 					</div>
-					<div id="anomalies-time-range">
-						<i class="glyphicon glyphicon-calendar fa fa-calendar"></i>&nbsp; <span></span> <b class="caret"></b>
+					<div id="anomalies-time-range" class="datepicker-range">
+						<span></span> <b class="caret"></b>
 					</div>
 				</div>
 				<!-- Hidding this until fleshed out -->
