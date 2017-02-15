@@ -41,6 +41,8 @@ import javax.annotation.concurrent.NotThreadSafe;
  * <ul>
  *   <li> Data bytes. </li>
  * </ul>
+ *
+ * Only sequential writes are supported.
  */
 @NotThreadSafe
 public class FixedByteChunkSingleValueWriter extends BaseChunkSingleValueWriter {
@@ -68,37 +70,42 @@ public class FixedByteChunkSingleValueWriter extends BaseChunkSingleValueWriter 
 
   @Override
   public void setInt(int row, int value) {
-    _chunkBuffer.putInt(_chunkDataOffset, value);
+    _chunkBuffer.putInt(value);
     _chunkDataOffset += INT_SIZE;
     flushChunkIfNeeded();
   }
 
   @Override
   public void setFloat(int row, float value) {
-    _chunkBuffer.putFloat(_chunkDataOffset, value);
+    _chunkBuffer.putFloat(value);
     _chunkDataOffset += FLOAT_SIZE;
     flushChunkIfNeeded();
   }
 
   @Override
   public void setLong(int row, long value) {
-    _chunkBuffer.putLong(_chunkDataOffset, value);
+    _chunkBuffer.putLong(value);
     _chunkDataOffset += LONG_SIZE;
     flushChunkIfNeeded();
   }
 
   @Override
   public void setDouble(int row, double value) {
-    _chunkBuffer.putDouble(_chunkDataOffset, value);
+    _chunkBuffer.putDouble(value);
     _chunkDataOffset += DOUBLE_SIZE;
     flushChunkIfNeeded();
+  }
+
+  @Override
+  protected void writeChunk() {
+    super.writeChunk();
+    _chunkDataOffset = 0;
   }
 
   private void flushChunkIfNeeded() {
     // If buffer filled, then compress and write to file.
     if (_chunkDataOffset == _chunkSize) {
       writeChunk();
-      _chunkDataOffset = 0;
     }
   }
 }

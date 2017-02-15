@@ -64,7 +64,8 @@ public abstract class ColumnIndexContainer {
       dictionary = load(metadata, dictionaryBuffer);
     }
 
-    if (metadata.isSorted() && metadata.isSingleValue()) {
+    // TODO: Support sorted index without dictionary.
+    if (dictionary != null && metadata.isSorted() && metadata.isSingleValue()) {
       return loadSorted(column, segmentReader, metadata, dictionary);
     }
 

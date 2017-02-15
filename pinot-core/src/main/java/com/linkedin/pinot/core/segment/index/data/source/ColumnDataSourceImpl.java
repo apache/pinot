@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.segment.index.data.source;
 
+import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,20 +74,22 @@ public class ColumnDataSourceImpl extends DataSource {
   public Block getNextBlock(BlockId blockId) {
     Block b = null;
 
-    if (indexContainer.getColumnMetadata().isSingleValue()) {
-      if (indexContainer.getColumnMetadata().isSorted()) {
+    ColumnMetadata columnMetadata = indexContainer.getColumnMetadata();
+    if (columnMetadata.isSingleValue()) {
+      // TODO: Support sorted index without dictionary.
+      if (columnMetadata.hasDictionary() && columnMetadata.isSorted()) {
         b = new SortedSingleValueBlock(blockId,
             (SortedForwardIndexReader) indexContainer.getForwardIndex(),
-            indexContainer.getDictionary(), indexContainer.getColumnMetadata());
+            indexContainer.getDictionary(), columnMetadata);
       } else {
         b = new UnSortedSingleValueBlock(blockId,
             (SingleColumnSingleValueReader) indexContainer.getForwardIndex(),
-            indexContainer.getDictionary(), indexContainer.getColumnMetadata());
+            indexContainer.getDictionary(), columnMetadata);
       }
     } else {
       b = new MultiValueBlock(blockId,
           (SingleColumnMultiValueReader) indexContainer.getForwardIndex(),
-          indexContainer.getDictionary(), indexContainer.getColumnMetadata());
+          indexContainer.getDictionary(), columnMetadata);
     }
 
     return b;

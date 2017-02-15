@@ -40,6 +40,8 @@ import javax.annotation.concurrent.NotThreadSafe;
  *   <li> Integer offsets to start position of rows: For partial chunks, offset values are 0 for missing rows. </li>
  *   <li> Data bytes. </li>
  * </ul>
+ *
+ * Only sequential writes are supported.
  */
 @NotThreadSafe
 public class VarByteChunkSingleValueWriter extends BaseChunkSingleValueWriter {
@@ -130,7 +132,6 @@ public class VarByteChunkSingleValueWriter extends BaseChunkSingleValueWriter {
       _chunkBuffer.putInt(i, 0);
     }
 
-    _chunkBuffer.flip(); // This is because setString changes 'position' of ByteBuffer.
     super.writeChunk();
 
     // Reset the chunk offsets.

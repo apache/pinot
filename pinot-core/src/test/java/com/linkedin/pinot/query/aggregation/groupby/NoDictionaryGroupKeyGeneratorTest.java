@@ -139,7 +139,7 @@ public class NoDictionaryGroupKeyGeneratorTest {
     }
 
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
-    config.setRawIndexCreationColumns(Collections.singletonList("column_1"));
+    config.setRawIndexCreationColumns(new ArrayList<String>(schema.getColumnNames()));
 
     config.setOutDir(SEGMENT_DIR_NAME);
     config.setSegmentName(SEGMENT_NAME);
