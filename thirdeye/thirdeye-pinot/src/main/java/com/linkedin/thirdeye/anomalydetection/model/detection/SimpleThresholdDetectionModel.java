@@ -34,8 +34,10 @@ public class SimpleThresholdDetectionModel extends AbstractDetectionModel {
 
     long bucketSizeInMillis = anomalyDetectionContext.getBucketSizeInMS();
 
+    String mainMetric =
+        anomalyDetectionContext.getAnomalyDetectionFunction().getSpec().getTopicMetric();
     // Compute the weight of this time series (average across whole)
-    TimeSeries currentTimeSeries = anomalyDetectionContext.getTransformedCurrent();
+    TimeSeries currentTimeSeries = anomalyDetectionContext.getTransformedCurrent(mainMetric);
     double averageValue = 0;
     for (long time : currentTimeSeries.timestampSet()) {
       averageValue += currentTimeSeries.get(time);
