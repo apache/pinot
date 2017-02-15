@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.query.aggregation.groupby;
 
 import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.request.GroupBy;
 import com.linkedin.pinot.core.common.BlockMetadata;
 import com.linkedin.pinot.core.common.BlockValSet;
@@ -44,7 +45,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   private final AggregationFunctionContext[] _aggrFunctionContexts;
   private final AggregationFunction[] _aggregationFunctions;
 
-  private  GroupKeyGenerator _groupKeyGenerator;
+  private GroupKeyGenerator _groupKeyGenerator;
   private GroupByResultHolder[] _resultHolderArray;
   private final String[] _groupByColumns;
 
@@ -113,8 +114,8 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
    */
   @Override
   public void process(TransformBlock transformBlock) {
-    Preconditions
-        .checkState(_inited, "Method 'process' cannot be called before 'init' for class " + getClass().getName());
+    Preconditions.checkState(_inited,
+        "Method 'process' cannot be called before 'init' for class " + getClass().getName());
 
     initGroupBy(transformBlock);
     generateGroupKeysForBlock(transformBlock);
@@ -170,8 +171,8 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
    */
   @Override
   public void finish() {
-    Preconditions
-        .checkState(_inited, "Method 'finish' cannot be called before 'init' for class " + getClass().getName());
+    Preconditions.checkState(_inited,
+        "Method 'finish' cannot be called before 'init' for class " + getClass().getName());
 
     _finished = true;
   }
@@ -184,8 +185,8 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
    */
   @Override
   public AggregationGroupByResult getResult() {
-    Preconditions
-        .checkState(_finished, "Method 'getResult' cannot be called before 'finish' for class " + getClass().getName());
+    Preconditions.checkState(_finished,
+        "Method 'getResult' cannot be called before 'finish' for class " + getClass().getName());
 
     // If group by was not initialized (in case of no transform blocks), return null.
     if (!_groupByInited) {
@@ -255,6 +256,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       return;
     }
 
+    FieldSpec.DataType dataType = null;
     for (String groupByColumn : _groupByColumns) {
       BlockMetadata metadata = transformBlock.getBlockMetadata(groupByColumn);
 
@@ -265,10 +267,20 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
       if (!metadata.hasDictionary()) {
         _hasColumnsWithoutDictionary = true;
       }
+
+      // Used only for single group-by case, so ok to overwrite.
+      dataType = metadata.getDataType();
     }
 
-    _groupKeyGenerator = (_hasColumnsWithoutDictionary) ? new NoDictionaryGroupKeyGenerator(_groupByColumns)
-        : new DefaultGroupKeyGenerator(transformBlock, _groupByColumns);
+    if (_hasColumnsWithoutDictionary) {
+      if (_groupByColumns.length == 1) {
+        _groupKeyGenerator = new NoDictionarySingleColumnGroupKeyGenerator(_groupByColumns[0], dataType);
+      } else {
+        _groupKeyGenerator = new NoDictionaryMultiColumnGroupKeyGenerator(transformBlock, _groupByColumns);
+      }
+    } else {
+      _groupKeyGenerator = new DefaultGroupKeyGenerator(transformBlock, _groupByColumns);
+    }
 
     int maxNumResults = _groupKeyGenerator.getGlobalGroupKeyUpperBound();
     initResultHolderArray(_numGroupsLimit, maxNumResults);
