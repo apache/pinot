@@ -49,7 +49,9 @@ public class SimplePercentageMergeModel extends AbstractMergeModel {
     TimeSeries expectedTimeSeries = expectedTimeSeriesPredictionModel.getExpectedTimeSeries();
     long expectedStartTime = expectedTimeSeries.getTimeSeriesInterval().getStartMillis();
 
-    TimeSeries observedTimeSeries = anomalyDetectionContext.getTransformedCurrent();
+    String mainMetric =
+        anomalyDetectionContext.getAnomalyDetectionFunction().getSpec().getTopicMetric();
+    TimeSeries observedTimeSeries = anomalyDetectionContext.getTransformedCurrent(mainMetric);
     long observedStartTime = observedTimeSeries.getTimeSeriesInterval().getStartMillis();
 
     double avgObserved = 0d;

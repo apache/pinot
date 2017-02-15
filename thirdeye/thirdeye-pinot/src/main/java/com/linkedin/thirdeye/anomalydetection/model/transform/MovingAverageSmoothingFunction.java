@@ -44,7 +44,7 @@ public class MovingAverageSmoothingFunction extends AbstractTransformationFuncti
     // Check if the moving average window size is larger than the time series itself
     long transformedStartTime = startTime + bucketSizeInMillis * (movingAverageWindowSize - 1);
     if (transformedStartTime > endTime) {
-      String metricName = anomalyDetectionContext.getTimeSeriesKey().getMetricName();
+      String metricName = anomalyDetectionContext.getAnomalyDetectionFunction().getSpec().getTopicMetric();
       DimensionMap dimensionMap = anomalyDetectionContext.getTimeSeriesKey().getDimensionMap();
       LOGGER.warn(
           "Input time series (Metric:{}, Dimension:{}) is shorter than the moving average "
