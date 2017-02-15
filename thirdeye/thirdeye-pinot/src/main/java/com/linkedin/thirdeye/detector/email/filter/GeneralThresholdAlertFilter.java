@@ -11,13 +11,20 @@ import org.slf4j.LoggerFactory;
 
 
 /**
+ * GeneralThresholdAlertFilter allows user to assign a given field name and its up/down threshold and filter anomaly
+ * results. The isQualified function will return false if upThreshold > givenFieldValue > downThreshold; otherwise, return
+ * false;
+ * The usage of this filter can used as the up/down threshold filter for anomaly weight, or the min/max filter for anomaly time.
  * Created by ychung on 2/15/17.
  */
 public class GeneralThresholdAlertFilter extends BaseAlertFilter {
   private final static Logger LOG = LoggerFactory.getLogger(GeneralThresholdAlertFilter.class);
+
+  private static final Double INFINITY = Double.POSITIVE_INFINITY;
+
   public static final String DEFAULT_THRESHOLD_FIELD = "weight";
-  public static final String DEFAULT_UP_THRESHOLD = "0.5";
-  public static final String DEFAULT_DOWN_THRESHOLD = "0.5";
+  public static final String DEFAULT_UP_THRESHOLD = Double.toString(-1 * INFINITY);
+  public static final String DEFAULT_DOWN_THRESHOLD = Double.toString(INFINITY);
 
   public static final String THRESHOLD_FIELD = "thresholdField";
   public static final String UP_THRESHOLD = "upThreshold";
@@ -44,6 +51,8 @@ public class GeneralThresholdAlertFilter extends BaseAlertFilter {
     return Collections.unmodifiableList(new ArrayList<>(Arrays.asList(THRESHOLD_FIELD, UP_THRESHOLD, DOWN_THRESHOLD)));
   }
 
+  // Explore the given class and find if we can fetch the field and field value from the instance
+  // Now we assume all values are in Double
   private final int MAX_EXPLORE_DEPTH = 3;
   public Double getFieldValueFromClass(MergedAnomalyResultDTO anomaly, String fieldName) throws NoSuchFieldException, IllegalAccessException{
     Class tmpClass = anomaly.getClass();
@@ -85,7 +94,7 @@ public class GeneralThresholdAlertFilter extends BaseAlertFilter {
       return true;
     }
 
-    return (fieldVal >= upThreshold) || (fieldVal <= -1 * downThreshold);
+    return (fieldVal >= upThreshold) || (fieldVal <= downThreshold);
   }
 
 
@@ -102,14 +111,14 @@ public class GeneralThresholdAlertFilter extends BaseAlertFilter {
   }
 
   public void setUpThreshold(double upThreshold) {
-    this.upThreshold = Math.abs(upThreshold);
+    this.upThreshold = upThreshold;
   }
 
   public double getDownThreshold() {
     return downThreshold;
   }
 
-  public void setDownThreshold(double dwnThreshold) {
-    this.downThreshold = Math.abs(dwnThreshold);
+  public void setDownThreshold(double downThreshold) {
+    this.downThreshold = downThreshold;
   }
 }
