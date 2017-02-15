@@ -89,25 +89,22 @@ AnalysisView.prototype = {
       this.viewParams['metricId'] = metricId;
 
       // Now render the dimensions and filters for selected metric
-      this.renderGranularity(self.viewParams.metric.id);
-      this.renderDimensions(self.viewParams.metric.id);
-      this.renderFilters(self.viewParams.metric.id);
+      this.renderGranularity(this.viewParams.metric.id);
+      this.renderDimensions(this.viewParams.metric.id);
+      this.renderFilters(this.viewParams.metric.id);
     }).trigger('change');
 
     // TIME RANGE SELECTION
-    var current_start = self.analysisModel.currentStart
-    var current_end = self.analysisModel.currentEnd;
-    var baseline_start = self.analysisModel.baselineStart;
-    var baseline_end = self.analysisModel.baselineEnd;
+    var currentStart = this.analysisModel.currentStart;
+    var currentEnd = this.analysisModel.currentEnd;
+    var baselineStart = this.analysisModel.baselineStart;
+    var baselineEnd = this.analysisModel.baselineEnd;
 
-    setCurrentRange(current_start, current_end);
-    setBaselineRange(baseline_start, baseline_end);
+    setCurrentRange(currentStart, currentEnd);
+    setBaselineRange(baselineStart, baselineEnd);
 
-    this.renderDatePicker('#current-range', setCurrentRange, current_start, current_end);
-    this.renderDatePicker('#baseline-range', setBaselineRange, baseline_start, baseline_end);
-
-    $('#baseline-range').datepicker( "option", "disabled" );
-    $("#baseline-range").datepicker("refresh");
+    this.renderDatePicker('#current-range', setCurrentRange, currentStart, currentEnd);
+    this.renderDatePicker('#baseline-range', setBaselineRange, baselineStart, baselineEnd);
 
     this.setupListeners();
   },
