@@ -152,7 +152,7 @@ public class MergedAnomalyResultBean extends AbstractBean
 
   @Override
   public int hashCode() {
-    return Objects.hash(getId(), startTime, endTime, collection, metric, dimensions, score);
+    return Objects.hash(getId(), startTime, endTime, collection, metric, dimensions, score, avgBaselineVal, avgCurrentVal);
   }
 
   @Override
@@ -163,7 +163,9 @@ public class MergedAnomalyResultBean extends AbstractBean
     MergedAnomalyResultBean m = (MergedAnomalyResultBean) o;
     return Objects.equals(getId(), m.getId()) && Objects.equals(startTime, m.getStartTime())
         && Objects.equals(endTime, m.getEndTime()) && Objects.equals(collection, m.getCollection())
-        && Objects.equals(metric, m.getMetric()) && Objects.equals(dimensions, m.getDimensions());
+        && Objects.equals(metric, m.getMetric()) && Objects.equals(dimensions, m.getDimensions())
+        && Objects.equals(avgBaselineVal, m.getAvgBaselineVal())
+        && Objects.equals(avgCurrentVal, m.getAvgCurrentVal());
   }
 
   @Override
@@ -187,7 +189,8 @@ public class MergedAnomalyResultBean extends AbstractBean
         + functionId + ", rawAnomalyIdList=" + rawAnomalyIdList + ", collection='" + collection
         + '\'' + ", metric='" + metric + '\'' + ", dimensions='" + dimensions + '\''
         + ", startTime=" + startTime + ", endTime=" + endTime + ", score=" + score + ", weight="
-        + weight + ", createdTime=" + createdTime + ", message='" + message + '\'' + ", notified="
-        + notified + '}';
+        + weight + ", createdTime=" + createdTime + ", message='" + message + '\''
+        + ", currentVal=" + avgCurrentVal + ", baseLineVal=" + avgBaselineVal
+        + ", notified=" + notified + '}';
   }
 }
