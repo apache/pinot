@@ -16,8 +16,8 @@ import org.slf4j.LoggerFactory;
  * and down threshold. The up and down threshold should be positive floating point number. This class return false if
  * - downThreshold < severity < upThreshold; otherwise, return true.
  */
-public class SeverityThresholdAlertFilter extends BaseAlertFilter {
-  private final static Logger LOG = LoggerFactory.getLogger(SeverityThresholdAlertFilter.class);
+public class WeightThresholdAlertFilter extends BaseAlertFilter {
+  private final static Logger LOG = LoggerFactory.getLogger(WeightThresholdAlertFilter.class);
 
   public static final String DEFAULT_UP_THRESHOLD = "0.5";
   public static final String DEFAULT_DOWN_THRESHOLD = "0.5";
@@ -45,11 +45,11 @@ public class SeverityThresholdAlertFilter extends BaseAlertFilter {
   }
 
 
-  public SeverityThresholdAlertFilter(){
+  public WeightThresholdAlertFilter(){
 
   }
 
-  public SeverityThresholdAlertFilter(double upThreshold, double downThreshold){
+  public WeightThresholdAlertFilter(double upThreshold, double downThreshold){
     setUpThreshold(upThreshold);
     setDownThreshold(downThreshold);
   }
