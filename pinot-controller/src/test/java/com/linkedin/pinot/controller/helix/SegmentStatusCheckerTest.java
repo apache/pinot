@@ -106,6 +106,8 @@ public class SegmentStatusCheckerTest {
         ControllerGauge.SEGMENTS_IN_ERROR_STATE), 1);
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
         ControllerGauge.NUMBER_OF_REPLICAS), 1);
+    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(externalView.getId(),
+        ControllerGauge.PERCENT_OF_REPLICAS), 33);
     segmentStatusChecker.stop();
   }
 

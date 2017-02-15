@@ -181,6 +181,7 @@ public class SegmentStatusChecker {
       ExternalView externalView = helixAdmin.getResourceExternalView(helixClusterName, tableName);
 
       final int nReplicasIdeal = Integer.parseInt(idealState.getReplicas());
+      int nReplicasIdealMax = 0;
       int nReplicasExternal = nReplicasIdeal;
       int nErrors = 0;
       int nOffline = 0;
@@ -201,6 +202,8 @@ public class SegmentStatusChecker {
           // No online segments in ideal state
           continue;
         }
+        nReplicasIdealMax = (idealState.getInstanceStateMap(partitionName).size() > nReplicasIdealMax)
+            ? idealState.getInstanceStateMap(partitionName).size() : nReplicasIdealMax;
         if ((externalView == null) || (externalView.getStateMap(partitionName) == null)) {
           // No replicas for this segment
           TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
@@ -239,14 +242,16 @@ public class SegmentStatusChecker {
       // Synchronization provided by Controller Gauge to make sure that only one thread updates the gauge
       _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.NUMBER_OF_REPLICAS,
           nReplicasExternal);
+      _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.PERCENT_OF_REPLICAS,
+          nReplicasExternal*100/nReplicasIdealMax);
       _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.SEGMENTS_IN_ERROR_STATE,
           nErrors);
       if (nOffline > 0) {
         LOGGER.warn("Table {} has {} segments with no online replicas", tableName, nOffline);
       }
-      if (nReplicasExternal < nReplicasIdeal) {
+      if (nReplicasExternal < nReplicasIdealMax) {
         LOGGER.warn("Table {} has {} replicas, below replication threshold :{}", tableName,
-            nReplicasExternal, nReplicasIdeal);
+            nReplicasExternal, nReplicasIdealMax);
       }
     }
     _metricsRegistry.setValueOfGlobalGauge(ControllerGauge.REALTIME_TABLE_COUNT, realTimeTableCount);
@@ -282,6 +287,7 @@ public class SegmentStatusChecker {
     // Synchronization provided by Controller Gauge to make sure that only one thread updates the gauge
     for (String tableName : allTableNames) {
       _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.NUMBER_OF_REPLICAS, 0);
+      _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.PERCENT_OF_REPLICAS, 0);
       _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.SEGMENTS_IN_ERROR_STATE, 0);
     }
   }
