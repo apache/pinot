@@ -22,7 +22,7 @@ public class SimpleThresholdDetectionModel extends AbstractDetectionModel {
   public static final String DEFAULT_MESSAGE_TEMPLATE = "change : %.2f %%, currentVal : %.2f, baseLineVal : %.2f, threshold : %s";
 
   @Override
-  public List<RawAnomalyResultDTO> detect(AnomalyDetectionContext anomalyDetectionContext) {
+  public List<RawAnomalyResultDTO> detect(String metricName, AnomalyDetectionContext anomalyDetectionContext) {
     List<RawAnomalyResultDTO> anomalyResults = new ArrayList<>();
 
     // Get thresholds
@@ -34,10 +34,8 @@ public class SimpleThresholdDetectionModel extends AbstractDetectionModel {
 
     long bucketSizeInMillis = anomalyDetectionContext.getBucketSizeInMS();
 
-    String mainMetric =
-        anomalyDetectionContext.getAnomalyDetectionFunction().getSpec().getTopicMetric();
     // Compute the weight of this time series (average across whole)
-    TimeSeries currentTimeSeries = anomalyDetectionContext.getTransformedCurrent(mainMetric);
+    TimeSeries currentTimeSeries = anomalyDetectionContext.getTransformedCurrent(metricName);
     double averageValue = 0;
     for (long time : currentTimeSeries.timestampSet()) {
       averageValue += currentTimeSeries.get(time);
@@ -57,7 +55,7 @@ public class SimpleThresholdDetectionModel extends AbstractDetectionModel {
       return anomalyResults; // empty list
     }
 
-    PredictionModel predictionModel = anomalyDetectionContext.getTrainedPredictionModel();
+    PredictionModel predictionModel = anomalyDetectionContext.getTrainedPredictionModel(metricName);
     if (!(predictionModel instanceof ExpectedTimeSeriesPredictionModel)) {
       LOGGER.info("SimpleThresholdDetectionModel detection model expects an ExpectedTimeSeriesPredictionModel but the trained prediction model in anomaly detection context is not.");
       return anomalyResults; // empty list

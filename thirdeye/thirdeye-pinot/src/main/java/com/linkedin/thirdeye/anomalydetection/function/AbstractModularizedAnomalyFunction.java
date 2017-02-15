@@ -30,9 +30,13 @@ import org.slf4j.LoggerFactory;
  * This class provides the default control logic to perform actions on an anomaly detection context
  * with the given anomaly detection module; the actions can be anomaly detection, information update
  * of merged anomalies, etc.
+ * Note that this class provides the default anomaly detection flow for only one single metric (main
+ * metric), the other metrics that come along in AnomalyDetectionContext are used as auxiliary
+ * metrics, e.g., they provide additional information during the transformation or detection of the
+ * main metric.
  */
-public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunction implements AnomalyDetectionFunction,
-    ModularizedAnomalyFunctionModelProvider {
+public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunction
+    implements AnomalyDetectionFunction, ModularizedAnomalyFunctionModelProvider {
   protected final Logger LOGGER = LoggerFactory.getLogger(this.getClass());
 
   protected AnomalyFunctionDTO spec;
@@ -64,11 +68,13 @@ public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunc
       return Collections.emptyList();
     }
 
+    String mainMetric = anomalyDetectionContext.getAnomalyDetectionFunction().getSpec().getTopicMetric();
+
     // Transform current and baseline time series and train the prediction model
-    transformAndPredictTimeSeries(anomalyDetectionContext);
+    transformAndPredictTimeSeries(mainMetric, anomalyDetectionContext);
 
     // Detect anomalies
-    return getDetectionModel().detect(anomalyDetectionContext);
+    return getDetectionModel().detect(mainMetric, anomalyDetectionContext);
   }
 
   @Override
@@ -77,8 +83,9 @@ public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunc
     MergeModel mergeModel = getMergeModel();
     if (!(mergeModel instanceof NoPredictionMergeModel)) {
       if (checkPrecondition(anomalyDetectionContext)) {
+        String mainMetric = anomalyDetectionContext.getAnomalyDetectionFunction().getSpec().getTopicMetric();
         // Transform current and baseline time series and train the prediction model
-        transformAndPredictTimeSeries(anomalyDetectionContext);
+        transformAndPredictTimeSeries(mainMetric, anomalyDetectionContext);
       } else {
         LOGGER.error("The precondition of anomaly detection context does not hold: please make sure"
             + "the observed time series and anomaly function are not null.");
@@ -114,17 +121,17 @@ public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunc
    * The processed anomaly detection context has multiple usages. For example, it could be used for
    * detecting anomalies, plotting UI, updating the information of anomalies, etc.
    *
+   * @param metricName the name of the metric on which we apply transformation and prediction
    * @param anomalyDetectionContext anomaly detection context that contains the necessary time
    *                                series for preparing the prediction model
    */
-  public void transformAndPredictTimeSeries(AnomalyDetectionContext anomalyDetectionContext) {
-    String mainMetric = anomalyDetectionContext.getAnomalyDetectionFunction().getSpec().getTopicMetric();
-    transformTimeSeries(anomalyDetectionContext);
+  public void transformAndPredictTimeSeries(String metricName, AnomalyDetectionContext anomalyDetectionContext) {
+    transformTimeSeries(metricName, anomalyDetectionContext);
 
     // Train Prediction Model
     PredictionModel predictionModel = getPredictionModel();
-    predictionModel.train(anomalyDetectionContext.getTransformedBaselines(mainMetric), anomalyDetectionContext);
-    anomalyDetectionContext.setTrainedPredictionModel(predictionModel);
+    predictionModel.train(anomalyDetectionContext.getTransformedBaselines(metricName), anomalyDetectionContext);
+    anomalyDetectionContext.setTrainedPredictionModel(metricName, predictionModel);
   }
 
   /**
@@ -132,40 +139,39 @@ public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunc
    *
    * TODO: Apply Chain-of-Responsibility on the transformation chain
    *
+   * @param metricName the name of the metric on which we apply transformation and prediction
    * @param anomalyDetectionContext anomaly detection context that contains the time series to be
    *                                transformed.
    */
-  private void transformTimeSeries(AnomalyDetectionContext anomalyDetectionContext) {
-    String mainMetric = anomalyDetectionContext.getAnomalyDetectionFunction().getSpec().getTopicMetric();
-
+  private void transformTimeSeries(String metricName, AnomalyDetectionContext anomalyDetectionContext) {
     // Transform the observed (current) time series
-    if (anomalyDetectionContext.getTransformedCurrent(mainMetric) == null) {
-      anomalyDetectionContext.setTransformedCurrent(mainMetric, anomalyDetectionContext.getCurrent(mainMetric));
+    if (anomalyDetectionContext.getTransformedCurrent(metricName) == null) {
+      anomalyDetectionContext.setTransformedCurrent(metricName, anomalyDetectionContext.getCurrent(metricName));
     }
     List<TransformationFunction> currentTimeSeriesTransformationChain =
         getCurrentTimeSeriesTransformationChain();
     if (CollectionUtils.isNotEmpty(currentTimeSeriesTransformationChain)) {
       for (TransformationFunction tf : currentTimeSeriesTransformationChain) {
         anomalyDetectionContext
-            .setTransformedCurrent(mainMetric, tf.transform(anomalyDetectionContext.getTransformedCurrent(mainMetric),
+            .setTransformedCurrent(metricName, tf.transform(anomalyDetectionContext.getTransformedCurrent(metricName),
                 anomalyDetectionContext));
       }
     }
 
     // Transform baseline time series
-    if (anomalyDetectionContext.getTransformedBaselines(mainMetric) == null) {
-      anomalyDetectionContext.setTransformedBaselines(mainMetric, anomalyDetectionContext.getBaselines(mainMetric));
+    if (anomalyDetectionContext.getTransformedBaselines(metricName) == null) {
+      anomalyDetectionContext.setTransformedBaselines(metricName, anomalyDetectionContext.getBaselines(metricName));
     }
     List<TransformationFunction> baselineTimeSeriesTransformationChain =
         getBaselineTimeSeriesTransformationChain();
     if (CollectionUtils.isNotEmpty(baselineTimeSeriesTransformationChain)) {
       for (TransformationFunction tf : baselineTimeSeriesTransformationChain) {
         List<TimeSeries> transformedBaselines = new ArrayList<>();
-        for (TimeSeries ts : anomalyDetectionContext.getTransformedBaselines(mainMetric)) {
+        for (TimeSeries ts : anomalyDetectionContext.getTransformedBaselines(metricName)) {
           TimeSeries transformedTS = tf.transform(ts, anomalyDetectionContext);
           transformedBaselines.add(transformedTS);
         }
-        anomalyDetectionContext.setTransformedBaselines(mainMetric, transformedBaselines);
+        anomalyDetectionContext.setTransformedBaselines(metricName, transformedBaselines);
       }
     }
   }
@@ -217,11 +223,11 @@ public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunc
             new DateTime(viewWindowEndTime));
     String mainMetric = anomalyDetectionContext.getAnomalyDetectionFunction().getSpec().getTopicMetric();
 
-    this.transformAndPredictTimeSeries(anomalyDetectionContext);
+    this.transformAndPredictTimeSeries(mainMetric, anomalyDetectionContext);
 
     TimeSeries observedTS = anomalyDetectionContext.getTransformedCurrent(mainMetric);
     TimeSeries expectedTS =
-        ((ExpectedTimeSeriesPredictionModel) anomalyDetectionContext.getTrainedPredictionModel())
+        ((ExpectedTimeSeriesPredictionModel) anomalyDetectionContext.getTrainedPredictionModel(mainMetric))
             .getExpectedTimeSeries();
     long expectedTSStartTime = expectedTS.getTimeSeriesInterval().getStartMillis();
 

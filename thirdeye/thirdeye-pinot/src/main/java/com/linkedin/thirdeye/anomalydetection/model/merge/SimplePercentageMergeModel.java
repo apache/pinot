@@ -37,7 +37,10 @@ public class SimplePercentageMergeModel extends AbstractMergeModel {
   @Override
   public void update(AnomalyDetectionContext anomalyDetectionContext,
       MergedAnomalyResultDTO anomalyToUpdated) {
-    PredictionModel predictionModel = anomalyDetectionContext.getTrainedPredictionModel();
+    String mainMetric =
+        anomalyDetectionContext.getAnomalyDetectionFunction().getSpec().getTopicMetric();
+
+    PredictionModel predictionModel = anomalyDetectionContext.getTrainedPredictionModel(mainMetric);
     if (!(predictionModel instanceof ExpectedTimeSeriesPredictionModel)) {
       LOGGER.error("SimplePercentageMergeModel expects an ExpectedTimeSeriesPredictionModel but the trained model is not one.");
       return;
@@ -49,8 +52,6 @@ public class SimplePercentageMergeModel extends AbstractMergeModel {
     TimeSeries expectedTimeSeries = expectedTimeSeriesPredictionModel.getExpectedTimeSeries();
     long expectedStartTime = expectedTimeSeries.getTimeSeriesInterval().getStartMillis();
 
-    String mainMetric =
-        anomalyDetectionContext.getAnomalyDetectionFunction().getSpec().getTopicMetric();
     TimeSeries observedTimeSeries = anomalyDetectionContext.getTransformedCurrent(mainMetric);
     long observedStartTime = observedTimeSeries.getTimeSeriesInterval().getStartMillis();
 

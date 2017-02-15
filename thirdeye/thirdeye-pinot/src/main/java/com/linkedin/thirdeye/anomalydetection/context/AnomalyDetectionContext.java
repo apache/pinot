@@ -27,7 +27,7 @@ public class AnomalyDetectionContext {
   private Map<String, TimeSeries> transformedCurrent = new HashMap<>();
   private Map<String, List<TimeSeries>> transformedBaselines = new HashMap<>();
 
-  private PredictionModel trainedPredictionModel;
+  private Map<String, PredictionModel> trainedPredictionModel = new HashMap<>();
 
   /**
    * Returns the key of the time series, which contains metric name and dimension map.
@@ -136,14 +136,14 @@ public class AnomalyDetectionContext {
   /**
    * Returns the trained prediction model.
    */
-  public PredictionModel getTrainedPredictionModel() {
-    return trainedPredictionModel;
+  public PredictionModel getTrainedPredictionModel(String metricName) {
+    return trainedPredictionModel.get(metricName);
   }
 
   /**
    * Sets the trained prediction model, which is supposed to be set by the anomaly function.
    */
-  public void setTrainedPredictionModel(PredictionModel trainedPredictionModel) {
-    this.trainedPredictionModel = trainedPredictionModel;
+  public void setTrainedPredictionModel(String metricName, PredictionModel trainedPredictionModel) {
+    this.trainedPredictionModel.put(metricName, trainedPredictionModel);
   }
 }
