@@ -457,3 +457,20 @@ text {
   letter-spacing: 1px;
 }
 
+/* root cause analysis date range picker*/
+
+#current-range, #baseline-range {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    border-bottom: 1px solid #CCC;
+    padding-bottom: 2px;
+    margin-bottom: 5px;
+}
+
+#baseline-range.disabled {
+    pointer-events: none;
+    cursor: none;
+    color: #CCC;
+}

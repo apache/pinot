@@ -5,6 +5,14 @@ function AnalysisView(analysisModel) {
   this.analysisModel = analysisModel;
   this.applyDataChangeEvent = new Event(this);
   this.viewParams = {granularity: "DAYS", dimension: "All", filters: {}};
+  this.baselineRange = {
+    'Last 24 Hours': [moment().subtract(1, 'days'), moment().subtract(1, 'days')],
+    'Yesterday': [moment().subtract(2, 'days'), moment().subtract(2, 'days')],
+    'Last 7 Days': [moment().subtract(13, 'days'), moment().subtract(7, 'days')],
+    'Last 30 Days': [moment().subtract(59, 'days'), moment().subtract(30, 'days')],
+    'This Month': [moment().subtract(1, 'month').startOf('month'), moment().subtract(1 , 'month').endOf('month')],
+    'Last Month': [moment().subtract(2, 'month').startOf('month'), moment().subtract(2, 'month').endOf('month')]
+  };
 }
 
 AnalysisView.prototype = {
@@ -14,6 +22,28 @@ AnalysisView.prototype = {
   },
 
   render: function () {
+    const setBaselineRange = (start, end, range) => {
+      this.viewParams['baselineStart'] = start;
+      this.viewParams['baselineEnd'] = end;
+      $('#baseline-range span').addClass("time-range").html(
+        `${start.format(constants.DATE_RANGE_FORMAT)} &mdash; ${end.format(constants.DATE_RANGE_FORMAT)}`);
+    };
+    const setCurrentRange = (start, end, rangeType = constants.DATE_RANGE_CUSTOM) => {
+      this.viewParams['currentStart'] = start;
+      this.viewParams['currentEnd'] = end;
+
+      if (rangeType === constants.DATE_RANGE_CUSTOM) {
+        $('#baseline-range').removeClass('disabled');
+      } else {
+        const [baselineStart, baselineEnd] = this.baselineRange[rangeType];
+        $('#baseline-range').addClass('disabled');
+        setBaselineRange(baselineStart, baselineEnd);
+      }
+
+      $('#current-range span').addClass("time-range").html(
+          `<span>${rangeType}</span> ${start.format(constants.DATE_RANGE_FORMAT)} &mdash; ${end.format(constants.DATE_RANGE_FORMAT)}`)
+    };
+
     $("#analysis-place-holder").html(this.analysis_template_compiled);
     var self = this;
     // METRIC SELECTION
@@ -70,33 +100,20 @@ AnalysisView.prototype = {
     var baseline_start = self.analysisModel.baselineStart;
     var baseline_end = self.analysisModel.baselineEnd;
 
-    current_range_cb(current_start, current_end);
-    baseline_range_cb(baseline_start, baseline_end);
+    setCurrentRange(current_start, current_end);
+    setBaselineRange(baseline_start, baseline_end);
 
-    this.renderDatePicker('#current-range', current_range_cb, current_start, current_end);
-    this.renderDatePicker('#baseline-range', baseline_range_cb, baseline_start, baseline_end);
+    this.renderDatePicker('#current-range', setCurrentRange, current_start, current_end);
+    this.renderDatePicker('#baseline-range', setBaselineRange, baseline_start, baseline_end);
 
-    function current_range_cb(start, end) {
-      self.viewParams['currentStart'] = start;
-      self.viewParams['currentEnd'] = end;
-      $('#current-range span').addClass("time-range").html(
-          start.format('MMM D, ') + start.format('hh:mm a') + '  &mdash;  ' + end.format('MMM D, ')
-          + end.format('hh:mm a'));
-    }
-
-    function baseline_range_cb(start, end) {
-      self.viewParams['baselineStart'] = start;
-      self.viewParams['baselineEnd'] = end;
-      $('#baseline-range span').addClass("time-range").html(
-          start.format('MMM D, ') + start.format('hh:mm a') + '  &mdash;  ' + end.format('MMM D, ')
-          + end.format('hh:mm a'));
-    }
+    $('#baseline-range').datepicker( "option", "disabled" );
+    $("#baseline-range").datepicker("refresh");
 
     this.setupListeners();
   },
 
-  renderDatePicker: function (domId, callbackFun, initialStart, initialEnd){
-    $(domId).daterangepicker({
+  renderDatePicker: function (selector, callbackFun, initialStart, initialEnd){
+    $(selector).daterangepicker({
       startDate: initialStart,
       endDate: initialEnd,
       dateLimit: {
@@ -118,7 +135,7 @@ AnalysisView.prototype = {
       },
       buttonClasses: ['btn', 'btn-sm'],
       applyClass: 'btn-primary',
-      cancelClass: 'btn-default'
+      cancelClass: 'btn-default',
     }, callbackFun);
   },
 

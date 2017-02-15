@@ -22,7 +22,7 @@
 		<div class="container top-buffer bottom-buffer">
 			<div class=row>
 
-				<div class="col-md-4">
+				<div class="col-md-5">
 					<div>
 						<label class="label-medium-semibold">Select time ranges to compare: </label>
 					</div>
@@ -31,16 +31,14 @@
 					</div>
 
 					<div id="current-range">
-						<i class="glyphicon glyphicon-calendar fa fa-calendar"></i>&nbsp; <span></span> <b class="caret"></b>
+						<span></span><b class="caret"></b>
 					</div>
-					<hr />
 					<div>
 						<label class="label-small-semibold">COMPARE TO(BASELINE)</label>
 					</div>
 					<div id="baseline-range">
-						<i class="glyphicon glyphicon-calendar fa fa-calendar"></i>&nbsp; <span></span> <b class="caret"></b>
+						<span></span> <b class="caret"></b>
 					</div>
-					<hr>
 				</div>
 				<div class="col-md-2">
 					<div class="row">
@@ -52,7 +50,7 @@
             </div>
           </div>
 				</div>
-				<div class="col-md-3">
+				<div class="col-md-2">
 					<div class="row">
 						<label class="label-medium-semibold" for="add-dimension-button">Dimensions</label>
 					</div>
