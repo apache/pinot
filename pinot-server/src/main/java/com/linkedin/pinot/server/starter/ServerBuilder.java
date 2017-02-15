@@ -19,6 +19,7 @@ import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.query.QueryExecutor;
+import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
 import com.linkedin.pinot.core.data.manager.offline.TableDataManagerProvider;
 import com.linkedin.pinot.core.operator.transform.TransformUtils;
 import com.linkedin.pinot.core.operator.transform.function.TransformFunctionFactory;
@@ -126,11 +127,11 @@ public class ServerBuilder {
     initMetrics();
   }
 
-  public DataManager buildInstanceDataManager() throws InstantiationException, IllegalAccessException,
-      ClassNotFoundException {
+  public InstanceDataManager buildInstanceDataManager() throws InstantiationException, IllegalAccessException,
+                                                               ClassNotFoundException {
     String className = _serverConf.getInstanceDataManagerClassName();
     LOGGER.info("Trying to Load Instance DataManager by Class : " + className);
-    DataManager instanceDataManager = (DataManager) Class.forName(className).newInstance();
+    InstanceDataManager instanceDataManager = (InstanceDataManager) Class.forName(className).newInstance();
     instanceDataManager.init(_serverConf.getInstanceDataManagerConfig());
     return instanceDataManager;
   }

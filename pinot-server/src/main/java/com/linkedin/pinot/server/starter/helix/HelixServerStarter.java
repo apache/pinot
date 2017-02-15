@@ -145,7 +145,7 @@ public class HelixServerStarter {
 
     // Register the service status handler
     ServiceStatus.setServiceStatusCallback(
-        new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixAdmin, _helixClusterName,
+        new ServerServiceStatusCallback(_helixAdmin, _serverInstance.getInstanceDataManager(), _helixClusterName,
             _instanceId));
 
     ControllerLeaderLocator.create(_helixManager);

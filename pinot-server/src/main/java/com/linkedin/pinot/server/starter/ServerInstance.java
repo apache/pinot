@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.server.starter;
 
+import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
 import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.lang.reflect.InvocationTargetException;
@@ -44,7 +45,7 @@ public class ServerInstance {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerInstance.class);
 
   private ServerConf _serverConf;
-  private DataManager _instanceDataManager;
+  private InstanceDataManager _instanceDataManager;
   private QueryExecutor _queryExecutor;
   private RequestHandlerFactory _requestHandlerFactory;
   private NettyServer _nettyServer;
@@ -123,14 +124,14 @@ public class ServerInstance {
   /**
    * @return instanceDataManager
    */
-  public DataManager getInstanceDataManager() {
+  public InstanceDataManager getInstanceDataManager() {
     return _instanceDataManager;
   }
 
   /**
    * @param instanceDataManager
    */
-  public void setInstanceDataManager(DataManager instanceDataManager) {
+  public void setInstanceDataManager(InstanceDataManager instanceDataManager) {
     this._instanceDataManager = instanceDataManager;
   }
 
