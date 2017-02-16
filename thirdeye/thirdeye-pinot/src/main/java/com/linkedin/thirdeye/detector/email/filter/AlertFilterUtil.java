@@ -44,8 +44,8 @@ public class AlertFilterUtil {
     if (TP + FP == 0) {
       throw new Exception("No predicted true labels. Check model input");
     }
-    evals[PRECISION_INDEX] = 1.0 * TP / (TP + FP);
-    evals[RECALL_INDEX] = 1.0 * TP / (TP + FN);
+    evals[PRECISION_INDEX] = 1.000 * TP / (TP + FP);
+    evals[RECALL_INDEX] = 1.000 * TP / (TP + FN);
     return evals;
   }
 }

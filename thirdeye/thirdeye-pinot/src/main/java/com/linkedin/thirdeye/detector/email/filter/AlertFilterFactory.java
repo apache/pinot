@@ -60,8 +60,8 @@ public class AlertFilterFactory {
       throw new IllegalArgumentException("Unsupported type " + type);
     }
     String className = props.getProperty(type);
-    alertFilter = (BaseAlertFilter) Class.forName(className).newInstance();
-    alertFilter.setParameters(anomalyFunctionSpec.getAlertFilter());
+    alertFilter = (AlertFilter) Class.forName(className).newInstance();
+//    alertFilter.setParameters(anomalyFunctionSpec.getAlertFilter());
     return alertFilter;
   }
 }

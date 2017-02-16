@@ -54,15 +54,14 @@ public class AlertFilterAutotuneFactory {
   }
 
   public AlertFilterAutoTune fromSpec(AnomalyFunctionDTO anomalyFunctionSpec) throws Exception {
-    BaseAlertFilterAutotune alertFilterAutoTune = null;
+    AlertFilterAutoTune alertFilterAutoTune = null;
     String type = anomalyFunctionSpec.getType();
     if (!props.containsKey(type)) {
       throw new IllegalArgumentException("Unsupported type " + type);
     }
     String className = props.getProperty(type);
-    alertFilterAutoTune = (BaseAlertFilterAutotune) Class.forName(className).newInstance();
+    alertFilterAutoTune = (AlertFilterAutoTune) Class.forName(className).newInstance();
 
-    alertFilterAutoTune.init(anomalyFunctionSpec);
     return alertFilterAutoTune;
   }
 
