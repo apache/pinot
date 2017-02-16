@@ -17,7 +17,6 @@
 package com.linkedin.pinot.common.query;
 
 import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.ListeningExecutorService;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.query.context.TimerContext;
 import com.linkedin.pinot.common.request.BrokerRequest;
@@ -42,9 +41,6 @@ public class QueryRequest {
   private ListenableFuture<DataTable> resultFuture;
   // Timing information for different phases of query execution
   private final TimerContext timerContext;
-
-  // executor service to parallelize query tasks
-  private ListeningExecutorService queryWorkers;
 
   private final ServerMetrics serverMetrics;
   private int segmentCountAfterPruning;
@@ -108,19 +104,6 @@ public class QueryRequest {
 
   public TimerContext getTimerContext() {
     return timerContext;
-  }
-
-  /**
-   * Get the executor service to use for running parallel
-   * tasks of a query (For ex: planning across all segments)
-   * @return
-   */
-  public ListeningExecutorService getQueryWorkers() {
-    return queryWorkers;
-  }
-
-  public void setQueryWorkers(ListeningExecutorService queryWorkers) {
-    this.queryWorkers = queryWorkers;
   }
 
   public void setSegmentCountAfterPruning(int segmentCountAfterPruning) {

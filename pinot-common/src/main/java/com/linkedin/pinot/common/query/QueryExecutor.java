@@ -16,6 +16,7 @@
 package com.linkedin.pinot.common.query;
 
 import com.linkedin.pinot.common.metrics.ServerMetrics;
+import java.util.concurrent.ExecutorService;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 
@@ -24,13 +25,13 @@ import com.linkedin.pinot.common.utils.DataTable;
 
 
 public interface QueryExecutor {
-  public void init(Configuration queryExecutorConfig, DataManager dataManager, ServerMetrics serverMetrics) throws ConfigurationException;
+  void init(Configuration queryExecutorConfig, DataManager dataManager, ServerMetrics serverMetrics) throws ConfigurationException;
 
-  public void start();
+  void start();
 
-  public DataTable processQuery(QueryRequest queryRequest);
+  DataTable processQuery(QueryRequest queryRequest, ExecutorService executorService);
 
-  public void shutDown();
+  void shutDown();
 
   boolean isStarted();
 

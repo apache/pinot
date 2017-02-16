@@ -44,11 +44,13 @@ public class FCFSQueryScheduler extends QueryScheduler {
 
   @Override
   public ListenableFuture<DataTable> submit(final QueryRequest queryRequest) {
+    Preconditions.checkNotNull(queryRequest);
+
     queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT);
     ListenableFuture<DataTable> queryResultFuture = queryRunners.submit(new Callable<DataTable>() {
       @Override
       public DataTable call() {
-        return queryExecutor.processQuery(queryRequest);
+        return queryExecutor.processQuery(queryRequest, queryWorkers);
       }
     });
 

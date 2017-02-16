@@ -15,33 +15,10 @@
  */
 package com.linkedin.pinot.server.request;
 
-import com.google.common.util.concurrent.Futures;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.linkedin.pinot.common.exception.QueryException;
-import com.linkedin.pinot.common.metrics.ServerGauge;
-import com.linkedin.pinot.common.metrics.ServerMeter;
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.metrics.ServerQueryPhase;
-import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.common.query.QueryRequest;
-import com.linkedin.pinot.common.query.context.TimerContext;
-import com.linkedin.pinot.common.request.InstanceRequest;
-import com.linkedin.pinot.common.utils.DataTable;
-import com.linkedin.pinot.core.common.datatable.DataTableImplV2;
-import com.linkedin.pinot.serde.SerDe;
-import com.linkedin.pinot.transport.netty.NettyServer.RequestHandler;
-import io.netty.buffer.ByteBuf;
-import io.netty.channel.ChannelHandlerContext;
-import java.net.InetSocketAddress;
-import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.thrift.protocol.TCompactProtocol;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-
 /**
  * A simple implementation of RequestHandler.
  */
+/*
 public class SimpleRequestHandler implements RequestHandler {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SimpleRequestHandler.class);
@@ -133,3 +110,4 @@ public class SimpleRequestHandler implements RequestHandler {
   }
 
 }
+*/

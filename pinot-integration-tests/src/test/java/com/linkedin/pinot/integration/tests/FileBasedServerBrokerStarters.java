@@ -15,14 +15,6 @@
  */
 package com.linkedin.pinot.integration.tests;
 
-import com.linkedin.pinot.core.query.pruner.ValidSegmentPruner;
-import java.util.Iterator;
-
-import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.commons.lang.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.broker.broker.BrokerServerBuilder;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.core.data.manager.offline.FileBasedInstanceDataManager;
@@ -30,15 +22,15 @@ import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadataLoad
 import com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import com.linkedin.pinot.core.query.pruner.DataSchemaSegmentPruner;
 import com.linkedin.pinot.core.query.pruner.TimeSegmentPruner;
+import com.linkedin.pinot.core.query.pruner.ValidSegmentPruner;
 import com.linkedin.pinot.server.conf.ServerConf;
-import com.linkedin.pinot.server.request.SimpleRequestHandlerFactory;
 import com.linkedin.pinot.server.starter.ServerInstance;
 import com.yammer.metrics.core.MetricsRegistry;
-
-
-/**
- * Sep 12, 2014
- */
+import java.util.Iterator;
+import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.commons.lang.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class FileBasedServerBrokerStarters {
 
@@ -124,8 +116,6 @@ public class FileBasedServerBrokerStarters {
     serverConfiguration.addProperty("pinot.server.query.executor.pruner.DataSchemaSegmentPruner.id", "1");
     serverConfiguration.addProperty("pinot.server.query.executor.pruner.ValidSegmentPruner.id", "2");
     serverConfiguration.addProperty("pinot.server.query.executor.class", ServerQueryExecutorV1Impl.class.getName());
-    serverConfiguration.addProperty("pinot.server.requestHandlerFactory.class",
-        SimpleRequestHandlerFactory.class.getName());
     serverConfiguration.addProperty("pinot.server.netty.port", SERVER_PORT);
     serverConfiguration.setDelimiterParsingDisabled(false);
     return serverConfiguration;

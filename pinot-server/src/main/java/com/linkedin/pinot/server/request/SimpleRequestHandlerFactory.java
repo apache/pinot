@@ -15,15 +15,11 @@
  */
 package com.linkedin.pinot.server.request;
 
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
-import com.linkedin.pinot.transport.netty.NettyServer.RequestHandler;
-import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
-
 /**
  * A simple implementation of RequestHandlerFactory.
  * Only return a SimpleRequestHandler.
  */
+/*
 public class SimpleRequestHandlerFactory implements RequestHandlerFactory {
 
   private QueryScheduler _queryScheduler;
@@ -41,3 +37,4 @@ public class SimpleRequestHandlerFactory implements RequestHandlerFactory {
   }
 
 }
+*/

@@ -41,6 +41,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
@@ -64,6 +66,8 @@ public class QueryExecutorTest {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryExecutorTest.class);
   public static final String PINOT_PROPERTIES = "pinot.properties";
   private ServerMetrics serverMetrics;
+  private static final ExecutorService queryRunners = Executors.newFixedThreadPool(20);
+
   @BeforeClass
   public void setup() throws Exception {
     serverMetrics = new ServerMetrics(new MetricsRegistry());
@@ -144,7 +148,7 @@ public class QueryExecutorTest {
       instanceRequest.getSearchSegments().add(segment.getSegmentName());
     }
     QueryRequest queryRequest = new QueryRequest(instanceRequest, serverMetrics);
-    DataTable instanceResponse = _queryExecutor.processQuery(queryRequest);
+    DataTable instanceResponse = _queryExecutor.processQuery(queryRequest, queryRunners);
     LOGGER.info("InstanceResponse is " + instanceResponse.getLong(0, 0));
     Assert.assertEquals(instanceResponse.getLong(0, 0), 400002L);
     LOGGER.info(
@@ -164,7 +168,7 @@ public class QueryExecutorTest {
       instanceRequest.getSearchSegments().add(segment.getSegmentName());
     }
     QueryRequest queryRequest = new QueryRequest(instanceRequest, serverMetrics);
-    DataTable instanceResponse = _queryExecutor.processQuery(queryRequest);
+    DataTable instanceResponse = _queryExecutor.processQuery(queryRequest, queryRunners);
     LOGGER.info("InstanceResponse is " + instanceResponse.getDouble(0, 0));
     Assert.assertEquals(instanceResponse.getDouble(0, 0), 40000200000.0);
     LOGGER.info(
@@ -185,7 +189,7 @@ public class QueryExecutorTest {
       instanceRequest.getSearchSegments().add(segment.getSegmentName());
     }
     QueryRequest queryRequest = new QueryRequest(instanceRequest, serverMetrics);
-    DataTable instanceResponse = _queryExecutor.processQuery(queryRequest);
+    DataTable instanceResponse = _queryExecutor.processQuery(queryRequest, queryRunners);
     LOGGER.info("InstanceResponse is " + instanceResponse.getDouble(0, 0));
     Assert.assertEquals(instanceResponse.getDouble(0, 0), 200000.0);
     LOGGER.info(
@@ -205,7 +209,7 @@ public class QueryExecutorTest {
       instanceRequest.getSearchSegments().add(segment.getSegmentName());
     }
     QueryRequest queryRequest = new QueryRequest(instanceRequest, serverMetrics);
-    DataTable instanceResponse = _queryExecutor.processQuery(queryRequest);
+    DataTable instanceResponse = _queryExecutor.processQuery(queryRequest, queryRunners);
     LOGGER.info("InstanceResponse is " + instanceResponse.getDouble(0, 0));
     Assert.assertEquals(instanceResponse.getDouble(0, 0), 0.0);
     LOGGER.info(
