@@ -5,6 +5,7 @@ import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
 import com.linkedin.thirdeye.anomalydetection.context.TimeSeriesKey;
 import com.linkedin.thirdeye.anomalydetection.model.detection.SimpleThresholdDetectionModel;
 import com.linkedin.thirdeye.anomalydetection.model.transform.MovingAverageSmoothingFunction;
+import com.linkedin.thirdeye.anomalydetection.model.transform.TotalCountThresholdRemovalFunction;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -287,6 +288,73 @@ public class TestWeekOverWeekRuleFunction {
     }
     expectedScore /= expectedRawAnomalies.size();
     Assert.assertEquals(mergedAnomaly.getScore(), expectedScore, EPSILON);
+  }
+
+  @Test(dataProvider = "timeSeriesDataProvider") public void testTotalCountThresholdFunction(
+      Properties properties, TimeSeriesKey timeSeriesKey, long bucketSizeInMs,
+      TimeSeries observedTimeSeries, List<TimeSeries> baselines) throws Exception {
+    AnomalyDetectionContext anomalyDetectionContext = new AnomalyDetectionContext();
+    anomalyDetectionContext.setBucketSizeInMS(bucketSizeInMs);
+
+    // Append properties for anomaly function specific setting
+    String totalCountTimeSeriesName = "totalCount";
+    TimeSeries totalCountTimeSeries = new TimeSeries();
+    {
+      totalCountTimeSeries.set(observedStartTime, 10d);
+      totalCountTimeSeries.set(observedStartTime + bucketMillis, 10d);
+      totalCountTimeSeries.set(observedStartTime + bucketMillis * 2, 10d);
+      totalCountTimeSeries.set(observedStartTime + bucketMillis * 3, 10d);
+      totalCountTimeSeries.set(observedStartTime + bucketMillis * 4, 10d);
+      Interval totalCountTimeSeriesInterval =
+          new Interval(observedStartTime, observedStartTime + bucketMillis * 5);
+      totalCountTimeSeries.setTimeSeriesInterval(totalCountTimeSeriesInterval);
+    }
+    properties.put(TotalCountThresholdRemovalFunction.TOTAL_COUNT_METRIC_NAME, totalCountTimeSeriesName);
+    properties.put(TotalCountThresholdRemovalFunction.TOTAL_COUNT_THRESHOLD, "51");
+
+    properties.put(WeekOverWeekRuleFunction.BASELINE, "w/2wAvg");
+    properties.put(SimpleThresholdDetectionModel.CHANGE_THRESHOLD, "0.2");
+
+
+    // Create anomaly function spec
+    AnomalyFunctionDTO functionSpec = new AnomalyFunctionDTO();
+    functionSpec.setMetric(mainMetric);
+    functionSpec.setProperties(toString(properties));
+
+    // Create anomalyDetectionContext using anomaly function spec
+    WeekOverWeekRuleFunction function = new WeekOverWeekRuleFunction();
+    function.init(functionSpec);
+    anomalyDetectionContext.setAnomalyDetectionFunction(function);
+    anomalyDetectionContext.setCurrent(mainMetric, observedTimeSeries);
+    anomalyDetectionContext.setBaselines(mainMetric, baselines);
+    anomalyDetectionContext.setTimeSeriesKey(timeSeriesKey);
+    anomalyDetectionContext.setCurrent(totalCountTimeSeriesName, totalCountTimeSeries);
+
+    List<RawAnomalyResultDTO> rawAnomalyResults = function.analyze(anomalyDetectionContext);
+    // No anomalies after smoothing the time series
+    Assert.assertEquals(rawAnomalyResults.size(), 0);
+
+
+    // Test disabled total count by lowering the threshold
+    anomalyDetectionContext = new AnomalyDetectionContext();
+    anomalyDetectionContext.setBucketSizeInMS(bucketSizeInMs);
+
+    properties.put(TotalCountThresholdRemovalFunction.TOTAL_COUNT_THRESHOLD, "0");
+    // Create anomaly function spec
+    functionSpec = new AnomalyFunctionDTO();
+    functionSpec.setMetric(mainMetric);
+    functionSpec.setProperties(toString(properties));
+    function = new WeekOverWeekRuleFunction();
+    function.init(functionSpec);
+
+    anomalyDetectionContext.setAnomalyDetectionFunction(function);
+    anomalyDetectionContext.setCurrent(mainMetric, observedTimeSeries);
+    anomalyDetectionContext.setBaselines(mainMetric, baselines);
+    anomalyDetectionContext.setTimeSeriesKey(timeSeriesKey);
+    anomalyDetectionContext.setCurrent(totalCountTimeSeriesName, totalCountTimeSeries);
+
+    rawAnomalyResults = function.analyze(anomalyDetectionContext);
+    compareWo2WAvgRawAnomalies(rawAnomalyResults);
   }
 
   @Test

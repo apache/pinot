@@ -13,6 +13,7 @@ import com.linkedin.thirdeye.anomalydetection.model.prediction.NoopPredictionMod
 import com.linkedin.thirdeye.anomalydetection.model.prediction.PredictionModel;
 import com.linkedin.thirdeye.anomalydetection.model.prediction.SeasonalAveragePredictionModel;
 import com.linkedin.thirdeye.anomalydetection.model.transform.MovingAverageSmoothingFunction;
+import com.linkedin.thirdeye.anomalydetection.model.transform.TotalCountThresholdRemovalFunction;
 import com.linkedin.thirdeye.anomalydetection.model.transform.TransformationFunction;
 import com.linkedin.thirdeye.anomalydetection.model.transform.ZeroRemovalFunction;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
@@ -60,6 +61,13 @@ public class WeekOverWeekRuleFunction extends AbstractModularizedAnomalyFunction
     TransformationFunction zeroRemover = new ZeroRemovalFunction();
     currentTimeSeriesTransformationChain.add(zeroRemover);
     baselineTimeSeriesTransformationChain.add(zeroRemover);
+
+    // Add total count threshold transformation
+    if (this.properties.containsKey(TotalCountThresholdRemovalFunction.TOTAL_COUNT_METRIC_NAME)) {
+      TransformationFunction totalCountThresholdFunction = new TotalCountThresholdRemovalFunction();
+      totalCountThresholdFunction.init(this.properties);
+      currentTimeSeriesTransformationChain.add(totalCountThresholdFunction);
+    }
 
     // Add moving average smoothing transformation
     if (this.properties.containsKey(ENABLE_SMOOTHING)) {
