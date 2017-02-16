@@ -15,10 +15,9 @@
  */
 package com.linkedin.pinot.core.segment;
 
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.segment.creator.SegmentPreIndexStatsCollector;
+import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector;
 
 
-public interface SegmentName {
-  String getSegmentName(SegmentPreIndexStatsCollector statsCollector, SegmentGeneratorConfig segmentGeneratorConfig) throws Exception;
+public interface SegmentNameGenerator {
+  String getSegmentName(AbstractColumnStatisticsCollector statsCollector, SegmentNameConfig segmentNameConfig) throws Exception;
 }

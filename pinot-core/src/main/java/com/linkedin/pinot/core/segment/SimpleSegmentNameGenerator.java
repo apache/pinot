@@ -16,17 +16,16 @@
 package com.linkedin.pinot.core.segment;
 
 import com.linkedin.pinot.common.utils.SegmentNameBuilder;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.segment.creator.SegmentPreIndexStatsCollector;
+import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector;
 
 
-public class SimpleSegmentName implements SegmentName {
-  public String getSegmentName(SegmentPreIndexStatsCollector statsCollector, SegmentGeneratorConfig config) throws Exception {
+public class SimpleSegmentNameGenerator implements SegmentNameGenerator {
+  public String getSegmentName(AbstractColumnStatisticsCollector statsCollector, SegmentNameConfig config) throws Exception {
     String timeColumn = config.getTimeColumnName();
     String segmentName;
     if (timeColumn != null && timeColumn.length() > 0) {
-      final Object minTimeValue = statsCollector.getColumnProfileFor(timeColumn).getMinValue();
-      final Object maxTimeValue = statsCollector.getColumnProfileFor(timeColumn).getMaxValue();
+      final Object minTimeValue = statsCollector.getMinValue();
+      final Object maxTimeValue = statsCollector.getMaxValue();
       segmentName = SegmentNameBuilder
           .buildBasic(config.getTableName(), minTimeValue, maxTimeValue, config.getSegmentNamePostfix());
     } else {

@@ -16,7 +16,8 @@
 package com.linkedin.pinot.core.segment.creator.impl;
 
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.core.segment.SimpleSegmentName;
+import com.linkedin.pinot.core.segment.SegmentNameConfig;
+import com.linkedin.pinot.core.segment.SimpleSegmentNameGenerator;
 import com.linkedin.pinot.core.segment.index.converter.SegmentFormatConverter;
 import com.linkedin.pinot.core.segment.index.converter.SegmentFormatConverterFactory;
 import java.io.DataOutputStream;
@@ -40,7 +41,6 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.StarTreeIndexSpec;
-import com.linkedin.pinot.common.utils.SegmentNameBuilder;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
 import com.linkedin.pinot.core.data.extractors.PlainFieldExtractor;
@@ -419,8 +419,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     if (config.getSegmentName() != null) {
       segmentName = config.getSegmentName();
     } else {
-      segmentName = new SimpleSegmentName()
-          .getSegmentName(statsCollector, config);
+      String timeColumn = config.getTimeColumnName();
+      SegmentNameConfig segmentNameConfig = new SegmentNameConfig(timeColumn, config.getTableName(), config.getSegmentNamePostfix());
+      segmentName = config.getSegmentNameGenerator().getSegmentName(statsCollector.getColumnProfileFor(timeColumn), segmentNameConfig);
     }
 
     // Write the index files to disk
