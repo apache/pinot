@@ -22,10 +22,16 @@ AnalysisView.prototype = {
   },
 
   render: function () {
+    $("#analysis-place-holder").html(this.analysis_template_compiled);
+    const $currentRangeText = $('#current-range span');
+    const $baselineRangeText= $('#baseline-range span');
+    const $currentRange = $('#current-range');
+    const $baselineRange = $('#baseline-range');
+
     const setBaselineRange = (start, end) => {
       this.viewParams['baselineStart'] = start;
       this.viewParams['baselineEnd'] = end;
-      $('#baseline-range span').addClass("time-range").html(
+      $baselineRangeText.addClass("time-range").html(
         `${start.format(constants.DATE_RANGE_FORMAT)} &mdash; ${end.format(constants.DATE_RANGE_FORMAT)}`);
     };
     const setCurrentRange = (start, end, rangeType = constants.DATE_RANGE_CUSTOM) => {
@@ -33,19 +39,16 @@ AnalysisView.prototype = {
       this.viewParams['currentEnd'] = end;
 
       if (rangeType === constants.DATE_RANGE_CUSTOM) {
-        $('#baseline-range').removeClass('disabled');
+        $baselineRange.removeClass('disabled');
       } else {
         const [baselineStart, baselineEnd] = this.baselineRange[rangeType];
-        $('#baseline-range').addClass('disabled');
+        $baselineRange.addClass('disabled');
         setBaselineRange(baselineStart, baselineEnd);
       }
-
-      $('#current-range span').addClass("time-range").html(
+      $currentRangeText.addClass("time-range").html(
           `<span>${rangeType}</span> ${start.format(constants.DATE_RANGE_FORMAT)} &mdash; ${end.format(constants.DATE_RANGE_FORMAT)}`)
     };
 
-    $("#analysis-place-holder").html(this.analysis_template_compiled);
-    var self = this;
     // METRIC SELECTION
     var analysisMetricSelect = $('#analysis-metric-input').select2({
       theme: "bootstrap", placeholder: "search for Metric(s)", ajax: {
@@ -103,14 +106,14 @@ AnalysisView.prototype = {
     setCurrentRange(currentStart, currentEnd);
     setBaselineRange(baselineStart, baselineEnd);
 
-    this.renderDatePicker('#current-range', setCurrentRange, currentStart, currentEnd);
-    this.renderDatePicker('#baseline-range', setBaselineRange, baselineStart, baselineEnd);
+    this.renderDatePicker($currentRange, setCurrentRange, currentStart, currentEnd);
+    this.renderDatePicker($baselineRange, setBaselineRange, baselineStart, baselineEnd);
 
     this.setupListeners();
   },
 
-  renderDatePicker: function (selector, callbackFun, initialStart, initialEnd){
-    $(selector).daterangepicker({
+  renderDatePicker: function ($selector, callbackFun, initialStart, initialEnd){
+    $selector.daterangepicker({
       startDate: initialStart,
       endDate: initialEnd,
       dateLimit: {
