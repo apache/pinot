@@ -421,7 +421,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     } else {
       String timeColumn = config.getTimeColumnName();
       SegmentNameConfig segmentNameConfig = new SegmentNameConfig(timeColumn, config.getTableName(), config.getSegmentNamePostfix());
-      segmentName = config.getSegmentNameGenerator().getSegmentName(statsCollector.getColumnProfileFor(timeColumn), segmentNameConfig);
+      segmentName = config.getSegmentNameGenerator()
+          .getSegmentName(statsCollector.getColumnProfileFor(timeColumn), segmentNameConfig);
     }
 
     // Write the index files to disk
