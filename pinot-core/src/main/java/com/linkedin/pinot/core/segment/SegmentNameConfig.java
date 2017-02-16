@@ -28,6 +28,8 @@ public class SegmentNameConfig {
   }
   public SegmentNameConfig(String timeColumnName, String tableName, String segmentNamePostfix) {
     _timeColumnName = timeColumnName;
+    _tableName = tableName;
+    _segmentNamePostfix = segmentNamePostfix;
   }
 
   public String getTimeColumnName() {

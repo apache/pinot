@@ -19,11 +19,11 @@ import com.linkedin.pinot.common.utils.SegmentNameBuilder;
 import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector;
 
 
-public class SimpleSegmentNameGenerator implements SegmentNameGenerator {
+public class SimpleSegmentNameGenerator implements DefaultSegmentNameGenerator {
   public String getSegmentName(AbstractColumnStatisticsCollector statsCollector, SegmentNameConfig config) throws Exception {
-    String timeColumn = config.getTimeColumnName();
+    final String timeColumnName = config.getTimeColumnName();
     String segmentName;
-    if (timeColumn != null && timeColumn.length() > 0) {
+    if (timeColumnName != null && timeColumnName.length() > 0) {
       final Object minTimeValue = statsCollector.getMinValue();
       final Object maxTimeValue = statsCollector.getMaxValue();
       segmentName = SegmentNameBuilder

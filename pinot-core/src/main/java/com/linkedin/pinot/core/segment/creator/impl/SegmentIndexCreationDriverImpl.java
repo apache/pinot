@@ -17,7 +17,6 @@ package com.linkedin.pinot.core.segment.creator.impl;
 
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.SegmentNameConfig;
-import com.linkedin.pinot.core.segment.SimpleSegmentNameGenerator;
 import com.linkedin.pinot.core.segment.index.converter.SegmentFormatConverter;
 import com.linkedin.pinot.core.segment.index.converter.SegmentFormatConverterFactory;
 import java.io.DataOutputStream;

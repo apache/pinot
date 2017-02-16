@@ -25,7 +25,7 @@ import com.linkedin.pinot.core.data.readers.CSVRecordReaderConfig;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.data.readers.RecordReaderConfig;
 import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
-import com.linkedin.pinot.core.segment.SegmentNameGenerator;
+import com.linkedin.pinot.core.segment.DefaultSegmentNameGenerator;
 import com.linkedin.pinot.core.segment.SimpleSegmentNameGenerator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.startree.hll.HllConfig;
@@ -79,7 +79,7 @@ public class SegmentGeneratorConfig {
   private String _starTreeIndexSpecFile = null;
   private StarTreeIndexSpec _starTreeIndexSpec = null;
   private String _creatorVersion = null;
-  private SegmentNameGenerator _segmentNameGenerator = new SimpleSegmentNameGenerator();
+  private DefaultSegmentNameGenerator _segmentNameGenerator = new SimpleSegmentNameGenerator();
   private char _paddingCharacter = V1Constants.Str.DEFAULT_STRING_PAD_CHAR;
 
   private HllConfig _hllConfig = null;
@@ -406,11 +406,11 @@ public class SegmentGeneratorConfig {
     _hllConfig = hllConfig;
   }
 
-  public SegmentNameGenerator getSegmentNameGenerator() {
+  public DefaultSegmentNameGenerator getSegmentNameGenerator() {
     return _segmentNameGenerator;
   }
 
-  public void setSegmentNameGenerator(SegmentNameGenerator segmentNameGenerator) {
+  public void segSegmentNameGenerator(DefaultSegmentNameGenerator segmentNameGenerator) {
     _segmentNameGenerator = segmentNameGenerator;
   }
 

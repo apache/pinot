@@ -18,6 +18,9 @@ package com.linkedin.pinot.core.segment;
 import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector;
 
 
-public interface SegmentNameGenerator {
-  String getSegmentName(AbstractColumnStatisticsCollector statsCollector, SegmentNameConfig segmentNameConfig) throws Exception;
+/**
+ * An interface that allows generates names for segments depending on the naming scheme.
+ */
+public interface DefaultSegmentNameGenerator {
+  String getSegmentName(AbstractColumnStatisticsCollector timeColStatsCollector, SegmentNameConfig segmentNameConfig) throws Exception;
 }
