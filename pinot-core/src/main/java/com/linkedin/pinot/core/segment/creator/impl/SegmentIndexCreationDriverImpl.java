@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.segment.creator.impl;
 
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.segment.SimpleSegmentName;
 import com.linkedin.pinot.core.segment.index.converter.SegmentFormatConverter;
 import com.linkedin.pinot.core.segment.index.converter.SegmentFormatConverterFactory;
 import java.io.DataOutputStream;
@@ -414,20 +415,12 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   }
 
   private void handlePostCreation() throws Exception {
-    // Build the segment name, if necessary
-    final String timeColumn = config.getTimeColumnName();
 
     if (config.getSegmentName() != null) {
       segmentName = config.getSegmentName();
     } else {
-      if (timeColumn != null && timeColumn.length() > 0) {
-        final Object minTimeValue = statsCollector.getColumnProfileFor(timeColumn).getMinValue();
-        final Object maxTimeValue = statsCollector.getColumnProfileFor(timeColumn).getMaxValue();
-        segmentName = SegmentNameBuilder
-            .buildBasic(config.getTableName(), minTimeValue, maxTimeValue, config.getSegmentNamePostfix());
-      } else {
-        segmentName = SegmentNameBuilder.buildBasic(config.getTableName(), config.getSegmentNamePostfix());
-      }
+      segmentName = new SimpleSegmentName()
+          .getSegmentName(statsCollector, config);
     }
 
     // Write the index files to disk
