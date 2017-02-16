@@ -96,7 +96,7 @@ public class BackwardAnomalyFunctionUtils {
       List<Interval> intervals =
           anomalyFunction.getTimeSeriesIntervals(windowStart.getMillis(), windowEnd.getMillis());
       List<TimeSeries> timeSeriesList =
-          BackwardAnomalyFunctionUtils.splitSetsOfTimeSeries(timeSeries, metric, intervals);
+          BackwardAnomalyFunctionUtils.splitSetsOfTimeSeries(timeSeries, metricName, intervals);
       anomalyDetectionContext.setCurrent(metricName, timeSeriesList.get(0));
       timeSeriesList.remove(0);
       anomalyDetectionContext.setBaselines(metricName, timeSeriesList);
