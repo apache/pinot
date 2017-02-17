@@ -89,21 +89,7 @@ public class TestWeekOverWeekRuleFunction {
   @Test(dataProvider = "timeSeriesDataProvider") public void analyzeWoW(
       Properties properties, TimeSeriesKey timeSeriesKey, long bucketSizeInMs,
       TimeSeries observedTimeSeries, List<TimeSeries> baselines) throws Exception {
-    // Expected RawAnomalies without smoothing
-    List<RawAnomalyResultDTO> expectedRawAnomalies = new ArrayList<>();
-    RawAnomalyResultDTO rawAnomaly1 = new RawAnomalyResultDTO();
-    rawAnomaly1.setStartTime(observedStartTime + bucketMillis);
-    rawAnomaly1.setEndTime(observedStartTime + bucketMillis * 2);
-    rawAnomaly1.setWeight(-0.25d);
-    rawAnomaly1.setScore(15d);
-    expectedRawAnomalies.add(rawAnomaly1);
 
-    RawAnomalyResultDTO rawAnomaly2 = new RawAnomalyResultDTO();
-    rawAnomaly2.setStartTime(observedStartTime + bucketMillis * 4);
-    rawAnomaly2.setEndTime(observedStartTime + bucketMillis * 5);
-    rawAnomaly2.setWeight(-0.2857142857d);
-    rawAnomaly2.setScore(15d);
-    expectedRawAnomalies.add(rawAnomaly2);
 
     AnomalyDetectionContext anomalyDetectionContext = new AnomalyDetectionContext();
     anomalyDetectionContext.setBucketSizeInMS(bucketSizeInMs);
@@ -127,13 +113,7 @@ public class TestWeekOverWeekRuleFunction {
     anomalyDetectionContext.setTimeSeriesKey(timeSeriesKey);
 
     List<RawAnomalyResultDTO> rawAnomalyResults = function.analyze(anomalyDetectionContext);
-    Assert.assertEquals(rawAnomalyResults.size(), expectedRawAnomalies.size());
-    for (int i = 0; i < rawAnomalyResults.size(); ++i) {
-      RawAnomalyResultDTO actualAnomaly = rawAnomalyResults.get(i);
-      RawAnomalyResultDTO expectedAnomaly = rawAnomalyResults.get(i);
-      Assert.assertEquals(actualAnomaly.getWeight(), expectedAnomaly.getWeight(), EPSILON);
-      Assert.assertEquals(actualAnomaly.getScore(), expectedAnomaly.getScore(), EPSILON);
-    }
+    compareWoWRawAnomalies(rawAnomalyResults);
 
     // Test data model
     List<Interval> expectedDataRanges = new ArrayList<>();
@@ -345,7 +325,7 @@ public class TestWeekOverWeekRuleFunction {
     return "";
   }
 
-  private void compareWo2WAvgRawAnomalies(List<RawAnomalyResultDTO> rawAnomalyResults) {
+  private void compareWo2WAvgRawAnomalies(List<RawAnomalyResultDTO> actualAnomalyResults) {
     // Expecting the same anomaly result from analyzeWo2WAvg
     List<RawAnomalyResultDTO> expectedRawAnomalies = new ArrayList<>();
     RawAnomalyResultDTO rawAnomaly1 = new RawAnomalyResultDTO();
@@ -362,10 +342,35 @@ public class TestWeekOverWeekRuleFunction {
     rawAnomaly2.setScore(15d);
     expectedRawAnomalies.add(rawAnomaly2);
 
-    Assert.assertEquals(rawAnomalyResults.size(), expectedRawAnomalies.size());
-    for (int i = 0; i < rawAnomalyResults.size(); ++i) {
-      RawAnomalyResultDTO actualAnomaly = rawAnomalyResults.get(i);
-      RawAnomalyResultDTO expectedAnomaly = rawAnomalyResults.get(i);
+    compareActualAndExpectedRawAnomalies(actualAnomalyResults, expectedRawAnomalies);
+  }
+
+  private void compareWoWRawAnomalies(List<RawAnomalyResultDTO> actualAnomalyResults) {
+    // Expected RawAnomalies of WoW without smoothing
+    List<RawAnomalyResultDTO> expectedRawAnomalies = new ArrayList<>();
+    RawAnomalyResultDTO rawAnomaly1 = new RawAnomalyResultDTO();
+    rawAnomaly1.setStartTime(observedStartTime + bucketMillis);
+    rawAnomaly1.setEndTime(observedStartTime + bucketMillis * 2);
+    rawAnomaly1.setWeight(-0.25d);
+    rawAnomaly1.setScore(15d);
+    expectedRawAnomalies.add(rawAnomaly1);
+
+    RawAnomalyResultDTO rawAnomaly2 = new RawAnomalyResultDTO();
+    rawAnomaly2.setStartTime(observedStartTime + bucketMillis * 4);
+    rawAnomaly2.setEndTime(observedStartTime + bucketMillis * 5);
+    rawAnomaly2.setWeight(-0.2857142857d);
+    rawAnomaly2.setScore(15d);
+    expectedRawAnomalies.add(rawAnomaly2);
+
+    compareActualAndExpectedRawAnomalies(actualAnomalyResults, expectedRawAnomalies);
+  }
+
+  private void compareActualAndExpectedRawAnomalies(List<RawAnomalyResultDTO> actualAnomalyResults,
+      List<RawAnomalyResultDTO> expectedRawAnomalies) {
+    Assert.assertEquals(actualAnomalyResults.size(), expectedRawAnomalies.size());
+    for (int i = 0; i < actualAnomalyResults.size(); ++i) {
+      RawAnomalyResultDTO actualAnomaly = actualAnomalyResults.get(i);
+      RawAnomalyResultDTO expectedAnomaly = actualAnomalyResults.get(i);
       Assert.assertEquals(actualAnomaly.getWeight(), expectedAnomaly.getWeight(), EPSILON);
       Assert.assertEquals(actualAnomaly.getScore(), expectedAnomaly.getScore(), EPSILON);
     }
