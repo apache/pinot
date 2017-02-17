@@ -323,8 +323,10 @@ hr {
     border: none !important;
 }
 .time-range {
-    font-weight: 300;
-    font-size: 15px;
+  font-weight: 300;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .selectAutoWidth {
     width: auto
@@ -449,11 +451,25 @@ text {
   align-self: center;
 }
 
-
-.time-range-description {
+.label-description {
   text-transform: uppercase;
   font-size: 10px;
   color: gray;
   letter-spacing: 1px;
 }
 
+/* root cause analysis date range picker*/
+.datepicker-range {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  border-bottom: 1px solid #CCC;
+  padding-bottom: 2px;
+  margin-bottom: 5px;
+}
+
+.datepicker-range.disabled {
+  pointer-events: none;
+  color: #999;
+}

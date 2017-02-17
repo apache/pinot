@@ -21,6 +21,8 @@ function Constants() {
   //
   this.TIMESERIES_DATE_FORMAT = 'YYYY-MM-DD HH:mm';
   this.DETAILS_DATE_FORMAT = 'MM/DD/YYYY HH:mm';
+  this.DATE_RANGE_CUSTOM = 'Custom Range';
+  this.DATE_RANGE_FORMAT = 'MMM D, YYYY hh:mm a';
 
   // modes
   this.MODE_METRIC = 'metric';
@@ -45,7 +47,6 @@ function Constants() {
   this.FEEDBACK_TYPE_ANOMALY = 'ANOMALY';
   this.FEEDBACK_TYPE_NOT_ANOMALY = 'NOT_ANOMALY';
   this.FEEDBACK_TYPE_ANOMALY_NO_ACTION = 'ANOMALY_NO_ACTION';
-
 
 }
 

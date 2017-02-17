@@ -5,6 +5,14 @@ function AnalysisView(analysisModel) {
   this.analysisModel = analysisModel;
   this.applyDataChangeEvent = new Event(this);
   this.viewParams = {granularity: "DAYS", dimension: "All", filters: {}};
+  this.baselineRange = {
+    'Last 24 Hours': [moment().subtract(1, 'days'), moment().subtract(1, 'days')],
+    'Yesterday': [moment().subtract(2, 'days'), moment().subtract(2, 'days')],
+    'Last 7 Days': [moment().subtract(13, 'days'), moment().subtract(7, 'days')],
+    'Last 30 Days': [moment().subtract(59, 'days'), moment().subtract(30, 'days')],
+    'This Month': [moment().subtract(1, 'month').startOf('month'), moment().subtract(1 , 'month').endOf('month')],
+    'Last Month': [moment().subtract(2, 'month').startOf('month'), moment().subtract(2, 'month').endOf('month')]
+  };
 }
 
 AnalysisView.prototype = {
@@ -15,7 +23,32 @@ AnalysisView.prototype = {
 
   render: function () {
     $("#analysis-place-holder").html(this.analysis_template_compiled);
-    var self = this;
+    const $currentRangeText = $('#current-range span');
+    const $baselineRangeText= $('#baseline-range span');
+    const $currentRange = $('#current-range');
+    const $baselineRange = $('#baseline-range');
+
+    const setBaselineRange = (start, end) => {
+      this.viewParams['baselineStart'] = start;
+      this.viewParams['baselineEnd'] = end;
+      $baselineRangeText.addClass("time-range").html(
+        `${start.format(constants.DATE_RANGE_FORMAT)} &mdash; ${end.format(constants.DATE_RANGE_FORMAT)}`);
+    };
+    const setCurrentRange = (start, end, rangeType = constants.DATE_RANGE_CUSTOM) => {
+      this.viewParams['currentStart'] = start;
+      this.viewParams['currentEnd'] = end;
+
+      if (rangeType === constants.DATE_RANGE_CUSTOM) {
+        $baselineRange.removeClass('disabled');
+      } else {
+        const [baselineStart, baselineEnd] = this.baselineRange[rangeType];
+        $baselineRange.addClass('disabled');
+        setBaselineRange(baselineStart, baselineEnd);
+      }
+      $currentRangeText.addClass("time-range").html(
+          `<span>${rangeType}</span> ${start.format(constants.DATE_RANGE_FORMAT)} &mdash; ${end.format(constants.DATE_RANGE_FORMAT)}`)
+    };
+
     // METRIC SELECTION
     var analysisMetricSelect = $('#analysis-metric-input').select2({
       theme: "bootstrap", placeholder: "search for Metric(s)", ajax: {
@@ -59,44 +92,28 @@ AnalysisView.prototype = {
       this.viewParams['metricId'] = metricId;
 
       // Now render the dimensions and filters for selected metric
-      this.renderGranularity(self.viewParams.metric.id);
-      this.renderDimensions(self.viewParams.metric.id);
-      this.renderFilters(self.viewParams.metric.id);
+      this.renderGranularity(this.viewParams.metric.id);
+      this.renderDimensions(this.viewParams.metric.id);
+      this.renderFilters(this.viewParams.metric.id);
     }).trigger('change');
 
     // TIME RANGE SELECTION
-    var current_start = self.analysisModel.currentStart
-    var current_end = self.analysisModel.currentEnd;
-    var baseline_start = self.analysisModel.baselineStart;
-    var baseline_end = self.analysisModel.baselineEnd;
+    var currentStart = this.analysisModel.currentStart;
+    var currentEnd = this.analysisModel.currentEnd;
+    var baselineStart = this.analysisModel.baselineStart;
+    var baselineEnd = this.analysisModel.baselineEnd;
 
-    current_range_cb(current_start, current_end);
-    baseline_range_cb(baseline_start, baseline_end);
+    setCurrentRange(currentStart, currentEnd);
+    setBaselineRange(baselineStart, baselineEnd);
 
-    this.renderDatePicker('#current-range', current_range_cb, current_start, current_end);
-    this.renderDatePicker('#baseline-range', baseline_range_cb, baseline_start, baseline_end);
-
-    function current_range_cb(start, end) {
-      self.viewParams['currentStart'] = start;
-      self.viewParams['currentEnd'] = end;
-      $('#current-range span').addClass("time-range").html(
-          start.format('MMM D, ') + start.format('hh:mm a') + '  &mdash;  ' + end.format('MMM D, ')
-          + end.format('hh:mm a'));
-    }
-
-    function baseline_range_cb(start, end) {
-      self.viewParams['baselineStart'] = start;
-      self.viewParams['baselineEnd'] = end;
-      $('#baseline-range span').addClass("time-range").html(
-          start.format('MMM D, ') + start.format('hh:mm a') + '  &mdash;  ' + end.format('MMM D, ')
-          + end.format('hh:mm a'));
-    }
+    this.renderDatePicker($currentRange, setCurrentRange, currentStart, currentEnd);
+    this.renderDatePicker($baselineRange, setBaselineRange, baselineStart, baselineEnd);
 
     this.setupListeners();
   },
 
-  renderDatePicker: function (domId, callbackFun, initialStart, initialEnd){
-    $(domId).daterangepicker({
+  renderDatePicker: function ($selector, callbackFun, initialStart, initialEnd){
+    $selector.daterangepicker({
       startDate: initialStart,
       endDate: initialEnd,
       dateLimit: {
