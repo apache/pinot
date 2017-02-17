@@ -119,5 +119,5 @@ public abstract class QueryScheduler {
     return queryExecutor;
   }
 
-  public ExecutorService getQueryRunners() { return queryRunners; }
+  public ExecutorService getWorkerExecutorService() { return queryWorkers; }
 }
