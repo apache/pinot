@@ -6,7 +6,8 @@ import java.util.Collections;
 import java.util.List;
 
 public class NoopDetectionModel extends AbstractDetectionModel {
-  @Override public List<RawAnomalyResultDTO> detect(AnomalyDetectionContext anomalyDetectionContext) {
+  @Override
+  public List<RawAnomalyResultDTO> detect(String metricName, AnomalyDetectionContext anomalyDetectionContext) {
     return Collections.emptyList();
   }
 }

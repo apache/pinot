@@ -91,14 +91,17 @@ public class BackwardAnomalyFunctionUtils {
     timeSeriesKey.setMetricName(metric);
     anomalyDetectionContext.setTimeSeriesKey(timeSeriesKey);
 
-    // Split metric time series to observed time series and baselines
-    List<Interval> intervals =
-        anomalyFunction.getTimeSeriesIntervals(windowStart.getMillis(), windowEnd.getMillis());
-    List<TimeSeries> timeSeriesList =
-        BackwardAnomalyFunctionUtils.splitSetsOfTimeSeries(timeSeries, metric, intervals);
-    anomalyDetectionContext.setCurrent(timeSeriesList.get(0));
-    timeSeriesList.remove(0);
-    anomalyDetectionContext.setBaselines(timeSeriesList);
+    // Split time series to observed time series and baselines for each metric
+    for (String metricName : anomalyFunction.getSpec().getMetrics()) {
+      List<Interval> intervals =
+          anomalyFunction.getTimeSeriesIntervals(windowStart.getMillis(), windowEnd.getMillis());
+      List<TimeSeries> timeSeriesList =
+          BackwardAnomalyFunctionUtils.splitSetsOfTimeSeries(timeSeries, metricName, intervals);
+      anomalyDetectionContext.setCurrent(metricName, timeSeriesList.get(0));
+      timeSeriesList.remove(0);
+      anomalyDetectionContext.setBaselines(metricName, timeSeriesList);
+    }
+
 
     return anomalyDetectionContext;
   }

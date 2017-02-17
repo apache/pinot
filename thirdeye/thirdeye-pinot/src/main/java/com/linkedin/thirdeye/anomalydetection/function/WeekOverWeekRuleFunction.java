@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.anomalydetection.function;
 
-import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
 import com.linkedin.thirdeye.anomalydetection.model.data.DataModel;
 import com.linkedin.thirdeye.anomalydetection.model.data.NoopDataModel;
 import com.linkedin.thirdeye.anomalydetection.model.data.SeasonalDataModel;
@@ -16,9 +15,7 @@ import com.linkedin.thirdeye.anomalydetection.model.prediction.SeasonalAveragePr
 import com.linkedin.thirdeye.anomalydetection.model.transform.MovingAverageSmoothingFunction;
 import com.linkedin.thirdeye.anomalydetection.model.transform.TransformationFunction;
 import com.linkedin.thirdeye.anomalydetection.model.transform.ZeroRemovalFunction;
-import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -64,6 +61,7 @@ public class WeekOverWeekRuleFunction extends AbstractModularizedAnomalyFunction
     currentTimeSeriesTransformationChain.add(zeroRemover);
     baselineTimeSeriesTransformationChain.add(zeroRemover);
 
+    // Add moving average smoothing transformation
     if (this.properties.containsKey(ENABLE_SMOOTHING)) {
       TransformationFunction movingAverageSoothingFunction = new MovingAverageSmoothingFunction();
       movingAverageSoothingFunction.init(this.properties);
