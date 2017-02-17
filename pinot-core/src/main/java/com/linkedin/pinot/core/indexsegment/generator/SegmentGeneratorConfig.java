@@ -25,7 +25,9 @@ import com.linkedin.pinot.core.data.readers.CSVRecordReaderConfig;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.data.readers.RecordReaderConfig;
 import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
+import com.linkedin.pinot.core.segment.DefaultSegmentNameConfig;
 import com.linkedin.pinot.core.segment.DefaultSegmentNameGenerator;
+import com.linkedin.pinot.core.segment.SegmentNameConfig;
 import com.linkedin.pinot.core.segment.SimpleSegmentNameGenerator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.startree.hll.HllConfig;
@@ -80,6 +82,7 @@ public class SegmentGeneratorConfig {
   private StarTreeIndexSpec _starTreeIndexSpec = null;
   private String _creatorVersion = null;
   private DefaultSegmentNameGenerator _segmentNameGenerator = new SimpleSegmentNameGenerator();
+  private DefaultSegmentNameConfig _segmentNameConfig = new SegmentNameConfig();
   private char _paddingCharacter = V1Constants.Str.DEFAULT_STRING_PAD_CHAR;
 
   private HllConfig _hllConfig = null;
@@ -118,6 +121,7 @@ public class SegmentGeneratorConfig {
     _hllConfig = config._hllConfig;
     _segmentVersion = config._segmentVersion;
     _segmentNameGenerator = config._segmentNameGenerator;
+    _segmentNameConfig = new SegmentNameConfig(_segmentTimeColumnName, _tableName, _segmentNamePostfix, _segmentName);
   }
 
   public SegmentGeneratorConfig(Schema schema) {
@@ -240,6 +244,7 @@ public class SegmentGeneratorConfig {
     return _segmentName;
   }
 
+  @Deprecated
   public void setSegmentName(String segmentName) {
     _segmentName = segmentName;
   }
@@ -410,8 +415,16 @@ public class SegmentGeneratorConfig {
     return _segmentNameGenerator;
   }
 
-  public void segSegmentNameGenerator(DefaultSegmentNameGenerator segmentNameGenerator) {
+  public void setSegmentNameGenerator(DefaultSegmentNameGenerator segmentNameGenerator) {
     _segmentNameGenerator = segmentNameGenerator;
+  }
+
+  public DefaultSegmentNameConfig getSegmentNameConfig() {
+    return _segmentNameConfig;
+  }
+
+  public void setSegmentNameConfig(DefaultSegmentNameConfig segmentNameConfig) {
+    _segmentNameConfig = segmentNameConfig;
   }
 
   @JsonIgnore

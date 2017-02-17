@@ -414,15 +414,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   }
 
   private void handlePostCreation() throws Exception {
-
-    if (config.getSegmentName() != null) {
-      segmentName = config.getSegmentName();
-    } else {
-      String timeColumn = config.getTimeColumnName();
-      SegmentNameConfig segmentNameConfig = new SegmentNameConfig(timeColumn, config.getTableName(), config.getSegmentNamePostfix());
-      segmentName = config.getSegmentNameGenerator()
-          .getSegmentName(statsCollector.getColumnProfileFor(timeColumn), segmentNameConfig);
-    }
+    String timeColumn = config.getTimeColumnName();
+    segmentName = config.getSegmentNameGenerator()
+        .getSegmentName(statsCollector.getColumnProfileFor(timeColumn), config.getSegmentNameConfig());
 
     // Write the index files to disk
     indexCreator.setSegmentName(segmentName);

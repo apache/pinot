@@ -18,18 +18,32 @@ package com.linkedin.pinot.core.segment;
 /**
  * DO NOT remove any getters, setters, or fields from this class otherwise it will be backwards incompatible.
  */
-public class SegmentNameConfig {
+public class SegmentNameConfig implements DefaultSegmentNameConfig {
   private String _timeColumnName;
   private String _tableName;
   private String _segmentNamePostfix;
+  private String _segmentName;
 
   public SegmentNameConfig() {
 
   }
-  public SegmentNameConfig(String timeColumnName, String tableName, String segmentNamePostfix) {
+  public SegmentNameConfig(String timeColumnName, String tableName, String segmentNamePostfix, String segmentName) {
     _timeColumnName = timeColumnName;
     _tableName = tableName;
     _segmentNamePostfix = segmentNamePostfix;
+    _segmentName = segmentName;
+  }
+
+  /**
+   * We have this here because this option is available in the current SegmentGeneratorConfig, and we don't want to take
+   * away this functionality in case users are setting their own segment names.
+   */
+  public void setSegmentName(String segmentName) {
+    _segmentName = segmentName;
+  }
+
+  public String getSegmentName() {
+    return _segmentName;
   }
 
   public String getTimeColumnName() {

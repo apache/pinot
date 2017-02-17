@@ -20,7 +20,11 @@ import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector
 
 
 public class SimpleSegmentNameGenerator implements DefaultSegmentNameGenerator {
-  public String getSegmentName(AbstractColumnStatisticsCollector statsCollector, SegmentNameConfig config) throws Exception {
+  public String getSegmentName(AbstractColumnStatisticsCollector statsCollector, DefaultSegmentNameConfig config) throws Exception {
+    String defaultSegmentName = config.getSegmentName();
+    if (defaultSegmentName != null) {
+      return defaultSegmentName;
+    }
     final String timeColumnName = config.getTimeColumnName();
     String segmentName;
     if (timeColumnName != null && timeColumnName.length() > 0) {

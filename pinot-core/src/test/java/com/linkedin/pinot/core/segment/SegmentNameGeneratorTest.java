@@ -29,9 +29,8 @@ public class SegmentNameGeneratorTest {
     ColumnMetadataTest columnMetadataTest = new ColumnMetadataTest();
     // Build the Segment metadata.
     SegmentGeneratorConfig config = columnMetadataTest.CreateSegmentConfigWithoutCreator();
-    config.setPaddingCharacter('\0');
-    config.setTableName("mytable");
-    config.setSegmentNamePostfix("postfix");
+    SegmentNameConfig segmentNameConfig = new SegmentNameConfig("daysSinceEpoch", "mytable", "postfix", null);
+    config.setSegmentNameConfig(segmentNameConfig);
     SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
     driver.build();
@@ -42,13 +41,23 @@ public class SegmentNameGeneratorTest {
     ColumnMetadataTest columnMetadataTest = new ColumnMetadataTest();
     // Build the Segment metadata.
     SegmentGeneratorConfig config = columnMetadataTest.CreateSegmentConfigWithoutCreator();
-    config.setTableName("mytable");
-    config.setSegmentNamePostfix("postfix");
-    config.setTimeColumnName(null);
+    SegmentNameConfig segmentNameConfig = new SegmentNameConfig(null, "mytable", "postfix", null);
+    config.setSegmentNameConfig(segmentNameConfig);
     SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
     driver.build();
     Assert.assertEquals(driver.getSegmentName(), "mytable_postfix");
   }
 
+  public void testSegmentAlreadyNamed() throws Exception {
+    ColumnMetadataTest columnMetadataTest = new ColumnMetadataTest();
+    // Build the Segment metadata.
+    SegmentGeneratorConfig config = columnMetadataTest.CreateSegmentConfigWithoutCreator();
+    SegmentNameConfig segmentNameConfig = new SegmentNameConfig("daysSinceEpoch", "mytable", "postfix", "ALREADYNAMEDBUTSHOULDBEDEPRECATED");
+    config.setSegmentNameConfig(segmentNameConfig);
+    SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    driver.init(config);
+    driver.build();
+    Assert.assertEquals(driver.getSegmentName(), "ALREADYNAMEDBUTSHOULDBEDEPRECATED");
+  }
 }
