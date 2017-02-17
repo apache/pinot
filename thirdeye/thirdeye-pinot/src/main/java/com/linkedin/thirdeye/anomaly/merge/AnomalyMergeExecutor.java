@@ -285,7 +285,6 @@ public class AnomalyMergeExecutor implements Runnable {
         }
       }
 
-      // TODO: Re-enable scaling factor for holiday effect
       // Transform Time Series
       List<ScalingFactor> scalingFactors = OverrideConfigHelper
           .getTimeSeriesScalingFactors(overrideConfigDAO, anomalyFunctionSpec.getCollection(),
