@@ -367,4 +367,47 @@ public class SegmentStatusCheckerTest {
     segmentStatusChecker.stop();
   }
 
+  @Test
+  public void noReplicas() throws Exception {
+    final String tableName = "myTable_REALTIME";
+    List<String> allTableNames = new ArrayList<String>();
+    allTableNames.add(tableName);
+    IdealState idealState = new IdealState(tableName);
+    idealState.setPartitionState("myTable_0", "pinot1", "OFFLINE");
+    idealState.setPartitionState("myTable_0", "pinot2", "OFFLINE");
+    idealState.setPartitionState("myTable_0", "pinot3", "OFFLINE");
+    idealState.setReplicas("0");
+    idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
+
+    HelixAdmin helixAdmin;
+    {
+      helixAdmin = mock(HelixAdmin.class);
+      when(helixAdmin.getResourceIdealState("StatusChecker",tableName)).thenReturn(idealState);
+      when(helixAdmin.getResourceExternalView("StatusChecker",tableName)).thenReturn(null);
+    }
+    {
+      helixResourceManager = mock(PinotHelixResourceManager.class);
+      when(helixResourceManager.isLeader()).thenReturn(true);
+      when(helixResourceManager.getAllPinotTableNames()).thenReturn(allTableNames);
+      when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
+      when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
+    }
+    {
+      config = mock(ControllerConf.class);
+      when(config.getStatusCheckerFrequencyInSeconds()).thenReturn(300);
+      when(config.getStatusCheckerWaitForPushTimeInSeconds()).thenReturn(300);
+    }
+    metricsRegistry = new MetricsRegistry();
+    controllerMetrics = new ControllerMetrics(metricsRegistry);
+    segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config);
+    segmentStatusChecker.setMetricsRegistry(controllerMetrics);
+    segmentStatusChecker.runSegmentMetrics();
+    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
+        ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
+    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
+        ControllerGauge.NUMBER_OF_REPLICAS), 0);
+    Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
+        ControllerGauge.PERCENT_OF_REPLICAS), 0);
+    segmentStatusChecker.stop();
+  }
 }

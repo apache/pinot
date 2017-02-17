@@ -242,8 +242,10 @@ public class SegmentStatusChecker {
       // Synchronization provided by Controller Gauge to make sure that only one thread updates the gauge
       _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.NUMBER_OF_REPLICAS,
           nReplicasExternal);
-      _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.PERCENT_OF_REPLICAS,
-          nReplicasExternal*100/nReplicasIdealMax);
+      if (nReplicasIdealMax != 0) {
+        _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.PERCENT_OF_REPLICAS,
+            nReplicasExternal * 100 / nReplicasIdealMax);
+      }
       _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.SEGMENTS_IN_ERROR_STATE,
           nErrors);
       if (nOffline > 0) {
