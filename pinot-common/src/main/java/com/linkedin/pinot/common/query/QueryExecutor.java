@@ -25,10 +25,26 @@ import com.linkedin.pinot.common.utils.DataTable;
 
 
 public interface QueryExecutor {
+  /**
+   * Initialize query executor
+   * @param queryExecutorConfig
+   * @param dataManager
+   * @param serverMetrics
+   * @throws ConfigurationException
+   */
   void init(Configuration queryExecutorConfig, DataManager dataManager, ServerMetrics serverMetrics) throws ConfigurationException;
 
   void start();
 
+  /**
+   * Execute a given query optionally parallelizing execution using provided
+   * executor service
+   * @param queryRequest Query to execute
+   * @param executorService executor service to use for parallelizing query execution
+   *                        across different segments
+   *
+   * @return
+   */
   DataTable processQuery(QueryRequest queryRequest, ExecutorService executorService);
 
   void shutDown();

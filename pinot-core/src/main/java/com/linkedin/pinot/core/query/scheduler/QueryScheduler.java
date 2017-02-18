@@ -30,6 +30,7 @@ import java.util.concurrent.ThreadFactory;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.PropertiesConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,7 +45,10 @@ public abstract class QueryScheduler {
 
   public static final String QUERY_RUNNER_CONFIG_KEY = "query_runner_threads";
   public static final String QUERY_WORKER_CONFIG_KEY = "query_worker_threads";
-
+  // set the main query runner priority higher than NORM but lower than MAX
+  // because if a query is complete we want to deserialize and return response as soon
+  // as possible
+  private static final int QUERY_RUNNER_THREAD_PRIORITY = 7;
   public static final int DEFAULT_QUERY_RUNNER_THREADS;
   public static final int DEFAULT_QUERY_WORKER_THREADS;
 
@@ -73,14 +77,6 @@ public abstract class QueryScheduler {
     DEFAULT_QUERY_WORKER_THREADS = 2 * numCores;
   }
 
-  public QueryScheduler(@Nullable QueryExecutor queryExecutor) {
-    numQueryRunnerThreads = DEFAULT_QUERY_RUNNER_THREADS;
-    numQueryWorkerThreads = DEFAULT_QUERY_WORKER_THREADS;
-    this.queryExecutor = queryExecutor;
-    queryRunners = MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(numQueryRunnerThreads));
-    queryWorkers = MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(numQueryWorkerThreads));
-  }
-
   /**
    * Constructor to initialize QueryScheduler based on scheduler configuration.
    * The configuration variables can control the size of query executors per servers.
@@ -101,7 +97,7 @@ public abstract class QueryScheduler {
         numQueryWorkerThreads);
     // pqr -> pinot query runner (to give short names)
     ThreadFactory queryRunnerFactory = new ThreadFactoryBuilder().setDaemon(false)
-        .setPriority(7)
+        .setPriority(QUERY_RUNNER_THREAD_PRIORITY)
         .setNameFormat("pqr-%d")
         .build();
     queryRunners = MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(numQueryRunnerThreads, queryRunnerFactory));
@@ -114,6 +110,11 @@ public abstract class QueryScheduler {
     queryWorkers = MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(numQueryWorkerThreads, queryWorkersFactory));
     this.queryExecutor = queryExecutor;
   }
+
+  public QueryScheduler(@Nullable QueryExecutor queryExecutor) {
+    this(new PropertiesConfiguration(), queryExecutor);
+  }
+
 
   public abstract ListenableFuture<DataTable> submit(@Nonnull QueryRequest queryRequest);
 
