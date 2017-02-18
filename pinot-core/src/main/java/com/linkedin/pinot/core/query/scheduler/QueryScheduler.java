@@ -99,15 +99,17 @@ public abstract class QueryScheduler {
     numQueryWorkerThreads = schedulerConfig.getInt(QUERY_WORKER_CONFIG_KEY, DEFAULT_QUERY_WORKER_THREADS);
     LOGGER.info("Initializing with {} query runner threads and {} worker threads", numQueryRunnerThreads,
         numQueryWorkerThreads);
+    // pqr -> pinot query runner (to give short names)
     ThreadFactory queryRunnerFactory = new ThreadFactoryBuilder().setDaemon(false)
         .setPriority(7)
-        .setNameFormat("query-runner-%d")
+        .setNameFormat("pqr-%d")
         .build();
     queryRunners = MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(numQueryRunnerThreads, queryRunnerFactory));
 
+    // pqw -> pinot query workers
     ThreadFactory queryWorkersFactory = new ThreadFactoryBuilder().setDaemon(false)
         .setPriority(Thread.NORM_PRIORITY)
-        .setNameFormat("query-worker-%d")
+        .setNameFormat("pqw-%d")
         .build();
     queryWorkers = MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(numQueryWorkerThreads, queryWorkersFactory));
     this.queryExecutor = queryExecutor;
