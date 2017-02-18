@@ -15,24 +15,12 @@
  */
 package com.linkedin.pinot.core.segment;
 
+import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector;
+
+
 /**
- * An interface for segment name config so that we can pass in different naming schemes if we were to call this from Hadoop.
+ * An interface that allows generates names for segments depending on the naming scheme.
  */
-public interface SegmentNameConfig {
-  @Deprecated
-  public void setSegmentName(String segmentName);
-
-  public String getSegmentName();
-
-  public String getTableName();
-
-  public String getSegmentNamePostfix();
-
-  public String getTimeColumnName();
-
-  public void setTableName(String tableName);
-
-  public void setSegmentNamePostfix(String segmentNamePostfix);
-
-  public void setTimeColumnName(String timeColumnName);
+public interface SegmentNameGenerator {
+  public String getSegmentName(AbstractColumnStatisticsCollector timeColStatsCollector, SegmentNameConfig segmentNameConfig) throws Exception;
 }

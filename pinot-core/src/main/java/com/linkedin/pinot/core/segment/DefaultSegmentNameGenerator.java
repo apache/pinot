@@ -15,12 +15,27 @@
  */
 package com.linkedin.pinot.core.segment;
 
+import com.linkedin.pinot.common.utils.SegmentNameBuilder;
 import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector;
 
 
-/**
- * An interface that allows generates names for segments depending on the naming scheme.
- */
-public interface DefaultSegmentNameGenerator {
-  String getSegmentName(AbstractColumnStatisticsCollector timeColStatsCollector, DefaultSegmentNameConfig segmentNameConfig) throws Exception;
+public class DefaultSegmentNameGenerator implements SegmentNameGenerator {
+  public String getSegmentName(AbstractColumnStatisticsCollector statsCollector, SegmentNameConfig config) throws Exception {
+    String defaultSegmentName = config.getSegmentName();
+    if (defaultSegmentName != null) {
+      return defaultSegmentName;
+    }
+    final String timeColumnName = config.getTimeColumnName();
+    String segmentName;
+    if (timeColumnName != null && timeColumnName.length() > 0) {
+      final Object minTimeValue = statsCollector.getMinValue();
+      final Object maxTimeValue = statsCollector.getMaxValue();
+      segmentName = SegmentNameBuilder
+          .buildBasic(config.getTableName(), minTimeValue, maxTimeValue, config.getSegmentNamePostfix());
+    }
+    else {
+      segmentName = SegmentNameBuilder.buildBasic(config.getTableName(), config.getSegmentNamePostfix());
+    }
+    return segmentName;
+  }
 }

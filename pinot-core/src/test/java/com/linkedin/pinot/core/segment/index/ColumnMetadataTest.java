@@ -67,6 +67,17 @@ public class ColumnMetadataTest {
     return config;
   }
 
+  public SegmentGeneratorConfig createSimpleSegmentConfig()
+      throws Exception {
+    final String filePath =
+        TestUtils.getFileFromResourceUrl(ColumnMetadataTest.class.getClassLoader().getResource(AVRO_DATA));
+    // Intentionally changed this to TimeUnit.Hours to make it non-default for testing.
+    SegmentGeneratorConfig config =
+        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, null,
+            null, "testTable");
+    return config;
+  }
+
   public SegmentGeneratorConfig createSegmentConfigWithCreator() throws Exception {
     SegmentGeneratorConfig config = CreateSegmentConfigWithoutCreator();
     config.setCreatorVersion(CREATOR_VERSION);

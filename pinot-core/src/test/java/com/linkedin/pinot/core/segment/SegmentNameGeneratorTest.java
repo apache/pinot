@@ -22,14 +22,15 @@ import com.linkedin.pinot.core.segment.index.ColumnMetadataTest;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-@Test
-public class SegmentNameGeneratorTest {
+public class SegmentNameGeneratorTest extends ColumnMetadataTest{
 
+  @Test
   public void testPostfix() throws Exception {
     ColumnMetadataTest columnMetadataTest = new ColumnMetadataTest();
     // Build the Segment metadata.
     SegmentGeneratorConfig config = columnMetadataTest.CreateSegmentConfigWithoutCreator();
-    SegmentNameConfig segmentNameConfig = new SegmentNameConfig("daysSinceEpoch", "mytable", "postfix", null);
+    DefaultSegmentNameConfig
+        segmentNameConfig = new DefaultSegmentNameConfig("daysSinceEpoch", "mytable", "postfix");
     config.setSegmentNameConfig(segmentNameConfig);
     SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
@@ -37,11 +38,12 @@ public class SegmentNameGeneratorTest {
      Assert.assertEquals(driver.getSegmentName(), "mytable_1756015683_1756015683_postfix");
   }
 
+  @Test
   public void testNullTimeColumn() throws Exception {
     ColumnMetadataTest columnMetadataTest = new ColumnMetadataTest();
     // Build the Segment metadata.
     SegmentGeneratorConfig config = columnMetadataTest.CreateSegmentConfigWithoutCreator();
-    SegmentNameConfig segmentNameConfig = new SegmentNameConfig(null, "mytable", "postfix", null);
+    DefaultSegmentNameConfig segmentNameConfig = new DefaultSegmentNameConfig(null, "mytable", "postfix");
     config.setSegmentNameConfig(segmentNameConfig);
     SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
@@ -49,15 +51,41 @@ public class SegmentNameGeneratorTest {
     Assert.assertEquals(driver.getSegmentName(), "mytable_postfix");
   }
 
-  public void testSegmentAlreadyNamed() throws Exception {
+  @Test
+  public void testAlreadyNamedSegmentUsingDefaultSegmentNameConfig() throws Exception {
     ColumnMetadataTest columnMetadataTest = new ColumnMetadataTest();
     // Build the Segment metadata.
     SegmentGeneratorConfig config = columnMetadataTest.CreateSegmentConfigWithoutCreator();
-    SegmentNameConfig segmentNameConfig = new SegmentNameConfig("daysSinceEpoch", "mytable", "postfix", "ALREADYNAMEDBUTSHOULDBEDEPRECATED");
+    DefaultSegmentNameConfig segmentNameConfig = new DefaultSegmentNameConfig("daysSinceEpoch", "mytable", "postfix");
+    segmentNameConfig.setSegmentName("ALREADYNAMEDBUTSHOULDBEDEPRECATED");
     config.setSegmentNameConfig(segmentNameConfig);
     SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
     driver.build();
     Assert.assertEquals(driver.getSegmentName(), "ALREADYNAMEDBUTSHOULDBEDEPRECATED");
+  }
+
+  @Test
+  public void testAlreadyNamedSegmentWithDefaultConstructor() throws Exception {
+    ColumnMetadataTest columnMetadataTest = new ColumnMetadataTest();
+    // Build the Segment metadata.
+    SegmentGeneratorConfig config = columnMetadataTest.CreateSegmentConfigWithoutCreator();
+    DefaultSegmentNameConfig segmentNameConfig = new DefaultSegmentNameConfig("ALREADYNAMEDBUTSHOULDBEDEPRECATED");
+    config.setSegmentNameConfig(segmentNameConfig);
+    SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    driver.init(config);
+    driver.build();
+    Assert.assertEquals(driver.getSegmentName(), "ALREADYNAMEDBUTSHOULDBEDEPRECATED");
+  }
+
+  @Test
+  public void testDefaultSegmentNameConfig() throws Exception {
+    ColumnMetadataTest columnMetadataTest = new ColumnMetadataTest();
+    // Build the Segment metadata.
+    SegmentGeneratorConfig config = columnMetadataTest.createSimpleSegmentConfig();
+    SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    driver.init(config);
+    driver.build();
+    Assert.assertEquals(driver.getSegmentName(), "testTable_");
   }
 }

@@ -25,10 +25,10 @@ import com.linkedin.pinot.core.data.readers.CSVRecordReaderConfig;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.data.readers.RecordReaderConfig;
 import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
+import com.linkedin.pinot.core.segment.SegmentNameConfig;
+import com.linkedin.pinot.core.segment.SegmentNameGenerator;
 import com.linkedin.pinot.core.segment.DefaultSegmentNameConfig;
 import com.linkedin.pinot.core.segment.DefaultSegmentNameGenerator;
-import com.linkedin.pinot.core.segment.SegmentNameConfig;
-import com.linkedin.pinot.core.segment.SimpleSegmentNameGenerator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.startree.hll.HllConfig;
 import java.io.File;
@@ -81,8 +81,8 @@ public class SegmentGeneratorConfig {
   private String _starTreeIndexSpecFile = null;
   private StarTreeIndexSpec _starTreeIndexSpec = null;
   private String _creatorVersion = null;
-  private DefaultSegmentNameGenerator _segmentNameGenerator = new SimpleSegmentNameGenerator();
-  private DefaultSegmentNameConfig _segmentNameConfig = new SegmentNameConfig();
+  private SegmentNameGenerator _segmentNameGenerator = new DefaultSegmentNameGenerator();
+  private SegmentNameConfig _segmentNameConfig = new DefaultSegmentNameConfig(null, null, null);
   private char _paddingCharacter = V1Constants.Str.DEFAULT_STRING_PAD_CHAR;
 
   private HllConfig _hllConfig = null;
@@ -121,7 +121,8 @@ public class SegmentGeneratorConfig {
     _hllConfig = config._hllConfig;
     _segmentVersion = config._segmentVersion;
     _segmentNameGenerator = config._segmentNameGenerator;
-    _segmentNameConfig = new SegmentNameConfig(_segmentTimeColumnName, _tableName, _segmentNamePostfix, _segmentName);
+    _segmentNameConfig = new DefaultSegmentNameConfig(_segmentTimeColumnName, _tableName, _segmentNamePostfix);
+    _segmentNameConfig.setSegmentName(_segmentName);
   }
 
   public SegmentGeneratorConfig(Schema schema) {
@@ -238,6 +239,7 @@ public class SegmentGeneratorConfig {
 
   public void setTableName(String tableName) {
     _tableName = tableName;
+    _segmentNameConfig.setTableName(tableName);
   }
 
   public String getSegmentName() {
@@ -247,6 +249,7 @@ public class SegmentGeneratorConfig {
   @Deprecated
   public void setSegmentName(String segmentName) {
     _segmentName = segmentName;
+    _segmentNameConfig.setSegmentName(segmentName);
   }
 
   public String getCreatorVersion() {
@@ -271,6 +274,7 @@ public class SegmentGeneratorConfig {
 
   public void setSegmentNamePostfix(String postfix) {
     _segmentNamePostfix = postfix;
+    _segmentNameConfig.setSegmentNamePostfix(postfix);
   }
 
   public String getTimeColumnName() {
@@ -282,6 +286,7 @@ public class SegmentGeneratorConfig {
 
   public void setTimeColumnName(String timeColumnName) {
     _segmentTimeColumnName = timeColumnName;
+    _segmentNameConfig.setTimeColumnName(timeColumnName);
   }
 
   public TimeUnit getSegmentTimeUnit() {
@@ -411,19 +416,19 @@ public class SegmentGeneratorConfig {
     _hllConfig = hllConfig;
   }
 
-  public DefaultSegmentNameGenerator getSegmentNameGenerator() {
+  public SegmentNameGenerator getSegmentNameGenerator() {
     return _segmentNameGenerator;
   }
 
-  public void setSegmentNameGenerator(DefaultSegmentNameGenerator segmentNameGenerator) {
+  public void setSegmentNameGenerator(SegmentNameGenerator segmentNameGenerator) {
     _segmentNameGenerator = segmentNameGenerator;
   }
 
-  public DefaultSegmentNameConfig getSegmentNameConfig() {
+  public SegmentNameConfig getSegmentNameConfig() {
     return _segmentNameConfig;
   }
 
-  public void setSegmentNameConfig(DefaultSegmentNameConfig segmentNameConfig) {
+  public void setSegmentNameConfig(SegmentNameConfig segmentNameConfig) {
     _segmentNameConfig = segmentNameConfig;
   }
 

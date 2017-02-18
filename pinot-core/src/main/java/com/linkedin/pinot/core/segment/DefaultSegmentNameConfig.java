@@ -16,24 +16,60 @@
 package com.linkedin.pinot.core.segment;
 
 /**
- * An interface for segment name config so that we can pass in different naming schemes if we were to call this from Hadoop.
+ * DO NOT remove any getters, setters, or fields from this class otherwise it will be backwards incompatible.
  */
-public interface DefaultSegmentNameConfig {
+public class DefaultSegmentNameConfig implements SegmentNameConfig {
+  private String _timeColumnName;
+  private String _tableName;
+  private String _segmentNamePostfix;
+  private String _segmentName;
+
+  public DefaultSegmentNameConfig(String timeColumnName, String tableName, String segmentNamePostfix) {
+    _timeColumnName = timeColumnName;
+    _tableName = tableName;
+    _segmentNamePostfix = segmentNamePostfix;
+  }
+
+  public DefaultSegmentNameConfig(String segmentName) {
+    _segmentName = segmentName;
+  }
+
+  /**
+   * We have this here because this option is available in the current SegmentGeneratorConfig, and we don't want to take
+   * away this functionality in case users are setting their own segment names. This option is deprecated and will be
+   * removed soon.
+   */
   @Deprecated
-  void setSegmentName(String segmentName);
+  public void setSegmentName(String segmentName) {
+    _segmentName = segmentName;
+  }
 
-  String getSegmentName();
+  public String getSegmentName() {
+    return _segmentName;
+  }
 
-  String getTimeColumnName();
+  public String getTimeColumnName() {
+    return _timeColumnName;
+  }
 
-  void setTimeColumnName(String timeColumnName);
+  public String getTableName() {
+    return _tableName;
+  }
 
-  String getTableName();
+  public String getSegmentNamePostfix() {
+    return _segmentNamePostfix;
+  }
 
-  void setTableName(String tableName);
+  public void setTimeColumnName(String timeColumnName) {
+    _timeColumnName = timeColumnName;
+  }
 
-  String getSegmentNamePostfix();
+  public void setTableName(String tableName) {
+    _tableName = tableName;
+  }
 
-  void setSegmentNamePostfix(String segmentNamePostfix);
+  public void setSegmentNamePostfix(String segmentNamePostfix) {
+    _segmentNamePostfix = segmentNamePostfix;
+  }
 
 }
