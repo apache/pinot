@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
+import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -86,7 +87,7 @@ public class DataResource {
   private final QueryCache queryCache;
   private AnomaliesResource anomaliesResoure;
 
-  public DataResource() {
+  public DataResource(AlertFilterFactory alertFilterFactory) {
     metricConfigDAO = daoRegistry.getMetricConfigDAO();
     datasetConfigDAO = daoRegistry.getDatasetConfigDAO();
     dashboardConfigDAO = daoRegistry.getDashboardConfigDAO();
@@ -94,7 +95,7 @@ public class DataResource {
     this.queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
     this.collectionMaxDataTimeCache = CACHE_REGISTRY_INSTANCE.getCollectionMaxDataTimeCache();
     this.dimensionsFilterCache = CACHE_REGISTRY_INSTANCE.getDimensionFiltersCache();
-    this.anomaliesResoure = new AnomaliesResource();
+    this.anomaliesResoure = new AnomaliesResource(alertFilterFactory);
   }
 
 //------------- endpoints to metric config -------------

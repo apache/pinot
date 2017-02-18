@@ -48,6 +48,8 @@ public class ThirdEyeAnomalyApplication
   private AnomalyMergeExecutor anomalyMergeExecutor = null;
   private AutoLoadPinotMetricsService autoLoadPinotMetricsService = null;
   private DataCompletenessScheduler dataCompletenessScheduler = null;
+  private AlertFilterFactory alertFilterFactory = null;
+  private AlertFilterAutotuneFactory alertFilterAutotuneFactory = null;
 
   public static void main(final String[] args) throws Exception {
     List<String> argList = new ArrayList<>(Arrays.asList(args));
@@ -91,8 +93,10 @@ public class ThirdEyeAnomalyApplication
         }
         if (config.isScheduler()) {
           detectionJobScheduler = new DetectionJobScheduler();
+          alertFilterFactory = new AlertFilterFactory(config.getAlertFilterConfigPath());
+          alertFilterAutotuneFactory = new AlertFilterAutotuneFactory(config.getFilterAutotuneConfigPath());
           detectionJobScheduler.start();
-          environment.jersey().register(new DetectionJobResource(detectionJobScheduler, config.getFilterAutotuneConfigPath(), config.getAlertFilterConfigPath()));
+          environment.jersey().register(new DetectionJobResource(detectionJobScheduler, alertFilterFactory, alertFilterAutotuneFactory));
           environment.jersey().register(new AnomalyFunctionResource(config.getFunctionConfigPath()));
         }
         if (config.isMonitor()) {

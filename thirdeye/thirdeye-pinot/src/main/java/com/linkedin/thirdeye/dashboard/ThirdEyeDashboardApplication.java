@@ -75,8 +75,8 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new SummaryResource());
     env.jersey().register(new ThirdEyeResource());
     env.jersey().register(new OverrideConfigResource());
-    env.jersey().register(new DataResource());
-    env.jersey().register(new AnomaliesResource());
+    env.jersey().register(new DataResource(alertFilterFactory));
+    env.jersey().register(new AnomaliesResource(alertFilterFactory));
     env.jersey().register(new TimeSeriesResource());
     env.jersey().register(new OnboardResource());
   }

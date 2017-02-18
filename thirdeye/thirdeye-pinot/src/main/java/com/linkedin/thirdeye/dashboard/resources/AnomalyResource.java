@@ -175,8 +175,9 @@ public class AnomalyResource {
     }
 
     if (applyAlertFiler) {
+      // TODO: why need try catch?
       try {
-        anomalyResults = AlertFilterHelper.applyFiltrationRule(anomalyResults);
+        anomalyResults = AlertFilterHelper.applyFiltrationRule(anomalyResults, alertFilterFactory);
       } catch (Exception e) {
         LOG.warn(
             "Failed to apply alert filters on anomalies for dataset:{}, metric:{}, start:{}, end:{}, exception:{}",

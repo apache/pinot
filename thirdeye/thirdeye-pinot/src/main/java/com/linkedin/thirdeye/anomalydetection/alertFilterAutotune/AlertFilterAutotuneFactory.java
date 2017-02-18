@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.anomalydetection.alertFilterAutotune;
 
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 import java.io.FileInputStream;
@@ -15,9 +16,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-/**
- * Created by ychung on 2/8/17.
- */
 public class AlertFilterAutotuneFactory {
   private static Logger LOGGER = LoggerFactory.getLogger(AlertFilterAutotuneFactory.class);
   private final Properties props;
@@ -28,7 +26,7 @@ public class AlertFilterAutotuneFactory {
       InputStream input = new FileInputStream(functionConfigPath);
       loadPropertiesFromInputStream(input);
     } catch (FileNotFoundException e) {
-      LOGGER.error("File {} not found", functionConfigPath, e);
+      LOGGER.error("Alert Filter Property File {} not found", functionConfigPath, e);
     }
 
   }
@@ -42,7 +40,7 @@ public class AlertFilterAutotuneFactory {
     try {
       props.load(input);
     } catch (IOException e) {
-      LOGGER.error("Error loading the functions from config", e);
+      LOGGER.error("Error loading the alert filter autotune class from config", e);
     } finally {
       IOUtils.closeQuietly(input);
     }
@@ -53,13 +51,13 @@ public class AlertFilterAutotuneFactory {
     }
   }
 
-  public AlertFilterAutoTune fromSpec(AnomalyFunctionDTO anomalyFunctionSpec) throws Exception {
+  public AlertFilterAutoTune initiateAutoTune(AnomalyFunctionDTO anomalyFunctionSpec) throws Exception {
     AlertFilterAutoTune alertFilterAutoTune = null;
-    String type = anomalyFunctionSpec.getType();
-    if (!props.containsKey(type)) {
-      throw new IllegalArgumentException("Unsupported type " + type);
+    String alertFilterType = anomalyFunctionSpec.getAlertFilter().get(AlertFilterFactory.FILTER_TYPE_KEY).toUpperCase();
+    if (!props.containsKey(alertFilterType)) {
+      throw new IllegalArgumentException("Unsupported type " + alertFilterType);
     }
-    String className = props.getProperty(type);
+    String className = props.getProperty(alertFilterType);
     alertFilterAutoTune = (AlertFilterAutoTune) Class.forName(className).newInstance();
 
     return alertFilterAutoTune;

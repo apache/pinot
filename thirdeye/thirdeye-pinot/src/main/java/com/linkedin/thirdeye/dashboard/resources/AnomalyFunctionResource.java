@@ -52,7 +52,6 @@ public class AnomalyFunctionResource {
   public AnomalyFunctionResource(String functionConfigPath) {
     buildFunctionMetadata(functionConfigPath);
     this.anomalyFunctionFactory = new AnomalyFunctionFactory(functionConfigPath);
-
   }
 
   private void buildFunctionMetadata(String functionConfigPath) {

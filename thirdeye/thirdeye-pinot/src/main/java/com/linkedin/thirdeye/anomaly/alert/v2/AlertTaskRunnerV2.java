@@ -21,6 +21,7 @@ import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
+import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
 import freemarker.template.TemplateExceptionHandler;
@@ -53,6 +54,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
 
   private AlertConfigDTO alertConfig;
   private ThirdEyeAnomalyConfiguration thirdeyeConfig;
+  private AlertFilterFactory alertFilterFactory;
 
   public AlertTaskRunnerV2() {
     anomalyMergedResultDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
@@ -67,6 +69,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
     AlertTaskInfo alertTaskInfo = (AlertTaskInfo) taskInfo;
     alertConfig = alertTaskInfo.getAlertConfigDTO();
     thirdeyeConfig = taskContext.getThirdEyeAnomalyConfiguration();
+    alertFilterFactory = new AlertFilterFactory(thirdeyeConfig.getAlertFilterConfigPath());
 
     try {
       LOG.info("Begin executing task {}", taskInfo);
@@ -88,7 +91,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
     sendScheduledDataReport();
   }
 
-  private void sendAnomalyReport() {
+  private void sendAnomalyReport() throws Exception{
     AlertConfigBean.EmailConfig emailConfig = alertConfig.getEmailConfig();
     if (emailConfig != null && emailConfig.getFunctionIds() != null) {
       List<Long> functionIds = alertConfig.getEmailConfig().getFunctionIds();
@@ -103,7 +106,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
       }
       // apply filtration rule
       List<MergedAnomalyResultDTO> results =
-          AlertFilterHelper.applyFiltrationRule(mergedAnomaliesAllResults);
+          AlertFilterHelper.applyFiltrationRule(mergedAnomaliesAllResults, alertFilterFactory);
 
       if (results.isEmpty()) {
         LOG.info("Zero anomalies found, skipping sending email");

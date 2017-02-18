@@ -8,6 +8,7 @@ import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewResponse;
 import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
+import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
@@ -56,6 +57,7 @@ public class AlertTaskRunner implements TaskRunner {
   private DateTime windowStart;
   private DateTime windowEnd;
   private ThirdEyeAnomalyConfiguration thirdeyeConfig;
+  private AlertFilterFactory alertFilterFactory;
 
   public static final TimeZone DEFAULT_TIME_ZONE = TimeZone.getTimeZone("America/Los_Angeles");
   public static final String CHARSET = "UTF-8";
@@ -73,6 +75,7 @@ public class AlertTaskRunner implements TaskRunner {
     windowStart = alertTaskInfo.getWindowStartTime();
     windowEnd = alertTaskInfo.getWindowEndTime();
     thirdeyeConfig = taskContext.getThirdEyeAnomalyConfiguration();
+    alertFilterFactory = new AlertFilterFactory(thirdeyeConfig.getAlertFilterConfigPath());
 
     try {
       LOG.info("Begin executing task {}", taskInfo);
@@ -97,7 +100,7 @@ public class AlertTaskRunner implements TaskRunner {
             alertConfig.getId());
 
     // apply filtration rule
-    List<MergedAnomalyResultDTO> results = AlertFilterHelper.applyFiltrationRule(allResults);
+    List<MergedAnomalyResultDTO> results = AlertFilterHelper.applyFiltrationRule(allResults, alertFilterFactory);
 
     if (results.isEmpty() && !alertConfig.isSendZeroAnomalyEmail()) {
       LOG.info("Zero anomalies found, skipping sending email");
