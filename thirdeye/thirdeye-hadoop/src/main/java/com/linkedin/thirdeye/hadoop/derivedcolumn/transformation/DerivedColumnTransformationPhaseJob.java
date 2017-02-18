@@ -21,6 +21,7 @@ import static com.linkedin.thirdeye.hadoop.derivedcolumn.transformation.DerivedC
 import static com.linkedin.thirdeye.hadoop.derivedcolumn.transformation.DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_THIRDEYE_CONFIG;
 import static com.linkedin.thirdeye.hadoop.derivedcolumn.transformation.DerivedColumnTransformationPhaseConstants.DERIVED_COLUMN_TRANSFORMATION_PHASE_TOPK_PATH;
 
+import java.io.DataInput;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -136,7 +137,7 @@ public class DerivedColumnTransformationPhaseJob extends Configured {
       topKDimensionValues = new TopKDimensionValues();
       if (fs.exists(topKPath)) {
         FSDataInputStream topkValuesStream = fs.open(topKPath);
-        topKDimensionValues = OBJECT_MAPPER.readValue(topkValuesStream, TopKDimensionValues.class);
+        topKDimensionValues = OBJECT_MAPPER.readValue((DataInput) topkValuesStream, TopKDimensionValues.class);
         topkValuesStream.close();
       }
       topKDimensionsMap = topKDimensionValues.getTopKDimensions();
