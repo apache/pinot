@@ -26,6 +26,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.avro.file.DataFileStream;
@@ -78,6 +80,7 @@ public class RealtimeQueriesSentinelTest {
   private static QueryExecutor QUERY_EXECUTOR;
   private static TestingServerPropertiesBuilder CONFIG_BUILDER;
   private static AvroRecordToPinotRowGenerator AVRO_RECORD_TRANSFORMER;
+  private static ExecutorService queryRunners = Executors.newFixedThreadPool(20);
 
   @BeforeClass
   public void setup() throws Exception {
@@ -120,7 +123,7 @@ public class RealtimeQueriesSentinelTest {
       instanceRequest.setSearchSegments(new ArrayList<String>());
       instanceRequest.getSearchSegments().add("testTable_testTable");
       QueryRequest queryRequest = new QueryRequest(instanceRequest, TableDataManagerProvider.getServerMetrics());
-      DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest);
+      DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest, queryRunners);
       instanceResponseMap.clear();
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
       final BrokerResponseNative brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
@@ -157,7 +160,7 @@ public class RealtimeQueriesSentinelTest {
     instanceRequest.setSearchSegments(new ArrayList<String>());
     instanceRequest.getSearchSegments().add("testTable_testTable");
     QueryRequest queryRequest = new QueryRequest(instanceRequest, TableDataManagerProvider.getServerMetrics());
-    DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest);
+    DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest, queryRunners);
     instanceResponseMap.clear();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
     BrokerResponseNative brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
@@ -178,7 +181,7 @@ public class RealtimeQueriesSentinelTest {
       instanceRequest.setSearchSegments(new ArrayList<String>());
       instanceRequest.getSearchSegments().add("testTable_testTable");
       QueryRequest queryRequest = new QueryRequest(instanceRequest, TableDataManagerProvider.getServerMetrics());
-      DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest);
+      DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest, queryRunners);
       instanceResponseMap.clear();
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
       Map<Object, Double> expected = groupBy.groupResults;

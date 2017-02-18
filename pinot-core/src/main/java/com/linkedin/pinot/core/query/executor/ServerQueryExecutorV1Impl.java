@@ -43,6 +43,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.slf4j.Logger;
@@ -86,7 +87,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   }
 
   @Override
-  public DataTable processQuery(final QueryRequest queryRequest) {
+  public DataTable processQuery(final QueryRequest queryRequest, ExecutorService executorService) {
     TimerContext timerContext = queryRequest.getTimerContext();
     TimerContext.Timer schedulerWaitTimer = timerContext.getPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT);
     if (schedulerWaitTimer != null) {
@@ -116,8 +117,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
       TimerContext.Timer planBuildTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.BUILD_QUERY_PLAN);
       final Plan globalQueryPlan = _planMaker.makeInterSegmentPlan(queryableSegmentDataManagerList, brokerRequest,
-          _instanceDataManager.getTableDataManager(brokerRequest.getQuerySource().getTableName()).getExecutorService(),
-          getResourceTimeOut(instanceRequest.getQuery()));
+          executorService, getResourceTimeOut(instanceRequest.getQuery()));
       planBuildTimer.stopAndRecord();
 
       if (_printQueryPlan) {
@@ -160,13 +160,11 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
           .put(DataTable.TRACE_INFO_METADATA_KEY, TraceContext.getTraceInfoOfRequestId(instanceRequest.getRequestId()));
       return dataTable;
     } finally {
-      if (_instanceDataManager.getTableDataManager(instanceRequest.getQuery().getQuerySource().getTableName()) != null) {
-        if (queryableSegmentDataManagerList != null) {
+      TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(queryRequest.getTableName());
+      if (tableDataManager != null && queryableSegmentDataManagerList != null) {
           for (SegmentDataManager segmentDataManager : queryableSegmentDataManagerList) {
-            _instanceDataManager.getTableDataManager(instanceRequest.getQuery().getQuerySource().getTableName())
-                .releaseSegment(segmentDataManager);
+            tableDataManager.releaseSegment(segmentDataManager);
           }
-        }
       }
       TraceContext.unregister(instanceRequest);
     }

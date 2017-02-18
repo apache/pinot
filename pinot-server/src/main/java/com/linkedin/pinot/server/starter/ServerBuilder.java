@@ -23,15 +23,15 @@ import com.linkedin.pinot.core.data.manager.offline.TableDataManagerProvider;
 import com.linkedin.pinot.core.operator.transform.TransformUtils;
 import com.linkedin.pinot.core.operator.transform.function.TransformFunctionFactory;
 import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
+import com.linkedin.pinot.core.query.scheduler.QuerySchedulerFactory;
 import com.linkedin.pinot.server.conf.NettyServerConfig;
 import com.linkedin.pinot.server.conf.ServerConf;
-import com.linkedin.pinot.server.request.SimpleRequestHandlerFactory;
+import com.linkedin.pinot.server.request.ScheduledRequestHandler;
 import com.linkedin.pinot.transport.netty.NettyServer;
 import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
 import com.linkedin.pinot.transport.netty.NettyTCPServer;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
-import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
@@ -147,20 +147,17 @@ public class ServerBuilder {
   public QueryScheduler buildQueryScheduler(QueryExecutor queryExecutor)
       throws ClassNotFoundException, NoSuchMethodException, IllegalAccessException, InvocationTargetException,
              InstantiationException {
-    String querySchedulerClassName = _serverConf.getQuerySchedulerClassName();
-    LOGGER.info("Using query scheduler class: {}", querySchedulerClassName);
-    Constructor<?> schedulerConstructor =
-        Class.forName(querySchedulerClassName).getConstructor(Configuration.class, QueryExecutor.class);
-    QueryScheduler scheduler =
-        (QueryScheduler) schedulerConstructor.newInstance(_serverConf.getSchedulerConfig(), queryExecutor);
-    return scheduler;
+    Configuration schedulerConfig = _serverConf.getSchedulerConfig();
+    return QuerySchedulerFactory.create(schedulerConfig, queryExecutor);
   }
 
-  public RequestHandlerFactory buildRequestHandlerFactory(QueryScheduler queryScheduler) throws InstantiationException,
-      IllegalAccessException, ClassNotFoundException {
-    String className = _serverConf.getRequestHandlerFactoryClassName();
-    LOGGER.info("Trying to Load Request Handler Factory by Class : " + className);
-    RequestHandlerFactory requestHandlerFactory = new SimpleRequestHandlerFactory(queryScheduler, _serverMetrics);
+  public RequestHandlerFactory buildRequestHandlerFactory(final QueryScheduler queryScheduler) {
+    RequestHandlerFactory requestHandlerFactory = new RequestHandlerFactory() {
+      @Override
+      public NettyServer.RequestHandler createNewRequestHandler() {
+        return new ScheduledRequestHandler(queryScheduler, _serverMetrics);
+      }
+    };
     return requestHandlerFactory;
   }
 

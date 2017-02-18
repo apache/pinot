@@ -36,7 +36,6 @@ public class TableDataManagerConfig {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(TableDataManagerConfig.class);
 
-  private static final String TABLE_DATA_MANAGER_NUM_QUERY_EXECUTOR_THREADS = "numQueryExecutorThreads";
   private static final String TABLE_DATA_MANAGER_TYPE = "dataManagerType";
   private static final String READ_MODE = "readMode";
   private static final String TABLE_DATA_MANAGER_DATA_DIRECTORY = "directory";
@@ -68,10 +67,6 @@ public class TableDataManagerConfig {
     return _tableDataManagerConfig.getString(TABLE_DATA_MANAGER_NAME);
   }
 
-  public int getNumberOfTableQueryExecutorThreads() {
-    return _tableDataManagerConfig.getInt(TABLE_DATA_MANAGER_NUM_QUERY_EXECUTOR_THREADS, 10);
-  }
-
   public static TableDataManagerConfig getDefaultHelixTableDataManagerConfig(
       InstanceDataManagerConfig _instanceDataManagerConfig, String tableName) throws ConfigurationException {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
@@ -92,7 +87,6 @@ public class TableDataManagerConfig {
     if (_instanceDataManagerConfig.isEnableDefaultColumns()) {
       defaultConfig.addProperty(IndexLoadingConfigMetadata.KEY_OF_ENABLE_DEFAULT_COLUMNS, true);
     }
-    defaultConfig.addProperty(TABLE_DATA_MANAGER_NUM_QUERY_EXECUTOR_THREADS, 20);
     TableDataManagerConfig tableDataManagerConfig = new TableDataManagerConfig(defaultConfig);
 
     switch (tableType) {

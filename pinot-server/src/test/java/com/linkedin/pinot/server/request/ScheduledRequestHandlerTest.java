@@ -19,6 +19,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
+import com.linkedin.pinot.common.query.QueryExecutor;
 import com.linkedin.pinot.common.query.QueryRequest;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
@@ -27,6 +28,7 @@ import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.common.datatable.DataTableBuilder;
 import com.linkedin.pinot.core.common.datatable.DataTableFactory;
 import com.linkedin.pinot.core.common.datatable.DataTableImplV2;
+import com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl;
 import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
 import com.linkedin.pinot.serde.SerDe;
 import com.yammer.metrics.core.MetricsRegistry;
@@ -61,7 +63,7 @@ public class ScheduledRequestHandlerTest {
   private ServerMetrics serverMetrics;
   private ChannelHandlerContext channelHandlerContext;
   private QueryScheduler queryScheduler;
-
+  private QueryExecutor queryExecutor;
   @BeforeTest
   public void setupTestMethod() {
     serverMetrics = new ServerMetrics(new MetricsRegistry());
@@ -76,6 +78,7 @@ public class ScheduledRequestHandlerTest {
         });
 
     queryScheduler = mock(QueryScheduler.class);
+    queryExecutor = new ServerQueryExecutorV1Impl();
   }
 
   @Test
@@ -114,7 +117,7 @@ public class ScheduledRequestHandlerTest {
   @Test
   public void testQueryProcessingException()
       throws Exception {
-    ScheduledRequestHandler handler = new ScheduledRequestHandler(new QueryScheduler(null) {
+    ScheduledRequestHandler handler = new ScheduledRequestHandler(new QueryScheduler(queryExecutor) {
       @Override
       public ListenableFuture<DataTable> submit(QueryRequest queryRequest) {
         return queryWorkers.submit(new Callable<DataTable>() {
@@ -140,7 +143,7 @@ public class ScheduledRequestHandlerTest {
   @Test
   public void testValidQueryResponse()
       throws InterruptedException, ExecutionException, TimeoutException, IOException {
-    ScheduledRequestHandler handler = new ScheduledRequestHandler(new QueryScheduler(null) {
+    ScheduledRequestHandler handler = new ScheduledRequestHandler(new QueryScheduler(queryExecutor) {
       @Override
       public ListenableFuture<DataTable> submit(QueryRequest queryRequest) {
         return queryRunners.submit(new Callable<DataTable>() {

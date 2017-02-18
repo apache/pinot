@@ -43,6 +43,8 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
@@ -64,6 +66,8 @@ public class QueryExceptionTest {
   private static QueryExecutor QUERY_EXECUTOR;
   private static TestingServerPropertiesBuilder CONFIG_BUILDER;
   private String segmentName;
+
+  private static ExecutorService queryRunners = Executors.newFixedThreadPool(20);
 
   @BeforeClass
   public void setup() throws Exception {
@@ -127,7 +131,7 @@ public class QueryExceptionTest {
     instanceRequest.setSearchSegments(new ArrayList<String>());
     instanceRequest.getSearchSegments().add(segmentName);
     QueryRequest queryRequest = new QueryRequest(instanceRequest, TableDataManagerProvider.getServerMetrics());
-    final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest);
+    final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest, queryRunners);
     instanceResponseMap.clear();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
     final BrokerResponseNative brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
@@ -144,7 +148,7 @@ public class QueryExceptionTest {
     instanceRequest.setSearchSegments(new ArrayList<String>());
     instanceRequest.getSearchSegments().add(segmentName);
     QueryRequest queryRequest = new QueryRequest(instanceRequest, TableDataManagerProvider.getServerMetrics());
-    final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest);
+    final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest, queryRunners);
     instanceResponseMap.clear();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
     final BrokerResponseNative brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
@@ -162,7 +166,7 @@ public class QueryExceptionTest {
     instanceRequest.setSearchSegments(new ArrayList<String>());
     instanceRequest.getSearchSegments().add(segmentName);
     QueryRequest queryRequest = new QueryRequest(instanceRequest, TableDataManagerProvider.getServerMetrics());
-    final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest);
+    final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest, queryRunners);
     instanceResponseMap.clear();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
     final BrokerResponseNative brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
@@ -180,7 +184,7 @@ public class QueryExceptionTest {
     instanceRequest.setSearchSegments(new ArrayList<String>());
     instanceRequest.getSearchSegments().add(segmentName);
     QueryRequest queryRequest = new QueryRequest(instanceRequest, TableDataManagerProvider.getServerMetrics());
-    final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest);
+    final DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest, queryRunners);
     instanceResponseMap.clear();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
     final BrokerResponseNative brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);
