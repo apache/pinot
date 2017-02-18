@@ -19,6 +19,7 @@ import static com.linkedin.thirdeye.hadoop.topk.TopKPhaseConstants.TOPK_PHASE_IN
 import static com.linkedin.thirdeye.hadoop.topk.TopKPhaseConstants.TOPK_PHASE_OUTPUT_PATH;
 import static com.linkedin.thirdeye.hadoop.topk.TopKPhaseConstants.TOPK_PHASE_THIRDEYE_CONFIG;
 
+import java.io.DataOutput;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
@@ -382,7 +383,7 @@ public class TopKPhaseJob extends Configured {
         LOGGER.info("Writing top k values to {}",topkValuesPath);
         FSDataOutputStream topKDimensionValuesOutputStream = fileSystem.create(
             new Path(topkValuesPath + File.separator + ThirdEyeConstants.TOPK_VALUES_FILE));
-        OBJECT_MAPPER.writeValue(topKDimensionValuesOutputStream, topkDimensionValues);
+        OBJECT_MAPPER.writeValue((DataOutput) topKDimensionValuesOutputStream, topkDimensionValues);
         topKDimensionValuesOutputStream.close();
       }
     }
