@@ -15,12 +15,29 @@
  */
 package com.linkedin.pinot.core.segment;
 
-import com.linkedin.pinot.common.utils.SegmentNameBuilder;
 import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector;
 
 
 public class DefaultSegmentNameGenerator implements SegmentNameGenerator {
-  public String getSegmentName(AbstractColumnStatisticsCollector statsCollector, SegmentNameConfig config) throws Exception {
+  /**
+   * To be used when segment name is pre-decided externally
+   * @param segmentName
+   */
+  public DefaultSegmentNameGenerator(final String segmentName) {
+
+  }
+
+  /**
+   * TODO Add arguments here that are needed for segment name generation
+   * - time col name, schema (to derive time col name), table name.
+   */
+  public DefaultSegmentNameGenerator() {
+
+  }
+
+  public String getSegmentName(AbstractColumnStatisticsCollector statsCollector) throws Exception {
+    /*
+    TODO
     String defaultSegmentName = config.getSegmentName();
     if (defaultSegmentName != null) {
       return defaultSegmentName;
@@ -37,5 +54,7 @@ public class DefaultSegmentNameGenerator implements SegmentNameGenerator {
       segmentName = SegmentNameBuilder.buildBasic(config.getTableName(), config.getSegmentNamePostfix());
     }
     return segmentName;
+    */
+    return null;
   }
 }

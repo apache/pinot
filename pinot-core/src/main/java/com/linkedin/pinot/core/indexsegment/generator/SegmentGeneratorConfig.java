@@ -15,22 +15,6 @@
  */
 package com.linkedin.pinot.core.indexsegment.generator;
 
-import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec.FieldType;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.data.StarTreeIndexSpec;
-import com.linkedin.pinot.common.data.TimeFieldSpec;
-import com.linkedin.pinot.core.data.readers.CSVRecordReaderConfig;
-import com.linkedin.pinot.core.data.readers.FileFormat;
-import com.linkedin.pinot.core.data.readers.RecordReaderConfig;
-import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
-import com.linkedin.pinot.core.segment.SegmentNameConfig;
-import com.linkedin.pinot.core.segment.SegmentNameGenerator;
-import com.linkedin.pinot.core.segment.DefaultSegmentNameConfig;
-import com.linkedin.pinot.core.segment.DefaultSegmentNameGenerator;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import com.linkedin.pinot.core.startree.hll.HllConfig;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -48,6 +32,20 @@ import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec.FieldType;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.data.StarTreeIndexSpec;
+import com.linkedin.pinot.common.data.TimeFieldSpec;
+import com.linkedin.pinot.core.data.readers.CSVRecordReaderConfig;
+import com.linkedin.pinot.core.data.readers.FileFormat;
+import com.linkedin.pinot.core.data.readers.RecordReaderConfig;
+import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
+import com.linkedin.pinot.core.segment.DefaultSegmentNameGenerator;
+import com.linkedin.pinot.core.segment.SegmentNameGenerator;
+import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.startree.hll.HllConfig;
 
 /**
  * Configuration properties used in the creation of index segments.
@@ -81,15 +79,19 @@ public class SegmentGeneratorConfig {
   private String _starTreeIndexSpecFile = null;
   private StarTreeIndexSpec _starTreeIndexSpec = null;
   private String _creatorVersion = null;
-  private SegmentNameGenerator _segmentNameGenerator = new DefaultSegmentNameGenerator();
-  private SegmentNameConfig _segmentNameConfig = new DefaultSegmentNameConfig(null, null, null);
   private char _paddingCharacter = V1Constants.Str.DEFAULT_STRING_PAD_CHAR;
-
   private HllConfig _hllConfig = null;
+  private SegmentNameGenerator _segmentNameGenerator = null;
 
   public SegmentGeneratorConfig() {
   }
 
+  /**
+   * @deprecated To be replaced by a builder pattern. Use set methods in the meantime.
+   * For now, this works only if no setters are called after this copy constructor.
+   * @param config to copy from
+   */
+  @Deprecated
   public SegmentGeneratorConfig(SegmentGeneratorConfig config) {
     Preconditions.checkNotNull(config);
     _customProperties.putAll(config._customProperties);
@@ -120,9 +122,8 @@ public class SegmentGeneratorConfig {
     _paddingCharacter = config._paddingCharacter;
     _hllConfig = config._hllConfig;
     _segmentVersion = config._segmentVersion;
+    _segmentName = config._segmentName;
     _segmentNameGenerator = config._segmentNameGenerator;
-    _segmentNameConfig = new DefaultSegmentNameConfig(_segmentTimeColumnName, _tableName, _segmentNamePostfix);
-    _segmentNameConfig.setSegmentName(_segmentName);
   }
 
   public SegmentGeneratorConfig(Schema schema) {
@@ -239,17 +240,14 @@ public class SegmentGeneratorConfig {
 
   public void setTableName(String tableName) {
     _tableName = tableName;
-    _segmentNameConfig.setTableName(tableName);
   }
 
   public String getSegmentName() {
     return _segmentName;
   }
 
-  @Deprecated
   public void setSegmentName(String segmentName) {
     _segmentName = segmentName;
-    _segmentNameConfig.setSegmentName(segmentName);
   }
 
   public String getCreatorVersion() {
@@ -274,7 +272,6 @@ public class SegmentGeneratorConfig {
 
   public void setSegmentNamePostfix(String postfix) {
     _segmentNamePostfix = postfix;
-    _segmentNameConfig.setSegmentNamePostfix(postfix);
   }
 
   public String getTimeColumnName() {
@@ -286,7 +283,6 @@ public class SegmentGeneratorConfig {
 
   public void setTimeColumnName(String timeColumnName) {
     _segmentTimeColumnName = timeColumnName;
-    _segmentNameConfig.setTimeColumnName(timeColumnName);
   }
 
   public TimeUnit getSegmentTimeUnit() {
@@ -417,19 +413,18 @@ public class SegmentGeneratorConfig {
   }
 
   public SegmentNameGenerator getSegmentNameGenerator() {
-    return _segmentNameGenerator;
+    if (_segmentNameGenerator != null) {
+      return _segmentNameGenerator;
+    }
+    if (_segmentName != null) {
+      return new DefaultSegmentNameGenerator(_segmentName);
+    }
+    // TODO Add the right set of arguments. Be sure to use getTimeColumnName() method to get the time col name
+    return new DefaultSegmentNameGenerator();
   }
 
   public void setSegmentNameGenerator(SegmentNameGenerator segmentNameGenerator) {
     _segmentNameGenerator = segmentNameGenerator;
-  }
-
-  public SegmentNameConfig getSegmentNameConfig() {
-    return _segmentNameConfig;
-  }
-
-  public void setSegmentNameConfig(SegmentNameConfig segmentNameConfig) {
-    _segmentNameConfig = segmentNameConfig;
   }
 
   @JsonIgnore
@@ -437,6 +432,11 @@ public class SegmentGeneratorConfig {
     return getQualifyingDimensions(FieldType.METRIC);
   }
 
+  /**
+   * @deprecated Load outside the class and use the setter for schema setting.
+   * @throws IOException
+   */
+  @Deprecated
   public void loadConfigFiles()
       throws IOException {
     ObjectMapper objectMapper = new ObjectMapper();
