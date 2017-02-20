@@ -15,8 +15,6 @@
  */
 package com.linkedin.pinot.core.segment;
 
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
@@ -41,39 +39,12 @@ public class DefaultSegmentNameGeneratorTest extends ColumnMetadataTest{
   }
 
   @Test
-  public void testNullTimeColumn() throws Exception {
-    ColumnMetadataTest columnMetadataTest = new ColumnMetadataTest();
-    // Build the Segment metadata.
-    SegmentGeneratorConfig config = columnMetadataTest.CreateSegmentConfigWithoutCreator();
-    SegmentNameGenerator segmentNameGenerator = new DefaultSegmentNameGenerator(null, null, "mytable", "1");
-    config.setSegmentNameGenerator(segmentNameGenerator);
-    SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
-    driver.init(config);
-    driver.build();
-    Assert.assertEquals(driver.getSegmentName(), "mytable_1");
-  }
-
-  @Test
   public void testAlreadyNamedSegment() throws Exception {
     ColumnMetadataTest columnMetadataTest = new ColumnMetadataTest();
     // Build the Segment metadata.
     SegmentGeneratorConfig config = columnMetadataTest.CreateSegmentConfigWithoutCreator();
     SegmentNameGenerator segmentNameGenerator = new DefaultSegmentNameGenerator("mytable_1");
     config.setSegmentNameGenerator(segmentNameGenerator);
-    SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
-    driver.init(config);
-    driver.build();
-    Assert.assertEquals(driver.getSegmentName(), "mytable_1");
-  }
-
-  @Test
-  public void testSchemaTimeColumn() throws Exception {
-    Schema schema = new Schema();
-    schema.setSchemaName("mytable");
-    TimeFieldSpec timeFieldSpec = new TimeFieldSpec();
-    timeFieldSpec.setName("daysSinceEpoch");
-    schema.setTimeFieldSpec(timeFieldSpec);
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
     SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
     driver.build();
