@@ -15,46 +15,62 @@
  */
 package com.linkedin.pinot.core.segment;
 
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.utils.SegmentNameBuilder;
 import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector;
 
 
 public class DefaultSegmentNameGenerator implements SegmentNameGenerator {
+  String _segmentName;
+  String _timeColumnName;
+  Schema _schema;
+  String _tableName;
+  String _segmentNamePostfix;
   /**
    * To be used when segment name is pre-decided externally
    * @param segmentName
    */
   public DefaultSegmentNameGenerator(final String segmentName) {
-
+    _segmentName = segmentName;
   }
 
   /**
-   * TODO Add arguments here that are needed for segment name generation
+   * To be used to derive segmentName
+   * @param timeColumnName
+   * @param schema
+   * @param tableName
+   * @param segmentNamePostfix
    * - time col name, schema (to derive time col name), table name.
    */
-  public DefaultSegmentNameGenerator() {
-
+  public DefaultSegmentNameGenerator(String timeColumnName, Schema schema, String tableName, String segmentNamePostfix) {
+    _timeColumnName = timeColumnName;
+    _schema = schema;
+    _tableName = tableName;
+    _segmentNamePostfix = segmentNamePostfix;
   }
 
   public String getSegmentName(AbstractColumnStatisticsCollector statsCollector) throws Exception {
-    /*
-    TODO
-    String defaultSegmentName = config.getSegmentName();
-    if (defaultSegmentName != null) {
-      return defaultSegmentName;
+    if (_segmentName != null) {
+      return _segmentName;
     }
-    final String timeColumnName = config.getTimeColumnName();
-    String segmentName;
-    if (timeColumnName != null && timeColumnName.length() > 0) {
+
+    if (_timeColumnName == null && _schema != null) {
+      _timeColumnName = _schema.getTimeColumnName();
+    }
+
+    if (_tableName == null && _schema != null) {
+      _tableName = _schema.getSchemaName();
+    }
+
+    if (_timeColumnName != null && _timeColumnName.length() > 0) {
       final Object minTimeValue = statsCollector.getMinValue();
       final Object maxTimeValue = statsCollector.getMaxValue();
-      segmentName = SegmentNameBuilder
-          .buildBasic(config.getTableName(), minTimeValue, maxTimeValue, config.getSegmentNamePostfix());
+      _segmentName = SegmentNameBuilder
+          .buildBasic(_tableName, minTimeValue, maxTimeValue, _segmentNamePostfix);
+    } else {
+      _segmentName = SegmentNameBuilder.buildBasic(_tableName, _segmentNamePostfix);
     }
-    else {
-      segmentName = SegmentNameBuilder.buildBasic(config.getTableName(), config.getSegmentNamePostfix());
-    }
-    return segmentName;
-    */
-    return null;
+
+    return _segmentName;
   }
 }

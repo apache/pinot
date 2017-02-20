@@ -419,8 +419,7 @@ public class SegmentGeneratorConfig {
     if (_segmentName != null) {
       return new DefaultSegmentNameGenerator(_segmentName);
     }
-    // TODO Add the right set of arguments. Be sure to use getTimeColumnName() method to get the time col name
-    return new DefaultSegmentNameGenerator();
+    return new DefaultSegmentNameGenerator(getTimeColumnName(), getSchema(), getTableName(), getSegmentNamePostfix());
   }
 
   public void setSegmentNameGenerator(SegmentNameGenerator segmentNameGenerator) {
