@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.detector.functionex.dataframe;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -286,5 +287,31 @@ public class DataFrameTest {
     Assert.assertEquals(ndf.toLongs("long").values(), new long[] { -2, 1, 2, 1 });
     Assert.assertEquals(ndf.toStrings("string").values(), new String[] { "-2.3", "-1", "0.13e1", "0.5" });
     Assert.assertEquals(ndf.toBooleans("boolean").values(), new boolean[] { true, true, true, true });
+  }
+
+  @Test
+  public void testStableMultiSortDoubleLong() {
+    DataFrame mydf = new DataFrame(new long[] { 1, 2, 3, 4, 5, 6, 7, 8 });
+    mydf.addSeries("double", 1.0, 1.0, 2.0, 2.0, 1.0, 1.0, 2.0, 2.0);
+    mydf.addSeries("long", 2, 2, 2, 2, 1, 1, 1, 1);
+
+    DataFrame sdfa = mydf.sortBySeries("double", "long");
+    Assert.assertEquals(sdfa.getIndex().values(), new long[] { 5, 6, 1, 2, 7, 8, 3, 4 });
+
+    DataFrame sdfb = mydf.sortBySeries("long", "double");
+    Assert.assertEquals(sdfb.getIndex().values(), new long[] { 3, 4, 7, 8, 1, 2, 5, 6 });
+  }
+
+  @Test
+  public void testStableMultiSortStringBoolean() {
+    DataFrame mydf = new DataFrame(new long[] { 1, 2, 3, 4, 5, 6, 7, 8 });
+    mydf.addSeries("string", "a", "a", "b", "b", "a", "a", "b", "b");
+    mydf.addSeries("boolean", true, true, true, true, false, false, false, false);
+
+    DataFrame sdfa = mydf.sortBySeries("string", "boolean");
+    Assert.assertEquals(sdfa.getIndex().values(), new long[] { 5, 6, 1, 2, 7, 8, 3, 4 });
+
+    DataFrame sdfb = mydf.sortBySeries("boolean", "string");
+    Assert.assertEquals(sdfb.getIndex().values(), new long[] { 3, 4, 7, 8, 1, 2, 5, 6 });
   }
 }

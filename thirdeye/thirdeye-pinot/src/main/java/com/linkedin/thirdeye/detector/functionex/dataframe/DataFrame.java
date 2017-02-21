@@ -209,8 +209,12 @@ public class DataFrame {
     return this.reorder(this.index.sortedIndex());
   }
 
-  public DataFrame sortBySeries(String seriesName) {
-    return this.reorder(assertSeriesExists(seriesName).sortedIndex());
+  public DataFrame sortBySeries(String... seriesNames) {
+    DataFrame df = this;
+    for(int i=seriesNames.length-1; i>=0; i--) {
+      df = df.reorder(assertSeriesExists(seriesNames[i]).sortedIndex());
+    }
+    return df;
   }
 
   public DataFrame reverse() {
