@@ -9,6 +9,7 @@ import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionExDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
+import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExFactory;
 import com.linkedin.thirdeye.detector.functionex.impl.MultiColumnConditionals;
 import java.text.ParseException;
 import java.util.ArrayList;
@@ -59,7 +60,7 @@ public class DetectionExJobScheduler implements JobScheduler, Runnable {
   private final Map<BackfillKey, Thread> existingBackfillJobs = new ConcurrentHashMap<>();
 
   public DetectionExJobScheduler() {
-    schedulerFactory = new StdSchedulerFactory();
+    this.schedulerFactory = new StdSchedulerFactory();
     try {
       quartzScheduler = schedulerFactory.getScheduler();
     } catch (SchedulerException e) {

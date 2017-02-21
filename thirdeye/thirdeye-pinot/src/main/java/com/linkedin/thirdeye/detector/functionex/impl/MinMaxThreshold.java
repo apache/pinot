@@ -14,8 +14,8 @@ public class MinMaxThreshold extends AnomalyFunctionEx {
     String datasource = getConfig("datasource");
     String query = getConfig("query");
 
-    double min = getConfigDouble("min");
-    double max = getConfigDouble("max");
+    double min = Double.parseDouble(getConfig("min"));
+    double max = Double.parseDouble(getConfig("max"));
 
     DataFrame df = queryDataSource(datasource, query);
     DoubleSeries series = df.toDoubles(column);

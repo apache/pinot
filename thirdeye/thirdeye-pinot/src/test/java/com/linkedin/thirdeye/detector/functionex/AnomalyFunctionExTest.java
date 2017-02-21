@@ -10,7 +10,7 @@ import org.testng.annotations.Test;
 
 public class AnomalyFunctionExTest {
 
-  static final String MOCK_CLASS_NAME = "com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExTest$MockAnomalyFunctionEx";
+  static final String MOCK_CLASS_NAME = MockAnomalyFunctionEx.class.getName();
 
   static final String DATASOURCE = "MOCK";
 

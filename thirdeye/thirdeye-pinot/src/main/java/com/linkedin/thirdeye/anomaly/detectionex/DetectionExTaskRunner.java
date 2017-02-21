@@ -12,11 +12,8 @@ import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionExDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionEx;
-import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExContext;
-import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExDataSource;
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExFactory;
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExResult;
-import com.linkedin.thirdeye.detector.functionex.dataframe.DataFrame;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -34,39 +31,26 @@ public class DetectionExTaskRunner implements TaskRunner {
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
-  static class MockDataSource implements AnomalyFunctionExDataSource<String, DataFrame> {
-    @Override
-    public DataFrame query(String query, AnomalyFunctionExContext context) {
-      DataFrame df = new DataFrame(5);
-      df.addSeries("long", 3, 4, 5, 6, 7);
-      df.addSeries("double", 1.2, 3.5, 2.8, 6.4, 4.9);
-      df.addSeries("stable", 1, 1, 1, 1, 1);
-      return df;
-    }
-  }
-
   private AnomalyFunctionExDTO funcSpec;
+  private AnomalyFunctionExFactory funcFactory;
   private long jobExecutionId;
 
-  protected void setupTask(TaskInfo taskInfo) throws Exception {
+  protected void setupTask(TaskInfo taskInfo, TaskContext context) throws Exception {
     DetectionExTaskInfo task = (DetectionExTaskInfo) taskInfo;
     jobExecutionId = task.getJobExecutionId();
     funcSpec = task.getAnomalyFunctionSpec();
+    funcFactory = context.getAnomalyFunctionExFactory();
   }
 
   public List<TaskResult> execute(TaskInfo taskInfo, TaskContext taskContext) throws Exception {
     LOG.info("Begin executing task {}", taskInfo);
 
-    setupTask(taskInfo);
+    setupTask(taskInfo, taskContext);
 
     List<TaskResult> taskResult = new ArrayList<>();
 
-    // factory
-    AnomalyFunctionExFactory factory = new AnomalyFunctionExFactory();
-    factory.addDataSource("mock", new MockDataSource());
-
     // instantiate function
-    AnomalyFunctionEx func = factory.fromSpec(funcSpec);
+    AnomalyFunctionEx func = funcFactory.fromSpec(funcSpec);
 
     // apply
     AnomalyFunctionExResult result = func.apply();

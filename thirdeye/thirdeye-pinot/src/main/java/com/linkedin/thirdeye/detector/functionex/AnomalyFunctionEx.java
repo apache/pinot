@@ -18,50 +18,14 @@ public abstract class AnomalyFunctionEx {
     return context.getConfig().get(key);
   }
 
-  protected double getConfigDouble(String key) {
-    return Double.parseDouble(getConfig(key));
-  }
-
-  protected double getConfigDouble(String key, double defaultValue) {
-    if(!context.getConfig().containsKey(key))
-      return defaultValue;
-    return Double.parseDouble(getConfig(key));
-  }
-
-  protected int getConfigInt(String key) {
-    return Integer.parseInt(getConfig(key));
-  }
-
-  protected int getConfigInt(String key, int defaultValue) {
-    if(!context.getConfig().containsKey(key))
-      return defaultValue;
-    return Integer.parseInt(getConfig(key));
-  }
-
-  protected long getConfigLong(String key) {
-    return Long.parseLong(getConfig(key));
-  }
-
-  protected long getConfigLong(String key, long defaultValue) {
-    if(!context.getConfig().containsKey(key))
-      return defaultValue;
-    return Long.parseLong(getConfig(key));
-  }
-
-  protected boolean getConfigBoolean(String key) {
-    return Boolean.parseBoolean(getConfig(key));
-  }
-
-  protected boolean getConfigBoolean(String key, boolean defaultValue) {
-    if(!context.getConfig().containsKey(key))
-      return defaultValue;
-    return Boolean.parseBoolean(getConfig(key));
-  }
-
   protected <R, Q> R queryDataSource(String dataSource, Q query) throws Exception {
     if(!hasDataSource(dataSource))
       throw new IllegalArgumentException(String.format("DataSource '%s' not available", dataSource));
     return (R) context.getDataSources().get(dataSource).query(query, context);
+  }
+
+  protected AnomalyFunctionExContext getContext() {
+    return context;
   }
 
   protected boolean hasDataSource(String dataSource) {

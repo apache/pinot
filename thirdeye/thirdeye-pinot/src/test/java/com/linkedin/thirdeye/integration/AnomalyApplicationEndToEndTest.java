@@ -36,6 +36,7 @@ import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
+import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExFactory;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 import java.io.InputStream;
@@ -367,7 +368,8 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
 
 
   private void startWorker() throws Exception {
-    taskDriver = new TaskDriver(thirdeyeAnomalyConfig, anomalyFunctionFactory, alertFilterFactory);
+    AnomalyFunctionExFactory dummy = new AnomalyFunctionExFactory();
+    taskDriver = new TaskDriver(thirdeyeAnomalyConfig, anomalyFunctionFactory, dummy, alertFilterFactory);
     taskDriver.start();
   }
 
