@@ -23,6 +23,7 @@ import com.linkedin.thirdeye.dashboard.resources.v2.DataResource;
 
 import com.linkedin.thirdeye.dashboard.resources.v2.EventResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.TimeSeriesResource;
+import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import io.dropwizard.assets.AssetsBundle;
 import io.dropwizard.setup.Bootstrap;
@@ -58,11 +59,12 @@ public class ThirdEyeDashboardApplication
     } catch (Exception e) {
       LOG.error("Exception while loading caches", e);
     }
-    env.jersey().register(new AnomalyFunctionResource(config.getFunctionConfigPath()));
+    env.jersey().register(new AnomalyFunctionResource(config.getFunctionConfigPath(), config.getFilterAutotuneConfigPath()));
     env.jersey().register(new DashboardResource());
     env.jersey().register(new CacheResource());
     AnomalyFunctionFactory anomalyFunctionFactory = new AnomalyFunctionFactory(config.getFunctionConfigPath());
-    env.jersey().register(new AnomalyResource(anomalyFunctionFactory));
+    AlertFilterFactory alertFilterFactory = new AlertFilterFactory(config.getAlertFilterConfigPath());
+    env.jersey().register(new AnomalyResource(anomalyFunctionFactory, alertFilterFactory));
     env.jersey().register(new EmailResource());
     env.jersey().register(new EntityManagerResource());
     env.jersey().register(new IngraphMetricConfigResource());
