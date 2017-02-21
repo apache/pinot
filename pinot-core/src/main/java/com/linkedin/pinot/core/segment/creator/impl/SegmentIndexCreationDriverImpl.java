@@ -15,9 +15,6 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl;
 
-import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.core.segment.index.converter.SegmentFormatConverter;
-import com.linkedin.pinot.core.segment.index.converter.SegmentFormatConverterFactory;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -39,13 +36,13 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.StarTreeIndexSpec;
-import com.linkedin.pinot.common.utils.SegmentNameBuilder;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
 import com.linkedin.pinot.core.data.extractors.PlainFieldExtractor;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.data.readers.RecordReaderFactory;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector;
 import com.linkedin.pinot.core.segment.creator.ColumnIndexCreationInfo;
 import com.linkedin.pinot.core.segment.creator.ColumnStatistics;
@@ -56,6 +53,8 @@ import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationInfo;
 import com.linkedin.pinot.core.segment.creator.SegmentPreIndexStatsCollector;
 import com.linkedin.pinot.core.segment.creator.impl.stats.SegmentPreIndexStatsCollectorImpl;
+import com.linkedin.pinot.core.segment.index.converter.SegmentFormatConverter;
+import com.linkedin.pinot.core.segment.index.converter.SegmentFormatConverterFactory;
 import com.linkedin.pinot.core.startree.OffHeapStarTreeBuilder;
 import com.linkedin.pinot.core.startree.StarTree;
 import com.linkedin.pinot.core.startree.StarTreeBuilder;
@@ -204,7 +203,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     }
     List<String> dimensionsSplitOrder = starTreeIndexSpec.getDimensionsSplitOrder();
     if (dimensionsSplitOrder != null && !dimensionsSplitOrder.isEmpty()) {
-      String timeColumnName = config.getTimeColumnName();
+      final String timeColumnName = config.getTimeColumnName();
       if (timeColumnName != null) {
         dimensionsSplitOrder.remove(timeColumnName);
       }
@@ -414,21 +413,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   }
 
   private void handlePostCreation() throws Exception {
-    // Build the segment name, if necessary
     final String timeColumn = config.getTimeColumnName();
-
-    if (config.getSegmentName() != null) {
-      segmentName = config.getSegmentName();
-    } else {
-      if (timeColumn != null && timeColumn.length() > 0) {
-        final Object minTimeValue = statsCollector.getColumnProfileFor(timeColumn).getMinValue();
-        final Object maxTimeValue = statsCollector.getColumnProfileFor(timeColumn).getMaxValue();
-        segmentName = SegmentNameBuilder
-            .buildBasic(config.getTableName(), minTimeValue, maxTimeValue, config.getSegmentNamePostfix());
-      } else {
-        segmentName = SegmentNameBuilder.buildBasic(config.getTableName(), config.getSegmentNamePostfix());
-      }
-    }
+    segmentName = config.getSegmentNameGenerator().getSegmentName(statsCollector.getColumnProfileFor(timeColumn));
 
     // Write the index files to disk
     indexCreator.setSegmentName(segmentName);
