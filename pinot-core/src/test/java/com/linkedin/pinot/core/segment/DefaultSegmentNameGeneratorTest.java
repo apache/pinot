@@ -19,11 +19,44 @@ import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.core.segment.index.ColumnMetadataTest;
+import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
+import com.linkedin.pinot.util.TestUtils;
+import java.io.File;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.io.FileUtils;
 import org.testng.Assert;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
-public class DefaultSegmentNameGeneratorTest extends ColumnMetadataTest{
+public class DefaultSegmentNameGeneratorTest {
+
+  private static final String AVRO_DATA = "data/test_data-mv.avro";
+  private static final File INDEX_DIR = new File(ColumnMetadataTest.class.toString());
+
+  @BeforeMethod
+  public void setUp() throws Exception {
+    FileUtils.deleteQuietly(INDEX_DIR);
+  }
+
+  @AfterMethod
+  public void tearDown() {
+    FileUtils.deleteQuietly(INDEX_DIR);
+  }
+
+  public SegmentGeneratorConfig CreateSegmentConfigWithoutCreator()
+      throws Exception {
+    final String filePath =
+        TestUtils.getFileFromResourceUrl(DefaultSegmentNameGeneratorTest.class.getClassLoader().getResource(AVRO_DATA));
+    // Intentionally changed this to TimeUnit.Hours to make it non-default for testing.
+    SegmentGeneratorConfig config =
+        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(new File(filePath), INDEX_DIR, "daysSinceEpoch",
+            TimeUnit.HOURS, "testTable");
+    config.setSegmentNamePostfix("1");
+    config.setTimeColumnName("daysSinceEpoch");
+    return config;
+  }
 
   @Test
   public void testPostfix() throws Exception {
@@ -35,7 +68,7 @@ public class DefaultSegmentNameGeneratorTest extends ColumnMetadataTest{
     SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
     driver.build();
-     Assert.assertEquals(driver.getSegmentName(), "mytable_1756015683_1756015683_1");
+    Assert.assertEquals(driver.getSegmentName(), "mytable_1756015683_1756015683_1");
   }
 
   @Test
@@ -51,4 +84,30 @@ public class DefaultSegmentNameGeneratorTest extends ColumnMetadataTest{
     Assert.assertEquals(driver.getSegmentName(), "mytable_1");
   }
 
+  @Test
+  public void testNullTimeColumn() throws Exception {
+    ColumnMetadataTest columnMetadataTest = new ColumnMetadataTest();
+    // Build the Segment metadata.
+    SegmentGeneratorConfig config = columnMetadataTest.CreateSegmentConfigWithoutCreator();
+    config.setTableName("mytable");
+    config.setSegmentNamePostfix("postfix");
+    config.setTimeColumnName(null);
+    SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    driver.init(config);
+    driver.build();
+    Assert.assertEquals(driver.getSegmentName(), "mytable_postfix");
+  }
+
+  @Test
+  public void testNullTimeColumnThroughDefaultSegment() throws Exception {
+    ColumnMetadataTest columnMetadataTest = new ColumnMetadataTest();
+    // Build the Segment metadata.
+    SegmentGeneratorConfig config = columnMetadataTest.CreateSegmentConfigWithoutCreator();
+    SegmentNameGenerator segmentNameGenerator = new DefaultSegmentNameGenerator(null, null, "mytable", "1");
+    config.setSegmentNameGenerator(segmentNameGenerator);
+    SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    driver.init(config);
+    driver.build();
+    Assert.assertEquals(driver.getSegmentName(), "mytable_1");
+  }
 }

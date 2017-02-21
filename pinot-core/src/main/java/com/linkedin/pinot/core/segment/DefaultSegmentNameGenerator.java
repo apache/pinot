@@ -21,11 +21,11 @@ import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector
 
 
 public class DefaultSegmentNameGenerator implements SegmentNameGenerator {
-  String _segmentName;
-  String _timeColumnName;
-  Schema _schema;
-  String _tableName;
-  String _segmentNamePostfix;
+  private String _segmentName;
+  private String _timeColumnName;
+  private Schema _schema;
+  private String _tableName;
+  private String _segmentNamePostfix;
   /**
    * To be used when segment name is pre-decided externally
    * @param segmentName
