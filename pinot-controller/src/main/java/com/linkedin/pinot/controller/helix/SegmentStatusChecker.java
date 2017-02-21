@@ -180,9 +180,8 @@ public class SegmentStatusChecker {
       _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.IDEALSTATE_ZNODE_SIZE, idealState.toString().length());
       ExternalView externalView = helixAdmin.getResourceExternalView(helixClusterName, tableName);
 
-      final int nReplicasIdeal = Integer.parseInt(idealState.getReplicas());
       int nReplicasIdealMax = 0;
-      int nReplicasExternal = nReplicasIdeal;
+      int nReplicasExternal = -1;
       int nErrors = 0;
       int nOffline = 0;
       for (String partitionName : idealState.getPartitionSet()) {
@@ -237,15 +236,16 @@ public class SegmentStatusChecker {
           }
           nOffline++;
         }
-        nReplicasExternal = (nReplicasExternal > nReplicas) ? nReplicas : nReplicasExternal;
+        nReplicasExternal = ((nReplicasExternal > nReplicas) || (nReplicasExternal == -1)) ? nReplicas : nReplicasExternal;
+      }
+      if (nReplicasExternal == -1){
+        nReplicasExternal = 0;
       }
       // Synchronization provided by Controller Gauge to make sure that only one thread updates the gauge
       _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.NUMBER_OF_REPLICAS,
           nReplicasExternal);
-      if (nReplicasIdealMax != 0) {
-        _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.PERCENT_OF_REPLICAS,
-            nReplicasExternal * 100 / nReplicasIdealMax);
-      }
+      _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.PERCENT_OF_REPLICAS,
+          (nReplicasIdealMax > 0) ? (nReplicasExternal * 100 / nReplicasIdealMax) : 100);
       _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.SEGMENTS_IN_ERROR_STATE,
           nErrors);
       if (nOffline > 0) {
