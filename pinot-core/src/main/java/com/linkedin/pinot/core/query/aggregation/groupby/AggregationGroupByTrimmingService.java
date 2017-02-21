@@ -181,7 +181,9 @@ public class AggregationGroupByTrimmingService {
       while (!priorityQueue.isEmpty()) {
         GroupKeyResultPair groupKeyResultPair = priorityQueue.poll();
         GroupByResult groupByResult = new GroupByResult();
-        groupByResult.setGroup(Arrays.asList(groupKeyResultPair._groupKey.split(GROUP_KEY_DELIMITER)));
+        // Do not remove trailing empty strings.
+        String[] groupKeys = groupKeyResultPair._groupKey.split(GROUP_KEY_DELIMITER, -1);
+        groupByResult.setGroup(Arrays.asList(groupKeys));
         groupByResult.setValue(AggregationFunctionUtils.formatValue(groupKeyResultPair._result));
         groupByResults.addFirst(groupByResult);
       }
