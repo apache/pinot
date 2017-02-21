@@ -1,26 +1,26 @@
 package com.linkedin.thirdeye.detector.functionex.dataframe;
 
-public abstract class Series<T extends Series> {
+public abstract class Series {
   public abstract int size();
   public abstract DoubleSeries toDoubles();
   public abstract LongSeries toLongs();
   public abstract BooleanSeries toBooleans();
   public abstract StringSeries toStrings();
   public abstract SeriesType type();
-  public abstract T slice(int from, int to);
-  public T head(int n) {
+  public abstract Series slice(int from, int to);
+  public Series head(int n) {
     int len = this.size();
     return this.slice(0, len);
   }
-  public T tail(int n) {
+  public Series tail(int n) {
     int len = this.size();
     return this.slice(len - n, len);
   }
 
-  public abstract T sort();
-  public abstract T reorder(int[] toIndex);
+  public abstract Series sort();
+  public abstract Series reorder(int[] toIndex);
 
-  public T reverse() {
+  public Series reverse() {
     int[] toIndex = new int[this.size()];
     for (int i = 0; i < toIndex.length; i++) {
       toIndex[i] = toIndex.length - i - 1;
@@ -45,7 +45,7 @@ public abstract class Series<T extends Series> {
     }
 
     public int size() {
-      return fromIndex.length;
+      return this.fromIndex.length;
     }
   }
 }

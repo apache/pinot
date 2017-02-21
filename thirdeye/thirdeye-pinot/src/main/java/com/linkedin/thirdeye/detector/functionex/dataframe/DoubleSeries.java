@@ -7,7 +7,7 @@ import java.util.Comparator;
 import java.util.List;
 
 
-public final class DoubleSeries extends Series<DoubleSeries> {
+public final class DoubleSeries extends Series {
   double[] values;
 
   @FunctionalInterface
@@ -126,6 +126,21 @@ public final class DoubleSeries extends Series<DoubleSeries> {
     return new DoubleSeries(Arrays.copyOfRange(this.values, from, to));
   }
 
+  @Override
+  public DoubleSeries head(int n) {
+    return (DoubleSeries)super.head(n);
+  }
+
+  @Override
+  public DoubleSeries tail(int n) {
+    return (DoubleSeries)super.tail(n);
+  }
+
+  @Override
+  public DoubleSeries reverse() {
+    return (DoubleSeries)super.reverse();
+  }
+
   public DoubleSeries map(DoubleFunction function) {
     double[] newValues = new double[this.values.length];
     for(int i=0; i<this.values.length; i++) {
@@ -153,15 +168,6 @@ public final class DoubleSeries extends Series<DoubleSeries> {
       values[toIndex[i]] = this.values[i];
     }
     return new DoubleSeries(values);
-  }
-
-  @Override
-  public DoubleSeries reverse() {
-    int[] toIndex = new int[this.size()];
-    for (int i = 0; i < toIndex.length; i++) {
-      toIndex[i] = toIndex.length - i - 1;
-    }
-    return this.reorder(toIndex);
   }
 
   @Override

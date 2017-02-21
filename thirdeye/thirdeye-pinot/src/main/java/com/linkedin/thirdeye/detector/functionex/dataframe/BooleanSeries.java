@@ -127,6 +127,11 @@ public final class BooleanSeries extends Series {
     return (BooleanSeries) super.tail(n);
   }
 
+  @Override
+  public BooleanSeries reverse() {
+    return (BooleanSeries)super.reverse();
+  }
+
   public boolean allTrue() {
     boolean result = true;
     for(boolean b : this.values) {

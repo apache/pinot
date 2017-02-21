@@ -137,6 +137,11 @@ public final class StringSeries extends Series {
     return (StringSeries) super.tail(n);
   }
 
+  @Override
+  public StringSeries reverse() {
+    return (StringSeries) super.reverse();
+  }
+
   public StringSeries map(StringFunction function) {
     String[] newValues = new String[this.values.length];
     for(int i=0; i<this.values.length; i++) {

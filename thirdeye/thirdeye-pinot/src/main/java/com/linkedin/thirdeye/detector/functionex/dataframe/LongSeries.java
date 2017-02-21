@@ -7,7 +7,7 @@ import java.util.Comparator;
 import java.util.List;
 
 
-public final class LongSeries extends Series<LongSeries> {
+public final class LongSeries extends Series {
   long[] values;
 
   @FunctionalInterface
@@ -122,6 +122,21 @@ public final class LongSeries extends Series<LongSeries> {
   @Override
   public LongSeries slice(int from, int to) {
     return new LongSeries(Arrays.copyOfRange(this.values, from, to));
+  }
+
+  @Override
+  public LongSeries head(int n) {
+    return (LongSeries)super.head(n);
+  }
+
+  @Override
+  public LongSeries tail(int n) {
+    return (LongSeries)super.tail(n);
+  }
+
+  @Override
+  public LongSeries reverse() {
+    return (LongSeries)super.reverse();
   }
 
   public LongSeries map(LongFunction function) {
