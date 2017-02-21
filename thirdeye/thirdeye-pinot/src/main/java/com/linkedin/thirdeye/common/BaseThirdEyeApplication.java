@@ -1,5 +1,4 @@
 package com.linkedin.thirdeye.common;
-
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.AlertConfigManagerImpl;
@@ -7,6 +6,9 @@ import com.linkedin.thirdeye.datalayer.bao.jdbc.AlertConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.DataCompletenessConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.EventManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.OverrideConfigManagerImpl;
+import com.yammer.metrics.core.Counter;
+import com.yammer.metrics.core.MetricsRegistry;
+import com.yammer.metrics.reporting.JmxReporter;
 import java.io.File;
 
 import org.slf4j.Logger;
@@ -32,6 +34,17 @@ import io.dropwizard.Configuration;
 
 public abstract class BaseThirdEyeApplication<T extends Configuration> extends Application<T> {
   protected final Logger LOG = LoggerFactory.getLogger(this.getClass());
+
+  public static MetricsRegistry metricsRegistry = new MetricsRegistry();
+  static JmxReporter jmxReporter = new JmxReporter(metricsRegistry);
+
+  public static final Counter dbCallCounter =
+      metricsRegistry.newCounter(BaseThirdEyeApplication.class, "dbCallCounter");
+
+  static {
+    jmxReporter.start();
+  }
+
   protected AnomalyFunctionManager anomalyFunctionDAO;
   protected RawAnomalyResultManager rawAnomalyResultDAO;
   protected EmailConfigurationManager emailConfigurationDAO;

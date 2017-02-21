@@ -56,8 +56,8 @@ public class AnomalyMergeExecutor implements Runnable {
   private final static AnomalyMergeConfig DEFAULT_MERGE_CONFIG;
   static {
     DEFAULT_MERGE_CONFIG = new AnomalyMergeConfig();
-    DEFAULT_MERGE_CONFIG.setSequentialAllowedGap(2 * 60 * 60_000); // merge anomalies apart 2 hours
-    DEFAULT_MERGE_CONFIG.setMaxMergeDurationLength(604_800_000); // break anomaly longer than 7 days
+    DEFAULT_MERGE_CONFIG.setSequentialAllowedGap(TimeUnit.HOURS.toMillis(2)); // merge anomalies apart 2 hours
+    DEFAULT_MERGE_CONFIG.setMaxMergeDurationLength(TimeUnit.DAYS.toMillis(7) - 3600_000); // break anomaly longer than 6 days 23 hours
     DEFAULT_MERGE_CONFIG.setMergeStrategy(AnomalyMergeStrategy.FUNCTION_DIMENSIONS);
   }
 
