@@ -64,7 +64,10 @@ public class ThirdEyePinotDataSource implements AnomalyFunctionExDataSource<Stri
 
       String function = resultSet.getColumnName(0);
       df.addSeries(function, makeGroupByValueSeries(resultSet));
-      df.addSeries("group", makeGroupByGroupSeries(resultSet));
+      for(int i=0; i<resultSet.getGroupKeyLength(); i++) {
+        String groupKey = resultSet.getGroupKeyColumnName(i);
+        df.addSeries(groupKey, makeGroupByGroupSeries(resultSet, i));
+      }
 
     } else {
       // defensive
@@ -109,24 +112,16 @@ public class ThirdEyePinotDataSource implements AnomalyFunctionExDataSource<Stri
     return DataFrame.toSeries(values);
   }
 
-  static Series makeGroupByGroupSeries(ResultSet resultSet) {
+  static Series makeGroupByGroupSeries(ResultSet resultSet, int keyIndex) {
     int rowCount = resultSet.getRowCount();
     if(rowCount <= 0)
       return new StringSeries(new String[0]);
 
     String[] values = new String[rowCount];
     for(int i=0; i<rowCount; i++) {
-      values[i] = makeGroupKeyString(resultSet, i);
+      values[i] = resultSet.getGroupKeyString(i, keyIndex);
     }
 
     return DataFrame.toSeries(values);
-  }
-
-  static String makeGroupKeyString(ResultSet resultSet, int rowIndex) {
-    int len = resultSet.getGroupKeyLength();
-    String[] s = new String[len];
-    for(int i=0; i<len; i++)
-      s[i] = resultSet.getGroupKeyString(rowIndex, i);
-    return String.join("|", s);
   }
 }
