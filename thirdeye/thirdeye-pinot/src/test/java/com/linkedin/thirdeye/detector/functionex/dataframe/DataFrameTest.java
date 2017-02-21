@@ -2,7 +2,6 @@ package com.linkedin.thirdeye.detector.functionex.dataframe;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -313,5 +312,21 @@ public class DataFrameTest {
 
     DataFrame sdfb = mydf.sortBySeries("boolean", "string");
     Assert.assertEquals(sdfb.getIndex().values(), new long[] { 3, 4, 7, 8, 1, 2, 5, 6 });
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testFilterUnequalLengthFail() {
+    df.filter(DataFrame.toSeries(false, true));
+  }
+
+  @Test
+  public void testFilter() {
+    DataFrame ndf = df.filter(DataFrame.toSeries(true, false, true, true, false));
+
+    Assert.assertEquals(ndf.getIndex().values(), new long[] { -1, -2, 4 });
+    Assert.assertEquals(ndf.toDoubles("double").values(), new double[] { -2.1, 0.0, 0.5 });
+    Assert.assertEquals(ndf.toLongs("long").values(), new long[] { -2, 0, 1 });
+    Assert.assertEquals(ndf.toStrings("string").values(), new String[] { "-2.3", "0.0", "0.5"  });
+    Assert.assertEquals(ndf.toBooleans("boolean").values(), new boolean[] { true, false, true });
   }
 }

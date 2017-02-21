@@ -235,6 +235,15 @@ public final class BooleanSeries extends Series {
   }
 
   @Override
+  public BooleanSeries filter(int[] fromIndex) {
+    boolean[] values = new boolean[fromIndex.length];
+    for(int i=0; i<fromIndex.length; i++) {
+      values[i] = this.values[fromIndex[i]];
+    }
+    return new BooleanSeries(values);
+  }
+
+  @Override
   int[] sortedIndex() {
     int[] toIndex = new int[this.values.length];
     int j=0;

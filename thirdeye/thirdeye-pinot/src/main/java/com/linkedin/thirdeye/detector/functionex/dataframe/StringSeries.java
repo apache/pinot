@@ -241,6 +241,15 @@ public final class StringSeries extends Series {
     return new StringSeries(values);
   }
 
+  @Override
+  public StringSeries filter(int[] fromIndex) {
+    String[] values = new String[fromIndex.length];
+    for(int i=0; i<fromIndex.length; i++) {
+      values[i] = this.values[fromIndex[i]];
+    }
+    return new StringSeries(values);
+  }
+
   static final class StringSortTuple {
     final String value;
     final int index;

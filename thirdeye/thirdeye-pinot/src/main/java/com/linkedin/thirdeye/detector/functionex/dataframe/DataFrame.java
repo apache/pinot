@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.detector.functionex.dataframe;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -34,19 +35,19 @@ public class DataFrame {
   LongSeries index;
   Map<String, Series> series = new HashMap<>();
 
-  public static DoubleSeries toSeries(double[] values) {
+  public static DoubleSeries toSeries(double... values) {
     return new DoubleSeries(values);
   }
 
-  public static LongSeries toSeries(long[] values) {
+  public static LongSeries toSeries(long... values) {
     return new LongSeries(values);
   }
 
-  public static BooleanSeries toSeries(boolean[] values) {
+  public static BooleanSeries toSeries(boolean... values) {
     return new BooleanSeries(values);
   }
 
-  public static StringSeries toSeries(String[] values) {
+  public static StringSeries toSeries(String... values) {
     return new StringSeries(values);
   }
 
@@ -209,6 +210,13 @@ public class DataFrame {
     return this.reorder(this.index.sortedIndex());
   }
 
+  /**
+   * Sort data frame by series values.  The resulting sort order is the equivalent of applying
+   * a stable sort to nth series first, and then sorting iteratively until the 1st series.
+   *
+   * @param seriesNames 1st series, 2nd series, ..., nth series
+   * @return sorted data frame
+   */
   public DataFrame sortBySeries(String... seriesNames) {
     DataFrame df = this;
     for(int i=seriesNames.length-1; i>=0; i--) {
@@ -245,6 +253,34 @@ public class DataFrame {
       newDataFrame.addSeries(e.getKey(), strategy.apply(e.getValue(), buckets));
     }
     return newDataFrame;
+  }
+
+  public DataFrame filter(BooleanSeries series) {
+    if(series.size() != this.index.size())
+      throw new IllegalArgumentException("Series size must be equal to index size");
+
+    int[] fromIndex = new int[series.size()];
+    int fromIndexCount = 0;
+    for(int i=0; i<series.size(); i++) {
+      if(series.values[i]) {
+        fromIndex[fromIndexCount] = i;
+        fromIndexCount++;
+      }
+    }
+
+    int[] fromIndexCompressed = Arrays.copyOf(fromIndex, fromIndexCount);
+
+    LongSeries index = this.index.filter(fromIndexCompressed);
+    DataFrame df = new DataFrame(index);
+    for(Map.Entry<String, Series> e : this.getSeries().entrySet()) {
+      df.addSeries(e.getKey(), e.getValue().filter(fromIndexCompressed));
+    }
+
+    return df;
+  }
+
+  public DataFrame filter(String seriesName) {
+    return this.filter(this.toBooleans(seriesName));
   }
 
   @Override

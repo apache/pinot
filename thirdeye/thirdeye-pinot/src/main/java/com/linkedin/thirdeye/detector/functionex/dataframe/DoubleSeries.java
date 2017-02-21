@@ -253,6 +253,15 @@ public final class DoubleSeries extends Series {
     return m;
   }
 
+  @Override
+  public DoubleSeries filter(int[] fromIndex) {
+    double[] values = new double[fromIndex.length];
+    for(int i=0; i<fromIndex.length; i++) {
+      values[i] = this.values[fromIndex[i]];
+    }
+    return new DoubleSeries(values);
+  }
+
   static final class DoubleSortTuple {
     final double value;
     final int index;

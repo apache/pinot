@@ -321,6 +321,15 @@ public final class LongSeries extends Series {
     return m;
   }
 
+  @Override
+  public LongSeries filter(int[] fromIndex) {
+    long[] values = new long[fromIndex.length];
+    for(int i=0; i<fromIndex.length; i++) {
+      values[i] = this.values[fromIndex[i]];
+    }
+    return new LongSeries(values);
+  }
+
   static final class LongSortTuple {
     final long value;
     final int index;

@@ -29,6 +29,7 @@ public abstract class Series {
   }
 
   abstract int[] sortedIndex();
+  abstract Series filter(int[] fromIndex);
 
   public enum SeriesType {
     DOUBLE,
