@@ -419,7 +419,7 @@ public class SegmentGeneratorConfig {
     if (_segmentName != null) {
       return new DefaultSegmentNameGenerator(_segmentName);
     }
-    return new DefaultSegmentNameGenerator(getTimeColumnName(), getSchema(), getTableName(), getSegmentNamePostfix());
+    return new DefaultSegmentNameGenerator(getTimeColumnName(), getTableName(), getSegmentNamePostfix());
   }
 
   public void setSegmentNameGenerator(SegmentNameGenerator segmentNameGenerator) {
