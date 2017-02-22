@@ -63,7 +63,7 @@ public class DefaultSegmentNameGeneratorTest {
     ColumnMetadataTest columnMetadataTest = new ColumnMetadataTest();
     // Build the Segment metadata.
     SegmentGeneratorConfig config = columnMetadataTest.CreateSegmentConfigWithoutCreator();
-    SegmentNameGenerator segmentNameGenerator = new DefaultSegmentNameGenerator("daysSinceEpoch", "mytable", "1");
+    SegmentNameGenerator segmentNameGenerator = new DefaultSegmentNameGenerator("daysSinceEpoch", "mytable", "1", -1);
     config.setSegmentNameGenerator(segmentNameGenerator);
     SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
@@ -103,11 +103,11 @@ public class DefaultSegmentNameGeneratorTest {
     ColumnMetadataTest columnMetadataTest = new ColumnMetadataTest();
     // Build the Segment metadata.
     SegmentGeneratorConfig config = columnMetadataTest.CreateSegmentConfigWithoutCreator();
-    SegmentNameGenerator segmentNameGenerator = new DefaultSegmentNameGenerator(null, "mytable", "1");
+    SegmentNameGenerator segmentNameGenerator = new DefaultSegmentNameGenerator(null, "mytable", "1", 2);
     config.setSegmentNameGenerator(segmentNameGenerator);
     SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
     driver.init(config);
     driver.build();
-    Assert.assertEquals(driver.getSegmentName(), "mytable_1");
+    Assert.assertEquals(driver.getSegmentName(), "mytable_1_2");
   }
 }

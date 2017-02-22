@@ -23,7 +23,13 @@ public class DefaultSegmentNameGenerator implements SegmentNameGenerator {
   private final String _segmentName;
   private final String _timeColumnName;
   private final String _tableName;
+  /*
+    The postfix is used if segments have different granularities while the sequenceId is used for numbering segments.
+    For example, you can name your segments as
+    tableName_date_daily_0 where "daily" is the segmentNamePostfix and 0 is the sequence id.
+   */
   private final String _segmentNamePostfix;
+  private final int _sequenceId;
   /**
    * To be used when segment name is pre-decided externally
    * @param segmentName
@@ -33,6 +39,7 @@ public class DefaultSegmentNameGenerator implements SegmentNameGenerator {
     _tableName = null;
     _timeColumnName = null;
     _segmentNamePostfix = null;
+    _sequenceId = -1;
   }
 
   /**
@@ -41,11 +48,12 @@ public class DefaultSegmentNameGenerator implements SegmentNameGenerator {
    * @param tableName
    * @param segmentNamePostfix
    */
-  public DefaultSegmentNameGenerator(String timeColumnName, String tableName, String segmentNamePostfix) {
+  public DefaultSegmentNameGenerator(String timeColumnName, String tableName, String segmentNamePostfix, int sequenceId) {
     _timeColumnName = timeColumnName;
     _tableName = tableName;
     _segmentNamePostfix = segmentNamePostfix;
     _segmentName = null;
+    _sequenceId = sequenceId;
   }
 
   @Override
@@ -60,9 +68,9 @@ public class DefaultSegmentNameGenerator implements SegmentNameGenerator {
       final Object minTimeValue = statsCollector.getMinValue();
       final Object maxTimeValue = statsCollector.getMaxValue();
       segmentName = SegmentNameBuilder
-          .buildBasic(_tableName, minTimeValue, maxTimeValue, _segmentNamePostfix);
+          .buildBasic(_tableName, minTimeValue, maxTimeValue, _segmentNamePostfix, _sequenceId);
     } else {
-      segmentName = SegmentNameBuilder.buildBasic(_tableName, _segmentNamePostfix);
+      segmentName = SegmentNameBuilder.buildBasic(_tableName, _segmentNamePostfix, _sequenceId);
     }
 
     return segmentName;

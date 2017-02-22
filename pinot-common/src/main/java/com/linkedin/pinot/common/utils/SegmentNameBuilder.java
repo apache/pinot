@@ -16,13 +16,19 @@
 package com.linkedin.pinot.common.utils;
 
 public class SegmentNameBuilder {
-  // For offline segments only
-  public static String buildBasic(String tableName, Object minTimeValue, Object maxTimeValue, String prefix) {
-    return StringUtil.join("_", tableName, minTimeValue.toString(), maxTimeValue.toString(), prefix);
+  public static String buildBasic(String tableName, Object minTimeValue, Object maxTimeValue, String postfix, int sequenceId) {
+    if (sequenceId == -1) {
+      return StringUtil.join("_", tableName, minTimeValue.toString(), maxTimeValue.toString(), postfix);
+    } else {
+      return StringUtil.join("_", tableName, minTimeValue.toString(), maxTimeValue.toString(), postfix, Integer.toString(sequenceId));
+    }
   }
 
-  // For offline segments only
-  public static String buildBasic(String tableName, String prefix) {
-    return StringUtil.join("_", tableName, prefix);
+  public static String buildBasic(String tableName, String postfix, int sequenceId) {
+    if (sequenceId == -1 ) {
+      return StringUtil.join("_", tableName, postfix);
+    } else {
+      return StringUtil.join("_", tableName, postfix, Integer.toString(sequenceId));
+    }
   }
 }

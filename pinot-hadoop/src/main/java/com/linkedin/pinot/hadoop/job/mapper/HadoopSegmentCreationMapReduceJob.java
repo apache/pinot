@@ -131,7 +131,7 @@ public class HadoopSegmentCreationMapReduceJob {
       LOGGER.info("*********************************************************************");
 
       try {
-        createSegment(_inputFilePath, schema, lineSplits[2]);
+        createSegment(_inputFilePath, schema, Integer.parseInt(lineSplits[2]));
         LOGGER.info("finished segment creation job successfully");
       } catch (Exception e) {
         LOGGER.error("Got exceptions during creating segments!", e);
@@ -142,7 +142,7 @@ public class HadoopSegmentCreationMapReduceJob {
       LOGGER.info("finished the job successfully");
     }
 
-    private String createSegment(String dataFilePath, Schema schema, String seqId) throws Exception {
+    private String createSegment(String dataFilePath, Schema schema, Integer seqId) throws Exception {
       final FileSystem fs = FileSystem.get(new Configuration());
       final Path hdfsDataPath = new Path(dataFilePath);
       final File dataPath = new File(_currentDiskWorkDir, "data");
@@ -161,10 +161,10 @@ public class HadoopSegmentCreationMapReduceJob {
 
       FileFormat fileFormat = getFileFormat(dataFilePath);
       segmentGeneratorConfig.setFormat(fileFormat);
+      segmentGeneratorConfig.setSequenceId(seqId);
+
       if (null != _postfix) {
-        segmentGeneratorConfig.setSegmentNamePostfix(String.format("%s-%s", _postfix, seqId));
-      } else {
-        segmentGeneratorConfig.setSegmentNamePostfix(seqId);
+        segmentGeneratorConfig.setSegmentNamePostfix(_postfix);
       }
       segmentGeneratorConfig.setReaderConfig(getReaderConfig(fileFormat));
 
