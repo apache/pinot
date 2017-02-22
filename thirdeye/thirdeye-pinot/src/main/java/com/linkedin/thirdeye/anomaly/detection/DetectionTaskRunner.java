@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.anomaly.detection;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.linkedin.pinot.pql.parsers.utils.Pair;
+import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyApplication;
 import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeExecutor;
 import com.linkedin.thirdeye.anomaly.override.OverrideConfigHelper;
 import com.linkedin.thirdeye.anomaly.task.TaskContext;
@@ -61,6 +62,7 @@ public class DetectionTaskRunner implements TaskRunner {
   }
 
   public List<TaskResult> execute(TaskInfo taskInfo, TaskContext taskContext) throws Exception {
+    ThirdEyeAnomalyApplication.detectionTaskCounter.inc();
     LOG.info("Begin executing task {}", taskInfo);
 
     setupTask(taskInfo);
@@ -131,7 +133,7 @@ public class DetectionTaskRunner implements TaskRunner {
     // executor on purpose in order to prevent an undesired asynchronous merge happens.
     AnomalyMergeExecutor syncAnomalyMergeExecutor = new AnomalyMergeExecutor(null, anomalyFunctionFactory);
     syncAnomalyMergeExecutor.synchronousMergeBasedOnFunctionIdAndDimension(anomalyFunctionSpec, isBackfill);
-
+    ThirdEyeAnomalyApplication.detectionTaskSuccessCounter.inc();
     return taskResult;
   }
 

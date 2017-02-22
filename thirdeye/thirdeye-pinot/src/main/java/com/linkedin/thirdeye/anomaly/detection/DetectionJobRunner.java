@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
 import com.linkedin.thirdeye.client.DAORegistry;
+import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -24,13 +25,7 @@ import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
 import com.linkedin.thirdeye.anomaly.task.TaskGenerator;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
-import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.JobManager;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
@@ -45,7 +40,6 @@ public class DetectionJobRunner implements Job {
   public static final String DETECTION_JOB_CONTEXT = "DETECTION_JOB_CONTEXT";
   public static final String DETECTION_JOB_MONITORING_WINDOW_START_TIME = "DETECTION_JOB_MONITORING_WINDOW_START_TIME";
   public static final String DETECTION_JOB_MONITORING_WINDOW_END_TIME = "DETECTION_JOB_MONITORING_WINDOW_END_TIME";
-  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
 
   private final static DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
@@ -104,7 +98,6 @@ public class DetectionJobRunner implements Job {
       // write to anomaly_tasks
       List<Long> taskIds = createTasks(monitoringWindowStartTime, monitoringWindowEndTime);
     }
-
   }
 
   private DateTime alignTimestampsToDataTimezone(DateTime inputDateTime, String collection) {

@@ -26,6 +26,7 @@ import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessScheduler;
 import com.linkedin.thirdeye.dashboard.resources.AnomalyFunctionResource;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
+import com.yammer.metrics.core.Counter;
 import io.dropwizard.assets.AssetsBundle;
 import io.dropwizard.lifecycle.Managed;
 import io.dropwizard.setup.Bootstrap;
@@ -51,11 +52,19 @@ public class ThirdEyeAnomalyApplication
   private AlertFilterFactory alertFilterFactory = null;
   private AlertFilterAutotuneFactory alertFilterAutotuneFactory = null;
 
+  public static final Counter detectionTaskCounter =
+      metricsRegistry.newCounter(ThirdEyeAnomalyApplication.class, "detectionTaskCounter");
+
+  public static final Counter detectionTaskSuccessCounter =
+      metricsRegistry.newCounter(ThirdEyeAnomalyApplication.class, "detectionTaskSuccessCounter");
+
   public static void main(final String[] args) throws Exception {
+
     List<String> argList = new ArrayList<>(Arrays.asList(args));
     if (argList.size() == 1) {
       argList.add(0, "server");
     }
+
     int lastIndex = argList.size() - 1;
     String thirdEyeConfigDir = argList.get(lastIndex);
     System.setProperty("dw.rootDir", thirdEyeConfigDir);
