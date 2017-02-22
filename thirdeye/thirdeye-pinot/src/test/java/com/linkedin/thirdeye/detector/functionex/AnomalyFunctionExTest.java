@@ -40,8 +40,7 @@ public class AnomalyFunctionExTest {
       if(hasDataSource(DATASOURCE))
         message = queryDataSource(DATASOURCE, getConfig(CONFIG_QUERY, QUERY_DEFAULT));
       AnomalyFunctionExResult result = new AnomalyFunctionExResult();
-      result.setAnomaly(true);
-      result.setMessage(message);
+      result.addAnomaly(0, 100, message);
       return result;
     }
   }
@@ -67,7 +66,7 @@ public class AnomalyFunctionExTest {
 
     AnomalyFunctionEx func = factory.fromSpec(dto);
 
-    Assert.assertEquals(func.apply().getMessage(), MESSAGE_CUSTOM);
+    Assert.assertEquals(func.apply().getAnomalies().get(0).getMessage(), MESSAGE_CUSTOM);
   }
 
   @Test
@@ -81,7 +80,7 @@ public class AnomalyFunctionExTest {
 
     AnomalyFunctionEx func = factory.fromSpec(dto);
 
-    Assert.assertEquals(func.apply().getMessage(), MESSAGE_DEFAULT);
+    Assert.assertEquals(func.apply().getAnomalies().get(0).getMessage(), MESSAGE_DEFAULT);
   }
 
   @Test
@@ -123,8 +122,8 @@ public class AnomalyFunctionExTest {
 
     Assert.assertEquals(ds.query, QUERY_CUSTOM);
 
-    Assert.assertEquals(result.getMessage(), QUERY_CUSTOM);
-    Assert.assertEquals(result.isAnomaly(), true);
+    Assert.assertFalse(result.getAnomalies().isEmpty());
+    Assert.assertEquals(result.getAnomalies().get(0).getMessage(), QUERY_CUSTOM);
   }
 
 }

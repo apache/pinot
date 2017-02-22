@@ -7,7 +7,7 @@ import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionExDTO;
 public class DetectionExJobContext extends JobContext {
 
   private Long anomalyFunctionId;
-  private AnomalyFunctionExDTO anomalyFunctionSpec;
+  private AnomalyFunctionExDTO anomalyFunctionExSpec;
 
   public Long getAnomalyFunctionId() {
     return anomalyFunctionId;
@@ -17,12 +17,12 @@ public class DetectionExJobContext extends JobContext {
     this.anomalyFunctionId = anomalyFunctionId;
   }
 
-  public AnomalyFunctionExDTO getAnomalyFunctionSpec() {
-    return anomalyFunctionSpec;
+  public AnomalyFunctionExDTO getAnomalyFunctionExSpec() {
+    return anomalyFunctionExSpec;
   }
 
-  public void setAnomalyFunctionSpec(AnomalyFunctionExDTO anomalyFunctionSpec) {
-    this.anomalyFunctionSpec = anomalyFunctionSpec;
+  public void setAnomalyFunctionExSpec(AnomalyFunctionExDTO anomalyFunctionSpec) {
+    this.anomalyFunctionExSpec = anomalyFunctionSpec;
   }
 
 }

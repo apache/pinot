@@ -5,10 +5,8 @@ import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExResult;
 import com.linkedin.thirdeye.detector.functionex.dataframe.DataFrame;
 import com.linkedin.thirdeye.detector.functionex.dataframe.DoubleSeries;
 import com.linkedin.thirdeye.detector.functionex.dataframe.Series;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.List;
 import org.apache.commons.lang3.math.NumberUtils;
 
 public class MultiColumnConditionals extends AnomalyFunctionEx {
@@ -21,9 +19,7 @@ public class MultiColumnConditionals extends AnomalyFunctionEx {
 
     DataFrame df = queryDataSource(datasource, query);
 
-    boolean global_pass = true;
-
-    List<String> messages = new ArrayList<>();
+    AnomalyFunctionExResult result = new AnomalyFunctionExResult();
 
     Collection<String> allConditions = Arrays.asList(conditions.replace(" ", "").split(","));
     for(String condition : allConditions) {
@@ -36,21 +32,22 @@ public class MultiColumnConditionals extends AnomalyFunctionEx {
 
       Series series = df.get(column);
 
+      String message;
+      boolean condition_pass = true;
       if(NumberUtils.isNumber(value)) {
         double d = Double.valueOf(value);
-        boolean condition_pass = series.toDoubles().map(new CustomDoubleConditional(op, d)).allTrue();
-        messages.add(String.format("%s: %b", condition, condition_pass));
-        global_pass &= condition_pass;
+        condition_pass = series.toDoubles().map(new CustomDoubleConditional(op, d)).allTrue();
+        message = String.format("%s: %b", condition, condition_pass);
       } else {
         // TODO implement boolean
         // TODO implement String
         throw new IllegalArgumentException(String.format("Value '%s' is not a number", value));
       }
-    }
 
-    AnomalyFunctionExResult result = new AnomalyFunctionExResult();
-    result.setAnomaly(!global_pass);
-    result.setMessage(String.join(", ", messages));
+      if(!condition_pass) {
+        result.addAnomaly(getContext().getMonitoringWindowStart(), getContext().getMonitoringWindowEnd(), message);
+      }
+    }
 
     return result;
   }

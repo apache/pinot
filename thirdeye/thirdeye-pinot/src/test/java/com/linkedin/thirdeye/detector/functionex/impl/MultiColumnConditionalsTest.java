@@ -4,8 +4,10 @@ import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExContext;
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExDataSource;
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExResult;
 import com.linkedin.thirdeye.detector.functionex.dataframe.DataFrame;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,10 +53,10 @@ public class MultiColumnConditionalsTest {
 
     AnomalyFunctionExResult result = func.apply();
 
-    LOG.info("all should pass. {}", result.getMessage());
-    Assert.assertFalse(result.isAnomaly());
-    Assert.assertTrue(result.getMessage().contains("true"));
-    Assert.assertFalse(result.getMessage().contains("false"));
+    Assert.assertTrue(result.getAnomalies().isEmpty());
+
+    String messages = collectMessages(result);
+    Assert.assertFalse(messages.contains("false"));
   }
 
   @Test
@@ -63,10 +65,10 @@ public class MultiColumnConditionalsTest {
 
     AnomalyFunctionExResult result = func.apply();
 
-    LOG.info("none should pass. {}", result.getMessage());
-    Assert.assertTrue(result.isAnomaly());
-    Assert.assertFalse(result.getMessage().contains("true"));
-    Assert.assertTrue(result.getMessage().contains("false"));
+    Assert.assertFalse(result.getAnomalies().isEmpty());
+
+    String messages = collectMessages(result);
+    Assert.assertTrue(messages.contains("false"));
   }
 
   @Test
@@ -75,10 +77,10 @@ public class MultiColumnConditionalsTest {
 
     AnomalyFunctionExResult result = func.apply();
 
-    LOG.info("all should pass. {}", result.getMessage());
-    Assert.assertFalse(result.isAnomaly());
-    Assert.assertTrue(result.getMessage().contains("true"));
-    Assert.assertFalse(result.getMessage().contains("false"));
+    Assert.assertTrue(result.getAnomalies().isEmpty());
+
+    String messages = collectMessages(result);
+    Assert.assertFalse(messages.contains("false"));
   }
 
   @Test
@@ -87,10 +89,10 @@ public class MultiColumnConditionalsTest {
 
     AnomalyFunctionExResult result = func.apply();
 
-    LOG.info("none should pass. {}", result.getMessage());
-    Assert.assertTrue(result.isAnomaly());
-    Assert.assertFalse(result.getMessage().contains("true"));
-    Assert.assertTrue(result.getMessage().contains("false"));
+    Assert.assertFalse(result.getAnomalies().isEmpty());
+
+    String messages = collectMessages(result);
+    Assert.assertTrue(messages.contains("false"));
   }
 
   @Test
@@ -99,10 +101,18 @@ public class MultiColumnConditionalsTest {
 
     AnomalyFunctionExResult result = func.apply();
 
-    LOG.info("one should not pass. {}", result.getMessage());
-    Assert.assertTrue(result.isAnomaly());
-    Assert.assertTrue(result.getMessage().contains("true"));
-    Assert.assertTrue(result.getMessage().contains("false"));
+    Assert.assertFalse(result.getAnomalies().isEmpty());
+
+    String messages = collectMessages(result);
+    Assert.assertTrue(messages.contains("false"));
+  }
+
+  private static String collectMessages(AnomalyFunctionExResult result) {
+    List<String> messages = new ArrayList<>();
+    for(AnomalyFunctionExResult.Anomaly a : result.getAnomalies()) {
+      messages.add(a.getMessage());
+    }
+    return String.join(", ", messages);
   }
 
 }

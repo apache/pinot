@@ -2,10 +2,16 @@ package com.linkedin.thirdeye.detector.functionex;
 
 public abstract class AnomalyFunctionEx {
 
+  // TODO allow StrSubstitutor of jakarta commons lang
+
   AnomalyFunctionExContext context;
 
   public void setContext(AnomalyFunctionExContext context) {
     this.context = context;
+  }
+
+  public AnomalyFunctionExContext getContext() {
+    return context;
   }
 
   protected String getConfig(String key) {
@@ -22,10 +28,6 @@ public abstract class AnomalyFunctionEx {
     if(!hasDataSource(dataSource))
       throw new IllegalArgumentException(String.format("DataSource '%s' not available", dataSource));
     return (R) context.getDataSources().get(dataSource).query(query, context);
-  }
-
-  protected AnomalyFunctionExContext getContext() {
-    return context;
   }
 
   protected boolean hasDataSource(String dataSource) {

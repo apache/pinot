@@ -52,8 +52,7 @@ public class MinMaxThresholdTest {
 
     AnomalyFunctionExResult result = func.apply();
 
-    LOG.info("all should pass. {}", result.getMessage());
-    Assert.assertFalse(result.isAnomaly());
+    Assert.assertTrue(result.getAnomalies().isEmpty());
   }
 
   @Test
@@ -62,7 +61,6 @@ public class MinMaxThresholdTest {
 
     AnomalyFunctionExResult result = func.apply();
 
-    LOG.info("none should pass. {}", result.getMessage());
-    Assert.assertTrue(result.isAnomaly());
+    Assert.assertFalse(result.getAnomalies().isEmpty());
   }
 }

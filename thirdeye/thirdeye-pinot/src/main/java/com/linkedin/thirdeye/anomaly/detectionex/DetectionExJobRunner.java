@@ -57,7 +57,7 @@ public class DetectionExJobRunner implements Job {
     if (spec == null) {
       LOG.error("AnomalyFunction with id {} does not exist.. Exiting from job execution", anomalyFunctionId);
     } else {
-      detectionJobContext.setAnomalyFunctionSpec(spec);
+      detectionJobContext.setAnomalyFunctionExSpec(spec);
 
       try {
         // write to anomaly_jobs
@@ -111,7 +111,7 @@ public class DetectionExJobRunner implements Job {
 
   private TaskDTO createTask() throws Exception {
     DetectionExTaskInfo taskInfo = new DetectionExTaskInfo();
-    taskInfo.setAnomalyFunctionSpec(detectionJobContext.getAnomalyFunctionSpec());
+    taskInfo.setAnomalyFunctionExSpec(detectionJobContext.getAnomalyFunctionExSpec());
     taskInfo.setJobExecutionId(detectionJobContext.getAnomalyFunctionId());
 
     String taskInfoJson = OBJECT_MAPPER.writeValueAsString(taskInfo);

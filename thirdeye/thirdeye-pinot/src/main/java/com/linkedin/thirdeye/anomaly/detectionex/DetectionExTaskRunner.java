@@ -12,12 +12,16 @@ import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionExDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionEx;
+import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExContext;
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExFactory;
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExResult;
+import com.linkedin.thirdeye.detector.functionex.dataframe.DataFrame;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import org.apache.commons.collections.CollectionUtils;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,7 +42,7 @@ public class DetectionExTaskRunner implements TaskRunner {
   protected void setupTask(TaskInfo taskInfo, TaskContext context) throws Exception {
     DetectionExTaskInfo task = (DetectionExTaskInfo) taskInfo;
     jobExecutionId = task.getJobExecutionId();
-    funcSpec = task.getAnomalyFunctionSpec();
+    funcSpec = task.getAnomalyFunctionExSpec();
     funcFactory = context.getAnomalyFunctionExFactory();
   }
 
@@ -52,13 +56,51 @@ public class DetectionExTaskRunner implements TaskRunner {
     // instantiate function
     AnomalyFunctionEx func = funcFactory.fromSpec(funcSpec);
 
+    // populate context
+    long timestamp = DateTime.now(DateTimeZone.UTC).getMillis() / 1000;
+
+    long alignedTimestamp = (timestamp / 3600) * 3600;
+    long windowStart = alignedTimestamp - 3600;
+    long windowEnd = alignedTimestamp;
+
+    AnomalyFunctionExContext context = func.getContext();
+    context.setMonitoringWindowStart(windowStart);
+    context.setMonitoringWindowEnd(windowEnd);
+
     // apply
     AnomalyFunctionExResult result = func.apply();
 
-    LOG.info("{} anomaly: {}", funcSpec.getName(), result.isAnomaly());
-    LOG.info("{} message: {}", funcSpec.getName(), result.getMessage());
+    LOG.info("{} detected {} anomalies", funcSpec.getName(), result.getAnomalies().size());
 
-    // TODO transform output into raw anomalies?
+    // transform output into raw anomalies
+    for(AnomalyFunctionExResult.Anomaly a : result.getAnomalies()) {
+      RawAnomalyResultDTO dto = new RawAnomalyResultDTO();
+      dto.setMessage(a.getMessage());
+      dto.setCreationTimeUtc(timestamp);
+      dto.setStartTime(a.getStart());
+      dto.setEndTime(a.getEnd());
+
+      // TODO avoid magic field names - refactor raw anomalies?
+      DataFrame df = a.getData();
+      if(df != null) {
+        if (df.contains("score")) {
+          dto.setScore(df.toDoubles("score").mean());
+        }
+        if (df.contains("weight")) {
+          dto.setWeight(df.toDoubles("score").mean());
+        }
+        if (df.contains("current")) {
+          dto.setAvgCurrentVal(df.toDoubles("current").mean());
+        }
+        if (df.contains("baseline")) {
+          dto.setAvgBaselineVal(df.toDoubles("baseline").mean());
+        }
+      }
+
+      // TODO store data and properties
+
+      DAO_REGISTRY.getRawAnomalyResultDAO().save(dto);
+    }
 
     // TODO merge?
 

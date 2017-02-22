@@ -33,8 +33,15 @@ public class MinMaxThreshold extends AnomalyFunctionEx {
     }).allTrue();
 
     AnomalyFunctionExResult result = new AnomalyFunctionExResult();
-    result.setAnomaly(!pass_min || !pass_max);
-    result.setMessage(String.format("pass_min: %b, pass_max: %b", pass_min, pass_max));
+
+    if(!pass_min) {
+      result.addAnomaly(getContext().getMonitoringWindowStart(), getContext().getMonitoringWindowEnd(),
+          String.format("encountered values below %f", min));
+    }
+    if(!pass_max) {
+      result.addAnomaly(getContext().getMonitoringWindowStart(), getContext().getMonitoringWindowEnd(),
+          String.format("encountered values above %f", max));
+    }
 
     return result;
   }
