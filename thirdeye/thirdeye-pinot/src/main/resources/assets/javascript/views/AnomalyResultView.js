@@ -225,36 +225,47 @@ AnomalyResultView.prototype = {
     });
 
   },
+
+  renderAnomalyDetails(anomaly, index) {
+      const regionStart = moment(anomaly.anomalyRegionStart, constants.TIMESERIES_DATE_FORMAT);
+      const regionEnd = moment(anomaly.anomalyRegionEnd, constants.TIMESERIES_DATE_FORMAT);
+
+      const timeDelta = regionEnd.diff(regionStart);
+      const regionDuration = moment.duration(timeDelta);
+
+      const dateFormat = regionDuration.days() > 1 ? constants.DETAILS_DATE_DAYS_FORMAT : constants.DETAILS_DATE_HOURS_FORMAT;
+      const durationUI = `${regionDuration.humanize()} (${regionStart.format(constants.DETAILS_DATE_DAYS_FORMAT)} &ndash; ${regionEnd.format(dateFormat)})`;
+      $(`#anomaly-region-${index}`).html(durationUI);
+
+      // (Todo) remove front end computation when endpoint is refined
+      // https://jira01.corp.linkedin.com:8443/browse/THIRDEYE-1044
+
+      let changeDelta;
+      if (!(anomaly.current && anomaly.baseline)) {
+        changeDelta = 'N/A'
+      } else {
+        const amount = (anomaly.current - anomaly.baseline) / anomaly.baseline % 100;
+        changeDelta = `${amount} %`;
+      }
+      $(`#anomaly-change-${index}`).html(changeDelta);
+  },
+
   renderAnomaliesTab : function(anomaliesWrapper) {
     var anomalies = anomaliesWrapper.anomalyDetailsList;
     for (var idx = 0; idx < anomalies.length; idx++) {
       var anomaly = anomalies[idx];
+
       console.log(anomaly);
 
       var currentRange = anomaly.currentStart + " - " + anomaly.currentEnd;
       var baselineRange = anomaly.baselineStart + " - " + anomaly.baselineEnd;
 
-      var date = [ 'date' ].concat(anomaly.dates);
-      var currentValues = [currentRange].concat(anomaly.currentValues);
-      var baselineValues = [baselineRange].concat(anomaly.baselineValues);
+      var date = ['date'].concat(anomaly.dates);
+      var currentValues = ['current'].concat(anomaly.currentValues);
+      var baselineValues = ['baseline'].concat(anomaly.baselineValues);
       var chartColumns = [ date, currentValues, baselineValues ];
+      const showPoints = date.length <= constants.MAX_POINT_NUM;
 
-      var regionStart = moment(anomaly.anomalyRegionStart, constants.TIMESERIES_DATE_FORMAT).format(constants.DETAILS_DATE_FORMAT);
-      var regionEnd = moment(anomaly.anomalyRegionEnd, constants.TIMESERIES_DATE_FORMAT).format(constants.DETAILS_DATE_FORMAT);
-      $(`#region-start-${idx}`).html(regionStart);
-      $(`#region-end-${idx}`).html(regionEnd);
-
-      var current = anomaly.current;
-      var baseline = anomaly.baseline;
-      $("#current-value-" + idx).html(current);
-      $("#baseline-value-" + idx).html(baseline);
-
-      var dimension = anomaly.anomalyFunctionDimension;
-      $("#dimension-" + idx).html(dimension)
-
-      if (anomaly.anomalyFeedback) {
-        $("#anomaly-feedback-" + idx + " select").val(anomaly.anomalyFeedback);
-      }
 
       // CHART GENERATION
       var chart = c3.generate({
@@ -263,10 +274,16 @@ AnomalyResultView.prototype = {
           x : 'date',
           xFormat : '%Y-%m-%d %H:%M',
           columns : chartColumns,
-          type : 'spline'
+          type : 'line'
+        },
+        point: {
+          show: showPoints,
         },
         legend : {
-          position : 'right'
+          position : 'inset',
+          inset: {
+            anchor: 'top-right',
+          }
         },
         axis : {
           y : {
@@ -288,6 +305,7 @@ AnomalyResultView.prototype = {
         } ]
       });
 
+      this.renderAnomalyDetails(anomaly, idx);
       this.setupListenersOnAnomaly(idx, anomaly);
     }
   },
