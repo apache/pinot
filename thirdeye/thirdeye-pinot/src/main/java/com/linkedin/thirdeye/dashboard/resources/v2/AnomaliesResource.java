@@ -437,9 +437,12 @@ public class AnomaliesResource {
 
   private Map<String, String> getAnomalyMessageDataMap(String message) {
     Map<String, String> messageDataMap = new HashMap<>();
-    String[] tokens = message.split("[,:]");
-    for (int i = 0; i < tokens.length; i = i+2) {
-      messageDataMap.put(tokens[i].trim(), tokens[i+1].trim());
+    String[] tokenPairs = message.split("[,]");
+    for (String tokenPair : tokenPairs) {
+      if (tokenPair.contains(":")) {
+        String[] tokens = tokenPair.split(":");
+        messageDataMap.put(tokens[0].trim(), tokens[1].trim());
+      }
     }
     LOG.info("Map {}", messageDataMap);
     return messageDataMap;
