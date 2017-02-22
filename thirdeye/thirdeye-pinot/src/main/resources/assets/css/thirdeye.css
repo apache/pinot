@@ -498,6 +498,14 @@ text {
   min-width: 0;
 }
 
+.anomaly-details-items--small {
+  flex-basis: calc(100%/3);
+}
+
+.anomaly-details-items + .anomaly-details-items {
+  border-left: 1px solid #CCC;
+}
+
 .anomaly-change-delta.negative {
   color: #ee1620
 }
@@ -506,13 +514,8 @@ text {
   color: #398b18
 }
 
-
-.anomaly-details-items--small {
-  flex-basis: calc(100%/3);
-}
-
-.anomaly-details-items + .anomaly-details-items {
-  border-left: 1px solid #CCC;
+.anomaly-duration {
+  text-transform: capitalize;
 }
 
 /* Common */
@@ -529,12 +532,13 @@ text {
   transition-timing-function: cubic-bezier(0,0,.2,1);
 }
 
-.thirdeye-btn:hover {
+.thirdeye-btn:hover,
+.thirdeye-btn:focus {
   background-color: #0073b1;
   color: white;
 }
 
-.thirdeye-btn:focus{
+.thirdeye-btn:active{
   color: white;
   background-color: #006097;
 }

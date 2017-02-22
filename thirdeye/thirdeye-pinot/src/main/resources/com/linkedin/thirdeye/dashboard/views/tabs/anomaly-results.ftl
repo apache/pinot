@@ -15,7 +15,7 @@
                 <span>&num;{{anomalyId}} {{metric}}</span>
               </div>
               <div id="root-cause-analysis-button-{{anomalyIndex}}">
-                <button type="button" class="btn thirdeye-btn btn-sm pull-right">Investigate</button>
+                <a type="button" class="btn thirdeye-btn btn-sm pull-right">Investigate</a>
               </div>
             </div>
 
@@ -29,7 +29,7 @@
               <div class="anomaly-details-row">
                 <div class="anomaly-details-items anomaly-details-items--small">
                   <label class="label-medium-semibold">Change</label>
-                  <span class="anomaly-change-delta {{colorDelta changeDelta}}">{{changeDelta}} </span>
+                  <span class="anomaly-change-delta {{colorDelta changeDelta}}">{{changeDelta}}</span>
                 </div>
 
                 <div class="anomaly-details-items anomaly-details-items--small">
@@ -61,7 +61,7 @@
               <div class="anomaly-details-row">
                 <div class="anomaly-details-items">
                   <label class="label-medium-semibold">Duration</label>
-                  <span>{{duration}}</span>
+                  <span class="anomaly-duration">{{duration}}</span>
                 </div>
 
                 <div class="anomaly-details-items">

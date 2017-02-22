@@ -115,31 +115,47 @@ AnomalyResultModel.prototype = {
     this.renderViewEvent.notify();
   },
 
-  formatAnomalies(){
-    this.anomaliesWrapper.anomalyDetailsList.forEach((anomaly, index) => {
+  getRegionDuration(start, end) {
+    const regionStart = moment(start, constants.TIMESERIES_DATE_FORMAT);
+    const regionEnd = moment(end, constants.TIMESERIES_DATE_FORMAT);
+    const isSameDay = regionStart.isSame(regionEnd, 'day');
+    const timeDelta = regionEnd.diff(regionStart);
+    const regionDuration = moment.duration(timeDelta);
+    let regionStartFormat;
+    let regionEndFormat;
+
+    if (isSameDay) {
+      regionStartFormat = constants.DETAILS_DATE_DAYS_FORMAT;
+      regionEndFormat = constants.DETAILS_DATE_HOURS_FORMAT;
+    } else {
+      regionStartFormat = regionEndFormat = constants.DETAILS_DATE_DAYS_FORMAT;
+    }
+
+    return `${regionDuration.humanize()} (${regionStart.format(regionStartFormat)} - ${regionEnd.format(regionEndFormat)})`;
+  },
+
+  getChangeDelta(current, baseline) {
+    let changeDelta;
+    if (!(current && baseline)) {
+      changeDelta = 'N/A'
+    } else {
+      const amount = (current - baseline) / baseline * 100;
+      changeDelta = `${amount.toFixed(2)}%`;
+    }
+
+    return changeDelta;
+  },
+
+  formatAnomalies() {
+    this.anomaliesWrapper.anomalyDetailsList.forEach((anomaly) => {
       if (!anomaly) {
         return;
       }
-      const regionStart = moment(anomaly.anomalyRegionStart, constants.TIMESERIES_DATE_FORMAT);
-      const regionEnd = moment(anomaly.anomalyRegionEnd, constants.TIMESERIES_DATE_FORMAT);
-      const timeDelta = regionEnd.diff(regionStart);
-      const regionDuration = moment.duration(timeDelta);
-      const dateFormat = regionDuration.days() > 1 ? constants.DETAILS_DATE_DAYS_FORMAT : constants.DETAILS_DATE_HOURS_FORMAT;
-
-      let changeDelta;
-      if (!(anomaly.current && anomaly.baseline)) {
-        changeDelta = 'N/A'
-      } else {
-        const amount = (anomaly.current - anomaly.baseline) / anomaly.baseline * 100;
-        changeDelta = `${amount.toFixed(2)}%`;
-      }
-
-      anomaly.duration = `${regionDuration.humanize()} (${regionStart.format(constants.DETAILS_DATE_DAYS_FORMAT)} - ${regionEnd.format(dateFormat)})`;
-      anomaly.changeDelta = changeDelta;
-
-      this.anomaliesWrapper.anomalyDetailsList[index] = anomaly;
+      anomaly.duration = this.getRegionDuration(anomaly.anomalyRegionStart, anomaly.anomalyRegionEnd);
+      anomaly.changeDelta = this.getChangeDelta(anomaly.current, anomaly.baseline);
     });
   },
+
   // Instead of calling rebuild for a simple anomaly feedback change, made a smaller function
   updateAnomalyFeedback : function() {
     console.log("Updating feedback at backend");
