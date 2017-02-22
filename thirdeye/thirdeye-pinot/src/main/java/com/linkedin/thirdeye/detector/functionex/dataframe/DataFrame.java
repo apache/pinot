@@ -89,6 +89,16 @@ public class DataFrame {
     addSeries(seriesName, DataFrame.toSeries(values));
   }
 
+  public void dropSeries(String seriesName) {
+    this.series.remove(seriesName);
+  }
+
+  public void renameSeries(String oldName, String newName) {
+    Series s = assertSeriesExists(oldName);
+    this.dropSeries(oldName);
+    this.addSeries(newName, s);
+  }
+
   public LongSeries getIndex() {
     return index;
   }
@@ -283,6 +293,61 @@ public class DataFrame {
     return this.filter(this.toBooleans(seriesName));
   }
 
+  public DataFrame filter(String seriesName, DoubleSeries.DoubleConditional conditional) {
+    return this.filter(assertSeriesExists(seriesName).toDoubles().map(conditional));
+  }
+
+  public DataFrame filter(String seriesName, LongSeries.LongConditional conditional) {
+    return this.filter(assertSeriesExists(seriesName).toLongs().map(conditional));
+  }
+
+  public DataFrame filter(String seriesName, StringSeries.StringConditional conditional) {
+    return this.filter(assertSeriesExists(seriesName).toStrings().map(conditional));
+  }
+
+  public DataFrame filterEquals(String seriesName, double value) {
+    return this.filter(seriesName, new DoubleSeries.DoubleConditional() {
+      @Override
+      public boolean apply(double v) {
+        return value == v;
+      }
+    });
+  }
+
+  public DataFrame filterEquals(String seriesName, long value) {
+    return this.filter(seriesName, new LongSeries.LongConditional() {
+      @Override
+      public boolean apply(long v) {
+        return value == v;
+      }
+    });
+  }
+
+  public DataFrame filterEquals(String seriesName, String value) {
+    return this.filter(seriesName, new StringSeries.StringConditional() {
+      @Override
+      public boolean apply(String v) {
+        return value.equals(v);
+      }
+    });
+  }
+
+  public double getDouble(String seriesName) {
+    return assertSingleValue(seriesName).toDoubles().first();
+  }
+
+  public long getLong(String seriesName) {
+    return assertSingleValue(seriesName).toLongs().first();
+  }
+
+  public String getString(String seriesName) {
+    return assertSingleValue(seriesName).toStrings().first();
+  }
+
+  public boolean getBoolean(String seriesName) {
+    return assertSingleValue(seriesName).toBooleans().first();
+  }
+
   @Override
   public String toString() {
     StringBuilder builder = new StringBuilder();
@@ -300,6 +365,12 @@ public class DataFrame {
   private Series assertSeriesExists(String name) {
     if(!series.containsKey(name))
       throw new IllegalArgumentException(String.format("Unknown series '%s'", name));
+    return series.get(name);
+  }
+
+  private Series assertSingleValue(String name) {
+    if(assertSeriesExists(name).size() != 1)
+      throw new IllegalArgumentException("Series must have exactly one element");
     return series.get(name);
   }
 

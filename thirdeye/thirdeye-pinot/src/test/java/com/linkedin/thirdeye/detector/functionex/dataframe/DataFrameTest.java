@@ -323,10 +323,63 @@ public class DataFrameTest {
   public void testFilter() {
     DataFrame ndf = df.filter(DataFrame.toSeries(true, false, true, true, false));
 
+    Assert.assertEquals(ndf.getIndex().size(), 3);
     Assert.assertEquals(ndf.getIndex().values(), new long[] { -1, -2, 4 });
     Assert.assertEquals(ndf.toDoubles("double").values(), new double[] { -2.1, 0.0, 0.5 });
     Assert.assertEquals(ndf.toLongs("long").values(), new long[] { -2, 0, 1 });
     Assert.assertEquals(ndf.toStrings("string").values(), new String[] { "-2.3", "0.0", "0.5"  });
     Assert.assertEquals(ndf.toBooleans("boolean").values(), new boolean[] { true, false, true });
   }
+
+  @Test
+  public void testFilterAll() {
+    DataFrame ndf = df.filter(DataFrame.toSeries(true, true, true, true, true));
+    Assert.assertEquals(ndf.getIndex().size(), 5);
+  }
+
+  @Test
+  public void testFilterNone() {
+    DataFrame ndf = df.filter(DataFrame.toSeries(false, false, false, false, false));
+    Assert.assertEquals(ndf.getIndex().size(), 0);
+  }
+
+  @Test
+  public void testGetSingleValue() {
+    DataFrame ndf = df.filter(DataFrame.toSeries(true, false, false, false, false));
+
+    Assert.assertEquals(ndf.getDouble("double"), -2.1);
+    Assert.assertEquals(ndf.getLong("long"), -2);
+    Assert.assertEquals(ndf.getString("string"), "-2.3");
+    Assert.assertEquals(ndf.getBoolean("boolean"), true);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testGetSingleValueMultipleDoubleFail() {
+    df.getDouble("double");
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testGetSingleValueNoDoubleFail() {
+    DataFrame ndf = df.filter(DataFrame.toSeries(false, false, false, false, false));
+    ndf.getDouble("double");
+  }
+
+  @Test
+  public void testRenameSeries() {
+    df.renameSeries("double", "new");
+    df.toDoubles("new");
+    try {
+      df.toDoubles("double");
+      Assert.fail();
+    } catch(IllegalArgumentException e) {
+      // left blank
+    }
+  }
+
+  @Test
+  public void testRenameSeriesOverride() {
+    df.renameSeries("double", "long");
+    Assert.assertEquals(df.toDoubles("long").values(), VALUES_DOUBLE);
+  }
+
 }
