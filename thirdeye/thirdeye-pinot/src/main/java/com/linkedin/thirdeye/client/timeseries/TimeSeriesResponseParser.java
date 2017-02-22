@@ -24,7 +24,6 @@ import com.linkedin.thirdeye.client.ThirdEyeResponse;
 import com.linkedin.thirdeye.client.ThirdEyeResponseRow;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow.Builder;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow.TimeSeriesMetric;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 //Heavily based off TimeOnTime equivalent
@@ -43,7 +42,7 @@ public class TimeSeriesResponseParser {
   private Map<String, Double> metricThresholds = new HashMap<>();
 
   public TimeSeriesResponseParser(ThirdEyeResponse response, List<Range<DateTime>> ranges,
-      TimeGranularity timeGranularity, List<String> groupByDimensions, MetricConfigManager metricConfigDAO) {
+      TimeGranularity timeGranularity, List<String> groupByDimensions) {
     this.response = response;
     this.ranges = ranges;
     this.aggTimeGranularity = timeGranularity;
@@ -111,9 +110,9 @@ public class TimeSeriesResponseParser {
 
     // group by dimension names (the 0th dimension, which is the time bucket, is skipped).
     List<String> groupKeyColumns = response.getGroupKeyColumns();
-    List<String> dimensionName = new ArrayList<>(groupKeyColumns.size() - 1);
+    List<String> dimensionNameList = new ArrayList<>(groupKeyColumns.size() - 1);
     for (int i = 1; i < groupKeyColumns.size(); ++i) {
-      dimensionName.add(groupKeyColumns.get(i));
+      dimensionNameList.add(groupKeyColumns.get(i));
     }
 
     // other row
@@ -127,9 +126,9 @@ public class TimeSeriesResponseParser {
       TimeSeriesRow.Builder builder = new TimeSeriesRow.Builder();
       builder.setStart(timeRange.lowerEndpoint());
       builder.setEnd(timeRange.upperEndpoint());
-      builder.setDimensionNames(dimensionName);
-      List<String> dimensionValues = new ArrayList(dimensionName.size());
-      for (int i = 0; i < dimensionName.size(); ++i) {
+      builder.setDimensionNames(dimensionNameList);
+      List<String> dimensionValues = new ArrayList(dimensionNameList.size());
+      for (int i = 0; i < dimensionNameList.size(); ++i) {
         dimensionValues.add(OTHER);
       }
       builder.setDimensionValues(dimensionValues);
@@ -157,7 +156,7 @@ public class TimeSeriesResponseParser {
         TimeSeriesRow.Builder builder = new TimeSeriesRow.Builder();
         builder.setStart(timeRange.lowerEndpoint());
         builder.setEnd(timeRange.upperEndpoint());
-        builder.setDimensionNames(dimensionName);
+        builder.setDimensionNames(dimensionNameList);
         builder.setDimensionValues(dimensionValues);
         addMetric(responseRow, builder);
 
@@ -173,9 +172,8 @@ public class TimeSeriesResponseParser {
           break;
         }
       }
-
-      if (passedThreshold) { // if any of the cells of a contributor row passes threshold, add all
-                             // those cells
+      // if any of the cells of a contributor row passes threshold, add all those cells
+      if (passedThreshold && !dimensionValues.contains(OTHER)) {
         rows.addAll(thresholdRows);
       } else { // else that row of cells goes into OTHER
         includeOther = true;
