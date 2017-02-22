@@ -63,6 +63,14 @@ public class DefaultSegmentNameGenerator implements SegmentNameGenerator {
    * If there is no time column, _segmentNamePostfix = "postfix" and _sequenceId = 1, the segment name would be
    * tableName_postfix_1
    *
+   * If there is no time column, no postfix, and no sequence id, the segment name would be
+   * tableName
+   *
+   * If there is no time column, a postfix, and no sequence id, the segment name would be
+   * tableName_postfix
+   *
+   * If there is no time column, no postfix, and a sequence id, the segment name would be
+   * tableName_sequenceId
    *
    * @param statsCollector
    * @return
@@ -79,15 +87,23 @@ public class DefaultSegmentNameGenerator implements SegmentNameGenerator {
     if (_timeColumnName != null && _timeColumnName.length() > 0) {
       final Object minTimeValue = statsCollector.getMinValue();
       final Object maxTimeValue = statsCollector.getMaxValue();
-      segmentName = buildBasic(_tableName, minTimeValue, maxTimeValue, _segmentNamePostfix, _sequenceId);
+      if (_segmentNamePostfix == null) {
+        segmentName = buildBasic(_tableName, minTimeValue, maxTimeValue, _sequenceId);
+      } else {
+        segmentName = buildBasic(_tableName, minTimeValue, maxTimeValue, _sequenceId, _segmentNamePostfix);
+      }
     } else {
-      segmentName = buildBasic(_tableName, _segmentNamePostfix, _sequenceId);
+      if (_segmentNamePostfix == null) {
+        segmentName = buildBasic(_tableName, _sequenceId);
+      } else {
+        segmentName = buildBasic(_tableName, _sequenceId, _segmentNamePostfix);
+      }
     }
 
     return segmentName;
   }
 
-  protected static String buildBasic(String tableName, Object minTimeValue, Object maxTimeValue, String postfix, int sequenceId) {
+  protected static String buildBasic(String tableName, Object minTimeValue, Object maxTimeValue, int sequenceId, String postfix) {
     if (sequenceId == -1) {
       return StringUtil.join("_", tableName, minTimeValue.toString(), maxTimeValue.toString(), postfix);
     } else {
@@ -95,8 +111,24 @@ public class DefaultSegmentNameGenerator implements SegmentNameGenerator {
     }
   }
 
-  protected static String buildBasic(String tableName, String postfix, int sequenceId) {
-    if (sequenceId == -1 ) {
+  protected static String buildBasic(String tableName, Object minTimeValue, Object maxTimeValue, int sequenceId) {
+    if (sequenceId == -1) {
+      return StringUtil.join("_", tableName, minTimeValue.toString(), maxTimeValue.toString());
+    } else {
+      return StringUtil.join("_", tableName, minTimeValue.toString(), maxTimeValue.toString(), Integer.toString(sequenceId));
+    }
+  }
+
+  protected static String buildBasic(String tableName, int sequenceId) {
+    if (sequenceId == -1) {
+      return tableName;
+    } else {
+      return StringUtil.join("_", tableName, Integer.toString(sequenceId));
+    }
+  }
+
+  protected static String buildBasic(String tableName, int sequenceId, String postfix) {
+    if (sequenceId == -1) {
       return StringUtil.join("_", tableName, postfix);
     } else {
       return StringUtil.join("_", tableName, postfix, Integer.toString(sequenceId));

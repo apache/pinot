@@ -110,4 +110,43 @@ public class DefaultSegmentNameGeneratorTest {
     driver.build();
     Assert.assertEquals(driver.getSegmentName(), "mytable_1_2");
   }
+
+  @Test
+  public void testNullPostfix() throws Exception {
+    ColumnMetadataTest columnMetadataTest = new ColumnMetadataTest();
+    // Build the Segment metadata.
+    SegmentGeneratorConfig config = columnMetadataTest.CreateSegmentConfigWithoutCreator();
+    SegmentNameGenerator segmentNameGenerator = new DefaultSegmentNameGenerator("daysSinceEpoch", "mytable", null, -1);
+    config.setSegmentNameGenerator(segmentNameGenerator);
+    SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    driver.init(config);
+    driver.build();
+    Assert.assertEquals(driver.getSegmentName(), "mytable_1756015683_1756015683");
+  }
+
+  @Test
+  public void testNullPostfixWithNonNegSequenceId() throws Exception {
+    ColumnMetadataTest columnMetadataTest = new ColumnMetadataTest();
+    // Build the Segment metadata.
+    SegmentGeneratorConfig config = columnMetadataTest.CreateSegmentConfigWithoutCreator();
+    SegmentNameGenerator segmentNameGenerator = new DefaultSegmentNameGenerator("daysSinceEpoch", "mytable", null, 2);
+    config.setSegmentNameGenerator(segmentNameGenerator);
+    SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    driver.init(config);
+    driver.build();
+    Assert.assertEquals(driver.getSegmentName(), "mytable_1756015683_1756015683_2");
+  }
+
+  @Test
+  public void testOnlyTableName() throws Exception {
+    ColumnMetadataTest columnMetadataTest = new ColumnMetadataTest();
+    // Build the Segment metadata.
+    SegmentGeneratorConfig config = columnMetadataTest.CreateSegmentConfigWithoutCreator();
+    SegmentNameGenerator segmentNameGenerator = new DefaultSegmentNameGenerator(null, "mytable", null, -1);
+    config.setSegmentNameGenerator(segmentNameGenerator);
+    SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    driver.init(config);
+    driver.build();
+    Assert.assertEquals(driver.getSegmentName(), "mytable");
+  }
 }
