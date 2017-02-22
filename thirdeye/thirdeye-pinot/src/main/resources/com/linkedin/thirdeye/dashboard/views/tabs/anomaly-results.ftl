@@ -15,7 +15,7 @@
                 <span>&num;{{anomalyId}} {{metric}}</span>
               </div>
               <div id="root-cause-analysis-button-{{anomalyIndex}}">
-                <button type="button" class="btn btn-primary btn-sm pull-right">Investigate</button>
+                <button type="button" class="btn thirdeye-btn btn-sm pull-right">Investigate</button>
               </div>
             </div>
 

@@ -68,7 +68,7 @@
 					</div>
 				</div> -->
 				<div class="col-md-2 filter-apply-button" id="apply-button">
-					<input type="button" class="btn btn-primary btn-sm" value="Apply" />
+					<input type="button" class="btn thirdeye-btn" value="Apply" />
 				</div>
 			</div>
 		</div>

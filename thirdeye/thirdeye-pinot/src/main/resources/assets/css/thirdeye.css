@@ -1,6 +1,6 @@
 body {
     font-family: SourceSansPro, sans-serif;
-    font-weight: lighter;
+    font-weight: normal;
     font-size: 15px;
     background-color: #F3F6F8;
     color: #080808
@@ -23,16 +23,16 @@ label {
     font-size: 15px;
 }
 .label-medium-semibold {
-    font-weight: 400;
+    font-weight: 600;
     font-size: 15px;
     margin-bottom: 0;
 }
 .label-small-semibold {
-    font-weight: 400;
+    font-weight: 600;
     font-size: 11px;
 }
 .dashboard-metric-label {
-    font-weight: 400;
+    font-weight: 600;
     font-size: 13px;
 }
 .wow-summary-content {
@@ -466,7 +466,8 @@ text {
 }
 
 .anomaly-result-title {
-  font-weight: bold;
+  font-weight: 600;
+  font-size: 17px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -512,5 +513,29 @@ text {
 
 .anomaly-details-items + .anomaly-details-items {
   border-left: 1px solid #CCC;
+}
+
+/* Common */
+.thirdeye-btn, .thirdeye-btn:hover  {
+  color: white;
+  font-weight: 600;
+  background-color: #0084bf;
+  font-size: 17px;
+  padding: 0 16px;
+  line-height: 32px;
+  border-radius: 2px;
+  transition-duration: 167ms;
+  transition-property: background-color,color;
+  transition-timing-function: cubic-bezier(0,0,.2,1);
+}
+
+.thirdeye-btn:hover {
+  background-color: #0073b1;
+  color: white;
+}
+
+.thirdeye-btn:focus{
+  color: white;
+  background-color: #006097;
 }
 
