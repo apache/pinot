@@ -81,6 +81,11 @@ public final class StringSeries extends Series {
   }
 
   @Override
+  public StringSeries copy() {
+    return new StringSeries(Arrays.copyOf(this.values, this.values.length));
+  }
+
+  @Override
   public DoubleSeries toDoubles() {
     return new DoubleSeries(this.values);
   }
@@ -239,6 +244,12 @@ public final class StringSeries extends Series {
       values[i] = grouper.apply(gvalues);
     }
     return new StringSeries(values);
+  }
+
+  private static String[] assertNotEmpty(String[] values) {
+    if(values.length <= 0)
+      throw new IllegalStateException("Must contain at least one value");
+    return values;
   }
 
   @Override

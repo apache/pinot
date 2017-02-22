@@ -71,6 +71,11 @@ public final class BooleanSeries extends Series {
   }
 
   @Override
+  public BooleanSeries copy() {
+    return new BooleanSeries(Arrays.copyOf(this.values, this.values.length));
+  }
+
+  @Override
   public DoubleSeries toDoubles() {
     return new DoubleSeries(this.values);
   }
@@ -105,10 +110,12 @@ public final class BooleanSeries extends Series {
   }
 
   public boolean first() {
+    assertNotEmpty(this.values);
     return this.values[0];
   }
 
   public boolean last() {
+    assertNotEmpty(this.values);
     return this.values[this.values.length-1];
   }
 
@@ -241,6 +248,12 @@ public final class BooleanSeries extends Series {
       values[i] = this.values[fromIndex[i]];
     }
     return new BooleanSeries(values);
+  }
+
+  private static boolean[] assertNotEmpty(boolean[] values) {
+    if(values.length <= 0)
+      throw new IllegalStateException("Must contain at least one value");
+    return values;
   }
 
   @Override

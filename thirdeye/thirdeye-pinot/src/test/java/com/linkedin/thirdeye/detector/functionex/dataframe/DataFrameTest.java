@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.detector.functionex.dataframe;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
@@ -22,6 +23,9 @@ public class DataFrameTest {
   // TODO test string batch function
   // TODO test boolean batch function
 
+  // TODO string test head, tail, accessors
+  // TODO boolean test head, tail, accessors
+
   DataFrame df;
 
   @BeforeMethod
@@ -40,7 +44,7 @@ public class DataFrameTest {
 
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testEnforceSeriesLengthFail() {
-    df.addSeries("series", new double[] { 0.1, 3.2});
+    df.addSeries("series", 0.1, 3.2);
   }
 
   @Test
@@ -127,25 +131,25 @@ public class DataFrameTest {
 
   @Test
   public void testSortDouble() {
-    DoubleSeries in = DataFrame.toSeries(new double[] { 3, 1.5, 1.3, 5, 1.9 });
+    DoubleSeries in = DataFrame.toSeries(3, 1.5, 1.3, 5, 1.9);
     Assert.assertEquals(in.sort().values(), new double[] { 1.3, 1.5, 1.9, 3, 5 });
   }
 
   @Test
   public void testSortLong() {
-    LongSeries in = DataFrame.toSeries(new long[] { 3, 15, 13, 5, 19 });
+    LongSeries in = DataFrame.toSeries(3, 15, 13, 5, 19);
     Assert.assertEquals(in.sort().values(), new long[] { 3, 5, 13, 15, 19 });
   }
 
   @Test
   public void testSortString() {
-    StringSeries in = DataFrame.toSeries(new String[] { "b", "a", "ba", "ab", "aa" });
+    StringSeries in = DataFrame.toSeries("b", "a", "ba", "ab", "aa");
     Assert.assertEquals(in.sort().values(), new String[] { "a", "aa", "ab", "b", "ba" });
   }
 
   @Test
   public void testSortBoolean() {
-    BooleanSeries in = DataFrame.toSeries(new boolean[] { true, false, false, true, false });
+    BooleanSeries in = DataFrame.toSeries(true, false, false, true, false);
     Assert.assertEquals(in.sort().values(), new boolean[] { false, false, false, true, true });
   }
 
@@ -206,7 +210,7 @@ public class DataFrameTest {
 
   @Test
   public void testLongBucketsByInterval() {
-    LongSeries in = DataFrame.toSeries(new long[] { 3, 15, 13, 5, 19, 20 });
+    LongSeries in = DataFrame.toSeries(3, 15, 13, 5, 19, 20);
     List<Series.Bucket> buckets = in.bucketsByInterval(4);
 
     Assert.assertEquals(buckets.size(), 6);
@@ -220,7 +224,7 @@ public class DataFrameTest {
 
   @Test
   public void testLongBucketsByCountAligned() {
-    LongSeries in = DataFrame.toSeries(new long[] { 3, 15, 13, 5, 19, 20 });
+    LongSeries in = DataFrame.toSeries(3, 15, 13, 5, 19, 20);
     List<Series.Bucket> buckets = in.bucketsByCount(3);
 
     Assert.assertEquals(buckets.size(), 2);
@@ -231,7 +235,7 @@ public class DataFrameTest {
 
   @Test
   public void testLongBucketsByCountUnaligned() {
-    LongSeries in = DataFrame.toSeries(new long[] { 3, 15, 13, 5, 19, 11, 12, 9 });
+    LongSeries in = DataFrame.toSeries(3, 15, 13, 5, 19, 11, 12, 9);
     List<Series.Bucket> buckets = in.bucketsByCount(3);
 
     Assert.assertEquals(buckets.size(), 3);
@@ -247,8 +251,8 @@ public class DataFrameTest {
     buckets.add(new Series.Bucket(new int[] {}));
     buckets.add(new Series.Bucket(new int[] { 0, 2 }));
 
-    LongSeries in = DataFrame.toSeries(new long[] { 3, 15, 13, 5, 19 });
-    LongSeries out = in.groupBy(buckets, 0, new LongSeries.LongBatchAdd());
+    LongSeries in = DataFrame.toSeries(3, 15, 13, 5, 19 );
+    LongSeries out = in.groupBy(buckets, 0, new LongSeries.LongBatchSum());
     Assert.assertEquals(out.values(), new long[] { 39, 0, 16 });
   }
 
@@ -259,18 +263,18 @@ public class DataFrameTest {
     buckets.add(new Series.Bucket(new int[] {}));
     buckets.add(new Series.Bucket(new int[] { 0, 2 }));
 
-    LongSeries in = DataFrame.toSeries(new long[] { 3, 15, 13, 5, 19 });
+    LongSeries in = DataFrame.toSeries(3, 15, 13, 5, 19 );
     LongSeries out = in.groupBy(buckets, -1, new LongSeries.LongBatchLast());
     Assert.assertEquals(out.values(), new long[] { 19, -1, 13 });
   }
 
   @Test
   public void testLongBucketsGroupByEndToEnd() {
-    LongSeries in = DataFrame.toSeries(new long[] { 0, 3, 12, 2, 4, 8, 5, 1, 7, 9, 6, 10, 11 });
+    LongSeries in = DataFrame.toSeries(0, 3, 12, 2, 4, 8, 5, 1, 7, 9, 6, 10, 11);
     List<Series.Bucket> buckets = in.bucketsByInterval(4);
     Assert.assertEquals(buckets.size(), 4);
 
-    LongSeries out = in.groupBy(buckets, 0, new LongSeries.LongBatchAdd());
+    LongSeries out = in.groupBy(buckets, 0, new LongSeries.LongBatchSum());
     Assert.assertEquals(out.values(), new long[] { 6, 22, 38, 12 });
   }
 
@@ -380,6 +384,143 @@ public class DataFrameTest {
   public void testRenameSeriesOverride() {
     df.renameSeries("double", "long");
     Assert.assertEquals(df.toDoubles("long").values(), VALUES_DOUBLE);
+  }
+
+  @Test
+  public void testContains() {
+    Assert.assertTrue(df.contains("double"));
+    Assert.assertFalse(df.contains("NOT_VALID"));
+  }
+
+  @Test
+  public void testCopy() {
+    DataFrame ndf = df.copy();
+
+    ndf.toDoubles("double").values()[0] = 100.0;
+    Assert.assertNotEquals(df.toDoubles("double").first(), ndf.toDoubles("double").first());
+
+    ndf.toLongs("long").values()[0] = 100;
+    Assert.assertNotEquals(df.toLongs("long").first(), ndf.toLongs("long").first());
+
+    ndf.toStrings("string").values()[0] = "other string";
+    Assert.assertNotEquals(df.toStrings("string").first(), ndf.toStrings("string").first());
+
+    ndf.toBooleans("boolean").values()[0] = false;
+    Assert.assertNotEquals(df.toBooleans("boolean").first(), ndf.toBooleans("boolean").first());
+  }
+
+  @Test
+  public void testDoubleHead() {
+    DoubleSeries s = DataFrame.toSeries(VALUES_DOUBLE);
+    Assert.assertEquals(s.head(0).values(), new double[]{});
+    Assert.assertEquals(s.head(3).values(), Arrays.copyOfRange(VALUES_DOUBLE, 0, 3));
+    Assert.assertEquals(s.head(6).values(), Arrays.copyOfRange(VALUES_DOUBLE, 0, 5));
+  }
+
+  @Test
+  public void testDoubleTail() {
+    DoubleSeries s = DataFrame.toSeries(VALUES_DOUBLE);
+    Assert.assertEquals(s.tail(0).values(), new double[] {});
+    Assert.assertEquals(s.tail(3).values(), Arrays.copyOfRange(VALUES_DOUBLE, 2, 5));
+    Assert.assertEquals(s.tail(6).values(), Arrays.copyOfRange(VALUES_DOUBLE, 0, 5));
+  }
+
+  @Test
+  public void testDoubleAccessorsEmpty() {
+    DoubleSeries s = new DoubleSeries(new double[] {});
+    Assert.assertEquals(s.sum(), 0.0d);
+
+    try {
+      s.first();
+      Assert.fail();
+    } catch(IllegalStateException e) {
+      // left blank
+    }
+
+    try {
+      s.last();
+      Assert.fail();
+    } catch(IllegalStateException e) {
+      // left blank
+    }
+
+    try {
+      s.min();
+      Assert.fail();
+    } catch(IllegalStateException e) {
+      // left blank
+    }
+
+    try {
+      s.max();
+      Assert.fail();
+    } catch(IllegalStateException e) {
+      // left blank
+    }
+
+    try {
+      s.mean();
+      Assert.fail();
+    } catch(IllegalStateException e) {
+      // left blank
+    }
+  }
+
+  @Test
+  public void testLongHead() {
+    LongSeries s = DataFrame.toSeries(VALUES_LONG);
+    Assert.assertEquals(s.head(0).values(), new long[] {});
+    Assert.assertEquals(s.head(3).values(), Arrays.copyOfRange(VALUES_LONG, 0, 3));
+    Assert.assertEquals(s.head(6).values(), Arrays.copyOfRange(VALUES_LONG, 0, 5));
+  }
+
+  @Test
+  public void testLongTail() {
+    LongSeries s = DataFrame.toSeries(VALUES_LONG);
+    Assert.assertEquals(s.tail(0).values(), new long[] {});
+    Assert.assertEquals(s.tail(3).values(), Arrays.copyOfRange(VALUES_LONG, 2, 5));
+    Assert.assertEquals(s.tail(6).values(), Arrays.copyOfRange(VALUES_LONG, 0, 5));
+  }
+
+  @Test
+  public void testLongAccessorsEmpty() {
+    LongSeries s = new LongSeries(new long[] {});
+    Assert.assertEquals(s.sum(), 0);
+
+    try {
+      s.first();
+      Assert.fail();
+    } catch(IllegalStateException e) {
+      // left blank
+    }
+
+    try {
+      s.last();
+      Assert.fail();
+    } catch(IllegalStateException e) {
+      // left blank
+    }
+
+    try {
+      s.min();
+      Assert.fail();
+    } catch(IllegalStateException e) {
+      // left blank
+    }
+
+    try {
+      s.max();
+      Assert.fail();
+    } catch(IllegalStateException e) {
+      // left blank
+    }
+
+    try {
+      s.mean();
+      Assert.fail();
+    } catch(IllegalStateException e) {
+      // left blank
+    }
   }
 
 }

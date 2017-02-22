@@ -25,7 +25,7 @@ public final class DoubleSeries extends Series {
     double apply(double[] values);
   }
 
-  public static class DoubleBatchAdd implements DoubleBatchFunction {
+  public static class DoubleBatchSum implements DoubleBatchFunction {
     @Override
     public double apply(double[] values) {
       // TODO sort, add low to high for accuracy
@@ -39,6 +39,7 @@ public final class DoubleSeries extends Series {
   public static class DoubleBatchMean implements DoubleBatchFunction {
     @Override
     public double apply(double[] values) {
+      assertNotEmpty(values);
       // TODO sort, add low to high for accuracy
       double sum = 0;
       for(double l : values)
@@ -80,6 +81,11 @@ public final class DoubleSeries extends Series {
   }
 
   @Override
+  public DoubleSeries copy() {
+    return new DoubleSeries(Arrays.copyOf(this.values, this.values.length));
+  }
+
+  @Override
   public DoubleSeries toDoubles() {
     return this;
   }
@@ -114,10 +120,12 @@ public final class DoubleSeries extends Series {
   }
 
   public double first() {
+    assertNotEmpty(this.values);
     return this.values[0];
   }
 
   public double last() {
+    assertNotEmpty(this.values);
     return this.values[this.values.length-1];
   }
 
@@ -238,6 +246,7 @@ public final class DoubleSeries extends Series {
   }
 
   public double min() {
+    assertNotEmpty(this.values);
     double m = this.values[0];
     for(double n : this.values) {
       m = Math.min(m, n);
@@ -246,11 +255,26 @@ public final class DoubleSeries extends Series {
   }
 
   public double max() {
+    assertNotEmpty(this.values);
     double m = this.values[0];
     for(double n : this.values) {
       m = Math.max(m, n);
     }
     return m;
+  }
+
+  public double mean() {
+    return new DoubleBatchMean().apply(this.values);
+  }
+
+  public double sum() {
+    return new DoubleBatchSum().apply(this.values);
+  }
+
+  private static double[] assertNotEmpty(double[] values) {
+    if(values.length <= 0)
+      throw new IllegalStateException("Must contain at least one value");
+    return values;
   }
 
   @Override

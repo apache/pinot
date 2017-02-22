@@ -67,6 +67,14 @@ public class DataFrame {
     this.index = index;
   }
 
+  public DataFrame copy() {
+    DataFrame newDataFrame = new DataFrame(this.index.copy());
+    for(Map.Entry<String, Series> e : this.series.entrySet()) {
+      newDataFrame.addSeries(e.getKey(), e.getValue().copy());
+    }
+    return newDataFrame;
+  }
+
   public void addSeries(String seriesName, Series s) {
     if(s.size() != this.index.size())
       throw new IllegalArgumentException("DataFrame index and series must be of same length");
@@ -113,6 +121,10 @@ public class DataFrame {
 
   public Series get(String seriesName) {
     return assertSeriesExists(seriesName);
+  }
+
+  public boolean contains(String seriesName) {
+    return this.series.containsKey(seriesName);
   }
 
   public DoubleSeries toDoubles(String seriesName) {

@@ -25,7 +25,7 @@ public final class LongSeries extends Series {
     long apply(long[] values);
   }
 
-  public static class LongBatchAdd implements LongBatchFunction {
+  public static class LongBatchSum implements LongBatchFunction {
     @Override
     public long apply(long[] values) {
       long sum = 0;
@@ -38,6 +38,7 @@ public final class LongSeries extends Series {
   public static class LongBatchMean implements LongBatchFunction {
     @Override
     public long apply(long[] values) {
+      assertNotEmpty(values);
       long sum = 0;
       for(long l : values)
         sum += l;
@@ -78,6 +79,11 @@ public final class LongSeries extends Series {
   }
 
   @Override
+  public LongSeries copy() {
+    return new LongSeries(Arrays.copyOf(this.values, this.values.length));
+  }
+
+  @Override
   public DoubleSeries toDoubles() {
     return new DoubleSeries(this.values);
   }
@@ -112,10 +118,12 @@ public final class LongSeries extends Series {
   }
 
   public long first() {
+    assertNotEmpty(this.values);
     return this.values[0];
   }
 
   public long last() {
+    assertNotEmpty(this.values);
     return this.values[this.values.length-1];
   }
 
@@ -306,6 +314,7 @@ public final class LongSeries extends Series {
   }
 
   public long min() {
+    assertNotEmpty(this.values);
     long m = this.values[0];
     for(long n : this.values) {
       m = Math.min(m, n);
@@ -314,11 +323,20 @@ public final class LongSeries extends Series {
   }
 
   public long max() {
+    assertNotEmpty(this.values);
     long m = this.values[0];
     for(long n : this.values) {
       m = Math.max(m, n);
     }
     return m;
+  }
+
+  public long mean() {
+    return new LongBatchMean().apply(this.values);
+  }
+
+  public long sum() {
+    return new LongBatchSum().apply(this.values);
   }
 
   @Override
@@ -328,6 +346,12 @@ public final class LongSeries extends Series {
       values[i] = this.values[fromIndex[i]];
     }
     return new LongSeries(values);
+  }
+
+  private static long[] assertNotEmpty(long[] values) {
+    if(values.length <= 0)
+      throw new IllegalStateException("Must contain at least one value");
+    return values;
   }
 
   static final class LongSortTuple {
