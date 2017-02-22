@@ -226,34 +226,14 @@ AnomalyResultView.prototype = {
 
   },
 
-  renderAnomalyDetails(anomaly, index) {
-      const regionStart = moment(anomaly.anomalyRegionStart, constants.TIMESERIES_DATE_FORMAT);
-      const regionEnd = moment(anomaly.anomalyRegionEnd, constants.TIMESERIES_DATE_FORMAT);
-
-      const timeDelta = regionEnd.diff(regionStart);
-      const regionDuration = moment.duration(timeDelta);
-
-      const dateFormat = regionDuration.days() > 1 ? constants.DETAILS_DATE_DAYS_FORMAT : constants.DETAILS_DATE_HOURS_FORMAT;
-      const durationUI = `${regionDuration.humanize()} (${regionStart.format(constants.DETAILS_DATE_DAYS_FORMAT)} &ndash; ${regionEnd.format(dateFormat)})`;
-      $(`#anomaly-region-${index}`).html(durationUI);
-
-      // (Todo) remove front end computation when endpoint is refined
-      // https://jira01.corp.linkedin.com:8443/browse/THIRDEYE-1044
-
-      let changeDelta;
-      if (!(anomaly.current && anomaly.baseline)) {
-        changeDelta = 'N/A'
-      } else {
-        const amount = (anomaly.current - anomaly.baseline) / anomaly.baseline % 100;
-        changeDelta = `${amount} %`;
-      }
-      $(`#anomaly-change-${index}`).html(changeDelta);
-  },
-
   renderAnomaliesTab : function(anomaliesWrapper) {
-    var anomalies = anomaliesWrapper.anomalyDetailsList;
-    for (var idx = 0; idx < anomalies.length; idx++) {
-      var anomaly = anomalies[idx];
+    const anomalies = anomaliesWrapper.anomalyDetailsList;
+    for (let idx = 0; idx < anomalies.length; idx++) {
+      const anomaly = anomalies[idx];
+
+      if (!anomaly) {
+        continue;
+      }
 
       console.log(anomaly);
 
@@ -291,7 +271,10 @@ AnomalyResultView.prototype = {
           },
           x : {
             type : 'timeseries',
-            show : true
+            show : true,
+            tick: {
+              fit: false,
+            }
           }
         },
         regions : [ {
@@ -305,7 +288,6 @@ AnomalyResultView.prototype = {
         } ]
       });
 
-      this.renderAnomalyDetails(anomaly, idx);
       this.setupListenersOnAnomaly(idx, anomaly);
     }
   },

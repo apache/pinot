@@ -497,6 +497,15 @@ text {
   min-width: 0;
 }
 
+.anomaly-change-delta.negative {
+  color: #ee1620
+}
+
+.anomaly-change-delta.positive {
+  color: #398b18
+}
+
+
 .anomaly-details-items--small {
   flex-basis: calc(100%/3);
 }

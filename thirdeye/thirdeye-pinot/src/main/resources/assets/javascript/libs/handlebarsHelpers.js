@@ -29,6 +29,12 @@ Handlebars.registerHelper('formatDelta', function (a, b) {
     return "" + delta.toFixed(1);
   }
 });
+
+Handlebars.registerHelper('colorDelta', function(value1) {
+    if (value1 ===  'N/A') return;
+    return parseInt(value1) >= 0 ? 'positive' : 'negative';
+});
+
 Handlebars.registerHelper('displayHour', function (date) {
   var tz = getTimeZone();
   return moment(date).tz(tz).format('h a');
