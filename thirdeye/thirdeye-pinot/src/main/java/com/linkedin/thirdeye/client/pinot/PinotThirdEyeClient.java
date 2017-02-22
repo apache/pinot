@@ -204,7 +204,12 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
         if (hasGroupBy) {
           groupKeys = new String[resultSet.getGroupKeyLength()];
           for (int grpKeyIdx = 0; grpKeyIdx < resultSet.getGroupKeyLength(); grpKeyIdx++) {
-            String groupKeyVal = resultSet.getGroupKeyString(r, grpKeyIdx);
+            String groupKeyVal = "";
+            try {
+              groupKeyVal = resultSet.getGroupKeyString(r, grpKeyIdx);
+            } catch (Exception e) {
+              // IGNORE FOR NOW, workaround for Pinot Bug
+            }
             if (hasGroupByTime && grpKeyIdx == 0) {
               int timeBucket;
               long millis;

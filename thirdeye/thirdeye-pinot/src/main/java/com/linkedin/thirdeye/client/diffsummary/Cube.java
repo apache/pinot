@@ -81,7 +81,7 @@ public class Cube { // the cube (Ca|Cb)
   public void buildWithAutoDimensionOrder(OLAPDataBaseClient olapClient, Dimensions dimensions, int topDimension,
       List<List<String>> hierarchy)
       throws Exception {
-
+    Dimensions sanitizedDimensions = sanitizeDimensions(dimensions);
     initializeBasicInfo(olapClient);
     if (dimensions == null || dimensions.size() == 0) {
       throw new IllegalArgumentException("Dimensions cannot be empty.");
@@ -89,10 +89,32 @@ public class Cube { // the cube (Ca|Cb)
     if (hierarchy == null) {
       hierarchy = Collections.emptyList();
     }
-    this.dimensions = sortDimensionOrder(olapClient, topRatio, dimensions, topDimension, hierarchy);
+    this.dimensions = sortDimensionOrder(olapClient, topRatio, sanitizedDimensions, topDimension, hierarchy);
+
     LOG.info("Auto decided dimensions: " + this.dimensions);
 
     buildWithManualDimensionOrder(olapClient, this.dimensions);
+  }
+
+  private Dimensions sanitizeDimensions(Dimensions dimensions) {
+    List<String> allDimensions = dimensions.allDimensions();
+    List<String> dimensionsToRemove = new ArrayList<>();
+    dimensionsToRemove.add("environment");
+    dimensionsToRemove.add("colo");
+    dimensionsToRemove.add("fabric");
+    List<String> validDimensionNames = new ArrayList<>();
+    for(String dim:allDimensions){
+      if(dim.indexOf("_topk") > -1) {
+        String rawDimensionName = dim.replaceAll("_topk", "");
+        dimensionsToRemove.add(rawDimensionName.toLowerCase());
+      }
+    }
+    for(String dim:allDimensions){
+      if(!dimensionsToRemove.contains(dim.toLowerCase())){
+        validDimensionNames.add(dim);
+      }
+    }
+    return new Dimensions(validDimensionNames);
   }
 
   public void buildWithManualDimensionOrder(OLAPDataBaseClient olapClient, Dimensions dimensions)
@@ -197,7 +219,28 @@ public class Cube { // the cube (Ca|Cb)
       }
     }
   }
+  static class DimNameValueCostEntry implements Comparable<DimNameValueCostEntry>{
+    double contributionFactor;
+    public DimNameValueCostEntry(String dimension, String dimValue, double dimValueCost, double contributionFactor) {
+      this.dimName = dimension;
+      this.dimValue = dimValue;
+      this.cost = dimValueCost;
+      this.contributionFactor = contributionFactor;
+    }
+    String dimName;
+    String dimValue;
+    double cost;
+    @Override
+    public int compareTo(DimNameValueCostEntry that) {
+      return Double.compare(that.cost, this.cost);
+    }
+    @Override
+    public String toString() {
+      return "DimNameValueCostEntry [contributionFactor=" + contributionFactor + ", dimName=" + dimName + ", dimValue=" + dimValue + ", cost=" + cost + "]";
+    }
 
+
+  }
   /**
    * Sort dimensions according to their cost, which is the sum of the error for aggregating all its children rows.
    * Dimensions with larger error is sorted in the front of the list.
@@ -208,6 +251,7 @@ public class Cube { // the cube (Ca|Cb)
   private static Dimensions sortDimensionOrder(OLAPDataBaseClient olapClient, double topRatio, Dimensions dimensions,
       int topDimension, List<List<String>> hierarchy)
       throws Exception {
+    List<DimNameValueCostEntry> costSet = new ArrayList<>();
     List<MutablePair<String, Double>> dimensionCostPairs = new ArrayList<>();
 
     // Given one dimension name D, returns the hierarchical dimension to which D belong.
@@ -239,6 +283,18 @@ public class Cube { // the cube (Ca|Cb)
     }
 
     List<List<Row>> wowValuesOfDimensions = olapClient.getAggregatedValuesOfDimension(dimensions);
+    double baselineTotal = 0;
+    double currentTotal = 0;
+    //use one dimension to compute baseline/current total
+    List<Row> wowValuesOfFirstDimension = wowValuesOfDimensions.get(0);
+    for (int j = 0; j < wowValuesOfFirstDimension.size(); ++j) {
+      Row wowValues = wowValuesOfFirstDimension.get(j);
+      baselineTotal += wowValues.baselineValue;
+      currentTotal += wowValues.currentValue;
+    }
+    System.out.println("baselineTotal:" + baselineTotal);
+    System.out.println("currentTotal:" + currentTotal);
+
     // Calculate cost for each dimension. The costs of the dimensions of the same hierarchical group will be the max
     // cost among all the children in that hierarchy.
     for (int i = 0; i < dimensions.size(); ++i) {
@@ -247,7 +303,13 @@ public class Cube { // the cube (Ca|Cb)
       List<Row> wowValuesOfOneDimension = wowValuesOfDimensions.get(i);
       for (int j = 0; j < wowValuesOfOneDimension.size(); ++j) {
         Row wowValues = wowValuesOfOneDimension.get(j);
-        cost += CostFunction.err4EmptyValues(wowValues.baselineValue, wowValues.currentValue, topRatio);
+        String dimValue = wowValues.getDimensionValues().get(0);
+
+        double dimValueCost = CostFunction.err4EmptyValues(wowValues.baselineValue, wowValues.currentValue, topRatio);
+        dimValueCost *= Math.log((wowValues.baselineValue + wowValues.currentValue) * 100 / (currentTotal + baselineTotal));
+        double contributionFactor = (wowValues.baselineValue + wowValues.currentValue)/(baselineTotal + currentTotal);
+        costSet.add(new DimNameValueCostEntry(dimension, dimValue, dimValueCost , contributionFactor));
+        cost += dimValueCost;
       }
 
       if (hierarchicalDimensionMap.containsKey(dimension)) {
@@ -301,6 +363,11 @@ public class Cube { // the cube (Ca|Cb)
       sb.append(dimensionCostPair.getRight());
       LOG.info(sb.toString());
       ++pairIdx;
+    }
+    Collections.sort(costSet);
+    System.out.println("Cost set");
+    for (DimNameValueCostEntry entry : costSet) {
+      System.out.println(entry);
     }
     return new Dimensions(newDimensions.subList(0, Math.min(topDimension, newDimensions.size())));
   }
