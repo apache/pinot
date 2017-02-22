@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.detector.email.filter;
 
-import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -17,18 +17,16 @@ import org.slf4j.LoggerFactory;
 public class AlertFilterFactory {
   private static Logger LOGGER = LoggerFactory.getLogger(AlertFilterFactory.class);
   public static final String FILTER_TYPE_KEY = "type";
-  public static final String ALPHA_BETA_ALERT_FILTER = "alpha_beta";
-  public static final String DUMMY_ALERT_FILTER = "dummy";
   private final Properties props;
 
 
-  public AlertFilterFactory(String functionConfigPath) {
+  public AlertFilterFactory(String AlertFilterConfigPath) {
     props = new Properties();
     try {
-      InputStream input = new FileInputStream(functionConfigPath);
+      InputStream input = new FileInputStream(AlertFilterConfigPath);
       loadPropertiesFromInputStream(input);
     } catch (FileNotFoundException e) {
-      LOGGER.error("Alert Filter Property File {} not found", functionConfigPath, e);
+      LOGGER.error("Alert Filter Property File {} not found", AlertFilterConfigPath, e);
     }
   }
 
@@ -62,7 +60,7 @@ public class AlertFilterFactory {
    * does not have an alert filter spec or this method fails to initiates an alert filter from the
    * spec.
    */
-  public AlertFilter getAlertFilter(AnomalyFunctionBean anomalyFunctionSpec) {
+  public AlertFilter getAlertFilter(AnomalyFunctionDTO anomalyFunctionSpec) {
     Map<String, String> alertFilterInfo = anomalyFunctionSpec.getAlertFilter();
     if (alertFilterInfo == null) {
       alertFilterInfo = Collections.emptyMap();
@@ -75,10 +73,8 @@ public class AlertFilterFactory {
         try {
           alertFilter = (AlertFilter) Class.forName(className).newInstance();
         } catch (Exception e) {
-          LOGGER.info(e.getMessage());
+          LOGGER.warn(e.getMessage());
         }
-      } else if(alertFilterType.equals(ALPHA_BETA_ALERT_FILTER)) {
-        alertFilter = new AlphaBetaAlertFilter();
       }
     }
     alertFilter.setParameters(alertFilterInfo);

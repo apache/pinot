@@ -16,11 +16,7 @@ import org.slf4j.LoggerFactory;
 
 public class AlertFilterHelper {
   private static final Logger LOG = LoggerFactory.getLogger(AlertFilterHelper.class);
-  private AlertFilterFactory alertFilterFactory;
 
-  public AlertFilterHelper(String alertFilterConfigPath){
-    this.alertFilterFactory = new AlertFilterFactory(alertFilterConfigPath);
-  }
 
   /**
    * Each function has a filtration rule which let alert module decide if an anomaly should be

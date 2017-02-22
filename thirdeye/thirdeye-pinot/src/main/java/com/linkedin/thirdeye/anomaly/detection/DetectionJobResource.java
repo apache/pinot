@@ -270,7 +270,7 @@ public class DetectionJobResource {
   @POST
   @Path("/autotune/{id}")
   public Response tuneAlertFilter(@PathParam("id") String id,
-      @QueryParam("startTime") Long startTime, @QueryParam("endTime") Long endTime)
+      @QueryParam("startTime") Long startTime, @QueryParam("endTime") Long endTime, @QueryParam("autoTuneType") String autoTuneType)
       throws Exception {
     AnomalyFunctionDTO anomalyFunctionSpec = DAO_REGISTRY.getAnomalyFunctionDAO().findById(Long.valueOf(id));
     AlertFilter alertFilter = alertFilterFactory.getAlertFilter(anomalyFunctionSpec);
@@ -283,7 +283,7 @@ public class DetectionJobResource {
       double[] evals = evaluator.getEvalResults(anomalyResultDTOS);
       LOG.info("AlertFilter of Type {}", alertFilter.getClass().toString(), "has been evaluated with precision: {}", evals[PRECISION_INDEX], "recall:", evals[RECALL_INDEX]);
 
-      AlertFilterAutoTune alertFilterAutotune = alertFilterAutotuneFactory.initiateAutoTune(anomalyFunctionSpec);
+      AlertFilterAutoTune alertFilterAutotune = alertFilterAutotuneFactory.fromSpec(autoTuneType);
       LOG.info("initiated alertFilterAutoTune of Type {}", alertFilterAutotune.getClass().toString());
 
       Map<String,String> tunedAlertFilter = alertFilterAutotune.tuneAlertFilter(anomalyResultDTOS, evals[PRECISION_INDEX], evals[RECALL_INDEX]);
@@ -300,6 +300,6 @@ public class DetectionJobResource {
     } catch (Exception e) {
       LOG.warn("AutoTune throws exception due to: {}", e.getMessage());
     }
-    return Response.ok(alertFilter).build();
+    return Response.ok(alertFilter.toString()).build();
   }
 }

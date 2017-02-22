@@ -20,13 +20,13 @@ public class AlertFilterAutotuneFactory {
   private static Logger LOGGER = LoggerFactory.getLogger(AlertFilterAutotuneFactory.class);
   private final Properties props;
 
-  public AlertFilterAutotuneFactory(String functionConfigPath) {
+  public AlertFilterAutotuneFactory(String autoTuneConfigPath) {
     props = new Properties();
     try {
-      InputStream input = new FileInputStream(functionConfigPath);
+      InputStream input = new FileInputStream(autoTuneConfigPath);
       loadPropertiesFromInputStream(input);
     } catch (FileNotFoundException e) {
-      LOGGER.error("Alert Filter Property File {} not found", functionConfigPath, e);
+      LOGGER.error("Alert Filter Property File {} not found", autoTuneConfigPath, e);
     }
 
   }
@@ -51,16 +51,18 @@ public class AlertFilterAutotuneFactory {
     }
   }
 
-  public AlertFilterAutoTune initiateAutoTune(AnomalyFunctionDTO anomalyFunctionSpec) throws Exception {
-    AlertFilterAutoTune alertFilterAutoTune = null;
-    String alertFilterType = anomalyFunctionSpec.getAlertFilter().get(AlertFilterFactory.FILTER_TYPE_KEY).toUpperCase();
-    if (!props.containsKey(alertFilterType)) {
-      throw new IllegalArgumentException("Unsupported type " + alertFilterType);
+  public AlertFilterAutoTune fromSpec(String AutoTuneType) {
+    AlertFilterAutoTune alertFilterAutoTune = new DummyAlertFilterAutoTune();
+    if (!props.containsKey(AutoTuneType)) {
+      LOGGER.warn("AutoTune from Spec: Unsupported type " + AutoTuneType);
+    } else{
+      try {
+        String className = props.getProperty(AutoTuneType);
+        alertFilterAutoTune = (AlertFilterAutoTune) Class.forName(className).newInstance();
+      } catch (Exception e) {
+        LOGGER.warn("Failed to init AutoTune from Spec: {}", e.getMessage());
+      }
     }
-    String className = props.getProperty(alertFilterType);
-    alertFilterAutoTune = (AlertFilterAutoTune) Class.forName(className).newInstance();
-
     return alertFilterAutoTune;
   }
-
 }
