@@ -221,22 +221,28 @@ public class Cube { // the cube (Ca|Cb)
   }
   static class DimNameValueCostEntry implements Comparable<DimNameValueCostEntry>{
     double contributionFactor;
-    public DimNameValueCostEntry(String dimension, String dimValue, double dimValueCost, double contributionFactor) {
+    public DimNameValueCostEntry(String dimension, String dimValue, double dimValueCost, double contributionFactor, double curValue, double preValue) {
       this.dimName = dimension;
       this.dimValue = dimValue;
       this.cost = dimValueCost;
       this.contributionFactor = contributionFactor;
+      this.curValue = curValue;
+      this.preValue = preValue;
     }
     String dimName;
     String dimValue;
     double cost;
+    double curValue;
+    double preValue;
     @Override
     public int compareTo(DimNameValueCostEntry that) {
       return Double.compare(that.cost, this.cost);
     }
     @Override
     public String toString() {
-      return "DimNameValueCostEntry [contributionFactor=" + contributionFactor + ", dimName=" + dimName + ", dimValue=" + dimValue + ", cost=" + cost + "]";
+      return "[contributionFactor=" + contributionFactor + ", dimName=" + dimName + ", dimValue="
+          + dimValue + ", cost=" + cost + ", delta=" + (curValue - preValue) + ", ratio=" + (
+          curValue / preValue) + "]";
     }
 
 
@@ -306,9 +312,13 @@ public class Cube { // the cube (Ca|Cb)
         String dimValue = wowValues.getDimensionValues().get(0);
 
         double dimValueCost = CostFunction.err4EmptyValues(wowValues.baselineValue, wowValues.currentValue, topRatio);
-        dimValueCost *= Math.log((wowValues.baselineValue + wowValues.currentValue) * 100 / (currentTotal + baselineTotal));
+        double percentage = (wowValues.baselineValue + wowValues.currentValue) * 100 / (currentTotal + baselineTotal);
+        if (Double.compare(percentage, Math.E) < 0) {
+          percentage = Math.E;
+        }
+        dimValueCost *= Math.log(percentage);
         double contributionFactor = (wowValues.baselineValue + wowValues.currentValue)/(baselineTotal + currentTotal);
-        costSet.add(new DimNameValueCostEntry(dimension, dimValue, dimValueCost , contributionFactor));
+        costSet.add(new DimNameValueCostEntry(dimension, dimValue, dimValueCost , contributionFactor, wowValues.currentValue, wowValues.baselineValue));
         cost += dimValueCost;
       }
 
