@@ -272,6 +272,9 @@ public class SegmentGeneratorConfig {
     return _segmentNamePostfix;
   }
 
+  /**
+   * If you are adding a sequence Id to the segment, please use setSequenceId.
+   */
   public void setSegmentNamePostfix(String postfix) {
     _segmentNamePostfix = postfix;
   }
@@ -291,6 +294,9 @@ public class SegmentGeneratorConfig {
     return _sequenceId;
   }
 
+  /**
+   * This method should be used instead of setPostfix if you are adding a sequence number.
+   */
   public void setSequenceId(int sequenceId) {
     _sequenceId = sequenceId;
   }

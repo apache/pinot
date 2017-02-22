@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.segment;
 
-import com.linkedin.pinot.common.utils.SegmentNameBuilder;
+import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector;
 
 
@@ -23,11 +23,6 @@ public class DefaultSegmentNameGenerator implements SegmentNameGenerator {
   private final String _segmentName;
   private final String _timeColumnName;
   private final String _tableName;
-  /*
-    The postfix is used if segments have different granularities while the sequenceId is used for numbering segments.
-    For example, you can name your segments as
-    tableName_date_daily_0 where "daily" is the segmentNamePostfix and 0 is the sequence id.
-   */
   private final String _segmentNamePostfix;
   private final int _sequenceId;
   /**
@@ -56,6 +51,23 @@ public class DefaultSegmentNameGenerator implements SegmentNameGenerator {
     _sequenceId = sequenceId;
   }
 
+  /**
+   *
+   * The sequenceId is used for numbering segments while the postfix is used to append a string to the segment name.
+   *
+   * Some examples:
+   *
+   * If the time column name exists, _segmentNamePostfix = "postfix", and _sequenceId = 1, the segment name would be
+   * tableName_minDate_maxDate_postfix_1
+   *
+   * If there is no time column, _segmentNamePostfix = "postfix" and _sequenceId = 1, the segment name would be
+   * tableName_postfix_1
+   *
+   *
+   * @param statsCollector
+   * @return
+   * @throws Exception
+   */
   @Override
   public String getSegmentName(AbstractColumnStatisticsCollector statsCollector) throws Exception {
     if (_segmentName != null) {
@@ -67,12 +79,27 @@ public class DefaultSegmentNameGenerator implements SegmentNameGenerator {
     if (_timeColumnName != null && _timeColumnName.length() > 0) {
       final Object minTimeValue = statsCollector.getMinValue();
       final Object maxTimeValue = statsCollector.getMaxValue();
-      segmentName = SegmentNameBuilder
-          .buildBasic(_tableName, minTimeValue, maxTimeValue, _segmentNamePostfix, _sequenceId);
+      segmentName = buildBasic(_tableName, minTimeValue, maxTimeValue, _segmentNamePostfix, _sequenceId);
     } else {
-      segmentName = SegmentNameBuilder.buildBasic(_tableName, _segmentNamePostfix, _sequenceId);
+      segmentName = buildBasic(_tableName, _segmentNamePostfix, _sequenceId);
     }
 
     return segmentName;
+  }
+
+  protected static String buildBasic(String tableName, Object minTimeValue, Object maxTimeValue, String postfix, int sequenceId) {
+    if (sequenceId == -1) {
+      return StringUtil.join("_", tableName, minTimeValue.toString(), maxTimeValue.toString(), postfix);
+    } else {
+      return StringUtil.join("_", tableName, minTimeValue.toString(), maxTimeValue.toString(), postfix, Integer.toString(sequenceId));
+    }
+  }
+
+  protected static String buildBasic(String tableName, String postfix, int sequenceId) {
+    if (sequenceId == -1 ) {
+      return StringUtil.join("_", tableName, postfix);
+    } else {
+      return StringUtil.join("_", tableName, postfix, Integer.toString(sequenceId));
+    }
   }
 }
