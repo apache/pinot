@@ -141,7 +141,8 @@ public class TimeOnTimeResponseParser {
       Row row = builder.build();
 
       boolean passedThreshold = checkMetricSums(row, baselineMetricSums, currentMetricSums);
-      if (passedThreshold) { // if any metric passes threshold, include it
+      // if any non-OTHER metric passes threshold, include it
+      if (passedThreshold && !dimensionValue.equalsIgnoreCase(OTHER)) {
         rows.add(row);
       } else { // else add it to OTHER
         includeOther = true;
