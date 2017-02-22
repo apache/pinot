@@ -1,5 +1,17 @@
 package com.linkedin.thirdeye.anomaly;
 
+import com.linkedin.thirdeye.anomaly.alert.v2.AlertJobSchedulerV2;
+import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
+import com.linkedin.thirdeye.dashboard.resources.AnomalyFunctionResource;
+
+import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
+import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+
 import com.linkedin.thirdeye.anomaly.alert.AlertJobResource;
 import com.linkedin.thirdeye.anomaly.alert.AlertJobScheduler;
 import com.linkedin.thirdeye.anomaly.alert.v2.AlertJobSchedulerV2;
@@ -36,6 +48,8 @@ public class ThirdEyeAnomalyApplication
   private AnomalyMergeExecutor anomalyMergeExecutor = null;
   private AutoLoadPinotMetricsService autoLoadPinotMetricsService = null;
   private DataCompletenessScheduler dataCompletenessScheduler = null;
+  private AlertFilterFactory alertFilterFactory = null;
+  private AlertFilterAutotuneFactory alertFilterAutotuneFactory = null;
 
   public static void main(final String[] args) throws Exception {
     List<String> argList = new ArrayList<>(Arrays.asList(args));
@@ -73,13 +87,16 @@ public class ThirdEyeAnomalyApplication
 
         if (config.isWorker()) {
           anomalyFunctionFactory = new AnomalyFunctionFactory(config.getFunctionConfigPath());
+
           taskDriver = new TaskDriver(config, anomalyFunctionFactory);
           taskDriver.start();
         }
         if (config.isScheduler()) {
           detectionJobScheduler = new DetectionJobScheduler();
+          alertFilterFactory = new AlertFilterFactory(config.getAlertFilterConfigPath());
+          alertFilterAutotuneFactory = new AlertFilterAutotuneFactory(config.getFilterAutotuneConfigPath());
           detectionJobScheduler.start();
-          environment.jersey().register(new DetectionJobResource(detectionJobScheduler));
+          environment.jersey().register(new DetectionJobResource(detectionJobScheduler, alertFilterFactory, alertFilterAutotuneFactory));
           environment.jersey().register(new AnomalyFunctionResource(config.getFunctionConfigPath()));
         }
         if (config.isMonitor()) {

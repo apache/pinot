@@ -1,11 +1,16 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
+import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutoTune;
+import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
+import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
+import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
+import com.linkedin.thirdeye.detector.email.filter.AlertFilterUtil;
 import com.linkedin.thirdeye.util.SeverityComputationUtil;
 import java.util.List;
 
@@ -33,6 +38,10 @@ import org.quartz.SchedulerException;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+
 
 @Path("/detection-job")
 @Produces(MediaType.APPLICATION_JSON)
@@ -44,13 +53,19 @@ public class DetectionJobResource {
   private final RawAnomalyResultManager rawAnomalyResultDAO;
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
+  private final AlertFilterAutotuneFactory alertFilterAutotuneFactory;
+  private final AlertFilterFactory alertFilterFactory;
 
-  public DetectionJobResource(DetectionJobScheduler detectionJobScheduler) {
+  private static final Logger LOG = LoggerFactory.getLogger(DetectionJobResource.class);
+
+  public DetectionJobResource(DetectionJobScheduler detectionJobScheduler, AlertFilterFactory alertFilterFactory, AlertFilterAutotuneFactory alertFilterAutotuneFactory) {
     this.detectionJobScheduler = detectionJobScheduler;
     this.anomalyFunctionSpecDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     this.rawAnomalyResultDAO = DAO_REGISTRY.getRawAnomalyResultDAO();
+    this.alertFilterAutotuneFactory = alertFilterAutotuneFactory;
+    this.alertFilterFactory = alertFilterFactory;
   }
 
   @GET
@@ -248,5 +263,58 @@ public class DetectionJobResource {
     }).start();
 
     return Response.ok().build();
+  }
+
+  /**
+   *
+   * @param id anomaly function id
+   * @param startTime start time of anomalies to tune alert filter
+   * @param endTime end time of anomalies to tune alert filter
+   * @param autoTuneType the type of auto tune to invoke (default is "AUTOTUNE")
+   * @return HTTP response of request: string of alert filter
+   */
+  @POST
+  @Path("/autotune/filter/{function_id}")
+  public Response tuneAlertFilter(@PathParam("function_id") String id,
+      @QueryParam("startTime") Long startTime,
+      @QueryParam("endTime") Long endTime,
+      @QueryParam("autoTuneType") String autoTuneType) {
+
+    // get anomalies by function id, start time and end time
+    AnomalyFunctionDTO anomalyFunctionSpec = DAO_REGISTRY.getAnomalyFunctionDAO().findById(Long.valueOf(id));
+    AnomalyFunctionManager anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
+    MergedAnomalyResultManager anomalyMergedResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
+    List<MergedAnomalyResultDTO> anomalyResultDTOS = anomalyMergedResultDAO.findByStartTimeInRangeAndFunctionId(startTime, endTime, Long.valueOf(id));
+
+    // create alert filter and evaluator
+    AlertFilter alertFilter = alertFilterFactory.fromSpec(anomalyFunctionSpec.getAlertFilter());
+    AlertFilterUtil evaluator = new AlertFilterUtil(alertFilter);
+    try {
+      //evaluate current alert filter (calculate current precision and recall)
+      double[] evals = evaluator.getEvalResults(anomalyResultDTOS);
+      LOG.info("AlertFilter of Type {}", alertFilter.getClass().toString(), "has been evaluated with precision: {}", evals[AlertFilterUtil.PRECISION_INDEX], "recall:", evals[AlertFilterUtil.RECALL_INDEX]);
+
+      // create alert filter auto tune
+      AlertFilterAutoTune alertFilterAutotune = alertFilterAutotuneFactory.fromSpec(autoTuneType);
+      LOG.info("initiated alertFilterAutoTune of Type {}", alertFilterAutotune.getClass().toString());
+
+      // get tuned alert filter
+      Map<String,String> tunedAlertFilter = alertFilterAutotune.tuneAlertFilter(anomalyResultDTOS, evals[AlertFilterUtil.PRECISION_INDEX], evals[AlertFilterUtil.RECALL_INDEX]);
+      LOG.info("tuned AlertFilter");
+
+      // if alert filter auto tune has updated alert filter, over write alert filter to anomaly function spec
+      // otherwise do nothing and return alert filter
+      if (alertFilterAutotune.isUpdated()){
+        anomalyFunctionSpec.setAlertFilter(tunedAlertFilter);
+        anomalyFunctionDAO.update(anomalyFunctionSpec);
+        alertFilter.setParameters(tunedAlertFilter);
+        LOG.info("Model has been updated");
+      } else {
+        LOG.info("Model hasn't been updated because tuned model cannot beat original model");
+      }
+    } catch (Exception e) {
+      LOG.warn("AutoTune throws exception due to: {}", e.getMessage());
+    }
+    return Response.ok(alertFilter.toString()).build();
   }
 }

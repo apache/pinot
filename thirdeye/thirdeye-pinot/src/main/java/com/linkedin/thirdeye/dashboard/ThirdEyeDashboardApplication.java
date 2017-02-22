@@ -23,6 +23,7 @@ import com.linkedin.thirdeye.dashboard.resources.v2.DataResource;
 
 import com.linkedin.thirdeye.dashboard.resources.v2.EventResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.TimeSeriesResource;
+import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import io.dropwizard.assets.AssetsBundle;
 import io.dropwizard.setup.Bootstrap;
@@ -62,7 +63,8 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new DashboardResource());
     env.jersey().register(new CacheResource());
     AnomalyFunctionFactory anomalyFunctionFactory = new AnomalyFunctionFactory(config.getFunctionConfigPath());
-    env.jersey().register(new AnomalyResource(anomalyFunctionFactory));
+    AlertFilterFactory alertFilterFactory = new AlertFilterFactory(config.getAlertFilterConfigPath());
+    env.jersey().register(new AnomalyResource(anomalyFunctionFactory, alertFilterFactory));
     env.jersey().register(new EmailResource());
     env.jersey().register(new EntityManagerResource());
     env.jersey().register(new IngraphMetricConfigResource());
@@ -74,8 +76,8 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new SummaryResource());
     env.jersey().register(new ThirdEyeResource());
     env.jersey().register(new OverrideConfigResource());
-    env.jersey().register(new DataResource());
-    env.jersey().register(new AnomaliesResource());
+    env.jersey().register(new DataResource(alertFilterFactory));
+    env.jersey().register(new AnomaliesResource(alertFilterFactory));
     env.jersey().register(new TimeSeriesResource());
     env.jersey().register(new OnboardResource());
     env.jersey().register(new EventResource());

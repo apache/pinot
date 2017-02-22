@@ -5,6 +5,7 @@ import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomaliesSummary;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomaliesWrapper;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalyDetails;
 
+import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -89,13 +90,15 @@ public class AnomaliesResource {
   private final AnomalyFunctionManager anomalyFunctionDAO;
   private final DashboardConfigManager dashboardConfigDAO;
   private ExecutorService threadPool;
+  private AlertFilterFactory alertFilterFactory;
 
-  public AnomaliesResource() {
+  public AnomaliesResource(AlertFilterFactory alertFilterFactory) {
     metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
     mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
     threadPool = Executors.newFixedThreadPool(10);
+    this.alertFilterFactory = alertFilterFactory;
   }
 
   /**
@@ -152,7 +155,7 @@ public class AnomaliesResource {
 
     List<MergedAnomalyResultDTO> mergedAnomalies = mergedAnomalyResultDAO.findByTime(startTime, endTime);
     try {
-      mergedAnomalies = AlertFilterHelper.applyFiltrationRule(mergedAnomalies);
+      mergedAnomalies = AlertFilterHelper.applyFiltrationRule(mergedAnomalies, alertFilterFactory);
     } catch (Exception e) {
       LOG.warn(
           "Failed to apply alert filters on anomalies in start:{}, end:{}, exception:{}",
@@ -292,7 +295,7 @@ public class AnomaliesResource {
     List<MergedAnomalyResultDTO> mergedAnomalies =
         mergedAnomalyResultDAO.findByCollectionMetricTime(dataset, metric, startTime, endTime, false);
     try {
-      mergedAnomalies = AlertFilterHelper.applyFiltrationRule(mergedAnomalies);
+      mergedAnomalies = AlertFilterHelper.applyFiltrationRule(mergedAnomalies, alertFilterFactory);
     } catch (Exception e) {
       LOG.warn(
           "Failed to apply alert filters on anomalies for metricid:{}, start:{}, end:{}, exception:{}",

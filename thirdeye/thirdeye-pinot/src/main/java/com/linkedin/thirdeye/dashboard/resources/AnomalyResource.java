@@ -10,6 +10,7 @@ import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dashboard.views.TimeBucket;
 
+import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunction;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import java.io.IOException;
@@ -87,11 +88,12 @@ public class AnomalyResource {
   private MetricConfigManager metricConfigDAO;
   private MergedAnomalyResultManager mergedAnomalyResultDAO;
   private AnomalyFunctionFactory anomalyFunctionFactory;
+  private AlertFilterFactory alertFilterFactory;
   private LoadingCache<String, Long> collectionMaxDataTimeCache;
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
-  public AnomalyResource(AnomalyFunctionFactory anomalyFunctionFactory) {
+  public AnomalyResource(AnomalyFunctionFactory anomalyFunctionFactory, AlertFilterFactory alertFilterFactory) {
     this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.rawAnomalyResultDAO = DAO_REGISTRY.getRawAnomalyResultDAO();
     this.anomalyMergedResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
@@ -99,6 +101,7 @@ public class AnomalyResource {
     this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
     this.mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     this.anomalyFunctionFactory = anomalyFunctionFactory;
+    this.alertFilterFactory = alertFilterFactory;
     this.collectionMaxDataTimeCache = CACHE_REGISTRY_INSTANCE.getCollectionMaxDataTimeCache();
   }
 
@@ -172,8 +175,9 @@ public class AnomalyResource {
     }
 
     if (applyAlertFiler) {
+      // TODO: why need try catch?
       try {
-        anomalyResults = AlertFilterHelper.applyFiltrationRule(anomalyResults);
+        anomalyResults = AlertFilterHelper.applyFiltrationRule(anomalyResults, alertFilterFactory);
       } catch (Exception e) {
         LOG.warn(
             "Failed to apply alert filters on anomalies for dataset:{}, metric:{}, start:{}, end:{}, exception:{}",
