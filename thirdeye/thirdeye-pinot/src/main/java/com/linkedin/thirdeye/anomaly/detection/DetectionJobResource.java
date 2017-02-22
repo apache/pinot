@@ -41,7 +41,6 @@ import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static com.linkedin.thirdeye.detector.email.filter.AlertFilterUtil.*;
 
 
 @Path("/detection-job")
@@ -266,29 +265,45 @@ public class DetectionJobResource {
     return Response.ok().build();
   }
 
-
+  /**
+   *
+   * @param id anomaly function id
+   * @param startTime start time of anomalies to tune alert filter
+   * @param endTime end time of anomalies to tune alert filter
+   * @param autoTuneType the type of auto tune to invoke (default is "AUTOTUNE")
+   * @return HTTP response of request: string of alert filter
+   */
   @POST
-  @Path("/autotune/{id}")
-  public Response tuneAlertFilter(@PathParam("id") String id,
-      @QueryParam("startTime") Long startTime, @QueryParam("endTime") Long endTime, @QueryParam("autoTuneType") String autoTuneType)
-      throws Exception {
+  @Path("/autotune/filter/{function_id}")
+  public Response tuneAlertFilter(@PathParam("function_id") String id,
+      @QueryParam("startTime") Long startTime,
+      @QueryParam("endTime") Long endTime,
+      @QueryParam("autoTuneType") String autoTuneType) {
+
+    // get anomalies by function id, start time and end time
     AnomalyFunctionDTO anomalyFunctionSpec = DAO_REGISTRY.getAnomalyFunctionDAO().findById(Long.valueOf(id));
-    AlertFilter alertFilter = alertFilterFactory.getAlertFilter(anomalyFunctionSpec);
     AnomalyFunctionManager anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     MergedAnomalyResultManager anomalyMergedResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     List<MergedAnomalyResultDTO> anomalyResultDTOS = anomalyMergedResultDAO.findByStartTimeInRangeAndFunctionId(startTime, endTime, Long.valueOf(id));
+
+    // create alert filter and evaluator
+    AlertFilter alertFilter = alertFilterFactory.fromSpec(anomalyFunctionSpec.getAlertFilter());
     AlertFilterUtil evaluator = new AlertFilterUtil(alertFilter);
     try {
       //evaluate current alert filter (calculate current precision and recall)
       double[] evals = evaluator.getEvalResults(anomalyResultDTOS);
-      LOG.info("AlertFilter of Type {}", alertFilter.getClass().toString(), "has been evaluated with precision: {}", evals[PRECISION_INDEX], "recall:", evals[RECALL_INDEX]);
+      LOG.info("AlertFilter of Type {}", alertFilter.getClass().toString(), "has been evaluated with precision: {}", evals[AlertFilterUtil.PRECISION_INDEX], "recall:", evals[AlertFilterUtil.RECALL_INDEX]);
 
+      // create alert filter auto tune
       AlertFilterAutoTune alertFilterAutotune = alertFilterAutotuneFactory.fromSpec(autoTuneType);
       LOG.info("initiated alertFilterAutoTune of Type {}", alertFilterAutotune.getClass().toString());
 
-      Map<String,String> tunedAlertFilter = alertFilterAutotune.tuneAlertFilter(anomalyResultDTOS, evals[PRECISION_INDEX], evals[RECALL_INDEX]);
+      // get tuned alert filter
+      Map<String,String> tunedAlertFilter = alertFilterAutotune.tuneAlertFilter(anomalyResultDTOS, evals[AlertFilterUtil.PRECISION_INDEX], evals[AlertFilterUtil.RECALL_INDEX]);
       LOG.info("tuned AlertFilter");
 
+      // if alert filter auto tune has updated alert filter, over write alert filter to anomaly function spec
+      // otherwise do nothing and return alert filter
       if (alertFilterAutotune.isUpdated()){
         anomalyFunctionSpec.setAlertFilter(tunedAlertFilter);
         anomalyFunctionDAO.update(anomalyFunctionSpec);

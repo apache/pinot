@@ -13,54 +13,54 @@ import static org.junit.Assert.*;
 public class TestAlertFilterUtil {
 
   @Test
-  public void testAlertFitlerEvaluator() throws Exception{
+  public void testPrecisionAndRecall() throws Exception{
     AlertFilter dummyAlertFilter = new DummyAlertFilter();
     AlertFilterUtil evaluator = new AlertFilterUtil(dummyAlertFilter);
-    List<MergedAnomalyResultDTO> anomalies = getMockMergedAnomalies();
+    // test data with 1 positive feedback, 1 negative feedback, other NA feedbacks
+    List<MergedAnomalyResultDTO> anomalies = getMockMergedAnomalies(7,8);
     double[] evals = evaluator.getEvalResults(anomalies);
     assertEquals(evals[AlertFilterUtil.PRECISION_INDEX], 0.1111, 0.0001);
     assertEquals(evals[AlertFilterUtil.RECALL_INDEX], 1, 0.0001);
+
+    // test data with 1 positive feedback and others are NA feedbacks
+    anomalies = getMockMergedAnomalies(6,-1);
+    evals = evaluator.getEvalResults(anomalies);
+    assertEquals(evals[AlertFilterUtil.PRECISION_INDEX], 0.1111, 0.0001);
+    assertEquals(evals[AlertFilterUtil.RECALL_INDEX], 1, 0.0001);
+
+    // test data with 0 positive feedback, 1 negative feedback and others are NA feedbacks
+    anomalies = getMockMergedAnomalies(-1,6);
+    try{
+      evals = evaluator.getEvalResults(anomalies);
+      fail("Should throw exception");
+    } catch (Exception e) {
+      assertEquals("No true labels in dataset. Check data", e.getMessage());
+    }
   }
 
-  public List<MergedAnomalyResultDTO> getMockMergedAnomaliesNullFeedbacks(){
+
+  private List<MergedAnomalyResultDTO> getMockMergedAnomalies(int posIdx, int negIdx){
     List<MergedAnomalyResultDTO> anomalyResultDTOS = new ArrayList<>();
-    int[] ws = {1, 1, 2, 3, 4, 4, 5};
-    double[] severity = {2.0, 4.0, 2.0, 3.0, 1.0, 3.0, 2.0};
-    AnomalyFeedbackDTO nullfeedback = null;
+    int[] ws = {1, 1, 2, 3, 4, 4, 5, 6 ,7};
+    double[] severity = {2.0, 4.0, 2.0, 3.0, 1.0, 3.0, 2.0,1.0,3.0};
+    AnomalyFeedbackDTO positiveFeedback = new AnomalyFeedbackDTO();
+    AnomalyFeedbackDTO negativeFeedback = new AnomalyFeedbackDTO();
+    positiveFeedback.setFeedbackType(ANOMALY);
+    negativeFeedback.setFeedbackType(NOT_ANOMALY);
     for(int i = 0; i < ws.length; i++){
       MergedAnomalyResultDTO anomaly = new MergedAnomalyResultDTO();
       anomaly.setStartTime(0l);
       anomaly.setEndTime(ws[i] * 3600 * 1000l);
       anomaly.setWeight(severity[i]);
-      anomaly.setFeedback(nullfeedback);
+      if(i == posIdx) {
+        anomaly.setFeedback(positiveFeedback);
+      } else if(i == negIdx) {
+        anomaly.setFeedback(negativeFeedback);
+      } else {
+        anomaly.setFeedback(null);
+      }
       anomalyResultDTOS.add(anomaly);
     }
-    return anomalyResultDTOS;
-  }
-
-  public List<MergedAnomalyResultDTO> getMockMergedAnomaliesSinglePositive(){
-    List<MergedAnomalyResultDTO> anomalyResultDTOS = getMockMergedAnomaliesNullFeedbacks();
-    AnomalyFeedbackDTO positiveFeedback = new AnomalyFeedbackDTO();
-    positiveFeedback.setFeedbackType(ANOMALY);
-    MergedAnomalyResultDTO anomaly = new MergedAnomalyResultDTO();
-    anomaly.setStartTime(0l);
-    anomaly.setEndTime(6 * 3600 * 1000l);
-    anomaly.setWeight(1.0);
-    anomaly.setFeedback(positiveFeedback);
-    anomalyResultDTOS.add(anomaly);
-    return anomalyResultDTOS;
-  }
-
-  public List<MergedAnomalyResultDTO> getMockMergedAnomalies(){
-    List<MergedAnomalyResultDTO> anomalyResultDTOS = getMockMergedAnomaliesSinglePositive();
-    AnomalyFeedbackDTO negativeFeedback = new AnomalyFeedbackDTO();
-    negativeFeedback.setFeedbackType(NOT_ANOMALY);
-    MergedAnomalyResultDTO anomaly = new MergedAnomalyResultDTO();
-    anomaly.setStartTime(0l);
-    anomaly.setEndTime(7 * 3600 * 1000l);
-    anomaly.setWeight(3.0);
-    anomaly.setFeedback(negativeFeedback);
-    anomalyResultDTOS.add(anomaly);
     return anomalyResultDTOS;
   }
 }

@@ -52,22 +52,22 @@ public class AlertFilterFactory {
 
 
   /**
-   * Initiates an alert filter for the given anomaly function.
+   * Get an alert filter for the given alert filter spec.
    *
-   * @param anomalyFunctionSpec the anomaly function that contains the alert filter spec.
-   *
+   * @param alertFilterSpec the anomaly function that contains the alert filter spec.
+   *        alertFilterSpec can be obtained by using AnomalyFunctionDTO getAlertFilter()
    * @return the alert filter specified by the alert filter spec or a dummy filter if the function
    * does not have an alert filter spec or this method fails to initiates an alert filter from the
    * spec.
    */
-  public AlertFilter getAlertFilter(AnomalyFunctionDTO anomalyFunctionSpec) {
-    Map<String, String> alertFilterInfo = anomalyFunctionSpec.getAlertFilter();
-    if (alertFilterInfo == null) {
-      alertFilterInfo = Collections.emptyMap();
+  public AlertFilter fromSpec(Map<String, String> alertFilterSpec) {
+    if (alertFilterSpec == null) {
+      alertFilterSpec = Collections.emptyMap();
     }
+    // the default alert filter is DummyAlertFilter
     AlertFilter alertFilter = new DummyAlertFilter();
-    if (alertFilterInfo.containsKey(FILTER_TYPE_KEY)) {
-      String alertFilterType = alertFilterInfo.get(FILTER_TYPE_KEY);
+    if (alertFilterSpec.containsKey(FILTER_TYPE_KEY)) {
+      String alertFilterType = alertFilterSpec.get(FILTER_TYPE_KEY);
       if(props.containsKey(alertFilterType.toUpperCase())) {
         String className = props.getProperty(alertFilterType.toUpperCase());
         try {
@@ -77,7 +77,7 @@ public class AlertFilterFactory {
         }
       }
     }
-    alertFilter.setParameters(alertFilterInfo);
+    alertFilter.setParameters(alertFilterSpec);
     return alertFilter;
   }
 }

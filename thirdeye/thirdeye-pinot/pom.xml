@@ -17,12 +17,6 @@
   </properties>
 
   <dependencies>
-    <!-- https://mvnrepository.com/artifact/nz.ac.waikato.cms.weka/weka-dev -->
-    <dependency>
-      <groupId>nz.ac.waikato.cms.weka</groupId>
-      <artifactId>weka-dev</artifactId>
-      <version>3.7.10</version>
-    </dependency>
     <dependency>
       <groupId>org.apache.httpcomponents</groupId>
       <artifactId>httpclient</artifactId>

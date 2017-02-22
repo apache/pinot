@@ -7,9 +7,11 @@ import java.util.Map;
 
 
 public class DummyAlertFilterAutoTune implements AlertFilterAutoTune {
+
   @Override
   public Map<String, String> tuneAlertFilter(List<MergedAnomalyResultDTO> anomalyResults, double currentPrecision,
       double currentRecall) throws Exception {
+    // do nothing and return empty map
     Map<String, String> emptyMap = new HashMap<>();
     return emptyMap;
   }

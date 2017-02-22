@@ -42,7 +42,7 @@ public class AlertFilterHelper {
       AlertFilter alertFilter = functionAlertFilter.get(functionId);
       if (alertFilter == null) {
         // Get filtration rule from anomaly function configuration
-        alertFilter = alertFilterFactory.getAlertFilter(anomalyFunctionSpec);
+        alertFilter = alertFilterFactory.fromSpec(anomalyFunctionSpec.getAlertFilter());
         functionAlertFilter.put(functionId, alertFilter);
         LOG.info("Using filter {} for anomaly function {} (dataset: {}, topic metric: {})", alertFilter,
             functionId, anomalyFunctionSpec.getCollection(), anomalyFunctionSpec.getTopicMetric());
