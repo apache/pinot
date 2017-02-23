@@ -30,4 +30,14 @@ public class CostFunction {
       return 0.;
     }
   }
+
+  public static double errWithPercentageRemoval(double v1, double v2, double parentRatio,
+      double threshold, double currentBaselineSum) {
+    double percentageContribution = (((v1 + v2) / currentBaselineSum) * 100);
+    if (Double.compare(percentageContribution, threshold) < 0) {
+      return 0d;
+    } else {
+      return err4EmptyValues(v1, v2, parentRatio) * Math.log(percentageContribution);
+    }
+  }
 }

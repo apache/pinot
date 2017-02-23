@@ -27,6 +27,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class Cube { // the cube (Ca|Cb)
   private static final Logger LOG = LoggerFactory.getLogger(Cube.class);
   private static final int DEFAULT_TOP_DIMENSION = 3;
+  public static final double PERCENTAGE_CONTRIBUTION_THRESHOLD = 3d;
 
   private double topBaselineValue;
   private double topCurrentValue;
@@ -307,12 +308,10 @@ public class Cube { // the cube (Ca|Cb)
         Row wowValues = wowValuesOfOneDimension.get(j);
         String dimValue = wowValues.getDimensionValues().get(0);
 
-        double dimValueCost = CostFunction.err4EmptyValues(wowValues.baselineValue, wowValues.currentValue, topRatio);
-        double percentage = (wowValues.baselineValue + wowValues.currentValue) * 100 / (currentTotal + baselineTotal);
-        if (Double.compare(percentage, Math.E) < 0) {
-          percentage = Math.E;
-        }
-        dimValueCost *= Math.log(percentage);
+        double dimValueCost = CostFunction
+            .errWithPercentageRemoval(wowValues.baselineValue, wowValues.currentValue, topRatio,
+                PERCENTAGE_CONTRIBUTION_THRESHOLD, currentTotal + baselineTotal);
+
         double contributionFactor = (wowValues.baselineValue + wowValues.currentValue)/(baselineTotal + currentTotal);
         costSet.add(new DimNameValueCostEntry(dimension, dimValue, dimValueCost , contributionFactor, wowValues.currentValue, wowValues.baselineValue));
         cost += dimValueCost;

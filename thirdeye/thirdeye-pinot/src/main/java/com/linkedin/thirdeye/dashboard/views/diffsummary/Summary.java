@@ -311,10 +311,8 @@ public class Summary {
     public void insertRowToDPArray(DPArray dp, HierarchyNode node, double targetRatio) {
       double baselineValue = node.getBaselineValue();
       double currentValue = node.getCurrentValue();
-      double percentage = (((baselineValue + currentValue) / topValue) * 100);
-      if (Double.compare(percentage, Math.E) < 0) percentage = Math.E;
-      double cost = CostFunction.err4EmptyValues(baselineValue, currentValue, targetRatio) * Math.log(percentage);
-//      double cost = CostFunction.err4EmptyValues(baselineValue, currentValue, targetRatio);
+      double cost = CostFunction.errWithPercentageRemoval(baselineValue, currentValue, targetRatio,
+          Cube.PERCENTAGE_CONTRIBUTION_THRESHOLD, topValue);
 
       for (int n = dp.size() - 1; n > 0; --n) {
         double val1 = dp.slotAt(n - 1).cost;

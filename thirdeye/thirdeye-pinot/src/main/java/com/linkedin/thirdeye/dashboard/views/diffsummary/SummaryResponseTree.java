@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.dashboard.views.diffsummary;
 
+import com.linkedin.thirdeye.client.diffsummary.Cube;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Iterator;
@@ -16,7 +17,6 @@ public class SummaryResponseTree {
   @JsonProperty("dimensions")
   List<String> dimensions = new ArrayList<>();
 
-//  List<SummaryResponseTreeNode> nodes = new ArrayList<>();
   List<HierarchyNode> hierarchicalNodes = new ArrayList<>();
 
 
@@ -25,6 +25,7 @@ public class SummaryResponseTree {
 
     // Build the header
     Dimensions dimensions = nodes.get(0).getDimensions();
+    double totalValue = nodes.get(0).getOriginalCurrentValue() + nodes.get(0).getOriginalBaselineValue();
     for (int i = 0; i < levelCount; ++i) {
       responseTree.dimensions.add(dimensions.get(i));
     }
@@ -56,7 +57,7 @@ public class SummaryResponseTree {
     }
 
     // Sort the children of each node by their cost
-    sortChildNodes(treeNodes.get(0));
+    sortChildNodes(treeNodes.get(0), totalValue);
 
     // Put the nodes to a flattened array
     insertChildNodes(treeNodes.get(0), responseTree.hierarchicalNodes);
@@ -74,24 +75,26 @@ public class SummaryResponseTree {
   /**
    * A recursive function to sort response tree.
    */
-  private static void sortChildNodes(SummaryResponseTreeNode node) {
+  private static void sortChildNodes(SummaryResponseTreeNode node, double totalValue) {
     if (node.children.size() == 0) return;
     for (SummaryResponseTreeNode child : node.children) {
-      sortChildNodes(child);
+      sortChildNodes(child, totalValue);
     }
     double ratio = node.currentRatio();
     for (SummaryResponseTreeNode child : node.children) {
-      computeCost(child, ratio);
+      computeCost(child, ratio, totalValue);
     }
     node.children.sort(new SummaryResponseTreeNodeCostComparator().reversed());
   }
 
-  private static void computeCost(SummaryResponseTreeNode node, double targetRatio) {
+  private static void computeCost(SummaryResponseTreeNode node, double targetRatio, double totalValue) {
     if (node.hierarchyNode != null) {
-      node.cost = CostFunction.err4EmptyValues(node.getBaselineValue(), node.getCurrentValue(), targetRatio);
+      node.cost = CostFunction
+          .errWithPercentageRemoval(node.getBaselineValue(), node.getCurrentValue(), targetRatio,
+              Cube.PERCENTAGE_CONTRIBUTION_THRESHOLD, totalValue);
     }
     for (SummaryResponseTreeNode child : node.children) {
-      computeCost(child, targetRatio);
+      computeCost(child, targetRatio, totalValue);
       node.cost += child.cost;
     }
   }
