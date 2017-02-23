@@ -18,10 +18,7 @@ import com.linkedin.thirdeye.completeness.checker.DataCompletenessScheduler;
 import com.linkedin.thirdeye.dashboard.resources.AnomalyFunctionResource;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
-import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExContext;
-import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExDataSource;
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExFactory;
-import com.linkedin.thirdeye.detector.functionex.dataframe.DataFrame;
 import com.linkedin.thirdeye.detector.functionex.impl.ThirdEyeMockDataSource;
 import com.linkedin.thirdeye.detector.functionex.impl.ThirdEyePinotConnection;
 import com.linkedin.thirdeye.detector.functionex.impl.ThirdEyePinotDataSource;
@@ -93,7 +90,7 @@ public class ThirdEyeAnomalyApplication
           if(alertFilterFactory == null)
             alertFilterFactory = new AlertFilterFactory(config.getAlertFilterConfigPath());
           anomalyFunctionFactory = makeAnomalyFunctionFactory(config);
-          anomalyFunctionExFactory = makeAnomalyfunctionExFactory(config);
+          anomalyFunctionExFactory = makeAnomalyFunctionExFactory(config);
           taskDriver = new TaskDriver(config, anomalyFunctionFactory, anomalyFunctionExFactory, alertFilterFactory);
           taskDriver.start();
         }
@@ -177,7 +174,7 @@ public class ThirdEyeAnomalyApplication
     return new AnomalyFunctionFactory(config.getFunctionConfigPath());
   }
 
-  private AnomalyFunctionExFactory makeAnomalyfunctionExFactory(ThirdEyeAnomalyConfiguration config) throws Exception {
+  private AnomalyFunctionExFactory makeAnomalyFunctionExFactory(ThirdEyeAnomalyConfiguration config) throws Exception {
     PinotThirdEyeClientConfig clientConfig = PinotThirdEyeClientConfig.createThirdEyeClientConfig(config);
 
     ThirdEyePinotConnection pinotConn = new ThirdEyePinotConnection(clientConfig);
