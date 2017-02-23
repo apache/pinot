@@ -82,6 +82,7 @@ public class SegmentGeneratorConfig {
   private char _paddingCharacter = V1Constants.Str.DEFAULT_STRING_PAD_CHAR;
   private HllConfig _hllConfig = null;
   private SegmentNameGenerator _segmentNameGenerator = null;
+  private int _sequenceId = -1;
 
   public SegmentGeneratorConfig() {
   }
@@ -124,6 +125,7 @@ public class SegmentGeneratorConfig {
     _segmentVersion = config._segmentVersion;
     _segmentName = config._segmentName;
     _segmentNameGenerator = config._segmentNameGenerator;
+    _sequenceId = config._sequenceId;
   }
 
   public SegmentGeneratorConfig(Schema schema) {
@@ -270,6 +272,9 @@ public class SegmentGeneratorConfig {
     return _segmentNamePostfix;
   }
 
+  /**
+   * If you are adding a sequence Id to the segment, please use setSequenceId.
+   */
   public void setSegmentNamePostfix(String postfix) {
     _segmentNamePostfix = postfix;
   }
@@ -283,6 +288,17 @@ public class SegmentGeneratorConfig {
 
   public void setTimeColumnName(String timeColumnName) {
     _segmentTimeColumnName = timeColumnName;
+  }
+
+  public int getSequenceId() {
+    return _sequenceId;
+  }
+
+  /**
+   * This method should be used instead of setPostfix if you are adding a sequence number.
+   */
+  public void setSequenceId(int sequenceId) {
+    _sequenceId = sequenceId;
   }
 
   public TimeUnit getSegmentTimeUnit() {
@@ -419,7 +435,7 @@ public class SegmentGeneratorConfig {
     if (_segmentName != null) {
       return new DefaultSegmentNameGenerator(_segmentName);
     }
-    return new DefaultSegmentNameGenerator(getTimeColumnName(), getTableName(), getSegmentNamePostfix());
+    return new DefaultSegmentNameGenerator(getTimeColumnName(), getTableName(), getSegmentNamePostfix(), getSequenceId());
   }
 
   public void setSegmentNameGenerator(SegmentNameGenerator segmentNameGenerator) {
