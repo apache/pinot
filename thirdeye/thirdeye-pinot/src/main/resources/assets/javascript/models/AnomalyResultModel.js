@@ -117,11 +117,15 @@ AnomalyResultModel.prototype = {
 
   /**
    * Helper Function that returns formatted anomaly region duration data for UI
-   * @param  [date] start: the anomaly region start
-   * @param  [date] end: the anomaly region end
-   * @return [string]  formatted start - end date/time
+   * @param  {date}   start   the anomaly region start
+   * @param  {date}   end     the anomaly region end
+   * @return {string}         formatted start - end date/time
    */
   getRegionDuration(start, end) {
+
+    if (!(start && end)) {
+      return 'N/A';
+    }
     const regionStart = moment(start, constants.TIMESERIES_DATE_FORMAT);
     const regionEnd = moment(end, constants.TIMESERIES_DATE_FORMAT);
     const isSameDay = regionStart.isSame(regionEnd, 'day');
@@ -142,15 +146,13 @@ AnomalyResultModel.prototype = {
 
   /**
    * Helper Function that retuns formatted change delta for UI
-   * @param  [int] current: current average anomaly
-   * @param  [int] baseline: baseline the anomaly is compared too
-   * @return [string] 'N/A' if either is missing, otherwise formatted delta (%)
+   * @param  {int}    current    current average anomaly
+   * @param  {int}    baseline   baseline the anomaly is compared too
+   * @return {string}            'N/A' if either is missing, otherwise formatted delta (%)
    */
   getChangeDelta(current, baseline) {
-    let changeDelta;
-    if (!(current && baseline)) {
-      changeDelta = 'N/A'
-    } else {
+    let changeDelta = 'N/A';
+    if (current && baseline) {
       const amount = (current - baseline) / baseline * 100;
       changeDelta = `${amount.toFixed(2)}%`;
     }
@@ -160,7 +162,7 @@ AnomalyResultModel.prototype = {
 
   /**
    * Helper Function that sets formatted duration and changeDelta onto the anomaly model
-   * @return null
+   * @return {null}
    */
   formatAnomalies() {
     this.anomaliesWrapper.anomalyDetailsList.forEach((anomaly) => {

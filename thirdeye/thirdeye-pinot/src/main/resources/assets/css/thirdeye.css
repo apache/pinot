@@ -458,6 +458,10 @@ text {
 }
 
 /* Anomaly Results*/
+
+.anormaly-chart {
+  height: 300px;
+}
 .anomaly-result-header {
   display: flex;
   justify-content: space-between;

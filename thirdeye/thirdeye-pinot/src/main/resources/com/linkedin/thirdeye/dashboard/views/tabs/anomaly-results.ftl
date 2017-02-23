@@ -19,11 +19,8 @@
               </div>
             </div>
 
-            <div class="row">
-              <div class="col-xs-12">
-                <div id="anomaly-chart-{{anomalyIndex}}" style="height: 300px"></div>
-              </div>
-            </div>
+            <div class ="anormaly-chart" id="anomaly-chart-{{anomalyIndex}}"></div>
+
 
             <div class="anomaly-details">
               <div class="anomaly-details-row">

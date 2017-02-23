@@ -228,28 +228,24 @@ AnomalyResultView.prototype = {
 
   renderAnomaliesTab : function(anomaliesWrapper) {
     const anomalies = anomaliesWrapper.anomalyDetailsList;
-    for (let idx = 0; idx < anomalies.length; idx++) {
-      const anomaly = anomalies[idx];
+    anomalies.forEach((anomaly, index) => {
 
       if (!anomaly) {
-        continue;
+        return;
       }
 
       console.log(anomaly);
 
-      var currentRange = anomaly.currentStart + " - " + anomaly.currentEnd;
-      var baselineRange = anomaly.baselineStart + " - " + anomaly.baselineEnd;
-
-      var date = ['date'].concat(anomaly.dates);
-      var currentValues = ['current'].concat(anomaly.currentValues);
-      var baselineValues = ['baseline'].concat(anomaly.baselineValues);
-      var chartColumns = [ date, currentValues, baselineValues ];
+      const date = ['date'].concat(anomaly.dates);
+      const currentValues = ['current'].concat(anomaly.currentValues);
+      const baselineValues = ['baseline'].concat(anomaly.baselineValues);
+      const chartColumns = [ date, currentValues, baselineValues ];
       const showPoints = date.length <= constants.MAX_POINT_NUM;
 
 
       // CHART GENERATION
       var chart = c3.generate({
-        bindto : '#anomaly-chart-' + idx,
+        bindto : '#anomaly-chart-' + index,
         data : {
           x : 'date',
           xFormat : '%Y-%m-%d %H:%M',
@@ -288,8 +284,8 @@ AnomalyResultView.prototype = {
         } ]
       });
 
-      this.setupListenersOnAnomaly(idx, anomaly);
-    }
+      this.setupListenersOnAnomaly(index, anomaly);
+    })
   },
 
   dataEventHandler : function(e) {

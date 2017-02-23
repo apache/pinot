@@ -36,8 +36,8 @@ Handlebars.registerHelper('formatDelta', function (a, b) {
  * @return [string] css class positive/negative
  */
 Handlebars.registerHelper('colorDelta', function(value) {
-    if (value ===  'N/A') return;
-    return parseInt(value1) >= 0 ? 'positive' : 'negative';
+    if (value ===  'N/A') { return; }
+    return parseInt(value) >= 0 ? 'positive' : 'negative';
 });
 
 Handlebars.registerHelper('displayHour', function (date) {
