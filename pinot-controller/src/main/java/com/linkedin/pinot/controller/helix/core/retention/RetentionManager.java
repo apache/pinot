@@ -17,13 +17,16 @@ package com.linkedin.pinot.controller.helix.core.retention;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.ZNRecord;
+import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,8 +37,11 @@ import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
+import com.linkedin.pinot.common.utils.SegmentName;
+import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
 import com.linkedin.pinot.controller.helix.core.retention.strategy.TimeRetentionStrategy;
@@ -61,6 +67,8 @@ public class RetentionManager {
   private final ScheduledExecutorService _executorService;
   private final int _runFrequencyInSeconds;
 
+  private static final int RETENTION_TIME_FOR_OLD_LLC_SEGMENTS_DAYS = 5;
+
   public RetentionManager(PinotHelixResourceManager pinotHelixResourceManager, int runFrequencyInSeconds) {
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _runFrequencyInSeconds = runFrequencyInSeconds;
@@ -72,6 +80,10 @@ public class RetentionManager {
         return thread;
       }
     });
+  }
+
+  public static long getRetentionTimeForOldLLCSegmentsDays() {
+    return RETENTION_TIME_FOR_OLD_LLC_SEGMENTS_DAYS;
   }
 
   public void start() {
@@ -116,6 +128,15 @@ public class RetentionManager {
     for (String tableName : _segmentMetadataMap.keySet()) {
       List<SegmentZKMetadata> segmentZKMetadataList = _segmentMetadataMap.get(tableName);
       List<String> segmentsToDelete = new ArrayList<>(128);
+      IdealState idealState = null;
+      try {
+        if (TableNameBuilder.getTableTypeFromTableName(tableName).equals(TableType.REALTIME)) {
+          idealState = HelixHelper.getTableIdealState(_pinotHelixResourceManager.getHelixZkManager(), tableName);
+        }
+      } catch (Exception e) {
+        LOGGER.warn("Could not get idealstate for {}", tableName);
+        // Ignore, worst case we have some old inactive segments in place.
+      }
       for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
         RetentionStrategy deletionStrategy;
         deletionStrategy = _tableDeletionStrategy.get(tableName);
@@ -124,7 +145,18 @@ public class RetentionManager {
           continue;
         }
         if (segmentZKMetadata instanceof RealtimeSegmentZKMetadata) {
-          if (((RealtimeSegmentZKMetadata) segmentZKMetadata).getStatus() == Status.IN_PROGRESS) {
+          final RealtimeSegmentZKMetadata realtimeSegmentZKMetadata = (RealtimeSegmentZKMetadata)segmentZKMetadata;
+          if (realtimeSegmentZKMetadata.getStatus() == Status.IN_PROGRESS) {
+            final String segmentId = realtimeSegmentZKMetadata.getSegmentName();
+            if (SegmentName.isHighLevelConsumerSegmentName(segmentId)) {
+              continue;
+            }
+            // This is an in-progress LLC segment. Delete any old ones hanging around. Do not delete
+            // segments that are current since there may be a race with the ValidationManager trying to
+            // auto-create LLC segments.
+            if (shouldDeleteInProgressLLCSegment(segmentId, idealState, realtimeSegmentZKMetadata)) {
+              segmentsToDelete.add(segmentId);
+            }
             continue;
           }
         }
@@ -138,6 +170,29 @@ public class RetentionManager {
         _pinotHelixResourceManager.deleteSegments(tableName, segmentsToDelete);
       }
     }
+  }
+
+  private boolean shouldDeleteInProgressLLCSegment(final String segmentId, final IdealState idealState, RealtimeSegmentZKMetadata segmentZKMetadata) {
+    if (idealState == null) {
+      return false;
+    }
+    Map<String, String> stateMap = idealState.getInstanceStateMap(segmentId);
+    if (stateMap == null) {
+      // segment is there in propertystore but not in idealstate. mark for deletion
+      return true;
+    } else {
+      Set<String> states = new HashSet<>(stateMap.values());
+      if (states.size() == 1 && states
+          .contains(CommonConstants.Helix.StateModel.SegmentOnlineOfflineStateModel.OFFLINE)) {
+        // All replicas of this segment are offline, delete it if it is old enough
+        final long now = System.currentTimeMillis();
+        if (now - segmentZKMetadata.getCreationTime() >= TimeUnit.DAYS.toMillis(
+            RETENTION_TIME_FOR_OLD_LLC_SEGMENTS_DAYS)) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   private void updateDeletionStrategiesForEntireCluster() {

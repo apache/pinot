@@ -18,15 +18,21 @@ package com.linkedin.pinot.controller.helix.retention;
 import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
+import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
 import org.json.JSONException;
@@ -36,18 +42,25 @@ import org.testng.Assert;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
+import com.alibaba.fastjson.JSONObject;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.StarTreeMetadata;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.common.utils.ZkStarter;
+import com.linkedin.pinot.common.utils.ZkUtils;
+import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
 import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import com.linkedin.pinot.controller.helix.core.retention.RetentionManager;
 import com.linkedin.pinot.controller.helix.core.util.ZKMetadataUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
@@ -76,9 +89,11 @@ public class RetentionManagerTest {
   private HelixAdmin _helixAdmin;
   private String _testTableName = "testTable";
   private String _offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(_testTableName);
+  private String _realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(_testTableName);
 
   private RetentionManager _retentionManager;
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
+  private ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
   @BeforeTest
   public void setup() throws Exception {
@@ -98,6 +113,7 @@ public class RetentionManagerTest {
         ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(_testTableName, null, null, 2).toString();
     AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(OfflineTableConfigJson);
     _pinotHelixResourceManager.addTable(offlineTableConfig);
+    _propertyStore = ZkUtils.getZkPropertyStore(_helixZkManager, HELIX_CLUSTER_NAME);
   }
 
   @AfterTest
@@ -111,11 +127,12 @@ public class RetentionManagerTest {
     ZkStarter.stopLocalZkServer(_zookeeperInstance);
   }
 
-  public void cleanupSegments() throws InterruptedException {
+  private void cleanupSegments(String tableName) throws InterruptedException {
     _retentionManager.stop();
-    _pinotHelixResourceManager.deleteSegments(_offlineTableName, _pinotHelixResourceManager.getAllSegmentsForResource(_offlineTableName));
+    _pinotHelixResourceManager.deleteSegments(tableName,
+        _pinotHelixResourceManager.getAllSegmentsForResource(tableName));
     while (_helixZkManager.getHelixPropertyStore()
-        .getChildNames(ZKMetadataProvider.constructPropertyStorePathForResource(_offlineTableName),
+        .getChildNames(ZKMetadataProvider.constructPropertyStorePathForResource(tableName),
             AccessOption.PERSISTENT)
         .size() > 0) {
       Thread.sleep(1000);
@@ -148,8 +165,8 @@ public class RetentionManagerTest {
       registerSegmentMetadata(segmentMetadata);
       Thread.sleep(100);
     }
-    validate();
-    cleanupSegments();
+    validate(20, _offlineTableName, 10, true);
+    cleanupSegments(_offlineTableName);
   }
 
   /**
@@ -177,17 +194,21 @@ public class RetentionManagerTest {
       registerSegmentMetadata(segmentMetadata);
       Thread.sleep(100);
     }
-    validate();
-    cleanupSegments();
+    validate(20, _offlineTableName, 10, true);
+    cleanupSegments(_offlineTableName);
   }
 
-  private void validate() throws InterruptedException {
+  private void validate(int expectedInitialNumSegments, String tableName, int expectedFinalNumSegments,
+      boolean checkExtView) throws InterruptedException {
     int INCREMENTAL_WAIT_TIME = 5000;
     int INITIAL_WAIT_TIME = 8000;
-    String segmentMetadaPathForTable = ZKMetadataProvider.constructPropertyStorePathForResource(_offlineTableName);
+//    final int expectedInitialNumSegments = 20;
+//    final int expectedFinalNumSegments = 10;
+//    final String tableName = _offlineTableName;
+    String segmentMetadaPathForTable = ZKMetadataProvider.constructPropertyStorePathForResource(tableName);
     int numSegmentsInMetadata = _helixZkManager.getHelixPropertyStore()
         .getChildNames(segmentMetadaPathForTable, AccessOption.PERSISTENT).size();
-    Assert.assertEquals(numSegmentsInMetadata, 20);
+    Assert.assertEquals(numSegmentsInMetadata, expectedInitialNumSegments);
     Thread.sleep(INITIAL_WAIT_TIME);
     LOGGER.info("Sleeping thread wakes up!");
     int evSize = 0;
@@ -196,18 +217,26 @@ public class RetentionManagerTest {
     long start = System.currentTimeMillis();
     int MAX_WAIT_TIME = 2 * 60 * 1000; // 2 minutes
     while (System.currentTimeMillis() - start < MAX_WAIT_TIME) {
-      evSize = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, _offlineTableName).getPartitionSet().size();
-      isSize = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, _offlineTableName).getPartitionSet().size();
+      evSize = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, tableName).getPartitionSet().size();
+      isSize = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, tableName).getPartitionSet().size();
       numSegmentsInMetadata = _helixZkManager.getHelixPropertyStore()
           .getChildNames(segmentMetadaPathForTable, AccessOption.PERSISTENT).size();
-      if (evSize == 10 && isSize == 10 && numSegmentsInMetadata == 10) {
+      boolean good = false;
+      if (checkExtView) {
+        good = (evSize == expectedFinalNumSegments && isSize == expectedFinalNumSegments && numSegmentsInMetadata == expectedFinalNumSegments);
+      } else {
+        good = (isSize == expectedFinalNumSegments && numSegmentsInMetadata == expectedFinalNumSegments);
+      }
+      if (good) {
         break;
       }
       Thread.sleep(INCREMENTAL_WAIT_TIME);
     }
-    Assert.assertEquals(evSize, 10);
-    Assert.assertEquals(isSize, 10);
-    Assert.assertEquals(numSegmentsInMetadata, 10);
+    if (checkExtView) {
+      Assert.assertEquals(evSize, expectedFinalNumSegments);
+    }
+    Assert.assertEquals(isSize, expectedFinalNumSegments);
+    Assert.assertEquals(numSegmentsInMetadata, expectedFinalNumSegments);
   }
 
   /**
@@ -234,8 +263,8 @@ public class RetentionManagerTest {
       registerSegmentMetadata(segmentMetadata);
       Thread.sleep(100);
     }
-    validate();
-    cleanupSegments();
+    validate(20, _offlineTableName, 10, true);
+    cleanupSegments(_offlineTableName);
   }
 
   /**
@@ -262,8 +291,8 @@ public class RetentionManagerTest {
       registerSegmentMetadata(segmentMetadata);
       Thread.sleep(100);
     }
-    validate();
-    cleanupSegments();
+    validate(20, _offlineTableName, 10, true);
+    cleanupSegments(_offlineTableName);
   }
 
   /**
@@ -291,8 +320,118 @@ public class RetentionManagerTest {
       registerSegmentMetadata(segmentMetadata);
       Thread.sleep(100);
     }
-    validate();
-    cleanupSegments();
+    validate(20, _offlineTableName, 10, true);
+    cleanupSegments(_offlineTableName);
+  }
+
+  @Test
+  public void testRealtimeLLCCleanup() throws Exception {
+    final int initialNumSegments = 8;
+    final long now = System.currentTimeMillis();
+    Set<String> remainingSegments = setupRealtimeTable(initialNumSegments, now);
+    Assert.assertTrue(initialNumSegments - remainingSegments.size() > 0);   // At least one segment should be deleted, otherwise we don't have a test
+    _retentionManager = new RetentionManager(_pinotHelixResourceManager, 5);
+    _retentionManager.start();
+    // Do not check external view when validating because the segments that are OFFLINE in Idealstate to begin with
+    // never show up in Externalview
+    validate(initialNumSegments, _realtimeTableName, remainingSegments.size(), false);
+    // Ensure that the segments that should be present are indeed present.
+    IdealState idealState = HelixHelper.getTableIdealState(_helixZkManager, _realtimeTableName);
+    for (final String segmentId : remainingSegments) {
+      Assert.assertTrue(idealState.getPartitionSet().contains(segmentId));
+      Assert.assertNotNull(ZKMetadataProvider.getRealtimeSegmentZKMetadata(_propertyStore, _realtimeTableName, segmentId));
+    }
+    cleanupSegments(_realtimeTableName);
+  }
+
+  // The most recent will be in
+  private Set<String> setupRealtimeTable(final int nSegments, final long now) throws Exception {
+    final int replicaCount = 1;
+
+    createRealtimeTableConfig(_realtimeTableName, replicaCount);
+    Set<String> remainingSegments = new HashSet<>();
+
+    IdealState idealState = PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(_realtimeTableName, replicaCount);
+
+    final int kafkaPartition = 5;
+    final long millisInDays = TimeUnit.DAYS.toMillis(1);
+    final String serverName = "Server_localhost_0";
+    // If we set the segment creation time to a certain value and compare it as being X ms old,
+    // then we could get unpredictable results depending on whether it takes more or less than
+    // one millisecond to get to RetentionManager time comparison code. To be safe, set the
+    // milliseconds off by 1/2 day.
+    long segmentCreationTime = now - (nSegments+1) * millisInDays + millisInDays/2;
+    List<LLCRealtimeSegmentZKMetadata> segmentZKMetadatas = new ArrayList<>();
+    for (int seq = 1; seq <= nSegments; seq++) {
+      segmentCreationTime += millisInDays;
+      LLCRealtimeSegmentZKMetadata segmentMetadata = createSegmentMetadata(replicaCount, segmentCreationTime);
+      LLCSegmentName llcSegmentName = new LLCSegmentName(_testTableName, kafkaPartition, seq, segmentCreationTime);
+      final String segName = llcSegmentName.getSegmentName();
+      segmentMetadata.setSegmentName(segName);
+      if (seq == nSegments) {
+        // create consuming segment
+        segmentMetadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
+        idealState.setPartitionState(segName, serverName, "CONSUMING");
+        remainingSegments.add(segName);
+      } else if (seq % 2 == 0) {
+        // create ONLINE segment
+        segmentMetadata.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+        idealState.setPartitionState(segName, serverName, "ONLINE");
+        remainingSegments.add(segName);
+      } else {
+        segmentMetadata.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
+        idealState.setPartitionState(segName, serverName, "OFFLINE");
+        if (now - segmentCreationTime < TimeUnit.DAYS.toMillis(RetentionManager.getRetentionTimeForOldLLCSegmentsDays())) {
+          remainingSegments.add(segName);
+        }
+      }
+      final String znodePath = ZKMetadataProvider.constructPropertyStorePathForSegment(_realtimeTableName,
+          segName);
+      _propertyStore.set(znodePath, segmentMetadata.toZNRecord(), AccessOption.PERSISTENT);
+    }
+    _helixAdmin.addResource(HELIX_CLUSTER_NAME, _realtimeTableName, idealState);
+    return remainingSegments;
+  }
+
+  private LLCRealtimeSegmentZKMetadata createSegmentMetadata(int replicaCount, long segmentCreationTime) {
+    LLCRealtimeSegmentZKMetadata segmentMetadata = new LLCRealtimeSegmentZKMetadata();
+    segmentMetadata.setCreationTime(segmentCreationTime);
+    segmentMetadata.setStartOffset(0L);
+    segmentMetadata.setEndOffset(-1L);
+
+    segmentMetadata.setNumReplicas(replicaCount);
+    segmentMetadata.setTableName(_testTableName);
+    return segmentMetadata;
+  }
+
+  private void createRealtimeTableConfig(String realtimeTableName, int replicaCount)
+      throws JSONException, IOException {
+    JSONObject tableConfig = new JSONObject();
+    tableConfig.put("tableName", _testTableName);
+    tableConfig.put("tableType", "REALTIME");
+
+    JSONObject segmentsConfig = new JSONObject();
+    segmentsConfig.put("retentionTimeUnit", "DAYS");
+    segmentsConfig.put("retentionTimeValue", "5");
+    segmentsConfig.put("replicasPerPartition", Integer.toString(replicaCount));
+    segmentsConfig.put("replicationNumber", Integer.toString(replicaCount));
+    segmentsConfig.put("replication", Integer.toString(replicaCount));
+    tableConfig.put("segmentsConfig", segmentsConfig);
+
+    JSONObject tableIndexConfig = new JSONObject();
+    tableIndexConfig.put("stream.kafka.consumer.type", "simple");
+    tableConfig.put("tableIndexConfig", tableIndexConfig);
+
+    JSONObject tenants = new JSONObject();
+    tableConfig.put("tenants", tenants);
+
+    JSONObject metadata = new JSONObject();
+    tableConfig.put("metadata", tenants);
+
+    // Set the propertystore entry for table.
+    AbstractTableConfig abstractTableConfig = AbstractTableConfig.init(tableConfig.toJSONString());
+    ZKMetadataProvider
+        .setRealtimeTableConfig(_propertyStore, realtimeTableName, AbstractTableConfig.toZnRecord(abstractTableConfig));
   }
 
   private void registerSegmentMetadata(SegmentMetadata segmentMetadata) {
