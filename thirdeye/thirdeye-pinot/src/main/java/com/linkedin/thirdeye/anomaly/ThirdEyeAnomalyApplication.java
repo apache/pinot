@@ -22,6 +22,7 @@ import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExContext;
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExDataSource;
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExFactory;
 import com.linkedin.thirdeye.detector.functionex.dataframe.DataFrame;
+import com.linkedin.thirdeye.detector.functionex.impl.ThirdEyeMockDataSource;
 import com.linkedin.thirdeye.detector.functionex.impl.ThirdEyePinotConnection;
 import com.linkedin.thirdeye.detector.functionex.impl.ThirdEyePinotDataSource;
 import com.yammer.metrics.core.Counter;
@@ -182,21 +183,9 @@ public class ThirdEyeAnomalyApplication
     ThirdEyePinotConnection pinotConn = new ThirdEyePinotConnection(clientConfig);
 
     AnomalyFunctionExFactory factory = new AnomalyFunctionExFactory();
-    factory.addDataSource("mock", new MockDataSource());
+    factory.addDataSource("mock", new ThirdEyeMockDataSource());
     factory.addDataSource("pinot", new ThirdEyePinotDataSource(pinotConn));
 
     return factory;
-  }
-
-  static class MockDataSource implements AnomalyFunctionExDataSource<String, DataFrame> {
-    @Override
-    public DataFrame query(String query, AnomalyFunctionExContext context) {
-      DataFrame df = new DataFrame(5);
-      df.addSeries("long", 3, 4, 5, 6, 7);
-      df.addSeries("double", 1.2, 3.5, 2.8, 6.4, 4.9);
-      df.addSeries("stable", 1, 1, 1, 1, 1);
-      df.addSeries("string", "aaa", "abb", "bcb", "caa", "ccb");
-      return df;
-    }
   }
 }
