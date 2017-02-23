@@ -180,37 +180,33 @@ public class Cube { // the cube (Ca|Cb)
       hierarchicalNodes.add(nodesAtCurrentLevel);
 
       if (level != 0) {
-        int parentIndex = 0;
-        HierarchyNode parentNode = hierarchicalNodes.get(level - 1).get(parentIndex);
+        HashMap<String, HierarchyNode> parent = new HashMap<>();
+        StringBuilder parentDimValues = new StringBuilder();
+        // Put all parent nodes to the hashmap
+        for (int parentIndex = 0; parentIndex < hierarchicalNodes.get(level - 1).size(); ++parentIndex) {
+          parentDimValues.setLength(0);
+          HierarchyNode parentNode = hierarchicalNodes.get(level - 1).get(parentIndex);
+          for (int i = 0; i < level - 1; ++i) {
+            parentDimValues.append(parentNode.data.dimensionValues.get(i));
+          }
+          parent.put(parentDimValues.toString(), parentNode);
+        }
+
         for (int index = 0; index < hierarchicalRows.get(level).size(); ++index) {
           Row row = hierarchicalRows.get(level).get(index);
+          parentDimValues.setLength(0);
+          for (int i = 0; i < level - 1; ++i) {
+            parentDimValues.append(row.dimensionValues.get(i));
+          }
+          HierarchyNode parentNode = parent.get(parentDimValues.toString());
+          // Sometimes Pinot returns a node without any matching parent
+          if (parentNode == null) {
+            LOG.info("Unable to find parent for node:{}", row);
+            continue;
+          }
           HierarchyNode node = new HierarchyNode(level, index, row, parentNode);
           parentNode.children.add(node);
           hierarchicalNodes.get(level).add(node);
-
-          // For testing if a node has the correct parent node
-          boolean haveProblem = false;
-          for (int i = 0; i < level - 1; ++i) {
-            if (parentNode == null || !parentNode.data.dimensionValues.get(i).equals(row.dimensionValues.get(i))) {
-              haveProblem = true;
-              break;
-            }
-          }
-          if (haveProblem) {
-            LOG.info(row + " is incorrectly connected to " + parentNode.data);
-          }
-
-          // If the next data does not have the same prefix of dimension values, then it belongs to a different present.
-          if ((level > 1) && (index != hierarchicalRows.get(level).size() - 1)) {
-            Row nextRow = hierarchicalRows.get(level).get(index + 1);
-            for (int i = level - 2; i >= 0; --i) {
-              if (!nextRow.dimensionValues.get(i).equals(row.dimensionValues.get(i))) {
-                ++parentIndex;
-                parentNode = hierarchicalNodes.get(level - 1).get(parentIndex);
-                break;
-              }
-            }
-          }
         }
       } else { // root
         Row row = hierarchicalRows.get(0).get(0);
@@ -376,6 +372,7 @@ public class Cube { // the cube (Ca|Cb)
     }
     Collections.sort(costSet);
     System.out.println("Cost set");
+    costSet = costSet.subList(0, 20);
     for (DimNameValueCostEntry entry : costSet) {
       System.out.println(entry);
     }
