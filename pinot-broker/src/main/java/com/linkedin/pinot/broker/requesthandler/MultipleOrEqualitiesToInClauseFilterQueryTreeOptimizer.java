@@ -36,8 +36,8 @@ import java.util.TreeSet;
  */
 public class MultipleOrEqualitiesToInClauseFilterQueryTreeOptimizer extends FilterQueryTreeOptimizer {
   @Override
-  public FilterQueryTree optimize(FilterQueryTree filterQueryTree) {
-    return optimize(filterQueryTree, null);
+  public FilterQueryTree optimize(FilterQueryOptimizerRequest request) {
+    return optimize(request.getFilterQueryTree(), null);
   }
 
   private FilterQueryTree optimize(FilterQueryTree filterQueryTree, FilterQueryTree parent) {

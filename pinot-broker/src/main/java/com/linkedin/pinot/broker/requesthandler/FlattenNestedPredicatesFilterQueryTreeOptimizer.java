@@ -30,7 +30,8 @@ public class FlattenNestedPredicatesFilterQueryTreeOptimizer extends FilterQuery
   public static int MAX_OPTIMIZING_DEPTH = 5;
 
   @Override
-  public FilterQueryTree optimize(FilterQueryTree filterQueryTree) {
+  public FilterQueryTree optimize(FilterQueryOptimizerRequest request) {
+    FilterQueryTree filterQueryTree = request.getFilterQueryTree();
     flatten(filterQueryTree, null, MAX_OPTIMIZING_DEPTH);
 
     return filterQueryTree;

@@ -282,18 +282,22 @@ public class BrokerRequestHandler {
       // At least one table matches the broker request.
       BrokerRequest offlineBrokerRequest = null;
       BrokerRequest realtimeBrokerRequest = null;
+
+      // We get timeColumnName from time boundary service currently, which only exists for offline table.
+      String timeColumnName = (offlineTableName != null) ? getTimeColumnName(offlineTableName) : null;
+
       if ((offlineTableName != null) && (realtimeTableName != null)) {
         // Hybrid table.
-        offlineBrokerRequest = getOfflineBrokerRequest(brokerRequest);
-        realtimeBrokerRequest = getRealtimeBrokerRequest(brokerRequest);
+        offlineBrokerRequest = _optimizer.optimize(getOfflineBrokerRequest(brokerRequest), timeColumnName);
+        realtimeBrokerRequest = _optimizer.optimize(getRealtimeBrokerRequest(brokerRequest), timeColumnName);
       } else if (offlineTableName != null) {
         // Offline table only.
         brokerRequest.getQuerySource().setTableName(offlineTableName);
-        offlineBrokerRequest = _optimizer.optimize(brokerRequest);
+        offlineBrokerRequest = _optimizer.optimize(brokerRequest, timeColumnName);
       } else {
         // Realtime table only.
         brokerRequest.getQuerySource().setTableName(realtimeTableName);
-        realtimeBrokerRequest = _optimizer.optimize(brokerRequest);
+        realtimeBrokerRequest = _optimizer.optimize(brokerRequest, timeColumnName);
       }
 
       ReduceService reduceService = _reduceServiceRegistry.get(responseType);
@@ -301,6 +305,19 @@ public class BrokerRequestHandler {
       return processOptimizedBrokerRequests(brokerRequest, offlineBrokerRequest, realtimeBrokerRequest, reduceService,
           scatterGatherStats, null, requestId);
     }
+  }
+
+  /**
+   * Returns the time column name for the table name from the time boundary service.
+   * Can return null if the time boundary service does not have the information.
+   *
+   * @param tableName Name of table for which to get the time column name
+   * @return Time column name for the table.
+   */
+  @Nullable
+  private String getTimeColumnName(@Nonnull String tableName) {
+    TimeBoundaryInfo timeBoundary = _timeBoundaryService.getTimeBoundaryInfoFor(tableName);
+    return (timeBoundary != null) ? timeBoundary.getTimeColumn() : null;
   }
 
   /**
@@ -316,7 +333,7 @@ public class BrokerRequestHandler {
     String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(hybridTableName);
     offlineRequest.getQuerySource().setTableName(offlineTableName);
     attachTimeBoundary(hybridTableName, offlineRequest, true);
-    return _optimizer.optimize(offlineRequest);
+    return offlineRequest;
   }
 
   /**
@@ -332,7 +349,7 @@ public class BrokerRequestHandler {
     String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(hybridTableName);
     realtimeRequest.getQuerySource().setTableName(realtimeTableName);
     attachTimeBoundary(hybridTableName, realtimeRequest, false);
-    return _optimizer.optimize(realtimeRequest);
+    return realtimeRequest;
   }
 
   /**
