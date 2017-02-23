@@ -7,7 +7,6 @@ import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.AlphaBetaAlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterType;
 import com.linkedin.thirdeye.detector.email.filter.DummyAlertFilter;
-import com.linkedin.thirdeye.detector.email.filter.WeightThresholdAlertFilter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -24,8 +23,6 @@ public class AlertFilterHelper {
     switch (filterType) {
       case ALPHA_BETA:
         return new AlphaBetaAlertFilter();
-      case WEIGHT_THRESHOLD:
-        return new WeightThresholdAlertFilter();
       case DUMMY:
       default:
         return new DummyAlertFilter();
