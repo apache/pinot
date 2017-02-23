@@ -60,7 +60,7 @@ public class DetectionExTaskRunner implements TaskRunner {
     long timestamp = DateTime.now(DateTimeZone.UTC).getMillis() / 1000;
 
     long alignedTimestamp = (timestamp / 3600) * 3600;
-    long windowStart = alignedTimestamp - 3600;
+    long windowStart = alignedTimestamp - 3600 * 6; // TODO configurable
     long windowEnd = alignedTimestamp;
 
     AnomalyFunctionExContext context = func.getContext();

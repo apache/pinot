@@ -29,20 +29,23 @@ public class ThirdEyePinotDataSource implements AnomalyFunctionExDataSource<Stri
 
     ResultSetGroup resultSetGroup = this.connection.execute(table, query);
 
-    if(resultSetGroup.getResultSetCount() <= 0)
+    if (resultSetGroup.getResultSetCount() <= 0)
       throw new IllegalArgumentException(String.format("Query did not return any results: '%s'", query));
 
-    if(resultSetGroup.getResultSetCount() > 1)
+    if (resultSetGroup.getResultSetCount() > 1)
       throw new IllegalArgumentException(String.format("Query returned multiple results: '%s'", query));
 
     ResultSet resultSet = resultSetGroup.getResultSet(0);
-    LOG.debug("col_count={} row_count={} group_key_len={}",
-        resultSet.getColumnCount(), resultSet.getRowCount(), resultSet.getGroupKeyLength());
+    LOG.debug("col_count={} row_count={}", resultSet.getColumnCount(), resultSet.getRowCount());
 
     DataFrame df = new DataFrame(resultSet.getRowCount());
 
     // TODO conditions not necessarily safe
-    if(resultSet.getGroupKeyLength() == 0 && resultSet.getRowCount() == 1 && resultSet.getColumnCount() == 1) {
+    if(resultSet.getColumnCount() == 1 && resultSet.getRowCount() == 0) {
+      // empty result
+      LOG.debug("Mapping empty to DataFrame");
+
+    } else if(resultSet.getColumnCount() == 1 && resultSet.getRowCount() == 1 && resultSet.getGroupKeyLength() == 0) {
       // aggregation result
       LOG.debug("Mapping AggregationResult to DataFrame");
 
@@ -50,15 +53,7 @@ public class ThirdEyePinotDataSource implements AnomalyFunctionExDataSource<Stri
       String value = resultSet.getString(0, 0);
       df.addSeries(function, DataFrame.toSeries(new String[] { value }));
 
-    } else if(resultSet.getGroupKeyLength() == 0) {
-      // selection result
-      LOG.debug("Mapping SelectionResult to DataFrame");
-
-      for (int i = 0; i < resultSet.getColumnCount(); i++) {
-        df.addSeries(resultSet.getColumnName(i), makeSelectionSeries(resultSet, i));
-      }
-
-    } else if(resultSet.getGroupKeyLength() > 0 && resultSet.getColumnCount() == 1) {
+    } else if(resultSet.getColumnCount() == 1 && resultSet.getGroupKeyLength() > 0) {
       // groupby result
       LOG.debug("Mapping GroupByResult to DataFrame");
 
@@ -67,6 +62,14 @@ public class ThirdEyePinotDataSource implements AnomalyFunctionExDataSource<Stri
       for(int i=0; i<resultSet.getGroupKeyLength(); i++) {
         String groupKey = resultSet.getGroupKeyColumnName(i);
         df.addSeries(groupKey, makeGroupByGroupSeries(resultSet, i));
+      }
+
+    } else if(resultSet.getColumnCount() >= 1 && resultSet.getGroupKeyLength() == 0) {
+      // selection result
+      LOG.debug("Mapping SelectionResult to DataFrame");
+
+      for (int i = 0; i < resultSet.getColumnCount(); i++) {
+        df.addSeries(resultSet.getColumnName(i), makeSelectionSeries(resultSet, i));
       }
 
     } else {
