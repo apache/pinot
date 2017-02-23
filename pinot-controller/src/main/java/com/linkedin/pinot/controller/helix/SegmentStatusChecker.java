@@ -180,13 +180,15 @@ public class SegmentStatusChecker {
       _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.IDEALSTATE_ZNODE_SIZE, idealState.toString().length());
       ExternalView externalView = helixAdmin.getResourceExternalView(helixClusterName, tableName);
 
-      int nReplicasIdealMax = 0;
-      int nReplicasExternal = -1;
-      int nErrors = 0;
-      int nOffline = 0;
+      int nReplicasIdealMax = 0; // Keeps track of maximum number of replicas in ideal state
+      int nReplicasExternal = -1; // Keeps track of minimum number of replicas in external view
+      int nErrors = 0; // Keeps track of number of segments in error state
+      int nOffline = 0; // Keeeps track of number segments with no online replicas
+      int nSegments = 0; // Counts number of segments
       for (String partitionName : idealState.getPartitionSet()) {
         int nReplicas = 0;
         int nIdeal = 0;
+        nSegments++;
         // Skip segments not online in ideal state
         for (Map.Entry<String, String> serverAndState : idealState.getInstanceStateMap(partitionName).entrySet()) {
           if (serverAndState == null) {
@@ -248,6 +250,8 @@ public class SegmentStatusChecker {
           (nReplicasIdealMax > 0) ? (nReplicasExternal * 100 / nReplicasIdealMax) : 100);
       _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.SEGMENTS_IN_ERROR_STATE,
           nErrors);
+      _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE,
+          (nSegments > 0) ? (100 - (nOffline * 100 / nSegments)) : 100);
       if (nOffline > 0) {
         LOGGER.warn("Table {} has {} segments with no online replicas", tableName, nOffline);
       }
@@ -291,6 +295,7 @@ public class SegmentStatusChecker {
       _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.NUMBER_OF_REPLICAS, 0);
       _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.PERCENT_OF_REPLICAS, 0);
       _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.SEGMENTS_IN_ERROR_STATE, 0);
+      _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE, 0);
     }
   }
 }

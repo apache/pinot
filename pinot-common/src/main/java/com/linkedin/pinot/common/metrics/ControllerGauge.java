@@ -22,9 +22,13 @@ import com.linkedin.pinot.common.Utils;
  * Controller gauges.
  */
 public enum ControllerGauge implements AbstractMetrics.Gauge {
-  NUMBER_OF_REPLICAS("replicas", false),
-  PERCENT_OF_REPLICAS("percent", false),
+  NUMBER_OF_REPLICAS("replicas", false), // Number of complete replicas of table in external view containing
+                                         // all segments online in ideal state
+  PERCENT_OF_REPLICAS("percent", false), // Percentage of complete online replicas in external view as compared
+                                         // to replicas in ideal state
   SEGMENTS_IN_ERROR_STATE("segments", false),
+  PERCENT_SEGMENTS_AVAILABLE("segments", false), // Percentage of segments with at least one online replica in external view
+                                          // as compared to total number of segments in ideal state
   IDEALSTATE_ZNODE_SIZE("idealstate", false),
   REALTIME_TABLE_COUNT("TableCount", true),
   OFFLINE_TABLE_COUNT("TableCount", true);
