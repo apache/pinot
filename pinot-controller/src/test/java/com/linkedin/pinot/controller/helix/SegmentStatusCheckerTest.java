@@ -310,10 +310,14 @@ public class SegmentStatusCheckerTest {
     allTableNames.add(tableName);
     IdealState idealState = new IdealState(tableName);
     idealState.setPartitionState("myTable_0", "pinot1", "ONLINE");
+    idealState.setPartitionState("myTable_1", "pinot1", "ONLINE");
+    idealState.setPartitionState("myTable_1", "pinot2", "ONLINE");
     idealState.setReplicas("2");
     idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
 
     ExternalView externalView = new ExternalView(tableName);
+    externalView.setState("myTable_1","pinot1","ONLINE");
+    externalView.setState("myTable_1","pinot2","ONLINE");
 
     HelixAdmin helixAdmin;
     {
@@ -407,7 +411,7 @@ public class SegmentStatusCheckerTest {
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
         ControllerGauge.NUMBER_OF_REPLICAS), 0);
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
-        ControllerGauge.PERCENT_OF_REPLICAS), 0);
+        ControllerGauge.PERCENT_OF_REPLICAS), 100);
     segmentStatusChecker.stop();
   }
 }
