@@ -115,6 +115,12 @@ AnomalyResultModel.prototype = {
     this.renderViewEvent.notify();
   },
 
+  /**
+   * Helper Function that returns formatted anomaly region duration data for UI
+   * @param  [date] start: the anomaly region start
+   * @param  [date] end: the anomaly region end
+   * @return [string]  formatted start - end date/time
+   */
   getRegionDuration(start, end) {
     const regionStart = moment(start, constants.TIMESERIES_DATE_FORMAT);
     const regionEnd = moment(end, constants.TIMESERIES_DATE_FORMAT);
@@ -134,6 +140,12 @@ AnomalyResultModel.prototype = {
     return `${regionDuration.humanize()} (${regionStart.format(regionStartFormat)} - ${regionEnd.format(regionEndFormat)})`;
   },
 
+  /**
+   * Helper Function that retuns formatted change delta for UI
+   * @param  [int] current: current average anomaly
+   * @param  [int] baseline: baseline the anomaly is compared too
+   * @return [string] 'N/A' if either is missing, otherwise formatted delta (%)
+   */
   getChangeDelta(current, baseline) {
     let changeDelta;
     if (!(current && baseline)) {
@@ -146,11 +158,12 @@ AnomalyResultModel.prototype = {
     return changeDelta;
   },
 
+  /**
+   * Helper Function that sets formatted duration and changeDelta onto the anomaly model
+   * @return null
+   */
   formatAnomalies() {
     this.anomaliesWrapper.anomalyDetailsList.forEach((anomaly) => {
-      if (!anomaly) {
-        return;
-      }
       anomaly.duration = this.getRegionDuration(anomaly.anomalyRegionStart, anomaly.anomalyRegionEnd);
       anomaly.changeDelta = this.getChangeDelta(anomaly.current, anomaly.baseline);
     });
