@@ -117,6 +117,26 @@ public final class LongSeries extends Series {
     return this.values;
   }
 
+  public LongSeries unique() {
+    if(this.values.length <= 0)
+      return new LongSeries(new long[0]);
+
+    long[] values = Arrays.copyOf(this.values, this.values.length);
+    Arrays.sort(values);
+
+    // first is always unique
+    int uniqueCount = 1;
+
+    for(int i=1; i<values.length; i++) {
+      if(values[i-1] != values[i]) {
+        values[uniqueCount] = values[i];
+        uniqueCount++;
+      }
+    }
+
+    return new LongSeries(Arrays.copyOf(values, uniqueCount));
+  }
+
   public long first() {
     assertNotEmpty(this.values);
     return this.values[0];
@@ -164,7 +184,7 @@ public final class LongSeries extends Series {
   }
 
   @Override
-  public LongSeries reorder(int[] toIndex) {
+  LongSeries reorder(int[] toIndex) {
     int len = this.values.length;
     if(toIndex.length != len)
       throw new IllegalArgumentException("toIndex size does not equal series size");

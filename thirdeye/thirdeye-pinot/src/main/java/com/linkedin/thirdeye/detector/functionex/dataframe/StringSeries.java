@@ -4,7 +4,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 
 public final class StringSeries extends Series {
@@ -119,11 +121,23 @@ public final class StringSeries extends Series {
     return this.values;
   }
 
+  public StringSeries unique() {
+    Set<String> uniques = new HashSet<>(Arrays.asList(this.values));
+    String[] values = new String[uniques.size()];
+    return new StringSeries(uniques.toArray(values));
+  }
+
+  public List<String> toList() {
+    return Arrays.asList(this.values);
+  }
+
   public String first() {
+    assertNotEmpty(this.values);
     return this.values[0];
   }
 
   public String last() {
+    assertNotEmpty(this.values);
     return this.values[this.values.length-1];
   }
 
@@ -164,7 +178,7 @@ public final class StringSeries extends Series {
   }
 
   @Override
-  public StringSeries reorder(int[] toIndex) {
+  StringSeries reorder(int[] toIndex) {
     int len = this.values.length;
     if(toIndex.length != len)
       throw new IllegalArgumentException("toIndex size does not equal series size");

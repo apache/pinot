@@ -119,6 +119,26 @@ public final class DoubleSeries extends Series {
     return this.values;
   }
 
+  public DoubleSeries unique() {
+    if(this.values.length <= 0)
+      return new DoubleSeries(new long[0]);
+
+    double[] values = Arrays.copyOf(this.values, this.values.length);
+    Arrays.sort(values);
+
+    // first is always unique
+    int uniqueCount = 1;
+
+    for(int i=1; i<values.length; i++) {
+      if(values[i-1] != values[i]) {
+        values[uniqueCount] = values[i];
+        uniqueCount++;
+      }
+    }
+
+    return new DoubleSeries(Arrays.copyOf(values, uniqueCount));
+  }
+
   public double first() {
     assertNotEmpty(this.values);
     return this.values[0];
@@ -166,7 +186,7 @@ public final class DoubleSeries extends Series {
   }
 
   @Override
-  public DoubleSeries reorder(int[] toIndex) {
+  DoubleSeries reorder(int[] toIndex) {
     int len = this.values.length;
     if(toIndex.length != len)
       throw new IllegalArgumentException("toIndex size does not equal series size");

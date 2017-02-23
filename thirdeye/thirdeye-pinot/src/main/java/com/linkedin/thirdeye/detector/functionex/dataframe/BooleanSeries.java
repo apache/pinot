@@ -172,7 +172,7 @@ public final class BooleanSeries extends Series {
   }
 
   @Override
-  public BooleanSeries reorder(int[] toIndex) {
+  BooleanSeries reorder(int[] toIndex) {
     int len = this.values.length;
     if(toIndex.length != len)
       throw new IllegalArgumentException("toIndex size does not equal series size");

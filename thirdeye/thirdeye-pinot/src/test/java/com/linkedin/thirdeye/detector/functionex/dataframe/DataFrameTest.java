@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.detector.functionex.dataframe;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
@@ -521,6 +522,42 @@ public class DataFrameTest {
     } catch(IllegalStateException e) {
       // left blank
     }
+  }
+
+  @Test
+  public void testLongUnique() {
+    LongSeries s1 = DataFrame.toSeries(new long[] {});
+    Assert.assertEquals(s1.unique().values(), new long[] {});
+
+    LongSeries s2 = DataFrame.toSeries(4, 5, 2, 1);
+    Assert.assertEquals(s2.unique().values(), new long[] {1, 2, 4, 5});
+
+    LongSeries s3 = DataFrame.toSeries(9, 1, 2, 3, 6, 1, 2, 9, 2, 7);
+    Assert.assertEquals(s3.unique().values(), new long[] {1, 2, 3, 6, 7, 9});
+  }
+
+  @Test
+  public void testDoubleUnique() {
+    DoubleSeries s1 = DataFrame.toSeries(new double[] {});
+    Assert.assertEquals(s1.unique().values(), new double[] {});
+
+    DoubleSeries s2 = DataFrame.toSeries(4.1, 5.2, 2.3, 1.4);
+    Assert.assertEquals(s2.unique().values(), new double[] {1.4, 2.3, 4.1, 5.2});
+
+    DoubleSeries s3 = DataFrame.toSeries(9.0, 1.1, 2.2, 3.0, 6.0, 1.1, 2.3, 9.0, 2.3, 7.0);
+    Assert.assertEquals(s3.unique().values(), new double[] {1.1, 2.2, 2.3, 3.0, 6.0, 7.0, 9.0});
+  }
+
+  @Test
+  public void testStringUnique() {
+    StringSeries s1 = DataFrame.toSeries(new String[] {});
+    Assert.assertEquals(s1.unique().values(), new String[] {});
+
+    StringSeries s2 = DataFrame.toSeries("a", "A", "b", "Cc");
+    Assert.assertEquals(new HashSet<>(s2.unique().toList()), new HashSet<>(Arrays.asList("a", "A", "b", "Cc")));
+
+    StringSeries s3 = DataFrame.toSeries("a", "A", "b", "Cc", "A", "cC", "a", "cC");
+    Assert.assertEquals(new HashSet<>(s3.unique().toList()), new HashSet<>(Arrays.asList("a", "A", "b", "Cc", "cC")));
   }
 
 }
