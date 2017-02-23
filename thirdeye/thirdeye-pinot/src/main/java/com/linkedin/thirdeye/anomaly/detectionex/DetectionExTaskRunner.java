@@ -53,19 +53,22 @@ public class DetectionExTaskRunner implements TaskRunner {
 
     List<TaskResult> taskResult = new ArrayList<>();
 
-    // instantiate function
-    AnomalyFunctionEx func = funcFactory.fromSpec(funcSpec);
-
-    // populate context
+    // create function context
     long timestamp = DateTime.now(DateTimeZone.UTC).getMillis() / 1000;
-
     long alignedTimestamp = (timestamp / 3600) * 3600;
     long windowStart = alignedTimestamp - 3600 * 6; // TODO configurable
     long windowEnd = alignedTimestamp;
 
-    AnomalyFunctionExContext context = func.getContext();
+    AnomalyFunctionExContext context = new AnomalyFunctionExContext();
     context.setMonitoringWindowStart(windowStart);
     context.setMonitoringWindowEnd(windowEnd);
+
+    context.setClassName(funcSpec.getClassName());
+    context.setConfig(funcSpec.getConfig());
+    context.setIdentifier(funcSpec.getName());
+
+    // instantiate function
+    AnomalyFunctionEx func = funcFactory.fromContext(context);
 
     // apply
     AnomalyFunctionExResult result = func.apply();
@@ -82,7 +85,7 @@ public class DetectionExTaskRunner implements TaskRunner {
 
       // TODO avoid magic field names - refactor raw anomalies?
       DataFrame df = a.getData();
-      if(df != null) {
+      if(df.getIndex().size() > 0) {
         if (df.contains("score")) {
           dto.setScore(df.toDoubles("score").mean());
         }

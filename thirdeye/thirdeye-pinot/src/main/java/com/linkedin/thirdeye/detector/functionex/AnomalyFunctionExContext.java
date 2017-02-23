@@ -4,7 +4,8 @@ import java.util.Map;
 
 
 public class AnomalyFunctionExContext {
-  String name;
+  String identifier;
+  String className;
   Map<String, String> config;
   Map<String, AnomalyFunctionExDataSource> dataSources;
 
@@ -12,12 +13,20 @@ public class AnomalyFunctionExContext {
   long monitoringWindowStart = -1;
   long monitoringWindowEnd = -1;
 
-  public String getName() {
-    return name;
+  public String getIdentifier() {
+    return identifier;
   }
 
-  public void setName(String name) {
-    this.name = name;
+  public void setIdentifier(String identifier) {
+    this.identifier = identifier;
+  }
+
+  public String getClassName() {
+    return className;
+  }
+
+  public void setClassName(String className) {
+    this.className = className;
   }
 
   public Map<String, String> getConfig() {

@@ -27,16 +27,7 @@ public class ThirdEyePinotConnection {
   static final String BROKER_PREFIX = "Broker_";
 
   static final int CONNECTION_TIMEOUT = 1000;
-  static final int MAX_CONNECTIONS;
-  static {
-    int MAX_CONNECTIONS_DEFAULT = 25;
-    try {
-      MAX_CONNECTIONS_DEFAULT = Integer.parseInt(System.getProperty("max_pinot_connections", "25"));
-    } catch (Exception e) {
-      // left blank
-    }
-    MAX_CONNECTIONS = MAX_CONNECTIONS_DEFAULT;
-  }
+  static final int MAX_CONNECTIONS = 5;
 
   PinotThirdEyeClientConfig config;
   BlockingQueue<Connection> connections;
@@ -61,6 +52,7 @@ public class ThirdEyePinotConnection {
           config.getClusterName(), config.getTag());
 
       String[] thirdeyeBrokers = new String[thirdeyeBrokerList.size()];
+
       for (int i = 0; i < thirdeyeBrokerList.size(); i++) {
         String instanceName = thirdeyeBrokerList.get(i);
         InstanceConfig instanceConfig =
@@ -68,6 +60,7 @@ public class ThirdEyePinotConnection {
         thirdeyeBrokers[i] = instanceConfig.getHostName().replaceAll(BROKER_PREFIX, "") + ":"
             + instanceConfig.getPort();
       }
+
       for (int i = 0; i < maxConnections; i++) {
         connections.add(ConnectionFactory.fromHostList(thirdeyeBrokers));
       }

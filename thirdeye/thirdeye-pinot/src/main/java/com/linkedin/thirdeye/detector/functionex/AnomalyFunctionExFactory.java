@@ -13,26 +13,23 @@ public class AnomalyFunctionExFactory {
 
   private Map<String, AnomalyFunctionExDataSource> dataSources = new HashMap<>();
 
-  public AnomalyFunctionEx fromSpec(AnomalyFunctionExDTO spec) throws Exception {
-
-    // populate context
-    AnomalyFunctionExContext context = new AnomalyFunctionExContext();
-
-    context.setName(spec.getName());
-    context.setConfig(Collections.unmodifiableMap(spec.getConfig()));
-
+  private AnomalyFunctionExContext populateFromDataSources(AnomalyFunctionExContext context) {
     Map<String, AnomalyFunctionExDataSource> ds = new HashMap<>();
     for(HashMap.Entry<String, AnomalyFunctionExDataSource> e : dataSources.entrySet()) {
       ds.put(e.getKey(), e.getValue());
     }
     context.setDataSources(Collections.unmodifiableMap(ds));
+    return context;
+  }
+
+  public AnomalyFunctionEx fromContext(AnomalyFunctionExContext context) throws Exception {
+    populateFromDataSources(context);
 
     // instantiate class
-    String className = spec.getClassName();
-    Class<?> clazz = Class.forName(className);
+    Class<?> clazz = Class.forName(context.getClassName());
     AnomalyFunctionEx func = (AnomalyFunctionEx) clazz.newInstance();
 
-    // NOTE: setter injection for client convenience
+    // TODO: reconsider setter vs constructor injection
     func.setContext(context);
 
     return func;

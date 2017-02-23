@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.detector.functionex;
 
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionExDTO;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -47,54 +46,54 @@ public class AnomalyFunctionExTest {
 
   @Test
   public void testInstantiation() throws Exception {
-    AnomalyFunctionExDTO dto = new AnomalyFunctionExDTO();
-    dto.setClassName(MOCK_CLASS_NAME);
-    dto.setConfig(Collections.EMPTY_MAP);
+    AnomalyFunctionExContext context = new AnomalyFunctionExContext();
+    context.setClassName(MOCK_CLASS_NAME);
+    context.setConfig(Collections.EMPTY_MAP);
 
     AnomalyFunctionExFactory factory = new AnomalyFunctionExFactory();
 
-    Assert.assertNotNull(factory.fromSpec(dto));
+    Assert.assertNotNull(factory.fromContext(context));
   }
 
   @Test
   public void testConfigInjection() throws Exception {
-    AnomalyFunctionExDTO dto = new AnomalyFunctionExDTO();
-    dto.setClassName(MOCK_CLASS_NAME);
-    dto.setConfig(Collections.singletonMap(CONFIG_MESSAGE, MESSAGE_CUSTOM));
+    AnomalyFunctionExContext context = new AnomalyFunctionExContext();
+    context.setClassName(MOCK_CLASS_NAME);
+    context.setConfig(Collections.singletonMap(CONFIG_MESSAGE, MESSAGE_CUSTOM));
 
     AnomalyFunctionExFactory factory = new AnomalyFunctionExFactory();
 
-    AnomalyFunctionEx func = factory.fromSpec(dto);
+    AnomalyFunctionEx func = factory.fromContext(context);
 
     Assert.assertEquals(func.apply().getAnomalies().get(0).getMessage(), MESSAGE_CUSTOM);
   }
 
   @Test
   public void testConfigInjectionTolerateNonExistingWithDefault() throws Exception {
-    AnomalyFunctionExDTO dto = new AnomalyFunctionExDTO();
-    dto.setClassName(MOCK_CLASS_NAME);
-    dto.setConfig(Collections.EMPTY_MAP);
+    AnomalyFunctionExContext context = new AnomalyFunctionExContext();
+    context.setClassName(MOCK_CLASS_NAME);
+    context.setConfig(Collections.EMPTY_MAP);
 
     AnomalyFunctionExFactory factory = new AnomalyFunctionExFactory();
 
 
-    AnomalyFunctionEx func = factory.fromSpec(dto);
+    AnomalyFunctionEx func = factory.fromContext(context);
 
     Assert.assertEquals(func.apply().getAnomalies().get(0).getMessage(), MESSAGE_DEFAULT);
   }
 
   @Test
   public void testDataSourceInjection() throws Exception {
-    AnomalyFunctionExDTO dto = new AnomalyFunctionExDTO();
-    dto.setClassName(MOCK_CLASS_NAME);
-    dto.setConfig(Collections.singletonMap(CONFIG_QUERY, QUERY_CUSTOM));
+    AnomalyFunctionExContext context = new AnomalyFunctionExContext();
+    context.setClassName(MOCK_CLASS_NAME);
+    context.setConfig(Collections.singletonMap(CONFIG_QUERY, QUERY_CUSTOM));
 
     MockDataSource ds = new MockDataSource();
 
     AnomalyFunctionExFactory factory = new AnomalyFunctionExFactory();
     factory.addDataSource(DATASOURCE, ds);
 
-    AnomalyFunctionEx func = factory.fromSpec(dto);
+    AnomalyFunctionEx func = factory.fromContext(context);
 
     func.apply();
 
@@ -107,16 +106,16 @@ public class AnomalyFunctionExTest {
     config.put(CONFIG_MESSAGE, MESSAGE_CUSTOM);
     config.put(CONFIG_QUERY, QUERY_CUSTOM);
 
-    AnomalyFunctionExDTO dto = new AnomalyFunctionExDTO();
-    dto.setClassName(MOCK_CLASS_NAME);
-    dto.setConfig(config);
+    AnomalyFunctionExContext context = new AnomalyFunctionExContext();
+    context.setClassName(MOCK_CLASS_NAME);
+    context.setConfig(config);
 
     MockDataSource ds = new MockDataSource();
 
     AnomalyFunctionExFactory factory = new AnomalyFunctionExFactory();
     factory.addDataSource(DATASOURCE, ds);
 
-    AnomalyFunctionEx func = factory.fromSpec(dto);
+    AnomalyFunctionEx func = factory.fromContext(context);
 
     AnomalyFunctionExResult result = func.apply();
 
