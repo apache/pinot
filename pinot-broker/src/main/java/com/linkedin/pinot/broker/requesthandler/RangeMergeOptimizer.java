@@ -18,9 +18,13 @@ package com.linkedin.pinot.broker.requesthandler;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.core.common.predicate.RangePredicate;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.jar.Pack200;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 
 /**
@@ -38,14 +42,7 @@ public class RangeMergeOptimizer extends FilterQueryTreeOptimizer {
 
   @Override
   public FilterQueryTree optimize(FilterQueryOptimizerRequest request) {
-    FilterQueryTree filterQueryTree = request.getFilterQueryTree();
-    optimizeRanges(filterQueryTree, request.getTimeColumn());
-
-    List<FilterQueryTree> children = filterQueryTree.getChildren();
-    if (children != null && children.size() == 1) {
-      return children.get(0);
-    }
-    return filterQueryTree;
+    return optimizeRanges(request.getFilterQueryTree(), request.getTimeColumn());
   }
 
   /**
@@ -55,48 +52,34 @@ public class RangeMergeOptimizer extends FilterQueryTreeOptimizer {
    * @param timeColumn Name of time column
    * @return Returns the optimized filter query tree
    */
-  private static FilterQueryTree optimizeRanges(FilterQueryTree current, String timeColumn) {
-    if (current == null || timeColumn == null) {
+  @Nonnull
+  private static FilterQueryTree optimizeRanges(@Nonnull FilterQueryTree current, @Nullable String timeColumn) {
+    if (timeColumn == null || current.getOperator() != FilterOperator.AND) {
       return current;
     }
 
     List<FilterQueryTree> children = current.getChildren();
-    if (children == null || children.isEmpty()) {
-      return current;
-    }
-
-    ListIterator<FilterQueryTree> iterator = children.listIterator();
-    while (iterator.hasNext()) {
-      FilterQueryTree child = iterator.next();
-      optimizeRanges(child, timeColumn);
-
-      List<FilterQueryTree> grandChildren = child.getChildren();
-      if (grandChildren != null && grandChildren.size() == 1) {
-        iterator.remove();
-        iterator.add(grandChildren.get(0));
-      }
-    }
-
+    List<FilterQueryTree> newChildren = new ArrayList<>();
     List<String> intersect = null;
-    iterator = children.listIterator();
 
-    while (iterator.hasNext()) {
-      FilterQueryTree child = iterator.next();
-      FilterOperator filterOperator = child.getOperator();
-      String column = child.getColumn();
-
-      if (filterOperator != null && column != null) {
-        if (column.equals(timeColumn) && filterOperator.equals(FilterOperator.RANGE)) {
-          intersect = (intersect == null) ? child.getValue() : intersectRanges(intersect, child.getValue());
-          iterator.remove();
-        }
+    for (FilterQueryTree child : children) {
+      FilterQueryTree newChild = optimizeRanges(child, timeColumn);
+      if (newChild.getOperator() == FilterOperator.RANGE && newChild.getColumn().equals(timeColumn)) {
+        List<String> value = newChild.getValue();
+        intersect = (intersect == null) ? value : intersectRanges(intersect, value);
+      } else {
+        newChildren.add(newChild);
       }
     }
 
-    if (intersect != null) {
-      children.add(new FilterQueryTree(timeColumn, intersect, FilterOperator.RANGE, null));
+    if (newChildren.isEmpty()) {
+      return new FilterQueryTree(timeColumn, intersect, FilterOperator.RANGE, null);
+    } else {
+      if (intersect != null) {
+        newChildren.add(new FilterQueryTree(timeColumn, intersect, FilterOperator.RANGE, null));
+      }
+      return new FilterQueryTree(null, null, FilterOperator.AND, newChildren);
     }
-    return current;
   }
 
   /**
@@ -116,14 +99,14 @@ public class RangeMergeOptimizer extends FilterQueryTreeOptimizer {
     String lowerString1 = predicate1.getLowerBoundary();
     String upperString1 = predicate1.getUpperBoundary();
 
-    long lower1 = (lowerString1.equals("*")) ? Long.MIN_VALUE : Long.valueOf(lowerString1);
-    long upper1 = (upperString1.equals("*")) ? Long.MAX_VALUE : Long.valueOf(upperString1);
+    long lower1 = (lowerString1.equals(RangePredicate.UNBOUNDED)) ? Long.MIN_VALUE : Long.valueOf(lowerString1);
+    long upper1 = (upperString1.equals(RangePredicate.UNBOUNDED)) ? Long.MAX_VALUE : Long.valueOf(upperString1);
 
     String lowerString2 = predicate2.getLowerBoundary();
     String upperString2 = predicate2.getUpperBoundary();
 
-    long lower2 = (lowerString2.equals("*")) ? Long.MIN_VALUE : Long.valueOf(lowerString2);
-    long upper2 = (upperString2.equals("*")) ? Long.MAX_VALUE : Long.valueOf(upperString2);
+    long lower2 = (lowerString2.equals(RangePredicate.UNBOUNDED)) ? Long.MIN_VALUE : Long.valueOf(lowerString2);
+    long upper2 = (upperString2.equals(RangePredicate.UNBOUNDED)) ? Long.MAX_VALUE : Long.valueOf(upperString2);
 
     final StringBuilder stringBuilder = new StringBuilder();
     if (lower1 > lower2) {

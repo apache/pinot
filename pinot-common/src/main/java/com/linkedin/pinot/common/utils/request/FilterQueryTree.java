@@ -15,10 +15,8 @@
  */
 package com.linkedin.pinot.common.utils.request;
 
-import com.google.common.base.Objects;
-import java.util.List;
-
 import com.linkedin.pinot.common.request.FilterOperator;
+import java.util.List;
 
 
 public class FilterQueryTree {
