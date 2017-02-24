@@ -4,7 +4,7 @@ import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionEx;
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExResult;
 
 
-public class AlwaysAnomaly extends AnomalyFunctionEx{
+public class AlwaysAnomalyDummy extends AnomalyFunctionEx {
   @Override
   public AnomalyFunctionExResult apply() throws Exception {
     AnomalyFunctionExResult result = new AnomalyFunctionExResult();
