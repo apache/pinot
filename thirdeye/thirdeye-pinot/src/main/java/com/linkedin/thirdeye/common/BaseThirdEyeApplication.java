@@ -29,7 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public abstract class BaseThirdEyeApplication<T extends Configuration> extends Application<T> {
-  protected final Logger LOG = LoggerFactory.getLogger(this.getClass());
+  private static final Logger LOG = LoggerFactory.getLogger(BaseThirdEyeApplication.class);
 
   public static MetricsRegistry metricsRegistry = new MetricsRegistry();
   static JmxReporter jmxReporter = new JmxReporter(metricsRegistry);
