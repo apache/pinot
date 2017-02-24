@@ -32,9 +32,9 @@ public class ThirdEyeEventDataSourceTest {
       this.end = endTime;
 
       return Arrays.asList(
-          makeEvent("HOLIDAY", "New Years 2016", 1451606400, 1451606400 + 86400),
-          makeEvent("HOLIDAY", "New Years 2017", 1483228800, 1483228800 + 86400),
-          makeEvent("holiday", "New Years 2018", 1514764800, 1514764800 + 86400)
+          makeEvent("HOLIDAY", "New Years 2016", 1451606400000L, 1451606400000L + 86400000),
+          makeEvent("HOLIDAY", "New Years 2017", 1483228800000L, 1483228800000L + 86400000),
+          makeEvent("holiday", "New Years 2018", 1514764800000L, 1514764800000L + 86400000)
           );
     }
 
@@ -62,8 +62,8 @@ public class ThirdEyeEventDataSourceTest {
     ds.query("type=abc,start=0123,end=444", context);
 
     Assert.assertEquals(manager.type, "abc");
-    Assert.assertEquals(manager.start, 123);
-    Assert.assertEquals(manager.end, 444);
+    Assert.assertEquals(manager.start, 123000);
+    Assert.assertEquals(manager.end, 444000);
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
