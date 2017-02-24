@@ -19,9 +19,7 @@ import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -86,6 +84,11 @@ public class RangeMergeOptimizerTest {
     range1.set(0, "(1\t\t10]");
     range2.set(0, "[10\t\t30)");
     testRangeOptimizer(range1, range2, "[10\t\t10]");
+
+    // Redundant case
+    range1.set(0, "(*\t\t10]");
+    range2.set(0, "(*\t\t30)");
+    testRangeOptimizer(range1, range2, "(*\t\t10]");
   }
 
   @Test
@@ -164,8 +167,11 @@ public class RangeMergeOptimizerTest {
     compareTrees(actualTree, expectedTree);
 
     // Query with OR predicates
-    actualTree = buildFilterQueryTree("select * from table where (foo1 = 'bar1' or (foo2 = 'bar2' and (time >= 10 and time <= 20)))", true);
-    expectedTree = buildFilterQueryTree("select * from table where (foo1 = 'bar1' or (foo2 = 'bar2' and time between 10 and 20))", false);
+    actualTree = buildFilterQueryTree(
+        "select * from table where (foo1 = 'bar1' or (foo2 = 'bar2' and (time >= 10 and time <= 20)))", true);
+    expectedTree =
+        buildFilterQueryTree("select * from table where (foo1 = 'bar1' or (foo2 = 'bar2' and time between 10 and 20))",
+            false);
     compareTrees(actualTree, expectedTree);
 
     // Query without time column

@@ -21,8 +21,6 @@ import com.linkedin.pinot.core.common.predicate.RangePredicate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.ListIterator;
-import java.util.jar.Pack200;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -64,7 +62,8 @@ public class RangeMergeOptimizer extends FilterQueryTreeOptimizer {
     }
 
     // For OR, we optimize all its children, but do not propagate up.
-    if (current.getOperator() == FilterOperator.OR) {
+    FilterOperator operator = current.getOperator();
+    if (operator == FilterOperator.OR) {
       int length = children.size();
       for (int i = 0; i < length; i++) {
         children.set(i, optimizeRanges(children.get(i), timeColumn));
@@ -72,6 +71,8 @@ public class RangeMergeOptimizer extends FilterQueryTreeOptimizer {
       return current;
     }
 
+    // After this point, since the node has children, it can only be an 'AND' node (only OR/AND supported).
+    assert operator == FilterOperator.AND;
     List<FilterQueryTree> newChildren = new ArrayList<>();
     List<String> intersect = null;
 
