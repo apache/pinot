@@ -1,6 +1,6 @@
 function AnomalyResultModel() {
 
-  this.anomaliesSearchMode = "time";
+  this.anomaliesSearchMode = null;
   this.previousMetricIds = null;
   this.metricIds = null;
   this.dashboardId = null;
