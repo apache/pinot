@@ -145,6 +145,7 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
     MonitorConfiguration monitorConfiguration = new MonitorConfiguration();
     monitorConfiguration.setMonitorFrequency(new TimeGranularity(30, TimeUnit.SECONDS));
     thirdeyeAnomalyConfig.setMonitorConfiguration(monitorConfiguration);
+    thirdeyeAnomalyConfig.setRootDir(System.getProperty("dw.rootDir", "NOT_SET(dw.rootDir)"));
 
     // create test anomaly function
     functionId = anomalyFunctionDAO.save(getTestFunctionSpec(metric, collection));
