@@ -30,8 +30,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class RequestUtils {
@@ -146,18 +144,23 @@ public class RequestUtils {
       return false;
     }
 
-    // Ensure that none of the group-by columns are skipped for materialization.
+    Set<String> metricColumnSet = new HashSet<>(segmentMetadata.getSchema().getMetricNames());
     List<String> skipMaterializationList = starTreeMetadata.getSkipMaterializationForDimensions();
     Set<String> skipMaterializationSet = null;
     if (skipMaterializationList != null && !skipMaterializationList.isEmpty()) {
-      skipMaterializationSet = new HashSet<String>(skipMaterializationList);
+      skipMaterializationSet = new HashSet<>(skipMaterializationList);
+    }
 
-      GroupBy groupBy = brokerRequest.getGroupBy();
-      if (groupBy != null) {
-        for (String groupByColumn : groupBy.getColumns()) {
-          if (skipMaterializationSet.contains(groupByColumn)) {
-            return false;
-          }
+    // Ensure that none of the group-by columns are metric or skipped for materialization.
+    GroupBy groupBy = brokerRequest.getGroupBy();
+    if (groupBy != null) {
+      List<String> groupByColumns = groupBy.getColumns();
+      for (String groupByColumn : groupByColumns) {
+        if (metricColumnSet.contains(groupByColumn)) {
+          return false;
+        }
+        if (skipMaterializationSet != null && skipMaterializationSet.contains(groupByColumn)) {
+          return false;
         }
       }
     }
@@ -172,8 +175,6 @@ public class RequestUtils {
 
     //if the filter tree has children, ensure that root is AND and all its children are leaves, and
     //no metric columns appear in the predicates.
-    Set<String> metricColumnSet = new HashSet<String>();
-    metricColumnSet.addAll(segmentMetadata.getSchema().getMetricNames());
     if (filterTree != null && filterTree.getChildren() != null && !filterTree.getChildren().isEmpty()) {
       //ensure that its AND
       if (filterTree.getOperator() != FilterOperator.AND) {
@@ -203,7 +204,7 @@ public class RequestUtils {
         }
         predicateColumns.add(column);
       }
-    } else if (filterTree != null){
+    } else if (filterTree != null) {
       // Predicate column of root node should be materialized.
       String rootColumn = filterTree.getColumn();
       if (skipMaterializationSet != null && skipMaterializationSet.contains(rootColumn)) {
