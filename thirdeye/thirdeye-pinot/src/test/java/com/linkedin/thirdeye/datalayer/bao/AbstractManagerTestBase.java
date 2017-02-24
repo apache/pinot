@@ -12,6 +12,7 @@ import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.DetectionStatusDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.datalayer.dto.IngraphDashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.IngraphMetricConfigDTO;
@@ -22,11 +23,13 @@ import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
 import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
+
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+
 import org.joda.time.DateTime;
 
 public abstract class AbstractManagerTestBase {
@@ -45,6 +48,7 @@ public abstract class AbstractManagerTestBase {
   protected AlertConfigManager alertConfigDAO;
   protected DataCompletenessConfigManager dataCompletenessConfigDAO;
   protected EventManager eventManager;
+  protected DetectionStatusManager detectionStatusDAO;
 
   protected TestDBResources testDBResources;
   protected DAORegistry daoRegistry;
@@ -231,5 +235,16 @@ public abstract class AbstractManagerTestBase {
     dataCompletenessConfigDTO.setPercentComplete(79);
     dataCompletenessConfigDTO.setNumAttempts(3);
     return dataCompletenessConfigDTO;
+  }
+
+  protected DetectionStatusDTO getTestDetectionStatus(String dataset, long dateToCheckInMS,
+      String dateToCheckInSDF, boolean detectionRun, long functionId) {
+    DetectionStatusDTO detectionStatusDTO = new DetectionStatusDTO();
+    detectionStatusDTO.setDataset(dataset);
+    detectionStatusDTO.setFunctionId(functionId);
+    detectionStatusDTO.setDateToCheckInMS(dateToCheckInMS);
+    detectionStatusDTO.setDateToCheckInSDF(dateToCheckInSDF);
+    detectionStatusDTO.setDetectionRun(detectionRun);
+    return detectionStatusDTO;
   }
 }

@@ -250,5 +250,22 @@ create index event_event_type_idx on event_index(event_type);
 create index event_start_time_idx on event_index(start_time);
 create index event_end_time_idx on event_index(end_time);
 
+create table if not exists detection_status_index (
+  function_id bigint(20),
+  dataset varchar(200) not null,
+  date_to_check_in_ms bigint(20) not null,
+  date_to_check_in_sdf varchar(20),
+  detection_run boolean,
+  base_id bigint(20) not null,
+  create_time timestamp,
+  update_time timestamp default current_timestamp,
+  version int(10)
+) ENGINE=InnoDB;
+ALTER TABLE `detection_status_index` ADD UNIQUE `detection_status_unique_index`(`function_id`, `date_to_check_in_sdf`);
+create index detection_status_dataset_idx on detection_status_index(dataset);
+create index detection_status_date_idx on detection_status_index(date_to_check_in_ms);
+create index detection_status_sdf_idx on detection_status_index(date_to_check_in_sdf);
+create index detection_status_run_idx on detection_status_index(detection_run);
+create index detection_status_function_idx on detection_status_index(function_id);
 
 

@@ -24,6 +24,7 @@ import com.linkedin.thirdeye.datalayer.entity.AnomalyFunctionIndex;
 import com.linkedin.thirdeye.datalayer.entity.DashboardConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.DataCompletenessConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.DatasetConfigIndex;
+import com.linkedin.thirdeye.datalayer.entity.DetectionStatusIndex;
 import com.linkedin.thirdeye.datalayer.entity.EmailConfigurationIndex;
 import com.linkedin.thirdeye.datalayer.entity.GenericJsonEntity;
 import com.linkedin.thirdeye.datalayer.entity.IngraphDashboardConfigIndex;
@@ -126,6 +127,8 @@ public abstract class DaoProviderUtil {
             convertCamelCaseToUnderscore(DataCompletenessConfigIndex.class.getSimpleName()));
         entityMappingHolder.register(conn, EventIndex.class,
             convertCamelCaseToUnderscore(EventIndex.class.getSimpleName()));
+        entityMappingHolder.register(conn, DetectionStatusIndex.class,
+            convertCamelCaseToUnderscore(DetectionStatusIndex.class.getSimpleName()));
       } catch (Exception e) {
         throw new RuntimeException(e);
       }

@@ -54,6 +54,7 @@ public class DataCompletenessJobRunner implements JobRunner {
     List<DatasetConfigDTO> datasets = DAO_REGISTRY.getDatasetConfigDAO()
         .findActiveRequiresCompletenessCheck();
 
+    // TODO: Use all datasets which have functions configured
     List<String> datasetsToCheck = new ArrayList<String>();
     for(DatasetConfigDTO d: datasets) {
       datasetsToCheck.add(d.getDataset());

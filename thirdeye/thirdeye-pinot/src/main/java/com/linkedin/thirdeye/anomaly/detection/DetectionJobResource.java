@@ -68,19 +68,13 @@ public class DetectionJobResource {
     this.alertFilterFactory = alertFilterFactory;
   }
 
-  @GET
-  public List<String> showScheduledJobs() throws SchedulerException {
-    return detectionJobScheduler.getScheduledJobs();
-  }
 
   @POST
   @Path("/{id}")
   public Response enable(@PathParam("id") Long id) throws Exception {
     toggleActive(id, true);
-    detectionJobScheduler.startJob(id);
     return Response.ok().build();
   }
-
 
   @POST
   @Path("/{id}/ad-hoc")
@@ -102,7 +96,6 @@ public class DetectionJobResource {
   @Path("/{id}")
   public Response disable(@PathParam("id") Long id) throws Exception {
     toggleActive(id, false);
-    detectionJobScheduler.stopJob(id);
     return Response.ok().build();
   }
 
@@ -115,13 +108,6 @@ public class DetectionJobResource {
     anomalyFunctionSpecDAO.update(anomalyFunctionSpec);
   }
 
-  @POST
-  @Path("/{id}/restart")
-  public Response restart(@PathParam("id") Long id) throws Exception {
-    detectionJobScheduler.stopJob(id);
-    detectionJobScheduler.startJob(id);
-    return Response.ok().build();
-  }
 
   /**
    * Returns the weight of the metric at the given window. The calculation of baseline (history) data is specified by

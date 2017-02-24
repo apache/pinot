@@ -8,6 +8,7 @@ import com.linkedin.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.DashboardConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.DataCompletenessConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.DatasetConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.DetectionStatusManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.EmailConfigurationManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.EventManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.IngraphDashboardConfigManagerImpl;
@@ -21,10 +22,12 @@ import com.linkedin.thirdeye.datalayer.bao.jdbc.TaskManagerImpl;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import com.linkedin.thirdeye.datalayer.util.ManagerProvider;
 import com.linkedin.thirdeye.datalayer.util.PersistenceConfig;
+
 import java.io.File;
 import java.io.FileReader;
 import java.net.URL;
 import java.sql.Connection;
+
 import org.apache.tomcat.jdbc.pool.DataSource;
 
 
@@ -146,6 +149,7 @@ public class TestDBResources {
     daoRegistry.setAlertConfigDAO(managerProvider.getInstance(AlertConfigManagerImpl.class));
     daoRegistry.setDataCompletenessConfigDAO(managerProvider.getInstance(DataCompletenessConfigManagerImpl.class));
     daoRegistry.setEventDAO(managerProvider.getInstance(EventManagerImpl.class));
+
   }
 
 }
