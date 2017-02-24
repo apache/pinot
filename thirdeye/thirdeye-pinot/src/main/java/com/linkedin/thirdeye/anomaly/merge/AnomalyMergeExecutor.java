@@ -6,7 +6,15 @@ import com.linkedin.thirdeye.anomaly.override.OverrideConfigHelper;
 import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
+import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.client.DAORegistry;
+import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 import com.linkedin.thirdeye.detector.metric.transfer.MetricTransfer;
@@ -23,20 +31,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.collections.CollectionUtils;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.client.DAORegistry;
-import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
-import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 
 
 /**
@@ -58,8 +56,8 @@ public class AnomalyMergeExecutor implements Runnable {
   private final static AnomalyMergeConfig DEFAULT_MERGE_CONFIG;
   static {
     DEFAULT_MERGE_CONFIG = new AnomalyMergeConfig();
-    DEFAULT_MERGE_CONFIG.setSequentialAllowedGap(2 * 60 * 60_000); // 2 hours
-    DEFAULT_MERGE_CONFIG.setMaxMergeDurationLength(-1); // no time based split
+    DEFAULT_MERGE_CONFIG.setSequentialAllowedGap(TimeUnit.HOURS.toMillis(2)); // merge anomalies apart 2 hours
+    DEFAULT_MERGE_CONFIG.setMaxMergeDurationLength(TimeUnit.DAYS.toMillis(7) - 3600_000); // break anomaly longer than 6 days 23 hours
     DEFAULT_MERGE_CONFIG.setMergeStrategy(AnomalyMergeStrategy.FUNCTION_DIMENSIONS);
   }
 
@@ -103,7 +101,11 @@ public class AnomalyMergeExecutor implements Runnable {
       Callable<Integer> task = () -> {
         final boolean isBackfill = false;
         // TODO : move merge config within the AnomalyFunction; Every function should have its own merge config.
-        return mergeAnomalies(function, DEFAULT_MERGE_CONFIG, isBackfill);
+        AnomalyMergeConfig anomalyMergeConfig = function.getAnomalyMergeConfig();
+        if (anomalyMergeConfig == null) {
+          anomalyMergeConfig = DEFAULT_MERGE_CONFIG;
+        }
+        return mergeAnomalies(function, anomalyMergeConfig, isBackfill);
       };
       Future<Integer> taskFuture = taskExecutorService.submit(task);
       taskCallbacks.add(taskFuture);
@@ -131,7 +133,11 @@ public class AnomalyMergeExecutor implements Runnable {
    */
   public int synchronousMergeBasedOnFunctionIdAndDimension(AnomalyFunctionDTO functionSpec, boolean isBackfill) {
     if (functionSpec.getIsActive()) {
-      return mergeAnomalies(functionSpec, DEFAULT_SYNCHRONIZED_MERGE_CONFIG, isBackfill);
+      AnomalyMergeConfig anomalyMergeConfig = functionSpec.getAnomalyMergeConfig();
+      if (anomalyMergeConfig == null) {
+        anomalyMergeConfig = DEFAULT_SYNCHRONIZED_MERGE_CONFIG;
+      }
+      return mergeAnomalies(functionSpec, anomalyMergeConfig, isBackfill);
     } else {
       return 0;
     }
@@ -215,8 +221,8 @@ public class AnomalyMergeExecutor implements Runnable {
       } catch (Exception e) {
         AnomalyFunctionDTO function = mergedResult.getFunction();
         LOG.warn(
-            "Unable to compute merged weight and the average weight of raw anomalies is used. Dataset: {}, Metric: {}, Function: {}, Time:{} - {}, Exception: {}",
-            function.getCollection(), function.getMetric(), function.getFunctionName(), new DateTime(mergedResult.getStartTime()), new DateTime(mergedResult.getEndTime()), e);
+            "Unable to compute merged weight and the average weight of raw anomalies is used. Dataset: {}, Topic Metric: {}, Function: {}, Time:{} - {}, Exception: {}",
+            function.getCollection(), function.getTopicMetric(), function.getFunctionName(), new DateTime(mergedResult.getStartTime()), new DateTime(mergedResult.getEndTime()), e);
       }
     }
     try {
@@ -282,12 +288,12 @@ public class AnomalyMergeExecutor implements Runnable {
       // Transform Time Series
       List<ScalingFactor> scalingFactors = OverrideConfigHelper
           .getTimeSeriesScalingFactors(overrideConfigDAO, anomalyFunctionSpec.getCollection(),
-              anomalyFunctionSpec.getMetric(), anomalyFunctionSpec.getId(), anomalyFunction
+              anomalyFunctionSpec.getTopicMetric(), anomalyFunctionSpec.getId(), anomalyFunction
                   .getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis()));
       if (CollectionUtils.isNotEmpty(scalingFactors)) {
         Properties properties = anomalyFunction.getProperties();
         MetricTransfer.rescaleMetric(metricTimeSeries, windowStart.getMillis(), scalingFactors,
-            anomalyFunctionSpec.getMetric(), properties);
+            anomalyFunctionSpec.getTopicMetric(), properties);
       }
 
       anomalyFunction.updateMergedAnomalyInfo(anomalyMergedResult, metricTimeSeries, windowStart, windowEnd,

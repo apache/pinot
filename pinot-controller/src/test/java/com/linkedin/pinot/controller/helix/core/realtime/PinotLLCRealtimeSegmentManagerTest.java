@@ -472,7 +472,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     IndexingConfig indexingConfig = mock(IndexingConfig.class);
     when(indexingConfig.getStreamConfigs()).thenReturn(streamPropMap);
     when(tableConfig.getIndexingConfig()).thenReturn(indexingConfig);
-    List<Integer> nonConsumingPartitions = new ArrayList<>(1);
+    Set<Integer> nonConsumingPartitions = new HashSet<>(1);
     nonConsumingPartitions.add(partitionToBeFixed);
     nonConsumingPartitions.add(partitionWithHigherOffset);
     nonConsumingPartitions.add(emptyPartition);
@@ -543,7 +543,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     // Now, if we make 'partitionToBeFixed' a non-consuming partition, a second one should get added with the same start offset as
     // as the first one, since the kafka offset to return has not changed.
-    List<Integer> ncPartitions = new ArrayList<>(1);
+    Set<Integer> ncPartitions = new HashSet<>(1);
     ncPartitions.add(partitionToBeFixed);
     segmentManager.createConsumingSegment(rtTableName, ncPartitions, segmentManager.getExistingSegments(rtTableName), tableConfig);
     Assert.assertEquals(segmentManager._paths.size(), 4);
@@ -715,7 +715,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    protected void writeSegmentsToPropertyStore(List<String> paths, List<ZNRecord> records) {
+    protected void writeSegmentsToPropertyStore(List<String> paths, List<ZNRecord> records, String realtimeTableName) {
       _paths.addAll(paths);
       _records.addAll(records);
       for (int i = 0; i < paths.size(); i++) {
@@ -748,8 +748,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
     }
 
     @Override
-    protected void updateHelixIdealState(IdealState idealState, String realtimeTableName, Map<String, List<String>> idealStateEntries,
-        boolean create, int nReplicas) {
+    protected void updateIdealState(IdealState idealState, String realtimeTableName,
+        Map<String, List<String>> idealStateEntries, boolean create, int nReplicas) {
       _realtimeTableName = realtimeTableName;
       _idealStateEntries = idealStateEntries;
       _nReplicas = nReplicas;
@@ -759,7 +759,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       }
     }
 
-    protected void updateHelixIdealState(final String realtimeTableName, final List<String> newInstances,
+    protected void updateIdealState(final String realtimeTableName, final List<String> newInstances,
         final String oldSegmentNameStr, final String newSegmentNameStr) {
       _realtimeTableName = realtimeTableName;
       _newInstances = newInstances;

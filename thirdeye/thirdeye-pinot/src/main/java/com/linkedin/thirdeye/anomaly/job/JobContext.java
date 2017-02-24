@@ -9,6 +9,7 @@ import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 
 public abstract class JobContext {
 
+  // Todo : remove DAOs from here as we can inject these wherever needed.
   private JobManager jobDAO;
   private TaskManager taskDAO;
   private AnomalyFunctionManager anomalyFunctionDAO;

@@ -26,6 +26,7 @@ import com.linkedin.pinot.common.query.context.TimerContext;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.utils.DataTable;
+import com.linkedin.pinot.core.common.datatable.DataTableImplV2;
 import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.data.manager.offline.TableDataManager;
@@ -42,6 +43,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.slf4j.Logger;
@@ -85,7 +87,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   }
 
   @Override
-  public DataTable processQuery(final QueryRequest queryRequest) {
+  public DataTable processQuery(final QueryRequest queryRequest, ExecutorService executorService) {
     TimerContext timerContext = queryRequest.getTimerContext();
     TimerContext.Timer schedulerWaitTimer = timerContext.getPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT);
     if (schedulerWaitTimer != null) {
@@ -98,7 +100,6 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     InstanceRequest instanceRequest = queryRequest.getInstanceRequest();
     final long requestId = instanceRequest.getRequestId();
     final long nSegmentsInQuery = instanceRequest.getSearchSegmentsSize();
-    long nPrunedSegments = -1;
     try {
       TraceContext.register(instanceRequest);
       final BrokerRequest brokerRequest = instanceRequest.getQuery();
@@ -108,16 +109,15 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       queryableSegmentDataManagerList = getPrunedQueryableSegments(instanceRequest);
       segmentPruneTimer.stopAndRecord();
 
-      nPrunedSegments = queryableSegmentDataManagerList.size();
-      LOGGER.debug("Matched {} segments! ", nPrunedSegments);
+      queryRequest.setSegmentCountAfterPruning(queryableSegmentDataManagerList.size());
+      LOGGER.debug("Matched {} segments", queryRequest.getSegmentCountAfterPruning());
       if (queryableSegmentDataManagerList.isEmpty()) {
-        return new DataTable();
+        return new DataTableImplV2();
       }
 
       TimerContext.Timer planBuildTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.BUILD_QUERY_PLAN);
       final Plan globalQueryPlan = _planMaker.makeInterSegmentPlan(queryableSegmentDataManagerList, brokerRequest,
-          _instanceDataManager.getTableDataManager(brokerRequest.getQuerySource().getTableName()).getExecutorService(),
-          getResourceTimeOut(instanceRequest.getQuery()));
+          executorService, getResourceTimeOut(instanceRequest.getQuery()));
       planBuildTimer.stopAndRecord();
 
       if (_printQueryPlan) {
@@ -142,17 +142,11 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       dataTable.getMetadata().put(DataTable.REQUEST_ID_METADATA_KEY, Long.toString(instanceRequest.getRequestId()));
       dataTable.getMetadata()
           .put(DataTable.TRACE_INFO_METADATA_KEY, TraceContext.getTraceInfoOfRequestId(instanceRequest.getRequestId()));
-      LOGGER.info("Processed requestId {},reqSegments={},prunedToSegmentCount={},planTime={},planExecTime={},totalTimeUsed={},broker={}",
-          requestId, nSegmentsInQuery, nPrunedSegments,
-          planBuildTimer.getDurationMs(),
-          timerContext.getPhaseDurationMs(ServerQueryPhase.QUERY_PLAN_EXECUTION),
-          queryProcessingTimer.getDurationMs(),
-          queryRequest.getBrokerId());
       return dataTable;
     } catch (Exception e) {
       _serverMetrics.addMeteredQueryValue(instanceRequest.getQuery(), ServerMeter.QUERY_EXECUTION_EXCEPTIONS, 1);
       LOGGER.error("Exception processing requestId {}", requestId, e);
-      dataTable = new DataTable();
+      dataTable = new DataTableImplV2();
       dataTable.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
       TraceContext.logException("ServerQueryExecutorV1Impl", "Exception occurs in processQuery");
       queryProcessingTimer.stopAndRecord();
@@ -166,13 +160,11 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
           .put(DataTable.TRACE_INFO_METADATA_KEY, TraceContext.getTraceInfoOfRequestId(instanceRequest.getRequestId()));
       return dataTable;
     } finally {
-      if (_instanceDataManager.getTableDataManager(instanceRequest.getQuery().getQuerySource().getTableName()) != null) {
-        if (queryableSegmentDataManagerList != null) {
+      TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(queryRequest.getTableName());
+      if (tableDataManager != null && queryableSegmentDataManagerList != null) {
           for (SegmentDataManager segmentDataManager : queryableSegmentDataManagerList) {
-            _instanceDataManager.getTableDataManager(instanceRequest.getQuery().getQuerySource().getTableName())
-                .releaseSegment(segmentDataManager);
+            tableDataManager.releaseSegment(segmentDataManager);
           }
-        }
       }
       TraceContext.unregister(instanceRequest);
     }

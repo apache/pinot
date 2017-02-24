@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -73,8 +74,8 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
   private final RoutingTableBuilder _realtimeHLCRoutingTableBuilder;
   private final RoutingTableBuilder _realtimeLLCRoutingTableBuilder;
 
-  private static final int MIN_SERVER_COUNT_FOR_LARGE_CLUSTER = 30;
-  private static final int MIN_REPLICA_COUNT_FOR_LARGE_CLUSTER = 4;
+  private static int MIN_SERVER_COUNT_FOR_LARGE_CLUSTER = 30;
+  private static int MIN_REPLICA_COUNT_FOR_LARGE_CLUSTER = 4;
 
   /*
    * _brokerRoutingTable has entries for offline as well as realtime tables. For the
@@ -115,6 +116,34 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     _smallClusterRoutingTableBuilder = new BalancedRandomRoutingTableBuilder();
     _realtimeHLCRoutingTableBuilder = new KafkaHighLevelConsumerBasedRoutingTableBuilder();
     _realtimeLLCRoutingTableBuilder = new KafkaLowLevelConsumerRoutingTableBuilder();
+
+    if (configuration.containsKey("minServerCountForLargeCluster")) {
+      final String minServerCountForLargeCluster = configuration.getString("minServerCountForLargeCluster");
+      try {
+        MIN_SERVER_COUNT_FOR_LARGE_CLUSTER = Integer.parseInt(minServerCountForLargeCluster);
+        LOGGER.info("Using large cluster min server count of {}", MIN_SERVER_COUNT_FOR_LARGE_CLUSTER);
+      } catch (Exception e) {
+        LOGGER.warn(
+            "Could not get the large cluster min server count from configuration value {}, keeping default value {}",
+            minServerCountForLargeCluster, MIN_SERVER_COUNT_FOR_LARGE_CLUSTER, e);
+      }
+    } else {
+      LOGGER.info("Using default value for large cluster min server count of {}", MIN_SERVER_COUNT_FOR_LARGE_CLUSTER);
+    }
+
+    if (configuration.containsKey("minReplicaCountForLargeCluster")) {
+      final String minReplicaCountForLargeCluster = configuration.getString("minReplicaCountForLargeCluster");
+      try {
+        MIN_REPLICA_COUNT_FOR_LARGE_CLUSTER = Integer.parseInt(minReplicaCountForLargeCluster);
+        LOGGER.info("Using large cluster min replica count of {}", MIN_REPLICA_COUNT_FOR_LARGE_CLUSTER);
+      } catch (Exception e) {
+        LOGGER.warn(
+            "Could not get the large cluster min replica count from configuration value {}, keeping default value {}",
+            minReplicaCountForLargeCluster, MIN_REPLICA_COUNT_FOR_LARGE_CLUSTER, e);
+      }
+    } else {
+      LOGGER.info("Using default value for large cluster min replica count of {}", MIN_REPLICA_COUNT_FOR_LARGE_CLUSTER);
+    }
 
     _largeClusterRoutingTableBuilder.init(configuration);
     _smallClusterRoutingTableBuilder.init(configuration);
@@ -519,16 +548,16 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
 
     // Remove table from all instances
     synchronized (_tablesForInstance) {
-      for (String instanceName : _brokerRoutingTable.keySet()) {
-        Set<String> tablesForCurrentInstance = _tablesForInstance.get(instanceName);
-        if (tablesForCurrentInstance.contains(tableName)) {
-          tablesForCurrentInstance.remove(tableName);
-        }
-
-        if (tablesForCurrentInstance.isEmpty()) {
-          _lastKnownInstanceConfigs.remove(instanceName);
+      Iterator<Map.Entry<String, Set<String>>> iterator = _tablesForInstance.entrySet().iterator();
+      while (iterator.hasNext()) {
+        Map.Entry<String, Set<String>> entry = iterator.next();
+        entry.getValue().remove(tableName);
+        if (entry.getValue().isEmpty()) {
+          _lastKnownInstanceConfigs.remove(entry.getKey());
+          iterator.remove();
         }
       }
+
     }
   }
 

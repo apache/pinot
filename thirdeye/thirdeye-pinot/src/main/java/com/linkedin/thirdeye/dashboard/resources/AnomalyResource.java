@@ -2,15 +2,17 @@ package com.linkedin.thirdeye.dashboard.resources;
 
 import com.google.common.cache.LoadingCache;
 import com.linkedin.pinot.pql.parsers.utils.Pair;
+import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import com.linkedin.thirdeye.anomaly.detection.TimeSeriesUtil;
 import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
-import com.linkedin.thirdeye.anomaly.views.function.AnomalyTimeSeriesView;
-import com.linkedin.thirdeye.anomaly.views.function.AnomalyTimeSeriesViewFactory;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dashboard.views.TimeBucket;
 
+import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
+import com.linkedin.thirdeye.detector.function.AnomalyFunction;
+import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import java.io.IOException;
 import java.net.URLDecoder;
 import java.util.ArrayList;
@@ -25,6 +27,7 @@ import java.util.concurrent.TimeUnit;
 
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.DELETE;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -84,19 +87,21 @@ public class AnomalyResource {
   private EmailConfigurationManager emailConfigurationDAO;
   private MetricConfigManager metricConfigDAO;
   private MergedAnomalyResultManager mergedAnomalyResultDAO;
-  private AnomalyTimeSeriesViewFactory anomalyTimeSeriesViewFactory;
+  private AnomalyFunctionFactory anomalyFunctionFactory;
+  private AlertFilterFactory alertFilterFactory;
   private LoadingCache<String, Long> collectionMaxDataTimeCache;
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
-  public AnomalyResource(AnomalyTimeSeriesViewFactory anomalyTimeSeriesViewFactory) {
+  public AnomalyResource(AnomalyFunctionFactory anomalyFunctionFactory, AlertFilterFactory alertFilterFactory) {
     this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.rawAnomalyResultDAO = DAO_REGISTRY.getRawAnomalyResultDAO();
     this.anomalyMergedResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     this.emailConfigurationDAO = DAO_REGISTRY.getEmailConfigurationDAO();
     this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
     this.mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
-    this.anomalyTimeSeriesViewFactory = anomalyTimeSeriesViewFactory;
+    this.anomalyFunctionFactory = anomalyFunctionFactory;
+    this.alertFilterFactory = alertFilterFactory;
     this.collectionMaxDataTimeCache = CACHE_REGISTRY_INSTANCE.getCollectionMaxDataTimeCache();
   }
 
@@ -107,7 +112,7 @@ public class AnomalyResource {
     if (StringUtils.isBlank(dataset)) {
       throw new IllegalArgumentException("dataset is a required query param");
     }
-    List<String> metrics = anomalyFunctionDAO.findDistinctMetricsByCollection(dataset);
+    List<String> metrics = anomalyFunctionDAO.findDistinctTopicMetricsByCollection(dataset);
     return metrics;
   }
 
@@ -125,7 +130,8 @@ public class AnomalyResource {
       @QueryParam("startTimeIso") String startTimeIso,
       @QueryParam("endTimeIso") String endTimeIso,
       @QueryParam("metric") String metric,
-      @QueryParam("dimensions") String exploredDimensions) {
+      @QueryParam("dimensions") String exploredDimensions,
+      @DefaultValue("true") @QueryParam("applyAlertFilter") boolean applyAlertFiler) {
 
     if (StringUtils.isBlank(dataset)) {
       throw new IllegalArgumentException("dataset is a required query param");
@@ -168,6 +174,17 @@ public class AnomalyResource {
       LOG.error("Exception in fetching anomalies", e);
     }
 
+    if (applyAlertFiler) {
+      // TODO: why need try catch?
+      try {
+        anomalyResults = AlertFilterHelper.applyFiltrationRule(anomalyResults, alertFilterFactory);
+      } catch (Exception e) {
+        LOG.warn(
+            "Failed to apply alert filters on anomalies for dataset:{}, metric:{}, start:{}, end:{}, exception:{}",
+            dataset, metric, startTimeIso, endTimeIso, e);
+      }
+    }
+
     return anomalyResults;
   }
 
@@ -203,7 +220,7 @@ public class AnomalyResource {
      List<AnomalyFunctionDTO> anomalyFunctions = anomalyFunctionDAO.findAllByCollection(dataset);
      List<Long> functionIds = new ArrayList<>();
      for (AnomalyFunctionDTO anomalyFunction : anomalyFunctions) {
-       if (StringUtils.isNotBlank(metric) && !anomalyFunction.getMetric().equals(metric)) {
+       if (StringUtils.isNotBlank(metric) && !anomalyFunction.getTopicMetric().equals(metric)) {
          continue;
        }
        functionIds.add(anomalyFunction.getId());
@@ -235,7 +252,7 @@ public class AnomalyResource {
     if (StringUtils.isNotEmpty(metric)) {
       anomalyFunctions = new ArrayList<>();
       for (AnomalyFunctionDTO anomalyFunctionSpec : anomalyFunctionSpecs) {
-        if (metric.equals(anomalyFunctionSpec.getMetric())) {
+        if (metric.equals(anomalyFunctionSpec.getTopicMetric())) {
           anomalyFunctions.add(anomalyFunctionSpec);
         }
       }
@@ -278,7 +295,8 @@ public class AnomalyResource {
     anomalyFunctionSpec.setMetricFunction(MetricAggFunction.valueOf(metric_function));
     anomalyFunctionSpec.setCollection(dataset);
     anomalyFunctionSpec.setFunctionName(functionName);
-    anomalyFunctionSpec.setMetric(metric);
+    anomalyFunctionSpec.setTopicMetric(metric);
+    anomalyFunctionSpec.setMetrics(Arrays.asList(metric));
     if (StringUtils.isEmpty(type)) {
       type = DEFAULT_FUNCTION_TYPE;
     }
@@ -366,7 +384,8 @@ public class AnomalyResource {
     anomalyFunctionSpec.setActive(isActive);
     anomalyFunctionSpec.setCollection(dataset);
     anomalyFunctionSpec.setFunctionName(functionName);
-    anomalyFunctionSpec.setMetric(metric);
+    anomalyFunctionSpec.setTopicMetric(metric);
+    anomalyFunctionSpec.setMetrics(Arrays.asList(metric));
     if (StringUtils.isEmpty(type)) {
       type = DEFAULT_FUNCTION_TYPE;
     }
@@ -555,7 +574,7 @@ public class AnomalyResource {
     MergedAnomalyResultDTO anomalyResult = anomalyMergedResultDAO.findById(anomalyResultId, loadRawAnomalies);
     DimensionMap dimensions = anomalyResult.getDimensions();
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyResult.getFunction();
-    AnomalyTimeSeriesView anomalyTimeSeriesView = anomalyTimeSeriesViewFactory.fromSpec(anomalyFunctionSpec);
+    AnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
 
     // Calculate view window start and end if they are not given by the user, which should be 0 if it is not given.
     // By default, the padding window size is half of the anomaly window.
@@ -591,7 +610,7 @@ public class AnomalyResource {
     }
 
     List<Pair<Long, Long>> startEndTimeRanges =
-        anomalyTimeSeriesView.getDataRangeIntervals(viewWindowStartTime, viewWindowEndTime);
+        anomalyFunction.getDataRangeIntervals(viewWindowStartTime, viewWindowEndTime);
 
     MetricTimeSeries metricTimeSeries =
         TimeSeriesUtil.getTimeSeriesByDimension(anomalyFunctionSpec, startEndTimeRanges, dimensions, timeGranularity);
@@ -605,7 +624,7 @@ public class AnomalyResource {
     // Known anomalies are ignored (the null parameter) because 1. we can reduce users' waiting time and 2. presentation
     // data does not need to be as accurate as the one used for detecting anomalies
     AnomalyTimelinesView anomalyTimelinesView =
-        anomalyTimeSeriesView.getTimeSeriesView(metricTimeSeries, bucketMillis, anomalyFunctionSpec.getMetric(),
+        anomalyFunction.getTimeSeriesView(metricTimeSeries, bucketMillis, anomalyFunctionSpec.getTopicMetric(),
             viewWindowStartTime, viewWindowEndTime, null);
 
     // Generate summary for frontend

@@ -20,6 +20,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
+import org.apache.commons.configuration.BaseConfiguration;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.slf4j.Logger;
@@ -46,7 +47,7 @@ public class KafkaLowLevelConsumerRoutingTableBuilderTest {
     Random random = new Random();
 
     KafkaLowLevelConsumerRoutingTableBuilder routingTableBuilder = new KafkaLowLevelConsumerRoutingTableBuilder();
-    routingTableBuilder.init(null);
+    routingTableBuilder.init(new BaseConfiguration());
 
     long totalNanos = 0L;
 
@@ -151,7 +152,7 @@ public class KafkaLowLevelConsumerRoutingTableBuilderTest {
     final int CONSUMING_SEGMENT_COUNT = SEGMENT_COUNT - ONLINE_SEGMENT_COUNT;
 
     KafkaLowLevelConsumerRoutingTableBuilder routingTableBuilder = new KafkaLowLevelConsumerRoutingTableBuilder();
-    routingTableBuilder.init(null);
+    routingTableBuilder.init(new BaseConfiguration());
 
     List<SegmentName> segmentNames = new ArrayList<SegmentName>();
     for(int i = 0; i < SEGMENT_COUNT; ++i) {

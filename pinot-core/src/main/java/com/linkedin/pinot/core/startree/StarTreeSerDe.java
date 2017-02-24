@@ -19,6 +19,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.HashBiMap;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -432,19 +433,20 @@ public class StarTreeSerDe {
    */
   public static void convertStarTreeFormatIfNeeded(File indexDir, StarTreeFormatVersion starTreeVersionToLoad)
       throws IOException, ClassNotFoundException {
-    File starTreeFile = new File(indexDir, V1Constants.STAR_TREE_INDEX_FILE);
+    File starTreeFile = SegmentDirectoryPaths.findStarTreeFile(indexDir);
 
     // If the star-tree file does not exist, this is not a star tree index, nothing to do here.
-    if (!starTreeFile.exists()) {
-      LOGGER.debug("Skipping Star Tree format conversion, as no star tree file exists for {}",
-          starTreeFile.getAbsoluteFile());
+    if (starTreeFile == null || !starTreeFile.exists()) {
+      LOGGER.debug("Skipping Star Tree format conversion, as star tree file {} does not exist in directory {}",
+          V1Constants.STAR_TREE_INDEX_FILE, indexDir);
       return;
     }
+    File parentDir = starTreeFile.getParentFile();
 
     StarTreeFormatVersion actualVersion = getStarTreeVersion(starTreeFile);
     if (actualVersion == StarTreeFormatVersion.ON_HEAP && starTreeVersionToLoad == StarTreeFormatVersion.OFF_HEAP) {
       LOGGER.info("Converting Star Tree from on-heap to off-heap format for {}", starTreeFile.getAbsolutePath());
-      File starTreeOffHeapFile = new File(indexDir, V1Constants.STAR_TREE_OFF_HEAP_INDEX_FILE);
+      File starTreeOffHeapFile = new File(parentDir, V1Constants.STAR_TREE_OFF_HEAP_INDEX_FILE);
       if (starTreeOffHeapFile.exists()) {
         LOGGER.info("Replacing star tree on-heap format with off-heap format for {}", starTreeFile.getAbsolutePath());
         FileUtils.copyFile(starTreeOffHeapFile, starTreeFile);
@@ -453,7 +455,7 @@ public class StarTreeSerDe {
 
         try {
           writeTreeOffHeapFormat(starTreeOnHeap, starTreeOffHeapFile);
-          FileUtils.copyFile(starTreeFile, new File(indexDir, V1Constants.STAR_TREE_ON_HEAP_INDEX_FILE));
+          FileUtils.copyFile(starTreeFile, new File(parentDir, V1Constants.STAR_TREE_ON_HEAP_INDEX_FILE));
           FileUtils.copyFile(starTreeOffHeapFile, starTreeFile);
         } catch (Exception e) {
           LOGGER.warn("Exception caught while convert star tree on-heap to off-heap format for {}",
@@ -462,10 +464,10 @@ public class StarTreeSerDe {
       }
     } else if (actualVersion == StarTreeFormatVersion.OFF_HEAP
         && starTreeVersionToLoad == StarTreeFormatVersion.ON_HEAP) {
-      File starTreeOnHeapFile = new File(indexDir, V1Constants.STAR_TREE_ON_HEAP_INDEX_FILE);
+      File starTreeOnHeapFile = new File(parentDir, V1Constants.STAR_TREE_ON_HEAP_INDEX_FILE);
       if (starTreeOnHeapFile.exists()) {
         try {
-          FileUtils.copyFile(starTreeFile, new File(indexDir, V1Constants.STAR_TREE_OFF_HEAP_INDEX_FILE));
+          FileUtils.copyFile(starTreeFile, new File(parentDir, V1Constants.STAR_TREE_OFF_HEAP_INDEX_FILE));
           FileUtils.copyFile(starTreeOnHeapFile, starTreeFile);
         } catch (Exception e) {
           LOGGER.warn("Exception caught while converting star tree off-heap to on-heap for {}",

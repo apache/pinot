@@ -21,8 +21,6 @@ import org.apache.commons.configuration.ConfigurationException;
 
 /**
  * The config used for Server.
- *
- *
  */
 public class ServerConf {
 
@@ -34,10 +32,6 @@ public class ServerConf {
   private static final String PINOT_SERVER_NETTY = "pinot.server.netty";
   private static final String PINOT_SERVER_INSTANCE_DATA_MANAGER_CLASS = "pinot.server.instance.data.manager.class";
   private static final String PINOT_SERVER_QUERY_EXECUTOR_CLASS = "pinot.server.query.executor.class";
-  private static final String PINOT_SERVER_REQUEST_HANDLER_FACTORY_CLASS = "pinot.server.requestHandlerFactory.class";
-  private static final String PINOT_SERVER_QUERY_SCHEDULER_CLASS_CONFIG_KEY = "pinot.server.query.scheduler.class" ;
-  private static final String DEFAULT_QUERY_SCHEDULER_CLASS_NAME =
-      "com.linkedin.pinot.core.query.scheduler.FCFSQueryScheduler";
   private static final String PINOT_SERVER_TRANSFORM_FUNCTIONS = "pinot.server.transforms";
 
   private static final String PINOT_QUERY_SCHEDULER_PREFIX = "pinot.query.scheduler";
@@ -82,15 +76,6 @@ public class ServerConf {
 
   public String getQueryExecutorClassName() {
     return _serverConf.getString(PINOT_SERVER_QUERY_EXECUTOR_CLASS);
-  }
-
-  public String getQuerySchedulerClassName() {
-    return _serverConf.getString(PINOT_SERVER_QUERY_SCHEDULER_CLASS_CONFIG_KEY,
-        DEFAULT_QUERY_SCHEDULER_CLASS_NAME);
-  }
-
-  public String getRequestHandlerFactoryClassName() {
-    return _serverConf.getString(PINOT_SERVER_REQUEST_HANDLER_FACTORY_CLASS);
   }
 
   public Configuration getSchedulerConfig() {

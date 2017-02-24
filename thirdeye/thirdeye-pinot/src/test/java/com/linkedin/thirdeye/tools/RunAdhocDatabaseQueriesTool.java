@@ -2,24 +2,31 @@ package com.linkedin.thirdeye.tools;
 
 import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
+
 import java.io.File;
 import java.util.List;
-
 import java.util.Map;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.autoload.pinot.metrics.ConfigGenerator;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.DataCompletenessConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
+import com.linkedin.thirdeye.datalayer.bao.JobManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
+import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
@@ -37,6 +44,9 @@ public class RunAdhocDatabaseQueriesTool {
   private MetricConfigManager metricConfigDAO;
   private DashboardConfigManager dashboardConfigDAO;
   private OverrideConfigManager overrideConfigDAO;
+  private JobManager jobDAO;
+  private TaskManager taskDAO;
+  private DataCompletenessConfigManager dataCompletenessConfigDAO;
 
   public RunAdhocDatabaseQueriesTool(File persistenceFile)
       throws Exception {
@@ -59,6 +69,12 @@ public class RunAdhocDatabaseQueriesTool {
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.DashboardConfigManagerImpl.class);
     overrideConfigDAO = DaoProviderUtil
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.OverrideConfigManagerImpl.class);
+    jobDAO = DaoProviderUtil
+        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.JobManagerImpl.class);
+    taskDAO = DaoProviderUtil
+        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.TaskManagerImpl.class);
+    dataCompletenessConfigDAO = DaoProviderUtil
+        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.DataCompletenessConfigManagerImpl.class);
   }
 
   private void toggleAnomalyFunction(Long id) {
@@ -118,16 +134,16 @@ public class RunAdhocDatabaseQueriesTool {
     List<AnomalyFunctionDTO> anomalyFunctionDTOs =
         anomalyFunctionDAO.findAllByCollection(collection);
     for (AnomalyFunctionDTO anomalyFunctionDTO : anomalyFunctionDTOs) {
-      String metricName = anomalyFunctionDTO.getMetric();
-      if (metricList.contains(metricName)) {
+      String topicMetricName = anomalyFunctionDTO.getTopicMetric();
+      if (metricList.contains(topicMetricName)) {
         Map<String, String> alertFilter = defaultAlertFilter;
-        if (metricRuleMap.containsKey(metricName)) {
-          alertFilter = metricRuleMap.get(metricName);
+        if (metricRuleMap.containsKey(topicMetricName)) {
+          alertFilter = metricRuleMap.get(topicMetricName);
         }
         anomalyFunctionDTO.setAlertFilter(alertFilter);
         anomalyFunctionDAO.update(anomalyFunctionDTO);
-        LOG.info("Add alert filter {} to function {} (dataset: {}, metric: {})", alertFilter,
-            anomalyFunctionDTO.getId(), collection, metricName);
+        LOG.info("Add alert filter {} to function {} (dataset: {}, topic metric: {})", alertFilter,
+            anomalyFunctionDTO.getId(), collection, topicMetricName);
       }
     }
   }
@@ -164,6 +180,13 @@ public class RunAdhocDatabaseQueriesTool {
     }
   }
 
+
+  private void deleteAllDataCompleteness() {
+    for (DataCompletenessConfigDTO dto : dataCompletenessConfigDAO.findAll()) {
+      dataCompletenessConfigDAO.delete(dto);
+    }
+  }
+
   public static void main(String[] args) throws Exception {
 
     File persistenceFile = new File(args[0]);
@@ -172,7 +195,6 @@ public class RunAdhocDatabaseQueriesTool {
       System.exit(1);
     }
     RunAdhocDatabaseQueriesTool dq = new RunAdhocDatabaseQueriesTool(persistenceFile);
-
   }
 
 }

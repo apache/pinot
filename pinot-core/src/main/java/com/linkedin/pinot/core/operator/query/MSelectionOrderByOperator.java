@@ -17,7 +17,7 @@ package com.linkedin.pinot.core.operator.query;
 
 import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.common.request.SelectionSort;
-import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
+import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Operator;
@@ -44,6 +44,7 @@ import org.slf4j.LoggerFactory;
  */
 public class MSelectionOrderByOperator extends BaseOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(MSelectionOrderByOperator.class);
+  private static final String OPERATOR_NAME = "MSelectionOrderByOperator";
 
   private final IndexSegment _indexSegment;
   private final MProjectionOperator _projectionOperator;
@@ -112,6 +113,11 @@ public class MSelectionOrderByOperator extends BaseOperator {
   @Override
   public Block getNextBlock(BlockId blockId) {
     throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public String getOperatorName() {
+    return OPERATOR_NAME;
   }
 
   @Override

@@ -3,6 +3,8 @@ package com.linkedin.thirdeye.datalayer.bao;
 import java.util.List;
 
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
@@ -17,6 +19,16 @@ public class TestMetricConfigManager extends AbstractManagerTestBase {
   private static String metric1 = "metric1";
   private static String metric2 = "metric2";
   private static String derivedMetric1 = "metric3";
+
+  @BeforeClass
+  void beforeClass() {
+    super.init();
+  }
+
+  @AfterClass(alwaysRun = true)
+  void afterClass() {
+    super.cleanup();
+  }
 
   @Test
   public void testCreate() {
@@ -55,6 +67,16 @@ public class TestMetricConfigManager extends AbstractManagerTestBase {
   }
 
   @Test(dependsOnMethods = { "testFind" })
+  public void testFindLike() {
+    List<MetricConfigDTO> metricConfigs = metricConfigDAO.findWhereNameLike("%m%");
+    Assert.assertEquals(metricConfigs.size(), 3);
+    metricConfigs = metricConfigDAO.findWhereNameLike("%1%");
+    Assert.assertEquals(metricConfigs.size(), 1);
+    metricConfigs = metricConfigDAO.findWhereNameLike("%p%");
+    Assert.assertEquals(metricConfigs.size(), 0);
+  }
+
+  @Test(dependsOnMethods = { "testFindLike" })
   public void testUpdate() {
     MetricConfigDTO metricConfig = metricConfigDAO.findById(metricConfigId1);
     Assert.assertNotNull(metricConfig);

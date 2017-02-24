@@ -15,16 +15,13 @@
  */
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-
-
 public class StringMutableDictionary extends MutableDictionaryReader {
 
   private String min = null;
   private String max = null;
 
-  public StringMutableDictionary(FieldSpec spec) {
-    super(spec);
+  public StringMutableDictionary(String column) {
+    super(column);
   }
 
   @Override

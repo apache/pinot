@@ -46,6 +46,105 @@ public final class UnSortedSingleValueSet extends BaseBlockValSet {
   }
 
   /**
+   * Reads int values for the given docIds and returns in the passed in double[].
+   * Only 'int' data type allowed to be read in as 'int'.
+   *
+   * @param inDocIds DocIds for which to get the values
+   * @param inStartPos start index in the inDocIds array
+   * @param inDocIdsSize size of docIds to read
+   * @param outValues Array where output is written
+   * @param outStartPos start index into output array
+   */
+  @Override
+  public void getIntValues(int[] inDocIds, int inStartPos, int inDocIdsSize, int[] outValues, int outStartPos) {
+    int inEndPos = inStartPos + inDocIdsSize;
+    ReaderContext context = sVReader.createContext();
+
+    if (columnMetadata.getDataType() == DataType.INT) {
+      for (int i = inStartPos; i < inEndPos; i++) {
+        outValues[outStartPos++] = sVReader.getInt(inDocIds[i], context);
+      }
+    } else {
+      throw new UnsupportedOperationException(
+          "Cannot fetch int values for column: " + columnMetadata.getColumnName());
+    }
+  }
+
+  /**
+   * Reads int values for the given docIds and returns in the passed in double[].
+   * Compatible data types ('int' and 'long') can be read in as long.
+   *
+   * @param inDocIds DocIds for which to get the values
+   * @param inStartPos start index in the inDocIds array
+   * @param inDocIdsSize size of docIds to read
+   * @param outValues Array where output is written
+   * @param outStartPos start index into output array
+   */
+  @Override
+  public void getLongValues(int[] inDocIds, int inStartPos, int inDocIdsSize, long[] outValues, int outStartPos) {
+    int inEndPos = inStartPos + inDocIdsSize;
+    ReaderContext context = sVReader.createContext();
+
+    switch (columnMetadata.getDataType()) {
+      case INT:
+        for (int i = inStartPos; i < inEndPos; i++) {
+          outValues[outStartPos++] = sVReader.getInt(inDocIds[i], context);
+        }
+        break;
+
+      case LONG:
+        for (int i = inStartPos; i < inEndPos; i++) {
+          outValues[outStartPos++] = sVReader.getLong(inDocIds[i], context);
+        }
+        break;
+
+      default:
+        throw new UnsupportedOperationException(
+            "Cannot fetch long values for column: " + columnMetadata.getColumnName());
+    }
+  }
+
+  /**
+   * Reads int values for the given docIds and returns in the passed in double[].
+   * Compatible data types ('int', 'long' and 'float') can be read in as float.
+   *
+   * @param inDocIds DocIds for which to get the values
+   * @param inStartPos start index in the inDocIds array
+   * @param inDocIdsSize size of docIds to read
+   * @param outValues Array where output is written
+   * @param outStartPos start index into output array
+   */
+  @Override
+  public void getFloatValues(int[] inDocIds, int inStartPos, int inDocIdsSize, float[] outValues, int outStartPos) {
+    int inEndPos = inStartPos + inDocIdsSize;
+    ReaderContext context = sVReader.createContext();
+
+    switch (columnMetadata.getDataType()) {
+      case INT:
+        for (int i = inStartPos; i < inEndPos; i++) {
+          outValues[outStartPos++] = sVReader.getInt(inDocIds[i], context);
+        }
+        break;
+
+      case LONG:
+        for (int i = inStartPos; i < inEndPos; i++) {
+          outValues[outStartPos++] = sVReader.getLong(inDocIds[i], context);
+        }
+        break;
+
+      case FLOAT:
+        for (int i = inStartPos; i < inEndPos; i++) {
+          outValues[outStartPos++] = sVReader.getFloat(inDocIds[i], context);
+        }
+        break;
+
+      default:
+        throw new UnsupportedOperationException(
+            "Cannot fetch float values for column: " + columnMetadata.getColumnName());
+    }
+  }
+
+  /**
    * Reads double values for the given docIds and returns in the passed in double[].
    * Compatible types (int, float, long) can also be read in as double.
    *

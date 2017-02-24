@@ -59,23 +59,24 @@ public class InstanceServerStarter {
 
     LOGGER.info("Trying to build QueryExecutor");
     final QueryExecutor queryExecutor = serverBuilder.buildQueryExecutor(instanceDataManager);
-
-    System.out.println(getCountQuery().toString());
-    sendQueryToQueryExecutor(getCountQuery(), queryExecutor, serverBuilder.getServerMetrics());
-    sendQueryToQueryExecutor(getSumQuery(), queryExecutor, serverBuilder.getServerMetrics());
-    sendQueryToQueryExecutor(getMaxQuery(), queryExecutor, serverBuilder.getServerMetrics());
-    sendQueryToQueryExecutor(getMinQuery(), queryExecutor, serverBuilder.getServerMetrics());
-
-    LOGGER.info("Trying to build RequestHandlerFactory");
     QueryScheduler queryScheduler = serverBuilder.buildQueryScheduler(queryExecutor);
     RequestHandlerFactory simpleRequestHandlerFactory = serverBuilder.buildRequestHandlerFactory(queryScheduler);
     LOGGER.info("Trying to build NettyServer");
 
     System.out.println(getMaxQuery());
     String queryJson = "";
+    System.out.println(getCountQuery().toString());
+    sendQueryToQueryExecutor(getCountQuery(), queryExecutor, queryScheduler, serverBuilder.getServerMetrics());
+    sendQueryToQueryExecutor(getSumQuery(), queryExecutor,  queryScheduler, serverBuilder.getServerMetrics());
+    sendQueryToQueryExecutor(getMaxQuery(), queryExecutor,  queryScheduler, serverBuilder.getServerMetrics());
+    sendQueryToQueryExecutor(getMinQuery(), queryExecutor,  queryScheduler, serverBuilder.getServerMetrics());
+
+    LOGGER.info("Trying to build RequestHandlerFactory");
+
   }
 
-  private static void sendQueryToQueryExecutor(BrokerRequest brokerRequest, QueryExecutor queryExecutor, ServerMetrics metrics) {
+  private static void sendQueryToQueryExecutor(BrokerRequest brokerRequest, QueryExecutor queryExecutor,
+      QueryScheduler queryScheduler, ServerMetrics metrics) {
 
     QuerySource querySource = new QuerySource();
     querySource.setTableName("midas");
@@ -83,7 +84,7 @@ public class InstanceServerStarter {
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     try {
       QueryRequest queryRequest = new QueryRequest(instanceRequest, metrics);
-      DataTable instanceResponse = queryExecutor.processQuery(queryRequest);
+      DataTable instanceResponse = queryExecutor.processQuery(queryRequest, queryScheduler.getWorkerExecutorService());
       System.out.println(instanceResponse.toString());
       System.out.println("Query Time Used : " + instanceResponse.getMetadata().get(DataTable.TIME_USED_MS_METADATA_KEY));
     } catch (Exception e) {

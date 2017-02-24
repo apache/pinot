@@ -15,219 +15,144 @@
  */
 package com.linkedin.pinot.core.query.aggregation.function;
 
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import java.io.Serializable;
-import java.nio.ByteBuffer;
-import java.text.DecimalFormat;
-import java.text.DecimalFormatSymbols;
-import java.util.List;
-
-import java.util.Locale;
-import org.json.JSONException;
-import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.BlockSingleValIterator;
-import com.linkedin.pinot.core.common.Constants;
-import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
-import com.linkedin.pinot.core.query.aggregation.CombineLevel;
-import com.linkedin.pinot.core.query.aggregation.function.AvgAggregationFunction.AvgPair;
-import com.linkedin.pinot.core.query.utils.Pair;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.common.BlockValSet;
+import com.linkedin.pinot.core.query.aggregation.AggregationResultHolder;
+import com.linkedin.pinot.core.query.aggregation.ObjectAggregationResultHolder;
+import com.linkedin.pinot.core.query.aggregation.function.customobject.AvgPair;
+import com.linkedin.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import com.linkedin.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import javax.annotation.Nonnull;
 
 
-/**
- * This function will take a column and do sum on that.
- *
- */
 public class AvgAggregationFunction implements AggregationFunction<AvgPair, Double> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(AvgAggregationFunction.class);
-  private static final double DEFAULT_AVG_VALUE = 0.0;
+  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.AVG.getName();
+  private static final double DEFAULT_FINAL_RESULT = Double.NEGATIVE_INFINITY;
 
-  private String _avgByColumn;
+  @Nonnull
+  @Override
+  public String getName() {
+    return NAME;
+  }
 
-  public AvgAggregationFunction() {
-
+  @Nonnull
+  @Override
+  public String getColumnName(@Nonnull String[] columns) {
+    return NAME + "_" + columns[0];
   }
 
   @Override
-  public void init(AggregationInfo aggregationInfo) {
-    _avgByColumn = aggregationInfo.getAggregationParams().get("column");
+  public void accept(@Nonnull AggregationFunctionVisitorBase visitor) {
+    visitor.visit(this);
+  }
 
+  @Nonnull
+  @Override
+  public AggregationResultHolder createAggregationResultHolder() {
+    return new ObjectAggregationResultHolder();
+  }
+
+  @Nonnull
+  @Override
+  public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity, int trimSize) {
+    return new ObjectGroupByResultHolder(initialCapacity, maxCapacity, trimSize);
   }
 
   @Override
-  public AvgPair aggregate(Block docIdSetBlock, Block[] block) {
-    double ret = 0;
-    long cnt = 0;
-    int docId = 0;
-    Dictionary dictionaryReader = block[0].getMetadata().getDictionary();
-    BlockDocIdIterator docIdIterator = docIdSetBlock.getBlockDocIdSet().iterator();
-    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) block[0].getBlockValueSet().iterator();
-
-    while ((docId = docIdIterator.next()) != Constants.EOF) {
-      if (blockValIterator.skipTo(docId)) {
-        int dictionaryIndex = blockValIterator.nextIntVal();
-        if (dictionaryIndex != Dictionary.NULL_VALUE_INDEX) {
-          ret += dictionaryReader.getDoubleValue(dictionaryIndex);
-          cnt++;
-        }
-      }
+  public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
+      @Nonnull BlockValSet... blockValSets) {
+    double[] valueArray = blockValSets[0].getDoubleValuesSV();
+    double sum = 0.0;
+    for (int i = 0; i < length; i++) {
+      sum += valueArray[i];
     }
-    return new AvgPair(ret, cnt);
+    setAggregationResult(aggregationResultHolder, sum, (long) length);
   }
 
-  @Override
-  public AvgPair aggregate(AvgPair mergedResult, int docId, Block[] block) {
-    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) block[0].getBlockValueSet().iterator();
-    if (blockValIterator.skipTo(docId)) {
-      int dictId = blockValIterator.nextIntVal();
-      if (dictId != Dictionary.NULL_VALUE_INDEX) {
-        if (mergedResult == null) {
-          return new AvgPair(block[0].getMetadata().getDictionary().getDoubleValue(dictId), (long) 1);
-        }
-        return new AvgPair(mergedResult.getFirst() + block[0].getMetadata().getDictionary().getDoubleValue(dictId),
-            mergedResult.getSecond() + 1);
-      }
-    }
-    return mergedResult;
-  }
-
-  @Override
-  public List<AvgPair> combine(List<AvgPair> aggregationResultList, CombineLevel combineLevel) {
-    double combinedSumResult = 0;
-    long combinedCntResult = 0;
-    for (AvgPair aggregationResult : aggregationResultList) {
-      combinedSumResult += aggregationResult.getFirst();
-      combinedCntResult += aggregationResult.getSecond();
-    }
-    aggregationResultList.clear();
-    aggregationResultList.add(new AvgPair(combinedSumResult, combinedCntResult));
-    return aggregationResultList;
-  }
-
-  @Override
-  public AvgPair combineTwoValues(AvgPair aggregationResult0, AvgPair aggregationResult1) {
-    if (aggregationResult0 == null) {
-      return aggregationResult1;
-    }
-    if (aggregationResult1 == null) {
-      return aggregationResult0;
-    }
-    return new AvgPair(aggregationResult0.getFirst() + aggregationResult1.getFirst(), aggregationResult0.getSecond()
-        + aggregationResult1.getSecond());
-  }
-
-  @Override
-  public Double reduce(List<AvgPair> combinedResult) {
-
-    double reducedSumResult = 0;
-    long reducedCntResult = 0;
-    for (AvgPair combineResult : combinedResult) {
-      reducedSumResult += combineResult.getFirst();
-      reducedCntResult += combineResult.getSecond();
-    }
-    if (reducedCntResult > 0) {
-      double avgResult = reducedSumResult / reducedCntResult;
-      return avgResult;
+  protected void setAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder, double sum,
+      long count) {
+    AvgPair avgPair = aggregationResultHolder.getResult();
+    if (avgPair == null) {
+      aggregationResultHolder.setValue(new AvgPair(sum, count));
     } else {
-      // Backward compatibility.
-      return DEFAULT_AVG_VALUE;
+      avgPair.apply(sum, count);
     }
   }
 
   @Override
-  public JSONObject render(Double finalAggregationResult) {
-    try {
-      if ((finalAggregationResult == null) || (Double.isNaN(finalAggregationResult))) {
-        return new JSONObject().put("value", DEFAULT_AVG_VALUE);
-      }
-      return new JSONObject().put("value", String.format(Locale.US, "%1.5f", finalAggregationResult));
-    } catch (JSONException e) {
-      LOGGER.error("Caught exception while rendering to JSON", e);
-      Utils.rethrowException(e);
-      throw new AssertionError("Should not reach this");
+  public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+    double[] valueArray = blockValSets[0].getDoubleValuesSV();
+    for (int i = 0; i < length; i++) {
+      setGroupByResult(groupKeyArray[i], groupByResultHolder, valueArray[i], 1L);
     }
   }
 
   @Override
-  public DataType aggregateResultDataType() {
-    return DataType.OBJECT;
+  public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+    double[] valueArray = blockValSets[0].getDoubleValuesSV();
+    for (int i = 0; i < length; i++) {
+      double value = valueArray[i];
+      for (int groupKey : groupKeysArray[i]) {
+        setGroupByResult(groupKey, groupByResultHolder, value, 1L);
+      }
+    }
   }
 
+  protected void setGroupByResult(int groupKey, @Nonnull GroupByResultHolder groupByResultHolder, double sum,
+      long count) {
+    AvgPair avgPair = groupByResultHolder.getResult(groupKey);
+    if (avgPair == null) {
+      groupByResultHolder.setValueForKey(groupKey, new AvgPair(sum, count));
+    } else {
+      avgPair.apply(sum, count);
+    }
+  }
+
+  @Nonnull
   @Override
-  public String getFunctionName() {
-    return "avg_" + _avgByColumn;
-  }
-
-  public static class AvgPair extends Pair<Double, Long> implements Comparable<AvgPair>, Serializable {
-    private static final long serialVersionUID = 7037868338412612822L;
-    public AvgPair(Double first, Long second) {
-      super(first, second);
-    }
-
-    @Override
-    public int compareTo(AvgPair o) {
-      if (getSecond() == 0) {
-        return -1;
-      }
-      if (o.getSecond() == 0) {
-        return 1;
-      }
-      if ((getFirst() / getSecond()) > (o.getFirst() / o.getSecond())) {
-        return 1;
-      }
-      if ((getFirst() / getSecond()) < (o.getFirst() / o.getSecond())) {
-        return -1;
-      }
-      return 0;
-    }
-
-    @Override
-    public String toString() {
-      if (getSecond() != 0) {
-        return new DecimalFormat("####################.##########", DecimalFormatSymbols.getInstance(Locale.US)).format((getFirst() / getSecond()));
-      } else {
-        return "0.0";
-      }
-    }
-
-    /**
-     * Helper method to serialize an AvgPair into a byte-array
-     * @return Serialized byte-array for the AvgPair.
-     */
-    public byte[] toBytes() {
-      int size = (V1Constants.Numbers.DOUBLE_SIZE) + (V1Constants.Numbers.LONG_SIZE);
-      ByteBuffer byteBuffer = ByteBuffer.allocate(size);
-      byteBuffer.putDouble(getFirst());
-      byteBuffer.putLong(getSecond());
-      return byteBuffer.array();
-    }
-
-    /**
-     * Helper method to de-serialize AvgPair from a byte-array
-     *
-     * @param bytes Serialized bytes of the AvgPair
-     * @return De-serialized AvgPair object from the byte-array
-     */
-    public static AvgPair fromBytes(byte[] bytes) {
-      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-      return new AvgPair(byteBuffer.getDouble(), byteBuffer.getLong());
+  public AvgPair extractAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder) {
+    AvgPair avgPair = aggregationResultHolder.getResult();
+    if (avgPair == null) {
+      return new AvgPair(0.0, 0L);
+    } else {
+      return avgPair;
     }
   }
 
-  public AvgPair getAvgPair(double first, long second) {
-    return new AvgPair(first, second);
-  }
-
+  @Nonnull
   @Override
-  public Serializable getDefaultValue() {
-    return new AvgPair(0.0, 0L);
+  public AvgPair extractGroupByResult(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
+    AvgPair avgPair = groupByResultHolder.getResult(groupKey);
+    if (avgPair == null) {
+      return new AvgPair(0.0, 0L);
+    } else {
+      return avgPair;
+    }
+  }
+
+  @Nonnull
+  @Override
+  public AvgPair merge(@Nonnull AvgPair intermediateResult1, @Nonnull AvgPair intermediateResult2) {
+    intermediateResult1.apply(intermediateResult2);
+    return intermediateResult1;
+  }
+
+  @Nonnull
+  @Override
+  public FieldSpec.DataType getIntermediateResultDataType() {
+    return FieldSpec.DataType.OBJECT;
+  }
+
+  @Nonnull
+  @Override
+  public Double extractFinalResult(@Nonnull AvgPair intermediateResult) {
+    long count = intermediateResult.getCount();
+    if (count == 0L) {
+      return DEFAULT_FINAL_RESULT;
+    } else {
+      return intermediateResult.getSum() / count;
+    }
   }
 }

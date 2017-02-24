@@ -1,25 +1,22 @@
 package com.linkedin.thirdeye.autoload.pinot.metrics;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-
-import org.testng.Assert;
-import org.testng.annotations.Test;
-
 import com.google.common.collect.Sets;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.thirdeye.autoload.pinot.metrics.AutoLoadPinotMetricsService;
-import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.bao.AbstractManagerTestBase;
 import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.DashboardConfigBean;
+import java.util.ArrayList;
+import java.util.List;
+import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
 
 public class AutoloadPinotMetricsServiceTest  extends AbstractManagerTestBase {
 
@@ -29,19 +26,20 @@ public class AutoloadPinotMetricsServiceTest  extends AbstractManagerTestBase {
   DatasetConfigDTO datasetConfig = null;
   DatasetConfigDTO ingraphDatasetConfig = null;
 
-
-  private void setup() throws IOException {
-    DAORegistry.registerDAOs(anomalyFunctionDAO, emailConfigurationDAO, rawResultDAO, mergedResultDAO,
-        jobDAO, taskDAO, datasetConfigDAO, metricConfigDAO, dashboardConfigDAO, ingraphMetricConfigDAO,
-        ingraphDashboardConfigDAO, overrideConfigDAO);
-    testAutoLoadPinotMetricsService = new AutoLoadPinotMetricsService();
-    schema = Schema.fromInputSteam(ClassLoader.getSystemResourceAsStream("sample-pinot-schema.json"));
+  @BeforeClass
+  void beforeClass() {
+    super.init();
   }
 
+  @AfterClass(alwaysRun = true)
+  void afterClass() {
+    super.cleanup();
+  }
 
   @Test
   public void testAddNewDataset() throws Exception {
-    setup();
+    testAutoLoadPinotMetricsService = new AutoLoadPinotMetricsService();
+    schema = Schema.fromInputSteam(ClassLoader.getSystemResourceAsStream("sample-pinot-schema.json"));
 
     testAutoLoadPinotMetricsService.addPinotDataset(dataset, schema, datasetConfig);
 

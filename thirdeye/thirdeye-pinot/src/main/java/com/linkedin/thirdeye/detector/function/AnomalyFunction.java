@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.detector.function;
 
 import com.linkedin.pinot.pql.parsers.utils.Pair;
+import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.List;
@@ -27,7 +28,7 @@ public interface AnomalyFunction {
    *
    * @return the time ranges of data that is used by this anomaly function
    */
-   List<Pair<Long, Long>> getDataRangeIntervals(Long monitoringWindowStartTime, Long monitoringWindowEndTime);
+  List<Pair<Long, Long>> getDataRangeIntervals(Long monitoringWindowStartTime, Long monitoringWindowEndTime);
 
   /**
    * Analyzes a metric time series and returns any anomalous points / intervals.
@@ -65,6 +66,36 @@ public interface AnomalyFunction {
   void updateMergedAnomalyInfo(MergedAnomalyResultDTO anomalyToUpdated, MetricTimeSeries timeSeries,
       DateTime windowStart, DateTime windowEnd, List<MergedAnomalyResultDTO> knownAnomalies)
       throws Exception;
+
+  /**
+   * Given any metric, this method returns the corresponding current and baseline time series to
+   * be presented in the frontend. The given metric is not necessary the data that is used for
+   * detecting anomaly.
+   *
+   * For instance, if a function uses the average values of the past 3 weeks as the baseline for
+   * anomaly detection, then this method should construct a baseline that contains the average
+   * value of the past 3 weeks of any given metric.
+   *
+   * Note that the usage of this method should be similar to the method {@link #analyze}, i.e., it
+   * does not take care of setting filters, dimension names, etc. for retrieving the data from the
+   * backend database. Specifically, it only processes the given data, i.e., timeSeries, for
+   * presentation purpose.
+   *
+   * The only difference between this method and {@link #analyze} is that their bucket sizes are
+   * different. This method's bucket size is given by frontend, which should larger or equal to the
+   * minimum time granularity of the data. On the other hand, {@link #analyze}'s buckets size is
+   * always the minimum time granularity of the data.
+   *
+   * @param timeSeries the time series that contains the metric to be processed
+   * @param metric the metric name to retrieve the data from the given time series
+   * @param bucketMillis the size of a bucket in milli-seconds
+   * @param viewWindowStartTime the start time bucket of current time series, inclusive
+   * @param viewWindowEndTime the end time buckets of current time series, exclusive
+   * @return Two sets of time series: a current and a baseline values, to be represented in the frontend
+   */
+  AnomalyTimelinesView getTimeSeriesView(MetricTimeSeries timeSeries, long bucketMillis,
+      String metric, long viewWindowStartTime, long viewWindowEndTime,
+      List<RawAnomalyResultDTO> knownAnomalies);
 
   /**
    *

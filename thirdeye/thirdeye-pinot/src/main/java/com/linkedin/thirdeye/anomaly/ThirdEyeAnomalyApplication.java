@@ -1,8 +1,11 @@
 package com.linkedin.thirdeye.anomaly;
 
+import com.linkedin.thirdeye.anomaly.alert.v2.AlertJobSchedulerV2;
+import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import com.linkedin.thirdeye.dashboard.resources.AnomalyFunctionResource;
 
-import com.linkedin.thirdeye.util.SeverityComputationUtil;
+import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
+import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -11,6 +14,7 @@ import java.util.concurrent.ScheduledExecutorService;
 
 import com.linkedin.thirdeye.anomaly.alert.AlertJobResource;
 import com.linkedin.thirdeye.anomaly.alert.AlertJobScheduler;
+import com.linkedin.thirdeye.anomaly.alert.v2.AlertJobSchedulerV2;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobResource;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
 import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeExecutor;
@@ -19,12 +23,19 @@ import com.linkedin.thirdeye.anomaly.task.TaskDriver;
 import com.linkedin.thirdeye.autoload.pinot.metrics.AutoLoadPinotMetricsService;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
+import com.linkedin.thirdeye.completeness.checker.DataCompletenessScheduler;
+import com.linkedin.thirdeye.dashboard.resources.AnomalyFunctionResource;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
-
+import com.yammer.metrics.core.Counter;
 import io.dropwizard.assets.AssetsBundle;
 import io.dropwizard.lifecycle.Managed;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 public class ThirdEyeAnomalyApplication
     extends BaseThirdEyeApplication<ThirdEyeAnomalyConfiguration> {
@@ -33,15 +44,27 @@ public class ThirdEyeAnomalyApplication
   private TaskDriver taskDriver = null;
   private MonitorJobScheduler monitorJobScheduler = null;
   private AlertJobScheduler alertJobScheduler = null;
+  private AlertJobSchedulerV2 alertJobSchedulerV2;
   private AnomalyFunctionFactory anomalyFunctionFactory = null;
   private AnomalyMergeExecutor anomalyMergeExecutor = null;
   private AutoLoadPinotMetricsService autoLoadPinotMetricsService = null;
+  private DataCompletenessScheduler dataCompletenessScheduler = null;
+  private AlertFilterFactory alertFilterFactory = null;
+  private AlertFilterAutotuneFactory alertFilterAutotuneFactory = null;
+
+  public static final Counter detectionTaskCounter =
+      metricsRegistry.newCounter(ThirdEyeAnomalyApplication.class, "detectionTaskCounter");
+
+  public static final Counter detectionTaskSuccessCounter =
+      metricsRegistry.newCounter(ThirdEyeAnomalyApplication.class, "detectionTaskSuccessCounter");
 
   public static void main(final String[] args) throws Exception {
+
     List<String> argList = new ArrayList<>(Arrays.asList(args));
     if (argList.size() == 1) {
       argList.add(0, "server");
     }
+
     int lastIndex = argList.size() - 1;
     String thirdEyeConfigDir = argList.get(lastIndex);
     System.setProperty("dw.rootDir", thirdEyeConfigDir);
@@ -73,13 +96,16 @@ public class ThirdEyeAnomalyApplication
 
         if (config.isWorker()) {
           anomalyFunctionFactory = new AnomalyFunctionFactory(config.getFunctionConfigPath());
+
           taskDriver = new TaskDriver(config, anomalyFunctionFactory);
           taskDriver.start();
         }
         if (config.isScheduler()) {
           detectionJobScheduler = new DetectionJobScheduler();
+          alertFilterFactory = new AlertFilterFactory(config.getAlertFilterConfigPath());
+          alertFilterAutotuneFactory = new AlertFilterAutotuneFactory(config.getFilterAutotuneConfigPath());
           detectionJobScheduler.start();
-          environment.jersey().register(new DetectionJobResource(detectionJobScheduler));
+          environment.jersey().register(new DetectionJobResource(detectionJobScheduler, alertFilterFactory, alertFilterAutotuneFactory));
           environment.jersey().register(new AnomalyFunctionResource(config.getFunctionConfigPath()));
         }
         if (config.isMonitor()) {
@@ -89,6 +115,11 @@ public class ThirdEyeAnomalyApplication
         if (config.isAlert()) {
           alertJobScheduler = new AlertJobScheduler();
           alertJobScheduler.start();
+
+          // start alert scheduler v2
+          alertJobSchedulerV2 = new AlertJobSchedulerV2();
+          alertJobSchedulerV2.start();
+
           environment.jersey()
           .register(new AlertJobResource(alertJobScheduler, emailConfigurationDAO));
         }
@@ -106,6 +137,10 @@ public class ThirdEyeAnomalyApplication
           autoLoadPinotMetricsService = new AutoLoadPinotMetricsService(config);
           autoLoadPinotMetricsService.start();
         }
+        if (config.isDataCompleteness()) {
+          dataCompletenessScheduler = new DataCompletenessScheduler();
+          dataCompletenessScheduler.start();
+        }
       }
 
       @Override
@@ -121,12 +156,16 @@ public class ThirdEyeAnomalyApplication
         }
         if (config.isAlert()) {
           alertJobScheduler.shutdown();
+          alertJobSchedulerV2.shutdown();
         }
         if (config.isMerger()) {
           anomalyMergeExecutor.stop();
         }
         if (config.isAutoload()) {
           autoLoadPinotMetricsService.shutdown();
+        }
+        if (config.isDataCompleteness()) {
+          dataCompletenessScheduler.shutdown();
         }
       }
     });

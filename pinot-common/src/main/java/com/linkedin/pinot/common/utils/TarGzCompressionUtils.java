@@ -1,19 +1,21 @@
-/*******************************************************************************
- * © [2013] LinkedIn Corp. All rights reserved.
+/**
+ * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *         http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- ******************************************************************************/
+ */
 package com.linkedin.pinot.common.utils;
 
+import com.linkedin.pinot.common.Utils;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayInputStream;
@@ -56,12 +58,18 @@ public class TarGzCompressionUtils {
    * @param directoryPath
    *          The path to the directory to create an archive of
    * @param tarGzPath
-   *          The path to the archive to create
+   *          The path to the archive to create. The file may not exist but
+   *          it's parent must exist and the parent must be a directory
    * @return tarGzPath
    * @throws IOException
    *           If anything goes wrong
    */
-  public static String createTarGzOfDirectory(String directoryPath, String tarGzPath) throws IOException {
+  public static String createTarGzOfDirectory(String directoryPath, String tarGzPath)
+      throws IOException {
+    return createTarGzOfDirectory(directoryPath, tarGzPath, "");
+  }
+
+  public static String createTarGzOfDirectory(String directoryPath, String tarGzPath, String entryPrefix) throws IOException {
     FileOutputStream fOut = null;
     BufferedOutputStream bOut = null;
     GzipCompressorOutputStream gzOut = null;
@@ -76,14 +84,24 @@ public class TarGzCompressionUtils {
       gzOut = new GzipCompressorOutputStream(bOut);
       tOut = new TarArchiveOutputStream(gzOut);
       tOut.setLongFileMode(TarArchiveOutputStream.LONGFILE_GNU);
-      addFileToTarGz(tOut, directoryPath, "");
+      addFileToTarGz(tOut, directoryPath, entryPrefix);
+    } catch (IOException e) {
+      LOGGER.error("Failed to create tar.gz file for {} at path: {}", directoryPath, tarGzPath, e);
+      Utils.rethrowException(e);
     } finally {
-      tOut.finish();
-
-      tOut.close();
-      gzOut.close();
-      bOut.close();
-      fOut.close();
+      if (tOut != null) {
+        tOut.finish();
+        tOut.close();
+      }
+      if (gzOut != null) {
+        gzOut.close();
+      }
+      if (bOut != null) {
+        bOut.close();
+      }
+      if (fOut != null) {
+        fOut.close();
+      }
     }
     return tarGzPath;
   }

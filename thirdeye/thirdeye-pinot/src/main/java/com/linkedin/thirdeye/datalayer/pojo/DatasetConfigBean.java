@@ -1,18 +1,18 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.google.common.base.MoreObjects;
+import com.linkedin.thirdeye.api.TimeSpec;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.google.common.base.MoreObjects;
-import com.linkedin.thirdeye.api.TimeSpec;
-
 @JsonIgnoreProperties(ignoreUnknown=true)
 public class DatasetConfigBean extends AbstractBean {
 
   public static String DEFAULT_PREAGGREGATED_DIMENSION_VALUE = "all";
+  public static String DATASET_OFFLINE_PREFIX = "_OFFLINE";
 
   private String dataset;
 
@@ -44,6 +44,10 @@ public class DatasetConfigBean extends AbstractBean {
   private String preAggregatedKeyword = DEFAULT_PREAGGREGATED_DIMENSION_VALUE;
   private Integer nonAdditiveBucketSize;
   private String nonAdditiveBucketUnit;
+
+  private boolean realtime = false;
+
+  private boolean requiresCompletenessCheck = false;
 
   public String getDataset() {
     return dataset;
@@ -182,6 +186,22 @@ public class DatasetConfigBean extends AbstractBean {
     this.nonAdditiveBucketUnit = nonAdditiveBucketUnit;
   }
 
+  public boolean isRealtime() {
+    return realtime;
+  }
+
+  public void setRealtime(boolean realtime) {
+    this.realtime = realtime;
+  }
+
+  public boolean isRequiresCompletenessCheck() {
+    return requiresCompletenessCheck;
+  }
+
+  public void setRequiresCompletenessCheck(boolean requiresCompletenessCheck) {
+    this.requiresCompletenessCheck = requiresCompletenessCheck;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (!(o instanceof DatasetConfigBean)) {
@@ -205,14 +225,16 @@ public class DatasetConfigBean extends AbstractBean {
         && Objects.equals(dimensionsHaveNoPreAggregation, dc.getDimensionsHaveNoPreAggregation())
         && Objects.equals(preAggregatedKeyword, dc.getPreAggregatedKeyword())
         && Objects.equals(nonAdditiveBucketUnit, dc.getNonAdditiveBucketUnit())
-        && Objects.equals(nonAdditiveBucketSize, dc.getNonAdditiveBucketSize());
+        && Objects.equals(nonAdditiveBucketSize, dc.getNonAdditiveBucketSize())
+        && Objects.equals(realtime, dc.isRealtime())
+        && Objects.equals(requiresCompletenessCheck, dc.isRequiresCompletenessCheck());
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(getId(), dataset, dimensions, timeColumn, timeUnit, timeDuration, timeFormat, timezone,
         metricAsDimension, metricNamesColumn, metricValuesColumn, autoDiscoverMetrics, active, additive,
-        dimensionsHaveNoPreAggregation, preAggregatedKeyword, nonAdditiveBucketSize, nonAdditiveBucketUnit);
+        dimensionsHaveNoPreAggregation, preAggregatedKeyword, nonAdditiveBucketSize, nonAdditiveBucketUnit, realtime, requiresCompletenessCheck);
   }
 
   @Override
@@ -224,6 +246,7 @@ public class DatasetConfigBean extends AbstractBean {
         .add("autoDiscoverMetrics", autoDiscoverMetrics).add("active", active).add("additive", additive)
         .add("dimensionsHaveNoPreAggregation", dimensionsHaveNoPreAggregation)
         .add("preAggregatedKeyword", preAggregatedKeyword).add("nonAdditiveBucketSize", nonAdditiveBucketSize)
-        .add("nonAdditiveBucketUnit", nonAdditiveBucketUnit).toString();
+        .add("nonAdditiveBucketUnit", nonAdditiveBucketUnit).add("offlineOnly", realtime)
+        .add("requiresCompletenessCheck", requiresCompletenessCheck).toString();
   }
 }

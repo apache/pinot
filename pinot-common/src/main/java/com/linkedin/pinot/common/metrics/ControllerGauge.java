@@ -23,6 +23,7 @@ import com.linkedin.pinot.common.Utils;
  */
 public enum ControllerGauge implements AbstractMetrics.Gauge {
   NUMBER_OF_REPLICAS("replicas", false),
+  PERCENT_OF_REPLICAS("percent", false),
   SEGMENTS_IN_ERROR_STATE("segments", false),
   IDEALSTATE_ZNODE_SIZE("idealstate", false),
   REALTIME_TABLE_COUNT("TableCount", true),

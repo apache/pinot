@@ -18,6 +18,7 @@ public class ResponseParserUtils {
   public static String TIME_DIMENSION_JOINER_ESCAPED = "\\|";
   public static String TIME_DIMENSION_JOINER = "|";
   public static String OTHER = "OTHER";
+  public static String UNKNOWN = "UNKNOWN";
 
   public static Map<String, ThirdEyeResponseRow> createResponseMapByTimeAndDimension(
       ThirdEyeResponse thirdEyeResponse) {

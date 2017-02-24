@@ -580,7 +580,7 @@
 
 
 
-    // rebuild path
+    // update path
     var path = el.pathname + el.search + (el.hash || '');
 
     // strip leading "/[drive letter]:" on NW.js on Windows
@@ -1112,3 +1112,4 @@ module.exports = Array.isArray || function (arr) {
 
 },{}]},{},[1])(1)
 });
+

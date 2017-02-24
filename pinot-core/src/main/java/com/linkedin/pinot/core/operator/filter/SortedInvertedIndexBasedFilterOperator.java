@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.operator.filter;
 
+import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -33,15 +34,16 @@ import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
 import com.linkedin.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 import com.linkedin.pinot.core.operator.docidsets.SortedDocIdSet;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
-import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import com.linkedin.pinot.core.segment.index.readers.SortedInvertedIndexReader;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 
 public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SortedInvertedIndexBasedFilterOperator.class);
+  private static final String OPERATOR_NAME = "SortedInvertedIndexBasedFilterOperator";
 
+  private final Predicate predicate;
+  private PredicateEvaluator predicateEvaluator;
   private DataSource dataSource;
 
   private SortedBlock sortedBlock;
@@ -56,7 +58,9 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
    * @param startDocId inclusive
    * @param endDocId inclusive
    */
-  public SortedInvertedIndexBasedFilterOperator(DataSource dataSource, int startDocId, int endDocId) {
+  public SortedInvertedIndexBasedFilterOperator(Predicate predicate, DataSource dataSource, int startDocId, int endDocId) {
+    this.predicate = predicate;
+    this.predicateEvaluator = PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, dataSource.getDictionary());
     this.dataSource = dataSource;
     this.startDocId = startDocId;
     this.endDocId = endDocId;
@@ -69,11 +73,8 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
 
   @Override
   public BaseFilterBlock nextFilterBlock(BlockId BlockId) {
-    Predicate predicate = getPredicate();
     final SortedInvertedIndexReader invertedIndex = (SortedInvertedIndexReader) dataSource.getInvertedIndex();
-    Dictionary dictionary = dataSource.getDictionary();
     List<IntPair> pairs = new ArrayList<IntPair>();
-    PredicateEvaluator evaluator = PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, dictionary);
 
     // At this point, we need to create a list of matching docId ranges. There are two kinds of operators:
     //
@@ -96,12 +97,12 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
       case EQ:
       case IN:
       case RANGE:
-        dictionaryIds = evaluator.getMatchingDictionaryIds();
+        dictionaryIds = predicateEvaluator.getMatchingDictionaryIds();
         break;
       case NEQ:
       case NOT_IN:
         additiveRanges = false;
-        dictionaryIds = evaluator.getNonMatchingDictionaryIds();
+        dictionaryIds = predicateEvaluator.getNonMatchingDictionaryIds();
         break;
       case REGEX:
         throw new RuntimeException("Regex is not supported");
@@ -193,8 +194,18 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
   }
 
   @Override
+  public boolean isResultEmpty() {
+    return predicateEvaluator.alwaysFalse();
+  }
+
+  @Override
   public boolean close() {
     return true;
+  }
+
+  @Override
+  public String getOperatorName() {
+    return OPERATOR_NAME;
   }
 
   public static class SortedBlock extends BaseFilterBlock {

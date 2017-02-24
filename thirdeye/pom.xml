@@ -20,7 +20,7 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <jdk.version>1.8</jdk.version>
     <dropwizard.version>0.8.4</dropwizard.version>
-    <jackson.version>2.5.1</jackson.version>
+    <jackson.version>2.8.3</jackson.version>
     <mysql.connector.version>5.1.39</mysql.connector.version>
     <quartz.version>2.2.1</quartz.version>
     <httpclient.version>4.5.2</httpclient.version>
@@ -144,6 +144,21 @@
       </dependency>
       <dependency>
         <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-annotations</artifactId>
+        <version>${jackson.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-core-asl</artifactId>
+        <version>${jackson.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-mapper-asl</artifactId>
+        <version>${jackson.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
         <artifactId>jackson-databind</artifactId>
         <version>${jackson.version}</version>
       </dependency>
@@ -156,6 +171,13 @@
         <groupId>com.fasterxml.jackson.datatype</groupId>
         <artifactId>jackson-datatype-joda</artifactId>
         <version>${jackson.version}</version>
+      </dependency>
+
+      <!-- yaml parser -->
+      <dependency>
+          <groupId>org.yaml</groupId>
+          <artifactId>snakeyaml</artifactId>
+          <version>1.17</version>
       </dependency>
 
       <!-- utils -->

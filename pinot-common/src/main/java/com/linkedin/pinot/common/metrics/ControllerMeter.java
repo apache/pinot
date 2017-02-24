@@ -45,6 +45,7 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   CONTROLLER_REALTIME_TABLE_SEGMENT_ASSIGNMENT_ERROR("errors", true),
   LLC_STATE_MACHINE_ABORTS("aborts", false),
   LLC_AUTO_CREATED_PARTITIONS("creates", false),
+  LLC_ZOOKEPER_UPDATE_FAILURES("failures", false),
   LLC_KAFKA_DATA_LOSS("dataLoss", false);
 
 

@@ -7,6 +7,8 @@ import static org.testng.Assert.assertNull;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
@@ -17,6 +19,16 @@ public class TestEmailConfigurationManager extends AbstractManagerTestBase {
   Long emailConfigId, functionId;
   private static String collection = "my dataset";
   private static String metricName = "__counts";
+
+  @BeforeClass
+  void beforeClass() {
+    super.init();
+  }
+
+  @AfterClass(alwaysRun = true)
+  void afterClass() {
+    super.cleanup();
+  }
 
   @Test
   public void testCreateEmailConfig() {

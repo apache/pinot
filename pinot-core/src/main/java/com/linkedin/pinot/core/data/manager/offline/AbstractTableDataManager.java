@@ -15,17 +15,6 @@
  */
 package com.linkedin.pinot.core.data.manager.offline;
 
-import java.io.File;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
@@ -33,13 +22,21 @@ import com.linkedin.pinot.common.metrics.ServerGauge;
 import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.common.utils.NamedThreadFactory;
 import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.annotation.Nonnull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
-public abstract  class AbstractTableDataManager implements TableDataManager {
+public abstract class AbstractTableDataManager implements TableDataManager {
   protected final List<String> _activeSegments = new ArrayList<String>();
   protected final List<String> _loadingSegments = new ArrayList<String>();
   // This read-write lock protects the _segmentsMap and SegmentDataManager.refCnt
@@ -50,13 +47,11 @@ public abstract  class AbstractTableDataManager implements TableDataManager {
   protected Logger LOGGER = LoggerFactory.getLogger(AbstractTableDataManager.class);
   protected volatile boolean _isStarted = false;
   protected String _tableName;
-  protected ExecutorService _queryExecutorService;
 
   protected ReadMode _readMode;
   protected TableDataManagerConfig _tableDataManagerConfig;
   protected String _tableDataDir;
   protected File _indexDir;
-  protected int _numberOfTableQueryExecutorThreads;
   protected IndexLoadingConfigMetadata _indexLoadingConfigMetadata;
   protected ServerMetrics _serverMetrics;
   protected String _serverInstance;
@@ -80,22 +75,11 @@ public abstract  class AbstractTableDataManager implements TableDataManager {
     if (!_indexDir.exists()) {
       _indexDir.mkdirs();
     }
-    _numberOfTableQueryExecutorThreads = _tableDataManagerConfig.getNumberOfTableQueryExecutorThreads();
-    if (_numberOfTableQueryExecutorThreads > 0) {
-      _queryExecutorService =
-          Executors.newFixedThreadPool(_numberOfTableQueryExecutorThreads,
-              new NamedThreadFactory("parallel-query-executor-" + _tableName));
-    } else {
-      _queryExecutorService =
-          Executors.newCachedThreadPool(new NamedThreadFactory("parallel-query-executor-" + _tableName));
-    }
     _readMode = ReadMode.valueOf(_tableDataManagerConfig.getReadMode());
     _indexLoadingConfigMetadata = _tableDataManagerConfig.getIndexLoadingConfigMetadata();
     LOGGER
         .info("Initialized table : " + _tableName + " with :\n\tData Directory: " + _tableDataDir
-            + "\n\tRead Mode : " + _readMode + "\n\tQuery Exeutor with "
-            + ((_numberOfTableQueryExecutorThreads > 0) ? _numberOfTableQueryExecutorThreads : "cached")
-            + " threads");
+            + "\n\tRead Mode : " + _readMode );
   }
 
   protected abstract void doInit();
@@ -119,7 +103,6 @@ public abstract  class AbstractTableDataManager implements TableDataManager {
     LOGGER.info("Trying to shutdown table : " + _tableName);
     doShutdown();
     if (_isStarted) {
-      _queryExecutorService.shutdown();
       _tableDataManagerConfig = null;
       _isStarted = false;
     } else {
@@ -210,11 +193,6 @@ public abstract  class AbstractTableDataManager implements TableDataManager {
   @Override
   public boolean isStarted() {
     return _isStarted;
-  }
-
-  @Override
-  public ExecutorService getExecutorService() {
-    return _queryExecutorService;
   }
 
   @Nonnull

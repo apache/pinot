@@ -120,21 +120,10 @@ create index merged_anomaly_result_feedback_idx on merged_anomaly_result_index(a
 create index merged_anomaly_result_metric_idx on merged_anomaly_result_index(metric_id);
 create index merged_anomaly_result_start_time_idx on merged_anomaly_result_index(start_time);
 
-
-create table if not exists webapp_config_index (
-    name varchar(200) not null,
-    collection varchar(200) not null,
-    type varchar(100) not null,
-    base_id bigint(20) not null,
-    create_time timestamp,
-    update_time timestamp default current_timestamp,
-    version int(10)
-) ENGINE=InnoDB;
-ALTER TABLE `webapp_config_index` ADD UNIQUE `webapp_config_unique_index`(`name`, `collection`, `type`);
-
 create table if not exists dataset_config_index (
     dataset varchar(200) not null,
     active boolean,
+    requires_completeness_check boolean,
     base_id bigint(20) not null,
     create_time timestamp,
     update_time timestamp default current_timestamp,
@@ -143,6 +132,10 @@ create table if not exists dataset_config_index (
 ) ENGINE=InnoDB;
 create index dataset_config_dataset_idx on dataset_config_index(dataset);
 create index dataset_config_active_idx on dataset_config_index(active);
+create index dataset_config_requires_completeness_check_idx on dataset_config_index(requires_completeness_check);
+
+-- ALTER TABLE dataset_config_index ADD COLUMN requires_completeness_check boolean;
+-- UPDATE dataset_config_index SET requires_completeness_check = 0;
 
 create table if not exists metric_config_index (
     name varchar(200) not null,
@@ -221,4 +214,41 @@ create table if not exists alert_config_index (
     update_time timestamp default current_timestamp,
     version int(10)
 ) ENGINE=InnoDB;
+
+
+create table if not exists data_completeness_config_index (
+    dataset varchar(200) not null,
+    date_to_check_in_ms bigint(20) not null,
+    date_to_check_in_sdf varchar(20),
+    data_complete boolean,
+    percent_complete double,
+    base_id bigint(20) not null,
+    create_time timestamp,
+    update_time timestamp default current_timestamp,
+    version int(10)
+) ENGINE=InnoDB;
+ALTER TABLE `data_completeness_config_index` ADD UNIQUE `data_completeness_config_unique_index`(`dataset`, `date_to_check_in_ms`);
+create index data_completeness_config_dataset_idx on data_completeness_config_index(dataset);
+create index data_completeness_config_date_idx on data_completeness_config_index(date_to_check_in_ms);
+create index data_completeness_config_sdf_idx on data_completeness_config_index(date_to_check_in_sdf);
+create index data_completeness_config_complete_idx on data_completeness_config_index(data_complete);
+create index data_completeness_config_percent_idx on data_completeness_config_index(percent_complete);
+
+create table if not exists event_index (
+  name VARCHAR (100),
+  event_type VARCHAR (100),
+  start_time bigint(20) not null,
+  end_time bigint(20) not null,
+  metric_name VARCHAR(200),
+  service_name VARCHAR (200),
+  base_id bigint(20) not null,
+  create_time timestamp,
+  update_time timestamp default current_timestamp,
+  version int(10)
+) ENGINE=InnoDB;
+create index event_event_type_idx on event_index(event_type);
+create index event_start_time_idx on event_index(start_time);
+create index event_end_time_idx on event_index(end_time);
+
+
 

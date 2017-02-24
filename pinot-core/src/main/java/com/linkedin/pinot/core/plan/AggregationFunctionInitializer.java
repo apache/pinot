@@ -16,9 +16,9 @@
 package com.linkedin.pinot.core.plan;
 
 import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunctionVisitorBase;
-import com.linkedin.pinot.core.operator.aggregation.function.FastHLLAggregationFunction;
-import com.linkedin.pinot.core.operator.aggregation.function.FastHLLMVAggregationFunction;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionVisitorBase;
+import com.linkedin.pinot.core.query.aggregation.function.FastHLLAggregationFunction;
+import com.linkedin.pinot.core.query.aggregation.function.FastHLLMVAggregationFunction;
 
 
 // class is public because existing tests are in different package

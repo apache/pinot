@@ -1,12 +1,18 @@
 package com.linkedin.thirdeye.tools;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.linkedin.thirdeye.anomaly.utils.DetectionResourceHttpUtils;
+import com.linkedin.thirdeye.dashboard.resources.OnboardResource;
+import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
-
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.client.ClientProtocolException;
 import org.joda.time.DateTime;
@@ -14,17 +20,6 @@ import org.joda.time.format.ISODateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.collections.Lists;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import com.linkedin.thirdeye.anomaly.utils.DetectionResourceHttpUtils;
-import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
-import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 
 /**
  * Utility class to cleanup all anomalies for input datasets,
@@ -120,27 +115,18 @@ public class CleanupAndRegenerateAnomaliesTool {
 
     for (Long functionId : functionIds) {
       AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
+      if(anomalyFunction == null){
+        LOG.info("Requested functionId {} doesn't exist", functionId);
+        continue;
+      }
+
       LOG.info("Beginning cleanup of functionId {} collection {} metric {}",
           functionId, anomalyFunction.getCollection(), anomalyFunction.getMetric());
-      // Find merged anomalies and delete them first
-      List<MergedAnomalyResultDTO> mergedResults =
-          mergedResultDAO.findByStartTimeInRangeAndFunctionId(startTime, endTime, functionId);
-      if (CollectionUtils.isNotEmpty(mergedResults)) {
-        deleteMergedResults(mergedResults);
-      }
-      // Just in case unmerged raw anomalies exist and hence are not deleted in the previous step
-      List<RawAnomalyResultDTO> rawResults = rawResultDAO.findAllByTimeAndFunctionId(startTime, endTime, functionId);
-      if (CollectionUtils.isNotEmpty(rawResults)) {
-        for (int i = rawResults.size() -1; i >= 0; --i) {
-          if (!rawResults.get(i).isMerged()) {
-            rawResults.remove(i);
-          }
-        }
-        deleteRawResults(rawResults);
-      }
+
+      // Clean up merged and raw anomaly of functionID
+      OnboardResource onboardResource = new OnboardResource(anomalyFunctionDAO, mergedResultDAO, rawResultDAO);
+      onboardResource.deleteExistingAnomalies(Long.toString(functionId), startTime, endTime);
     }
-    LOG.info("Deleted {} raw anomalies", rawAnomaliesDeleted);
-    LOG.info("Deleted {} merged anomalies", mergedAnomaliesDeleted);
   }
 
 
@@ -190,28 +176,6 @@ public class CleanupAndRegenerateAnomaliesTool {
     String response = detectionResourceHttpUtils.runAdhocAnomalyFunction(String.valueOf(functionId),
         monitoringWindowStart, monitoringWindowEnd);
     LOG.info("Response {}", response);
-  }
-
-  private void deleteRawResults(List<RawAnomalyResultDTO> rawResults) {
-    LOG.info("Deleting raw results");
-    for (RawAnomalyResultDTO rawResult : rawResults) {
-      LOG.info("......Deleting id {} for functionId {}", rawResult.getId(), rawResult.getFunctionId());
-      rawResultDAO.delete(rawResult);
-      rawAnomaliesDeleted++;
-    }
-  }
-
-  private void deleteMergedResults(List<MergedAnomalyResultDTO> mergedResults) {
-    LOG.info("Deleting merged results");
-    for (MergedAnomalyResultDTO mergedResult : mergedResults) {
-      // Delete raw anomalies of the merged anomaly
-      List<RawAnomalyResultDTO> rawAnomalyResultDTOs = mergedResult.getAnomalyResults();
-      deleteRawResults(rawAnomalyResultDTOs);
-
-      LOG.info(".....Deleting id {} for functionId {}", mergedResult.getId(), mergedResult.getFunctionId());
-      mergedResultDAO.delete(mergedResult);
-      mergedAnomaliesDeleted++;
-    }
   }
 
   public static void main(String[] args) throws Exception {

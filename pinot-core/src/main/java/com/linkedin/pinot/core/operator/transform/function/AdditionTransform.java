@@ -15,16 +15,21 @@
  */
 package com.linkedin.pinot.core.operator.transform.function;
 
-import com.linkedin.pinot.core.operator.transform.result.TransformResult;
-import com.linkedin.pinot.core.operator.transform.result.DoubleArrayTransformResult;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.common.BlockValSet;
+import com.linkedin.pinot.core.operator.docvalsets.TransformBlockValSet;
+import com.linkedin.pinot.core.plan.DocIdSetPlanNode;
 import javax.annotation.Nonnull;
+import javax.annotation.concurrent.NotThreadSafe;
 
 
 /**
  * This class implements the Addition transformation.
  */
+@NotThreadSafe
 public class AdditionTransform implements TransformFunction {
   private static final String TRANSFORM_NAME = "add";
+  private double[] _sum; // Result of addition transform.
 
   /**
    * {@inheritDoc}
@@ -34,19 +39,26 @@ public class AdditionTransform implements TransformFunction {
    *
    * @param length Length of doc ids to process
    * @param inputs Array of input values
-   * @return TransformResult containing results values
+   * @return BlockValSet containing transformed values.
    */
   @Override
-  public TransformResult transform(int length, @Nonnull Object... inputs) {
-    double[] sum = new double[((double[]) inputs[0]).length];
+  public double[] transform(int length, @Nonnull BlockValSet... inputs) {
+    if (_sum == null || _sum.length < length) {
+      _sum = new double[Math.max(length, DocIdSetPlanNode.MAX_DOC_PER_CALL)];
+    }
 
-    for (Object input : inputs) {
-      double[] values = (double[]) input;
+    for (BlockValSet input : inputs) {
+      double[] values = input.getDoubleValuesSV();
       for (int j = 0; j < length; j++) {
-        sum[j] += values[j];
+        _sum[j] += values[j];
       }
     }
-    return new DoubleArrayTransformResult(sum);
+    return _sum;
+  }
+
+  @Override
+  public FieldSpec.DataType getOutputType() {
+    return FieldSpec.DataType.DOUBLE;
   }
 
   /**

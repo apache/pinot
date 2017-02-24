@@ -15,159 +15,267 @@
  */
 package com.linkedin.pinot.core.query.aggregation.function;
 
-import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.common.BlockValSet;
+import com.linkedin.pinot.core.query.aggregation.AggregationResultHolder;
+import com.linkedin.pinot.core.query.aggregation.ObjectAggregationResultHolder;
+import com.linkedin.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import com.linkedin.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
-
-import java.io.Serializable;
-import java.util.List;
-
-import org.json.JSONException;
-import org.json.JSONObject;
-
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.BlockSingleValIterator;
-import com.linkedin.pinot.core.common.Constants;
-import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
-import com.linkedin.pinot.core.query.aggregation.CombineLevel;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import javax.annotation.Nonnull;
 
 
 public class DistinctCountAggregationFunction implements AggregationFunction<IntOpenHashSet, Integer> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(DistinctCountAggregationFunction.class);
+  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.DISTINCTCOUNT.getName();
 
-  private String _distinctCountColumnName;
+  @Nonnull
+  @Override
+  public String getName() {
+    return NAME;
+  }
 
-  public DistinctCountAggregationFunction() {
-
+  @Nonnull
+  @Override
+  public String getColumnName(@Nonnull String[] columns) {
+    return NAME + "_" + columns[0];
   }
 
   @Override
-  public void init(AggregationInfo aggregationInfo) {
-    _distinctCountColumnName = aggregationInfo.getAggregationParams().get("column");
+  public void accept(@Nonnull AggregationFunctionVisitorBase visitor) {
+    visitor.visit(this);
+  }
+
+  @Nonnull
+  @Override
+  public AggregationResultHolder createAggregationResultHolder() {
+    return new ObjectAggregationResultHolder();
+  }
+
+  @Nonnull
+  @Override
+  public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity, int trimSize) {
+    return new ObjectGroupByResultHolder(initialCapacity, maxCapacity, trimSize);
   }
 
   @Override
-  public IntOpenHashSet aggregate(Block docIdSetBlock, Block[] block) {
-    IntOpenHashSet ret = new IntOpenHashSet();
-    int docId = 0;
-    Dictionary dictionaryReader = block[0].getMetadata().getDictionary();
-    BlockDocIdIterator docIdIterator = docIdSetBlock.getBlockDocIdSet().iterator();
-    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) block[0].getBlockValueSet().iterator();
+  public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
+      @Nonnull BlockValSet... blockValSets) {
+    IntOpenHashSet valueSet = aggregationResultHolder.getResult();
+    if (valueSet == null) {
+      valueSet = new IntOpenHashSet();
+      aggregationResultHolder.setValue(valueSet);
+    }
 
-    if (block[0].getMetadata().getDataType() == DataType.STRING) {
-      while ((docId = docIdIterator.next()) != Constants.EOF) {
-        if (blockValIterator.skipTo(docId)) {
-          int dictionaryIndex = blockValIterator.nextIntVal();
-          if (dictionaryIndex != Dictionary.NULL_VALUE_INDEX) {
-            ret.add(dictionaryReader.get(dictionaryIndex).hashCode());
-          } else {
-            ret.add(Integer.MIN_VALUE);
-          }
+    FieldSpec.DataType valueType = blockValSets[0].getValueType();
+    switch (valueType) {
+      case INT:
+        int[] intValues = blockValSets[0].getIntValuesSV();
+        for (int i = 0; i < length; i++) {
+          valueSet.add(intValues[i]);
         }
-      }
+        break;
+
+      case LONG:
+        long[] longValues = blockValSets[0].getLongValuesSV();
+        for (int i = 0; i < length; i++) {
+          valueSet.add(Long.valueOf(longValues[i]).hashCode());
+        }
+        break;
+
+      case FLOAT:
+        float[] floatValues = blockValSets[0].getFloatValuesSV();
+        for (int i = 0; i < length; i++) {
+          valueSet.add(Float.valueOf(floatValues[i]).hashCode());
+        }
+        break;
+
+      case DOUBLE:
+        double[] doubleValues = blockValSets[0].getDoubleValuesSV();
+        for (int i = 0; i < length; i++) {
+          valueSet.add(Double.valueOf(doubleValues[i]).hashCode());
+        }
+        break;
+
+      case STRING:
+        String[] stringValues = blockValSets[0].getStringValuesSV();
+        for (int i = 0; i < length; i++) {
+          valueSet.add(stringValues[i].hashCode());
+        }
+        break;
+
+      default:
+        throw new IllegalArgumentException("Illegal data type for distinct count aggregation function: " + valueType);
+    }
+  }
+
+  @Override
+  public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+
+    FieldSpec.DataType valueType = blockValSets[0].getValueType();
+    switch (valueType) {
+      case INT:
+        int[] intValues = blockValSets[0].getIntValuesSV();
+        for (int i = 0; i < length; i++) {
+          // Hashcode for int is the same as its value.
+          setValueForGroupKey(groupByResultHolder, groupKeyArray[i], intValues[i]);
+        }
+        break;
+
+      case LONG:
+        long[] longValues = blockValSets[0].getLongValuesSV();
+        for (int i = 0; i < length; i++) {
+          int hashCode = Long.valueOf(longValues[i]).hashCode();
+          setValueForGroupKey(groupByResultHolder, groupKeyArray[i], hashCode);
+        }
+        break;
+
+      case FLOAT:
+        float[] floatValues = blockValSets[0].getFloatValuesSV();
+        for (int i = 0; i < length; i++) {
+          int hashCode = Float.valueOf(floatValues[i]).hashCode();
+          setValueForGroupKey(groupByResultHolder, groupKeyArray[i], hashCode);
+        }
+        break;
+
+      case DOUBLE:
+        double[] doubleValues = blockValSets[0].getDoubleValuesSV();
+        for (int i = 0; i < length; i++) {
+          int hashCode = Double.valueOf(doubleValues[i]).hashCode();
+          setValueForGroupKey(groupByResultHolder, groupKeyArray[i], hashCode);
+        }
+        break;
+
+      case STRING:
+        String[] stringValues = blockValSets[0].getStringValuesSV();
+        for (int i = 0; i < length; i++) {
+          int hashCode = stringValues[i].hashCode();
+          setValueForGroupKey(groupByResultHolder, groupKeyArray[i], hashCode);
+        }
+        break;
+
+      default:
+        throw new IllegalArgumentException("Illegal data type for distinct count aggregation function: " + valueType);
+    }
+  }
+
+  @Override
+  public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+    FieldSpec.DataType valueType = blockValSets[0].getValueType();
+    switch (valueType) {
+      case INT:
+        int[] intValues = blockValSets[0].getIntValuesSV();
+        for (int i = 0; i < length; i++) {
+          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], intValues[i]);
+        }
+        break;
+
+      case LONG:
+        long[] longValues = blockValSets[0].getLongValuesSV();
+        for (int i = 0; i < length; i++) {
+          int hashCode = Long.valueOf(longValues[i]).hashCode();
+          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], hashCode);
+        }
+        break;
+
+      case FLOAT:
+        float[] floatValues = blockValSets[0].getFloatValuesSV();
+        for (int i = 0; i < length; i++) {
+          int hashCode = Float.valueOf(floatValues[i]).hashCode();
+          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], hashCode);
+        }
+        break;
+
+      case DOUBLE:
+        double[] doubleValues = blockValSets[0].getDoubleValuesSV();
+        for (int i = 0; i < length; i++) {
+          int hashCode = Double.valueOf(doubleValues[i]).hashCode();
+          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], hashCode);
+        }
+        break;
+
+      case STRING:
+        String[] stringValues = blockValSets[0].getStringValuesSV();
+        for (int i = 0; i < length; i++) {
+          int hashCode = stringValues[i].hashCode();
+          setValueForGroupKeys(groupByResultHolder, groupKeysArray[i], hashCode);
+        }
+        break;
+
+      default:
+        throw new IllegalArgumentException("Illegal data type for distinct count aggregation function: " + valueType);
+    }
+  }
+
+  @Nonnull
+  @Override
+  public IntOpenHashSet extractAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder) {
+    IntOpenHashSet valueSet = aggregationResultHolder.getResult();
+    if (valueSet == null) {
+      return new IntOpenHashSet();
     } else {
-      while ((docId = docIdIterator.next()) != Constants.EOF) {
-        if (blockValIterator.skipTo(docId)) {
-          int dictionaryIndex = blockValIterator.nextIntVal();
-          if (dictionaryIndex != Dictionary.NULL_VALUE_INDEX) {
-            ret.add(((Number) dictionaryReader.get(dictionaryIndex)).hashCode());
-          } else {
-            ret.add(Integer.MIN_VALUE);
-          }
-        }
-      }
+      return valueSet;
     }
-    return ret;
   }
 
+  @Nonnull
   @Override
-  public IntOpenHashSet aggregate(IntOpenHashSet mergedResult, int docId, Block[] block) {
-    if (mergedResult == null) {
-      mergedResult = new IntOpenHashSet();
+  public IntOpenHashSet extractGroupByResult(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
+    IntOpenHashSet valueSet = groupByResultHolder.getResult(groupKey);
+    if (valueSet == null) {
+      return new IntOpenHashSet();
+    } else {
+      return valueSet;
     }
-    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) block[0].getBlockValueSet().iterator();
-    if (blockValIterator.skipTo(docId)) {
-      int dictId = blockValIterator.nextIntVal();
-      if (dictId != Dictionary.NULL_VALUE_INDEX) {
-        if (block[0].getMetadata().getDataType() == DataType.STRING) {
-          mergedResult.add(block[0].getMetadata().getDictionary().get(dictId).hashCode());
-        } else {
-          mergedResult.add(((Number) block[0].getMetadata().getDictionary().get(dictId)).hashCode());
-        }
-      } else {
-        mergedResult.add(Integer.MIN_VALUE);
-      }
-    }
-    return mergedResult;
   }
 
+  @Nonnull
   @Override
-  public List<IntOpenHashSet> combine(List<IntOpenHashSet> aggregationResultList, CombineLevel combineLevel) {
-    if ((aggregationResultList == null) || aggregationResultList.isEmpty()) {
-      return null;
-    }
-    IntOpenHashSet intOpenHashSet = aggregationResultList.get(0);
-    for (int i = 1; i < aggregationResultList.size(); ++i) {
-      intOpenHashSet.addAll(aggregationResultList.get(i));
-    }
-    aggregationResultList.clear();
-    aggregationResultList.add(intOpenHashSet);
-    return aggregationResultList;
+  public IntOpenHashSet merge(@Nonnull IntOpenHashSet intermediateResult1,
+      @Nonnull IntOpenHashSet intermediateResult2) {
+    intermediateResult1.addAll(intermediateResult2);
+    return intermediateResult1;
   }
 
+  @Nonnull
   @Override
-  public IntOpenHashSet combineTwoValues(IntOpenHashSet aggregationResult0, IntOpenHashSet aggregationResult1) {
-    if (aggregationResult0 == null) {
-      return aggregationResult1;
-    }
-    if (aggregationResult1 == null) {
-      return aggregationResult0;
-    }
-    aggregationResult0.addAll(aggregationResult1);
-    return aggregationResult0;
+  public FieldSpec.DataType getIntermediateResultDataType() {
+    return FieldSpec.DataType.OBJECT;
   }
 
+  @Nonnull
   @Override
-  public Integer reduce(List<IntOpenHashSet> combinedResultList) {
-    if ((combinedResultList == null) || combinedResultList.isEmpty()) {
-      return 0;
+  public Integer extractFinalResult(@Nonnull IntOpenHashSet intermediateResult) {
+    return intermediateResult.size();
+  }
+
+  /**
+   * Helper method to set value for a groupKey into the result holder.
+   *
+   * @param groupByResultHolder Result holder
+   * @param groupKey Group-key for which to set the value
+   * @param value Value for the group key
+   */
+  private void setValueForGroupKey(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey, int value) {
+    IntOpenHashSet valueSet = groupByResultHolder.getResult(groupKey);
+    if (valueSet == null) {
+      valueSet = new IntOpenHashSet();
+      groupByResultHolder.setValueForKey(groupKey, valueSet);
     }
-    IntOpenHashSet reducedResult = combinedResultList.get(0);
-    for (int i = 1; i < combinedResultList.size(); ++i) {
-      reducedResult.addAll(combinedResultList.get(i));
-    }
-    return reducedResult.size();
+    valueSet.add(value);
   }
 
-  @Override
-  public JSONObject render(Integer finalAggregationResult) {
-    try {
-      return new JSONObject().put("value", finalAggregationResult.toString());
-    } catch (JSONException e) {
-      LOGGER.error("Caught exception while rendering aggregation result", e);
-      Utils.rethrowException(e);
-      throw new AssertionError("Should not reach this");
+  /**
+   * Helper method to set values for a given array of groupKeys, into the result holder.
+   *
+   * @param groupByResultHolder Result holder
+   * @param groupKeys Array of group keys for which to set the value
+   * @param value Value to be set
+   */
+  private void setValueForGroupKeys(@Nonnull GroupByResultHolder groupByResultHolder, int[] groupKeys, int value) {
+    for (int groupKey : groupKeys) {
+      setValueForGroupKey(groupByResultHolder, groupKey, value);
     }
   }
-
-  @Override
-  public DataType aggregateResultDataType() {
-    return DataType.OBJECT;
-  }
-
-  @Override
-  public String getFunctionName() {
-    return "distinctCount_" + _distinctCountColumnName;
-  }
-
-  @Override
-  public Serializable getDefaultValue() {
-    return new IntOpenHashSet();
-  }
-
 }

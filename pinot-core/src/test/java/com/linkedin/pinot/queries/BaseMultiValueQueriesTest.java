@@ -58,7 +58,7 @@ import org.testng.annotations.BeforeTest;
  */
 public abstract class BaseMultiValueQueriesTest extends BaseQueriesTest {
   private static final String AVRO_DATA = "data/test_data-mv.avro";
-  private static final String SEGMENT_NAME = "testTable_1756015683_1756015683_";
+  private static final String SEGMENT_NAME = "testTable_1756015683_1756015683";
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "MultiValueQueriesTest");
 
   // Hard-coded query filter.

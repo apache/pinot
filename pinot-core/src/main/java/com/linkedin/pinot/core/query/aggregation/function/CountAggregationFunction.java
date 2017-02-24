@@ -15,113 +15,100 @@
  */
 package com.linkedin.pinot.core.query.aggregation.function;
 
-import com.linkedin.pinot.common.utils.primitive.MutableLongValue;
-import java.io.Serializable;
-import com.linkedin.pinot.common.Utils;
-import java.util.List;
-
-import org.json.JSONException;
-import org.json.JSONObject;
-
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.operator.blocks.DocIdSetBlock;
-import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
-import com.linkedin.pinot.core.query.aggregation.CombineLevel;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.common.BlockValSet;
+import com.linkedin.pinot.core.query.aggregation.AggregationResultHolder;
+import com.linkedin.pinot.core.query.aggregation.DoubleAggregationResultHolder;
+import com.linkedin.pinot.core.query.aggregation.groupby.DoubleGroupByResultHolder;
+import com.linkedin.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import javax.annotation.Nonnull;
 
 
-/**
- * This function will take a column and do sum on that.
- *
- */
-public class CountAggregationFunction implements AggregationFunction<Number, Number> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(CountAggregationFunction.class);
+public class CountAggregationFunction implements AggregationFunction<Long, Long> {
+  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.COUNT.getName();
+  private static final double DEFAULT_INITIAL_VALUE = 0.0;
 
-  public CountAggregationFunction() {
+  @Nonnull
+  @Override
+  public String getName() {
+    return NAME;
+  }
 
+  @Nonnull
+  @Override
+  public String getColumnName(@Nonnull String[] columns) {
+    return NAME + "_star";
   }
 
   @Override
-  public void init(AggregationInfo aggregationInfo) {
+  public void accept(@Nonnull AggregationFunctionVisitorBase visitor) {
+    visitor.visit(this);
+  }
 
+  @Nonnull
+  @Override
+  public AggregationResultHolder createAggregationResultHolder() {
+    return new DoubleAggregationResultHolder(DEFAULT_INITIAL_VALUE);
+  }
+
+  @Nonnull
+  @Override
+  public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity, int trimSize) {
+    return new DoubleGroupByResultHolder(initialCapacity, maxCapacity, trimSize, DEFAULT_INITIAL_VALUE);
   }
 
   @Override
-  public MutableLongValue aggregate(Block docIdSetBlock, Block[] block) {
-    return new MutableLongValue(((DocIdSetBlock) docIdSetBlock).getSearchableLength());
+  public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
+      @Nonnull BlockValSet... blockValSets) {
+    aggregationResultHolder.setValue(aggregationResultHolder.getDoubleResult() + length);
   }
 
   @Override
-  public Number aggregate(Number mergedResult, int docId, Block[] block) {
-    if (mergedResult == null) {
-      return new MutableLongValue(1L);
-    } else {
-      ((MutableLongValue) mergedResult).addToValue(1L);
-      return mergedResult;
+  public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+    for (int i = 0; i < length; i++) {
+      int groupKey = groupKeyArray[i];
+      groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + 1);
     }
   }
 
   @Override
-  public List<Number> combine(List<Number> aggregationResultList, CombineLevel combineLevel) {
-    long combinedValue = 0;
-    for (Number value : aggregationResultList) {
-      combinedValue += value.longValue();
-    }
-    aggregationResultList.clear();
-    aggregationResultList.add(new MutableLongValue(combinedValue));
-    return aggregationResultList;
-  }
-
-  @Override
-  public Number combineTwoValues(Number aggregationResult0, Number aggregationResult1) {
-    if (aggregationResult0 == null) {
-      return aggregationResult1;
-    }
-    if (aggregationResult1 == null) {
-      return aggregationResult0;
-    }
-    return new MutableLongValue(aggregationResult0.longValue() + aggregationResult1.longValue());
-  }
-
-  @Override
-  public Number reduce(List<Number> combinedResultList) {
-    long reducedValue = 0;
-    for (Number value : combinedResultList) {
-      reducedValue += value.longValue();
-    }
-    return new MutableLongValue(reducedValue);
-  }
-
-  @Override
-  public JSONObject render(Number reduceResult) {
-    try {
-      if (reduceResult == null) {
-        reduceResult = new MutableLongValue(0L);
+  public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+    for (int i = 0; i < length; i++) {
+      for (int groupKey : groupKeysArray[i]) {
+        groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + 1);
       }
-      return new JSONObject().put("value", reduceResult.toString());
-    } catch (JSONException e) {
-      LOGGER.error("Caught exception while rendering to JSON", e);
-      Utils.rethrowException(e);
-      throw new AssertionError("Should not reach this");
     }
   }
 
+  @Nonnull
   @Override
-  public DataType aggregateResultDataType() {
-    return DataType.LONG;
+  public Long extractAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder) {
+    return (long) aggregationResultHolder.getDoubleResult();
   }
 
+  @Nonnull
   @Override
-  public String getFunctionName() {
-    return "count_star";
+  public Long extractGroupByResult(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
+    return (long) groupByResultHolder.getDoubleResult(groupKey);
   }
 
+  @Nonnull
   @Override
-  public Serializable getDefaultValue() {
-    return new MutableLongValue(0L);
+  public Long merge(@Nonnull Long intermediateResult1, @Nonnull Long intermediateResult2) {
+    return intermediateResult1 + intermediateResult2;
   }
 
+  @Nonnull
+  @Override
+  public FieldSpec.DataType getIntermediateResultDataType() {
+    return FieldSpec.DataType.LONG;
+  }
+
+  @Nonnull
+  @Override
+  public Long extractFinalResult(@Nonnull Long intermediateResult) {
+    return intermediateResult;
+  }
 }

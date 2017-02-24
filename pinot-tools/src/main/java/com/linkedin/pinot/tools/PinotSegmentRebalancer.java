@@ -87,7 +87,13 @@ public class PinotSegmentRebalancer extends PinotZKChanger {
     String rawTenantName = tenantName.replaceAll("_OFFLINE", "").replace("_REALTIME", "");
     int nRebalances = 0;
     for (ZNRecord znRecord : tableConfigs) {
-      AbstractTableConfig tableConfig = AbstractTableConfig.fromZnRecord(znRecord);
+      AbstractTableConfig tableConfig;
+      try {
+        tableConfig = AbstractTableConfig.fromZnRecord(znRecord);
+      } catch (Exception e) {
+        LOGGER.warn("Failed to parse table configuration for ZnRecord id: {}. Skipping", znRecord.getId());
+        continue;
+      }
       if (tableConfig.getTenantConfig().getServer().equals(rawTenantName)) {
         LOGGER.info(tableConfig.getTableName() + ":" + tableConfig.getTenantConfig().getServer());
         nRebalances++;
@@ -155,12 +161,16 @@ public class PinotSegmentRebalancer extends PinotZKChanger {
     AutoRebalanceStrategy rebalanceStrategy = new AutoRebalanceStrategy(tableName, partitions, states);
 
     TableNameBuilder builder = new TableNameBuilder(tableType);
-    List<String> instancesInClusterWithTag = helixAdmin.getInstancesInClusterWithTag(clusterName, builder.forTable(tenantName));
-    LOGGER.info("Current: Nodes:" + currentHosts);
-    LOGGER.info("New Nodes:" + instancesInClusterWithTag);
+    String serverTenant = builder.forTable(tenantName);
+    List<String> instancesInClusterWithTag = helixAdmin.getInstancesInClusterWithTag(clusterName, serverTenant);
+    List<String> enabledInstancesWithTag =
+        HelixHelper.getEnabledInstancesWithTag(helixAdmin, clusterName, serverTenant);
+    LOGGER.info("Current nodes: {}", currentHosts);
+    LOGGER.info("New nodes: {}", instancesInClusterWithTag);
+    LOGGER.info("Enabled nodes: {}", enabledInstancesWithTag);
     Map<String, Map<String, String>> currentMapping = currentIdealState.getRecord().getMapFields();
     ZNRecord newZnRecord = rebalanceStrategy
-        .computePartitionAssignment(instancesInClusterWithTag, currentMapping, instancesInClusterWithTag);
+        .computePartitionAssignment(enabledInstancesWithTag, currentMapping, instancesInClusterWithTag);
     final Map<String, Map<String, String>> newMapping = newZnRecord.getMapFields();
     LOGGER.info("Current segment Assignment:");
     printSegmentAssignment(currentMapping);

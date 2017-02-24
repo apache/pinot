@@ -79,8 +79,14 @@ public abstract class ThirdEyeConfiguration extends Configuration {
     return getRootDir() + "/detector-config/anomaly-functions/functions.properties";
   }
 
-  public String getAnomaliesViewConfigPath() {
-    return getRootDir() + "/webapp-config/anomaly-views/views.properties";
+  //alertFilter.properties format: {alert filter type} = {path to alert filter implementation}
+  public String getAlertFilterConfigPath() {
+    return getRootDir() + "/detector-config/anomaly-functions/alertFilter.properties";
+  }
+
+  //alertFilterAutotune.properties format: {auto tune type} = {path to auto tune implementation}
+  public String getFilterAutotuneConfigPath() {
+    return getRootDir() + "/detector-config/anomaly-functions/alertFilterAutotune.properties";
   }
 
   public String getSmtpHost() {

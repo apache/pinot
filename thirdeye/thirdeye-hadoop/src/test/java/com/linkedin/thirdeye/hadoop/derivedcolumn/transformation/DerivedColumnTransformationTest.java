@@ -15,6 +15,8 @@
  */
 package com.linkedin.thirdeye.hadoop.derivedcolumn.transformation;
 
+import java.io.DataInput;
+import java.io.DataInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -242,7 +244,7 @@ public class DerivedColumnTransformationTest {
       topKDimensionValues = new TopKDimensionValues();
       if (fs.exists(topKPath)) {
         FSDataInputStream topkValuesStream = fs.open(topKPath);
-        topKDimensionValues = OBJECT_MAPPER.readValue(topkValuesStream, TopKDimensionValues.class);
+        topKDimensionValues = OBJECT_MAPPER.readValue((DataInput)topkValuesStream, TopKDimensionValues.class);
         topkValuesStream.close();
       }
       topKDimensionsMap = topKDimensionValues.getTopKDimensions();

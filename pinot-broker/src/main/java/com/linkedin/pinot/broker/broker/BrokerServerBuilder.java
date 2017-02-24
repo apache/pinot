@@ -15,17 +15,8 @@
  */
 package com.linkedin.pinot.broker.broker;
 
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.atomic.AtomicReference;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.ConfigurationException;
-import org.eclipse.jetty.server.Server;
-import org.eclipse.jetty.webapp.WebAppContext;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.broker.broker.helix.LiveInstancesChangeListenerImpl;
+import com.linkedin.pinot.broker.requesthandler.BrokerRequestHandler;
 import com.linkedin.pinot.broker.servlet.PinotBrokerHealthCheckServlet;
 import com.linkedin.pinot.broker.servlet.PinotBrokerRoutingTableDebugServlet;
 import com.linkedin.pinot.broker.servlet.PinotBrokerServletContextChangeListener;
@@ -37,10 +28,7 @@ import com.linkedin.pinot.common.metrics.MetricsHelper;
 import com.linkedin.pinot.common.query.ReduceServiceRegistry;
 import com.linkedin.pinot.common.response.BrokerResponseFactory;
 import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.common.utils.DataTableSerDeRegistry;
 import com.linkedin.pinot.core.query.reduce.BrokerReduceService;
-import com.linkedin.pinot.core.util.DataTableCustomSerDe;
-import com.linkedin.pinot.requestHandler.BrokerRequestHandler;
 import com.linkedin.pinot.routing.CfgBasedRouting;
 import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
 import com.linkedin.pinot.routing.RoutingTable;
@@ -59,6 +47,16 @@ import com.yammer.metrics.core.MetricsRegistry;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.HashedWheelTimer;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.atomic.AtomicReference;
+import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.ConfigurationException;
+import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.webapp.WebAppContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class BrokerServerBuilder {
   private static final String TRANSPORT_CONFIG_PREFIX = "pinot.broker.transport";
@@ -170,9 +168,6 @@ public class BrokerServerBuilder {
     ReduceServiceRegistry reduceServiceRegistry = buildReduceServiceRegistry();
     _requestHandler = new BrokerRequestHandler(_routingTable, _timeBoundaryService, _scatterGather,
         reduceServiceRegistry, _brokerMetrics, _config);
-
-    // Register SerDe for data-table.
-    DataTableSerDeRegistry.getInstance().register(new DataTableCustomSerDe(_brokerMetrics));
 
     LOGGER.info("Network initialized !!");
   }

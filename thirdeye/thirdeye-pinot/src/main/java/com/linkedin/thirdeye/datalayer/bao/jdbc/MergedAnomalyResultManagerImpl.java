@@ -37,9 +37,13 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
       "where collection=:collection and metric=:metric "
           + "and (startTime < :endTime and endTime > :startTime) order by endTime desc";
 
+
   // find a conflicting window
   private static final String FIND_BY_COLLECTION_TIME = "where collection=:collection "
       + "and (startTime < :endTime and endTime > :startTime) order by endTime desc";
+
+  private static final String FIND_BY_TIME = "where (startTime < :endTime and endTime > :startTime) "
+      + "order by endTime desc";
 
   private static final String FIND_BY_FUNCTION_ID = "where functionId=:functionId";
 
@@ -49,6 +53,7 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
 
   private static final String FIND_BY_FUNCTION_AND_NULL_DIMENSION =
       "where functionId=:functionId " + "and dimensions is null order by endTime desc";
+
 
   private ExecutorService executorService = Executors.newFixedThreadPool(10);
 
@@ -120,7 +125,7 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
   @Override
   public List<MergedAnomalyResultDTO> findAllConflictByFunctionId(long functionId, long conflictWindowStart, long conflictWindowEnd) {
     Predicate predicate =
-        Predicate.AND(Predicate.LE("startTime", conflictWindowEnd), Predicate.GE("endTime", conflictWindowStart),
+        Predicate.AND(Predicate.LT("startTime", conflictWindowEnd), Predicate.GE("endTime", conflictWindowStart),
             Predicate.EQ("functionId", functionId));
     List<MergedAnomalyResultBean> list = genericPojoDao.get(predicate, MergedAnomalyResultBean.class);
     return batchConvertMergedAnomalyBean2DTO(list, true);
@@ -147,10 +152,18 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
   }
 
   @Override
+  public List<MergedAnomalyResultDTO> findByFunctionIdAndIdGreaterThan(Long functionId, Long anomalyId) {
+    Predicate predicate = Predicate.AND(Predicate.EQ("functionId", functionId), Predicate.GT("baseId", anomalyId));
+    List<MergedAnomalyResultBean> list = genericPojoDao.get(predicate, MergedAnomalyResultBean.class);
+    return batchConvertMergedAnomalyBean2DTO(list, true);
+  }
+
+
+  @Override
   public List<MergedAnomalyResultDTO> findByStartTimeInRangeAndFunctionId(long startTime, long
       endTime, long functionId) {
     Predicate predicate =
-        Predicate.AND(Predicate.GE("startTime", startTime), Predicate.LT("startTime", endTime),
+        Predicate.AND(Predicate.GE("startTime", startTime), Predicate.LT("endTime", endTime),
             Predicate.EQ("functionId", functionId));
     List<MergedAnomalyResultBean> list = genericPojoDao.get(predicate, MergedAnomalyResultBean.class);
     return batchConvertMergedAnomalyBean2DTO(list, true);
@@ -188,14 +201,23 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
   @Override
   public List<MergedAnomalyResultDTO> findByCollectionTime(String collection, long startTime,
       long endTime, boolean loadRawAnomalies) {
+    Predicate predicate = Predicate
+        .AND(Predicate.EQ("collection", collection), Predicate.GT("startTime", startTime),
+            Predicate.LT("endTime", endTime));
+
+    List<MergedAnomalyResultBean> list = genericPojoDao.get(predicate, MergedAnomalyResultBean.class);
+    return batchConvertMergedAnomalyBean2DTO(list, loadRawAnomalies);
+  }
+
+  @Override
+  public List<MergedAnomalyResultDTO> findByTime(long startTime, long endTime) {
     Map<String, Object> filterParams = new HashMap<>();
-    filterParams.put("collection", collection);
     filterParams.put("startTime", startTime);
     filterParams.put("endTime", endTime);
 
-    List<MergedAnomalyResultBean> list = genericPojoDao.executeParameterizedSQL(
-        FIND_BY_COLLECTION_TIME, filterParams, MergedAnomalyResultBean.class);
-    return batchConvertMergedAnomalyBean2DTO(list, loadRawAnomalies);
+    List<MergedAnomalyResultBean> list =
+        genericPojoDao.executeParameterizedSQL(FIND_BY_TIME, filterParams, MergedAnomalyResultBean.class);
+    return batchConvertMergedAnomalyBean2DTO(list, false);
   }
 
   @Override
@@ -325,4 +347,5 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
 
     return mergedAnomalyResultDTOList;
   }
+
 }

@@ -31,11 +31,12 @@ import com.linkedin.pinot.core.operator.docidsets.FilterBlockDocIdSet;
 
 public class OrOperator extends BaseFilterOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(OrOperator.class);
+  private static final String OPERATOR_NAME = "OrOperator";
 
-  private List<Operator> operators;
+  private List<BaseFilterOperator> operators;
   private OrBlock orBlock;
 
-  public OrOperator(List<Operator> operators) {
+  public OrOperator(List<BaseFilterOperator> operators) {
     this.operators = operators;
   }
 
@@ -60,10 +61,25 @@ public class OrOperator extends BaseFilterOperator {
   }
 
   @Override
+  public boolean isResultEmpty() {
+    for (BaseFilterOperator operator : operators) {
+      if (!operator.isResultEmpty()) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  @Override
   public boolean close() {
     for (Operator operator : operators) {
       operator.close();
     }
     return true;
+  }
+
+  @Override
+  public String getOperatorName() {
+    return OPERATOR_NAME;
   }
 }

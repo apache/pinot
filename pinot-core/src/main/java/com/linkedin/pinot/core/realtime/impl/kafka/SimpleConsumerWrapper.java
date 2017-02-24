@@ -468,7 +468,6 @@ public class SimpleConsumerWrapper implements Closeable {
       case UNKNOWN:
       case OFFSET_OUT_OF_RANGE:
       case CORRUPT_MESSAGE:
-      case UNKNOWN_TOPIC_OR_PARTITION:
       case MESSAGE_TOO_LARGE:
       case OFFSET_METADATA_TOO_LARGE:
       case INVALID_TOPIC_EXCEPTION:
@@ -481,6 +480,7 @@ public class SimpleConsumerWrapper implements Closeable {
       case INVALID_SESSION_TIMEOUT:
       case INVALID_COMMIT_OFFSET_SIZE:
         return new PermanentConsumerException(kafkaError);
+      case UNKNOWN_TOPIC_OR_PARTITION:
       case LEADER_NOT_AVAILABLE:
       case NOT_LEADER_FOR_PARTITION:
       case REQUEST_TIMED_OUT:

@@ -54,11 +54,6 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
   private SchedulerFactory schedulerFactory;
   private Scheduler quartzScheduler;
   private ScheduledExecutorService scheduledExecutorService;
-  private JobManager anomalyJobDAO;
-  private TaskManager anomalyTaskDAO;
-  private AnomalyFunctionManager anomalyFunctionDAO;
-  private DatasetConfigManager datasetConfigDAO;
-  private MetricConfigManager metricConfigDAO;
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   private static final int BACKFILL_MAX_RETRY = 3;
@@ -67,12 +62,6 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
   private final Map<BackfillKey, Thread> existingBackfillJobs = new ConcurrentHashMap<>();
 
   public DetectionJobScheduler() {
-    this.anomalyJobDAO = DAO_REGISTRY.getJobDAO();
-    this.anomalyTaskDAO = DAO_REGISTRY.getTaskDAO();
-    this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
-    this.datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
-    this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
-
     schedulerFactory = new StdSchedulerFactory();
     try {
       quartzScheduler = schedulerFactory.getScheduler();
@@ -152,7 +141,7 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
       // stop the schedule, as function has been deleted
       for (String scheduledJobKey : scheduledJobs) {
         Long functionId = getIdFromJobKey(scheduledJobKey);
-        AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(functionId);
+        AnomalyFunctionDTO anomalyFunctionSpec = DAO_REGISTRY.getAnomalyFunctionDAO().findById(functionId);
         if (anomalyFunctionSpec == null) {
           LOG.info("Found scheduled, but not in database {}", functionId);
           stopJob(scheduledJobKey);
@@ -169,7 +158,7 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
   }
 
   public void startJob(Long id) throws SchedulerException {
-    AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
+    AnomalyFunctionDTO anomalyFunctionSpec = DAO_REGISTRY.getAnomalyFunctionDAO().findById(id);
     if (anomalyFunctionSpec == null) {
       throw new IllegalArgumentException("No function with id " + id);
     }
@@ -185,11 +174,6 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
       throw new IllegalStateException("Anomaly function " + jobKey + " is already scheduled");
     }
     DetectionJobContext detectionJobContext = new DetectionJobContext();
-    detectionJobContext.setAnomalyFunctionDAO(anomalyFunctionDAO);
-    detectionJobContext.setJobDAO(anomalyJobDAO);
-    detectionJobContext.setTaskDAO(anomalyTaskDAO);
-    detectionJobContext.setDatasetConfigDAO(datasetConfigDAO);
-    detectionJobContext.setMetricConfigDAO(metricConfigDAO);
     detectionJobContext.setAnomalyFunctionId(anomalyFunctionSpec.getId());
     detectionJobContext.setJobName(jobKey);
 
@@ -197,7 +181,7 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
   }
 
   public void stopJob(Long id) throws SchedulerException {
-    AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
+    AnomalyFunctionDTO anomalyFunctionSpec = DAO_REGISTRY.getAnomalyFunctionDAO().findById(id);
     String functionName = anomalyFunctionSpec.getFunctionName();
     String jobKey = getJobKey(id, functionName);
     stopJob(jobKey);
@@ -222,7 +206,7 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
    * time, function name, and function id; which are separated by symbol "_".
    */
   public String runAdHoc(Long id, DateTime windowStartTime, DateTime windowEndTime) {
-    AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
+    AnomalyFunctionDTO anomalyFunctionSpec = DAO_REGISTRY.getAnomalyFunctionDAO().findById(id);
     if (anomalyFunctionSpec == null) {
       throw new IllegalArgumentException("No function with id " + id);
     }
@@ -233,11 +217,6 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
     JobDetail job = JobBuilder.newJob(DetectionJobRunner.class).withIdentity(jobKey).build();
 
     DetectionJobContext detectionJobContext = new DetectionJobContext();
-    detectionJobContext.setAnomalyFunctionDAO(anomalyFunctionDAO);
-    detectionJobContext.setJobDAO(anomalyJobDAO);
-    detectionJobContext.setTaskDAO(anomalyTaskDAO);
-    detectionJobContext.setDatasetConfigDAO(datasetConfigDAO);
-    detectionJobContext.setMetricConfigDAO(metricConfigDAO);
     detectionJobContext.setAnomalyFunctionId(anomalyFunctionSpec.getId());
     detectionJobContext.setJobName(jobKey);
 
@@ -278,7 +257,7 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
   }
 
   private List<AnomalyFunctionDTO> readAnomalyFunctionSpecs() {
-    return anomalyFunctionDAO.findAll();
+    return DAO_REGISTRY.getAnomalyFunctionDAO().findAll();
   }
 
   private String getJobKey(Long id, String functionName) {
@@ -306,7 +285,7 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
    * @param force set to false to resume from previous backfill if there exists any
    */
   public void runBackfill(long functionId, DateTime backfillStartTime, DateTime backfillEndTime, boolean force) {
-    AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
+    AnomalyFunctionDTO anomalyFunction = DAO_REGISTRY.getAnomalyFunctionDAO().findById(functionId);
     boolean isActive = anomalyFunction.getIsActive();
     if (!isActive) {
       LOG.info("Skipping function {}", functionId);
@@ -378,7 +357,7 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
   }
 
   private JobDTO getPreviousJob(long functionId, long backfillWindowStart, long backfillWindowEnd) {
-    return anomalyJobDAO.findLatestBackfillScheduledJobByFunctionId(functionId, backfillWindowStart, backfillWindowEnd);
+    return DAO_REGISTRY.getJobDAO().findLatestBackfillScheduledJobByFunctionId(functionId, backfillWindowStart, backfillWindowEnd);
   }
 
   /**
@@ -420,18 +399,18 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
    */
   private void cleanUpJob(JobDTO job) {
     if (!job.getStatus().equals(JobConstants.JobStatus.COMPLETED)) {
-      List<TaskDTO> tasks = anomalyTaskDAO.findByJobIdStatusNotIn(job.getId(), TaskConstants.TaskStatus.COMPLETED);
+      List<TaskDTO> tasks = DAO_REGISTRY.getTaskDAO().findByJobIdStatusNotIn(job.getId(), TaskConstants.TaskStatus.COMPLETED);
       if (CollectionUtils.isNotEmpty(tasks)) {
         for (TaskDTO task : tasks) {
           task.setStatus(TaskConstants.TaskStatus.FAILED);
-          anomalyTaskDAO.save(task);
+          DAO_REGISTRY.getTaskDAO().save(task);
         }
         job.setStatus(JobConstants.JobStatus.FAILED);
       } else {
         // This case happens when scheduler dies before it knows that all its tasks are actually finished
         job.setStatus(JobConstants.JobStatus.COMPLETED);
       }
-      anomalyJobDAO.save(job);
+      DAO_REGISTRY.getJobDAO().save(job);
     }
   }
 
@@ -444,7 +423,7 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
   private JobDTO tryToGetJob(String jobName) {
     JobDTO job = null;
     for (int i = 0; i < BACKFILL_MAX_RETRY; ++i) {
-      job = anomalyJobDAO.findLatestScheduledJobByName(jobName);
+      job = DAO_REGISTRY.getJobDAO().findLatestScheduledJobByName(jobName);
       if (job == null) {
         sleepSilently(BACKFILL_TASK_POLL_TIME);
         if (Thread.currentThread().interrupted()) {
@@ -473,7 +452,7 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
       boolean taskCompleted = waitUntilTasksFinished(job.getId());
       if (taskCompleted) {
         job.setStatus(JobConstants.JobStatus.COMPLETED);
-        anomalyJobDAO.save(job);
+        DAO_REGISTRY.getJobDAO().save(job);
       } else {
         cleanUpJob(job);
       }
@@ -488,7 +467,7 @@ public class DetectionJobScheduler implements JobScheduler, Runnable {
    */
   private boolean waitUntilTasksFinished(long jobId) {
     while (true) {
-      List<TaskDTO> tasks = anomalyTaskDAO.findByJobIdStatusNotIn(jobId, TaskConstants.TaskStatus.COMPLETED);
+      List<TaskDTO> tasks = DAO_REGISTRY.getTaskDAO().findByJobIdStatusNotIn(jobId, TaskConstants.TaskStatus.COMPLETED);
       if (CollectionUtils.isEmpty(tasks)) {
         return true; // task finished
       } else {

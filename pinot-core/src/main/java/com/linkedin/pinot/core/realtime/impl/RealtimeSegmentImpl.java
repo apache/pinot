@@ -658,6 +658,12 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
       public int getTotalDocs() {
         return docIdSearchableOffset + 1;
       }
+
+      @Override
+      public int getTotalRawDocs() {
+        // In realtime total docs and total raw docs are the same currently.
+        return docIdSearchableOffset + 1;
+      }
     };
   }
 
@@ -665,6 +671,12 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     _segmentMetadata = new SegmentMetadataImpl(segmentMetadata, schema) {
       @Override
       public int getTotalDocs() {
+        return docIdSearchableOffset + 1;
+      }
+
+      @Override
+      public int getTotalRawDocs() {
+        // In realtime total docs and total raw docs are the same currently.
         return docIdSearchableOffset + 1;
       }
     };

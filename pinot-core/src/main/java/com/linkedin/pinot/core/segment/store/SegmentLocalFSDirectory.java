@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Path;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
@@ -37,6 +38,13 @@ import org.slf4j.LoggerFactory;
 
 class SegmentLocalFSDirectory extends SegmentDirectory {
   private static Logger LOGGER = LoggerFactory.getLogger(SegmentLocalFSDirectory.class);
+
+  // matches most systems
+  private static final int PAGE_SIZE_BYTES = 4096;
+  // Prefetch limit...arbitrary but related to common server memory and data size profiles
+  private static final long MAX_MMAP_PREFETCH_PAGES = 100 * 1024 * 1024 * 1024L / PAGE_SIZE_BYTES;
+  private static final double PREFETCH_SLOWDOWN_PCT = 0.67;
+  private static AtomicLong prefetchedPages = new AtomicLong(0);
 
   private final File segmentDirectory;
   SegmentLock segmentLock;
@@ -49,12 +57,17 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
     this(new File(directoryPath), metadata, readMode);
   }
 
+  SegmentLocalFSDirectory (File directory, ReadMode readMode)
+      throws IOException, ConfigurationException {
+    this(directory, loadSegmentMetadata(directory), readMode);
+  }
+
   SegmentLocalFSDirectory(File directoryFile, SegmentMetadataImpl metadata, ReadMode readMode) {
 
     Preconditions.checkNotNull(directoryFile);
     Preconditions.checkNotNull(metadata);
 
-    segmentDirectory = directoryFile;
+    segmentDirectory = getSegmentPath(directoryFile, metadata.getSegmentVersion());
     Preconditions.checkState(segmentDirectory.exists(), "Segment directory: " + directoryFile + " must exist");
 
     segmentLock = new SegmentLock();
@@ -66,6 +79,30 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
       LOGGER.error("Failed to load segment, error: ", e);
       throw new RuntimeException(e);
     }
+  }
+
+  private File getSegmentPath(File segmentDirectory, SegmentVersion segmentVersion) {
+    if (segmentVersion == SegmentVersion.v1 || segmentVersion == SegmentVersion.v2) {
+      return segmentDirectory;
+    }
+
+    if (segmentVersion == SegmentVersion.v3) {
+      if (segmentDirectory.getAbsolutePath().endsWith(SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME)) {
+        return segmentDirectory;
+      }
+      File v3SubDir = new File(segmentDirectory, SegmentDirectoryPaths.V3_SUBDIRECTORY_NAME);
+      if (v3SubDir.exists()) {
+        return v3SubDir;
+      }
+      // return input path by default
+      return segmentDirectory;
+    }
+    throw new IllegalArgumentException("Unknown segment version: " + segmentVersion);
+  }
+
+  public static SegmentMetadataImpl loadSegmentMetadata(File segmentDirectory)
+      throws IOException, ConfigurationException {
+    return new SegmentMetadataImpl(segmentDirectory);
   }
 
   @Override
@@ -186,15 +223,63 @@ class SegmentLocalFSDirectory extends SegmentDirectory {
 
   private PinotDataBuffer getIndexForColumn(String column, ColumnIndexType type)
       throws IOException {
+    PinotDataBuffer buffer;
     switch (type) {
       case DICTIONARY:
-        return columnIndexDirectory.getDictionaryBufferFor(column);
+        buffer = columnIndexDirectory.getDictionaryBufferFor(column);
+        break;
       case FORWARD_INDEX:
-        return columnIndexDirectory.getForwardIndexBufferFor(column);
+        buffer = columnIndexDirectory.getForwardIndexBufferFor(column);
+        break;
       case INVERTED_INDEX:
-        return columnIndexDirectory.getInvertedIndexBufferFor(column);
+        buffer = columnIndexDirectory.getInvertedIndexBufferFor(column);
+        break;
       default:
         throw new RuntimeException("Unknown index type: " + type.name());
+    }
+    if (readMode == ReadMode.mmap) {
+      prefetchMmapData(buffer);
+    }
+    return buffer;
+  }
+
+  private void prefetchMmapData(PinotDataBuffer buffer) {
+    // mmap mode causes high number of major page faults after server restart.
+    // This impacts latency especially for prod "online" use cases that require low latency.
+    // This function proactively loads pages in memory to lower the variance in
+    // latencies after server startup.
+
+    // This has to handle two different data size profiles
+    // 1. Servers with data size close to main memory size
+    // 2. Servers with very large data sizes (terabytes)
+    // To prevent it from loading terabytes of data on startup, we put a limit
+    // on the number of pages this will prefetch (OS will do something more on top of this)
+    // The logic here is as follows:
+    // Server doesn't know total data size it is expected to serve. So this will
+    // load all data till 2/3rd (PREFETCH_SLOWDOWN_PCT) of the configured limit. After that it will only
+    // read the header page. We read headers because that has more frequently accessed
+    // information which will have bigger impact on the latency. This can go over the limit
+    // because it doesn't stop at any point. But that's not an issue considering this is
+    // an optimization.
+
+    // Prefetch limit and slowdown percentage are arbitrary
+    if (prefetchedPages.get() >= MAX_MMAP_PREFETCH_PAGES) {
+      return;
+    }
+
+    final long prefetchSlowdownPageLimit = (long) (PREFETCH_SLOWDOWN_PCT * MAX_MMAP_PREFETCH_PAGES);
+    if (prefetchedPages.get() >= prefetchSlowdownPageLimit) {
+      if (0 < buffer.size()) {
+        buffer.getByte(0);
+        prefetchedPages.incrementAndGet();
+      }
+    } else {
+      // pos needs to be long because buffer.size() is 32 bit but
+      // adding 4k can make it go over int size
+      for (long pos = 0; pos < buffer.size() && prefetchedPages.get() < prefetchSlowdownPageLimit; pos += PAGE_SIZE_BYTES) {
+        buffer.getByte((int)pos);
+        prefetchedPages.incrementAndGet();
+      }
     }
   }
 

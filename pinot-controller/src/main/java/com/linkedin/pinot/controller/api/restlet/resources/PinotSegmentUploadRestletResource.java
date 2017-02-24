@@ -15,19 +15,30 @@
  */
 package com.linkedin.pinot.controller.api.restlet.resources;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import com.linkedin.pinot.common.utils.helix.HelixHelper;
+import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
 import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.InetAddress;
 import java.net.URLDecoder;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.HelixAdmin;
+import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang.Validate;
 import org.apache.helix.ZNRecord;
+import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.joda.time.Interval;
 import org.json.JSONArray;
@@ -117,13 +128,13 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
     try {
       final String tableName = (String) getRequest().getAttributes().get("tableName");
       final String segmentName = (String) getRequest().getAttributes().get("segmentName");
-      final String active = getReference().getQueryAsForm().getValues("active");
+      final String tableType = getReference().getQueryAsForm().getValues("type");
 
       if ((tableName == null) && (segmentName == null)) {
         return getAllSegments();
 
       } else if ((tableName != null) && (segmentName == null)) {
-        return getSegmentsForTable(tableName, !"false".equalsIgnoreCase(active));
+        return getSegmentsForTable(tableName, tableType);
       }
 
       presentation = getSegmentFile(tableName, segmentName);
@@ -181,38 +192,59 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
   private Representation getSegmentsForTable(
       @Parameter(name = "tableName", in = "path", description = "The name of the table for which to list segments", required = true)
       String tableName,
-      @Parameter(name = "active", in = "query", description = "true = show active segments (in Helix), false = all segments (on filesystem)", required = false)
-      boolean activeOnly
-      ) {
+      @Parameter(name = "tableType", in = "query", description = "Type of table {offline|realtime}", required = false)
+      String type
+      ) throws Exception {
     Representation presentation;
-    final JSONArray ret = new JSONArray();
+    JSONArray ret = new JSONArray();
+    final String realtime = "REALTIME";
+    final String offline = "OFFLINE";
 
-    if (activeOnly) {
-      String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
-      List<String> segmentList = _pinotHelixResourceManager.getAllSegmentsForResource(offlineTableName);
-      ZkHelixPropertyStore<ZNRecord> propertyStore = _pinotHelixResourceManager.getPropertyStore();
-
-      for (String segmentName : segmentList) {
-        OfflineSegmentZKMetadata offlineSegmentZKMetadata =
-            ZKMetadataProvider.getOfflineSegmentZKMetadata(propertyStore, tableName, segmentName);
-        ret.put(offlineSegmentZKMetadata.getDownloadUrl());
-      }
+    if (type == null) {
+      ret.put(formatSegments(tableName, CommonConstants.Helix.TableType.valueOf(offline)));
+      ret.put(formatSegments(tableName, CommonConstants.Helix.TableType.valueOf(realtime)));
     } else {
-      File tableDir = new File(baseDataDir, tableName);
-
-      if (tableDir.exists()) {
-        for (final File file : tableDir.listFiles()) {
-	  final String url = _controllerConf.generateVipUrl() + "/segments/" + tableName + "/" + file.getName();
-          ret.put(url);
-        }
-      } else {
-        LOGGER.error("Error: Table {} not found.", tableName);
-        setStatus(Status.CLIENT_ERROR_NOT_FOUND);
-      }
+      ret.put(formatSegments(tableName, CommonConstants.Helix.TableType.valueOf(type)));
     }
 
     presentation = new StringRepresentation(ret.toString());
     return presentation;
+  }
+
+  private org.json.JSONObject formatSegments(String tableName, CommonConstants.Helix.TableType tableType) throws Exception {
+    org.json.JSONObject obj = new org.json.JSONObject();
+    obj.put(tableType.toString(), getSegments(tableName, tableType.toString()));
+    return obj;
+  }
+  private JSONArray getSegments(String tableName, String tableType) {
+
+    final JSONArray ret = new JSONArray();
+
+    String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
+    String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
+
+    String tableNameWithType;
+    if (CommonConstants.Helix.TableType.valueOf(tableType).toString().equals("REALTIME")) {
+      tableNameWithType = realtimeTableName;
+    } else {
+      tableNameWithType = offlineTableName;
+    }
+
+    List<String> segmentList = _pinotHelixResourceManager.getAllSegmentsForResource(tableNameWithType);
+    IdealState idealState =
+        HelixHelper.getTableIdealState(_pinotHelixResourceManager.getHelixZkManager(), tableNameWithType);
+
+    for (String segmentName : segmentList) {
+      Map<String, String> map = idealState.getInstanceStateMap(segmentName);
+      if (map == null) {
+        continue;
+      }
+      if (!map.containsValue(PinotHelixSegmentOnlineOfflineStateModelGenerator.OFFLINE_STATE)) {
+        ret.put(segmentName);
+      }
+    }
+
+    return ret;
   }
 
   @HttpVerb("get")
@@ -536,10 +568,18 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
     Representation rep;
     try {
       final String tableName = (String) getRequest().getAttributes().get("tableName");
-      final String segmentName = (String) getRequest().getAttributes().get("segmentName");
+      String segmentName =(String) getRequest().getAttributes().get("segmentName");
+      if (segmentName != null) {
+        segmentName = URLDecoder.decode(segmentName, "UTF-8");
+      }
+      final String tableType = getReference().getQueryAsForm().getValues(TABLE_TYPE);
 
       LOGGER.info("Getting segment deletion request, tableName: " + tableName + " segmentName: " + segmentName);
-      rep = deleteOneSegment(tableName, segmentName);
+      if (segmentName != null) {
+        rep = deleteOneSegment(tableName, segmentName, tableType);
+      } else {
+        rep = deleteAllSegments(tableName, tableType);
+      }
     } catch (final Exception e) {
       rep = exceptionToStringRepresentation(e);
       LOGGER.error("Caught exception while processing delete request", e);
@@ -554,13 +594,17 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
   @Tags({"segment", "table"})
   @Paths({ "/segments/{tableName}/{segmentName}", "/segments/{tableName}/{segmentName}/" })
   private Representation deleteOneSegment(
-      @Parameter(name = "tableName", in = "path", description = "The name of the table in which the segment resides",
+      @Parameter(name = "tableName", in = "path", description = "The table name in which the segment resides",
           required = true) String tableName,
       @Parameter(name = "segmentName", in = "path", description = "The name of the segment to delete",
-          required = true) String segmentName)
+          required = true) String segmentName,
+      @Parameter(name = "type", in = "query", description = "Type of table {offline|realtime}",
+          required = true) String tableType)
       throws JsonProcessingException, JSONException {
 
-    return new PinotSegmentRestletResource().toggleSegmentState(tableName, segmentName, "drop", null);
+    Validate.isTrue(!StringUtils.containsIgnoreCase(tableName, "_OFFLINE") && !StringUtils.containsIgnoreCase(tableName, "_REALTIME"));
+    Validate.notNull(tableType, "tableType can't be null");
+    return new PinotSegmentRestletResource().toggleSegmentState(tableName, segmentName, "drop", tableType);
   }
 
   @HttpVerb("delete")
@@ -568,11 +612,15 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
   @Tags({"segment", "table"})
   @Paths({ "/segments/{tableName}", "/segments/{tableName}/" })
   private Representation deleteAllSegments(
-      @Parameter(name = "tableName", in = "path", description = "The name of the table in which the segment resides",
-          required = true) String tableName)
+      @Parameter(name = "tableName", in = "path", description = "The table name in which the segment resides",
+          required = true) String tableName,
+      @Parameter(name = "type", in = "query", description = "Type of table {offline|realtime}",
+      required = true) String tableType)
       throws JsonProcessingException, JSONException {
 
-    return new PinotSegmentRestletResource().toggleSegmentState(tableName, null, "drop", null);
+    Validate.isTrue(!StringUtils.containsIgnoreCase(tableName, "_OFFLINE") && !StringUtils.containsIgnoreCase(tableName, "_REALTIME"), "Invaild table name");
+    Validate.notNull(tableType, "tableType can't be null");
+    return new PinotSegmentRestletResource().toggleSegmentState(tableName, null, StateType.DROP.toString(), tableType);
   }
 
   /**

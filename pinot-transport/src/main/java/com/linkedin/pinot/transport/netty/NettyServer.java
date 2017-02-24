@@ -87,6 +87,10 @@ public abstract class NettyServer implements Runnable {
      * thread-safe. Hence, we need a factory for the Channel Initializer to use for each incoming channel.
      * @return
      */
+    /*
+     * TODO/atumbde: Our exisiting request handlers are thread-safe. So, we can replace factory
+     * with request handler object
+     */
     RequestHandler createNewRequestHandler();
   }
 
@@ -99,6 +103,8 @@ public abstract class NettyServer implements Runnable {
   protected AtomicBoolean _shutdownComplete = new AtomicBoolean(false);
 
   //TODO: Need configs to control number of threads
+  // NOTE/atumbde: With ScheduledRequestHandler, queries are executed asynchronously.
+  // So, these netty threads are not blocked. Config is still important
   protected final EventLoopGroup _bossGroup = new NioEventLoopGroup(1);
   protected final EventLoopGroup _workerGroup = new NioEventLoopGroup(20);
 

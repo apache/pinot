@@ -21,7 +21,6 @@ import com.linkedin.pinot.core.common.BlockDocIdIterator;
 import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.Constants;
-import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
 import com.linkedin.pinot.core.operator.filter.BaseFilterOperator;
 import com.linkedin.pinot.core.operator.filter.OrOperator;
@@ -40,8 +39,8 @@ public class OrOperatorTest {
   public void testIntersectionForTwoLists() {
     int[] list1 = new int[] { 2, 3, 10, 15, 16, 28 };
     int[] list2 = new int[] { 3, 6, 8, 20, 28 };
-    ;
-    List<Operator> operators = new ArrayList<Operator>();
+
+    List<BaseFilterOperator> operators = new ArrayList<>();
     operators.add(makeFilterOperator(list1));
     operators.add(makeFilterOperator(list2));
     final OrOperator orOperator = new OrOperator(operators);
@@ -69,7 +68,7 @@ public class OrOperatorTest {
     int[] list2 = new int[] { 3, 6, 8, 20, 28 };
     int[] list3 = new int[] { 1, 2, 3, 6, 30 };
 
-    List<Operator> operators = new ArrayList<Operator>();
+    List<BaseFilterOperator> operators = new ArrayList<>();
     operators.add(makeFilterOperator(list1));
     operators.add(makeFilterOperator(list2));
     operators.add(makeFilterOperator(list3));
@@ -106,12 +105,12 @@ public class OrOperatorTest {
     set.addAll(Lists.newArrayList(ArrayUtils.toObject(list3)));
     Iterator<Integer> expectedIterator = set.iterator();
 
-    List<Operator> operators = new ArrayList<Operator>();
+    List<BaseFilterOperator> operators = new ArrayList<>();
     operators.add(makeFilterOperator(list1));
     operators.add(makeFilterOperator(list2));
 
     final OrOperator orOperator1 = new OrOperator(operators);
-    List<Operator> operators1 = new ArrayList<Operator>();
+    List<BaseFilterOperator> operators1 = new ArrayList<>();
     operators1.add(orOperator1);
     operators1.add(makeFilterOperator(list3));
 
@@ -133,6 +132,13 @@ public class OrOperatorTest {
 
   public BaseFilterOperator makeFilterOperator(final int[] list) {
     return new BaseFilterOperator() {
+      public static final String OPERATOR_NAME = "Anonymous";
+
+      @Override
+      public String getOperatorName() {
+        return OPERATOR_NAME;
+      }
+
       boolean alreadyInvoked = false;
 
       @Override
@@ -155,6 +161,11 @@ public class OrOperatorTest {
         }
         alreadyInvoked = true;
         return new ArrayBasedFilterBlock(list);
+      }
+
+      @Override
+      public boolean isResultEmpty() {
+        return false;
       }
     };
   }

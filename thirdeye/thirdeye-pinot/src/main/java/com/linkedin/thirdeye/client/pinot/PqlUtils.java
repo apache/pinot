@@ -2,13 +2,10 @@ package com.linkedin.thirdeye.client.pinot;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
-
-import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormat;
@@ -28,6 +25,7 @@ import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 /**
  * Util class for generated PQL queries (pinot).
@@ -40,7 +38,6 @@ public class PqlUtils {
   private static final int DEFAULT_TOP = 100000;
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
-  private static MetricConfigManager metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
 
   /**
    * Returns sql to calculate the sum of all raw metrics required for <tt>request</tt>, grouped by
@@ -87,8 +84,8 @@ public class PqlUtils {
 
     List<String> metricAsDimensionPqls = new ArrayList<>();
     for (MetricFunction metricFunction : metricFunctions) {
-      String metricAsDimensionPql = getMetricAsDimensionPql(collection, metricFunction, startTime, endTimeExclusive, filterSet, groupBy, timeGranularity,
-          dataTimeSpec, metricValuesColumn, metricNamesColumn);
+      String metricAsDimensionPql = getMetricAsDimensionPql(collection, metricFunction, startTime, endTimeExclusive,
+          filterSet, groupBy, timeGranularity, dataTimeSpec, metricValuesColumn, metricNamesColumn);
       metricAsDimensionPqls.add(metricAsDimensionPql);
     }
     return metricAsDimensionPqls;
@@ -102,7 +99,9 @@ public class PqlUtils {
     StringBuilder sb = new StringBuilder();
     String selectionClause = getMetricAsDimensionSelectionClause(metricFunction, metricValuesColumn);
 
-    sb.append("SELECT ").append(selectionClause).append(" FROM ").append(collection);
+    String tableName = ThirdEyeUtils.computeTableName(collection);
+
+    sb.append("SELECT ").append(selectionClause).append(" FROM ").append(tableName);
     String betweenClause = getBetweenClause(startTime, endTimeExclusive, dataTimeSpec, collection);
     sb.append(" WHERE ").append(betweenClause);
 
@@ -113,6 +112,7 @@ public class PqlUtils {
     if (StringUtils.isNotBlank(dimensionWhereClause)) {
       sb.append(" AND ").append(dimensionWhereClause);
     }
+
     String groupByClause = getDimensionGroupByClause(groupBy, timeGranularity, dataTimeSpec);
     if (StringUtils.isNotBlank(groupByClause)) {
       sb.append(" ").append(groupByClause);
@@ -129,7 +129,9 @@ public class PqlUtils {
     StringBuilder sb = new StringBuilder();
     String selectionClause = getSelectionClause(metricFunctions);
 
-    sb.append("SELECT ").append(selectionClause).append(" FROM ").append(collection);
+    String tableName = ThirdEyeUtils.computeTableName(collection);
+
+    sb.append("SELECT ").append(selectionClause).append(" FROM ").append(tableName);
     String betweenClause = getBetweenClause(startTime, endTimeExclusive, dataTimeSpec, collection);
     sb.append(" WHERE ").append(betweenClause);
 
@@ -137,6 +139,7 @@ public class PqlUtils {
     if (StringUtils.isNotBlank(dimensionWhereClause)) {
       sb.append(" AND ").append(dimensionWhereClause);
     }
+
     String groupByClause = getDimensionGroupByClause(groupBy, timeGranularity, dataTimeSpec);
     if (StringUtils.isNotBlank(groupByClause)) {
       sb.append(" ").append(groupByClause);
@@ -151,7 +154,7 @@ public class PqlUtils {
     if (!metricFunction.getMetricName().equals("*")) {
       builder.append(" AND ");
       String metricId = metricFunction.getMetricName().replaceAll(MetricConfigBean.DERIVED_METRIC_ID_PREFIX, "");
-      MetricConfigDTO metricConfig = metricConfigDAO.findById(Long.valueOf(metricId));
+      MetricConfigDTO metricConfig = DAO_REGISTRY.getMetricConfigDAO().findById(Long.valueOf(metricId));
       String metricName = metricConfig.getName();
       builder.append(String.format("%s='%s'", metricNameColumn, metricName));
     }
@@ -171,7 +174,7 @@ public class PqlUtils {
         metricName = "*";
       } else {
         String metricId = function.getMetricName().replaceAll(MetricConfigBean.DERIVED_METRIC_ID_PREFIX, "");
-        MetricConfigDTO metricConfig = metricConfigDAO.findById(Long.valueOf(metricId));
+        MetricConfigDTO metricConfig = DAO_REGISTRY.getMetricConfigDAO().findById(Long.valueOf(metricId));
         metricName = metricConfig.getName();
       }
       builder.append(function.getFunctionName()).append("(").append(metricName)

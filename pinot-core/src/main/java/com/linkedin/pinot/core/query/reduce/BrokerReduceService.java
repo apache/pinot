@@ -29,11 +29,11 @@ import com.linkedin.pinot.common.response.broker.BrokerResponseNative;
 import com.linkedin.pinot.common.response.broker.GroupByResult;
 import com.linkedin.pinot.common.response.broker.QueryProcessingException;
 import com.linkedin.pinot.common.response.broker.SelectionResults;
+import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.common.utils.DataTable;
-import com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema;
-import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunction;
-import com.linkedin.pinot.core.operator.aggregation.function.AggregationFunctionUtils;
-import com.linkedin.pinot.core.operator.aggregation.groupby.AggregationGroupByTrimmingService;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunction;
+import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionUtils;
+import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
 import java.io.Serializable;
@@ -222,6 +222,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     while (iterator.hasNext()) {
       Map.Entry<ServerInstance, DataTable> entry = iterator.next();
       DataSchema dataSchemaToCompare = entry.getValue().getDataSchema();
+      assert dataSchemaToCompare != null;
       if (!dataSchema.isTypeCompatibleWith(dataSchemaToCompare)) {
         droppedServers.add(entry.getKey().toString());
         iterator.remove();
@@ -275,10 +276,10 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     int numAggregationFunctions = aggregationFunctions.length;
 
     // Merge results from all data tables.
-    Serializable[] intermediateResults = new Serializable[numAggregationFunctions];
+    Object[] intermediateResults = new Object[numAggregationFunctions];
     for (DataTable dataTable : dataTableMap.values()) {
       for (int i = 0; i < numAggregationFunctions; i++) {
-        Serializable intermediateResultToMerge;
+        Object intermediateResultToMerge;
         FieldSpec.DataType columnType = dataSchema.getColumnType(i);
         switch (columnType) {
           case LONG:
@@ -293,7 +294,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
           default:
             throw new IllegalStateException("Illegal column type in aggregation results: " + columnType);
         }
-        Serializable mergedIntermediateResult = intermediateResults[i];
+        Object mergedIntermediateResult = intermediateResults[i];
         if (mergedIntermediateResult == null) {
           intermediateResults[i] = intermediateResultToMerge;
         } else {
@@ -328,20 +329,20 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
 
     // Merge results from all data tables.
     String[] columnNames = new String[numAggregationFunctions];
-    Map<String, Serializable>[] intermediateResultMaps = new Map[numAggregationFunctions];
+    Map<String, Object>[] intermediateResultMaps = new Map[numAggregationFunctions];
     for (DataTable dataTable : dataTableMap.values()) {
       for (int i = 0; i < numAggregationFunctions; i++) {
         if (columnNames[i] == null) {
           columnNames[i] = dataTable.getString(i, 0);
           intermediateResultMaps[i] = dataTable.getObject(i, 1);
         } else {
-          Map<String, Serializable> mergedIntermediateResultMap = intermediateResultMaps[i];
-          Map<String, Serializable> intermediateResultMapToMerge = dataTable.getObject(i, 1);
-          for (Map.Entry<String, Serializable> entry : intermediateResultMapToMerge.entrySet()) {
+          Map<String, Object> mergedIntermediateResultMap = intermediateResultMaps[i];
+          Map<String, Object> intermediateResultMapToMerge = dataTable.getObject(i, 1);
+          for (Map.Entry<String, Object> entry : intermediateResultMapToMerge.entrySet()) {
             String groupKey = entry.getKey();
-            Serializable intermediateResultToMerge = entry.getValue();
+            Object intermediateResultToMerge = entry.getValue();
             if (mergedIntermediateResultMap.containsKey(groupKey)) {
-              Serializable mergedIntermediateResult = mergedIntermediateResultMap.get(groupKey);
+              Object mergedIntermediateResult = mergedIntermediateResultMap.get(groupKey);
               mergedIntermediateResultMap.put(groupKey,
                   aggregationFunctions[i].merge(mergedIntermediateResult, intermediateResultToMerge));
             } else {
@@ -353,12 +354,12 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     }
 
     // Extract final result maps from the merged intermediate result maps.
-    Map<String, Object>[] finalResultMaps = new Map[numAggregationFunctions];
+    Map<String, Comparable>[] finalResultMaps = new Map[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
-      Map<String, Serializable> intermediateResultMap = intermediateResultMaps[i];
-      Map<String, Object> finalResultMap = new HashMap<>();
+      Map<String, Object> intermediateResultMap = intermediateResultMaps[i];
+      Map<String, Comparable> finalResultMap = new HashMap<>();
       for (String groupKey : intermediateResultMap.keySet()) {
-        Serializable intermediateResult = intermediateResultMap.get(groupKey);
+        Object intermediateResult = intermediateResultMap.get(groupKey);
         finalResultMap.put(groupKey, aggregationFunctions[i].extractFinalResult(intermediateResult));
       }
       finalResultMaps[i] = finalResultMap;
@@ -371,7 +372,11 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
     List<AggregationResult> aggregationResults = new ArrayList<>(numAggregationFunctions);
     for (int i = 0; i < numAggregationFunctions; i++) {
       List<GroupByResult> groupByResultList = groupByResultLists[i];
-      aggregationResults.add(new AggregationResult(groupByResultList, groupBy.getColumns(), columnNames[i]));
+      List<String> groupByColumns = groupBy.getExpressions();
+      if (groupByColumns == null) {
+        groupByColumns = groupBy.getColumns();
+      }
+      aggregationResults.add(new AggregationResult(groupByResultList, groupByColumns, columnNames[i]));
     }
     brokerResponseNative.setAggregationResults(aggregationResults);
   }

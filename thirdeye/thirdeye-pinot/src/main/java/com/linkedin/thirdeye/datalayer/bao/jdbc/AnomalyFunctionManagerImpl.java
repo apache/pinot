@@ -30,12 +30,13 @@ public class AnomalyFunctionManagerImpl extends AbstractManagerImpl<AnomalyFunct
   }
 
   @Override
-  public List<String> findDistinctMetricsByCollection(String collection) {
+  public List<String> findDistinctTopicMetricsByCollection(String collection) {
     Predicate predicate = Predicate.EQ("collection", collection);
     List<AnomalyFunctionBean> list = genericPojoDao.get(predicate, AnomalyFunctionBean.class);
     Set<String> metrics = new HashSet<>();
     for (AnomalyFunctionBean anomalyFunctionBean : list) {
-      metrics.add(anomalyFunctionBean.getMetric());
+      AnomalyFunctionDTO dto = MODEL_MAPPER.map(anomalyFunctionBean, AnomalyFunctionDTO.class);
+      metrics.add(dto.getTopicMetric());
     }
     return new ArrayList<>(metrics);
   }

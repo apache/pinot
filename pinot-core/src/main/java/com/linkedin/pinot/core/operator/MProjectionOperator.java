@@ -15,20 +15,14 @@
  */
 package com.linkedin.pinot.core.operator;
 
-import com.linkedin.pinot.core.common.DataFetcher;
-import com.linkedin.pinot.core.operator.aggregation.DataBlockCache;
-import com.linkedin.pinot.core.operator.blocks.DocIdSetBlock;
-import java.util.HashMap;
-import java.util.Map;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
-import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.common.Operator;
+import com.linkedin.pinot.core.common.DataBlockCache;
+import com.linkedin.pinot.core.common.DataFetcher;
+import com.linkedin.pinot.core.operator.blocks.DocIdSetBlock;
 import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
+import java.util.HashMap;
+import java.util.Map;
 
 
 /**
@@ -37,6 +31,7 @@ import com.linkedin.pinot.core.operator.blocks.ProjectionBlock;
  *
  */
 public class MProjectionOperator extends BaseOperator {
+  private static final String OPERATOR_NAME = "MProjectionOperator";
 
   private final BReusableFilteredDocIdSetOperator _docIdSetOperator;
   private final Map<String, BaseOperator> _columnToDataSourceMap;
@@ -89,6 +84,11 @@ public class MProjectionOperator extends BaseOperator {
   @Override
   public Block getNextBlock(BlockId blockId) {
     throw new UnsupportedOperationException("Not supported in MProjectionOperator!");
+  }
+
+  @Override
+  public String getOperatorName() {
+    return OPERATOR_NAME;
   }
 
   // TODO: remove this method.

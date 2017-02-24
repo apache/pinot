@@ -124,16 +124,13 @@ public class ValidationManagerTest {
   public void testRebuildBrokerResourceWhenBrokerAdded() throws Exception {
     // Check that the first table we added doesn't need to be rebuilt(case where ideal state brokers and brokers in broker resource are the same.
     String partitionName = _offlineTableConfig.getTableName();
-    FakeValidationMetrics validationMetrics = new FakeValidationMetrics();
-    ValidationManager validationManager = new ValidationManager(validationMetrics, _pinotHelixResourceManager, new ControllerConf(),
-        _segmentManager);
     HelixAdmin helixAdmin = _helixManager.getClusterManagmentTool();
 
     IdealState idealState = HelixHelper.getBrokerIdealStates(helixAdmin, HELIX_CLUSTER_NAME);
     // Ensure that the broker resource is not rebuilt.
     Assert.assertTrue(idealState.getInstanceSet(partitionName).equals(
         _pinotHelixResourceManager.getAllInstancesForBrokerTenant(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME)));
-    validationManager.rebuildBrokerResourceWhenBrokerAdded(_offlineTableConfig, idealState);
+    _pinotHelixResourceManager.rebuildBrokerResourceFromHelixTags(partitionName);
 
     // Add another table that needs to be rebuilt
     String offlineTableTwoConfigJson =
@@ -155,7 +152,7 @@ public class ValidationManagerTest {
     // Assert that the two don't equal before the call to rebuild the broker resource.
     Assert.assertTrue(!idealState.getInstanceSet(partitionNameTwo).equals(
         _pinotHelixResourceManager.getAllInstancesForBrokerTenant(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME)));
-    validationManager.rebuildBrokerResourceWhenBrokerAdded(offlineTableConfigTwo, idealState);
+    _pinotHelixResourceManager.rebuildBrokerResourceFromHelixTags(partitionNameTwo);
     idealState = HelixHelper.getBrokerIdealStates(helixAdmin, HELIX_CLUSTER_NAME);
     // Assert that the two do equal after being rebuilt.
     Assert.assertTrue(idealState.getInstanceSet(partitionNameTwo).equals(

@@ -11,8 +11,7 @@
   <tr>
     <td style="min-height: 30px; font-family: 'Proxima Nova','Arial', 'Helvetica Neue',Helvetica, sans-serif;font-size:16px;font-weight:300; width:100%;display:inline;">
       <p>Hello,</p>
-      <p>You are receiving this email because you have subscribed to ThirdEye Anomaly detection
-        service for '${collection}:${metric}'.<br/></p>
+      <p>You are receiving this email because you have subscribed to ThirdEye service for '${collection}:${metric}'.<br/></p>
     <#if (anomalyCount > 0)>
       <p> ThirdEye has analyzed your dataset for time range ${dateFormat(startTime)}
         to ${dateFormat(endTime)} (${timeZone}) and has detected

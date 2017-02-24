@@ -30,10 +30,11 @@ import com.linkedin.pinot.core.io.reader.impl.ChunkReaderContext;
 import com.linkedin.pinot.core.io.reader.impl.v1.FixedByteChunkSingleValueReader;
 import com.linkedin.pinot.core.io.reader.impl.v1.VarByteChunkSingleValueReader;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
+import com.linkedin.pinot.core.segment.store.ColumnIndexType;
+import com.linkedin.pinot.core.segment.store.SegmentDirectory;
 import java.io.File;
-import java.nio.channels.FileChannel;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -47,7 +48,7 @@ import org.testng.annotations.Test;
 
 
 /**
- * Class for testing forward index creators.
+ * Class for testing Raw index creators.
  */
 public class RawIndexCreatorTest {
 
@@ -66,6 +67,8 @@ public class RawIndexCreatorTest {
 
   Random _random;
   private RecordReader _recordReader;
+  SegmentDirectory _segmentDirectory;
+  private SegmentDirectory.Reader _segmentReader;
 
   /**
    * Setup to build a segment with raw indexes (no-dictionary) of various data types.
@@ -147,14 +150,10 @@ public class RawIndexCreatorTest {
   @Test
   public void testStringRawIndexCreator()
       throws Exception {
-
-    File indexFile = getIndexFileForColumn(STRING_COLUMN);
-    Assert.assertTrue(indexFile.exists(), "Index file not generated: " + indexFile.getAbsolutePath());
+    PinotDataBuffer indexBuffer = getIndexBufferForColumn(STRING_COLUMN);
 
     ChunkDecompressor uncompressor = ChunkCompressorFactory.getDecompressor("snappy");
-    VarByteChunkSingleValueReader rawIndexReader = new VarByteChunkSingleValueReader(
-        PinotDataBuffer.fromFile(indexFile, ReadMode.heap, FileChannel.MapMode.READ_ONLY, getClass().getName()),
-        uncompressor);
+    VarByteChunkSingleValueReader rawIndexReader = new VarByteChunkSingleValueReader(indexBuffer, uncompressor);
 
     _recordReader.rewind();
     ChunkReaderContext context = rawIndexReader.createContext();
@@ -175,11 +174,9 @@ public class RawIndexCreatorTest {
    */
   private void testFixedLengthRawIndexCreator(String column, FieldSpec.DataType dataType)
       throws Exception {
-    File indexFile = getIndexFileForColumn(column);
-    Assert.assertTrue(indexFile.exists(), "Index file not generated: " + indexFile.getAbsolutePath());
+    PinotDataBuffer indexBuffer = getIndexBufferForColumn(column);
 
-    FixedByteChunkSingleValueReader rawIndexReader = new FixedByteChunkSingleValueReader(
-        PinotDataBuffer.fromFile(indexFile, ReadMode.heap, FileChannel.MapMode.READ_ONLY, getClass().getName()),
+    FixedByteChunkSingleValueReader rawIndexReader = new FixedByteChunkSingleValueReader(indexBuffer,
         ChunkCompressorFactory.getDecompressor("snappy"));
 
     _recordReader.rewind();
@@ -199,9 +196,9 @@ public class RawIndexCreatorTest {
    * @param column Column name for which to get the index file name
    * @return Name of index file for the given column name
    */
-  private File getIndexFileForColumn(String column) {
-    return new File(SEGMENT_DIR_NAME,
-        File.separator + SEGMENT_NAME + File.separator + column + V1Constants.Indexes.RAW_SV_FWD_IDX_FILE_EXTENTION);
+  private PinotDataBuffer getIndexBufferForColumn(String column)
+      throws IOException {
+    return _segmentReader.getIndexFor(column, ColumnIndexType.FORWARD_INDEX);
   }
 
   /**
@@ -239,7 +236,8 @@ public class RawIndexCreatorTest {
     RecordReader reader = new TestRecordReader(rows, schema);
     driver.init(config, reader);
     driver.build();
-
+    _segmentDirectory = SegmentDirectory.createFromLocalFS(driver.getOutputDirectory(), ReadMode.mmap);
+    _segmentReader = _segmentDirectory.createReader();
     reader.rewind();
     return reader;
   }

@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.detector.function;
 
+import com.linkedin.thirdeye.anomalydetection.function.WeekOverWeekRuleFunction;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;

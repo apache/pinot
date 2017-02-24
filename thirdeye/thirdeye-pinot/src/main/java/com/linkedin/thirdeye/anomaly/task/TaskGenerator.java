@@ -1,10 +1,12 @@
 package com.linkedin.thirdeye.anomaly.task;
 
+import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
+
 import com.linkedin.thirdeye.anomaly.alert.AlertJobContext;
 import com.linkedin.thirdeye.anomaly.alert.AlertTaskInfo;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobContext;
@@ -16,11 +18,11 @@ import com.linkedin.thirdeye.anomaly.monitor.MonitorTaskInfo;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 
+
 /**
  * Generates tasks for a job depending on the task type
  */
 public class TaskGenerator {
-
 
   public List<DetectionTaskInfo> createDetectionTasks(DetectionJobContext detectionJobContext,
       DateTime monitoringWindowStartTime, DateTime monitoringWindowEndTime)
@@ -47,16 +49,30 @@ public class TaskGenerator {
 
   }
 
-  public List<AlertTaskInfo> createAlertTasks(AlertJobContext alertJobContext, DateTime monitoringWindowStartTime,
-      DateTime monitoringWindowEndTime)
-      throws Exception{
+  public List<AlertTaskInfo> createAlertTasks(AlertJobContext alertJobContext,
+      DateTime monitoringWindowStartTime, DateTime monitoringWindowEndTime) throws Exception {
 
     List<AlertTaskInfo> tasks = new ArrayList<>();
     EmailConfigurationDTO alertConfig = alertJobContext.getAlertConfig();
     long jobExecutionId = alertJobContext.getJobExecutionId();
 
+    AlertTaskInfo taskInfo =
+        new AlertTaskInfo(jobExecutionId, monitoringWindowStartTime, monitoringWindowEndTime,
+            alertConfig, null);
+    tasks.add(taskInfo);
+    return tasks;
+  }
 
-    AlertTaskInfo taskInfo = new AlertTaskInfo(jobExecutionId, monitoringWindowStartTime, monitoringWindowEndTime, alertConfig);
+  public List<AlertTaskInfo> createAlertTasksV2(AlertJobContext alertJobContext,
+      DateTime monitoringWindowStartTime, DateTime monitoringWindowEndTime) throws Exception {
+
+    List<AlertTaskInfo> tasks = new ArrayList<>();
+    AlertConfigDTO alertConfig = alertJobContext.getAlertConfigDTO();
+    long jobExecutionId = alertJobContext.getJobExecutionId();
+
+    AlertTaskInfo taskInfo =
+        new AlertTaskInfo(jobExecutionId, monitoringWindowStartTime, monitoringWindowEndTime, null,
+            alertConfig);
     tasks.add(taskInfo);
     return tasks;
   }
@@ -79,4 +95,5 @@ public class TaskGenerator {
 
     return tasks;
   }
+
 }

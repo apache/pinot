@@ -14,7 +14,7 @@ public class DetectionResourceHttpUtils extends AbstractResourceHttpUtils {
 
   private static String DETECTION_JOB_ENDPOINT = "/api/detection-job/";
   private static String ADHOC = "/ad-hoc";
-  private static String BACKFILL = "/backfill";
+  private static String BACKFILL = "/generateAnomaliesInRange";
 
   public DetectionResourceHttpUtils(String detectionHost, int detectionPort) {
     super(new HttpHost(detectionHost, detectionPort));

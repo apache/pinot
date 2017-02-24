@@ -16,6 +16,7 @@
 package com.linkedin.pinot.common.data;
 
 import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.utils.DataSchema;
 import javax.annotation.Nonnull;
 import org.apache.avro.Schema.Type;
 import org.json.JSONArray;
@@ -201,7 +202,7 @@ public abstract class FieldSpec {
 
   /**
    * The <code>DataType</code> enum is used to demonstrate the data type of a column.
-   * <p>Array <code>DataType</code> is only used in {@link com.linkedin.pinot.common.utils.DataTableBuilder.DataSchema}.
+   * <p>Array <code>DataType</code> is only used in {@link DataSchema}.
    * <p>In {@link Schema}, use non-array <code>DataType</code> only.
    * <p>In pinot, we store data using 5 <code>DataType</code>s: INT, LONG, FLOAT, DOUBLE, STRING. All other
    * <code>DataType</code>s will be converted to one of them.

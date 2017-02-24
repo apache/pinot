@@ -21,7 +21,6 @@ import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
-import java.io.FileInputStream;
 import java.util.Collections;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -69,15 +68,16 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
   @BeforeMethod
   public void setupMethod(Object[] args)
       throws Exception {
+    ensureDirectoryExistsAndIsEmpty(_tmpDir);
+    ensureDirectoryExistsAndIsEmpty(_segmentsDir);
+    ensureDirectoryExistsAndIsEmpty(_tarsDir);
     if (args == null || args.length == 0) {
       return;
     }
     this.tableName = (String) args[0];
     SegmentVersion version = (SegmentVersion) args[1];
     addOfflineTable("DaysSinceEpoch", "daysSinceEpoch", -1, "", null, null, this.tableName, version);
-    ensureDirectoryExistsAndIsEmpty(_tmpDir);
-    ensureDirectoryExistsAndIsEmpty(_segmentsDir);
-    ensureDirectoryExistsAndIsEmpty(_tarsDir);
+
   }
 
   @AfterMethod

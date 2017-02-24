@@ -36,13 +36,13 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.StarTreeIndexSpec;
-import com.linkedin.pinot.common.utils.SegmentNameBuilder;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
 import com.linkedin.pinot.core.data.extractors.PlainFieldExtractor;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.data.readers.RecordReaderFactory;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector;
 import com.linkedin.pinot.core.segment.creator.ColumnIndexCreationInfo;
 import com.linkedin.pinot.core.segment.creator.ColumnStatistics;
@@ -53,6 +53,8 @@ import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationInfo;
 import com.linkedin.pinot.core.segment.creator.SegmentPreIndexStatsCollector;
 import com.linkedin.pinot.core.segment.creator.impl.stats.SegmentPreIndexStatsCollectorImpl;
+import com.linkedin.pinot.core.segment.index.converter.SegmentFormatConverter;
+import com.linkedin.pinot.core.segment.index.converter.SegmentFormatConverterFactory;
 import com.linkedin.pinot.core.startree.OffHeapStarTreeBuilder;
 import com.linkedin.pinot.core.startree.StarTree;
 import com.linkedin.pinot.core.startree.StarTreeBuilder;
@@ -201,7 +203,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     }
     List<String> dimensionsSplitOrder = starTreeIndexSpec.getDimensionsSplitOrder();
     if (dimensionsSplitOrder != null && !dimensionsSplitOrder.isEmpty()) {
-      String timeColumnName = config.getTimeColumnName();
+      final String timeColumnName = config.getTimeColumnName();
       if (timeColumnName != null) {
         dimensionsSplitOrder.remove(timeColumnName);
       }
@@ -411,21 +413,8 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   }
 
   private void handlePostCreation() throws Exception {
-    // Build the segment name, if necessary
     final String timeColumn = config.getTimeColumnName();
-
-    if (config.getSegmentName() != null) {
-      segmentName = config.getSegmentName();
-    } else {
-      if (timeColumn != null && timeColumn.length() > 0) {
-        final Object minTimeValue = statsCollector.getColumnProfileFor(timeColumn).getMinValue();
-        final Object maxTimeValue = statsCollector.getColumnProfileFor(timeColumn).getMaxValue();
-        segmentName = SegmentNameBuilder
-            .buildBasic(config.getTableName(), minTimeValue, maxTimeValue, config.getSegmentNamePostfix());
-      } else {
-        segmentName = SegmentNameBuilder.buildBasic(config.getTableName(), config.getSegmentNamePostfix());
-      }
-    }
+    segmentName = config.getSegmentNameGenerator().getSegmentName(statsCollector.getColumnProfileFor(timeColumn));
 
     // Write the index files to disk
     indexCreator.setSegmentName(segmentName);
@@ -459,9 +448,35 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       }
     }
 
+    convertFormatIfNeeded(segmentOutputDir);
     LOGGER.info("Driver, record read time : {}", totalRecordReadTime);
     LOGGER.info("Driver, stats collector time : {}", totalStatsCollectorTime);
     LOGGER.info("Driver, indexing time : {}", totalIndexTime);
+  }
+
+  // Explanation of why we are using format converter:
+  // There are 3 options to correctly generate segments to v3 format
+  // 1. Generate v3 directly: This is efficient but v3 index writer needs to know buffer size upfront.
+  // Inverted, star and raw indexes don't have the index size upfront. This is also least flexible approach
+  // if we add more indexes in future.
+  // 2. Hold data in-memory: One way to work around predeclaring sizes in (1) is to allocate "large" buffer (2GB?)
+  // and hold the data in memory and write the buffer at the end. The memory requirement in this case increases linearly
+  // with the number of columns. Variation of that is to mmap data to separate files...which is what we are doing here
+  // 3. Another option is to generate dictionary and fwd indexes in v3 and generate inverted, star and raw indexes in
+  // separate files. Then add those files to v3 index file. This leads to lot of hodgepodge code to
+  // handle multiple segment formats.
+  // Using converter is similar to option (2), plus it's battle-tested code. We will roll out with
+  // this change to keep changes limited. Once we've migrated we can implement approach (1) with option to
+  // copy for indexes for which we don't know sizes upfront.
+  private void convertFormatIfNeeded(File segmentDirectory)
+      throws Exception {
+    SegmentVersion versionToGenerate = config.getSegmentVersion();
+    if (versionToGenerate.equals(SegmentVersion.v1)) {
+      // v1 by default
+      return;
+    }
+    SegmentFormatConverter converter = SegmentFormatConverterFactory.getConverter(SegmentVersion.v1, SegmentVersion.v3);
+    converter.convert(segmentDirectory);
   }
 
   public ColumnStatistics getColumnStatisticsCollector(final String columnName) throws Exception {
@@ -531,6 +546,14 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
    */
   public String getSegmentName() {
     return segmentName;
+  }
+
+  @Override
+  /**
+   * Returns the path of the output directory
+   */
+  public File getOutputDirectory() {
+    return new File(new File(config.getOutDir()), segmentName);
   }
 
   private GenericRow readNextRowSanitized(GenericRow readRow, GenericRow transformedRow) {

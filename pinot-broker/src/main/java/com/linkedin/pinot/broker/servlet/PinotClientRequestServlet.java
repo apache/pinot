@@ -15,25 +15,22 @@
  */
 package com.linkedin.pinot.broker.servlet;
 
+import com.linkedin.pinot.broker.requesthandler.BrokerRequestHandler;
+import com.linkedin.pinot.common.metrics.BrokerMeter;
+import com.linkedin.pinot.common.metrics.BrokerMetrics;
+import com.linkedin.pinot.common.response.BrokerResponse;
 import java.io.BufferedReader;
 import java.io.IOException;
-
 import java.io.PrintWriter;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.linkedin.pinot.common.metrics.BrokerMeter;
-import com.linkedin.pinot.common.metrics.BrokerMetrics;
-import com.linkedin.pinot.common.response.BrokerResponse;
-import com.linkedin.pinot.requestHandler.BrokerRequestHandler;
 
 
 public class PinotClientRequestServlet extends HttpServlet {

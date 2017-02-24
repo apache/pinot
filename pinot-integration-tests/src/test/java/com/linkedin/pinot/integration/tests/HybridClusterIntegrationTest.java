@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.File;
 import java.sql.ResultSet;
 import java.sql.Statement;
@@ -34,8 +35,10 @@ import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.model.ExternalView;
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -47,7 +50,6 @@ import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.util.TestUtils;
-import junit.framework.Assert;
 import kafka.server.KafkaServerStartable;
 
 
@@ -205,6 +207,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     rs.close();
 
     waitForRecordCountToStabilizeToExpectedCount(h2RecordCount, timeInFiveMinutes);
+
   }
 
   protected boolean shouldUseLlc() {
@@ -217,7 +220,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
    *
    * @return sorted column name or null if none is to be used for this run.
    */
-  private String makeSortedColumn() {
+  protected String makeSortedColumn() {
     List<String> dimensions = schema.getDimensionNames();
     final int nDimensions = dimensions.size();
     int ntries = nDimensions;
@@ -248,7 +251,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
    *
    * @return list of inverted index columns or null is no inv index is to be used for this run
    */
-  private List<String> makeInvertedIndexColumns() {
+  protected List<String> makeInvertedIndexColumns() {
     List<String> dimensions = schema.getDimensionNames();
     final int nDimensions = dimensions.size();
     int dimPos = random.nextInt(dimensions.size()+1);
@@ -328,6 +331,31 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
 
   @AfterClass
   public void tearDown() throws Exception {
+    // Try deleting the tables and check that they have no routing table
+    dropOfflineTable(getTableName());
+    dropRealtimeTable(getTableName());
+
+    long endTime = System.currentTimeMillis() + 15000;
+    boolean isRoutingTableEmpty = false;
+    JSONObject routingTableSnapshot = null;
+    while (System.currentTimeMillis() < endTime) {
+      try {
+        routingTableSnapshot = getDebugInfo("debug/routingTable/" + getTableName());
+
+        if (routingTableSnapshot.getJSONArray("routingTableSnapshot").length() == 0) {
+          isRoutingTableEmpty = true;
+          break;
+        }
+      } catch (Exception e) {
+        // Will retry in a bit
+      }
+
+      Uninterruptibles.sleepUninterruptibly(500, TimeUnit.MILLISECONDS);
+    }
+
+    Assert.assertTrue(isRoutingTableEmpty,
+        "Routing table is not empty, last snapshot is " + routingTableSnapshot.toString());
+
     stopBroker();
     stopController();
     stopServer();

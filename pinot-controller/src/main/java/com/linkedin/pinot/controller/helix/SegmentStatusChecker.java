@@ -180,8 +180,8 @@ public class SegmentStatusChecker {
       _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.IDEALSTATE_ZNODE_SIZE, idealState.toString().length());
       ExternalView externalView = helixAdmin.getResourceExternalView(helixClusterName, tableName);
 
-      final int nReplicasIdeal = Integer.parseInt(idealState.getReplicas());
-      int nReplicasExternal = nReplicasIdeal;
+      int nReplicasIdealMax = 0;
+      int nReplicasExternal = -1;
       int nErrors = 0;
       int nOffline = 0;
       for (String partitionName : idealState.getPartitionSet()) {
@@ -201,6 +201,8 @@ public class SegmentStatusChecker {
           // No online segments in ideal state
           continue;
         }
+        nReplicasIdealMax = (idealState.getInstanceStateMap(partitionName).size() > nReplicasIdealMax)
+            ? idealState.getInstanceStateMap(partitionName).size() : nReplicasIdealMax;
         if ((externalView == null) || (externalView.getStateMap(partitionName) == null)) {
           // No replicas for this segment
           TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
@@ -234,19 +236,24 @@ public class SegmentStatusChecker {
           }
           nOffline++;
         }
-        nReplicasExternal = (nReplicasExternal > nReplicas) ? nReplicas : nReplicasExternal;
+        nReplicasExternal = ((nReplicasExternal > nReplicas) || (nReplicasExternal == -1)) ? nReplicas : nReplicasExternal;
+      }
+      if (nReplicasExternal == -1){
+        nReplicasExternal = 0;
       }
       // Synchronization provided by Controller Gauge to make sure that only one thread updates the gauge
       _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.NUMBER_OF_REPLICAS,
           nReplicasExternal);
+      _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.PERCENT_OF_REPLICAS,
+          (nReplicasIdealMax > 0) ? (nReplicasExternal * 100 / nReplicasIdealMax) : 100);
       _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.SEGMENTS_IN_ERROR_STATE,
           nErrors);
       if (nOffline > 0) {
         LOGGER.warn("Table {} has {} segments with no online replicas", tableName, nOffline);
       }
-      if (nReplicasExternal < nReplicasIdeal) {
+      if (nReplicasExternal < nReplicasIdealMax) {
         LOGGER.warn("Table {} has {} replicas, below replication threshold :{}", tableName,
-            nReplicasExternal, nReplicasIdeal);
+            nReplicasExternal, nReplicasIdealMax);
       }
     }
     _metricsRegistry.setValueOfGlobalGauge(ControllerGauge.REALTIME_TABLE_COUNT, realTimeTableCount);
@@ -282,6 +289,7 @@ public class SegmentStatusChecker {
     // Synchronization provided by Controller Gauge to make sure that only one thread updates the gauge
     for (String tableName : allTableNames) {
       _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.NUMBER_OF_REPLICAS, 0);
+      _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.PERCENT_OF_REPLICAS, 0);
       _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.SEGMENTS_IN_ERROR_STATE, 0);
     }
   }

@@ -15,8 +15,8 @@
  */
 package com.linkedin.pinot.broker.servlet;
 
+import com.linkedin.pinot.broker.requesthandler.BrokerRequestHandler;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
-import com.linkedin.pinot.requestHandler.BrokerRequestHandler;
 import com.linkedin.pinot.routing.TimeBoundaryService;
 import javax.servlet.ServletContextEvent;
 import javax.servlet.ServletContextListener;

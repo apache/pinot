@@ -15,202 +15,108 @@
  */
 package com.linkedin.pinot.core.query.aggregation.function;
 
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.BlockDocIdSet;
-import com.linkedin.pinot.core.common.BlockSingleValIterator;
+import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.BlockValSet;
-import com.linkedin.pinot.core.common.Constants;
-import com.linkedin.pinot.core.operator.docidsets.ArrayBasedDocIdSet;
-import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
-import com.linkedin.pinot.core.query.aggregation.CombineLevel;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import java.io.Serializable;
-import java.util.List;
-import java.util.Locale;
-import org.json.JSONException;
-import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.linkedin.pinot.core.query.aggregation.AggregationResultHolder;
+import com.linkedin.pinot.core.query.aggregation.DoubleAggregationResultHolder;
+import com.linkedin.pinot.core.query.aggregation.groupby.DoubleGroupByResultHolder;
+import com.linkedin.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import javax.annotation.Nonnull;
 
 
-/**
- * This function will take a column and do sum on that.
- *
- */
 public class SumAggregationFunction implements AggregationFunction<Double, Double> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(SumAggregationFunction.class);
+  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.SUM.getName();
+  private static final double DEFAULT_VALUE = 0.0;
 
-  private String _sumByColumn;
-  static final int VECTOR_SIZE = 1000;
-  private static final  ThreadLocal<int[]> DICTIONARY_ID_ARRAY = new ThreadLocal<int[]>() {
-    @Override
-    protected int[] initialValue() {
-      return new int[VECTOR_SIZE];
-    }
-  };
+  @Nonnull
+  @Override
+  public String getName() {
+    return NAME;
+  }
 
-  private static final ThreadLocal<double[]> DOC_VALUE_ARRAY = new ThreadLocal<double[]>() {
-    @Override
-    protected double[] initialValue() {
-      return new double[VECTOR_SIZE];
-    }
-  };
-
-  public SumAggregationFunction() {
-
+  @Nonnull
+  @Override
+  public String getColumnName(@Nonnull String[] columns) {
+    return NAME + "_" + columns[0];
   }
 
   @Override
-  public void init(AggregationInfo aggregationInfo) {
-    _sumByColumn = aggregationInfo.getAggregationParams().get("column");
+  public void accept(@Nonnull AggregationFunctionVisitorBase visitor) {
+    visitor.visit(this);
+  }
 
+  @Nonnull
+  @Override
+  public AggregationResultHolder createAggregationResultHolder() {
+    return new DoubleAggregationResultHolder(DEFAULT_VALUE);
+  }
+
+  @Nonnull
+  @Override
+  public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity, int trimSize) {
+    return new DoubleGroupByResultHolder(initialCapacity, maxCapacity, trimSize, DEFAULT_VALUE);
   }
 
   @Override
-  public Double aggregate(Block docIdSetBlock, Block[] blocks) {
-    BlockDocIdSet blockDocIdSet = docIdSetBlock.getBlockDocIdSet();
+  public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
+      @Nonnull BlockValSet... blockValSets) {
+    double[] valueArray = blockValSets[0].getDoubleValuesSV();
+    double sum = aggregationResultHolder.getDoubleResult();
+    for (int i = 0; i < length; i++) {
+      sum += valueArray[i];
+    }
+    aggregationResultHolder.setValue(sum);
+  }
 
-    // for queries with high selectivity (10s of millions), iterative
-    // approach to aggregation is quite slow. Hence switch to the
-    // vectorized version. Some of the interface calls in
-    // vectorizedAggregate are implemented only for ArrayBasedDocIdSet.
-    // Hence, the if-else below. I'm pretty sure this method
-    // is called for ArrayBasedDocIdSet only but don't want to take
-    // RuntimeException
-    assert blocks.length == 1;
-    if ( blockDocIdSet instanceof  ArrayBasedDocIdSet) {
-       return vectorizedAggregate((ArrayBasedDocIdSet) blockDocIdSet, blocks);
-    } else {
-      return iterativeAggregate(docIdSetBlock, blocks);
+  @Override
+  public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+    double[] valueArray = blockValSets[0].getDoubleValuesSV();
+    for (int i = 0; i < length; i++) {
+      int groupKey = groupKeyArray[i];
+      groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + valueArray[i]);
     }
   }
 
-
-  public Double vectorizedAggregate(ArrayBasedDocIdSet docIdSet, Block[] blocks) {
-    double ret = 0;
-    Dictionary dictionaryReader = blocks[0].getMetadata().getDictionary();
-    BlockValSet blockValueSet = blocks[0].getBlockValueSet();
-
-    final int vectorSize = 1000;
-
-    int[] dictIds = DICTIONARY_ID_ARRAY.get();
-    double[] values = DOC_VALUE_ARRAY.get();
-
-    int[] docIds = (int[]) docIdSet.getRaw();
-    int docIdLength = docIdSet.size();
-    int current = 0;
-    while (current < docIdLength) {
-      int pending = (docIdLength - current);
-      int batchLimit = (pending > vectorSize) ? vectorSize : pending;
-      blockValueSet.getDictionaryIds(docIds, current, batchLimit, dictIds, 0);
-      dictionaryReader.readDoubleValues(dictIds, 0, batchLimit, values, 0);
-      for (int vi = 0; vi < batchLimit; vi++) {
-        ret += values[vi];
-      }
-      current += batchLimit;
-    }
-    return ret;
-  }
-
-  public Double iterativeAggregate(Block docIdSetBlock, Block[] blocks) {
-    double ret = 0;
-    int docId = 0;
-    Dictionary dictionaryReader = blocks[0].getMetadata().getDictionary();
-    BlockDocIdIterator docIdIterator = docIdSetBlock.getBlockDocIdSet().iterator();
-    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) blocks[0].getBlockValueSet().iterator();
-
-    while ((docId = docIdIterator.next()) != Constants.EOF) {
-      if (blockValIterator.skipTo(docId)) {
-        int dictionaryIndex = blockValIterator.nextIntVal();
-        if (dictionaryIndex != Dictionary.NULL_VALUE_INDEX) {
-          ret += dictionaryReader.getDoubleValue(dictionaryIndex);
-        }
+  @Override
+  public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+    double[] valueArray = blockValSets[0].getDoubleValuesSV();
+    for (int i = 0; i < length; i++) {
+      double value = valueArray[i];
+      for (int groupKey : groupKeysArray[i]) {
+        groupByResultHolder.setValueForKey(groupKey, groupByResultHolder.getDoubleResult(groupKey) + value);
       }
     }
-    return ret;
   }
 
+  @Nonnull
   @Override
-  public Double aggregate(Double mergedResult, int docId, Block[] block) {
-    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) block[0].getBlockValueSet().iterator();
-    if (blockValIterator.skipTo(docId)) {
-      int dictionaryIndex = blockValIterator.nextIntVal();
-      if (dictionaryIndex != Dictionary.NULL_VALUE_INDEX) {
-        double value = block[0].getMetadata().getDictionary().getDoubleValue(dictionaryIndex);
-        if (mergedResult == null) {
-          return value;
-        } else {
-          return mergedResult + value;
-        }
-      } else {
-        return mergedResult;
-      }
-    }
-    return mergedResult;
+  public Double extractAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder) {
+    return aggregationResultHolder.getDoubleResult();
   }
 
+  @Nonnull
   @Override
-  public List<Double> combine(List<Double> aggregationResultList, CombineLevel combineLevel) {
-    double combinedResult = 0;
-    for (double aggregationResult : aggregationResultList) {
-      combinedResult += aggregationResult;
-    }
-    aggregationResultList.clear();
-    aggregationResultList.add(combinedResult);
-    return aggregationResultList;
+  public Double extractGroupByResult(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
+    return groupByResultHolder.getDoubleResult(groupKey);
   }
 
+  @Nonnull
   @Override
-  public Double combineTwoValues(Double aggregationResult0, Double aggregationResult1) {
-    if (aggregationResult0 == null) {
-      return aggregationResult1;
-    }
-    if (aggregationResult1 == null) {
-      return aggregationResult0;
-    }
-    return aggregationResult0 + aggregationResult1;
+  public Double merge(@Nonnull Double intermediateResult1, @Nonnull Double intermediateResult2) {
+    return intermediateResult1 + intermediateResult2;
   }
 
+  @Nonnull
   @Override
-  public Double reduce(List<Double> combinedResult) {
-    double reducedResult = 0;
-    for (double combineResult : combinedResult) {
-      reducedResult += combineResult;
-    }
-    return reducedResult;
+  public FieldSpec.DataType getIntermediateResultDataType() {
+    return FieldSpec.DataType.DOUBLE;
   }
 
+  @Nonnull
   @Override
-  public JSONObject render(Double finalAggregationResult) {
-    try {
-      if (finalAggregationResult == null) {
-        finalAggregationResult = 0.0;
-      }
-      return new JSONObject().put("value", String.format(Locale.US, "%.5f", finalAggregationResult));
-    } catch (JSONException e) {
-      LOGGER.error("Caught exception while rendering to JSON", e);
-      Utils.rethrowException(e);
-      throw new AssertionError("Should not reach this");
-    }
+  public Double extractFinalResult(@Nonnull Double intermediateResult) {
+    return intermediateResult;
   }
-
-  @Override
-  public DataType aggregateResultDataType() {
-    return DataType.DOUBLE;
-  }
-
-  @Override
-  public String getFunctionName() {
-    return "sum_" + _sumByColumn;
-  }
-
-  @Override
-  public Serializable getDefaultValue() {
-    return Double.valueOf(0);
-  }
-
 }

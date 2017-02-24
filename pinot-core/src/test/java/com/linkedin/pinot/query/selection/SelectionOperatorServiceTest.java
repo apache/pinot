@@ -19,8 +19,8 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.common.request.SelectionSort;
 import com.linkedin.pinot.common.response.broker.SelectionResults;
+import com.linkedin.pinot.common.utils.DataSchema;
 import com.linkedin.pinot.common.utils.DataTable;
-import com.linkedin.pinot.common.utils.DataTableBuilder;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
 import java.io.Serializable;
@@ -44,15 +44,15 @@ public class SelectionOperatorServiceTest {
       {"int", "long", "float", "double", "string", "int_array", "long_array", "float_array", "double_array", "string_array"};
   private final FieldSpec.DataType[] _dataTypes =
       {FieldSpec.DataType.INT, FieldSpec.DataType.LONG, FieldSpec.DataType.FLOAT, FieldSpec.DataType.DOUBLE, FieldSpec.DataType.STRING, FieldSpec.DataType.INT_ARRAY, FieldSpec.DataType.LONG_ARRAY, FieldSpec.DataType.FLOAT_ARRAY, FieldSpec.DataType.DOUBLE_ARRAY, FieldSpec.DataType.STRING_ARRAY};
-  private final DataTableBuilder.DataSchema _dataSchema = new DataTableBuilder.DataSchema(_columnNames, _dataTypes);
+  private final DataSchema _dataSchema = new DataSchema(_columnNames, _dataTypes);
   private final FieldSpec.DataType[] _compatibleDataTypes =
       {FieldSpec.DataType.LONG, FieldSpec.DataType.FLOAT, FieldSpec.DataType.DOUBLE, FieldSpec.DataType.INT, FieldSpec.DataType.STRING, FieldSpec.DataType.LONG_ARRAY, FieldSpec.DataType.FLOAT_ARRAY, FieldSpec.DataType.DOUBLE_ARRAY, FieldSpec.DataType.INT_ARRAY, FieldSpec.DataType.STRING_ARRAY};
-  private final DataTableBuilder.DataSchema _compatibleDataSchema =
-      new DataTableBuilder.DataSchema(_columnNames, _compatibleDataTypes);
+  private final DataSchema _compatibleDataSchema =
+      new DataSchema(_columnNames, _compatibleDataTypes);
   private final FieldSpec.DataType[] _upgradedDataTypes =
       new FieldSpec.DataType[]{FieldSpec.DataType.LONG, FieldSpec.DataType.DOUBLE, FieldSpec.DataType.DOUBLE, FieldSpec.DataType.DOUBLE, FieldSpec.DataType.STRING, FieldSpec.DataType.LONG_ARRAY, FieldSpec.DataType.DOUBLE_ARRAY, FieldSpec.DataType.DOUBLE_ARRAY, FieldSpec.DataType.DOUBLE_ARRAY, FieldSpec.DataType.STRING_ARRAY};
-  private final DataTableBuilder.DataSchema _upgradedDataSchema =
-      new DataTableBuilder.DataSchema(_columnNames, _upgradedDataTypes);
+  private final DataSchema _upgradedDataSchema =
+      new DataSchema(_columnNames, _upgradedDataTypes);
   private final Serializable[] _row1 =
       {0, 1L, 2.0F, 3.0, "4", new int[]{5}, new long[]{6L}, new float[]{7.0F}, new double[]{8.0}, new String[]{"9"}};
   private final Serializable[] _row2 =
@@ -126,7 +126,7 @@ public class SelectionOperatorServiceTest {
     Collection<Serializable[]> rows = new ArrayList<>(2);
     rows.add(_row1.clone());
     rows.add(_compatibleRow1.clone());
-    DataTableBuilder.DataSchema dataSchema = _dataSchema.clone();
+    DataSchema dataSchema = _dataSchema.clone();
     Assert.assertTrue(dataSchema.isTypeCompatibleWith(_compatibleDataSchema));
     dataSchema.upgradeToCover(_compatibleDataSchema);
     Assert.assertEquals(dataSchema, _upgradedDataSchema);

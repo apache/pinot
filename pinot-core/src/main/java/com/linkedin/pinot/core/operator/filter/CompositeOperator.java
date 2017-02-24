@@ -24,10 +24,10 @@ import com.linkedin.pinot.core.operator.blocks.BaseFilterBlock;
 import com.linkedin.pinot.core.operator.blocks.CompositeBaseFilterBlock;
 
 public class CompositeOperator extends BaseFilterOperator{
+  private static final String OPERATOR_NAME = "CompositeOperator";
+  private List<BaseFilterOperator> operators;
 
-  private List<Operator> operators;
-
-  public CompositeOperator(List<Operator> operators) {
+  public CompositeOperator(List<BaseFilterOperator> operators) {
     this.operators = operators;
   }
 
@@ -50,4 +50,18 @@ public class CompositeOperator extends BaseFilterOperator{
     return new CompositeBaseFilterBlock(blocks);
   }
 
+  @Override
+  public boolean isResultEmpty() {
+    for (BaseFilterOperator operator : operators) {
+      if (!operator.isResultEmpty()) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  @Override
+  public String getOperatorName() {
+    return OPERATOR_NAME;
+  }
 }

@@ -19,7 +19,6 @@
 				<div class="row">
 					<div class="col-md-12 box-add-metric"></div>
 				</div>
-
 			</div>
 			<div class="modal-footer">
 				<button type="button" class="btn btn-inverse" data-dismiss="modal">Cancel</button>

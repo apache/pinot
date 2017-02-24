@@ -1,9 +1,14 @@
 package com.linkedin.thirdeye.datalayer.dao;
 
+import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
+import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
 import com.linkedin.thirdeye.datalayer.entity.AlertConfigIndex;
+import com.linkedin.thirdeye.datalayer.entity.EventIndex;
 import com.linkedin.thirdeye.datalayer.entity.OverrideConfigIndex;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
+import com.linkedin.thirdeye.datalayer.pojo.EventBean;
 import com.linkedin.thirdeye.datalayer.pojo.OverrideConfigBean;
+
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -34,6 +39,7 @@ import com.linkedin.thirdeye.datalayer.entity.AbstractJsonEntity;
 import com.linkedin.thirdeye.datalayer.entity.AnomalyFeedbackIndex;
 import com.linkedin.thirdeye.datalayer.entity.AnomalyFunctionIndex;
 import com.linkedin.thirdeye.datalayer.entity.DashboardConfigIndex;
+import com.linkedin.thirdeye.datalayer.entity.DataCompletenessConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.DatasetConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.EmailConfigurationIndex;
 import com.linkedin.thirdeye.datalayer.entity.GenericJsonEntity;
@@ -44,11 +50,11 @@ import com.linkedin.thirdeye.datalayer.entity.MergedAnomalyResultIndex;
 import com.linkedin.thirdeye.datalayer.entity.MetricConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.RawAnomalyResultIndex;
 import com.linkedin.thirdeye.datalayer.entity.TaskIndex;
-import com.linkedin.thirdeye.datalayer.entity.WebappConfigIndex;
 import com.linkedin.thirdeye.datalayer.pojo.AbstractBean;
 import com.linkedin.thirdeye.datalayer.pojo.AnomalyFeedbackBean;
 import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
 import com.linkedin.thirdeye.datalayer.pojo.DashboardConfigBean;
+import com.linkedin.thirdeye.datalayer.pojo.DataCompletenessConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.DatasetConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.EmailConfigurationBean;
 import com.linkedin.thirdeye.datalayer.pojo.IngraphDashboardConfigBean;
@@ -58,7 +64,6 @@ import com.linkedin.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
 import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.RawAnomalyResultBean;
 import com.linkedin.thirdeye.datalayer.pojo.TaskBean;
-import com.linkedin.thirdeye.datalayer.pojo.WebappConfigBean;
 import com.linkedin.thirdeye.datalayer.util.GenericResultSetMapper;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
 import com.linkedin.thirdeye.datalayer.util.SqlQueryBuilder;
@@ -88,8 +93,6 @@ public class GenericPojoDao {
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, MergedAnomalyResultIndex.class));
     pojoInfoMap.put(RawAnomalyResultBean.class,
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, RawAnomalyResultIndex.class));
-    pojoInfoMap.put(WebappConfigBean.class,
-        newPojoInfo(DEFAULT_BASE_TABLE_NAME, WebappConfigIndex.class));
     pojoInfoMap.put(DatasetConfigBean.class,
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, DatasetConfigIndex.class));
     pojoInfoMap.put(MetricConfigBean.class,
@@ -105,8 +108,12 @@ public class GenericPojoDao {
     pojoInfoMap.put(OverrideConfigBean.class,
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, OverrideConfigIndex.class));
 
+    pojoInfoMap.put(EventBean.class, newPojoInfo(DEFAULT_BASE_TABLE_NAME, EventIndex.class));
+
     pojoInfoMap
         .put(AlertConfigBean.class, newPojoInfo(DEFAULT_BASE_TABLE_NAME, AlertConfigIndex.class));
+    pojoInfoMap.put(DataCompletenessConfigBean.class,
+        newPojoInfo(DEFAULT_BASE_TABLE_NAME, DataCompletenessConfigIndex.class));
   }
 
   private static PojoInfo newPojoInfo(String baseTableName,
@@ -140,6 +147,7 @@ public class GenericPojoDao {
    * @throws SQLException
    */
   public Connection getConnection() throws SQLException {
+    BaseThirdEyeApplication.dbCallCounter.inc();
     // ensure to close the connection
     return dataSource.getConnection();
   }

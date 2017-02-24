@@ -105,6 +105,7 @@ public class ColumnIndexDirectoryTestHelper {
   static SegmentMetadataImpl writeMetadata(SegmentVersion version) {
     SegmentMetadataImpl meta = mock(SegmentMetadataImpl.class);
     when(meta.getVersion()).thenReturn(version.toString());
+    when(meta.getSegmentVersion()).thenReturn(version);
     when(meta.getDictionaryFileName(anyString(), anyString()))
         .thenAnswer(new Answer<String>() {
           @Override

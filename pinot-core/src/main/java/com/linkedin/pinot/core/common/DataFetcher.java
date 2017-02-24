@@ -177,8 +177,13 @@ public class DataFetcher {
    */
   public void fetchIntValues(String column, int[] inDocIds, int inStartPos, int length, int[] outValues, int outStartPos) {
     Dictionary dictionary = getDictionaryForColumn(column);
-    fetchSingleDictIds(column, inDocIds, inStartPos, length, _reusableDictIds, 0);
-    dictionary.readIntValues(_reusableDictIds, 0, length, outValues, outStartPos);
+    if (dictionary != null) {
+      fetchSingleDictIds(column, inDocIds, inStartPos, length, _reusableDictIds, 0);
+      dictionary.readIntValues(_reusableDictIds, 0, length, outValues, outStartPos);
+    } else {
+      BlockValSet blockValSet = _columnToBlockValSetMap.get(column);
+      blockValSet.getIntValues(inDocIds, inStartPos, length, outValues, outStartPos);
+    }
   }
 
   /**
@@ -216,8 +221,13 @@ public class DataFetcher {
    */
   public void fetchLongValues(String column, int[] inDocIds, int inStartPos, int length, long[] outValues, int outStartPos) {
     Dictionary dictionary = getDictionaryForColumn(column);
-    fetchSingleDictIds(column, inDocIds, inStartPos, length, _reusableDictIds, 0);
-    dictionary.readLongValues(_reusableDictIds, 0, length, outValues, outStartPos);
+    if (dictionary != null) {
+      fetchSingleDictIds(column, inDocIds, inStartPos, length, _reusableDictIds, 0);
+      dictionary.readLongValues(_reusableDictIds, 0, length, outValues, outStartPos);
+    } else {
+      BlockValSet blockValSet = _columnToBlockValSetMap.get(column);
+      blockValSet.getLongValues(inDocIds, inStartPos, length, outValues, outStartPos);
+    }
   }
 
   /**
@@ -255,8 +265,13 @@ public class DataFetcher {
    */
   public void fetchFloatValues(String column, int[] inDocIds, int inStartPos, int length, float[] outValues, int outStartPos) {
     Dictionary dictionary = getDictionaryForColumn(column);
-    fetchSingleDictIds(column, inDocIds, inStartPos, length, _reusableDictIds, 0);
-    dictionary.readFloatValues(_reusableDictIds, 0, length, outValues, outStartPos);
+    if (dictionary != null) {
+      fetchSingleDictIds(column, inDocIds, inStartPos, length, _reusableDictIds, 0);
+      dictionary.readFloatValues(_reusableDictIds, 0, length, outValues, outStartPos);
+    } else {
+      BlockValSet blockValSet = _columnToBlockValSetMap.get(column);
+      blockValSet.getFloatValues(inDocIds, inStartPos, length, outValues, outStartPos);
+    }
   }
 
   /**
@@ -299,7 +314,7 @@ public class DataFetcher {
       dictionary.readDoubleValues(_reusableDictIds, 0, length, outValues, outStartPos);
     } else {
       BlockValSet blockValSet = _columnToBlockValSetMap.get(column);
-      blockValSet.getDoubleValues(inDocIds, 0, length, outValues, 0);
+      blockValSet.getDoubleValues(inDocIds, inStartPos, length, outValues, outStartPos);
     }
   }
 
@@ -340,7 +355,7 @@ public class DataFetcher {
       dictionary.readStringValues(_reusableDictIds, 0, length, outValues, outStartPos);
     } else {
       BlockValSet blockValSet = _columnToBlockValSetMap.get(column);
-      blockValSet.getStringValues(inDocIds, 0, length, outValues, 0);
+      blockValSet.getStringValues(inDocIds, inStartPos, length, outValues, outStartPos);
     }
   }
 

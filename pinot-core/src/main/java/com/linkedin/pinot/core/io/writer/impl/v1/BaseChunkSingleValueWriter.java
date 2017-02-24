@@ -126,7 +126,7 @@ public abstract class BaseChunkSingleValueWriter implements SingleColumnSingleVa
       throws IOException {
 
     // Write the chunk if it is non-empty.
-    if (_chunkBuffer.limit() > 0) {
+    if (_chunkBuffer.position() > 0) {
       writeChunk();
     }
 
@@ -147,6 +147,7 @@ public abstract class BaseChunkSingleValueWriter implements SingleColumnSingleVa
    *
    */
   protected void writeChunk() {
+    _chunkBuffer.flip();
     _compressedBuffer.flip();
 
     int compressedSize;

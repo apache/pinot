@@ -90,7 +90,7 @@ e&&(m[1]=3*(k(e)-1));break;case "M":case "MM":null!=e&&(m[1]=k(e)-1);break;case 
  * This combined file was created by the DataTables downloader builder:
  *   https://datatables.net/download
  *
- * To rebuild or modify this file with the latest versions of the included
+ * To update or modify this file with the latest versions of the included
  * software please visit:
  *   https://datatables.net/download/#dt/dt-1.10.12
  *

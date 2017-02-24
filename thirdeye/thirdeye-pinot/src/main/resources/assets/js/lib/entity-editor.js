@@ -54,6 +54,8 @@ function buildNameForEntity(entity, entityType) {
       var endTime = new Date(entity.endTime);
       return entity.id + " : " + entity.targetEntity + " : "+ startTime.toString() + " -- "
              + endTime.toString();
+    case "ALERT_CONFIG" :
+      return entity.id + " : " + entity.name;
     default:
       console.log("entity type not found : " + entityType);
       return entity.id;

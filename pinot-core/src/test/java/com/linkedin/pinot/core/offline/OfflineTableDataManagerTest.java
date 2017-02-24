@@ -25,6 +25,8 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
@@ -74,6 +76,7 @@ public class OfflineTableDataManagerTest {
   // When we replace a segment, we pick a number between _hi and _lo (inclusive)
   private volatile int _lo;
   private volatile int _hi;
+  ExecutorService queryRunners = Executors.newFixedThreadPool(20);
 
   @BeforeSuite
   public void setUp() throws Exception {
@@ -108,7 +111,6 @@ public class OfflineTableDataManagerTest {
       config = mock(TableDataManagerConfig.class);
       when(config.getTableName()).thenReturn(tableName);
       when(config.getDataDir()).thenReturn(_tmpDir.getAbsolutePath());
-      when(config.getNumberOfTableQueryExecutorThreads()).thenReturn(1);  // we do not spawn any real executor threads.
       when(config.getReadMode()).thenReturn(readMode.toString());
       when(config.getIndexLoadingConfigMetadata()).thenReturn(null);
     }

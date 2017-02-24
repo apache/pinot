@@ -16,11 +16,6 @@ import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
 import com.linkedin.thirdeye.client.DAORegistry;
-import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.JobManager;
-import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
@@ -50,14 +45,7 @@ public class TaskDriver {
     this.anomalyTaskDAO = DAO_REGISTRY.getTaskDAO();
     taskExecutorService = Executors.newFixedThreadPool(MAX_PARALLEL_TASK);
     taskContext = new TaskContext();
-    taskContext.setJobDAO(DAO_REGISTRY.getJobDAO());
-    taskContext.setTaskDAO(anomalyTaskDAO);
-    taskContext.setResultDAO(DAO_REGISTRY.getRawAnomalyResultDAO());
     taskContext.setAnomalyFunctionFactory(anomalyFunctionFactory);
-    taskContext.setMergedResultDAO(DAO_REGISTRY.getMergedAnomalyResultDAO());
-    taskContext.setDatasetConfigDAO(DAO_REGISTRY.getDatasetConfigDAO());
-    taskContext.setMetricConfigDAO(DAO_REGISTRY.getMetricConfigDAO());
-    taskContext.setOverrideConfigDAO(DAO_REGISTRY.getOverrideConfigDAO());
     taskContext.setThirdEyeAnomalyConfiguration(thirdEyeAnomalyConfiguration);
     allowedOldTaskStatus.add(TaskStatus.FAILED);
     allowedOldTaskStatus.add(TaskStatus.WAITING);
@@ -88,8 +76,7 @@ public class TaskDriver {
             LOG.info(Thread.currentThread().getId() + " : DONE Executing task: {}",
                 anomalyTaskSpec.getId());
             // update status to COMPLETED
-            updateStatusAndTaskEndTime(anomalyTaskSpec.getId(), TaskStatus.RUNNING,
-                TaskStatus.COMPLETED);
+            updateStatusAndTaskEndTime(anomalyTaskSpec.getId(), TaskStatus.RUNNING, TaskStatus.COMPLETED);
           } catch (Exception e) {
             LOG.error("Exception in electing and executing task", e);
             try {

@@ -35,6 +35,8 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import junit.framework.Assert;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,6 +48,7 @@ public class ApproximateQueryTestUtil {
   private static final ReduceService<BrokerResponseNative> REDUCE_SERVICE = new BrokerReduceService();
   private static final Pql2Compiler REQUEST_COMPILER = new Pql2Compiler();
   private static long counter = 0;
+  private static ExecutorService queryRunners = Executors.newFixedThreadPool(20);
 
   public static Object runQuery(QueryExecutor queryExecutor, String segmentName,
       AvroQueryGenerator.TestAggreationQuery query, ServerMetrics metrics) {
@@ -62,7 +65,7 @@ public class ApproximateQueryTestUtil {
       instanceRequest.getSearchSegments().add(segment);
     }
     QueryRequest queryRequest = new QueryRequest(instanceRequest, metrics);
-    final DataTable instanceResponse = queryExecutor.processQuery(queryRequest);
+    final DataTable instanceResponse = queryExecutor.processQuery(queryRequest, queryRunners);
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
     final BrokerResponseNative brokerResponse = REDUCE_SERVICE.reduceOnDataTable(brokerRequest, instanceResponseMap);

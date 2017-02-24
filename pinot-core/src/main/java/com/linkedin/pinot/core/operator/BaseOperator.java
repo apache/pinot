@@ -29,15 +29,13 @@ import org.slf4j.LoggerFactory;
 public abstract class BaseOperator implements Operator {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseOperator.class);
 
-  private final String _operatorName = getClass().getSimpleName();
-
   @Override
   public final Block nextBlock() {
     long start = System.currentTimeMillis();
     Block ret = getNextBlock();
     long end = System.currentTimeMillis();
-    LOGGER.trace("Time spent in {}: {}", _operatorName, (end - start));
-    TraceContext.logLatency(_operatorName, (end - start));
+    LOGGER.trace("Time spent in {}: {}", getOperatorName(), (end - start));
+    TraceContext.logLatency(getOperatorName(), (end - start));
     return ret;
   }
 
@@ -46,8 +44,8 @@ public abstract class BaseOperator implements Operator {
     long start = System.currentTimeMillis();
     Block ret = getNextBlock(blockId);
     long end = System.currentTimeMillis();
-    LOGGER.trace("Time spent in {}: {}", _operatorName, (end - start));
-    TraceContext.logLatency(_operatorName, (end - start));
+    LOGGER.trace("Time spent in {}: {}", getOperatorName(), (end - start));
+    TraceContext.logLatency(getOperatorName(), (end - start));
     return ret;
   }
 
@@ -55,9 +53,9 @@ public abstract class BaseOperator implements Operator {
 
   public abstract Block getNextBlock(BlockId blockId);
 
-  public String getOperatorName() {
-    return _operatorName;
-  }
+  // Enforcing sub-class to implement the getOperatorName(), as they can just return a static final,
+  // as opposed to this super class calling getClass().getSimpleName().
+  public abstract String getOperatorName();
 
   @Override
   public ExecutionStatistics getExecutionStatistics() {

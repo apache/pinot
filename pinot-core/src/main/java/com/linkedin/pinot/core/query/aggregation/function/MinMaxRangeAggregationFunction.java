@@ -15,216 +15,147 @@
  */
 package com.linkedin.pinot.core.query.aggregation.function;
 
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
-import java.io.Serializable;
-import java.nio.ByteBuffer;
-import java.text.DecimalFormat;
-import java.text.DecimalFormatSymbols;
-import java.util.List;
-import java.util.Locale;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.common.BlockValSet;
+import com.linkedin.pinot.core.query.aggregation.AggregationResultHolder;
+import com.linkedin.pinot.core.query.aggregation.ObjectAggregationResultHolder;
+import com.linkedin.pinot.core.query.aggregation.function.customobject.MinMaxRangePair;
+import com.linkedin.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import com.linkedin.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder;
+import javax.annotation.Nonnull;
 
-import org.json.JSONException;
-import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.BlockSingleValIterator;
-import com.linkedin.pinot.core.common.Constants;
-import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
-import com.linkedin.pinot.core.query.aggregation.CombineLevel;
-import com.linkedin.pinot.core.query.aggregation.function.MinMaxRangeAggregationFunction.MinMaxRangePair;
-import com.linkedin.pinot.core.query.utils.Pair;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-
-/**
- * This function will take a column and do min/max and compute diff on that.
- */
 public class MinMaxRangeAggregationFunction implements AggregationFunction<MinMaxRangePair, Double> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(MinMaxRangeAggregationFunction.class);
-  private static final double DEFAULT_MIN_MAX_RANGE_VALUE = -1;
+  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.MINMAXRANGE.getName();
 
-  private String _minMaxRangeByColumn;
+  @Nonnull
+  @Override
+  public String getName() {
+    return NAME;
+  }
 
-  public MinMaxRangeAggregationFunction() {
-
+  @Nonnull
+  @Override
+  public String getColumnName(@Nonnull String[] columns) {
+    return NAME + "_" + columns[0];
   }
 
   @Override
-  public void init(AggregationInfo aggregationInfo) {
-    _minMaxRangeByColumn = aggregationInfo.getAggregationParams().get("column");
+  public void accept(@Nonnull AggregationFunctionVisitorBase visitor) {
+    visitor.visit(this);
+  }
 
+  @Nonnull
+  @Override
+  public AggregationResultHolder createAggregationResultHolder() {
+    return new ObjectAggregationResultHolder();
+  }
+
+  @Nonnull
+  @Override
+  public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity, int trimSize) {
+    return new ObjectGroupByResultHolder(initialCapacity, maxCapacity, trimSize);
   }
 
   @Override
-  public MinMaxRangePair aggregate(Block docIdSetBlock, Block[] block) {
+  public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
+      @Nonnull BlockValSet... blockValSets) {
+    double[] valueArray = blockValSets[0].getDoubleValuesSV();
     double min = Double.POSITIVE_INFINITY;
     double max = Double.NEGATIVE_INFINITY;
-    int docId = 0;
-    Dictionary dictionaryReader = block[0].getMetadata().getDictionary();
-    BlockDocIdIterator docIdIterator = docIdSetBlock.getBlockDocIdSet().iterator();
-    BlockSingleValIterator blockValIterator =
-        (BlockSingleValIterator) block[0].getBlockValueSet().iterator();
-
-    while ((docId = docIdIterator.next()) != Constants.EOF) {
-      if (blockValIterator.skipTo(docId)) {
-        int dictionaryIndex = blockValIterator.nextIntVal();
-        if (dictionaryIndex != Dictionary.NULL_VALUE_INDEX) {
-          min = Math.min(min, dictionaryReader.getDoubleValue(dictionaryIndex));
-          max = Math.max(max, dictionaryReader.getDoubleValue(dictionaryIndex));
-        }
+    for (int i = 0; i < length; i++) {
+      double value = valueArray[i];
+      if (value < min) {
+        min = value;
+      }
+      if (value > max) {
+        max = value;
       }
     }
-    return new MinMaxRangePair(min, max);
+    setAggregationResult(aggregationResultHolder, min, max);
   }
 
-  @Override
-  public MinMaxRangePair aggregate(MinMaxRangePair mergedResult, int docId, Block[] block) {
-    BlockSingleValIterator blockValIterator =
-        (BlockSingleValIterator) block[0].getBlockValueSet().iterator();
-    if (blockValIterator.skipTo(docId)) {
-      int dictId = blockValIterator.nextIntVal();
-      if (dictId != Dictionary.NULL_VALUE_INDEX) {
-        double currentValue = block[0].getMetadata().getDictionary().getDoubleValue(dictId);
-        if (mergedResult == null) {
-          return new MinMaxRangePair(currentValue, currentValue);
-        }
-        return new MinMaxRangePair(Math.min(mergedResult.getFirst(), currentValue),
-            Math.max(mergedResult.getSecond(), currentValue));
-      }
-    }
-    return mergedResult;
-  }
-
-  @Override
-  public List<MinMaxRangePair> combine(List<MinMaxRangePair> aggregationResultList, CombineLevel combineLevel) {
-    double combinedMinResult = Double.POSITIVE_INFINITY;
-    double combinedMaxResult = Double.NEGATIVE_INFINITY;
-    for (MinMaxRangePair aggregationResult : aggregationResultList) {
-      combinedMinResult = Math.min(combinedMinResult, aggregationResult.getFirst());
-      combinedMaxResult = Math.max(combinedMaxResult, aggregationResult.getSecond());
-    }
-    aggregationResultList.clear();
-    aggregationResultList.add(new MinMaxRangePair(combinedMinResult, combinedMaxResult));
-    return aggregationResultList;
-  }
-
-  @Override
-  public MinMaxRangePair combineTwoValues(MinMaxRangePair aggregationResult0, MinMaxRangePair aggregationResult1) {
-    if (aggregationResult0 == null) {
-      return aggregationResult1;
-    }
-    if (aggregationResult1 == null) {
-      return aggregationResult0;
-    }
-    return new MinMaxRangePair(Math.min(aggregationResult0.getFirst(), aggregationResult1.getFirst()),
-        Math.max(aggregationResult0.getSecond(), aggregationResult1.getSecond()));
-  }
-
-  @Override
-  public Double reduce(List<MinMaxRangePair> combinedResult) {
-    if (combinedResult.isEmpty()) {
-      return DEFAULT_MIN_MAX_RANGE_VALUE;
-    }
-
-    double reducedMinResult = Double.POSITIVE_INFINITY;
-    double reducedMaxResult = Double.NEGATIVE_INFINITY;
-    for (MinMaxRangePair combineResult : combinedResult) {
-      reducedMinResult = Math.min(reducedMinResult, combineResult.getFirst());
-      reducedMaxResult = Math.max(reducedMaxResult, combineResult.getSecond());
-    }
-    if (reducedMinResult != Double.POSITIVE_INFINITY
-        && reducedMaxResult != Double.NEGATIVE_INFINITY) {
-      return reducedMaxResult - reducedMinResult;
+  protected void setAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder, double min,
+      double max) {
+    MinMaxRangePair minMaxRangePair = aggregationResultHolder.getResult();
+    if (minMaxRangePair == null) {
+      aggregationResultHolder.setValue(new MinMaxRangePair(min, max));
     } else {
-      return DEFAULT_MIN_MAX_RANGE_VALUE;
+      minMaxRangePair.apply(min, max);
     }
   }
 
   @Override
-  public JSONObject render(Double finalAggregationResult) {
-    try {
-      if ((finalAggregationResult == null) || (Double.isNaN(finalAggregationResult))) {
-        return new JSONObject().put("value", DEFAULT_MIN_MAX_RANGE_VALUE);
+  public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+    double[] valueArray = blockValSets[0].getDoubleValuesSV();
+    for (int i = 0; i < length; i++) {
+      double value = valueArray[i];
+      setGroupByResult(groupKeyArray[i], groupByResultHolder, value, value);
+    }
+  }
+
+  @Override
+  public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+    double[] valueArray = blockValSets[0].getDoubleValuesSV();
+    for (int i = 0; i < length; i++) {
+      double value = valueArray[i];
+      for (int groupKey : groupKeysArray[i]) {
+        setGroupByResult(groupKey, groupByResultHolder, value, value);
       }
-      return new JSONObject().put("value",
-          String.format(Locale.US, "%1.5f", finalAggregationResult));
-    } catch (JSONException e) {
-      LOGGER.error("Caught exception while rendering to JSON", e);
-      Utils.rethrowException(e);
-      throw new AssertionError("Should not reach this");
     }
   }
 
+  protected void setGroupByResult(int groupKey, @Nonnull GroupByResultHolder groupByResultHolder, double min,
+      double max) {
+    MinMaxRangePair minMaxRangePair = groupByResultHolder.getResult(groupKey);
+    if (minMaxRangePair == null) {
+      groupByResultHolder.setValueForKey(groupKey, new MinMaxRangePair(min, max));
+    } else {
+      minMaxRangePair.apply(min, max);
+    }
+  }
+
+  @Nonnull
   @Override
-  public DataType aggregateResultDataType() {
-    return DataType.OBJECT;
+  public MinMaxRangePair extractAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder) {
+    MinMaxRangePair minMaxRangePair = aggregationResultHolder.getResult();
+    if (minMaxRangePair == null) {
+      return new MinMaxRangePair(Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY);
+    } else {
+      return minMaxRangePair;
+    }
   }
 
+  @Nonnull
   @Override
-  public String getFunctionName() {
-    return "minMaxRange_" + _minMaxRangeByColumn;
-  }
-
-  public static class MinMaxRangePair extends Pair<Double, Double>
-      implements Comparable<MinMaxRangePair>, Serializable {
-    private static final long serialVersionUID = 498953067962085988L;
-    public MinMaxRangePair(Double first, Double second) {
-      super(first, second);
-    }
-
-    @Override
-    public int compareTo(MinMaxRangePair o) {
-      double diff = getSecond() - getFirst() - o.getSecond() + o.getFirst();
-      if (diff > 0) {
-        return 1;
-      } else if (diff < 0) {
-        return -1;
-      }
-      return 0;
-    }
-
-    @Override
-    public String toString() {
-      return new DecimalFormat("####################.##########",
-          DecimalFormatSymbols.getInstance(Locale.US)).format((getSecond() - getFirst()));
-    }
-
-    /**
-     * Helper method to serialize a MinMaxRangePair into a byte-array.
-     *
-     * @return Serialized byte-array of for the MinMaxRangePair.
-     */
-    public byte[] toBytes() {
-      int size = 2 * V1Constants.Numbers.DOUBLE_SIZE;
-      ByteBuffer byteBuffer = ByteBuffer.allocate(size);
-      byteBuffer.putDouble(getFirst());
-      byteBuffer.putDouble(getSecond());
-      return byteBuffer.array();
-    }
-
-    /**
-     * Helper method to de-serialize a MinMaxRangePair from a byte-array
-     *
-     * @param bytes Serialized byte-array for the MinMaxRangePair
-     * @return De-serialized MinMaxRangePair from byte-array
-     */
-    public static MinMaxRangePair fromBytes(byte[] bytes) {
-      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-      return new MinMaxRangePair(byteBuffer.getDouble(), byteBuffer.getDouble());
+  public MinMaxRangePair extractGroupByResult(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
+    MinMaxRangePair minMaxRangePair = groupByResultHolder.getResult(groupKey);
+    if (minMaxRangePair == null) {
+      return new MinMaxRangePair(Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY);
+    } else {
+      return minMaxRangePair;
     }
   }
 
-  public MinMaxRangePair getMinMaxRangePair(double first, double second) {
-    return new MinMaxRangePair(first, second);
-  }
-
+  @Nonnull
   @Override
-  public Serializable getDefaultValue() {
-    return new MinMaxRangePair(Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY);
+  public MinMaxRangePair merge(@Nonnull MinMaxRangePair intermediateResult1,
+      @Nonnull MinMaxRangePair intermediateResult2) {
+    intermediateResult1.apply(intermediateResult2);
+    return intermediateResult1;
+  }
+
+  @Nonnull
+  @Override
+  public FieldSpec.DataType getIntermediateResultDataType() {
+    return FieldSpec.DataType.OBJECT;
+  }
+
+  @Nonnull
+  @Override
+  public Double extractFinalResult(@Nonnull MinMaxRangePair intermediateResult) {
+    return intermediateResult.getMax() - intermediateResult.getMin();
   }
 }

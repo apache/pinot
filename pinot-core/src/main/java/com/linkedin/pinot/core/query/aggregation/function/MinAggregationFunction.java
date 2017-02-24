@@ -15,151 +15,120 @@
  */
 package com.linkedin.pinot.core.query.aggregation.function;
 
-import java.io.Serializable;
-import com.linkedin.pinot.common.Utils;
-import java.util.List;
-import java.util.Locale;
-import java.util.NoSuchElementException;
-
-import org.json.JSONException;
-import org.json.JSONObject;
-
-import com.linkedin.pinot.common.data.FieldSpec.DataType;
-import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.core.common.Block;
-import com.linkedin.pinot.core.common.BlockDocIdIterator;
-import com.linkedin.pinot.core.common.BlockSingleValIterator;
-import com.linkedin.pinot.core.common.Constants;
-import com.linkedin.pinot.core.query.aggregation.AggregationFunction;
-import com.linkedin.pinot.core.query.aggregation.CombineLevel;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.core.common.BlockValSet;
+import com.linkedin.pinot.core.query.aggregation.AggregationResultHolder;
+import com.linkedin.pinot.core.query.aggregation.DoubleAggregationResultHolder;
+import com.linkedin.pinot.core.query.aggregation.groupby.DoubleGroupByResultHolder;
+import com.linkedin.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import javax.annotation.Nonnull;
 
 
 public class MinAggregationFunction implements AggregationFunction<Double, Double> {
+  private static final String NAME = AggregationFunctionFactory.AggregationFunctionType.MIN.getName();
   private static final double DEFAULT_VALUE = Double.POSITIVE_INFINITY;
-  private static final Logger LOGGER = LoggerFactory.getLogger(MinAggregationFunction.class);
 
-  private String _minColumnName;
+  @Nonnull
+  @Override
+  public String getName() {
+    return NAME;
+  }
 
-  public MinAggregationFunction() {
-
+  @Nonnull
+  @Override
+  public String getColumnName(@Nonnull String[] columns) {
+    return NAME + "_" + columns[0];
   }
 
   @Override
-  public void init(AggregationInfo aggregationInfo) {
-    _minColumnName = aggregationInfo.getAggregationParams().get("column");
+  public void accept(@Nonnull AggregationFunctionVisitorBase visitor) {
+    visitor.visit(this);
+  }
+
+  @Nonnull
+  @Override
+  public AggregationResultHolder createAggregationResultHolder() {
+    return new DoubleAggregationResultHolder(DEFAULT_VALUE);
+  }
+
+  @Nonnull
+  @Override
+  public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity, int trimSize) {
+    return new DoubleGroupByResultHolder(initialCapacity, maxCapacity, trimSize, DEFAULT_VALUE, true);
   }
 
   @Override
-  public Double aggregate(Block docIdSetBlock, Block[] block) {
-    double ret = DEFAULT_VALUE;
-    double tmp = 0;
-    int docId = 0;
-    Dictionary dictionaryReader = block[0].getMetadata().getDictionary();
-    BlockDocIdIterator docIdIterator = docIdSetBlock.getBlockDocIdSet().iterator();
-    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) block[0].getBlockValueSet().iterator();
+  public void aggregate(int length, @Nonnull AggregationResultHolder aggregationResultHolder,
+      @Nonnull BlockValSet... blockValSets) {
+    double[] valueArray = blockValSets[0].getDoubleValuesSV();
+    double min = aggregationResultHolder.getDoubleResult();
+    for (int i = 0; i < length; i++) {
+      double value = valueArray[i];
+      if (value < min) {
+        min = value;
+      }
+    }
+    aggregationResultHolder.setValue(min);
+  }
 
-    while ((docId = docIdIterator.next()) != Constants.EOF) {
-      if (blockValIterator.skipTo(docId)) {
+  @Override
+  public void aggregateGroupBySV(int length, @Nonnull int[] groupKeyArray,
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+    double[] valueArray = blockValSets[0].getDoubleValuesSV();
+    for (int i = 0; i < length; i++) {
+      double value = valueArray[i];
+      int groupKey = groupKeyArray[i];
+      if (value < groupByResultHolder.getDoubleResult(groupKey)) {
+        groupByResultHolder.setValueForKey(groupKey, value);
+      }
+    }
+  }
 
-        int dictionaryIndex = blockValIterator.nextIntVal();
-        if (dictionaryIndex != Dictionary.NULL_VALUE_INDEX) {
-          tmp = dictionaryReader.getDoubleValue(dictionaryIndex);
-          if (tmp < ret) {
-            ret = tmp;
-          }
+  @Override
+  public void aggregateGroupByMV(int length, @Nonnull int[][] groupKeysArray,
+      @Nonnull GroupByResultHolder groupByResultHolder, @Nonnull BlockValSet... blockValSets) {
+    double[] valueArray = blockValSets[0].getDoubleValuesSV();
+    for (int i = 0; i < length; i++) {
+      double value = valueArray[i];
+      for (int groupKey : groupKeysArray[i]) {
+        if (value < groupByResultHolder.getDoubleResult(groupKey)) {
+          groupByResultHolder.setValueForKey(groupKey, value);
         }
       }
     }
-    return ret;
   }
 
+  @Nonnull
   @Override
-  public Double aggregate(Double mergedResult, int docId, Block[] block) {
-    BlockSingleValIterator blockValIterator = (BlockSingleValIterator) block[0].getBlockValueSet().iterator();
-    if (blockValIterator.skipTo(docId)) {
-      int dictionaryIndex = blockValIterator.nextIntVal();
-      if (dictionaryIndex != Dictionary.NULL_VALUE_INDEX) {
-        double value = block[0].getMetadata().getDictionary().getDoubleValue(dictionaryIndex);
-        if (mergedResult != null) {
-          return Math.min(value, mergedResult);
-        } else {
-          return value;
-        }
-      } else {
-        return mergedResult;
-      }
-    }
-    return mergedResult;
+  public Double extractAggregationResult(@Nonnull AggregationResultHolder aggregationResultHolder) {
+    return aggregationResultHolder.getDoubleResult();
   }
 
+  @Nonnull
   @Override
-  public List<Double> combine(List<Double> aggregationResultList, CombineLevel combineLevel) {
-    double minValue = DEFAULT_VALUE;
-    for (double aggregationResult : aggregationResultList) {
-      if (aggregationResult < minValue) {
-        minValue = aggregationResult;
-      }
-    }
-    aggregationResultList.clear();
-    aggregationResultList.add(minValue);
-    return aggregationResultList;
+  public Double extractGroupByResult(@Nonnull GroupByResultHolder groupByResultHolder, int groupKey) {
+    return groupByResultHolder.getDoubleResult(groupKey);
   }
 
+  @Nonnull
   @Override
-  public Double combineTwoValues(Double aggregationResult0, Double aggregationResult1) {
-    if (aggregationResult0 == null) {
-      return aggregationResult1;
-    }
-    if (aggregationResult1 == null) {
-      return aggregationResult0;
-    }
-    return (aggregationResult0 < aggregationResult1) ? aggregationResult0 : aggregationResult1;
-  }
-
-  @Override
-  public Double reduce(List<Double> combinedResultList) {
-    double minValue = DEFAULT_VALUE;
-    for (double combinedResult : combinedResultList) {
-      if (combinedResult < minValue) {
-        minValue = combinedResult;
-      }
-    }
-    return minValue;
-  }
-
-  @Override
-  public JSONObject render(Double finalAggregationResult) {
-    try {
-      if (finalAggregationResult == null) {
-        throw new NoSuchElementException("Final result is null!");
-      }
-      if (finalAggregationResult.isInfinite()) {
-        return new JSONObject().put("value", "null");
-      }
-      return new JSONObject().put("value", String.format(Locale.US, "%1.5f", finalAggregationResult));
-    } catch (JSONException e) {
-      LOGGER.error("Caught exception while rendering to JSON", e);
-      Utils.rethrowException(e);
-      throw new AssertionError("Should not reach this");
+  public Double merge(@Nonnull Double intermediateResult1, @Nonnull Double intermediateResult2) {
+    if (intermediateResult1 < intermediateResult2) {
+      return intermediateResult1;
+    } else {
+      return intermediateResult2;
     }
   }
 
+  @Nonnull
   @Override
-  public DataType aggregateResultDataType() {
-    return DataType.DOUBLE;
+  public FieldSpec.DataType getIntermediateResultDataType() {
+    return FieldSpec.DataType.DOUBLE;
   }
 
+  @Nonnull
   @Override
-  public String getFunctionName() {
-    return "min_" + _minColumnName;
+  public Double extractFinalResult(@Nonnull Double intermediateResult) {
+    return intermediateResult;
   }
-
-  @Override
-  public Serializable getDefaultValue() {
-    return new Double(DEFAULT_VALUE);
-  }
-
 }

@@ -15,7 +15,6 @@ import javax.ws.rs.core.MediaType;
 
 import org.codehaus.jackson.node.ObjectNode;
 
-import com.google.common.collect.Lists;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;

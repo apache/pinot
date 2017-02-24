@@ -46,8 +46,7 @@ public class BucketizedSegmentStrategy implements SegmentAssignmentStrategy {
       serverTenantName = ControllerTenantNameBuilder.getOfflineTenantNameForTenant(tenantName);
     }
 
-    List<String> allInstances =
-        helixAdmin.getInstancesInClusterWithTag(helixClusterName, serverTenantName);
+    List<String> allInstances = HelixHelper.getEnabledInstancesWithTag(helixAdmin, helixClusterName, serverTenantName);
     List<String> selectedInstanceList = new ArrayList<String>();
     if (segmentMetadata.getShardingKey() != null) {
       for (String instance : allInstances) {

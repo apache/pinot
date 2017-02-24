@@ -1,7 +1,10 @@
 package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+
 import org.apache.commons.collections.CollectionUtils;
 
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
@@ -11,6 +14,8 @@ import com.linkedin.thirdeye.datalayer.util.Predicate;
 
 public class MetricConfigManagerImpl extends AbstractManagerImpl<MetricConfigDTO>
     implements MetricConfigManager {
+
+  private static final String FIND_BY_NAME_LIKE = " WHERE name like :name";
 
   public MetricConfigManagerImpl() {
     super(MetricConfigDTO.class, MetricConfigBean.class);
@@ -79,5 +84,16 @@ public class MetricConfigManagerImpl extends AbstractManagerImpl<MetricConfigDTO
     return result;
   }
 
-
+  @Override
+  public List<MetricConfigDTO> findWhereNameLike(String name) {
+    Map<String, Object> parameterMap = new HashMap<>();
+    parameterMap.put("name", name);
+    List<MetricConfigBean> list =
+        genericPojoDao.executeParameterizedSQL(FIND_BY_NAME_LIKE, parameterMap, MetricConfigBean.class);
+    List<MetricConfigDTO> result = new ArrayList<>();
+    for (MetricConfigBean bean : list) {
+      result.add(MODEL_MAPPER.map(bean, MetricConfigDTO.class));
+    }
+    return result;
+  }
 }

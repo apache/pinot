@@ -71,7 +71,6 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
   @Override
   public boolean updateStatusAndWorkerId(Long workerId, Long id, Set<TaskStatus> permittedOldStatus,
       TaskStatus newStatus, int expectedVersion) {
-    // TODO: add proper transaction here
     TaskDTO task = findById(id);
     if (permittedOldStatus.contains(task.getStatus())) {
       task.setStatus(newStatus);

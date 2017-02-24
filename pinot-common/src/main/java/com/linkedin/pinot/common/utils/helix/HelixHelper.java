@@ -15,6 +15,12 @@
  */
 package com.linkedin.pinot.common.utils.helix;
 
+import com.google.common.base.Function;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.SegmentAssignmentStrategyType;
+import com.linkedin.pinot.common.utils.EqualityUtils;
+import com.linkedin.pinot.common.utils.retry.RetryPolicies;
+import com.linkedin.pinot.common.utils.retry.RetryPolicy;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -22,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
-
 import javax.annotation.Nullable;
 import org.apache.helix.AccessOption;
 import org.apache.helix.BaseDataAccessor;
@@ -37,16 +42,10 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.HelixConfigScope.ConfigScopeProperty;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.google.common.base.Function;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.SegmentAssignmentStrategyType;
-import com.linkedin.pinot.common.utils.EqualityUtils;
-import com.linkedin.pinot.common.utils.retry.RetryPolicies;
-import com.linkedin.pinot.common.utils.retry.RetryPolicy;
 
 
 public class HelixHelper {
@@ -374,7 +373,7 @@ public class HelixHelper {
         try {
           targetInstances = getInstancesForSegment.call();
         } catch (Exception e) {
-          LOGGER.error("Unable to get new instances for uploading segment {}, table {}", segmentName, tableName);
+          LOGGER.error("Unable to get new instances for uploading segment {}, table {}", segmentName, tableName, e);
           return null;
         }
 
@@ -392,5 +391,21 @@ public class HelixHelper {
     };
 
     updateIdealState(helixManager, tableName, updater, DEFAULT_RETRY_POLICY);
+  }
+
+  public static List<String> getEnabledInstancesWithTag(HelixAdmin helixAdmin, String helixClusterName, String instanceTag) {
+    List<String> instances = helixAdmin.getInstancesInCluster(helixClusterName);
+    List<String> enabledInstances = new ArrayList<>();
+    for (String instance : instances) {
+      InstanceConfig instanceConfig = helixAdmin.getInstanceConfig(helixClusterName, instance);
+      if (instanceConfig == null) {
+        LOGGER.warn("InstanceConfig not found for instance: {}", instance);
+        continue;
+      }
+      if (instanceConfig.containsTag(instanceTag) && instanceConfig.getInstanceEnabled()) {
+        enabledInstances.add(instance);
+      }
+    }
+    return enabledInstances;
   }
 }

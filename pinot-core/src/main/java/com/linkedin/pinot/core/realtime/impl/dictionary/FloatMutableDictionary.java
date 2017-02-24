@@ -15,16 +15,13 @@
  */
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
-import com.linkedin.pinot.common.data.FieldSpec;
-
-
 public class FloatMutableDictionary extends MutableDictionaryReader {
 
   private Float min = Float.MAX_VALUE;
   private Float max = Float.MIN_VALUE;
 
-  public FloatMutableDictionary(FieldSpec spec) {
-    super(spec);
+  public FloatMutableDictionary(String column) {
+    super(column);
   }
 
   @Override

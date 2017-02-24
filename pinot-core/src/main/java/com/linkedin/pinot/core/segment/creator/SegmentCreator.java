@@ -27,10 +27,7 @@ import org.apache.commons.configuration.ConfigurationException;
 
 /**
  * Interface for segment creators, which create an index over a set of rows and writes the resulting index to disk.
- *
- * Nov 21, 2014
  */
-
 public interface SegmentCreator {
 
   /**

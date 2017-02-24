@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.client.pinot;
 
+import com.linkedin.thirdeye.client.TimeRangeUtils;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -14,6 +15,7 @@ import org.apache.http.HttpHost;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
@@ -29,6 +31,7 @@ import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.datalayer.pojo.DatasetConfigBean;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 public class PinotThirdEyeClient implements ThirdEyeClient {
@@ -111,20 +114,20 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     List<String> dimensionNames = datasetConfig.getDimensions();
     List<ResultSetGroup> resultSetGroups = new ArrayList<>();
 
+    // By default, query only offline, unless dataset has been marked as realtime
+    String tableName = ThirdEyeUtils.computeTableName(request.getCollection());
+
     if (datasetConfig.isMetricAsDimension()) {
        List<String> pqls = PqlUtils.getMetricAsDimensionPqls(request, dataTimeSpec, datasetConfig);
        for (String pql : pqls) {
          LOG.debug("PQL isMetricAsDimension : {}", pql);
-         ResultSetGroup result = CACHE_REGISTRY_INSTANCE.getResultSetGroupCache()
-             .get(new PinotQuery(pql, request.getCollection()));
+         ResultSetGroup result = CACHE_REGISTRY_INSTANCE.getResultSetGroupCache().get(new PinotQuery(pql, tableName));
          resultSetGroups.add(result);
        }
     } else {
-
       String sql = PqlUtils.getPql(request, dataTimeSpec);
       LOG.debug("PQL: {}", sql);
-      ResultSetGroup result = CACHE_REGISTRY_INSTANCE.getResultSetGroupCache()
-          .get(new PinotQuery(sql, request.getCollection()));
+      ResultSetGroup result = CACHE_REGISTRY_INSTANCE.getResultSetGroupCache().get(new PinotQuery(sql, tableName));
       resultSetGroups.add(result);
       if (LOG.isDebugEnabled()) {
         LOG.debug("Result for: {} {}", sql, format(result));
@@ -177,7 +180,8 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     String collection = datasetConfig.getDataset();
     TimeGranularity dataGranularity = null;
     long startTime = request.getStartTimeInclusive().getMillis();
-    long interval = -1;
+    DateTimeZone dateTimeZone = Utils.getDataTimeZone(collection);
+    DateTime startDateTime = new DateTime(startTime, dateTimeZone);
     TimeSpec timespec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
     dataGranularity = timespec.getDataGranularity();
     boolean isISOFormat = false;
@@ -185,11 +189,10 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     String timeFormat = timespec.getFormat();
     if (timeFormat != null && !timeFormat.equals(TimeSpec.SINCE_EPOCH_FORMAT)) {
       isISOFormat = true;
-      inputDataDateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZone(Utils.getDataTimeZone(collection));
+      inputDataDateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZone(dateTimeZone);
     }
     if (request.getGroupByTimeGranularity() != null) {
       hasGroupByTime = true;
-      interval = request.getGroupByTimeGranularity().toMillis();
     }
     LinkedHashMap<String, String[]> dataMap = new LinkedHashMap<>();
     for (int i = 0; i < resultSets.size(); i++) {
@@ -215,7 +218,9 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
                 skipRowDueToError = true;
                 break;
               }
-              timeBucket = (int) ((millis - startTime) / interval);
+              timeBucket = TimeRangeUtils
+                  .computeBucketIndex(request.getGroupByTimeGranularity(), startDateTime,
+                      new DateTime(millis, dateTimeZone));
               groupKeyVal = String.valueOf(timeBucket);
             }
             groupKeys[grpKeyIdx] = groupKeyVal;

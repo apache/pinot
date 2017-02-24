@@ -21,18 +21,19 @@ import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 public class RealtimeDictionaryProvider {
 
   public static MutableDictionaryReader getDictionaryFor(FieldSpec spec) {
+    String column = spec.getName();
     switch (spec.getDataType()) {
       case INT:
-        return new IntMutableDictionary(spec);
+        return new IntMutableDictionary(column);
       case LONG:
-        return new LongMutableDictionary(spec);
+        return new LongMutableDictionary(column);
       case FLOAT:
-        return new FloatMutableDictionary(spec);
+        return new FloatMutableDictionary(column);
       case DOUBLE:
-        return new DoubleMutableDictionary(spec);
+        return new DoubleMutableDictionary(column);
       case BOOLEAN:
       case STRING:
-        return new StringMutableDictionary(spec);
+        return new StringMutableDictionary(column);
     }
     throw new UnsupportedOperationException();
   }

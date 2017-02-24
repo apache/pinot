@@ -1,17 +1,17 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
-import java.util.Map;
-import java.util.Objects;
-import java.util.concurrent.TimeUnit;
-
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeConfig;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
 
 @JsonIgnoreProperties(ignoreUnknown=true)
@@ -21,7 +21,11 @@ public class AnomalyFunctionBean extends AbstractBean {
 
   private String functionName;
 
+  // This variable is topic metric, which is used as a search criteria for searching anomalies
   private String metric;
+
+  // The list of metrics that have to be retrieved in order to detect anomalies for this function
+  private List<String> metrics;
 
   private MetricAggFunction metricFunction;
 
@@ -52,6 +56,8 @@ public class AnomalyFunctionBean extends AbstractBean {
   private long metricId;
 
   private Map<String, String> alertFilter;
+
+  private AnomalyMergeConfig anomalyMergeConfig;
 
 
   public long getMetricId() {
@@ -84,6 +90,14 @@ public class AnomalyFunctionBean extends AbstractBean {
 
   public void setMetric(String metric) {
     this.metric = metric;
+  }
+
+  public List<String> getMetrics() {
+    return metrics;
+  }
+
+  public void setMetrics(List<String> metrics) {
+    this.metrics = metrics;
   }
 
   public MetricAggFunction getMetricFunction() {
@@ -211,6 +225,14 @@ public class AnomalyFunctionBean extends AbstractBean {
     this.alertFilter = alertFilter;
   }
 
+  public AnomalyMergeConfig getAnomalyMergeConfig() {
+    return anomalyMergeConfig;
+  }
+
+  public void setAnomalyMergeConfig(AnomalyMergeConfig anomalyMergeConfig) {
+    this.anomalyMergeConfig = anomalyMergeConfig;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (!(o instanceof AnomalyFunctionBean)) {
@@ -219,6 +241,7 @@ public class AnomalyFunctionBean extends AbstractBean {
     AnomalyFunctionBean af = (AnomalyFunctionBean) o;
     return Objects.equals(getId(), af.getId()) && Objects.equals(collection, af.getCollection())
         && Objects.equals(metric, af.getMetric())
+        && Objects.equals(metrics, af.getMetrics())
         && Objects.equals(metricFunction, af.getMetricFunction())
         && Objects.equals(type, af.getType()) && Objects.equals(isActive, af.getIsActive())
         && Objects.equals(cron, af.getCron()) && Objects.equals(properties, af.getProperties())
@@ -235,7 +258,7 @@ public class AnomalyFunctionBean extends AbstractBean {
 
   @Override
   public int hashCode() {
-    return Objects.hash(getId(), collection, metric, metricFunction, type, isActive, cron,
+    return Objects.hash(getId(), collection, metric, metrics, metricFunction, type, isActive, cron,
         properties, bucketSize, bucketUnit, windowSize, windowUnit, windowDelay, windowDelayUnit,
         exploreDimensions, filters, alertFilter);
   }
@@ -243,7 +266,7 @@ public class AnomalyFunctionBean extends AbstractBean {
   @Override
   public String toString() {
     return MoreObjects.toStringHelper(this).add("id", getId()).add("collection", collection)
-        .add("metric", metric).add("metric_function", getMetricFunction()).add("type", type)
+        .add("metric", metric).add("metrics", metrics).add("metric_function", getMetricFunction()).add("type", type)
         .add("isActive", isActive).add("cron", cron).add("properties", properties)
         .add("bucketSize", bucketSize).add("bucketUnit", bucketUnit).add("windowSize", windowSize)
         .add("windowUnit", windowUnit).add("windowDelay", windowDelay)

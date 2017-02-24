@@ -463,7 +463,7 @@ public class SegmentCompletionTest {
     }
 
     @Override
-    protected void writeSegmentsToPropertyStore(List<String> paths, List<ZNRecord> records) {
+    protected void writeSegmentsToPropertyStore(List<String> paths, List<ZNRecord> records, String realtimeTableName) {
       _segmentMetadata = new LLCRealtimeSegmentZKMetadata(records.get(0));  // Updated record that we are writing to ZK
     }
 

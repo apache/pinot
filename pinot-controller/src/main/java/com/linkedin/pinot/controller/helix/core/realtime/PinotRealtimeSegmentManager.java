@@ -316,10 +316,11 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
       return;
     }
 
-    for (ZNRecord tableConfig : tableConfigs) {
+    for (ZNRecord tableConfigZnRecord : tableConfigs) {
       try {
-        AbstractTableConfig abstractTableConfig = AbstractTableConfig.fromZnRecord(tableConfig);
-        if (abstractTableConfig.isRealTime()) {
+        String znRecordId = tableConfigZnRecord.getId();
+        if (TableNameBuilder.getTableTypeFromTableName(znRecordId) == TableType.REALTIME) {
+          AbstractTableConfig abstractTableConfig = AbstractTableConfig.fromZnRecord(tableConfigZnRecord);
           KafkaStreamMetadata metadata = new KafkaStreamMetadata(abstractTableConfig.getIndexingConfig().getStreamConfigs());
           if (metadata.hasHighLevelKafkaConsumerType()) {
             String realtimeTable = abstractTableConfig.getTableName();
@@ -356,10 +357,11 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
             }
           }
         }
-      } catch (JSONException e) {
-        LOGGER.error("Caught exception while reading table config", e);
-      } catch (IOException e) {
-        LOGGER.error("Caught exception while setting change listeners for realtime tables/segments", e);
+      } catch (Exception e) {
+        // we want to continue setting watches for other tables for any kind of exception here so that
+        // errors with one table don't impact others
+        LOGGER.error("Caught exception while processing ZNRecord id: {}. Skipping node to continue setting watches",
+            tableConfigZnRecord.getId(), e);
       }
     }
   }

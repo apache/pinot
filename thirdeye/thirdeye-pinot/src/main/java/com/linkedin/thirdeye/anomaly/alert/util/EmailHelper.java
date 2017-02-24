@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.anomaly.alert.util;
 import com.google.common.cache.LoadingCache;
 import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 
+import com.linkedin.thirdeye.anomaly.alert.v2.AlertTaskRunnerV2;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
@@ -10,6 +11,7 @@ import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewHandler;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewRequest;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewResponse;
+import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +41,9 @@ import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.detector.email.AnomalyGraphGenerator;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
+/**
+ * Stateless class to provide util methods to help build anomaly report
+ */
 public abstract class EmailHelper {
 
   private static final Logger LOG = LoggerFactory.getLogger(EmailHelper.class);
@@ -190,8 +195,12 @@ public abstract class EmailHelper {
     }
   }
 
-  public static ContributorViewResponse getContributorData(String collection, String metric, List<String> dimensions)
+  public static ContributorViewResponse getContributorDataForDataReport(String collection,
+      String metric, List<String> dimensions, AlertConfigBean.COMPARE_MODE compareMode,
+      long offsetDelayMillis, boolean intraday)
       throws Exception {
+
+    long baselineOffset = getBaselineOffset(compareMode);
 
     ContributorViewRequest request = new ContributorViewRequest();
     request.setCollection(collection);
@@ -202,25 +211,34 @@ public abstract class EmailHelper {
     long currentEnd = System.currentTimeMillis();
     long maxDataTime = collectionMaxDataTimeCache.get(collection);
     if (currentEnd > maxDataTime) {
-      long delta = currentEnd - maxDataTime;
-      currentEnd = currentEnd - delta;
+      currentEnd = maxDataTime;
     }
 
     // align to nearest hour
-    currentEnd = currentEnd - (currentEnd % HOUR_MILLIS);
+    currentEnd = (currentEnd - (currentEnd % HOUR_MILLIS)) - offsetDelayMillis;
 
     String aggTimeGranularity = "HOURS";
     long currentStart = currentEnd - DAY_MILLIS;
 
+    // intraday option
+    if (intraday) {
+      DateTimeZone timeZone = DateTimeZone.forTimeZone(AlertTaskRunnerV2.DEFAULT_TIME_ZONE);
+      DateTime endDate = new DateTime(currentEnd, timeZone);
+      DateTime intraDayStartTime = new DateTime(endDate.toString().split("T")[0], timeZone);
+      if (intraDayStartTime.getMillis() != currentEnd) {
+        currentStart = intraDayStartTime.getMillis();
+      }
+    }
+
     DatasetConfigDTO datasetConfigDTO = datasetConfigManager.findByDataset(collection);
-    if (datasetConfigDTO.getTimeUnit().toString().equals("DAYS")) {
-      aggTimeGranularity = datasetConfigDTO.getTimeUnit().toString();
+    if (datasetConfigDTO != null && TimeUnit.DAYS.equals(datasetConfigDTO.getTimeUnit())) {
+      aggTimeGranularity = datasetConfigDTO.getTimeUnit().name();
       currentEnd = currentEnd - (currentEnd % DAY_MILLIS);
       currentStart = currentEnd - WEEK_MILLIS;
     }
 
-    long baselineStart = currentStart - WEEK_MILLIS ;
-    long baselineEnd = currentEnd - WEEK_MILLIS;
+    long baselineStart = currentStart - baselineOffset ;
+    long baselineEnd = currentEnd - baselineOffset;
 
     String timeZone = datasetConfigDTO.getTimezone();
     request.setBaselineStart(new DateTime(baselineStart, DateTimeZone.forID(timeZone)));
@@ -230,7 +248,23 @@ public abstract class EmailHelper {
     request.setTimeGranularity(Utils.getAggregationTimeGranularity(aggTimeGranularity, collection));
     request.setGroupByDimensions(dimensions);
     ContributorViewHandler handler = new ContributorViewHandler(queryCache);
-    ContributorViewResponse response = handler.process(request);
-    return response;
+    return handler.process(request);
+  }
+
+  public static ContributorViewResponse getContributorDataForDataReport(String collection, String metric, List<String> dimensions)
+      throws Exception {
+    return getContributorDataForDataReport(collection, metric, dimensions, AlertConfigBean.COMPARE_MODE.WoW, 2 * 36_00_000, false); // add 2 hours delay
+  }
+
+  private static long getBaselineOffset(AlertConfigBean.COMPARE_MODE compareMode) {
+    switch (compareMode) {
+    case Wo2W:
+      return 2 * WEEK_MILLIS;
+    case Wo3W:
+      return 3 * WEEK_MILLIS;
+    case WoW:
+      default:
+      return WEEK_MILLIS;
+    }
   }
 }

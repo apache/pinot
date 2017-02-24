@@ -1,7 +1,16 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
+import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutoTune;
+import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
+import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
+import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
+import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
+import com.linkedin.thirdeye.detector.email.filter.AlertFilterUtil;
 import com.linkedin.thirdeye.util.SeverityComputationUtil;
 import java.util.List;
 
@@ -19,6 +28,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.NullArgumentException;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
@@ -28,18 +38,34 @@ import org.quartz.SchedulerException;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+
 
 @Path("/detection-job")
 @Produces(MediaType.APPLICATION_JSON)
 public class DetectionJobResource {
   private final DetectionJobScheduler detectionJobScheduler;
   private final AnomalyFunctionManager anomalyFunctionSpecDAO;
+  private final AnomalyFunctionManager anomalyFunctionDAO;
+  private final MergedAnomalyResultManager mergedAnomalyResultDAO;
+  private final RawAnomalyResultManager rawAnomalyResultDAO;
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
+  private final AlertFilterAutotuneFactory alertFilterAutotuneFactory;
+  private final AlertFilterFactory alertFilterFactory;
 
-  public DetectionJobResource(DetectionJobScheduler detectionJobScheduler) {
+  private static final Logger LOG = LoggerFactory.getLogger(DetectionJobResource.class);
+
+  public DetectionJobResource(DetectionJobScheduler detectionJobScheduler, AlertFilterFactory alertFilterFactory, AlertFilterAutotuneFactory alertFilterAutotuneFactory) {
     this.detectionJobScheduler = detectionJobScheduler;
     this.anomalyFunctionSpecDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
+    this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
+    this.mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
+    this.rawAnomalyResultDAO = DAO_REGISTRY.getRawAnomalyResultDAO();
+    this.alertFilterAutotuneFactory = alertFilterAutotuneFactory;
+    this.alertFilterFactory = alertFilterFactory;
   }
 
   @GET
@@ -69,42 +95,6 @@ public class DetectionJobResource {
       endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso);
     }
     detectionJobScheduler.runAdHoc(id, startTime, endTime);
-    return Response.ok().build();
-  }
-
-  /**
-   * Asynchronous call to a backfill procedure
-   * @param id
-   * @param startTimeIso
-   * @param endTimeIso
-   * @return
-   * @throws Exception
-   */
-  @POST
-  @Path("/{id}/backfill")
-  public Response backfill(@PathParam("id") Long id, @QueryParam("start") String startTimeIso,
-      @QueryParam("end") String endTimeIso, @DefaultValue("false") @QueryParam("force") boolean force) throws Exception {
-    DateTime startTime = null;
-    DateTime endTime = null;
-    if (StringUtils.isNotBlank(startTimeIso)) {
-      startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso);
-    }
-    if (StringUtils.isNotBlank(endTimeIso)) {
-      endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso);
-    }
-
-    if (startTime != null && endTime != null) {
-      DateTime innerStartTime = startTime;
-      DateTime innerEndTime = endTime;
-
-      new Thread(new Runnable() {
-        @Override
-        public void run() {
-          detectionJobScheduler.runBackfill(id, innerStartTime, innerEndTime, force);
-        }
-      }).start();
-    }
-
     return Response.ok().build();
   }
 
@@ -189,5 +179,142 @@ public class DetectionJobResource {
         util.computeSeverity(currentWindowStart, currentWindowEnd, seasonalPeriodMillis, seasonCountInt);
 
     return Response.ok(severity.toString(), MediaType.TEXT_PLAIN_TYPE).build();
+  }
+
+  /**
+   * Breaks down the given range into consecutive monitoring windows as per function definition
+   * Regenerates anomalies for each window separately
+   *
+   * As the anomaly result regeneration is a heavy job, we move the function from Dashboard to worker
+   * @param id anomaly function id
+   * @param startTimeIso The start time of the monitoring window (in ISO Format), ex: 2016-5-23T00:00:00Z
+   * @param endTimeIso The start time of the monitoring window (in ISO Format)
+   * @param isForceBackfill false to resume backfill from the latest left off
+   * @return HTTP response of this request
+   * @throws Exception
+   */
+  @POST
+  @Path("/{id}/generateAnomaliesInRange")
+  public Response generateAnomaliesInRange(@PathParam("id") String id,
+      @QueryParam("start") String startTimeIso,
+      @QueryParam("end") String endTimeIso,
+      @QueryParam("force") @DefaultValue("false") String isForceBackfill) throws Exception {
+    long functionId = Long.valueOf(id);
+    AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
+    if (anomalyFunction == null) {
+      return Response.noContent().build();
+
+    }
+
+    // Check if the timestamps are available
+    DateTime startTime = null;
+    DateTime endTime = null;
+    if (startTimeIso == null || startTimeIso.isEmpty()) {
+      throw new IllegalArgumentException(String.format("[functionId %s] Monitoring start time is not found", id));
+    }
+    if (endTimeIso == null || endTimeIso.isEmpty()) {
+      throw new IllegalArgumentException(String.format("[functionId %s] Monitoring end time is not found", id));
+    }
+
+    startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso);
+    endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso);
+
+    if(startTime.isAfter(endTime)){
+      throw new IllegalArgumentException(String.format(
+          "[functionId %s] Monitoring start time is after monitoring end time", id));
+    }
+    if(endTime.isAfterNow()){
+      throw new IllegalArgumentException(String.format(
+          "[functionId %s] Monitor end time {} should not be in the future", id, endTime.toString()));
+    }
+
+    // Check if the merged anomaly results have been cleaned up before regeneration
+    List<MergedAnomalyResultDTO> mergedResults =
+        mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(startTime.getMillis(), endTime.getMillis(),
+            functionId);
+    if (CollectionUtils.isNotEmpty(mergedResults)) {
+      throw new IllegalArgumentException(String.format(
+          "[functionId %s] Merged anomaly results should be cleaned up before regeneration", id));
+    }
+
+    //  Check if the raw anomaly results have been cleaned up before regeneration
+    List<RawAnomalyResultDTO> rawResults =
+        rawAnomalyResultDAO.findAllByTimeAndFunctionId(startTime.getMillis(), endTime.getMillis(), functionId);
+    if(CollectionUtils.isNotEmpty(rawResults)){
+      throw new IllegalArgumentException(String.format(
+          "[functionId {}] Raw anomaly results should be cleaned up before regeneration", id));
+    }
+
+    // Check if the anomaly function is active
+    if (!anomalyFunction.getIsActive()) {
+      throw new IllegalArgumentException(String.format("Skipping deactivated function %s", id));
+    }
+
+    String response = null;
+
+    DateTime innerStartTime = startTime;
+    DateTime innerEndTime = endTime;
+
+    new Thread(new Runnable() {
+      @Override
+      public void run() {
+        detectionJobScheduler.runBackfill(functionId, innerStartTime, innerEndTime, Boolean.valueOf(isForceBackfill));
+      }
+    }).start();
+
+    return Response.ok().build();
+  }
+
+  /**
+   *
+   * @param id anomaly function id
+   * @param startTime start time of anomalies to tune alert filter
+   * @param endTime end time of anomalies to tune alert filter
+   * @param autoTuneType the type of auto tune to invoke (default is "AUTOTUNE")
+   * @return HTTP response of request: string of alert filter
+   */
+  @POST
+  @Path("/autotune/filter/{function_id}")
+  public Response tuneAlertFilter(@PathParam("function_id") String id,
+      @QueryParam("startTime") Long startTime,
+      @QueryParam("endTime") Long endTime,
+      @QueryParam("autoTuneType") String autoTuneType) {
+
+    // get anomalies by function id, start time and end time
+    AnomalyFunctionDTO anomalyFunctionSpec = DAO_REGISTRY.getAnomalyFunctionDAO().findById(Long.valueOf(id));
+    AnomalyFunctionManager anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
+    MergedAnomalyResultManager anomalyMergedResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
+    List<MergedAnomalyResultDTO> anomalyResultDTOS = anomalyMergedResultDAO.findByStartTimeInRangeAndFunctionId(startTime, endTime, Long.valueOf(id));
+
+    // create alert filter and evaluator
+    AlertFilter alertFilter = alertFilterFactory.fromSpec(anomalyFunctionSpec.getAlertFilter());
+    AlertFilterUtil evaluator = new AlertFilterUtil(alertFilter);
+    try {
+      //evaluate current alert filter (calculate current precision and recall)
+      double[] evals = evaluator.getEvalResults(anomalyResultDTOS);
+      LOG.info("AlertFilter of Type {}", alertFilter.getClass().toString(), "has been evaluated with precision: {}", evals[AlertFilterUtil.PRECISION_INDEX], "recall:", evals[AlertFilterUtil.RECALL_INDEX]);
+
+      // create alert filter auto tune
+      AlertFilterAutoTune alertFilterAutotune = alertFilterAutotuneFactory.fromSpec(autoTuneType);
+      LOG.info("initiated alertFilterAutoTune of Type {}", alertFilterAutotune.getClass().toString());
+
+      // get tuned alert filter
+      Map<String,String> tunedAlertFilter = alertFilterAutotune.tuneAlertFilter(anomalyResultDTOS, evals[AlertFilterUtil.PRECISION_INDEX], evals[AlertFilterUtil.RECALL_INDEX]);
+      LOG.info("tuned AlertFilter");
+
+      // if alert filter auto tune has updated alert filter, over write alert filter to anomaly function spec
+      // otherwise do nothing and return alert filter
+      if (alertFilterAutotune.isUpdated()){
+        anomalyFunctionSpec.setAlertFilter(tunedAlertFilter);
+        anomalyFunctionDAO.update(anomalyFunctionSpec);
+        alertFilter.setParameters(tunedAlertFilter);
+        LOG.info("Model has been updated");
+      } else {
+        LOG.info("Model hasn't been updated because tuned model cannot beat original model");
+      }
+    } catch (Exception e) {
+      LOG.warn("AutoTune throws exception due to: {}", e.getMessage());
+    }
+    return Response.ok(alertFilter.toString()).build();
   }
 }

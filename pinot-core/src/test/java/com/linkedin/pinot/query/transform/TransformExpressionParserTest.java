@@ -50,9 +50,16 @@ public class TransformExpressionParserTest {
       Assert.assertEquals(actualGroupByColumns.get(i), expectedGroupByColumns[i]);
     }
 
+    // Group by expression contains columns as well as expressions.
     List<String> actualGroupByExpressions = brokerRequest.getGroupBy().getExpressions();
-    for (int i = 0; i < actualGroupByExpressions.size(); i++) {
-      Assert.assertEquals(actualGroupByExpressions.get(i), expectedGroupByExpressions[i]);
+    for (int i = 0; i < expectedGroupByColumns.length; i++) {
+      Assert.assertEquals(actualGroupByExpressions.get(i), expectedGroupByColumns[i]);
+    }
+
+    for (int i = 0; i < expectedGroupByExpressions.length; i++) {
+      int expressionIndex = i + expectedGroupByColumns.length;
+      Assert.assertEquals(actualGroupByExpressions.get(expressionIndex),
+          expectedGroupByExpressions[i].replaceAll("\\s", ""));
     }
   }
 }
