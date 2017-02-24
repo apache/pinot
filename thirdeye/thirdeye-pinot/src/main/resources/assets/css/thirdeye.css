@@ -1,7 +1,7 @@
 body {
     font-family: SourceSansPro, sans-serif;
-    font-weight: lighter;
-    font-size: 14px;
+    font-weight: normal;
+    font-size: 15px;
     background-color: #F3F6F8;
     color: #080808
 }
@@ -23,15 +23,16 @@ label {
     font-size: 15px;
 }
 .label-medium-semibold {
-    font-weight: 400;
+    font-weight: 600;
     font-size: 15px;
+    margin-bottom: 0;
 }
 .label-small-semibold {
-    font-weight: 400;
+    font-weight: 600;
     font-size: 11px;
 }
 .dashboard-metric-label {
-    font-weight: 400;
+    font-weight: 600;
     font-size: 13px;
 }
 .wow-summary-content {
@@ -154,10 +155,7 @@ hr {
     margin-bottom: 10px;
 }
 .padding-all {
-    padding-right: 20px;
-    padding-left: 20px;
-    padding-top: 20px;
-    padding-bottom: 20px;
+    padding: 24px;
 }
 .fill-up {
     margin-bottom: 5px;
@@ -412,12 +410,6 @@ text {
   font-size: 13px;
 }
 
-.row-footer {
-  border-top: 1px solid #CCC;
-  padding-top: 20px;
-  margin-top: 20px;
-}
-
 /* anomalies page Search Bar*/
 
 .search-bar {
@@ -431,15 +423,6 @@ text {
 
 .search-select {
   flex-basis: 150px;
-}
-
-.anomaly-function-detail {
-  border: 1px solid #CCC;
-  padding: 10px;
-  background-color: #F3F6F8;
-  display: flex;
-  justify-content: center;
-  flex-direction: column;
 }
 
 .filter-bar {
@@ -473,3 +456,94 @@ text {
   pointer-events: none;
   color: #999;
 }
+
+/* Anomaly Results*/
+
+.anormaly-chart {
+  height: 300px;
+}
+.anomaly-result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.anomaly-result-title {
+  font-weight: 600;
+  font-size: 17px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-right: 14px;
+}
+
+.anomaly-details {
+  border: 1px solid #CCC;
+  border-radius: 2px;
+  margin-top: 24px;
+}
+
+.anomaly-details-row {
+  display: flex;
+  flex-wrap: no-wrap;
+}
+
+.anomaly-details-row + .anomaly-details-row {
+  border-top: 1px solid #CCC;
+}
+
+.anomaly-details-items {
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  flex-basis: 50%;
+  padding: 14px 24px;
+  min-width: 0;
+}
+
+.anomaly-details-items--small {
+  flex-basis: calc(100%/3);
+}
+
+.anomaly-details-items + .anomaly-details-items {
+  border-left: 1px solid #CCC;
+}
+
+.anomaly-change-delta.negative {
+  color: #ee1620
+}
+
+.anomaly-change-delta.positive {
+  color: #398b18
+}
+
+.anomaly-duration {
+  text-transform: capitalize;
+}
+
+/* Common */
+.thirdeye-btn, .thirdeye-btn:hover  {
+  color: white;
+  font-weight: 600;
+  background-color: #0084bf;
+  font-size: 17px;
+  padding: 0 16px;
+  line-height: 32px;
+  border-radius: 2px;
+  transition-duration: 167ms;
+  transition-property: background-color,color;
+  transition-timing-function: cubic-bezier(0,0,.2,1);
+}
+
+.thirdeye-btn:hover,
+.thirdeye-btn:focus {
+  background-color: #0073b1;
+  color: white;
+}
+
+.thirdeye-btn:active{
+  color: white;
+  background-color: #006097;
+}
+

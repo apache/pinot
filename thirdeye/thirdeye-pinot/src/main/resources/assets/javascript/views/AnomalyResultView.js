@@ -225,48 +225,41 @@ AnomalyResultView.prototype = {
     });
 
   },
+
   renderAnomaliesTab : function(anomaliesWrapper) {
-    var anomalies = anomaliesWrapper.anomalyDetailsList;
-    for (var idx = 0; idx < anomalies.length; idx++) {
-      var anomaly = anomalies[idx];
+    const anomalies = anomaliesWrapper.anomalyDetailsList;
+    anomalies.forEach((anomaly, index) => {
+
+      if (!anomaly) {
+        return;
+      }
+
       console.log(anomaly);
 
-      var currentRange = anomaly.currentStart + " - " + anomaly.currentEnd;
-      var baselineRange = anomaly.baselineStart + " - " + anomaly.baselineEnd;
+      const date = ['date'].concat(anomaly.dates);
+      const currentValues = ['current'].concat(anomaly.currentValues);
+      const baselineValues = ['baseline'].concat(anomaly.baselineValues);
+      const chartColumns = [ date, currentValues, baselineValues ];
+      const showPoints = date.length <= constants.MAX_POINT_NUM;
 
-      var date = [ 'date' ].concat(anomaly.dates);
-      var currentValues = [currentRange].concat(anomaly.currentValues);
-      var baselineValues = [baselineRange].concat(anomaly.baselineValues);
-      var chartColumns = [ date, currentValues, baselineValues ];
-
-      var regionStart = moment(anomaly.anomalyRegionStart, constants.TIMESERIES_DATE_FORMAT).format(constants.DETAILS_DATE_FORMAT);
-      var regionEnd = moment(anomaly.anomalyRegionEnd, constants.TIMESERIES_DATE_FORMAT).format(constants.DETAILS_DATE_FORMAT);
-      $(`#region-start-${idx}`).html(regionStart);
-      $(`#region-end-${idx}`).html(regionEnd);
-
-      var current = anomaly.current;
-      var baseline = anomaly.baseline;
-      $("#current-value-" + idx).html(current);
-      $("#baseline-value-" + idx).html(baseline);
-
-      var dimension = anomaly.anomalyFunctionDimension;
-      $("#dimension-" + idx).html(dimension)
-
-      if (anomaly.anomalyFeedback) {
-        $("#anomaly-feedback-" + idx + " select").val(anomaly.anomalyFeedback);
-      }
 
       // CHART GENERATION
       var chart = c3.generate({
-        bindto : '#anomaly-chart-' + idx,
+        bindto : '#anomaly-chart-' + index,
         data : {
           x : 'date',
           xFormat : '%Y-%m-%d %H:%M',
           columns : chartColumns,
-          type : 'spline'
+          type : 'line'
+        },
+        point: {
+          show: showPoints,
         },
         legend : {
-          position : 'right'
+          position : 'inset',
+          inset: {
+            anchor: 'top-right',
+          }
         },
         axis : {
           y : {
@@ -274,7 +267,10 @@ AnomalyResultView.prototype = {
           },
           x : {
             type : 'timeseries',
-            show : true
+            show : true,
+            tick: {
+              fit: false,
+            }
           }
         },
         regions : [ {
@@ -288,8 +284,8 @@ AnomalyResultView.prototype = {
         } ]
       });
 
-      this.setupListenersOnAnomaly(idx, anomaly);
-    }
+      this.setupListenersOnAnomaly(index, anomaly);
+    })
   },
 
   dataEventHandler : function(e) {

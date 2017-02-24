@@ -29,6 +29,17 @@ Handlebars.registerHelper('formatDelta', function (a, b) {
     return "" + delta.toFixed(1);
   }
 });
+
+/**
+ * Template helper that assigns the correct css class based on the delta
+ * @param  {string} value: string value of delta ('2.4%')
+ * @return [string] css class positive/negative
+ */
+Handlebars.registerHelper('colorDelta', function(value) {
+    if (value ===  'N/A') { return; }
+    return parseInt(value) >= 0 ? 'positive' : 'negative';
+});
+
 Handlebars.registerHelper('displayHour', function (date) {
   var tz = getTimeZone();
   return moment(date).tz(tz).format('h a');

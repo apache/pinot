@@ -17,10 +17,12 @@ function Constants() {
   this.SEARCH_ANOMALIES_ANOMALYIDS = '/anomalies/search/anomalyIds/';
   this.SEARCH_ANOMALIES_TIME = '/anomalies/search/time/';
   this.UPDATE_ANOMALY_FEEDBACK = '/anomalies/updateFeedback/';
+  this.MAX_POINT_NUM = 150;
 
   //
   this.TIMESERIES_DATE_FORMAT = 'YYYY-MM-DD HH:mm';
-  this.DETAILS_DATE_FORMAT = 'MM/DD/YYYY HH:mm';
+  this.DETAILS_DATE_DAYS_FORMAT = 'MMM D, hh:mm a';
+  this.DETAILS_DATE_HOURS_FORMAT = 'hh:mm a';
   this.DATE_RANGE_CUSTOM = 'Custom Range';
   this.DATE_RANGE_FORMAT = 'MMM D, YYYY hh:mm a';
 
