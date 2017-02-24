@@ -134,7 +134,7 @@ public class RetentionManager {
           idealState = HelixHelper.getTableIdealState(_pinotHelixResourceManager.getHelixZkManager(), tableName);
         }
       } catch (Exception e) {
-        LOGGER.warn("Could not get idealstate for {}", tableName);
+        LOGGER.warn("Could not get idealstate for {}", tableName, e);
         // Ignore, worst case we have some old inactive segments in place.
       }
       for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
