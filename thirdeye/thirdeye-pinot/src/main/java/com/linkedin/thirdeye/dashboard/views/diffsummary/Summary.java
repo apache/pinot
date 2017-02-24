@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.dashboard.views.diffsummary;
 
+import com.linkedin.thirdeye.client.diffsummary.DimNameValueCostEntry;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -29,12 +30,14 @@ public class Summary {
   private final RowInserter basicRowInserter = new BasicRowInserter();
   private RowInserter oneSideErrorRowInserter = basicRowInserter;
   private RowInserter leafRowInserter = basicRowInserter;
+  private List<DimNameValueCostEntry> costSet;
 
   public Summary(Cube cube) {
     this.cube = cube;
     this.maxLevelCount = cube.getDimensions().size();
     this.topValue = cube.getTopBaselineValue() + cube.getTopCurrentValue();
     this.levelCount = this.maxLevelCount;
+    this.costSet = cube.getCostSet();
   }
 
   public SummaryResponse computeSummary(int answerSize) {
@@ -70,7 +73,8 @@ public class Summary {
     }
     computeChildDPArray(root);
     List<HierarchyNode> answer = new ArrayList<>(dpArrays.get(0).getAnswer());
-    SummaryResponse response = SummaryResponse.buildResponse(answer, this.levelCount);
+    SummaryResponse response = new SummaryResponse();
+    response.build(answer, this.levelCount, this.costSet);
 
     return response;
   }
