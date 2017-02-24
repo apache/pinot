@@ -160,7 +160,8 @@ $(document).ready( function() {
             "pValueThreshold","complementaryPattern","complementaryLevel","seasonal","minIncrement","minWindowLength","maxWindowLength","bootstrap","numSimulations",
             "notEqualEpsilon","proportionAnomalyInTraining","enableSTL","robust","periodic","enableOfflineTrain","numOfOfflineAnomalies","filterOnSeverity","targetPattern","targetLevel"
         ],
-        SPLINE_REGRESSION: ["historicalDataLength","historicalDataMaxLength", "historicalDataMinLength","degree","pValueThreshold","logTransform","timezone","anomalyRemovalSeverityThreshold","weeklyEffectRemovedInPrediction"]
+        SPLINE_REGRESSION: ["historicalDataLength","historicalDataMaxLength", "historicalDataMinLength","degree","pValueThreshold","logTransform","timezone",
+          "anomalyRemovalSeverityThreshold","weeklyEffectRemovedInPrediction","recentAnomalyToleranceLength","historyOutliersRemoval","useSTD"]
     }
 
         //Adding property defaults and datatypes from: https://gitli.corp.linkedin.com/ars-projects/anomaly-detection/source/bdafe93d4b4e57a439b16a8ca82c5b4119218ddd:anomaly-detection/src/main/java/com/linkedin/anomaly/api
@@ -181,6 +182,9 @@ $(document).ready( function() {
                 "SPLINE_REGRESSION|timezone":["America/Los_Angeles","string"],
                 "SPLINE_REGRESSION|weeklyEffectRemovedInPrediction":[true,"boolean"],
                 "SPLINE_REGRESSION|anomalyRemovalSeverityThreshold":[0.5,"double"],
+                "SPLINE_REGRESSION|recentAnomalyToleranceLength":[0,"int"],
+                "SPLINE_REGRESSION|historyOutliersRemoval":[false,"boolean"],
+                "SPLINE_REGRESSION|useSTD":[true,"boolean"],
                 "KALMAN_FILTER|knob": [10000, "double"],
                 "KALMAN_FILTER|order": [1, "int"],
                 "KALMAN_FILTER|pValueThreshold": [0.05, "double"],
