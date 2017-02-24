@@ -12,8 +12,8 @@ import java.util.regex.Pattern;
 
 public class ThirdEyeEventDataSource implements AnomalyFunctionExDataSource<String, DataFrame> {
 
-  private final static String PATTERN = "type=(\\w+),start=(\\d+),end=(\\d+)";
-  private final static Pattern pattern = Pattern.compile(PATTERN);
+  private static final String PATTERN = "type=(\\w+),start=(\\d+),end=(\\d+)";
+  private static final Pattern pattern = Pattern.compile(PATTERN);
 
   private final EventManager manager;
 
@@ -67,11 +67,11 @@ public class ThirdEyeEventDataSource implements AnomalyFunctionExDataSource<Stri
     Matcher m = pattern.matcher(query);
 
     if(!m.find())
-      throw new IllegalArgumentException(String.format("query must match pattern '%s'", PATTERN));
+      throw new IllegalArgumentException(String.format("query '%s' does not match pattern '%s'", query, PATTERN));
 
     String type = m.group(1);
-    long start = Long.parseLong(m.group(2));
-    long end = Long.parseLong(m.group(3));
+    long start = Long.parseLong(m.group(2)) * 1000;
+    long end = Long.parseLong(m.group(3)) * 1000;
 
     return manager.findEventsBetweenTimeRange(type, start, end);
   }

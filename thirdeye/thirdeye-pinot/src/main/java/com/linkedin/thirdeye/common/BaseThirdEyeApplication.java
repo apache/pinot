@@ -51,9 +51,12 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
   protected DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   public void initDAOs() {
-    String persistenceConfig = System.getProperty("dw.rootDir") + "/persistence.yml";
+    this.initDAOs(new File(System.getProperty("dw.rootDir") + "/persistence.yml"));
+  }
+
+  public void initDAOs(File persistenceConfig) {
     LOG.info("Loading persistence config from [{}]", persistenceConfig);
-    DaoProviderUtil.init(new File(persistenceConfig));
+    DaoProviderUtil.init(persistenceConfig);
     anomalyFunctionDAO = DaoProviderUtil.getInstance(AnomalyFunctionManagerImpl.class);
     rawAnomalyResultDAO = DaoProviderUtil.getInstance(RawAnomalyResultManagerImpl.class);
     emailConfigurationDAO = DaoProviderUtil.getInstance(EmailConfigurationManagerImpl.class);

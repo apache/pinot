@@ -15,6 +15,8 @@ public abstract class AnomalyFunctionEx {
   }
 
   protected String getConfig(String key) {
+    if(!context.getConfig().containsKey(key))
+      throw new IllegalStateException(String.format("Config or default for '%s' required", key));
     return context.getConfig().get(key);
   }
 

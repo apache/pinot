@@ -1,6 +1,10 @@
 package com.linkedin.thirdeye.detector.functionex;
 
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
+import com.linkedin.thirdeye.datalayer.bao.EventManager;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.EventManagerImpl;
+import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
+import com.linkedin.thirdeye.detector.functionex.impl.ThirdEyeEventDataSource;
 import com.linkedin.thirdeye.detector.functionex.impl.ThirdEyeMockDataSource;
 import com.linkedin.thirdeye.detector.functionex.impl.ThirdEyePinotConnection;
 import com.linkedin.thirdeye.detector.functionex.impl.ThirdEyePinotDataSource;
@@ -31,8 +35,9 @@ public class AnomalyFunctionExRunner {
   private static final String ID_MONITOR_FROM = "monitor-from";
   private static final String ID_MONITOR_TO = "monitor-to";
   private static final String ID_CONFIG = "config";
-  private static final String ID_PINOT = "pinot";
-  private static final String ID_MOCK = "mock";
+  private static final String ID_PINOT = "enable-pinot";
+  private static final String ID_MOCK = "enable-mock";
+  private static final String ID_THIRDEYE = "enable-thirdeye";
 
   public static void main(String[] args) throws Exception {
     Options options = makeParserOptions();
@@ -60,25 +65,34 @@ public class AnomalyFunctionExRunner {
 
     Map<String, String> config = new HashMap<>();
     if(cmd.hasOption(ID_CONFIG)) {
-      String[] params = cmd.getOptionValue(ID_CONFIG).split(",");
+      String[] params = cmd.getOptionValue(ID_CONFIG).split("(?<!\\\\),");
       for(String setting : params) {
-        String[] items = setting.split("=");
-        config.put(items[0], items[1]);
+        String[] items = setting.split("=", 2);
+        config.put(items[0], items[1].replace("\\,", ","));
       }
     }
     LOG.info("Using configuration '{}'", config);
+
+    if(cmd.hasOption(ID_THIRDEYE)) {
+      LOG.info("Enabling ThirdEye internal database with config '{}'", cmd.getOptionValue(ID_THIRDEYE));
+      File configFile = new File(cmd.getOptionValue(ID_THIRDEYE));
+      DaoProviderUtil.init(configFile);
+
+      EventManager eventManager = DaoProviderUtil.getInstance(EventManagerImpl.class);
+      factory.addDataSource("event", new ThirdEyeEventDataSource(eventManager));
+    }
 
     if(cmd.hasOption(ID_PINOT)) {
       LOG.info("Enabling '{}' datasource with config '{}'", ID_PINOT, cmd.getOptionValue(ID_PINOT));
       File configFile = new File(cmd.getOptionValue(ID_PINOT));
       PinotThirdEyeClientConfig clientConfig = PinotThirdEyeClientConfig.fromFile(configFile);
       ThirdEyePinotConnection conn = new ThirdEyePinotConnection(clientConfig);
-      factory.addDataSource(ID_PINOT, new ThirdEyePinotDataSource(conn));
+      factory.addDataSource("pinot", new ThirdEyePinotDataSource(conn));
     }
 
     if(cmd.hasOption(ID_MOCK)) {
       LOG.info("Enabling '{}' datasource", ID_MOCK, cmd.getOptionValue(ID_MOCK));
-      factory.addDataSource(ID_MOCK, new ThirdEyeMockDataSource());
+      factory.addDataSource("mock", new ThirdEyeMockDataSource());
     }
 
     AnomalyFunctionExContext context = new AnomalyFunctionExContext();
@@ -88,12 +102,24 @@ public class AnomalyFunctionExRunner {
     context.setConfig(config);
 
     LOG.info("Instantiating ...");
-    AnomalyFunctionEx function = factory.fromContext(context);
+    AnomalyFunctionEx function = null;
+    try {
+      function = factory.fromContext(context);
+    } catch (Exception e) {
+      LOG.error("Error instantiating anomaly function", e);
+      System.exit(1);
+    }
 
     LOG.info("Applying ...");
-    AnomalyFunctionExResult result = function.apply();
+    AnomalyFunctionExResult result = null;
+    try {
+      result = function.apply();
+    } catch (Exception e) {
+      LOG.error("Error applying anomaly function", e);
+      System.exit(1);
+    }
 
-    LOG.info("Got result with {} anomalies", result.getAnomalies().size());
+    LOG.info("Got function result with {} anomalies", result.getAnomalies().size());
     for(AnomalyFunctionExResult.Anomaly a : result.getAnomalies()) {
       String data = "(no data)";
       if(a.getData().getIndex().size() > 0)
@@ -118,7 +144,7 @@ public class AnomalyFunctionExRunner {
     options.addOption(classname);
 
     Option config = new Option("c", ID_CONFIG, true,
-        "Configuration parameters as comma separated list (example: key1=value1,key2=value2,...)");
+        "Configuration parameters as comma separated list (example: 'key1=value1,key2=value\\\\,2,...')");
     options.addOption(config);
 
     Option monitoringFrom = new Option("f", ID_MONITOR_FROM, true,
@@ -130,12 +156,16 @@ public class AnomalyFunctionExRunner {
     options.addOption(monitoringTo);
 
     Option pinot = new Option("P", ID_PINOT, true,
-        String.format("Enables '%s' data source. Requires path to pinot client config YAML file.", ID_PINOT));
+        "Enables 'pinot' data source. Requires path to pinot client config YAML file.");
     options.addOption(pinot);
 
     Option mock = new Option("M", ID_MOCK, false,
-        String.format("Enables '%s' data source.", ID_MOCK));
+        "Enables 'mock' data source.");
     options.addOption(mock);
+
+    Option thirdeye = new Option("T", ID_THIRDEYE, true,
+        "Enables access to the ThirdEye internal database. Requires path to thirdeye persistence config YAML file.");
+    options.addOption(thirdeye);
 
     return options;
   }
