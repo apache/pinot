@@ -19,6 +19,9 @@ import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,7 +48,48 @@ public class RangeMergeOptimizerTest {
   }
 
   @Test
-  public void test() {
+  public void testRangeIntersection() {
+    List<String> range1 = Arrays.asList("");
+    List<String> range2 = Arrays.asList("");
+
+    // One range within another
+    range1.set(0, "(1\t\t100)");
+    range2.set(0, "(10\t\t20]");
+    testRangeOptimizer(range1, range2, "(10\t\t20]");
+
+    // One range within another, and one range is unbounded
+    range1.set(0, "(*\t\t*)");
+    range2.set(0, "[1\t\t2)");
+    testRangeOptimizer(range1, range2, "[1\t\t2)");
+
+    // One range with unbounded lower
+    range1.set(0, "(*\t\t5]");
+    range2.set(0, "[1\t\t20)");
+    testRangeOptimizer(range1, range2, "[1\t\t5]");
+
+    // One range with unbounded upper
+    range1.set(0, "(5\t\t*)");
+    range2.set(0, "[1\t\t20)");
+    testRangeOptimizer(range1, range2, "(5\t\t20)");
+
+    // Partial overlap
+    range1.set(0, "(1\t\t10]");
+    range2.set(0, "[5\t\t20)");
+    testRangeOptimizer(range1, range2, "[5\t\t10]");
+
+    // No overlap
+    range1.set(0, "(1\t\t10]");
+    range2.set(0, "[20\t\t30)");
+    testRangeOptimizer(range1, range2, "[20\t\t10]");
+
+    // Single point overlap
+    range1.set(0, "(1\t\t10]");
+    range2.set(0, "[10\t\t30)");
+    testRangeOptimizer(range1, range2, "[10\t\t10]");
+  }
+
+  @Test
+  public void testRangeOptimizer() {
 
     // Query with single >
     FilterQueryTree actualTree = buildFilterQueryTree("select * from table where time > 10", true);
@@ -120,14 +164,22 @@ public class RangeMergeOptimizerTest {
     compareTrees(actualTree, expectedTree);
 
     // Query with OR predicates
-    actualTree = buildFilterQueryTree("select * from table where (foo = 'bar' or time < 10)", true);
-    expectedTree = buildFilterQueryTree("select * from table where (foo = 'bar' or time < 10)", false);
+    actualTree = buildFilterQueryTree("select * from table where (foo1 = 'bar1' or (foo2 = 'bar2' and (time >= 10 and time <= 20)))", true);
+    expectedTree = buildFilterQueryTree("select * from table where (foo1 = 'bar1' or (foo2 = 'bar2' and time between 10 and 20))", false);
     compareTrees(actualTree, expectedTree);
 
     // Query without time column
     actualTree = buildFilterQueryTree("select * from table where foo = 'bar'", true);
     expectedTree = buildFilterQueryTree("select * from table where foo = 'bar'", false);
     compareTrees(actualTree, expectedTree);
+  }
+
+  private void testRangeOptimizer(List<String> range1, List<String> range2, String expected) {
+    String actual;
+    actual = RangeMergeOptimizer.intersectRanges(range1, range2).get(0);
+    Assert.assertEquals(actual, expected);
+    actual = RangeMergeOptimizer.intersectRanges(range2, range1).get(0);
+    Assert.assertEquals(actual, expected);
   }
 
   /**

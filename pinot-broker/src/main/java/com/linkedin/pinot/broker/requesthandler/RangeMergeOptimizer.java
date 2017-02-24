@@ -54,11 +54,24 @@ public class RangeMergeOptimizer extends FilterQueryTreeOptimizer {
    */
   @Nonnull
   private static FilterQueryTree optimizeRanges(@Nonnull FilterQueryTree current, @Nullable String timeColumn) {
-    if (timeColumn == null || current.getOperator() != FilterOperator.AND) {
+    if (timeColumn == null) {
       return current;
     }
 
     List<FilterQueryTree> children = current.getChildren();
+    if (children == null || children.isEmpty()) {
+      return current;
+    }
+
+    // For OR, we optimize all its children, but do not propagate up.
+    if (current.getOperator() == FilterOperator.OR) {
+      int length = children.size();
+      for (int i = 0; i < length; i++) {
+        children.set(i, optimizeRanges(children.get(i), timeColumn));
+      }
+      return current;
+    }
+
     List<FilterQueryTree> newChildren = new ArrayList<>();
     List<String> intersect = null;
 
@@ -90,7 +103,7 @@ public class RangeMergeOptimizer extends FilterQueryTreeOptimizer {
    * @param range2 Second range
    * @return Intersection of the given ranges.
    */
-  private static List<String> intersectRanges(List<String> range1, List<String> range2) {
+  public static List<String> intersectRanges(List<String> range1, List<String> range2) {
 
     // Build temporary range predicates to parse the string range values.
     RangePredicate predicate1 = new RangePredicate(DUMMY_STRING, range1);
