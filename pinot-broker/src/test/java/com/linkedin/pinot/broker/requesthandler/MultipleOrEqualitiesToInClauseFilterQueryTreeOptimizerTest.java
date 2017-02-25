@@ -115,7 +115,7 @@ public class MultipleOrEqualitiesToInClauseFilterQueryTreeOptimizerTest {
   }
 
   private String filterQueryTreeForQuery(String query) {
-    BrokerRequest brokerRequest = OPTIMIZER.optimize(COMPILER.compileToBrokerRequest(query));
+    BrokerRequest brokerRequest = OPTIMIZER.optimize(COMPILER.compileToBrokerRequest(query), null /* timeColumn */);
     return RequestUtils.generateFilterQueryTree(brokerRequest).toString();
   }
 
