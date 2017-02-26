@@ -410,6 +410,31 @@ text {
   font-size: 13px;
 }
 
+/* Common */
+.thirdeye-btn, .thirdeye-btn:hover  {
+  color: white;
+  font-weight: 600;
+  background-color: #0084bf;
+  font-size: 17px;
+  padding: 0 16px;
+  line-height: 32px;
+  border-radius: 2px;
+  transition-duration: 167ms;
+  transition-property: background-color,color;
+  transition-timing-function: cubic-bezier(0,0,.2,1);
+}
+
+.thirdeye-btn:hover,
+.thirdeye-btn:focus {
+  background-color: #0073b1;
+  color: white;
+}
+
+.thirdeye-btn:active{
+  color: white;
+  background-color: #006097;
+}
+
 /* anomalies page Search Bar*/
 
 .search-bar {
@@ -422,7 +447,17 @@ text {
 }
 
 .search-select {
-  flex-basis: 150px;
+  flex-basis: 25%;
+}
+
+.search-input .select2-container--bootstrap .select2-selection {
+  border-radius: 4px 0px 0px 4px;
+}
+
+.search-button {
+  display: flex;
+  align-items: center;
+  border-radius: 0px 2px 2px 0px
 }
 
 .filter-bar {
@@ -521,29 +556,3 @@ text {
 .anomaly-duration {
   text-transform: capitalize;
 }
-
-/* Common */
-.thirdeye-btn, .thirdeye-btn:hover  {
-  color: white;
-  font-weight: 600;
-  background-color: #0084bf;
-  font-size: 17px;
-  padding: 0 16px;
-  line-height: 32px;
-  border-radius: 2px;
-  transition-duration: 167ms;
-  transition-property: background-color,color;
-  transition-timing-function: cubic-bezier(0,0,.2,1);
-}
-
-.thirdeye-btn:hover,
-.thirdeye-btn:focus {
-  background-color: #0073b1;
-  color: white;
-}
-
-.thirdeye-btn:active{
-  color: white;
-  background-color: #006097;
-}
-

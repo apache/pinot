@@ -302,7 +302,7 @@ AnomalyResultView.prototype = {
   },
   setupListenerOnApplyButton : function() {
     var self = this;
-    $('#apply-button').click(function() {
+    $('#search-button').click(function() {
       var anomaliesSearchMode = $('#anomalies-search-mode').val();
       var metricIds = undefined;
       var dashboardId = undefined;
