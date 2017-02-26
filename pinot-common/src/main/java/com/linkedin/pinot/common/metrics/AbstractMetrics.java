@@ -48,10 +48,18 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
 
   private final Map<String, AtomicLong> _gaugeValues = new ConcurrentHashMap<String, AtomicLong>();
 
+  protected final boolean _global;
+
   public AbstractMetrics(String metricPrefix, MetricsRegistry metricsRegistry, Class clazz) {
+    this(metricPrefix, metricsRegistry, clazz, false);
+  }
+
+  public AbstractMetrics(String metricPrefix, MetricsRegistry metricsRegistry, Class clazz, boolean global) {
     _metricPrefix = metricPrefix;
     _metricsRegistry = metricsRegistry;
     _clazz = clazz;
+    _global = global;
+
   }
 
   public interface QueryPhase {
@@ -93,7 +101,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   }
 
   public void addPhaseTiming(String tableName, QP phase, long nanos) {
-    String fullTimerName = _metricPrefix + tableName + "." + phase.getQueryPhaseName();
+    String fullTimerName = _metricPrefix + getTableName(tableName) + "." + phase.getQueryPhaseName();
     addValueToTimer(fullTimerName, nanos, TimeUnit.NANOSECONDS);
   }
 
@@ -106,7 +114,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param timeUnit The log time duration time unit
    */
   public void addTimedTableValue(final String tableName, T timer, final long duration, final TimeUnit timeUnit) {
-    final String fullTimerName = _metricPrefix + tableName + "." + timer.getTimerName();
+    final String fullTimerName = _metricPrefix + getTableName(tableName) + "." + timer.getTimerName();
     addValueToTimer(fullTimerName, duration, timeUnit);
   }
 
@@ -140,7 +148,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    */
   private String buildMetricName(@Nullable BrokerRequest request, String metricName) {
     if (request != null && request.getQuerySource() != null && request.getQuerySource().getTableName() != null) {
-      return _metricPrefix + request.getQuerySource().getTableName() + "." + metricName;
+      return _metricPrefix + getTableName(request.getQuerySource().getTableName()) + "." + metricName;
     } else {
       return _metricPrefix + "unknown." + metricName;
     }
@@ -191,7 +199,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   public void addMeteredTableValue(final String tableName, final M meter, final long unitCount) {
     final String fullMeterName;
     String meterName = meter.getMeterName();
-    fullMeterName = _metricPrefix + tableName + "." + meterName;
+    fullMeterName = _metricPrefix + getTableName(tableName) + "." + meterName;
     final MetricName metricName = new MetricName(_clazz, fullMeterName);
 
     MetricsHelper.newMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS).mark(unitCount);
@@ -227,7 +235,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   public void addValueToTableGauge(final String tableName, final G gauge, final long unitCount) {
     final String fullGaugeName;
     String gaugeName = gauge.getGaugeName();
-    fullGaugeName = gaugeName + "." + tableName;
+    fullGaugeName = gaugeName + "." + getTableName(tableName);
 
     if (!_gaugeValues.containsKey(fullGaugeName)) {
       synchronized (_gaugeValues) {
@@ -258,7 +266,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   public void setValueOfTableGauge(final String tableName, final G gauge, final long value) {
     final String fullGaugeName;
     String gaugeName = gauge.getGaugeName();
-    fullGaugeName = gaugeName + "." + tableName;
+    fullGaugeName = gaugeName + "." + getTableName(tableName);
 
     if (!_gaugeValues.containsKey(fullGaugeName)) {
       synchronized (_gaugeValues) {
@@ -317,7 +325,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   public long getValueOfTableGauge(final String tableName, final G gauge) {
     final String fullGaugeName;
     String gaugeName = gauge.getGaugeName();
-    fullGaugeName = gaugeName + "." + tableName;
+    fullGaugeName = gaugeName + "." + getTableName(tableName);
 
     if (!_gaugeValues.containsKey(fullGaugeName)) {
       return 0;
@@ -373,4 +381,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   protected abstract M[] getMeters();
 
   protected abstract G[] getGauges();
+
+  protected String getTableName(String tableName){
+     return (_global ? "allTables" : tableName);
+  }
 }

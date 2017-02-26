@@ -32,6 +32,10 @@ public class BrokerMetrics extends AbstractMetrics<BrokerQueryPhase, BrokerMeter
     super("pinot.broker.", metricsRegistry, BrokerMetrics.class);
   }
 
+  public BrokerMetrics(MetricsRegistry metricsRegistry, boolean global) {
+    super("pinot.broker.", metricsRegistry, BrokerMetrics.class, global);
+  }
+
   @Override
   protected BrokerQueryPhase[] getQueryPhases() {
     return BrokerQueryPhase.values();
