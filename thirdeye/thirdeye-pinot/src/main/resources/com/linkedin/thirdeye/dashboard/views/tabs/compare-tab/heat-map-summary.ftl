@@ -4,7 +4,7 @@
             <table id="heat-map-{{metricName}}-difference-summary-table" style="width:100%;">
                 <thead>
                 <tr>
-                    <th colspan="{{dimensions.length}}">Dimension</th>
+                    <th colspan="{{dimensions.length}}">Top 3 Multi-Dimensions Drill Down (Select "Dimensions" from the left panel to specify interested dimensions)</th>
                     <th></th>
                     <th></th>
                     <th></th>
@@ -44,7 +44,7 @@
             <table id="heat-map-{{metricName}}-gainer-summary-table" style="width:100%;">
               <thead>
               <tr>
-                <th colspan="{{dimensions.length}}">Top {{gainer.length}} Gainer</th>
+                <th colspan="{{dimensions.length}}">Top {{gainer.length}} Gainers of Single Dimension</th>
                 <th></th>
                 <th></th>
                 <th></th>
@@ -52,8 +52,8 @@
                 <th></th>
               </tr>
               <tr>
-                <th class="summary-header">Dimension</th>
-                <th class="summary-header"> </th>
+                <th>Dimension Name</th>
+                <th>Dimension Value</th>
                 <th class="summary-header">Baseline</th>
                 <th class="summary-header">Current</th>
                 <th class="summary-header thin-column">Percentage Change</th>
@@ -82,7 +82,7 @@
             <table id="heat-map-{{metricName}}-loser-summary-table" style="width:100%;">
               <thead>
               <tr>
-                <th colspan="{{dimensions.length}}">Top {{loser.length}} Loser</th>
+                <th colspan="{{dimensions.length}}">Top {{loser.length}} Losers of Single Dimension</th>
                 <th></th>
                 <th></th>
                 <th></th>
@@ -90,8 +90,8 @@
                 <th></th>
               </tr>
               <tr>
-                <th class="summary-header">Dimension</th>
-                <th class="summary-header"> </th>
+                <th>Dimension Name</th>
+                <th>Dimension Value</th>
                 <th class="summary-header">Baseline</th>
                 <th class="summary-header">Current</th>
                 <th class="summary-header thin-column">Percentage Change</th>

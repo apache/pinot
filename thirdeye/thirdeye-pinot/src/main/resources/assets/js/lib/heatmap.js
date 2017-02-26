@@ -304,8 +304,12 @@ function renderHeatMapSummary(summaryData){
     $("#heat-map-" + summaryData.metricName +"-difference-summary-table").DataTable({
         "bSort" : false
     });
-    $("#heat-map-" + summaryData.metricName +"-gainer-summary-table").DataTable();
-    $("#heat-map-" + summaryData.metricName +"-loser-summary-table").DataTable();
+    $("#heat-map-" + summaryData.metricName +"-gainer-summary-table").DataTable({
+        "order": [[ 7, "desc" ]]
+    });
+    $("#heat-map-" + summaryData.metricName +"-loser-summary-table").DataTable({
+        "order": [[ 7, "desc" ]]
+    });
 }
 
 function heatMapEventListeners(tab) {
