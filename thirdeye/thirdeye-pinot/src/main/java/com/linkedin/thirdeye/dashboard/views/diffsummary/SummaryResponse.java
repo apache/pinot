@@ -17,7 +17,7 @@ import com.linkedin.thirdeye.client.diffsummary.Dimensions;
 import com.linkedin.thirdeye.client.diffsummary.HierarchyNode;
 
 public class SummaryResponse {
-  private final static int MAX_GAINER_LOSER_COUNT = 10;
+  private final static int MAX_GAINER_LOSER_COUNT = 5;
   private final static NumberFormat DOUBLE_FORMATTER = new DecimalFormat("#0.00");
   static final  String INFINITE = "";
 
@@ -35,10 +35,14 @@ public class SummaryResponse {
   private List<SummaryResponseRow> responseRows = new ArrayList<>();
 
   @JsonProperty("gainer")
-  private List<DimNameValueCostEntry> gainer = new ArrayList<>();
+  private List<SummaryGainerLoserResponseRow> gainer = new ArrayList<>();
 
   @JsonProperty("loser")
-  private List<DimNameValueCostEntry> loser = new ArrayList<>();
+  private List<SummaryGainerLoserResponseRow> loser = new ArrayList<>();
+
+  private double totalBaselineValue = 0d;
+
+  private double totalCurrentValue = 0d;
 
   public String getMetricName() {
     return metricName;
@@ -52,11 +56,11 @@ public class SummaryResponse {
     return responseRows;
   }
 
-  public List<DimNameValueCostEntry> getGainer() {
+  public List<SummaryGainerLoserResponseRow> getGainer() {
     return gainer;
   }
 
-  public List<DimNameValueCostEntry> getLoser() {
+  public List<SummaryGainerLoserResponseRow> getLoser() {
     return loser;
   }
 
@@ -69,10 +73,10 @@ public class SummaryResponse {
 
   private void buildGainerLoserGroup(List<DimNameValueCostEntry> costSet) {
     for (DimNameValueCostEntry dimNameValueCostEntry : costSet) {
-      if (dimNameValueCostEntry.getCurValue() >= dimNameValueCostEntry.getBaselineValue() && gainer.size() < MAX_GAINER_LOSER_COUNT) {
-        gainer.add(dimNameValueCostEntry);
-      } else if (dimNameValueCostEntry.getCurValue() < dimNameValueCostEntry.getBaselineValue() && loser.size() < MAX_GAINER_LOSER_COUNT) {
-        loser.add(dimNameValueCostEntry);
+      if (dimNameValueCostEntry.getCurrentValue() >= dimNameValueCostEntry.getBaselineValue() && gainer.size() < MAX_GAINER_LOSER_COUNT) {
+        gainer.add(buildGainerLoserRow(dimNameValueCostEntry));
+      } else if (dimNameValueCostEntry.getCurrentValue() < dimNameValueCostEntry.getBaselineValue() && loser.size() < MAX_GAINER_LOSER_COUNT) {
+        loser.add(buildGainerLoserRow(dimNameValueCostEntry));
       }
       if (gainer.size() >= MAX_GAINER_LOSER_COUNT && loser.size() >= MAX_GAINER_LOSER_COUNT) {
         break;
@@ -80,16 +84,29 @@ public class SummaryResponse {
     }
   }
 
-  public void build(List<HierarchyNode> nodes, int targetLevelCount, List<DimNameValueCostEntry> costSet) {
-    this.buildGainerLoserGroup(costSet);
+  private SummaryGainerLoserResponseRow buildGainerLoserRow(DimNameValueCostEntry costEntry) {
+    SummaryGainerLoserResponseRow row = new SummaryGainerLoserResponseRow();
+    row.baselineValue = costEntry.getBaselineValue();
+    row.currentValue = costEntry.getCurrentValue();
+    row.dimensionName = costEntry.getDimName();
+    row.dimensionValue = costEntry.getDimValue();
+    row.percentageChange = computePercentageChange(row.baselineValue, row.currentValue);
+    row.contributionChange =
+        computeContributionChange(row.baselineValue, row.currentValue, totalBaselineValue, totalCurrentValue);
+    row.contributionToOverallChange =
+        computeContributionToOverallChange(row.baselineValue, row.currentValue, totalBaselineValue);
+    row.cost = DOUBLE_FORMATTER.format(roundUp(costEntry.getCost()));
+    return row;
+  }
 
+  public void build(List<HierarchyNode> nodes, int targetLevelCount, List<DimNameValueCostEntry> costSet) {
     // Compute the total baseline and current value
-    double totalBaselineValue = 0d;
-    double totalCurrentValue = 0d;
     for(HierarchyNode node : nodes) {
       totalBaselineValue += node.getBaselineValue();
       totalCurrentValue += node.getCurrentValue();
     }
+
+    this.buildGainerLoserGroup(costSet);
 
     // If all nodes have a lower level count than targetLevelCount, then it is not necessary to print the summary with
     // height higher than the available level.

@@ -5,15 +5,15 @@ public class DimNameValueCostEntry implements Comparable<DimNameValueCostEntry>{
   private String dimName;
   private String dimValue;
   private double cost;
-  private double curValue;
+  private double currentValue;
   private double baselineValue;
 
-  public DimNameValueCostEntry(String dimension, String dimValue, double dimValueCost, double contributionFactor, double curValue, double baselineValue) {
+  public DimNameValueCostEntry(String dimension, String dimValue, double dimValueCost, double contributionFactor, double currentValue, double baselineValue) {
     this.dimName = dimension;
     this.dimValue = dimValue;
     this.cost = dimValueCost;
     this.contributionFactor = contributionFactor;
-    this.curValue = curValue;
+    this.currentValue = currentValue;
     this.baselineValue = baselineValue;
   }
 
@@ -49,12 +49,12 @@ public class DimNameValueCostEntry implements Comparable<DimNameValueCostEntry>{
     this.cost = cost;
   }
 
-  public double getCurValue() {
-    return curValue;
+  public double getCurrentValue() {
+    return currentValue;
   }
 
-  public void setCurValue(double curValue) {
-    this.curValue = curValue;
+  public void setCurrentValue(double currentValue) {
+    this.currentValue = currentValue;
   }
 
   public double getBaselineValue() {
@@ -73,8 +73,8 @@ public class DimNameValueCostEntry implements Comparable<DimNameValueCostEntry>{
   @Override
   public String toString() {
     return "[contributionFactor=" + contributionFactor + ", dimName=" + dimName + ", dimValue="
-        + dimValue + ", cost=" + cost + ", delta=" + (curValue - baselineValue) + ", ratio=" + (
-        curValue / baselineValue) + "]";
+        + dimValue + ", cost=" + cost + ", delta=" + (currentValue - baselineValue) + ", ratio=" + (
+        currentValue / baselineValue) + "]";
   }
 }
 

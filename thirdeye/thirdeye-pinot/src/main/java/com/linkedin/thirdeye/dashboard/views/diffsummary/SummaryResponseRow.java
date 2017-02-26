@@ -9,13 +9,8 @@ import org.apache.commons.lang3.builder.ToStringStyle;
 /**
  * A POJO for front-end representation.
  */
-public class SummaryResponseRow {
+public class SummaryResponseRow extends BaseResponseRow {
   public List<String> names;
-  public double baselineValue;
-  public double currentValue;
-  public String percentageChange;
-  public String contributionChange;
-  public String contributionToOverallChange;
   public String otherDimensionValues;
 
   public static SummaryResponseRow buildNotAvailableRow() {
