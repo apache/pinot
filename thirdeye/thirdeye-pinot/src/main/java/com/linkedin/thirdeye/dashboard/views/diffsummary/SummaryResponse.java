@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.dashboard.views.diffsummary;
 
+import com.linkedin.thirdeye.client.diffsummary.DimNameValueCostEntry;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.ArrayList;
@@ -16,6 +17,7 @@ import com.linkedin.thirdeye.client.diffsummary.Dimensions;
 import com.linkedin.thirdeye.client.diffsummary.HierarchyNode;
 
 public class SummaryResponse {
+  private final static int MAX_GAINER_LOSER_COUNT = 5;
   private final static NumberFormat DOUBLE_FORMATTER = new DecimalFormat("#0.00");
   static final  String INFINITE = "";
 
@@ -32,6 +34,16 @@ public class SummaryResponse {
   @JsonProperty("responseRows")
   private List<SummaryResponseRow> responseRows = new ArrayList<>();
 
+  @JsonProperty("gainer")
+  private List<SummaryGainerLoserResponseRow> gainer = new ArrayList<>();
+
+  @JsonProperty("loser")
+  private List<SummaryGainerLoserResponseRow> loser = new ArrayList<>();
+
+  private double totalBaselineValue = 0d;
+
+  private double totalCurrentValue = 0d;
+
   public String getMetricName() {
     return metricName;
   }
@@ -44,6 +56,14 @@ public class SummaryResponse {
     return responseRows;
   }
 
+  public List<SummaryGainerLoserResponseRow> getGainer() {
+    return gainer;
+  }
+
+  public List<SummaryGainerLoserResponseRow> getLoser() {
+    return loser;
+  }
+
   public static SummaryResponse buildNotAvailableResponse() {
     SummaryResponse response = new SummaryResponse();
     response.dimensions.add(NOT_AVAILABLE);
@@ -51,16 +71,42 @@ public class SummaryResponse {
     return response;
   }
 
-  public static SummaryResponse buildResponse(List<HierarchyNode> nodes, int targetLevelCount) {
-    SummaryResponse response = new SummaryResponse();
+  private void buildGainerLoserGroup(List<DimNameValueCostEntry> costSet) {
+    for (DimNameValueCostEntry dimNameValueCostEntry : costSet) {
+      if (dimNameValueCostEntry.getCurrentValue() >= dimNameValueCostEntry.getBaselineValue() && gainer.size() < MAX_GAINER_LOSER_COUNT) {
+        gainer.add(buildGainerLoserRow(dimNameValueCostEntry));
+      } else if (dimNameValueCostEntry.getCurrentValue() < dimNameValueCostEntry.getBaselineValue() && loser.size() < MAX_GAINER_LOSER_COUNT) {
+        loser.add(buildGainerLoserRow(dimNameValueCostEntry));
+      }
+      if (gainer.size() >= MAX_GAINER_LOSER_COUNT && loser.size() >= MAX_GAINER_LOSER_COUNT) {
+        break;
+      }
+    }
+  }
 
+  private SummaryGainerLoserResponseRow buildGainerLoserRow(DimNameValueCostEntry costEntry) {
+    SummaryGainerLoserResponseRow row = new SummaryGainerLoserResponseRow();
+    row.baselineValue = costEntry.getBaselineValue();
+    row.currentValue = costEntry.getCurrentValue();
+    row.dimensionName = costEntry.getDimName();
+    row.dimensionValue = costEntry.getDimValue();
+    row.percentageChange = computePercentageChange(row.baselineValue, row.currentValue);
+    row.contributionChange =
+        computeContributionChange(row.baselineValue, row.currentValue, totalBaselineValue, totalCurrentValue);
+    row.contributionToOverallChange =
+        computeContributionToOverallChange(row.baselineValue, row.currentValue, totalBaselineValue);
+    row.cost = DOUBLE_FORMATTER.format(roundUp(costEntry.getCost()));
+    return row;
+  }
+
+  public void build(List<HierarchyNode> nodes, int targetLevelCount, List<DimNameValueCostEntry> costSet) {
     // Compute the total baseline and current value
-    double totalBaselineValue = 0d;
-    double totalCurrentValue = 0d;
     for(HierarchyNode node : nodes) {
       totalBaselineValue += node.getBaselineValue();
       totalCurrentValue += node.getCurrentValue();
     }
+
+    this.buildGainerLoserGroup(costSet);
 
     // If all nodes have a lower level count than targetLevelCount, then it is not necessary to print the summary with
     // height higher than the available level.
@@ -73,7 +119,7 @@ public class SummaryResponse {
     // Build the header
     Dimensions dimensions = nodes.get(0).getDimensions();
     for (int i = 0; i < targetLevelCount; ++i) {
-      response.dimensions.add(dimensions.get(i));
+      this.dimensions.add(dimensions.get(i));
     }
 
     // Build the response
@@ -128,10 +174,8 @@ public class SummaryResponse {
         separator = ", ";
       }
       row.otherDimensionValues = sb.toString();
-      response.responseRows.add(row);
+      this.responseRows.add(row);
     }
-
-    return response;
   }
 
   private static String computePercentageChange(double baseline, double current) {
