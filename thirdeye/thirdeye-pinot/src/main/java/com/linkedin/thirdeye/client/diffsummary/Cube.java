@@ -183,43 +183,44 @@ public class Cube { // the cube (Ca|Cb)
    * Establish the hierarchy between aggregated and detailed rows.
    */
   private void buildHierarchy() {
+    HashMap<String, HierarchyNode> curParent = new HashMap<>();
+    HashMap<String, HierarchyNode> nextParent = new HashMap<>();
+
     for (int level = 0; level <= this.dimensions.size(); ++level) {
-      List<HierarchyNode> nodesAtCurrentLevel = new ArrayList<>(hierarchicalRows.get(level).size());
-      hierarchicalNodes.add(nodesAtCurrentLevel);
+      hierarchicalNodes.add(new ArrayList<>(hierarchicalRows.get(level).size()));
 
       if (level != 0) {
-        HashMap<String, HierarchyNode> parent = new HashMap<>();
-        StringBuilder parentDimValues = new StringBuilder();
-        // Put all parent nodes to the hashmap
-        for (int parentIndex = 0; parentIndex < hierarchicalNodes.get(level - 1).size(); ++parentIndex) {
-          parentDimValues.setLength(0);
-          HierarchyNode parentNode = hierarchicalNodes.get(level - 1).get(parentIndex);
-          for (int i = 0; i < level - 1; ++i) {
-            parentDimValues.append(parentNode.data.dimensionValues.get(i));
-          }
-          parent.put(parentDimValues.toString(), parentNode);
-        }
 
         for (int index = 0; index < hierarchicalRows.get(level).size(); ++index) {
           Row row = hierarchicalRows.get(level).get(index);
-          parentDimValues.setLength(0);
+          StringBuilder parentDimValues = new StringBuilder();
           for (int i = 0; i < level - 1; ++i) {
             parentDimValues.append(row.dimensionValues.get(i));
           }
-          HierarchyNode parentNode = parent.get(parentDimValues.toString());
-          // Sometimes Pinot returns a node without any matching parent
+          HierarchyNode parentNode = curParent.get(parentDimValues.toString());
+          // Sometimes Pinot returns a node without any matching parent; we discard those nodes.
           if (parentNode == null) {
-            LOG.info("Unable to find parent for node:{}", row);
             continue;
           }
           HierarchyNode node = new HierarchyNode(level, index, row, parentNode);
           parentNode.children.add(node);
           hierarchicalNodes.get(level).add(node);
+          // Add current node's dimension values to next parent lookup table for the next level of nodes
+          parentDimValues.append(row.dimensionValues.get(level - 1));
+          nextParent.put(parentDimValues.toString(), node);
         }
       } else { // root
         Row row = hierarchicalRows.get(0).get(0);
         HierarchyNode node = new HierarchyNode(0, 0, row, null);
         hierarchicalNodes.get(0).add(node);
+        nextParent.put("", node);
+      }
+
+      // The last level of nodes won't be a parent of any other nodes, so we don't need to initialized
+      // the hashmap of parent nodes for it.
+      if (level != this.dimensions.size()) {
+        curParent = nextParent;
+        nextParent = new HashMap<>();
       }
     }
   }

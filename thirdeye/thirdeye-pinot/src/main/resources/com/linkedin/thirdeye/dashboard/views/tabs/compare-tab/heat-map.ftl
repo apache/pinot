@@ -91,9 +91,10 @@
         <div id="funnel-table-msg" class="tip-to-user uk-alert">
           <i class="close-parent uk-icon-close"></i>
           <span>This table shows interesting records that explains the difference between current and baseline total.
-              Dimensions of records are drilled down from left to right. The symbol (ALL) means the values on that
-              dimension are aggregated. The symbol "(ALL)-" means the current row excludes the values of rows below
-              it, e.g., the first row excludes rows 2-10.
+              Top 3 interesting dimensions are vertically drilled down from left to right. You may select "Dimensions"
+              from the left panel to narrow down the interesting dimensions and increase the accuracy of this summary.
+              The symbol "(ALL)" means the values on that dimension are aggregated; "(ALL)-" means the current row
+              excludes the rows below it, e.g., the first row excludes rows 2-10.
           </span>
         </div>
         <div id="difference-summary-{{metricName}}" class="difference-summary uk-margin-bottom">

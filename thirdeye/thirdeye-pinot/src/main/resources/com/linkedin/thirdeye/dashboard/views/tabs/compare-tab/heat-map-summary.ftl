@@ -4,7 +4,7 @@
             <table id="heat-map-{{metricName}}-difference-summary-table" style="width:100%;">
                 <thead>
                 <tr>
-                    <th colspan="{{dimensions.length}}">Top 3 Multi-Dimensions Drill Down (Select "Dimensions" from the left panel to specify interested dimensions)</th>
+                    <th colspan="{{dimensions.length}}">Multi-Dimensional Outlier Summary</th>
                     <th></th>
                     <th></th>
                     <th></th>
@@ -41,10 +41,11 @@
                 {{/with}}<!--end of summaryData -->
                 </tbody>
             </table>
+            <hr>
             <table id="heat-map-{{metricName}}-gainer-summary-table" style="width:100%;">
               <thead>
               <tr>
-                <th colspan="{{dimensions.length}}">Top {{gainer.length}} Gainers of Single Dimension</th>
+                <th colspan="{{dimensions.length}}">Top {{gainer.length}} Gainers among all Single Dimensions</th>
                 <th></th>
                 <th></th>
                 <th></th>
@@ -79,10 +80,11 @@
               {{/with}}<!--end of summaryData -->
               </tbody>
             </table>
+            <hr>
             <table id="heat-map-{{metricName}}-loser-summary-table" style="width:100%;">
               <thead>
               <tr>
-                <th colspan="{{dimensions.length}}">Top {{loser.length}} Losers of Single Dimension</th>
+                <th colspan="{{dimensions.length}}">Top {{loser.length}} Losers among all Single Dimensions</th>
                 <th></th>
                 <th></th>
                 <th></th>
