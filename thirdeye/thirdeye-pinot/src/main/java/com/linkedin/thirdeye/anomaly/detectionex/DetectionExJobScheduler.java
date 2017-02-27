@@ -10,6 +10,7 @@ import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionExDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExFactory;
+import com.linkedin.thirdeye.detector.functionex.impl.AlwaysAnomalyDummy;
 import com.linkedin.thirdeye.detector.functionex.impl.MultiColumnConditionals;
 import java.text.ParseException;
 import java.util.ArrayList;
@@ -94,13 +95,9 @@ public class DetectionExJobScheduler implements JobScheduler, Runnable {
       // TODO remove debug
       if(anomalyFunctions.isEmpty()) {
         Map<String, String> config = new HashMap<>();
-        config.put("datasource", "mock");
-        config.put("query", "select * from my_table");
-        config.put("conditions", "long >= 3, long > 2, long <= 7, long < 8, stable == 1, double != 3");
-
         AnomalyFunctionExDTO dto = new AnomalyFunctionExDTO();
-        dto.setName("ex_test_1");
-        dto.setClassName(MultiColumnConditionals.class.getName());
+        dto.setName("ex_test_always");
+        dto.setClassName(AlwaysAnomalyDummy.class.getName());
         dto.setActive(true);
         dto.setCron("0 * * * * ?");
         dto.setConfig(config);

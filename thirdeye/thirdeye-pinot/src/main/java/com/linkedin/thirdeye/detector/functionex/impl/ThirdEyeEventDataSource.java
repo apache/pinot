@@ -50,8 +50,8 @@ public class ThirdEyeEventDataSource implements AnomalyFunctionExDataSource<Stri
       EventDTO e = events.get(i);
       type[i] = e.getEventType();
       name[i] = e.getName();
-      start[i] = e.getStartTime() / 1000; // millis to seconds
-      end[i] = e.getEndTime() / 1000; // millis to seconds
+      start[i] = e.getStartTime();
+      end[i] = e.getEndTime();
     }
 
     DataFrame df = new DataFrame(events.size());
@@ -73,6 +73,6 @@ public class ThirdEyeEventDataSource implements AnomalyFunctionExDataSource<Stri
     long start = Long.parseLong(m.group(2));
     long end = Long.parseLong(m.group(3));
 
-    return manager.findEventsBetweenTimeRange(type, start * 1000, end * 1000); // seconds to millis
+    return manager.findEventsBetweenTimeRange(type, start, end);
   }
 }

@@ -323,7 +323,8 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
     MergedAnomalyResultDTO mergedAnomalyResultDTO;
     mergedAnomalyResultDTO =
         MODEL_MAPPER.map(mergedAnomalyResultBean, MergedAnomalyResultDTO.class);
-    if (mergedAnomalyResultBean.getFunctionId() != null) {
+    if (mergedAnomalyResultBean.getFunctionId() != null &&
+        mergedAnomalyResultBean.getFunctionId() >= 0) {
       AnomalyFunctionBean anomalyFunctionBean =
           genericPojoDao.get(mergedAnomalyResultBean.getFunctionId(), AnomalyFunctionBean.class);
       AnomalyFunctionDTO anomalyFunctionDTO =

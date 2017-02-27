@@ -6,6 +6,7 @@ import com.linkedin.thirdeye.anomaly.task.TaskInfo;
 import com.linkedin.thirdeye.anomaly.task.TaskResult;
 import com.linkedin.thirdeye.anomaly.task.TaskRunner;
 import com.linkedin.thirdeye.api.DimensionKey;
+import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionExDTO;
@@ -18,6 +19,7 @@ import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExResult;
 import com.linkedin.thirdeye.detector.functionex.dataframe.DataFrame;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import org.apache.commons.collections.CollectionUtils;
 import org.joda.time.DateTime;
@@ -32,6 +34,8 @@ import org.slf4j.LoggerFactory;
 public class DetectionExTaskRunner implements TaskRunner {
 
   private static final Logger LOG = LoggerFactory.getLogger(DetectionExTaskRunner.class);
+
+  private static final long MAX_WINDOW = 3600000;
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
@@ -54,10 +58,12 @@ public class DetectionExTaskRunner implements TaskRunner {
     List<TaskResult> taskResult = new ArrayList<>();
 
     // create function context
-    long timestamp = DateTime.now(DateTimeZone.UTC).getMillis() / 1000;
-    long alignedTimestamp = (timestamp / 3600) * 3600;
-    long windowStart = alignedTimestamp - 3600 * 6; // TODO configurable
+    long timestamp = DateTime.now(DateTimeZone.UTC).getMillis();
+    long alignedTimestamp = (timestamp / 3600000) * 3600000;
+    long windowStart = alignedTimestamp - 3600000 * 6; // TODO configurable
     long windowEnd = alignedTimestamp;
+
+    long functionId = -funcSpec.getId(); // avoid interference with regular anomalies
 
     AnomalyFunctionExContext context = new AnomalyFunctionExContext();
     context.setMonitoringWindowStart(windowStart);
@@ -76,6 +82,8 @@ public class DetectionExTaskRunner implements TaskRunner {
     LOG.info("{} detected {} anomalies", funcSpec.getName(), result.getAnomalies().size());
 
     // transform output into raw anomalies
+    List<RawAnomalyResultDTO> raw = new ArrayList<>();
+
     for(AnomalyFunctionExResult.Anomaly a : result.getAnomalies()) {
       RawAnomalyResultDTO dto = new RawAnomalyResultDTO();
       dto.setMessage(a.getMessage());
@@ -83,7 +91,10 @@ public class DetectionExTaskRunner implements TaskRunner {
       dto.setStartTime(a.getStart());
       dto.setEndTime(a.getEnd());
 
-      // TODO avoid magic field names - refactor raw anomalies?
+      // TODO remove hack, refactor raw anomalies?
+      dto.setFunctionId(functionId);
+
+      // TODO avoid magic field names, refactor raw anomalies?
       DataFrame df = a.getData();
       if(df.getIndex().size() > 0) {
         if (df.contains("score")) {
@@ -101,11 +112,75 @@ public class DetectionExTaskRunner implements TaskRunner {
       }
 
       // TODO store data and properties
-
-      DAO_REGISTRY.getRawAnomalyResultDAO().save(dto);
+      //DAO_REGISTRY.getRawAnomalyResultDAO().save(dto);
+      raw.add(dto);
     }
 
-    // TODO merge?
+    // merge
+
+    // TODO plugable merging policy or actually use merge task
+    // forward merging only
+    // see also: com.linkedin.thirdeye.anomaly.merge.AnomalyTimeBasedSummarizer.java
+    //List<RawAnomalyResultDTO> raw = DAO_REGISTRY.getRawAnomalyResultDAO().findUnmergedByFunctionId(functionId);
+
+    LOG.info("Generated {} raw anomalies", raw.size());
+    if(raw.isEmpty())
+      return taskResult;
+
+    Collections.sort(raw, new Comparator<RawAnomalyResultDTO>() {
+      @Override
+      public int compare(RawAnomalyResultDTO o1, RawAnomalyResultDTO o2) {
+        return o1.getStartTime().compareTo(o2.getStartTime());
+      }
+    });
+
+    // NOTE: requires null dimension
+    // MergedAnomalyResultDTO m = DAO_REGISTRY.getMergedAnomalyResultDAO().findLatestByFunctionIdOnly(functionId);
+
+    // find most recent merged anomaly
+    List<MergedAnomalyResultDTO> merged = DAO_REGISTRY.getMergedAnomalyResultDAO().findByFunctionId(functionId);
+    MergedAnomalyResultDTO m;
+    if(!merged.isEmpty()) {
+      m = Collections.max(merged, new Comparator<MergedAnomalyResultDTO>() {
+        @Override
+        public int compare(MergedAnomalyResultDTO o1, MergedAnomalyResultDTO o2) {
+          return o1.getEndTime().compareTo(o2.getStartTime());
+        }
+      });
+      LOG.info("Fetched existing merged anomaly {}", m);
+
+    } else {
+      LOG.info("No merged anomaly found. Bootstrapping.");
+      RawAnomalyResultDTO r = raw.get(0);
+      m = makeNewMerged(r);
+      DAO_REGISTRY.getMergedAnomalyResultDAO().save(m);
+    }
+
+    // merge raw anomalies
+    for(RawAnomalyResultDTO r : raw) {
+      LOG.info("Attempting merge of raw anomaly {}", r);
+      long mergeLimit = m.getEndTime() + MAX_WINDOW;
+      if(r.getStartTime() > mergeLimit) {
+        LOG.info("Raw anomaly start time {} outside merge limit {}", r.getStartTime(), mergeLimit);
+        LOG.info("Storing current merged anomaly {}. Creating new.", m);
+        DAO_REGISTRY.getMergedAnomalyResultDAO().update(m);
+        m = makeNewMerged(r);
+      }
+
+      if(r.getEndTime() >= m.getEndTime()) {
+        LOG.info("Expanding current merged anomaly end time to {}", r.getEndTime());
+        m.setEndTime(r.getEndTime());
+        m.getAnomalyResults().add(r);
+        m.setMessage(String.format("Merged from %d raw anomalies", m.getAnomalyResults().size() + 1));
+
+        LOG.info("Storing raw anomaly {}", r.getEndTime());
+        r.setMerged(true);
+        DAO_REGISTRY.getRawAnomalyResultDAO().save(r);
+      }
+    }
+
+    LOG.info("Storing current merged anomaly {}", m);
+    DAO_REGISTRY.getMergedAnomalyResultDAO().update(m);
 
 //    if(datasetConfig.isRequiresCompletenessCheck()) {
 //      LOG.info("Dataset {} requires completeness check", dataset);
@@ -159,6 +234,22 @@ public class DetectionExTaskRunner implements TaskRunner {
 //    handleResults(resultsOfAnEntry);
 
     return taskResult;
+  }
+
+  private MergedAnomalyResultDTO makeNewMerged(RawAnomalyResultDTO r) {
+    MergedAnomalyResultDTO m = new MergedAnomalyResultDTO();
+    m.setFunctionId(r.getFunctionId());
+    m.setRawAnomalyIdList(new ArrayList<>());
+    m.setStartTime(r.getStartTime());
+    m.setEndTime(r.getStartTime());
+    m.setMessage("");
+    m.setCollection("");
+    m.setMetric("");
+    m.setDimensions(new DimensionMap(""));
+
+    m.setCreatedTime(DateTime.now(DateTimeZone.UTC).getMillis());
+
+    return m;
   }
 
 //  private DataFrame.Series getSeries(MetricTimeSeries ts, String metric) {

@@ -59,7 +59,7 @@ public class ThirdEyeEventDataSourceTest {
 
   @Test
   public void testParseQuery() throws Exception {
-    ds.query("type=abc,start=0123,end=444", context);
+    ds.query("type=abc,start=0123000,end=444000", context);
 
     Assert.assertEquals(manager.type, "abc");
     Assert.assertEquals(manager.start, 123000);
@@ -68,7 +68,7 @@ public class ThirdEyeEventDataSourceTest {
 
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testParseQueryFail() throws Exception {
-    ds.query("type=abc,start=0123,end=", context);
+    ds.query("type=abc,start=0123000,end=", context);
   }
 
   @Test
@@ -79,8 +79,8 @@ public class ThirdEyeEventDataSourceTest {
     Assert.assertEquals(df.getSeriesNames(), new HashSet<>(Arrays.asList("type", "name", "start", "end")));
     Assert.assertEquals(df.toStrings("type").values(), new String[] { "HOLIDAY", "HOLIDAY", "holiday" });
     Assert.assertEquals(df.toStrings("name").values(), new String[] { "New Years 2016", "New Years 2017", "New Years 2018" });
-    Assert.assertEquals(df.toLongs("start").values(), new long[] { 1451606400, 1483228800, 1514764800 });
-    Assert.assertEquals(df.toLongs("end").values(), new long[] { 1451606400 + 86400, 1483228800 + 86400, 1514764800 + 86400 });
+    Assert.assertEquals(df.toLongs("start").values(), new long[] { 1451606400000L, 1483228800000L, 1514764800000L });
+    Assert.assertEquals(df.toLongs("end").values(), new long[] { 1451606400000L + 86400000, 1483228800000L + 86400000, 1514764800000L + 86400000 });
   }
 
   private static EventDTO makeEvent(String type, String name, long start, long end) {
