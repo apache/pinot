@@ -460,6 +460,13 @@ text {
   border-radius: 0px 2px 2px 0px
 }
 
+/* known select2 bugs, temporary fix until it's patched*/
+.search-input .select2-search__field {
+    width: auto !important;
+}
+
+/* Filter */
+
 .filter-bar {
   display: flex;
   align-items: stretch;
@@ -492,7 +499,34 @@ text {
   color: #999;
 }
 
+/*rgba(0, 0, 0, 0.701961)
+;*/
+
 /* Anomaly Results*/
+.anomalies-panel {
+  margin: 24px 0;
+  background-color: white;
+  border-radius: 2px;
+  border: 1px solid #CCC;
+  box-shadow: 0 0 0 1px rgba(0,0,0,.1);
+}
+
+.panel-title {
+  font-size: 21px;
+}
+
+.anomaly-cards-wrapper {
+  border-width: 1px 0px;
+  border-style: solid;
+  border-color: #CCC;
+}
+
+.anomaly-card:not(:last-child) {
+  border-bottom: 1px solid #CCC;
+  padding-bottom: 24px;
+}
+
+
 
 .anormaly-chart {
   height: 300px;
@@ -557,7 +591,11 @@ text {
   text-transform: capitalize;
 }
 
-/* known select2 bugs, temporary fix until it's patched*/
-.search-input .select2-search__field {
-    width: auto !important;
+/* Pagination */
+
+.thirdeye-pagination {
+  margin-top: 0;
+  margin-bottom: 0;
 }
+
+
