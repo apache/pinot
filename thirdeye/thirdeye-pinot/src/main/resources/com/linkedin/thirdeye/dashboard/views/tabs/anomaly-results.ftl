@@ -1,14 +1,12 @@
 <div class="container-fluid">
   <div class="row row-bordered">
-    <div class="container top-buffer bottom-buffer">
+        <div class="container">
+          <div class="panel padding-all">
       <div>
         Showing <strong>{{this.numAnomaliesOnPage}} </strong> anomalies of <strong> {{this.totalAnomalies}}</strong>
       </div>
-    </div>
     {{#each this.anomalyDetailsList as |anomalyData anomalyIndex|}}
       {{#with anomalyData}}
-        <div class="container">
-          <div class="panel padding-all">
 
             <div class="anomaly-result-header">
               <div class="anomaly-result-title">
@@ -74,10 +72,10 @@
               </div>
 
             </div>
-          </div>
-        </div>
       {{/with}}
     {{/each}}
+          </div>
+        </div>
     <div class="container text-center">
       <nav aria-label="Page navigation">
         <ul id="pagination" class="pagination-sm"></ul>

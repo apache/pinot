@@ -4,12 +4,13 @@ function AnomalyResultView(anomalyResultModel) {
   this.anomalyResultModel = anomalyResultModel;
   this.metricSearchConfig = {
       theme : "bootstrap",
+      width: '100%',
+      allowClear: true,
       placeholder : "Search for Metric",
       ajax : {
         url : '/data/autocomplete/metric',
         minimumInputLength : 3,
         delay : 250,
-        allowClear: true,
         data : function(params) {
           var query = {
             name : params.term,
@@ -35,12 +36,13 @@ function AnomalyResultView(anomalyResultModel) {
     };
   this.dashboardSearchConfig = {
       theme : "bootstrap",
+      width: '100%',
+      allowClear: true,
       placeholder : "Search for Dashboard",
       ajax : {
         url : '/data/autocomplete/dashboard',
         minimumInputLength : 3,
         delay : 250,
-        allowClear: true,
         data : function(params) {
           var query = {
             name : params.term,
@@ -67,11 +69,14 @@ function AnomalyResultView(anomalyResultModel) {
 
   this.anomalySearchConfig = {
       theme : "bootstrap",
+      width: '100%',
+      allowClear: true,
       placeholder : "Search for anomaly ID",
       tags: true
     };
   this.timeSearchConfig = {
       theme : "bootstrap",
+      width: '100%',
       placeholder : "All anomalies in the selected time range",
       tags: true,
       disabled: true

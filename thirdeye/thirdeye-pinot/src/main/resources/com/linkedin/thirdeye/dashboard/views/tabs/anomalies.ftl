@@ -16,16 +16,16 @@
 
 				<div class="search-input search-field">
 					<div id="anomalies-search-metrics-container" class="" style="overflow:hidden; display: none;">
-						<select style="width: 100%" id="anomalies-search-metrics-input" class="label-large-light" multiple="multiple"></select>
+						<select id="anomalies-search-metrics-input" class="label-large-light" multiple="multiple"></select>
 					</div>
 					<div id="anomalies-search-dashboard-container" class=""  style="overflow:hidden; display: none;">
-						<select style="width: 100%;" id="anomalies-search-dashboard-input" class="label-large-light"></select>
+						<select id="anomalies-search-dashboard-input" class="label-large-light"></select>
 					</div>
 					<div id="anomalies-search-anomaly-container" class=""  style="overflow:hidden; display: none;">
-						<select style="width: 100%;" id="anomalies-search-anomaly-input" class="label-large-light" multiple="multiple"></select>
+						<select id="anomalies-search-anomaly-input" class="label-large-light" multiple="multiple"></select>
 					</div>
           <div id="anomalies-search-time-container" class=""  style="overflow:hidden; display: none;">
-            <select style="width: 100%;" id="anomalies-search-time-input" class="label-large-light"></select>
+            <select id="anomalies-search-time-input" class="label-large-light"></select>
           </div>
 				</div>
 
@@ -37,11 +37,11 @@
 		</div>
 	</div>
 </div>
-<div class="container-fluid bg-white ">
+<!-- <div class="container-fluid bg-white ">
 	<div class="row bg-white row-bordered">
 		<div class="container top-buffer bottom-buffer">
-			<div class="row filter-bar">
-				<div class="col-md-5">
+			<div class="row filter-bar"> -->
+				<div class="col-md-5" style="display: none">
 					<div>
 						<label>Select time range: </label>
 					</div>
@@ -74,7 +74,7 @@
 						<label class="checkbox-inline"><input type="checkbox" id="status-unresolved-checkbox"><span class="label anomaly-status-label">Unresolved</span></label>
 					</div>
 				</div> -->
-				<div class="col-md-2 filter-apply-button" id="apply-button">
+<!-- 				<div class="col-md-2 filter-apply-button" id="apply-button">
 					<input type="button" class="btn thirdeye-btn" value="Apply" />
 				</div>
 			</div>
@@ -82,8 +82,8 @@
 	</div>
 </div>
 
-
-<div>
+ -->
+<div class="container top-buffer bottom-buffer">
   <div id='anomaly-spin-area'></div>
 	<div id="anomaly-results-place-holder"></div>
 </div>

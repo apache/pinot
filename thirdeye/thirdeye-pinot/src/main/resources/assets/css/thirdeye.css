@@ -556,3 +556,8 @@ text {
 .anomaly-duration {
   text-transform: capitalize;
 }
+
+/* known select2 bugs, temporary fix until it's patched*/
+.search-input .select2-search__field {
+    width: auto !important;
+}

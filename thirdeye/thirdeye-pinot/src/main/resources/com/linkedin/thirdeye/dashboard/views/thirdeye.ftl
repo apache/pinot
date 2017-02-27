@@ -143,21 +143,18 @@
 <body>
 
 	<div class="container-fullwidth bg-black">
-		<div class="row">
-			<div class="col-md-12">
+		<div class="">
+			<div class="">
 				<nav class="navbar navbar-inverse" role="navigation">
           <div class="container">
-						<div id="global-navbar" class="navbar-header">
-							<button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
-								<span class="sr-only">Toggle navigation</span><span class="icon-bar"></span><span class="icon-bar"></span><span class="icon-bar"></span>
-							</button>
+						<div id="global-navbar" class="navbar-header pull-left">
 							<a class="navbar-brand logo" href="#dashboard" data-toggle="tab">ThirdEye</a>
 						</div>
-						<div id="main-tabs" class="collapse navbar-collapse">
+						<div id="main-tabs" class="pull-right">
 							<ul class="nav navbar-nav">
-								<li class=""><a href="#dashboard">Dashboard</a></li>
+                <!-- <li class=""><a href="#dashboard">Dashboard</a></li> -->
 								<li class=""><a href="#anomalies">Anomalies</a></li>
-								<li class=""><a href="#analysis">Root Cause Analysis</a></li>
+								<!-- <li class=""><a href="#analysis">Root Cause Analysis</a></li> -->
 							</ul>
 
             <!-- Hidding this until it's fully fleshed out -->
