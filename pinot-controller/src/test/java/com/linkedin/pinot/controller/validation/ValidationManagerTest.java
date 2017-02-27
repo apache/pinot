@@ -563,6 +563,26 @@ public class ValidationManagerTest {
     }
 
     @Override
+    public String getTimeColumn() {
+      return null;
+    }
+
+    @Override
+    public long getStartTime() {
+      return Long.MAX_VALUE;
+    }
+
+    @Override
+    public long getEndTime() {
+      return Long.MIN_VALUE;
+    }
+
+    @Override
+    public TimeUnit getTimeUnit() {
+      return null;
+    }
+
+    @Override
     public Duration getTimeGranularity() {
       return _timeGranularity;
     }

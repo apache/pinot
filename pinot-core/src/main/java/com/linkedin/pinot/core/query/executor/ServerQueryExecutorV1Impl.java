@@ -99,20 +99,26 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     List<SegmentDataManager> queryableSegmentDataManagerList = null;
     InstanceRequest instanceRequest = queryRequest.getInstanceRequest();
     final long requestId = instanceRequest.getRequestId();
-    final long nSegmentsInQuery = instanceRequest.getSearchSegmentsSize();
+
     try {
       TraceContext.register(instanceRequest);
       final BrokerRequest brokerRequest = instanceRequest.getQuery();
       LOGGER.debug("Incoming query is : {}", brokerRequest);
 
       TimerContext.Timer segmentPruneTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.SEGMENT_PRUNING);
-      queryableSegmentDataManagerList = getPrunedQueryableSegments(instanceRequest);
+
+      final String tableName = instanceRequest.getQuery().getQuerySource().getTableName();
+      TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(tableName);
+      queryableSegmentDataManagerList = acquireQueryableSegments(tableDataManager, instanceRequest);
+      long totalRawDocs = pruneSegments(tableDataManager, queryableSegmentDataManagerList, instanceRequest.getQuery());
       segmentPruneTimer.stopAndRecord();
 
       queryRequest.setSegmentCountAfterPruning(queryableSegmentDataManagerList.size());
       LOGGER.debug("Matched {} segments", queryRequest.getSegmentCountAfterPruning());
       if (queryableSegmentDataManagerList.isEmpty()) {
-        return new DataTableImplV2();
+        DataTable emptyDataTable = new DataTableImplV2();
+        emptyDataTable.getMetadata().put(DataTable.TOTAL_DOCS_METADATA_KEY, String.valueOf(totalRawDocs));
+        return emptyDataTable;
       }
 
       TimerContext.Timer planBuildTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.BUILD_QUERY_PLAN);
@@ -132,31 +138,36 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       planExecTimer.stopAndRecord();
 
       dataTable = globalQueryPlan.getInstanceResponse();
+      Map<String, String> dataTableMetadata = dataTable.getMetadata();
       queryProcessingTimer.stopAndRecord();
 
       LOGGER.debug("Searching Instance for Request Id - {}, browse took: {}", instanceRequest.getRequestId(),
           queryProcessingTimer.getDurationNs());
       LOGGER.debug("InstanceResponse for Request Id - {} : {}", instanceRequest.getRequestId(), dataTable.toString());
-      dataTable.getMetadata()
+      dataTableMetadata
           .put(DataTable.TIME_USED_MS_METADATA_KEY, Long.toString(queryProcessingTimer.getDurationMs()));
-      dataTable.getMetadata().put(DataTable.REQUEST_ID_METADATA_KEY, Long.toString(instanceRequest.getRequestId()));
-      dataTable.getMetadata()
+      dataTableMetadata.put(DataTable.REQUEST_ID_METADATA_KEY, Long.toString(instanceRequest.getRequestId()));
+      dataTableMetadata
           .put(DataTable.TRACE_INFO_METADATA_KEY, TraceContext.getTraceInfoOfRequestId(instanceRequest.getRequestId()));
+
+      // Update the total docs in the metadata based on un-pruned segments.
+      dataTableMetadata.put(DataTable.TOTAL_DOCS_METADATA_KEY, String.valueOf(totalRawDocs));
       return dataTable;
     } catch (Exception e) {
       _serverMetrics.addMeteredQueryValue(instanceRequest.getQuery(), ServerMeter.QUERY_EXECUTION_EXCEPTIONS, 1);
       LOGGER.error("Exception processing requestId {}", requestId, e);
       dataTable = new DataTableImplV2();
+      Map<String, String> dataTableMetadata = dataTable.getMetadata();
       dataTable.addException(QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, e));
       TraceContext.logException("ServerQueryExecutorV1Impl", "Exception occurs in processQuery");
       queryProcessingTimer.stopAndRecord();
 
       LOGGER.info("Searching Instance for Request Id - {}, browse took: {}, instanceResponse: {}", requestId,
           queryProcessingTimer.getDurationMs(), dataTable.toString());
-      dataTable.getMetadata()
+      dataTableMetadata
           .put(DataTable.TIME_USED_MS_METADATA_KEY, Long.toString(queryProcessingTimer.getDurationNs()));
-      dataTable.getMetadata().put(DataTable.REQUEST_ID_METADATA_KEY, Long.toString(instanceRequest.getRequestId()));
-      dataTable.getMetadata()
+      dataTableMetadata.put(DataTable.REQUEST_ID_METADATA_KEY, Long.toString(instanceRequest.getRequestId()));
+      dataTableMetadata
           .put(DataTable.TRACE_INFO_METADATA_KEY, TraceContext.getTraceInfoOfRequestId(instanceRequest.getRequestId()));
       return dataTable;
     } finally {
@@ -170,28 +181,57 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
   }
 
-  private List<SegmentDataManager> getPrunedQueryableSegments(final InstanceRequest instanceRequest) {
-    LOGGER.debug("InstanceRequest contains {} segments", instanceRequest.getSearchSegments().size());
+  /**
+   * Helper method to acquire segments that can be queried for the request.
+   *
+   * @param tableDataManager Table data manager
+   * @param instanceRequest Instance request
+   * @return List of segment data managers that can be queried.
+   */
+  private List<SegmentDataManager> acquireQueryableSegments(TableDataManager tableDataManager,
+      final InstanceRequest instanceRequest) {
+    LOGGER.debug("InstanceRequest contains {} segments", instanceRequest.getSearchSegmentsSize());
 
-    final String tableName = instanceRequest.getQuery().getQuerySource().getTableName();
-    final TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(tableName);
     if (tableDataManager == null || instanceRequest.getSearchSegmentsSize() == 0) {
-      return new ArrayList<SegmentDataManager>();
+      return new ArrayList<>();
     }
-    List<SegmentDataManager> listOfQueryableSegments = tableDataManager.acquireSegments(
-        instanceRequest.getSearchSegments());
+    List<SegmentDataManager> listOfQueryableSegments =
+        tableDataManager.acquireSegments(instanceRequest.getSearchSegments());
     LOGGER.debug("TableDataManager found {} segments before pruning", listOfQueryableSegments.size());
+    return listOfQueryableSegments;
+  }
 
-    Iterator<SegmentDataManager> it = listOfQueryableSegments.iterator();
+  /**
+   * Helper method to prune segments.
+   *
+   * @param tableDataManager Table data manager
+   * @param segments List of segments to prune
+   * @param brokerRequest Broker request
+   * @return Total number of docs across all segments (including the ones that were pruned).
+   */
+  private long pruneSegments(TableDataManager tableDataManager, List<SegmentDataManager> segments,
+      BrokerRequest brokerRequest) {
+    long totalRawDocs = 0;
+    Iterator<SegmentDataManager> it = segments.iterator();
+
     while (it.hasNext()) {
       SegmentDataManager segmentDataManager = it.next();
       final IndexSegment indexSegment = segmentDataManager.getSegment();
-      if (_segmentPrunerService.prune(indexSegment, instanceRequest.getQuery())) {
+      // We need to compute the total raw docs for the table before any pruning.
+      totalRawDocs += indexSegment.getSegmentMetadata().getTotalRawDocs();
+
+      // TODO: Temporary work-around to avoid pruning all segments. If all segments are pruned, we currently would not
+      // be able to build a proper empty response (selection/aggr/groupby). Keeping at least one segment helps
+      // mask that issue for now.
+      if (segments.size() == 1) {
+        return totalRawDocs;
+      }
+      if (_segmentPrunerService.prune(indexSegment, brokerRequest)) {
         it.remove();
         tableDataManager.releaseSegment(segmentDataManager);
       }
     }
-    return listOfQueryableSegments;
+    return totalRawDocs;
   }
 
   @Override

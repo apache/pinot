@@ -18,6 +18,7 @@ package com.linkedin.pinot.common.segment;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
@@ -31,6 +32,14 @@ public interface SegmentMetadata {
   String getTableName();
 
   String getIndexType();
+
+  String getTimeColumn();
+
+  long getStartTime();
+
+  long getEndTime();
+
+  TimeUnit getTimeUnit();
 
   Duration getTimeGranularity();
 
