@@ -8,6 +8,9 @@ public class DetectionExJobContext extends JobContext {
 
   private Long anomalyFunctionId;
   private AnomalyFunctionExDTO anomalyFunctionExSpec;
+  private long monitoringWindowAlignment;
+  private long monitoringWindowLookback;
+  private long mergeWindow;
 
   public Long getAnomalyFunctionId() {
     return anomalyFunctionId;
@@ -25,4 +28,27 @@ public class DetectionExJobContext extends JobContext {
     this.anomalyFunctionExSpec = anomalyFunctionSpec;
   }
 
+  public long getMergeWindow() {
+    return mergeWindow;
+  }
+
+  public void setMergeWindow(long mergeWindow) {
+    this.mergeWindow = mergeWindow;
+  }
+
+  public long getMonitoringWindowAlignment() {
+    return monitoringWindowAlignment;
+  }
+
+  public void setMonitoringWindowAlignment(long monitoringWindowAlignment) {
+    this.monitoringWindowAlignment = monitoringWindowAlignment;
+  }
+
+  public long getMonitoringWindowLookback() {
+    return monitoringWindowLookback;
+  }
+
+  public void setMonitoringWindowLookback(long monitoringWindowLookback) {
+    this.monitoringWindowLookback = monitoringWindowLookback;
+  }
 }

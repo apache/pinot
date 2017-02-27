@@ -9,9 +9,7 @@ import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionExDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
-import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExFactory;
 import com.linkedin.thirdeye.detector.functionex.impl.AlwaysAnomalyDummy;
-import com.linkedin.thirdeye.detector.functionex.impl.MultiColumnConditionals;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Date;
@@ -26,6 +24,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.collections.CollectionUtils;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.joda.time.format.ISODateTimeFormat;
 import org.quartz.CronExpression;
 import org.quartz.CronScheduleBuilder;
@@ -98,9 +97,16 @@ public class DetectionExJobScheduler implements JobScheduler, Runnable {
         AnomalyFunctionExDTO dto = new AnomalyFunctionExDTO();
         dto.setName("ex_test_always");
         dto.setClassName(AlwaysAnomalyDummy.class.getName());
+
         dto.setActive(true);
         dto.setCron("0 * * * * ?");
         dto.setConfig(config);
+        dto.setMonitoringWindowAlignment(60000);
+        dto.setMonitoringWindowLookback(300000);
+        dto.setMergeWindow(300000);
+
+        dto.setDisplayMetric("num_login_attempt");
+        dto.setDisplayCollection("login_hourly_additive");
 
         DAO_REGISTRY.getAnomalyFunctionExDAO().save(dto);
         anomalyFunctions = readAnomalyFunctionSpecs();
@@ -182,15 +188,18 @@ public class DetectionExJobScheduler implements JobScheduler, Runnable {
     startJob(anomalyFunctionSpec, jobKey);
   }
 
-  public void startJob(AnomalyFunctionExDTO anomalyFunctionSpec, String jobKey) throws SchedulerException {
+  public void startJob(AnomalyFunctionExDTO spec, String jobKey) throws SchedulerException {
     if (quartzScheduler.checkExists(JobKey.jobKey(jobKey))) {
       throw new IllegalStateException("Anomaly function " + jobKey + " is already scheduled");
     }
-    DetectionExJobContext detectionJobContext = new DetectionExJobContext();
-    detectionJobContext.setAnomalyFunctionId(anomalyFunctionSpec.getId());
-    detectionJobContext.setJobName(jobKey);
+    DetectionExJobContext context = new DetectionExJobContext();
+    context.setAnomalyFunctionId(spec.getId());
+    context.setJobName(jobKey);
+    context.setMonitoringWindowAlignment(spec.getMonitoringWindowAlignment());
+    context.setMonitoringWindowLookback(spec.getMonitoringWindowLookback());
+    context.setMergeWindow(spec.getMergeWindow());
 
-    scheduleJob(detectionJobContext, anomalyFunctionSpec);
+    scheduleJob(context, spec);
   }
 
   public void stopJob(Long id) throws SchedulerException {

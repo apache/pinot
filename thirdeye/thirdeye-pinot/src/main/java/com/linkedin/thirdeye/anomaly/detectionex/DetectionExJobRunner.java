@@ -37,7 +37,7 @@ public class DetectionExJobRunner implements Job {
 
   private final static DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
-  private DetectionExJobContext detectionJobContext;
+  private DetectionExJobContext context;
 
   private TaskGenerator taskGenerator;
 
@@ -49,22 +49,22 @@ public class DetectionExJobRunner implements Job {
   public void execute(JobExecutionContext jobExecutionContext) throws JobExecutionException {
     LOG.info("Running " + jobExecutionContext.getJobDetail().getKey().toString());
 
-    detectionJobContext =
+    context =
         (DetectionExJobContext) jobExecutionContext.getJobDetail().getJobDataMap().get(DETECTION_EX_JOB_CONTEXT);
-    long anomalyFunctionId = detectionJobContext.getAnomalyFunctionId();
+    long anomalyFunctionId = context.getAnomalyFunctionId();
 
     AnomalyFunctionExDTO spec = getAnomalyFunctionSpec(anomalyFunctionId);
     if (spec == null) {
       LOG.error("AnomalyFunction with id {} does not exist.. Exiting from job execution", anomalyFunctionId);
     } else {
-      detectionJobContext.setAnomalyFunctionExSpec(spec);
+      context.setAnomalyFunctionExSpec(spec);
 
       try {
         // write to anomaly_jobs
         JobDTO jobSpec = createJob();
         DAO_REGISTRY.getJobDAO().save(jobSpec);
 
-        detectionJobContext.setJobExecutionId(jobSpec.getId());
+        context.setJobExecutionId(jobSpec.getId());
       } catch (Exception e) {
         throw new JobExecutionException("Error creating job", e);
       }
@@ -103,26 +103,35 @@ public class DetectionExJobRunner implements Job {
 
   private JobDTO createJob() throws Exception {
     JobDTO jobSpec = new JobDTO();
-    jobSpec.setJobName(detectionJobContext.getJobName());
+    jobSpec.setJobName(context.getJobName());
     jobSpec.setScheduleStartTime(System.currentTimeMillis());
     jobSpec.setStatus(JobStatus.SCHEDULED);
     return jobSpec;
   }
 
   private TaskDTO createTask() throws Exception {
+    AnomalyFunctionExDTO spec = context.getAnomalyFunctionExSpec();
+    long timestamp = DateTime.now(DateTimeZone.UTC).getMillis();
+    long alignedEnd = timestamp / spec.getMonitoringWindowAlignment() * spec.getMonitoringWindowAlignment();
+    long alignedStart = alignedEnd - spec.getMonitoringWindowLookback();
+
     DetectionExTaskInfo taskInfo = new DetectionExTaskInfo();
-    taskInfo.setAnomalyFunctionExSpec(detectionJobContext.getAnomalyFunctionExSpec());
-    taskInfo.setJobExecutionId(detectionJobContext.getAnomalyFunctionId());
+    taskInfo.setAnomalyFunctionExSpec(spec);
+    taskInfo.setJobExecutionId(spec.getId());
+    taskInfo.setMonitoringWindowStart(alignedStart);
+    taskInfo.setMonitoringWindowEnd(alignedEnd);
+
+    taskInfo.setMergeWindow(context.getMergeWindow());
 
     String taskInfoJson = OBJECT_MAPPER.writeValueAsString(taskInfo);
 
     TaskDTO taskSpec = new TaskDTO();
     taskSpec.setTaskType(TaskType.ANOMALY_DETECTION_EX);
-    taskSpec.setJobName(detectionJobContext.getJobName());
+    taskSpec.setJobName(context.getJobName());
     taskSpec.setStatus(TaskStatus.WAITING);
     taskSpec.setStartTime(System.currentTimeMillis());
     taskSpec.setTaskInfo(taskInfoJson);
-    taskSpec.setJobId(detectionJobContext.getJobExecutionId());
+    taskSpec.setJobId(context.getJobExecutionId());
     return taskSpec;
   }
 

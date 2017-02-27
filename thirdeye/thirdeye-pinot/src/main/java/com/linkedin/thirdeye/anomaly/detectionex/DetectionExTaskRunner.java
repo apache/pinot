@@ -35,19 +35,23 @@ public class DetectionExTaskRunner implements TaskRunner {
 
   private static final Logger LOG = LoggerFactory.getLogger(DetectionExTaskRunner.class);
 
-  private static final long MAX_WINDOW = 3600000;
-
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   private AnomalyFunctionExDTO funcSpec;
   private AnomalyFunctionExFactory funcFactory;
   private long jobExecutionId;
+  private long monitoringWindowStart;
+  private long monitoringWindowEnd;
+  private long mergeWindow;
 
   protected void setupTask(TaskInfo taskInfo, TaskContext context) throws Exception {
     DetectionExTaskInfo task = (DetectionExTaskInfo) taskInfo;
     jobExecutionId = task.getJobExecutionId();
     funcSpec = task.getAnomalyFunctionExSpec();
     funcFactory = context.getAnomalyFunctionExFactory();
+    monitoringWindowStart = task.getMonitoringWindowStart();
+    monitoringWindowEnd = task.getMonitoringWindowEnd();
+    mergeWindow = task.getMergeWindow();
   }
 
   public List<TaskResult> execute(TaskInfo taskInfo, TaskContext taskContext) throws Exception {
@@ -59,15 +63,11 @@ public class DetectionExTaskRunner implements TaskRunner {
 
     // create function context
     long timestamp = DateTime.now(DateTimeZone.UTC).getMillis();
-    long alignedTimestamp = (timestamp / 3600000) * 3600000;
-    long windowStart = alignedTimestamp - 3600000 * 6; // TODO configurable
-    long windowEnd = alignedTimestamp;
-
     long functionId = -funcSpec.getId(); // avoid interference with regular anomalies
 
     AnomalyFunctionExContext context = new AnomalyFunctionExContext();
-    context.setMonitoringWindowStart(windowStart);
-    context.setMonitoringWindowEnd(windowEnd);
+    context.setMonitoringWindowStart(monitoringWindowStart);
+    context.setMonitoringWindowEnd(monitoringWindowEnd);
 
     context.setClassName(funcSpec.getClassName());
     context.setConfig(funcSpec.getConfig());
@@ -90,6 +90,9 @@ public class DetectionExTaskRunner implements TaskRunner {
       dto.setCreationTimeUtc(timestamp);
       dto.setStartTime(a.getStart());
       dto.setEndTime(a.getEnd());
+
+      dto.setDisplayMetric(funcSpec.getDisplayMetric());
+      dto.setDisplayCollection(funcSpec.getDisplayCollection());
 
       // TODO remove hack, refactor raw anomalies?
       dto.setFunctionId(functionId);
@@ -159,7 +162,7 @@ public class DetectionExTaskRunner implements TaskRunner {
     // merge raw anomalies
     for(RawAnomalyResultDTO r : raw) {
       LOG.info("Attempting merge of raw anomaly {}", r);
-      long mergeLimit = m.getEndTime() + MAX_WINDOW;
+      long mergeLimit = m.getEndTime() + mergeWindow;
       if(r.getStartTime() > mergeLimit) {
         LOG.info("Raw anomaly start time {} outside merge limit {}", r.getStartTime(), mergeLimit);
         LOG.info("Storing current merged anomaly {}. Creating new.", m);
@@ -171,9 +174,9 @@ public class DetectionExTaskRunner implements TaskRunner {
         LOG.info("Expanding current merged anomaly end time to {}", r.getEndTime());
         m.setEndTime(r.getEndTime());
         m.getAnomalyResults().add(r);
-        m.setMessage(String.format("Merged from %d raw anomalies", m.getAnomalyResults().size() + 1));
+        m.setMessage(String.format("Merged from %d raw anomalies. Last message: {}", m.getAnomalyResults().size() + 1, r.getMessage()));
 
-        LOG.info("Storing raw anomaly {}", r.getEndTime());
+        LOG.info("Storing raw anomaly {}", r);
         r.setMerged(true);
         DAO_REGISTRY.getRawAnomalyResultDAO().save(r);
       }
@@ -243,8 +246,8 @@ public class DetectionExTaskRunner implements TaskRunner {
     m.setStartTime(r.getStartTime());
     m.setEndTime(r.getStartTime());
     m.setMessage("");
-    m.setCollection("");
-    m.setMetric("");
+    m.setCollection(r.getDisplayCollection());
+    m.setMetric(r.getDisplayMetric());
     m.setDimensions(new DimensionMap(""));
 
     m.setCreatedTime(DateTime.now(DateTimeZone.UTC).getMillis());

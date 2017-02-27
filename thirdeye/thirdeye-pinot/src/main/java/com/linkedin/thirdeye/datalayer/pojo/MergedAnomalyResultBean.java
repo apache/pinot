@@ -185,7 +185,7 @@ public class MergedAnomalyResultBean extends AbstractBean
 
   @Override
   public String toString() {
-    return "MergedAnomalyResultBean{" + "anomalyFeedbackId=" + anomalyFeedbackId + ", functionId="
+    return "MergedAnomalyResultBean{" + "id=" + getId() + ", anomalyFeedbackId=" + anomalyFeedbackId + ", functionId="
         + functionId + ", rawAnomalyIdList=" + rawAnomalyIdList + ", collection='" + collection
         + '\'' + ", metric='" + metric + '\'' + ", dimensions='" + dimensions + '\''
         + ", startTime=" + startTime + ", endTime=" + endTime + ", score=" + score + ", weight="

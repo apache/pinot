@@ -368,14 +368,16 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
 
     List<MergedAnomalyResultDTO> mergedAnomalyResultDTOList = new ArrayList<>(mergedAnomalyResultBeanList.size());
     for (Future future : mergedAnomalyResultDTOFutureList) {
+
+    List<MergedAnomalyResultDTO> dtos = new ArrayList<>();
+    for(MergedAnomalyResultBean b : mergedAnomalyResultBeanList) {
       try {
-        mergedAnomalyResultDTOList.add((MergedAnomalyResultDTO) future.get(60, TimeUnit.SECONDS));
-      } catch (InterruptedException | TimeoutException | ExecutionException e) {
-        LOG.warn("Failed to convert MergedAnomalyResultDTO from bean: {}", e.toString());
+        dtos.add(convertMergedAnomalyBean2DTO(b, loadRawAnomalies));
+      } catch (Exception e) {
+        LOG.warn("Could not convert bean to dto", e);
       }
     }
-
-    return mergedAnomalyResultDTOList;
+    return dtos;
   }
 
 }

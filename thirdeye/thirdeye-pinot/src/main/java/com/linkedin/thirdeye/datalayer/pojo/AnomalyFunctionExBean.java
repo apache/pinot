@@ -1,30 +1,29 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.base.MoreObjects;
-import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeConfig;
-import com.linkedin.thirdeye.constant.MetricAggFunction;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Properties;
-import java.util.concurrent.TimeUnit;
 
 
 @JsonIgnoreProperties(ignoreUnknown=true)
 public class AnomalyFunctionExBean extends AbstractBean {
 
+  // Anomaly function parameterization
   String name;
   String className;
   Map<String, String> config;
 
+  // scheduling
   String cron;
   boolean active;
+  long monitoringWindowAlignment;
+  long monitoringWindowLookback;
+
+  // merging
+  long mergeWindow;
+
+  // display
+  String displayMetric;
+  String displayCollection;
 
   public String getName() {
     return name;
@@ -64,5 +63,45 @@ public class AnomalyFunctionExBean extends AbstractBean {
 
   public void setActive(boolean active) {
     this.active = active;
+  }
+
+  public long getMonitoringWindowAlignment() {
+    return monitoringWindowAlignment;
+  }
+
+  public void setMonitoringWindowAlignment(long monitoringWindowAlignment) {
+    this.monitoringWindowAlignment = monitoringWindowAlignment;
+  }
+
+  public long getMonitoringWindowLookback() {
+    return monitoringWindowLookback;
+  }
+
+  public void setMonitoringWindowLookback(long monitoringWindowLookback) {
+    this.monitoringWindowLookback = monitoringWindowLookback;
+  }
+
+  public long getMergeWindow() {
+    return mergeWindow;
+  }
+
+  public void setMergeWindow(long mergeWindow) {
+    this.mergeWindow = mergeWindow;
+  }
+
+  public String getDisplayMetric() {
+    return displayMetric;
+  }
+
+  public void setDisplayMetric(String displayMetric) {
+    this.displayMetric = displayMetric;
+  }
+
+  public String getDisplayCollection() {
+    return displayCollection;
+  }
+
+  public void setDisplayCollection(String displayCollection) {
+    this.displayCollection = displayCollection;
   }
 }
