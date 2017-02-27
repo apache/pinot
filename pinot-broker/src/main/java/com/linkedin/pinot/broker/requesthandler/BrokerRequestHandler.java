@@ -283,6 +283,7 @@ public class BrokerRequestHandler {
       BrokerRequest offlineBrokerRequest = null;
       BrokerRequest realtimeBrokerRequest = null;
 
+      // TODO: get time column name from schema or table config so that we can apply it in realtime only use case.
       // We get timeColumnName from time boundary service currently, which only exists for offline table.
       String timeColumnName = (offlineTableName != null) ? getTimeColumnName(offlineTableName) : null;
 

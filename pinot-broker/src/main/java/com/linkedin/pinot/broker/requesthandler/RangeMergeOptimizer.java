@@ -147,15 +147,15 @@ public class RangeMergeOptimizer extends FilterQueryTreeOptimizer {
       stringBuilder.append(upper1);
       stringBuilder.append(
           (predicate1.includeUpperBoundary() ? RangePredicate.UPPER_INCLUSIVE : RangePredicate.UPPER_EXCLUSIVE));
-    } else if (upper2 < upper1) {
+    } else if (upper1 > upper2) {
       stringBuilder.append(upper2);
       stringBuilder.append(
           (predicate2.includeUpperBoundary() ? RangePredicate.UPPER_INCLUSIVE : RangePredicate.UPPER_EXCLUSIVE));
     } else {
-      if (upper1 == Long.MAX_VALUE) { // lower1 == lower2
+      if (upper1 == Long.MAX_VALUE) { // upper1 == upper2
         stringBuilder.append(RangePredicate.UNBOUNDED + RangePredicate.UPPER_EXCLUSIVE); // * always has ')'
       } else {
-        stringBuilder.append(lower1);
+        stringBuilder.append(upper1);
         stringBuilder.append(
             (predicate1.includeUpperBoundary() && predicate2.includeUpperBoundary()) ? RangePredicate.UPPER_INCLUSIVE
                 : RangePredicate.UPPER_EXCLUSIVE);
