@@ -12,6 +12,10 @@ import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterEvaluationUtil;
 import com.linkedin.thirdeye.util.SeverityComputationUtil;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
 
 import java.util.List;
 import java.util.Map;
@@ -33,7 +37,11 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.NullArgumentException;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.joda.time.format.ISODateTimeFormat;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
@@ -56,6 +64,7 @@ public class DetectionJobResource {
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
   private final AlertFilterAutotuneFactory alertFilterAutotuneFactory;
   private final AlertFilterFactory alertFilterFactory;
+  private final int MAX_CLONE_FUNCTIONS = 10;
 
   private static final Logger LOG = LoggerFactory.getLogger(DetectionJobResource.class);
 
@@ -363,5 +372,138 @@ public class DetectionJobResource {
     // get anomaly summary from merged anomaly results
     evaluator.updateFeedbackSummary(anomalyResultDTOS);
     return Response.ok(evaluator.toProperties().toString()).build();
+  }
+
+
+  private List<Map<String, String>> listAllTuningParameters(JSONObject tuningJSON) throws JSONException {
+    List<Map<String, String>> tuningParameters = new ArrayList<>();
+    Iterator<String> jsonFieldIterator = tuningJSON.keys();
+    Map<String, List<String>> fieldToParams = new HashMap<>();
+
+    int numPermutations = 1;
+    while(jsonFieldIterator.hasNext()){
+      String field = jsonFieldIterator.next();
+
+      if(field != null && !field.isEmpty()){
+        // JsonArray to String List
+        List<String> params = new ArrayList<>();
+        JSONArray paramArray = tuningJSON.getJSONArray(field);
+        if(paramArray.length() == 0){
+          continue;
+        }
+        for(int i = 0; i < paramArray.length(); i++){
+          params.add(paramArray.get(i).toString());
+        }
+        numPermutations *= params.size();
+        fieldToParams.put(field, params);
+      }
+    }
+
+    List<String> fieldList = new ArrayList<>(fieldToParams.keySet());
+    for(int i = 0; i < numPermutations; i++){
+      Map<String, String> combination = new HashMap<>();
+      int index = i;
+      for(String field : fieldList) {
+        List<String> params = fieldToParams.get(field);
+        combination.put(field, params.get(i % params.size()));
+        index /= params.size();
+      }
+      tuningParameters.add(combination);
+    }
+
+    return tuningParameters;
+  }
+
+  private Map<String, Comparable> getGoalRange(JSONObject goalJSON) throws JSONException {
+    Map<String, Comparable> goalRange = new HashMap<>();
+    Iterator<String> goalFieldIterator = goalJSON.keys();
+
+    while(goalFieldIterator.hasNext()){
+      String goalField = goalFieldIterator.next();
+      JSONObject fieldObject = goalJSON.getJSONObject(goalField);
+      if(fieldObject == null) {
+        continue;
+      }
+
+      // Parse comparable object
+      // TODO: generalize to comparable objects
+      Comparable goal = fieldObject.getDouble("value");
+      if(goal == null){
+        LOG.warn("No value field in {}, fill in null", goalField);
+      }
+      goalRange.put(goalField, goal);
+    }
+
+    return goalRange;
+  }
+
+  /**
+   * Perform anomaly function autotune:
+   *  - run backfill on all possible combinations of tuning parameters
+   *  - keep all the parameter combinations which lie in the goal range
+   *  - return list of parameter combinations along with their performance evaluation
+   * @param functionId
+   * the id of the target anomaly function
+   * @param replayStartTime
+   * the start time of the anomaly function replay in ISO format, e.g. 2017-02-27T00:00:00.000Z
+   * @param replayEndTime
+   * the end time of the anomaly function replay in ISO format
+   * @param timezone
+   * the timezone of replay time
+   * @param tuningJSON
+   * the json object includes all tuning fields and list of parameters
+   * ex: {"baselineLift": [0.9, 0.95, 1, 1.05, 1.1], "baselineSeasonalPeriod": [2, 3, 4]}
+   * @param goalRangeJSON
+   * the json object includes the range of comparable objects
+   * ex: {"max": {"value": "0.5"}, "min": {"value": "0.2"}}
+   * TODO: Generalize the json object to load any kind of comparable objects, e.g. precision and recall
+   * @return
+   * A response containing all satisfied properties with their evaluation result
+   */
+  @POST
+  @Path("function/{id}/autotune")
+  public Response anomalyFunctionAutotune(@PathParam("id") long functionId, @QueryParam("start") String replayStartTime,
+      @QueryParam("end") String replayEndTime, @QueryParam("timezone") String timezone,
+      @QueryParam("tune") String tuningJSON, @QueryParam("goalRange") String goalRangeJSON){
+    AnomalyFunctionDTO anomalyFunctionDTO = anomalyFunctionDAO.findById(functionId);
+    DateTimeZone dateTimeZone = DateTimeZone.forID(timezone);
+    // DateTime monitoringWindowStartTime = ISODateTimeFormat.dateTimeParser().parseDateTime(monitoringDateTime).withZone(dateTimeZone);
+    DateTime replayStart = ISODateTimeFormat.dateTimeParser().parseDateTime(replayStartTime).withZone(dateTimeZone);
+    DateTime replayEnd = ISODateTimeFormat.dateTimeParser().parseDateTime(replayEndTime).withZone(dateTimeZone);
+
+    // List all tuning parameter sets
+    try {
+      List<Map<String, String>> tuningParameters = listAllTuningParameters(new JSONObject(tuningJSON));
+    }
+    catch(JSONException e){
+      LOG.error("Unable to parse json string: {}", tuningJSON, e );
+      return Response.status(Response.Status.BAD_REQUEST).build();
+    }
+
+    // Parse goal
+    try{
+      Map<String, Comparable> goals = getGoalRange(new JSONObject(goalRangeJSON));
+    }
+    catch (JSONException e){
+      LOG.error("Unable to parse json string: {}", goalRangeJSON, e );
+      return Response.status(Response.Status.BAD_REQUEST).build();
+    }
+
+    // Clone functions for functionId
+    /*
+    Map<long>
+    for(int i = 0; i < MAX_CLONE_FUNCTIONS; i++){
+
+    }
+
+
+    Thread thread =  new Thread(new Runnable() {
+        @Override
+        public void run() {
+          detectionJobScheduler.runBackfill(functionId, replayStart, replayEnd, true);
+        }
+      }).start();
+*/
+    return Response.ok().build();
   }
 }
