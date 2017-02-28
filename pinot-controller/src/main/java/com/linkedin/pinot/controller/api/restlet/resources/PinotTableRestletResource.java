@@ -78,6 +78,17 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
   @Tags({ "table" })
   @Paths({ "/tables", "/tables/" })
   private void addTable(AbstractTableConfig config) throws IOException {
+
+    // For self-serviced cluster, ensure that the tables are created with atleast
+    // min replication factor irrespective of table configuratio value.
+    int requestReplication = config.getValidationConfig().getReplicationNumber();
+    int configMinReplication = _controllerConf.getDefaultTableMinReplicas();
+    if (requestReplication < configMinReplication) {
+      LOGGER.info("Creating table with minimum replication factor of: {} instead of requested replication: {}",
+          configMinReplication, requestReplication);
+      config.getValidationConfig().setReplication(String.valueOf(configMinReplication));
+    }
+
     _pinotHelixResourceManager.addTable(config);
   }
 

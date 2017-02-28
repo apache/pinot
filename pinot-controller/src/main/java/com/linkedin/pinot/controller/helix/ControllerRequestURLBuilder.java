@@ -126,10 +126,6 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables");
   }
 
-  public String forTableGetConfig(String tableName) {
-    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables", tableName, "configs");
-  }
-
   public String forTableGetServerInstances(String tableName) {
     return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables", tableName, "instances?type=server");
   }
@@ -139,7 +135,7 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forTableGet(String tableName) {
-    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables", tableName, "instances");
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "tables", tableName);
   }
 
   public String forTableDelete(String tableName) {

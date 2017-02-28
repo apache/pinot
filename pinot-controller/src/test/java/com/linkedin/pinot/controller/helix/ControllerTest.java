@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.helix;
 
+import com.google.common.base.Preconditions;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -122,10 +123,9 @@ public abstract class ControllerTest {
   /**
    * Starts a controller instance.
    */
-  protected void startController(boolean useTenantIsolation) {
-    assert _controllerStarter == null;
-    ControllerConf config = ControllerTestUtils.getDefaultControllerConfiguration();
-    config.setTenantIsolationEnabled(!useTenantIsolation);
+  protected void startController(ControllerConf config) {
+    Preconditions.checkNotNull(config);
+    Preconditions.checkState(_controllerStarter == null);
 
     _zkClient = new ZkClient(ZkStarter.DEFAULT_ZK_STR);
     if (_zkClient.exists("/" + getHelixClusterName())) {
@@ -136,8 +136,18 @@ public abstract class ControllerTest {
     _propertyStore = _controllerStarter.getHelixResourceManager().getPropertyStore();
   }
 
+  /**
+   * Starts a controller instance.
+   */
+  /*protected void startController(boolean useTenantIsolation) {
+    assert _controllerStarter == null;
+    ControllerConf config = ControllerTestUtils.getDefaultControllerConfiguration();
+    config.setTenantIsolationEnabled(!useTenantIsolation);
+    startController(config);
+  }
+*/
   protected void startController() {
-    startController(false);
+    startController(ControllerTestUtils.getDefaultControllerConfiguration());
   }
 
   protected ValidationManager getControllerValidationManager() throws Exception {
