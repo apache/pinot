@@ -5,7 +5,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import org.apache.commons.lang.math.NumberUtils;
 
 
 public class DataFrame {
@@ -143,7 +145,7 @@ public class DataFrame {
    return assertSeriesExists(seriesName).toBooleans();
   }
 
-  public DoubleSeries mapAsDouble(DoubleSeries.DoubleBatchFunction function, String... seriesNames) {
+  public DoubleSeries map(DoubleSeries.DoubleBatchFunction function, String... seriesNames) {
     DoubleSeries[] inputSeries = new DoubleSeries[seriesNames.length];
     for(int i=0; i<seriesNames.length; i++) {
       inputSeries[i] = assertSeriesExists(seriesNames[i]).toDoubles();
@@ -161,7 +163,7 @@ public class DataFrame {
     return new DoubleSeries(output);
   }
 
-  public LongSeries mapAsLong(LongSeries.LongBatchFunction function, String... seriesNames) {
+  public LongSeries map(LongSeries.LongBatchFunction function, String... seriesNames) {
     LongSeries[] inputSeries = new LongSeries[seriesNames.length];
     for(int i=0; i<seriesNames.length; i++) {
       inputSeries[i] = assertSeriesExists(seriesNames[i]).toLongs();
@@ -179,7 +181,7 @@ public class DataFrame {
     return new LongSeries(output);
   }
 
-  public StringSeries mapAsString(StringSeries.StringBatchFunction function, String... seriesNames) {
+  public StringSeries map(StringSeries.StringBatchFunction function, String... seriesNames) {
     StringSeries[] inputSeries = new StringSeries[seriesNames.length];
     for(int i=0; i<seriesNames.length; i++) {
       inputSeries[i] = assertSeriesExists(seriesNames[i]).toStrings();
@@ -197,7 +199,7 @@ public class DataFrame {
     return new StringSeries(output);
   }
 
-  public BooleanSeries mapAsBoolean(BooleanSeries.BooleanBatchFunction function, String... seriesNames) {
+  public BooleanSeries map(BooleanSeries.BooleanBatchFunction function, String... seriesNames) {
     BooleanSeries[] inputSeries = new BooleanSeries[seriesNames.length];
     for(int i=0; i<seriesNames.length; i++) {
       inputSeries[i] = assertSeriesExists(seriesNames[i]).toBooleans();
@@ -358,6 +360,162 @@ public class DataFrame {
 
   public boolean getBoolean(String seriesName) {
     return assertSingleValue(seriesName).toBooleans().first();
+  }
+
+  public static DoubleSeries toDoubles(DoubleSeries s) {
+    return s;
+  }
+
+  public static DoubleSeries toDoubles(LongSeries s) {
+    double[] values = new double[s.size()];
+    for(int i=0; i<values.length; i++) {
+      if(LongSeries.isNull(s.values[i])) {
+        values[i] = DoubleSeries.NULL_VALUE;
+      } else {
+        values[i] = (double) s.values[i];
+      }
+    }
+    return new DoubleSeries(values);
+  }
+
+  public static DoubleSeries toDoubles(StringSeries s) {
+    double[] values = new double[s.size()];
+    for(int i=0; i<values.length; i++) {
+      if(StringSeries.isNull(s.values[i])) {
+        values[i] = DoubleSeries.NULL_VALUE;
+      } else {
+        values[i] = Double.parseDouble(s.values[i]);
+      }
+    }
+    return new DoubleSeries(values);
+  }
+
+  public static DoubleSeries toDoubles(BooleanSeries s) {
+    double[] values = new double[s.size()];
+    for(int i=0; i<values.length; i++) {
+      values[i] = s.values[i] ? 1.0d : 0.0d;
+    }
+    return new DoubleSeries(values);
+  }
+
+  public static LongSeries toLongs(DoubleSeries s) {
+    long[] values = new long[s.size()];
+    for(int i=0; i<values.length; i++) {
+      if(DoubleSeries.isNull(s.values[i])) {
+        values[i] = LongSeries.NULL_VALUE;
+      } else {
+        values[i] = (long) s.values[i];
+      }
+    }
+    return new LongSeries(values);
+  }
+
+  public static LongSeries toLongs(LongSeries s) {
+    return s;
+  }
+
+  public static LongSeries toLongs(StringSeries s) {
+    long[] values = new long[s.size()];
+    for(int i=0; i<values.length; i++) {
+      if(StringSeries.isNull(s.values[i])) {
+        values[i] = LongSeries.NULL_VALUE;
+      } else {
+        try {
+          values[i] = Long.parseLong(s.values[i]);
+        } catch (NumberFormatException e) {
+          values[i] = (long) Double.parseDouble(s.values[i]);
+        }
+      }
+    }
+    return new LongSeries(values);
+  }
+
+  public static LongSeries toLongs(BooleanSeries s) {
+    long[] values = new long[s.size()];
+    for(int i=0; i<values.length; i++) {
+      values[i] = s.values[i] ? 1L : 0L;
+    }
+    return new LongSeries(values);
+  }
+
+  public static BooleanSeries toBooleans(DoubleSeries s) {
+    boolean[] values = new boolean[s.size()];
+    for(int i=0; i<values.length; i++) {
+      if(DoubleSeries.isNull(s.values[i])) {
+        values[i] = BooleanSeries.NULL_VALUE;
+      } else {
+        values[i] = s.values[i] != 0.0d;
+      }
+    }
+    return new BooleanSeries(values);
+  }
+
+  public static BooleanSeries toBooleans(LongSeries s) {
+    boolean[] values = new boolean[s.size()];
+    for(int i=0; i<values.length; i++) {
+      if(LongSeries.isNull(s.values[i])) {
+        values[i] = BooleanSeries.NULL_VALUE;
+      } else {
+        values[i] = s.values[i] != 0L;
+      }
+    }
+    return new BooleanSeries(values);
+  }
+
+  public static BooleanSeries toBooleans(BooleanSeries s) {
+    return s;
+  }
+
+  public static BooleanSeries toBooleans(StringSeries s) {
+    boolean[] values = new boolean[s.size()];
+    for(int i=0; i<values.length; i++) {
+      if(StringSeries.isNull(s.values[i])) {
+        values[i] = BooleanSeries.NULL_VALUE;
+      } else {
+        if(NumberUtils.isNumber(s.values[i])) {
+          values[i] = Double.parseDouble(s.values[i]) != 0.0d;
+        } else {
+          values[i] = Boolean.parseBoolean(s.values[i]);
+        }
+      }
+    }
+    return new BooleanSeries(values);
+  }
+
+  public static StringSeries toStrings(DoubleSeries s) {
+    String[] values = new String[s.size()];
+    for(int i=0; i<values.length; i++) {
+      if(DoubleSeries.isNull(s.values[i])) {
+        values[i] = StringSeries.NULL_VALUE;
+      } else {
+        values[i] = String.valueOf(s.values[i]);
+      }
+    }
+    return new StringSeries(values);
+  }
+
+  public static StringSeries toStrings(LongSeries s) {
+    String[] values = new String[s.size()];
+    for(int i=0; i<values.length; i++) {
+      if(LongSeries.isNull(s.values[i])) {
+        values[i] = StringSeries.NULL_VALUE;
+      } else {
+        values[i] = String.valueOf(s.values[i]);
+      }
+    }
+    return new StringSeries(values);
+  }
+
+  public static StringSeries toStrings(BooleanSeries s) {
+    String[] values = new String[s.size()];
+    for(int i=0; i<values.length; i++) {
+      values[i] = String.valueOf(s.values[i]);
+    }
+    return new StringSeries(values);
+  }
+
+  public static StringSeries toStrings(StringSeries s) {
+    return s;
   }
 
   @Override

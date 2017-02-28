@@ -8,6 +8,8 @@ import java.util.List;
 
 
 public final class DoubleSeries extends Series {
+  public static final double NULL_VALUE = Double.NaN;
+
   double[] values;
 
   @FunctionalInterface
@@ -55,29 +57,8 @@ public final class DoubleSeries extends Series {
     }
   }
 
-  DoubleSeries(double[] values) {
-    this.values = Arrays.copyOf(values, values.length);
-  }
-
-  DoubleSeries(long[] values) {
-    this.values = new double[values.length];
-    for(int i=0; i<values.length; i++) {
-      this.values[i] = (double) values[i];
-    }
-  }
-
-  DoubleSeries(boolean[] values) {
-    this.values = new double[values.length];
-    for(int i=0; i<values.length; i++) {
-      this.values[i] = values[i] ? 1.0d : 0.0d;
-    }
-  }
-
-  DoubleSeries(String[] values) {
-    this.values = new double[values.length];
-    for(int i=0; i<values.length; i++) {
-      this.values[i] = Double.parseDouble(values[i]);
-    }
+  DoubleSeries(double... values) {
+    this.values = values;
   }
 
   @Override
@@ -87,22 +68,22 @@ public final class DoubleSeries extends Series {
 
   @Override
   public DoubleSeries toDoubles() {
-    return this;
+    return DataFrame.toDoubles(this);
   }
 
   @Override
   public LongSeries toLongs() {
-    return new LongSeries(this.values);
+    return DataFrame.toLongs(this);
   }
 
   @Override
   public BooleanSeries toBooleans() {
-    return new BooleanSeries(this.values);
- }
+    return DataFrame.toBooleans(this);
+  }
 
   @Override
   public StringSeries toStrings() {
-    return new StringSeries(this.values);
+    return DataFrame.toStrings(this);
   }
 
   @Override
@@ -121,7 +102,7 @@ public final class DoubleSeries extends Series {
 
   public DoubleSeries unique() {
     if(this.values.length <= 0)
-      return new DoubleSeries(new long[0]);
+      return new DoubleSeries();
 
     double[] values = Arrays.copyOf(this.values, this.values.length);
     Arrays.sort(values);
@@ -186,40 +167,6 @@ public final class DoubleSeries extends Series {
   }
 
   @Override
-  DoubleSeries reorder(int[] toIndex) {
-    int len = this.values.length;
-    if(toIndex.length != len)
-      throw new IllegalArgumentException("toIndex size does not equal series size");
-
-    double[] values = new double[len];
-    for(int i=0; i<len; i++) {
-      values[toIndex[i]] = this.values[i];
-    }
-    return new DoubleSeries(values);
-  }
-
-  @Override
-  int[] sortedIndex() {
-    List<DoubleSortTuple> tuples = new ArrayList<>();
-    for(int i=0; i<this.values.length; i++) {
-      tuples.add(new DoubleSortTuple(this.values[i], i));
-    }
-
-    Collections.sort(tuples, new Comparator<DoubleSortTuple>() {
-      @Override
-      public int compare(DoubleSortTuple a, DoubleSortTuple b) {
-        return a.value == b.value ? 0 : a.value <= b.value ? -1 : 1;
-      }
-    });
-
-    int[] toIndex = new int[tuples.size()];
-    for(int i=0; i<tuples.size(); i++) {
-      toIndex[tuples.get(i).index] = i;
-    }
-    return toIndex;
-  }
-
-  @Override
   public DoubleSeries sort() {
     double[] values = Arrays.copyOf(this.values, this.values.length);
     Arrays.sort(values);
@@ -241,7 +188,7 @@ public final class DoubleSeries extends Series {
   // TODO bucketsBy...
 
   public DoubleSeries groupBy(List<Bucket> buckets, DoubleBatchFunction grouper) {
-    return this.groupBy(buckets, Double.NaN, grouper);
+    return this.groupBy(buckets, NULL_VALUE, grouper);
   }
 
   public DoubleSeries groupBy(List<Bucket> buckets, double nullValue, DoubleBatchFunction grouper) {
@@ -291,10 +238,27 @@ public final class DoubleSeries extends Series {
     return new DoubleBatchSum().apply(this.values);
   }
 
-  private static double[] assertNotEmpty(double[] values) {
-    if(values.length <= 0)
-      throw new IllegalStateException("Must contain at least one value");
-    return values;
+  public DoubleSeries fillNull(double value) {
+    double[] values = Arrays.copyOf(this.values, this.values.length);
+    for(int i=0; i<values.length; i++) {
+      if(isNull(values[i])) {
+        values[i] = value;
+      }
+    }
+    return new DoubleSeries(values);
+  }
+
+  @Override
+  public DoubleSeries shift(int offset) {
+    double[] values = new double[this.values.length];
+    if(offset >= 0) {
+      Arrays.fill(values, 0, Math.min(offset, values.length), NULL_VALUE);
+      System.arraycopy(this.values, 0, values, Math.min(offset, values.length), Math.max(values.length - offset, 0));
+    } else {
+      System.arraycopy(this.values, Math.min(-offset, values.length), values, 0, Math.max(values.length + offset, 0));
+      Arrays.fill(values, Math.max(values.length + offset, 0), Math.min(-offset, values.length), NULL_VALUE);
+    }
+    return new DoubleSeries(values);
   }
 
   @Override
@@ -304,6 +268,59 @@ public final class DoubleSeries extends Series {
       values[i] = this.values[fromIndex[i]];
     }
     return new DoubleSeries(values);
+  }
+
+  @Override
+  DoubleSeries reorder(int[] toIndex) {
+    int len = this.values.length;
+    if(toIndex.length != len)
+      throw new IllegalArgumentException("toIndex size does not equal series size");
+
+    double[] values = new double[len];
+    for(int i=0; i<len; i++) {
+      values[toIndex[i]] = this.values[i];
+    }
+    return new DoubleSeries(values);
+  }
+
+  @Override
+  int[] sortedIndex() {
+    List<DoubleSortTuple> tuples = new ArrayList<>();
+    for(int i=0; i<this.values.length; i++) {
+      tuples.add(new DoubleSortTuple(this.values[i], i));
+    }
+
+    Collections.sort(tuples, new Comparator<DoubleSortTuple>() {
+      @Override
+      public int compare(DoubleSortTuple a, DoubleSortTuple b) {
+        return a.value == b.value ? 0 : a.value <= b.value ? -1 : 1;
+      }
+    });
+
+    int[] toIndex = new int[tuples.size()];
+    for(int i=0; i<tuples.size(); i++) {
+      toIndex[tuples.get(i).index] = i;
+    }
+    return toIndex;
+  }
+
+  @Override
+  public boolean hasNull() {
+    for(double v : this.values) {
+      if(isNull(v))
+        return true;
+    }
+    return false;
+  }
+
+  public static boolean isNull(double value) {
+    return Double.isNaN(value);
+  }
+
+  private static double[] assertNotEmpty(double[] values) {
+    if(values.length <= 0)
+      throw new IllegalStateException("Must contain at least one value");
+    return values;
   }
 
   static final class DoubleSortTuple {

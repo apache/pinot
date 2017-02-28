@@ -8,6 +8,8 @@ import java.util.List;
 
 
 public final class LongSeries extends Series {
+  public static final long NULL_VALUE = Long.MIN_VALUE;
+
   long[] values;
 
   @FunctionalInterface
@@ -53,54 +55,33 @@ public final class LongSeries extends Series {
     }
   }
 
-  LongSeries(long[] values) {
-    this.values = Arrays.copyOf(values, values.length);
+  LongSeries(long... values) {
+    this.values = values;
   }
 
-  LongSeries(double[] values) {
-    this.values = new long[values.length];
-    for(int i=0; i<values.length; i++) {
-      this.values[i] = (long) values[i];
-    }
+  @Override
+  public DoubleSeries toDoubles() {
+    return DataFrame.toDoubles(this);
   }
 
-  LongSeries(boolean[] values) {
-    this.values = new long[values.length];
-    for(int i=0; i<values.length; i++) {
-      this.values[i] = values[i] ? 1l : 0l;
-    }
+  @Override
+  public LongSeries toLongs() {
+    return DataFrame.toLongs(this);
   }
 
-  LongSeries(String[] values) {
-    this.values = new long[values.length];
-    for(int i=0; i<values.length; i++) {
-      this.values[i] = (long) Double.parseDouble(values[i]);
-    }
+  @Override
+  public BooleanSeries toBooleans() {
+    return DataFrame.toBooleans(this);
+  }
+
+  @Override
+  public StringSeries toStrings() {
+    return DataFrame.toStrings(this);
   }
 
   @Override
   public LongSeries copy() {
     return new LongSeries(Arrays.copyOf(this.values, this.values.length));
-  }
-
-  @Override
-  public DoubleSeries toDoubles() {
-    return new DoubleSeries(this.values);
-  }
-
-  @Override
-  public LongSeries toLongs() {
-    return this;
-  }
-
-  @Override
-  public BooleanSeries toBooleans() {
-    return new BooleanSeries(this.values);
-  }
-
-  @Override
-  public StringSeries toStrings() {
-    return new StringSeries(this.values);
   }
 
   @Override
@@ -309,7 +290,7 @@ public final class LongSeries extends Series {
   // TODO buckets by bucket count - for deciles, etc.
 
   public LongSeries groupBy(List<Bucket> buckets, LongBatchFunction grouper) {
-    return this.groupBy(buckets, Long.MIN_VALUE, grouper);
+    return this.groupBy(buckets, NULL_VALUE, grouper);
   }
 
   public LongSeries groupBy(List<Bucket> buckets, long nullValue, LongBatchFunction grouper) {
@@ -366,6 +347,41 @@ public final class LongSeries extends Series {
       values[i] = this.values[fromIndex[i]];
     }
     return new LongSeries(values);
+  }
+
+  public LongSeries fillNull(long value) {
+    long[] values = Arrays.copyOf(this.values, this.values.length);
+    for(int i=0; i<values.length; i++) {
+      if(isNull(values[i])) {
+        values[i] = value;
+      }
+    }
+    return new LongSeries(values);
+  }
+
+  @Override
+  public LongSeries shift(int offset) {
+    long[] values = new long[this.values.length];
+    if(offset >= 0) {
+      Arrays.fill(values, 0, Math.min(offset, values.length), NULL_VALUE);
+      System.arraycopy(this.values, 0, values, Math.min(offset, values.length), Math.max(values.length - offset, 0));
+    } else {
+      System.arraycopy(this.values, Math.min(-offset, values.length), values, 0, Math.max(values.length + offset, 0));
+      Arrays.fill(values, Math.max(values.length + offset, 0), Math.min(-offset, values.length), NULL_VALUE);
+    }
+    return new LongSeries(values);
+  }
+
+  @Override
+  public boolean hasNull() {
+    for(long v : this.values)
+      if(isNull(v))
+        return true;
+    return false;
+  }
+
+  public static boolean isNull(long value) {
+    return value == NULL_VALUE;
   }
 
   private static long[] assertNotEmpty(long[] values) {

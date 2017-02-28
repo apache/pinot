@@ -16,16 +16,15 @@ public class DataFrameTest {
   final static String[] VALUES_STRING = new String[] { "-2.3", "-1", "0.0", "0.5", "0.13e1" };
   final static boolean[] VALUES_BOOLEAN = new boolean[] { true, true, false, true, true };
 
-  // TODO thorough testing for longs
-  // TODO thorough testing for strings
-  // TODO thorough testing for booleans
-
   // TODO test double batch function
   // TODO test string batch function
   // TODO test boolean batch function
 
   // TODO string test head, tail, accessors
   // TODO boolean test head, tail, accessors
+
+  // TODO shift double, long, boolean
+  // TODO fill double, long, boolean
 
   DataFrame df;
 
@@ -49,34 +48,148 @@ public class DataFrameTest {
   }
 
   @Test
-  public void testDoubleSeriesDataDuplication() {
+  public void testDoubleNoDataDuplication() {
     DoubleSeries first = DataFrame.toSeries(VALUES_DOUBLE);
     DoubleSeries second = DataFrame.toSeries(VALUES_DOUBLE);
-    Assert.assertEquals(first.values(), new double[] { -2.1, -0.1, 0.0, 0.5, 1.3 });
-    Assert.assertEquals(first.values(), second.values());
-    Assert.assertNotSame(first.values(), second.values());
+    Assert.assertSame(first.values(), second.values());
   }
 
   @Test
-  public void testDoubleToBoolean() {
-    BooleanSeries s = DataFrame.toSeries(VALUES_DOUBLE).toBooleans();
-    Assert.assertEquals(s.values(), new boolean[] { true, true, false, true, true });
+  public void testDoubleToDouble() {
+    Series s = DataFrame.toSeries(VALUES_DOUBLE);
+    Assert.assertEquals(s.toDoubles().values(), VALUES_DOUBLE);
   }
 
   @Test
   public void testDoubleToLong() {
-    LongSeries s = DataFrame.toSeries(VALUES_DOUBLE).toLongs();
-    Assert.assertEquals(s.values(), new long[] { -2, 0, 0, 0, 1 });
+    Series s = DataFrame.toSeries(VALUES_DOUBLE);
+    Assert.assertEquals(s.toLongs().values(), new long[] { -2, 0, 0, 0, 1 });
+  }
+
+  @Test
+  public void testDoubleToBoolean() {
+    Series s = DataFrame.toSeries(VALUES_DOUBLE);
+    Assert.assertEquals(s.toBooleans().values(), new boolean[] { true, true, false, true, true });
   }
 
   @Test
   public void testDoubleToString() {
-    StringSeries s = DataFrame.toSeries(VALUES_DOUBLE).toStrings();
-    Assert.assertEquals(s.values(), new String[] { "-2.1", "-0.1", "0.0", "0.5", "1.3" });
+    Series s = DataFrame.toSeries(VALUES_DOUBLE);
+    Assert.assertEquals(s.toStrings().values(), new String[] { "-2.1", "-0.1", "0.0", "0.5", "1.3" });
   }
 
   @Test
-  public void testMapSeriesDoubleToDouble() {
+  public void testLongToDouble() {
+    Series s = DataFrame.toSeries(VALUES_LONG);
+    Assert.assertEquals(s.toDoubles().values(), new double[] { -2.0, 1.0, 0.0, 1.0, 2.0 });
+  }
+
+  @Test
+  public void testLongToLong() {
+    Series s = DataFrame.toSeries(VALUES_LONG);
+    Assert.assertEquals(s.toLongs().values(), VALUES_LONG);
+  }
+
+  @Test
+  public void testLongToBoolean() {
+    Series s = DataFrame.toSeries(VALUES_LONG);
+    Assert.assertEquals(s.toBooleans().values(), new boolean[] { true, true, false, true, true });
+  }
+
+  @Test
+  public void testLongToString() {
+    Series s = DataFrame.toSeries(VALUES_LONG);
+    Assert.assertEquals(s.toStrings().values(), new String[] { "-2", "1", "0", "1", "2" });
+  }
+
+  @Test
+  public void testBooleanToDouble() {
+    Series s = DataFrame.toSeries(VALUES_BOOLEAN);
+    Assert.assertEquals(s.toDoubles().values(), new double[] { 1.0, 1.0, 0.0, 1.0, 1.0 });
+  }
+
+  @Test
+  public void testBooleanToLong() {
+    Series s = DataFrame.toSeries(VALUES_BOOLEAN);
+    Assert.assertEquals(s.toLongs().values(), new long[] { 1, 1, 0, 1, 1 });
+  }
+
+  @Test
+  public void testBooleanToBoolean() {
+    Series s = DataFrame.toSeries(VALUES_BOOLEAN);
+    Assert.assertEquals(s.toBooleans().values(), VALUES_BOOLEAN);
+  }
+
+  @Test
+  public void testBooleanToString() {
+    Series s = DataFrame.toSeries(VALUES_BOOLEAN);
+    Assert.assertEquals(s.toStrings().values(), new String[] { "true", "true", "false", "true", "true" });
+  }
+
+  @Test
+  public void testStringToDouble() {
+    Series s = DataFrame.toSeries(VALUES_STRING);
+    Assert.assertEquals(s.toDoubles().values(), new double[] { -2.3, -1.0, 0.0, 0.5, 1.3 });
+  }
+
+  @Test
+  public void testStringToLong() {
+    // NOTE: transparent conversion via double
+    Series s = DataFrame.toSeries(VALUES_STRING);
+    Assert.assertEquals(s.toLongs().values(), new long[] { -2, -1, 0, 0, 1 });
+  }
+
+  @Test
+  public void testStringToBoolean() {
+    // NOTE: transparent conversion via double
+    Series s = DataFrame.toSeries(VALUES_STRING);
+    Assert.assertEquals(s.toBooleans().values(), new boolean[] { true, true, false, true, true });
+  }
+
+  @Test
+  public void testStringToString() {
+    Series s = DataFrame.toSeries(VALUES_STRING);
+    Assert.assertEquals(s.toStrings().values(), VALUES_STRING);
+  }
+
+  @Test
+  public void testDoubleNull() {
+    Series s = DataFrame.toSeries(1.0, DoubleSeries.NULL_VALUE, 2.0);
+    Assert.assertEquals(s.toDoubles().values(), new double[] { 1.0, DoubleSeries.NULL_VALUE, 2.0 });
+    Assert.assertEquals(s.toLongs().values(), new long[] { 1, LongSeries.NULL_VALUE, 2 });
+    Assert.assertEquals(s.toBooleans().values(), new boolean[] { true, BooleanSeries.NULL_VALUE, true });
+    Assert.assertEquals(s.toStrings().values(), new String[] { "1.0", StringSeries.NULL_VALUE, "2.0" });
+  }
+
+  @Test
+  public void testLongNull() {
+    Series s = DataFrame.toSeries(1, LongSeries.NULL_VALUE, 2);
+    Assert.assertEquals(s.toDoubles().values(), new double[] { 1.0, DoubleSeries.NULL_VALUE, 2.0 });
+    Assert.assertEquals(s.toLongs().values(), new long[] { 1, LongSeries.NULL_VALUE, 2 });
+    Assert.assertEquals(s.toBooleans().values(), new boolean[] { true, BooleanSeries.NULL_VALUE, true });
+    Assert.assertEquals(s.toStrings().values(), new String[] { "1", StringSeries.NULL_VALUE, "2" });
+  }
+
+  @Test
+  public void testBooleanNull() {
+    Series s = DataFrame.toSeries(true, BooleanSeries.NULL_VALUE, false);
+    Assert.assertEquals(s.toDoubles().values(), new double[] { 1.0, 0.0, 0.0 });
+    Assert.assertEquals(s.toLongs().values(), new long[] { 1, 0, 0 });
+    Assert.assertEquals(s.toBooleans().values(), new boolean[] { true, false, false });
+    Assert.assertEquals(s.toStrings().values(), new String[] { "true", "false", "false" });
+  }
+
+  @Test
+  public void testStringNull() {
+    Series s = DataFrame.toSeries("1.0", StringSeries.NULL_VALUE, "2.0");
+    Assert.assertEquals(s.toDoubles().values(), new double[] { 1.0, DoubleSeries.NULL_VALUE, 2.0 });
+    Assert.assertEquals(s.toLongs().values(), new long[] { 1, LongSeries.NULL_VALUE, 2 });
+    Assert.assertEquals(s.toBooleans().values(), new boolean[] { true, BooleanSeries.NULL_VALUE, true });
+    Assert.assertEquals(s.toStrings().values(), new String[] { "1.0", StringSeries.NULL_VALUE, "2.0" });
+  }
+
+  @Test
+  public void testMapDoubleToDouble() {
     DoubleSeries in = DataFrame.toSeries(VALUES_DOUBLE);
     DoubleSeries out = in.map(new DoubleSeries.DoubleFunction() {
       public double apply(double value) {
@@ -87,7 +200,7 @@ public class DataFrameTest {
   }
 
   @Test
-  public void testMapSeriesDoubleToBoolean() {
+  public void testMapDoubleToBoolean() {
     DoubleSeries in = DataFrame.toSeries(VALUES_DOUBLE);
     BooleanSeries out = in.map(new DoubleSeries.DoubleConditional() {
       public boolean apply(double value) {
@@ -99,7 +212,7 @@ public class DataFrameTest {
 
   @Test
   public void testMapDataFrameAsDouble() {
-    DoubleSeries out = df.mapAsDouble(new DoubleSeries.DoubleBatchFunction() {
+    DoubleSeries out = df.map(new DoubleSeries.DoubleBatchFunction() {
       public double apply(double[] values) {
         return values[0] + values[1] + values[2];
       }
@@ -116,18 +229,6 @@ public class DataFrameTest {
     });
     df.addSeries("double", out);
     Assert.assertEquals(df.toDoubles("double").values(), new double[] { -4.2, -0.2, 0.0, 1.0, 2.6 });
-  }
-
-  @Test
-  public void testTransparentConversionStringToBooleanViaDouble() {
-    BooleanSeries s = DataFrame.toSeries(VALUES_STRING).toBooleans();
-    Assert.assertEquals(s.values(), new boolean[] { true, true, false, true, true });
-  }
-
-  @Test
-  public void testTransparentConversionStringToLongViaDouble() {
-    LongSeries s = DataFrame.toSeries(VALUES_STRING).toLongs();
-    Assert.assertEquals(s.values(), new long[] { -2, -1, 0, 0, 1 });
   }
 
   @Test
@@ -428,7 +529,7 @@ public class DataFrameTest {
 
   @Test
   public void testDoubleAccessorsEmpty() {
-    DoubleSeries s = new DoubleSeries(new double[] {});
+    DoubleSeries s = new DoubleSeries();
     Assert.assertEquals(s.sum(), 0.0d);
 
     try {
@@ -485,7 +586,7 @@ public class DataFrameTest {
 
   @Test
   public void testLongAccessorsEmpty() {
-    LongSeries s = new LongSeries(new long[] {});
+    LongSeries s = new LongSeries();
     Assert.assertEquals(s.sum(), 0);
 
     try {
@@ -561,12 +662,9 @@ public class DataFrameTest {
   }
 
   @Test
-  public void testStringFill() {
-    StringSeries s1 = DataFrame.toSeries("a", null, null, "b", null);
-    Assert.assertEquals(s1.fill(null, "N").values(), new String[] { "a", "N", "N", "b", "N" });
-
-    StringSeries s2 = DataFrame.toSeries("a", null, null, "b", null);
-    Assert.assertEquals(s2.fill("a", "A").values(), new String[] { "A", null, null, "b", null });
+  public void testStringFillNull() {
+    StringSeries s = DataFrame.toSeries("a", null, null, "b", null);
+    Assert.assertEquals(s.fillNull("N").values(), new String[] { "a", "N", "N", "b", "N" });
   }
 
   @Test

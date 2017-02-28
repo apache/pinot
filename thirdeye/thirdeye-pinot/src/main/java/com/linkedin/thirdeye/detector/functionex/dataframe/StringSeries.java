@@ -60,54 +60,33 @@ public final class StringSeries extends Series {
     }
   }
 
-  public StringSeries(String[] values) {
-    this.values = Arrays.copyOf(values, values.length);
+  public StringSeries(String... values) {
+    this.values = values;
   }
 
-  StringSeries(double[] values) {
-    this.values = new String[values.length];
-    for(int i=0; i<values.length; i++) {
-      this.values[i] = String.valueOf(values[i]);
-    }
+  @Override
+  public DoubleSeries toDoubles() {
+    return DataFrame.toDoubles(this);
   }
 
-  StringSeries(long[] values) {
-    this.values = new String[values.length];
-    for(int i=0; i<values.length; i++) {
-      this.values[i] = String.valueOf(values[i]);
-    }
+  @Override
+  public LongSeries toLongs() {
+    return DataFrame.toLongs(this);
   }
 
-  StringSeries(boolean[] values) {
-    this.values = new String[values.length];
-    for(int i=0; i<values.length; i++) {
-      this.values[i] = String.valueOf(values[i]);
-    }
+  @Override
+  public BooleanSeries toBooleans() {
+    return DataFrame.toBooleans(this);
+  }
+
+  @Override
+  public StringSeries toStrings() {
+    return DataFrame.toStrings(this);
   }
 
   @Override
   public StringSeries copy() {
     return new StringSeries(Arrays.copyOf(this.values, this.values.length));
-  }
-
-  @Override
-  public DoubleSeries toDoubles() {
-    return new DoubleSeries(this.values);
-  }
-
-  @Override
-  public LongSeries toLongs() {
-    return new LongSeries(this.values);
-  }
-
-  @Override
-  public BooleanSeries toBooleans() {
-    return new BooleanSeries(this.values);
-  }
-
-  @Override
-  public StringSeries toStrings() {
-    return this;
   }
 
   @Override
@@ -181,6 +160,85 @@ public final class StringSeries extends Series {
   }
 
   @Override
+  public StringSeries sort() {
+    String[] values = Arrays.copyOf(this.values, this.values.length);
+    Arrays.sort(values);
+    return new StringSeries(values);
+  }
+
+  @Override
+  public String toString() {
+    StringBuilder builder = new StringBuilder();
+    builder.append("StringSeries{");
+    for(String s : this.values) {
+      builder.append("'");
+      builder.append(s);
+      builder.append("' ");
+    }
+    builder.append("}");
+    return builder.toString();
+  }
+
+  // TODO bucketsBy...
+
+  public StringSeries groupBy(List<Bucket> buckets, StringBatchFunction grouper) {
+    return this.groupBy(buckets, NULL_VALUE, grouper);
+  }
+
+  public StringSeries groupBy(List<Bucket> buckets, String nullValue, StringBatchFunction grouper) {
+    String[] values = new String[buckets.size()];
+    for(int i=0; i<buckets.size(); i++) {
+      Bucket b = buckets.get(i);
+
+      // no elements in group
+      if(b.fromIndex.length <= 0) {
+        values[i] = nullValue;
+        continue;
+      }
+
+      // group
+      String[] gvalues = new String[b.fromIndex.length];
+      for(int j=0; j<gvalues.length; j++) {
+        gvalues[j] = this.values[b.fromIndex[j]];
+      }
+      values[i] = grouper.apply(gvalues);
+    }
+    return new StringSeries(values);
+  }
+
+  public StringSeries fillNull(String value) {
+    String[] values = Arrays.copyOf(this.values, this.values.length);
+    for(int i=0; i<values.length; i++) {
+      if(isNull(values[i])) {
+        values[i] = value;
+      }
+    }
+    return new StringSeries(values);
+  }
+
+  @Override
+  public StringSeries shift(int offset) {
+    String[] values = new String[this.values.length];
+    if(offset >= 0) {
+      Arrays.fill(values, 0, Math.min(offset, values.length), NULL_VALUE);
+      System.arraycopy(this.values, 0, values, Math.min(offset, values.length), Math.max(values.length - offset, 0));
+    } else {
+      System.arraycopy(this.values, Math.min(-offset, values.length), values, 0, Math.max(values.length + offset, 0));
+      Arrays.fill(values, Math.max(values.length + offset, 0), Math.min(-offset, values.length), NULL_VALUE);
+    }
+    return new StringSeries(values);
+  }
+
+  @Override
+  StringSeries filter(int[] fromIndex) {
+    String[] values = new String[fromIndex.length];
+    for(int i=0; i<fromIndex.length; i++) {
+      values[i] = this.values[fromIndex[i]];
+    }
+    return new StringSeries(values);
+  }
+
+  @Override
   StringSeries reorder(int[] toIndex) {
     int len = this.values.length;
     if(toIndex.length != len)
@@ -217,89 +275,22 @@ public final class StringSeries extends Series {
   }
 
   @Override
-  public StringSeries sort() {
-    String[] values = Arrays.copyOf(this.values, this.values.length);
-    Arrays.sort(values);
-    return new StringSeries(values);
+  public boolean hasNull() {
+    for(String v : this.values)
+      if(isNull(v))
+        return true;
+    return false;
   }
 
-  @Override
-  public String toString() {
-    StringBuilder builder = new StringBuilder();
-    builder.append("StringSeries{");
-    for(String s : this.values) {
-      builder.append("'");
-      builder.append(s);
-      builder.append("' ");
-    }
-    builder.append("}");
-    return builder.toString();
+  public static boolean isNull(String value) {
+    return Objects.equals(value, NULL_VALUE);
   }
 
-  // TODO bucketsBy...
-
-  public StringSeries groupBy(List<Bucket> buckets, StringBatchFunction grouper) {
-    String[] values = new String[buckets.size()];
-    for(int i=0; i<buckets.size(); i++) {
-      Bucket b = buckets.get(i);
-
-      // no elements in group
-      if(b.fromIndex.length <= 0) {
-        values[i] = NULL_VALUE;
-        continue;
-      }
-
-      // group
-      String[] gvalues = new String[b.fromIndex.length];
-      for(int j=0; j<gvalues.length; j++) {
-        gvalues[j] = this.values[b.fromIndex[j]];
-      }
-      values[i] = grouper.apply(gvalues);
-    }
-    return new StringSeries(values);
-  }
-
-  public StringSeries fill(String where, String value) {
-    String[] values = Arrays.copyOf(this.values, this.values.length);
-    for(int i=0; i<values.length; i++) {
-      if(Objects.equals(values[i], where)) {
-        values[i] = value;
-      }
-    }
-    return new StringSeries(values);
-  }
-
-  public StringSeries fillna(String value) {
-    return this.fill(NULL_VALUE, value);
-  }
-
-  public StringSeries shift(int offset) {
-    String[] values = new String[this.values.length];
-    for(int i=0; i<Math.min(offset, values.length); i++) {
-      values[i] = NULL_VALUE;
-    }
-    for(int i=Math.max(0, offset); i<values.length + Math.min(offset, 0); i++) {
-      values[i] = this.values[i - offset];
-    }
-    for(int i=Math.max(values.length + offset, 0); i<values.length; i++) {
-      values[i] = NULL_VALUE;
-    }
-    return new StringSeries(values);
-  }
 
   private static String[] assertNotEmpty(String[] values) {
     if(values.length <= 0)
       throw new IllegalStateException("Must contain at least one value");
     return values;
-  }
-
-  @Override
-  StringSeries filter(int[] fromIndex) {
-    String[] values = new String[fromIndex.length];
-    for(int i=0; i<fromIndex.length; i++) {
-      values[i] = this.values[fromIndex[i]];
-    }
-    return new StringSeries(values);
   }
 
   static final class StringSortTuple {

@@ -6,6 +6,8 @@ import org.apache.commons.lang.math.NumberUtils;
 
 
 public final class BooleanSeries extends Series {
+  public static final boolean NULL_VALUE = false;
+
   boolean[] values;
 
   @FunctionalInterface
@@ -42,32 +44,8 @@ public final class BooleanSeries extends Series {
     }
   }
 
-  BooleanSeries(boolean[] values) {
-    this.values = Arrays.copyOf(values, values.length);
-  }
-
-  BooleanSeries(double[] values) {
-    this.values = new boolean[values.length];
-    for(int i=0; i<values.length; i++) {
-      this.values[i] = values[i] != 0.0d;
-    }
-  }
-
-  BooleanSeries(long[] values) {
-    this.values = new boolean[values.length];
-    for(int i=0; i<values.length; i++) {
-      this.values[i] = values[i] != 0l;
-    }
-  }
-
-  BooleanSeries(String[] values) {
-    this.values = new boolean[values.length];
-    for(int i=0; i<values.length; i++) {
-      if(NumberUtils.isNumber(values[i]))
-        this.values[i] = Double.parseDouble(values[i]) != 0.0d;
-      else
-        this.values[i] = Boolean.parseBoolean(values[i]);
-    }
+  BooleanSeries(boolean... values) {
+    this.values = values;
   }
 
   @Override
@@ -77,22 +55,22 @@ public final class BooleanSeries extends Series {
 
   @Override
   public DoubleSeries toDoubles() {
-    return new DoubleSeries(this.values);
+    return DataFrame.toDoubles(this);
   }
 
   @Override
   public LongSeries toLongs() {
-    return new LongSeries(this.values);
+    return DataFrame.toLongs(this);
   }
 
   @Override
   public BooleanSeries toBooleans() {
-    return this;
+    return DataFrame.toBooleans(this);
   }
 
   @Override
   public StringSeries toStrings() {
-    return new StringSeries(this.values);
+    return DataFrame.toStrings(this);
   }
 
   @Override
@@ -172,26 +150,13 @@ public final class BooleanSeries extends Series {
   }
 
   @Override
-  BooleanSeries reorder(int[] toIndex) {
-    int len = this.values.length;
-    if(toIndex.length != len)
-      throw new IllegalArgumentException("toIndex size does not equal series size");
-
-    boolean[] values = new boolean[len];
-    for(int i=0; i<len; i++) {
-      values[toIndex[i]] = this.values[i];
-    }
-    return new BooleanSeries(values);
-  }
-
-  @Override
   public BooleanSeries sort() {
     boolean[] values = new boolean[this.values.length];
     int count_false = 0;
 
     // count true
-    for(int i=0; i<this.values.length; i++) {
-      if(!this.values[i])
+    for(boolean b : this.values) {
+      if(!b)
         count_false++;
     }
 
@@ -217,7 +182,7 @@ public final class BooleanSeries extends Series {
   // TODO bucketsBy...
 
   public BooleanSeries groupBy(List<Bucket> buckets, BooleanBatchFunction grouper) {
-    return this.groupBy(buckets, false, grouper);
+    return this.groupBy(buckets, NULL_VALUE, grouper);
   }
 
   public BooleanSeries groupBy(List<Bucket> buckets, boolean nullValue, BooleanBatchFunction grouper) {
@@ -242,6 +207,19 @@ public final class BooleanSeries extends Series {
   }
 
   @Override
+  public BooleanSeries shift(int offset) {
+    boolean[] values = new boolean[this.values.length];
+    if(offset >= 0) {
+      Arrays.fill(values, 0, Math.min(offset, values.length), NULL_VALUE);
+      System.arraycopy(this.values, 0, values, Math.min(offset, values.length), Math.max(values.length - offset, 0));
+    } else {
+      System.arraycopy(this.values, Math.min(-offset, values.length), values, 0, Math.max(values.length + offset, 0));
+      Arrays.fill(values, Math.max(values.length + offset, 0), Math.min(-offset, values.length), NULL_VALUE);
+    }
+    return new BooleanSeries(values);
+  }
+
+  @Override
   BooleanSeries filter(int[] fromIndex) {
     boolean[] values = new boolean[fromIndex.length];
     for(int i=0; i<fromIndex.length; i++) {
@@ -250,10 +228,17 @@ public final class BooleanSeries extends Series {
     return new BooleanSeries(values);
   }
 
-  private static boolean[] assertNotEmpty(boolean[] values) {
-    if(values.length <= 0)
-      throw new IllegalStateException("Must contain at least one value");
-    return values;
+  @Override
+  BooleanSeries reorder(int[] toIndex) {
+    int len = this.values.length;
+    if(toIndex.length != len)
+      throw new IllegalArgumentException("toIndex size does not equal series size");
+
+    boolean[] values = new boolean[len];
+    for(int i=0; i<len; i++) {
+      values[toIndex[i]] = this.values[i];
+    }
+    return new BooleanSeries(values);
   }
 
   @Override
@@ -274,6 +259,17 @@ public final class BooleanSeries extends Series {
     }
 
     return toIndex;
+  }
+
+  @Override
+  public boolean hasNull() {
+    return false;
+  }
+
+  private static boolean[] assertNotEmpty(boolean[] values) {
+    if(values.length <= 0)
+      throw new IllegalStateException("Must contain at least one value");
+    return values;
   }
 
 }
