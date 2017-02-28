@@ -154,7 +154,7 @@
 							<ul class="nav navbar-nav">
                 <!-- <li class=""><a href="#dashboard">Dashboard</a></li> -->
 								<li class=""><a href="#anomalies">Anomalies</a></li>
-								<!-- <li class=""><a href="#analysis">Root Cause Analysis</a></li> -->
+								<li class=""><a href="#analysis">Investigate</a></li>
 							</ul>
 
             <!-- Hidding this until it's fully fleshed out -->

@@ -33,7 +33,13 @@
               </div>
               <div class="anomaly-details-items anomaly-details-items--small">
                 <label class="label-medium-semibold">Baseline</label>
-                <span>{{baseline}}</span>
+                <span>
+                  {{#if baseline}}
+                    {{baseline}}
+                  {{else}}
+                    N/A
+                  {{/if}}
+                </span>
               </div>
             </div>
             <div class="anomaly-details-row">
@@ -63,7 +69,7 @@
                 <label class="label-medium-semibold">Status</label>
                 <span>
                   {{#if anomalyFeedback}}
-                    Resolved ({anomalyStatus}})
+                    Resolved ({{anomalyFeedback}})
                   {{else}}
                     Not Resolved
                   {{/if}}
