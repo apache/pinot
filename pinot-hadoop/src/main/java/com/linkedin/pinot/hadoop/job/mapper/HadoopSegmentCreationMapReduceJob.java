@@ -15,9 +15,28 @@
  */
 package com.linkedin.pinot.hadoop.job.mapper;
 
+import com.linkedin.pinot.common.data.DimensionFieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.MetricFieldSpec;
+import com.linkedin.pinot.common.data.TimeFieldSpec;
+import com.linkedin.pinot.common.data.TimeGranularitySpec;
+import com.linkedin.pinot.core.data.readers.AvroRecordReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import org.apache.avro.file.DataFileStream;
+import org.apache.avro.generic.GenericData;
+import org.apache.avro.generic.GenericDatumReader;
+import org.apache.avro.generic.GenericRecord;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.Predicate;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -120,7 +139,13 @@ public class HadoopSegmentCreationMapReduceJob {
         throw new RuntimeException("Input to the mapper is malformed, please contact the pinot team");
       }
       _inputFilePath = lineSplits[1].trim();
-      Schema schema = Schema.fromString(context.getConfiguration().get("data.schema"));
+
+      Schema schema = new Schema();
+      try {
+        schema = getSchema(context);
+      } catch (Exception e) {
+        LOGGER.info("Could not get schema");
+      }
 
       LOGGER.info("*********************************************************************");
       LOGGER.info("input data file path : {}", _inputFilePath);
@@ -215,6 +240,134 @@ public class HadoopSegmentCreationMapReduceJob {
           break;
       }
       return readerConfig;
+    }
+
+    protected Schema getSchema(Context context) throws Exception {
+      return Schema.fromString(context.getConfiguration().get("data.schema"));
+    }
+
+    protected Schema deriveAvroSchema(String avroFilePath, String currentDiskWorkDir, String timeColumnName,
+        String timeType, List<String> dimensionList, List<String> metricsList) throws Exception {
+
+      final FileSystem fs = FileSystem.get(new Configuration());
+      final Path hdfsAvroPath = new Path(avroFilePath);
+      final File avroPath = new File(currentDiskWorkDir, "avro");
+
+      if (!avroPath.exists()) {
+        avroPath.mkdir();
+      }
+      if (!(new File(avroPath, hdfsAvroPath.getName()).exists())) {
+        final Path localAvroPath = new Path(avroPath + "/" + hdfsAvroPath.getName());
+        LOGGER.info("Copy from " + hdfsAvroPath + " to " + localAvroPath);
+        fs.copyToLocalFile(hdfsAvroPath, localAvroPath);
+      }
+      DataFileStream<GenericRecord> avroStream =
+          new DataFileStream<GenericRecord>(new FileInputStream(new File(avroPath, hdfsAvroPath.getName())), new GenericDatumReader<GenericRecord>());
+
+      org.apache.avro.Schema avroSchema = avroStream.getSchema();
+
+      avroStream.close();
+      final List<org.apache.avro.Schema.Field> inputFieldList = avroSchema.getFields();
+      final Set<String> inputFieldNames = new HashSet<String>(inputFieldList.size());
+      for (org.apache.avro.Schema.Field inputField : inputFieldList) {
+        inputFieldNames.add(inputField.name());
+      }
+
+      if (dimensionList.isEmpty() && metricsList.isEmpty()) {
+          dimensionList.addAll(inputFieldNames);
+          LOGGER.info("Dimension list not found: Added all avro fields as dimemsions:" + dimensionList);
+      } else {
+        // Metrics and/or dimensions are specified.
+        Set<String> specifiedFieldNames = new HashSet<String>(dimensionList.size() + metricsList.size());
+        for (String fieldName : dimensionList) {
+          specifiedFieldNames.add(fieldName);
+        }
+        for (String fieldName : metricsList) {
+          specifiedFieldNames.add(fieldName);
+        }
+        if (timeColumnName != null) {
+          specifiedFieldNames.add(timeColumnName);
+        }
+        if (!specifiedFieldNames.equals(inputFieldNames)) {
+          for (String fieldName : inputFieldNames) {
+            if (!specifiedFieldNames.contains(fieldName)) {
+              String msg = "Field " + fieldName + " in Avro, but not specified. V1 segments will differ from V2 segments";
+              // If you see this exception, then add this field to one of metric or dimension list and rerun the job.
+              throw new RuntimeException(msg);
+            }
+          }
+        }
+      }
+      // TODO Check if metrics list has some multi-dimension fields and disallow it.
+
+      Schema schema = new Schema();
+
+      for (String dimension : dimensionList) {
+        try {
+          if (dimension.equals(timeColumnName)) {
+            // We will add the time column below after adding all the other dimensions and metrics
+            continue;
+          }
+          org.apache.avro.Schema.Field field = avroSchema.getField(dimension);
+
+          if (field == null) {
+            LOGGER
+                .error("Cannot find dimension field " + dimension + " in avro schema, does it exist in the source data?");
+            throw new RuntimeException("Unknown Avro field " + dimension);
+          }
+
+          FieldSpec.DataType pinotDataType = AvroRecordReader.getColumnType(field);
+          FieldSpec spec = new DimensionFieldSpec();
+          spec.setName(dimension);
+          spec.setDataType(pinotDataType);
+
+          org.apache.avro.Schema fieldSchema = field.schema();
+          if (fieldSchema.getType() == org.apache.avro.Schema.Type.UNION) {
+            if ((fieldSchema).getType() == org.apache.avro.Schema.Type.UNION) {
+              fieldSchema = ((org.apache.avro.Schema) CollectionUtils.find(fieldSchema.getTypes(), new Predicate() {
+                @Override
+                public boolean evaluate(Object object) {
+                  return ((org.apache.avro.Schema) object).getType() != org.apache.avro.Schema.Type.NULL;
+                }
+              }));
+            }
+          }
+          spec.setSingleValueField(!(fieldSchema.getType() == org.apache.avro.Schema.Type.ARRAY));
+          schema.addField(spec);
+        } catch (Exception e) {
+          String errMsg = "Unable to add field '" + dimension + "' as a dimension field";
+          LOGGER.error(errMsg);
+          throw new RuntimeException(errMsg, e);
+        }
+      }
+
+      for (String metric : metricsList) {
+        try {
+          FieldSpec spec = new MetricFieldSpec();
+          org.apache.avro.Schema.Field field = avroSchema.getField(metric);
+
+          if (field == null) {
+            LOGGER.error("Cannot find metric field " + metric + " in avro schema, does it exist in the source data?");
+            throw new RuntimeException("Unknown Avro field " + metric);
+          }
+          spec.setDataType(AvroRecordReader.getColumnType(field));
+          spec.setName(metric);
+          spec.setSingleValueField(true);
+          schema.addField(spec);
+        } catch (Exception e) {
+          String errMsg = "Unable to add field '" + metric + "' as a metric field";
+          LOGGER.error(errMsg);
+          throw new RuntimeException(errMsg, e);
+        }
+      }
+
+        TimeGranularitySpec incoming =
+            new TimeGranularitySpec(AvroRecordReader.getColumnType(avroSchema.getField(timeColumnName)), TimeUnit
+                .valueOf(timeType.toUpperCase()), timeColumnName);
+        TimeGranularitySpec outgoing =
+            new TimeGranularitySpec(AvroRecordReader.getColumnType(avroSchema.getField(timeColumnName)), TimeUnit.valueOf(timeType.toUpperCase()), timeColumnName);
+        schema.addField(new TimeFieldSpec(incoming, outgoing));
+      return schema;
     }
 
     private FileFormat getFileFormat(String dataFilePath) {
