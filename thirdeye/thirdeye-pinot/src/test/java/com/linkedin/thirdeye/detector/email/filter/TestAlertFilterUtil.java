@@ -4,7 +4,7 @@ import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.ArrayList;
 import java.util.List;
-import org.junit.Test;
+import org.testng.annotations.Test;
 
 import static com.linkedin.thirdeye.constant.AnomalyFeedbackType.*;
 import static org.junit.Assert.*;
