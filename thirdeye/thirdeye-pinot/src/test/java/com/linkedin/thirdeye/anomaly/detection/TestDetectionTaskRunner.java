@@ -34,14 +34,5 @@ public class TestDetectionTaskRunner {
 
   }
 
-  @Test
-  void testCompletenessCheckAssertPass() {
-    runner.assertCompletenessCheck("dataset1");
-  }
-
-  @Test(expectedExceptions = IllegalStateException.class)
-  void testCompletenessCheckAssertFail() {
-    runner.assertCompletenessCheck("dataset0");
-  }
 
 }

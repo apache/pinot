@@ -19,7 +19,6 @@ import java.util.concurrent.TimeUnit;
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
-import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -33,8 +32,6 @@ import org.apache.commons.lang.NullArgumentException;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.format.ISODateTimeFormat;
-import org.quartz.SchedulerException;
-
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
@@ -80,15 +77,15 @@ public class DetectionJobResource {
   @Path("/{id}/ad-hoc")
   public Response adHoc(@PathParam("id") Long id, @QueryParam("start") String startTimeIso,
       @QueryParam("end") String endTimeIso) throws Exception {
-    DateTime startTime = null;
-    DateTime endTime = null;
+    Long startTime = null;
+    Long endTime = null;
     if (StringUtils.isNotBlank(startTimeIso)) {
-      startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso);
+      startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso).getMillis();
     }
     if (StringUtils.isNotBlank(endTimeIso)) {
-      endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso);
+      endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso).getMillis();
     }
-    detectionJobScheduler.runAdHoc(id, startTime, endTime);
+    detectionJobScheduler.runAnomalyFunction(id, startTime, endTime);
     return Response.ok().build();
   }
 

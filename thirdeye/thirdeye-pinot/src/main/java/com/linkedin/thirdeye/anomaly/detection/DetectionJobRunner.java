@@ -1,9 +1,7 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
 import com.linkedin.thirdeye.client.DAORegistry;
-import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -11,9 +9,6 @@ import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
-import org.quartz.Job;
-import org.quartz.JobExecutionContext;
-import org.quartz.JobExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,18 +27,11 @@ import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
-public class DetectionJobRunner implements Job {
+public class DetectionJobRunner {
 
   private static final Logger LOG = LoggerFactory.getLogger(DetectionJobRunner.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-
-  public static final String DETECTION_JOB_CONTEXT = "DETECTION_JOB_CONTEXT";
-  public static final String DETECTION_JOB_MONITORING_WINDOW_START_TIME = "DETECTION_JOB_MONITORING_WINDOW_START_TIME";
-  public static final String DETECTION_JOB_MONITORING_WINDOW_END_TIME = "DETECTION_JOB_MONITORING_WINDOW_END_TIME";
-
   private final static DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
-
-  private DetectionJobContext detectionJobContext;
 
   private TaskGenerator taskGenerator;
 
@@ -51,54 +39,47 @@ public class DetectionJobRunner implements Job {
     taskGenerator = new TaskGenerator();
   }
 
-  @Override
-  public void execute(JobExecutionContext jobExecutionContext) throws JobExecutionException {
-    LOG.info("Running " + jobExecutionContext.getJobDetail().getKey().toString());
 
-    detectionJobContext = (DetectionJobContext) jobExecutionContext.getJobDetail().getJobDataMap()
-        .get(DETECTION_JOB_CONTEXT);
-    long anomalyFunctionId = detectionJobContext.getAnomalyFunctionId();
+  public Long run(DetectionJobContext detectionJobContext) {
 
-    AnomalyFunctionDTO anomalyFunctionSpec = getAnomalyFunctionSpec(anomalyFunctionId);
-    if (anomalyFunctionSpec == null) {
-      LOG.error("AnomalyFunction with id {} does not exist.. Exiting from job execution", anomalyFunctionId);
+    long functionId = detectionJobContext.getAnomalyFunctionId();
+    AnomalyFunctionDTO anomalyFunction = DAO_REGISTRY.getAnomalyFunctionDAO().findById(functionId);
+    DateTime monitoringWindowStartTime = null;
+    DateTime monitoringWindowEndTime = null;
+    Long startTime = detectionJobContext.getStartTime();
+    Long endTime = detectionJobContext.getEndTime();
+
+    if (endTime == null) {
+      long delayMillis = 0;
+      if (anomalyFunction.getWindowDelay() != null) {
+        delayMillis = TimeUnit.MILLISECONDS.convert(anomalyFunction.getWindowDelay(), anomalyFunction.getWindowDelayUnit());
+      }
+      monitoringWindowEndTime = new DateTime().minus(delayMillis);
     } else {
-      detectionJobContext.setAnomalyFunctionSpec(anomalyFunctionSpec);
-
-      DateTime monitoringWindowStartTime =
-          (DateTime) jobExecutionContext.getJobDetail().getJobDataMap().get(DETECTION_JOB_MONITORING_WINDOW_START_TIME);
-      DateTime monitoringWindowEndTime =
-          (DateTime) jobExecutionContext.getJobDetail().getJobDataMap().get(DETECTION_JOB_MONITORING_WINDOW_END_TIME);
-
-      // Compute window end
-      if (monitoringWindowEndTime == null) {
-        long delayMillis = 0;
-        if (anomalyFunctionSpec.getWindowDelay() != null) {
-          delayMillis = TimeUnit.MILLISECONDS.convert(anomalyFunctionSpec.getWindowDelay(), anomalyFunctionSpec.getWindowDelayUnit());
-        }
-        Date scheduledFireTime = jobExecutionContext.getScheduledFireTime();
-        monitoringWindowEndTime = new DateTime(scheduledFireTime).minus(delayMillis);
-      }
-
-      // Compute window start according to window end
-      if (monitoringWindowStartTime == null) {
-        int windowSize = anomalyFunctionSpec.getWindowSize();
-        TimeUnit windowUnit = anomalyFunctionSpec.getWindowUnit();
-        long windowMillis = TimeUnit.MILLISECONDS.convert(windowSize, windowUnit);
-        monitoringWindowStartTime = monitoringWindowEndTime.minus(windowMillis);
-      }
-
-      monitoringWindowStartTime = alignTimestampsToDataTimezone(monitoringWindowStartTime, anomalyFunctionSpec.getCollection());
-      monitoringWindowEndTime = alignTimestampsToDataTimezone(monitoringWindowEndTime, anomalyFunctionSpec.getCollection());
-
-      // write to anomaly_jobs
-      Long jobExecutionId = createJob(monitoringWindowStartTime, monitoringWindowEndTime);
-      detectionJobContext.setJobExecutionId(jobExecutionId);
-
-      // write to anomaly_tasks
-      List<Long> taskIds = createTasks(monitoringWindowStartTime, monitoringWindowEndTime);
+      monitoringWindowEndTime = new DateTime(endTime);
     }
+    if (startTime == null) {
+      int windowSize = anomalyFunction.getWindowSize();
+      TimeUnit windowUnit = anomalyFunction.getWindowUnit();
+      long windowMillis = TimeUnit.MILLISECONDS.convert(windowSize, windowUnit);
+      monitoringWindowStartTime = monitoringWindowEndTime.minus(windowMillis);
+    } else {
+      monitoringWindowStartTime = new DateTime(startTime);
+    }
+
+    monitoringWindowStartTime = alignTimestampsToDataTimezone(monitoringWindowStartTime, anomalyFunction.getCollection());
+    monitoringWindowEndTime = alignTimestampsToDataTimezone(monitoringWindowEndTime, anomalyFunction.getCollection());
+
+    // write to anomaly_jobs
+    Long jobExecutionId = createJob(detectionJobContext.getJobName(), monitoringWindowStartTime, monitoringWindowEndTime);
+    detectionJobContext.setJobExecutionId(jobExecutionId);
+
+    // write to anomaly_tasks
+    List<Long> taskIds = createTasks(detectionJobContext, monitoringWindowStartTime, monitoringWindowEndTime);
+
+    return jobExecutionId;
   }
+
 
   private DateTime alignTimestampsToDataTimezone(DateTime inputDateTime, String collection) {
 
@@ -122,19 +103,18 @@ public class DetectionJobRunner implements Job {
     return inputDateTime;
   }
 
-  private long createJob(DateTime monitoringWindowStartTime, DateTime monitoringWindowEndTime) {
+  private long createJob(String jobName, DateTime monitoringWindowStartTime, DateTime monitoringWindowEndTime) {
     Long jobExecutionId = null;
     try {
       JobDTO jobSpec = new JobDTO();
-      jobSpec.setJobName(detectionJobContext.getJobName());
+      jobSpec.setJobName(jobName);
       jobSpec.setWindowStartTime(monitoringWindowStartTime.getMillis());
       jobSpec.setWindowEndTime(monitoringWindowEndTime.getMillis());
       jobSpec.setScheduleStartTime(System.currentTimeMillis());
       jobSpec.setStatus(JobStatus.SCHEDULED);
       jobExecutionId = DAO_REGISTRY.getJobDAO().save(jobSpec);
 
-      LOG.info("Created anomalyJobSpec {} with jobExecutionId {}", jobSpec,
-          jobExecutionId);
+      LOG.info("Created anomalyJobSpec {} with jobExecutionId {}", jobSpec, jobExecutionId);
     } catch (Exception e) {
       LOG.error("Exception in creating detection job", e);
     }
@@ -142,7 +122,8 @@ public class DetectionJobRunner implements Job {
     return jobExecutionId;
   }
 
-  private List<Long> createTasks(DateTime monitoringWindowStartTime, DateTime monitoringWindowEndTime) {
+
+  private List<Long> createTasks(DetectionJobContext detectionJobContext, DateTime monitoringWindowStartTime, DateTime monitoringWindowEndTime) {
     List<Long> taskIds = new ArrayList<>();
     try {
 
@@ -173,14 +154,7 @@ public class DetectionJobRunner implements Job {
     return taskIds;
   }
 
-  private AnomalyFunctionDTO getAnomalyFunctionSpec(Long anomalyFunctionId) {
-    AnomalyFunctionDTO anomalyFunctionSpec = null;
-    try {
-      anomalyFunctionSpec = DAO_REGISTRY.getAnomalyFunctionDAO().findById(anomalyFunctionId);
-    } catch (Exception e)  {
-      LOG.error("Exception in getting anomalyFunctionSpec by id", e);
-    }
-    return anomalyFunctionSpec;
-  }
+
+
 
 }

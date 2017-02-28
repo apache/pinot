@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.anomaly.detection;
 
 import com.linkedin.thirdeye.anomaly.job.JobConstants;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants;
+import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionStatusDTO;
@@ -9,48 +10,28 @@ import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 
 import java.text.ParseException;
-import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
-import java.util.TimeZone;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.joda.time.format.ISODateTimeFormat;
 import org.quartz.CronExpression;
-import org.quartz.CronScheduleBuilder;
-import org.quartz.CronTrigger;
-import org.quartz.JobBuilder;
-import org.quartz.JobDetail;
-import org.quartz.JobKey;
-import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
-import org.quartz.SchedulerFactory;
-import org.quartz.Trigger;
-import org.quartz.TriggerBuilder;
-import org.quartz.impl.StdSchedulerFactory;
-import org.quartz.impl.matchers.GroupMatcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.thirdeye.anomaly.job.JobContext;
-import com.linkedin.thirdeye.anomaly.job.JobScheduler;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
-import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.JobManager;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 
 /**
@@ -62,6 +43,8 @@ public class DetectionJobScheduler implements Runnable {
   private ScheduledExecutorService scheduledExecutorService;
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY  = ThirdEyeCacheRegistry.getInstance();
+  private DetectionJobRunner detectionJobRunner = new DetectionJobRunner();
+
 
   private static final int BACKFILL_MAX_RETRY = 3;
   private static final int BACKFILL_TASK_POLL_TIME = 5_000; // Period to check if a task is finished
@@ -81,25 +64,29 @@ public class DetectionJobScheduler implements Runnable {
 
     try {
 
-      DateTime currentDateTime = new DateTime();
-
       // read all anomaly functions
       LOG.info("Reading all anomaly functions");
       List<AnomalyFunctionDTO> anomalyFunctions = DAO_REGISTRY.getAnomalyFunctionDAO().findAllActiveFunctions();
 
       // for each active anomaly function
       for (AnomalyFunctionDTO anomalyFunction : anomalyFunctions) {
+        LOG.info("Function {}", anomalyFunction);
 
         long functionId = anomalyFunction.getId();
         String dataset = anomalyFunction.getCollection();
         DatasetConfigDTO datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(dataset);
+        DateTimeZone dateTimeZone = Utils.getDataTimeZone(dataset);
+        DateTime currentDateTime = new DateTime(dateTimeZone);
 
         // find last entry into detectionStatus table, for this function
         DetectionStatusDTO lastEntryForFunction = DAO_REGISTRY.getDetectionStatusDAO().
             findLatestEntryForFunctionId(functionId);
+        LOG.info("Last entry for function {} is {}", functionId, lastEntryForFunction);
 
         // calculate entries from last entry to current time
-        Map<String, Long> newEntries = getNewEntries(lastEntryForFunction, anomalyFunction);
+        // TODO: this should understand MINUTE level granularity as well - make it a function of 'frequency' (new field in anomaly function)
+        Map<String, Long> newEntries = DetectionJobSchedulerUtils.getNewEntries(currentDateTime, lastEntryForFunction,
+            datasetConfig, dateTimeZone);
 
         // create these entries
         for (Entry<String, Long> entry : newEntries.entrySet()) {
@@ -115,20 +102,21 @@ public class DetectionJobScheduler implements Runnable {
         List<DetectionStatusDTO> entriesInLast3Days = DAO_REGISTRY.getDetectionStatusDAO().
             findAllInTimeRangeForFunctionAndDetectionRun(currentDateTime.minusDays(3).getMillis(),
                 currentDateTime.getMillis(), functionId, false);
+        LOG.info("Entries in last 3 days {}", entriesInLast3Days);
 
         // for each entry
         for (DetectionStatusDTO detectionStatus : entriesInLast3Days) {
 
-          // check availability for monitoring window - delay
-          long endTime = 0;
-          long startTime = 0;
-          List<DataCompletenessConfigDTO> incompleteTimePeriods = DAO_REGISTRY.getDataCompletenessConfigDAO().
-            findAllByDatasetAndInTimeRangeAndStatus(dataset, startTime, endTime, false);
+          long dateToCheck = detectionStatus.getDateToCheckInMS();
+          LOG.info("Entry : {}", detectionStatus);
 
-          // if available, run the function, and mark as isRun = true
-          if (incompleteTimePeriods.size() == 0) {
-            runAnomalyFunction(anomalyFunction, startTime, endTime);
-          }
+          // check availability for monitoring window - delay
+          long endTime = dateToCheck - TimeUnit.MILLISECONDS.convert(anomalyFunction.getWindowDelay(), anomalyFunction.getWindowDelayUnit());
+          long startTime = endTime - TimeUnit.MILLISECONDS.convert(anomalyFunction.getWindowSize(), anomalyFunction.getWindowUnit());
+          LOG.info("Checking start:{} {} to end:{} {}", startTime, new DateTime(startTime, dateTimeZone), endTime, new DateTime(endTime, dateTimeZone));
+
+          long jobExecutionId = runAnomalyFunctionAndUpdateDetectionStatus(functionId, startTime, endTime, detectionStatus);
+          LOG.info("Job Execution Id {}", jobExecutionId);
         }
       }
     } catch (Exception e) {
@@ -136,31 +124,74 @@ public class DetectionJobScheduler implements Runnable {
     }
   }
 
-  private void runAnomalyFunction(AnomalyFunctionDTO anomalyFunction, long startTime, long endTime) {
-    // TODO Auto-generated method stub
+  private Long runAnomalyFunctionAndUpdateDetectionStatus(long functionId, long startTime, long endTime, DetectionStatusDTO detectionStatus) {
+    Long jobExecutionId = runAnomalyFunction(functionId, startTime, endTime);
 
+    if (jobExecutionId != -1) {
+      detectionStatus.setDetectionRun(true);
+      DAO_REGISTRY.getDetectionStatusDAO().update(detectionStatus);
+    }
+    return jobExecutionId;
   }
 
+  public Long runAnomalyFunction(Long functionId, long startTime, long endTime) {
+    LOG.info("Running anomaly function {} for window {} ({}) to {} ({})", functionId, startTime,
+        new DateTime(startTime), endTime, new DateTime(endTime));
 
-  private Map<String, Long> getNewEntries(DetectionStatusDTO lastEntryForFunction, AnomalyFunctionDTO anomalyFunction) {
+    AnomalyFunctionDTO anomalyFunction = DAO_REGISTRY.getAnomalyFunctionDAO().findById(functionId);
 
-    Map<String, Long> newEntries = new HashMap<>();
+    String dataset = anomalyFunction.getCollection();
+    DatasetConfigDTO datasetConfig = null;
+    try {
+      datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(dataset);
+    } catch (ExecutionException e) {
+      LOG.error("Exception in fetching dataset config", e);
+    }
+    Long jobExecutionId = -1L;
+    if (datasetConfig.isRequiresCompletenessCheck()) {
+      LOG.info("Checking for completeness for dataset {} and function {}", dataset, functionId);
+      List<DataCompletenessConfigDTO> incompleteTimePeriods = DAO_REGISTRY.getDataCompletenessConfigDAO().
+          findAllByDatasetAndInTimeRangeAndStatus(dataset, startTime, endTime, false);
+      LOG.info("Incomplete periods {}", incompleteTimePeriods);
+      List<DataCompletenessConfigDTO> completeTimePeriods = DAO_REGISTRY.getDataCompletenessConfigDAO().
+          findAllByDatasetAndInTimeRangeAndStatus(dataset, startTime, endTime, true);
+      LOG.info("Complete periods {}", completeTimePeriods);
+      long expectedCompleteBuckets = DetectionJobSchedulerUtils.getExpectedCompleteBuckets(datasetConfig, startTime, endTime);
+      LOG.info("Num complete periods: {} Expected num buckets:{}", completeTimePeriods.size(), expectedCompleteBuckets);
 
-    // get current hour/day, depending on granularity of dataset
+      // if available, run the function, and mark as isRun = true
+      if (incompleteTimePeriods.size() == 0 && completeTimePeriods.size() == expectedCompleteBuckets) {
+        LOG.info("Found complete buckets, running anomaly detection for function {} from {} ({}) to {} ({})",
+            functionId, startTime, new DateTime(startTime), endTime, new DateTime(endTime));
+        jobExecutionId = setDetectionContextAndRunAnomalyFunction(anomalyFunction, startTime, endTime);
+      } else {
+        LOG.warn("Data incomplete for monitoring window {} ({}) to {} ({}), skipping anomaly detection",
+            startTime, new DateTime(startTime), endTime, new DateTime(endTime));
+      }
+    } else {
+      LOG.info("No completeness check required, running anomaly detection for function {} from {} ({}) to {} ({})",
+            functionId, startTime, new DateTime(startTime), endTime, new DateTime(endTime));
+      jobExecutionId = setDetectionContextAndRunAnomalyFunction(anomalyFunction, startTime, endTime);
+    }
 
-    // get current hour/day from lastEntry
-
-    // calculate missing entries, populate in map
-
-    return newEntries;
+    return jobExecutionId;
   }
 
+  private Long setDetectionContextAndRunAnomalyFunction(AnomalyFunctionDTO anomalyFunction, Long startTime, Long endTime) {
+    DetectionJobContext detectionJobContext = new DetectionJobContext();
+    detectionJobContext.setAnomalyFunctionId(anomalyFunction.getId());
+    detectionJobContext.setAnomalyFunctionSpec(anomalyFunction);
+    detectionJobContext.setJobName(DetectionJobSchedulerUtils.createJobName(anomalyFunction, startTime, endTime));
+    detectionJobContext.setStartTime(startTime);
+    detectionJobContext.setEndTime(endTime);
+    Long jobExecutionId = detectionJobRunner.run(detectionJobContext);
+    LOG.info("Created job {}", jobExecutionId);
+    return jobExecutionId;
+  }
 
   public void shutdown() throws SchedulerException{
     scheduledExecutorService.shutdown();
   }
-
-
 
   /**
    * Sequentially performs anomaly detection for all the monitoring windows that are located between backfillStartTime
@@ -218,10 +249,10 @@ public class DetectionJobScheduler implements Runnable {
         String monitoringWindowEnd = ISODateTimeFormat.dateHourMinute().print(currentEnd);
         LOG.info("Running adhoc function {} for range {} to {}", functionId, monitoringWindowStart, monitoringWindowEnd);
 
-        String jobKey = runAdHoc(functionId, currentStart, currentEnd);
+        Long jobExecutionId = runAnomalyFunction(functionId, currentStart.getMillis(), currentEnd.getMillis());
 
         // Synchronously and periodically check if job is done
-        boolean status = waitUntilJobIsDone(jobKey);
+        boolean status = waitUntilJobIsDone(jobExecutionId);
 
         if (Thread.currentThread().isInterrupted()) {
           LOG.info("Terminating adhoc function {}. Last executed job ranges {} to {}.", functionId, currentStart,
@@ -245,11 +276,6 @@ public class DetectionJobScheduler implements Runnable {
     } finally {
       existingBackfillJobs.remove(backfillKey, Thread.currentThread());
     }
-  }
-
-  String runAdHoc(long functionId, DateTime currentStart, DateTime currentEnd) {
-    // TODO Auto-generated method stub
-    return null;
   }
 
 
@@ -315,12 +341,13 @@ public class DetectionJobScheduler implements Runnable {
    * Returns the job of the given name with retries. This method is used to get the job that is just inserted to database
    *
    * @param jobName
+   * @param jobExecutionId
    * @return
    */
-  private JobDTO tryToGetJob(String jobName) {
+  private JobDTO tryToGetJob(Long jobExecutionId) {
     JobDTO job = null;
     for (int i = 0; i < BACKFILL_MAX_RETRY; ++i) {
-      job = DAO_REGISTRY.getJobDAO().findLatestScheduledJobByName(jobName);
+      job = DAO_REGISTRY.getJobDAO().findById(jobExecutionId);
       if (job == null) {
         sleepSilently(BACKFILL_TASK_POLL_TIME);
         if (Thread.currentThread().interrupted()) {
@@ -338,9 +365,9 @@ public class DetectionJobScheduler implements Runnable {
    * @param jobName
    * @return false if any one of its tasks is FAILED or thread is interrupted.
    */
-  private boolean waitUntilJobIsDone(String jobName) {
+  private boolean waitUntilJobIsDone(Long jobExecutionId) {
     // A new job may not be stored to database in time, so we try to read the job BACKFILL_MAX_RETRY times
-    JobDTO job = tryToGetJob(jobName);
+    JobDTO job = tryToGetJob(jobExecutionId);
 
     if (job == null || job.getStatus() != JobConstants.JobStatus.SCHEDULED) {
       return false;

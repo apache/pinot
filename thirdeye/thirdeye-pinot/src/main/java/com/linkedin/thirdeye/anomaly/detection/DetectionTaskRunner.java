@@ -82,11 +82,6 @@ public class DetectionTaskRunner implements TaskRunner {
               .toString());
     }
 
-    if(datasetConfig.isRequiresCompletenessCheck()) {
-      LOG.info("Dataset {} requires completeness check", dataset);
-      assertCompletenessCheck(dataset);
-    }
-
     LOG.info(
         "Running anomaly detection job with metricFunction: [{}], topic metric [{}], collection: [{}]",
         anomalyFunctionSpec.getFunctionName(), anomalyFunctionSpec.getTopicMetric(),
@@ -137,19 +132,6 @@ public class DetectionTaskRunner implements TaskRunner {
     return taskResult;
   }
 
-  protected void assertCompletenessCheck(String dataset) {
-    List<DataCompletenessConfigDTO> completed =
-        DAO_REGISTRY.getDataCompletenessConfigDAO().findAllByDatasetAndInTimeRangeAndStatus(
-            dataset, windowStart.getMillis(), windowEnd.getMillis(), true);
-
-    LOG.debug("Found {} dataCompleteness records for dataset {} from {} to {}",
-        completed.size(), dataset, windowStart.getMillis(), windowEnd.getMillis());
-
-    if (completed.size() <= 0) {
-      LOG.warn("Dataset {} is incomplete. Skipping anomaly detection.", dataset);
-      throw new IllegalStateException(String.format("Dataset %s incomplete", dataset));
-    }
-  }
 
   private void exploreDimensionsAndAnalyze(Map<DimensionKey, MetricTimeSeries> dimensionKeyMetricTimeSeriesMap) {
     int anomalyCounter = 0;

@@ -18,7 +18,7 @@ public class TestDetectionStatusManager extends AbstractManagerTestBase {
   private Long detectionStatusId2;
   private static String collection1 = "my dataset1";
   private DateTime now = new DateTime();
-  private DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern("yyyyMMddHHmm");
+  private DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern("yyyyMMddHH");
 
   @BeforeClass
   void beforeClass() {
@@ -36,64 +36,43 @@ public class TestDetectionStatusManager extends AbstractManagerTestBase {
     String dateString = dateTimeFormatter.print(now.getMillis());
     long dateMillis = dateTimeFormatter.parseMillis(dateString);
     detectionStatusId1 = detectionStatusDAO.save(getTestDetectionStatus(collection1, dateMillis, dateString, false, 1));
+    detectionStatusDAO.save(getTestDetectionStatus(collection1, dateMillis, dateString, true, 2));
 
     dateMillis = new DateTime(dateMillis).minusHours(1).getMillis();
     dateString = dateTimeFormatter.print(dateMillis);
     detectionStatusId2 = detectionStatusDAO.
         save(getTestDetectionStatus(collection1, dateMillis, dateString, true, 1));
+    detectionStatusDAO.save(getTestDetectionStatus(collection1, dateMillis, dateString, true, 2));
+
+    dateMillis = new DateTime(dateMillis).minusHours(1).getMillis();
+    dateString = dateTimeFormatter.print(dateMillis);
+    detectionStatusDAO.save(getTestDetectionStatus(collection1, dateMillis, dateString, true, 2));
 
     Assert.assertNotNull(detectionStatusId1);
     Assert.assertNotNull(detectionStatusId2);
 
     List<DetectionStatusDTO> detectionStatusDTOs = detectionStatusDAO.findAll();
-    Assert.assertEquals(detectionStatusDTOs.size(), 2);
+    Assert.assertEquals(detectionStatusDTOs.size(), 5);
   }
 
-  /*@Test(dependsOnMethods = {"testCreate"})
+  @Test(dependsOnMethods = {"testCreate"})
   public void testFind() {
-    List<DataCompletenessConfigDTO> dataCompletenessConfigDTOs =
-        dataCompletenessConfigDAO.findAllByDataset(collection1);
-    Assert.assertEquals(dataCompletenessConfigDTOs.get(0).getDataset(), collection1);
+    DetectionStatusDTO detectionStatusDTO = detectionStatusDAO.findLatestEntryForFunctionId(1);
+    String dateString = dateTimeFormatter.print(now.getMillis());
+    Assert.assertEquals(detectionStatusDTO.getFunctionId(), 1);
+    Assert.assertEquals(detectionStatusDTO.getDateToCheckInSDF(), dateString);
+    Assert.assertEquals(detectionStatusDTO.isDetectionRun(), false);
 
-    dataCompletenessConfigDTOs = dataCompletenessConfigDAO.findAllInTimeRange(now.minusMinutes(30).getMillis(),
-        new DateTime().getMillis());
-    Assert.assertEquals(dataCompletenessConfigDTOs.size(), 1);
+    long dateMillis = dateTimeFormatter.parseMillis(dateString);
+    dateMillis = new DateTime(dateMillis).minusHours(1).getMillis();
 
-    dataCompletenessConfigDTOs = dataCompletenessConfigDAO.findAllByTimeOlderThan(new DateTime().getMillis());
-    Assert.assertEquals(dataCompletenessConfigDTOs.size(), 2);
-
-    dataCompletenessConfigDTOs =
-        dataCompletenessConfigDAO.findAllByTimeOlderThanAndStatus(new DateTime().getMillis(), true);
-    Assert.assertEquals(dataCompletenessConfigDTOs.size(), 1);
-
-    DataCompletenessConfigDTO config =
-        dataCompletenessConfigDAO.findByDatasetAndDateSDF(collection1, dateTimeFormatter.print(now.getMillis()));
-    Assert.assertNotNull(config);
-    Assert.assertEquals(config.getId(), dataCompletenessConfigId1);
-
-    config = dataCompletenessConfigDAO.findByDatasetAndDateMS(collection1, now.minusHours(1).getMillis());
-    Assert.assertNotNull(config);
-    Assert.assertEquals(config.getId(), dataCompletenessConfigId2);
-
+    List<DetectionStatusDTO> detectionStatusDTOs = detectionStatusDAO.
+        findAllInTimeRangeForFunctionAndDetectionRun(dateMillis, now.getMillis(), 2, true);
+    Assert.assertEquals(detectionStatusDTOs.size(), 2);
+    detectionStatusDTOs = detectionStatusDAO.
+        findAllInTimeRangeForFunctionAndDetectionRun(dateMillis, now.getMillis(), 2, false);
+    Assert.assertEquals(detectionStatusDTOs.size(), 0);
 
   }
 
-  @Test(dependsOnMethods = { "testFind" })
-  public void testUpdate() {
-    DataCompletenessConfigDTO dataCompletenessConfigDTO = dataCompletenessConfigDAO.findById(dataCompletenessConfigId2);
-    Assert.assertNotNull(dataCompletenessConfigDTO);
-    Assert.assertFalse(dataCompletenessConfigDTO.isTimedOut());
-    dataCompletenessConfigDTO.setTimedOut(true);
-    dataCompletenessConfigDAO.update(dataCompletenessConfigDTO);
-    dataCompletenessConfigDTO = dataCompletenessConfigDAO.findById(dataCompletenessConfigId2);
-    Assert.assertNotNull(dataCompletenessConfigDTO);
-    Assert.assertTrue(dataCompletenessConfigDTO.isTimedOut());
-  }
-
-  @Test(dependsOnMethods = { "testUpdate" })
-  public void testDelete() {
-    dataCompletenessConfigDAO.deleteById(dataCompletenessConfigId2);
-    DataCompletenessConfigDTO dataCompletenessConfigDTO = dataCompletenessConfigDAO.findById(dataCompletenessConfigId2);
-    Assert.assertNull(dataCompletenessConfigDTO);
-  }*/
 }

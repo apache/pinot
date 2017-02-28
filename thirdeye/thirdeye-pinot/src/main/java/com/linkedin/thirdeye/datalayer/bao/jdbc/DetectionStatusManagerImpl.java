@@ -1,6 +1,8 @@
 package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +32,13 @@ public class DetectionStatusManagerImpl extends AbstractManagerImpl<DetectionSta
         executeParameterizedSQL(FIND_BY_FUNCTION_ORDER_BY_DATE_DESC, parameterMap, DetectionStatusBean.class);
     DetectionStatusDTO result = null;
     if (CollectionUtils.isNotEmpty(list)) {
+      Collections.sort(list, new Comparator<DetectionStatusBean>() {
+
+        @Override
+        public int compare(DetectionStatusBean o1, DetectionStatusBean o2) {
+          return o2.getDateToCheckInSDF().compareTo(o1.getDateToCheckInSDF());
+        }
+      });
       result = (DetectionStatusDTO) MODEL_MAPPER.map(list.get(0), DetectionStatusDTO.class);
     }
     return result;
@@ -42,7 +51,7 @@ public class DetectionStatusManagerImpl extends AbstractManagerImpl<DetectionSta
         Predicate.EQ("functionId", functionId),
         Predicate.LE("dateToCheckInMS", endTime),
         Predicate.GE("dateToCheckInMS", startTime),
-        Predicate.EQ("detectionRun", false));
+        Predicate.EQ("detectionRun", detectionRun));
 
     List<DetectionStatusBean> list = genericPojoDao.get(predicate, DetectionStatusBean.class);
     List<DetectionStatusDTO> results = new ArrayList<>();

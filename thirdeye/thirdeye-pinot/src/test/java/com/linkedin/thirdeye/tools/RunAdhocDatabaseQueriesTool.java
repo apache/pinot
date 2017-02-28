@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.tools;
 
+import com.google.common.collect.Lists;
 import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
 
@@ -14,15 +15,20 @@ import com.linkedin.thirdeye.autoload.pinot.metrics.ConfigGenerator;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DataCompletenessConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.DetectionStatusManager;
 import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.DetectionStatusManagerImpl;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.DetectionStatusDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -47,6 +53,8 @@ public class RunAdhocDatabaseQueriesTool {
   private JobManager jobDAO;
   private TaskManager taskDAO;
   private DataCompletenessConfigManager dataCompletenessConfigDAO;
+  private DatasetConfigManager datasetConfigDAO;
+  private DetectionStatusManager detectionStatusDAO;
 
   public RunAdhocDatabaseQueriesTool(File persistenceFile)
       throws Exception {
@@ -75,6 +83,9 @@ public class RunAdhocDatabaseQueriesTool {
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.TaskManagerImpl.class);
     dataCompletenessConfigDAO = DaoProviderUtil
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.DataCompletenessConfigManagerImpl.class);
+    datasetConfigDAO = DaoProviderUtil
+        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.DatasetConfigManagerImpl.class);
+    detectionStatusDAO = DaoProviderUtil.getInstance(DetectionStatusManagerImpl.class);
   }
 
   private void toggleAnomalyFunction(Long id) {
@@ -187,6 +198,40 @@ public class RunAdhocDatabaseQueriesTool {
     }
   }
 
+  private void disableAnomalyFunctions() {
+    List<Long> functionIds = Lists.newArrayList(1053256L, 549099L, 132783L, 41L, 42L);
+    for (AnomalyFunctionDTO anomalyFunctionDTO : anomalyFunctionDAO.findAllActiveFunctions()) {
+      if (!functionIds.contains(anomalyFunctionDTO.getId())) {
+        anomalyFunctionDTO.setActive(false);
+        anomalyFunctionDAO.update(anomalyFunctionDTO);
+      }
+    }
+  }
+
+  private void addRequiresCompletenessCheck() {
+    List<String> datasets = Lists.newArrayList("feed_sessions_hourly_additive", "login_additive", "mny-ads-su-kpi-alerts", "ptrans_db_hourly_additive");
+    for (String dataset : datasets) {
+      DatasetConfigDTO dto = datasetConfigDAO.findByDataset(dataset);
+      dto.setRequiresCompletenessCheck(true);
+      datasetConfigDAO.update(dto);
+    }
+  }
+
+  private void updateDetectionRun() {
+    for (DetectionStatusDTO dto : detectionStatusDAO.findAll()) {
+      dto.setDetectionRun(false);
+      detectionStatusDAO.update(dto);
+    }
+  }
+
+  private void enableDataCompleteness() {
+    List<DataCompletenessConfigDTO> dtos = dataCompletenessConfigDAO.findAllByDataset("mny-ads-su-kpi-alerts");
+    for (DataCompletenessConfigDTO dto : dtos) {
+      dto.setDataComplete(true);
+      dataCompletenessConfigDAO.update(dto);
+    }
+  }
+
   public static void main(String[] args) throws Exception {
 
     File persistenceFile = new File(args[0]);
@@ -195,6 +240,7 @@ public class RunAdhocDatabaseQueriesTool {
       System.exit(1);
     }
     RunAdhocDatabaseQueriesTool dq = new RunAdhocDatabaseQueriesTool(persistenceFile);
+    dq.updateDetectionRun();
   }
 
 }
