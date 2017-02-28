@@ -11,9 +11,13 @@ public class AlwaysAnomalyDummy extends AnomalyFunctionEx {
 
     long start = getContext().getMonitoringWindowStart();
     long end = getContext().getMonitoringWindowEnd();
+    long interval = Long.parseLong(getConfig("interval", "3600000"));
 
     result.setContext(getContext());
-    result.addAnomaly(start, end, "always trigger anomaly");
+    for(long t=start; t<end; t+=interval) {
+      long effectiveEnd = Math.min(t + interval, end);
+      result.addAnomaly(t, effectiveEnd, "always trigger anomaly");
+    }
 
     return result;
   }

@@ -33,27 +33,19 @@ public class DetectionExJobRunner implements Job {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   public static final String DETECTION_EX_JOB_CONTEXT = "DETECTION_EX_JOB_CONTEXT";
-  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
 
   private final static DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   private DetectionExJobContext context;
 
-  private TaskGenerator taskGenerator;
-
-  public DetectionExJobRunner() {
-    taskGenerator = new TaskGenerator();
-  }
-
   @Override
   public void execute(JobExecutionContext jobExecutionContext) throws JobExecutionException {
     LOG.info("Running " + jobExecutionContext.getJobDetail().getKey().toString());
 
-    context =
-        (DetectionExJobContext) jobExecutionContext.getJobDetail().getJobDataMap().get(DETECTION_EX_JOB_CONTEXT);
+    context = (DetectionExJobContext) jobExecutionContext.getJobDetail().getJobDataMap().get(DETECTION_EX_JOB_CONTEXT);
     long anomalyFunctionId = context.getAnomalyFunctionId();
 
-    AnomalyFunctionExDTO spec = getAnomalyFunctionSpec(anomalyFunctionId);
+    AnomalyFunctionExDTO spec = DAO_REGISTRY.getAnomalyFunctionExDAO().findById(anomalyFunctionId);
     if (spec == null) {
       LOG.error("AnomalyFunction with id {} does not exist.. Exiting from job execution", anomalyFunctionId);
     } else {
@@ -79,28 +71,6 @@ public class DetectionExJobRunner implements Job {
     }
   }
 
-  private DateTime alignTimestampsToDataTimezone(DateTime inputDateTime, String collection) {
-
-    try {
-      DatasetConfigDTO datasetConfig = DAO_REGISTRY.getDatasetConfigDAO().findByDataset(collection);
-      TimeSpec timespec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
-      TimeGranularity dataGranularity = timespec.getDataGranularity();
-      String timeFormat = timespec.getFormat();
-      if (dataGranularity.getUnit().equals(TimeUnit.DAYS)) {
-        DateTimeZone dataTimeZone = Utils.getDataTimeZone(collection);
-        DateTimeFormatter inputDataDateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZone(dataTimeZone);
-
-        long inputMillis = inputDateTime.getMillis();
-        String inputDateTimeString = inputDataDateTimeFormatter.print(inputMillis);
-        long timeZoneOffsetMillis = inputDataDateTimeFormatter.parseMillis(inputDateTimeString);
-        inputDateTime = new DateTime(timeZoneOffsetMillis);
-      }
-    } catch (Exception e) {
-      LOG.error("Exception in aligning timestamp to data time zone", e);
-    }
-    return inputDateTime;
-  }
-
   private JobDTO createJob() throws Exception {
     JobDTO jobSpec = new JobDTO();
     jobSpec.setJobName(context.getJobName());
@@ -111,17 +81,22 @@ public class DetectionExJobRunner implements Job {
 
   private TaskDTO createTask() throws Exception {
     AnomalyFunctionExDTO spec = context.getAnomalyFunctionExSpec();
-    long timestamp = DateTime.now(DateTimeZone.UTC).getMillis();
-    long alignedEnd = timestamp / spec.getMonitoringWindowAlignment() * spec.getMonitoringWindowAlignment();
-    long alignedStart = alignedEnd - spec.getMonitoringWindowLookback();
 
     DetectionExTaskInfo taskInfo = new DetectionExTaskInfo();
     taskInfo.setAnomalyFunctionExSpec(spec);
     taskInfo.setJobExecutionId(spec.getId());
-    taskInfo.setMonitoringWindowStart(alignedStart);
-    taskInfo.setMonitoringWindowEnd(alignedEnd);
-
     taskInfo.setMergeWindow(context.getMergeWindow());
+
+    switch(context.getType()) {
+      case ONLINE:
+        populateTimeForOnline(taskInfo);
+        break;
+      case BACKFILL:
+        populateTimeForBackfill(taskInfo);
+        break;
+      default:
+        throw new IllegalStateException(String.format("Unknown job type '%s'", context.getType()));
+    }
 
     String taskInfoJson = OBJECT_MAPPER.writeValueAsString(taskInfo);
 
@@ -135,13 +110,20 @@ public class DetectionExJobRunner implements Job {
     return taskSpec;
   }
 
-  private AnomalyFunctionExDTO getAnomalyFunctionSpec(Long anomalyFunctionId) {
-    AnomalyFunctionExDTO spec = null;
-    try {
-      spec = DAO_REGISTRY.getAnomalyFunctionExDAO().findById(anomalyFunctionId);
-    } catch (Exception e) {
-      LOG.error("Exception in getting anomalyFunctionSpec by id", e);
-    }
-    return spec;
+  private DetectionExTaskInfo populateTimeForOnline(DetectionExTaskInfo t) {
+    AnomalyFunctionExDTO spec = context.getAnomalyFunctionExSpec();
+    long timestamp = DateTime.now(DateTimeZone.UTC).getMillis();
+    long alignedEnd = timestamp / spec.getMonitoringWindowAlignment() * spec.getMonitoringWindowAlignment();
+    long alignedStart = alignedEnd - spec.getMonitoringWindowLookback();
+
+    t.setMonitoringWindowStart(alignedStart);
+    t.setMonitoringWindowEnd(alignedEnd);
+    return t;
+  }
+
+  private DetectionExTaskInfo populateTimeForBackfill(DetectionExTaskInfo t) {
+    t.setMonitoringWindowStart(context.getMonitoringWindowStart());
+    t.setMonitoringWindowEnd(context.getMonitoringWindowEnd());
+    return t;
   }
 }

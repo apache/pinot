@@ -5,6 +5,7 @@ import com.linkedin.thirdeye.anomaly.alert.AlertJobScheduler;
 import com.linkedin.thirdeye.anomaly.alert.v2.AlertJobSchedulerV2;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobResource;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
+import com.linkedin.thirdeye.anomaly.detectionex.DetectionExJobResource;
 import com.linkedin.thirdeye.anomaly.detectionex.DetectionExJobScheduler;
 import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeExecutor;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorJobScheduler;
@@ -104,12 +105,15 @@ public class ThirdEyeAnomalyApplication
             alertFilterFactory = new AlertFilterFactory(config.getAlertFilterConfigPath());
           detectionJobScheduler = new DetectionJobScheduler();
           alertFilterAutotuneFactory = new AlertFilterAutotuneFactory(config.getFilterAutotuneConfigPath());
-          detectionJobScheduler.start();
-          environment.jersey().register(new DetectionJobResource(detectionJobScheduler, alertFilterFactory, alertFilterAutotuneFactory));
-          environment.jersey().register(new AnomalyFunctionResource(config.getFunctionConfigPath()));
-
+          detectionJobScheduler = new DetectionJobScheduler();
           detectionExJobScheduler = new DetectionExJobScheduler();
+
+          detectionJobScheduler.start();
           detectionExJobScheduler.start();
+
+          environment.jersey().register(new DetectionJobResource(detectionJobScheduler, alertFilterFactory, alertFilterAutotuneFactory));
+          environment.jersey().register(new DetectionExJobResource(detectionExJobScheduler));
+          environment.jersey().register(new AnomalyFunctionResource(config.getFunctionConfigPath()));
         }
         if (config.isMonitor()) {
           monitorJobScheduler = new MonitorJobScheduler(config.getMonitorConfiguration());

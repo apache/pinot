@@ -22,14 +22,17 @@ import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.format.ISODateTimeFormat;
 import org.quartz.SchedulerException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
-@Path("/detection-job")
+@Path("/detection-ex-job")
 @Produces(MediaType.APPLICATION_JSON)
 public class DetectionExJobResource {
+  private static final Logger LOG = LoggerFactory.getLogger(DetectionExJobResource.class);
+
   private final DetectionExJobScheduler detectionJobScheduler;
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
-  private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
 
   public DetectionExJobResource(DetectionExJobScheduler detectionJobScheduler) {
     this.detectionJobScheduler = detectionJobScheduler;
@@ -61,7 +64,7 @@ public class DetectionExJobResource {
     if (StringUtils.isNotBlank(endTimeIso)) {
       endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso);
     }
-    detectionJobScheduler.runAdHoc(id, startTime, endTime);
+    detectionJobScheduler.runBackfill(id, startTime, endTime);
     return Response.ok().build();
   }
 
@@ -159,17 +162,10 @@ public class DetectionExJobResource {
       throw new IllegalArgumentException(String.format("Skipping deactivated function %s", id));
     }
 
-    String response = null;
-
     DateTime innerStartTime = startTime;
     DateTime innerEndTime = endTime;
 
-    new Thread(new Runnable() {
-      @Override
-      public void run() {
-        detectionJobScheduler.runBackfill(functionId, innerStartTime, innerEndTime, Boolean.valueOf(isForceBackfill));
-      }
-    }).start();
+    detectionJobScheduler.runBackfill(functionId, innerStartTime, innerEndTime);
 
     return Response.ok().build();
   }
