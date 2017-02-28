@@ -177,6 +177,49 @@
   <build>
     <plugins>
       <plugin>
+        <groupId>com.github.eirslett</groupId>
+        <artifactId>frontend-maven-plugin</artifactId>
+        <!-- Latest version for Maven 2 -->
+        <version>0.0.22</version>
+        <dependencies>
+          <dependency>
+            <groupId>org.codehaus.plexus</groupId>
+            <artifactId>plexus-utils</artifactId>
+            <version>2.1</version>
+          </dependency>
+        </dependencies>
+
+        <executions>
+
+          <execution>
+            <id>install node and npm</id>
+            <goals>
+              <goal>install-node-and-npm</goal>
+            </goals>
+            <phase>generate-resources</phase>
+            <configuration>
+              <nodeVersion>v6.10.0</nodeVersion>
+              <npmVersion>3.10.0</npmVersion>
+ <!--              <workingDirectory>src/main/frontend/</workingDirectory>
+              <installDirectory>src/main/frontend/node_maven/</installDirectory> -->
+            </configuration>
+          </execution>
+
+          <execution>
+            <id>npm install</id>
+            <goals>
+              <goal>npm</goal>
+            </goals>
+            <phase>generate-resources</phase>
+            <!-- Optional configuration which provides for running any npm command -->
+            <configuration>
+              <arguments>install</arguments>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <plugin>
         <artifactId>maven-shade-plugin</artifactId>
         <version>1.7</version>
         <configuration>
