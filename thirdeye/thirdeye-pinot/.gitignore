@@ -1,3 +1,4 @@
 /.apt_generated/
-node
-node_modules
+/node/
+/node_modules/
+/etc/
