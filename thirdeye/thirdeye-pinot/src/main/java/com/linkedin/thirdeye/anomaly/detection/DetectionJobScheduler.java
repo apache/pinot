@@ -10,6 +10,7 @@ import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 
 import java.text.ParseException;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -84,9 +85,8 @@ public class DetectionJobScheduler implements Runnable {
         LOG.info("Last entry for function {} is {}", functionId, lastEntryForFunction);
 
         // calculate entries from last entry to current time
-        // TODO: this should understand MINUTE level granularity as well - make it a function of 'frequency' (new field in anomaly function)
         Map<String, Long> newEntries = DetectionJobSchedulerUtils.getNewEntries(currentDateTime, lastEntryForFunction,
-            datasetConfig, dateTimeZone);
+            anomalyFunction, datasetConfig, dateTimeZone);
 
         // create these entries
         for (Entry<String, Long> entry : newEntries.entrySet()) {
@@ -102,6 +102,7 @@ public class DetectionJobScheduler implements Runnable {
         List<DetectionStatusDTO> entriesInLast3Days = DAO_REGISTRY.getDetectionStatusDAO().
             findAllInTimeRangeForFunctionAndDetectionRun(currentDateTime.minusDays(3).getMillis(),
                 currentDateTime.getMillis(), functionId, false);
+        Collections.sort(entriesInLast3Days);
         LOG.info("Entries in last 3 days {}", entriesInLast3Days);
 
         // for each entry
@@ -128,6 +129,7 @@ public class DetectionJobScheduler implements Runnable {
     Long jobExecutionId = runAnomalyFunction(functionId, startTime, endTime);
 
     if (jobExecutionId != -1) {
+      LOG.info("Updating detection status {} to true", detectionStatus);
       detectionStatus.setDetectionRun(true);
       DAO_REGISTRY.getDetectionStatusDAO().update(detectionStatus);
     }
@@ -135,7 +137,7 @@ public class DetectionJobScheduler implements Runnable {
   }
 
   public Long runAnomalyFunction(Long functionId, long startTime, long endTime) {
-    LOG.info("Running anomaly function {} for window {} ({}) to {} ({})", functionId, startTime,
+    LOG.info("Check for anomaly function {} for window {} ({}) to {} ({})", functionId, startTime,
         new DateTime(startTime), endTime, new DateTime(endTime));
 
     AnomalyFunctionDTO anomalyFunction = DAO_REGISTRY.getAnomalyFunctionDAO().findById(functionId);
@@ -152,14 +154,17 @@ public class DetectionJobScheduler implements Runnable {
       LOG.info("Checking for completeness for dataset {} and function {}", dataset, functionId);
       List<DataCompletenessConfigDTO> incompleteTimePeriods = DAO_REGISTRY.getDataCompletenessConfigDAO().
           findAllByDatasetAndInTimeRangeAndStatus(dataset, startTime, endTime, false);
+
       LOG.info("Incomplete periods {}", incompleteTimePeriods);
       List<DataCompletenessConfigDTO> completeTimePeriods = DAO_REGISTRY.getDataCompletenessConfigDAO().
           findAllByDatasetAndInTimeRangeAndStatus(dataset, startTime, endTime, true);
       LOG.info("Complete periods {}", completeTimePeriods);
-      long expectedCompleteBuckets = DetectionJobSchedulerUtils.getExpectedCompleteBuckets(datasetConfig, startTime, endTime);
+
+      long expectedCompleteBuckets = DetectionJobSchedulerUtils.
+          getExpectedCompleteBuckets(datasetConfig, startTime, endTime);
       LOG.info("Num complete periods: {} Expected num buckets:{}", completeTimePeriods.size(), expectedCompleteBuckets);
 
-      // if available, run the function, and mark as isRun = true
+      // if available, run the function
       if (incompleteTimePeriods.size() == 0 && completeTimePeriods.size() == expectedCompleteBuckets) {
         LOG.info("Found complete buckets, running anomaly detection for function {} from {} ({}) to {} ({})",
             functionId, startTime, new DateTime(startTime), endTime, new DateTime(endTime));
@@ -167,6 +172,7 @@ public class DetectionJobScheduler implements Runnable {
       } else {
         LOG.warn("Data incomplete for monitoring window {} ({}) to {} ({}), skipping anomaly detection",
             startTime, new DateTime(startTime), endTime, new DateTime(endTime));
+        // TODO: Send email to owners/dev team
       }
     } else {
       LOG.info("No completeness check required, running anomaly detection for function {} from {} ({}) to {} ({})",

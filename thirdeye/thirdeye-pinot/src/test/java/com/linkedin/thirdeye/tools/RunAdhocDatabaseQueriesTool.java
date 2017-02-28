@@ -7,10 +7,12 @@ import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
 import java.io.File;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.autoload.pinot.metrics.ConfigGenerator;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
@@ -199,28 +201,28 @@ public class RunAdhocDatabaseQueriesTool {
   }
 
   private void disableAnomalyFunctions() {
-    List<Long> functionIds = Lists.newArrayList(1053256L, 549099L, 132783L, 41L, 42L);
-    for (AnomalyFunctionDTO anomalyFunctionDTO : anomalyFunctionDAO.findAllActiveFunctions()) {
-      if (!functionIds.contains(anomalyFunctionDTO.getId())) {
-        anomalyFunctionDTO.setActive(false);
-        anomalyFunctionDAO.update(anomalyFunctionDTO);
-      }
-    }
+    AnomalyFunctionDTO anomalyFunctionDTO = anomalyFunctionDAO.findById(41L);
+    anomalyFunctionDTO.setActive(false);
+    anomalyFunctionDAO.update(anomalyFunctionDTO);
+    anomalyFunctionDTO = anomalyFunctionDAO.findById(42L);
+    anomalyFunctionDTO.setActive(false);
+    anomalyFunctionDAO.update(anomalyFunctionDTO);
   }
 
   private void addRequiresCompletenessCheck() {
-    List<String> datasets = Lists.newArrayList("feed_sessions_hourly_additive", "login_additive", "mny-ads-su-kpi-alerts", "ptrans_db_hourly_additive");
+    List<String> datasets = Lists.newArrayList("feed_sessions_hourly_additive");
     for (String dataset : datasets) {
       DatasetConfigDTO dto = datasetConfigDAO.findByDataset(dataset);
-      dto.setRequiresCompletenessCheck(true);
+      dto.setRequiresCompletenessCheck(false);
       datasetConfigDAO.update(dto);
     }
   }
 
   private void updateDetectionRun() {
     for (DetectionStatusDTO dto : detectionStatusDAO.findAll()) {
-      dto.setDetectionRun(false);
-      detectionStatusDAO.update(dto);
+      if (dto.getId() >=2028200) {
+        detectionStatusDAO.delete(dto);
+      }
     }
   }
 

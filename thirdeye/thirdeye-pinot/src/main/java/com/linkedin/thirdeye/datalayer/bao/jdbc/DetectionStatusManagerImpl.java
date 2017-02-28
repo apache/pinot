@@ -2,11 +2,7 @@ package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-
 import org.apache.commons.collections.CollectionUtils;
 
 import com.linkedin.thirdeye.datalayer.bao.DetectionStatusManager;
@@ -17,29 +13,18 @@ import com.linkedin.thirdeye.datalayer.util.Predicate;
 public class DetectionStatusManagerImpl extends AbstractManagerImpl<DetectionStatusDTO>
     implements DetectionStatusManager {
 
-  private static final String FIND_BY_FUNCTION_ORDER_BY_DATE_DESC =
-      " WHERE functionId = :functionId order by dateToCheckInSDF desc";
-
   public DetectionStatusManagerImpl() {
     super(DetectionStatusDTO.class, DetectionStatusBean.class);
   }
 
   @Override
   public DetectionStatusDTO findLatestEntryForFunctionId(long functionId) {
-    Map<String, Object> parameterMap = new HashMap<>();
-    parameterMap.put("functionId", String.valueOf(functionId));
-    List<DetectionStatusBean> list = genericPojoDao.
-        executeParameterizedSQL(FIND_BY_FUNCTION_ORDER_BY_DATE_DESC, parameterMap, DetectionStatusBean.class);
+    Predicate predicate = Predicate.EQ("functionId", functionId);
+    List<DetectionStatusBean> list = genericPojoDao.get(predicate, DetectionStatusBean.class);
     DetectionStatusDTO result = null;
     if (CollectionUtils.isNotEmpty(list)) {
-      Collections.sort(list, new Comparator<DetectionStatusBean>() {
-
-        @Override
-        public int compare(DetectionStatusBean o1, DetectionStatusBean o2) {
-          return o2.getDateToCheckInSDF().compareTo(o1.getDateToCheckInSDF());
-        }
-      });
-      result = (DetectionStatusDTO) MODEL_MAPPER.map(list.get(0), DetectionStatusDTO.class);
+      Collections.sort(list);
+      result = (DetectionStatusDTO) MODEL_MAPPER.map(list.get(list.size() - 1), DetectionStatusDTO.class);
     }
     return result;
   }

@@ -8,7 +8,7 @@ import com.google.common.base.MoreObjects;
 /**
  * This class corresponds to data completeness config.
  */
-public class DetectionStatusBean extends AbstractBean {
+public class DetectionStatusBean extends AbstractBean implements Comparable<DetectionStatusBean>{
 
   private long functionId;
   private String dataset;
@@ -78,5 +78,10 @@ public class DetectionStatusBean extends AbstractBean {
     return MoreObjects.toStringHelper(this).add("id", getId()).add("dataset", dataset)
         .add("dateToCheckInMS", dateToCheckInMS).add("dateToCheckInSDF", dateToCheckInSDF)
         .add("functionId", functionId).add("detectionRun", detectionRun).toString();
+  }
+
+  @Override
+  public int compareTo(DetectionStatusBean o) {
+    return dateToCheckInSDF.compareTo(o.getDateToCheckInSDF());
   }
 }
