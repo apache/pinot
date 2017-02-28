@@ -100,6 +100,7 @@ public class SegmentsValidationAndRetentionConfig {
   public String getReplication() {
     return replication;
   }
+
   public int getReplicationNumber() {
     return Integer.parseInt(replication);
   }

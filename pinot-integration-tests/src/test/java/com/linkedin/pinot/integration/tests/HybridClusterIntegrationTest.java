@@ -16,6 +16,8 @@
 package com.linkedin.pinot.integration.tests;
 
 import com.google.common.util.concurrent.Uninterruptibles;
+import com.linkedin.pinot.controller.ControllerConf;
+import com.linkedin.pinot.controller.helix.ControllerTestUtils;
 import java.io.File;
 import java.sql.ResultSet;
 import java.sql.Statement;
@@ -306,7 +308,9 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     KafkaStarterUtils.createTopic(KAFKA_TOPIC, KafkaStarterUtils.DEFAULT_ZK_STR, partitionCount);
 
     // Start the Pinot cluster
-    startController(true);
+    ControllerConf config = ControllerTestUtils.getDefaultControllerConfiguration();
+    config.setTenantIsolationEnabled(true);
+    startController(config);
     startBroker();
     startServers(2);
 
