@@ -20,6 +20,7 @@
 <link href="../../assets/css/thirdeye.css" rel="stylesheet" type="text/css" />
 
 <!-- javascripts -->
+<script scr="node_modules/babel-polyfill/dist/polyfill.js"
 <script src="../../assets/js/vendor/jquery.js" type="text/javascript"></script>
 <script src="../../assets/bootstrap/js/bootstrap.min.js" type="text/javascript"></script>
 <script src="../../assets/jquery-ui/jquery-ui.min.js" type="text/javascript"></script>
