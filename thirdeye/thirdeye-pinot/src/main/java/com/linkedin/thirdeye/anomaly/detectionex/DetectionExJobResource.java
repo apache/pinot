@@ -51,7 +51,6 @@ public class DetectionExJobResource {
     return Response.ok().build();
   }
 
-
   @POST
   @Path("/{id}/ad-hoc")
   public Response adHoc(@PathParam("id") Long id, @QueryParam("start") String startTimeIso,
@@ -90,83 +89,6 @@ public class DetectionExJobResource {
   public Response restart(@PathParam("id") Long id) throws Exception {
     detectionJobScheduler.stopJob(id);
     detectionJobScheduler.startJob(id);
-    return Response.ok().build();
-  }
-
-  /**
-   * Breaks down the given range into consecutive monitoring windows as per function definition
-   * Regenerates anomalies for each window separately
-   *
-   * As the anomaly result regeneration is a heavy job, we move the function from Dashboard to worker
-   * @param id anomaly function id
-   * @param startTimeIso The start time of the monitoring window (in ISO Format), ex: 2016-5-23T00:00:00Z
-   * @param endTimeIso The start time of the monitoring window (in ISO Format)
-   * @param isForceBackfill false to resume backfill from the latest left off
-   * @return HTTP response of this request
-   * @throws Exception
-   */
-  @POST
-  @Path("/{id}/generateAnomaliesInRange")
-  public Response generateAnomaliesInRange(@PathParam("id") String id,
-      @QueryParam("start") String startTimeIso,
-      @QueryParam("end") String endTimeIso,
-      @QueryParam("force") @DefaultValue("false") String isForceBackfill) throws Exception {
-    long functionId = Long.valueOf(id);
-    AnomalyFunctionExDTO dto = DAO_REGISTRY.getAnomalyFunctionExDAO().findById(functionId);
-    if (dto == null) {
-      return Response.noContent().build();
-
-    }
-
-    // Check if the timestamps are available
-    DateTime startTime = null;
-    DateTime endTime = null;
-    if (startTimeIso == null || startTimeIso.isEmpty()) {
-      throw new IllegalArgumentException(String.format("[functionId %s] Monitoring start time is not found", id));
-    }
-    if (endTimeIso == null || endTimeIso.isEmpty()) {
-      throw new IllegalArgumentException(String.format("[functionId %s] Monitoring end time is not found", id));
-    }
-
-    startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso);
-    endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso);
-
-    if(startTime.isAfter(endTime)){
-      throw new IllegalArgumentException(String.format(
-          "[functionId %s] Monitoring start time is after monitoring end time", id));
-    }
-    if(endTime.isAfterNow()){
-      throw new IllegalArgumentException(String.format(
-          "[functionId %s] Monitor end time {} should not be in the future", id, endTime.toString()));
-    }
-
-    // Check if the merged anomaly results have been cleaned up before regeneration
-    List<MergedAnomalyResultDTO> mergedResults =
-        DAO_REGISTRY.getMergedAnomalyResultDAO().findByStartTimeInRangeAndFunctionId(startTime.getMillis(), endTime.getMillis(),
-            functionId);
-    if (CollectionUtils.isNotEmpty(mergedResults)) {
-      throw new IllegalArgumentException(String.format(
-          "[functionId %s] Merged anomaly results should be cleaned up before regeneration", id));
-    }
-
-    //  Check if the raw anomaly results have been cleaned up before regeneration
-    List<RawAnomalyResultDTO> rawResults =
-        DAO_REGISTRY.getRawAnomalyResultDAO().findAllByTimeAndFunctionId(startTime.getMillis(), endTime.getMillis(), functionId);
-    if(CollectionUtils.isNotEmpty(rawResults)){
-      throw new IllegalArgumentException(String.format(
-          "[functionId {}] Raw anomaly results should be cleaned up before regeneration", id));
-    }
-
-    // Check if the anomaly function is active
-    if (!dto.isActive()) {
-      throw new IllegalArgumentException(String.format("Skipping deactivated function %s", id));
-    }
-
-    DateTime innerStartTime = startTime;
-    DateTime innerEndTime = endTime;
-
-    detectionJobScheduler.runBackfill(functionId, innerStartTime, innerEndTime);
-
     return Response.ok().build();
   }
 }
