@@ -94,6 +94,8 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
     if (segmentsConfig.getReplicasPerPartition() != null) {
       int replicasPerPartition = Integer.valueOf(segmentsConfig.getReplicasPerPartition());
       if (replicasPerPartition < configMinReplication) {
+        LOGGER.info("Creating table with minimum replicasPerPartition of: {} instead of requested replicasPerPartition: {}",
+          configMinReplication, requestReplication);
         segmentsConfig.setReplicasPerPartition(String.valueOf(configMinReplication));
       }
     }
