@@ -360,7 +360,7 @@ public final class LongSeries extends Series {
   }
 
   @Override
-  public LongSeries filter(int[] fromIndex) {
+  LongSeries filter(int[] fromIndex) {
     long[] values = new long[fromIndex.length];
     for(int i=0; i<fromIndex.length; i++) {
       values[i] = this.values[fromIndex[i]];

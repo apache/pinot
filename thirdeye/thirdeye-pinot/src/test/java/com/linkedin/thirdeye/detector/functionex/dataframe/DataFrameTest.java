@@ -560,4 +560,34 @@ public class DataFrameTest {
     Assert.assertEquals(new HashSet<>(s3.unique().toList()), new HashSet<>(Arrays.asList("a", "A", "b", "Cc", "cC")));
   }
 
+  @Test
+  public void testStringFill() {
+    StringSeries s1 = DataFrame.toSeries("a", null, null, "b", null);
+    Assert.assertEquals(s1.fill(null, "N").values(), new String[] { "a", "N", "N", "b", "N" });
+
+    StringSeries s2 = DataFrame.toSeries("a", null, null, "b", null);
+    Assert.assertEquals(s2.fill("a", "A").values(), new String[] { "A", null, null, "b", null });
+  }
+
+  @Test
+  public void testStringShift() {
+    StringSeries s1 = DataFrame.toSeries(VALUES_STRING);
+    Assert.assertEquals(s1.shift(0).values(), VALUES_STRING);
+
+    StringSeries s2 = DataFrame.toSeries(VALUES_STRING);
+    Assert.assertEquals(s2.shift(2).values(), new String[] { null, null, "-2.3", "-1", "0.0" });
+
+    StringSeries s3 = DataFrame.toSeries(VALUES_STRING);
+    Assert.assertEquals(s3.shift(4).values(), new String[] { null, null, null, null, "-2.3" });
+
+    StringSeries s4 = DataFrame.toSeries(VALUES_STRING);
+    Assert.assertEquals(s4.shift(-4).values(), new String[] { "0.13e1", null, null, null, null });
+
+    StringSeries s5 = DataFrame.toSeries(VALUES_STRING);
+    Assert.assertEquals(s5.shift(100).values(), new String[] { null, null, null, null, null });
+
+    StringSeries s6 = DataFrame.toSeries(VALUES_STRING);
+    Assert.assertEquals(s6.shift(-100).values(), new String[] { null, null, null, null, null });
+  }
+
 }

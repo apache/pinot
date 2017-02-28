@@ -241,7 +241,7 @@ public final class DoubleSeries extends Series {
   // TODO bucketsBy...
 
   public DoubleSeries groupBy(List<Bucket> buckets, DoubleBatchFunction grouper) {
-    return this.groupBy(buckets, Double.MIN_VALUE, grouper);
+    return this.groupBy(buckets, Double.NaN, grouper);
   }
 
   public DoubleSeries groupBy(List<Bucket> buckets, double nullValue, DoubleBatchFunction grouper) {
@@ -298,7 +298,7 @@ public final class DoubleSeries extends Series {
   }
 
   @Override
-  public DoubleSeries filter(int[] fromIndex) {
+  DoubleSeries filter(int[] fromIndex) {
     double[] values = new double[fromIndex.length];
     for(int i=0; i<fromIndex.length; i++) {
       values[i] = this.values[fromIndex[i]];

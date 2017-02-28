@@ -6,10 +6,13 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 
 public final class StringSeries extends Series {
+  public static final String NULL_VALUE = null;
+
   String[] values;
 
   @FunctionalInterface
@@ -236,17 +239,13 @@ public final class StringSeries extends Series {
   // TODO bucketsBy...
 
   public StringSeries groupBy(List<Bucket> buckets, StringBatchFunction grouper) {
-    return this.groupBy(buckets, null, grouper);
-  }
-
-  public StringSeries groupBy(List<Bucket> buckets, String nullValue, StringBatchFunction grouper) {
     String[] values = new String[buckets.size()];
     for(int i=0; i<buckets.size(); i++) {
       Bucket b = buckets.get(i);
 
       // no elements in group
       if(b.fromIndex.length <= 0) {
-        values[i] = nullValue;
+        values[i] = NULL_VALUE;
         continue;
       }
 
@@ -260,6 +259,34 @@ public final class StringSeries extends Series {
     return new StringSeries(values);
   }
 
+  public StringSeries fill(String where, String value) {
+    String[] values = Arrays.copyOf(this.values, this.values.length);
+    for(int i=0; i<values.length; i++) {
+      if(Objects.equals(values[i], where)) {
+        values[i] = value;
+      }
+    }
+    return new StringSeries(values);
+  }
+
+  public StringSeries fillna(String value) {
+    return this.fill(NULL_VALUE, value);
+  }
+
+  public StringSeries shift(int offset) {
+    String[] values = new String[this.values.length];
+    for(int i=0; i<Math.min(offset, values.length); i++) {
+      values[i] = NULL_VALUE;
+    }
+    for(int i=Math.max(0, offset); i<values.length + Math.min(offset, 0); i++) {
+      values[i] = this.values[i - offset];
+    }
+    for(int i=Math.max(values.length + offset, 0); i<values.length; i++) {
+      values[i] = NULL_VALUE;
+    }
+    return new StringSeries(values);
+  }
+
   private static String[] assertNotEmpty(String[] values) {
     if(values.length <= 0)
       throw new IllegalStateException("Must contain at least one value");
@@ -267,7 +294,7 @@ public final class StringSeries extends Series {
   }
 
   @Override
-  public StringSeries filter(int[] fromIndex) {
+  StringSeries filter(int[] fromIndex) {
     String[] values = new String[fromIndex.length];
     for(int i=0; i<fromIndex.length; i++) {
       values[i] = this.values[fromIndex[i]];
