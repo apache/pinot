@@ -41,7 +41,7 @@
 	<div class="row bg-white row-bordered">
 		<div class="container top-buffer bottom-buffer">
 			<div class="row filter-bar"> -->
-				<div class="col-md-5" style="display: none">
+<!-- 				<div class="col-md-5">
 					<div>
 						<label>Select time range: </label>
 					</div>
@@ -51,7 +51,7 @@
 					<div id="anomalies-time-range" class="datepicker-range">
 						<span></span> <b class="caret"></b>
 					</div>
-				</div>
+				</div> -->
 				<!-- Hidding this until fleshed out -->
 				<!-- Jira: https://jira01.corp.linkedin.com:8443/browse/THIRDEYE-1043 -->
 				<!-- <div class="col-md-4">
@@ -85,5 +85,31 @@
  -->
 <div class="container top-buffer bottom-buffer">
   <div id='anomaly-spin-area'></div>
-	<div id="anomaly-results-place-holder"></div>
+  <div class="page-content">
+  	<div class="page-filter">
+	  	<div class="anomalies-panel">
+	  		<div class="filter-header">
+	  			Filter
+	  		</div>
+
+	  		<div class="filter-body">
+					<div>
+						<label>Select time range: </label>
+					</div>
+					<div>
+						<label class="label-description">Date Range (current)</label>
+					</div>
+					<div id="anomalies-time-range" class="datepicker-range">
+						<span></span> <b class="caret"></b>
+					</div>
+				</div>
+
+				<div class="filter-footer">
+					<a href="#">Apply Filter</a>
+				</div>
+	  	</div>
+
+  	</div>
+		<div class="page-results" id="anomaly-results-place-holder"></div>
+  </div>
 </div>

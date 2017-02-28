@@ -443,7 +443,7 @@ text {
 
 .search-field {
   flex-grow: 1;
-  margin-left: 10px;
+  margin-left: 24px;
 }
 
 .search-select {
@@ -466,6 +466,40 @@ text {
 }
 
 /* Filter */
+.page-content {
+  display: flex;
+}
+
+.page-filter {
+  max-width: 25%;
+}
+
+.page-results {
+  width: 70%;
+  flex-grow: 1;
+  margin-left: 24px;
+}
+
+
+
+.filter-header {
+  background-color: #F3F6F8;
+  font-weight: 600;
+  border-bottom: 1px solid #CCC;
+  text-transform: uppercase;
+  padding: 12px 16px;
+}
+
+.filter-body {
+  padding: 16px;
+}
+
+.filter-footer {
+  border-top: 1px solid #CCC;
+  padding: 16px;
+  text-align: center;
+  font-weight: 600;
+}
 
 .filter-bar {
   display: flex;
@@ -508,7 +542,6 @@ text {
   background-color: white;
   border-radius: 2px;
   border: 1px solid #CCC;
-  box-shadow: 0 0 0 1px rgba(0,0,0,.1);
 }
 
 .panel-title {
@@ -524,6 +557,7 @@ text {
 .anomaly-card:not(:last-child) {
   border-bottom: 1px solid #CCC;
   padding-bottom: 24px;
+  margin-bottom: 24px;
 }
 
 
