@@ -1,17 +1,13 @@
 package com.linkedin.thirdeye.anomaly.detectionex;
 
-import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomaly.task.TaskContext;
 import com.linkedin.thirdeye.anomaly.task.TaskInfo;
 import com.linkedin.thirdeye.anomaly.task.TaskResult;
 import com.linkedin.thirdeye.anomaly.task.TaskRunner;
-import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.DimensionMap;
-import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionExDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionEx;
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExContext;
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExFactory;
@@ -20,16 +16,13 @@ import com.linkedin.thirdeye.detector.functionex.dataframe.DataFrame;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
-import org.apache.commons.collections.CollectionUtils;
+import java.util.Set;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-// NOTES:
-// - no scaling
-// - no backfill detection
 
 public class DetectionExTaskRunner implements TaskRunner {
 
@@ -39,14 +32,12 @@ public class DetectionExTaskRunner implements TaskRunner {
 
   private AnomalyFunctionExDTO funcSpec;
   private AnomalyFunctionExFactory funcFactory;
-  private long jobExecutionId;
   private long monitoringWindowStart;
   private long monitoringWindowEnd;
   private long mergeWindow;
 
   protected void setupTask(TaskInfo taskInfo, TaskContext context) throws Exception {
     DetectionExTaskInfo task = (DetectionExTaskInfo) taskInfo;
-    jobExecutionId = task.getJobExecutionId();
     funcSpec = task.getAnomalyFunctionExSpec();
     funcFactory = context.getAnomalyFunctionExFactory();
     monitoringWindowStart = task.getMonitoringWindowStart();
@@ -58,8 +49,6 @@ public class DetectionExTaskRunner implements TaskRunner {
     LOG.info("Begin executing task {}", taskInfo);
 
     setupTask(taskInfo, taskContext);
-
-    List<TaskResult> taskResult = new ArrayList<>();
 
     // create function context
     long timestamp = DateTime.now(DateTimeZone.UTC).getMillis();
@@ -81,23 +70,22 @@ public class DetectionExTaskRunner implements TaskRunner {
 
     LOG.info("{} detected {} anomalies", funcSpec.getName(), result.getAnomalies().size());
 
-    // transform output into raw anomalies
-    List<RawAnomalyResultDTO> raw = new ArrayList<>();
+    // transform output into thirdeye anomalies
+    List<MergedAnomalyResultDTO> generated = new ArrayList<>();
 
     for(AnomalyFunctionExResult.Anomaly a : result.getAnomalies()) {
-      RawAnomalyResultDTO dto = new RawAnomalyResultDTO();
+      MergedAnomalyResultDTO dto = new MergedAnomalyResultDTO();
       dto.setMessage(a.getMessage());
-      dto.setCreationTimeUtc(timestamp);
       dto.setStartTime(a.getStart());
       dto.setEndTime(a.getEnd());
-
-      dto.setDisplayMetric(funcSpec.getDisplayMetric());
-      dto.setDisplayCollection(funcSpec.getDisplayCollection());
-
-      // TODO remove hack, refactor raw anomalies?
+      dto.setCreatedTime(timestamp);
       dto.setFunctionId(functionId);
+      dto.setMetric(funcSpec.getDisplayMetric());
+      dto.setCollection(funcSpec.getDisplayCollection());
+      dto.setDimensions(new DimensionMap());
+      dto.setRawAnomalyIdList(Collections.EMPTY_LIST);
 
-      // TODO avoid magic field names, refactor raw anomalies?
+      // TODO avoid magic field names, refactor anomalies?
       DataFrame df = a.getData();
       if(df.getIndex().size() > 0) {
         if (df.contains("score")) {
@@ -114,397 +102,63 @@ public class DetectionExTaskRunner implements TaskRunner {
         }
       }
 
-      // TODO store data and properties
-      //DAO_REGISTRY.getRawAnomalyResultDAO().save(dto);
-      raw.add(dto);
+      generated.add(dto);
     }
 
-    // merge
-
     // TODO plugable merging policy or actually use merge task
-    // forward merging only
     // see also: com.linkedin.thirdeye.anomaly.merge.AnomalyTimeBasedSummarizer.java
-    //List<RawAnomalyResultDTO> raw = DAO_REGISTRY.getRawAnomalyResultDAO().findUnmergedByFunctionId(functionId);
 
-    LOG.info("Generated {} raw anomalies", raw.size());
-    if(raw.isEmpty())
-      return taskResult;
+    LOG.info("Generated {} anomalies", generated.size());
+    if(generated.isEmpty())
+      return Collections.EMPTY_LIST;
 
-    Collections.sort(raw, new Comparator<RawAnomalyResultDTO>() {
+    List<MergedAnomalyResultDTO> existing = DAO_REGISTRY.getMergedAnomalyResultDAO().findByFunctionId(functionId);
+
+    List<MergedAnomalyResultDTO> all = new ArrayList<>();
+    all.addAll(generated);
+    all.addAll(existing);
+
+    Collections.sort(all, new Comparator<MergedAnomalyResultDTO>() {
       @Override
-      public int compare(RawAnomalyResultDTO o1, RawAnomalyResultDTO o2) {
+      public int compare(MergedAnomalyResultDTO o1, MergedAnomalyResultDTO o2) {
         return o1.getStartTime().compareTo(o2.getStartTime());
       }
     });
 
-    // NOTE: requires null dimension
-    // MergedAnomalyResultDTO m = DAO_REGISTRY.getMergedAnomalyResultDAO().findLatestByFunctionIdOnly(functionId);
+    // merge minimal set
+    Set<MergedAnomalyResultDTO> merged = new HashSet<>();
 
-    // find most recent merged anomaly
-    List<MergedAnomalyResultDTO> merged = DAO_REGISTRY.getMergedAnomalyResultDAO().findByFunctionId(functionId);
-    MergedAnomalyResultDTO m;
-    if(!merged.isEmpty()) {
-      m = Collections.max(merged, new Comparator<MergedAnomalyResultDTO>() {
-        @Override
-        public int compare(MergedAnomalyResultDTO o1, MergedAnomalyResultDTO o2) {
-          return o1.getEndTime().compareTo(o2.getStartTime());
+    MergedAnomalyResultDTO active = all.get(0);
+    for(MergedAnomalyResultDTO candidate : all) {
+      if(candidate.getStartTime() <= active.getEndTime() + mergeWindow) {
+        active.setEndTime(Math.max(active.getEndTime(), candidate.getEndTime()));
+        active.setCreatedTime(Math.min(active.getCreatedTime(), candidate.getCreatedTime()));
+        // TODO merge any other fields
+      } else {
+        merged.add(active);
+        active = candidate;
+      }
+    }
+    merged.add(active);
+
+    // store
+    for(MergedAnomalyResultDTO m : all) {
+      if(merged.contains(m)) {
+        if(m.getId() == null) {
+          // active, but does not exist
+          DAO_REGISTRY.getMergedAnomalyResultDAO().save(m);
+        } else {
+          // active, and exists
+          DAO_REGISTRY.getMergedAnomalyResultDAO().update(m);
         }
-      });
-      LOG.info("Fetched existing merged anomaly {}", m);
-
-    } else {
-      LOG.info("No merged anomaly found. Bootstrapping.");
-      RawAnomalyResultDTO r = raw.get(0);
-      m = makeNewMerged(r);
-      DAO_REGISTRY.getMergedAnomalyResultDAO().save(m);
-    }
-
-    // merge raw anomalies
-    for(RawAnomalyResultDTO r : raw) {
-      LOG.info("Attempting merge of raw anomaly {}", r);
-      long mergeLimit = m.getEndTime() + mergeWindow;
-      if(r.getStartTime() > mergeLimit) {
-        LOG.info("Raw anomaly start time {} outside merge limit {}", r.getStartTime(), mergeLimit);
-        LOG.info("Storing current merged anomaly {}. Creating new.", m);
-        DAO_REGISTRY.getMergedAnomalyResultDAO().update(m);
-        m = makeNewMerged(r);
-      }
-
-      if(r.getEndTime() >= m.getEndTime()) {
-        LOG.info("Expanding current merged anomaly end time to {}", r.getEndTime());
-        m.setEndTime(r.getEndTime());
-        m.getAnomalyResults().add(r);
-        m.setMessage(String.format("Merged from %d raw anomalies. Last message: {}", m.getAnomalyResults().size() + 1, r.getMessage()));
-
-        LOG.info("Storing raw anomaly {}", r);
-        r.setMerged(true);
-        DAO_REGISTRY.getRawAnomalyResultDAO().save(r);
-      }
-    }
-
-    LOG.info("Storing current merged anomaly {}", m);
-    DAO_REGISTRY.getMergedAnomalyResultDAO().update(m);
-
-//    if(datasetConfig.isRequiresCompletenessCheck()) {
-//      LOG.info("Dataset {} requires completeness check", dataset);
-//      assertCompletenessCheck(dataset);
-//    }
-//
-//    LOG.info(
-//        "Running anomaly detection job with metricFunction: [{}], topic metric [{}], collection: [{}]",
-//        anomalyFunctionSpec.getFunctionName(), anomalyFunctionSpec.getTopicMetric(),
-//        anomalyFunctionSpec.getCollection());
-//
-//    collectionDimensions = datasetConfig.getDimensions();
-//
-//    // Get Time Series
-//    List<Pair<Long, Long>> startEndTimeRanges = anomalyFunction.getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis());
-//    Map<DimensionKey, MetricTimeSeries> dimensionKeyMetricTimeSeriesMap = TimeSeriesUtil.getTimeSeriesForAnomalyDetection(anomalyFunctionSpec, startEndTimeRanges);
-//
-//    // construct data frame index
-//    // TODO: fix the hack
-//    Map.Entry<DimensionKey, MetricTimeSeries> eTemp = dimensionKeyMetricTimeSeriesMap.entrySet().iterator().next();
-//    MetricTimeSeries tsTemp = eTemp.getValue();
-//
-//    long[] index = getTimestamps(tsTemp);
-//
-//    // construct data frame
-//    DataFrame dfInput = new DataFrame(index);
-//
-//    for(Map.Entry<DimensionKey, MetricTimeSeries> e : dimensionKeyMetricTimeSeriesMap.entrySet()) {
-//      DimensionKey key = e.getKey();
-//      MetricTimeSeries ts = e.getValue();
-//
-//      LOG.info("processing key={} ts={}", key, ts);
-//
-//      for(String metric : ts.getSchema().getNames()) {
-//
-//        // construct name
-//        String name = getSeriesName(key, metric);
-//
-//        // construct and add series
-//        DataFrame.Series s = getSeries(ts, metric);
-//        dfInput.addSeries(name, s);
-//      }
-//    }
-//
-//    DataFrame dfOutput =
-//
-//    List<RawAnomalyResultDTO> resultsOfAnEntry = anomalyFunction
-//        .analyze(exploredDimensions, metricTimeSeries, windowStart, windowEnd, historyMergedAnomalies);
-//
-//    // Handle results
-//    handleResults(resultsOfAnEntry);
-
-    return taskResult;
-  }
-
-  private MergedAnomalyResultDTO makeNewMerged(RawAnomalyResultDTO r) {
-    MergedAnomalyResultDTO m = new MergedAnomalyResultDTO();
-    m.setFunctionId(r.getFunctionId());
-    m.setRawAnomalyIdList(new ArrayList<>());
-    m.setStartTime(r.getStartTime());
-    m.setEndTime(r.getStartTime());
-    m.setMessage("");
-    m.setCollection(r.getDisplayCollection());
-    m.setMetric(r.getDisplayMetric());
-    m.setDimensions(new DimensionMap(""));
-
-    m.setCreatedTime(DateTime.now(DateTimeZone.UTC).getMillis());
-
-    return m;
-  }
-
-//  private DataFrame.Series getSeries(MetricTimeSeries ts, String metric) {
-//    MetricType mtype = ts.getSchema().getMetricType(metric);
-//    switch(mtype) {
-//      case FLOAT:
-//      case DOUBLE:
-//        return getDoubleSeries(ts, metric);
-//
-//      case SHORT:
-//      case INT:
-//      case LONG:
-//        return getLongSeries(ts, metric);
-//
-//      default:
-//        throw new IllegalArgumentException(String.format("Unknown data type '%s'", mtype));
-//    }
-//  }
-//
-//  private DataFrame.DoubleSeries getDoubleSeries(MetricTimeSeries ts, String metric) {
-//    long[] index = getTimestamps(ts);
-//    double[] values = new double[index.length];
-//    int i=0;
-//    for(long t : index) {
-//      values[i] = ts.get(t, metric).doubleValue();
-//      i++;
-//    }
-//    return new DataFrame.DoubleSeries(values);
-//  }
-//
-//  private DataFrame.LongSeries getLongSeries(MetricTimeSeries ts, String metric) {
-//    long[] index = getTimestamps(ts);
-//    long[] values = new long[index.length];
-//    int i=0;
-//    for(long t : index) {
-//      values[i] = ts.get(t, metric).longValue();
-//      i++;
-//    }
-//    return new DataFrame.LongSeries(values);
-//  }
-
-  private long[] getTimestamps(MetricTimeSeries ts) {
-    long[] index = new long[ts.getTimeWindowSet().size()];
-    List<Long> timestamps = new ArrayList<>(ts.getTimeWindowSet());
-    Collections.sort(timestamps);
-    // Note: no built-in toArray for primitive types
-    for(int i=0; i<=timestamps.size(); i++) {
-      index[i] = timestamps.get(i);
-    }
-    return index;
-  }
-
-  private String getSeriesName(DimensionKey key, String metric) {
-    int ndim = key.getDimensionValues().length;
-    if(ndim == 0) {
-      return metric;
-    } else if(ndim == 1) {
-      return String.format("%s/%s", metric, key.getDimensionValues()[0]);
-    } else {
-      throw new IllegalStateException("dimensionality must be <= 1");
-    }
-  }
-
-//  protected void assertCompletenessCheck(String dataset) {
-//    List<DataCompletenessConfigDTO> completed =
-//        DAO_REGISTRY.getDataCompletenessConfigDAO().findAllByDatasetAndInTimeRangeAndStatus(
-//            dataset, windowStart.getMillis(), windowEnd.getMillis(), true);
-//
-//    LOG.debug("Found {} dataCompleteness records for dataset {} from {} to {}",
-//        completed.size(), dataset, windowStart.getMillis(), windowEnd.getMillis());
-//
-//    if (completed.size() <= 0) {
-//      LOG.warn("Dataset {} is incomplete. Skipping anomaly detection.", dataset);
-//      throw new IllegalStateException(String.format("Dataset %s incomplete", dataset));
-//    }
-//  }
-
-  /**
-   * Returns existing raw anomalies in the given monitoring window
-   *
-   * @param functionId the id of the anomaly function
-   * @param monitoringWindowStart inclusive
-   * @param monitoringWindowEnd inclusive but it doesn't matter
-   *
-   * @return known raw anomalies in the given window
-   */
-  private List<RawAnomalyResultDTO> getExistingRawAnomalies(long functionId, long monitoringWindowStart,
-      long monitoringWindowEnd) {
-    List<RawAnomalyResultDTO> results = new ArrayList<>();
-    try {
-      results.addAll(DAO_REGISTRY.getRawAnomalyResultDAO().findAllByTimeAndFunctionId(monitoringWindowStart, monitoringWindowEnd, functionId));
-    } catch (Exception e) {
-      LOG.error("Exception in getting existing anomalies", e);
-    }
-    return results;
-  }
-
-  /**
-   * Returns all known merged anomalies of the function id that are needed for anomaly detection, i.e., the merged
-   * anomalies that overlap with the monitoring window and baseline windows.
-   *
-   * @param functionId the id of the anomaly function
-   * @param startEndTimeRanges the time ranges for retrieving the known merge anomalies
-
-   * @return known merged anomalies of the function id that are needed for anomaly detection
-   */
-  public List<MergedAnomalyResultDTO> getKnownMergedAnomalies(long functionId, List<Pair<Long, Long>> startEndTimeRanges) {
-
-    List<MergedAnomalyResultDTO> results = new ArrayList<>();
-    for (Pair<Long, Long> startEndTimeRange : startEndTimeRanges) {
-      try {
-        results.addAll(
-            DAO_REGISTRY.getMergedAnomalyResultDAO().findAllConflictByFunctionId(functionId, startEndTimeRange.getFirst(),
-                startEndTimeRange.getSecond()));
-      } catch (Exception e) {
-        LOG.error("Exception in getting merged anomalies", e);
-      }
-    }
-
-    return results;
-  }
-
-  /**
-   * Returns history anomalies of the monitoring window from the given known anomalies.
-   *
-   * Definition of history anomaly: An anomaly that starts before the monitoring window starts.
-   *
-   * @param monitoringWindowStart the start of the monitoring window
-   * @param knownAnomalies the list of known anomalies
-   *
-   * @return all history anomalies of the monitoring window
-   */
-  private List<MergedAnomalyResultDTO> retainHistoryMergedAnomalies(long monitoringWindowStart,
-      List<MergedAnomalyResultDTO> knownAnomalies) {
-    List<MergedAnomalyResultDTO> historyAnomalies = new ArrayList<>();
-    for (MergedAnomalyResultDTO knownAnomaly : knownAnomalies) {
-      if (knownAnomaly.getStartTime() < monitoringWindowStart) {
-        historyAnomalies.add(knownAnomaly);
-      }
-    }
-    return historyAnomalies;
-  }
-
-  /**
-   * Returns anomalies that overlap with the monitoring window from the given known anomalies
-   *
-   * Definition of existing anomaly: An anomaly that happens in the monitoring window
-   *
-   * @param monitoringWindowStart the start of the monitoring window
-   * @param monitoringWindowEnd the end of the monitoring window
-   * @param knownAnomalies the list of known anomalies
-   *
-   * @return anomalies that happen in the monitoring window from the given known anomalies
-   */
-  private List<MergedAnomalyResultDTO> retainExistingMergedAnomalies(long monitoringWindowStart, long monitoringWindowEnd,
-      List<MergedAnomalyResultDTO> knownAnomalies) {
-    List<MergedAnomalyResultDTO> existingAnomalies = new ArrayList<>();
-    for (MergedAnomalyResultDTO knownAnomaly : knownAnomalies) {
-      if (knownAnomaly.getStartTime() <= monitoringWindowEnd && knownAnomaly.getEndTime() >= monitoringWindowStart) {
-        existingAnomalies.add(knownAnomaly);
-      }
-    }
-    return existingAnomalies;
-  }
-
-  /**
-   * Given a list of raw anomalies, this method returns a list of raw anomalies that are not contained in any existing
-   * merged anomalies.
-   *
-   * @param rawAnomalies
-   * @param existingAnomalies
-   * @return
-   */
-  private List<RawAnomalyResultDTO> removeFromExistingMergedAnomalies(List<RawAnomalyResultDTO> rawAnomalies,
-      List<MergedAnomalyResultDTO> existingAnomalies) {
-    if (CollectionUtils.isEmpty(rawAnomalies) || CollectionUtils.isEmpty(existingAnomalies)) {
-      return rawAnomalies;
-    }
-    List<RawAnomalyResultDTO> newRawAnomalies = new ArrayList<>();
-
-    for (RawAnomalyResultDTO rawAnomaly : rawAnomalies) {
-      boolean isContained = false;
-      for (MergedAnomalyResultDTO existingAnomaly : existingAnomalies) {
-        if (existingAnomaly.getStartTime().compareTo(rawAnomaly.getStartTime()) <= 0
-            && rawAnomaly.getEndTime().compareTo(existingAnomaly.getEndTime()) <= 0) {
-          isContained = true;
-          break;
+      } else {
+        if(m.getId() != null) {
+          // not active, but exists
+          DAO_REGISTRY.getMergedAnomalyResultDAO().delete(m);
         }
       }
-      if (!isContained) {
-        newRawAnomalies.add(rawAnomaly);
-      }
     }
 
-    return newRawAnomalies;
-  }
-
-  /**
-   * Given a list of raw anomalies, this method returns a list of raw anomalies that are not contained in any existing
-   * raw anomalies.
-   *
-   * @param rawAnomalies
-   * @param existingRawAnomalies
-   * @return
-   */
-  private List<RawAnomalyResultDTO> removeFromExistingRawAnomalies(List<RawAnomalyResultDTO> rawAnomalies,
-      List<RawAnomalyResultDTO> existingRawAnomalies) {
-    List<RawAnomalyResultDTO> newRawAnomalies = new ArrayList<>();
-
-    for (RawAnomalyResultDTO rawAnomaly : rawAnomalies) {
-      boolean matched = false;
-      for (RawAnomalyResultDTO existingAnomaly : existingRawAnomalies) {
-        if (existingAnomaly.getStartTime().compareTo(rawAnomaly.getStartTime()) <= 0
-            && rawAnomaly.getEndTime().compareTo(existingAnomaly.getEndTime()) <= 0) {
-          matched = true;
-          break;
-        }
-      }
-      if (!matched) {
-        newRawAnomalies.add(rawAnomaly);
-      }
-    }
-
-    return newRawAnomalies;
-  }
-
-  private void handleResults(List<RawAnomalyResultDTO> results) {
-//    for (RawAnomalyResultDTO result : results) {
-//      try {
-//        // Properties that always come from the function spec
-//        AnomalyFunctionDTO spec = anomalyFunction.getSpec();
-//        // make sure score and weight are valid numbers
-//        result.setScore(normalize(result.getScore()));
-//        result.setWeight(normalize(result.getWeight()));
-//        result.setFunction(spec);
-//        DAO_REGISTRY.getRawAnomalyResultDAO().save(result);
-//      } catch (Exception e) {
-//        LOG.error("Exception in saving anomaly result : " + result.toString(), e);
-//      }
-//    }
-  }
-
-  /**
-   * Handle any infinite or NaN values by replacing them with +/- max value or 0
-   */
-  private double normalize(double value) {
-    if (Double.isInfinite(value)) {
-      return (value > 0.0 ? 1 : -1) * Double.MAX_VALUE;
-    } else if (Double.isNaN(value)) {
-      return 0.0; // default?
-    } else {
-      return value;
-    }
+    return Collections.EMPTY_LIST;
   }
 }

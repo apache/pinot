@@ -30,10 +30,6 @@ public class RawAnomalyResultBean extends AbstractBean implements Comparable<Raw
   private double avgCurrentVal;
   private double avgBaselineVal;
 
-  // display metric, anomaly function ex
-  private String displayMetric;
-  private String displayCollection;
-
   public double getAvgCurrentVal(){
     return this.avgCurrentVal;
   }
@@ -149,22 +145,6 @@ public class RawAnomalyResultBean extends AbstractBean implements Comparable<Raw
 
   public void setAnomalyFeedbackId(Long anomalyFeedbackId) {
     AnomalyFeedbackId = anomalyFeedbackId;
-  }
-
-  public String getDisplayMetric() {
-    return displayMetric;
-  }
-
-  public void setDisplayMetric(String displayMetric) {
-    this.displayMetric = displayMetric;
-  }
-
-  public String getDisplayCollection() {
-    return displayCollection;
-  }
-
-  public void setDisplayCollection(String displayCollection) {
-    this.displayCollection = displayCollection;
   }
 
   @Override
