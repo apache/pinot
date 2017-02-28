@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
+import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.job.JobConstants;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants;
 import com.linkedin.thirdeye.dashboard.Utils;
@@ -33,6 +34,7 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 
 /**
@@ -160,8 +162,7 @@ public class DetectionJobScheduler implements Runnable {
           findAllByDatasetAndInTimeRangeAndStatus(dataset, startTime, endTime, true);
       LOG.info("Complete periods {}", completeTimePeriods);
 
-      long expectedCompleteBuckets = DetectionJobSchedulerUtils.
-          getExpectedCompleteBuckets(datasetConfig, startTime, endTime);
+      long expectedCompleteBuckets = DetectionJobSchedulerUtils.getExpectedCompleteBuckets(datasetConfig, startTime, endTime);
       LOG.info("Num complete periods: {} Expected num buckets:{}", completeTimePeriods.size(), expectedCompleteBuckets);
 
       // if available, run the function
