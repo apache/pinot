@@ -119,11 +119,37 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), request.toString());
     // table creation should succeed
-    String tableConfigStr = sendGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableGet(tableName));
-    JSONObject json = new JSONObject(tableConfigStr);
-    String offlineString = json.getJSONObject("OFFLINE").toString();
-    AbstractTableConfig tableConfig = AbstractTableConfig.init(offlineString);
+    AbstractTableConfig tableConfig = getTableConfig(tableName, "OFFLINE");
     Assert.assertEquals(tableConfig.getValidationConfig().getReplicationNumber(),
         Math.max(tableReplication, TABLE_MIN_REPLICATION));
+
+    JSONObject metadata = new JSONObject();
+    metadata.put("streamType", "kafka");
+    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.CONSUMER_TYPE, Kafka.ConsumerType.highLevel.toString());
+    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.TOPIC_NAME, "fakeTopic");
+    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.DECODER_CLASS, "fakeClass");
+    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.ZK_BROKER_URL, "fakeUrl");
+    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.HighLevelConsumer.ZK_CONNECTION_STRING, "potato");
+    metadata.put(DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE, Integer.toString(1234));
+    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.KAFKA_CONSUMER_PROPS_PREFIX + "." + Kafka.AUTO_OFFSET_RESET,
+        "smallest");
+
+    request = ControllerRequestBuilder.buildCreateRealtimeTableJSON(tableName, "default", "default",
+        "potato", "DAYS", "DAYS", "5", tableReplication, "BalanceNumSegmentAssignmentStrategy", metadata, "fakeSchema", "fakeColumn",
+        Collections.<String>emptyList(), "MMAP", false /*lowLevel*/);
+    sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), request.toString());
+    tableConfig = getTableConfig(tableName, "REALTIME");
+    Assert.assertEquals(tableConfig.getValidationConfig().getReplicationNumber(),
+        Math.max(tableReplication, TABLE_MIN_REPLICATION));
+    int replicasPerPartition = Integer.valueOf(tableConfig.getValidationConfig().getReplicasPerPartition());
+    Assert.assertEquals(replicasPerPartition, Math.max(tableReplication, TABLE_MIN_REPLICATION));
+  }
+
+  private AbstractTableConfig getTableConfig(String tableName, String type)
+      throws IOException, JSONException {
+    String tableConfigStr = sendGetRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableGet(tableName));
+    JSONObject json = new JSONObject(tableConfigStr);
+    String offlineString = json.getJSONObject(type).toString();
+    return AbstractTableConfig.init(offlineString);
   }
 }

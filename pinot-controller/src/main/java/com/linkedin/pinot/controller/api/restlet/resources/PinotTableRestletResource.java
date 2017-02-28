@@ -1,5 +1,6 @@
 package com.linkedin.pinot.controller.api.restlet.resources;
 
+import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import java.io.File;
 import java.io.IOException;
 import java.util.Set;
@@ -81,12 +82,20 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
 
     // For self-serviced cluster, ensure that the tables are created with atleast
     // min replication factor irrespective of table configuratio value.
-    int requestReplication = config.getValidationConfig().getReplicationNumber();
+    SegmentsValidationAndRetentionConfig segmentsConfig = config.getValidationConfig();
+    int requestReplication = segmentsConfig.getReplicationNumber();
     int configMinReplication = _controllerConf.getDefaultTableMinReplicas();
     if (requestReplication < configMinReplication) {
       LOGGER.info("Creating table with minimum replication factor of: {} instead of requested replication: {}",
           configMinReplication, requestReplication);
-      config.getValidationConfig().setReplication(String.valueOf(configMinReplication));
+      segmentsConfig.setReplication(String.valueOf(configMinReplication));
+    }
+
+    if (segmentsConfig.getReplicasPerPartition() != null) {
+      int replicasPerPartition = Integer.valueOf(segmentsConfig.getReplicasPerPartition());
+      if (replicasPerPartition < configMinReplication) {
+        segmentsConfig.setReplicasPerPartition(String.valueOf(configMinReplication));
+      }
     }
 
     _pinotHelixResourceManager.addTable(config);
