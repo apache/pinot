@@ -25,14 +25,11 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.avro.file.DataFileStream;
-import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.commons.collections.CollectionUtils;
@@ -45,7 +42,6 @@ import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
-import org.codehaus.jackson.map.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -298,10 +294,8 @@ public class HadoopSegmentCreationMapReduceJob {
           }
         }
       }
-      // TODO Check if metrics list has some multi-dimension fields and disallow it.
 
       Schema schema = new Schema();
-
       for (String dimension : dimensionList) {
         try {
           if (dimension.equals(timeColumnName)) {

@@ -133,7 +133,7 @@ public class SegmentCreationJob extends Configured {
     job.setJarByClass(SegmentCreationJob.class);
     job.setJobName(_jobName);
 
-    job.setMapperClass(HadoopSegmentCreationMapper.class);
+    setMapperClass(job);
 
     if (System.getenv("HADOOP_TOKEN_FILE_LOCATION") != null) {
       job.getConfiguration().set("mapreduce.job.credentials.binary", System.getenv("HADOOP_TOKEN_FILE_LOCATION"));
@@ -178,6 +178,12 @@ public class SegmentCreationJob extends Configured {
     LOGGER.info("Cleanup the working directory.");
     LOGGER.info("Deleting the dir: {}", _stagingDir);
     fs.delete(new Path(_stagingDir), true);
+  }
+
+
+  protected Job setMapperClass(Job job) {
+    job.setMapperClass(HadoopSegmentCreationMapper.class);
+    return job;
   }
 
   private void addDepsJarToDistributedCache(Path path, Job job) throws IOException {
