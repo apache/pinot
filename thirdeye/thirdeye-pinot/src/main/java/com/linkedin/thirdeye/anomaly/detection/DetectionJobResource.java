@@ -15,6 +15,7 @@ import com.linkedin.thirdeye.util.SeverityComputationUtil;
 import java.util.List;
 
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.DELETE;
@@ -289,14 +290,14 @@ public class DetectionJobResource {
     // create alert filter and evaluator
     AlertFilter alertFilter = alertFilterFactory.fromSpec(anomalyFunctionSpec.getAlertFilter());
     AlertFilterUtil evaluator = new AlertFilterUtil(alertFilter);
+
+    // create alert filter auto tune
+    AlertFilterAutoTune alertFilterAutotune = alertFilterAutotuneFactory.fromSpec(autoTuneType);
+    LOG.info("initiated alertFilterAutoTune of Type {}", alertFilterAutotune.getClass().toString());
     try {
       //evaluate current alert filter (calculate current precision and recall)
-      double[] evals = evaluator.getEvalResults(anomalyResultDTOS);
+      Double[] evals = evaluator.getEvalResults(anomalyResultDTOS);
       LOG.info("AlertFilter of Type {}", alertFilter.getClass().toString(), "has been evaluated with precision: {}", evals[AlertFilterUtil.PRECISION_INDEX], "recall:", evals[AlertFilterUtil.RECALL_INDEX]);
-
-      // create alert filter auto tune
-      AlertFilterAutoTune alertFilterAutotune = alertFilterAutotuneFactory.fromSpec(autoTuneType);
-      LOG.info("initiated alertFilterAutoTune of Type {}", alertFilterAutotune.getClass().toString());
 
       // get tuned alert filter
       Map<String,String> tunedAlertFilter = alertFilterAutotune.tuneAlertFilter(anomalyResultDTOS, evals[AlertFilterUtil.PRECISION_INDEX], evals[AlertFilterUtil.RECALL_INDEX]);
@@ -307,7 +308,6 @@ public class DetectionJobResource {
       if (alertFilterAutotune.isUpdated()){
         anomalyFunctionSpec.setAlertFilter(tunedAlertFilter);
         anomalyFunctionDAO.update(anomalyFunctionSpec);
-        alertFilter.setParameters(tunedAlertFilter);
         LOG.info("Model has been updated");
       } else {
         LOG.info("Model hasn't been updated because tuned model cannot beat original model");
@@ -315,6 +315,44 @@ public class DetectionJobResource {
     } catch (Exception e) {
       LOG.warn("AutoTune throws exception due to: {}", e.getMessage());
     }
-    return Response.ok(alertFilter.toString()).build();
+    return Response.ok(alertFilterAutotune.isUpdated()).build();
+  }
+
+  /**
+   * The endpoint to evaluate alert filter
+   * @param id: function ID
+   * @param startTime: startTime of merged anomaly
+   * @param endTime: endTime of merged anomaly
+   * @return feedback summary and precision/recall as json object
+   * @throws Exception when data has no positive label or model has no positive prediction
+   */
+  @POST
+  @Path("/eval/filter/{function_id}")
+  public Response evaluateAlertFilterByFunctionId(@PathParam("function_id") String id,
+      @QueryParam("startTime") Long startTime,
+      @QueryParam("endTime") Long endTime) throws Exception {
+
+    // get anomalies by function id, start time and end time
+    AnomalyFunctionDTO anomalyFunctionSpec = DAO_REGISTRY.getAnomalyFunctionDAO().findById(Long.valueOf(id));
+    MergedAnomalyResultManager anomalyMergedResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
+    List<MergedAnomalyResultDTO> anomalyResultDTOS =
+        anomalyMergedResultDAO.findByStartTimeInRangeAndFunctionId(startTime, endTime, Long.valueOf(id));
+
+    // create alert filter and evaluator
+    AlertFilter alertFilter = alertFilterFactory.fromSpec(anomalyFunctionSpec.getAlertFilter());
+    AlertFilterUtil evaluator = new AlertFilterUtil(alertFilter);
+
+    //evaluate current alert filter (calculate current precision and recall)
+    Double[] evals = evaluator.getEvalResults(anomalyResultDTOS);
+    LOG.info("AlertFilter of Type {}", alertFilter.getClass().toString(), "has been evaluated with precision: {}",
+        evals[AlertFilterUtil.PRECISION_INDEX], "recall:", evals[AlertFilterUtil.RECALL_INDEX]);
+
+    // get anomaly summary from merged anomaly results
+    Integer[] feedbackEvals = evaluator.getEvalFeedbacks(anomalyResultDTOS);
+
+    Properties evaluations = new Properties();
+    evaluations.put("PrecisionAndRecall", StringUtils.join(evals, ","));
+    evaluations.put("FeedbackSummary", StringUtils.join(feedbackEvals, ","));
+    return Response.ok(evaluations).build();
   }
 }

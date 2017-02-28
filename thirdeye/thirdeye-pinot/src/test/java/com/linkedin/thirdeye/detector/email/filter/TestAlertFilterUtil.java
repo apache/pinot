@@ -18,7 +18,7 @@ public class TestAlertFilterUtil {
     AlertFilterUtil evaluator = new AlertFilterUtil(dummyAlertFilter);
     // test data with 1 positive feedback, 1 negative feedback, other NA feedbacks
     List<MergedAnomalyResultDTO> anomalies = getMockMergedAnomalies(7,8);
-    double[] evals = evaluator.getEvalResults(anomalies);
+    Double[] evals = evaluator.getEvalResults(anomalies);
     assertEquals(evals[AlertFilterUtil.PRECISION_INDEX], 0.1111, 0.0001);
     assertEquals(evals[AlertFilterUtil.RECALL_INDEX], 1, 0.0001);
 
