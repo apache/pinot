@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomaly.task;
 
+import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -40,13 +41,14 @@ public class TaskDriver {
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   public TaskDriver(ThirdEyeAnomalyConfiguration thirdEyeAnomalyConfiguration,
-      AnomalyFunctionFactory anomalyFunctionFactory) {
+      AnomalyFunctionFactory anomalyFunctionFactory, AlertFilterFactory alertFilterFactory) {
     this.workerId = thirdEyeAnomalyConfiguration.getId();
     this.anomalyTaskDAO = DAO_REGISTRY.getTaskDAO();
     taskExecutorService = Executors.newFixedThreadPool(MAX_PARALLEL_TASK);
     taskContext = new TaskContext();
     taskContext.setAnomalyFunctionFactory(anomalyFunctionFactory);
     taskContext.setThirdEyeAnomalyConfiguration(thirdEyeAnomalyConfiguration);
+    taskContext.setAlertFilterFactory(alertFilterFactory);
     allowedOldTaskStatus.add(TaskStatus.FAILED);
     allowedOldTaskStatus.add(TaskStatus.WAITING);
   }

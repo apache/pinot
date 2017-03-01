@@ -96,8 +96,9 @@ public class ThirdEyeAnomalyApplication
 
         if (config.isWorker()) {
           anomalyFunctionFactory = new AnomalyFunctionFactory(config.getFunctionConfigPath());
+          alertFilterFactory = new AlertFilterFactory(config.getAlertFilterConfigPath());
 
-          taskDriver = new TaskDriver(config, anomalyFunctionFactory);
+          taskDriver = new TaskDriver(config, anomalyFunctionFactory, alertFilterFactory);
           taskDriver.start();
         }
         if (config.isScheduler()) {
