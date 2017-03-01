@@ -10,9 +10,11 @@ import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+
 import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
@@ -25,8 +27,8 @@ import org.slf4j.LoggerFactory;
 public class DataCompletenessJobRunner implements JobRunner {
 
   private static final Logger LOG = LoggerFactory.getLogger(DataCompletenessJobRunner.class);
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private DataCompletenessJobContext dataCompletenessJobContext;
   private DateTimeFormatter dateTimeFormatter = DateTimeFormat.forPattern("yyyyMMddHHmm");
@@ -115,13 +117,13 @@ public class DataCompletenessJobRunner implements JobRunner {
           createDataCompletenessTasks(dataCompletenessJobContext);
       LOG.info("DataCompleteness tasks {}", dataCompletenessTasks);
       for (DataCompletenessTaskInfo taskInfo : dataCompletenessTasks) {
+
         String taskInfoJson = null;
         try {
           taskInfoJson = OBJECT_MAPPER.writeValueAsString(taskInfo);
         } catch (JsonProcessingException e) {
-          LOG.error("Exception when converting MonitorTaskInfo {} to jsonString", taskInfo, e);
+          LOG.error("Exception when converting DataCompletenessTaskInfo {} to jsonString", taskInfo, e);
         }
-
         TaskDTO taskSpec = new TaskDTO();
         taskSpec.setTaskType(TaskType.DATA_COMPLETENESS);
         taskSpec.setJobName(dataCompletenessJobContext.getJobName());

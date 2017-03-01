@@ -1,6 +1,9 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.client.DAORegistry;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -12,8 +15,6 @@ import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
@@ -30,8 +31,8 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
 public class DetectionJobRunner {
 
   private static final Logger LOG = LoggerFactory.getLogger(DetectionJobRunner.class);
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private final static DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private TaskGenerator taskGenerator;
 
@@ -44,38 +45,31 @@ public class DetectionJobRunner {
 
     long functionId = detectionJobContext.getAnomalyFunctionId();
     AnomalyFunctionDTO anomalyFunction = DAO_REGISTRY.getAnomalyFunctionDAO().findById(functionId);
-    DateTime monitoringWindowStartTime = null;
-    DateTime monitoringWindowEndTime = null;
-    Long startTime = detectionJobContext.getStartTime();
-    Long endTime = detectionJobContext.getEndTime();
 
-    if (endTime == null) {
-      long delayMillis = 0;
-      if (anomalyFunction.getWindowDelay() != null) {
-        delayMillis = TimeUnit.MILLISECONDS.convert(anomalyFunction.getWindowDelay(), anomalyFunction.getWindowDelayUnit());
-      }
-      monitoringWindowEndTime = new DateTime().minus(delayMillis);
-    } else {
-      monitoringWindowEndTime = new DateTime(endTime);
+    List<DateTime> monitoringWindowStartTimes = new ArrayList<>();
+    List<DateTime> monitoringWindowEndTimes = new ArrayList<>();
+
+    List<Long> startTimes = detectionJobContext.getStartTimes();
+    List<Long> endTimes = detectionJobContext.getEndTimes();
+
+    for (Long startTime : startTimes) {
+      DateTime monitoringWindowStartTime = new DateTime(startTime);
+      monitoringWindowStartTime = alignTimestampsToDataTimezone(monitoringWindowStartTime, anomalyFunction.getCollection());
+      monitoringWindowStartTimes.add(monitoringWindowStartTime);
     }
-    if (startTime == null) {
-      int windowSize = anomalyFunction.getWindowSize();
-      TimeUnit windowUnit = anomalyFunction.getWindowUnit();
-      long windowMillis = TimeUnit.MILLISECONDS.convert(windowSize, windowUnit);
-      monitoringWindowStartTime = monitoringWindowEndTime.minus(windowMillis);
-    } else {
-      monitoringWindowStartTime = new DateTime(startTime);
+    for (Long endTime : endTimes) {
+      DateTime monitoringWindowEndTime = new DateTime(endTime);
+      monitoringWindowEndTime = alignTimestampsToDataTimezone(monitoringWindowEndTime, anomalyFunction.getCollection());
+      monitoringWindowEndTimes.add(monitoringWindowEndTime);
     }
 
-    monitoringWindowStartTime = alignTimestampsToDataTimezone(monitoringWindowStartTime, anomalyFunction.getCollection());
-    monitoringWindowEndTime = alignTimestampsToDataTimezone(monitoringWindowEndTime, anomalyFunction.getCollection());
 
     // write to anomaly_jobs
-    Long jobExecutionId = createJob(detectionJobContext.getJobName(), monitoringWindowStartTime, monitoringWindowEndTime);
+    Long jobExecutionId = createJob(detectionJobContext.getJobName(), monitoringWindowStartTimes.get(0), monitoringWindowEndTimes.get(0));
     detectionJobContext.setJobExecutionId(jobExecutionId);
 
     // write to anomaly_tasks
-    List<Long> taskIds = createTasks(detectionJobContext, monitoringWindowStartTime, monitoringWindowEndTime);
+    List<Long> taskIds = createTasks(detectionJobContext, monitoringWindowStartTimes, monitoringWindowEndTimes);
 
     return jobExecutionId;
   }
@@ -123,14 +117,16 @@ public class DetectionJobRunner {
   }
 
 
-  private List<Long> createTasks(DetectionJobContext detectionJobContext, DateTime monitoringWindowStartTime, DateTime monitoringWindowEndTime) {
+  private List<Long> createTasks(DetectionJobContext detectionJobContext, List<DateTime> monitoringWindowStartTimes,
+      List<DateTime> monitoringWindowEndTimes) {
     List<Long> taskIds = new ArrayList<>();
     try {
 
       List<DetectionTaskInfo> tasks =
-          taskGenerator.createDetectionTasks(detectionJobContext, monitoringWindowStartTime, monitoringWindowEndTime);
+          taskGenerator.createDetectionTasks(detectionJobContext, monitoringWindowStartTimes, monitoringWindowEndTimes);
 
       for (DetectionTaskInfo taskInfo : tasks) {
+
         String taskInfoJson = null;
         try {
           taskInfoJson = OBJECT_MAPPER.writeValueAsString(taskInfo);

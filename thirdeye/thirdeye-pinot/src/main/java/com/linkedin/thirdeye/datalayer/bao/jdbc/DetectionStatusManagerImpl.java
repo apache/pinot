@@ -1,10 +1,14 @@
 package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import org.apache.commons.collections.CollectionUtils;
 
+import org.apache.commons.collections.CollectionUtils;
+import org.joda.time.DateTime;
+
+import com.google.inject.persist.Transactional;
 import com.linkedin.thirdeye.datalayer.bao.DetectionStatusManager;
 import com.linkedin.thirdeye.datalayer.dto.DetectionStatusDTO;
 import com.linkedin.thirdeye.datalayer.pojo.DetectionStatusBean;
@@ -44,5 +48,18 @@ public class DetectionStatusManagerImpl extends AbstractManagerImpl<DetectionSta
       results.add((DetectionStatusDTO) MODEL_MAPPER.map(bean, DetectionStatusDTO.class));
     }
     return results;
+  }
+
+  @Override
+  @Transactional
+  public int deleteRecordsOlderThanDays(int days) {
+    DateTime expireDate = new DateTime().minusDays(days);
+    Timestamp expireTimestamp = new Timestamp(expireDate.getMillis());
+    Predicate timestampPredicate = Predicate.LT("createTime", expireTimestamp);
+    List<DetectionStatusBean> list = genericPojoDao.get(timestampPredicate, DetectionStatusBean.class);
+    for (DetectionStatusBean bean : list) {
+      deleteById(bean.getId());
+    }
+    return list.size();
   }
 }

@@ -71,7 +71,9 @@ public class MonitorTaskRunner implements TaskRunner {
       // fist delete tasks then jobs, as task has a foreign key
       int numAnomalyTasksDeleted = DAO_REGISTRY.getTaskDAO().deleteRecordsOlderThanDaysWithStatus(expireDaysAgo, TaskStatus.COMPLETED);
       int numAnomalyJobsDeleted = DAO_REGISTRY.getJobDAO().deleteRecordsOlderThanDaysWithStatus(expireDaysAgo, JobStatus.COMPLETED);
+      int numDetectionStatusRowsDeleted = DAO_REGISTRY.getDetectionStatusDAO().deleteRecordsOlderThanDays(7);
       LOG.info("Deleted {} anomaly jobs and {} anomaly tasks", numAnomalyJobsDeleted, numAnomalyTasksDeleted);
+      LOG.info("Deleted {} rows from detectionStatus table", numDetectionStatusRowsDeleted);
     } catch (Exception e) {
       LOG.error("Exception in monitor expire task", e);
     }

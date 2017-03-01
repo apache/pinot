@@ -85,7 +85,7 @@ public class DetectionJobResource {
     if (StringUtils.isNotBlank(endTimeIso)) {
       endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso).getMillis();
     }
-    detectionJobScheduler.runAnomalyFunction(id, startTime, endTime);
+    detectionJobScheduler.runAdhocAnomalyFunction(id, startTime, endTime);
     return Response.ok().build();
   }
 

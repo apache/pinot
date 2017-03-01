@@ -25,7 +25,7 @@ import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 public class TaskGenerator {
 
   public List<DetectionTaskInfo> createDetectionTasks(DetectionJobContext detectionJobContext,
-      DateTime monitoringWindowStartTime, DateTime monitoringWindowEndTime)
+      List<DateTime> monitoringWindowStartTimes, List<DateTime> monitoringWindowEndTimes)
       throws Exception {
 
     List<DetectionTaskInfo> tasks = new ArrayList<>();
@@ -36,11 +36,11 @@ public class TaskGenerator {
     String exploreDimensionsString = anomalyFunctionSpec.getExploreDimensions();
     if (StringUtils.isBlank(exploreDimensionsString)) {
       DetectionTaskInfo taskInfo = new DetectionTaskInfo(jobExecutionId,
-          monitoringWindowStartTime, monitoringWindowEndTime, anomalyFunctionSpec, null);
+          monitoringWindowStartTimes, monitoringWindowEndTimes, anomalyFunctionSpec, null);
       tasks.add(taskInfo);
     } else {
       DetectionTaskInfo taskInfo =
-          new DetectionTaskInfo(jobExecutionId, monitoringWindowStartTime, monitoringWindowEndTime, anomalyFunctionSpec,
+          new DetectionTaskInfo(jobExecutionId, monitoringWindowStartTimes, monitoringWindowEndTimes, anomalyFunctionSpec,
               exploreDimensionsString);
         tasks.add(taskInfo);
     }

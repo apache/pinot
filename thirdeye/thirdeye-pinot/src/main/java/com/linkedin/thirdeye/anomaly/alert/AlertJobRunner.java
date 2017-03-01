@@ -123,6 +123,7 @@ public class AlertJobRunner implements Job {
           taskGenerator.createAlertTasks(alertJobContext, monitoringWindowStartTime, monitoringWindowEndTime);
 
       for (AlertTaskInfo taskInfo : tasks) {
+
         String taskInfoJson = null;
         try {
           taskInfoJson = OBJECT_MAPPER.writeValueAsString(taskInfo);

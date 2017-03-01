@@ -2,8 +2,8 @@ package com.linkedin.thirdeye.datalayer.bao;
 
 import java.util.HashSet;
 import java.util.List;
-
 import java.util.Set;
+
 import org.joda.time.DateTime;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -12,8 +12,8 @@ import org.testng.annotations.Test;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.anomaly.monitor.MonitorConstants.MonitorType;
-import com.linkedin.thirdeye.anomaly.monitor.MonitorTaskInfo;
+import com.google.common.collect.Lists;
+import com.linkedin.thirdeye.anomaly.detection.DetectionTaskInfo;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
@@ -51,7 +51,7 @@ public class TestAnomalyTaskManager extends AbstractManagerTestBase {
   }
 
   @Test(dependsOnMethods = {"testCreate"})
-  public void testFindAll() {
+  public void testFindAll() throws Exception {
     List<TaskDTO> anomalyTasks = taskDAO.findAll();
     Assert.assertEquals(anomalyTasks.size(), 2);
   }
@@ -107,17 +107,18 @@ public class TestAnomalyTaskManager extends AbstractManagerTestBase {
     TaskDTO jobSpec = new TaskDTO();
     jobSpec.setJobName("Test_Anomaly_Task");
     jobSpec.setStatus(TaskStatus.WAITING);
-    jobSpec.setTaskType(TaskType.MONITOR);
+    jobSpec.setTaskType(TaskType.ANOMALY_DETECTION);
     jobSpec.setStartTime(new DateTime().minusDays(20).getMillis());
     jobSpec.setEndTime(new DateTime().minusDays(10).getMillis());
-    jobSpec.setTaskInfo(new ObjectMapper().writeValueAsString(getTestMonitorTaskInfo()));
+    jobSpec.setTaskInfo(new ObjectMapper().writeValueAsString(getTestDetectionTaskInfo()));
     jobSpec.setJobId(anomalyJobSpec.getId());
     return jobSpec;
   }
 
-  static MonitorTaskInfo getTestMonitorTaskInfo() {
-    MonitorTaskInfo taskInfo = new MonitorTaskInfo();
-    taskInfo.setMonitorType(MonitorType.UPDATE);
+  static DetectionTaskInfo getTestDetectionTaskInfo() {
+    DetectionTaskInfo taskInfo = new DetectionTaskInfo();
+    taskInfo.setWindowStartTime(Lists.newArrayList(new DateTime(), new DateTime().minusHours(1)));
+    taskInfo.setWindowEndTime(Lists.newArrayList(new DateTime(), new DateTime().minusHours(1)));
     return taskInfo;
   }
 }

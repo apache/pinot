@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -171,9 +172,10 @@ public class DetectionJobSchedulerUtils {
   }
 
 
-  public static String createJobName(AnomalyFunctionDTO anomalyFunction, long startTime, long endTime) {
+  public static String createJobName(AnomalyFunctionDTO anomalyFunction, List<Long> startTimes, List<Long> endTimes) {
 
-    return String.format("%s-%s-%s-%s", anomalyFunction.getId(), anomalyFunction.getFunctionName(), startTime, endTime);
+    return String.format("%s-%s-%s-%s-%d", anomalyFunction.getId(), anomalyFunction.getFunctionName(),
+        startTimes.get(0), endTimes.get(0), startTimes.size());
   }
 
   public static long getExpectedCompleteBuckets(DatasetConfigDTO datasetConfig, long startTime, long endTime) {
