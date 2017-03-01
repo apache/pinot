@@ -7,7 +7,7 @@ import java.util.List;
 import org.apache.commons.collections.CollectionUtils;
 
 public class AverageAnomalyMergeModel extends AbstractMergeModel implements NoPredictionMergeModel {
-  private static final String DEFAULT_MESSAGE_TEMPLATE = "weight: %.2f, score: %.2f";
+  private static final String DEFAULT_MESSAGE_TEMPLATE = "baseLineVal: %.2f, currentVal: %.2f, weight: %.2f, score: %.2f";
 
   /**
    * The weight and score is the average weight and score, respectively, of the raw anomalies of
@@ -28,18 +28,26 @@ public class AverageAnomalyMergeModel extends AbstractMergeModel implements NoPr
 
     double weight = 0d;
     double score = 0d;
+    double baseline = 0d;
+    double current = 0d;
     for (RawAnomalyResultDTO rawAnomaly : rawAnomalyResultDTOs) {
       weight += rawAnomaly.getWeight();
       score += rawAnomaly.getScore();
+      current += rawAnomaly.getAvgCurrentVal();
+      baseline += rawAnomaly.getAvgBaselineVal();
     }
     if (rawAnomalyResultDTOs.size() != 0) {
       double size = rawAnomalyResultDTOs.size();
       weight /= size;
       score /= size;
+      current /= size;
+      anomalyToUpdated.setAvgCurrentVal(current);
+      baseline /= size;
+      anomalyToUpdated.setAvgBaselineVal(baseline);
     }
 
     anomalyToUpdated.setWeight(weight);
     anomalyToUpdated.setScore(score);
-    anomalyToUpdated.setMessage(String.format(DEFAULT_MESSAGE_TEMPLATE, weight, score));
+    anomalyToUpdated.setMessage(String.format(DEFAULT_MESSAGE_TEMPLATE, baseline, current, weight, score));
   }
 }
