@@ -94,17 +94,23 @@ public class DetectionExTaskRunner implements TaskRunner {
         if (df.contains("metric")) {
           dto.setMetric(df.toStrings("metric").first());
         }
+        if (df.contains("dimension")) {
+          DimensionMap m = new DimensionMap();
+          String[] s = df.toStrings("dimension").first().split("=", 2);
+          m.put(s[0], s[1]);
+          dto.setDimensions(m);
+        }
         if (df.contains("score")) {
-          dto.setScore(df.toDoubles("score").first());
+          dto.setScore(df.toDoubles("score").mean());
         }
         if (df.contains("weight")) {
-          dto.setWeight(df.toDoubles("weight").first());
+          dto.setWeight(df.toDoubles("weight").mean());
         }
         if (df.contains("current")) {
-          dto.setAvgCurrentVal(df.toDoubles("current").first());
+          dto.setAvgCurrentVal(df.toDoubles("current").mean());
         }
         if (df.contains("baseline")) {
-          dto.setAvgBaselineVal(df.toDoubles("baseline").first());
+          dto.setAvgBaselineVal(df.toDoubles("baseline").mean());
         }
       }
 

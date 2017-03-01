@@ -10,6 +10,25 @@ import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.TimeGranularity;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.base.Joiner;
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
+import com.linkedin.thirdeye.api.TimeRange;
+import com.linkedin.thirdeye.api.TimeSpec;
+import com.linkedin.thirdeye.client.DAORegistry;
+import com.linkedin.thirdeye.client.MetricExpression;
+import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.client.timeseries.TimeSeriesHandler;
+import com.linkedin.thirdeye.client.timeseries.TimeSeriesRequest;
+import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponse;
+import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow;
+import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow.TimeSeriesMetric;
+import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
+import com.linkedin.thirdeye.constant.FeedbackStatus;
+import com.linkedin.thirdeye.constant.MetricAggFunction;
+import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomaliesSummary;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomaliesWrapper;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalyDataCompare;
@@ -21,13 +40,23 @@ import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionExManager;
+import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionExDTO;
+import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 import com.linkedin.thirdeye.detector.metric.transfer.MetricTransfer;
 import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
-import com.linkedin.thirdeye.detector.function.AnomalyFunction;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -45,7 +74,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -53,7 +81,6 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
-
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.text.StrSubstitutor;
@@ -67,35 +94,6 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.base.Joiner;
-import com.google.common.collect.Multimap;
-import com.linkedin.thirdeye.api.TimeRange;
-import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.client.DAORegistry;
-import com.linkedin.thirdeye.client.MetricExpression;
-import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.client.timeseries.TimeSeriesHandler;
-import com.linkedin.thirdeye.client.timeseries.TimeSeriesRequest;
-import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponse;
-import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow;
-import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow.TimeSeriesMetric;
-import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
-import com.linkedin.thirdeye.constant.FeedbackStatus;
-import com.linkedin.thirdeye.constant.MetricAggFunction;
-import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
-import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 @Path(value = "/anomalies")
 @Produces(MediaType.APPLICATION_JSON)
@@ -542,7 +540,7 @@ public class AnomaliesResource {
   }
 
 
-  private Map<String, String> getAnomalyMessageDataMap(String message) {
+  private static Map<String, String> getAnomalyMessageDataMap(String message) {
     Map<String, String> messageDataMap = new HashMap<>();
     String[] tokenPairs = message.split("[,]");
     for (String tokenPair : tokenPairs) {
@@ -713,16 +711,35 @@ public class AnomaliesResource {
     String dataset = datasetConfig.getDataset();
     String metricName = mergedAnomaly.getMetric();
 
+    Multimap<String, String> filterSet = ArrayListMultimap.create();
+
     AnomalyFunctionDTO anomalyFunctionSpec = null;
     BaseAnomalyFunction anomalyFunction = null;
     if(mergedAnomaly.getFunctionId() >= 0) {
       anomalyFunctionSpec = anomalyFunctionDAO.findById(mergedAnomaly.getFunctionId());
       anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
+      filterSet = anomalyFunctionSpec.getFilterSet();
     }
 
     AnomalyFunctionExDTO anomalyFunctionEx = null;
-    if(mergedAnomaly.getFunctionId() < 0)
+    if(mergedAnomaly.getFunctionId() < 0) {
       anomalyFunctionEx = anomalyFunctionExDAO.findById(-mergedAnomaly.getFunctionId());
+
+      if (mergedAnomaly.getCollection() != null) {
+        dataset = mergedAnomaly.getCollection();
+      }
+
+      if (mergedAnomaly.getMetric() != null) {
+        metricName = mergedAnomaly.getMetric();
+      }
+
+      if (mergedAnomaly.getDimensions().isEmpty()) {
+        filterSet = ArrayListMultimap.create();
+        for (Map.Entry<String, String> e : mergedAnomaly.getDimensions().entrySet()) {
+          filterSet.put(e.getKey(), e.getValue());
+        }
+      }
+    }
 
     String aggGranularity = constructAggGranularity(datasetConfig);
 
@@ -731,6 +748,9 @@ public class AnomaliesResource {
     TimeRange range = getTimeseriesOffsetedTimes(anomalyStartTime, anomalyEndTime, datasetConfig);
     long currentStartTime = range.getStart();
     long currentEndTime = range.getEnd();
+
+    long baselineStartTime = new DateTime(currentStartTime).minusDays(7).getMillis();
+    long baselineEndTime = new DateTime(currentEndTime).minusDays(7).getMillis();
 
     DimensionMap dimensions = mergedAnomaly.getDimensions();
     TimeGranularity timeGranularity =
@@ -843,13 +863,30 @@ public class AnomaliesResource {
     anomalyDetails.setExternalUrl(externalUrl);
 
     // from function
-    if(anomalyFunction != null)
+    if(anomalyFunction != null) {
       populateFromAnomalyFunction(anomalyDetails, anomalyFunction);
+      populateValuesFromString(anomalyDetails, mergedAnomaly.getMessage());
+    }
 
-    if(anomalyFunctionEx != null)
+    if(anomalyFunctionEx != null) {
       populateFromAnomalyFunctionEx(anomalyDetails, anomalyFunctionEx);
+      populateValuesFromAnomaly(anomalyDetails, mergedAnomaly);
+    }
 
     return anomalyDetails;
+  }
+
+  private static AnomalyDetails populateValuesFromAnomaly(AnomalyDetails d, MergedAnomalyResultDTO dto) {
+    d.setCurrent(String.valueOf(dto.getAvgCurrentVal()));
+    d.setBaseline(String.valueOf(dto.getAvgBaselineVal()));
+    return d;
+  }
+
+  private static AnomalyDetails populateValuesFromString(AnomalyDetails d, String s) {
+    Map<String, String> messageDataMap = getAnomalyMessageDataMap(s);
+    d.setCurrent(messageDataMap.get(ANOMALY_CURRENT_VAL_KEY));
+    d.setBaseline(messageDataMap.get(ANOMALY_BASELINE_VAL_KEY));
+    return d;
   }
 
   private static AnomalyDetails populateFromAnomalyFunction(AnomalyDetails d, AnomalyFunctionDTO dto) {

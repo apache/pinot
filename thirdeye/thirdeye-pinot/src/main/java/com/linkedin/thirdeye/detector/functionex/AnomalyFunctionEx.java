@@ -35,9 +35,7 @@ public abstract class AnomalyFunctionEx {
     if(!hasDataSource(dataSource))
       throw new IllegalArgumentException(String.format("DataSource '%s' not available", dataSource));
     LOG.info("Querying '{}': {}", dataSource, query);
-    R response = (R) context.getDataSources().get(dataSource).query(query, context);
-    LOG.debug("Got result: {}", response);
-    return response;
+    return (R) context.getDataSources().get(dataSource).query(query, context);
   }
 
   protected boolean hasDataSource(String dataSource) {
