@@ -77,6 +77,7 @@ public class CloneFunctionAndAutoTuneAlertFilterTool {
     for(AnomalyFunctionDTO anomalyFunctionSpec: anomalyFunctionSpecs) {
       Long functionId = anomalyFunctionSpec.getId();
       Long clonedFunctionId = cloneFunctionToAutotune(functionId, AUTOTUNE_TAG, IS_CLONE_ANOMALY);
+
       // remove holiday for cloned functionId
       if (isRemoveHoliday) {
         try {

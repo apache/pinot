@@ -70,33 +70,32 @@ public class FetchAutoTuneResult {
     Map<Long, Long> clonedMap = executor.readTwoColumnsCSVToMap(DIR_TO_FILE + cloneMapName);
     LOG.info("Read function mappings from file: {}", DIR_TO_FILE + cloneMapName);
 
-    // getTuned
+    // getTuned and Evaluate prev, curr alert filter
     Map<Long, Boolean> tunedResult = new HashMap<>();
-    for(Map.Entry<Long, Long> pair: clonedMap.entrySet()) {
-      Long clonedFunctionId = pair.getValue();
-      Boolean isUpdated = Boolean.valueOf(executor.getTunedAlertFilterByFunctionId(clonedFunctionId, STARTTIMEISO, ENDTIMEISO, AUTOTUNE_TYPE));
-      tunedResult.put(clonedFunctionId, isUpdated);
-    }
-    LOG.info("Tuned cloned functions");
-
-    // evaluate prev, curr alert filter
     Map<Long, String> outputMap = new HashMap<>();
-    for (Map.Entry<Long, Long> pair: clonedMap.entrySet()) {
+    for(Map.Entry<Long, Long> pair: clonedMap.entrySet()) {
+
       StringBuilder outputVal = new StringBuilder(Collection + CloneFunctionAndAutoTuneAlertFilterTool.CSVSEPERATOR);
 
-      //origin function info
-      Long origFunctionId = pair.getKey();
-      String origEvals = executor.evalAlertFilterToCommaSeperateString(origFunctionId, STARTTIMEISO, ENDTIMEISO);
+      Long clonedFunctionId = pair.getValue();
 
-      //tuned function info
-      Long tunedFunctionId = pair.getValue();
-      String tunedEvals = executor.evalAlertFilterToCommaSeperateString(tunedFunctionId, STARTTIMEISO, ENDTIMEISO);
+      //before tuning, evaluate current
+      String origEvals = executor.evalAlertFilterToCommaSeperateString(clonedFunctionId, STARTTIMEISO, ENDTIMEISO);
+
+      // tune by functionId
+      Boolean isUpdated = Boolean.valueOf(executor.getTunedAlertFilterByFunctionId(clonedFunctionId, STARTTIMEISO, ENDTIMEISO, AUTOTUNE_TYPE));
+
+      // after tuning, evaluate tuned
+      String tunedEvals = executor.evalAlertFilterToCommaSeperateString(clonedFunctionId, STARTTIMEISO, ENDTIMEISO);
 
       outputVal.append(origEvals)
           .append(tunedEvals)
-          .append(tunedResult.get(tunedFunctionId));
-      outputMap.put(origFunctionId, outputVal.toString());
+          .append(isUpdated);
+
+      outputMap.put(pair.getKey(), outputVal.toString());
+      tunedResult.put(clonedFunctionId, isUpdated);
     }
+    LOG.info("Tuned cloned functions and constructed evaluations");
 
     // write to file
     executor.writeMapToCSV(Collections.unmodifiableMap(outputMap), DIR_TO_FILE + Collection + CSVSUFFIX);
