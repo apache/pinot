@@ -1,43 +1,57 @@
 package com.linkedin.thirdeye.detector.email.filter;
 
+
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.List;
+import java.util.Properties;
 
 
 /**
  * Utility class to evaluate alert filter
  */
-public class AlertFilterUtil {
-  public static final Integer PRECISION_INDEX = 0;
-  public static final Integer RECALL_INDEX = 1;
-  public static final Integer TOTAL_ANOMALIES_INDEX = 0;
-  public static final Integer TOTAL_RESPONSES_INDEX = 1;
-  public static final Integer TRUE_ANOMALY_INDEX = 2;
-  public static final Integer FALSE_ALARM_INDEX = 3;
-  public static final Integer NONACTIONALBLE_INDEX = 4;
+public class AlertFilterEvaluationUtil {
 
-  private static final Integer NUM_EVALUATE_METRICS = 2;
-  private static final Integer NUM_EVALUTATE_FEEDBACK_METRICS = 5;
+  private double precision = -1;
+  private double recall = -1;
+  private int totalAnomalies = -1;
+  private int totalResponses = -1;
+  private int trueAnomalies = -1;
+  private int falseAlarm = -1;
+  private int nonActionable = -1;
+
+  private static final String PRECISION = "precision";
+  private static final String RECALL = "recall";
+  private static final String TOTALANOMALIES = "totalAnomalies";
+  private static final String TOTALRESPONSES = "totalResponses";
+  private static final String TRUEANOMALIES = "trueAnomalies";
+  private static final String FALSEALARM = "falseAlarm";
+  private static final String NONACTIONABLE = "nonActionable";
+
+  public double getPrecision(){return this.precision;}
+  public double getRecall(){return this.recall;}
+  public int getTotalAnomalies(){return this.totalAnomalies;}
+  public int getTotalResponses(){return this.totalResponses;}
+  public int getTrueAnomalies(){return this.trueAnomalies;}
+  public int getFalseAlarm(){return this.falseAlarm;}
+  public int getNonActionable(){return this.nonActionable;}
 
   private AlertFilter alertFilter;
 
-  public AlertFilterUtil(AlertFilter alertFilter){
+  public AlertFilterEvaluationUtil(AlertFilter alertFilter){
     this.alertFilter = alertFilter;
   }
 
   /**
    * Evaluate alert filter given merged anomalies and output precision and recall
    * @param mergedAnomalyResultDTOS
-   * @return Array of precision and recall
    * @throws Exception
    */
-  public Double[] getEvalResults(List<MergedAnomalyResultDTO> mergedAnomalyResultDTOS) throws Exception {
+  public void updatePrecisionAndRecall(List<MergedAnomalyResultDTO> mergedAnomalyResultDTOS) throws Exception {
     int TP = 0;
     int FP = 0;
     int FN = 0;
-    Double[] evals = new Double[NUM_EVALUATE_METRICS];
     for (MergedAnomalyResultDTO anomaly: mergedAnomalyResultDTOS) {
       boolean predLabel = alertFilter.isQualified(anomaly);
       AnomalyFeedbackDTO feedback = anomaly.getFeedback();
@@ -60,20 +74,17 @@ public class AlertFilterUtil {
     if (TP + FP == 0) {
       throw new Exception("No predicted true labels. Check model input");
     }
-    evals[PRECISION_INDEX] = 1.000 * TP / (TP + FP);
-    evals[RECALL_INDEX] = 1.000 * TP / (TP + FN);
-    return evals;
+    this.precision = 1.000 * TP / (TP + FP);
+    this.recall = 1.000 * TP / (TP + FN);
   }
 
-  //TODO: put it somewhere not in alertfilterUtil?
+
 
   /**
    * Provide feedback summary give a list of merged anomalies
    * @param anomalies
-   * @return summary array of feedbacks
    */
-  public Integer[] getEvalFeedbacks(List<MergedAnomalyResultDTO> anomalies){
-    Integer[] evals = new Integer[NUM_EVALUTATE_FEEDBACK_METRICS];
+  public void updateFeedbackSummary(List<MergedAnomalyResultDTO> anomalies){
     int totalAnomalies = 0;
     int totalResponses = 0;
     int trueAnomalies = 0;
@@ -99,11 +110,22 @@ public class AlertFilterUtil {
         }
       }
     }
-    evals[TOTAL_ANOMALIES_INDEX] = totalAnomalies;
-    evals[TOTAL_RESPONSES_INDEX] = totalResponses;
-    evals[TRUE_ANOMALY_INDEX] = trueAnomalies;
-    evals[FALSE_ALARM_INDEX] = falseAlarm;
-    evals[NONACTIONALBLE_INDEX] = nonActionable;
+    this.totalAnomalies = totalAnomalies;
+    this.totalResponses = totalResponses;
+    this.trueAnomalies = trueAnomalies;
+    this.falseAlarm = falseAlarm;
+    this.nonActionable = nonActionable;
+  }
+
+  public Properties toProperties() {
+    Properties evals = new Properties();
+    evals.put(PRECISION, precision);
+    evals.put(RECALL, recall);
+    evals.put(TOTALANOMALIES, totalAnomalies);
+    evals.put(TOTALRESPONSES, totalResponses);
+    evals.put(TRUEANOMALIES, trueAnomalies);
+    evals.put(FALSEALARM, falseAlarm);
+    evals.put(NONACTIONABLE, nonActionable);
     return evals;
   }
 }

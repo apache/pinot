@@ -46,9 +46,9 @@ public class DetectionResourceHttpUtils extends AbstractResourceHttpUtils {
     return callJobEndpoint(req);
   }
 
-  public String runAutoTune(String function_id, String startTimeIso, String endTimeIso, String autoTuneType) throws Exception {
+  public String runAutoTune(Long functionId, Long startTimeIso, Long endTimeIso, String autoTuneType) throws Exception {
     HttpPost req = new HttpPost(
-        DETECTION_JOB_ENDPOINT + AUTOTUNE_FILTER + function_id
+        DETECTION_JOB_ENDPOINT + AUTOTUNE_FILTER + functionId
             + "?startTime=" + startTimeIso
         + "&endTime=" + endTimeIso
         + "&autoTuneType=" + autoTuneType
@@ -56,9 +56,9 @@ public class DetectionResourceHttpUtils extends AbstractResourceHttpUtils {
     return callJobEndpoint(req);
   }
 
-  public String getEvalStatsAlertFilter(String function_id, String startTimeIso, String endTimeIso) throws Exception{
+  public String getEvalStatsAlertFilter(Long functionId, Long startTimeIso, Long endTimeIso) throws Exception{
     HttpPost req = new HttpPost(
-        DETECTION_JOB_ENDPOINT + EVAL_FILTER + function_id
+        DETECTION_JOB_ENDPOINT + EVAL_FILTER + functionId
             + "?startTime=" + startTimeIso
             + "&endTime=" + endTimeIso
     );

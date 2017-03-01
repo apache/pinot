@@ -9,17 +9,25 @@ import org.apache.http.client.methods.HttpPost;
  * Utility class for calling OnboardResource endpoint to execute/schedule jobs
  */
 public class OnboardResourceHttpUtils extends AbstractResourceHttpUtils {
-  private String Onboard_Resource_ENDPOINT = "/onboard/";
-  private String Function_Key = "function";
-  private String Clone_Key = "clone";
+  private static final String ONBOARD_RESOURCE_ENDPOINT = "/onboard/";
+  private static final String FUNCTION_KEY = "function";
+  private static final String CLONE_KEY = "clone";
+  private static final String DELETE_EXISTING_ANOMALIES = "deleteExistingAnomalies";
 
   public OnboardResourceHttpUtils(String onboardHost, int onboardPost) {
     super(new HttpHost(onboardHost, onboardPost));
   }
 
-  public String getClonedFunctionID(String functionId, String tag, boolean isCloneAnomaly) throws IOException{
-    HttpPost req = new HttpPost(Onboard_Resource_ENDPOINT + Function_Key + "/" + functionId + "/" + Clone_Key + "/"
+  public String getClonedFunctionID(long functionId, String tag, boolean isCloneAnomaly) throws IOException{
+    HttpPost req = new HttpPost(ONBOARD_RESOURCE_ENDPOINT + FUNCTION_KEY + "/" + functionId + "/" + CLONE_KEY + "/"
     + tag + "?cloneAnomaly=" + String.valueOf(isCloneAnomaly));
+    return callJobEndpoint(req);
+  }
+
+  public String removeMergedAnomalies(long functionId, long startTime, long endTime) throws IOException{
+    HttpPost req = new HttpPost(ONBOARD_RESOURCE_ENDPOINT + FUNCTION_KEY + "/" + functionId + "/" + DELETE_EXISTING_ANOMALIES
+        + "?start="+startTime
+        + "&end="+ endTime);
     return callJobEndpoint(req);
   }
 }
