@@ -200,8 +200,6 @@
             <configuration>
               <nodeVersion>v6.10.0</nodeVersion>
               <npmVersion>3.10.0</npmVersion>
- <!--              <workingDirectory>src/main/frontend/</workingDirectory>
-              <installDirectory>src/main/frontend/node_maven/</installDirectory> -->
             </configuration>
           </execution>
 
@@ -211,10 +209,16 @@
               <goal>npm</goal>
             </goals>
             <phase>generate-resources</phase>
-            <!-- Optional configuration which provides for running any npm command -->
             <configuration>
               <arguments>install</arguments>
             </configuration>
+          </execution>
+          <execution>
+            <id>grunt build</id>
+            <goals>
+              <goal>grunt</goal>
+            </goals>
+            <phase>generate-sources</phase>
           </execution>
         </executions>
       </plugin>

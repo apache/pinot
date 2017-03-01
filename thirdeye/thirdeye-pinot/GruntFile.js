@@ -17,9 +17,9 @@ module.exports = (grunt) => {
         files: [
           {
             expand: true,
-            cwd: 'front-end/javascript/',
+            cwd: 'src/main/resources/assets/javascript/',
             src: ['**/*.js'],
-            dest: 'src/main/resources/assets/javascript/'
+            dest: 'target/classes/assets/javascript/'
           }
         ]
       }
