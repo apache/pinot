@@ -213,12 +213,16 @@
               <arguments>install</arguments>
             </configuration>
           </execution>
+
           <execution>
             <id>grunt build</id>
             <goals>
               <goal>grunt</goal>
             </goals>
-            <phase>generate-sources</phase>
+            <phase>generate-resources</phase>
+            <configuration>
+              <arguments>--no-color</arguments>
+            </configuration>
           </execution>
         </executions>
       </plugin>
