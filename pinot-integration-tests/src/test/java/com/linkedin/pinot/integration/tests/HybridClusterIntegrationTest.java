@@ -309,7 +309,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
 
     // Start the Pinot cluster
     ControllerConf config = ControllerTestUtils.getDefaultControllerConfiguration();
-    config.setTenantIsolationEnabled(true);
+    config.setTenantIsolationEnabled(false);
     startController(config);
     startBroker();
     startServers(2);

@@ -136,16 +136,6 @@ public abstract class ControllerTest {
     _propertyStore = _controllerStarter.getHelixResourceManager().getPropertyStore();
   }
 
-  /**
-   * Starts a controller instance.
-   */
-  /*protected void startController(boolean useTenantIsolation) {
-    assert _controllerStarter == null;
-    ControllerConf config = ControllerTestUtils.getDefaultControllerConfiguration();
-    config.setTenantIsolationEnabled(!useTenantIsolation);
-    startController(config);
-  }
-*/
   protected void startController() {
     startController(ControllerTestUtils.getDefaultControllerConfiguration());
   }

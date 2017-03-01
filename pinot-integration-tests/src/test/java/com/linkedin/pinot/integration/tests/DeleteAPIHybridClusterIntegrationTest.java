@@ -77,7 +77,7 @@ public class DeleteAPIHybridClusterIntegrationTest extends HybridClusterIntegrat
   // TODO: Find ways to refactor waitForNumRows and waitForSegmentsToBeInDeleteDirectory
   private void waitForNumRows(long numRows, CommonConstants.Helix.TableType tableType) throws Exception {
     long start = System.currentTimeMillis();
-    long end = start + 600 * 1000;
+    long end = start + 60 * 1000;
     while (System.currentTimeMillis() < end) {
       if (numRowsReturned(tableType) == numRows) {
         return;
