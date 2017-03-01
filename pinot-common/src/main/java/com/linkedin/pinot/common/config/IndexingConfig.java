@@ -36,6 +36,7 @@ public class IndexingConfig {
   private Map<String, String> streamConfigs = new HashMap<String, String>();
   private String segmentFormatVersion;
   private String starTreeFormat;
+  private List<String> noDictionaryColumns;
 
   public IndexingConfig() {
 
@@ -87,6 +88,14 @@ public class IndexingConfig {
 
   public String getSegmentFormatVersion() {
     return segmentFormatVersion;
+  }
+
+  public List<String> getNoDictionaryColumns() {
+    return noDictionaryColumns;
+  }
+
+  public void setNoDictionaryColumns(List<String> noDictionaryColumns) {
+    this.noDictionaryColumns = noDictionaryColumns;
   }
 
   @Override

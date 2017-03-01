@@ -73,7 +73,6 @@ public class CommonConstants {
       public static final String SCHEMA = "schema";
       public static final String KAFKA = "kafka";
       public static final String STREAM_PREFIX = "stream";
-
       public static enum SegmentAssignmentStrategyType {
         RandomAssignmentStrategy,
         BalanceNumSegmentAssignmentStrategy,
@@ -93,6 +92,8 @@ public class CommonConstants {
         public static final String STREAM_TYPE = "streamType";
         // Time threshold that will keep the realtime segment open for before we convert it into an offline segment
         public static final String REALTIME_SEGMENT_FLUSH_TIME = "realtime.segment.flush.threshold.time";
+        // Time threshold that controller will wait for the segment to be built by the server
+        public static final String SEGMENT_COMMIT_TIMEOUT_SECONDS = "realtime.segment.commit.timeoutSeconds";
         /**
          * Row count flush threshold for realtime segments. This behaves in a similar way for HLC and LLC. For HLC,
          * since there is only one consumer per server, this size is used as the size of the consumption buffer and

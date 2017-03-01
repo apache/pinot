@@ -105,7 +105,7 @@ public class ControllerRequestBuilder {
     List<String> invertedIndexColumns = Collections.emptyList();
     return buildCreateRealtimeTableJSON(tableName, serverTenant, brokerTenant, timeColumnName, timeType, retentionTimeUnit,
         retentionTimeValue, numReplicas, segmentAssignmentStrategy, streamConfigs, schemaName, sortedColumn,
-        invertedIndexColumns, null, true);
+        invertedIndexColumns, null, true, null);
   }
 
   public static JSONObject buildCreateRealtimeTableJSON(String tableName, String serverTenant, String brokerTenant,
@@ -113,6 +113,16 @@ public class ControllerRequestBuilder {
       String segmentAssignmentStrategy, JSONObject streamConfigs, String schemaName, String sortedColumn,
       List<String> invertedIndexColumns, String loadMode, boolean isHighLevel)
           throws JSONException {
+    return buildCreateRealtimeTableJSON(tableName, serverTenant, brokerTenant, timeColumnName, timeType, retentionTimeUnit,
+        retentionTimeValue, numReplicas, segmentAssignmentStrategy, streamConfigs, schemaName, sortedColumn,
+        invertedIndexColumns, loadMode, isHighLevel, null);
+  }
+
+  public static JSONObject buildCreateRealtimeTableJSON(String tableName, String serverTenant, String brokerTenant,
+        String timeColumnName, String timeType, String retentionTimeUnit, String retentionTimeValue, int numReplicas,
+    String segmentAssignmentStrategy, JSONObject streamConfigs, String schemaName, String sortedColumn,
+        List<String> invertedIndexColumns, String loadMode, boolean isHighLevel, List<String> noDictionaryColumns)
+    throws JSONException {
     JSONObject creationRequest = new JSONObject();
     creationRequest.put("tableName", tableName);
 
@@ -144,6 +154,9 @@ public class ControllerRequestBuilder {
       sortedColumns.put(sortedColumn);
     }
     tableIndexConfig.put("sortedColumn", sortedColumns);
+    if (noDictionaryColumns != null) {
+      tableIndexConfig.put("noDictionaryColumns", noDictionaryColumns);
+    }
     creationRequest.put("tableIndexConfig", tableIndexConfig);
     JSONObject tenants = new JSONObject();
     tenants.put("broker", brokerTenant);

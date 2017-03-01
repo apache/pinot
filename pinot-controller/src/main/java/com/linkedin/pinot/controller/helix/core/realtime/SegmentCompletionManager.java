@@ -291,11 +291,11 @@ public class SegmentCompletionManager {
     private String _winner;
     private final PinotLLCRealtimeSegmentManager _segmentManager;
     private final SegmentCompletionManager _segmentCompletionManager;
-    // Once the winner is notified, the are expected to commit right away. At this point, it is the segment build
+    // Once the winner is notified, they are expected to commit right away. At this point, it is the segment build
     // time that we need to consider.
     // We may need to add some time here to allow for getting the lock? For now 0
     // We may need to add some time for the committer come back to us (after the build)? For now 0.
-    private final long _maxTimeAllowedToCommitMs = MAX_TIME_TO_NOTIFY_WINNER_MS + SegmentCompletionProtocol.getMaxSegmentCommitTimeMs();
+    private long _maxTimeAllowedToCommitMs;
 
     public static SegmentCompletionFSM fsmInHolding(PinotLLCRealtimeSegmentManager segmentManager, SegmentCompletionManager segmentCompletionManager, LLCSegmentName segmentName, int numReplicas) {
       return new SegmentCompletionFSM(segmentManager, segmentCompletionManager, segmentName, numReplicas);
@@ -321,6 +321,8 @@ public class SegmentCompletionManager {
       _excludedServerStateMap = new HashSet<>(_numReplicas);
       _segmentCompletionManager = segmentCompletionManager;
       _startTime = _segmentCompletionManager.getCurrentTimeMs();
+      _maxTimeAllowedToCommitMs = MAX_TIME_TO_NOTIFY_WINNER_MS +
+          _segmentManager.getCommitTimeoutMS(_segmentName.getTableName());
       LOGGER = LoggerFactory.getLogger("SegmentFinalizerFSM_"  + segmentName.getSegmentName());
     }
 
