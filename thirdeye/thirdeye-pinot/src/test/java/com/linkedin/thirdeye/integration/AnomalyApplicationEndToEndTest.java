@@ -31,6 +31,7 @@ import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
+import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.io.InputStream;
@@ -63,6 +64,7 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
   private AnomalyMergeExecutor anomalyMergeExecutor = null;
   private DataCompletenessScheduler dataCompletenessScheduler = null;
   private AnomalyFunctionFactory anomalyFunctionFactory = null;
+  private AlertFilterFactory alertFilterFactory = null;
   private ThirdEyeCacheRegistry cacheRegistry = ThirdEyeCacheRegistry.getInstance();
   private ThirdEyeAnomalyConfiguration thirdeyeAnomalyConfig;
   private List<TaskDTO> tasks;
@@ -72,6 +74,7 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
   private int id = 0;
   private String dashboardHost = "http://localhost:8080/dashboard";
   private String functionPropertiesFile = "/sample-functions.properties";
+  private String alertFilterPropertiesFile = "/sample-alertfilter.properties";
   private String metric = "cost";
   private String collection = "test-collection";
 
@@ -147,6 +150,7 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
     thirdeyeAnomalyConfig.setMonitorConfiguration(monitorConfiguration);
     thirdeyeAnomalyConfig.setRootDir(System.getProperty("dw.rootDir", "NOT_SET(dw.rootDir)"));
 
+
     // create test anomaly function
     functionId = anomalyFunctionDAO.save(getTestFunctionSpec(metric, collection));
 
@@ -162,6 +166,10 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
     // setup function factory for worker and merger
     InputStream factoryStream = AnomalyApplicationEndToEndTest.class.getResourceAsStream(functionPropertiesFile);
     anomalyFunctionFactory = new AnomalyFunctionFactory(factoryStream);
+
+    // setup alertfilter factory for worker
+    InputStream alertFilterStream = AnomalyApplicationEndToEndTest.class.getResourceAsStream(alertFilterPropertiesFile);
+    alertFilterFactory = new AlertFilterFactory(alertFilterStream);
   }
 
 
@@ -341,7 +349,7 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
 
 
   private void startWorker() throws Exception {
-    taskDriver = new TaskDriver(thirdeyeAnomalyConfig, anomalyFunctionFactory);
+    taskDriver = new TaskDriver(thirdeyeAnomalyConfig, anomalyFunctionFactory, alertFilterFactory);
     taskDriver.start();
   }
 

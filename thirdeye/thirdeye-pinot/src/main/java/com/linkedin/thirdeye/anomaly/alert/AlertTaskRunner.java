@@ -75,7 +75,7 @@ public class AlertTaskRunner implements TaskRunner {
     windowStart = alertTaskInfo.getWindowStartTime();
     windowEnd = alertTaskInfo.getWindowEndTime();
     thirdeyeConfig = taskContext.getThirdEyeAnomalyConfiguration();
-    alertFilterFactory = new AlertFilterFactory(thirdeyeConfig.getAlertFilterConfigPath());
+    alertFilterFactory = taskContext.getAlertFilterFactory();
 
     try {
       LOG.info("Begin executing task {}", taskInfo);
