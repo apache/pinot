@@ -164,7 +164,8 @@ public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunc
     }
     List<TransformationFunction> baselineTimeSeriesTransformationChain =
         getBaselineTimeSeriesTransformationChain();
-    if (CollectionUtils.isNotEmpty(baselineTimeSeriesTransformationChain)) {
+    if (CollectionUtils.isNotEmpty(anomalyDetectionContext.getTransformedBaselines(metricName))
+        && CollectionUtils.isNotEmpty(baselineTimeSeriesTransformationChain)) {
       for (TransformationFunction tf : baselineTimeSeriesTransformationChain) {
         List<TimeSeries> transformedBaselines = new ArrayList<>();
         for (TimeSeries ts : anomalyDetectionContext.getTransformedBaselines(metricName)) {

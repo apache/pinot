@@ -38,7 +38,7 @@ public class MinMaxThresholdDetectionModel extends AbstractDetectionModel {
     // Compute the bucket size, so we can iterate in those steps
     long bucketMillis = anomalyDetectionContext.getBucketSizeInMS();
     Interval timeSeriesInterval = timeSeries.getTimeSeriesInterval();
-    long numBuckets = (timeSeriesInterval.getStartMillis() - timeSeriesInterval.getEndMillis()) / bucketMillis;
+    long numBuckets = Math.abs(timeSeriesInterval.getEndMillis() - timeSeriesInterval.getStartMillis()) / bucketMillis;
 
     // avg value of this time series
     averageValue /= numBuckets;
@@ -55,7 +55,7 @@ public class MinMaxThresholdDetectionModel extends AbstractDetectionModel {
         anomalyResult.setEndTime(timeBucket + bucketMillis); // point-in-time
         anomalyResult.setDimensions(dimensionMap);
         anomalyResult.setScore(averageValue);
-        anomalyResult.setWeight(Math.abs(deviationFromThreshold)); // higher change, higher the severity
+        anomalyResult.setWeight(deviationFromThreshold); // higher change, higher the severity
         anomalyResult.setAvgCurrentVal(value);
         String message =
             String.format(DEFAULT_MESSAGE_TEMPLATE, deviationFromThreshold, value, min, max);
