@@ -49,5 +49,6 @@ public abstract class Series {
   abstract int[] sortedIndex();
   abstract Series filter(int[] fromIndex);
   abstract Series reorder(int[] toIndex);
+  abstract int[] nullIndex();
 
 }

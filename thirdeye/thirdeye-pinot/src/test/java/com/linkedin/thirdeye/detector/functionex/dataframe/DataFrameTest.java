@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.detector.functionex.dataframe;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import org.testng.Assert;
@@ -688,4 +689,107 @@ public class DataFrameTest {
     Assert.assertEquals(s6.shift(-100).values(), new String[] { null, null, null, null, null });
   }
 
+  @Test(expectedExceptions = IllegalStateException.class)
+  public void testDoubleMapNullConditionalFail() {
+    DoubleSeries s = DataFrame.toSeries(1.0, DoubleSeries.NULL_VALUE, 2.0);
+    s.map(new DoubleSeries.DoubleConditional() {
+      @Override
+      public boolean apply(double value) {
+        return false;
+      }
+    });
+  }
+
+  @Test(expectedExceptions = IllegalStateException.class)
+  public void testLongMapNullConditionalFail() {
+    LongSeries s = DataFrame.toSeries(1, LongSeries.NULL_VALUE, 2);
+    s.map(new LongSeries.LongConditional() {
+      @Override
+      public boolean apply(long value) {
+        return false;
+      }
+    });
+  }
+
+  @Test(expectedExceptions = IllegalStateException.class)
+  public void testStringMapNullConditionalFail() {
+    StringSeries s = DataFrame.toSeries("1.0", StringSeries.NULL_VALUE, "2.0");
+    s.map(new StringSeries.StringConditional() {
+      @Override
+      public boolean apply(String value) {
+        return false;
+      }
+    });
+  }
+
+  @Test(expectedExceptions = IllegalStateException.class)
+  public void testDoubleMapNullFunctionFail() {
+    DoubleSeries s = DataFrame.toSeries(1.0, DoubleSeries.NULL_VALUE, 2.0);
+    s.map(new DoubleSeries.DoubleFunction() {
+      @Override
+      public double apply(double value) {
+        return value;
+      }
+    });
+  }
+
+  @Test(expectedExceptions = IllegalStateException.class)
+  public void testLongMapNullFunctionFail() {
+    LongSeries s = DataFrame.toSeries(1, LongSeries.NULL_VALUE, 2);
+    s.map(new LongSeries.LongFunction() {
+      @Override
+      public long apply(long value) {
+        return value;
+      }
+    });
+  }
+
+  @Test(expectedExceptions = IllegalStateException.class)
+  public void testStringMapNullFunctionFail() {
+    StringSeries s = DataFrame.toSeries("1.0", StringSeries.NULL_VALUE, "2.0");
+    s.map(new StringSeries.StringFunction() {
+      @Override
+      public String apply(String value) {
+        return value;
+      }
+    });
+  }
+
+  @Test
+  public void testDropNullRows() {
+    DataFrame mdf = new DataFrame(new long[] { 1, 2, 3, 4, 5, 6 });
+    mdf.addSeries("double", 1.0, 2.0, DoubleSeries.NULL_VALUE, 4.0, 5.0, 6.0);
+    mdf.addSeries("long", LongSeries.NULL_VALUE, 2, 3, 4, 5, 6);
+    mdf.addSeries("string", "1.0", "2", "bbb", "true", StringSeries.NULL_VALUE, "aaa");
+    mdf.addSeries("boolean", true, true, false, false, false, false);
+
+    DataFrame ddf = mdf.dropNullRows();
+    Assert.assertEquals(ddf.getIndex().size(), 3);
+    Assert.assertEquals(ddf.getIndex().values(), new long[] { 2, 4, 6 });
+    Assert.assertEquals(ddf.toDoubles("double").values(), new double[] { 2.0, 4.0, 6.0 });
+    Assert.assertEquals(ddf.toLongs("long").values(), new long[] { 2, 4, 6 });
+    Assert.assertEquals(ddf.toStrings("string").values(), new String[] { "2", "true", "aaa" });
+    Assert.assertEquals(ddf.toBooleans("boolean").values(), new boolean[] { true, false, false });
+  }
+
+  @Test
+  public void testDropNullRowsIdentity() {
+    Assert.assertEquals(df.dropNullRows().getIndex().size(), df.getIndex().size());
+  }
+
+  @Test
+  public void testDropNullColumns() {
+    DataFrame mdf = new DataFrame(new long[] { 1, 2, 3 });
+    mdf.addSeries("double_null", 1.0, 2.0, DoubleSeries.NULL_VALUE);
+    mdf.addSeries("double", 1.0, 2.0, 3.0);
+    mdf.addSeries("long_null", LongSeries.NULL_VALUE, 2, 3);
+    mdf.addSeries("long", 1, 2, 3);
+    mdf.addSeries("string_null", "true", StringSeries.NULL_VALUE, "aaa");
+    mdf.addSeries("string", "true", "this", "aaa");
+    mdf.addSeries("boolean", true, true, false);
+
+    DataFrame ddf = mdf.dropNullColumns();
+    Assert.assertEquals(ddf.getIndex().size(), 3);
+    Assert.assertEquals(new HashSet<>(ddf.getSeriesNames()), new HashSet<>(Arrays.asList("double", "long", "string", "boolean")));
+  }
 }

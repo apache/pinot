@@ -144,6 +144,11 @@ public final class StringSeries extends Series {
   }
 
   public StringSeries map(StringFunction function) {
+    assertNotNull();
+    return this.mapWithNull(function);
+  }
+
+  public StringSeries mapWithNull(StringFunction function) {
     String[] newValues = new String[this.values.length];
     for(int i=0; i<this.values.length; i++) {
       newValues[i] = function.apply(this.values[i]);
@@ -152,6 +157,11 @@ public final class StringSeries extends Series {
   }
 
   public BooleanSeries map(StringConditional conditional) {
+    assertNotNull();
+    return this.mapWithNull(conditional);
+  }
+
+  public BooleanSeries mapWithNull(StringConditional conditional) {
     boolean[] newValues = new boolean[this.values.length];
     for(int i=0; i<this.values.length; i++) {
       newValues[i] = conditional.apply(this.values[i]);
@@ -282,10 +292,29 @@ public final class StringSeries extends Series {
     return false;
   }
 
+  @Override
+  int[] nullIndex() {
+    int[] nulls = new int[this.values.length];
+    int nullCount = 0;
+
+    for(int i=0; i<this.values.length; i++) {
+      if(isNull(this.values[i])) {
+        nulls[nullCount] = i;
+        nullCount++;
+      }
+    }
+
+    return Arrays.copyOf(nulls, nullCount);
+  }
+
   public static boolean isNull(String value) {
     return Objects.equals(value, NULL_VALUE);
   }
 
+  private void assertNotNull() {
+    if(hasNull())
+      throw new IllegalStateException("Must not contain null values");
+  }
 
   private static String[] assertNotEmpty(String[] values) {
     if(values.length <= 0)

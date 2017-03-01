@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.detector.functionex.dataframe;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -279,6 +280,16 @@ public class DataFrame {
     return newDataFrame;
   }
 
+  DataFrame filter(int[] fromIndex) {
+    LongSeries index = this.index.filter(fromIndex);
+    DataFrame df = new DataFrame(index);
+    for(Map.Entry<String, Series> e : this.getSeries().entrySet()) {
+      df.addSeries(e.getKey(), e.getValue().filter(fromIndex));
+    }
+
+    return df;
+  }
+
   public DataFrame filter(BooleanSeries series) {
     if(series.size() != this.index.size())
       throw new IllegalArgumentException("Series size must be equal to index size");
@@ -294,13 +305,7 @@ public class DataFrame {
 
     int[] fromIndexCompressed = Arrays.copyOf(fromIndex, fromIndexCount);
 
-    LongSeries index = this.index.filter(fromIndexCompressed);
-    DataFrame df = new DataFrame(index);
-    for(Map.Entry<String, Series> e : this.getSeries().entrySet()) {
-      df.addSeries(e.getKey(), e.getValue().filter(fromIndexCompressed));
-    }
-
-    return df;
+    return this.filter(fromIndexCompressed);
   }
 
   public DataFrame filter(String seriesName) {
@@ -516,6 +521,42 @@ public class DataFrame {
 
   public static StringSeries toStrings(StringSeries s) {
     return s;
+  }
+
+  public DataFrame dropNullRows() {
+    int[] fromIndex = new int[this.index.size()];
+    for(int i=0; i<fromIndex.length; i++) {
+      fromIndex[i] = i;
+    }
+
+    for(Series s : this.series.values()) {
+      int[] nulls = s.nullIndex();
+      for(int n : nulls) {
+        fromIndex[n] = -1;
+      }
+    }
+
+    int countNotNull = 0;
+    for(int i=0; i<fromIndex.length; i++) {
+      if(fromIndex[i] >= 0) {
+        fromIndex[countNotNull] = fromIndex[i];
+        countNotNull++;
+      }
+    }
+
+    int[] fromIndexCompressed = Arrays.copyOf(fromIndex, countNotNull);
+
+    return this.filter(fromIndexCompressed);
+  }
+
+  public DataFrame dropNullColumns() {
+    DataFrame df = new DataFrame(index);
+    for(Map.Entry<String, Series> e : this.getSeries().entrySet()) {
+      if(!e.getValue().hasNull())
+        df.addSeries(e.getKey(), e.getValue());
+    }
+
+    return df;
   }
 
   @Override

@@ -266,6 +266,11 @@ public final class BooleanSeries extends Series {
     return false;
   }
 
+  @Override
+  int[] nullIndex() {
+    return new int[0];
+  }
+
   private static boolean[] assertNotEmpty(boolean[] values) {
     if(values.length <= 0)
       throw new IllegalStateException("Must contain at least one value");

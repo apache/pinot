@@ -31,9 +31,10 @@ public final class DoubleSeries extends Series {
     @Override
     public double apply(double[] values) {
       // TODO sort, add low to high for accuracy
-      double sum = 0;
-      for(double l : values)
-        sum += l;
+      double sum = 0.0d;
+      for(double v : values)
+        if(!isNull(v))
+          sum += v;
       return sum;
     }
   }
@@ -43,10 +44,15 @@ public final class DoubleSeries extends Series {
     public double apply(double[] values) {
       assertNotEmpty(values);
       // TODO sort, add low to high for accuracy
-      double sum = 0;
-      for(double l : values)
-        sum += l;
-      return sum / values.length;
+      double sum = 0.0d;
+      int count = 0;
+      for(double v : values) {
+        if (!isNull(v)) {
+          sum += v;
+          count++;
+        }
+      }
+      return sum / count;
     }
   }
 
@@ -151,6 +157,11 @@ public final class DoubleSeries extends Series {
   }
 
   public DoubleSeries map(DoubleFunction function) {
+    assertNotNull();
+    return this.mapWithNull(function);
+  }
+
+  public DoubleSeries mapWithNull(DoubleFunction function) {
     double[] newValues = new double[this.values.length];
     for(int i=0; i<this.values.length; i++) {
       newValues[i] = function.apply(this.values[i]);
@@ -159,6 +170,11 @@ public final class DoubleSeries extends Series {
   }
 
   public BooleanSeries map(DoubleConditional conditional) {
+    assertNotNull();
+    return this.mapWithNull(conditional);
+  }
+
+  public BooleanSeries mapWithNull(DoubleConditional conditional) {
     boolean[] newValues = new boolean[this.values.length];
     for(int i=0; i<this.values.length; i++) {
       newValues[i] = conditional.apply(this.values[i]);
@@ -313,8 +329,28 @@ public final class DoubleSeries extends Series {
     return false;
   }
 
+  @Override
+  int[] nullIndex() {
+    int[] nulls = new int[this.values.length];
+    int nullCount = 0;
+
+    for(int i=0; i<this.values.length; i++) {
+      if(isNull(this.values[i])) {
+        nulls[nullCount] = i;
+        nullCount++;
+      }
+    }
+
+    return Arrays.copyOf(nulls, nullCount);
+  }
+
   public static boolean isNull(double value) {
     return Double.isNaN(value);
+  }
+
+  private void assertNotNull() {
+    if(hasNull())
+      throw new IllegalStateException("Must not contain null values");
   }
 
   private static double[] assertNotEmpty(double[] values) {

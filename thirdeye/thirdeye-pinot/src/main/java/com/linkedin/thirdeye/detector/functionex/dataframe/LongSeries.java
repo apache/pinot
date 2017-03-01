@@ -31,20 +31,10 @@ public final class LongSeries extends Series {
     @Override
     public long apply(long[] values) {
       long sum = 0;
-      for(long l : values)
-        sum += l;
+      for(long v : values)
+        if(!isNull(v))
+          sum += v;
       return sum;
-    }
-  }
-
-  public static class LongBatchMean implements LongBatchFunction {
-    @Override
-    public long apply(long[] values) {
-      assertNotEmpty(values);
-      long sum = 0;
-      for(long l : values)
-        sum += l;
-      return sum / values.length;
     }
   }
 
@@ -149,6 +139,11 @@ public final class LongSeries extends Series {
   }
 
   public LongSeries map(LongFunction function) {
+    assertNotNull();
+    return this.mapWithNull(function);
+  }
+
+  public LongSeries mapWithNull(LongFunction function) {
     long[] newValues = new long[this.values.length];
     for(int i=0; i<this.values.length; i++) {
       newValues[i] = function.apply(this.values[i]);
@@ -157,6 +152,11 @@ public final class LongSeries extends Series {
   }
 
   public BooleanSeries map(LongConditional conditional) {
+    assertNotNull();
+    return this.mapWithNull(conditional);
+  }
+
+  public BooleanSeries mapWithNull(LongConditional conditional) {
     boolean[] newValues = new boolean[this.values.length];
     for(int i=0; i<this.values.length; i++) {
       newValues[i] = conditional.apply(this.values[i]);
@@ -332,8 +332,17 @@ public final class LongSeries extends Series {
     return m;
   }
 
-  public long mean() {
-    return new LongBatchMean().apply(this.values);
+  public double mean() {
+    assertNotEmpty(this.values);
+    long sum = 0;
+    int count = 0;
+    for(long v : this.values) {
+      if(!isNull(v)) {
+        sum += v;
+        count++;
+      }
+    }
+    return sum / (double) count;
   }
 
   public long sum() {
@@ -380,8 +389,28 @@ public final class LongSeries extends Series {
     return false;
   }
 
+  @Override
+  int[] nullIndex() {
+    int[] nulls = new int[this.values.length];
+    int nullCount = 0;
+
+    for(int i=0; i<this.values.length; i++) {
+      if(isNull(this.values[i])) {
+        nulls[nullCount] = i;
+        nullCount++;
+      }
+    }
+
+    return Arrays.copyOf(nulls, nullCount);
+  }
+
   public static boolean isNull(long value) {
     return value == NULL_VALUE;
+  }
+
+  private void assertNotNull() {
+    if(hasNull())
+      throw new IllegalStateException("Must not contain null values");
   }
 
   private static long[] assertNotEmpty(long[] values) {
