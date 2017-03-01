@@ -70,6 +70,14 @@ public class DataFrame {
     this.index = index;
   }
 
+  public int size() {
+    return this.index.size();
+  }
+
+  public boolean isEmpty() {
+    return this.index.size() <= 0;
+  }
+
   public DataFrame copy() {
     DataFrame newDataFrame = new DataFrame(this.index.copy());
     for(Map.Entry<String, Series> e : this.series.entrySet()) {

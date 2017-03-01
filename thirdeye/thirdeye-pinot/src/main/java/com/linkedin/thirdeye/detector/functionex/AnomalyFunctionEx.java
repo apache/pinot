@@ -1,6 +1,11 @@
 package com.linkedin.thirdeye.detector.functionex;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+
 public abstract class AnomalyFunctionEx {
+  private static final Logger LOG = LoggerFactory.getLogger(AnomalyFunctionEx.class);
 
   // TODO allow StrSubstitutor of jakarta commons lang
 
@@ -29,7 +34,10 @@ public abstract class AnomalyFunctionEx {
   protected <R, Q> R queryDataSource(String dataSource, Q query) throws Exception {
     if(!hasDataSource(dataSource))
       throw new IllegalArgumentException(String.format("DataSource '%s' not available", dataSource));
-    return (R) context.getDataSources().get(dataSource).query(query, context);
+    LOG.info("Querying '{}': {}", dataSource, query);
+    R response = (R) context.getDataSources().get(dataSource).query(query, context);
+    LOG.debug("Got result: {}", response);
+    return response;
   }
 
   protected boolean hasDataSource(String dataSource) {

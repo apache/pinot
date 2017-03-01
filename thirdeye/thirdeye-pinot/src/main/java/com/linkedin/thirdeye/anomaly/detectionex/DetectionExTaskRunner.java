@@ -87,18 +87,24 @@ public class DetectionExTaskRunner implements TaskRunner {
 
       // TODO avoid magic field names, refactor anomalies?
       DataFrame df = a.getData();
-      if(df.getIndex().size() > 0) {
+      if(!df.isEmpty()) {
+        if (df.contains("collection")) {
+          dto.setCollection(df.toStrings("collection").first());
+        }
+        if (df.contains("metric")) {
+          dto.setMetric(df.toStrings("metric").first());
+        }
         if (df.contains("score")) {
-          dto.setScore(df.toDoubles("score").mean());
+          dto.setScore(df.toDoubles("score").first());
         }
         if (df.contains("weight")) {
-          dto.setWeight(df.toDoubles("score").mean());
+          dto.setWeight(df.toDoubles("weight").first());
         }
         if (df.contains("current")) {
-          dto.setAvgCurrentVal(df.toDoubles("current").mean());
+          dto.setAvgCurrentVal(df.toDoubles("current").first());
         }
         if (df.contains("baseline")) {
-          dto.setAvgBaselineVal(df.toDoubles("baseline").mean());
+          dto.setAvgBaselineVal(df.toDoubles("baseline").first());
         }
       }
 
