@@ -64,6 +64,8 @@ public class BrokerServerBuilder {
   private static final String METRICS_CONFIG_PREFIX = "pinot.broker.metrics";
   private static final long DEFAULT_BROKER_DELAY_SHUTDOWN_TIME_MS = 10 * 1000L;
   private static final String BROKER_DELAY_SHUTDOWN_TIME_CONFIG = "pinot.broker.delayShutdownTimeMs";
+  private static final String PINOT_BROKER_TABLE_LEVEL_METRICS = "pinot.broker.enableTableLevelMetrics";
+  private static final String PINOT_BROKER_TABLE_LEVEL_METRICS_LIST = "pinot.broker.tablelevel.metrics.whitelist";
 
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerServerBuilder.class);
   // Connection Pool Related
@@ -124,7 +126,7 @@ public class BrokerServerBuilder {
     _registry = new MetricsRegistry();
     MetricsHelper.initializeMetrics(_config.subset(METRICS_CONFIG_PREFIX));
     MetricsHelper.registerMetricsRegistry(_registry);
-    _brokerMetrics = new BrokerMetrics(_registry);
+    _brokerMetrics = new BrokerMetrics(_registry, !emitTableLevelMetrics());
     _brokerMetrics.initializeGlobalMeters();
     _state.set(State.INIT);
     _eventLoopGroup = new NioEventLoopGroup();
@@ -266,5 +268,9 @@ public class BrokerServerBuilder {
 
   public BrokerRequestHandler getBrokerRequestHandler() {
     return _requestHandler;
+  }
+
+  private boolean emitTableLevelMetrics() {
+    return _config.getBoolean(PINOT_BROKER_TABLE_LEVEL_METRICS, true);
   }
 }

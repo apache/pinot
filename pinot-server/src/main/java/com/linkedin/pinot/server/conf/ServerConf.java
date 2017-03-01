@@ -27,6 +27,9 @@ public class ServerConf {
   private static final String PINOT_ = "pinot.";
   private static final String PINOT_SERVER_INSTANCE = "pinot.server.instance";
   private static final String PINOT_SERVER_METRICS = "pinot.server.metrics";
+  private static final String PINOT_SERVER_TABLE_LEVEL_METRICS = "pinot.server.enableTableLevelMetrics";
+  // List of metrics to always send table level metrics even if table level metrics is disabled
+  private static final String PINOT_SERVER_TABLE_LEVEL_METRICS_LIST = "pinot.server.tablelevel.metrics.whitelist";
   private static final String PINOT_SERVER_QUERY = "pinot.server.query.executor";
   private static final String PINOT_SERVER_REQUEST = "pinot.server.request";
   private static final String PINOT_SERVER_NETTY = "pinot.server.netty";
@@ -88,5 +91,9 @@ public class ServerConf {
    */
   public String[] getTransformFunctions() {
     return _serverConf.getStringArray(PINOT_SERVER_TRANSFORM_FUNCTIONS);
+  }
+
+  public boolean emitTableLevelMetrics() {
+    return _serverConf.getBoolean(PINOT_SERVER_TABLE_LEVEL_METRICS, true);
   }
 }

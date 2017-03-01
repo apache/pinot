@@ -181,7 +181,7 @@ public class ServerBuilder {
   private void initMetrics() {
     MetricsHelper.initializeMetrics(_serverConf.getMetricsConfig());
     MetricsHelper.registerMetricsRegistry(metricsRegistry);
-    _serverMetrics = new ServerMetrics(metricsRegistry);
+    _serverMetrics = new ServerMetrics(metricsRegistry, !_serverConf.emitTableLevelMetrics());
     _serverMetrics.initializeGlobalMeters();
 
     TableDataManagerProvider.setServerMetrics(_serverMetrics);
