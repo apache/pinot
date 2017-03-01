@@ -27,6 +27,7 @@ DataService.prototype = {
     getDataAsynchronous: function(url, data, callback, spinArea)  {
       var target = document.getElementById(spinArea);
       var spinner = new Spinner();
+      let results;
       spinner.spin(target);
 
       console.log("request url:", url)

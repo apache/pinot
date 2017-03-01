@@ -24,7 +24,7 @@ AppController.prototype = {
 
   handleAppEvent : function() {
     console.log('In AppController.handleAppEvent');
-    tabName = HASH_SERVICE.get('tab');
+    let tabName = HASH_SERVICE.get('tab');
     this.appModel.tabSelected = tabName;
     console.log('tabName:' + tabName);
     var controllerName = 'anomalies';
@@ -45,13 +45,13 @@ AppController.prototype = {
   compileTemplates : function() {
     // compile templates
     var ingraph_metric_config_template = $("#ingraph-metric-config-template").html();
-    ingraph_metric_config_template_compiled = Handlebars.compile(ingraph_metric_config_template);
+    Handlebars.compile(ingraph_metric_config_template);
 
     var metric_config_template = $("#metric-config-template").html();
-    metric_config_template_compiled = Handlebars.compile(metric_config_template);
+    Handlebars.compile(metric_config_template);
 
     var job_info_template = $("#job-info-template").html();
-    job_info_template_compiled = Handlebars.compile(job_info_template);
+    Handlebars.compile(job_info_template);
   },
 
   onTabClickEventHandler : function(sender, args) {
