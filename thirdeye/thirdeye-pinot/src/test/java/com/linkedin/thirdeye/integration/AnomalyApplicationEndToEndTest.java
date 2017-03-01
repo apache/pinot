@@ -12,7 +12,6 @@ import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
 import com.linkedin.thirdeye.anomaly.task.TaskDriver;
 import com.linkedin.thirdeye.anomaly.task.TaskInfoFactory;
-import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
@@ -76,7 +75,6 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
   private String dashboardHost = "http://localhost:8080/dashboard";
   private String functionPropertiesFile = "/sample-functions.properties";
   private String alertFilterPropertiesFile = "/sample-alertfilter.properties";
-  private String alertFilterAutoTunePropertiesFile = "/sample-alertfilterautotune.properties";
   private String metric = "cost";
   private String collection = "test-collection";
 
