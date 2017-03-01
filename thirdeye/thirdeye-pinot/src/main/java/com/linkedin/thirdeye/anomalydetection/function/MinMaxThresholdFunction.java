@@ -38,7 +38,6 @@ public class MinMaxThresholdFunction extends AbstractModularizedAnomalyFunction 
     // Removes zeros from time series, which currently mean empty values in ThirdEye.
     TransformationFunction zeroRemover = new ZeroRemovalFunction();
     currentTimeSeriesTransformationChain.add(zeroRemover);
-    baselineTimeSeriesTransformationChain.add(zeroRemover);
 
     detectionModel = new MinMaxThresholdDetectionModel();
     detectionModel.init(properties);

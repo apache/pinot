@@ -7,7 +7,7 @@ import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.Properties;
 import org.joda.time.Interval;
 
-public class MinMaxThresholdMergeModel extends AbstractMergeModel implements NoPredictionMergeModel {
+public class MinMaxThresholdMergeModel extends AbstractMergeModel {
   public static final String DEFAULT_MESSAGE_TEMPLATE = "change : %.2f %%, currentVal : %.2f, min : %.2f, max : %.2f";
   public static final String MIN_VAL = "min";
   public static final String MAX_VAL = "max";
