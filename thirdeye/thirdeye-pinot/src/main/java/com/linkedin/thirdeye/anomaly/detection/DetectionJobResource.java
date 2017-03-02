@@ -108,6 +108,30 @@ public class DetectionJobResource {
   }
 
 
+  @POST
+  @Path("/requiresCompletenessCheck/enable/{id}")
+  public Response enableRequiresCompletenessCheck(@PathParam("id") Long id) throws Exception {
+    toggleRequiresCompletenessCheck(id, true);
+    return Response.ok().build();
+  }
+
+  @POST
+  @Path("/requiresCompletenessCheck/disable/{id}")
+  public Response disableRequiresCompletenessCheck(@PathParam("id") Long id) throws Exception {
+    toggleRequiresCompletenessCheck(id, false);
+    return Response.ok().build();
+  }
+
+  private void toggleRequiresCompletenessCheck(Long id, boolean state) {
+    AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionSpecDAO.findById(id);
+    if(anomalyFunctionSpec == null) {
+      throw new NullArgumentException("Function spec not found");
+    }
+    anomalyFunctionSpec.setRequiresCompletenessCheck(state);
+    anomalyFunctionSpecDAO.update(anomalyFunctionSpec);
+  }
+
+
   /**
    * Returns the weight of the metric at the given window. The calculation of baseline (history) data is specified by
    * seasonal period (in days) and season count. Seasonal period is the difference of duration from one window to the
