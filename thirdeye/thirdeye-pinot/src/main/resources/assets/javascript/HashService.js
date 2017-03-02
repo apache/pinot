@@ -12,11 +12,11 @@ HashService.prototype = {
     window.onhashchange = this.onHashChangeEventHandler.bind(this);
     console.log("window.location:" + window.location + " path " + window.location.pathname);
     console.log(window.location);
-    tab = constants.TAB_ANOMALIES;
+    let tab = constants.TAB_ANOMALIES;
     console.log(tab);
     console.log(constants);
     if (window.location.hash) {
-      splits = window.location.hash.split('/');
+      let splits = window.location.hash.split('/');
       if (splits.length > 0) {
         console.log("hash split[0]" + splits[0]);
         tab = splits[0].replace("#", "");
@@ -24,7 +24,7 @@ HashService.prototype = {
     }
     console.log("Setting tab to:" + tab)
     this.set(HASH_PARAMS.TAB, tab);
-    urlFragment = window.location.hash.replace("#", "").replace("!", "");
+    let urlFragment = window.location.hash.replace("#", "").replace("!", "");
     console.log(urlFragment);
     console.log('HashService.init ends');
   },
