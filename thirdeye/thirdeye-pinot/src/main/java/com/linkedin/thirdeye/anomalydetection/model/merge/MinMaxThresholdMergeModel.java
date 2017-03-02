@@ -36,14 +36,19 @@ public class MinMaxThresholdMergeModel extends AbstractMergeModel {
     double currentAverageValue = 0d;
     int currentBucketCount = 0;
     double deviationFromThreshold = 0d;
+    long anomalyStartTime = anomalyToUpdated.getStartTime();
+    long anomalyEndTime = anomalyToUpdated.getEndTime();
+    Interval anomalyInterval = new Interval(anomalyStartTime, anomalyEndTime);
     for (long time : timeSeries.timestampSet()) {
-      double value = timeSeries.get(time);
-      if (value != 0d) {
-        if (windowStartInMillis <= time && time <= windowEndInMillis) {
-          currentAverageValue += value;
-          ++currentBucketCount;
-          deviationFromThreshold += MinMaxThresholdDetectionModel.getDeviationFromThreshold(value, min, max);
-        } // else ignore unknown time key
+      if (anomalyInterval.contains(time)) {
+        double value = timeSeries.get(time);
+        if (value != 0d) {
+          if (windowStartInMillis <= time && time <= windowEndInMillis) {
+            currentAverageValue += value;
+            ++currentBucketCount;
+            deviationFromThreshold += MinMaxThresholdDetectionModel.getDeviationFromThreshold(value, min, max);
+          } // else ignore unknown time key
+        }
       }
     }
 

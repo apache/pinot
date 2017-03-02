@@ -6,6 +6,7 @@ import com.linkedin.thirdeye.anomalydetection.context.TimeSeriesKey;
 import com.linkedin.thirdeye.anomalydetection.model.detection.MinMaxThresholdDetectionModel;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import java.util.ArrayList;
 import java.util.List;
@@ -113,5 +114,77 @@ public class TestMinMaxThresholdFunction {
     List<Interval> actualDataRanges =
         function.getTimeSeriesIntervals(observedStartTime, observedStartTime + bucketMillis * 5);
     Assert.assertEquals(actualDataRanges, expectedDataRanges);
+  }
+
+  @Test(dataProvider = "timeSeriesDataProvider")
+  public void recomputeMergedAnomalyWeight(Properties properties, TimeSeriesKey timeSeriesKey,
+      long bucketSizeInMs, TimeSeries observedTimeSeries) throws Exception {
+
+    AnomalyDetectionContext anomalyDetectionContext = new AnomalyDetectionContext();
+    anomalyDetectionContext.setBucketSizeInMS(bucketSizeInMs);
+
+    properties.put(MinMaxThresholdDetectionModel.MAX_VAL, "20");
+    properties.put(MinMaxThresholdDetectionModel.MIN_VAL, "12");
+
+    // Create anomaly function spec
+    AnomalyFunctionDTO functionSpec = new AnomalyFunctionDTO();
+    functionSpec.setMetric(mainMetric);
+    functionSpec.setProperties(TestWeekOverWeekRuleFunction.toString(properties));
+
+    AnomalyDetectionFunction function = new MinMaxThresholdFunction();
+    function.init(functionSpec);
+    anomalyDetectionContext.setAnomalyDetectionFunction(function);
+    anomalyDetectionContext.setCurrent(mainMetric, observedTimeSeries);
+    anomalyDetectionContext.setTimeSeriesKey(timeSeriesKey);
+
+    List<RawAnomalyResultDTO> expectedRawAnomalies = new ArrayList<>();
+
+    RawAnomalyResultDTO rawAnomaly1 = new RawAnomalyResultDTO();
+    rawAnomaly1.setStartTime(observedStartTime + bucketMillis * 3);
+    rawAnomaly1.setEndTime(observedStartTime + bucketMillis * 4);
+    rawAnomaly1.setWeight(0.1d);
+    rawAnomaly1.setScore(13.6d);
+    expectedRawAnomalies.add(rawAnomaly1);
+
+    RawAnomalyResultDTO rawAnomaly2 = new RawAnomalyResultDTO();
+    rawAnomaly2.setStartTime(observedStartTime + bucketMillis * 4);
+    rawAnomaly2.setEndTime(observedStartTime + bucketMillis * 5);
+    rawAnomaly2.setWeight(-0.33333d);
+    rawAnomaly2.setScore(13.6d);
+    expectedRawAnomalies.add(rawAnomaly2);
+
+    MergedAnomalyResultDTO mergedAnomaly = new MergedAnomalyResultDTO();
+    mergedAnomaly.setStartTime(expectedRawAnomalies.get(0).getStartTime());
+    mergedAnomaly.setEndTime(expectedRawAnomalies.get(1).getEndTime());
+    mergedAnomaly.setAnomalyResults(expectedRawAnomalies);
+
+    function.updateMergedAnomalyInfo(anomalyDetectionContext, mergedAnomaly);
+
+    double currentTotal = 0d;
+    double deviationFromThreshold = 0d;
+    Interval interval = new Interval(mergedAnomaly.getStartTime(), mergedAnomaly.getEndTime());
+    TimeSeries currentTS = anomalyDetectionContext.getTransformedCurrent(mainMetric);
+    for (long timestamp : currentTS.timestampSet()) {
+      if (interval.contains(timestamp)) {
+        double value = currentTS.get(timestamp);
+        currentTotal += value;
+        deviationFromThreshold += computeDeviationFromMinMax(value, 12d, 20d);
+      }
+    }
+    double score = currentTotal / 2d;
+    double weight = deviationFromThreshold / 2d;
+
+    Assert.assertEquals(mergedAnomaly.getScore(), score, EPSILON);
+    Assert.assertEquals(mergedAnomaly.getAvgCurrentVal(), score, EPSILON);
+    Assert.assertEquals(mergedAnomaly.getWeight(), weight, EPSILON);
+  }
+
+  private static double computeDeviationFromMinMax(double currentValue, double min, double max) {
+    if (currentValue < min && min != 0d) {
+      return (currentValue - min) / min;
+    } else if (currentValue > max && max != 0d) {
+      return (currentValue - max) / max;
+    }
+    return 0;
   }
 }
