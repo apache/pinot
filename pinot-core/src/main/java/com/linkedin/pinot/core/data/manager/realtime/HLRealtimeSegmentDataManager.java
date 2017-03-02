@@ -41,6 +41,7 @@ import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaHighLevelStreamProviderConfig;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import java.io.File;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.TimerTask;
@@ -83,6 +84,7 @@ public class HLRealtimeSegmentDataManager extends SegmentDataManager {
 
   private final String sortedColumn;
   private final List<String> invertedIndexColumns;
+  private final List<String> noDictionaryColumns;
   private Logger segmentLogger = LOGGER;
   private final SegmentVersion _segmentVersion;
   private final RealtimeTableDataManager _realtimeTableDataManager;
@@ -126,6 +128,9 @@ public class HLRealtimeSegmentDataManager extends SegmentDataManager {
       invertedIndexColumns.add(sortedColumn);
     }
     this.segmentMetatdaZk = segmentMetadata;
+
+    // No DictionaryColumns
+    noDictionaryColumns = indexingConfig.getNoDictionaryColumns();
 
     // create and init stream provider config
     // TODO : ideally resourceMetatda should create and give back a streamProviderConfig
@@ -246,7 +251,8 @@ public class HLRealtimeSegmentDataManager extends SegmentDataManager {
           // lets convert the segment now
           RealtimeSegmentConverter converter =
               new RealtimeSegmentConverter(realtimeSegment, tempSegmentFolder.getAbsolutePath(), schema,
-                  segmentMetadata.getTableName(), segmentMetadata.getSegmentName(), sortedColumn, invertedIndexColumns);
+                  segmentMetadata.getTableName(), segmentMetadata.getSegmentName(), sortedColumn, invertedIndexColumns,
+                  noDictionaryColumns);
 
           segmentLogger.info("Trying to build segment");
           final long buildStartTime = System.nanoTime();

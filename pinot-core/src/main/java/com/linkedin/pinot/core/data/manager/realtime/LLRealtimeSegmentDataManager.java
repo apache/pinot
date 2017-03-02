@@ -163,6 +163,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   private final File _resourceTmpDir;
   private final String _tableName;
   private final List<String> _invertedIndexColumns;
+  private final List<String> _noDictionaryColumns;
   private final String _sortedColumn;
   private Logger segmentLogger = LOGGER;
   private final String _tableStreamName;
@@ -505,7 +506,8 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     // lets convert the segment now
     RealtimeSegmentConverter converter =
         new RealtimeSegmentConverter(_realtimeSegment, tempSegmentFolder.getAbsolutePath(), _schema,
-            _segmentZKMetadata.getTableName(), _segmentZKMetadata.getSegmentName(), _sortedColumn, _invertedIndexColumns);
+            _segmentZKMetadata.getTableName(), _segmentZKMetadata.getSegmentName(), _sortedColumn,
+            _invertedIndexColumns, _noDictionaryColumns );
 
     logStatistics();
     segmentLogger.info("Trying to build segment");
@@ -777,6 +779,10 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     if (_sortedColumn != null && !invertedIndexColumns.contains(_sortedColumn)) {
       invertedIndexColumns.add(_sortedColumn);
     }
+
+    // No dictionary Columns
+    _noDictionaryColumns = indexingConfig.getNoDictionaryColumns();
+
 
     // Read the max number of rows
     int segmentMaxRowCount = kafkaStreamProviderConfig.getSizeThresholdToFlushSegment();

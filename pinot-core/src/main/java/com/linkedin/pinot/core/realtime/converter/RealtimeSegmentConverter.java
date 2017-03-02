@@ -38,9 +38,11 @@ public class RealtimeSegmentConverter {
   private String segmentName;
   private String sortedColumn;
   private List<String> invertedIndexColumns;
+  private List<String> noDictionaryColumns;
 
   public RealtimeSegmentConverter(RealtimeSegmentImpl realtimeSegment, String outputPath, Schema schema,
-      String tableName, String segmentName, String sortedColumn, List<String> invertedIndexColumns) {
+      String tableName, String segmentName, String sortedColumn, List<String> invertedIndexColumns,
+      List<String> noDictionaryColumns) {
     if (new File(outputPath).exists()) {
       throw new IllegalAccessError("path already exists:" + outputPath);
     }
@@ -69,17 +71,18 @@ public class RealtimeSegmentConverter {
     this.sortedColumn = sortedColumn;
     this.tableName = tableName;
     this.segmentName = segmentName;
+    this.noDictionaryColumns = noDictionaryColumns;
   }
 
   public RealtimeSegmentConverter(RealtimeSegmentImpl realtimeSegment, String outputPath, Schema schema,
       String tableName, String segmentName, String sortedColumn) {
-    this(realtimeSegment, outputPath, schema, tableName, segmentName, sortedColumn, new ArrayList<String>());
+    this(realtimeSegment, outputPath, schema, tableName, segmentName, sortedColumn, new ArrayList<String>(),
+        new ArrayList<String>());
   }
 
   public void build(SegmentVersion segmentVersion) throws Exception {
     // lets create a record reader
     RecordReader reader;
-
     if (sortedColumn == null) {
       reader = new RealtimeSegmentRecordReader(realtimeSegmentImpl, dataSchema);
     } else {
@@ -90,6 +93,9 @@ public class RealtimeSegmentConverter {
       for (String column : invertedIndexColumns) {
         genConfig.createInvertedIndexForColumn(column);
       }
+    }
+    if (noDictionaryColumns != null) {
+      genConfig.setRawIndexCreationColumns(noDictionaryColumns);
     }
     genConfig.setTimeColumnName(dataSchema.getTimeFieldSpec().getOutgoingTimeColumnName());
     genConfig.setSegmentTimeUnit(dataSchema.getTimeFieldSpec().getOutgoingGranularitySpec().getTimeType());

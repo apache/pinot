@@ -16,6 +16,8 @@
 
 package com.linkedin.pinot.controller.helix.core.realtime;
 
+import com.linkedin.pinot.common.config.IndexingConfig;
+import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
@@ -561,9 +563,32 @@ public class PinotLLCRealtimeSegmentManager {
     return true;
   }
 
+  // TODO: Would be good to cache table config fields which are repeatedly checked
+
   protected int getRealtimeTableFlushSizeForTable(String tableName) {
     AbstractTableConfig tableConfig = ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, tableName);
     return getRealtimeTableFlushSize(tableConfig);
+  }
+
+  public long getCommitTimeoutMS(String tableName) {
+    long commitTimeoutMS = SegmentCompletionProtocol.getMaxSegmentCommitTimeMs();
+    if (_propertyStore == null) {
+      return commitTimeoutMS;
+    }
+    AbstractTableConfig tableConfig = ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, tableName);
+    final Map<String, String> streamConfigs = tableConfig.getIndexingConfig().getStreamConfigs();
+    if (streamConfigs != null && streamConfigs.containsKey(
+        CommonConstants.Helix.DataSource.Realtime.SEGMENT_COMMIT_TIMEOUT_SECONDS)) {
+      final String commitTimeoutSecondsStr =
+          streamConfigs.get(CommonConstants.Helix.DataSource.Realtime.SEGMENT_COMMIT_TIMEOUT_SECONDS);
+      try {
+        return TimeUnit.MILLISECONDS.convert(Integer.parseInt(commitTimeoutSecondsStr), TimeUnit.SECONDS);
+      } catch (Exception e) {
+        LOGGER.warn("Failed to parse flush size of {}", commitTimeoutSecondsStr, e);
+        return commitTimeoutMS;
+      }
+    }
+    return commitTimeoutMS;
   }
 
   public static int getRealtimeTableFlushSize(AbstractTableConfig tableConfig) {

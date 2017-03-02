@@ -247,6 +247,17 @@ public abstract class ClusterTest extends ControllerTest {
       String retentionTimeUnit, String kafkaBrokerList, String kafkaTopic, String schemaName, String serverTenant,
       String brokerTenant, File avroFile, int realtimeSegmentFlushSize, String sortedColumn,
       List<String> invertedIndexColumns, String loadMode)
+      throws Exception {
+    addLLCRealtimeTable(tableName, timeColumnName, timeColumnType, retentionDays,
+    retentionTimeUnit, kafkaBrokerList, kafkaTopic, schemaName, serverTenant,
+        brokerTenant, avroFile, realtimeSegmentFlushSize, sortedColumn,
+        invertedIndexColumns, loadMode, null);
+  }
+
+  protected void addLLCRealtimeTable(String tableName, String timeColumnName, String timeColumnType, int retentionDays,
+      String retentionTimeUnit, String kafkaBrokerList, String kafkaTopic, String schemaName, String serverTenant,
+      String brokerTenant, File avroFile, int realtimeSegmentFlushSize, String sortedColumn,
+      List<String> invertedIndexColumns, String loadMode, List<String> noDictionaryColumns)
           throws Exception {
     JSONObject metadata = new JSONObject();
     metadata.put("streamType", "kafka");
@@ -258,11 +269,13 @@ public abstract class ClusterTest extends ControllerTest {
     metadata.put(DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE, Integer.toString(realtimeSegmentFlushSize));
     metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.KAFKA_CONSUMER_PROPS_PREFIX + "." + Kafka.AUTO_OFFSET_RESET,
         "smallest");
+    metadata.put(DataSource.Realtime.SEGMENT_COMMIT_TIMEOUT_SECONDS, "3600");
 
     AvroFileSchemaKafkaAvroMessageDecoder.avroFile = avroFile;
     JSONObject request = ControllerRequestBuilder.buildCreateRealtimeTableJSON(tableName, serverTenant, brokerTenant,
         timeColumnName, timeColumnType, retentionTimeUnit, Integer.toString(retentionDays), 1,
-        "BalanceNumSegmentAssignmentStrategy", metadata, schemaName, sortedColumn, invertedIndexColumns, null, false);
+        "BalanceNumSegmentAssignmentStrategy", metadata, schemaName, sortedColumn, invertedIndexColumns, null, false,
+        noDictionaryColumns);
     sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), request.toString());
   }
 
