@@ -39,10 +39,6 @@ public class CloneFunctionAndAutoTuneAlertFilterTool {
   public static String CSVSEPERATOR = ",";
   public static String CSVESCAPE = ";";
 
-  private static final Long HOLIDAYSTART1 = 1479888000000L;
-  private static final Long HOLIDAYEND1 = 1480233600000L;
-  private static final Long HOLIDAYSTART2 = 1482480000000L;
-  private static final Long HOLIDAYEND2 = 1483948800000L;
 
   public CloneFunctionAndAutoTuneAlertFilterTool(File persistenceFile){
     DaoProviderUtil.init(persistenceFile);

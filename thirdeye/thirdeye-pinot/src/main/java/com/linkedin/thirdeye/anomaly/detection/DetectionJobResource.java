@@ -323,7 +323,7 @@ public class DetectionJobResource {
    * @param id: function ID
    * @param startTime: startTime of merged anomaly
    * @param endTime: endTime of merged anomaly
-   * @return feedback summary and precision/recall as json object
+   * @return feedback summary, precision and recall as json object
    * @throws Exception when data has no positive label or model has no positive prediction
    */
   @POST
