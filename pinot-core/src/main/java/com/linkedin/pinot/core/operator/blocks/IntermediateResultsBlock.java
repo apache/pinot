@@ -30,7 +30,6 @@ import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.common.datatable.DataTableBuilder;
 import com.linkedin.pinot.core.common.datatable.DataTableImplV2;
 import com.linkedin.pinot.core.query.aggregation.AggregationFunctionContext;
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunction;
 import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
 import java.io.Serializable;
@@ -218,9 +217,8 @@ public class IntermediateResultsBlock implements Block {
     FieldSpec.DataType[] columnTypes = new FieldSpec.DataType[numAggregationFunctions];
     for (int i = 0; i < numAggregationFunctions; i++) {
       AggregationFunctionContext aggregationFunctionContext = _aggregationFunctionContexts[i];
-      AggregationFunction aggregationFunction = aggregationFunctionContext.getAggregationFunction();
-      columnNames[i] = aggregationFunction.getColumnName(aggregationFunctionContext.getAggregationColumns());
-      columnTypes[i] = aggregationFunction.getIntermediateResultDataType();
+      columnNames[i] = aggregationFunctionContext.getAggregationColumnName();
+      columnTypes[i] = aggregationFunctionContext.getAggregationFunction().getIntermediateResultDataType();
     }
 
     // Build the data table.
@@ -260,8 +258,7 @@ public class IntermediateResultsBlock implements Block {
     for (int i = 0; i < numAggregationFunctions; i++) {
       dataTableBuilder.startRow();
       AggregationFunctionContext aggregationFunctionContext = _aggregationFunctionContexts[i];
-      dataTableBuilder.setColumn(0, aggregationFunctionContext.getAggregationFunction()
-          .getColumnName(aggregationFunctionContext.getAggregationColumns()));
+      dataTableBuilder.setColumn(0, aggregationFunctionContext.getAggregationColumnName());
       dataTableBuilder.setColumn(1, _combinedAggregationGroupByResult.get(i));
       dataTableBuilder.finishRow();
     }
