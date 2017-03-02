@@ -82,6 +82,7 @@ public class DAORegistry {
    * @param DaoRegistry the DAO registry of new content.
    */
   public static void overrideSingletonDAORegistryForTesting(DAORegistry DaoRegistry) {
+    singleton.reset_internal();
     singleton.setAnomalyFunctionDAO(DaoRegistry.getAnomalyFunctionDAO());
     singleton.setEmailConfigurationDAO(DaoRegistry.getEmailConfigurationDAO());
     singleton.setRawAnomalyResultDAO(DaoRegistry.getRawAnomalyResultDAO());
