@@ -28,12 +28,12 @@ import java.sql.Connection;
 import org.apache.tomcat.jdbc.pool.DataSource;
 
 
-public class TestUtils {
+public class TestDBResources {
   private DataSource ds;
   private DAORegistry daoRegistry;
 
-  public static TestUtils setupDAO() {
-    TestUtils instance = new TestUtils();
+  public static TestDBResources setupDAO() {
+    TestDBResources instance = new TestDBResources();
     instance.setTestDaoRegistry(DAORegistry.getTestInstance());
     try {
       DAORegistry.resetForTesting();
@@ -45,7 +45,7 @@ public class TestUtils {
     }
   }
 
-  public static void teardownDAO(TestUtils instance) {
+  public static void teardownDAO(TestDBResources instance) {
     try {
       System.out.println("DAOs cleaned up");
       instance.cleanUp();

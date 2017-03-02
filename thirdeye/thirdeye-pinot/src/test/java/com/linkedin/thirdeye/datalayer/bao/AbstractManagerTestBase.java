@@ -1,7 +1,7 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
 import com.google.common.collect.Lists;
-import com.linkedin.thirdeye.TestUtils;
+import com.linkedin.thirdeye.TestDBResources;
 import com.linkedin.thirdeye.anomaly.job.JobConstants;
 import com.linkedin.thirdeye.anomaly.override.OverrideConfigHelper;
 import com.linkedin.thirdeye.api.DimensionMap;
@@ -46,12 +46,12 @@ public abstract class AbstractManagerTestBase {
   protected DataCompletenessConfigManager dataCompletenessConfigDAO;
   protected EventManager eventManager;
 
-  protected TestUtils testUtils;
+  protected TestDBResources testDBResources;
   protected DAORegistry daoRegistry;
 
   protected void init() {
-    testUtils = TestUtils.setupDAO();
-    daoRegistry = testUtils.getTestDaoRegistry();
+    testDBResources = TestDBResources.setupDAO();
+    daoRegistry = testDBResources.getTestDaoRegistry();
     anomalyFunctionDAO = daoRegistry.getAnomalyFunctionDAO();
     rawAnomalyResultDAO = daoRegistry.getRawAnomalyResultDAO();
     jobDAO = daoRegistry.getJobDAO();
@@ -71,7 +71,7 @@ public abstract class AbstractManagerTestBase {
   }
 
   protected void cleanup() {
-    TestUtils.teardownDAO(testUtils);
+    TestDBResources.teardownDAO(testDBResources);
   }
 
   protected AnomalyFunctionDTO getTestFunctionSpec(String metricName, String collection) {

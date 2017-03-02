@@ -101,7 +101,7 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
    */
   @BeforeMethod
   void beforeMethod(){
-    DAORegistry.overrideSingletonDAORegistryForTesting(testUtils.getTestDaoRegistry());
+    DAORegistry.overrideSingletonDAORegistryForTesting(testDBResources.getTestDaoRegistry());
   }
 
   void cleanup_schedulers() throws SchedulerException {
