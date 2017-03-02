@@ -531,6 +531,26 @@ public class RetentionManagerTest {
       }
 
       @Override
+      public String getTimeColumn() {
+        return null;
+      }
+
+      @Override
+      public long getStartTime() {
+        return Long.valueOf(startTime);
+      }
+
+      @Override
+      public long getEndTime() {
+        return Long.valueOf(endTime);
+      }
+
+      @Override
+      public TimeUnit getTimeUnit() {
+        return segmentTimeUnit;
+      }
+
+      @Override
       public String getIndexDir() {
         return null;
       }

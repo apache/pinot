@@ -22,6 +22,7 @@ import com.linkedin.pinot.core.startree.hll.HllConstants;
 import java.util.HashMap;
 import java.util.Map;
 
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
 import org.joda.time.Duration;
@@ -76,6 +77,26 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
   @Override
   public String getIndexType() {
     return _indexType;
+  }
+
+  @Override
+  public String getTimeColumn() {
+    return null;
+  }
+
+  @Override
+  public long getStartTime() {
+    return Long.MAX_VALUE;
+  }
+
+  @Override
+  public long getEndTime() {
+    return Long.MIN_VALUE;
+  }
+
+  @Override
+  public TimeUnit getTimeUnit() {
+    return null;
   }
 
   @Override

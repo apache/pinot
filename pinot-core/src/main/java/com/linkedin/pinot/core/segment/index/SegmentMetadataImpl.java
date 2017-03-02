@@ -75,6 +75,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private final String _indexDir;
   private long _crc = Long.MIN_VALUE;
   private long _creationTime = Long.MIN_VALUE;
+  private String _timeColumn;
+  private TimeUnit _timeUnit;
   private Interval _timeInterval;
   private Duration _timeGranularity;
   private long _pushTime = Long.MIN_VALUE;
@@ -88,6 +90,8 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private final Map<String, String> _hllDerivedColumnMap = new HashMap<>();
   private int _totalDocs;
   private int _totalRawDocs;
+  private long _segmentStartTime;
+  private long _segmentEndTime;
 
   public SegmentMetadataImpl(File indexDir)
       throws ConfigurationException, IOException {
@@ -109,7 +113,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
       loadCreationMeta(creationMetaFile);
     }
 
-    setTimeIntervalAndGranularity();
+    setTimeInfo();
     LOGGER.debug("loaded metadata for {}", indexDir.getName());
     _totalDocs = _segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS);
     _totalRawDocs = _segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_RAW_DOCS,
@@ -146,7 +150,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     _creationTime = offlineSegmentZKMetadata.getCreationTime();
     _pushTime = offlineSegmentZKMetadata.getPushTime();
     _refreshTime = offlineSegmentZKMetadata.getRefreshTime();
-    setTimeIntervalAndGranularity();
+    setTimeInfo();
     _columnMetadataMap = null;
     _segmentName = offlineSegmentZKMetadata.getSegmentName();
     _schema = new Schema();
@@ -186,7 +190,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
     _crc = segmentMetadata.getCrc();
     _creationTime = segmentMetadata.getCreationTime();
-    setTimeIntervalAndGranularity();
+    setTimeInfo();
     _columnMetadataMap = null;
     _segmentName = segmentMetadata.getSegmentName();
     _schema = new Schema();
@@ -213,25 +217,38 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     }
   }
 
-  private void setTimeIntervalAndGranularity() {
+  /**
+   * Helper method to set time related information:
+   * <ul>
+   *   <li> Time column Name. </li>
+   *   <li> Tine Unit. </li>
+   *   <li> Time Interval. </li>
+   *   <li> Start and End time. </li>
+   * </ul>
+   */
+  private void setTimeInfo() {
+    _timeColumn = _segmentMetadataPropertiesConfiguration.getString(Segment.TIME_COLUMN_NAME);
     if (_segmentMetadataPropertiesConfiguration.containsKey(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME)
         && _segmentMetadataPropertiesConfiguration.containsKey(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME)
         && _segmentMetadataPropertiesConfiguration.containsKey(V1Constants.MetadataKeys.Segment.TIME_UNIT)) {
 
       try {
-        TimeUnit segmentTimeUnit =
+        _timeUnit =
             TimeUtils.timeUnitFromString(_segmentMetadataPropertiesConfiguration.getString(TIME_UNIT));
-        _timeGranularity = new Duration(segmentTimeUnit.toMillis(1));
+        _timeGranularity = new Duration(_timeUnit.toMillis(1));
         String startTimeString =
             _segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME);
         String endTimeString =
             _segmentMetadataPropertiesConfiguration.getString(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME);
-        _timeInterval = new Interval(segmentTimeUnit.toMillis(Long.parseLong(startTimeString)),
-            segmentTimeUnit.toMillis(Long.parseLong(endTimeString)));
+        _segmentStartTime = Long.parseLong(startTimeString);
+        _segmentEndTime = Long.parseLong(endTimeString);
+        _timeInterval = new Interval(_timeUnit.toMillis(_segmentStartTime), _timeUnit.toMillis(_segmentEndTime));
       } catch (Exception e) {
         LOGGER.warn("Caught exception while setting time interval and granularity", e);
         _timeInterval = null;
         _timeGranularity = null;
+        _segmentStartTime = Long.MAX_VALUE;
+        _segmentEndTime = Long.MIN_VALUE;
       }
     }
   }
@@ -393,6 +410,26 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   @Override
   public String getIndexType() {
     return IndexType.COLUMNAR.toString();
+  }
+
+  @Override
+  public String getTimeColumn() {
+    return _timeColumn;
+  }
+
+  @Override
+  public long getStartTime() {
+    return _segmentStartTime;
+  }
+
+  @Override
+  public long getEndTime() {
+    return _segmentEndTime;
+  }
+
+  @Override
+  public TimeUnit getTimeUnit() {
+    return _timeUnit;
   }
 
   @Override
