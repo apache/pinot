@@ -21,7 +21,7 @@ public class TestAlertConfigManager extends AbstractManagerTestBase {
   }
 
   @Test
-  public void testCreateAlertConfig() throws InterruptedException {
+  public void testCreateAlertConfig() {
     AlertConfigDTO request = new AlertConfigDTO();
     request.setActive(true);
     request.setName("my alert config");
@@ -30,7 +30,7 @@ public class TestAlertConfigManager extends AbstractManagerTestBase {
   }
 
   @Test (dependsOnMethods = {"testCreateAlertConfig"})
-  public void testFetchAlertConfig() throws InterruptedException {
+  public void testFetchAlertConfig() {
     // find by id
     AlertConfigDTO response = alertConfigDAO.findById(alertConfigid);
     Assert.assertNotNull(response);
