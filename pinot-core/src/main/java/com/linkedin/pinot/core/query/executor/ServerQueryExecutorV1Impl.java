@@ -26,6 +26,7 @@ import com.linkedin.pinot.common.query.context.TimerContext;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.utils.DataTable;
+import com.linkedin.pinot.core.common.datatable.DataTableBuilder;
 import com.linkedin.pinot.core.common.datatable.DataTableImplV2;
 import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
@@ -113,10 +114,11 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       long totalRawDocs = pruneSegments(tableDataManager, queryableSegmentDataManagerList, instanceRequest.getQuery());
       segmentPruneTimer.stopAndRecord();
 
-      queryRequest.setSegmentCountAfterPruning(queryableSegmentDataManagerList.size());
-      LOGGER.debug("Matched {} segments", queryRequest.getSegmentCountAfterPruning());
-      if (queryableSegmentDataManagerList.isEmpty()) {
-        DataTable emptyDataTable = new DataTableImplV2();
+      int numSegmentsMatched = queryableSegmentDataManagerList.size();
+      queryRequest.setSegmentCountAfterPruning(numSegmentsMatched);
+      LOGGER.debug("Matched {} segments", numSegmentsMatched);
+      if (numSegmentsMatched == 0) {
+        DataTable emptyDataTable = DataTableBuilder.buildEmptyDataTable(brokerRequest);
         emptyDataTable.getMetadata().put(DataTable.TOTAL_DOCS_METADATA_KEY, String.valueOf(totalRawDocs));
         return emptyDataTable;
       }
@@ -219,13 +221,6 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       final IndexSegment indexSegment = segmentDataManager.getSegment();
       // We need to compute the total raw docs for the table before any pruning.
       totalRawDocs += indexSegment.getSegmentMetadata().getTotalRawDocs();
-
-      // TODO: Temporary work-around to avoid pruning all segments. If all segments are pruned, we currently would not
-      // be able to build a proper empty response (selection/aggr/groupby). Keeping at least one segment helps
-      // mask that issue for now.
-      if (segments.size() == 1) {
-        return totalRawDocs;
-      }
       if (_segmentPrunerService.prune(indexSegment, brokerRequest)) {
         it.remove();
         tableDataManager.releaseSegment(segmentDataManager);

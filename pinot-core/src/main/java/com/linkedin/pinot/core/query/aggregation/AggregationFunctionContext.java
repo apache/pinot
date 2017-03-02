@@ -35,8 +35,8 @@ public class AggregationFunctionContext {
   }
 
   public AggregationFunctionContext(String[] aggrColumns, AggregationFunction aggregationFunction) {
-    this._aggrColumns = aggrColumns;
-    this._aggregationFunction = aggregationFunction;
+    _aggrColumns = aggrColumns;
+    _aggregationFunction = aggregationFunction;
   }
 
   /**
@@ -53,5 +53,12 @@ public class AggregationFunctionContext {
    */
   public String[] getAggregationColumns() {
     return _aggrColumns;
+  }
+
+  /**
+   * Returns the aggregation column name for the results.
+   */
+  public String getAggregationColumnName() {
+    return _aggregationFunction.getColumnName(_aggrColumns);
   }
 }
