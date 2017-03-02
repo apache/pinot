@@ -2,17 +2,21 @@ package com.linkedin.thirdeye.completeness.checker;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.Lists;
 import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 import com.linkedin.thirdeye.anomaly.job.JobRunner;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
 import com.linkedin.thirdeye.client.DAORegistry;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import org.joda.time.DateTime;
@@ -53,16 +57,14 @@ public class DataCompletenessJobRunner implements JobRunner {
     dataCompletenessJobContext.setCheckDurationEndTime(checkDurationEndTime);
     dataCompletenessJobContext.setJobName(jobName);
 
-    List<DatasetConfigDTO> datasets = DAO_REGISTRY.getDatasetConfigDAO()
-        .findActiveRequiresCompletenessCheck();
-
-    // TODO: Use all datasets which have functions configured
-    List<String> datasetsToCheck = new ArrayList<String>();
-    for(DatasetConfigDTO d: datasets) {
-      datasetsToCheck.add(d.getDataset());
+    Set<String> datasetsToCheck = new HashSet<>();
+    for (AnomalyFunctionDTO anomalyFunction : DAO_REGISTRY.getAnomalyFunctionDAO().findAllActiveFunctions()) {
+      datasetsToCheck.add(anomalyFunction.getCollection());
     }
-
-    dataCompletenessJobContext.setDatasetsToCheck(datasetsToCheck);
+    for (DatasetConfigDTO datasetConfig : DAO_REGISTRY.getDatasetConfigDAO().findActiveRequiresCompletenessCheck()) {
+      datasetsToCheck.add(datasetConfig.getDataset());
+    }
+    dataCompletenessJobContext.setDatasetsToCheck(Lists.newArrayList(datasetsToCheck));
 
     // create data completeness job
     long jobExecutionId = createJob();

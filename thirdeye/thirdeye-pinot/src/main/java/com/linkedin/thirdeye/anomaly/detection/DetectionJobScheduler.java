@@ -48,7 +48,6 @@ public class DetectionJobScheduler implements Runnable {
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY  = ThirdEyeCacheRegistry.getInstance();
   private DetectionJobRunner detectionJobRunner = new DetectionJobRunner();
 
-
   private static final int BACKFILL_MAX_RETRY = 3;
   private static final int BACKFILL_TASK_POLL_TIME = 5_000; // Period to check if a task is finished
   private static final int BACKFILL_RESCHEDULE_TIME = 15_000; // Pause before reschedule a failed job
@@ -65,15 +64,14 @@ public class DetectionJobScheduler implements Runnable {
 
   public void run() {
 
-    try {
+    // read all anomaly functions
+    LOG.info("Reading all anomaly functions");
+    List<AnomalyFunctionDTO> anomalyFunctions = DAO_REGISTRY.getAnomalyFunctionDAO().findAllActiveFunctions();
 
-      // read all anomaly functions
-      LOG.info("Reading all anomaly functions");
-      List<AnomalyFunctionDTO> anomalyFunctions = DAO_REGISTRY.getAnomalyFunctionDAO().findAllActiveFunctions();
+    // for each active anomaly function
+    for (AnomalyFunctionDTO anomalyFunction : anomalyFunctions) {
 
-      // for each active anomaly function
-      for (AnomalyFunctionDTO anomalyFunction : anomalyFunctions) {
-
+      try {
         LOG.info("Function {}", anomalyFunction);
         long functionId = anomalyFunction.getId();
         String dataset = anomalyFunction.getCollection();
@@ -113,25 +111,31 @@ public class DetectionJobScheduler implements Runnable {
         List<DetectionStatusDTO> detectionStatusToUpdate = new ArrayList<>();
 
         for (DetectionStatusDTO detectionStatus : entriesInLast3Days) {
-          LOG.info("Entry : {}", detectionStatus);
 
-          long dateToCheck = detectionStatus.getDateToCheckInMS();
-          // check availability for monitoring window - delay
-          long endTime = dateToCheck - TimeUnit.MILLISECONDS.convert(anomalyFunction.getWindowDelay(), anomalyFunction.getWindowDelayUnit());
-          long startTime = endTime - TimeUnit.MILLISECONDS.convert(anomalyFunction.getWindowSize(), anomalyFunction.getWindowUnit());
-          LOG.info("Checking start:{} {} to end:{} {}", startTime, new DateTime(startTime, dateTimeZone), endTime, new DateTime(endTime, dateTimeZone));
+          try {
+            LOG.info("Entry : {}", detectionStatus);
 
-          boolean pass = checkIfDetectionRunCriteriaMet(startTime, endTime, datasetConfig);
-          if (pass) {
-            startTimes.add(startTime);
-            endTimes.add(endTime);
-            detectionStatusToUpdate.add(detectionStatus);
-          } else {
-            LOG.warn("Data incomplete for monitoring window {} ({}) to {} ({}), skipping anomaly detection",
-                startTime, new DateTime(startTime), endTime, new DateTime(endTime));
-            // TODO: Send email to owners/dev team
+            long dateToCheck = detectionStatus.getDateToCheckInMS();
+            // check availability for monitoring window - delay
+            long endTime = dateToCheck - TimeUnit.MILLISECONDS.convert(anomalyFunction.getWindowDelay(), anomalyFunction.getWindowDelayUnit());
+            long startTime = endTime - TimeUnit.MILLISECONDS.convert(anomalyFunction.getWindowSize(), anomalyFunction.getWindowUnit());
+            LOG.info("Checking start:{} {} to end:{} {}", startTime, new DateTime(startTime, dateTimeZone), endTime, new DateTime(endTime, dateTimeZone));
+
+            boolean pass = checkIfDetectionRunCriteriaMet(startTime, endTime, datasetConfig);
+            if (pass) {
+              startTimes.add(startTime);
+              endTimes.add(endTime);
+              detectionStatusToUpdate.add(detectionStatus);
+            } else {
+              LOG.warn("Data incomplete for monitoring window {} ({}) to {} ({}), skipping anomaly detection",
+                  startTime, new DateTime(startTime), endTime, new DateTime(endTime));
+              // TODO: Send email to owners/dev team
+            }
+          } catch (Exception e) {
+            LOG.error("Exception in preparing entry {}", detectionStatus, e);
           }
         }
+
         if (!startTimes.isEmpty() && !endTimes.isEmpty() && startTimes.size() == endTimes.size()) {
           long jobExecutionId = runAnomalyFunctionOnRanges(anomalyFunction, startTimes, endTimes);
           LOG.info("Created job {} for running anomaly function {} on ranges {} to {}",
@@ -143,9 +147,9 @@ public class DetectionJobScheduler implements Runnable {
             DAO_REGISTRY.getDetectionStatusDAO().update(detectionStatus);
           }
         }
+      } catch (Exception e) {
+        LOG.error("Exception in running anomaly function {}", anomalyFunction, e);
       }
-    } catch (Exception e) {
-      LOG.error("Exception in scheduling job", e);
     }
   }
 

@@ -201,27 +201,27 @@ public class RunAdhocDatabaseQueriesTool {
   }
 
   private void disableAnomalyFunctions() {
-    AnomalyFunctionDTO anomalyFunctionDTO = anomalyFunctionDAO.findById(41L);
+    List<AnomalyFunctionDTO> anomalyFunctionDTOs = anomalyFunctionDAO.findAllByCollection("thirdeyeAbook");
+    for (AnomalyFunctionDTO anomalyFunctionDTO : anomalyFunctionDTOs) {
     anomalyFunctionDTO.setActive(false);
     anomalyFunctionDAO.update(anomalyFunctionDTO);
-    anomalyFunctionDTO = anomalyFunctionDAO.findById(42L);
-    anomalyFunctionDTO.setActive(false);
-    anomalyFunctionDAO.update(anomalyFunctionDTO);
+    }
   }
 
   private void addRequiresCompletenessCheck() {
-    List<String> datasets = Lists.newArrayList("feed_sessions_hourly_additive");
+    List<String> datasets = Lists.newArrayList("login_additive", "mny-ads-su-kpi-alerts", "ptrans_db_hourly_additive");
     for (String dataset : datasets) {
       DatasetConfigDTO dto = datasetConfigDAO.findByDataset(dataset);
-      dto.setRequiresCompletenessCheck(false);
+      dto.setRequiresCompletenessCheck(true);
       datasetConfigDAO.update(dto);
     }
   }
 
   private void updateDetectionRun() {
     for (DetectionStatusDTO dto : detectionStatusDAO.findAll()) {
-      if (dto.getId() >=2028200) {
-        detectionStatusDAO.delete(dto);
+      if (dto.getDataset().equals("login_additive")) {
+        dto.setDetectionRun(false);
+        detectionStatusDAO.update(dto);
       }
     }
   }
@@ -242,7 +242,7 @@ public class RunAdhocDatabaseQueriesTool {
       System.exit(1);
     }
     RunAdhocDatabaseQueriesTool dq = new RunAdhocDatabaseQueriesTool(persistenceFile);
-    dq.updateDetectionRun();
+    dq.disableAnomalyFunctions();
   }
 
 }

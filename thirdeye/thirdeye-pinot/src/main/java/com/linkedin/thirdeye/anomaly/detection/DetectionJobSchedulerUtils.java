@@ -22,7 +22,7 @@ public class DetectionJobSchedulerUtils {
 
   private static final String DAY_FORMAT = "yyyyMMdd";
   private static final String HOUR_FORMAT = "yyyyMMddHH";
-  private static final String MINUTE_FORMAT = "yyyyMMdHHmm";
+  private static final String MINUTE_FORMAT = "yyyyMMddHHmm";
 
   /**
    * Get date time formatter according to granularity of dataset
