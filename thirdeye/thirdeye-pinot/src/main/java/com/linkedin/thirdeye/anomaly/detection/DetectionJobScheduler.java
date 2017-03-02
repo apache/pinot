@@ -62,6 +62,13 @@ public class DetectionJobScheduler implements Runnable {
     scheduledExecutorService.scheduleWithFixedDelay(this, 0, 15, TimeUnit.MINUTES);
   }
 
+  /**
+   * Reads all active anomaly functions
+   * For each function, finds all time periods for which detection needs to be run
+   * Calls run anomaly function for all those periods, and updates detection status
+   * {@inheritDoc}
+   * @see java.lang.Runnable#run()
+   */
   public void run() {
 
     // read all anomaly functions
@@ -87,6 +94,7 @@ public class DetectionJobScheduler implements Runnable {
         // calculate entries from last entry to current time
         Map<String, Long> newEntries = DetectionJobSchedulerUtils.getNewEntries(currentDateTime, lastEntryForFunction,
             anomalyFunction, datasetConfig, dateTimeZone);
+        LOG.info("Creating {} new entries {}", newEntries.size(), newEntries);
 
         // create these entries
         for (Entry<String, Long> entry : newEntries.entrySet()) {
@@ -121,7 +129,7 @@ public class DetectionJobScheduler implements Runnable {
             long startTime = endTime - TimeUnit.MILLISECONDS.convert(anomalyFunction.getWindowSize(), anomalyFunction.getWindowUnit());
             LOG.info("Checking start:{} {} to end:{} {}", startTime, new DateTime(startTime, dateTimeZone), endTime, new DateTime(endTime, dateTimeZone));
 
-            boolean pass = checkIfDetectionRunCriteriaMet(startTime, endTime, datasetConfig);
+            boolean pass = checkIfDetectionRunCriteriaMet(startTime, endTime, datasetConfig, anomalyFunction);
             if (pass) {
               startTimes.add(startTime);
               endTimes.add(endTime);
@@ -136,6 +144,7 @@ public class DetectionJobScheduler implements Runnable {
           }
         }
 
+        // If any time periods found, for which detection needs to be run
         if (!startTimes.isEmpty() && !endTimes.isEmpty() && startTimes.size() == endTimes.size()) {
           long jobExecutionId = runAnomalyFunctionOnRanges(anomalyFunction, startTimes, endTimes);
           LOG.info("Created job {} for running anomaly function {} on ranges {} to {}",
@@ -175,7 +184,7 @@ public class DetectionJobScheduler implements Runnable {
       LOG.error("Exception in fetching dataset config", e);
     }
 
-    boolean pass = checkIfDetectionRunCriteriaMet(startTime, endTime, datasetConfig);
+    boolean pass = checkIfDetectionRunCriteriaMet(startTime, endTime, datasetConfig, anomalyFunction);
     if (pass) {
       jobExecutionId = runAnomalyFunctionOnRanges(anomalyFunction, Lists.newArrayList(startTime), Lists.newArrayList(endTime));
     } else {
@@ -191,13 +200,19 @@ public class DetectionJobScheduler implements Runnable {
    * @param startTime
    * @param endTime
    * @param datasetConfig
+   * @param anomalyFunction
    * @return
    */
-  private boolean checkIfDetectionRunCriteriaMet(Long startTime, Long endTime, DatasetConfigDTO datasetConfig) {
+  private boolean checkIfDetectionRunCriteriaMet(Long startTime, Long endTime, DatasetConfigDTO datasetConfig, AnomalyFunctionDTO anomalyFunction) {
     boolean pass = true;
     String dataset = datasetConfig.getDataset();
 
-    if (datasetConfig.isRequiresCompletenessCheck()) {
+    /**
+     * Check is completeness check required is set at dataset level. That flag is false by default, so user will set as needed
+     * Check also for same flag in function level. That flag is true by default, so dataset config's flag will have its way unless user has tampered with this flag
+     * This flag would typically be unset, in backfill cases
+     */
+    if (datasetConfig.isRequiresCompletenessCheck() && anomalyFunction.isRequiresCompletenessCheck()) {
 
       LOG.info("Checking for completeness for dataset {} and time range {}({}) to {}({})", dataset,
           startTime, new DateTime(startTime), endTime, new DateTime(endTime));
@@ -212,7 +227,9 @@ public class DetectionJobScheduler implements Runnable {
       LOG.info("Num complete periods: {} Expected num buckets:{}", completeTimePeriods.size(), expectedCompleteBuckets);
 
       // if available, run the function
-      if (incompleteTimePeriods.size() == 0 && completeTimePeriods.size() == expectedCompleteBuckets) {
+      if (incompleteTimePeriods.size() == 0 && // nothing incomplete
+          completeTimePeriods.size() == expectedCompleteBuckets) { // complete matches expected buckets
+
         LOG.info("Found complete time range for dataset and time range {}({}) to {}({})", dataset,
           startTime, new DateTime(startTime), endTime, new DateTime(endTime));
       } else {

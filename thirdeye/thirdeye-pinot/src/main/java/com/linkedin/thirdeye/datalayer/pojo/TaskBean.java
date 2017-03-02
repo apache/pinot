@@ -6,7 +6,6 @@ import java.util.Objects;
 import com.google.common.base.MoreObjects;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
-import com.linkedin.thirdeye.anomaly.task.TaskInfo;
 
 
 /**

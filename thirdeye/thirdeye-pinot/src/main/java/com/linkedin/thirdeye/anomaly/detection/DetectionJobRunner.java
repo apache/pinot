@@ -41,6 +41,11 @@ public class DetectionJobRunner {
   }
 
 
+  /**
+   * Creates anomaly detection job and tasks, depending on the information in context
+   * @param detectionJobContext
+   * @return
+   */
   public Long run(DetectionJobContext detectionJobContext) {
 
     long functionId = detectionJobContext.getAnomalyFunctionId();

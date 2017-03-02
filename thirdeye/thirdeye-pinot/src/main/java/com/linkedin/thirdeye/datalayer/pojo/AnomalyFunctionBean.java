@@ -63,6 +63,13 @@ public class AnomalyFunctionBean extends AbstractBean {
 
   private AnomalyMergeConfig anomalyMergeConfig;
 
+  /**
+   * This flag always true. The same flag in dataset config, will act as master, always false.
+   * This flag would typically be unset, in backfill cases, where we want to override the completeness check,
+   * but not have to touch the dataset config setting for that
+   */
+  private boolean requiresCompletenessCheck = true;
+
 
   public long getMetricId() {
     return metricId;
@@ -213,6 +220,16 @@ public class AnomalyFunctionBean extends AbstractBean {
     return filters;
   }
 
+
+
+  public boolean isRequiresCompletenessCheck() {
+    return requiresCompletenessCheck;
+  }
+
+  public void setRequiresCompletenessCheck(boolean requiresCompletenessCheck) {
+    this.requiresCompletenessCheck = requiresCompletenessCheck;
+  }
+
   @JsonIgnore
   @JsonProperty("wrapper")
   public Multimap<String, String> getFilterSet() {
@@ -267,14 +284,15 @@ public class AnomalyFunctionBean extends AbstractBean {
         && Objects.equals(windowDelayUnit, af.getWindowDelayUnit())
         && Objects.equals(exploreDimensions, af.getExploreDimensions())
         && Objects.equals(filters, af.getFilters())
-        && Objects.equals(alertFilter, af.getAlertFilter());
+        && Objects.equals(alertFilter, af.getAlertFilter())
+        && Objects.equals(requiresCompletenessCheck,  af.isRequiresCompletenessCheck());
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(getId(), collection, metric, metrics, metricFunction, type, isActive, cron, frequency,
         properties, bucketSize, bucketUnit, windowSize, windowUnit, windowDelay, windowDelayUnit,
-        exploreDimensions, filters, alertFilter);
+        exploreDimensions, filters, alertFilter, requiresCompletenessCheck);
   }
 
   @Override
@@ -285,6 +303,7 @@ public class AnomalyFunctionBean extends AbstractBean {
         .add("bucketSize", bucketSize).add("bucketUnit", bucketUnit).add("windowSize", windowSize)
         .add("windowUnit", windowUnit).add("windowDelay", windowDelay)
         .add("windowDelayUnit", windowDelayUnit).add("exploreDimensions", exploreDimensions)
-        .add("filters", filters).add("alertFilter", alertFilter).toString();
+        .add("filters", filters).add("alertFilter", alertFilter)
+        .add("requiresCompletenessCheck", requiresCompletenessCheck).toString();
   }
 }

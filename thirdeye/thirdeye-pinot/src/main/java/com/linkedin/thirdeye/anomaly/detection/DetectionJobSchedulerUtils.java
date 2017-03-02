@@ -172,12 +172,25 @@ public class DetectionJobSchedulerUtils {
   }
 
 
+  /**
+   * Creates job name for anomaly detection job
+   * @param anomalyFunction
+   * @param startTimes
+   * @param endTimes
+   * @return
+   */
   public static String createJobName(AnomalyFunctionDTO anomalyFunction, List<Long> startTimes, List<Long> endTimes) {
-
     return String.format("%s-%s-%s-%s-%d", anomalyFunction.getId(), anomalyFunction.getFunctionName(),
         startTimes.get(0), endTimes.get(0), startTimes.size());
   }
 
+  /**
+   * Calculates the number of buckets that a time period can be divided into, depending on the dataset and function frequency
+   * @param datasetConfig
+   * @param startTime
+   * @param endTime
+   * @return
+   */
   public static long getExpectedCompleteBuckets(DatasetConfigDTO datasetConfig, long startTime, long endTime) {
     TimeSpec timeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
     long bucketSize = DataCompletenessTaskUtils.getBucketSizeInMSForDataset(timeSpec);

@@ -200,16 +200,15 @@ public class RunAdhocDatabaseQueriesTool {
     }
   }
 
-  private void disableAnomalyFunctions() {
-    List<AnomalyFunctionDTO> anomalyFunctionDTOs = anomalyFunctionDAO.findAllByCollection("thirdeyeAbook");
+  private void disableAnomalyFunctions(String dataset) {
+    List<AnomalyFunctionDTO> anomalyFunctionDTOs = anomalyFunctionDAO.findAllByCollection(dataset);
     for (AnomalyFunctionDTO anomalyFunctionDTO : anomalyFunctionDTOs) {
     anomalyFunctionDTO.setActive(false);
     anomalyFunctionDAO.update(anomalyFunctionDTO);
     }
   }
 
-  private void addRequiresCompletenessCheck() {
-    List<String> datasets = Lists.newArrayList("login_additive", "mny-ads-su-kpi-alerts", "ptrans_db_hourly_additive");
+  private void addRequiresCompletenessCheck(List<String> datasets) {
     for (String dataset : datasets) {
       DatasetConfigDTO dto = datasetConfigDAO.findByDataset(dataset);
       dto.setRequiresCompletenessCheck(true);
@@ -217,17 +216,17 @@ public class RunAdhocDatabaseQueriesTool {
     }
   }
 
-  private void updateDetectionRun() {
+  private void updateDetectionRun(String dataset) {
     for (DetectionStatusDTO dto : detectionStatusDAO.findAll()) {
-      if (dto.getDataset().equals("login_additive")) {
+      if (dto.getDataset().equals(dataset)) {
         dto.setDetectionRun(false);
         detectionStatusDAO.update(dto);
       }
     }
   }
 
-  private void enableDataCompleteness() {
-    List<DataCompletenessConfigDTO> dtos = dataCompletenessConfigDAO.findAllByDataset("mny-ads-su-kpi-alerts");
+  private void enableDataCompleteness(String dataset) {
+    List<DataCompletenessConfigDTO> dtos = dataCompletenessConfigDAO.findAllByDataset(dataset);
     for (DataCompletenessConfigDTO dto : dtos) {
       dto.setDataComplete(true);
       dataCompletenessConfigDAO.update(dto);
@@ -242,7 +241,6 @@ public class RunAdhocDatabaseQueriesTool {
       System.exit(1);
     }
     RunAdhocDatabaseQueriesTool dq = new RunAdhocDatabaseQueriesTool(persistenceFile);
-    dq.disableAnomalyFunctions();
   }
 
 }

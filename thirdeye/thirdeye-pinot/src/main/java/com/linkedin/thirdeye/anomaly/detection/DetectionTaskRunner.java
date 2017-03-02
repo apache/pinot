@@ -90,9 +90,11 @@ public class DetectionTaskRunner implements TaskRunner {
         anomalyFunctionSpec.getCollection());
 
 
+    // Run for all pairs of window start and window end
     for (int i = 0; i < windowStarts.size(); i ++) {
       DateTime windowStart = windowStarts.get(i);
       DateTime windowEnd = windowEnds.get(i);
+      LOG.info("Running for time range {} to  {}", windowStart, windowEnd);
 
       // Get Time Series
       List<Pair<Long, Long>> startEndTimeRanges = anomalyFunction.getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis());

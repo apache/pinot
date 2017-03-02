@@ -12,10 +12,11 @@ import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterUtil;
 import com.linkedin.thirdeye.util.SeverityComputationUtil;
-import java.util.List;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
@@ -32,9 +33,11 @@ import org.apache.commons.lang.NullArgumentException;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.format.ISODateTimeFormat;
+
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,12 +82,11 @@ public class DetectionJobResource {
       @QueryParam("end") String endTimeIso) throws Exception {
     Long startTime = null;
     Long endTime = null;
-    if (StringUtils.isNotBlank(startTimeIso)) {
-      startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso).getMillis();
+    if (StringUtils.isBlank(startTimeIso) || StringUtils.isBlank(endTimeIso)) {
+      throw new IllegalStateException("startTimeIso and endTimeIso must not be null");
     }
-    if (StringUtils.isNotBlank(endTimeIso)) {
-      endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso).getMillis();
-    }
+    startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso).getMillis();
+    endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso).getMillis();
     detectionJobScheduler.runAdhocAnomalyFunction(id, startTime, endTime);
     return Response.ok().build();
   }

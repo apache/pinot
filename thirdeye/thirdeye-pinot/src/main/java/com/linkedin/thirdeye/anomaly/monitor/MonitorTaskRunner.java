@@ -15,8 +15,6 @@ import com.linkedin.thirdeye.anomaly.task.TaskContext;
 import com.linkedin.thirdeye.anomaly.task.TaskInfo;
 import com.linkedin.thirdeye.anomaly.task.TaskResult;
 import com.linkedin.thirdeye.anomaly.task.TaskRunner;
-import com.linkedin.thirdeye.datalayer.bao.JobManager;
-import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 
@@ -71,6 +69,7 @@ public class MonitorTaskRunner implements TaskRunner {
       // fist delete tasks then jobs, as task has a foreign key
       int numAnomalyTasksDeleted = DAO_REGISTRY.getTaskDAO().deleteRecordsOlderThanDaysWithStatus(expireDaysAgo, TaskStatus.COMPLETED);
       int numAnomalyJobsDeleted = DAO_REGISTRY.getJobDAO().deleteRecordsOlderThanDaysWithStatus(expireDaysAgo, JobStatus.COMPLETED);
+      // delete rows from detection status table, older than
       int numDetectionStatusRowsDeleted = DAO_REGISTRY.getDetectionStatusDAO().deleteRecordsOlderThanDays(7);
       LOG.info("Deleted {} anomaly jobs and {} anomaly tasks", numAnomalyJobsDeleted, numAnomalyTasksDeleted);
       LOG.info("Deleted {} rows from detectionStatus table", numDetectionStatusRowsDeleted);
