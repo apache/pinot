@@ -15,6 +15,21 @@ import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.AlertConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.DashboardConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.DataCompletenessConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.DatasetConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.EmailConfigurationManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.EventManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.IngraphDashboardConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.IngraphMetricConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.JobManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.MetricConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.OverrideConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.RawAnomalyResultManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.TaskManagerImpl;
 
 /**
  * Singleton service registry for Data Access Objects (DAOs)
@@ -48,9 +63,47 @@ public class DAORegistry {
 
   /**
    * **USE FOR TESTING ONLY**
+   * Return a DAO registry for testing purpose, which may be performed in arbitrary order and
+   * hence need independent registry for each test.
+   *
+   * @return an independent DAO registry to the global singleton registry.
+   */
+  public static DAORegistry getTestInstance() {
+    return new DAORegistry();
+  }
+
+  /**
+   * **USE FOR TESTING ONLY**
+   * Override the singleton DAO registry's content with the given DAO registry.
+   * This method is used by testing methods only and should not be used in any production code.
+   * The reason we need this method is for solving TestNG's interleaved testing order among different
+   * test class.
+   *
+   * @param DaoRegistry the DAO registry of new content.
+   */
+  public static void overrideSingletonDAORegistryForTesting(DAORegistry DaoRegistry) {
+    singleton.setAnomalyFunctionDAO(DaoRegistry.getAnomalyFunctionDAO());
+    singleton.setEmailConfigurationDAO(DaoRegistry.getEmailConfigurationDAO());
+    singleton.setRawAnomalyResultDAO(DaoRegistry.getRawAnomalyResultDAO());
+    singleton.setMergedAnomalyResultDAO(DaoRegistry.getMergedAnomalyResultDAO());
+    singleton.setJobDAO(DaoRegistry.getJobDAO());
+    singleton.setTaskDAO(DaoRegistry.getTaskDAO());
+    singleton.setDatasetConfigDAO(DaoRegistry.getDatasetConfigDAO());
+    singleton.setMetricConfigDAO(DaoRegistry.getMetricConfigDAO());
+    singleton.setDashboardConfigDAO(DaoRegistry.getDashboardConfigDAO());
+    singleton.setIngraphMetricConfigDAO(DaoRegistry.getIngraphMetricConfigDAO());
+    singleton.setIngraphDashboardConfigDAO(DaoRegistry.getIngraphDashboardConfigDAO());
+    singleton.setOverrideConfigDAO(DaoRegistry.getOverrideConfigDAO());
+    singleton.setAlertConfigDAO(DaoRegistry.getAlertConfigDAO());
+    singleton.setDataCompletenessConfigDAO(DaoRegistry.getDataCompletenessConfigDAO());
+    singleton.setEventDAO(DaoRegistry.getEventDAO());
+  }
+
+  /**
+   * **USE FOR TESTING ONLY**
    * Reset registry to empty initial state.
    */
-  public static void reset() {
+  public static void resetForTesting() {
     singleton.reset_internal();
   }
 

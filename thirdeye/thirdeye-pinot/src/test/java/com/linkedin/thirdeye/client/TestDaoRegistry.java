@@ -1,8 +1,6 @@
 package com.linkedin.thirdeye.client;
 
 import com.linkedin.thirdeye.datalayer.bao.jdbc.AlertConfigManagerImpl;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 public class TestDaoRegistry {
@@ -30,7 +28,7 @@ public class TestDaoRegistry {
   void testSingletonReset() {
     registry.setAlertConfigDAO(new AlertConfigManagerImpl());
     registry.getAlertConfigDAO();
-    DAORegistry.reset();
+    DAORegistry.resetForTesting();
 
     registry.setAlertConfigDAO(new AlertConfigManagerImpl());
     registry.getAlertConfigDAO();

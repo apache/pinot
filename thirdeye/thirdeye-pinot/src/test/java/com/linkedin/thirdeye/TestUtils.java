@@ -29,26 +29,23 @@ import org.apache.tomcat.jdbc.pool.DataSource;
 
 
 public class TestUtils {
-
-  static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
-  static final TestUtils instance = new TestUtils();
-
-  private ManagerProvider managerProvider;
-  private PersistenceConfig configuration;
-
   private DataSource ds;
+  private DAORegistry DAO_REGISTRY;
 
-  public static void setupDAO() {
+  public static TestUtils setupDAO() {
+    TestUtils instance = new TestUtils();
+    instance.setTestDaoRegistry(DAORegistry.getTestInstance());
     try {
-      DAORegistry.reset();
+      DAORegistry.resetForTesting();
       instance.init();
       System.out.println("DAOs initialized");
+      return instance;
     } catch(Exception e) {
       throw new RuntimeException(e);
     }
   }
 
-  public static void teardownDAO() {
+  public static void teardownDAO(TestUtils instance) {
     try {
       System.out.println("DAOs cleaned up");
       instance.cleanUp();
@@ -57,10 +54,18 @@ public class TestUtils {
     }
   }
 
+  public void setTestDaoRegistry(DAORegistry DaoRegistry) {
+    DAO_REGISTRY = DaoRegistry;
+  }
+
+  public DAORegistry getTestDaoRegistry() {
+    return DAO_REGISTRY;
+  }
+
   private void init() throws Exception {
     URL url = AbstractManagerTestBase.class.getResource("/persistence-local.yml");
     File configFile = new File(url.toURI());
-    configuration = DaoProviderUtil.createConfiguration(configFile);
+    PersistenceConfig configuration = DaoProviderUtil.createConfiguration(configFile);
 
     initializeDs(configuration);
     initJDBC();
@@ -97,7 +102,6 @@ public class TestUtils {
 
   //JDBC related init/cleanup
   private void initJDBC() throws Exception {
-    cleanUp();
     initDB();
     initManagers();
   }
@@ -123,7 +127,7 @@ public class TestUtils {
   }
 
   private void initManagers() throws Exception {
-    managerProvider = new ManagerProvider(ds);
+    ManagerProvider managerProvider = new ManagerProvider(ds);
     Class<AnomalyFunctionManagerImpl> c = AnomalyFunctionManagerImpl.class;
     System.out.println(c);
 

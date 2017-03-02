@@ -30,8 +30,6 @@ import java.util.concurrent.TimeUnit;
 import org.joda.time.DateTime;
 
 public abstract class AbstractManagerTestBase {
-  protected static DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
-
   protected AnomalyFunctionManager anomalyFunctionDAO;
   protected RawAnomalyResultManager rawAnomalyResultDAO;
   protected JobManager jobDAO;
@@ -48,28 +46,32 @@ public abstract class AbstractManagerTestBase {
   protected DataCompletenessConfigManager dataCompletenessConfigDAO;
   protected EventManager eventManager;
 
+  protected TestUtils testUtils;
+  protected DAORegistry daoRegistry;
+
   protected void init() {
-    TestUtils.setupDAO();
-    anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
-    rawAnomalyResultDAO = DAO_REGISTRY.getRawAnomalyResultDAO();
-    jobDAO = DAO_REGISTRY.getJobDAO();
-    taskDAO = DAO_REGISTRY.getTaskDAO();
-    emailConfigurationDAO = DAO_REGISTRY.getEmailConfigurationDAO();
-    mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
-    datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
-    metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
-    dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
-    ingraphDashboardConfigDAO = DAO_REGISTRY.getIngraphDashboardConfigDAO();
-    ingraphMetricConfigDAO = DAO_REGISTRY.getIngraphMetricConfigDAO();
-    overrideConfigDAO = DAO_REGISTRY.getOverrideConfigDAO();
-    alertConfigDAO = DAO_REGISTRY.getAlertConfigDAO();
-    dataCompletenessConfigDAO = DAO_REGISTRY.getDataCompletenessConfigDAO();
-    eventManager = DAO_REGISTRY.getEventDAO();
-    anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
+    testUtils = TestUtils.setupDAO();
+    daoRegistry = testUtils.getTestDaoRegistry();
+    anomalyFunctionDAO = daoRegistry.getAnomalyFunctionDAO();
+    rawAnomalyResultDAO = daoRegistry.getRawAnomalyResultDAO();
+    jobDAO = daoRegistry.getJobDAO();
+    taskDAO = daoRegistry.getTaskDAO();
+    emailConfigurationDAO = daoRegistry.getEmailConfigurationDAO();
+    mergedAnomalyResultDAO = daoRegistry.getMergedAnomalyResultDAO();
+    datasetConfigDAO = daoRegistry.getDatasetConfigDAO();
+    metricConfigDAO = daoRegistry.getMetricConfigDAO();
+    dashboardConfigDAO = daoRegistry.getDashboardConfigDAO();
+    ingraphDashboardConfigDAO = daoRegistry.getIngraphDashboardConfigDAO();
+    ingraphMetricConfigDAO = daoRegistry.getIngraphMetricConfigDAO();
+    overrideConfigDAO = daoRegistry.getOverrideConfigDAO();
+    alertConfigDAO = daoRegistry.getAlertConfigDAO();
+    dataCompletenessConfigDAO = daoRegistry.getDataCompletenessConfigDAO();
+    eventManager = daoRegistry.getEventDAO();
+    anomalyFunctionDAO = daoRegistry.getAnomalyFunctionDAO();
   }
 
   protected void cleanup() {
-    TestUtils.teardownDAO();
+    TestUtils.teardownDAO(testUtils);
   }
 
   protected AnomalyFunctionDTO getTestFunctionSpec(String metricName, String collection) {
