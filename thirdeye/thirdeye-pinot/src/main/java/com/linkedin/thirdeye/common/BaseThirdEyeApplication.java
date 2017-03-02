@@ -5,6 +5,7 @@ import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
+import com.linkedin.thirdeye.datalayer.bao.FunctionAutoTuneConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
@@ -17,6 +18,7 @@ import com.linkedin.thirdeye.datalayer.bao.jdbc.JobManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.MetricConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.RawAnomalyResultManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.FunctionAutoTuneConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import com.yammer.metrics.core.MetricsRegistry;
 import com.yammer.metrics.reporting.JmxReporter;
@@ -44,6 +46,7 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
   protected DatasetConfigManager datasetConfigDAO;
   protected MetricConfigManager metricConfigDAO;
   protected DashboardConfigManager dashboardConfigDAO;
+  protected FunctionAutoTuneConfigManager functionAutoTuneConfigDAO;
 
   protected DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
@@ -59,5 +62,6 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
     datasetConfigDAO = DaoProviderUtil.getInstance(DatasetConfigManagerImpl.class);
     metricConfigDAO = DaoProviderUtil.getInstance(MetricConfigManagerImpl.class);
     dashboardConfigDAO = DaoProviderUtil.getInstance(DashboardConfigManagerImpl.class);
+    functionAutoTuneConfigDAO = DaoProviderUtil.getInstance(FunctionAutoTuneConfigManagerImpl.class);
   }
 }

@@ -2,6 +2,8 @@ package com.linkedin.thirdeye.datalayer.bao;
 
 import com.google.common.collect.Lists;
 import com.linkedin.thirdeye.TestDBResources;
+import com.linkedin.thirdeye.anomaly.detection.lib.AutotuneMethodType;
+import com.linkedin.thirdeye.anomaly.detection.lib.PerformanceEvaluationMethod;
 import com.linkedin.thirdeye.anomaly.job.JobConstants;
 import com.linkedin.thirdeye.anomaly.override.OverrideConfigHelper;
 import com.linkedin.thirdeye.api.DimensionMap;
@@ -15,6 +17,7 @@ import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionStatusDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
+import com.linkedin.thirdeye.datalayer.dto.FunctionAutoTuneConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.IngraphDashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.IngraphMetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
@@ -58,6 +61,7 @@ public abstract class AbstractManagerTestBase {
   protected DataCompletenessConfigManager dataCompletenessConfigDAO;
   protected EventManager eventManager;
   protected DetectionStatusManager detectionStatusDAO;
+  protected FunctionAutoTuneConfigManager functionAutoTuneConfigDAO;
 
   //  protected TestDBResources testDBResources;
   protected DAORegistry daoRegistry;
@@ -91,6 +95,7 @@ public abstract class AbstractManagerTestBase {
       eventManager = daoRegistry.getEventDAO();
       anomalyFunctionDAO = daoRegistry.getAnomalyFunctionDAO();
       detectionStatusDAO = daoRegistry.getDetectionStatusDAO();
+      functionAutoTuneConfigDAO = daoRegistry.getFunctionAutoTuneDAO();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -328,5 +333,20 @@ public abstract class AbstractManagerTestBase {
     detectionStatusDTO.setDateToCheckInSDF(dateToCheckInSDF);
     detectionStatusDTO.setDetectionRun(detectionRun);
     return detectionStatusDTO;
+  }
+
+  protected FunctionAutoTuneConfigDTO getTestFunctionAutoTuneConfig(long functionId, long start, long end) {
+    FunctionAutoTuneConfigDTO functionAutoTuneConfigDTO = new FunctionAutoTuneConfigDTO();
+    functionAutoTuneConfigDTO.setFunctionId(functionId);
+    functionAutoTuneConfigDTO.setStartTime(start);
+    functionAutoTuneConfigDTO.setEndTime(end);
+    functionAutoTuneConfigDTO.setPerformanceEvaluationMethod(PerformanceEvaluationMethod.ANOMALY_PERCENTAGE);
+    Map<String, String> config = new HashMap<>();
+    config.put("ConfigKey", "ConfigValue");
+    functionAutoTuneConfigDTO.setConfiguration(config);
+    Map<String, String> performance = new HashMap<>();
+    performance.put("PerformanceKey", "PerformanceValue");
+    functionAutoTuneConfigDTO.setPerformance(performance);
+    return functionAutoTuneConfigDTO;
   }
 }

@@ -3,9 +3,11 @@ package com.linkedin.thirdeye.datalayer.dao;
 import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricUtil;
 import com.linkedin.thirdeye.datalayer.entity.AlertConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.EventIndex;
+import com.linkedin.thirdeye.datalayer.entity.FunctionAutotuneConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.OverrideConfigIndex;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.EventBean;
+import com.linkedin.thirdeye.datalayer.pojo.FunctionAutoTuneConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.OverrideConfigBean;
 
 import java.sql.Connection;
@@ -109,6 +111,8 @@ public class GenericPojoDao {
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, EventIndex.class));
     pojoInfoMap.put(AlertConfigBean.class,
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, AlertConfigIndex.class));
+    pojoInfoMap.put(FunctionAutoTuneConfigBean.class,
+        newPojoInfo(DEFAULT_BASE_TABLE_NAME, FunctionAutotuneConfigIndex.class));
     pojoInfoMap.put(DataCompletenessConfigBean.class,
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, DataCompletenessConfigIndex.class));
     pojoInfoMap.put(DetectionStatusBean.class,

@@ -1,25 +1,32 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
+import com.linkedin.thirdeye.anomaly.detection.lib.FunctionAutotuneExcutorRunnable;
+import com.linkedin.thirdeye.anomaly.detection.lib.FunctionAutotuneRunnable;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutoTune;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
+import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.AnomalyPercentagePerformanceEvaluation;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
+import com.linkedin.thirdeye.dashboard.resources.OnboardResource;
+import com.linkedin.thirdeye.datalayer.bao.FunctionAutoTuneConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.dto.FunctionAutoTuneConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterEvaluationUtil;
 import com.linkedin.thirdeye.util.SeverityComputationUtil;
+import com.sun.org.apache.xpath.internal.operations.Bool;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 
-import java.util.List;
 import java.util.Map;
-import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import javax.validation.constraints.NotNull;
@@ -38,6 +45,7 @@ import org.apache.commons.lang.NullArgumentException;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
+import org.joda.time.Interval;
 import org.joda.time.format.ISODateTimeFormat;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -60,6 +68,7 @@ public class DetectionJobResource {
   private final AnomalyFunctionManager anomalyFunctionDAO;
   private final MergedAnomalyResultManager mergedAnomalyResultDAO;
   private final RawAnomalyResultManager rawAnomalyResultDAO;
+  private final FunctionAutoTuneConfigManager functionAutoTuneConfigDAO;
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
   private final AlertFilterAutotuneFactory alertFilterAutotuneFactory;
@@ -74,6 +83,7 @@ public class DetectionJobResource {
     this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     this.rawAnomalyResultDAO = DAO_REGISTRY.getRawAnomalyResultDAO();
+    this.functionAutoTuneConfigDAO = DAO_REGISTRY.getFunctionAutoTuneDAO();
     this.alertFilterAutotuneFactory = alertFilterAutotuneFactory;
     this.alertFilterFactory = alertFilterFactory;
   }
@@ -281,6 +291,7 @@ public class DetectionJobResource {
       }
     }).start();
 
+
     return Response.ok().build();
   }
 
@@ -405,7 +416,7 @@ public class DetectionJobResource {
       int index = i;
       for(String field : fieldList) {
         List<String> params = fieldToParams.get(field);
-        combination.put(field, params.get(i % params.size()));
+        combination.put(field, params.get(index % params.size()));
         index /= params.size();
       }
       tuningParameters.add(combination);
@@ -465,15 +476,17 @@ public class DetectionJobResource {
   public Response anomalyFunctionAutotune(@PathParam("id") long functionId, @QueryParam("start") String replayStartTime,
       @QueryParam("end") String replayEndTime, @QueryParam("timezone") String timezone,
       @QueryParam("tune") String tuningJSON, @QueryParam("goalRange") String goalRangeJSON){
-    AnomalyFunctionDTO anomalyFunctionDTO = anomalyFunctionDAO.findById(functionId);
     DateTimeZone dateTimeZone = DateTimeZone.forID(timezone);
     // DateTime monitoringWindowStartTime = ISODateTimeFormat.dateTimeParser().parseDateTime(monitoringDateTime).withZone(dateTimeZone);
     DateTime replayStart = ISODateTimeFormat.dateTimeParser().parseDateTime(replayStartTime).withZone(dateTimeZone);
     DateTime replayEnd = ISODateTimeFormat.dateTimeParser().parseDateTime(replayEndTime).withZone(dateTimeZone);
+    Interval replayInterval = new Interval(replayStart.getMillis(), replayEnd.getMillis());
+    Set<String> satisfiedProperties = new HashSet<>();
 
     // List all tuning parameter sets
+    List<Map<String, String>> tuningParameters = null;
     try {
-      List<Map<String, String>> tuningParameters = listAllTuningParameters(new JSONObject(tuningJSON));
+      tuningParameters = listAllTuningParameters(new JSONObject(tuningJSON));
     }
     catch(JSONException e){
       LOG.error("Unable to parse json string: {}", tuningJSON, e );
@@ -481,29 +494,26 @@ public class DetectionJobResource {
     }
 
     // Parse goal
+    Map<String, Comparable> goals = null;
     try{
-      Map<String, Comparable> goals = getGoalRange(new JSONObject(goalRangeJSON));
+      goals = getGoalRange(new JSONObject(goalRangeJSON));
     }
     catch (JSONException e){
       LOG.error("Unable to parse json string: {}", goalRangeJSON, e );
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
 
-    // Clone functions for functionId
-    /*
-    Map<long>
-    for(int i = 0; i < MAX_CLONE_FUNCTIONS; i++){
+    FunctionAutotuneExcutorRunnable excutorRunnable = new FunctionAutotuneExcutorRunnable(detectionJobScheduler, anomalyFunctionDAO,
+        mergedAnomalyResultDAO, rawAnomalyResultDAO, functionAutoTuneConfigDAO);
+    excutorRunnable.setTuningFunctionId(functionId);
+    excutorRunnable.setReplayStart(replayStart);
+    excutorRunnable.setReplayEnd(replayEnd);
+    excutorRunnable.setForceBackfill(true);
+    excutorRunnable.setTuningParameters(tuningParameters);
+    excutorRunnable.setGoalRange(goals);
 
-    }
+    new Thread(excutorRunnable).start();
 
-
-    Thread thread =  new Thread(new Runnable() {
-        @Override
-        public void run() {
-          detectionJobScheduler.runBackfill(functionId, replayStart, replayEnd, true);
-        }
-      }).start();
-*/
-    return Response.ok().build();
+    return Response.ok("Function AutoTune is running").build();
   }
 }
