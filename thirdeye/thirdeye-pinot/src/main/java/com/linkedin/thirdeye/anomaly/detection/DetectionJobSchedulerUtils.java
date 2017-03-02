@@ -40,6 +40,7 @@ public class DetectionJobSchedulerUtils {
         pattern = DAY_FORMAT;
         break;
       case MINUTES:
+      case MILLISECONDS:
         pattern = MINUTE_FORMAT;
         break;
       case HOURS:
@@ -69,13 +70,13 @@ public class DetectionJobSchedulerUtils {
 
     // For nMINUTE level datasets, with frequency defined in nMINUTES in the function, (make sure size doesnt exceed 30 minutes, just use 1 HOUR in that case)
     // Calculate time periods according to the function frequency
-    if (dataUnit.equals(TimeUnit.MINUTES)) {
+    if (dataUnit.equals(TimeUnit.MINUTES) || dataUnit.equals(TimeUnit.MILLISECONDS)) {
       if (functionFrequency.getUnit().equals(TimeUnit.MINUTES) && (functionFrequency.getSize() <=30)) {
         int minuteBucketSize = functionFrequency.getSize();
         int roundedMinutes = (dateTime.getMinuteOfHour()/minuteBucketSize) * minuteBucketSize;
         dateTime = dateTime.withTime(dateTime.getHourOfDay(), roundedMinutes, 0, 0);
       } else {
-        dateTime = getBoundaryAlignedTimeForDataset(dateTime, TimeUnit.HOURS);
+        dateTime = getBoundaryAlignedTimeForDataset(dateTime, TimeUnit.HOURS); // default to HOURS
       }
     } else {
       dateTime = getBoundaryAlignedTimeForDataset(dateTime, dataUnit);
@@ -112,22 +113,19 @@ public class DetectionJobSchedulerUtils {
 
     // For nMINUTE level datasets, with frequency defined in nMINUTES in the function, (make sure size doesnt exceed 30 minutes, just use 1 HOUR in that case)
     // Calculate time periods according to the function frequency
-    if (dataUnit.equals(TimeUnit.MINUTES)) {
+    if (dataUnit.equals(TimeUnit.MINUTES) || dataUnit.equals(TimeUnit.MILLISECONDS)) {
       if (functionFrequency.getUnit().equals(TimeUnit.MINUTES) && (functionFrequency.getSize() <=30)) {
-        bucketMillis = getBucketSizeInMSForDataset(functionFrequency.getSize(), dataUnit);
+        bucketMillis = TimeUnit.MILLISECONDS.convert(functionFrequency.getSize(), TimeUnit.MINUTES);
       } else {
-        bucketMillis = getBucketSizeInMSForDataset(1, TimeUnit.HOURS);
+        bucketMillis = TimeUnit.MILLISECONDS.convert(1, TimeUnit.HOURS); // default to HOURS
       }
     } else {
-      bucketMillis = getBucketSizeInMSForDataset(1, dataUnit);
+      bucketMillis = TimeUnit.MILLISECONDS.convert(1, dataUnit);
     }
     return bucketMillis;
   }
 
-  private static long getBucketSizeInMSForDataset(int size, TimeUnit unit) {
-    long bucketMillis = TimeUnit.MILLISECONDS.convert(size, unit);
-    return bucketMillis;
-  }
+
 
   /**
    * Create new entries from last entry to current time,
@@ -193,6 +191,7 @@ public class DetectionJobSchedulerUtils {
    */
   public static long getExpectedCompleteBuckets(DatasetConfigDTO datasetConfig, long startTime, long endTime) {
     TimeSpec timeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
+    // Get this from DataCompletenessUtils because that determines number of buckets to check
     long bucketSize = DataCompletenessTaskUtils.getBucketSizeInMSForDataset(timeSpec);
     long numBuckets = (endTime - startTime)/bucketSize;
     return numBuckets;
