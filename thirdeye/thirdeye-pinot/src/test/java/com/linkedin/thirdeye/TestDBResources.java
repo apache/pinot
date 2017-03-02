@@ -28,27 +28,24 @@ import java.sql.Connection;
 import org.apache.tomcat.jdbc.pool.DataSource;
 
 
-public class TestUtils {
-
-  static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
-  static final TestUtils instance = new TestUtils();
-
-  private ManagerProvider managerProvider;
-  private PersistenceConfig configuration;
-
+public class TestDBResources {
   private DataSource ds;
+  private DAORegistry daoRegistry;
 
-  public static void setupDAO() {
+  public static TestDBResources setupDAO() {
+    TestDBResources instance = new TestDBResources();
+    instance.setTestDaoRegistry(DAORegistry.getTestInstance());
     try {
-      DAORegistry.reset();
+      DAORegistry.resetForTesting();
       instance.init();
       System.out.println("DAOs initialized");
+      return instance;
     } catch(Exception e) {
       throw new RuntimeException(e);
     }
   }
 
-  public static void teardownDAO() {
+  public static void teardownDAO(TestDBResources instance) {
     try {
       System.out.println("DAOs cleaned up");
       instance.cleanUp();
@@ -57,10 +54,18 @@ public class TestUtils {
     }
   }
 
+  public void setTestDaoRegistry(DAORegistry daoRegistry) {
+    this.daoRegistry = daoRegistry;
+  }
+
+  public DAORegistry getTestDaoRegistry() {
+    return daoRegistry;
+  }
+
   private void init() throws Exception {
     URL url = AbstractManagerTestBase.class.getResource("/persistence-local.yml");
     File configFile = new File(url.toURI());
-    configuration = DaoProviderUtil.createConfiguration(configFile);
+    PersistenceConfig configuration = DaoProviderUtil.createConfiguration(configFile);
 
     initializeDs(configuration);
     initJDBC();
@@ -97,7 +102,6 @@ public class TestUtils {
 
   //JDBC related init/cleanup
   private void initJDBC() throws Exception {
-    cleanUp();
     initDB();
     initManagers();
   }
@@ -123,25 +127,25 @@ public class TestUtils {
   }
 
   private void initManagers() throws Exception {
-    managerProvider = new ManagerProvider(ds);
+    ManagerProvider managerProvider = new ManagerProvider(ds);
     Class<AnomalyFunctionManagerImpl> c = AnomalyFunctionManagerImpl.class;
     System.out.println(c);
 
-    DAO_REGISTRY.setAnomalyFunctionDAO(managerProvider.getInstance(AnomalyFunctionManagerImpl.class));
-    DAO_REGISTRY.setEmailConfigurationDAO(managerProvider.getInstance(EmailConfigurationManagerImpl.class));
-    DAO_REGISTRY.setRawAnomalyResultDAO(managerProvider.getInstance(RawAnomalyResultManagerImpl.class));
-    DAO_REGISTRY.setMergedAnomalyResultDAO(managerProvider.getInstance(MergedAnomalyResultManagerImpl.class));
-    DAO_REGISTRY.setJobDAO(managerProvider.getInstance(JobManagerImpl.class));
-    DAO_REGISTRY.setTaskDAO(managerProvider.getInstance(TaskManagerImpl.class));
-    DAO_REGISTRY.setDatasetConfigDAO(managerProvider.getInstance(DatasetConfigManagerImpl.class));
-    DAO_REGISTRY.setMetricConfigDAO(managerProvider.getInstance(MetricConfigManagerImpl.class));
-    DAO_REGISTRY.setDashboardConfigDAO(managerProvider.getInstance(DashboardConfigManagerImpl.class));
-    DAO_REGISTRY.setIngraphMetricConfigDAO(managerProvider.getInstance(IngraphMetricConfigManagerImpl.class));
-    DAO_REGISTRY.setIngraphDashboardConfigDAO(managerProvider.getInstance(IngraphDashboardConfigManagerImpl.class));
-    DAO_REGISTRY.setOverrideConfigDAO(managerProvider.getInstance(OverrideConfigManagerImpl.class));
-    DAO_REGISTRY.setAlertConfigDAO(managerProvider.getInstance(AlertConfigManagerImpl.class));
-    DAO_REGISTRY.setDataCompletenessConfigDAO(managerProvider.getInstance(DataCompletenessConfigManagerImpl.class));
-    DAO_REGISTRY.setEventDAO(managerProvider.getInstance(EventManagerImpl.class));
+    daoRegistry.setAnomalyFunctionDAO(managerProvider.getInstance(AnomalyFunctionManagerImpl.class));
+    daoRegistry.setEmailConfigurationDAO(managerProvider.getInstance(EmailConfigurationManagerImpl.class));
+    daoRegistry.setRawAnomalyResultDAO(managerProvider.getInstance(RawAnomalyResultManagerImpl.class));
+    daoRegistry.setMergedAnomalyResultDAO(managerProvider.getInstance(MergedAnomalyResultManagerImpl.class));
+    daoRegistry.setJobDAO(managerProvider.getInstance(JobManagerImpl.class));
+    daoRegistry.setTaskDAO(managerProvider.getInstance(TaskManagerImpl.class));
+    daoRegistry.setDatasetConfigDAO(managerProvider.getInstance(DatasetConfigManagerImpl.class));
+    daoRegistry.setMetricConfigDAO(managerProvider.getInstance(MetricConfigManagerImpl.class));
+    daoRegistry.setDashboardConfigDAO(managerProvider.getInstance(DashboardConfigManagerImpl.class));
+    daoRegistry.setIngraphMetricConfigDAO(managerProvider.getInstance(IngraphMetricConfigManagerImpl.class));
+    daoRegistry.setIngraphDashboardConfigDAO(managerProvider.getInstance(IngraphDashboardConfigManagerImpl.class));
+    daoRegistry.setOverrideConfigDAO(managerProvider.getInstance(OverrideConfigManagerImpl.class));
+    daoRegistry.setAlertConfigDAO(managerProvider.getInstance(AlertConfigManagerImpl.class));
+    daoRegistry.setDataCompletenessConfigDAO(managerProvider.getInstance(DataCompletenessConfigManagerImpl.class));
+    daoRegistry.setEventDAO(managerProvider.getInstance(EventManagerImpl.class));
   }
 
 }

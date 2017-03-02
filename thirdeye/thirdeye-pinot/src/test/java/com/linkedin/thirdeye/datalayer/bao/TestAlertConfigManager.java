@@ -27,7 +27,6 @@ public class TestAlertConfigManager extends AbstractManagerTestBase {
     request.setName("my alert config");
     alertConfigid = alertConfigDAO.save(request);
     Assert.assertTrue(alertConfigid > 0);
-
   }
 
   @Test (dependsOnMethods = {"testCreateAlertConfig"})

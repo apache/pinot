@@ -6,6 +6,7 @@ import com.linkedin.pinot.common.data.FieldSpec.DataType;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
+import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.bao.AbstractManagerTestBase;
 import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
@@ -16,6 +17,7 @@ import java.util.List;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 public class AutoloadPinotMetricsServiceTest  extends AbstractManagerTestBase {
@@ -24,7 +26,6 @@ public class AutoloadPinotMetricsServiceTest  extends AbstractManagerTestBase {
   private String dataset = "test-collection";
   private Schema schema;
   DatasetConfigDTO datasetConfig = null;
-  DatasetConfigDTO ingraphDatasetConfig = null;
 
   @BeforeClass
   void beforeClass() {
@@ -34,6 +35,17 @@ public class AutoloadPinotMetricsServiceTest  extends AbstractManagerTestBase {
   @AfterClass(alwaysRun = true)
   void afterClass() {
     super.cleanup();
+  }
+
+  /**
+   * This test class needs to use a class that accesses the global singleton DAO registry. Therefore,
+   * we need to copy the local DAO registry, which is created for this test, to the global one.
+   * Otherwise, the global singleton one may reference to an arbitrary DB that is created for this
+   * test.
+   */
+  @BeforeMethod
+  void beforeMethod(){
+    DAORegistry.overrideSingletonDAORegistryForTesting(testDBResources.getTestDaoRegistry());
   }
 
   @Test
@@ -66,7 +78,6 @@ public class AutoloadPinotMetricsServiceTest  extends AbstractManagerTestBase {
     DashboardConfigDTO dashboardConfig = dashboardConfigDAO.
         findByName(DashboardConfigBean.DEFAULT_DASHBOARD_PREFIX + dataset);
     Assert.assertEquals(dashboardConfig.getMetricIds(), metricIds);
-
   }
 
   @Test(dependsOnMethods = {"testAddNewDataset"})
@@ -96,7 +107,6 @@ public class AutoloadPinotMetricsServiceTest  extends AbstractManagerTestBase {
     DashboardConfigDTO dashboardConfig = dashboardConfigDAO.
         findByName(DashboardConfigBean.DEFAULT_DASHBOARD_PREFIX + dataset);
     Assert.assertEquals(dashboardConfig.getMetricIds(), metricIds);
-
   }
 
 
