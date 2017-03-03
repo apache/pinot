@@ -155,8 +155,10 @@ public class EmailResource {
   public Response generateAndSendAlertForDatasets(@PathParam("startTime") Long startTime,
       @PathParam("endTime") Long endTime, @QueryParam("datasets") String datasets,
       @QueryParam("from") String fromAddr, @QueryParam("to") String toAddr,
+      @QueryParam("subject") String subject,
       @QueryParam("includeSentAnomaliesOnly") boolean includeSentAnomaliesOnly,
-      @QueryParam("teHost") String teHost,  @QueryParam("smtpHost") String smtpHost, @QueryParam("smtpPort") int smtpPort) {
+      @QueryParam("teHost") String teHost, @QueryParam("smtpHost") String smtpHost,
+      @QueryParam("smtpPort") int smtpPort) {
     if (Strings.isNullOrEmpty(datasets)) {
       throw new WebApplicationException("datasets null or empty : " + datasets);
     }
@@ -183,20 +185,23 @@ public class EmailResource {
 
     configuration.setSmtpConfiguration(smtpConfiguration);
     configuration.setDashboardHost(teHost);
+    String emailSub = Strings.isNullOrEmpty(subject) ? "Thirdeye Anomaly Report" : subject;
 
     anomalyReportGenerator
-        .buildReport(startTime, endTime, anomalies, "Thirdeye Anomaly Report", configuration,
-            includeSentAnomaliesOnly, toAddr, fromAddr, "UI-Generated");
+        .buildReport(startTime, endTime, anomalies, emailSub, configuration,
+            includeSentAnomaliesOnly, toAddr, fromAddr, "UI-Generated", true);
     return Response.ok().build();
   }
 
   @GET
   @Path("generate/metrics/{startTime}/{endTime}")
-  public Response generateAndSendAlertForMetrics(@PathParam("startTime") Long startTime,
-      @PathParam("endTime") Long endTime, @QueryParam("metrics") String metrics,
-      @QueryParam("from") String fromAddr, @QueryParam("to") String toAddr,
+  public Response generateAndSendAlertForMetrics(
+      @PathParam("startTime") Long startTime, @PathParam("endTime") Long endTime,
+      @QueryParam("metrics") String metrics, @QueryParam("from") String fromAddr,
+      @QueryParam("to") String toAddr,@QueryParam("subject") String subject,
       @QueryParam("includeSentAnomaliesOnly") boolean includeSentAnomaliesOnly,
-      @QueryParam("teHost") String teHost,  @QueryParam("smtpHost") String smtpHost, @QueryParam("smtpPort") int smtpPort) {
+      @QueryParam("teHost") String teHost, @QueryParam("smtpHost") String smtpHost,
+      @QueryParam("smtpPort") int smtpPort) {
     if (Strings.isNullOrEmpty(metrics)) {
       throw new WebApplicationException("metrics null or empty: " + metrics);
     }
@@ -223,10 +228,10 @@ public class EmailResource {
 
     configuration.setSmtpConfiguration(smtpConfiguration);
     configuration.setDashboardHost(teHost);
-
+    String emailSub = Strings.isNullOrEmpty(subject) ? "Thirdeye Anomaly Report" : subject;
     anomalyReportGenerator
-        .buildReport(startTime, endTime, anomalies, "Thirdeye Anomaly Report", configuration,
-            includeSentAnomaliesOnly, toAddr, fromAddr, "UI-Generated");
+        .buildReport(startTime, endTime, anomalies, emailSub, configuration,
+            includeSentAnomaliesOnly, toAddr, fromAddr, "UI-Generated", true);
     return Response.ok().build();
   }
 }

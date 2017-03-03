@@ -1,5 +1,5 @@
 package com.linkedin.thirdeye.anomaly.events;
 
 public enum EventType {
-  HOLIDAY, DEPLOYMENT
+  HOLIDAY, DEPLOYMENT, HISTORICAL_ANOMALY, CUSTOM
 }

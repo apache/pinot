@@ -37,6 +37,10 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
       "where collection=:collection and metric=:metric "
           + "and (startTime < :endTime and endTime > :startTime) order by endTime desc";
 
+  // find a conflicting window
+  private static final String FIND_BY_METRIC_TIME =
+      "where metric=:metric and (startTime < :endTime and endTime > :startTime) order by endTime desc";
+
 
   // find a conflicting window
   private static final String FIND_BY_COLLECTION_TIME = "where collection=:collection "
@@ -195,6 +199,17 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
 
     List<MergedAnomalyResultBean> list = genericPojoDao.executeParameterizedSQL(
         FIND_BY_COLLECTION_METRIC_TIME, filterParams, MergedAnomalyResultBean.class);
+    return batchConvertMergedAnomalyBean2DTO(list, loadRawAnomalies);
+  }
+
+  public List<MergedAnomalyResultDTO> findByMetricTime(String metric, long startTime, long endTime, boolean loadRawAnomalies) {
+    Map<String, Object> filterParams = new HashMap<>();
+    filterParams.put("metric", metric);
+    filterParams.put("startTime", startTime);
+    filterParams.put("endTime", endTime);
+
+    List<MergedAnomalyResultBean> list = genericPojoDao.executeParameterizedSQL(
+        FIND_BY_METRIC_TIME, filterParams, MergedAnomalyResultBean.class);
     return batchConvertMergedAnomalyBean2DTO(list, loadRawAnomalies);
   }
 

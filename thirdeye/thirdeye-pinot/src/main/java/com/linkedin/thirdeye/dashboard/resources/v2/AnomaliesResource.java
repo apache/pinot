@@ -450,7 +450,7 @@ public class AnomaliesResource {
 
   /**
    * Construct agg granularity for using in timeseries
-   * @param anomalyFunction
+   * @param datasetConfig
    * @return
    */
   private String constructAggGranularity(DatasetConfigDTO datasetConfig) {

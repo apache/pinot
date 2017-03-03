@@ -13,7 +13,6 @@ import org.joda.time.DateTime;
 
 import com.google.common.collect.Range;
 import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
@@ -27,8 +26,6 @@ import com.linkedin.thirdeye.dashboard.Utils;
 
 public class TimeSeriesHandler {
   private final QueryCache queryCache;
-
-  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   public TimeSeriesHandler(QueryCache queryCache) {
     this.queryCache = queryCache;
