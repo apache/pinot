@@ -45,7 +45,7 @@ public class AutoloadPinotMetricsServiceTest  extends AbstractManagerTestBase {
    */
   @BeforeMethod
   void beforeMethod(){
-    DAORegistry.overrideSingletonDAORegistryForTesting(testDBResources.getTestDaoRegistry());
+     // DAORegistry.overrideSingletonDAORegistryForTesting(testDBResources.getTestDaoRegistry());
   }
 
   @Test

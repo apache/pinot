@@ -16,7 +16,6 @@ import com.linkedin.thirdeye.anomaly.task.TaskDriver;
 import com.linkedin.thirdeye.anomaly.task.TaskInfoFactory;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
@@ -58,7 +57,6 @@ import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
-import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
@@ -89,24 +87,12 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
   void beforeClass() {
     super.init();
     Assert.assertNotNull(daoRegistry.getJobDAO());
-
   }
 
   @AfterClass(alwaysRun = true)
   void afterClass() throws Exception {
     cleanup_schedulers();
     super.cleanup();
-  }
-
-  /**
-   * This test class needs to use a class that accesses the global singleton DAO registry. Therefore,
-   * we need to copy the local DAO registry, which is created for this test, to the global one.
-   * Otherwise, the global singleton one may reference to an arbitrary DB that is created for this
-   * test.
-   */
-  @BeforeMethod
-  void beforeMethod(){
-    DAORegistry.overrideSingletonDAORegistryForTesting(testDBResources.getTestDaoRegistry());
   }
 
   void cleanup_schedulers() throws SchedulerException {
