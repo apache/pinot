@@ -36,8 +36,17 @@ import org.apache.commons.configuration.Configuration;
  */
 public class TimeSegmentPruner implements SegmentPruner {
 
+  private static final boolean DISABLED = true;
+
   @Override
   public boolean prune(IndexSegment segment, BrokerRequest brokerRequest) {
+    // TODO: It turns out that segment metadata is always in millisSinceEpoch, where as data in the
+    // time column can be in any format (daysSinceEpoch or millis, or yyyymmdd, yyyy-mm-dd, etc). Temporarily disabling
+    // this feature until we can handle this.
+    if (DISABLED) {
+      return false;
+    }
+
     SegmentMetadata metadata = segment.getSegmentMetadata();
     String timeColumn = metadata.getTimeColumn();
 
