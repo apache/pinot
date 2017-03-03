@@ -44,12 +44,6 @@ public class ThirdEyeAnomalyApplication
   private AlertFilterFactory alertFilterFactory = null;
   private AlertFilterAutotuneFactory alertFilterAutotuneFactory = null;
 
-  public static final Counter detectionTaskCounter =
-      metricsRegistry.newCounter(ThirdEyeAnomalyApplication.class, "detectionTaskCounter");
-
-  public static final Counter detectionTaskSuccessCounter =
-      metricsRegistry.newCounter(ThirdEyeAnomalyApplication.class, "detectionTaskSuccessCounter");
-
   public static void main(final String[] args) throws Exception {
 
     List<String> argList = new ArrayList<>(Arrays.asList(args));

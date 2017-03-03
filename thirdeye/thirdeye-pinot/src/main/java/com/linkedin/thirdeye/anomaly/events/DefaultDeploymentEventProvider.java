@@ -20,6 +20,6 @@ public class DefaultDeploymentEventProvider implements EventDataProvider<EventDT
     // TODO: write go/informed query app to fetch deployment events onthe fly.
 
     // TODO: filter qualified events from allEvents based on filter criteria
-    return qualifiedDeploymentEvents;
+    return allEventsBetweenTimeRange;
   }
 }

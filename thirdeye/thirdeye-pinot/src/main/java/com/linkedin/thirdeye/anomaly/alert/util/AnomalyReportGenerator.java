@@ -87,12 +87,12 @@ public class AnomalyReportGenerator {
       }
     }
     buildReport(startTime, endTime, anomalies, subject, configuration, false,
-        alertConfig.getRecipients(), alertConfig.getFromAddress(), alertConfig.getName());
+        alertConfig.getRecipients(), alertConfig.getFromAddress(), alertConfig.getName(), false);
   }
 
   public void buildReport(long startTime, long endTime, List<MergedAnomalyResultDTO> anomalies,
       String subject, ThirdEyeAnomalyConfiguration configuration, boolean includeSentAnomaliesOnly,
-      String emailRecipients, String fromEmail, String alertConfigName) {
+      String emailRecipients, String fromEmail, String alertConfigName, boolean includeSummary) {
     if (anomalies == null || anomalies.size() == 0) {
       LOG.info("No anomalies found to send email, please check the parameters.. exiting");
     } else {
@@ -157,6 +157,7 @@ public class AnomalyReportGenerator {
       templateData.put("nonActionableCount", nonActionable);
       templateData.put("anomalyDetails", anomalyReportDTOList);
       templateData.put("alertConfigName", alertConfigName);
+      templateData.put("includeSummary", includeSummary);
       templateData.put("reportGenerationTimeMillis", System.currentTimeMillis());
       buildEmailTemplateAndSendAlert(templateData, configuration.getSmtpConfiguration(), subject,
           emailRecipients, fromEmail);

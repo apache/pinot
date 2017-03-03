@@ -18,7 +18,6 @@ import com.linkedin.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.MetricConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.RawAnomalyResultManagerImpl;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
-import com.yammer.metrics.core.Counter;
 import com.yammer.metrics.core.MetricsRegistry;
 import com.yammer.metrics.reporting.JmxReporter;
 import io.dropwizard.Application;
@@ -32,9 +31,6 @@ public abstract class BaseThirdEyeApplication<T extends Configuration> extends A
 
   public static MetricsRegistry metricsRegistry = new MetricsRegistry();
   static JmxReporter jmxReporter = new JmxReporter(metricsRegistry);
-
-  public static final Counter dbCallCounter =
-      metricsRegistry.newCounter(BaseThirdEyeApplication.class, "dbCallCounter");
 
   static {
     jmxReporter.start();

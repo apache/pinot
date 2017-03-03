@@ -2,7 +2,6 @@ package com.linkedin.thirdeye.anomaly.detection;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.linkedin.pinot.pql.parsers.utils.Pair;
-import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyApplication;
 import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeExecutor;
 import com.linkedin.thirdeye.anomaly.override.OverrideConfigHelper;
 import com.linkedin.thirdeye.anomaly.task.TaskContext;
@@ -35,6 +34,7 @@ import org.apache.commons.lang.NullArgumentException;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import static com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricUtil.*;
 
 public class DetectionTaskRunner implements TaskRunner {
 
@@ -63,7 +63,7 @@ public class DetectionTaskRunner implements TaskRunner {
   }
 
   public List<TaskResult> execute(TaskInfo taskInfo, TaskContext taskContext) throws Exception {
-    ThirdEyeAnomalyApplication.detectionTaskCounter.inc();
+    detectionTaskCounter.inc();
     LOG.info("Begin executing task {}", taskInfo);
 
     setupTask(taskInfo);
@@ -128,6 +128,7 @@ public class DetectionTaskRunner implements TaskRunner {
       if (jobName != null && jobName.toLowerCase().startsWith(BACKFILL_PREFIX)) {
         isBackfill = true;
       }
+      detectionTaskSuccessCounter.inc();
 
       // TODO: Create AnomalyMergeExecutor in class level in order to reuse the resource
       // syncAnomalyMergeExecutor is supposed to perform lightweight merges (i.e., anomalies that have the same function
@@ -135,9 +136,8 @@ public class DetectionTaskRunner implements TaskRunner {
       // executor on purpose in order to prevent an undesired asynchronous merge happens.
       AnomalyMergeExecutor syncAnomalyMergeExecutor = new AnomalyMergeExecutor(null, anomalyFunctionFactory);
       syncAnomalyMergeExecutor.synchronousMergeBasedOnFunctionIdAndDimension(anomalyFunctionSpec, isBackfill);
+      detectionTaskSuccessCounter.inc();
     }
-
-    ThirdEyeAnomalyApplication.detectionTaskSuccessCounter.inc();
     return taskResult;
   }
 

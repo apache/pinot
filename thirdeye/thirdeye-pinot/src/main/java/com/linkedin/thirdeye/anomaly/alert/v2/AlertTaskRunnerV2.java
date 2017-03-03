@@ -12,6 +12,7 @@ import com.linkedin.thirdeye.anomaly.task.TaskContext;
 import com.linkedin.thirdeye.anomaly.task.TaskInfo;
 import com.linkedin.thirdeye.anomaly.task.TaskResult;
 import com.linkedin.thirdeye.anomaly.task.TaskRunner;
+import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricUtil;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewResponse;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
@@ -89,9 +90,10 @@ public class AlertTaskRunnerV2 implements TaskRunner {
         alertConfig.getName());
     sendAnomalyReport();
     sendScheduledDataReport();
+    ThirdeyeMetricUtil.alertTaskSuccessCounter.inc();
   }
 
-  private void sendAnomalyReport() throws Exception{
+  private void sendAnomalyReport() throws Exception {
     AlertConfigBean.EmailConfig emailConfig = alertConfig.getEmailConfig();
     if (emailConfig != null && emailConfig.getFunctionIds() != null) {
       List<Long> functionIds = alertConfig.getEmailConfig().getFunctionIds();
@@ -103,9 +105,10 @@ public class AlertTaskRunnerV2 implements TaskRunner {
         if (resultsForFunction != null && resultsForFunction.size() > 0) {
           mergedAnomaliesAllResults.addAll(resultsForFunction);
         }
-        // TODO:
+        // TODO: @pjaiswal / @ychang
         // fetch anomalies having id lesser than the watermark for the same function with notified = false & endTime > last one day
         // these anomalies are the ones that did not qualify filtration rule and got modified.
+        // We should add these again so that these could be included in email if qualified through filtration rule
       }
 
       // apply filtration rule
@@ -126,9 +129,6 @@ public class AlertTaskRunnerV2 implements TaskRunner {
             lastNotifiedAlertId = anomalyResult.getId();
           }
         }
-      /* TODO: change watermark to last updated timestamp instead of baseId as Id would not work in when
-       an anomaly which was not sent because of filtration rule, got updated later by a merge.
-       */
         if (lastNotifiedAlertId != emailConfig.getAnomalyWatermark()) {
           alertConfig.getEmailConfig().setAnomalyWatermark(lastNotifiedAlertId);
           alertConfigDAO.update(alertConfig);
@@ -137,91 +137,95 @@ public class AlertTaskRunnerV2 implements TaskRunner {
     }
   }
 
-  private void sendScheduledDataReport () throws Exception {
-    AlertConfigBean.ReportConfigCollection
-        reportConfigCollection = alertConfig.getReportConfigCollection();
+  private void sendScheduledDataReport() throws Exception {
+    AlertConfigBean.ReportConfigCollection reportConfigCollection =
+        alertConfig.getReportConfigCollection();
 
     if (reportConfigCollection != null && reportConfigCollection.isEnabled()) {
       if (reportConfigCollection.getReportMetricConfigs() != null
           && reportConfigCollection.getReportMetricConfigs().size() > 0) {
 
-          List<MetricDimensionReport> metricDimensionValueReports;
-          // Used later to provide collection for a metric to help build the url link in report
+        List<MetricDimensionReport> metricDimensionValueReports;
+        // Used later to provide collection for a metric to help build the url link in report
 
         Map<String, MetricConfigDTO> metricMap = new HashMap<>();
 
-          List<ContributorViewResponse> reports = new ArrayList<>();
-          for (int i = 0; i < reportConfigCollection.getReportMetricConfigs().size(); i++) {
-            AlertConfigBean.ReportMetricConfig reportMetricConfig =
-                reportConfigCollection.getReportMetricConfigs().get(i);
-            MetricConfigDTO metricConfig =
-                metricConfigManager.findById(reportMetricConfig.getMetricId());
+        List<ContributorViewResponse> reports = new ArrayList<>();
+        for (int i = 0; i < reportConfigCollection.getReportMetricConfigs().size(); i++) {
+          AlertConfigBean.ReportMetricConfig reportMetricConfig =
+              reportConfigCollection.getReportMetricConfigs().get(i);
+          MetricConfigDTO metricConfig =
+              metricConfigManager.findById(reportMetricConfig.getMetricId());
 
-            List<String> dimensions = reportMetricConfig.getDimensions();
-            if (dimensions != null && dimensions.size() > 0) {
-              for (String dimension : dimensions) {
-                ContributorViewResponse report = EmailHelper
-                    .getContributorDataForDataReport(metricConfig.getDataset(), metricConfig.getName(),
-                        Arrays.asList(dimension), reportMetricConfig.getCompareMode(),
-                        alertConfig.getReportConfigCollection().getDelayOffsetMillis(),
-                        alertConfig.getReportConfigCollection().isIntraDay());
-                if (report != null) {
-                  metricMap.put(metricConfig.getName(), metricConfig);
-                  reports.add(report);
-                }
+          List<String> dimensions = reportMetricConfig.getDimensions();
+          if (dimensions != null && dimensions.size() > 0) {
+            for (String dimension : dimensions) {
+              ContributorViewResponse report = EmailHelper
+                  .getContributorDataForDataReport(metricConfig.getDataset(),
+                      metricConfig.getName(), Arrays.asList(dimension),
+                      reportMetricConfig.getCompareMode(),
+                      alertConfig.getReportConfigCollection().getDelayOffsetMillis(),
+                      alertConfig.getReportConfigCollection().isIntraDay());
+              if (report != null) {
+                metricMap.put(metricConfig.getName(), metricConfig);
+                reports.add(report);
               }
             }
           }
+        }
         if (reports.size() == 0) {
           LOG.warn("Could not fetch report data for " + alertConfig.getName());
           return;
         }
-          long reportStartTs = reports.get(0).getTimeBuckets().get(0).getCurrentStart();
-          metricDimensionValueReports = DataReportHelper.getInstance().getDimensionReportList(reports);
-          for (int i = 0; i < metricDimensionValueReports.size(); i++) {
-            MetricDimensionReport report = metricDimensionValueReports.get(i);
-            report.setDataset(metricMap.get(report.getMetricName()).getDataset());
-            long metricId = metricMap.get(report.getMetricName()).getId();
-            report.setMetricId(metricId);
-            for (AlertConfigBean.ReportMetricConfig reportMetricConfig : reportConfigCollection.getReportMetricConfigs()) {
-             if(reportMetricConfig.getMetricId() == metricId) {
-               metricDimensionValueReports.get(i).setCompareMode(reportMetricConfig.getCompareMode().name());
-             }
+        long reportStartTs = reports.get(0).getTimeBuckets().get(0).getCurrentStart();
+        metricDimensionValueReports =
+            DataReportHelper.getInstance().getDimensionReportList(reports);
+        for (int i = 0; i < metricDimensionValueReports.size(); i++) {
+          MetricDimensionReport report = metricDimensionValueReports.get(i);
+          report.setDataset(metricMap.get(report.getMetricName()).getDataset());
+          long metricId = metricMap.get(report.getMetricName()).getId();
+          report.setMetricId(metricId);
+          for (AlertConfigBean.ReportMetricConfig reportMetricConfig : reportConfigCollection
+              .getReportMetricConfigs()) {
+            if (reportMetricConfig.getMetricId() == metricId) {
+              metricDimensionValueReports.get(i)
+                  .setCompareMode(reportMetricConfig.getCompareMode().name());
             }
           }
-          Configuration freemarkerConfig = new Configuration(Configuration.VERSION_2_3_21);
-          freemarkerConfig
-              .setClassForTemplateLoading(getClass(), "/com/linkedin/thirdeye/detector/");
-          freemarkerConfig.setDefaultEncoding(CHARSET);
-          freemarkerConfig.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);
-          Map<String, Object> templateData = new HashMap<>();
-          DateTimeZone timeZone = DateTimeZone.forTimeZone(DEFAULT_TIME_ZONE);
-          DataReportHelper.DateFormatMethod dateFormatMethod =
-              new DataReportHelper.DateFormatMethod(timeZone);
-          templateData.put("timeZone", timeZone);
-          templateData.put("dateFormat", dateFormatMethod);
-          templateData.put("dashboardHost", thirdeyeConfig.getDashboardHost());
-          templateData.put("fromEmail", alertConfig.getFromAddress());
-          templateData.put("contactEmail", alertConfig.getReportConfigCollection().getContactEmail());
-          templateData.put("reportStartDateTime", reportStartTs);
-          templateData.put("metricDimensionValueReports", metricDimensionValueReports);
-          ByteArrayOutputStream baos = new ByteArrayOutputStream();
-          try (Writer out = new OutputStreamWriter(baos, CHARSET)) {
-            Template template = freemarkerConfig.getTemplate("data-report-by-metric-dimension.ftl");
-            template.process(templateData, out);
-
-            // Send email
-            HtmlEmail email = new HtmlEmail();
-            String alertEmailSubject = String .format("Thirdeye data report : %s", alertConfig.getName());
-            String alertEmailHtml = new String(baos.toByteArray(), CHARSET);
-            EmailHelper
-                .sendEmailWithHtml(email, thirdeyeConfig.getSmtpConfiguration(), alertEmailSubject,
-                    alertEmailHtml, alertConfig.getFromAddress(), alertConfig.getRecipients());
-
-          } catch (Exception e) {
-            throw new JobExecutionException(e);
-          }
         }
+        Configuration freemarkerConfig = new Configuration(Configuration.VERSION_2_3_21);
+        freemarkerConfig.setClassForTemplateLoading(getClass(), "/com/linkedin/thirdeye/detector/");
+        freemarkerConfig.setDefaultEncoding(CHARSET);
+        freemarkerConfig.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);
+        Map<String, Object> templateData = new HashMap<>();
+        DateTimeZone timeZone = DateTimeZone.forTimeZone(DEFAULT_TIME_ZONE);
+        DataReportHelper.DateFormatMethod dateFormatMethod =
+            new DataReportHelper.DateFormatMethod(timeZone);
+        templateData.put("timeZone", timeZone);
+        templateData.put("dateFormat", dateFormatMethod);
+        templateData.put("dashboardHost", thirdeyeConfig.getDashboardHost());
+        templateData.put("fromEmail", alertConfig.getFromAddress());
+        templateData.put("contactEmail", alertConfig.getReportConfigCollection().getContactEmail());
+        templateData.put("reportStartDateTime", reportStartTs);
+        templateData.put("metricDimensionValueReports", metricDimensionValueReports);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try (Writer out = new OutputStreamWriter(baos, CHARSET)) {
+          Template template = freemarkerConfig.getTemplate("data-report-by-metric-dimension.ftl");
+          template.process(templateData, out);
+
+          // Send email
+          HtmlEmail email = new HtmlEmail();
+          String alertEmailSubject =
+              String.format("Thirdeye data report : %s", alertConfig.getName());
+          String alertEmailHtml = new String(baos.toByteArray(), CHARSET);
+          EmailHelper
+              .sendEmailWithHtml(email, thirdeyeConfig.getSmtpConfiguration(), alertEmailSubject,
+                  alertEmailHtml, alertConfig.getFromAddress(), alertConfig.getRecipients());
+
+        } catch (Exception e) {
+          throw new JobExecutionException(e);
+        }
+      }
     }
   }
 
