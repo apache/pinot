@@ -21,7 +21,7 @@ public class FetchAutoTuneResult {
    * @param args
    * args[0]: Type of AutoTune, default value is: AUTOTUNE
    * args[1]: Start time of merged anomaly in milliseconds
-   * args[2]: End time of mmerged anomaly in milliseconds
+   * args[2]: End time of merged anomaly in milliseconds
    * args[3]: Path to Persistence File
    * args[4]: Collection Name
    * args[5]: true if clone function is needed. if false, need to have clone map file in directory
@@ -38,8 +38,8 @@ public class FetchAutoTuneResult {
     }
 
     String AUTOTUNE_TYPE = args[0];
-    Long STARTTIMEISO = Long.valueOf(args[1]);
-    Long ENDTIMEISO = Long.valueOf(args[2]);
+    Long STARTTIME = Long.valueOf(args[1]);
+    Long ENDTIME = Long.valueOf(args[2]);
     String path2PersistenceFile = args[3];
     String Collection = args[4];
     Boolean isCloneFunction = Boolean.valueOf(args[5]);
@@ -58,11 +58,12 @@ public class FetchAutoTuneResult {
     CloneFunctionAndAutoTuneAlertFilterTool executor = new CloneFunctionAndAutoTuneAlertFilterTool(new File(path2PersistenceFile));
 
     String cloneMapName = Collection + UNDERSCORE + CLONEDMAPSUFFIX + CSVSUFFIX;
-    // clone functions
+
+    // clone functions (and remove holidays)
     if (isCloneFunction) {
-      Map<Long, Long> clonedFunctionIds = executor.cloneFunctionsToAutoTune(Collection, isRemoveHoliday, DIR_TO_FILE + holidayFileName);
+      Map<String, String> clonedFunctionIds = executor.cloneFunctionsToAutoTune(Collection, isRemoveHoliday, DIR_TO_FILE + holidayFileName);
       // write relationship to csv
-      executor.writeMapToCSV(Collections.unmodifiableMap(clonedFunctionIds), DIR_TO_FILE + cloneMapName);
+      executor.writeMapToCSV(clonedFunctionIds, DIR_TO_FILE + cloneMapName, null);
       LOG.info("Cloned the set of funcitons and write to file: {}", cloneMapName);
     }
 
@@ -72,33 +73,34 @@ public class FetchAutoTuneResult {
 
     // getTuned and Evaluate prev, curr alert filter
     Map<Long, Boolean> tunedResult = new HashMap<>();
-    Map<Long, String> outputMap = new HashMap<>();
+    Map<String, String> outputMap = new HashMap<>();
     for(Map.Entry<Long, Long> pair: clonedMap.entrySet()) {
 
-      StringBuilder outputVal = new StringBuilder(Collection + CloneFunctionAndAutoTuneAlertFilterTool.CSVSEPERATOR);
+      StringBuilder outputVal = new StringBuilder();
 
       Long clonedFunctionId = pair.getValue();
 
       //before tuning, evaluate current
-      String origEvals = executor.evalAlertFilterToCommaSeperateString(clonedFunctionId, STARTTIMEISO, ENDTIMEISO);
+      String origEvals = executor.evalAlertFilterToEvalNode(clonedFunctionId, STARTTIME, ENDTIME).toCSVString();
 
       // tune by functionId
-      Boolean isUpdated = Boolean.valueOf(executor.getTunedAlertFilterByFunctionId(clonedFunctionId, STARTTIMEISO, ENDTIMEISO, AUTOTUNE_TYPE));
+      Boolean isUpdated = Boolean.valueOf(executor.getTunedAlertFilterByFunctionId(clonedFunctionId, STARTTIME, ENDTIME, AUTOTUNE_TYPE));
 
       // after tuning, evaluate tuned
-      String tunedEvals = executor.evalAlertFilterToCommaSeperateString(clonedFunctionId, STARTTIMEISO, ENDTIMEISO);
+      String tunedEvals = executor.evalAlertFilterToEvalNode(clonedFunctionId, STARTTIME, ENDTIME).toCSVString();
 
       outputVal.append(origEvals)
           .append(tunedEvals)
           .append(isUpdated);
 
-      outputMap.put(pair.getKey(), outputVal.toString());
+      outputMap.put(String.valueOf(pair.getKey()), outputVal.toString());
       tunedResult.put(clonedFunctionId, isUpdated);
     }
     LOG.info("Tuned cloned functions and constructed evaluations");
 
     // write to file
-    executor.writeMapToCSV(Collections.unmodifiableMap(outputMap), DIR_TO_FILE + Collection + CSVSUFFIX);
+    String header = "FunctionId" + "," + CloneFunctionAndAutoTuneAlertFilterTool.EvaluationNode.getCSVSchema() + "," + CloneFunctionAndAutoTuneAlertFilterTool.EvaluationNode.getCSVSchema() + "," + "isModelUpdated";
+    executor.writeMapToCSV(outputMap, DIR_TO_FILE + Collection + CSVSUFFIX, header);
     LOG.info("Write evaluations to file: {}", DIR_TO_FILE + Collection + CSVSUFFIX);
   }
 }

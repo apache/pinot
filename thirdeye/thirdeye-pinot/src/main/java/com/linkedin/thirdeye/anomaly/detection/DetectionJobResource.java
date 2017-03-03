@@ -345,10 +345,10 @@ public class DetectionJobResource {
     try{
       //evaluate current alert filter (calculate current precision and recall)
       evaluator.updatePrecisionAndRecall(anomalyResultDTOS);
-      LOG.info("AlertFilter of Type {}", alertFilter.getClass().toString(), "has been evaluated with precision: {}",
-          evaluator.getPrecision(), "recall:", evaluator.getRecall());
+      LOG.info("AlertFilter of Type {}, has been evaluated with precision: {}, recall:{}", alertFilter.getClass().toString(),
+          evaluator.getPrecision(), evaluator.getRecall());
     } catch (Exception e) {
-      LOG.warn("Updating precision and recall failed because: {}",e.getMessage());
+      LOG.warn("Updating precision and recall failed because: {}", e.getMessage());
     }
 
     // get anomaly summary from merged anomaly results

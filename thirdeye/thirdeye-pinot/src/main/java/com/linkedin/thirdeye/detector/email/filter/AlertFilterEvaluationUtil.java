@@ -1,9 +1,11 @@
 package com.linkedin.thirdeye.detector.email.filter;
 
-
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 
@@ -21,13 +23,13 @@ public class AlertFilterEvaluationUtil {
   private int falseAlarm = -1;
   private int nonActionable = -1;
 
-  private static final String PRECISION = "precision";
-  private static final String RECALL = "recall";
-  private static final String TOTALANOMALIES = "totalAnomalies";
-  private static final String TOTALRESPONSES = "totalResponses";
-  private static final String TRUEANOMALIES = "trueAnomalies";
-  private static final String FALSEALARM = "falseAlarm";
-  private static final String NONACTIONABLE = "nonActionable";
+  public static final String PRECISION = "precision";
+  public static final String RECALL = "recall";
+  public static final String TOTALANOMALIES = "totalAnomalies";
+  public static final String TOTALRESPONSES = "totalResponses";
+  public static final String TRUEANOMALIES = "trueAnomalies";
+  public static final String FALSEALARM = "falseAlarm";
+  public static final String NONACTIONABLE = "nonActionable";
 
   public double getPrecision(){return this.precision;}
   public double getRecall(){return this.recall;}
@@ -38,6 +40,9 @@ public class AlertFilterEvaluationUtil {
   public int getNonActionable(){return this.nonActionable;}
 
   private AlertFilter alertFilter;
+
+  private static final List<String> propertyNames =
+      Collections.unmodifiableList(new ArrayList<>(Arrays.asList(PRECISION, RECALL, TOTALANOMALIES, TOTALRESPONSES, TRUEANOMALIES, FALSEALARM, NONACTIONABLE)));
 
   public AlertFilterEvaluationUtil(AlertFilter alertFilter){
     this.alertFilter = alertFilter;
@@ -127,5 +132,9 @@ public class AlertFilterEvaluationUtil {
     evals.put(FALSEALARM, falseAlarm);
     evals.put(NONACTIONABLE, nonActionable);
     return evals;
+  }
+
+  public static List<String> getPropertyNames() {
+    return propertyNames;
   }
 }

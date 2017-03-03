@@ -6,16 +6,21 @@ import com.linkedin.thirdeye.anomaly.utils.OnboardResourceHttpUtils;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
+import com.linkedin.thirdeye.detector.email.filter.AlertFilterEvaluationUtil;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
+import org.apache.commons.lang.StringUtils;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -44,8 +49,49 @@ public class CloneFunctionAndAutoTuneAlertFilterTool {
     DaoProviderUtil.init(persistenceFile);
     anomalyFunctionDAO = DaoProviderUtil
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl.class);
-
   }
+
+
+  public static class EvaluationNode{
+
+    private Properties alertFilterEval;
+
+    private static final String FUNCTIONID = "functionId";
+    private static final String METRICNAME = "metricName";
+    private static final String ALERTFILTERSTR = "alertFilterStr";
+    private static final String COLLECTION = "collection";
+
+    private static List<String> getHeaders(){
+      List<String> headers = new ArrayList<>();
+      headers.addAll(Arrays.asList(COLLECTION, METRICNAME, FUNCTIONID, ALERTFILTERSTR));
+      headers.addAll(AlertFilterEvaluationUtil.getPropertyNames());
+      return headers;
+    }
+
+    public EvaluationNode(Long functionId, String metricName, String collection, String alertFilterStr, Properties alertFilterEvaluations){
+
+      alertFilterEvaluations.put(FUNCTIONID, functionId);
+      alertFilterEvaluations.put(METRICNAME, metricName);
+      alertFilterEvaluations.put(COLLECTION, collection);
+      alertFilterEvaluations.put(ALERTFILTERSTR, alertFilterStr);
+
+      this.alertFilterEval = alertFilterEvaluations;
+    }
+
+    public String toCSVString(){
+      StringBuilder res = new StringBuilder();
+      for(String header : getHeaders()){
+        res.append(alertFilterEval.get(header))
+        .append(CSVSEPERATOR);
+      }
+      return res.toString();
+    }
+
+    public static String getCSVSchema(){
+      return StringUtils.join(getHeaders(), CSVSEPERATOR);
+    }
+  }
+
 
   public Long cloneFunctionToAutotune(Long functionid, String autoTuneTag, boolean isCloneAnomaly) {
     OnboardResourceHttpUtils httpUtils = new OnboardResourceHttpUtils(LOCALHOST, DASHBOARD_PORT);
@@ -67,9 +113,9 @@ public class CloneFunctionAndAutoTuneAlertFilterTool {
     return null;
   }
 
-  public Map<Long, Long> cloneFunctionsToAutoTune(String Collection, Boolean isRemoveHoliday, String holidayFileName){
+  public Map<String, String> cloneFunctionsToAutoTune(String Collection, Boolean isRemoveHoliday, String holidayFileName){
     List<AnomalyFunctionDTO> anomalyFunctionSpecs = anomalyFunctionDAO.findAllByCollection(Collection);
-    Map<Long, Long> clonedFunctionIds = new HashMap<>();
+    Map<String, String> clonedFunctionIds = new HashMap<>();
     for(AnomalyFunctionDTO anomalyFunctionSpec: anomalyFunctionSpecs) {
       Long functionId = anomalyFunctionSpec.getId();
       Long clonedFunctionId = cloneFunctionToAutotune(functionId, AUTOTUNE_TAG, IS_CLONE_ANOMALY);
@@ -85,7 +131,7 @@ public class CloneFunctionAndAutoTuneAlertFilterTool {
           LOG.warn("Error for holiday removal", e.getMessage());
         }
       }
-      clonedFunctionIds.put(functionId, clonedFunctionId);
+      clonedFunctionIds.put(String.valueOf(functionId), String.valueOf(clonedFunctionId));
     }
     return clonedFunctionIds;
   }
@@ -101,10 +147,10 @@ public class CloneFunctionAndAutoTuneAlertFilterTool {
   }
 
 
-  public String getAlertFilterEvaluation(Long functionId, Long startTimeISO, Long endTimeISO){
+  public String getAlertFilterEvaluation(Long functionId, Long startTime, Long endTime){
     DetectionResourceHttpUtils httpUtils = new DetectionResourceHttpUtils(LOCALHOST, APPLICATION_PORT);
     try{
-      return httpUtils.getEvalStatsAlertFilter(functionId, startTimeISO, endTimeISO);
+      return httpUtils.getEvalStatsAlertFilter(functionId, startTime, endTime);
     } catch (Exception e) {
       LOG.warn(e.getMessage());
     }
@@ -112,9 +158,13 @@ public class CloneFunctionAndAutoTuneAlertFilterTool {
   }
 
 
-  public void writeMapToCSV(Map<Object, Object> map, String fileName) throws IOException {
+  public void writeMapToCSV(Map<String, String> map, String fileName, String headers) throws IOException {
     BufferedWriter bw = new BufferedWriter(new FileWriter(fileName));
-    for (Map.Entry<Object, Object> pair : map.entrySet()) {
+    if (headers != null){
+      bw.write(headers);
+      bw.newLine();
+    }
+    for (Map.Entry<String, String> pair : map.entrySet()) {
       bw.write(pair.getKey() + "," + pair.getValue());
       bw.newLine();
     }
@@ -135,31 +185,24 @@ public class CloneFunctionAndAutoTuneAlertFilterTool {
     return longLongMap;
   }
 
-  public String evalAlertFilterToCommaSeperateString(Long functionID, Long startTimeISO, Long endTimeISO)
+  public EvaluationNode evalAlertFilterToEvalNode(Long functionID, Long startTime, Long endTime)
       throws IOException, JSONException {
-    StringBuilder outputVal = new StringBuilder();
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(functionID);
     String metricName = anomalyFunctionSpec.getFunctionName();
-    String metricAlertFilter = (anomalyFunctionSpec.getAlertFilter() == null)? "null": anomalyFunctionSpec.getAlertFilter().toString();
-    outputVal.append(functionID)
-        .append(CSVSEPERATOR)
-        .append(metricName)
-        .append(CSVSEPERATOR)
-        .append(metricAlertFilter.replaceAll(CSVSEPERATOR, CSVESCAPE))
-        .append(CSVSEPERATOR);
+    String collection = anomalyFunctionSpec.getCollection();
+    String metricAlertFilter = (anomalyFunctionSpec.getAlertFilter() == null)? "null": anomalyFunctionSpec.getAlertFilter().toString().replaceAll(CSVSEPERATOR, CSVESCAPE);
+    Properties alertFilterEvaluations = new Properties();
 
-    String evals = getAlertFilterEvaluation(functionID, startTimeISO, endTimeISO);
-
+    String evals = getAlertFilterEvaluation(functionID, startTime, endTime);
     if(evals != null) {
       JSONObject evalJson = new JSONObject(evals);
       Iterator<String> nameltr = evalJson.keys();
       while (nameltr.hasNext()) {
-        String eval = evalJson.getString(nameltr.next());
-        outputVal.append(eval).append(CSVSEPERATOR);
+        String key = nameltr.next();
+        String eval = evalJson.getString(key);
+        alertFilterEvaluations.put(key, eval);
       }
-    } else {
-      outputVal.append("null").append(CSVSEPERATOR);
     }
-    return outputVal.toString();
+    return new EvaluationNode(functionID, metricName, collection, metricAlertFilter, alertFilterEvaluations);
   }
 }
