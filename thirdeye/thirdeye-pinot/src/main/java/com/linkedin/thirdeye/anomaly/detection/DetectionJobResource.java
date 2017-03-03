@@ -379,7 +379,12 @@ public class DetectionJobResource {
     return Response.ok(evaluator.toProperties().toString()).build();
   }
 
-
+  /**
+   * Parse the jsonobject and list all the possible configuration combinations
+   * @param tuningJSON the input json string from user
+   * @return full list of all the possible configurations
+   * @throws JSONException
+   */
   private List<Map<String, String>> listAllTuningParameters(JSONObject tuningJSON) throws JSONException {
     List<Map<String, String>> tuningParameters = new ArrayList<>();
     Iterator<String> jsonFieldIterator = tuningJSON.keys();
@@ -417,29 +422,6 @@ public class DetectionJobResource {
     }
 
     return tuningParameters;
-  }
-
-  private Map<String, Comparable> getGoalRange(JSONObject goalJSON) throws JSONException {
-    Map<String, Comparable> goalRange = new HashMap<>();
-    Iterator<String> goalFieldIterator = goalJSON.keys();
-
-    while(goalFieldIterator.hasNext()){
-      String goalField = goalFieldIterator.next();
-      JSONObject fieldObject = goalJSON.getJSONObject(goalField);
-      if(fieldObject == null) {
-        continue;
-      }
-
-      // Parse comparable object
-      // TODO: generalize to comparable objects
-      Comparable goal = fieldObject.getDouble("value");
-      if(goal == null){
-        LOG.warn("No value field in {}, fill in null", goalField);
-      }
-      goalRange.put(goalField, goal);
-    }
-
-    return goalRange;
   }
 
   /**
