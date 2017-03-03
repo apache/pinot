@@ -142,12 +142,24 @@ AnomalyResultView.prototype = {
     // TIME RANGE SELECTION
     this.timeRangeConfig.startDate = this.anomalyResultModel.startDate;
     this.timeRangeConfig.endDate = this.anomalyResultModel.endDate;
-    const $anomalyTimeRange = $('#anomalies-time-range span');
+
+
+    const $anomalyTimeRangeStart = $('#anomalies-time-range-start span');
+    const $anomalyTimeRangeEnd = $('#anomalies-time-range-end span');
 
     function cb(start, end, rangeType = constants.DATE_RANGE_CUSTOM) {
-      $anomalyTimeRange.addClass("time-range").html(`<span>${rangeType}</span> ${start.format(constants.DATE_RANGE_FORMAT)} &mdash; ${end.format(constants.DATE_RANGE_FORMAT)}`);
+      $anomalyTimeRangeStart.addClass('time-range').html(start.format(constants.DATE_RANGE_FORMAT));
+      $anomalyTimeRangeEnd.addClass('time-range').html(end.format(constants.DATE_RANGE_FORMAT));
     }
-    $('#anomalies-time-range').daterangepicker(this.timeRangeConfig, cb);
+    $('#anomalies-time-range-start').daterangepicker(this.timeRangeConfig, cb);
+
+    $('#anomalies-time-range-end').on('click', () => {
+      console.log("triggering");
+      $('#anomalies-time-range-start').click();
+      $('#end').focus();
+    });
+
+    // $('#anomalies-time-range-end').daterangepicker(this.timeRangeConfig, cb);
     cb(this.timeRangeConfig.startDate, this.timeRangeConfig.endDate);
 
 
