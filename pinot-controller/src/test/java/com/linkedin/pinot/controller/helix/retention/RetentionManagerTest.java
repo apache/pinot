@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.helix.retention;
 
+import com.linkedin.pinot.common.data.FieldSpec;
 import java.io.File;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
@@ -528,6 +529,11 @@ public class RetentionManagerTest {
       @Override
       public String getIndexType() {
         return "offline";
+      }
+
+      @Override
+      public FieldSpec.DataType getColumnDataType(String column) {
+        return null;
       }
 
       @Override

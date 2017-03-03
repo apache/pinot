@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.query.pruner;
 
+import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
@@ -25,6 +26,8 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import java.util.List;
 import javax.annotation.Nonnull;
 import org.apache.commons.configuration.Configuration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -35,19 +38,31 @@ import org.apache.commons.configuration.Configuration;
  *
  */
 public class TimeSegmentPruner implements SegmentPruner {
+  private static final Logger LOGGER = LoggerFactory.getLogger(TimeSegmentPruner.class);
 
   @Override
   public boolean prune(IndexSegment segment, BrokerRequest brokerRequest) {
-    SegmentMetadata metadata = segment.getSegmentMetadata();
-    String timeColumn = metadata.getTimeColumn();
+    try {
+      SegmentMetadata metadata = segment.getSegmentMetadata();
+      String timeColumn = metadata.getTimeColumn();
+      if (timeColumn == null) {
+        return false;
+      }
 
-    if (timeColumn == null) {
+      FieldSpec.DataType columnDataType = metadata.getColumnDataType(timeColumn);
+      if (columnDataType != FieldSpec.DataType.INT && columnDataType != FieldSpec.DataType.LONG) {
+        return false;
+      }
+
+      TimeInterval segmentInterval = new TimeInterval(metadata.getStartTime(), metadata.getEndTime());
+      FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
+
+      return (filterQueryTree != null && pruneSegment(filterQueryTree, segmentInterval, timeColumn));
+    } catch (Exception e) {
+      // If anything goes wrong during pruning, just return false to be safe.
+      LOGGER.error("Unexpected exception during pruning segment '{}' on time.", segment.getSegmentName(), e);
       return false;
     }
-
-    TimeInterval segmentInterval = new TimeInterval(metadata.getStartTime(), metadata.getEndTime());
-    FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
-    return (filterQueryTree != null && pruneSegment(filterQueryTree, segmentInterval, timeColumn));
   }
 
   /**

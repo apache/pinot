@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.segment.index;
 
+import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
@@ -410,6 +411,12 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   @Override
   public String getIndexType() {
     return IndexType.COLUMNAR.toString();
+  }
+
+  @Override
+  public FieldSpec.DataType getColumnDataType(String column) {
+    ColumnMetadata metadata = _columnMetadataMap.get(column);
+    return (metadata != null) ? metadata.getDataType() : null;
   }
 
   @Override

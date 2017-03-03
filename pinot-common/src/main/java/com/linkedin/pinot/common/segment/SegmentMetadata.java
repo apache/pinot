@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.segment;
 
+import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import java.util.Map;
@@ -32,6 +33,8 @@ public interface SegmentMetadata {
   String getTableName();
 
   String getIndexType();
+
+  FieldSpec.DataType getColumnDataType(String column);
 
   String getTimeColumn();
 

@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.validation;
 
+import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
@@ -560,6 +561,11 @@ public class ValidationManagerTest {
     @Override
     public String getIndexType() {
       return _indexType;
+    }
+
+    @Override
+    public FieldSpec.DataType getColumnDataType(String column) {
+      return null;
     }
 
     @Override
