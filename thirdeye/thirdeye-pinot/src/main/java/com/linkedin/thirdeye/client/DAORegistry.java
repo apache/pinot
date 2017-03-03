@@ -16,36 +16,37 @@ import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.AlertConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.DashboardConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.DataCompletenessConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.DatasetConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.DetectionStatusManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.EmailConfigurationManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.EventManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.IngraphDashboardConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.IngraphMetricConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.JobManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.MetricConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.OverrideConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.RawAnomalyResultManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.TaskManagerImpl;
+import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 
 /**
  * Singleton service registry for Data Access Objects (DAOs)
  */
 public class DAORegistry {
-  private AnomalyFunctionManager anomalyFunctionDAO;
-  private EmailConfigurationManager emailConfigurationDAO;
-  private AlertConfigManager alertConfigDAO;
-  private RawAnomalyResultManager rawAnomalyResultDAO;
-  private MergedAnomalyResultManager mergedAnomalyResultDAO;
-  private JobManager jobDAO;
-  private TaskManager taskDAO;
-  private DatasetConfigManager datasetConfigDAO;
-  private MetricConfigManager metricConfigDAO;
-  private DashboardConfigManager dashboardConfigDAO;
-  private IngraphDashboardConfigManager ingraphDashboardConfigDAO;
-  private IngraphMetricConfigManager ingraphMetricConfigDAO;
-  private OverrideConfigManager overrideConfigDAO;
-  private DataCompletenessConfigManager dataCompletenessConfigDAO;
-  private EventManager eventDAO;
-  private DetectionStatusManager detectionStatusDAO;
 
-  private static final DAORegistry singleton = new DAORegistry();
+  private static final DAORegistry INSTANCE = new DAORegistry();
 
   /****************************************************************************
    * SINGLETON
    */
 
   public static DAORegistry getInstance() {
-    return singleton;
+    return INSTANCE;
   }
 
   /**
@@ -59,64 +60,7 @@ public class DAORegistry {
     return new DAORegistry();
   }
 
-  /**
-   * **USE FOR TESTING ONLY**
-   * Override the singleton DAO registry's content with the given DAO registry.
-   * This method is used by testing methods only and should not be used in any production code.
-   * The reason we need this method is for solving TestNG's interleaved testing order among different
-   * test class.
-   *
-   * @param DaoRegistry the DAO registry of new content.
-   */
-  public static void overrideSingletonDAORegistryForTesting(DAORegistry DaoRegistry) {
-    singleton.reset_internal();
-    singleton.setAnomalyFunctionDAO(DaoRegistry.getAnomalyFunctionDAO());
-    singleton.setEmailConfigurationDAO(DaoRegistry.getEmailConfigurationDAO());
-    singleton.setRawAnomalyResultDAO(DaoRegistry.getRawAnomalyResultDAO());
-    singleton.setMergedAnomalyResultDAO(DaoRegistry.getMergedAnomalyResultDAO());
-    singleton.setJobDAO(DaoRegistry.getJobDAO());
-    singleton.setTaskDAO(DaoRegistry.getTaskDAO());
-    singleton.setDatasetConfigDAO(DaoRegistry.getDatasetConfigDAO());
-    singleton.setMetricConfigDAO(DaoRegistry.getMetricConfigDAO());
-    singleton.setDashboardConfigDAO(DaoRegistry.getDashboardConfigDAO());
-    singleton.setIngraphMetricConfigDAO(DaoRegistry.getIngraphMetricConfigDAO());
-    singleton.setIngraphDashboardConfigDAO(DaoRegistry.getIngraphDashboardConfigDAO());
-    singleton.setOverrideConfigDAO(DaoRegistry.getOverrideConfigDAO());
-    singleton.setAlertConfigDAO(DaoRegistry.getAlertConfigDAO());
-    singleton.setDataCompletenessConfigDAO(DaoRegistry.getDataCompletenessConfigDAO());
-    singleton.setEventDAO(DaoRegistry.getEventDAO());
-  }
 
-  /**
-   * **USE FOR TESTING ONLY**
-   * Reset registry to empty initial state.
-   */
-  public static void resetForTesting() {
-    singleton.reset_internal();
-  }
-
-  /****************************************************************************
-   * INTERNAL
-   */
-
-  private void reset_internal() {
-    anomalyFunctionDAO = null;
-    emailConfigurationDAO = null;
-    alertConfigDAO = null;
-    rawAnomalyResultDAO = null;
-    mergedAnomalyResultDAO = null;
-    jobDAO = null;
-    taskDAO = null;
-    datasetConfigDAO = null;
-    metricConfigDAO = null;
-    dashboardConfigDAO = null;
-    ingraphDashboardConfigDAO = null;
-    ingraphMetricConfigDAO = null;
-    overrideConfigDAO = null;
-    dataCompletenessConfigDAO = null;
-    eventDAO = null;
-    detectionStatusDAO = null;
-  }
 
   /**
    * internal constructor.
@@ -128,162 +72,73 @@ public class DAORegistry {
    */
 
   public AnomalyFunctionManager getAnomalyFunctionDAO() {
-    return assertNotNull(anomalyFunctionDAO);
+    return DaoProviderUtil.getInstance(AnomalyFunctionManagerImpl.class);
   }
 
-  public void setAnomalyFunctionDAO(AnomalyFunctionManager anomalyFunctionDAO) {
-    assertNull(this.anomalyFunctionDAO);
-    this.anomalyFunctionDAO = anomalyFunctionDAO;
-  }
 
   public EmailConfigurationManager getEmailConfigurationDAO() {
-    return assertNotNull(emailConfigurationDAO);
+    return DaoProviderUtil.getInstance(EmailConfigurationManagerImpl.class);
   }
 
-  public void setEmailConfigurationDAO(EmailConfigurationManager emailConfigurationDAO) {
-    assertNull(this.emailConfigurationDAO);
-    this.emailConfigurationDAO = emailConfigurationDAO;
-  }
 
   public AlertConfigManager getAlertConfigDAO() {
-    return assertNotNull(alertConfigDAO);
+    return DaoProviderUtil.getInstance(AlertConfigManagerImpl.class);
   }
 
-  public void setAlertConfigDAO(AlertConfigManager alertConfigDAO) {
-    assertNull(this.alertConfigDAO);
-    this.alertConfigDAO = alertConfigDAO;
-  }
 
   public RawAnomalyResultManager getRawAnomalyResultDAO() {
-    return assertNotNull(rawAnomalyResultDAO);
+    return DaoProviderUtil.getInstance(RawAnomalyResultManagerImpl.class);
   }
 
-  public void setRawAnomalyResultDAO(RawAnomalyResultManager rawAnomalyResultDAO) {
-    assertNull(this.rawAnomalyResultDAO);
-    this.rawAnomalyResultDAO = rawAnomalyResultDAO;
-  }
 
   public MergedAnomalyResultManager getMergedAnomalyResultDAO() {
-    return assertNotNull(mergedAnomalyResultDAO);
-  }
-
-  public void setMergedAnomalyResultDAO(MergedAnomalyResultManager mergedAnomalyResultDAO) {
-    assertNull(this.mergedAnomalyResultDAO);
-    this.mergedAnomalyResultDAO = mergedAnomalyResultDAO;
+    return DaoProviderUtil.getInstance(MergedAnomalyResultManagerImpl.class);
   }
 
   public JobManager getJobDAO() {
-    return assertNotNull(jobDAO);
-  }
-
-  public void setJobDAO(JobManager jobDAO) {
-    assertNull(this.jobDAO);
-    this.jobDAO = jobDAO;
+    return DaoProviderUtil.getInstance(JobManagerImpl.class);
   }
 
   public TaskManager getTaskDAO() {
-    return assertNotNull(taskDAO);
-  }
-
-  public void setTaskDAO(TaskManager taskDAO) {
-    assertNull(this.taskDAO);
-    this.taskDAO = taskDAO;
+    return DaoProviderUtil.getInstance(TaskManagerImpl.class);
   }
 
   public DatasetConfigManager getDatasetConfigDAO() {
-    return assertNotNull(datasetConfigDAO);
-  }
-
-  public void setDatasetConfigDAO(DatasetConfigManager datasetConfigDAO) {
-    assertNull(this.datasetConfigDAO);
-    this.datasetConfigDAO = datasetConfigDAO;
+    return DaoProviderUtil.getInstance(DatasetConfigManagerImpl.class);
   }
 
   public MetricConfigManager getMetricConfigDAO() {
-    return assertNotNull(metricConfigDAO);
+    return DaoProviderUtil.getInstance(MetricConfigManagerImpl.class);
   }
 
-  public void setMetricConfigDAO(MetricConfigManager metricConfigDAO) {
-    assertNull(this.metricConfigDAO);
-    this.metricConfigDAO = metricConfigDAO;
-  }
 
   public DashboardConfigManager getDashboardConfigDAO() {
-    return assertNotNull(dashboardConfigDAO);
+    return DaoProviderUtil.getInstance(DashboardConfigManagerImpl.class);
   }
 
-  public void setDashboardConfigDAO(DashboardConfigManager dashboardConfigDAO) {
-    assertNull(this.dashboardConfigDAO);
-    this.dashboardConfigDAO = dashboardConfigDAO;
-  }
 
   public IngraphDashboardConfigManager getIngraphDashboardConfigDAO() {
-    return assertNotNull(ingraphDashboardConfigDAO);
-  }
-
-  public void setIngraphDashboardConfigDAO(IngraphDashboardConfigManager ingraphDashboardConfigDAO) {
-    assertNull(this.ingraphDashboardConfigDAO);
-    this.ingraphDashboardConfigDAO = ingraphDashboardConfigDAO;
+    return DaoProviderUtil.getInstance(IngraphDashboardConfigManagerImpl.class);
   }
 
   public IngraphMetricConfigManager getIngraphMetricConfigDAO() {
-    return assertNotNull(ingraphMetricConfigDAO);
-  }
-
-  public void setIngraphMetricConfigDAO(IngraphMetricConfigManager ingraphMetricConfigDAO) {
-    assertNull(this.ingraphMetricConfigDAO);
-    this.ingraphMetricConfigDAO = ingraphMetricConfigDAO;
+    return DaoProviderUtil.getInstance(IngraphMetricConfigManagerImpl.class);
   }
 
   public OverrideConfigManager getOverrideConfigDAO() {
-    return assertNotNull(overrideConfigDAO);
-  }
-
-  public void setOverrideConfigDAO(OverrideConfigManager overrideConfigDAO) {
-    assertNull(this.overrideConfigDAO);
-    this.overrideConfigDAO = overrideConfigDAO;
+    return DaoProviderUtil.getInstance(OverrideConfigManagerImpl.class);
   }
 
   public DataCompletenessConfigManager getDataCompletenessConfigDAO() {
-    return assertNotNull(dataCompletenessConfigDAO);
-  }
-
-  public void setDataCompletenessConfigDAO(DataCompletenessConfigManager dataCompletenessConfigDAO) {
-    assertNull(this.dataCompletenessConfigDAO);
-    this.dataCompletenessConfigDAO = dataCompletenessConfigDAO;
+    return DaoProviderUtil.getInstance(DataCompletenessConfigManagerImpl.class);
   }
 
   public EventManager getEventDAO() {
-    return assertNotNull(eventDAO);
-  }
-
-  public void setEventDAO(EventManager eventDAO) {
-    assertNull(this.eventDAO);
-    this.eventDAO = eventDAO;
+    return DaoProviderUtil.getInstance(EventManagerImpl.class);
   }
 
   public DetectionStatusManager getDetectionStatusDAO() {
-    return assertNotNull(detectionStatusDAO);
-  }
-
-  public void setDetectionStatusDAO(DetectionStatusManager detectionStatusDAO) {
-    assertNull(this.detectionStatusDAO);
-    this.detectionStatusDAO = detectionStatusDAO;
-  }
-
-  /****************************************************************************
-   * HELPERS
-   */
-
-  private <T> T assertNotNull(T o) {
-    if(o == null)
-      throw new IllegalStateException("DAO not initialized");
-    return o;
-  }
-
-  private void assertNull(Object o) {
-    if(o != null)
-      throw new IllegalStateException("DAO already initialized");
+    return DaoProviderUtil.getInstance(DetectionStatusManagerImpl.class);
   }
 
 }

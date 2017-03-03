@@ -3,31 +3,12 @@ package com.linkedin.thirdeye;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.ScriptRunner;
 import com.linkedin.thirdeye.datalayer.bao.AbstractManagerTestBase;
-import com.linkedin.thirdeye.datalayer.bao.jdbc.AlertConfigManagerImpl;
-import com.linkedin.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl;
-import com.linkedin.thirdeye.datalayer.bao.jdbc.DashboardConfigManagerImpl;
-import com.linkedin.thirdeye.datalayer.bao.jdbc.DataCompletenessConfigManagerImpl;
-import com.linkedin.thirdeye.datalayer.bao.jdbc.DatasetConfigManagerImpl;
-import com.linkedin.thirdeye.datalayer.bao.jdbc.DetectionStatusManagerImpl;
-import com.linkedin.thirdeye.datalayer.bao.jdbc.EmailConfigurationManagerImpl;
-import com.linkedin.thirdeye.datalayer.bao.jdbc.EventManagerImpl;
-import com.linkedin.thirdeye.datalayer.bao.jdbc.IngraphDashboardConfigManagerImpl;
-import com.linkedin.thirdeye.datalayer.bao.jdbc.IngraphMetricConfigManagerImpl;
-import com.linkedin.thirdeye.datalayer.bao.jdbc.JobManagerImpl;
-import com.linkedin.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl;
-import com.linkedin.thirdeye.datalayer.bao.jdbc.MetricConfigManagerImpl;
-import com.linkedin.thirdeye.datalayer.bao.jdbc.OverrideConfigManagerImpl;
-import com.linkedin.thirdeye.datalayer.bao.jdbc.RawAnomalyResultManagerImpl;
-import com.linkedin.thirdeye.datalayer.bao.jdbc.TaskManagerImpl;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
-import com.linkedin.thirdeye.datalayer.util.ManagerProvider;
 import com.linkedin.thirdeye.datalayer.util.PersistenceConfig;
-
 import java.io.File;
 import java.io.FileReader;
 import java.net.URL;
 import java.sql.Connection;
-
 import org.apache.tomcat.jdbc.pool.DataSource;
 
 
@@ -35,17 +16,21 @@ public class TestDBResources {
   private DataSource ds;
   private DAORegistry daoRegistry;
 
-  public static TestDBResources setupDAO() {
-    TestDBResources instance = new TestDBResources();
-    instance.setTestDaoRegistry(DAORegistry.getTestInstance());
-    try {
-      DAORegistry.resetForTesting();
-      instance.init();
-      System.out.println("DAOs initialized");
-      return instance;
-    } catch(Exception e) {
-      throw new RuntimeException(e);
-    }
+  public static TestDBResources setupDAO() throws Exception {
+    URL url = TestDBResources.class.getResource("/persistence-local.yml");
+    File configFile = new File(url.toURI());
+    DaoProviderUtil.init(configFile);
+//    TestDBResources instance = new TestDBResources();
+//    instance.setTestDaoRegistry(DAORegistry.getInstance());
+//    try {
+//
+//      instance.init();
+//      System.out.println("DAOs initialized");
+//      return instance;
+//    } catch(Exception e) {
+//      throw new RuntimeException(e);
+//    }
+    return null;
   }
 
   public static void teardownDAO(TestDBResources instance) {
@@ -106,7 +91,6 @@ public class TestDBResources {
   //JDBC related init/cleanup
   private void initJDBC() throws Exception {
     initDB();
-    initManagers();
   }
 
   private void initDB() throws Exception {
@@ -127,29 +111,6 @@ public class TestDBResources {
       scriptRunner.runScript(new FileReader(deleteSchemaUrl.getFile()));
     }
     System.out.println("Cleaning database: done!");
-  }
-
-  private void initManagers() throws Exception {
-    ManagerProvider managerProvider = new ManagerProvider(ds);
-    Class<AnomalyFunctionManagerImpl> c = AnomalyFunctionManagerImpl.class;
-    System.out.println(c);
-
-    daoRegistry.setAnomalyFunctionDAO(managerProvider.getInstance(AnomalyFunctionManagerImpl.class));
-    daoRegistry.setEmailConfigurationDAO(managerProvider.getInstance(EmailConfigurationManagerImpl.class));
-    daoRegistry.setRawAnomalyResultDAO(managerProvider.getInstance(RawAnomalyResultManagerImpl.class));
-    daoRegistry.setMergedAnomalyResultDAO(managerProvider.getInstance(MergedAnomalyResultManagerImpl.class));
-    daoRegistry.setJobDAO(managerProvider.getInstance(JobManagerImpl.class));
-    daoRegistry.setTaskDAO(managerProvider.getInstance(TaskManagerImpl.class));
-    daoRegistry.setDatasetConfigDAO(managerProvider.getInstance(DatasetConfigManagerImpl.class));
-    daoRegistry.setMetricConfigDAO(managerProvider.getInstance(MetricConfigManagerImpl.class));
-    daoRegistry.setDashboardConfigDAO(managerProvider.getInstance(DashboardConfigManagerImpl.class));
-    daoRegistry.setIngraphMetricConfigDAO(managerProvider.getInstance(IngraphMetricConfigManagerImpl.class));
-    daoRegistry.setIngraphDashboardConfigDAO(managerProvider.getInstance(IngraphDashboardConfigManagerImpl.class));
-    daoRegistry.setOverrideConfigDAO(managerProvider.getInstance(OverrideConfigManagerImpl.class));
-    daoRegistry.setAlertConfigDAO(managerProvider.getInstance(AlertConfigManagerImpl.class));
-    daoRegistry.setDataCompletenessConfigDAO(managerProvider.getInstance(DataCompletenessConfigManagerImpl.class));
-    daoRegistry.setEventDAO(managerProvider.getInstance(EventManagerImpl.class));
-
   }
 
 }

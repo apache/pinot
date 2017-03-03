@@ -61,6 +61,11 @@ public abstract class DaoProviderUtil {
     // Timeout before an abandoned(in use) connection can be removed.
     dataSource.setRemoveAbandonedTimeout(600_000);
     dataSource.setRemoveAbandoned(true);
+    init(dataSource);
+  }
+
+  public static void init (DataSource ds) {
+    dataSource = ds;
     provider = new ManagerProvider(dataSource);
   }
 
