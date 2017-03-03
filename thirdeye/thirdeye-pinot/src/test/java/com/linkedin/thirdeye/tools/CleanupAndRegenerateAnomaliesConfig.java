@@ -11,6 +11,7 @@ public class CleanupAndRegenerateAnomaliesConfig {
   // Start time and end time in ISO format for adhoc run
   private String startTimeIso;
   private String endTimeIso;
+  private String timezone;
 
   // function ids to cleanup/regenerate
   private String functionIds;
@@ -69,4 +70,11 @@ public class CleanupAndRegenerateAnomaliesConfig {
     this.forceBackfill = forceBackfill;
   }
 
+  public String getTimezone() {
+    return timezone;
+  }
+
+  public void setTimezone(String timezone) {
+    this.timezone = timezone;
+  }
 }

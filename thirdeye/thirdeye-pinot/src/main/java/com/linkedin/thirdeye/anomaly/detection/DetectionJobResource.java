@@ -68,7 +68,6 @@ public class DetectionJobResource {
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
   private final AlertFilterAutotuneFactory alertFilterAutotuneFactory;
   private final AlertFilterFactory alertFilterFactory;
-  private final int MAX_CLONE_FUNCTIONS = 10;
 
   private static final Logger LOG = LoggerFactory.getLogger(DetectionJobResource.class);
 

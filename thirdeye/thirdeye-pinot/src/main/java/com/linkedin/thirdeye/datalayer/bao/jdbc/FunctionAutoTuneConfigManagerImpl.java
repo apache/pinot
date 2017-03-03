@@ -58,7 +58,7 @@ public class FunctionAutoTuneConfigManagerImpl extends AbstractManagerImpl<Funct
   @Override
   public List<FunctionAutoTuneConfigDTO> findAllByFuctionIdAndWindow(long functionId, long startTime, long endTime) {
     Predicate predicate = Predicate.AND(Predicate.EQ(FUNCTION_ID, functionId),
-        Predicate.GE(START_TIME, startTime), Predicate.LT(END_TIME, endTime));
+        Predicate.GE(START_TIME, startTime), Predicate.LE(END_TIME, endTime));
 
     List<FunctionAutoTuneConfigBean> list = genericPojoDao.get(predicate, FunctionAutoTuneConfigBean.class);
     return beansToDTOs(list);
