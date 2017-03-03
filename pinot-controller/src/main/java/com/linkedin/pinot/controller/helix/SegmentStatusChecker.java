@@ -174,7 +174,10 @@ public class SegmentStatusChecker {
         realTimeTableCount++;
       }
       IdealState idealState = helixAdmin.getResourceIdealState(helixClusterName, tableName);
-      if (idealState == null) {
+      if ((idealState == null) || (idealState.getPartitionSet().isEmpty())) {
+        _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.NUMBER_OF_REPLICAS, 1);
+        _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.PERCENT_OF_REPLICAS, 100);
+        _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.PERCENT_SEGMENTS_AVAILABLE, 100);
         continue;
       }
       _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.IDEALSTATE_ZNODE_SIZE, idealState.toString().length());
@@ -241,7 +244,7 @@ public class SegmentStatusChecker {
         nReplicasExternal = ((nReplicasExternal > nReplicas) || (nReplicasExternal == -1)) ? nReplicas : nReplicasExternal;
       }
       if (nReplicasExternal == -1){
-        nReplicasExternal = 0;
+        nReplicasExternal = (nReplicasIdealMax == 0) ? 1 : 0;
       }
       // Synchronization provided by Controller Gauge to make sure that only one thread updates the gauge
       _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.NUMBER_OF_REPLICAS,
