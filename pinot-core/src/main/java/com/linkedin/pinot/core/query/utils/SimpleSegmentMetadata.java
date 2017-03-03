@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.query.utils;
 
+import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.segment.StarTreeMetadata;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
@@ -77,6 +78,11 @@ public class SimpleSegmentMetadata implements SegmentMetadata {
   @Override
   public String getIndexType() {
     return _indexType;
+  }
+
+  @Override
+  public FieldSpec.DataType getColumnDataType(String column) {
+    return null;
   }
 
   @Override
