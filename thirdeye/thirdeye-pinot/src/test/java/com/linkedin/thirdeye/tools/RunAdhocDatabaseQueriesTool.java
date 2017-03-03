@@ -1,28 +1,36 @@
 package com.linkedin.thirdeye.tools;
 
+import com.google.common.collect.Lists;
 import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
 
 import java.io.File;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.autoload.pinot.metrics.ConfigGenerator;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DataCompletenessConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.DetectionStatusManager;
 import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.DetectionStatusManagerImpl;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.DetectionStatusDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -47,6 +55,8 @@ public class RunAdhocDatabaseQueriesTool {
   private JobManager jobDAO;
   private TaskManager taskDAO;
   private DataCompletenessConfigManager dataCompletenessConfigDAO;
+  private DatasetConfigManager datasetConfigDAO;
+  private DetectionStatusManager detectionStatusDAO;
 
   public RunAdhocDatabaseQueriesTool(File persistenceFile)
       throws Exception {
@@ -75,6 +85,9 @@ public class RunAdhocDatabaseQueriesTool {
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.TaskManagerImpl.class);
     dataCompletenessConfigDAO = DaoProviderUtil
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.DataCompletenessConfigManagerImpl.class);
+    datasetConfigDAO = DaoProviderUtil
+        .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.DatasetConfigManagerImpl.class);
+    detectionStatusDAO = DaoProviderUtil.getInstance(DetectionStatusManagerImpl.class);
   }
 
   private void toggleAnomalyFunction(Long id) {
@@ -184,6 +197,39 @@ public class RunAdhocDatabaseQueriesTool {
   private void deleteAllDataCompleteness() {
     for (DataCompletenessConfigDTO dto : dataCompletenessConfigDAO.findAll()) {
       dataCompletenessConfigDAO.delete(dto);
+    }
+  }
+
+  private void disableAnomalyFunctions(String dataset) {
+    List<AnomalyFunctionDTO> anomalyFunctionDTOs = anomalyFunctionDAO.findAllByCollection(dataset);
+    for (AnomalyFunctionDTO anomalyFunctionDTO : anomalyFunctionDTOs) {
+    anomalyFunctionDTO.setActive(false);
+    anomalyFunctionDAO.update(anomalyFunctionDTO);
+    }
+  }
+
+  private void addRequiresCompletenessCheck(List<String> datasets) {
+    for (String dataset : datasets) {
+      DatasetConfigDTO dto = datasetConfigDAO.findByDataset(dataset);
+      dto.setRequiresCompletenessCheck(true);
+      datasetConfigDAO.update(dto);
+    }
+  }
+
+  private void updateDetectionRun(String dataset) {
+    for (DetectionStatusDTO dto : detectionStatusDAO.findAll()) {
+      if (dto.getDataset().equals(dataset)) {
+        dto.setDetectionRun(false);
+        detectionStatusDAO.update(dto);
+      }
+    }
+  }
+
+  private void enableDataCompleteness(String dataset) {
+    List<DataCompletenessConfigDTO> dtos = dataCompletenessConfigDAO.findAllByDataset(dataset);
+    for (DataCompletenessConfigDTO dto : dtos) {
+      dto.setDataComplete(true);
+      dataCompletenessConfigDAO.update(dto);
     }
   }
 

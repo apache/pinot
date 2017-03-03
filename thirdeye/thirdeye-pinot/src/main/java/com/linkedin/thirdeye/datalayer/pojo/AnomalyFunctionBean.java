@@ -6,8 +6,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeConfig;
+import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
+
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -37,6 +39,8 @@ public class AnomalyFunctionBean extends AbstractBean {
 
   private String cron;
 
+  private TimeGranularity frequency = new TimeGranularity(1, TimeUnit.HOURS);
+
   private Integer bucketSize;
 
   private TimeUnit bucketUnit;
@@ -58,6 +62,13 @@ public class AnomalyFunctionBean extends AbstractBean {
   private Map<String, String> alertFilter;
 
   private AnomalyMergeConfig anomalyMergeConfig;
+
+  /**
+   * This flag always true. The same flag in dataset config, will act as master, always false.
+   * This flag would typically be unset, in backfill cases, where we want to override the completeness check,
+   * but not have to touch the dataset config setting for that
+   */
+  private boolean requiresCompletenessCheck = true;
 
 
   public long getMetricId() {
@@ -140,6 +151,15 @@ public class AnomalyFunctionBean extends AbstractBean {
     this.cron = cron;
   }
 
+
+  public TimeGranularity getFrequency() {
+    return frequency;
+  }
+
+  public void setFrequency(TimeGranularity frequency) {
+    this.frequency = frequency;
+  }
+
   public Integer getBucketSize() {
     return bucketSize;
   }
@@ -200,6 +220,16 @@ public class AnomalyFunctionBean extends AbstractBean {
     return filters;
   }
 
+
+
+  public boolean isRequiresCompletenessCheck() {
+    return requiresCompletenessCheck;
+  }
+
+  public void setRequiresCompletenessCheck(boolean requiresCompletenessCheck) {
+    this.requiresCompletenessCheck = requiresCompletenessCheck;
+  }
+
   @JsonIgnore
   @JsonProperty("wrapper")
   public Multimap<String, String> getFilterSet() {
@@ -245,6 +275,7 @@ public class AnomalyFunctionBean extends AbstractBean {
         && Objects.equals(metricFunction, af.getMetricFunction())
         && Objects.equals(type, af.getType()) && Objects.equals(isActive, af.getIsActive())
         && Objects.equals(cron, af.getCron()) && Objects.equals(properties, af.getProperties())
+        && Objects.equals(frequency, af.getFrequency())
         && Objects.equals(bucketSize, af.getBucketSize())
         && Objects.equals(bucketUnit, af.getBucketUnit())
         && Objects.equals(windowSize, af.getWindowSize())
@@ -253,24 +284,26 @@ public class AnomalyFunctionBean extends AbstractBean {
         && Objects.equals(windowDelayUnit, af.getWindowDelayUnit())
         && Objects.equals(exploreDimensions, af.getExploreDimensions())
         && Objects.equals(filters, af.getFilters())
-        && Objects.equals(alertFilter, af.getAlertFilter());
+        && Objects.equals(alertFilter, af.getAlertFilter())
+        && Objects.equals(requiresCompletenessCheck,  af.isRequiresCompletenessCheck());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(getId(), collection, metric, metrics, metricFunction, type, isActive, cron,
+    return Objects.hash(getId(), collection, metric, metrics, metricFunction, type, isActive, cron, frequency,
         properties, bucketSize, bucketUnit, windowSize, windowUnit, windowDelay, windowDelayUnit,
-        exploreDimensions, filters, alertFilter);
+        exploreDimensions, filters, alertFilter, requiresCompletenessCheck);
   }
 
   @Override
   public String toString() {
     return MoreObjects.toStringHelper(this).add("id", getId()).add("collection", collection)
         .add("metric", metric).add("metrics", metrics).add("metric_function", getMetricFunction()).add("type", type)
-        .add("isActive", isActive).add("cron", cron).add("properties", properties)
+        .add("isActive", isActive).add("cron", cron).add("frequency", frequency).add("properties", properties)
         .add("bucketSize", bucketSize).add("bucketUnit", bucketUnit).add("windowSize", windowSize)
         .add("windowUnit", windowUnit).add("windowDelay", windowDelay)
         .add("windowDelayUnit", windowDelayUnit).add("exploreDimensions", exploreDimensions)
-        .add("filters", filters).add("alertFilter", alertFilter).toString();
+        .add("filters", filters).add("alertFilter", alertFilter)
+        .add("requiresCompletenessCheck", requiresCompletenessCheck).toString();
   }
 }

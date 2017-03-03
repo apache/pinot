@@ -12,14 +12,14 @@ import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterUtil;
 import com.linkedin.thirdeye.util.SeverityComputationUtil;
-import java.util.List;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
-import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -33,11 +33,11 @@ import org.apache.commons.lang.NullArgumentException;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.format.ISODateTimeFormat;
-import org.quartz.SchedulerException;
 
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,33 +68,26 @@ public class DetectionJobResource {
     this.alertFilterFactory = alertFilterFactory;
   }
 
-  @GET
-  public List<String> showScheduledJobs() throws SchedulerException {
-    return detectionJobScheduler.getScheduledJobs();
-  }
 
   @POST
   @Path("/{id}")
   public Response enable(@PathParam("id") Long id) throws Exception {
     toggleActive(id, true);
-    detectionJobScheduler.startJob(id);
     return Response.ok().build();
   }
-
 
   @POST
   @Path("/{id}/ad-hoc")
   public Response adHoc(@PathParam("id") Long id, @QueryParam("start") String startTimeIso,
       @QueryParam("end") String endTimeIso) throws Exception {
-    DateTime startTime = null;
-    DateTime endTime = null;
-    if (StringUtils.isNotBlank(startTimeIso)) {
-      startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso);
+    Long startTime = null;
+    Long endTime = null;
+    if (StringUtils.isBlank(startTimeIso) || StringUtils.isBlank(endTimeIso)) {
+      throw new IllegalStateException("startTimeIso and endTimeIso must not be null");
     }
-    if (StringUtils.isNotBlank(endTimeIso)) {
-      endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso);
-    }
-    detectionJobScheduler.runAdHoc(id, startTime, endTime);
+    startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso).getMillis();
+    endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso).getMillis();
+    detectionJobScheduler.runAdhocAnomalyFunction(id, startTime, endTime);
     return Response.ok().build();
   }
 
@@ -102,7 +95,6 @@ public class DetectionJobResource {
   @Path("/{id}")
   public Response disable(@PathParam("id") Long id) throws Exception {
     toggleActive(id, false);
-    detectionJobScheduler.stopJob(id);
     return Response.ok().build();
   }
 
@@ -115,13 +107,30 @@ public class DetectionJobResource {
     anomalyFunctionSpecDAO.update(anomalyFunctionSpec);
   }
 
+
   @POST
-  @Path("/{id}/restart")
-  public Response restart(@PathParam("id") Long id) throws Exception {
-    detectionJobScheduler.stopJob(id);
-    detectionJobScheduler.startJob(id);
+  @Path("/requiresCompletenessCheck/enable/{id}")
+  public Response enableRequiresCompletenessCheck(@PathParam("id") Long id) throws Exception {
+    toggleRequiresCompletenessCheck(id, true);
     return Response.ok().build();
   }
+
+  @POST
+  @Path("/requiresCompletenessCheck/disable/{id}")
+  public Response disableRequiresCompletenessCheck(@PathParam("id") Long id) throws Exception {
+    toggleRequiresCompletenessCheck(id, false);
+    return Response.ok().build();
+  }
+
+  private void toggleRequiresCompletenessCheck(Long id, boolean state) {
+    AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionSpecDAO.findById(id);
+    if(anomalyFunctionSpec == null) {
+      throw new NullArgumentException("Function spec not found");
+    }
+    anomalyFunctionSpec.setRequiresCompletenessCheck(state);
+    anomalyFunctionSpecDAO.update(anomalyFunctionSpec);
+  }
+
 
   /**
    * Returns the weight of the metric at the given window. The calculation of baseline (history) data is specified by

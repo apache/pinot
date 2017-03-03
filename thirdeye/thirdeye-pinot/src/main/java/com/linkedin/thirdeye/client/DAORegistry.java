@@ -5,6 +5,7 @@ import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DataCompletenessConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.DetectionStatusManager;
 import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
 import com.linkedin.thirdeye.datalayer.bao.EventManager;
 import com.linkedin.thirdeye.datalayer.bao.IngraphDashboardConfigManager;
@@ -35,6 +36,7 @@ public class DAORegistry {
   private OverrideConfigManager overrideConfigDAO;
   private DataCompletenessConfigManager dataCompletenessConfigDAO;
   private EventManager eventDAO;
+  private DetectionStatusManager detectionStatusDAO;
 
   private static final DAORegistry singleton = new DAORegistry();
 
@@ -113,6 +115,7 @@ public class DAORegistry {
     overrideConfigDAO = null;
     dataCompletenessConfigDAO = null;
     eventDAO = null;
+    detectionStatusDAO = null;
   }
 
   /**
@@ -257,6 +260,15 @@ public class DAORegistry {
   public void setEventDAO(EventManager eventDAO) {
     assertNull(this.eventDAO);
     this.eventDAO = eventDAO;
+  }
+
+  public DetectionStatusManager getDetectionStatusDAO() {
+    return assertNotNull(detectionStatusDAO);
+  }
+
+  public void setDetectionStatusDAO(DetectionStatusManager detectionStatusDAO) {
+    assertNull(this.detectionStatusDAO);
+    this.detectionStatusDAO = detectionStatusDAO;
   }
 
   /****************************************************************************

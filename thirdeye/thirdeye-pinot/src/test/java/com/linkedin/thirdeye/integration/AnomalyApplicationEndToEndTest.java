@@ -1,6 +1,8 @@
 package com.linkedin.thirdeye.integration;
 
 import com.google.common.cache.LoadingCache;
+import com.linkedin.pinot.client.ResultSet;
+import com.linkedin.pinot.client.ResultSetGroup;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.alert.AlertJobScheduler;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
@@ -21,6 +23,7 @@ import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.client.ThirdEyeResponse;
 import com.linkedin.thirdeye.client.cache.MetricDataset;
 import com.linkedin.thirdeye.client.cache.QueryCache;
+import com.linkedin.thirdeye.client.pinot.PinotQuery;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeResponse;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessConstants.DataCompletenessType;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessScheduler;
@@ -35,6 +38,7 @@ import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
+
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
@@ -42,6 +46,7 @@ import java.util.Random;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+
 import org.joda.time.DateTime;
 import org.mockito.Matchers;
 import org.mockito.Mockito;
@@ -153,6 +158,21 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
     LoadingCache<String, DatasetConfigDTO> mockDatasetConfigCache = Mockito.mock(LoadingCache.class);
     Mockito.when(mockDatasetConfigCache.get(collection)).thenReturn(getTestDatasetConfig(collection));
     cacheRegistry.registerDatasetConfigCache(mockDatasetConfigCache);
+
+    ResultSet mockResultSet = Mockito.mock(ResultSet.class);
+    Mockito.when(mockResultSet.getRowCount()).thenReturn(0);
+    ResultSetGroup mockResultSetGroup = Mockito.mock(ResultSetGroup.class);
+    Mockito.when(mockResultSetGroup.getResultSet(0)).thenReturn(mockResultSet);
+    LoadingCache<PinotQuery, ResultSetGroup> mockResultSetGroupCache = Mockito.mock(LoadingCache.class);
+    Mockito.when(mockResultSetGroupCache.get(Matchers.any(PinotQuery.class)))
+    .thenAnswer(new Answer<ResultSetGroup>() {
+
+      @Override
+      public ResultSetGroup answer(InvocationOnMock invocation) throws Throwable {
+        return mockResultSetGroup;
+      }
+    });
+    cacheRegistry.registerResultSetGroupCache(mockResultSetGroupCache);
 
     // Application config
     thirdeyeAnomalyConfig = new ThirdEyeAnomalyConfiguration();

@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
+import java.util.List;
 import java.util.Objects;
 
 import org.joda.time.DateTime;
@@ -9,25 +10,25 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.base.MoreObjects;
 import com.linkedin.thirdeye.anomaly.task.TaskInfo;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.util.CustomDateDeserializer;
-import com.linkedin.thirdeye.util.CustomDateSerializer;
+import com.linkedin.thirdeye.util.CustomListDateDeserializer;
+import com.linkedin.thirdeye.util.CustomListDateSerializer;
 
 public class DetectionTaskInfo implements TaskInfo {
 
   private long jobExecutionId;
 
-  @JsonSerialize(using = CustomDateSerializer.class)
-  @JsonDeserialize(using = CustomDateDeserializer.class)
-  private DateTime windowStartTime;
+  @JsonSerialize(using = CustomListDateSerializer.class)
+  @JsonDeserialize(using = CustomListDateDeserializer.class)
+  private List<DateTime> windowStartTime;
 
-  @JsonSerialize(using = CustomDateSerializer.class)
-  @JsonDeserialize(using = CustomDateDeserializer.class)
-  private DateTime windowEndTime;
+  @JsonSerialize(using = CustomListDateSerializer.class)
+  @JsonDeserialize(using = CustomListDateDeserializer.class)
+  private List<DateTime> windowEndTime;
   private AnomalyFunctionDTO anomalyFunctionSpec;
   private String groupByDimension;
 
-  public DetectionTaskInfo(long jobExecutionId, DateTime windowStartTime,
-      DateTime windowEndTime, AnomalyFunctionDTO anomalyFunctionSpec, String groupByDimension) {
+  public DetectionTaskInfo(long jobExecutionId, List<DateTime> windowStartTime,
+      List<DateTime> windowEndTime, AnomalyFunctionDTO anomalyFunctionSpec, String groupByDimension) {
     this.jobExecutionId = jobExecutionId;
     this.windowStartTime = windowStartTime;
     this.windowEndTime = windowEndTime;
@@ -47,19 +48,19 @@ public class DetectionTaskInfo implements TaskInfo {
     this.jobExecutionId = jobExecutionId;
   }
 
-  public DateTime getWindowStartTime() {
+  public List<DateTime> getWindowStartTime() {
     return windowStartTime;
   }
 
-  public void setWindowStartTime(DateTime windowStartTime) {
+  public void setWindowStartTime(List<DateTime> windowStartTime) {
     this.windowStartTime = windowStartTime;
   }
 
-  public DateTime getWindowEndTime() {
+  public List<DateTime> getWindowEndTime() {
     return windowEndTime;
   }
 
-  public void setWindowEndTime(DateTime windowEndTime) {
+  public void setWindowEndTime(List<DateTime> windowEndTime) {
     this.windowEndTime = windowEndTime;
   }
 

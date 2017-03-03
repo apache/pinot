@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
 import com.google.common.base.Strings;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -8,11 +9,15 @@ import java.util.concurrent.TimeUnit;
 import javax.validation.constraints.NotNull;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
+import javax.ws.rs.POST;
 import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 
+import org.apache.commons.lang.NullArgumentException;
 import org.codehaus.jackson.node.ObjectNode;
 
 import com.linkedin.thirdeye.client.DAORegistry;
@@ -27,10 +32,10 @@ public class DatasetConfigResource {
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
-  private DatasetConfigManager datassetConfigDao;
+  private DatasetConfigManager datasetConfigDao;
 
   public DatasetConfigResource() {
-    this.datassetConfigDao = DAO_REGISTRY.getDatasetConfigDAO();
+    this.datasetConfigDao = DAO_REGISTRY.getDatasetConfigDAO();
   }
 
   @GET
@@ -63,7 +68,7 @@ public class DatasetConfigResource {
       datasetConfigDTO.setTimeFormat(timeFormat);
       datasetConfigDTO.setTimeUnit(timeUnit);
       datasetConfigDTO.setTimezone(timezone);
-      Long id = datassetConfigDao.save(datasetConfigDTO);
+      Long id = datasetConfigDao.save(datasetConfigDTO);
       datasetConfigDTO.setId(id);
       return JsonResponseUtil.buildResponseJSON(datasetConfigDTO).toString();
     } catch (Exception e) {
@@ -91,7 +96,7 @@ public class DatasetConfigResource {
       @QueryParam("timeDuration") Integer timeDuration, @QueryParam("timeFormat") String timeFormat, @QueryParam("timezone") TimeUnit timeUnit,
       @QueryParam("timezone") String timezone) {
     try {
-      DatasetConfigDTO datasetConfigDTO = datassetConfigDao.findById(datasetConfigId);
+      DatasetConfigDTO datasetConfigDTO = datasetConfigDao.findById(datasetConfigId);
       datasetConfigDTO.setDataset(dataset);
       datasetConfigDTO.setDimensions(toList(dimensions));
       datasetConfigDTO.setDimensionsHaveNoPreAggregation(toList(dimensionsHaveNoPreAggregation));
@@ -107,7 +112,7 @@ public class DatasetConfigResource {
       datasetConfigDTO.setTimeFormat(timeFormat);
       datasetConfigDTO.setTimeUnit(timeUnit);
       datasetConfigDTO.setTimezone(timezone);
-      int numRowsUpdated = datassetConfigDao.update(datasetConfigDTO);
+      int numRowsUpdated = datasetConfigDao.update(datasetConfigDTO);
       if (numRowsUpdated == 1) {
         return JsonResponseUtil.buildResponseJSON(datasetConfigDTO).toString();
       } else {
@@ -118,10 +123,34 @@ public class DatasetConfigResource {
     }
   }
 
+
+  @POST
+  @Path("/requiresCompletenessCheck/enable/{dataset}")
+  public Response enableRequiresCompletenessCheck(@PathParam("dataset") String dataset) throws Exception {
+    toggleRequiresCompletenessCheck(dataset, true);
+    return Response.ok().build();
+  }
+
+  @POST
+  @Path("/requiresCompletenessCheck/disable/{dataset}")
+  public Response disableRequiresCompletenessCheck(@PathParam("dataset") String dataset) throws Exception {
+    toggleRequiresCompletenessCheck(dataset, false);
+    return Response.ok().build();
+  }
+
+  private void toggleRequiresCompletenessCheck(String dataset, boolean state) {
+    DatasetConfigDTO datasetConfig = datasetConfigDao.findByDataset(dataset);
+    if(datasetConfig == null) {
+      throw new NullArgumentException("dataset config spec not found");
+    }
+    datasetConfig.setRequiresCompletenessCheck(state);
+    datasetConfigDao.update(datasetConfig);
+  }
+
   @GET
   @Path("/delete")
   public String deleteDatasetConfig(@NotNull @QueryParam("id") Long datasetConfigId) {
-    datassetConfigDao.deleteById(datasetConfigId);
+    datasetConfigDao.deleteById(datasetConfigId);
     return JsonResponseUtil.buildSuccessResponseJSON("Successully deleted dataset id: " + datasetConfigId).toString();
   }
 
@@ -130,11 +159,13 @@ public class DatasetConfigResource {
   @Produces(MediaType.APPLICATION_JSON)
   public String viewDatsetConfig(@DefaultValue("0") @QueryParam("jtStartIndex") int jtStartIndex,
       @DefaultValue("100") @QueryParam("jtPageSize") int jtPageSize) {
-    List<DatasetConfigDTO> datasetConfigDTOs = datassetConfigDao.findAll();
+    List<DatasetConfigDTO> datasetConfigDTOs = datasetConfigDao.findAll();
     List<DatasetConfigDTO> subList = Utils.sublist(datasetConfigDTOs, jtStartIndex, jtPageSize);
     ObjectNode rootNode = JsonResponseUtil.buildResponseJSON(subList);
     return rootNode.toString();
   }
+
+
 
 
 

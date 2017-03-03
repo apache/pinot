@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
-import org.joda.time.DateTime;
+import java.util.List;
 
 import com.linkedin.thirdeye.anomaly.job.JobContext;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
@@ -9,6 +9,25 @@ public class DetectionJobContext extends JobContext {
 
   private Long anomalyFunctionId;
   private AnomalyFunctionDTO anomalyFunctionSpec;
+  private List<Long> startTimes;
+  private List<Long> endTimes;
+
+
+  public List<Long> getStartTimes() {
+    return startTimes;
+  }
+
+  public void setStartTimes(List<Long> startTimes) {
+    this.startTimes = startTimes;
+  }
+
+  public List<Long> getEndTimes() {
+    return endTimes;
+  }
+
+  public void setEndTimes(List<Long> endTimes) {
+    this.endTimes = endTimes;
+  }
 
   public Long getAnomalyFunctionId() {
     return anomalyFunctionId;

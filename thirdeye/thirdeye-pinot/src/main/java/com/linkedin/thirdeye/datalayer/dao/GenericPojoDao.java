@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.datalayer.dao;
 
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
-import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
 import com.linkedin.thirdeye.datalayer.entity.AlertConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.EventIndex;
 import com.linkedin.thirdeye.datalayer.entity.OverrideConfigIndex;
@@ -41,6 +40,7 @@ import com.linkedin.thirdeye.datalayer.entity.AnomalyFunctionIndex;
 import com.linkedin.thirdeye.datalayer.entity.DashboardConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.DataCompletenessConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.DatasetConfigIndex;
+import com.linkedin.thirdeye.datalayer.entity.DetectionStatusIndex;
 import com.linkedin.thirdeye.datalayer.entity.EmailConfigurationIndex;
 import com.linkedin.thirdeye.datalayer.entity.GenericJsonEntity;
 import com.linkedin.thirdeye.datalayer.entity.IngraphDashboardConfigIndex;
@@ -56,6 +56,7 @@ import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
 import com.linkedin.thirdeye.datalayer.pojo.DashboardConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.DataCompletenessConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.DatasetConfigBean;
+import com.linkedin.thirdeye.datalayer.pojo.DetectionStatusBean;
 import com.linkedin.thirdeye.datalayer.pojo.EmailConfigurationBean;
 import com.linkedin.thirdeye.datalayer.pojo.IngraphDashboardConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.IngraphMetricConfigBean;
@@ -82,13 +83,12 @@ public class GenericPojoDao {
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, AnomalyFeedbackIndex.class));
     pojoInfoMap.put(AnomalyFunctionBean.class,
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, AnomalyFunctionIndex.class));
-
     pojoInfoMap.put(EmailConfigurationBean.class,
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, EmailConfigurationIndex.class));
-
-    pojoInfoMap.put(JobBean.class, newPojoInfo(DEFAULT_BASE_TABLE_NAME, JobIndex.class));
-    pojoInfoMap.put(TaskBean.class, newPojoInfo(DEFAULT_BASE_TABLE_NAME, TaskIndex.class));
-
+    pojoInfoMap.put(JobBean.class,
+        newPojoInfo(DEFAULT_BASE_TABLE_NAME, JobIndex.class));
+    pojoInfoMap.put(TaskBean.class,
+        newPojoInfo(DEFAULT_BASE_TABLE_NAME, TaskIndex.class));
     pojoInfoMap.put(MergedAnomalyResultBean.class,
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, MergedAnomalyResultIndex.class));
     pojoInfoMap.put(RawAnomalyResultBean.class,
@@ -99,21 +99,21 @@ public class GenericPojoDao {
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, MetricConfigIndex.class));
     pojoInfoMap.put(DashboardConfigBean.class,
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, DashboardConfigIndex.class));
-
     pojoInfoMap.put(IngraphDashboardConfigBean.class,
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, IngraphDashboardConfigIndex.class));
     pojoInfoMap.put(IngraphMetricConfigBean.class,
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, IngraphMetricConfigIndex.class));
-
     pojoInfoMap.put(OverrideConfigBean.class,
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, OverrideConfigIndex.class));
-
-    pojoInfoMap.put(EventBean.class, newPojoInfo(DEFAULT_BASE_TABLE_NAME, EventIndex.class));
-
-    pojoInfoMap
-        .put(AlertConfigBean.class, newPojoInfo(DEFAULT_BASE_TABLE_NAME, AlertConfigIndex.class));
+    pojoInfoMap.put(EventBean.class,
+        newPojoInfo(DEFAULT_BASE_TABLE_NAME, EventIndex.class));
+    pojoInfoMap.put(AlertConfigBean.class,
+        newPojoInfo(DEFAULT_BASE_TABLE_NAME, AlertConfigIndex.class));
     pojoInfoMap.put(DataCompletenessConfigBean.class,
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, DataCompletenessConfigIndex.class));
+    pojoInfoMap.put(DetectionStatusBean.class,
+        newPojoInfo(DEFAULT_BASE_TABLE_NAME, DetectionStatusIndex.class));
+
   }
 
   private static PojoInfo newPojoInfo(String baseTableName,
