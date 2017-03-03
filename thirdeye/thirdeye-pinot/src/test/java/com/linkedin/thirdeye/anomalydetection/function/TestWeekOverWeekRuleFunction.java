@@ -378,7 +378,7 @@ public class TestWeekOverWeekRuleFunction {
     Assert.assertEquals(WeekOverWeekRuleFunction.parseWowString(testString), "34");
   }
 
-  private String toString(Properties properties) {
+  public static String toString(Properties properties) {
     if (properties != null && properties.size() != 0) {
       List<String> propertyEntry = new ArrayList<>();
       StringBuilder sb = new StringBuilder();

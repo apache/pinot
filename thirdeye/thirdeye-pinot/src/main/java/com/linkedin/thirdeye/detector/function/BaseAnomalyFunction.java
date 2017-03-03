@@ -21,7 +21,7 @@ public abstract class BaseAnomalyFunction implements AnomalyFunction {
 
   protected final Logger LOGGER = LoggerFactory.getLogger(getClass());
 
-  private AnomalyFunctionDTO spec;
+  protected AnomalyFunctionDTO spec;
 
   @Override
   public void init(AnomalyFunctionDTO spec) throws Exception {
