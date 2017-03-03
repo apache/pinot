@@ -59,7 +59,7 @@ public class DetectionJobScheduler implements Runnable {
 
 
   public void start() throws SchedulerException {
-    scheduledExecutorService.scheduleWithFixedDelay(this, 0, 15, TimeUnit.MINUTES);
+    scheduledExecutorService.scheduleAtFixedRate(this, 0, 15, TimeUnit.MINUTES);
   }
 
   /**
@@ -169,7 +169,7 @@ public class DetectionJobScheduler implements Runnable {
    * @param functionId
    * @param startTime
    * @param endTime
-   * @return
+   * @return job execution id
    */
   public Long runAdhocAnomalyFunction(Long functionId, Long startTime, Long endTime) {
     Long jobExecutionId = null;
@@ -201,10 +201,11 @@ public class DetectionJobScheduler implements Runnable {
    * @param endTime
    * @param datasetConfig
    * @param anomalyFunction
-   * @return
+   * @return true if data completeness check is requested and passes, or data completeness check is not requested at all
+   * false if data completeness check is requested and fails
    */
   private boolean checkIfDetectionRunCriteriaMet(Long startTime, Long endTime, DatasetConfigDTO datasetConfig, AnomalyFunctionDTO anomalyFunction) {
-    boolean pass = true;
+    boolean pass = false;
     String dataset = datasetConfig.getDataset();
 
     /**
@@ -220,24 +221,23 @@ public class DetectionJobScheduler implements Runnable {
       List<DataCompletenessConfigDTO> incompleteTimePeriods = DAO_REGISTRY.getDataCompletenessConfigDAO().
           findAllByDatasetAndInTimeRangeAndStatus(dataset, startTime, endTime, false);
       LOG.info("Incomplete periods {}", incompleteTimePeriods);
-      List<DataCompletenessConfigDTO> completeTimePeriods = DAO_REGISTRY.getDataCompletenessConfigDAO().
-          findAllByDatasetAndInTimeRangeAndStatus(dataset, startTime, endTime, true);
-      LOG.info("Complete periods {}", completeTimePeriods);
-      long expectedCompleteBuckets = DetectionJobSchedulerUtils.getExpectedCompleteBuckets(datasetConfig, startTime, endTime);
-      LOG.info("Num complete periods: {} Expected num buckets:{}", completeTimePeriods.size(), expectedCompleteBuckets);
 
-      // if available, run the function
-      if (incompleteTimePeriods.size() == 0 && // nothing incomplete
-          completeTimePeriods.size() == expectedCompleteBuckets) { // complete matches expected buckets
+      if (incompleteTimePeriods.size() == 0) { // nothing incomplete
+        // find complete buckets
+        List<DataCompletenessConfigDTO> completeTimePeriods = DAO_REGISTRY.getDataCompletenessConfigDAO().
+            findAllByDatasetAndInTimeRangeAndStatus(dataset, startTime, endTime, true);
+        LOG.info("Complete periods {}", completeTimePeriods);
+        long expectedCompleteBuckets = DetectionJobSchedulerUtils.getExpectedCompleteBuckets(datasetConfig, startTime, endTime);
+        LOG.info("Num complete periods: {} Expected num buckets:{}", completeTimePeriods.size(), expectedCompleteBuckets);
 
-        LOG.info("Found complete time range for dataset and time range {}({}) to {}({})", dataset,
-          startTime, new DateTime(startTime), endTime, new DateTime(endTime));
-      } else {
-        pass = false;
-        LOG.warn("Data incomplete for monitoring window {} ({}) to {} ({})",
-            startTime, new DateTime(startTime), endTime, new DateTime(endTime));
-        // TODO: Send email to owners/dev team
+        if (completeTimePeriods.size() == expectedCompleteBuckets) { // complete matches expected
+          LOG.info("Found complete time range for dataset and time range {}({}) to {}({})", dataset,
+              startTime, new DateTime(startTime), endTime, new DateTime(endTime));
+          pass = true;
+        }
       }
+    } else { // no check required
+      pass = true;
     }
     return pass;
   }

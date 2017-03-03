@@ -6,7 +6,7 @@ import com.google.common.base.MoreObjects;
 
 
 /**
- * This class corresponds to data completeness config.
+ * Bean to store the detection status
  */
 public class DetectionStatusBean extends AbstractBean implements Comparable<DetectionStatusBean>{
 

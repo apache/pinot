@@ -40,6 +40,7 @@ public class DetectionJobSchedulerUtils {
         pattern = DAY_FORMAT;
         break;
       case MINUTES:
+      case SECONDS:
       case MILLISECONDS:
         pattern = MINUTE_FORMAT;
         break;
@@ -55,7 +56,8 @@ public class DetectionJobSchedulerUtils {
   /**
    * round this time to earlier boundary, depending on granularity of dataset
    * e.g. 12:15pm on HOURLY dataset should be treated as 12pm
-   * and 12:50pm on any MINUTE level dataset should be treated as 12:30pm
+   * any dataset with granularity finer than HOUR, will be rounded as per function frequency (assumption is that this is in MINUTES)
+   * so 12.53 on 5 MINUTES dataset, with function frequency 15 MINUTES will be rounded to 12.45
    * @param anomalyFunction
    * @param timeSpec
    * @param dataCompletenessStartTime
@@ -70,7 +72,7 @@ public class DetectionJobSchedulerUtils {
 
     // For nMINUTE level datasets, with frequency defined in nMINUTES in the function, (make sure size doesnt exceed 30 minutes, just use 1 HOUR in that case)
     // Calculate time periods according to the function frequency
-    if (dataUnit.equals(TimeUnit.MINUTES) || dataUnit.equals(TimeUnit.MILLISECONDS)) {
+    if (dataUnit.equals(TimeUnit.MINUTES) || dataUnit.equals(TimeUnit.MILLISECONDS) || dataUnit.equals(TimeUnit.SECONDS)) {
       if (functionFrequency.getUnit().equals(TimeUnit.MINUTES) && (functionFrequency.getSize() <=30)) {
         int minuteBucketSize = functionFrequency.getSize();
         int roundedMinutes = (dateTime.getMinuteOfHour()/minuteBucketSize) * minuteBucketSize;
@@ -113,7 +115,7 @@ public class DetectionJobSchedulerUtils {
 
     // For nMINUTE level datasets, with frequency defined in nMINUTES in the function, (make sure size doesnt exceed 30 minutes, just use 1 HOUR in that case)
     // Calculate time periods according to the function frequency
-    if (dataUnit.equals(TimeUnit.MINUTES) || dataUnit.equals(TimeUnit.MILLISECONDS)) {
+    if (dataUnit.equals(TimeUnit.MINUTES) || dataUnit.equals(TimeUnit.MILLISECONDS) || dataUnit.equals(TimeUnit.SECONDS)) {
       if (functionFrequency.getUnit().equals(TimeUnit.MINUTES) && (functionFrequency.getSize() <=30)) {
         bucketMillis = TimeUnit.MILLISECONDS.convert(functionFrequency.getSize(), TimeUnit.MINUTES);
       } else {
