@@ -7,7 +7,6 @@ import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExContext;
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExDataSource;
 import com.linkedin.thirdeye.detector.functionex.dataframe.DataFrame;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.testng.Assert;
@@ -22,7 +21,10 @@ public class ThirdEyeMetricDataSourceTest {
     @Override
     public DataFrame query(String query, AnomalyFunctionExContext context) throws Exception {
       this.query = query;
-      return new DataFrame(0);
+      DataFrame df = new DataFrame(0);
+      df.addSeries("time", new long[0]);
+      df.addSeries("function_metric", new long[0]);
+      return df;
     }
   }
 
@@ -106,14 +108,14 @@ public class ThirdEyeMetricDataSourceTest {
   public void testQueryWithoutFilter() throws Exception {
     String query = "dataset/metric/function";
     this.ds.query(query, context);
-    Assert.assertEquals(this.pinot.query, "SELECT function(metric) FROM dataset WHERE (((time>='100') AND (time<'200'))) GROUP BY time TOP 10000");
+    Assert.assertEquals(this.pinot.query, "SELECT function(metric) FROM dataset WHERE (((time>'100') AND (time<='200'))) GROUP BY time TOP 10000");
   }
 
   @Test
   public void testQueryWithFilter() throws Exception {
     String query = "dataset/metric/function/k1=v1,k1=v2,k2=v2";
     this.ds.query(query, context);
-    Assert.assertEquals(this.pinot.query, "SELECT function(metric) FROM dataset WHERE (((k1='v1') OR (k1='v2')) AND ((k2='v2')) AND ((time>='100') AND (time<'200'))) GROUP BY k1, k2, time TOP 10000");
+    Assert.assertEquals(this.pinot.query, "SELECT function(metric) FROM dataset WHERE (((k1='v1') OR (k1='v2')) AND ((k2='v2')) AND ((time>'100') AND (time<='200'))) GROUP BY k1, k2, time TOP 10000");
   }
 
   static void assertFilter(ThirdEyeMetricDataSource.Filter f, String key, String operator, String value) {

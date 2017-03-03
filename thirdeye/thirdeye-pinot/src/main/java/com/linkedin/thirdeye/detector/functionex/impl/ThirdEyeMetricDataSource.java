@@ -8,9 +8,10 @@ import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExContext;
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExDataSource;
 import com.linkedin.thirdeye.detector.functionex.dataframe.DataFrame;
+import com.linkedin.thirdeye.detector.functionex.dataframe.LongSeries;
+import com.linkedin.thirdeye.detector.functionex.dataframe.Series;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -20,6 +21,9 @@ import java.util.Set;
 public class ThirdEyeMetricDataSource implements AnomalyFunctionExDataSource<String, DataFrame> {
 
   private static final int TOP_K = 10000;
+
+  public static final String COLUMN_TIMESTAMP = "timestamp";
+  public static final String COLUMN_METRIC = "metric";
 
   AnomalyFunctionExDataSource<String, DataFrame> pinot;
   DatasetConfigManager manager;
@@ -58,15 +62,28 @@ public class ThirdEyeMetricDataSource implements AnomalyFunctionExDataSource<Str
     // build query
     String pinotQuery = makeQuery(dataset, metric, function, filters);
 
-    return this.pinot.query(pinotQuery, context);
+    DataFrame result = this.pinot.query(pinotQuery, context);
+
+    result.renameSeries(dto.getTimeColumn(),COLUMN_TIMESTAMP);
+    result.renameSeries(function + "_" + metric, COLUMN_METRIC);
+
+    Series s = result.toLongs(COLUMN_TIMESTAMP).map(new LongSeries.LongFunction() {
+      @Override
+      public long apply(long value) {
+        return tg.toMillis(value);
+      }
+    });
+    result.addSeries(COLUMN_TIMESTAMP, s);
+
+    return result.sortBySeries();
   }
 
   static Collection<Filter> augmentFiltersWithTime(Collection<Filter> filters, String column, TimeGranularity tg, long start, long stop) {
     String minTime = String.valueOf(tg.convertToUnit(start));
     String maxTime = String.valueOf(tg.convertToUnit(stop));
 
-    filters.add(new Filter(column, ">=", minTime));
-    filters.add(new Filter(column, "<", maxTime));
+    filters.add(new Filter(column, ">", minTime));
+    filters.add(new Filter(column, "<=", maxTime));
     return filters;
   }
 

@@ -1,10 +1,13 @@
 package com.linkedin.thirdeye.detector.functionex;
 
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
+import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.EventManager;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.DatasetConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.EventManagerImpl;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import com.linkedin.thirdeye.detector.functionex.impl.ThirdEyeEventDataSource;
+import com.linkedin.thirdeye.detector.functionex.impl.ThirdEyeMetricDataSource;
 import com.linkedin.thirdeye.detector.functionex.impl.ThirdEyeMockDataSource;
 import com.linkedin.thirdeye.detector.functionex.impl.ThirdEyePinotConnection;
 import com.linkedin.thirdeye.detector.functionex.impl.ThirdEyePinotDataSource;
@@ -38,6 +41,8 @@ public class AnomalyFunctionExRunner {
   private static final String ID_PINOT = "enable-pinot";
   private static final String ID_MOCK = "enable-mock";
   private static final String ID_THIRDEYE = "enable-thirdeye";
+  private static final String ID_EVENT = "enable-event";
+  private static final String ID_METRIC = "enable-metric";
 
   public static void main(String[] args) throws Exception {
     Options options = makeParserOptions();
@@ -61,7 +66,7 @@ public class AnomalyFunctionExRunner {
 
     long monitoringEnd = Long.parseLong(cmd.getOptionValue(ID_MONITOR_TO, String.valueOf(DateTime.now(DateTimeZone.UTC).getMillis() / 1000)));
     long monitoringStart = Long.parseLong(cmd.getOptionValue(ID_MONITOR_FROM, String.valueOf(monitoringEnd - 3600)));
-    LOG.info("Setting monitoring window '{}-{}'", monitoringStart, monitoringEnd);
+    LOG.info("Setting monitoring window from '{}' to '{}'", monitoringStart, monitoringEnd);
 
     Map<String, String> config = new HashMap<>();
     if(cmd.hasOption(ID_CONFIG)) {
@@ -77,22 +82,48 @@ public class AnomalyFunctionExRunner {
       LOG.info("Enabling ThirdEye internal database with config '{}'", cmd.getOptionValue(ID_THIRDEYE));
       File configFile = new File(cmd.getOptionValue(ID_THIRDEYE));
       DaoProviderUtil.init(configFile);
-
-      EventManager eventManager = DaoProviderUtil.getInstance(EventManagerImpl.class);
-      factory.addDataSource("event", new ThirdEyeEventDataSource(eventManager));
     }
 
+    ThirdEyePinotDataSource pinotDataSource = null;
     if(cmd.hasOption(ID_PINOT)) {
-      LOG.info("Enabling '{}' datasource with config '{}'", ID_PINOT, cmd.getOptionValue(ID_PINOT));
+      LOG.info("Enabling 'pinot' datasource with config '{}'", cmd.getOptionValue(ID_PINOT));
       File configFile = new File(cmd.getOptionValue(ID_PINOT));
       PinotThirdEyeClientConfig clientConfig = PinotThirdEyeClientConfig.fromFile(configFile);
-      ThirdEyePinotConnection conn = new ThirdEyePinotConnection(clientConfig);
-      factory.addDataSource("pinot", new ThirdEyePinotDataSource(conn));
+      ThirdEyePinotConnection conn = new ThirdEyePinotConnection(clientConfig, 1);
+      pinotDataSource = new ThirdEyePinotDataSource(conn);
+      factory.addDataSource("pinot", pinotDataSource);
     }
 
     if(cmd.hasOption(ID_MOCK)) {
-      LOG.info("Enabling '{}' datasource", ID_MOCK, cmd.getOptionValue(ID_MOCK));
+      LOG.info("Enabling 'mock' datasource");
       factory.addDataSource("mock", new ThirdEyeMockDataSource());
+    }
+
+    if(cmd.hasOption(ID_EVENT)) {
+      if(!cmd.hasOption(ID_THIRDEYE)) {
+        LOG.error("--{} requires --{}", ID_EVENT, ID_THIRDEYE);
+        System.exit(1);
+      }
+
+      LOG.info("Enabling 'event' datasource");
+      EventManager manager = DaoProviderUtil.getInstance(EventManagerImpl.class);
+      factory.addDataSource("event", new ThirdEyeEventDataSource(manager));
+    }
+
+    if(cmd.hasOption(ID_METRIC)) {
+      if(!cmd.hasOption(ID_THIRDEYE)) {
+        LOG.error("--{} requires --{}", ID_METRIC, ID_THIRDEYE);
+        System.exit(1);
+      }
+
+      if(!cmd.hasOption(ID_PINOT)) {
+        LOG.error("--{} requires --{}", ID_METRIC, ID_PINOT);
+        System.exit(1);
+      }
+
+      LOG.info("Enabling 'metric' datasource");
+      DatasetConfigManager manager = DaoProviderUtil.getInstance(DatasetConfigManagerImpl.class);
+      factory.addDataSource("metric", new ThirdEyeMetricDataSource(pinotDataSource, manager));
     }
 
     AnomalyFunctionExContext context = new AnomalyFunctionExContext();
@@ -159,13 +190,21 @@ public class AnomalyFunctionExRunner {
         "Enables 'pinot' data source. Requires path to pinot client config YAML file.");
     options.addOption(pinot);
 
-    Option mock = new Option("M", ID_MOCK, false,
+    Option mock = new Option("O", ID_MOCK, false,
         "Enables 'mock' data source.");
     options.addOption(mock);
 
     Option thirdeye = new Option("T", ID_THIRDEYE, true,
         "Enables access to the ThirdEye internal database. Requires path to thirdeye persistence config YAML file.");
     options.addOption(thirdeye);
+
+    Option event = new Option("E", ID_EVENT, false,
+        "Enables 'event' data source. (Requires: " + ID_THIRDEYE + ")");
+    options.addOption(event);
+
+    Option metric = new Option("M", ID_METRIC, false,
+        "Enables 'metric' data source. (Requires: " + ID_THIRDEYE + " " + ID_PINOT + ")");
+    options.addOption(metric);
 
     return options;
   }
