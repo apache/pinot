@@ -1,22 +1,19 @@
 package com.linkedin.thirdeye.anomaly.detection.lib;
 
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
-import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.AnomalyPercentagePerformanceEvaluation;
-import com.linkedin.thirdeye.dashboard.resources.OnboardResource;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.FunctionAutoTuneConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.FunctionAutoTuneConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import org.joda.time.DateTime;
-import org.joda.time.Interval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,7 +29,7 @@ public class FunctionAutotuneExcutorRunnable implements Runnable {
   private DateTime replayStart;
   private DateTime replayEnd;
   private boolean isForceBackfill;
-  private Map<String, Comparable> goalRange;
+  private double goal;
   private List<Map<String, String>> tuningParameters;
 
   private final String MAX_GAOL = "max";
@@ -54,7 +51,7 @@ public class FunctionAutotuneExcutorRunnable implements Runnable {
       MergedAnomalyResultManager mergedAnomalyResultDAO, RawAnomalyResultManager rawAnomalyResultDAO,
       FunctionAutoTuneConfigManager functionAutoTuneConfigDAO,
       List<Map<String, String>> tuningParameters, long tuningFunctionId, DateTime replayStart, DateTime replayEnd,
-      Map<String, Comparable> goalRange, boolean isForceBackfill) {
+      double goal, boolean isForceBackfill) {
     this.detectionJobScheduler = detectionJobScheduler;
     this.mergedAnomalyResultDAO = mergedAnomalyResultDAO;
     this.rawAnomalyResultDAO = rawAnomalyResultDAO;
@@ -65,38 +62,79 @@ public class FunctionAutotuneExcutorRunnable implements Runnable {
     setReplayEnd(replayEnd);
     setForceBackfill(isForceBackfill);
     setTuningParameters(tuningParameters);
-    setGoalRange(goalRange);
+    setGoal(goal);
   }
 
   @Override
   public void run() {
     LOG.info("Generating threads for each configuration...");
-    List<Thread> runningThreads = new ArrayList<>();
+    long executionStartTime = System.currentTimeMillis();
+    ExecutorService pool = Executors.newSingleThreadExecutor();
+    List<Future<FunctionAutotuneReturn>> runningThreads = new ArrayList<>();
     for(Map<String, String> config : tuningParameters) {
       LOG.info("Running backfill replay with parameter configuration: {}" + config.toString());
-      FunctionAutotuneRunnable backfillRunnable = new FunctionAutotuneRunnable(detectionJobScheduler, anomalyFunctionDAO,
+      FunctionAutotuneCallable backfillCallable = new FunctionAutotuneCallable(detectionJobScheduler, anomalyFunctionDAO,
           mergedAnomalyResultDAO, rawAnomalyResultDAO, functionAutoTuneConfigDAO);
-      backfillRunnable.setTuningFunctionId(tuningFunctionId);
-      backfillRunnable.setReplayStart(replayStart);
-      backfillRunnable.setReplayEnd(replayEnd);
-      backfillRunnable.setForceBackfill(true);
-      backfillRunnable.setTuningParameter(config);
-      backfillRunnable.setGoalRange(goalRange);
+      backfillCallable.setTuningFunctionId(tuningFunctionId);
+      backfillCallable.setReplayStart(replayStart);
+      backfillCallable.setReplayEnd(replayEnd);
+      backfillCallable.setForceBackfill(true);
+      backfillCallable.setPerformanceEvaluationMethod(PerformanceEvaluationMethod.ANOMALY_PERCENTAGE);
+      backfillCallable.setAutotuneMethodType(AutotuneMethodType.EXHAUSTIVE);
+      backfillCallable.setTuningParameter(config);
 
-      Thread thread = new Thread(backfillRunnable);
-      thread.setName(config.toString());
-      runningThreads.add(thread);
-      thread.start();
+      Future future = pool.submit(backfillCallable);
+      runningThreads.add(future);
     }
-    for(Thread t : runningThreads){
+    FunctionAutotuneReturn bestResult = null;
+    long sum = 0l;
+    double bestPerformance = Double.POSITIVE_INFINITY;
+    for(Future<FunctionAutotuneReturn> t : runningThreads){
+      FunctionAutotuneReturn backfillResult = null;
       try {
-        t.join();
+        backfillResult = t.get();
       }
       catch (InterruptedException e){
-        LOG.warn("Thread {} with config {} is interrupted", t.toString(), t.getName(), e);
+        LOG.warn("Thread {} is interrupted", t.toString(), e);
+        continue;
+      }
+      catch (ExecutionException e){
+        LOG.warn("Thread {} has an execution exception", t.toString(), e);
+        continue;
+      }
+
+      // Summing total time usage for replay
+      sum += System.currentTimeMillis() - executionStartTime;
+
+      // Compare the performance with goal
+      if(similarity(goal, bestPerformance) > similarity(goal, backfillResult.getPerformance())) {
+        bestResult = backfillResult;
+        bestPerformance = backfillResult.getPerformance();
       }
     }
+
+    LOG.info("Average replay time is {} second(s)", (sum/runningThreads.size())/1000);
+    LOG.info("Total running time is {} second(s)", (System.currentTimeMillis() - executionStartTime)/1000);
+
+    if(bestResult != null) {
+      FunctionAutoTuneConfigDTO functionAutoTuneConfigDTO = new FunctionAutoTuneConfigDTO();
+      functionAutoTuneConfigDTO.setFunctionId(tuningFunctionId);
+      functionAutoTuneConfigDTO.setStartTime(replayStart.getMillis());
+      functionAutoTuneConfigDTO.setEndTime(replayEnd.getMillis());
+      functionAutoTuneConfigDTO.setAutotuneMethod(bestResult.getAutotuneMethod());
+      functionAutoTuneConfigDTO.setPerformanceEvaluationMethod(bestResult.getPerformanceEvaluationMethod());
+      functionAutoTuneConfigDTO.setPerformance(bestResult.getPerformance());
+      functionAutoTuneConfigDTO.setConfiguration(bestResult.getConfiguration());
+      functionAutoTuneConfigDTO.setAvgRunningTime((sum/runningThreads.size())/1000l);
+      functionAutoTuneConfigDTO.setOverallRunningTime((System.currentTimeMillis() - executionStartTime)/1000);
+
+      functionAutoTuneConfigDAO.save(functionAutoTuneConfigDTO);
+    }
     // TODO: send email or notification out
+  }
+
+  private double similarity(double d1, double d2){
+    return Math.abs(d1 - d2);
   }
 
   public long getTuningFunctionId() {
@@ -131,19 +169,19 @@ public class FunctionAutotuneExcutorRunnable implements Runnable {
     isForceBackfill = forceBackfill;
   }
 
-  public Map<String, Comparable> getGoalRange() {
-    return goalRange;
-  }
-
-  public void setGoalRange(Map<String, Comparable> goalRange) {
-    this.goalRange = goalRange;
-  }
-
   public List<Map<String, String>> getTuningParameters() {
     return tuningParameters;
   }
 
   public void setTuningParameters(List<Map<String, String>> tuningParameters) {
     this.tuningParameters = tuningParameters;
+  }
+
+  public double getGoal() {
+    return goal;
+  }
+
+  public void setGoal(double goal) {
+    this.goal = goal;
   }
 }

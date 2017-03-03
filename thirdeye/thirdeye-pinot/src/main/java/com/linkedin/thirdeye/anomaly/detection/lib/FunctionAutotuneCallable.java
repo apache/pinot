@@ -8,48 +8,47 @@ import com.linkedin.thirdeye.datalayer.bao.FunctionAutoTuneConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.FunctionAutoTuneConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
 import org.joda.time.DateTime;
 import org.joda.time.Interval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class FunctionAutotuneRunnable implements Runnable {
-  private static final Logger LOG = LoggerFactory.getLogger(FunctionAutotuneRunnable.class);
+public class FunctionAutotuneCallable implements Callable<FunctionAutotuneReturn> {
+  private static final Logger LOG = LoggerFactory.getLogger(FunctionAutotuneCallable.class);
   private DetectionJobScheduler detectionJobScheduler;
   private MergedAnomalyResultManager mergedAnomalyResultDAO;
   private AnomalyFunctionManager anomalyFunctionDAO;
   private RawAnomalyResultManager rawAnomalyResultDAO;
-  private FunctionAutoTuneConfigManager functionAutoTuneConfigDAO;
+  private AutotuneMethodType autotuneMethodType;
+  private PerformanceEvaluationMethod performanceEvaluationMethod;
   private long tuningFunctionId;
   private DateTime replayStart;
   private DateTime replayEnd;
   private boolean isForceBackfill;
-  private Map<String, Comparable> goalRange;
   private Map<String, String> tuningParameter;
 
   private final String MAX_GAOL = "max";
   private final String MIN_GOAL = "min";
   private final String PERFORMANCE_VALUE = "value";
 
-  public FunctionAutotuneRunnable(DetectionJobScheduler detectionJobScheduler, AnomalyFunctionManager anomalyFunctionDAO,
+  public FunctionAutotuneCallable(DetectionJobScheduler detectionJobScheduler, AnomalyFunctionManager anomalyFunctionDAO,
       MergedAnomalyResultManager mergedAnomalyResultDAO, RawAnomalyResultManager rawAnomalyResultDAO,
       FunctionAutoTuneConfigManager functionAutoTuneConfigDAO){
     this.detectionJobScheduler = detectionJobScheduler;
     this.mergedAnomalyResultDAO = mergedAnomalyResultDAO;
     this.anomalyFunctionDAO = anomalyFunctionDAO;
     this.rawAnomalyResultDAO = rawAnomalyResultDAO;
-    this.functionAutoTuneConfigDAO = functionAutoTuneConfigDAO;
     setForceBackfill(true);
   }
 
-  public FunctionAutotuneRunnable(DetectionJobScheduler detectionJobScheduler, AnomalyFunctionManager anomalyFunctionDAO,
+  public FunctionAutotuneCallable(DetectionJobScheduler detectionJobScheduler, AnomalyFunctionManager anomalyFunctionDAO,
       MergedAnomalyResultManager mergedAnomalyResultDAO, RawAnomalyResultManager rawAnomalyResultDAO,
       FunctionAutoTuneConfigManager functionAutoTuneConfigDAO,
       Map<String, String> tuningParameter, long tuningFunctionId, DateTime replayStart, DateTime replayEnd,
@@ -58,17 +57,15 @@ public class FunctionAutotuneRunnable implements Runnable {
     this.mergedAnomalyResultDAO = mergedAnomalyResultDAO;
     this.rawAnomalyResultDAO = rawAnomalyResultDAO;
     this.anomalyFunctionDAO = anomalyFunctionDAO;
-    this.functionAutoTuneConfigDAO = functionAutoTuneConfigDAO;
     setTuningFunctionId(tuningFunctionId);
     setReplayStart(replayStart);
     setReplayEnd(replayEnd);
     setForceBackfill(isForceBackfill);
     setTuningParameter(tuningParameter);
-    setGoalRange(goalRange);
   }
 
   @Override
-  public void run() {
+  public FunctionAutotuneReturn call() {
     long clonedFunctionId = 0l;
     OnboardResource onboardResource = new OnboardResource(anomalyFunctionDAO, mergedAnomalyResultDAO, rawAnomalyResultDAO);
     StringBuilder functionName = new StringBuilder();
@@ -80,12 +77,27 @@ public class FunctionAutotuneRunnable implements Runnable {
     }
     catch (Exception e) {
       LOG.error("Unable to clone function {} with given name {}", tuningFunctionId, functionName.toString(), e);
-      return;
+      return null;
     }
 
     AnomalyFunctionDTO anomalyFunctionDTO = anomalyFunctionDAO.findById(clonedFunctionId);
     // Remove alert filters
     anomalyFunctionDTO.setAlertFilter(null);
+
+    // enlarge window size so that we can speed-up the replay speed
+    switch(anomalyFunctionDTO.getWindowUnit()){
+      case MILLISECONDS: // In case of future use
+      case MINUTES:
+        anomalyFunctionDTO.setWindowSize(1);
+        anomalyFunctionDTO.setWindowUnit(TimeUnit.DAYS);
+        anomalyFunctionDTO.setCron("0 0 0 * * ?");
+      case HOURS:
+      case DAYS:
+      default:
+        anomalyFunctionDTO.setWindowSize(7);
+        anomalyFunctionDTO.setWindowUnit(TimeUnit.DAYS);
+        anomalyFunctionDTO.setCron("0 0 0 ? * MON *");
+    }
 
     // Set Properties
     Properties properties = anomalyFunctionDTO.toProperties();
@@ -101,25 +113,17 @@ public class FunctionAutotuneRunnable implements Runnable {
     List<MergedAnomalyResultDTO> detectedMergedAnomalies =
         mergedAnomalyResultDAO.findAllConflictByFunctionId(clonedFunctionId, replayStart.getMillis(), replayEnd.getMillis());
 
-    Comparable performance = AnomalyPercentagePerformanceEvaluation.evaluate(
-        new Interval(replayStart.getMillis(), replayEnd.getMillis()), detectedMergedAnomalies);
-    // If the performance is in the goal range, e.g. max >= performance >= min, store the properties in the list
-    if(performance.compareTo(goalRange.get(MAX_GAOL)) <= 0 && performance.compareTo(goalRange.get(MIN_GOAL)) >= 0){
-      FunctionAutoTuneConfigDTO functionAutoTuneConfigDTO = new FunctionAutoTuneConfigDTO();
-      functionAutoTuneConfigDTO.setFunctionId(tuningFunctionId);
-      functionAutoTuneConfigDTO.setAutotuneMethod(AutotuneMethodType.EXHAUSTIVE);
-      functionAutoTuneConfigDTO.setPerformanceEvaluationMethod(PerformanceEvaluationMethod.ANOMALY_PERCENTAGE);
-      functionAutoTuneConfigDTO.setPerformance(performanceToMap(performance));
-      functionAutoTuneConfigDTO.setConfiguration(tuningParameter);
-      functionAutoTuneConfigDTO.setStartTime(replayStart.getMillis());
-      functionAutoTuneConfigDTO.setEndTime(replayEnd.getMillis());
+    double performance = AnomalyPercentagePerformanceEvaluation.evaluate(new Interval(replayStart.getMillis(), replayEnd.getMillis()),
+        detectedMergedAnomalies);
 
-      functionAutoTuneConfigDAO.save(functionAutoTuneConfigDTO);
-    }
+    FunctionAutotuneReturn functionAutotuneReturn = new FunctionAutotuneReturn(tuningFunctionId, replayStart, replayEnd,
+        tuningParameter, autotuneMethodType, performanceEvaluationMethod, performance);
 
     // clean up and kill itself
     onboardResource.deleteExistingAnomalies(Long.toString(clonedFunctionId), replayStart.getMillis(), replayEnd.getMillis());
     anomalyFunctionDAO.deleteById(clonedFunctionId);
+
+    return functionAutotuneReturn;
   }
 
   private Map<String, String> performanceToMap(Comparable performance){
@@ -173,14 +177,6 @@ public class FunctionAutotuneRunnable implements Runnable {
     isForceBackfill = forceBackfill;
   }
 
-  public Map<String, Comparable> getGoalRange() {
-    return goalRange;
-  }
-
-  public void setGoalRange(Map<String, Comparable> goalRange) {
-    this.goalRange = goalRange;
-  }
-
   public Map<String, String> getTuningParameter() {
     return tuningParameter;
   }
@@ -189,4 +185,19 @@ public class FunctionAutotuneRunnable implements Runnable {
     this.tuningParameter = tuningParameter;
   }
 
+  public AutotuneMethodType getAutotuneMethodType() {
+    return autotuneMethodType;
+  }
+
+  public void setAutotuneMethodType(AutotuneMethodType autotuneMethodType) {
+    this.autotuneMethodType = autotuneMethodType;
+  }
+
+  public PerformanceEvaluationMethod getPerformanceEvaluationMethod() {
+    return performanceEvaluationMethod;
+  }
+
+  public void setPerformanceEvaluationMethod(PerformanceEvaluationMethod performanceEvaluationMethod) {
+    this.performanceEvaluationMethod = performanceEvaluationMethod;
+  }
 }

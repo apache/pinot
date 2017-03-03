@@ -344,9 +344,7 @@ public abstract class AbstractManagerTestBase {
     Map<String, String> config = new HashMap<>();
     config.put("ConfigKey", "ConfigValue");
     functionAutoTuneConfigDTO.setConfiguration(config);
-    Map<String, String> performance = new HashMap<>();
-    performance.put("PerformanceKey", "PerformanceValue");
-    functionAutoTuneConfigDTO.setPerformance(performance);
+    functionAutoTuneConfigDTO.setPerformance(0.5);
     return functionAutoTuneConfigDTO;
   }
 }

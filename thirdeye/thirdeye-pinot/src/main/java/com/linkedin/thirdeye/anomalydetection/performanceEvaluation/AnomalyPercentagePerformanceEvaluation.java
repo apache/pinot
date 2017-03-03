@@ -9,7 +9,7 @@ import org.joda.time.Interval;
  * Created by ychung on 2/28/17.
  */
 public class AnomalyPercentagePerformanceEvaluation {
-  public static Comparable evaluate(Interval windowInterval, List<MergedAnomalyResultDTO> detectedResults){
+  public static double evaluate(Interval windowInterval, List<MergedAnomalyResultDTO> detectedResults){
     long anomalyLength = 0;
     long totalLength = windowInterval.toDurationMillis();
     for(MergedAnomalyResultDTO mergedAnomaly : detectedResults){

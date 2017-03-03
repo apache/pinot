@@ -1,24 +1,19 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
 import com.linkedin.thirdeye.anomaly.detection.lib.FunctionAutotuneExcutorRunnable;
-import com.linkedin.thirdeye.anomaly.detection.lib.FunctionAutotuneRunnable;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutoTune;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
-import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.AnomalyPercentagePerformanceEvaluation;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
-import com.linkedin.thirdeye.dashboard.resources.OnboardResource;
 import com.linkedin.thirdeye.datalayer.bao.FunctionAutoTuneConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.dto.FunctionAutoTuneConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterEvaluationUtil;
 import com.linkedin.thirdeye.util.SeverityComputationUtil;
-import com.sun.org.apache.xpath.internal.operations.Bool;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -464,10 +459,8 @@ public class DetectionJobResource {
    * @param tuningJSON
    * the json object includes all tuning fields and list of parameters
    * ex: {"baselineLift": [0.9, 0.95, 1, 1.05, 1.1], "baselineSeasonalPeriod": [2, 3, 4]}
-   * @param goalRangeJSON
-   * the json object includes the range of comparable objects
-   * ex: {"max": {"value": "0.5"}, "min": {"value": "0.2"}}
-   * TODO: Generalize the json object to load any kind of comparable objects, e.g. precision and recall
+   * @param goal
+   * the expected performance assigned by user
    * @return
    * A response containing all satisfied properties with their evaluation result
    */
@@ -475,7 +468,7 @@ public class DetectionJobResource {
   @Path("function/{id}/autotune")
   public Response anomalyFunctionAutotune(@PathParam("id") long functionId, @QueryParam("start") String replayStartTime,
       @QueryParam("end") String replayEndTime, @QueryParam("timezone") String timezone,
-      @QueryParam("tune") String tuningJSON, @QueryParam("goalRange") String goalRangeJSON){
+      @QueryParam("tune") String tuningJSON, @QueryParam("goal") double goal){
     DateTimeZone dateTimeZone = DateTimeZone.forID(timezone);
     // DateTime monitoringWindowStartTime = ISODateTimeFormat.dateTimeParser().parseDateTime(monitoringDateTime).withZone(dateTimeZone);
     DateTime replayStart = ISODateTimeFormat.dateTimeParser().parseDateTime(replayStartTime).withZone(dateTimeZone);
@@ -493,16 +486,6 @@ public class DetectionJobResource {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
 
-    // Parse goal
-    Map<String, Comparable> goals = null;
-    try{
-      goals = getGoalRange(new JSONObject(goalRangeJSON));
-    }
-    catch (JSONException e){
-      LOG.error("Unable to parse json string: {}", goalRangeJSON, e );
-      return Response.status(Response.Status.BAD_REQUEST).build();
-    }
-
     FunctionAutotuneExcutorRunnable excutorRunnable = new FunctionAutotuneExcutorRunnable(detectionJobScheduler, anomalyFunctionDAO,
         mergedAnomalyResultDAO, rawAnomalyResultDAO, functionAutoTuneConfigDAO);
     excutorRunnable.setTuningFunctionId(functionId);
@@ -510,7 +493,7 @@ public class DetectionJobResource {
     excutorRunnable.setReplayEnd(replayEnd);
     excutorRunnable.setForceBackfill(true);
     excutorRunnable.setTuningParameters(tuningParameters);
-    excutorRunnable.setGoalRange(goals);
+    excutorRunnable.setGoal(goal);
 
     new Thread(excutorRunnable).start();
 

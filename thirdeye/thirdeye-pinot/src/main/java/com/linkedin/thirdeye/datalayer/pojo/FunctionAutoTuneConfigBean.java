@@ -22,10 +22,14 @@ public class FunctionAutoTuneConfigBean extends AbstractBean {
   private AutotuneMethodType autotuneMethod;
   // The performance evaluation method which is used for performance evaluation
   private PerformanceEvaluationMethod performanceEvaluationMethod;
-  // The performance value, can be Number or any Comparable class
-  private Map<String, String> performance;
+  // The performance value
+  private double performance;
   // The tuned properties configuration
   private Map<String, String> configuration;
+  // The average running time for each thread while doing autotune
+  private long avgRunningTime;
+  // The overall running time  while doing autotune
+  private long overallRunningTime;
 
   public long getFunctionId() {
     return functionId;
@@ -67,11 +71,11 @@ public class FunctionAutoTuneConfigBean extends AbstractBean {
     this.performanceEvaluationMethod = performanceEvaluationMethod;
   }
 
-  public Map<String, String> getPerformance() {
+  public double getPerformance() {
     return performance;
   }
 
-  public void setPerformance(Map<String, String> performance) {
+  public void setPerformance(double performance) {
     this.performance = performance;
   }
 
@@ -83,6 +87,22 @@ public class FunctionAutoTuneConfigBean extends AbstractBean {
     this.configuration = configuration;
   }
 
+  public long getAvgRunningTime() {
+    return avgRunningTime;
+  }
+
+  public void setAvgRunningTime(long avgRunningTime) {
+    this.avgRunningTime = avgRunningTime;
+  }
+
+  public long getOverallRunningTime() {
+    return overallRunningTime;
+  }
+
+  public void setOverallRunningTime(long overallRunningTime) {
+    this.overallRunningTime = overallRunningTime;
+  }
+
   @Override
   public boolean equals(Object o){
     if(!(o instanceof FunctionAutoTuneConfigBean)){
@@ -92,19 +112,22 @@ public class FunctionAutoTuneConfigBean extends AbstractBean {
     return Objects.equals(getFunctionId(), fac.getFunctionId()) && Objects.equals(getStartTime(), fac.getStartTime())
         && Objects.equals(getEndTime(), fac.getEndTime()) && Objects.equals(getAutotuneMethod(), fac.getAutotuneMethod())
         && Objects.equals(getConfiguration(), fac.getConfiguration()) && Objects.equals(getPerformance(), fac.getPerformance())
-        && Objects.equals(getPerformanceEvaluationMethod(), fac.getPerformanceEvaluationMethod());
+        && Objects.equals(getPerformanceEvaluationMethod(), fac.getPerformanceEvaluationMethod())
+        && Objects.equals(getAvgRunningTime(), fac.getAvgRunningTime())
+        && Objects.equals(getOverallRunningTime(), fac.getOverallRunningTime());
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(getId(), functionId, startTime, endTime, autotuneMethod, performanceEvaluationMethod,
-        configuration, performance);
+        configuration, performance, avgRunningTime, overallRunningTime);
   }
 
   @Override
   public String toString(){
     return MoreObjects.toStringHelper(this).add("functionId", functionId).add("configuration", configuration)
         .add("startTime", startTime).add("endTime", endTime).add("autotuneMethod", autotuneMethod)
-        .add("performanceEvaluationMethod", performanceEvaluationMethod).add("performance", performance).toString();
+        .add("performanceEvaluationMethod", performanceEvaluationMethod).add("performance", performance)
+        .add("avgRunningTime", avgRunningTime).add("overallRunningTime", overallRunningTime).toString();
   }
 }
