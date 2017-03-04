@@ -100,11 +100,7 @@ public class FunctionAutotuneCallable implements Callable<FunctionAutotuneReturn
     }
 
     // Set Properties
-    Properties properties = anomalyFunctionDTO.toProperties();
-    for(Map.Entry<String, String> entry : tuningParameter.entrySet()) {
-      properties.setProperty(entry.getKey(), entry.getValue());
-    }
-    anomalyFunctionDTO.setProperties(propertiesToString(properties));
+    FunctionPropertiesUtils.applyConfigurationToProperties(anomalyFunctionDTO, tuningParameter);
     anomalyFunctionDTO.setActive(true);
 
     anomalyFunctionDAO.update(anomalyFunctionDTO);
@@ -126,24 +122,6 @@ public class FunctionAutotuneCallable implements Callable<FunctionAutotuneReturn
     return functionAutotuneReturn;
   }
 
-  private Map<String, String> performanceToMap(Comparable performance){
-    Map<String, String> performancenMap = new HashMap<>();
-    performancenMap.put(PERFORMANCE_VALUE, performance.toString());
-    return performancenMap;
-  }
-  /**
-   * Convert Properties to String following the format in TE
-   * @param props
-   * @return a String of given Properties
-   */
-  private String propertiesToString(Properties props){
-    StringBuilder stringBuilder = new StringBuilder();
-    for(Map.Entry entry : props.entrySet()){
-      stringBuilder.append(entry.getKey() + "=" + entry.getValue() + ";");
-    }
-    stringBuilder.deleteCharAt(stringBuilder.length() - 1);
-    return stringBuilder.toString();
-  }
 
   public long getTuningFunctionId() {
     return tuningFunctionId;
