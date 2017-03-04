@@ -24,10 +24,8 @@ public class DataCompletenessTaskUtilsTest {
 
   @Test
   public void testGetAdjustedStartForDataset() throws Exception {
-    DateTime dateTime1 = new DateTime(2017, 01, 12, 15, 46);
-    DateTime dateTime2 = new DateTime(2017, 01, 12, 15, 00);
-    DateTime dateTime3 = new DateTime(2017, 01, 12, 15, 03);
     DateTimeZone zone = DateTimeZone.forID("America/Los_Angeles");
+    DateTime dateTime1 = new DateTime(2017, 01, 12, 15, 46, zone);
 
     // SDF, DAYS
     long startTime = dateTime1.getMillis();
@@ -42,30 +40,34 @@ public class DataCompletenessTaskUtilsTest {
     timeFormat = TimeSpec.SINCE_EPOCH_FORMAT;
     // HOURS
     zone = DateTimeZone.UTC;
+    dateTime1 = new DateTime(2017, 01, 12, 15, 46, zone);
+    startTime = dateTime1.getMillis();
     timeGranularity = new TimeGranularity(1, TimeUnit.HOURS);
     timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
     adjustedStartTime = DataCompletenessTaskUtils.getAdjustedTimeForDataset(timeSpec, startTime, zone);
-    Assert.assertEquals(adjustedStartTime, new DateTime(2017, 01, 12, 15, 0).getMillis());
+    Assert.assertEquals(adjustedStartTime, new DateTime(2017, 01, 12, 15, 0, zone).getMillis());
 
     // DEFAULT
     timeGranularity = new TimeGranularity(1, TimeUnit.MILLISECONDS);
     timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
     adjustedStartTime = DataCompletenessTaskUtils.getAdjustedTimeForDataset(timeSpec, startTime, zone);
-    Assert.assertEquals(adjustedStartTime, new DateTime(2017, 01, 12, 15, 0).getMillis());
+    Assert.assertEquals(adjustedStartTime, new DateTime(2017, 01, 12, 15, 0, zone).getMillis());
 
     // MINUTES
     timeGranularity = new TimeGranularity(5, TimeUnit.MINUTES);
     timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
     adjustedStartTime = DataCompletenessTaskUtils.getAdjustedTimeForDataset(timeSpec, startTime, zone);
-    Assert.assertEquals(adjustedStartTime, new DateTime(2017, 01, 12, 15, 30).getMillis());
+    Assert.assertEquals(adjustedStartTime, new DateTime(2017, 01, 12, 15, 30, zone).getMillis());
 
+    DateTime dateTime2 = new DateTime(2017, 01, 12, 15, 00, zone);
+    DateTime dateTime3 = new DateTime(2017, 01, 12, 15, 03, zone);
     startTime = dateTime2.getMillis();
     adjustedStartTime = DataCompletenessTaskUtils.getAdjustedTimeForDataset(timeSpec, startTime, zone);
-    Assert.assertEquals(adjustedStartTime, new DateTime(2017, 01, 12, 15, 0).getMillis());
+    Assert.assertEquals(adjustedStartTime, new DateTime(2017, 01, 12, 15, 0, zone).getMillis());
 
     startTime = dateTime3.getMillis();
     adjustedStartTime = DataCompletenessTaskUtils.getAdjustedTimeForDataset(timeSpec, startTime, zone);
-    Assert.assertEquals(adjustedStartTime, new DateTime(2017, 01, 12, 15, 0).getMillis());
+    Assert.assertEquals(adjustedStartTime, new DateTime(2017, 01, 12, 15, 0, zone).getMillis());
   }
 
   @Test
@@ -112,16 +114,17 @@ public class DataCompletenessTaskUtilsTest {
     DateTimeFormatter dateTimeFormatter = DataCompletenessTaskUtils.getDateTimeFormatterForDataset(timeSpec, zone);
     Assert.assertEquals(dateTimeFormatter.print(dateTimeInMS), "20170112");
 
-    long dateTimeInMS1 = new DateTime(2017, 01, 12, 05, 30, zone).getMillis();
     zone = DateTimeZone.forID("America/Los_Angeles");
+    long dateTimeInMS1 = new DateTime(2017, 01, 12, 05, 30, zone).getMillis();
     // DAYS bucket
     timeGranularity = new TimeGranularity(1, TimeUnit.DAYS);
     timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
     dateTimeFormatter = DataCompletenessTaskUtils.getDateTimeFormatterForDataset(timeSpec, zone);
-    Assert.assertEquals(dateTimeFormatter.print(dateTimeInMS1), "20170111");
+    Assert.assertEquals(dateTimeFormatter.print(dateTimeInMS1), "20170112");
 
     // HOURS bucket
     zone = DateTimeZone.UTC;
+    dateTimeInMS = new DateTime(2017, 01, 12, 15, 30, zone).getMillis();
     timeGranularity = new TimeGranularity(1, TimeUnit.HOURS);
     timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
     dateTimeFormatter = DataCompletenessTaskUtils.getDateTimeFormatterForDataset(timeSpec, zone);
@@ -143,6 +146,7 @@ public class DataCompletenessTaskUtilsTest {
   @Test
   public void testGetBucketNameToTimeValuesMap() {
 
+    DateTimeZone zone = DateTimeZone.forID("America/Los_Angeles");
     // SDF
     String columnName = "Date";
     TimeGranularity timeGranularity = new TimeGranularity(1, TimeUnit.DAYS);
@@ -151,9 +155,9 @@ public class DataCompletenessTaskUtilsTest {
 
     // DAYS
     Map<String, Long> bucketNameToBucketValue = new HashMap<>();
-    bucketNameToBucketValue.put("20170112", new DateTime(2017, 01, 12, 0, 0).getMillis());
-    bucketNameToBucketValue.put("20170113", new DateTime(2017, 01, 13, 0, 0).getMillis());
-    bucketNameToBucketValue.put("20170114", new DateTime(2017, 01, 14, 0, 0).getMillis());
+    bucketNameToBucketValue.put("20170112", new DateTime(2017, 01, 12, 0, 0, zone).getMillis());
+    bucketNameToBucketValue.put("20170113", new DateTime(2017, 01, 13, 0, 0, zone).getMillis());
+    bucketNameToBucketValue.put("20170114", new DateTime(2017, 01, 14, 0, 0, zone).getMillis());
     Map<String, Long> expectedValues = new HashMap<>();
     expectedValues.put("20170112", 20170112L);
     expectedValues.put("20170113", 20170113L);
@@ -165,6 +169,7 @@ public class DataCompletenessTaskUtilsTest {
     }
 
     // EPOCH
+    zone = DateTimeZone.UTC;
     timeFormat = TimeSpec.SINCE_EPOCH_FORMAT;
     timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
 
@@ -172,13 +177,13 @@ public class DataCompletenessTaskUtilsTest {
     timeGranularity = new TimeGranularity(1, TimeUnit.HOURS);
     timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
     bucketNameToBucketValue = new HashMap<>();
-    bucketNameToBucketValue.put("2017011200", new DateTime(2017, 01, 12, 0, 0).getMillis());
-    bucketNameToBucketValue.put("2017011201", new DateTime(2017, 01, 12, 1, 0).getMillis());
-    bucketNameToBucketValue.put("2017011202", new DateTime(2017, 01, 12, 2, 0).getMillis());
+    bucketNameToBucketValue.put("2017011200", new DateTime(2017, 01, 12, 0, 0, zone).getMillis());
+    bucketNameToBucketValue.put("2017011201", new DateTime(2017, 01, 12, 1, 0, zone).getMillis());
+    bucketNameToBucketValue.put("2017011202", new DateTime(2017, 01, 12, 2, 0, zone).getMillis());
     expectedValues = new HashMap<>();
-    expectedValues.put("2017011200", 412280L); // hours since epoch values
-    expectedValues.put("2017011201", 412281L);
-    expectedValues.put("2017011202", 412282L);
+    expectedValues.put("2017011200", 412272L); // hours since epoch values
+    expectedValues.put("2017011201", 412273L);
+    expectedValues.put("2017011202", 412274L);
     bucketNameToTimeValuesMap = DataCompletenessTaskUtils.getBucketNameToTimeValuesMap(timeSpec, bucketNameToBucketValue);
     for (Entry<String, Long> entry : bucketNameToTimeValuesMap.entries()) {
       String bucketName = entry.getKey();
@@ -189,15 +194,15 @@ public class DataCompletenessTaskUtilsTest {
     timeGranularity = new TimeGranularity(10, TimeUnit.MINUTES);
     timeSpec = new TimeSpec(columnName, timeGranularity, timeFormat);
     bucketNameToBucketValue = new HashMap<>();
-    bucketNameToBucketValue.put("201701120000", new DateTime(2017, 01, 12, 0, 0).getMillis());
-    bucketNameToBucketValue.put("201701120030", new DateTime(2017, 01, 12, 0, 30).getMillis());
-    bucketNameToBucketValue.put("201701120100", new DateTime(2017, 01, 12, 1, 00).getMillis());
-    bucketNameToBucketValue.put("201701120130", new DateTime(2017, 01, 12, 1, 30).getMillis());
+    bucketNameToBucketValue.put("201701120000", new DateTime(2017, 01, 12, 0, 0, zone).getMillis());
+    bucketNameToBucketValue.put("201701120030", new DateTime(2017, 01, 12, 0, 30, zone).getMillis());
+    bucketNameToBucketValue.put("201701120100", new DateTime(2017, 01, 12, 1, 00, zone).getMillis());
+    bucketNameToBucketValue.put("201701120130", new DateTime(2017, 01, 12, 1, 30, zone).getMillis());
     Map<String, List<Long>> expectedValuesList = new HashMap<>();
-    expectedValuesList.put("201701120000", Lists.newArrayList(2473680L, 2473681L, 2473682L)); // 10 minutes since epoch values
-    expectedValuesList.put("201701120030", Lists.newArrayList(2473683L, 2473684L, 2473685L));
-    expectedValuesList.put("201701120100", Lists.newArrayList(2473686L, 2473687L, 2473688L));
-    expectedValuesList.put("201701120130", Lists.newArrayList(2473689L, 2473690L, 2473691L));
+    expectedValuesList.put("201701120000", Lists.newArrayList(2473632L, 2473633L, 2473634L)); // 10 minutes since epoch values
+    expectedValuesList.put("201701120030", Lists.newArrayList(2473635L, 2473636L, 2473637L));
+    expectedValuesList.put("201701120100", Lists.newArrayList(2473638L, 2473639L, 2473640L));
+    expectedValuesList.put("201701120130", Lists.newArrayList(2473641L, 2473642L, 2473643L));
 
     bucketNameToTimeValuesMap = DataCompletenessTaskUtils.getBucketNameToTimeValuesMap(timeSpec, bucketNameToBucketValue);
     for (String bucketName : bucketNameToTimeValuesMap.keySet()) {
