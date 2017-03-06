@@ -143,7 +143,6 @@ AnomalyResultView.prototype = {
     this.timeRangeConfig.startDate = this.anomalyResultModel.startDate;
     this.timeRangeConfig.endDate = this.anomalyResultModel.endDate;
 
-
     const $anomalyTimeRangeStart = $('#anomalies-time-range-start span');
     const $anomalyTimeRangeEnd = $('#anomalies-time-range-end span');
 
@@ -154,9 +153,7 @@ AnomalyResultView.prototype = {
     $('#anomalies-time-range-start').daterangepicker(this.timeRangeConfig, cb);
 
     $('#anomalies-time-range-end').on('click', () => {
-      console.log("triggering");
       $('#anomalies-time-range-start').click();
-      $('#end').focus();
     });
 
     // $('#anomalies-time-range-end').daterangepicker(this.timeRangeConfig, cb);
@@ -344,7 +341,6 @@ AnomalyResultView.prototype = {
         anomaliesParams.anomalyIds = $('#anomalies-search-anomaly-input').val().join();
         delete anomaliesParams.startDate;
         delete anomaliesParams.endDate;
-        console.log(anomaliesParams.anomalyIds);
       }
 
       this.applyButtonEvent.notify(anomaliesParams);

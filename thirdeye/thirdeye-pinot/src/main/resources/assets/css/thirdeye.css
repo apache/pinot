@@ -480,8 +480,6 @@ text {
   margin-left: 24px;
 }
 
-
-
 .filter-header {
   background-color: #F3F6F8;
   font-weight: 600;
@@ -500,7 +498,6 @@ text {
   text-align: center;
   font-weight: 600;
 }
-
 
 .filter-bar {
   display: flex;
@@ -534,9 +531,6 @@ text {
   color: #999;
 }
 
-/*rgba(0, 0, 0, 0.701961)
-;*/
-
 /* Anomaly Results*/
 .anomalies-panel {
   margin: 24px 0;
@@ -562,8 +556,6 @@ text {
   padding-bottom: 24px;
   margin-bottom: 24px;
 }
-
-
 
 .anormaly-chart {
   height: 300px;
