@@ -32,7 +32,7 @@ public class DataCompletenessTaskUtils {
 
   private static final String DAY_FORMAT = "yyyyMMdd";
   private static final String HOUR_FORMAT = "yyyyMMddHH";
-  private static final String MINUTE_FORMAT = "yyyyMMdHHmm";
+  private static final String MINUTE_FORMAT = "yyyyMMddHHmm";
   /**
    * All MINUTE granularity data will be rounded off to 30 MINUTES by default
    */
