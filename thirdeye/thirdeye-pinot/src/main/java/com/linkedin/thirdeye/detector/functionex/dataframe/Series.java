@@ -31,6 +31,7 @@ public abstract class Series {
   public abstract Series shift(int offset);
   public abstract boolean hasNull();
 
+
   public Series head(int n) {
     return this.slice(0, Math.min(n, this.size()));
   }

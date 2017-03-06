@@ -182,6 +182,21 @@ public final class DoubleSeries extends Series {
     return new BooleanSeries(newValues);
   }
 
+  public DoubleSeries applyMovingWindow(int size, int minSize, DoubleBatchFunction function) {
+    double[] values = new double[this.values.length];
+
+    // fill minSize - 1 with null values
+    Arrays.fill(values, 0, Math.min(values.length, Math.max(0, minSize)), NULL_VALUE);
+
+    for(int to=Math.max(1, minSize); to<=values.length; to++) {
+      int from = Math.max(0, to - size);
+      double[] input = Arrays.copyOfRange(this.values, from, to);
+      values[to-1] = function.apply(input);
+    }
+
+    return new DoubleSeries(values);
+  }
+
   @Override
   public DoubleSeries sort() {
     double[] values = Arrays.copyOf(this.values, this.values.length);

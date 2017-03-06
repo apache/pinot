@@ -839,4 +839,11 @@ public class DataFrameTest {
     DoubleSeries s = mdf.mapWithNull("null + 1");
     Assert.assertEquals(s.values(), new double[] { 2.0, 2.0, DoubleSeries.NULL_VALUE, 2.0, 2.0 });
   }
+
+  @Test
+  public void testDoubleMovingWindow() {
+    DoubleSeries s = DataFrame.toSeries(1.0, 2.0, 3.0, 4.0, 5.0, 6.0);
+    DoubleSeries out = s.applyMovingWindow(2, 1, new DoubleSeries.DoubleBatchSum());
+    Assert.assertEquals(out.values(), new double[] { 1.0, 3.0, 5.0, 7.0, 9.0, 11.0 });
+  }
 }
