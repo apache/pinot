@@ -18,12 +18,14 @@ public class ThirdEyeMetricDataSourceTest {
 
   static class MockDataSource implements AnomalyFunctionExDataSource<String, DataFrame> {
     String query;
+    int outputLen = 0;
+
     @Override
     public DataFrame query(String query, AnomalyFunctionExContext context) throws Exception {
       this.query = query;
-      DataFrame df = new DataFrame(0);
-      df.addSeries("time", new long[0]);
-      df.addSeries("function_metric", new long[0]);
+      DataFrame df = new DataFrame(outputLen);
+      df.addSeries("time", new long[outputLen]);
+      df.addSeries("function_metric", new long[outputLen]);
       return df;
     }
   }
@@ -116,6 +118,12 @@ public class ThirdEyeMetricDataSourceTest {
     String query = "dataset/metric/function/k1=v1,k1=v2,k2=v2";
     this.ds.query(query, context);
     Assert.assertEquals(this.pinot.query, "SELECT function(metric) FROM dataset WHERE (((k1='v1') OR (k1='v2')) AND ((k2='v2')) AND ((time>'100') AND (time<='200'))) GROUP BY k1, k2, time TOP 10000");
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testQueryResultTruncationFail() throws Exception {
+    this.pinot.outputLen = ThirdEyeMetricDataSource.TOP_K;
+    this.ds.query("a/b/c", context);
   }
 
   static void assertFilter(ThirdEyeMetricDataSource.Filter f, String key, String operator, String value) {

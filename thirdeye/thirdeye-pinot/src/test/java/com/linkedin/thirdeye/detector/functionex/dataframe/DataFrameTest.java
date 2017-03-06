@@ -7,6 +7,7 @@ import java.util.HashSet;
 import java.util.List;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
@@ -46,6 +47,23 @@ public class DataFrameTest {
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testEnforceSeriesLengthFail() {
     df.addSeries("series", 0.1, 3.2);
+  }
+
+  @Test
+  public void testSeriesName() {
+    df.addSeries("ab", VALUES_DOUBLE);
+    df.addSeries("_a", VALUES_DOUBLE);
+    df.addSeries("a1", VALUES_DOUBLE);
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class, dataProvider = "testSeriesNameFailProvider")
+  public void testSeriesNameFail(String name) {
+    df.addSeries(name, VALUES_DOUBLE);
+  }
+
+  @DataProvider(name = "testSeriesNameFailProvider")
+  public Object[][] testSeriesNameFailProvider() {
+    return new Object[][] { { null }, { "" }, { "1a" }, { "a,b" }, { "a-b" }, { "a+b" }, { "a*b" }, { "a/b" }, { "a=b" }, { "a>b" } };
   }
 
   @Test
@@ -791,5 +809,34 @@ public class DataFrameTest {
     DataFrame ddf = mdf.dropNullColumns();
     Assert.assertEquals(ddf.getIndex().size(), 3);
     Assert.assertEquals(new HashSet<>(ddf.getSeriesNames()), new HashSet<>(Arrays.asList("double", "long", "string", "boolean")));
+  }
+
+  @Test
+  public void testMapExpression() {
+    DoubleSeries s = df.map("(double * 2 + long + boolean) / 2");
+    Assert.assertEquals(s.values(), new double[] { -2.6, 0.9, 0.0, 1.5, 2.8 });
+  }
+
+  @Test(expectedExceptions = IllegalStateException.class)
+  public void testMapExpressionNullFail() {
+    DataFrame mdf = new DataFrame(VALUES_LONG);
+    mdf.addSeries("null", 1.0, 1.0, DoubleSeries.NULL_VALUE, 1.0, 1.0);
+    mdf.map("null + 1");
+  }
+
+  @Test
+  public void testMapExpressionOtherNullPass() {
+    DataFrame mdf = new DataFrame(VALUES_LONG);
+    mdf.addSeries("null", 1.0, 1.0, DoubleSeries.NULL_VALUE, 1.0, 1.0);
+    mdf.addSeries("notnull", 1.0, 1.0, 1.0, 1.0, 1.0);
+    mdf.map("notnull + 1");
+  }
+
+  @Test
+  public void testMapExpressionWithNull() {
+    DataFrame mdf = new DataFrame(VALUES_LONG);
+    mdf.addSeries("null", 1.0, 1.0, DoubleSeries.NULL_VALUE, 1.0, 1.0);
+    DoubleSeries s = mdf.mapWithNull("null + 1");
+    Assert.assertEquals(s.values(), new double[] { 2.0, 2.0, DoubleSeries.NULL_VALUE, 2.0, 2.0 });
   }
 }

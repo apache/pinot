@@ -20,7 +20,7 @@ import java.util.Set;
 
 public class ThirdEyeMetricDataSource implements AnomalyFunctionExDataSource<String, DataFrame> {
 
-  private static final int TOP_K = 10000;
+  public static final int TOP_K = 10000;
 
   public static final String COLUMN_TIMESTAMP = "timestamp";
   public static final String COLUMN_METRIC = "metric";
@@ -55,7 +55,7 @@ public class ThirdEyeMetricDataSource implements AnomalyFunctionExDataSource<Str
     if(dto == null)
       throw new IllegalArgumentException(String.format("Could not find dataset '%s'", dataset));
 
-    // Time filter
+    // add time filter
     TimeGranularity tg = new TimeGranularity(dto.getTimeDuration(), dto.getTimeUnit());
     augmentFiltersWithTime(filters, dto.getTimeColumn(), tg, context.getMonitoringWindowStart(), context.getMonitoringWindowEnd());
 
@@ -64,6 +64,11 @@ public class ThirdEyeMetricDataSource implements AnomalyFunctionExDataSource<Str
 
     DataFrame result = this.pinot.query(pinotQuery, context);
 
+    // check for truncation
+    if(result.size() >= TOP_K)
+      throw new IllegalArgumentException(String.format("Got more than %d rows. Results may be truncated.", TOP_K));
+
+    // standardize dataframe format
     result.renameSeries(dto.getTimeColumn(),COLUMN_TIMESTAMP);
     result.renameSeries(function + "_" + metric, COLUMN_METRIC);
 
