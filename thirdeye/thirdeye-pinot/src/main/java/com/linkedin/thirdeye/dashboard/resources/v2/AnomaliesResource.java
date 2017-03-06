@@ -97,7 +97,7 @@ public class AnomaliesResource {
     mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
-    threadPool = Executors.newFixedThreadPool(10);
+    threadPool = Executors.newFixedThreadPool(40);
     this.alertFilterFactory = alertFilterFactory;
   }
 
@@ -108,11 +108,12 @@ public class AnomaliesResource {
    * @param endTime
    * @return
    */
+  @GET
+  @Path("getAnomalyCount/{metricId}/{startTime}/{endTime}")
   public AnomaliesSummary getAnomalyCountForMetricInRange(
       @PathParam("metricId") Long metricId,
       @PathParam("startTime") Long startTime,
-      @PathParam("endTime") Long endTime){
-
+      @PathParam("endTime") Long endTime) {
     AnomaliesSummary anomaliesSummary = new AnomaliesSummary();
     List<MergedAnomalyResultDTO> mergedAnomalies = getAnomaliesForMetricIdInRange(metricId, startTime, endTime);
 
