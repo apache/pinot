@@ -37,11 +37,11 @@ AnomalyResultController.prototype = {
     this.anomalyResultModel.getMetricIdFromName(args.metric).then((id) => {
       args.metricId = id;
 
-      HASH_SERVICE.clear();
-      HASH_SERVICE.set('tab', 'analysis');
-      HASH_SERVICE.update(args);
-      HASH_SERVICE.refreshWindowHashForRouting('analysis');
-      HASH_SERVICE.routeTo('app');
+    HASH_SERVICE.clear();
+    HASH_SERVICE.set('tab', 'investigate');
+    HASH_SERVICE.update(args);
+    HASH_SERVICE.refreshWindowHashForRouting('investigate');
+    HASH_SERVICE.routeTo('app');
     });
 
     // Send this event and the args to parent controller, to route to AnalysisController

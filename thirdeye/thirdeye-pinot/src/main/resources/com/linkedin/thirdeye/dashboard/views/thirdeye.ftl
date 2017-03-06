@@ -59,6 +59,9 @@
 <script id="anomaly-results-template" type="text/x-handlebars-template">
   <#include "tabs/anomaly-results.ftl"/>
 </script>
+<script id="investigate-template" type="text/x-handlebars-template">
+  <#include "tabs/investigate.ftl"/>
+</script>
 <script id="dashboard-template" type="text/x-handlebars-template">
   <#include "tabs/dashboard.ftl"/>
 </script>
@@ -121,6 +124,10 @@
 <script src="assets/javascript/views/AnalysisView.js"></script>
 <script src="assets/javascript/controllers/AnalysisController.js"></script>
 
+<script src="assets/javascript/models/InvestigateModel.js"></script>
+<script src="assets/javascript/views/InvestigateView.js"></script>
+<script src="assets/javascript/controllers/InvestigateController.js"></script>
+
 <script src="assets/javascript/models/TimeSeriesCompareModel.js"></script>
 <script src="assets/javascript/views/TimeSeriesCompareView.js"></script>
 <script src="assets/javascript/controllers/TimeSeriesCompareController.js"></script>
@@ -154,6 +161,7 @@
 							<ul class="nav navbar-nav">
 								<li class=""><a href="#anomalies">Anomalies</a></li>
 								<li class=""><a href="#analysis">Root Cause Analysis</a></li>
+								<li class=""><a href="#investigate">Investigate</a></li>
 							</ul>
 
             <!-- Hidding this until it's fully fleshed out -->
@@ -184,7 +192,9 @@
 		</div>
 		<div class="tab-pane" id="anomalies">
 			<div id="anomalies-place-holder"></div>
+			<div id="investigate-place-holder""></div>
 		</div>
+
 		<div class="tab-pane" id="analysis">
 			<div id="analysis-place-holder"></div>
 		</div>
