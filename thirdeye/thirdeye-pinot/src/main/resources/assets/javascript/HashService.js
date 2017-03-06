@@ -46,7 +46,7 @@ HashService.prototype = {
       case HASH_PARAMS.ANALYSIS_CURRENT_END:
       case HASH_PARAMS.ANALYSIS_BASELINE_START:
       case HASH_PARAMS.ANALYSIS_BASELINE_END:
-        value = moment(value);
+        value = value && moment(value);
         break;
       case HASH_PARAMS.ANOMALIES_PAGE_NUMBER:
         value = Number(value);

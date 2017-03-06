@@ -106,7 +106,7 @@
 				</div>
 
 				<div class="filter-footer">
-					<a href="#">Apply Filter</a>
+					<a type="button" id="apply-button">Apply Filter</a>
 				</div>
 	  	</div>
   	</div>

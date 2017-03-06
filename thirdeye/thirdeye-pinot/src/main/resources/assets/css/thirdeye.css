@@ -501,6 +501,7 @@ text {
   font-weight: 600;
 }
 
+
 .filter-bar {
   display: flex;
   align-items: stretch;
@@ -542,6 +543,8 @@ text {
   background-color: white;
   border-radius: 2px;
   border: 1px solid #CCC;
+  position: sticky;
+  top: 0px;
 }
 
 .panel-title {

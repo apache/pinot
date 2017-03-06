@@ -318,40 +318,36 @@ AnomalyResultView.prototype = {
     }
   },
   setupListenerOnApplyButton : function() {
-    var self = this;
-    $('#search-button').click(function() {
+    $('#search-button, #apply-button').click(() => {
       var anomaliesSearchMode = $('#anomalies-search-mode').val();
       var metricIds = undefined;
       var dashboardId = undefined;
       var anomalyIds = undefined;
-      console.log('anomaliesSearchMode');
-      console.log(anomaliesSearchMode);
-      if (anomaliesSearchMode == constants.MODE_METRIC) {
-        metricIds = $('#anomalies-search-metrics-input').val().join();
-      } else if (anomaliesSearchMode == constants.MODE_DASHBOARD) {
-        dashboardId = $('#anomalies-search-dashboard-input').val();
-      } else if (anomaliesSearchMode == constants.MODE_ID) {
-        anomalyIds = $('#anomalies-search-anomaly-input').val().join();
-        console.log(anomalyIds);
-      }
 
       var functionName = $('#anomaly-function-dropdown').val();
-      var startDate = $('#anomalies-time-range').data('daterangepicker').startDate;
-      var endDate = $('#anomalies-time-range').data('daterangepicker').endDate;
+      var startDate = $('#anomalies-time-range-start').data('daterangepicker').startDate;
+      var endDate = $('#anomalies-time-range-start').data('daterangepicker').endDate;
 
       var anomaliesParams = {
         anomaliesSearchMode : anomaliesSearchMode,
-        metricIds : metricIds,
-        dashboardId : dashboardId,
-        anomalyIds : anomalyIds,
         startDate : startDate,
         endDate : endDate,
         pageNumber : 1,
         functionName : functionName
       }
 
-      self.applyButtonEvent.notify(anomaliesParams);
+      if (anomaliesSearchMode == constants.MODE_METRIC) {
+        anomaliesParams.metricIds = $('#anomalies-search-metrics-input').val().join();
+      } else if (anomaliesSearchMode == constants.MODE_DASHBOARD) {
+        anomaliesParams.dashboardId = $('#anomalies-search-dashboard-input').val();
+      } else if (anomaliesSearchMode == constants.MODE_ID) {
+        anomaliesParams.anomalyIds = $('#anomalies-search-anomaly-input').val().join();
+        delete anomaliesParams.startDate;
+        delete anomaliesParams.endDate;
+        console.log(anomaliesParams.anomalyIds);
+      }
 
+      this.applyButtonEvent.notify(anomaliesParams);
     })
   },
   setupListenersOnAnomaly : function(idx, anomaly) {
