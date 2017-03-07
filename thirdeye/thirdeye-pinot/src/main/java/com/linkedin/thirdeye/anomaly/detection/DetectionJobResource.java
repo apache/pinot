@@ -10,11 +10,12 @@ import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
-import com.linkedin.thirdeye.detector.email.filter.AlertFilterUtil;
+import com.linkedin.thirdeye.detector.email.filter.AlertFilterEvaluationUtil;
 import com.linkedin.thirdeye.util.SeverityComputationUtil;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
 import javax.validation.constraints.NotNull;
@@ -283,32 +284,32 @@ public class DetectionJobResource {
    * @return HTTP response of request: string of alert filter
    */
   @POST
-  @Path("/autotune/filter/{function_id}")
-  public Response tuneAlertFilter(@PathParam("function_id") String id,
-      @QueryParam("startTime") Long startTime,
-      @QueryParam("endTime") Long endTime,
+  @Path("/autotune/filter/{functionId}")
+  public Response tuneAlertFilter(@PathParam("functionId") long id,
+      @QueryParam("startTime") long startTime,
+      @QueryParam("endTime") long endTime,
       @QueryParam("autoTuneType") String autoTuneType) {
 
     // get anomalies by function id, start time and end time
-    AnomalyFunctionDTO anomalyFunctionSpec = DAO_REGISTRY.getAnomalyFunctionDAO().findById(Long.valueOf(id));
+    AnomalyFunctionDTO anomalyFunctionSpec = DAO_REGISTRY.getAnomalyFunctionDAO().findById(id);
     AnomalyFunctionManager anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     MergedAnomalyResultManager anomalyMergedResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
-    List<MergedAnomalyResultDTO> anomalyResultDTOS = anomalyMergedResultDAO.findByStartTimeInRangeAndFunctionId(startTime, endTime, Long.valueOf(id));
+    List<MergedAnomalyResultDTO> anomalyResultDTOS = anomalyMergedResultDAO.findByStartTimeInRangeAndFunctionId(startTime, endTime, id);
 
     // create alert filter and evaluator
     AlertFilter alertFilter = alertFilterFactory.fromSpec(anomalyFunctionSpec.getAlertFilter());
-    AlertFilterUtil evaluator = new AlertFilterUtil(alertFilter);
+    AlertFilterEvaluationUtil evaluator = new AlertFilterEvaluationUtil(alertFilter);
+
+    // create alert filter auto tune
+    AlertFilterAutoTune alertFilterAutotune = alertFilterAutotuneFactory.fromSpec(autoTuneType);
+    LOG.info("initiated alertFilterAutoTune of Type {}", alertFilterAutotune.getClass().toString());
     try {
       //evaluate current alert filter (calculate current precision and recall)
-      double[] evals = evaluator.getEvalResults(anomalyResultDTOS);
-      LOG.info("AlertFilter of Type {}", alertFilter.getClass().toString(), "has been evaluated with precision: {}", evals[AlertFilterUtil.PRECISION_INDEX], "recall:", evals[AlertFilterUtil.RECALL_INDEX]);
-
-      // create alert filter auto tune
-      AlertFilterAutoTune alertFilterAutotune = alertFilterAutotuneFactory.fromSpec(autoTuneType);
-      LOG.info("initiated alertFilterAutoTune of Type {}", alertFilterAutotune.getClass().toString());
+      evaluator.updatePrecisionAndRecall(anomalyResultDTOS);
+      LOG.info("AlertFilter of Type {}, has been evaluated with precision: {}, recall: {}", alertFilter.getClass().toString(), evaluator.getPrecision(), evaluator.getRecall());
 
       // get tuned alert filter
-      Map<String,String> tunedAlertFilter = alertFilterAutotune.tuneAlertFilter(anomalyResultDTOS, evals[AlertFilterUtil.PRECISION_INDEX], evals[AlertFilterUtil.RECALL_INDEX]);
+      Map<String,String> tunedAlertFilter = alertFilterAutotune.tuneAlertFilter(anomalyResultDTOS, evaluator.getPrecision(), evaluator.getRecall());
       LOG.info("tuned AlertFilter");
 
       // if alert filter auto tune has updated alert filter, over write alert filter to anomaly function spec
@@ -316,7 +317,6 @@ public class DetectionJobResource {
       if (alertFilterAutotune.isUpdated()){
         anomalyFunctionSpec.setAlertFilter(tunedAlertFilter);
         anomalyFunctionDAO.update(anomalyFunctionSpec);
-        alertFilter.setParameters(tunedAlertFilter);
         LOG.info("Model has been updated");
       } else {
         LOG.info("Model hasn't been updated because tuned model cannot beat original model");
@@ -324,6 +324,44 @@ public class DetectionJobResource {
     } catch (Exception e) {
       LOG.warn("AutoTune throws exception due to: {}", e.getMessage());
     }
-    return Response.ok(alertFilter.toString()).build();
+    return Response.ok(alertFilterAutotune.isUpdated()).build();
+  }
+
+  /**
+   * The endpoint to evaluate alert filter
+   * @param id: function ID
+   * @param startTime: startTime of merged anomaly
+   * @param endTime: endTime of merged anomaly
+   * @return feedback summary, precision and recall as json object
+   * @throws Exception when data has no positive label or model has no positive prediction
+   */
+  @POST
+  @Path("/eval/filter/{functionId}")
+  public Response evaluateAlertFilterByFunctionId(@PathParam("functionId") long id,
+      @QueryParam("startTime") long startTime,
+      @QueryParam("endTime") long endTime) {
+
+    // get anomalies by function id, start time and end time
+    AnomalyFunctionDTO anomalyFunctionSpec = DAO_REGISTRY.getAnomalyFunctionDAO().findById(id);
+    MergedAnomalyResultManager anomalyMergedResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
+    List<MergedAnomalyResultDTO> anomalyResultDTOS =
+        anomalyMergedResultDAO.findByStartTimeInRangeAndFunctionId(startTime, endTime, id);
+
+    // create alert filter and evaluator
+    AlertFilter alertFilter = alertFilterFactory.fromSpec(anomalyFunctionSpec.getAlertFilter());
+    AlertFilterEvaluationUtil evaluator = new AlertFilterEvaluationUtil(alertFilter);
+
+    try{
+      //evaluate current alert filter (calculate current precision and recall)
+      evaluator.updatePrecisionAndRecall(anomalyResultDTOS);
+      LOG.info("AlertFilter of Type {}, has been evaluated with precision: {}, recall:{}", alertFilter.getClass().toString(),
+          evaluator.getPrecision(), evaluator.getRecall());
+    } catch (Exception e) {
+      LOG.warn("Updating precision and recall failed because: {}", e.getMessage());
+    }
+
+    // get anomaly summary from merged anomaly results
+    evaluator.updateFeedbackSummary(anomalyResultDTOS);
+    return Response.ok(evaluator.toProperties().toString()).build();
   }
 }
