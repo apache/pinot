@@ -97,7 +97,7 @@ public class AnomaliesResource {
     mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
-    threadPool = Executors.newFixedThreadPool(40);
+    threadPool = Executors.newFixedThreadPool(DEFAULT_PAGE_SIZE);
     this.alertFilterFactory = alertFilterFactory;
   }
 
@@ -494,34 +494,36 @@ public class AnomaliesResource {
 
     // TODO: get page number and page size from client
     int pageSize = DEFAULT_PAGE_SIZE;
-    int maxPageNumber = mergedAnomalies.size()/pageSize + 1;
+    int maxPageNumber = (mergedAnomalies.size() - 1) / pageSize + 1;
     if (pageNumber > maxPageNumber) {
       pageNumber = maxPageNumber;
     }
     if (pageNumber < 1) {
       pageNumber = 1;
     }
-    if (mergedAnomalies.size() > pageSize) {
-      if (mergedAnomalies.size() > pageSize * pageNumber ) {
-        mergedAnomalies.subList(pageSize * pageNumber, mergedAnomalies.size()).clear();
-      }
-      mergedAnomalies.subList(0, pageSize * (pageNumber - 1)).clear();
+
+    int fromIndex = (pageNumber - 1) * pageSize;
+    int toIndex = pageNumber * pageSize;
+    if (toIndex > mergedAnomalies.size()) {
+      toIndex = mergedAnomalies.size();
     }
-    anomaliesWrapper.setNumAnomaliesOnPage(mergedAnomalies.size());
-    LOG.info("Page number: {} Page size: {} Num anomalies on page: {}", pageNumber, pageSize, mergedAnomalies.size());
+
+    List<MergedAnomalyResultDTO> displayedAnomalies = mergedAnomalies.subList(fromIndex, toIndex);
+    anomaliesWrapper.setNumAnomaliesOnPage(displayedAnomalies.size());
+    LOG.info("Page number: {} Page size: {} Num anomalies on page: {}", pageNumber, pageSize, displayedAnomalies.size());
 
     // for each anomaly, create anomaly details
     List<Future<AnomalyDetails>> anomalyDetailsListFutures = new ArrayList<>();
-    for (MergedAnomalyResultDTO mergedAnomaly : mergedAnomalies) {
-      String dataset = mergedAnomaly.getCollection();
-      DatasetConfigDTO datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(dataset);
-      DateTimeFormatter  timeSeriesDateFormatter = DateTimeFormat.forPattern(TIME_SERIES_DATE_FORMAT).withZone(Utils.getDataTimeZone(dataset));
-      DateTimeFormatter startEndDateFormatterDays = DateTimeFormat.forPattern(START_END_DATE_FORMAT_DAYS).withZone(Utils.getDataTimeZone(dataset));
-      DateTimeFormatter startEndDateFormatterHours = DateTimeFormat.forPattern(START_END_DATE_FORMAT_HOURS).withZone(Utils.getDataTimeZone(dataset));
-
+    for (MergedAnomalyResultDTO mergedAnomaly : displayedAnomalies) {
       Callable<AnomalyDetails> callable = new Callable<AnomalyDetails>() {
         @Override
         public AnomalyDetails call() throws Exception {
+          String dataset = mergedAnomaly.getCollection();
+          DatasetConfigDTO datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(dataset);
+          DateTimeFormatter  timeSeriesDateFormatter = DateTimeFormat.forPattern(TIME_SERIES_DATE_FORMAT).withZone(Utils.getDataTimeZone(dataset));
+          DateTimeFormatter startEndDateFormatterDays = DateTimeFormat.forPattern(START_END_DATE_FORMAT_DAYS).withZone(Utils.getDataTimeZone(dataset));
+          DateTimeFormatter startEndDateFormatterHours = DateTimeFormat.forPattern(START_END_DATE_FORMAT_HOURS).withZone(Utils.getDataTimeZone(dataset));
+
           return getAnomalyDetails(mergedAnomaly, datasetConfig, timeSeriesDateFormatter,
               startEndDateFormatterHours, startEndDateFormatterDays);
         }
