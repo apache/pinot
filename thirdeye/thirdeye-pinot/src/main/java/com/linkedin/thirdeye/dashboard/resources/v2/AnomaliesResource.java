@@ -81,6 +81,7 @@ public class AnomaliesResource {
   private static final String COMMA_SEPARATOR = ",";
   private static final int DEFAULT_PAGE_NUMBER = 1;
   private static final int DEFAULT_PAGE_SIZE = 10;
+  private static final int NUM_EXECS = 40;
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY = ThirdEyeCacheRegistry.getInstance();
@@ -97,7 +98,7 @@ public class AnomaliesResource {
     mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
-    threadPool = Executors.newFixedThreadPool(DEFAULT_PAGE_SIZE);
+    threadPool = Executors.newFixedThreadPool(NUM_EXECS);
     this.alertFilterFactory = alertFilterFactory;
   }
 
