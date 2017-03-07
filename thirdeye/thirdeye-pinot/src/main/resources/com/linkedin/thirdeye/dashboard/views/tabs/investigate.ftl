@@ -18,15 +18,78 @@
 
 <div class="container">
 
-  <div class="panel-title padding-all">
-    <span>engaged_feed_session_count</span>
-  </div>
+  <div class="investigate-title">engaged_feed_session_count</div>
 
   <div class ="anormaly-chart bg-white" id="anomaly-investigate-chart"></div>
+
+  <div class="investigate-title">Root Cause Summary</div>
+
+  <div class="investigate-cards">
+
+    <div class="investigate-card">
+      <div class="investigate-card-title">
+        Current
+      </div>
+      <div class="investigate-card-body">
+        <div class="investigate-number">100k</div>
+        <hr class="investigate-divider"/>
+        <label class="label-medium-semibold">Events</label>
+        <span>Diwali (ind)</span>
+      </div>
+    </div>
+
+    <div class="investigate-card">
+      <div class="investigate-card-title">
+        WoW
+      </div>
+      <div class="investigate-card-body">
+        <div class="investigate-number">125k (-20%)</div>
+        <hr class="investigate-divider"/>
+        <div>
+          <label class="label-medium-semibold">Events</label>
+          <span>Diwali (ind)</span>
+        </div>
+        <div>
+          <label class="label-medium-semibold">Contributor</label>
+          <span>Country:ind</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="investigate-card">
+      <div class="investigate-card-title">
+        WoW2
+      </div>
+      <div class="investigate-card-body">
+        <div class="investigate-number">125k (-20%)</div>
+        <hr class="investigate-divider"/>
+        <label class="label-medium-semibold">Events</label>
+        <span>Diwali (ind)</span>
+      </div>
+    </div>
+
+    <div class="investigate-card">
+      <div class="investigate-card-title">
+        WoW3
+      </div>
+      <div class="investigate-card-body">
+        <div class="investigate-number">125k (-20%)</div>
+        <hr class="investigate-divider"/>
+        <label class="label-medium-semibold">Events</label>
+        <span>Diwali (ind)</span>
+      </div>
+    </div>
+
+  </div>
+
+
+
   <div class="investigate-tips padding-all">
-    <div class="investigate-icon"></div>
+    <div class="investigate-icon">
+      <img rel="lightbulb" src="assets/img/Lightbulb.png">
+    </div>
     <div class="investigate-tips-body">
-      <h5>Investigating Tip</h5>
+      <label class="label-medium-semibold">Investigating Tip</label>
       <p>Anomalies are Tricky! Sure an event such as <strong>Diwali</strong> may be the cause for the anomaly. but where did the drop take place? Did it actually happen in India? Always take a double look and watch out for these tricky anomalies!</p>
     </div>
   </div>

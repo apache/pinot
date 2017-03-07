@@ -96,7 +96,7 @@ label {
     background-image: none;
     background-color: #080808;
     margin-bottom: 0px;
-    border: 0px;
+    border: 2px solid #080808;
 }
 
 .navbar-inverse .logo {
@@ -631,6 +631,9 @@ text {
 /* Investigate */
 .anomaly-feedback{
   background-color: white;
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 
 .anomaly-feedback-title {
@@ -644,8 +647,61 @@ text {
 }
 
 .investigate-tips {
+  display: flex;
+  align-items: center;
+  padding: 24px;
   background-color: white;
   margin-top: 24px;
-  border-top: 3px solid black;
+  border-top: 5px solid #080808;
 }
 
+.investigate-icon {
+  margin-right: 24px;
+}
+
+.investigate-title {
+  font-size: 21px;
+  margin: 24px 0;
+}
+
+
+.investigate-cards {
+  display: flex;
+}
+
+.investigate-card + .investigate-card {
+  margin-left: 24px;
+}
+
+.investigate-card-title {
+  background-color: #080808;
+  font-size: 19px;
+  font-weight: 600;
+  color: white;
+  text-align: center;
+  padding: 8px 24px;
+}
+
+.investigate-card {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  flex-basis: 0;
+}
+
+.investigate-card-body {
+  background-color: white;
+  padding: 24px;
+  flex-grow: 1;
+}
+
+.investigate-number {
+  font-size: 42px;
+  font-weight: lighter;
+  line-height: 1.1;
+  text-align: center;
+}
+
+.investigate-divider {
+  margin: 24px 0;
+}
