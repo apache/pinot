@@ -35,11 +35,12 @@ AppView.prototype = {
     case "anomalies":
       $('#main-tabs a[href=#anomalies]').tab('show');
       $('#anomalies-place-holder').show();
-      $('investigate-place-holder').hide();
+      $('#investigate-place-holder').hide();
       break;
     case "investigate":
       $('#main-tabs a[href=#anomalies]').tab('show');
       $('#anomalies-place-holder').hide();
+      $('#investigate-place-holder').show()
       break;
     }
     // compiledHtml

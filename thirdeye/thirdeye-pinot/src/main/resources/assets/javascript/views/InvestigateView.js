@@ -7,8 +7,8 @@ function InvestigateView(investigateModel) {
 
 InvestigateView.prototype = {
   init(params = {}) {
-    const { metricId } = params;
-    this.metricId = metricId;
+    const { anomalyId } = params;
+    this.anomalyId = anomalyId;
   },
 
   render: function () {

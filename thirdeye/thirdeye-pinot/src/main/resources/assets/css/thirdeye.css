@@ -628,3 +628,18 @@ text {
 }
 
 
+/* Investigate */
+.anomaly-feedback{
+  background-color: white;
+}
+
+.anomaly-feedback-title {
+  font-size: 26px;
+  font-weight: lighter;
+  margin: 0;
+}
+
+.anomaly-feedback-select {
+  width: 100%;
+}
+

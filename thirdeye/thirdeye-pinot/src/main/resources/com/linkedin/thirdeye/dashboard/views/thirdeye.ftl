@@ -161,7 +161,6 @@
 							<ul class="nav navbar-nav">
 								<li class=""><a href="#anomalies">Anomalies</a></li>
 								<li class=""><a href="#analysis">Root Cause Analysis</a></li>
-								<li class=""><a href="#investigate">Investigate</a></li>
 							</ul>
 
             <!-- Hidding this until it's fully fleshed out -->

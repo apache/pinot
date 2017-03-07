@@ -116,7 +116,7 @@ function AnomalyResultView(anomalyResultModel) {
 
   // events
   this.applyButtonEvent = new Event(this);
-  this.rootCauseAnalysisButtonClickEvent = new Event(this);
+  this.investigateButtonClickEvent = new Event(this);
   this.showDetailsLinkClickEvent = new Event(this);
   this.anomalyFeedbackSelectEvent = new Event(this);
 
@@ -304,8 +304,8 @@ AnomalyResultView.prototype = {
 
   dataEventHandler : function(e) {
     var currentTargetId = e.currentTarget.id;
-    if (currentTargetId.startsWith('root-cause-analysis-button-')) {
-      this.rootCauseAnalysisButtonClickEvent.notify(e.data);
+    if (currentTargetId.startsWith('investigate-button-')) {
+      this.investigateButtonClickEvent.notify(e.data);
     } else if (currentTargetId.startsWith('show-details-')) {
       this.showDetailsLinkClickEvent.notify(e.data);
     } else if (currentTargetId.startsWith('anomaly-feedback-')) {
@@ -347,6 +347,13 @@ AnomalyResultView.prototype = {
     })
   },
   setupListenersOnAnomaly : function(idx, anomaly) {
+
+    const investigateParams = {
+      anomalyId : anomaly.anomalyId,
+    }
+
+    $(`#investigate-button-${idx}`).click(investigateParams, this.dataEventHandler.bind(this));
+
     var rootCauseAnalysisParams = {
       metric : anomaly.metric,
       currentStart : anomaly.currentStart,

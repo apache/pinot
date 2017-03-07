@@ -1,5 +1,7 @@
 function InvestigateModel() {
   this.metricId;
+  this.startDate = moment().subtract(1, 'days').startOf('day');
+  this.endDate = moment().subtract(0, 'days').startOf('day');
 }
 
 InvestigateModel.prototype = {
@@ -14,6 +16,8 @@ InvestigateModel.prototype = {
       this.metricId = params.metricId;
     }
   },
+
+
 
   fetchGranularityForMetric: function (metricId) {
     return dataService.fetchGranularityForMetric(metricId);
