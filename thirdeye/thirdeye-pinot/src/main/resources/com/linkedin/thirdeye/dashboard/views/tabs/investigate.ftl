@@ -17,7 +17,20 @@
 </div>
 
 <div class="container">
-  {{metricId}}
+
+  <div class="panel-title padding-all">
+    <span>engaged_feed_session_count</span>
+  </div>
+
+  <div class ="anormaly-chart bg-white" id="anomaly-investigate-chart"></div>
+  <div class="investigate-tips padding-all">
+    <div class="investigate-icon"></div>
+    <div class="investigate-tips-body">
+      <h5>Investigating Tip</h5>
+      <p>Anomalies are Tricky! Sure an event such as <strong>Diwali</strong> may be the cause for the anomaly. but where did the drop take place? Did it actually happen in India? Always take a double look and watch out for these tricky anomalies!</p>
+    </div>
+  </div>
 </div>
+
 
 

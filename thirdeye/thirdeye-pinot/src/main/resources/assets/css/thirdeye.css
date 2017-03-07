@@ -643,3 +643,9 @@ text {
   width: 100%;
 }
 
+.investigate-tips {
+  background-color: white;
+  margin-top: 24px;
+  border-top: 3px solid black;
+}
+

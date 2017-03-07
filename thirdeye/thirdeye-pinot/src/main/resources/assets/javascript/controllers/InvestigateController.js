@@ -10,14 +10,14 @@ InvestigateController.prototype = {
   handleAppEvent: function () {
     const hashParams = HASH_SERVICE.getParams();
     this.investigateModel.init(hashParams);
-    this.investigateModel.update(hashParams);
+    // this.investigateModel.update(hashParams);
     this.investigateView.init(hashParams);
-    this.investigateView.render();
+    // this.investigateView.render();
     // this.timeSeriesCompareController.handleAppEvent(hashParams);
   },
 
   handleApplyAnalysisEvent: function (viewObject) {
-    // HASH_SERVICE.update(viewObject.viewParams);
+  // HASH_SERVICE.update(viewObject.viewParams);
     // HASH_SERVICE.refreshWindowHashForRouting('analysis');
     // this.timeSeriesCompareController.handleAppEvent(HASH_SERVICE.getParams());
   }
