@@ -1,9 +1,11 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
+import com.linkedin.thirdeye.anomaly.events.DefaultDeploymentEventProvider;
 import com.linkedin.thirdeye.anomaly.events.DefaultHolidayEventProvider;
 import com.linkedin.thirdeye.anomaly.events.EventDataProviderManager;
 import com.linkedin.thirdeye.anomaly.events.EventFilter;
 import com.linkedin.thirdeye.anomaly.events.EventType;
+import com.linkedin.thirdeye.anomaly.events.HistoricalAnomalyEventProvider;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.bao.EventManager;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
@@ -26,9 +28,13 @@ public class EventResource {
   static final EventDataProviderManager EVENT_DATA_PROVIDER_MANAGER =  EventDataProviderManager.getInstance();
   static final EventManager eventDAO = DAORegistry.getInstance().getEventDAO();
 
-  public EventResource() {
+  public EventResource(String informedAPIUrl) {
     EVENT_DATA_PROVIDER_MANAGER
         .registerEventDataProvider(EventType.HOLIDAY, new DefaultHolidayEventProvider());
+    EVENT_DATA_PROVIDER_MANAGER
+        .registerEventDataProvider(EventType.DEPLOYMENT, new DefaultDeploymentEventProvider(informedAPIUrl));
+    EVENT_DATA_PROVIDER_MANAGER.registerEventDataProvider(EventType.HISTORICAL_ANOMALY,
+        new HistoricalAnomalyEventProvider());
   }
 
   @GET
