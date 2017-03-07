@@ -25,6 +25,8 @@ AnomalyResultController.prototype = {
   applyButtonEventHandler: function(sender, args) {
     console.log("Apply button Event in AnomalyResultController");
     console.log(args);
+    HASH_SERVICE.clear();
+    HASH_SERVICE.set('tab', 'anomalies');
     HASH_SERVICE.update(args);
     HASH_SERVICE.refreshWindowHashForRouting('anomalies');
     HASH_SERVICE.routeTo('anomalies');

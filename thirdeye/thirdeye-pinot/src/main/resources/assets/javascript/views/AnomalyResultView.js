@@ -4,12 +4,13 @@ function AnomalyResultView(anomalyResultModel) {
   this.anomalyResultModel = anomalyResultModel;
   this.metricSearchConfig = {
       theme : "bootstrap",
+      width: '100%',
+      allowClear: true,
       placeholder : "Search for Metric",
       ajax : {
         url : '/data/autocomplete/metric',
         minimumInputLength : 3,
         delay : 250,
-        allowClear: true,
         data : function(params) {
           var query = {
             name : params.term,
@@ -35,12 +36,13 @@ function AnomalyResultView(anomalyResultModel) {
     };
   this.dashboardSearchConfig = {
       theme : "bootstrap",
+      width: '100%',
+      allowClear: true,
       placeholder : "Search for Dashboard",
       ajax : {
         url : '/data/autocomplete/dashboard',
         minimumInputLength : 3,
         delay : 250,
-        allowClear: true,
         data : function(params) {
           var query = {
             name : params.term,
@@ -67,11 +69,14 @@ function AnomalyResultView(anomalyResultModel) {
 
   this.anomalySearchConfig = {
       theme : "bootstrap",
+      width: '100%',
+      allowClear: true,
       placeholder : "Search for anomaly ID",
       tags: true
     };
   this.timeSearchConfig = {
       theme : "bootstrap",
+      width: '100%',
       placeholder : "All anomalies in the selected time range",
       tags: true,
       disabled: true
@@ -137,12 +142,21 @@ AnomalyResultView.prototype = {
     // TIME RANGE SELECTION
     this.timeRangeConfig.startDate = this.anomalyResultModel.startDate;
     this.timeRangeConfig.endDate = this.anomalyResultModel.endDate;
-    const $anomalyTimeRange = $('#anomalies-time-range span');
+
+    const $anomalyTimeRangeStart = $('#anomalies-time-range-start span');
+    const $anomalyTimeRangeEnd = $('#anomalies-time-range-end span');
 
     function cb(start, end, rangeType = constants.DATE_RANGE_CUSTOM) {
-      $anomalyTimeRange.addClass("time-range").html(`<span>${rangeType}</span> ${start.format(constants.DATE_RANGE_FORMAT)} &mdash; ${end.format(constants.DATE_RANGE_FORMAT)}`);
+      $anomalyTimeRangeStart.addClass('time-range').html(start.format(constants.DATE_RANGE_FORMAT));
+      $anomalyTimeRangeEnd.addClass('time-range').html(end.format(constants.DATE_RANGE_FORMAT));
     }
-    $('#anomalies-time-range').daterangepicker(this.timeRangeConfig, cb);
+    $('#anomalies-time-range-start').daterangepicker(this.timeRangeConfig, cb);
+
+    $('#anomalies-time-range-end').on('click', () => {
+      $('#anomalies-time-range-start').click();
+    });
+
+    // $('#anomalies-time-range-end').daterangepicker(this.timeRangeConfig, cb);
     cb(this.timeRangeConfig.startDate, this.timeRangeConfig.endDate);
 
 
@@ -301,40 +315,35 @@ AnomalyResultView.prototype = {
     }
   },
   setupListenerOnApplyButton : function() {
-    var self = this;
-    $('#apply-button').click(function() {
+    $('#search-button, #apply-button').click(() => {
       var anomaliesSearchMode = $('#anomalies-search-mode').val();
       var metricIds = undefined;
       var dashboardId = undefined;
       var anomalyIds = undefined;
-      console.log('anomaliesSearchMode');
-      console.log(anomaliesSearchMode);
-      if (anomaliesSearchMode == constants.MODE_METRIC) {
-        metricIds = $('#anomalies-search-metrics-input').val().join();
-      } else if (anomaliesSearchMode == constants.MODE_DASHBOARD) {
-        dashboardId = $('#anomalies-search-dashboard-input').val();
-      } else if (anomaliesSearchMode == constants.MODE_ID) {
-        anomalyIds = $('#anomalies-search-anomaly-input').val().join();
-        console.log(anomalyIds);
-      }
 
       var functionName = $('#anomaly-function-dropdown').val();
-      var startDate = $('#anomalies-time-range').data('daterangepicker').startDate;
-      var endDate = $('#anomalies-time-range').data('daterangepicker').endDate;
+      var startDate = $('#anomalies-time-range-start').data('daterangepicker').startDate;
+      var endDate = $('#anomalies-time-range-start').data('daterangepicker').endDate;
 
       var anomaliesParams = {
         anomaliesSearchMode : anomaliesSearchMode,
-        metricIds : metricIds,
-        dashboardId : dashboardId,
-        anomalyIds : anomalyIds,
         startDate : startDate,
         endDate : endDate,
         pageNumber : 1,
         functionName : functionName
       }
 
-      self.applyButtonEvent.notify(anomaliesParams);
+      if (anomaliesSearchMode == constants.MODE_METRIC) {
+        anomaliesParams.metricIds = $('#anomalies-search-metrics-input').val().join();
+      } else if (anomaliesSearchMode == constants.MODE_DASHBOARD) {
+        anomaliesParams.dashboardId = $('#anomalies-search-dashboard-input').val();
+      } else if (anomaliesSearchMode == constants.MODE_ID) {
+        anomaliesParams.anomalyIds = $('#anomalies-search-anomaly-input').val().join();
+        delete anomaliesParams.startDate;
+        delete anomaliesParams.endDate;
+      }
 
+      this.applyButtonEvent.notify(anomaliesParams);
     })
   },
   setupListenersOnAnomaly : function(idx, anomaly) {
