@@ -10,15 +10,22 @@ import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExDataSource;
 import com.linkedin.thirdeye.detector.functionex.dataframe.DataFrame;
 import com.linkedin.thirdeye.detector.functionex.dataframe.LongSeries;
 import com.linkedin.thirdeye.detector.functionex.dataframe.Series;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.utils.URLEncodedUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class ThirdEyeMetricDataSource implements AnomalyFunctionExDataSource<String, DataFrame> {
+  private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeMetricDataSource.class);
 
   public static final int TOP_K = 10000;
 
@@ -28,7 +35,7 @@ public class ThirdEyeMetricDataSource implements AnomalyFunctionExDataSource<Str
   AnomalyFunctionExDataSource<String, DataFrame> pinot;
   DatasetConfigManager manager;
 
-  // dataset/metric/sum/dimension1=v1,dimension2=v2
+  // metric://pinot/dataset/metric/sum/?k1=v2&k2=v2&filters=dimension1=v1,dimension2%3Cv2
 
   public ThirdEyeMetricDataSource(AnomalyFunctionExDataSource<String, DataFrame> pinot, DatasetConfigManager manager) {
     this.pinot = pinot;
@@ -37,27 +44,33 @@ public class ThirdEyeMetricDataSource implements AnomalyFunctionExDataSource<Str
 
   @Override
   public DataFrame query(String query, AnomalyFunctionExContext context) throws Exception {
-    String[] fragments = query.split("/");
-    if(fragments.length < 3)
-      throw new IllegalArgumentException("requires at least dataset, metric, and function name");
+    URI uri = URI.create(query);
+    if(uri.getHost() == null || !uri.getHost().equals("pinot"))
+      throw new IllegalArgumentException("source required (only 'pinot' allowed)");
+    if(uri.getPath() == null || uri.getPath().split("/").length < 4)
+      throw new IllegalArgumentException("dataset, metric and function required");
 
-    String dataset = fragments[0];
-    String metric = fragments[1];
-    String function = fragments[2];
-    String filterString = null;
-    if(fragments.length >= 4)
-      filterString =  fragments[3];
+    String[] fragments = uri.getPath().split("/");
 
-    Collection<Filter> filters = parseFilters(filterString);
+    String dataset = fragments[1]; // NOTE: path starts with '/'
+    String metric = fragments[2];
+    String function = fragments[3];
 
-    // fetch dataset config
+    // user filters
+    Collection<Filter> filters = new ArrayList<>();
+    if(uri.getQuery() != null) {
+      List<NameValuePair> params = URLEncodedUtils.parse(uri, "UTF-8");
+      filters.addAll(getBasicFilters(params));
+      filters.addAll(getAdvancedFilters(params));
+    }
+
+    // time filter
     DatasetConfigDTO dto = this.manager.findByDataset(dataset);
     if(dto == null)
       throw new IllegalArgumentException(String.format("Could not find dataset '%s'", dataset));
 
-    // add time filter
     TimeGranularity tg = new TimeGranularity(dto.getTimeDuration(), dto.getTimeUnit());
-    augmentFiltersWithTime(filters, dto.getTimeColumn(), tg, context.getMonitoringWindowStart(), context.getMonitoringWindowEnd());
+    filters.addAll(getTimeFilters(dto.getTimeColumn(), tg, context.getMonitoringWindowStart(), context.getMonitoringWindowEnd()));
 
     // build query
     String pinotQuery = makeQuery(dataset, metric, function, filters);
@@ -83,10 +96,28 @@ public class ThirdEyeMetricDataSource implements AnomalyFunctionExDataSource<Str
     return result.sortBySeries();
   }
 
-  static Collection<Filter> augmentFiltersWithTime(Collection<Filter> filters, String column, TimeGranularity tg, long start, long stop) {
+  static Collection<Filter> getAdvancedFilters(List<NameValuePair> params) {
+    for(NameValuePair p : params) {
+      if(p.getName().equals("filters"))
+        return parseFilters(p.getValue());
+    }
+    return Collections.emptyList();
+  }
+
+  static Collection<Filter> getBasicFilters(List<NameValuePair> params) {
+    Collection<Filter> filters = new ArrayList<>();
+    for(NameValuePair p : params) {
+      if(!p.getName().equals("filters"))
+        filters.add(new Filter(p.getName(), "=", p.getValue()));
+    }
+    return filters;
+  }
+
+  static Collection<Filter> getTimeFilters(String column, TimeGranularity tg, long start, long stop) {
     String minTime = String.valueOf(tg.convertToUnit(start));
     String maxTime = String.valueOf(tg.convertToUnit(stop));
 
+    Collection<Filter> filters = new ArrayList<>();
     filters.add(new Filter(column, ">", minTime));
     filters.add(new Filter(column, "<=", maxTime));
     return filters;
@@ -111,11 +142,11 @@ public class ThirdEyeMetricDataSource implements AnomalyFunctionExDataSource<Str
   }
 
   static String makeDimensions(Collection<Filter> filters) {
-    Set<String> keySet = new HashSet<>();
+    Set<String> s = new HashSet<>();
     for(Filter f : filters) {
-      keySet.add(f.key);
+      s.add(f.key);
     }
-    return String.join(", ", keySet);
+    return String.join(", ", s);
   }
 
   static String makeFilters(Collection<Filter> filters) {

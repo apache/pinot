@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.detector.functionex;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.EventManager;
@@ -12,6 +14,7 @@ import com.linkedin.thirdeye.detector.functionex.impl.ThirdEyeMockDataSource;
 import com.linkedin.thirdeye.detector.functionex.impl.ThirdEyePinotConnection;
 import com.linkedin.thirdeye.detector.functionex.impl.ThirdEyePinotDataSource;
 import java.io.File;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.cli.CommandLine;
@@ -68,14 +71,7 @@ public class AnomalyFunctionExRunner {
     long monitoringStart = Long.parseLong(cmd.getOptionValue(ID_MONITOR_FROM, String.valueOf(monitoringEnd - 3600)));
     LOG.info("Setting monitoring window from '{}' to '{}'", monitoringStart, monitoringEnd);
 
-    Map<String, String> config = new HashMap<>();
-    if(cmd.hasOption(ID_CONFIG)) {
-      String[] params = cmd.getOptionValue(ID_CONFIG).split("(?<!\\\\),");
-      for(String setting : params) {
-        String[] items = setting.split("=", 2);
-        config.put(items[0], items[1].replace("\\,", ","));
-      }
-    }
+    Map<String, String> config = parseConfig(cmd.getOptionValue("config"));
     LOG.info("Using configuration '{}'", config);
 
     if(cmd.hasOption(ID_THIRDEYE)) {
@@ -207,5 +203,10 @@ public class AnomalyFunctionExRunner {
     options.addOption(metric);
 
     return options;
+  }
+
+  private static Map<String, String> parseConfig(String configJson) throws IOException {
+    ObjectMapper mapper = new ObjectMapper();
+    return mapper.readValue(configJson, new TypeReference<Map<String, String>>() {});
   }
 }

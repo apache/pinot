@@ -107,23 +107,37 @@ public class ThirdEyeMetricDataSourceTest {
   }
 
   @Test
-  public void testQueryWithoutFilter() throws Exception {
-    String query = "dataset/metric/function";
+  public void testQueryWithoutFilters() throws Exception {
+    String query = "metric://pinot/dataset/metric/function";
     this.ds.query(query, context);
     Assert.assertEquals(this.pinot.query, "SELECT function(metric) FROM dataset WHERE (((time>'100') AND (time<='200'))) GROUP BY time TOP 10000");
   }
 
   @Test
-  public void testQueryWithFilter() throws Exception {
-    String query = "dataset/metric/function/k1=v1,k1=v2,k2=v2";
+  public void testQueryWithFilters() throws Exception {
+    String query = "metric://pinot/dataset/metric/function?k1=v1&k2=v2";
     this.ds.query(query, context);
-    Assert.assertEquals(this.pinot.query, "SELECT function(metric) FROM dataset WHERE (((k1='v1') OR (k1='v2')) AND ((k2='v2')) AND ((time>'100') AND (time<='200'))) GROUP BY k1, k2, time TOP 10000");
+    Assert.assertEquals(this.pinot.query, "SELECT function(metric) FROM dataset WHERE (((k1='v1')) AND ((k2='v2')) AND ((time>'100') AND (time<='200'))) GROUP BY k1, k2, time TOP 10000");
+  }
+
+  @Test
+  public void testQueryWithAdvancedFilters() throws Exception {
+    String query = "metric://pinot/dataset/metric/function/?filters=k1=v1,k1=v2,k2%3Cv2";
+    this.ds.query(query, context);
+    Assert.assertEquals(this.pinot.query, "SELECT function(metric) FROM dataset WHERE (((k1='v1') OR (k1='v2')) AND ((k2<'v2')) AND ((time>'100') AND (time<='200'))) GROUP BY k1, k2, time TOP 10000");
+  }
+
+  @Test
+  public void testQueryWithBasicAndAdvancedFilters() throws Exception {
+    String query = "metric://pinot/dataset/metric/function/?k1=v1&filters=k1=v2,k2%3Cv2";
+    this.ds.query(query, context);
+    Assert.assertEquals(this.pinot.query, "SELECT function(metric) FROM dataset WHERE (((k1='v1') OR (k1='v2')) AND ((k2<'v2')) AND ((time>'100') AND (time<='200'))) GROUP BY k1, k2, time TOP 10000");
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testQueryResultTruncationFail() throws Exception {
     this.pinot.outputLen = ThirdEyeMetricDataSource.TOP_K;
-    this.ds.query("a/b/c", context);
+    this.ds.query("metric://pinot/a/b/c", context);
   }
 
   static void assertFilter(ThirdEyeMetricDataSource.Filter f, String key, String operator, String value) {
