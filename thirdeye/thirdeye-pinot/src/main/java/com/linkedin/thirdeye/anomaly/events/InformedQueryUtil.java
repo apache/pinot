@@ -68,8 +68,9 @@ public class InformedQueryUtil {
         }
         //        informedPosts.sortInAscendingOrder();
         return informedPosts;
-
-  }return new InFormedPosts();}
+    }
+   return new InFormedPosts();
+  }
 
   public static class InFormedPosts {
     public List<InFormedPost> data = new ArrayList<>();
