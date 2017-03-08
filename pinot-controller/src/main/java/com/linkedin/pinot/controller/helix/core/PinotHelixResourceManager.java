@@ -464,15 +464,20 @@ public class PinotHelixResourceManager {
 
     try {
       final TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+      AbstractTableConfig tableConfig;
       if (tableType == TableType.OFFLINE) {
-        tenantConfig = ZKMetadataProvider.getOfflineTableConfig(getPropertyStore(), tableName).getTenantConfig();
+        tableConfig = ZKMetadataProvider.getOfflineTableConfig(getPropertyStore(), tableName);
       } else if (tableType == TableType.REALTIME) {
-        tenantConfig = ZKMetadataProvider.getRealtimeTableConfig(getPropertyStore(), tableName).getTenantConfig();
+        tableConfig = ZKMetadataProvider.getRealtimeTableConfig(getPropertyStore(), tableName);
       } else {
         return new PinotResourceManagerResponse("Table " + tableName + " does not have a table type", false);
       }
+      if (tableConfig == null) {
+        return new PinotResourceManagerResponse("Table " + tableName + " does not exist", false);
+      }
+      tenantConfig = tableConfig.getTenantConfig();
     } catch (Exception e) {
-      LOGGER.warn("Caught exception while rebuilding broker resource from Helix tags for table {}", e, tableName);
+      LOGGER.warn("Caught exception while getting tenant config for table {}", tableName, e);
       return new PinotResourceManagerResponse(
           "Failed to fetch broker tag for table " + tableName + " due to exception: " + e.getMessage(), false);
     }
