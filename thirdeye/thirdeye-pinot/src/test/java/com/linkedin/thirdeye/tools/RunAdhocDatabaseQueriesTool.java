@@ -200,11 +200,19 @@ public class RunAdhocDatabaseQueriesTool {
     }
   }
 
-  private void disableAnomalyFunctions(String dataset) {
+  private void setActivenessAnomalyFunctions(String dataset, boolean isActive) {
     List<AnomalyFunctionDTO> anomalyFunctionDTOs = anomalyFunctionDAO.findAllByCollection(dataset);
     for (AnomalyFunctionDTO anomalyFunctionDTO : anomalyFunctionDTOs) {
-    anomalyFunctionDTO.setActive(false);
+    anomalyFunctionDTO.setActive(isActive);
     anomalyFunctionDAO.update(anomalyFunctionDTO);
+    }
+  }
+
+  private void setDataCompletenessCheckForFunctions(String dataset, boolean isDataCompletenessCheck) {
+    List<AnomalyFunctionDTO> anomalyFunctionDTOs = anomalyFunctionDAO.findAllByCollection(dataset);
+    for (AnomalyFunctionDTO anomalyFunctionDTO : anomalyFunctionDTOs) {
+      anomalyFunctionDTO.setRequiresCompletenessCheck(isDataCompletenessCheck);
+      anomalyFunctionDAO.update(anomalyFunctionDTO);
     }
   }
 
@@ -225,6 +233,12 @@ public class RunAdhocDatabaseQueriesTool {
     }
   }
 
+  private void updateAlertFilterForFunctionId(long functionId, Map<String, String> alertFilter) {
+    AnomalyFunctionDTO functionDTO = anomalyFunctionDAO.findById(functionId);
+    functionDTO.setAlertFilter(alertFilter);
+    anomalyFunctionDAO.save(functionDTO);
+  }
+
   private void enableDataCompleteness(String dataset) {
     List<DataCompletenessConfigDTO> dtos = dataCompletenessConfigDAO.findAllByDataset(dataset);
     for (DataCompletenessConfigDTO dto : dtos) {
@@ -241,6 +255,8 @@ public class RunAdhocDatabaseQueriesTool {
       System.exit(1);
     }
     RunAdhocDatabaseQueriesTool dq = new RunAdhocDatabaseQueriesTool(persistenceFile);
+
+
   }
 
 }

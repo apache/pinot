@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.anomaly.detection.lib;
 
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
+import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluationMethod;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.FunctionAutoTuneConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
@@ -13,6 +14,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,6 +31,7 @@ public class FunctionAutotuneExcutorRunnable implements Runnable {
   private DateTime replayStart;
   private DateTime replayEnd;
   private boolean isForceBackfill;
+  private PerformanceEvaluationMethod performanceEvaluationMethod;
   private double goal;
   private List<Map<String, String>> tuningParameters;
 
@@ -44,12 +47,13 @@ public class FunctionAutotuneExcutorRunnable implements Runnable {
     this.anomalyFunctionDAO = anomalyFunctionDAO;
     this.rawAnomalyResultDAO = rawAnomalyResultDAO;
     this.functionAutoTuneConfigDAO = functionAutoTuneConfigDAO;
+    performanceEvaluationMethod = PerformanceEvaluationMethod.ANOMALY_PERCENTAGE;
     setForceBackfill(true);
   }
 
   public FunctionAutotuneExcutorRunnable(DetectionJobScheduler detectionJobScheduler, AnomalyFunctionManager anomalyFunctionDAO,
       MergedAnomalyResultManager mergedAnomalyResultDAO, RawAnomalyResultManager rawAnomalyResultDAO,
-      FunctionAutoTuneConfigManager functionAutoTuneConfigDAO,
+      FunctionAutoTuneConfigManager functionAutoTuneConfigDAO, PerformanceEvaluationMethod performanceEvaluationMethod,
       List<Map<String, String>> tuningParameters, long tuningFunctionId, DateTime replayStart, DateTime replayEnd,
       double goal, boolean isForceBackfill) {
     this.detectionJobScheduler = detectionJobScheduler;
@@ -62,7 +66,26 @@ public class FunctionAutotuneExcutorRunnable implements Runnable {
     setReplayEnd(replayEnd);
     setForceBackfill(isForceBackfill);
     setTuningParameters(tuningParameters);
+    setPerformanceEvaluationMethod(performanceEvaluationMethod);
     setGoal(goal);
+  }
+
+  private void shutdownAndAwaitTermination(ExecutorService pool) {
+    pool.shutdown(); // Disable new tasks from being submitted
+    try {
+      // Wait a while for existing tasks to terminate
+      if (!pool.awaitTermination(60, TimeUnit.SECONDS)) {
+        pool.shutdownNow(); // Cancel currently executing tasks
+        // Wait a while for tasks to respond to being cancelled
+        if (!pool.awaitTermination(60, TimeUnit.SECONDS))
+          LOG.error("Pool did not terminate");
+      }
+    } catch (InterruptedException ie) {
+      // (Re-)Cancel if current thread also interrupted
+      pool.shutdownNow();
+      // Preserve interrupt status
+      Thread.currentThread().interrupt();
+    }
   }
 
   @Override
@@ -79,13 +102,14 @@ public class FunctionAutotuneExcutorRunnable implements Runnable {
       backfillCallable.setReplayStart(replayStart);
       backfillCallable.setReplayEnd(replayEnd);
       backfillCallable.setForceBackfill(true);
-      backfillCallable.setPerformanceEvaluationMethod(PerformanceEvaluationMethod.ANOMALY_PERCENTAGE);
+      backfillCallable.setPerformanceEvaluationMethod(performanceEvaluationMethod);
       backfillCallable.setAutotuneMethodType(AutotuneMethodType.EXHAUSTIVE);
       backfillCallable.setTuningParameter(config);
 
       Future future = pool.submit(backfillCallable);
       runningThreads.add(future);
     }
+
     FunctionAutotuneReturn bestResult = null;
     long sum = 0l;
     double bestPerformance = Double.POSITIVE_INFINITY;
@@ -130,6 +154,10 @@ public class FunctionAutotuneExcutorRunnable implements Runnable {
 
       functionAutoTuneConfigDAO.save(functionAutoTuneConfigDTO);
     }
+
+    // Shutdown ExecutorService
+    shutdownAndAwaitTermination(pool);
+
     // TODO: send email or notification out
   }
 
@@ -183,5 +211,13 @@ public class FunctionAutotuneExcutorRunnable implements Runnable {
 
   public void setGoal(double goal) {
     this.goal = goal;
+  }
+
+  public PerformanceEvaluationMethod getPerformanceEvaluationMethod() {
+    return performanceEvaluationMethod;
+  }
+
+  public void setPerformanceEvaluationMethod(PerformanceEvaluationMethod performanceEvaluationMethod) {
+    this.performanceEvaluationMethod = performanceEvaluationMethod;
   }
 }

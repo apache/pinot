@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomaly.detection.lib;
 
+import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluationMethod;
 import java.util.Map;
 import org.joda.time.DateTime;
 

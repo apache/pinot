@@ -1,7 +1,9 @@
 package com.linkedin.thirdeye.anomaly.detection.lib;
 
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
-import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.AnomalyPercentagePerformanceEvaluation;
+import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluate;
+import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluateHelper;
+import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluationMethod;
 import com.linkedin.thirdeye.dashboard.resources.OnboardResource;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.FunctionAutoTuneConfigManager;
@@ -9,10 +11,8 @@ import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import org.joda.time.DateTime;
@@ -68,9 +68,12 @@ public class FunctionAutotuneCallable implements Callable<FunctionAutotuneReturn
   public FunctionAutotuneReturn call() {
     long clonedFunctionId = 0l;
     OnboardResource onboardResource = new OnboardResource(anomalyFunctionDAO, mergedAnomalyResultDAO, rawAnomalyResultDAO);
-    StringBuilder functionName = new StringBuilder();
+    StringBuilder functionName = new StringBuilder("clone");
     for (Map.Entry<String, String> entry : tuningParameter.entrySet()) {
-      functionName.append("_" + entry.getKey() + "_" + entry.getValue());
+      functionName.append("_");
+      functionName.append(entry.getKey());
+      functionName.append("_");
+      functionName.append(entry.getValue());
     }
     try {
       clonedFunctionId = onboardResource.cloneAnomalyFunctionById(tuningFunctionId, functionName.toString(), false);
@@ -86,12 +89,18 @@ public class FunctionAutotuneCallable implements Callable<FunctionAutotuneReturn
 
     // enlarge window size so that we can speed-up the replay speed
     switch(anomalyFunctionDTO.getWindowUnit()){
+      case NANOSECONDS:
+      case MICROSECONDS:
       case MILLISECONDS: // In case of future use
+      case SECONDS:
       case MINUTES:
-        anomalyFunctionDTO.setWindowSize(1);
-        anomalyFunctionDTO.setWindowUnit(TimeUnit.DAYS);
-        anomalyFunctionDTO.setCron("0 0 0 * * ?");
+        anomalyFunctionDTO.setWindowSize(4);
+        anomalyFunctionDTO.setWindowUnit(TimeUnit.HOURS);
+        anomalyFunctionDTO.setCron("0 0 0/4 * * ? *");
       case HOURS:
+        anomalyFunctionDTO.setWindowSize(3);
+        anomalyFunctionDTO.setWindowUnit(TimeUnit.DAYS);
+        anomalyFunctionDTO.setCron("0 0 0 */3 * ? *");
       case DAYS:
       default:
         anomalyFunctionDTO.setWindowSize(7);
@@ -109,8 +118,9 @@ public class FunctionAutotuneCallable implements Callable<FunctionAutotuneReturn
     List<MergedAnomalyResultDTO> detectedMergedAnomalies =
         mergedAnomalyResultDAO.findAllConflictByFunctionId(clonedFunctionId, replayStart.getMillis(), replayEnd.getMillis());
 
-    double performance = AnomalyPercentagePerformanceEvaluation.evaluate(new Interval(replayStart.getMillis(), replayEnd.getMillis()),
-        detectedMergedAnomalies);
+    PerformanceEvaluate performanceEvaluator = PerformanceEvaluateHelper.getPerformanceEvaluator(performanceEvaluationMethod,
+        tuningFunctionId, clonedFunctionId, new Interval(replayStart.getMillis(), replayEnd.getMillis()), mergedAnomalyResultDAO);
+    double performance = performanceEvaluator.evaluate();
 
     FunctionAutotuneReturn functionAutotuneReturn = new FunctionAutotuneReturn(tuningFunctionId, replayStart, replayEnd,
         tuningParameter, autotuneMethodType, performanceEvaluationMethod, performance);

@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.anomaly.detection;
 import com.linkedin.thirdeye.anomaly.detection.lib.FunctionAutotuneExcutorRunnable;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutoTune;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
+import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluationMethod;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.datalayer.bao.FunctionAutoTuneConfigManager;
@@ -409,6 +410,9 @@ public class DetectionJobResource {
       }
     }
 
+    if(fieldToParams.size() == 0) { // No possible tuning parameters
+      return tuningParameters;
+    }
     List<String> fieldList = new ArrayList<>(fieldToParams.keySet());
     for(int i = 0; i < numPermutations; i++){
       Map<String, String> combination = new HashMap<>();
@@ -449,7 +453,8 @@ public class DetectionJobResource {
   @Path("function/{id}/autotune")
   public Response anomalyFunctionAutotune(@PathParam("id") long functionId, @QueryParam("start") String replayStartTime,
       @QueryParam("end") String replayEndTime, @QueryParam("timezone") String timezone,
-      @QueryParam("tune") String tuningJSON, @QueryParam("goal") double goal){
+      @QueryParam("tune") String tuningJSON, @QueryParam("goal") double goal,
+      @QueryParam("evalMethod") @DefaultValue("ANOMALY_PERCENTAGE") String performanceEvaluationMethod){
     DateTimeZone dateTimeZone = DateTimeZone.forID(timezone);
     // DateTime monitoringWindowStartTime = ISODateTimeFormat.dateTimeParser().parseDateTime(monitoringDateTime).withZone(dateTimeZone);
     DateTime replayStart = ISODateTimeFormat.dateTimeParser().parseDateTime(replayStartTime).withZone(dateTimeZone);
@@ -466,6 +471,10 @@ public class DetectionJobResource {
       LOG.error("Unable to parse json string: {}", tuningJSON, e );
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
+    if(tuningParameters.size() == 0) { // no tuning combinations
+      LOG.warn("No tuning parameter is found in json string {}", tuningJSON);
+      return Response.status(Response.Status.BAD_REQUEST).build();
+    }
 
     FunctionAutotuneExcutorRunnable excutorRunnable = new FunctionAutotuneExcutorRunnable(detectionJobScheduler, anomalyFunctionDAO,
         mergedAnomalyResultDAO, rawAnomalyResultDAO, functionAutoTuneConfigDAO);
@@ -475,6 +484,7 @@ public class DetectionJobResource {
     excutorRunnable.setForceBackfill(true);
     excutorRunnable.setTuningParameters(tuningParameters);
     excutorRunnable.setGoal(goal);
+    excutorRunnable.setPerformanceEvaluationMethod(PerformanceEvaluationMethod.valueOf(performanceEvaluationMethod.toUpperCase()));
 
     new Thread(excutorRunnable).start();
 

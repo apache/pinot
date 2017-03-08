@@ -2,8 +2,7 @@ package com.linkedin.thirdeye.datalayer.bao;
 
 import com.google.common.collect.Lists;
 import com.linkedin.thirdeye.TestDBResources;
-import com.linkedin.thirdeye.anomaly.detection.lib.AutotuneMethodType;
-import com.linkedin.thirdeye.anomaly.detection.lib.PerformanceEvaluationMethod;
+import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluationMethod;
 import com.linkedin.thirdeye.anomaly.job.JobConstants;
 import com.linkedin.thirdeye.anomaly.override.OverrideConfigHelper;
 import com.linkedin.thirdeye.api.DimensionMap;
