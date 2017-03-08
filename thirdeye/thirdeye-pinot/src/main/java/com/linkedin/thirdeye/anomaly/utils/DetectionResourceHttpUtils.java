@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.anomaly.utils;
 
-import com.linkedin.thirdeye.anomaly.detection.lib.PerformanceEvaluationMethod;
+import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluationMethod;
 import java.io.IOException;
 
 import org.apache.http.HttpHost;

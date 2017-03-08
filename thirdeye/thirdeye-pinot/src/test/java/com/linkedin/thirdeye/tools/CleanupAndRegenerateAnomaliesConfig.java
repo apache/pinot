@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.tools;
 
+import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluationMethod;
+
 
 public class CleanupAndRegenerateAnomaliesConfig {
 
@@ -20,6 +22,8 @@ public class CleanupAndRegenerateAnomaliesConfig {
   private String datasets;
   // forceBackfill previous backfill job if there exists any
   private String forceBackfill;
+
+  private PerformanceEvaluationMethod perfomranceEvaluationMethod;
 
   public String getPersistenceFile() {
     return persistenceFile;
@@ -68,6 +72,14 @@ public class CleanupAndRegenerateAnomaliesConfig {
   }
   public void setForceBackfill(String forceBackfill) {
     this.forceBackfill = forceBackfill;
+  }
+
+  public PerformanceEvaluationMethod getPerfomranceEvaluationMethod() {
+    return perfomranceEvaluationMethod;
+  }
+
+  public void setPerfomranceEvaluationMethod(PerformanceEvaluationMethod perfomranceEvaluationMethod) {
+    this.perfomranceEvaluationMethod = perfomranceEvaluationMethod;
   }
 
   public String getTimezone() {
