@@ -617,9 +617,15 @@ public class AnomaliesResource {
       JSONObject currentTimeseriesResponse, JSONObject baselineTimeseriesResponse,
       DateTimeFormatter timeSeriesDateFormatter, DateTimeFormatter startEndDateFormatterHours, DateTimeFormatter startEndDateFormatterDays) throws JSONException {
 
+    MetricConfigDTO metricConfigDTO = metricConfigDAO.findByMetricAndDataset(metricName, dataset);
+
     AnomalyDetails anomalyDetails = new AnomalyDetails();
     anomalyDetails.setMetric(metricName);
     anomalyDetails.setDataset(dataset);
+
+    if (metricConfigDTO != null) {
+      anomalyDetails.setMetricId(metricConfigDTO.getId());
+    }
 
     // get this from timeseries calls
     List<String> dateValues = getDateFromTimeSeriesObject(currentTimeseriesResponse, timeSeriesDateFormatter);
