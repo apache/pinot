@@ -19,7 +19,8 @@ public class EventDataProviderManager {
     return INSTANCE;
   }
 
-  public void registerEventDataProvider(EventType eventType, EventDataProvider<EventDTO> eventDataProvider) {
+  public void registerEventDataProvider(EventType eventType,
+      EventDataProvider<EventDTO> eventDataProvider) {
     switch (eventType) {
     case HOLIDAY:
       holidayEventDataProvider = eventDataProvider;

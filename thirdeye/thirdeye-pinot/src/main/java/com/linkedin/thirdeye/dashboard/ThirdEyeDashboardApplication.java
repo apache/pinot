@@ -80,7 +80,7 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new AnomaliesResource(alertFilterFactory));
     env.jersey().register(new TimeSeriesResource());
     env.jersey().register(new OnboardResource());
-    env.jersey().register(new EventResource());
+    env.jersey().register(new EventResource(config.getInformedApiUrl()));
   }
 
   public static void main(String[] args) throws Exception {
