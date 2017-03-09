@@ -667,6 +667,7 @@ text {
 
 .investigate-cards {
   display: flex;
+  margin-bottom: 24px;
 }
 
 .investigate-card + .investigate-card {

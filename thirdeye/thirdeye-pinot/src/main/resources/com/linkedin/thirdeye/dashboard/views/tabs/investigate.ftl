@@ -18,9 +18,66 @@
 
 <div class="container">
 
-  <div class="investigate-title">engaged_feed_session_count</div>
+  <div class="investigate-title">{{metric}}</div>
 
   <div class ="anormaly-chart bg-white" id="anomaly-investigate-chart"></div>
+  <div class="anomaly-details bg-white">
+    <div class="anomaly-details-row">
+      <div class="anomaly-details-items anomaly-details-items--small">
+        <label class="label-medium-semibold">Change</label>
+        <span class="anomaly-change-delta {{colorDelta changeDelta}}">{{changeDelta}}</span>
+      </div>
+
+      <div class="anomaly-details-items anomaly-details-items--small">
+        <label class="label-medium-semibold">Current</label>
+        <span>{{current}}</span>
+      </div>
+      <div class="anomaly-details-items anomaly-details-items--small">
+        <label class="label-medium-semibold">Baseline</label>
+        <span>
+          {{#if baseline}}
+            {{baseline}}
+          {{else}}
+            N/A
+          {{/if}}
+        </span>
+      </div>
+    </div>
+    <div class="anomaly-details-row">
+      <div class="anomaly-details-items">
+        <label class="label-medium-semibold">Dimension</label>
+        <span>
+        {{#if_eq anomalyFunctionDimension '{}'}}
+          N/A
+        {{else}}
+          {{anomalyFunctionDimension}}
+        {{/if_eq}}
+        </span>
+      </div>
+
+      <div class="anomaly-details-items">
+        <label class="label-medium-semibold">Function</label>
+        <span>{{anomalyFunctionName}}</span>
+      </div>
+    </div>
+    <div class="anomaly-details-row">
+      <div class="anomaly-details-items">
+        <label class="label-medium-semibold">Duration</label>
+        <span class="anomaly-duration">{{duration}}</span>
+      </div>
+
+      <div class="anomaly-details-items">
+        <label class="label-medium-semibold">Status</label>
+        <span>
+          {{#if anomalyFeedback}}
+            Resolved ({{anomalyFeedback}})
+          {{else}}
+            Not Resolved
+          {{/if}}
+        </span>
+      </div>
+    </div>
+  </div>
 
   <div class="investigate-title">Root Cause Summary</div>
 
@@ -32,9 +89,9 @@
       </div>
       <div class="investigate-card-body">
         <div class="investigate-number">100k</div>
-        <hr class="investigate-divider"/>
+<!--         <hr class="investigate-divider"/>
         <label class="label-medium-semibold">Events</label>
-        <span>Diwali (ind)</span>
+        <span>Diwali (ind)</span> -->
       </div>
     </div>
 
@@ -44,15 +101,6 @@
       </div>
       <div class="investigate-card-body">
         <div class="investigate-number">125k (-20%)</div>
-        <hr class="investigate-divider"/>
-        <div>
-          <label class="label-medium-semibold">Events</label>
-          <span>Diwali (ind)</span>
-        </div>
-        <div>
-          <label class="label-medium-semibold">Contributor</label>
-          <span>Country:ind</span>
-        </div>
       </div>
     </div>
 
@@ -62,9 +110,6 @@
       </div>
       <div class="investigate-card-body">
         <div class="investigate-number">125k (-20%)</div>
-        <hr class="investigate-divider"/>
-        <label class="label-medium-semibold">Events</label>
-        <span>Diwali (ind)</span>
       </div>
     </div>
 
@@ -74,9 +119,6 @@
       </div>
       <div class="investigate-card-body">
         <div class="investigate-number">125k (-20%)</div>
-        <hr class="investigate-divider"/>
-        <label class="label-medium-semibold">Events</label>
-        <span>Diwali (ind)</span>
       </div>
     </div>
 
@@ -84,7 +126,7 @@
 
 
 
-  <div class="investigate-tips padding-all">
+  <!-- <div class="investigate-tips padding-all">
     <div class="investigate-icon">
       <img rel="lightbulb" src="assets/img/Lightbulb.png">
     </div>
@@ -92,7 +134,7 @@
       <label class="label-medium-semibold">Investigating Tip</label>
       <p>Anomalies are Tricky! Sure an event such as <strong>Diwali</strong> may be the cause for the anomaly. but where did the drop take place? Did it actually happen in India? Always take a double look and watch out for these tricky anomalies!</p>
     </div>
-  </div>
+  </div> -->
 </div>
 
 

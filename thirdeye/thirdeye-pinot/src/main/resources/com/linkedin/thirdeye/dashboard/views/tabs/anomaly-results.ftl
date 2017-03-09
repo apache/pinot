@@ -20,7 +20,7 @@
 
           <div class ="anormaly-chart" id="anomaly-chart-{{anomalyIndex}}"></div>
 
-          <div class="anomaly-details">
+          <div class="anomaly-details bg-white">
             <div class="anomaly-details-row">
               <div class="anomaly-details-items anomaly-details-items--small">
                 <label class="label-medium-semibold">Change</label>
