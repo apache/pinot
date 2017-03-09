@@ -4,6 +4,13 @@ function InvestigateModel() {
   this.endDate = moment().subtract(0, 'days').startOf('day');
   this.pageNumber = 1;
   this.functionName = '';
+  this.granularity;
+  this.dimension;
+  this.filters;
+  this.currentStart;
+  this.currentEndl;
+  this.baselineStart;
+  this.baselineEnd;
   this.renderViewEvent = new Event();
 }
 
@@ -30,6 +37,7 @@ InvestigateModel.prototype = {
 
   updateModelAndNotifyView(anomaliesWrapper) {
     this.anomaliesWrapper = anomaliesWrapper;
+    this.update(anomaliesWrapper.anomalyDetailsList[0]);
     this.formatAnomaly();
     this.renderViewEvent.notify();
   },

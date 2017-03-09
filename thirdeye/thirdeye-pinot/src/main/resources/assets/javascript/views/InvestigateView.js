@@ -4,6 +4,8 @@ function InvestigateView(investigateModel) {
   this.investigate_template_compiled = Handlebars.compile(investigate);
   this.investigateModel = investigateModel;
 
+  this.viewContributionClickEvent = new Event(this);
+
   this.investigateModel.renderViewEvent.attach(this.renderViewEventHandler.bind(this));
 }
 
@@ -23,6 +25,46 @@ InvestigateView.prototype = {
     const template_with_anomaly = this.investigate_template_compiled(anomaly);
     $("#investigate-place-holder").html(template_with_anomaly);
     this.renderAnomalyChart(anomaly);
+    this.setupListenerOnViewContributionLink();
+  },
+
+  setupListenerOnViewContributionLink() {
+    const investigateParams = this.investigateModel;
+    $('.thirdeye-link').click((e) => {
+      const wowType = e.target.id;
+
+      console.log(investigateParams);
+      console.log(e);
+      this.viewContributionClickEvent.notify(investigateParams);
+      // var anomaliesSearchMode = $('#anomalies-search-mode').val();
+      // var metricIds = undefined;
+      // var dashboardId = undefined;
+      // var anomalyIds = undefined;
+
+      // var functionName = $('#anomaly-function-dropdown').val();
+      // var startDate = $('#anomalies-time-range-start').data('daterangepicker').startDate;
+      // var endDate = $('#anomalies-time-range-start').data('daterangepicker').endDate;
+
+      // var anomaliesParams = {
+      //   anomaliesSearchMode : anomaliesSearchMode,
+      //   startDate : startDate,
+      //   endDate : endDate,
+      //   pageNumber : 1,
+      //   functionName : functionName
+      // }
+
+      // if (anomaliesSearchMode == constants.MODE_METRIC) {
+      //   anomaliesParams.metricIds = $('#anomalies-search-metrics-input').val().join();
+      // } else if (anomaliesSearchMode == constants.MODE_DASHBOARD) {
+      //   anomaliesParams.dashboardId = $('#anomalies-search-dashboard-input').val();
+      // } else if (anomaliesSearchMode == constants.MODE_ID) {
+      //   anomaliesParams.anomalyIds = $('#anomalies-search-anomaly-input').val().join();
+      //   delete anomaliesParams.startDate;
+      //   delete anomaliesParams.endDate;
+      // }
+
+      // this.applyButtonEvent.notify(anomaliesParams);
+    });
   },
 
   renderAnomalyChart(anomaly){
