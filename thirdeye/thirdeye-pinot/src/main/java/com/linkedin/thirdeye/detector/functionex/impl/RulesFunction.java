@@ -7,6 +7,7 @@ import com.linkedin.thirdeye.detector.functionex.dataframe.DoubleSeries;
 import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.TreeMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,7 +38,7 @@ public class RulesFunction extends AnomalyFunctionEx {
     Map<String, DataFrame> dataFrames = new HashMap<>();
 
     LOG.info("Populating variables:");
-    for(Map.Entry<String, String> e : variables.entrySet()) {
+    for (Map.Entry<String, String> e : variables.entrySet()) {
       URI uri = URI.create(e.getValue());
       LOG.info("Fetching '{}': '{}'", e.getKey(), uri);
       DataFrame queryResult = queryDataSource(uri.getScheme(), uri.toString());
@@ -50,14 +51,13 @@ public class RulesFunction extends AnomalyFunctionEx {
     anomalyResult.setContext(getContext());
 
     LOG.info("Applying rules:");
-    for(Map.Entry<String, String> e : rules.entrySet()) {
-      LOG.info("Applying '{}': '{}'", e.getKey(), e.getValue());
+    for (Map.Entry<String, String> e : rules.entrySet()) {
       DoubleSeries ruleResults = data.map(e.getValue());
       DataFrame violations = data.filter(ruleResults.toBooleans());
-      LOG.info("Rule '{}' violated at {} out of {} timestamps in monitoring window", e.getKey(), violations.size(), ruleResults.size());
+      LOG.info("Rule '{}' violated at {} / {} timestamps", e.getKey(), violations.size(), ruleResults.size());
 
       long[] timestamps = violations.toLongs("timestamp").values();
-      for(int i=0; i<timestamps.length; i++) {
+      for (int i = 0; i < timestamps.length; i++) {
         anomalyResult.addAnomaly(timestamps[i], timestamps[i], String.format("Rule '%s' violated", e.getKey()));
       }
     }
@@ -68,14 +68,15 @@ public class RulesFunction extends AnomalyFunctionEx {
   static DataFrame mergeDataFrames(Map<String, DataFrame> dataFrames) {
     // TODO: move to data frame, check indices and timestamps
 
-    if(dataFrames.isEmpty())
+    if (dataFrames.isEmpty()) {
       return new DataFrame(0);
+    }
 
     DataFrame first = dataFrames.values().iterator().next();
     DataFrame df = new DataFrame(first.getIndex());
     df.addSeries("timestamp", first.get("timestamp"));
 
-    for(Map.Entry<String, DataFrame> e : dataFrames.entrySet()) {
+    for (Map.Entry<String, DataFrame> e : dataFrames.entrySet()) {
       df.addSeries(e.getKey(), e.getValue().get("metric"));
     }
 
@@ -83,9 +84,9 @@ public class RulesFunction extends AnomalyFunctionEx {
   }
 
   static Map<String, String> getSubConfig(Map<String, String> map, String prefix) {
-    Map<String, String> output = new HashMap<>();
-    for(Map.Entry<String, String> e : map.entrySet()) {
-      if(e.getKey().startsWith(prefix)) {
+    Map<String, String> output = new TreeMap<>();
+    for (Map.Entry<String, String> e : map.entrySet()) {
+      if (e.getKey().startsWith(prefix)) {
         String subKey = e.getKey().substring(prefix.length());
         output.put(subKey, e.getValue());
       }
