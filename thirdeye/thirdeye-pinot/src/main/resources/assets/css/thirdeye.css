@@ -644,6 +644,7 @@ text {
   position: sticky;
   top: 0;
   z-index: 1;
+  border-bottom: 1px solid #CCC;
 }
 
 .anomaly-feedback-title {
@@ -676,48 +677,35 @@ text {
   justify-content: space-between;
 }
 
-
-.investigate-cards {
+.investigate-wow {
   display: flex;
   margin-bottom: 24px;
-}
-
-.investigate-card + .investigate-card {
-  margin-left: 24px;
-}
-
-.investigate-card-title {
-  background-color: #080808;
-  font-size: 19px;
-  font-weight: 600;
-  color: white;
   text-align: center;
-  padding: 8px 24px;
-}
-
-.investigate-card {
-  flex-grow: 1;
-  display: flex;
-  flex-direction: column;
-  flex-basis: 0;
-}
-
-.investigate-card-body {
+  border: 1px solid #CCC;
   background-color: white;
-  padding: 24px;
+}
+
+.wow-card {
+  flex-basis: 0;
   flex-grow: 1;
 }
 
-.investigate-number {
-  font-size: 42px;
-  font-weight: lighter;
-  line-height: 1.1;
-  text-align: center;
+.wow-card-header {
+  background-color: #e4e8ec;
+  border-bottom: 1px solid #CCC;
+  padding: 8px 0;
 }
 
-.investigate-divider {
-  margin: 24px 0;
+.wow-card-body {
+  padding: 8px 0;
 }
+
+.wow-card-footer {
+  border-top: 1px solid #CCC;
+  padding: 8px 0;
+}
+
+/* Radio*/
 
 .anomaly-feedback-radio {
   margin: 8px 0;

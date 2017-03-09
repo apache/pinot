@@ -81,52 +81,55 @@
           </span>
         </div>
       </div>
-  </div>
+    </div>
   </div>
 
   <div class="investigate-title">Change Over Time</div>
 
-  <div class="investigate-cards">
-
-    <div class="investigate-card">
-      <div class="investigate-card-title">
-        Current
+  <div class="investigate-wow">
+    <div class="wow-card">
+      <div class="wow-card-header">
+        <label class="label-medium-semibold">Current</label>
       </div>
-      <div class="investigate-card-body">
-        <div class="investigate-number">100k</div>
-<!--         <hr class="investigate-divider"/>
-        <label class="label-medium-semibold">Events</label>
-        <span>Diwali (ind)</span> -->
+      <div class="wow-card-body">
+        100k
+      </div>
+      <div class="wow-card-footer">
       </div>
     </div>
-
-    <div class="investigate-card">
-      <div class="investigate-card-title">
-        WoW
+      <div class="wow-card">
+      <div class="wow-card-header">
+        <label class="label-medium-semibold">WoW</label>
       </div>
-      <div class="investigate-card-body">
-        <div class="investigate-number">125k (-20%)</div>
+      <div class="wow-card-body">
+        125k (-20%)
       </div>
-    </div>
-
-    <div class="investigate-card">
-      <div class="investigate-card-title">
-        WoW2
-      </div>
-      <div class="investigate-card-body">
-        <div class="investigate-number">125k (-20%)</div>
+      <div class="wow-card-footer">
+        <a href="#" class="thirdeye-link">View Contribution Analysis</a>
       </div>
     </div>
-
-    <div class="investigate-card">
-      <div class="investigate-card-title">
-        WoW3
+      <div class="wow-card">
+      <div class="wow-card-header">
+        <label class="label-medium-semibold">Wow2</label>
       </div>
-      <div class="investigate-card-body">
-        <div class="investigate-number">125k (-20%)</div>
+      <div class="wow-card-body">
+        125k (-20%)
+      </div>
+      <div class="wow-card-footer">
+        <a href="#" class="thirdeye-link">View Contribution Analysis</a>
       </div>
     </div>
-
+      <div class="wow-card">
+      <div class="wow-card-header">
+        <label class="label-medium-semibold">Wow3</label>
+      </div>
+      <div class="wow-card-body">
+        125k (-20%)
+      </div>
+      <div class="wow-card-footer">
+        <a href="#" class="thirdeye-link">View Contribution Analysis</a>
+      </div>
+    </div>
   </div>
 
 
