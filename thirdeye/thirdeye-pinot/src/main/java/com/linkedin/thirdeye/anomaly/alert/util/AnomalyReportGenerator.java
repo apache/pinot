@@ -184,7 +184,7 @@ public class AnomalyReportGenerator {
       freemarkerConfig.setClassForTemplateLoading(getClass(), "/com/linkedin/thirdeye/detector");
       freemarkerConfig.setDefaultEncoding(AlertTaskRunner.CHARSET);
       freemarkerConfig.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);
-      Template template = freemarkerConfig.getTemplate("custom-anomaly-report.ftl");
+      Template template = freemarkerConfig.getTemplate("anomaly-report-v2.ftl");
       template.process(paramMap, out);
 
       String alertEmailHtml = new String(baos.toByteArray(), AlertTaskRunner.CHARSET);
