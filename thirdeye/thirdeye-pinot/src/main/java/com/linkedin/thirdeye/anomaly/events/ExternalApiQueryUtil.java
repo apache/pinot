@@ -12,8 +12,8 @@ import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class InformedQueryUtil {
-  private final static Logger LOG = LoggerFactory.getLogger(InformedQueryUtil.class);
+public class ExternalApiQueryUtil {
+  private final static Logger LOG = LoggerFactory.getLogger(ExternalApiQueryUtil.class);
   static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   // 1000ms: the smallest time unit is 1 second. 1ms: smallest unit is 1 ms.
@@ -24,7 +24,7 @@ public class InformedQueryUtil {
 
   private String queryPrefix;
 
-  public InformedQueryUtil(String informedUrl) {
+  public ExternalApiQueryUtil(String informedUrl) {
     this.queryPrefix = informedUrl + INFORMED_QUERY;
   }
 
