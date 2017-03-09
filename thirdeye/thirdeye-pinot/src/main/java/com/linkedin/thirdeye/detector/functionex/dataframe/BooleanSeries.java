@@ -150,7 +150,7 @@ public final class BooleanSeries extends Series {
   }
 
   @Override
-  public BooleanSeries sort() {
+  public BooleanSeries sorted() {
     boolean[] values = new boolean[this.values.length];
     int count_false = 0;
 
@@ -220,7 +220,7 @@ public final class BooleanSeries extends Series {
   }
 
   @Override
-  BooleanSeries filter(int[] fromIndex) {
+  BooleanSeries project(int[] fromIndex) {
     boolean[] values = new boolean[fromIndex.length];
     for(int i=0; i<fromIndex.length; i++) {
       values[i] = this.values[fromIndex[i]];
@@ -229,36 +229,23 @@ public final class BooleanSeries extends Series {
   }
 
   @Override
-  BooleanSeries reorder(int[] toIndex) {
-    int len = this.values.length;
-    if(toIndex.length != len)
-      throw new IllegalArgumentException("toIndex size does not equal series size");
-
-    boolean[] values = new boolean[len];
-    for(int i=0; i<len; i++) {
-      values[toIndex[i]] = this.values[i];
-    }
-    return new BooleanSeries(values);
-  }
-
-  @Override
   int[] sortedIndex() {
-    int[] toIndex = new int[this.values.length];
+    int[] fromIndex = new int[this.values.length];
     int j=0;
 
     // false first
     for(int i=0; i<this.values.length; i++) {
       if(!this.values[i])
-        toIndex[i] = j++;
+        fromIndex[j++] = i;
     }
 
     // then true
     for(int i=0; i<this.values.length; i++) {
       if(this.values[i])
-        toIndex[i] = j++;
+        fromIndex[j++] = i;
     }
 
-    return toIndex;
+    return fromIndex;
   }
 
   @Override
@@ -269,6 +256,25 @@ public final class BooleanSeries extends Series {
   @Override
   int[] nullIndex() {
     return new int[0];
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+
+    BooleanSeries that = (BooleanSeries) o;
+
+    return Arrays.equals(this.values, that.values);
+  }
+
+  @Override
+  public int hashCode() {
+    return Arrays.hashCode(this.values);
   }
 
   private static boolean[] assertNotEmpty(boolean[] values) {

@@ -8,11 +8,16 @@ import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class RulesFunction extends AnomalyFunctionEx {
   private static final Logger LOG = LoggerFactory.getLogger(RulesFunction.class);
+
+  private static final String COLUMN_TIMESTAMP = "timestamp";
+  private static final String COLUMN_METRIC = "metric";
 
   @Override
   public AnomalyFunctionExResult apply() throws Exception {
@@ -29,23 +34,35 @@ public class RulesFunction extends AnomalyFunctionEx {
       URI uri = URI.create(e.getValue());
       LOG.info("Fetching '{}': '{}'", e.getKey(), uri);
       DataFrame queryResult = queryDataSource(uri.getScheme(), uri.toString());
-      dataFrames.put(e.getKey(), queryResult.sortBySeries("timestamp"));
+      dataFrames.put(e.getKey(), queryResult);
     }
 
     DataFrame data = mergeDataFrames(dataFrames);
+
+    long timestepSize = estimateStepSize(data);
 
     AnomalyFunctionExResult anomalyResult = new AnomalyFunctionExResult();
     anomalyResult.setContext(getContext());
 
     LOG.info("Applying rules:");
     for (Map.Entry<String, String> e : rules.entrySet()) {
-      DoubleSeries ruleResults = data.map(e.getValue());
+      String rule = e.getValue();
+      DoubleSeries ruleResults = data.map(rule);
       DataFrame violations = data.filter(ruleResults.toBooleans());
       LOG.info("Rule '{}' violated at {} / {} timestamps", e.getKey(), violations.size(), ruleResults.size());
 
-      long[] timestamps = violations.toLongs("timestamp").values();
+      long[] timestamps = violations.toLongs(COLUMN_TIMESTAMP).values();
       for (int i = 0; i < timestamps.length; i++) {
-        anomalyResult.addAnomaly(timestamps[i], timestamps[i], String.format("Rule '%s' violated", e.getKey()));
+        DataFrame slice = violations.sliceRows(i, i+1);
+
+        String numeric = extractNumericPortion(rule);
+        String threshold = extractThresholdPortion(rule);
+
+        DataFrame debug = new DataFrame(1);
+        debug.addSeries("current", slice.map(numeric).first());
+        debug.addSeries("baseline", slice.map(threshold).first());
+
+        anomalyResult.addAnomaly(timestamps[i] - timestepSize, timestamps[i], String.format("Rule '%s' violated", e.getKey()), debug);
       }
     }
 
@@ -59,12 +76,15 @@ public class RulesFunction extends AnomalyFunctionEx {
       return new DataFrame(0);
     }
 
-    DataFrame first = dataFrames.values().iterator().next();
+    DataFrame first = dataFrames.values().iterator().next().sortBySeries(COLUMN_TIMESTAMP);
     DataFrame df = new DataFrame(first.getIndex());
-    df.addSeries("timestamp", first.get("timestamp"));
+    df.addSeries(COLUMN_TIMESTAMP, first.toLongs(COLUMN_TIMESTAMP));
 
     for (Map.Entry<String, DataFrame> e : dataFrames.entrySet()) {
-      df.addSeries(e.getKey(), e.getValue().get("metric"));
+      DataFrame candidate = e.getValue().sortBySeries(COLUMN_TIMESTAMP);
+      if(!first.toLongs(COLUMN_TIMESTAMP).equals(candidate.toLongs(COLUMN_TIMESTAMP)))
+        throw new IllegalStateException("series timestamps do not align");
+      df.addSeries(e.getKey(), candidate.get(COLUMN_METRIC));
     }
 
     return df;
@@ -79,5 +99,28 @@ public class RulesFunction extends AnomalyFunctionEx {
       }
     }
     return output;
+  }
+
+  static long estimateStepSize(DataFrame df) {
+    if(df.size() <= 1)
+      return 0;
+    long[] index = df.toLongs(COLUMN_TIMESTAMP).values();
+    return index[1] - index[0];
+  }
+
+  static String extractNumericPortion(String rule) {
+    Pattern p = Pattern.compile(">=|<=|>|<|!=|==|=");
+    Matcher m = p.matcher(rule);
+    if(!m.find())
+      return "0";
+    return rule.substring(0, m.start()).trim();
+  }
+
+  static String extractThresholdPortion(String rule) {
+    Pattern p = Pattern.compile(">=|<=|>|<|!=|==|=");
+    Matcher m = p.matcher(rule);
+    if(!m.find())
+      return "0";
+    return rule.substring(m.end()).trim();
   }
 }

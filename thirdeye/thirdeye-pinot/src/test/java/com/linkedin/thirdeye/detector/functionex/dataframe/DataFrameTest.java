@@ -2,7 +2,6 @@ package com.linkedin.thirdeye.detector.functionex.dataframe;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import org.testng.Assert;
@@ -253,25 +252,25 @@ public class DataFrameTest {
   @Test
   public void testSortDouble() {
     DoubleSeries in = DataFrame.toSeries(3, 1.5, 1.3, 5, 1.9);
-    Assert.assertEquals(in.sort().values(), new double[] { 1.3, 1.5, 1.9, 3, 5 });
+    Assert.assertEquals(in.sorted().values(), new double[] { 1.3, 1.5, 1.9, 3, 5 });
   }
 
   @Test
   public void testSortLong() {
     LongSeries in = DataFrame.toSeries(3, 15, 13, 5, 19);
-    Assert.assertEquals(in.sort().values(), new long[] { 3, 5, 13, 15, 19 });
+    Assert.assertEquals(in.sorted().values(), new long[] { 3, 5, 13, 15, 19 });
   }
 
   @Test
   public void testSortString() {
     StringSeries in = DataFrame.toSeries("b", "a", "ba", "ab", "aa");
-    Assert.assertEquals(in.sort().values(), new String[] { "a", "aa", "ab", "b", "ba" });
+    Assert.assertEquals(in.sorted().values(), new String[] { "a", "aa", "ab", "b", "ba" });
   }
 
   @Test
   public void testSortBoolean() {
     BooleanSeries in = DataFrame.toSeries(true, false, false, true, false);
-    Assert.assertEquals(in.sort().values(), new boolean[] { false, false, false, true, true });
+    Assert.assertEquals(in.sorted().values(), new boolean[] { false, false, false, true, true });
   }
 
   @Test
@@ -311,7 +310,7 @@ public class DataFrameTest {
 
   @Test
   public void testSortByBoolean() {
-    // NOTE: boolean sort should be stable
+    // NOTE: boolean sorted should be stable
     df.addSeries("myseries", true, true, false, false, true );
     DataFrame ndf = df.sortBySeries("myseries");
     Assert.assertEquals(ndf.getIndex().values(), new long[] { -2, 4, -1, 1, 3 });
@@ -845,5 +844,24 @@ public class DataFrameTest {
     DoubleSeries s = DataFrame.toSeries(1.0, 2.0, 3.0, 4.0, 5.0, 6.0);
     DoubleSeries out = s.applyMovingWindow(2, 1, new DoubleSeries.DoubleBatchSum());
     Assert.assertEquals(out.values(), new double[] { 1.0, 3.0, 5.0, 7.0, 9.0, 11.0 });
+  }
+
+  @Test
+  void testSeriesEquals() {
+    Assert.assertTrue(DataFrame.toSeries(0.0, 3.0, 4.0).equals(DataFrame.toSeries(0.0, 3.0, 4.0)));
+    Assert.assertTrue(DataFrame.toSeries(0, 3, 4).equals(DataFrame.toSeries(0, 3, 4)));
+    Assert.assertTrue(DataFrame.toSeries(false, true, true).equals(DataFrame.toSeries(false, true, true)));
+    Assert.assertTrue(DataFrame.toSeries("1", "3", "4").equals(DataFrame.toSeries("1", "3", "4")));
+
+    Assert.assertFalse(DataFrame.toSeries(0.0, 3.0, 4.0).equals(DataFrame.toSeries(0, 3, 4)));
+    Assert.assertFalse(DataFrame.toSeries(0, 3, 4).equals(DataFrame.toSeries(0.0, 3.0, 4.0)));
+    Assert.assertFalse(DataFrame.toSeries(false, true, true).equals(DataFrame.toSeries("0", "1", "1")));
+    Assert.assertFalse(DataFrame.toSeries("1", "3", "4").equals(DataFrame.toSeries(1, 3, 4)));
+
+    Assert.assertTrue(DataFrame.toSeries(0.0, 3.0, 4.0).equals(DataFrame.toSeries(0, 3, 4).toDoubles()));
+    Assert.assertTrue(DataFrame.toSeries(0, 3, 4).equals(DataFrame.toSeries(0.0, 3.0, 4.0).toLongs()));
+    Assert.assertTrue(DataFrame.toSeries(false, true, true).equals(DataFrame.toSeries("0", "1", "1").toBooleans()));
+    Assert.assertTrue(DataFrame.toSeries("1", "3", "4").equals(DataFrame.toSeries(1, 3, 4).toStrings()));
+
   }
 }

@@ -175,7 +175,7 @@ public class MergedAnomalyResultBean extends AbstractBean
     if (diff != 0) {
       return diff;
     }
-    diff = -ObjectUtils.compare(startTime, o.getStartTime()); // inverted to sort by
+    diff = -ObjectUtils.compare(startTime, o.getStartTime()); // inverted to sorted by
     // decreasing time
     if (diff != 0) {
       return diff;

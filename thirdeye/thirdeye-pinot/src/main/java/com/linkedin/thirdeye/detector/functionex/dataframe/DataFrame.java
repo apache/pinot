@@ -78,6 +78,14 @@ public class DataFrame {
     return this.index.size();
   }
 
+  public DataFrame sliceRows(int from, int to) {
+    DataFrame newDataFrame = new DataFrame(this.getIndex().slice(from, to));
+    for(Map.Entry<String, Series> e : this.series.entrySet()) {
+      newDataFrame.addSeries(e.getKey(), e.getValue().slice(from, to));
+    }
+    return newDataFrame;
+  }
+
   public boolean isEmpty() {
     return this.index.size() <= 0;
   }
@@ -283,26 +291,23 @@ public class DataFrame {
     return this.mapWithNull(doubleExpression, variables.toArray(new String[variables.size()]));
   }
 
-  public DataFrame reorder(int[] toIndex) {
-    if(toIndex.length != this.index.size())
-      throw new IllegalArgumentException("toIndex size does not equal series size");
-
-    LongSeries newIndex = this.index.reorder(toIndex);
+  public DataFrame project(int[] fromIndex) {
+    LongSeries newIndex = this.index.project(fromIndex);
     DataFrame newDataFrame = new DataFrame(newIndex);
 
     for(Map.Entry<String, Series> e : this.series.entrySet()) {
-      newDataFrame.addSeries(e.getKey(), e.getValue().reorder(toIndex));
+      newDataFrame.addSeries(e.getKey(), e.getValue().project(fromIndex));
     }
     return newDataFrame;
   }
 
   public DataFrame sortByIndex() {
-    return this.reorder(this.index.sortedIndex());
+    return this.project(this.index.sortedIndex());
   }
 
   /**
-   * Sort data frame by series values.  The resulting sort order is the equivalent of applying
-   * a stable sort to nth series first, and then sorting iteratively until the 1st series.
+   * Sort data frame by series values.  The resulting sorted order is the equivalent of applying
+   * a stable sorted to nth series first, and then sorting iteratively until the 1st series.
    *
    * @param seriesNames 1st series, 2nd series, ..., nth series
    * @return sorted data frame
@@ -310,7 +315,7 @@ public class DataFrame {
   public DataFrame sortBySeries(String... seriesNames) {
     DataFrame df = this;
     for(int i=seriesNames.length-1; i>=0; i--) {
-      df = df.reorder(assertSeriesExists(seriesNames[i]).sortedIndex());
+      df = df.project(assertSeriesExists(seriesNames[i]).sortedIndex());
     }
     return df;
   }
@@ -346,10 +351,10 @@ public class DataFrame {
   }
 
   DataFrame filter(int[] fromIndex) {
-    LongSeries index = this.index.filter(fromIndex);
+    LongSeries index = this.index.project(fromIndex);
     DataFrame df = new DataFrame(index);
     for(Map.Entry<String, Series> e : this.getSeries().entrySet()) {
-      df.addSeries(e.getKey(), e.getValue().filter(fromIndex));
+      df.addSeries(e.getKey(), e.getValue().project(fromIndex));
     }
 
     return df;

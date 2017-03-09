@@ -165,19 +165,6 @@ public final class LongSeries extends Series {
   }
 
   @Override
-  LongSeries reorder(int[] toIndex) {
-    int len = this.values.length;
-    if(toIndex.length != len)
-      throw new IllegalArgumentException("toIndex size does not equal series size");
-
-    long[] values = new long[len];
-    for(int i=0; i<len; i++) {
-      values[toIndex[i]] = this.values[i];
-    }
-    return new LongSeries(values);
-  }
-
-  @Override
   int[] sortedIndex() {
     List<LongSortTuple> tuples = new ArrayList<>();
     for(int i=0; i<this.values.length; i++) {
@@ -187,19 +174,19 @@ public final class LongSeries extends Series {
     Collections.sort(tuples, new Comparator<LongSortTuple>() {
       @Override
       public int compare(LongSortTuple a, LongSortTuple b) {
-        return a.value == b.value ? 0 : a.value <= b.value ? -1 : 1;
+        return Long.compare(a.value, b.value);
       }
     });
 
-    int[] toIndex = new int[tuples.size()];
+    int[] fromIndex = new int[tuples.size()];
     for(int i=0; i<tuples.size(); i++) {
-      toIndex[tuples.get(i).index] = i;
+      fromIndex[i] = tuples.get(i).index;
     }
-    return toIndex;
+    return fromIndex;
   }
 
   @Override
-  public LongSeries sort() {
+  public LongSeries sorted() {
     long[] values = Arrays.copyOf(this.values, this.values.length);
     Arrays.sort(values);
     return new LongSeries(values);
@@ -221,8 +208,8 @@ public final class LongSeries extends Series {
     if(this.size() <= 0)
       return Collections.EMPTY_LIST;
 
-    // sort series and find ranges
-    LongSeries series = this.sort();
+    // sorted series and find ranges
+    LongSeries series = this.sorted();
 
     long startOffset = series.first() / interval * interval; // align with interval
     List<Range> ranges = new ArrayList<>();
@@ -350,7 +337,7 @@ public final class LongSeries extends Series {
   }
 
   @Override
-  LongSeries filter(int[] fromIndex) {
+  LongSeries project(int[] fromIndex) {
     long[] values = new long[fromIndex.length];
     for(int i=0; i<fromIndex.length; i++) {
       values[i] = this.values[fromIndex[i]];
@@ -402,6 +389,25 @@ public final class LongSeries extends Series {
     }
 
     return Arrays.copyOf(nulls, nullCount);
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+
+    LongSeries that = (LongSeries) o;
+
+    return Arrays.equals(this.values, that.values);
+  }
+
+  @Override
+  public int hashCode() {
+    return Arrays.hashCode(this.values);
   }
 
   public static boolean isNull(long value) {

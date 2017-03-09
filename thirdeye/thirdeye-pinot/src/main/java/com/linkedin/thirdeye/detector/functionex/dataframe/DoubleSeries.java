@@ -30,7 +30,7 @@ public final class DoubleSeries extends Series {
   public static class DoubleBatchSum implements DoubleBatchFunction {
     @Override
     public double apply(double[] values) {
-      // TODO sort, add low to high for accuracy
+      // TODO sorted, add low to high for accuracy
       double sum = 0.0d;
       for(double v : values)
         if(!isNull(v))
@@ -43,7 +43,7 @@ public final class DoubleSeries extends Series {
     @Override
     public double apply(double[] values) {
       assertNotEmpty(values);
-      // TODO sort, add low to high for accuracy
+      // TODO sorted, add low to high for accuracy
       double sum = 0.0d;
       int count = 0;
       for(double v : values) {
@@ -198,7 +198,7 @@ public final class DoubleSeries extends Series {
   }
 
   @Override
-  public DoubleSeries sort() {
+  public DoubleSeries sorted() {
     double[] values = Arrays.copyOf(this.values, this.values.length);
     Arrays.sort(values);
     return new DoubleSeries(values);
@@ -293,23 +293,10 @@ public final class DoubleSeries extends Series {
   }
 
   @Override
-  DoubleSeries filter(int[] fromIndex) {
+  DoubleSeries project(int[] fromIndex) {
     double[] values = new double[fromIndex.length];
     for(int i=0; i<fromIndex.length; i++) {
       values[i] = this.values[fromIndex[i]];
-    }
-    return new DoubleSeries(values);
-  }
-
-  @Override
-  DoubleSeries reorder(int[] toIndex) {
-    int len = this.values.length;
-    if(toIndex.length != len)
-      throw new IllegalArgumentException("toIndex size does not equal series size");
-
-    double[] values = new double[len];
-    for(int i=0; i<len; i++) {
-      values[toIndex[i]] = this.values[i];
     }
     return new DoubleSeries(values);
   }
@@ -324,15 +311,15 @@ public final class DoubleSeries extends Series {
     Collections.sort(tuples, new Comparator<DoubleSortTuple>() {
       @Override
       public int compare(DoubleSortTuple a, DoubleSortTuple b) {
-        return a.value == b.value ? 0 : a.value <= b.value ? -1 : 1;
+        return Double.compare(a.value, b.value);
       }
     });
 
-    int[] toIndex = new int[tuples.size()];
+    int[] fromIndex = new int[tuples.size()];
     for(int i=0; i<tuples.size(); i++) {
-      toIndex[tuples.get(i).index] = i;
+      fromIndex[i] = tuples.get(i).index;
     }
-    return toIndex;
+    return fromIndex;
   }
 
   @Override
@@ -357,6 +344,25 @@ public final class DoubleSeries extends Series {
     }
 
     return Arrays.copyOf(nulls, nullCount);
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+
+    DoubleSeries that = (DoubleSeries) o;
+
+    return Arrays.equals(this.values, that.values);
+  }
+
+  @Override
+  public int hashCode() {
+    return Arrays.hashCode(this.values);
   }
 
   public static boolean isNull(double value) {

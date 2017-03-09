@@ -170,7 +170,7 @@ public final class StringSeries extends Series {
   }
 
   @Override
-  public StringSeries sort() {
+  public StringSeries sorted() {
     String[] values = Arrays.copyOf(this.values, this.values.length);
     Arrays.sort(values);
     return new StringSeries(values);
@@ -240,23 +240,10 @@ public final class StringSeries extends Series {
   }
 
   @Override
-  StringSeries filter(int[] fromIndex) {
+  StringSeries project(int[] fromIndex) {
     String[] values = new String[fromIndex.length];
     for(int i=0; i<fromIndex.length; i++) {
       values[i] = this.values[fromIndex[i]];
-    }
-    return new StringSeries(values);
-  }
-
-  @Override
-  StringSeries reorder(int[] toIndex) {
-    int len = this.values.length;
-    if(toIndex.length != len)
-      throw new IllegalArgumentException("toIndex size does not equal series size");
-
-    String[] values = new String[len];
-    for(int i=0; i<len; i++) {
-      values[toIndex[i]] = this.values[i];
     }
     return new StringSeries(values);
   }
@@ -277,11 +264,11 @@ public final class StringSeries extends Series {
       }
     });
 
-    int[] toIndex = new int[tuples.size()];
+    int[] fromIndex = new int[tuples.size()];
     for(int i=0; i<tuples.size(); i++) {
-      toIndex[tuples.get(i).index] = i;
+      fromIndex[i] = tuples.get(i).index;
     }
-    return toIndex;
+    return fromIndex;
   }
 
   @Override
@@ -305,6 +292,25 @@ public final class StringSeries extends Series {
     }
 
     return Arrays.copyOf(nulls, nullCount);
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+
+    StringSeries that = (StringSeries) o;
+
+    return Arrays.equals(this.values, that.values);
+  }
+
+  @Override
+  public int hashCode() {
+    return Arrays.hashCode(this.values);
   }
 
   public static boolean isNull(String value) {

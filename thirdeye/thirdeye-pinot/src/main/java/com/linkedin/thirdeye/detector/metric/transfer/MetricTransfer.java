@@ -119,7 +119,7 @@ public class MetricTransfer {
     }
 
     /**
-     * Used to sort ScaledValue by the natural order of their timestamp
+     * Used to sorted ScaledValue by the natural order of their timestamp
      */
     @Override
     public int compareTo(ScaledValue o) {

@@ -109,7 +109,7 @@ public class AlertTaskRunner implements TaskRunner {
       return;
     }
 
-    // Group by dimension key, then sort according to anomaly result compareTo method.
+    // Group by dimension key, then sorted according to anomaly result compareTo method.
     Map<DimensionMap, List<MergedAnomalyResultDTO>> groupedResults = new TreeMap<>();
     for (MergedAnomalyResultDTO result : results) {
       DimensionMap dimensions = result.getDimensions();
@@ -118,7 +118,7 @@ public class AlertTaskRunner implements TaskRunner {
       }
       groupedResults.get(dimensions).add(result);
     }
-    // sort each list of anomaly results afterwards
+    // sorted each list of anomaly results afterwards
     for (List<MergedAnomalyResultDTO> resultsByExploredDimensions : groupedResults.values()) {
       Collections.sort(resultsByExploredDimensions);
     }

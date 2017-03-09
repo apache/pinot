@@ -50,6 +50,7 @@ public class AnomalyFunctionExRunner {
   private static final String ID_THIRDEYE = "enable-thirdeye";
   private static final String ID_EVENT = "enable-event";
   private static final String ID_METRIC = "enable-metric";
+  private static final String ID_AS_JSOM = "as-json";
 
   public static void main(String[] args) throws Exception {
     Options options = makeParserOptions();
@@ -81,6 +82,11 @@ public class AnomalyFunctionExRunner {
     if(cmd.hasOption(ID_CONFIG))
       config.putAll(parseConfig(cmd.getOptionValue(ID_CONFIG)));
     LOG.info("Using configuration '{}'", config);
+
+    if(cmd.hasOption(ID_AS_JSOM)) {
+      LOG.info(config2json(config));
+      System.exit(0);
+    }
 
     if(cmd.hasOption(ID_THIRDEYE)) {
       LOG.info("Enabling ThirdEye internal database with config '{}'", cmd.getOptionValue(ID_THIRDEYE));
@@ -214,6 +220,10 @@ public class AnomalyFunctionExRunner {
         "Enables 'metric' data source. (Requires: " + ID_THIRDEYE + " " + ID_PINOT + ")");
     options.addOption(metric);
 
+    Option asJson = new Option("", ID_AS_JSOM, false,
+        "Prints the configuration as Json");
+    options.addOption(asJson);
+
     return options;
   }
 
@@ -236,5 +246,10 @@ public class AnomalyFunctionExRunner {
       map.put(e.getKey().toString(), e.getValue().toString());
     }
     return map;
+  }
+
+  private static String config2json(Map<String, String> config) throws Exception {
+    ObjectMapper mapper = new ObjectMapper();
+    return mapper.writeValueAsString(config);
   }
 }

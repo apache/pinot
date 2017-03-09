@@ -20,6 +20,7 @@ import com.linkedin.thirdeye.dashboard.resources.AnomalyFunctionResource;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExFactory;
+import com.linkedin.thirdeye.detector.functionex.impl.ThirdEyeMetricDataSource;
 import com.linkedin.thirdeye.detector.functionex.impl.ThirdEyeMockDataSource;
 import com.linkedin.thirdeye.detector.functionex.impl.ThirdEyePinotConnection;
 import com.linkedin.thirdeye.detector.functionex.impl.ThirdEyePinotDataSource;
@@ -187,10 +188,12 @@ public class ThirdEyeAnomalyApplication
     PinotThirdEyeClientConfig clientConfig = PinotThirdEyeClientConfig.createThirdEyeClientConfig(config);
 
     ThirdEyePinotConnection pinotConn = new ThirdEyePinotConnection(clientConfig);
+    ThirdEyePinotDataSource pinot = new ThirdEyePinotDataSource(pinotConn);
 
     AnomalyFunctionExFactory factory = new AnomalyFunctionExFactory();
     factory.addDataSource("mock", new ThirdEyeMockDataSource());
-    factory.addDataSource("pinot", new ThirdEyePinotDataSource(pinotConn));
+    factory.addDataSource("pinot", pinot);
+    factory.addDataSource("metric", new ThirdEyeMetricDataSource(pinot, datasetConfigDAO));
 
     return factory;
   }
