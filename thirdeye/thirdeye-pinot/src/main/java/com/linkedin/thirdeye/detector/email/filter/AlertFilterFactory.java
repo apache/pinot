@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.detector.email.filter;
 
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;

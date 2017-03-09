@@ -24,6 +24,7 @@ import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import com.linkedin.thirdeye.datalayer.util.PersistenceConfig;
+import com.linkedin.thirdeye.detector.email.filter.AlphaBetaAlertFilter;
 import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
@@ -164,6 +165,17 @@ public abstract class AbstractManagerTestBase {
     functionSpec.setWindowUnit(TimeUnit.DAYS);
     functionSpec.setProperties("baseline=w/w;changeThreshold=0.001");
     functionSpec.setIsActive(true);
+    return functionSpec;
+  }
+
+  protected AnomalyFunctionDTO getTestFunctionAlphaBetaAlertFilterSpec(String metricName, String collection){
+    AnomalyFunctionDTO functionSpec = getTestFunctionSpec(metricName, collection);
+    Map<String, String> alphaBetaAlertFilter = new HashMap<>();
+    alphaBetaAlertFilter.put("type", "alpha_beta");
+    alphaBetaAlertFilter.put(AlphaBetaAlertFilter.ALPHA, "1");
+    alphaBetaAlertFilter.put(AlphaBetaAlertFilter.BETA, "1");
+    alphaBetaAlertFilter.put(AlphaBetaAlertFilter.THRESHOLD, "0.5");
+    functionSpec.setAlertFilter(alphaBetaAlertFilter);
     return functionSpec;
   }
 
