@@ -161,9 +161,9 @@ public class DetectionJobScheduler implements Runnable {
    * @param anomalyFunction
    * @param detectionStatusToUpdate
    */
-  private long runAnomalyFunctionAndUpdateDetectionStatus(List<Long> startTimes, List<Long> endTimes,
+  private Long runAnomalyFunctionAndUpdateDetectionStatus(List<Long> startTimes, List<Long> endTimes,
       AnomalyFunctionDTO anomalyFunction, List<DetectionStatusDTO> detectionStatusToUpdate) {
-    long jobExecutionId = 0l;
+    Long jobExecutionId = null;
     if (!startTimes.isEmpty() && !endTimes.isEmpty() && startTimes.size() == endTimes.size()) {
       jobExecutionId = runAnomalyFunctionOnRanges(anomalyFunction, startTimes, endTimes);
       LOG.info("Function: {} Dataset: {} Created job {} for running anomaly function {} on ranges {} to {}",
