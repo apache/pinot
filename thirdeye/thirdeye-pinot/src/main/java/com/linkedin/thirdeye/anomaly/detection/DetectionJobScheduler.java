@@ -418,11 +418,11 @@ public class DetectionJobScheduler implements Runnable {
           hasFailedTask = true;
           LOG.warn("The backfill of anomaly function {} (task id: {}) failed. Retry count: {}", functionId,
               jobExecutionId, retryCounter);
-          jobExecutionId = runBackfill(functionId, backfillStartTime, backfillEndTime, force);
         }
       }
       if (hasFailedTask) {
         retryCounter++;
+        jobExecutionId = runBackfill(functionId, backfillStartTime, backfillEndTime, force);
       }
       try {
         TimeUnit.SECONDS.sleep(SYNC_SLEEP_SECONDS);
@@ -433,7 +433,7 @@ public class DetectionJobScheduler implements Runnable {
       scheduledTaskDTO = taskDAO.findByJobIdStatusNotIn(jobExecutionId, TaskConstants.TaskStatus.COMPLETED);
     }
   }
-  
+
   private JobDTO getPreviousJob(long functionId, long backfillWindowStart, long backfillWindowEnd) {
     return DAO_REGISTRY.getJobDAO().findLatestBackfillScheduledJobByFunctionId(functionId, backfillWindowStart, backfillWindowEnd);
   }
