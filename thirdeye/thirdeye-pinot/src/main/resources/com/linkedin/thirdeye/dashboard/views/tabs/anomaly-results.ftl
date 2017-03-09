@@ -26,18 +26,17 @@
                 <label class="label-medium-semibold">Change</label>
                 <span class="anomaly-change-delta {{colorDelta changeDelta}}">{{changeDelta}}</span>
               </div>
-
               <div class="anomaly-details-items anomaly-details-items--small">
-                <label class="label-medium-semibold">Current</label>
-                <span>{{current}}</span>
+                <label class="label-medium-semibold">Duration</label>
+                <span class="anomaly-duration">{{duration}}</span>
               </div>
               <div class="anomaly-details-items anomaly-details-items--small">
-                <label class="label-medium-semibold">Baseline</label>
+                <label class="label-medium-semibold">Status</label>
                 <span>
-                  {{#if baseline}}
-                    {{baseline}}
+                  {{#if anomalyFeedback}}
+                    Resolved ({{anomalyFeedback}})
                   {{else}}
-                    N/A
+                    Not Resolved
                   {{/if}}
                 </span>
               </div>
@@ -61,17 +60,16 @@
             </div>
             <div class="anomaly-details-row">
               <div class="anomaly-details-items">
-                <label class="label-medium-semibold">Duration</label>
-                <span>{{duration}}</span>
+                <label class="label-medium-semibold">Current</label>
+                <span>{{current}}</span>
               </div>
-
               <div class="anomaly-details-items">
-                <label class="label-medium-semibold">Status</label>
+                <label class="label-medium-semibold">Baseline</label>
                 <span>
-                  {{#if anomalyFeedback}}
-                    Resolved ({{anomalyFeedback}})
+                  {{#if baseline}}
+                    {{baseline}}
                   {{else}}
-                    Not Resolved
+                    N/A
                   {{/if}}
                 </span>
               </div>

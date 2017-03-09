@@ -593,6 +593,7 @@ text {
   border: 1px solid #CCC;
   border-radius: 2px;
   margin-top: 24px;
+  text-align: center;
 }
 
 .anomaly-details-row {
