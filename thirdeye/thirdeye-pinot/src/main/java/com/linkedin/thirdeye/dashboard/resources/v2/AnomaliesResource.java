@@ -1,13 +1,23 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
+import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
+import com.linkedin.thirdeye.anomaly.alert.util.EmailHelper;
+import com.linkedin.thirdeye.anomaly.detection.TimeSeriesUtil;
+import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
+import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomaliesSummary;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomaliesWrapper;
+import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalyDataCompare;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalyDetails;
 
+import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
+import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -90,6 +100,7 @@ public class AnomaliesResource {
   private final MergedAnomalyResultManager mergedAnomalyResultDAO;
   private final AnomalyFunctionManager anomalyFunctionDAO;
   private final DashboardConfigManager dashboardConfigDAO;
+  private final DatasetConfigManager datasetConfigDAO;
   private ExecutorService threadPool;
   private AlertFilterFactory alertFilterFactory;
 
@@ -98,9 +109,69 @@ public class AnomaliesResource {
     mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
+    datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
     threadPool = Executors.newFixedThreadPool(NUM_EXECS);
     this.alertFilterFactory = alertFilterFactory;
   }
+
+  @GET
+  @Path("/{anomalyId}")
+  public AnomalyDataCompare.Response getAnomalyDataCompareResults(
+      @PathParam("anomalyId") Long anomalyId) {
+    MergedAnomalyResultDTO anomaly = mergedAnomalyResultDAO.findById(anomalyId);
+    if (anomaly == null) {
+      LOG.error("Anomaly not found with id " + anomalyId);
+      throw new IllegalArgumentException("Anomaly not found with id " + anomalyId);
+    }
+    AnomalyDataCompare.Response response = new AnomalyDataCompare.Response();
+    response.setCurrentStart(anomaly.getStartTime());
+    response.setCurrenEnd(anomaly.getEndTime());
+    try {
+      DatasetConfigDTO dataset = datasetConfigDAO.findByDataset(anomaly.getCollection());
+      TimeGranularity granularity =
+          new TimeGranularity(dataset.getTimeDuration(), dataset.getTimeUnit());
+
+      // Lets compute currentTimeRange
+      // TODO : make one call to pinot
+      Pair<Long, Long> currentTmeRange = new Pair<>(anomaly.getStartTime(), anomaly.getEndTime());
+      MetricTimeSeries ts = TimeSeriesUtil
+          .getTimeSeriesByDimension(anomaly.getFunction(), Arrays.asList(currentTmeRange),
+              anomaly.getDimensions(), granularity);
+
+      response.setCurrentVal(getTotalFromTimeSeries(ts, dataset.isAdditive()));
+
+      for (AlertConfigBean.COMPARE_MODE compareMode : AlertConfigBean.COMPARE_MODE.values()) {
+        long baselineOffset = EmailHelper.getBaselineOffset(compareMode);
+        Pair<Long, Long> baselineTmeRange = new Pair<>(anomaly.getStartTime() - baselineOffset,
+            anomaly.getEndTime() - baselineOffset);
+        MetricTimeSeries baselineTs = TimeSeriesUtil
+            .getTimeSeriesByDimension(anomaly.getFunction(), Arrays.asList(baselineTmeRange),
+                anomaly.getDimensions(), granularity);
+        AnomalyDataCompare.CompareResult cr = new AnomalyDataCompare.CompareResult();
+        cr.setBaselineValue(getTotalFromTimeSeries(baselineTs, dataset.isAdditive()));
+        cr.setCompareMode(compareMode);
+        response.getCompareResults().add(cr);
+      }
+    } catch (Exception e) {
+      LOG.error("Error fetching the timeseries data from pinot", e);
+      throw new RuntimeException(e);
+    }
+    return response;
+  }
+
+
+  double getTotalFromTimeSeries (MetricTimeSeries mts, boolean isAdditive) {
+    double total = 0.0;
+    for (Number num : mts.getMetricSums()) {
+      total += num.doubleValue();
+    }
+    if (!isAdditive) {
+      // for non Additive data sets return the average
+      total /= mts.getTimeWindowSet().size();
+    }
+    return total;
+  }
+
 
   /**
    * Get count of anomalies for metric in time range
