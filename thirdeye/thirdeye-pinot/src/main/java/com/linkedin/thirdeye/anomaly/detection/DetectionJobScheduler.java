@@ -4,6 +4,7 @@ import com.google.common.collect.Lists;
 import com.linkedin.thirdeye.anomaly.job.JobConstants;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants;
 import com.linkedin.thirdeye.dashboard.Utils;
+import com.linkedin.thirdeye.datalayer.bao.JobManager;
 import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionStatusDTO;
@@ -49,6 +50,9 @@ public class DetectionJobScheduler implements Runnable {
   private DetectionJobRunner detectionJobRunner = new DetectionJobRunner();
 
   private final Map<BackfillKey, Thread> existingBackfillJobs = new ConcurrentHashMap<>();
+
+  private final int MAX_BACKFILL_RETRY = 3;
+  private final long SYNC_SLEEP_SECONDS = 5;
 
   public DetectionJobScheduler() {
     scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
@@ -366,6 +370,44 @@ public class DetectionJobScheduler implements Runnable {
     }
     return jobId;
   }
+  /**
+   * Different from asynchronous backfill in runBackfill, it will return after the backfill is done.
+   * @param functionId
+   * @param backfillStartTime
+   * @param backfillEndTime
+   * @param force
+   */
+  public void synchronousBackFill(long functionId, DateTime backfillStartTime, DateTime backfillEndTime, boolean force) {
+    Long jobExecutionId = runBackfill(functionId, backfillStartTime, backfillEndTime, force);
+
+    if(jobExecutionId == null) {
+      LOG.warn("Unable to perform backfill on function Id {} between {} and {}", functionId, backfillStartTime, backfillEndTime);
+      return;
+    }
+
+    JobManager jobDAO = DAO_REGISTRY.getJobDAO();
+    JobDTO jobDTO = jobDAO.findById(jobExecutionId);
+    int retryCounter = 0;
+    while(jobDTO.getStatus() != JobConstants.JobStatus.COMPLETED) {
+      if(jobDTO.getStatus() == JobConstants.JobStatus.FAILED) {
+        if(retryCounter >= MAX_BACKFILL_RETRY) {
+          LOG.warn("The backfill of anomaly function {} (task id: {}) failed. Stop retry.", functionId, jobExecutionId);
+          return;
+        }
+        retryCounter++;
+        LOG.warn("The backfill of anomaly function {} (task id: {}) failed. Retry count: {}", functionId, jobExecutionId, retryCounter);
+        jobExecutionId = runBackfill(functionId, backfillStartTime, backfillEndTime, force);
+      }
+      try {
+        TimeUnit.SECONDS.sleep(SYNC_SLEEP_SECONDS);
+      }
+      catch (InterruptedException e) {
+        LOG.warn("The backfill of anomaly function {} (task id: {}) is awakened.", functionId, jobExecutionId);
+      }
+      jobDTO = jobDAO.findById(jobExecutionId);
+    }
+  }
+
 
 
   private JobDTO getPreviousJob(long functionId, long backfillWindowStart, long backfillWindowEnd) {
