@@ -706,3 +706,7 @@ text {
 .investigate-divider {
   margin: 24px 0;
 }
+
+.anomaly-feedback-radio {
+  margin: 8px 0;
+}
