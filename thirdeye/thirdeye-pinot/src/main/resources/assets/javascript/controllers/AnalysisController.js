@@ -10,11 +10,8 @@ function AnalysisController(parentController) {
 
 AnalysisController.prototype = {
   handleAppEvent: function () {
-    let hashParams = HASH_SERVICE.getParams();
-    if (hashParams.metricId) {
-      HASH_SERVICE.refreshWindowHashForRouting('analysis');
-      hashParams = HASH_SERVICE.getParams();
-    }
+    HASH_SERVICE.refreshWindowHashForRouting('analysis');
+    const hashParams = HASH_SERVICE.getParams();
     this.analysisModel.init(hashParams);
     this.analysisModel.update(hashParams);
     this.analysisView.init(hashParams);
