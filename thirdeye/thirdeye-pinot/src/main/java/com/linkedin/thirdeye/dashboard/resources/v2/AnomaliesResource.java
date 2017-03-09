@@ -132,13 +132,12 @@ public class AnomaliesResource {
           new TimeGranularity(dataset.getTimeDuration(), dataset.getTimeUnit());
 
       // Lets compute currentTimeRange
-      // TODO : make one call to pinot
       Pair<Long, Long> currentTmeRange = new Pair<>(anomaly.getStartTime(), anomaly.getEndTime());
       MetricTimeSeries ts = TimeSeriesUtil
           .getTimeSeriesByDimension(anomaly.getFunction(), Arrays.asList(currentTmeRange),
               anomaly.getDimensions(), granularity);
-
-      response.setCurrentVal(getTotalFromTimeSeries(ts, dataset.isAdditive()));
+      double currentVal = getTotalFromTimeSeries(ts, dataset.isAdditive());
+      response.setCurrentVal(currentVal);
 
       for (AlertConfigBean.COMPARE_MODE compareMode : AlertConfigBean.COMPARE_MODE.values()) {
         long baselineOffset = EmailHelper.getBaselineOffset(compareMode);
@@ -148,8 +147,10 @@ public class AnomaliesResource {
             .getTimeSeriesByDimension(anomaly.getFunction(), Arrays.asList(baselineTmeRange),
                 anomaly.getDimensions(), granularity);
         AnomalyDataCompare.CompareResult cr = new AnomalyDataCompare.CompareResult();
-        cr.setBaselineValue(getTotalFromTimeSeries(baselineTs, dataset.isAdditive()));
+        double baseLineval = getTotalFromTimeSeries(baselineTs, dataset.isAdditive());
+        cr.setBaselineValue(baseLineval);
         cr.setCompareMode(compareMode);
+        cr.setChange(calculateChange(currentVal, baseLineval));
         response.getCompareResults().add(cr);
       }
     } catch (Exception e) {
@@ -159,6 +160,17 @@ public class AnomaliesResource {
     return response;
   }
 
+  private double calculateChange(double currentValue, double baselineValue) {
+    if (baselineValue == 0.0) {
+      if (currentValue != 0) {
+        return 1;  // 100 % change
+      }
+      if (currentValue == 0) {
+        return 0;  // No change
+      }
+    }
+    return (currentValue - baselineValue) / baselineValue;
+  }
 
   double getTotalFromTimeSeries (MetricTimeSeries mts, boolean isAdditive) {
     double total = 0.0;

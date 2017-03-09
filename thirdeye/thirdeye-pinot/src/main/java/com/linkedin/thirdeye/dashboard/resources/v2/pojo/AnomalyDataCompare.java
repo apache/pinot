@@ -49,6 +49,7 @@ public class AnomalyDataCompare {
   public static class CompareResult {
     AlertConfigBean.COMPARE_MODE compareMode;
     double baselineValue;
+    double change = 1;
 
     public double getBaselineValue() {
       return baselineValue;
@@ -56,6 +57,14 @@ public class AnomalyDataCompare {
 
     public void setBaselineValue(double baselineValue) {
       this.baselineValue = baselineValue;
+    }
+
+    public double getChange() {
+      return change;
+    }
+
+    public void setChange(double change) {
+      this.change = change;
     }
 
     public AlertConfigBean.COMPARE_MODE getCompareMode() {
