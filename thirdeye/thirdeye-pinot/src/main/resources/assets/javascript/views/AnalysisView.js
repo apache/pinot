@@ -88,13 +88,13 @@ AnalysisView.prototype = {
         metricName = name;
       }
 
-      this.viewParams['metric'] = {id: metricId, alias: metricAlias, allowClear:true, name:metricName};
-      this.viewParams['metricId'] = metricId;
+      this.viewParams['metric'] = {id: metricId, alias: metricAlias, allowClear:true, name:metricName} || this.viewParams['metric'];
+      this.viewParams['metricId'] = metricId || this.viewParams['metricId'];
 
       // Now render the dimensions and filters for selected metric
-      this.renderGranularity(this.viewParams.metric.id);
-      this.renderDimensions(this.viewParams.metric.id);
-      this.renderFilters(this.viewParams.metric.id);
+      this.renderGranularity(this.viewParams.metricId);
+      this.renderDimensions(this.viewParams.metricId);
+      this.renderFilters(this.viewParams.metricId);
     }).trigger('change');
 
     // TIME RANGE SELECTION

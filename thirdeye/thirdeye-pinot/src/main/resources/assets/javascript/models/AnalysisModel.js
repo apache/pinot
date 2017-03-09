@@ -5,13 +5,10 @@ function AnalysisModel() {
   this.granularity;
   this.dimension;
   this.filters;
-
-  var currentTime = moment();
-  currentTime = currentTime - (currentTime % 3600000) - 2 * 3600000;  // 2 hours behind current time
-  this.currentStart = moment(currentTime).subtract(4, 'days');
-  this.currentEnd = moment(currentTime);
-  this.baselineStart= moment(currentTime).subtract(10, 'days');
-  this.baselineEnd = moment(currentTime).subtract(6, 'days');
+  this.currentStart;
+  this.currentEndl;
+  this.baselineStart;
+  this.baselineEnd;
 }
 
 AnalysisModel.prototype = {
