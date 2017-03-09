@@ -11,19 +11,6 @@ import java.util.TreeMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/*
- * CONFIG:
- * variables: {
- *   var_a: "metric://pinot/dataset/metric/function?key=value",
- *   var_b: "metric://pinot/dataset/metric/function?key=other_value"
- * },
- * rules: {
- *   rule_1: "var_a >= var_b",
- *   rule_2: "var_a > 10",
- *   rule_3: "var_b > 10"
- * }
- */
-
 public class RulesFunction extends AnomalyFunctionEx {
   private static final Logger LOG = LoggerFactory.getLogger(RulesFunction.class);
 
