@@ -161,10 +161,11 @@ public class DetectionJobScheduler implements Runnable {
    * @param anomalyFunction
    * @param detectionStatusToUpdate
    */
-  private void runAnomalyFunctionAndUpdateDetectionStatus(List<Long> startTimes, List<Long> endTimes,
+  private Long runAnomalyFunctionAndUpdateDetectionStatus(List<Long> startTimes, List<Long> endTimes,
       AnomalyFunctionDTO anomalyFunction, List<DetectionStatusDTO> detectionStatusToUpdate) {
+    Long jobExecutionId = null;
     if (!startTimes.isEmpty() && !endTimes.isEmpty() && startTimes.size() == endTimes.size()) {
-      long jobExecutionId = runAnomalyFunctionOnRanges(anomalyFunction, startTimes, endTimes);
+      jobExecutionId = runAnomalyFunctionOnRanges(anomalyFunction, startTimes, endTimes);
       LOG.info("Function: {} Dataset: {} Created job {} for running anomaly function {} on ranges {} to {}",
           anomalyFunction.getId(), anomalyFunction.getCollection(), jobExecutionId, anomalyFunction, startTimes, endTimes);
 
@@ -175,6 +176,7 @@ public class DetectionJobScheduler implements Runnable {
         DAO_REGISTRY.getDetectionStatusDAO().update(detectionStatus);
       }
     }
+    return jobExecutionId;
   }
 
 
@@ -290,14 +292,16 @@ public class DetectionJobScheduler implements Runnable {
    * @param backfillStartTime the start time for backfilling
    * @param backfillEndTime the end time for backfilling
    * @param force set to false to resume from previous backfill if there exists any
+   * @return task id
    */
-  public void runBackfill(long functionId, DateTime backfillStartTime, DateTime backfillEndTime, boolean force) {
+  public Long runBackfill(long functionId, DateTime backfillStartTime, DateTime backfillEndTime, boolean force) {
     AnomalyFunctionDTO anomalyFunction = DAO_REGISTRY.getAnomalyFunctionDAO().findById(functionId);
+    Long jobId = null;
     String dataset = anomalyFunction.getCollection();
     boolean isActive = anomalyFunction.getIsActive();
     if (!isActive) {
       LOG.info("Skipping function {}", functionId);
-      return;
+      return null;
     }
 
     BackfillKey backfillKey = new BackfillKey(functionId, backfillStartTime, backfillEndTime);
@@ -305,7 +309,7 @@ public class DetectionJobScheduler implements Runnable {
     // If returned thread is not current thread, then a backfill job is already running
     if (returnedThread != null) {
       LOG.info("Function: {} Dataset: {} Aborting... An existing back-fill job is running...", functionId, dataset);
-      return;
+      return null;
     }
 
     try {
@@ -314,7 +318,7 @@ public class DetectionJobScheduler implements Runnable {
         cronExpression = new CronExpression(anomalyFunction.getCron());
       } catch (ParseException e) {
         LOG.error("Function: {} Dataset: {} Failed to parse cron expression", functionId, dataset);
-        return;
+        return null;
       }
 
       long monitoringWindowSize = TimeUnit.MILLISECONDS.convert(anomalyFunction.getWindowSize(), anomalyFunction.getWindowUnit());
@@ -338,7 +342,7 @@ public class DetectionJobScheduler implements Runnable {
 
         if (Thread.currentThread().isInterrupted()) {
           LOG.info("Function: {} Dataset: {} Terminating adhoc function.", functionId, dataset);
-          return;
+          return null;
         }
         String monitoringWindowStart = ISODateTimeFormat.dateHourMinute().print(currentStart);
         String monitoringWindowEnd = ISODateTimeFormat.dateHourMinute().print(currentEnd);
@@ -354,12 +358,13 @@ public class DetectionJobScheduler implements Runnable {
       // If any time periods found, for which detection needs to be run, run anomaly function update detection status
       List<DetectionStatusDTO> findAllInTimeRange = DAO_REGISTRY.getDetectionStatusDAO()
           .findAllInTimeRangeForFunctionAndDetectionRun(backfillStartTime.getMillis(), currentStart.getMillis(), functionId, false);
-      runAnomalyFunctionAndUpdateDetectionStatus(startTimes, endTimes, anomalyFunction, findAllInTimeRange);
+      jobId = runAnomalyFunctionAndUpdateDetectionStatus(startTimes, endTimes, anomalyFunction, findAllInTimeRange);
       LOG.info("Function: {} Dataset: {} Generated job for detecting anomalies for each monitoring window "
           + "whose start is located in range {} -- {}", functionId, dataset, backfillStartTime, currentStart);
     } finally {
       existingBackfillJobs.remove(backfillKey, Thread.currentThread());
     }
+    return jobId;
   }
 
 
