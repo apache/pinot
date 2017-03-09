@@ -53,7 +53,7 @@ public class RulesFunction extends AnomalyFunctionEx {
     for(Map.Entry<String, String> e : rules.entrySet()) {
       LOG.info("Applying '{}': '{}'", e.getKey(), e.getValue());
       DoubleSeries ruleResults = data.map(e.getValue());
-      DataFrame violations = data.filter(ruleResults.toBooleans().not());
+      DataFrame violations = data.filter(ruleResults.toBooleans());
       LOG.info("Rule '{}' violated at {} out of {} timestamps in monitoring window", e.getKey(), violations.size(), ruleResults.size());
 
       long[] timestamps = violations.toLongs("timestamp").values();
