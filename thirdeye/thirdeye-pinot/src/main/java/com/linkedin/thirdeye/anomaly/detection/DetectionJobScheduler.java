@@ -5,6 +5,7 @@ import com.linkedin.thirdeye.anomaly.job.JobConstants;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
+import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionStatusDTO;
@@ -370,46 +371,69 @@ public class DetectionJobScheduler implements Runnable {
     }
     return jobId;
   }
+
   /**
    * Different from asynchronous backfill in runBackfill, it will return after the backfill is done.
+   * This function monitors the backfill task status, and return once the tasks are completed.
    * @param functionId
+   * the function id to be backfilled
    * @param backfillStartTime
+   * the monitor start time for backfill
    * @param backfillEndTime
+   * the monitor end time for backfill
    * @param force
+   * set to false to resume from previous backfill if there exists any
    */
   public void synchronousBackFill(long functionId, DateTime backfillStartTime, DateTime backfillEndTime, boolean force) {
     Long jobExecutionId = runBackfill(functionId, backfillStartTime, backfillEndTime, force);
 
-    if(jobExecutionId == null) {
-      LOG.warn("Unable to perform backfill on function Id {} between {} and {}", functionId, backfillStartTime, backfillEndTime);
+    if (jobExecutionId == null) {
+      LOG.warn("Unable to perform backfill on function Id {} between {} and {}", functionId, backfillStartTime,
+          backfillEndTime);
       return;
     }
 
+    TaskManager taskDAO = DAO_REGISTRY.getTaskDAO();
     JobManager jobDAO = DAO_REGISTRY.getJobDAO();
-    JobDTO jobDTO = jobDAO.findById(jobExecutionId);
+    JobDTO jobDTO = null;
+    List<TaskDTO> scheduledTaskDTO = taskDAO.findByJobIdStatusNotIn(jobExecutionId, TaskConstants.TaskStatus.COMPLETED);
+
     int retryCounter = 0;
-    while(jobDTO.getStatus() != JobConstants.JobStatus.COMPLETED) {
-      if(jobDTO.getStatus() == JobConstants.JobStatus.FAILED) {
-        if(retryCounter >= MAX_BACKFILL_RETRY) {
-          LOG.warn("The backfill of anomaly function {} (task id: {}) failed. Stop retry.", functionId, jobExecutionId);
-          return;
+    while (scheduledTaskDTO.size() > 0) {
+      boolean hasFailedTask = false;
+      for (TaskDTO taskDTO : scheduledTaskDTO) {
+        if (taskDTO.getStatus() == TaskConstants.TaskStatus.FAILED) {
+          if (retryCounter >= MAX_BACKFILL_RETRY) {
+            LOG.warn("The backfill of anomaly function {} (task id: {}) failed. Stop retry.", functionId, jobExecutionId);
+
+            // Set job to be failed
+            jobDTO = jobDAO.findById(jobExecutionId);
+            if (jobDTO.getStatus() != JobConstants.JobStatus.FAILED) {
+              jobDTO.setStatus(JobConstants.JobStatus.FAILED);
+              jobDAO.save(jobDTO);
+            }
+
+            return;
+          }
+          hasFailedTask = true;
+          LOG.warn("The backfill of anomaly function {} (task id: {}) failed. Retry count: {}", functionId,
+              jobExecutionId, retryCounter);
+          jobExecutionId = runBackfill(functionId, backfillStartTime, backfillEndTime, force);
         }
+      }
+      if (hasFailedTask) {
         retryCounter++;
-        LOG.warn("The backfill of anomaly function {} (task id: {}) failed. Retry count: {}", functionId, jobExecutionId, retryCounter);
-        jobExecutionId = runBackfill(functionId, backfillStartTime, backfillEndTime, force);
       }
       try {
         TimeUnit.SECONDS.sleep(SYNC_SLEEP_SECONDS);
+      } catch (InterruptedException e) {
+        LOG.warn("The monitoring thread for anomaly function {} (task id: {}) backfill is awakened.", functionId,
+            jobExecutionId);
       }
-      catch (InterruptedException e) {
-        LOG.warn("The backfill of anomaly function {} (task id: {}) is awakened.", functionId, jobExecutionId);
-      }
-      jobDTO = jobDAO.findById(jobExecutionId);
+      scheduledTaskDTO = taskDAO.findByJobIdStatusNotIn(jobExecutionId, TaskConstants.TaskStatus.COMPLETED);
     }
   }
-
-
-
+  
   private JobDTO getPreviousJob(long functionId, long backfillWindowStart, long backfillWindowEnd) {
     return DAO_REGISTRY.getJobDAO().findLatestBackfillScheduledJobByFunctionId(functionId, backfillWindowStart, backfillWindowEnd);
   }
