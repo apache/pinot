@@ -6,6 +6,7 @@ import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAut
 import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluationMethod;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
+import com.linkedin.thirdeye.datalayer.bao.DetectionStatusManager;
 import com.linkedin.thirdeye.datalayer.bao.FunctionAutoTuneConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
@@ -69,6 +70,7 @@ public class DetectionJobResource {
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
   private final AlertFilterAutotuneFactory alertFilterAutotuneFactory;
   private final AlertFilterFactory alertFilterFactory;
+  private final DetectionStatusManager detectionStatusDAO;
 
   private static final Logger LOG = LoggerFactory.getLogger(DetectionJobResource.class);
 
@@ -81,6 +83,7 @@ public class DetectionJobResource {
     this.functionAutoTuneConfigDAO = DAO_REGISTRY.getFunctionAutoTuneDAO();
     this.alertFilterAutotuneFactory = alertFilterAutotuneFactory;
     this.alertFilterFactory = alertFilterFactory;
+    this.detectionStatusDAO = DAO_REGISTRY.getDetectionStatusDAO();
   }
 
 

@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.anomaly.detection.lib;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
 import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluationMethod;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import com.linkedin.thirdeye.datalayer.bao.DetectionStatusManager;
 import com.linkedin.thirdeye.datalayer.bao.FunctionAutoTuneConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
@@ -27,6 +28,7 @@ public class FunctionAutotuneExcutorRunnable implements Runnable {
   private AnomalyFunctionManager anomalyFunctionDAO;
   private RawAnomalyResultManager rawAnomalyResultDAO;
   private FunctionAutoTuneConfigManager functionAutoTuneConfigDAO;
+
   private long tuningFunctionId;
   private DateTime replayStart;
   private DateTime replayEnd;
@@ -34,10 +36,6 @@ public class FunctionAutotuneExcutorRunnable implements Runnable {
   private PerformanceEvaluationMethod performanceEvaluationMethod;
   private double goal;
   private List<Map<String, String>> tuningParameters;
-
-  private final String MAX_GAOL = "max";
-  private final String MIN_GOAL = "min";
-  private final String PERFORMANCE_VALUE = "value";
 
   public FunctionAutotuneExcutorRunnable(DetectionJobScheduler detectionJobScheduler, AnomalyFunctionManager anomalyFunctionDAO,
       MergedAnomalyResultManager mergedAnomalyResultDAO, RawAnomalyResultManager rawAnomalyResultDAO,
@@ -53,8 +51,9 @@ public class FunctionAutotuneExcutorRunnable implements Runnable {
 
   public FunctionAutotuneExcutorRunnable(DetectionJobScheduler detectionJobScheduler, AnomalyFunctionManager anomalyFunctionDAO,
       MergedAnomalyResultManager mergedAnomalyResultDAO, RawAnomalyResultManager rawAnomalyResultDAO,
-      FunctionAutoTuneConfigManager functionAutoTuneConfigDAO, PerformanceEvaluationMethod performanceEvaluationMethod,
-      List<Map<String, String>> tuningParameters, long tuningFunctionId, DateTime replayStart, DateTime replayEnd,
+      FunctionAutoTuneConfigManager functionAutoTuneConfigDAO,
+      PerformanceEvaluationMethod performanceEvaluationMethod, List<Map<String, String>> tuningParameters,
+      long tuningFunctionId, DateTime replayStart, DateTime replayEnd,
       double goal, boolean isForceBackfill) {
     this.detectionJobScheduler = detectionJobScheduler;
     this.mergedAnomalyResultDAO = mergedAnomalyResultDAO;
@@ -74,7 +73,7 @@ public class FunctionAutotuneExcutorRunnable implements Runnable {
     pool.shutdown(); // Disable new tasks from being submitted
     try {
       // Wait a while for existing tasks to terminate
-      if (!pool.awaitTermination(60, TimeUnit.SECONDS)) {
+      if (!pool.awaitTermination(60, TimeUnit.MINUTES)) {
         pool.shutdownNow(); // Cancel currently executing tasks
         // Wait a while for tasks to respond to being cancelled
         if (!pool.awaitTermination(60, TimeUnit.SECONDS))
@@ -97,7 +96,7 @@ public class FunctionAutotuneExcutorRunnable implements Runnable {
     for(Map<String, String> config : tuningParameters) {
       LOG.info("Running backfill replay with parameter configuration: {}" + config.toString());
       FunctionAutotuneCallable backfillCallable = new FunctionAutotuneCallable(detectionJobScheduler, anomalyFunctionDAO,
-          mergedAnomalyResultDAO, rawAnomalyResultDAO, functionAutoTuneConfigDAO);
+          mergedAnomalyResultDAO, rawAnomalyResultDAO);
       backfillCallable.setTuningFunctionId(tuningFunctionId);
       backfillCallable.setReplayStart(replayStart);
       backfillCallable.setReplayEnd(replayEnd);
@@ -124,6 +123,10 @@ public class FunctionAutotuneExcutorRunnable implements Runnable {
       }
       catch (ExecutionException e){
         LOG.warn("Thread {} has an execution exception", t.toString(), e);
+        continue;
+      }
+
+      if(backfillResult == null) {
         continue;
       }
 

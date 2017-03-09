@@ -6,10 +6,12 @@ import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceE
 import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluationMethod;
 import com.linkedin.thirdeye.dashboard.resources.OnboardResource;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import com.linkedin.thirdeye.datalayer.bao.DetectionStatusManager;
 import com.linkedin.thirdeye.datalayer.bao.FunctionAutoTuneConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.DetectionStatusDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.List;
 import java.util.Map;
@@ -34,13 +36,8 @@ public class FunctionAutotuneCallable implements Callable<FunctionAutotuneReturn
   private boolean isForceBackfill;
   private Map<String, String> tuningParameter;
 
-  private final String MAX_GAOL = "max";
-  private final String MIN_GOAL = "min";
-  private final String PERFORMANCE_VALUE = "value";
-
   public FunctionAutotuneCallable(DetectionJobScheduler detectionJobScheduler, AnomalyFunctionManager anomalyFunctionDAO,
-      MergedAnomalyResultManager mergedAnomalyResultDAO, RawAnomalyResultManager rawAnomalyResultDAO,
-      FunctionAutoTuneConfigManager functionAutoTuneConfigDAO){
+      MergedAnomalyResultManager mergedAnomalyResultDAO, RawAnomalyResultManager rawAnomalyResultDAO){
     this.detectionJobScheduler = detectionJobScheduler;
     this.mergedAnomalyResultDAO = mergedAnomalyResultDAO;
     this.anomalyFunctionDAO = anomalyFunctionDAO;
@@ -50,7 +47,6 @@ public class FunctionAutotuneCallable implements Callable<FunctionAutotuneReturn
 
   public FunctionAutotuneCallable(DetectionJobScheduler detectionJobScheduler, AnomalyFunctionManager anomalyFunctionDAO,
       MergedAnomalyResultManager mergedAnomalyResultDAO, RawAnomalyResultManager rawAnomalyResultDAO,
-      FunctionAutoTuneConfigManager functionAutoTuneConfigDAO,
       Map<String, String> tuningParameter, long tuningFunctionId, DateTime replayStart, DateTime replayEnd,
       Map<String, Comparable> goalRange, boolean isForceBackfill) {
     this.detectionJobScheduler = detectionJobScheduler;
@@ -114,9 +110,7 @@ public class FunctionAutotuneCallable implements Callable<FunctionAutotuneReturn
 
     anomalyFunctionDAO.update(anomalyFunctionDTO);
 
-    detectionJobScheduler.runBackfill(clonedFunctionId, replayStart, replayEnd, isForceBackfill);
-    List<MergedAnomalyResultDTO> detectedMergedAnomalies =
-        mergedAnomalyResultDAO.findAllConflictByFunctionId(clonedFunctionId, replayStart.getMillis(), replayEnd.getMillis());
+    detectionJobScheduler.synchronousBackFill(clonedFunctionId, replayStart, replayEnd, isForceBackfill);
 
     PerformanceEvaluate performanceEvaluator = PerformanceEvaluateHelper.getPerformanceEvaluator(performanceEvaluationMethod,
         tuningFunctionId, clonedFunctionId, new Interval(replayStart.getMillis(), replayEnd.getMillis()), mergedAnomalyResultDAO);
