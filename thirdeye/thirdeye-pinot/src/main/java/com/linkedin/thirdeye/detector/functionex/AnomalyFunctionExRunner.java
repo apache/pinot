@@ -13,10 +13,13 @@ import com.linkedin.thirdeye.detector.functionex.impl.ThirdEyeMetricDataSource;
 import com.linkedin.thirdeye.detector.functionex.impl.ThirdEyeMockDataSource;
 import com.linkedin.thirdeye.detector.functionex.impl.ThirdEyePinotConnection;
 import com.linkedin.thirdeye.detector.functionex.impl.ThirdEyePinotDataSource;
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.HelpFormatter;
@@ -41,6 +44,7 @@ public class AnomalyFunctionExRunner {
   private static final String ID_MONITOR_FROM = "monitor-from";
   private static final String ID_MONITOR_TO = "monitor-to";
   private static final String ID_CONFIG = "config";
+  private static final String ID_CONFIG_FILE = "config-path";
   private static final String ID_PINOT = "enable-pinot";
   private static final String ID_MOCK = "enable-mock";
   private static final String ID_THIRDEYE = "enable-thirdeye";
@@ -71,7 +75,11 @@ public class AnomalyFunctionExRunner {
     long monitoringStart = Long.parseLong(cmd.getOptionValue(ID_MONITOR_FROM, String.valueOf(monitoringEnd - 3600)));
     LOG.info("Setting monitoring window from '{}' to '{}'", monitoringStart, monitoringEnd);
 
-    Map<String, String> config = parseConfig(cmd.getOptionValue("config"));
+    Map<String, String> config = new HashMap<>();
+    if(cmd.hasOption(ID_CONFIG_FILE))
+      config.putAll(parseConfigFile(new File(cmd.getOptionValue(ID_CONFIG_FILE))));
+    if(cmd.hasOption(ID_CONFIG))
+      config.putAll(parseConfig(cmd.getOptionValue(ID_CONFIG)));
     LOG.info("Using configuration '{}'", config);
 
     if(cmd.hasOption(ID_THIRDEYE)) {
@@ -171,10 +179,14 @@ public class AnomalyFunctionExRunner {
     options.addOption(classname);
 
     Option config = new Option("c", ID_CONFIG, true,
-        "Configuration parameters as comma separated list (example: 'key1=value1,key2=value\\\\,2,...')");
+        "Configuration parameters as json-parseable list (Example: k1:'v1',k2:'v2')");
     options.addOption(config);
 
-    Option monitoringFrom = new Option("f", ID_MONITOR_FROM, true,
+    Option configFile = new Option("f", ID_CONFIG_FILE, true,
+        "Configuration file following json specification (command-line args may override these)");
+    options.addOption(configFile);
+
+    Option monitoringFrom = new Option("s", ID_MONITOR_FROM, true,
         "Monitoring window start timestamp in seconds. (Default: monitoring end timestamp - 1 hour)");
     options.addOption(monitoringFrom);
 
@@ -205,8 +217,24 @@ public class AnomalyFunctionExRunner {
     return options;
   }
 
-  private static Map<String, String> parseConfig(String configJson) throws IOException {
-    ObjectMapper mapper = new ObjectMapper();
-    return mapper.readValue(configJson, new TypeReference<Map<String, String>>() {});
+  private static Map<String, String> parseConfig(String config) throws IOException {
+    String[] fragments = config.split(";");
+    Map<String, String> map = new HashMap<>();
+    for(String s : fragments) {
+      String kv[] = s.split("=", 2);
+      map.put(kv[0], kv[1]);
+    }
+    return map;
+  }
+
+  private static Map<String, String> parseConfigFile(File file) throws IOException {
+    Properties p = new Properties();
+    p.load(new FileReader(file));
+
+    Map<String, String> map = new HashMap<>();
+    for(Map.Entry<Object, Object> e : p.entrySet()) {
+      map.put(e.getKey().toString(), e.getValue().toString());
+    }
+    return map;
   }
 }

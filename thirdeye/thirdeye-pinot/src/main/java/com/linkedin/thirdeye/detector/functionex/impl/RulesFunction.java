@@ -1,12 +1,9 @@
 package com.linkedin.thirdeye.detector.functionex.impl;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionEx;
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExResult;
 import com.linkedin.thirdeye.detector.functionex.dataframe.DataFrame;
 import com.linkedin.thirdeye.detector.functionex.dataframe.DoubleSeries;
-import java.io.IOException;
 import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
@@ -31,7 +28,12 @@ public class RulesFunction extends AnomalyFunctionEx {
 
   @Override
   public AnomalyFunctionExResult apply() throws Exception {
-    Map<String, String> variables = parseJson(getConfig("variables"));
+    Map<String, String> variables = getSubConfig(getContext().getConfig(), "variables.");
+    Map<String, String> rules = getSubConfig(getContext().getConfig(), "rules.");
+
+    LOG.info("Using {} variables: {}", variables.size(), variables.keySet());
+    LOG.info("Using {} rules: {}", rules.size(), rules.keySet());
+
     Map<String, DataFrame> dataFrames = new HashMap<>();
 
     LOG.info("Populating variables:");
@@ -46,8 +48,6 @@ public class RulesFunction extends AnomalyFunctionEx {
 
     AnomalyFunctionExResult anomalyResult = new AnomalyFunctionExResult();
     anomalyResult.setContext(getContext());
-
-    Map<String, String> rules = parseJson(getConfig("rules"));
 
     LOG.info("Applying rules:");
     for(Map.Entry<String, String> e : rules.entrySet()) {
@@ -82,8 +82,14 @@ public class RulesFunction extends AnomalyFunctionEx {
     return df;
   }
 
-  static Map<String, String> parseJson(String json) throws IOException {
-    ObjectMapper mapper = new ObjectMapper();
-    return mapper.readValue(json, new TypeReference<Map<String, String>>() {});
+  static Map<String, String> getSubConfig(Map<String, String> map, String prefix) {
+    Map<String, String> output = new HashMap<>();
+    for(Map.Entry<String, String> e : map.entrySet()) {
+      if(e.getKey().startsWith(prefix)) {
+        String subKey = e.getKey().substring(prefix.length());
+        output.put(subKey, e.getValue());
+      }
+    }
+    return output;
   }
 }
