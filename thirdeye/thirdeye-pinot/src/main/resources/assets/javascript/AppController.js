@@ -1,11 +1,11 @@
 function AppController() {
   // CONTROLLERs
-  this.dashboardController = new DashboardController(this);
   this.anomalyResultController = new AnomalyResultController(this);
   this.analysisController = new AnalysisController(this);
-  HASH_SERVICE.registerController('dashboard', this.dashboardController);
+  this.investigateController = new InvestigateController(this);
   HASH_SERVICE.registerController('anomalies', this.anomalyResultController);
   HASH_SERVICE.registerController('analysis', this.analysisController);
+  HASH_SERVICE.registerController('investigate', this.investigateController);
 
   this.appModel = new AppModel();
   this.appView = new AppView(this.appModel);
@@ -37,6 +37,9 @@ AppController.prototype = {
     } else if (tabName.startsWith('analysis')) {
       this.appModel.tabSelected = 'analysis';
       controllerName = 'analysis';
+    } else if (tabName.startsWith('investigate')) {
+      this.appModel.tabSelected = 'investigate';
+      controllerName = 'investigate';
     }
     this.appView.render();
     HASH_SERVICE.routeTo(controllerName);

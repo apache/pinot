@@ -69,7 +69,7 @@
 				</div>
 
 				<div class="filter-footer">
-					<a type="button" id="apply-button">Apply Filter</a>
+					<a type="button" id="apply-button" class="thirdeye-link">Apply Filter</a>
 				</div>
 	  	</div>
   	</div>

@@ -59,6 +59,9 @@
 <script id="anomaly-results-template" type="text/x-handlebars-template">
   <#include "tabs/anomaly-results.ftl"/>
 </script>
+<script id="investigate-template" type="text/x-handlebars-template">
+  <#include "tabs/investigate.ftl"/>
+</script>
 <script id="dashboard-template" type="text/x-handlebars-template">
   <#include "tabs/dashboard.ftl"/>
 </script>
@@ -120,6 +123,10 @@
 <script src="assets/javascript/models/AnalysisModel.js"></script>
 <script src="assets/javascript/views/AnalysisView.js"></script>
 <script src="assets/javascript/controllers/AnalysisController.js"></script>
+
+<script src="assets/javascript/models/InvestigateModel.js"></script>
+<script src="assets/javascript/views/InvestigateView.js"></script>
+<script src="assets/javascript/controllers/InvestigateController.js"></script>
 
 <script src="assets/javascript/models/TimeSeriesCompareModel.js"></script>
 <script src="assets/javascript/views/TimeSeriesCompareView.js"></script>
@@ -184,7 +191,9 @@
 		</div>
 		<div class="tab-pane" id="anomalies">
 			<div id="anomalies-place-holder"></div>
+			<div id="investigate-place-holder""></div>
 		</div>
+
 		<div class="tab-pane" id="analysis">
 			<div id="analysis-place-holder"></div>
 		</div>

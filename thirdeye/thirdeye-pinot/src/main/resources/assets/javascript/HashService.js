@@ -12,7 +12,7 @@ HashService.prototype = {
     window.onhashchange = this.onHashChangeEventHandler.bind(this);
     console.log("window.location:" + window.location + " path " + window.location.pathname);
     console.log(window.location);
-    let tab = constants.TAB_ANOMALIES;
+    let tab = '';
     console.log(tab);
     console.log(constants);
     if (window.location.hash) {
@@ -21,6 +21,11 @@ HashService.prototype = {
         console.log("hash split[0]" + splits[0]);
         tab = splits[0].replace("#", "");
       }
+    }
+    if (!tab) {
+      tab = constants.TAB_ANOMALIES;
+      this.set(HASH_PARAMS.TAB, tab);
+      this.refreshWindowHashForRouting('app');
     }
     console.log("Setting tab to:" + tab)
     this.set(HASH_PARAMS.TAB, tab);
@@ -139,6 +144,10 @@ HashService.prototype = {
     const currentTab = HASH_SERVICE.get('tab');
     const params = this.getParams();
     const [, newHash] = newURL.split('#');
+    if (!newHash) {
+      return true;
+    }
+
     // getting the tab and params from the hash
     const [newTab, newParams] = newHash.split('?');
     // getting rid of 'rand' or '&rand' params
