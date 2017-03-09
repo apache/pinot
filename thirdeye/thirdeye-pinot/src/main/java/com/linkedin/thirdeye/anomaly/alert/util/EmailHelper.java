@@ -256,12 +256,14 @@ public abstract class EmailHelper {
     return getContributorDataForDataReport(collection, metric, dimensions, AlertConfigBean.COMPARE_MODE.WoW, 2 * 36_00_000, false); // add 2 hours delay
   }
 
-  private static long getBaselineOffset(AlertConfigBean.COMPARE_MODE compareMode) {
+  public static long getBaselineOffset(AlertConfigBean.COMPARE_MODE compareMode) {
     switch (compareMode) {
     case Wo2W:
       return 2 * WEEK_MILLIS;
     case Wo3W:
       return 3 * WEEK_MILLIS;
+    case Wo4W:
+      return 4 * WEEK_MILLIS;
     case WoW:
       default:
       return WEEK_MILLIS;
