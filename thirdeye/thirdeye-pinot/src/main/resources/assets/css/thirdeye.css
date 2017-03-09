@@ -411,6 +411,8 @@ text {
 }
 
 /* Common */
+
+/*button*/
 .thirdeye-btn, .thirdeye-btn:hover  {
   color: white;
   font-weight: 600;
@@ -433,6 +435,17 @@ text {
 .thirdeye-btn:active{
   color: white;
   background-color: #006097;
+}
+
+/* link*/
+.thirdeye-link {
+  cursor: pointer;
+  color: #0084bf;
+  padding: 0 8px;
+}
+
+.thirdeye-link:hover {
+  color: #0073b1;
 }
 
 /* anomalies page Search Bar*/
@@ -616,10 +629,6 @@ text {
   color: #398b18
 }
 
-.anomaly-duration {
-  text-transform: capitalize;
-}
-
 /* Pagination */
 
 .thirdeye-pagination {
@@ -662,6 +671,8 @@ text {
 .investigate-title {
   font-size: 21px;
   margin: 24px 0;
+  display: flex;
+  justify-content: space-between;
 }
 
 
@@ -709,4 +720,11 @@ text {
 
 .anomaly-feedback-radio {
   margin: 8px 0;
+  user-select: none;
+}
+
+.anomaly-details-wrapper {
+  background-color: white;
+  padding: 24px;
+  border: 1px solid #CCC;
 }

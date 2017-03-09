@@ -62,7 +62,7 @@
             <div class="anomaly-details-row">
               <div class="anomaly-details-items">
                 <label class="label-medium-semibold">Duration</label>
-                <span class="anomaly-duration">{{duration}}</span>
+                <span>{{duration}}</span>
               </div>
 
               <div class="anomaly-details-items">

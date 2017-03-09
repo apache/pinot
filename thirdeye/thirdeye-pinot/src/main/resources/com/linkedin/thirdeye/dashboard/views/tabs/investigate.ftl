@@ -17,68 +17,76 @@
 
 <div class="container">
 
-  <div class="investigate-title">{{metric}}</div>
-
-  <div class ="anormaly-chart bg-white" id="anomaly-investigate-chart"></div>
-  <div class="anomaly-details bg-white">
-    <div class="anomaly-details-row">
-      <div class="anomaly-details-items anomaly-details-items--small">
-        <label class="label-medium-semibold">Change</label>
-        <span class="anomaly-change-delta {{colorDelta changeDelta}}">{{changeDelta}}</span>
-      </div>
-
-      <div class="anomaly-details-items anomaly-details-items--small">
-        <label class="label-medium-semibold">Current</label>
-        <span>{{current}}</span>
-      </div>
-      <div class="anomaly-details-items anomaly-details-items--small">
-        <label class="label-medium-semibold">Baseline</label>
-        <span>
-          {{#if baseline}}
-            {{baseline}}
-          {{else}}
-            N/A
-          {{/if}}
-        </span>
-      </div>
-    </div>
-    <div class="anomaly-details-row">
-      <div class="anomaly-details-items">
-        <label class="label-medium-semibold">Dimension</label>
-        <span>
-        {{#if_eq anomalyFunctionDimension '{}'}}
-          N/A
-        {{else}}
-          {{anomalyFunctionDimension}}
-        {{/if_eq}}
-        </span>
-      </div>
-
-      <div class="anomaly-details-items">
-        <label class="label-medium-semibold">Function</label>
-        <span>{{anomalyFunctionName}}</span>
-      </div>
-    </div>
-    <div class="anomaly-details-row">
-      <div class="anomaly-details-items">
-        <label class="label-medium-semibold">Duration</label>
-        <span class="anomaly-duration">{{duration}}</span>
-      </div>
-
-      <div class="anomaly-details-items">
-        <label class="label-medium-semibold">Status</label>
-        <span>
-          {{#if anomalyFeedback}}
-            Resolved ({{anomalyFeedback}})
-          {{else}}
-            Not Resolved
-          {{/if}}
-        </span>
-      </div>
+  <div class="investigate-title">
+    <span>{{metric}}</span>
+    <div class="investigate-button">
+      <a href="#" class="thirdeye-link">Share</a>
+      <a href="#" class="thirdeye-link">InGraphs</a>
     </div>
   </div>
 
-  <div class="investigate-title">Root Cause Summary</div>
+  <div class="anomaly-details-wrapper padding-all bg-white">
+    <div class ="anormaly-chart" id="anomaly-investigate-chart"></div>
+    <div class="anomaly-details">
+      <div class="anomaly-details-row">
+        <div class="anomaly-details-items anomaly-details-items--small">
+          <label class="label-medium-semibold">Change</label>
+          <span class="anomaly-change-delta {{colorDelta changeDelta}}">{{changeDelta}}</span>
+        </div>
+
+        <div class="anomaly-details-items anomaly-details-items--small">
+          <label class="label-medium-semibold">Current</label>
+          <span>{{current}}</span>
+        </div>
+        <div class="anomaly-details-items anomaly-details-items--small">
+          <label class="label-medium-semibold">Baseline</label>
+          <span>
+            {{#if baseline}}
+              {{baseline}}
+            {{else}}
+              N/A
+            {{/if}}
+          </span>
+        </div>
+      </div>
+      <div class="anomaly-details-row">
+        <div class="anomaly-details-items">
+          <label class="label-medium-semibold">Dimension</label>
+          <span>
+          {{#if_eq anomalyFunctionDimension '{}'}}
+            N/A
+          {{else}}
+            {{anomalyFunctionDimension}}
+          {{/if_eq}}
+          </span>
+        </div>
+
+        <div class="anomaly-details-items">
+          <label class="label-medium-semibold">Function</label>
+          <span>{{anomalyFunctionName}}</span>
+        </div>
+      </div>
+      <div class="anomaly-details-row">
+        <div class="anomaly-details-items">
+          <label class="label-medium-semibold">Duration</label>
+          <span class="anomaly-duration">{{duration}}</span>
+        </div>
+
+        <div class="anomaly-details-items">
+          <label class="label-medium-semibold">Status</label>
+          <span>
+            {{#if anomalyFeedback}}
+              Resolved ({{anomalyFeedback}})
+            {{else}}
+              Not Resolved
+            {{/if}}
+          </span>
+        </div>
+      </div>
+  </div>
+  </div>
+
+  <div class="investigate-title">Change Over Time</div>
 
   <div class="investigate-cards">
 
