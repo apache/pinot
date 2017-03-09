@@ -1,10 +1,8 @@
 function AppController() {
   // CONTROLLERs
-  // this.dashboardController = new DashboardController(this);
   this.anomalyResultController = new AnomalyResultController(this);
   this.analysisController = new AnalysisController(this);
   this.investigateController = new InvestigateController(this);
-  // HASH_SERVICE.registerController('dashboard', this.dashboardController);
   HASH_SERVICE.registerController('anomalies', this.anomalyResultController);
   HASH_SERVICE.registerController('analysis', this.analysisController);
   HASH_SERVICE.registerController('investigate', this.investigateController);

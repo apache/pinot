@@ -32,9 +32,6 @@ AnomalyResultController.prototype = {
     HASH_SERVICE.routeTo('anomalies');
   },
   investigateButtonClickEventHandler: function (sender, args) {
-    console.log("received root cause analysis button click event at AnomalyResultController");
-    console.log(args);
-
     HASH_SERVICE.clear();
     HASH_SERVICE.set('tab', 'investigate');
     HASH_SERVICE.update(args);
