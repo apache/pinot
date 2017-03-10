@@ -18,6 +18,7 @@ AnalysisModel.prototype = {
   update: function (params) {
     if (params.metricId) {
       this.metricId = params.metricId;
+      this.metricName = this.fetchMetricName(params.metricId).name;
     }
     if (params.timeRange) {
       this.timeRange = params.timeRange;
@@ -43,6 +44,10 @@ AnalysisModel.prototype = {
     if (params.baselineEnd) {
       this.baselineEnd = params.baselineEnd;
     }
+  },
+
+  fetchMetricName(metricId) {
+    return dataService.fetchMetricByMetricId(metricId);
   },
 
   fetchGranularityForMetric: function (metricId) {

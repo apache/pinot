@@ -16,7 +16,7 @@ AnalysisController.prototype = {
     this.analysisModel.update(hashParams);
     this.analysisView.init(hashParams);
     this.analysisView.render();
-    this.timeSeriesCompareController.handleAppEvent(hashParams);
+    this.timeSeriesCompareController.handleAppEvent(this.analysisView.viewParams);
   },
 
   handleApplyAnalysisEvent: function (viewObject) {

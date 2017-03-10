@@ -10,13 +10,14 @@ function TimeSeriesCompareController(parentController) {
 }
 
 TimeSeriesCompareController.prototype = {
-  handleAppEvent: function () {
-    this.timeSeriesCompareModel.init(HASH_SERVICE.getParams());
+  handleAppEvent: function (params) {
+    params = params || HASH_SERVICE.getParams();
+    this.timeSeriesCompareModel.init(params);
     this.timeSeriesCompareModel.update();
     this.timeSeriesCompareView.render();
 
     // render heatmap if view params are set in hashParams
-    this.dimensionTreeMapController.handleAppEvent();
+    this.dimensionTreeMapController.handleAppEvent(params);
   },
 
   handleHeatMapRenderEvent: function (viewObject) {
