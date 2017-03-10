@@ -264,11 +264,13 @@ public class TestWeekOverWeekRuleFunction {
     final long oneWeekInMillis = TimeUnit.DAYS.toMillis(7);
     double observedTotal = 0d;
     double baselineTotal = 0d;
+    int bucketCount = 0;
     Interval interval = new Interval(mergedAnomaly.getStartTime(), mergedAnomaly.getEndTime());
     TimeSeries observedTS = anomalyDetectionContext.getTransformedCurrent(mainMetric);
     List<TimeSeries> baselineTSs = anomalyDetectionContext.getTransformedBaselines(mainMetric);
     for (long timestamp : observedTS.timestampSet()) {
       if (interval.contains(timestamp)) {
+        ++bucketCount;
         observedTotal += observedTS.get(timestamp);
         for (int i = 0; i < baselineTSs.size(); ++i) {
           TimeSeries baselineTS = baselineTSs.get(i);
@@ -278,8 +280,16 @@ public class TestWeekOverWeekRuleFunction {
       }
     }
     baselineTotal /= baselineTSs.size();
+
+    // Compare anomaly weight, avg. current, avg. baseline, score, etc
     double expectedWeight = (observedTotal - baselineTotal) / baselineTotal;
     Assert.assertEquals(mergedAnomaly.getWeight(), expectedWeight, EPSILON);
+
+    double avgCurrent = observedTotal / bucketCount;
+    Assert.assertEquals(mergedAnomaly.getAvgCurrentVal(), avgCurrent, EPSILON);
+
+    double avgBaseline = baselineTotal / bucketCount;
+    Assert.assertEquals(mergedAnomaly.getAvgBaselineVal(), avgBaseline, EPSILON);
 
     // Test Score; score is the average of all raw anomalies' score
     double expectedScore = 0d;
