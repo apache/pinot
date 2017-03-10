@@ -38,7 +38,7 @@ public class ThirdEyePinotDataSource implements AnomalyFunctionExDataSource<Stri
     ResultSet resultSet = resultSetGroup.getResultSet(0);
     LOG.debug("col_count={} row_count={}", resultSet.getColumnCount(), resultSet.getRowCount());
 
-    DataFrame df = new DataFrame(resultSet.getRowCount());
+    DataFrame df = new DataFrame();
 
     // TODO conditions not necessarily safe
     if(resultSet.getColumnCount() == 1 && resultSet.getRowCount() == 0) {

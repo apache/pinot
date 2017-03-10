@@ -163,7 +163,7 @@ public class AnomalyFunctionExRunner {
     LOG.info("Got function result with {} anomalies", result.getAnomalies().size());
     for(AnomalyFunctionExResult.Anomaly a : result.getAnomalies()) {
       String data = "";
-      if(a.getData().getIndex().size() > 0)
+      if(!a.getData().isEmpty())
         data = a.getData().toString();
       LOG.info("Anomaly at '{}-{}': '{}' {}", a.getStart(), a.getEnd(), a.getMessage(), data);
     }

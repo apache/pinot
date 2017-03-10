@@ -93,7 +93,7 @@ public class ThirdEyeMetricDataSource implements AnomalyFunctionExDataSource<Str
     });
     result.addSeries(COLUMN_TIMESTAMP, s);
 
-    return result.sortBySeries();
+    return result.sortBy(COLUMN_TIMESTAMP);
   }
 
   static Collection<Filter> getAdvancedFilters(List<NameValuePair> params) {

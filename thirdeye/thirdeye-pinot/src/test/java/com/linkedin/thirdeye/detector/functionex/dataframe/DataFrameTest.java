@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.detector.functionex.dataframe;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import org.testng.Assert;
@@ -63,6 +64,15 @@ public class DataFrameTest {
   @DataProvider(name = "testSeriesNameFailProvider")
   public Object[][] testSeriesNameFailProvider() {
     return new Object[][] { { null }, { "" }, { "1a" }, { "a,b" }, { "a-b" }, { "a+b" }, { "a*b" }, { "a/b" }, { "a=b" }, { "a>b" } };
+  }
+
+  @Test
+  public void testIndexColumn() {
+    DataFrame dfEmpty = new DataFrame();
+    Assert.assertTrue(dfEmpty.getSeriesNames().isEmpty());
+
+    DataFrame dfIndexRange = new DataFrame(0);
+    Assert.assertEquals(dfIndexRange.getSeriesNames(), Collections.singleton("index"));
   }
 
   @Test
@@ -275,9 +285,9 @@ public class DataFrameTest {
 
   @Test
   public void testSortByIndex() {
-    DataFrame ndf = df.sortByIndex();
+    DataFrame ndf = df.sortBy("index");
     // NOTE: internal logic uses reorder() for all sorting
-    Assert.assertEquals(ndf.getIndex().values(), new long[] { -2, -1, 1, 3, 4 });
+    Assert.assertEquals(ndf.toLongs("index").values(), new long[] { -2, -1, 1, 3, 4 });
     Assert.assertEquals(ndf.toDoubles("double").values(), new double[] { 0.0, -2.1, -0.1, 1.3, 0.5 });
     Assert.assertEquals(ndf.toLongs("long").values(), new long[] { 0, -2, 1, 2, 1 });
     Assert.assertEquals(ndf.toStrings("string").values(), new String[] { "0.0", "-2.3", "-1", "0.13e1", "0.5" });
@@ -287,24 +297,24 @@ public class DataFrameTest {
   @Test
   public void testSortByDouble() {
     df.addSeries("myseries", 0.1, -2.1, 3.3, 4.6, -7.8 );
-    DataFrame ndf = df.sortBySeries("myseries");
-    Assert.assertEquals(ndf.getIndex().values(), new long[] { 3, 1, -1, -2, 4 });
+    DataFrame ndf = df.sortBy("myseries");
+    Assert.assertEquals(ndf.toLongs("index").values(), new long[] { 3, 1, -1, -2, 4 });
     Assert.assertEquals(ndf.toLongs("long").values(), new long[] { 2, 1, -2, 0, 1 });
   }
 
   @Test
   public void testSortByLong() {
     df.addSeries("myseries", 1, -21, 33, 46, -78 );
-    DataFrame ndf = df.sortBySeries("myseries");
-    Assert.assertEquals(ndf.getIndex().values(), new long[] { 3, 1, -1, -2, 4 });
+    DataFrame ndf = df.sortBy("myseries");
+    Assert.assertEquals(ndf.toLongs("index").values(), new long[] { 3, 1, -1, -2, 4 });
     Assert.assertEquals(ndf.toLongs("long").values(), new long[] { 2, 1, -2, 0, 1 });
   }
 
   @Test
   public void testSortByString() {
     df.addSeries("myseries", "b", "aa", "bb", "c", "a" );
-    DataFrame ndf = df.sortBySeries("myseries");
-    Assert.assertEquals(ndf.getIndex().values(), new long[] { 3, 1, -1, -2, 4 });
+    DataFrame ndf = df.sortBy("myseries");
+    Assert.assertEquals(ndf.toLongs("index").values(), new long[] { 3, 1, -1, -2, 4 });
     Assert.assertEquals(ndf.toLongs("long").values(), new long[] { 2, 1, -2, 0, 1 });
   }
 
@@ -312,8 +322,8 @@ public class DataFrameTest {
   public void testSortByBoolean() {
     // NOTE: boolean sorted should be stable
     df.addSeries("myseries", true, true, false, false, true );
-    DataFrame ndf = df.sortBySeries("myseries");
-    Assert.assertEquals(ndf.getIndex().values(), new long[] { -2, 4, -1, 1, 3 });
+    DataFrame ndf = df.sortBy("myseries");
+    Assert.assertEquals(ndf.toLongs("index").values(), new long[] { -2, 4, -1, 1, 3 });
     Assert.assertEquals(ndf.toLongs("long").values(), new long[] { 0, 1, -2, 1, 2 });
   }
 
@@ -321,7 +331,7 @@ public class DataFrameTest {
   public void testReverse() {
     // NOTE: uses separate reverse() implementation by each series
     DataFrame ndf = df.reverse();
-    Assert.assertEquals(ndf.getIndex().values(), new long[] { 3, 4, -2, 1, -1 });
+    Assert.assertEquals(ndf.toLongs("index").values(), new long[] { 3, 4, -2, 1, -1 });
     Assert.assertEquals(ndf.toDoubles("double").values(), new double[] { 1.3, 0.5, 0.0, -0.1, -2.1 });
     Assert.assertEquals(ndf.toLongs("long").values(), new long[] { 2, 1, 0, 1, -2 });
     Assert.assertEquals(ndf.toStrings("string").values(), new String[] { "0.13e1", "0.5", "0.0", "-1", "-2.3" });
@@ -400,12 +410,12 @@ public class DataFrameTest {
 
   @Test
   public void testResampleEndToEnd() {
-    DataFrame ndf = df.resample(2, new DataFrame.ResampleLast());
+    DataFrame ndf = df.resampleBy("index", 2, new DataFrame.ResampleLast());
 
-    Assert.assertEquals(ndf.getIndex().size(), 4);
-    Assert.assertEquals(ndf.getSeriesNames().size(), 4);
+    Assert.assertEquals(ndf.size(), 4);
+    Assert.assertEquals(ndf.getSeriesNames().size(), 5);
 
-    Assert.assertEquals(ndf.getIndex().values(), new long[] { -2, 0, 2, 4 });
+    Assert.assertEquals(ndf.toLongs("index").values(), new long[] { -2, 0, 2, 4 });
     Assert.assertEquals(ndf.toDoubles("double").values(), new double[] { -2.1, -0.1, 1.3, 0.5 });
     Assert.assertEquals(ndf.toLongs("long").values(), new long[] { -2, 1, 2, 1 });
     Assert.assertEquals(ndf.toStrings("string").values(), new String[] { "-2.3", "-1", "0.13e1", "0.5" });
@@ -418,11 +428,11 @@ public class DataFrameTest {
     mydf.addSeries("double", 1.0, 1.0, 2.0, 2.0, 1.0, 1.0, 2.0, 2.0);
     mydf.addSeries("long", 2, 2, 2, 2, 1, 1, 1, 1);
 
-    DataFrame sdfa = mydf.sortBySeries("double", "long");
-    Assert.assertEquals(sdfa.getIndex().values(), new long[] { 5, 6, 1, 2, 7, 8, 3, 4 });
+    DataFrame sdfa = mydf.sortBy("double", "long");
+    Assert.assertEquals(sdfa.toLongs("index").values(), new long[] { 5, 6, 1, 2, 7, 8, 3, 4 });
 
-    DataFrame sdfb = mydf.sortBySeries("long", "double");
-    Assert.assertEquals(sdfb.getIndex().values(), new long[] { 3, 4, 7, 8, 1, 2, 5, 6 });
+    DataFrame sdfb = mydf.sortBy("long", "double");
+    Assert.assertEquals(sdfb.toLongs("index").values(), new long[] { 3, 4, 7, 8, 1, 2, 5, 6 });
   }
 
   @Test
@@ -431,11 +441,11 @@ public class DataFrameTest {
     mydf.addSeries("string", "a", "a", "b", "b", "a", "a", "b", "b");
     mydf.addSeries("boolean", true, true, true, true, false, false, false, false);
 
-    DataFrame sdfa = mydf.sortBySeries("string", "boolean");
-    Assert.assertEquals(sdfa.getIndex().values(), new long[] { 5, 6, 1, 2, 7, 8, 3, 4 });
+    DataFrame sdfa = mydf.sortBy("string", "boolean");
+    Assert.assertEquals(sdfa.toLongs("index").values(), new long[] { 5, 6, 1, 2, 7, 8, 3, 4 });
 
-    DataFrame sdfb = mydf.sortBySeries("boolean", "string");
-    Assert.assertEquals(sdfb.getIndex().values(), new long[] { 3, 4, 7, 8, 1, 2, 5, 6 });
+    DataFrame sdfb = mydf.sortBy("boolean", "string");
+    Assert.assertEquals(sdfb.toLongs("index").values(), new long[] { 3, 4, 7, 8, 1, 2, 5, 6 });
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
@@ -447,8 +457,8 @@ public class DataFrameTest {
   public void testFilter() {
     DataFrame ndf = df.filter(DataFrame.toSeries(true, false, true, true, false));
 
-    Assert.assertEquals(ndf.getIndex().size(), 3);
-    Assert.assertEquals(ndf.getIndex().values(), new long[] { -1, -2, 4 });
+    Assert.assertEquals(ndf.size(), 3);
+    Assert.assertEquals(ndf.toLongs("index").values(), new long[] { -1, -2, 4 });
     Assert.assertEquals(ndf.toDoubles("double").values(), new double[] { -2.1, 0.0, 0.5 });
     Assert.assertEquals(ndf.toLongs("long").values(), new long[] { -2, 0, 1 });
     Assert.assertEquals(ndf.toStrings("string").values(), new String[] { "-2.3", "0.0", "0.5"  });
@@ -458,13 +468,13 @@ public class DataFrameTest {
   @Test
   public void testFilterAll() {
     DataFrame ndf = df.filter(DataFrame.toSeries(true, true, true, true, true));
-    Assert.assertEquals(ndf.getIndex().size(), 5);
+    Assert.assertEquals(ndf.size(), 5);
   }
 
   @Test
   public void testFilterNone() {
     DataFrame ndf = df.filter(DataFrame.toSeries(false, false, false, false, false));
-    Assert.assertEquals(ndf.getIndex().size(), 0);
+    Assert.assertEquals(ndf.size(), 0);
   }
 
   @Test
@@ -781,8 +791,8 @@ public class DataFrameTest {
     mdf.addSeries("boolean", true, true, false, false, false, false);
 
     DataFrame ddf = mdf.dropNullRows();
-    Assert.assertEquals(ddf.getIndex().size(), 3);
-    Assert.assertEquals(ddf.getIndex().values(), new long[] { 2, 4, 6 });
+    Assert.assertEquals(ddf.size(), 3);
+    Assert.assertEquals(ddf.toLongs("index").values(), new long[] { 2, 4, 6 });
     Assert.assertEquals(ddf.toDoubles("double").values(), new double[] { 2.0, 4.0, 6.0 });
     Assert.assertEquals(ddf.toLongs("long").values(), new long[] { 2, 4, 6 });
     Assert.assertEquals(ddf.toStrings("string").values(), new String[] { "2", "true", "aaa" });
@@ -791,12 +801,12 @@ public class DataFrameTest {
 
   @Test
   public void testDropNullRowsIdentity() {
-    Assert.assertEquals(df.dropNullRows().getIndex().size(), df.getIndex().size());
+    Assert.assertEquals(df.dropNullRows().size(), df.size());
   }
 
   @Test
   public void testDropNullColumns() {
-    DataFrame mdf = new DataFrame(new long[] { 1, 2, 3 });
+    DataFrame mdf = new DataFrame();
     mdf.addSeries("double_null", 1.0, 2.0, DoubleSeries.NULL_VALUE);
     mdf.addSeries("double", 1.0, 2.0, 3.0);
     mdf.addSeries("long_null", LongSeries.NULL_VALUE, 2, 3);
@@ -806,7 +816,7 @@ public class DataFrameTest {
     mdf.addSeries("boolean", true, true, false);
 
     DataFrame ddf = mdf.dropNullColumns();
-    Assert.assertEquals(ddf.getIndex().size(), 3);
+    Assert.assertEquals(ddf.size(), 3);
     Assert.assertEquals(new HashSet<>(ddf.getSeriesNames()), new HashSet<>(Arrays.asList("double", "long", "string", "boolean")));
   }
 

@@ -54,7 +54,7 @@ public class ThirdEyeEventDataSource implements AnomalyFunctionExDataSource<Stri
       end[i] = e.getEndTime();
     }
 
-    DataFrame df = new DataFrame(events.size());
+    DataFrame df = new DataFrame();
     df.addSeries("type", type);
     df.addSeries("name", name);
     df.addSeries("start", start);

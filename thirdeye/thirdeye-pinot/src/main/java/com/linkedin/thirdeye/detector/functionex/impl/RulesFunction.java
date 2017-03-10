@@ -76,12 +76,12 @@ public class RulesFunction extends AnomalyFunctionEx {
       return new DataFrame(0);
     }
 
-    DataFrame first = dataFrames.values().iterator().next().sortBySeries(COLUMN_TIMESTAMP);
-    DataFrame df = new DataFrame(first.getIndex());
+    DataFrame first = dataFrames.values().iterator().next();
+    DataFrame df = new DataFrame();
     df.addSeries(COLUMN_TIMESTAMP, first.toLongs(COLUMN_TIMESTAMP));
 
     for (Map.Entry<String, DataFrame> e : dataFrames.entrySet()) {
-      DataFrame candidate = e.getValue().sortBySeries(COLUMN_TIMESTAMP);
+      DataFrame candidate = e.getValue();
       if(!first.toLongs(COLUMN_TIMESTAMP).equals(candidate.toLongs(COLUMN_TIMESTAMP)))
         throw new IllegalStateException("series timestamps do not align");
       df.addSeries(e.getKey(), candidate.get(COLUMN_METRIC));

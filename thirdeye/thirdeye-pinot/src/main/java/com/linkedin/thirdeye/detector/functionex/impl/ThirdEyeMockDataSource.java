@@ -9,7 +9,7 @@ public class ThirdEyeMockDataSource implements AnomalyFunctionExDataSource<Objec
 
   @Override
   public DataFrame query(Object not_needed, AnomalyFunctionExContext context) {
-    DataFrame df = new DataFrame(5);
+    DataFrame df = new DataFrame();
     df.addSeries("long", 3, 4, 5, 6, 7);
     df.addSeries("double", 1.2, 3.5, 2.8, 6.4, 4.9);
     df.addSeries("stable", 1, 1, 1, 1, 1);

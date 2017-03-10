@@ -75,7 +75,7 @@ public class ThirdEyeEventDataSourceTest {
   public void testQueryDataFrame() throws Exception {
     DataFrame df = ds.query("type=IGNORED,start=000,end=000", context);
 
-    Assert.assertEquals(df.getIndex().size(), 3);
+    Assert.assertEquals(df.size(), 3);
     Assert.assertEquals(df.getSeriesNames(), new HashSet<>(Arrays.asList("type", "name", "start", "end")));
     Assert.assertEquals(df.toStrings("type").values(), new String[] { "HOLIDAY", "HOLIDAY", "holiday" });
     Assert.assertEquals(df.toStrings("name").values(), new String[] { "New Years 2016", "New Years 2017", "New Years 2018" });

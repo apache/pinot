@@ -17,6 +17,8 @@ import org.apache.commons.lang.math.NumberUtils;
 public class DataFrame {
   public static Pattern SERIES_NAME_PATTERN = Pattern.compile("([A-Za-z_]\\w*)");
 
+  public static final String COLUMN_INDEX = "index";
+
   public interface ResamplingStrategy {
     Series apply(Series s, List<Series.Bucket> buckets);
   }
@@ -39,7 +41,6 @@ public class DataFrame {
     }
   }
 
-  LongSeries index;
   Map<String, Series> series = new HashMap<>();
 
   public static DoubleSeries toSeries(double... values) {
@@ -63,23 +64,29 @@ public class DataFrame {
     for(int i=0; i<defaultIndexSize; i++) {
       indexValues[i] = i;
     }
-    this.index = new LongSeries(indexValues);
+    this.addSeries(COLUMN_INDEX, new LongSeries(indexValues));
   }
 
   public DataFrame(long[] indexValues) {
-    this.index = new LongSeries(indexValues);
+    this.addSeries(COLUMN_INDEX, new LongSeries(indexValues));
   }
 
   public DataFrame(LongSeries index) {
-    this.index = index;
+    this.addSeries(COLUMN_INDEX, index);
+  }
+
+  public DataFrame() {
+    // left blank
   }
 
   public int size() {
-    return this.index.size();
+    if(this.series.isEmpty())
+      return 0;
+    return this.series.values().iterator().next().size();
   }
 
   public DataFrame sliceRows(int from, int to) {
-    DataFrame newDataFrame = new DataFrame(this.getIndex().slice(from, to));
+    DataFrame newDataFrame = new DataFrame();
     for(Map.Entry<String, Series> e : this.series.entrySet()) {
       newDataFrame.addSeries(e.getKey(), e.getValue().slice(from, to));
     }
@@ -87,11 +94,11 @@ public class DataFrame {
   }
 
   public boolean isEmpty() {
-    return this.index.size() <= 0;
+    return this.size() <= 0;
   }
 
   public DataFrame copy() {
-    DataFrame newDataFrame = new DataFrame(this.index.copy());
+    DataFrame newDataFrame = new DataFrame();
     for(Map.Entry<String, Series> e : this.series.entrySet()) {
       newDataFrame.addSeries(e.getKey(), e.getValue().copy());
     }
@@ -101,7 +108,7 @@ public class DataFrame {
   public void addSeries(String seriesName, Series s) {
     if(seriesName == null || !SERIES_NAME_PATTERN.matcher(seriesName).matches())
       throw new IllegalArgumentException(String.format("Series name must match pattern '%s'", SERIES_NAME_PATTERN));
-    if(s.size() != this.index.size())
+    if(!this.series.isEmpty() && s.size() != this.size())
       throw new IllegalArgumentException("DataFrame index and series must be of same length");
     series.put(seriesName, s);
   }
@@ -130,10 +137,6 @@ public class DataFrame {
     Series s = assertSeriesExists(oldName);
     this.dropSeries(oldName);
     this.addSeries(newName, s);
-  }
-
-  public LongSeries getIndex() {
-    return index;
   }
 
   public Set<String> getSeriesNames() {
@@ -179,8 +182,8 @@ public class DataFrame {
       inputSeries[i] = assertSeriesExists(seriesNames[i]).toDoubles();
     }
 
-    double[] output = new double[this.index.size()];
-    for(int i=0; i<this.index.size(); i++) {
+    double[] output = new double[this.size()];
+    for(int i=0; i<this.size(); i++) {
       double[] input = new double[seriesNames.length];
       for(int j=0; j<inputSeries.length; j++) {
         input[j] = inputSeries[j].values[i];
@@ -202,8 +205,8 @@ public class DataFrame {
       inputSeries[i] = assertSeriesExists(seriesNames[i]).toLongs();
     }
 
-    long[] output = new long[this.index.size()];
-    for(int i=0; i<this.index.size(); i++) {
+    long[] output = new long[this.size()];
+    for(int i=0; i<this.size(); i++) {
       long[] input = new long[seriesNames.length];
       for(int j=0; j<inputSeries.length; j++) {
         input[j] = inputSeries[j].values[i];
@@ -225,8 +228,8 @@ public class DataFrame {
       inputSeries[i] = assertSeriesExists(seriesNames[i]).toStrings();
     }
 
-    String[] output = new String[this.index.size()];
-    for(int i=0; i<this.index.size(); i++) {
+    String[] output = new String[this.size()];
+    for(int i=0; i<this.size(); i++) {
       String[] input = new String[seriesNames.length];
       for(int j=0; j<inputSeries.length; j++) {
         input[j] = inputSeries[j].values[i];
@@ -248,8 +251,8 @@ public class DataFrame {
       inputSeries[i] = assertSeriesExists(seriesNames[i]).toBooleans();
     }
 
-    boolean[] output = new boolean[this.index.size()];
-    for(int i=0; i<this.index.size(); i++) {
+    boolean[] output = new boolean[this.size()];
+    for(int i=0; i<this.size(); i++) {
       boolean[] input = new boolean[seriesNames.length];
       for(int j=0; j<inputSeries.length; j++) {
         input[j] = inputSeries[j].values[i];
@@ -292,17 +295,11 @@ public class DataFrame {
   }
 
   public DataFrame project(int[] fromIndex) {
-    LongSeries newIndex = this.index.project(fromIndex);
-    DataFrame newDataFrame = new DataFrame(newIndex);
-
+    DataFrame newDataFrame = new DataFrame();
     for(Map.Entry<String, Series> e : this.series.entrySet()) {
       newDataFrame.addSeries(e.getKey(), e.getValue().project(fromIndex));
     }
     return newDataFrame;
-  }
-
-  public DataFrame sortByIndex() {
-    return this.project(this.index.sortedIndex());
   }
 
   /**
@@ -312,7 +309,7 @@ public class DataFrame {
    * @param seriesNames 1st series, 2nd series, ..., nth series
    * @return sorted data frame
    */
-  public DataFrame sortBySeries(String... seriesNames) {
+  public DataFrame sortBy(String... seriesNames) {
     DataFrame df = this;
     for(int i=seriesNames.length-1; i>=0; i--) {
       df = df.project(assertSeriesExists(seriesNames[i]).sortedIndex());
@@ -321,47 +318,49 @@ public class DataFrame {
   }
 
   public DataFrame reverse() {
-    DataFrame newDataFrame = new DataFrame(this.index.reverse());
+    DataFrame newDataFrame = new DataFrame();
     for(Map.Entry<String, Series> e : this.series.entrySet()) {
       newDataFrame.addSeries(e.getKey(), e.getValue().reverse());
     }
     return newDataFrame;
   }
 
-  public DataFrame resample(long interval, ResamplingStrategy strategy) {
-    DataFrame baseDataFrame = this.sortByIndex();
+  public DataFrame resampleBy(String seriesName, long interval, ResamplingStrategy strategy) {
+    DataFrame baseDataFrame = this.sortBy(seriesName);
 
-    List<Series.Bucket> buckets = baseDataFrame.getIndex().bucketsByInterval(interval);
+    List<Series.Bucket> buckets = baseDataFrame.toLongs(seriesName).bucketsByInterval(interval);
 
     // new index from intervals
-    int startIndex = (int)(baseDataFrame.getIndex().min() / interval);
+    int startIndex = (int)(baseDataFrame.toLongs(seriesName).min() / interval);
 
-    long[] ivalues = new long[buckets.size()];
+    long[] rvalues = new long[buckets.size()];
     for(int i=0; i<buckets.size(); i++) {
-      ivalues[i] = (i + startIndex) * interval;
+      rvalues[i] = (i + startIndex) * interval;
     }
 
     // resample series
-    DataFrame newDataFrame = new DataFrame(ivalues);
+    DataFrame newDataFrame = new DataFrame();
 
     for(Map.Entry<String, Series> e : baseDataFrame.getSeries().entrySet()) {
+      if(e.getKey().equals(seriesName))
+        continue;
       newDataFrame.addSeries(e.getKey(), strategy.apply(e.getValue(), buckets));
     }
+
+    newDataFrame.addSeries(seriesName, new LongSeries(rvalues));
     return newDataFrame;
   }
 
   DataFrame filter(int[] fromIndex) {
-    LongSeries index = this.index.project(fromIndex);
-    DataFrame df = new DataFrame(index);
+    DataFrame df = new DataFrame();
     for(Map.Entry<String, Series> e : this.getSeries().entrySet()) {
       df.addSeries(e.getKey(), e.getValue().project(fromIndex));
     }
-
     return df;
   }
 
   public DataFrame filter(BooleanSeries series) {
-    if(series.size() != this.index.size())
+    if(series.size() != this.size())
       throw new IllegalArgumentException("Series size must be equal to index size");
 
     int[] fromIndex = new int[series.size()];
@@ -594,7 +593,7 @@ public class DataFrame {
   }
 
   public DataFrame dropNullRows() {
-    int[] fromIndex = new int[this.index.size()];
+    int[] fromIndex = new int[this.size()];
     for(int i=0; i<fromIndex.length; i++) {
       fromIndex[i] = i;
     }
@@ -620,12 +619,11 @@ public class DataFrame {
   }
 
   public DataFrame dropNullColumns() {
-    DataFrame df = new DataFrame(index);
+    DataFrame df = new DataFrame();
     for(Map.Entry<String, Series> e : this.getSeries().entrySet()) {
       if(!e.getValue().hasNull())
         df.addSeries(e.getKey(), e.getValue());
     }
-
     return df;
   }
 

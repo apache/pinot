@@ -18,7 +18,7 @@ public class QueryResultDummy extends AnomalyFunctionEx {
     LOG.info("Querying '{}' with '{}'", datasource, config);
     DataFrame df = queryDataSource(datasource, config);
 
-    LOG.info("Got query result with {} columns and {} rows", df.getSeriesNames().size(), df.getIndex().size());
+    LOG.info("Got query result with {} columns and {} rows", df.getSeriesNames().size(), df.size());
     LOG.info(df.toString());
 
     return new AnomalyFunctionExResult();
