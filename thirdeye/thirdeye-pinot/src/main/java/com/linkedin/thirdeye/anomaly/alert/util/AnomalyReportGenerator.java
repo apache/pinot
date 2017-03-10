@@ -120,7 +120,7 @@ public class AnomalyReportGenerator {
         }
 
         String feedbackVal = getFeedback(
-            anomaly.getFeedback() == null ? "N/A" : anomaly.getFeedback().getFeedbackType().name());
+            anomaly.getFeedback() == null ? "Not Resolved" : "Resolved(" + anomaly.getFeedback().getFeedbackType().name() + ")");
 
         AnomalyReportDTO anomalyReportDTO = new AnomalyReportDTO(String.valueOf(anomaly.getId()),
             getAnomalyURL(anomaly, configuration.getDashboardHost()),
@@ -202,21 +202,22 @@ public class AnomalyReportGenerator {
   String getFeedback(String feedbackType) {
     switch (feedbackType) {
     case "ANOMALY":
-      return "Confirmed Anomaly";
+      return "Resolved (Confirmed Anomaly)";
     case "NOT_ANOMALY":
-      return "False Alarm";
+      return "Resolved (False Alarm)";
     case "ANOMALY_NO_ACTION":
       return "Not Actionable";
     }
-    return "NA";
+    return "Not Resolved";
   }
 
   String getAnomalyURL(MergedAnomalyResultDTO anomalyResultDTO, String dashboardUrl) {
     String urlPart =
         "/dashboard#view=anomalies&dataset=%s&metrics=%s&currentStart=%s&currentEnd=%s";
-    return dashboardUrl + String
-        .format(urlPart, anomalyResultDTO.getCollection(), anomalyResultDTO.getMetric(),
-            anomalyResultDTO.getStartTime(), anomalyResultDTO.getEndTime());
+    // return dashboardUrl + String
+        // .format(urlPart, anomalyResultDTO.getCollection(), anomalyResultDTO.getMetric(),
+            // anomalyResultDTO.getStartTime(), anomalyResultDTO.getEndTime());
+    return "http://localhost:1426/thirdeye#investigate?anomalyId=";
   }
 
   @JsonIgnoreProperties(ignoreUnknown = true)
