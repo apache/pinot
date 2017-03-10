@@ -160,7 +160,7 @@
 						<div id="main-tabs" class="pull-right">
 							<ul class="nav navbar-nav">
 								<li class=""><a href="#anomalies">Anomalies</a></li>
-								<li class=""><a href="#analysis">Root Cause Analysis</a></li>
+								<!-- <li class=""><a href="#analysis">Root Cause Analysis</a></li> -->
 							</ul>
 
             <!-- Hidding this until it's fully fleshed out -->

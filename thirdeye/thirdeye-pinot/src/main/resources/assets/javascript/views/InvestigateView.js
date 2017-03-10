@@ -39,7 +39,7 @@ InvestigateView.prototype = {
     const template_with_anomaly = this.investigate_template_compiled(investigateData);
     $("#investigate-place-holder").html(template_with_anomaly);
     this.renderAnomalyChart(anomaly);
-    this.setupListenerOnViewContributionLink();
+    // this.setupListenerOnViewContributionLink();
     this.setupListenerOnUserFeedback();
   },
 
@@ -124,7 +124,10 @@ InvestigateView.prototype = {
         },
         axis : {
           y : {
-            show : true
+            show : true,
+            tick: {
+              format: d3.format(".2f")
+            }
           },
           x : {
             type : 'timeseries',

@@ -97,8 +97,8 @@
         <div class="wow-card-body">
           {{formatDouble currentValue}}
         </div>
-        <div class="wow-card-footer">
-        </div>
+<!--         <div class="wow-card-footer">
+        </div> -->
       </div>
 
       <div class="wow-card">
@@ -109,9 +109,9 @@
           {{formatDouble wow.baselineValue}}
           <span class="anomaly-change-delta {{colorDelta wow.change}}">({{formatPercent wow.change}})</span>
         </div>
-        <div class="wow-card-footer">
+<!--         <div class="wow-card-footer">
           <a id="wow1" class="thirdeye-link">View Contribution Analysis</a>
-        </div>
+        </div> -->
       </div>
 
       <div class="wow-card">
@@ -122,9 +122,9 @@
           {{formatDouble wow2.baselineValue}}
           <span class="anomaly-change-delta {{colorDelta wow2.change}}">({{formatPercent wow2.change}})</span>
         </div>
-        <div class="wow-card-footer">
+<!--         <div class="wow-card-footer">
           <a id ="wow2" class="thirdeye-link">View Contribution Analysis</a>
-        </div>
+        </div> -->
       </div>
 
       <div class="wow-card">
@@ -135,9 +135,9 @@
           {{formatDouble wow3.baselineValue}}
           <span class="anomaly-change-delta {{colorDelta wow3.change}}">({{formatPercent wow3.change}})<span>
         </div>
-        <div class="wow-card-footer">
+<!--         <div class="wow-card-footer">
           <a id="wow3" class="thirdeye-link">View Contribution Analysis</a>
-        </div>
+        </div> -->
       </div>
     </div>
 
