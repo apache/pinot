@@ -22,7 +22,7 @@
     <div class="investigate-title">
       <span>{{metric}}</span>
       <div class="investigate-button">
-        <a href="#" class="thirdeye-link">Share</a>
+        <!-- <a href="#" class="thirdeye-link">Share</a> -->
         <a href="#" class="thirdeye-link">InGraphs</a>
       </div>
     </div>
@@ -69,11 +69,11 @@
         </div>
         <div class="anomaly-details-row">
           <div class="anomaly-details-items">
-            <label class="label-medium-semibold">Current</label>
+            <label class="label-medium-semibold">Current Avg</label>
             <span>{{current}}</span>
           </div>
           <div class="anomaly-details-items">
-            <label class="label-medium-semibold">Baseline</label>
+            <label class="label-medium-semibold">Baseline Avg</label>
             <span>
               {{#if baseline}}
                 {{baseline}}
@@ -92,7 +92,7 @@
     <div class="investigate-wow">
       <div class="wow-card">
         <div class="wow-card-header">
-          <label class="label-medium-semibold">Current</label>
+          <label class="label-medium-semibold">Current Total</label>
         </div>
         <div class="wow-card-body">
           {{formatDouble currentValue}}
@@ -116,7 +116,7 @@
 
       <div class="wow-card">
         <div class="wow-card-header">
-          <label class="label-medium-semibold">WoW2</label>
+          <label class="label-medium-semibold">Wo2W</label>
         </div>
         <div class="wow-card-body">
           {{formatDouble wow2.baselineValue}}
@@ -129,7 +129,7 @@
 
       <div class="wow-card">
         <div class="wow-card-header">
-          <label class="label-medium-semibold">WoW3</label>
+          <label class="label-medium-semibold">Wo3W</label>
         </div>
         <div class="wow-card-body">
           {{formatDouble wow3.baselineValue}}

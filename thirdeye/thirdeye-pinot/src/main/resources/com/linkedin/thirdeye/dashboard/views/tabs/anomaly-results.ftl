@@ -60,11 +60,11 @@
             </div>
             <div class="anomaly-details-row">
               <div class="anomaly-details-items">
-                <label class="label-medium-semibold">Current</label>
+                <label class="label-medium-semibold">Current Avg</label>
                 <span>{{current}}</span>
               </div>
               <div class="anomaly-details-items">
-                <label class="label-medium-semibold">Baseline</label>
+                <label class="label-medium-semibold">Baseline Avg</label>
                 <span>
                   {{#if baseline}}
                     {{baseline}}
