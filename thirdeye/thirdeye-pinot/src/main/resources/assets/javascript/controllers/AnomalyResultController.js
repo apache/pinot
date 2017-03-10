@@ -4,7 +4,7 @@ function AnomalyResultController(parentController) {
   this.anomalyResultView = new AnomalyResultView(this.anomalyResultModel);
 
   this.anomalyResultView.applyButtonEvent.attach(this.applyButtonEventHandler.bind(this));
-  this.anomalyResultView.rootCauseAnalysisButtonClickEvent.attach(this.rootCauseAnalysisButtonClickEventHandler.bind(this));
+  this.anomalyResultView.investigateButtonClickEvent.attach(this.investigateButtonClickEventHandler.bind(this));
   this.anomalyResultView.showDetailsLinkClickEvent.attach(this.showDetailsLinkClickEventHandler.bind(this));
   this.anomalyResultView.anomalyFeedbackSelectEvent.attach(this.anomalyFeedbackSelectEventHandler.bind(this));
 
@@ -31,19 +31,12 @@ AnomalyResultController.prototype = {
     HASH_SERVICE.refreshWindowHashForRouting('anomalies');
     HASH_SERVICE.routeTo('anomalies');
   },
-  rootCauseAnalysisButtonClickEventHandler: function (sender, args) {
-    console.log("received root cause analysis button click event at AnomalyResultController");
-    console.log(args);
-    this.anomalyResultModel.getMetricIdFromName(args.metric).then((id) => {
-      args.metricId = id;
-
-      HASH_SERVICE.clear();
-      HASH_SERVICE.set('tab', 'analysis');
-      HASH_SERVICE.update(args);
-      HASH_SERVICE.refreshWindowHashForRouting('analysis');
-      HASH_SERVICE.routeTo('app');
-    });
-
+  investigateButtonClickEventHandler: function (sender, args) {
+    HASH_SERVICE.clear();
+    HASH_SERVICE.set('tab', 'investigate');
+    HASH_SERVICE.update(args);
+    HASH_SERVICE.refreshWindowHashForRouting('investigate');
+    HASH_SERVICE.routeTo('app');
     // Send this event and the args to parent controller, to route to AnalysisController
   },
   showDetailsLinkClickEventHandler: function (sender, args) {

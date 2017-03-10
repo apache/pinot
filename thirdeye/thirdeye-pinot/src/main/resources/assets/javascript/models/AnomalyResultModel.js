@@ -208,7 +208,4 @@ AnomalyResultModel.prototype = {
       return feedbackType;
     }
   },
-  getMetricIdFromName(name) {
-    return name && dataService.fetchMetricId(name);
-  },
 }

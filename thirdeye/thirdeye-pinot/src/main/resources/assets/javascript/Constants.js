@@ -39,6 +39,7 @@ function Constants() {
   this.TAB_DASHBOARD = 'dashboard';
   this.TAB_ANOMALIES = 'anomalies';
   this.TAB_ANALYSIS = 'analysis';
+  this.TAB_INVESTIGATE = 'investigate';
 
   this.DEFAULT_ANALYSIS_GRANULARITY = 'DAYS';
   this.DEFAULT_ANALYSIS_DIMENSION = 'ALL';

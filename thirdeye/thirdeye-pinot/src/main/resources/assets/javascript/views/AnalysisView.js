@@ -17,8 +17,8 @@ function AnalysisView(analysisModel) {
 
 AnalysisView.prototype = {
   init(params = {}) {
-    const { metricId } = params;
-    this.viewParams.metricId = metricId || '';
+    this.viewParams = params;
+    this.viewParams.metricName = this.analysisModel.metricName;
   },
 
   render: function () {
@@ -88,13 +88,14 @@ AnalysisView.prototype = {
         metricName = name;
       }
 
-      this.viewParams['metric'] = {id: metricId, alias: metricAlias, allowClear:true, name:metricName};
-      this.viewParams['metricId'] = metricId;
+      this.viewParams['metric'] = {id: metricId, alias: metricAlias, allowClear:true, name:metricName} || this.viewParams['metric'];
+      this.viewParams['metricId'] = metricId || this.viewParams['metricId'];
+      this.viewParams['metricName'] = metricName || this.viewParams['metricName'];
 
       // Now render the dimensions and filters for selected metric
-      this.renderGranularity(this.viewParams.metric.id);
-      this.renderDimensions(this.viewParams.metric.id);
-      this.renderFilters(this.viewParams.metric.id);
+      this.renderGranularity(this.viewParams.metricId);
+      this.renderDimensions(this.viewParams.metricId);
+      this.renderFilters(this.viewParams.metricId);
     }).trigger('change');
 
     // TIME RANGE SELECTION
@@ -149,35 +150,25 @@ AnalysisView.prototype = {
     };
     if (granularities) {
       $("#analysis-granularity-input").select2().empty();
-      $("#analysis-granularity-input").select2(config).on("change", function (e) {
-        var selectedElement = $(e.currentTarget);
-        var selectedData = selectedElement.select2("data");
-        self.viewParams['granularity'] = selectedData[0].id;
-      }).trigger('change');
+      $("#analysis-granularity-input").select2(config);
     }
   },
 
   renderDimensions: function (metricId) {
     if(!metricId) return;
-    var self = this;
-    var dimensions = self.analysisModel.fetchDimensionsForMetric(metricId);
+    var dimensions = this.analysisModel.fetchDimensionsForMetric(metricId);
     var config = {
       minimumResultsForSearch: -1, data: dimensions
     };
     if (dimensions) {
       $("#analysis-metric-dimension-input").select2().empty();
-      $("#analysis-metric-dimension-input").select2(config).on("select2:select", function (e) {
-        var selectedElement = $(e.currentTarget);
-        var selectedData = selectedElement.select2("data");
-        self.viewParams['dimension'] = selectedData[0].id;
-      });
+      $("#analysis-metric-dimension-input").select2(config);
     }
   },
 
   renderFilters: function (metricId) {
     if(!metricId) return;
-    var self = this;
-    var filters = self.analysisModel.fetchFiltersForMetric(metricId);
+    var filters = this.analysisModel.fetchFiltersForMetric(metricId);
     var filterData = [];
     for (var key in filters) {
       // TODO: introduce category
@@ -202,7 +193,6 @@ AnalysisView.prototype = {
   },
 
   collectViewParams : function () {
-    var self = this;
     // Collect filters
     var selectedFilters = $("#analysis-metric-filter-input").val();
     var filterMap = {};
@@ -216,10 +206,15 @@ AnalysisView.prototype = {
         filterMap[keyVal[0]] = [keyVal[1]];
       }
     }
-    self.viewParams['filters'] = filterMap;
+
+    try {
+      this.viewParams['dimension'] = $("#analysis-metric-dimension-input").select2("data")[0].id;
+      this.viewParams['granularity'] = $("#analysis-granularity-input").select2("data")[0].id;
+    } catch (e) {}
+    this.viewParams['filters'] = filterMap;
 
     // Also reset the filters for heatmap
-    self.viewParams['heatmapFilters'] = filterMap;
+    this.viewParams['heatmapFilters'] = filterMap;
   },
 
   setupListeners: function () {

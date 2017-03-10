@@ -68,14 +68,21 @@ TimeSeriesCompareView.prototype = {
   loadChart: function (timeSeriesObject) {
     // CHART GENERATION
     var chart = c3.generate({
-      bindto: '#analysis-chart', data: {
-        x: 'date', columns: timeSeriesObject.columns, type: 'spline'
-      }, legend: {
-        show: false, position: 'top'
-      }, axis: {
+      bindto: '#analysis-chart',
+      data: {
+        x: 'date', columns: timeSeriesObject.columns, type: 'line'
+      },
+      legend : {
+        position : 'inset',
+        inset: {
+          anchor: 'top-right',
+        }
+      },
+      axis: {
         y: {
           show: true
-        }, x: {
+        },
+        x: {
           type: 'timeseries', show: true, tick: {
             "culling": {"max": 100},
             "count": 10, // "rotate":30,   // this will rotate the x axis display values

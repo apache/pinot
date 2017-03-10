@@ -13,31 +13,30 @@
             <div class="anomaly-result-title">
               <span>&num;{{anomalyId}} {{metric}}</span>
             </div>
-            <div id="root-cause-analysis-button-{{anomalyIndex}}">
+            <div id="investigate-button-{{anomalyIndex}}">
               <a type="button" class="btn thirdeye-btn pull-right">Investigate</a>
             </div>
           </div>
 
           <div class ="anormaly-chart" id="anomaly-chart-{{anomalyIndex}}"></div>
 
-          <div class="anomaly-details">
+          <div class="anomaly-details bg-white">
             <div class="anomaly-details-row">
               <div class="anomaly-details-items anomaly-details-items--small">
                 <label class="label-medium-semibold">Change</label>
                 <span class="anomaly-change-delta {{colorDelta changeDelta}}">{{changeDelta}}</span>
               </div>
-
               <div class="anomaly-details-items anomaly-details-items--small">
-                <label class="label-medium-semibold">Current</label>
-                <span>{{current}}</span>
+                <label class="label-medium-semibold">Duration</label>
+                <span class="anomaly-duration">{{duration}}</span>
               </div>
               <div class="anomaly-details-items anomaly-details-items--small">
-                <label class="label-medium-semibold">Baseline</label>
+                <label class="label-medium-semibold">Status</label>
                 <span>
-                  {{#if baseline}}
-                    {{baseline}}
+                  {{#if anomalyFeedback}}
+                    Resolved ({{anomalyFeedback}})
                   {{else}}
-                    N/A
+                    Not Resolved
                   {{/if}}
                 </span>
               </div>
@@ -61,17 +60,16 @@
             </div>
             <div class="anomaly-details-row">
               <div class="anomaly-details-items">
-                <label class="label-medium-semibold">Duration</label>
-                <span class="anomaly-duration">{{duration}}</span>
+                <label class="label-medium-semibold">Current</label>
+                <span>{{current}}</span>
               </div>
-
               <div class="anomaly-details-items">
-                <label class="label-medium-semibold">Status</label>
+                <label class="label-medium-semibold">Baseline</label>
                 <span>
-                  {{#if anomalyFeedback}}
-                    Resolved ({{anomalyFeedback}})
+                  {{#if baseline}}
+                    {{baseline}}
                   {{else}}
-                    Not Resolved
+                    N/A
                   {{/if}}
                 </span>
               </div>

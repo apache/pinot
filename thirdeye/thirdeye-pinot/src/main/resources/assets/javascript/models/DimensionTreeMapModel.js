@@ -22,14 +22,8 @@ function DimensionTreeMapModel() {
 DimensionTreeMapModel.prototype = {
   init: function (params) {
     if (params) {
-      if (params.metric) {
-        this.metricId = params.metric.id;
-        this.metricName = params.metric.name;
-      }
-
-      if (params.metricId) {
-        this.metricId = params.metricId;
-      }
+      this.metricId = params.metricId;
+      this.metricName = params.metricName;
 
       if (params.currentStart) {
         this.currentStart = params.currentStart;
