@@ -46,29 +46,42 @@ InvestigateView.prototype = {
     const anomaly = this.investigateModel.getAnomaly();
     $('.thirdeye-link').click((e) => {
       const wowType = e.target.id;
-
       const wowMapping = {
         wow1: 7,
         wow2: 14,
         wow3: 21
       };
       const offset = wowMapping[wowType] || 7;
+      const currentStart = moment(anomaly.currentStart);
+      const currentEnd = moment(anomaly.currentEnd);
+      const granularity = this.getGranularity(currentStart, currentEnd);
 
       const analysisParams = {
         metricId: anomaly.metricId,
-        currentStart: moment(anomaly.currentStart),
-        currentEnd: moment(anomaly.currentEnd),
-        baselineStart: moment(anomaly.currentStart).subtract(offset, 'days'),
-        baselineEnd: moment(anomaly.currentEnd).subtract(offset, 'days')
+        currentStart,
+        currentEnd,
+        granularity,
+        baselineStart: currentStart.clone().subtract(offset, 'days'),
+        baselineEnd: currentEnd.clone().subtract(offset, 'days')
       };
 
       // if (anomaly.anomalyFunctionDimension.length) {
       //   const dimension = JSON.parse(anomaly.anomalyFunctionDimension);
       //   analysisParams.dimension = Object.keys(dimension)[0];
       // }
-
       this.viewContributionClickEvent.notify(analysisParams);
     });
+  },
+
+  getGranularity(start, end) {
+    const hoursDiff = end.diff(start, 'hours');
+    if (hoursDiff < 3) {
+      return '5_MINUTES'
+    } else if (hoursDiff < 120) {
+      return 'HOURS';
+    } else {
+      return 'DAYS';
+    }
   },
 
   renderAnomalyChart(anomaly){

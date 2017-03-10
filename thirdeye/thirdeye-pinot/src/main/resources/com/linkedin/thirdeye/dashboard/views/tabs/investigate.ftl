@@ -94,7 +94,7 @@
           <label class="label-medium-semibold">Current</label>
         </div>
         <div class="wow-card-body">
-          {{currentValue}}
+          {{formatDouble currentValue}}
         </div>
         <div class="wow-card-footer">
         </div>
