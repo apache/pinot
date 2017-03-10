@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.detector.functionex.dataframe;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -41,6 +42,8 @@ public final class LongSeries extends Series {
   public static class LongBatchLast implements LongBatchFunction {
     @Override
     public long apply(long[] values) {
+      if(values.length <= 0)
+        return NULL_VALUE;
       return values[values.length - 1];
     }
   }
@@ -90,7 +93,7 @@ public final class LongSeries extends Series {
 
   public LongSeries unique() {
     if(this.values.length <= 0)
-      return new LongSeries(new long[0]);
+      return new LongSeries();
 
     long[] values = Arrays.copyOf(this.values, this.values.length);
     Arrays.sort(values);
@@ -204,9 +207,11 @@ public final class LongSeries extends Series {
     return builder.toString();
   }
 
-  public List<Bucket> bucketsByInterval(long interval) {
+  public List<Bucket> groupByInterval(long interval) {
+    if(interval <= 0)
+      throw new IllegalArgumentException("interval must be greater than 0");
     if(this.size() <= 0)
-      return Collections.EMPTY_LIST;
+      return Collections.emptyList();
 
     // sorted series and find ranges
     LongSeries series = this.sorted();
@@ -254,42 +259,10 @@ public final class LongSeries extends Series {
     return buckets;
   }
 
-  public List<Bucket> bucketsByCount(int count) {
-    if(this.size() <= 0)
-      return Collections.EMPTY_LIST;
-
-    List<Bucket> buckets = new ArrayList<>();
-    for(int i=0; i<this.size(); i+=count) {
-
-      // last (and potentially smaller) bucket
-      int effective = Math.min(count, this.size() - i);
-
-      int[] fromIndex = new int[effective];
-      for(int j=0; j<effective; j++) {
-        fromIndex[j] = i + j;
-      }
-      buckets.add(new Bucket(fromIndex));
-    }
-
-    return buckets;
-  }
-
-  // TODO buckets by bucket count - for deciles, etc.
-
-  public LongSeries groupBy(List<Bucket> buckets, LongBatchFunction grouper) {
-    return this.groupBy(buckets, NULL_VALUE, grouper);
-  }
-
-  public LongSeries groupBy(List<Bucket> buckets, long nullValue, LongBatchFunction grouper) {
+  public LongSeries aggregate(List<Bucket> buckets, LongBatchFunction grouper) {
     long[] values = new long[buckets.size()];
     for(int i=0; i<buckets.size(); i++) {
       Bucket b = buckets.get(i);
-
-      // no elements in group
-      if(b.fromIndex.length <= 0) {
-        values[i] = nullValue;
-        continue;
-      }
 
       // group
       long[] gvalues = new long[b.fromIndex.length];
@@ -392,6 +365,38 @@ public final class LongSeries extends Series {
   }
 
   @Override
+  List<JoinPair> joinLeft(Series other) {
+    return null;
+  }
+
+  @Override
+  public List<Bucket> groupByValue() {
+    if(this.isEmpty())
+      return Collections.emptyList();
+
+    List<Bucket> buckets = new ArrayList<>();
+    int[] sortedIndex = this.sortedIndex();
+
+    int bucketOffset = 0;
+    long lastValue = this.values[sortedIndex[0]];
+
+    for(int i=1; i<sortedIndex.length; i++) {
+      long currVal = this.values[sortedIndex[i]];
+      if(Long.compare(lastValue, currVal) != 0) {
+        int[] fromIndex = Arrays.copyOfRange(sortedIndex, bucketOffset, i);
+        buckets.add(new Bucket(fromIndex));
+        bucketOffset = i;
+        lastValue = currVal;
+      }
+    }
+
+    int[] fromIndex = Arrays.copyOfRange(sortedIndex, bucketOffset, sortedIndex.length);
+    buckets.add(new Bucket(fromIndex));
+
+    return buckets;
+  }
+
+  @Override
   public boolean equals(Object o) {
     if (this == o) {
       return true;
@@ -429,7 +434,7 @@ public final class LongSeries extends Series {
     final long value;
     final int index;
 
-    public LongSortTuple(long value, int index) {
+    LongSortTuple(long value, int index) {
       this.value = value;
       this.index = index;
     }
@@ -439,7 +444,7 @@ public final class LongSeries extends Series {
     final long lower;
     final long upper; // exclusive
 
-    public Range(long lower, long upper) {
+    Range(long lower, long upper) {
       this.lower = lower;
       this.upper = upper;
     }

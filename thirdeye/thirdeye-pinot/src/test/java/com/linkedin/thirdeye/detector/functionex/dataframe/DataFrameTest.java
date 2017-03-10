@@ -339,9 +339,19 @@ public class DataFrameTest {
   }
 
   @Test
-  public void testLongBucketsByInterval() {
+  public void testLongGroupByIntervalEmpty() {
+    Assert.assertTrue(DataFrame.toSeries(new long[0]).groupByInterval(1).isEmpty());
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testLongGroupByIntervalFailZero() {
+    DataFrame.toSeries(-1).groupByInterval(0);
+  }
+
+  @Test
+  public void testLongGroupByInterval() {
     LongSeries in = DataFrame.toSeries(3, 15, 13, 5, 19, 20);
-    List<Series.Bucket> buckets = in.bucketsByInterval(4);
+    List<Series.Bucket> buckets = in.groupByInterval(4);
 
     Assert.assertEquals(buckets.size(), 6);
     Assert.assertEquals(buckets.get(0).fromIndex, new int[] { 0 });
@@ -353,20 +363,29 @@ public class DataFrameTest {
   }
 
   @Test
-  public void testLongBucketsByCountAligned() {
+  public void testLongGroupByCountEmpty() {
+    Assert.assertTrue(DataFrame.toSeries(new long[0]).groupByCount(1).isEmpty());
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testLongGroupByCountFailZero() {
+    DataFrame.toSeries(-1).groupByCount(0);
+  }
+
+  @Test
+  public void testLongGroupByCountAligned() {
     LongSeries in = DataFrame.toSeries(3, 15, 13, 5, 19, 20);
-    List<Series.Bucket> buckets = in.bucketsByCount(3);
+    List<Series.Bucket> buckets = in.groupByCount(3);
 
     Assert.assertEquals(buckets.size(), 2);
     Assert.assertEquals(buckets.get(0).fromIndex, new int[] { 0, 1, 2 });
     Assert.assertEquals(buckets.get(1).fromIndex, new int[] { 3, 4, 5 });
-
   }
 
   @Test
   public void testLongBucketsByCountUnaligned() {
     LongSeries in = DataFrame.toSeries(3, 15, 13, 5, 19, 11, 12, 9);
-    List<Series.Bucket> buckets = in.bucketsByCount(3);
+    List<Series.Bucket> buckets = in.groupByCount(3);
 
     Assert.assertEquals(buckets.size(), 3);
     Assert.assertEquals(buckets.get(0).fromIndex, new int[] { 0, 1, 2 });
@@ -375,36 +394,135 @@ public class DataFrameTest {
   }
 
   @Test
-  public void testLongBucketsGroupBySum() {
+  public void testLongGroupByPartitionsEmpty() {
+    Assert.assertTrue(DataFrame.toSeries(new long[0]).groupByPartitions(1).isEmpty());
+  }
+
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testLongGroupByPartitionsFailZero() {
+    DataFrame.toSeries(-1).groupByPartitions(0);
+  }
+
+  @Test
+  public void testLongGroupByPartitionsAligned() {
+    LongSeries in = DataFrame.toSeries(3, 15, 13, 5, 19, 20, 5, 5, 8, 1);
+    List<Series.Bucket> buckets = in.groupByPartitions(5);
+
+    Assert.assertEquals(buckets.size(), 5);
+    Assert.assertEquals(buckets.get(0).fromIndex, new int[] { 0, 1 });
+    Assert.assertEquals(buckets.get(1).fromIndex, new int[] { 2, 3 });
+    Assert.assertEquals(buckets.get(2).fromIndex, new int[] { 4, 5 });
+    Assert.assertEquals(buckets.get(3).fromIndex, new int[] { 6, 7 });
+    Assert.assertEquals(buckets.get(4).fromIndex, new int[] { 8, 9 });
+  }
+
+  @Test
+  public void testLongGroupByPartitionsUnaligned() {
+    LongSeries in = DataFrame.toSeries(3, 15, 13, 5, 19, 20, 5, 5, 8, 1);
+    List<Series.Bucket> buckets = in.groupByPartitions(3);
+
+    Assert.assertEquals(buckets.size(), 3);
+    Assert.assertEquals(buckets.get(0).fromIndex, new int[] { 0, 1, 2 });
+    Assert.assertEquals(buckets.get(1).fromIndex, new int[] { 3, 4, 5, 6 });
+    Assert.assertEquals(buckets.get(2).fromIndex, new int[] { 7, 8, 9 });
+  }
+
+  @Test
+  public void testLongGroupByPartitionsUnalignedSmall() {
+    LongSeries in = DataFrame.toSeries(3, 15, 1);
+    List<Series.Bucket> buckets = in.groupByPartitions(7);
+
+    Assert.assertEquals(buckets.size(), 7);
+    Assert.assertEquals(buckets.get(0).fromIndex, new int[] {});
+    Assert.assertEquals(buckets.get(1).fromIndex, new int[] { 0 });
+    Assert.assertEquals(buckets.get(2).fromIndex, new int[] {});
+    Assert.assertEquals(buckets.get(3).fromIndex, new int[] { 1 });
+    Assert.assertEquals(buckets.get(4).fromIndex, new int[] {});
+    Assert.assertEquals(buckets.get(5).fromIndex, new int[] { 2 });
+    Assert.assertEquals(buckets.get(6).fromIndex, new int[] {});
+  }
+
+  @Test
+  public void testLongGroupByValueEmpty() {
+    Assert.assertTrue(DataFrame.toSeries(new long[0]).groupByValue().isEmpty());
+  }
+
+  @Test
+  public void testLongGroupByValue() {
+    LongSeries in = DataFrame.toSeries(3, 4, 5, 5, 3, 1, 5);
+    List<Series.Bucket> buckets = in.groupByValue();
+
+    Assert.assertEquals(buckets.size(), 4);
+    Assert.assertEquals(buckets.get(0).fromIndex, new int[] { 5 });
+    Assert.assertEquals(buckets.get(1).fromIndex, new int[] { 0, 4 });
+    Assert.assertEquals(buckets.get(2).fromIndex, new int[] { 1 });
+    Assert.assertEquals(buckets.get(3).fromIndex, new int[] { 2, 3, 6 });
+  }
+
+  @Test
+  public void testBooleanGroupByValueEmpty() {
+    Assert.assertTrue(DataFrame.toSeries(new boolean[0]).groupByValue().isEmpty());
+  }
+
+  @Test
+  public void testBooleanGroupByValue() {
+    BooleanSeries in = DataFrame.toSeries(true, false, false, true, false, true, false);
+    List<Series.Bucket> buckets = in.groupByValue();
+
+    Assert.assertEquals(buckets.size(), 2);
+    Assert.assertEquals(buckets.get(0).fromIndex, new int[] { 1, 2, 4, 6 });
+    Assert.assertEquals(buckets.get(1).fromIndex, new int[] { 0, 3, 5 });
+  }
+
+  @Test
+  public void testBooleanGroupByValueTrueOnly() {
+    BooleanSeries in = DataFrame.toSeries(true, true, true);
+    List<Series.Bucket> buckets = in.groupByValue();
+
+    Assert.assertEquals(buckets.size(), 1);
+    Assert.assertEquals(buckets.get(0).fromIndex, new int[] { 0, 1, 2 });
+  }
+
+  @Test
+  public void testBooleanGroupByValueFalseOnly() {
+    BooleanSeries in = DataFrame.toSeries(false, false, false);
+    List<Series.Bucket> buckets = in.groupByValue();
+
+    Assert.assertEquals(buckets.size(), 1);
+    Assert.assertEquals(buckets.get(0).fromIndex, new int[] { 0, 1, 2 });
+  }
+
+  @Test
+  public void testLongAggregateSum() {
     List<Series.Bucket> buckets = new ArrayList<>();
     buckets.add(new Series.Bucket(new int[] { 1, 3, 4 }));
     buckets.add(new Series.Bucket(new int[] {}));
     buckets.add(new Series.Bucket(new int[] { 0, 2 }));
 
     LongSeries in = DataFrame.toSeries(3, 15, 13, 5, 19 );
-    LongSeries out = in.groupBy(buckets, 0, new LongSeries.LongBatchSum());
+    LongSeries out = in.aggregate(buckets, new LongSeries.LongBatchSum());
     Assert.assertEquals(out.values(), new long[] { 39, 0, 16 });
   }
 
   @Test
-  public void testLongBucketsGroupByLast() {
+  public void testLongAggregateLast() {
     List<Series.Bucket> buckets = new ArrayList<>();
     buckets.add(new Series.Bucket(new int[] { 1, 3, 4 }));
     buckets.add(new Series.Bucket(new int[] {}));
     buckets.add(new Series.Bucket(new int[] { 0, 2 }));
 
     LongSeries in = DataFrame.toSeries(3, 15, 13, 5, 19 );
-    LongSeries out = in.groupBy(buckets, -1, new LongSeries.LongBatchLast());
-    Assert.assertEquals(out.values(), new long[] { 19, -1, 13 });
+    LongSeries out = in.aggregate(buckets,  new LongSeries.LongBatchLast());
+    Assert.assertEquals(out.values(), new long[] { 19, LongSeries.NULL_VALUE, 13 });
   }
 
   @Test
-  public void testLongBucketsGroupByEndToEnd() {
+  public void testLongGroupByAggregateEndToEnd() {
     LongSeries in = DataFrame.toSeries(0, 3, 12, 2, 4, 8, 5, 1, 7, 9, 6, 10, 11);
-    List<Series.Bucket> buckets = in.bucketsByInterval(4);
+    List<Series.Bucket> buckets = in.groupByInterval(4);
     Assert.assertEquals(buckets.size(), 4);
 
-    LongSeries out = in.groupBy(buckets, 0, new LongSeries.LongBatchSum());
+    LongSeries out = in.aggregate(buckets, new LongSeries.LongBatchSum());
     Assert.assertEquals(out.values(), new long[] { 6, 22, 38, 12 });
   }
 
@@ -872,6 +990,5 @@ public class DataFrameTest {
     Assert.assertTrue(DataFrame.toSeries(0, 3, 4).equals(DataFrame.toSeries(0.0, 3.0, 4.0).toLongs()));
     Assert.assertTrue(DataFrame.toSeries(false, true, true).equals(DataFrame.toSeries("0", "1", "1").toBooleans()));
     Assert.assertTrue(DataFrame.toSeries("1", "3", "4").equals(DataFrame.toSeries(1, 3, 4).toStrings()));
-
   }
 }

@@ -1,6 +1,9 @@
 package com.linkedin.thirdeye.detector.functionex.dataframe;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import org.apache.commons.lang.math.NumberUtils;
 
@@ -18,6 +21,8 @@ public final class BooleanSeries extends Series {
   public static class BooleanBatchAnd implements BooleanBatchFunction {
     @Override
     public boolean apply(boolean[] values) {
+      if(values.length <= 0)
+        return NULL_VALUE;
       for(boolean b : values) {
         if(!b)
           return false;
@@ -29,6 +34,8 @@ public final class BooleanSeries extends Series {
   public static class BooleanBatchOr implements BooleanBatchFunction {
     @Override
     public boolean apply(boolean[] values) {
+      if(values.length <= 0)
+        return NULL_VALUE;
       for(boolean b : values) {
         if(b)
           return true;
@@ -40,6 +47,8 @@ public final class BooleanSeries extends Series {
   public static class BooleanBatchLast implements BooleanBatchFunction {
     @Override
     public boolean apply(boolean[] values) {
+      if(values.length <= 0)
+        return NULL_VALUE;
       return values[values.length-1];
     }
   }
@@ -179,22 +188,10 @@ public final class BooleanSeries extends Series {
     return builder.toString();
   }
 
-  // TODO bucketsBy...
-
-  public BooleanSeries groupBy(List<Bucket> buckets, BooleanBatchFunction grouper) {
-    return this.groupBy(buckets, NULL_VALUE, grouper);
-  }
-
-  public BooleanSeries groupBy(List<Bucket> buckets, boolean nullValue, BooleanBatchFunction grouper) {
+  public BooleanSeries aggregate(List<Bucket> buckets, BooleanBatchFunction grouper) {
     boolean[] values = new boolean[buckets.size()];
     for(int i=0; i<buckets.size(); i++) {
       Bucket b = buckets.get(i);
-
-      // no elements in group
-      if(b.fromIndex.length <= 0) {
-        values[i] = nullValue;
-        continue;
-      }
 
       // group
       boolean[] gvalues = new boolean[b.fromIndex.length];
@@ -256,6 +253,37 @@ public final class BooleanSeries extends Series {
   @Override
   int[] nullIndex() {
     return new int[0];
+  }
+
+  @Override
+  List<JoinPair> joinLeft(Series other) {
+    return null;
+  }
+
+  @Override
+  public List<Bucket> groupByValue() {
+    if(this.isEmpty())
+      return Collections.emptyList();
+
+    int[] sortedIndex = this.sortedIndex();
+
+    int countFalse = 0;
+    for(int si : sortedIndex) {
+      if(this.values[si])
+        break;
+      countFalse++;
+    }
+
+    int[] indexFalse = Arrays.copyOfRange(sortedIndex, 0, countFalse);
+    int[] indexTrue = Arrays.copyOfRange(sortedIndex, countFalse, sortedIndex.length);
+
+    List<Bucket> buckets = new ArrayList<>();
+    if(indexFalse.length > 0)
+      buckets.add(new Bucket(indexFalse));
+    if(indexTrue.length > 0)
+      buckets.add(new Bucket(indexTrue));
+
+    return buckets;
   }
 
   @Override

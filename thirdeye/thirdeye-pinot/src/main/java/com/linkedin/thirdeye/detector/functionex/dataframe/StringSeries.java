@@ -2,12 +2,14 @@ package com.linkedin.thirdeye.detector.functionex.dataframe;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import org.apache.commons.lang3.ArrayUtils;
 
 
 public final class StringSeries extends Series {
@@ -56,6 +58,8 @@ public final class StringSeries extends Series {
   public static class StringBatchLast implements StringBatchFunction {
     @Override
     public String apply(String[] values) {
+      if(values.length <= 0)
+        return NULL_VALUE;
       return values[values.length-1];
     }
   }
@@ -189,22 +193,10 @@ public final class StringSeries extends Series {
     return builder.toString();
   }
 
-  // TODO bucketsBy...
-
-  public StringSeries groupBy(List<Bucket> buckets, StringBatchFunction grouper) {
-    return this.groupBy(buckets, NULL_VALUE, grouper);
-  }
-
-  public StringSeries groupBy(List<Bucket> buckets, String nullValue, StringBatchFunction grouper) {
+  public StringSeries aggregate(List<Bucket> buckets, StringBatchFunction grouper) {
     String[] values = new String[buckets.size()];
     for(int i=0; i<buckets.size(); i++) {
       Bucket b = buckets.get(i);
-
-      // no elements in group
-      if(b.fromIndex.length <= 0) {
-        values[i] = nullValue;
-        continue;
-      }
 
       // group
       String[] gvalues = new String[b.fromIndex.length];
@@ -295,6 +287,38 @@ public final class StringSeries extends Series {
   }
 
   @Override
+  List<JoinPair> joinLeft(Series other) {
+    return null;
+  }
+
+  @Override
+  public List<Bucket> groupByValue() {
+    if(this.isEmpty())
+      return Collections.emptyList();
+
+    List<Bucket> buckets = new ArrayList<>();
+    int[] sortedIndex = this.sortedIndex();
+
+    int bucketOffset = 0;
+    String lastValue = this.values[sortedIndex[0]];
+
+    for(int i=1; i<sortedIndex.length; i++) {
+      String currVal = this.values[sortedIndex[i]];
+      if(!Objects.equals(lastValue, currVal)) {
+        int[] fromIndex = Arrays.copyOfRange(sortedIndex, bucketOffset, i);
+        buckets.add(new Bucket(fromIndex));
+        bucketOffset = i;
+        lastValue = currVal;
+      }
+    }
+
+    int[] fromIndex = Arrays.copyOfRange(sortedIndex, bucketOffset, sortedIndex.length);
+    buckets.add(new Bucket(fromIndex));
+
+    return buckets;
+  }
+
+  @Override
   public boolean equals(Object o) {
     if (this == o) {
       return true;
@@ -332,7 +356,7 @@ public final class StringSeries extends Series {
     final String value;
     final int index;
 
-    public StringSortTuple(String value, int index) {
+    StringSortTuple(String value, int index) {
       this.value = value;
       this.index = index;
     }

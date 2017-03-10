@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.detector.functionex.dataframe;
 
 import com.udojava.evalex.Expression;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -18,6 +19,7 @@ public class DataFrame {
   public static Pattern SERIES_NAME_PATTERN = Pattern.compile("([A-Za-z_]\\w*)");
 
   public static final String COLUMN_INDEX = "index";
+  public static final String COLUMN_JOIN = "join";
 
   public interface ResamplingStrategy {
     Series apply(Series s, List<Series.Bucket> buckets);
@@ -28,13 +30,13 @@ public class DataFrame {
     public Series apply(Series s, List<Series.Bucket> buckets) {
       switch(s.type()) {
         case DOUBLE:
-          return ((DoubleSeries)s).groupBy(buckets, new DoubleSeries.DoubleBatchLast());
+          return ((DoubleSeries)s).aggregate(buckets, new DoubleSeries.DoubleBatchLast());
         case LONG:
-          return ((LongSeries)s).groupBy(buckets, new LongSeries.LongBatchLast());
+          return ((LongSeries)s).aggregate(buckets, new LongSeries.LongBatchLast());
         case STRING:
-          return ((StringSeries)s).groupBy(buckets, new StringSeries.StringBatchLast());
+          return ((StringSeries)s).aggregate(buckets, new StringSeries.StringBatchLast());
         case BOOLEAN:
-          return ((BooleanSeries)s).groupBy(buckets, new BooleanSeries.BooleanBatchLast());
+          return ((BooleanSeries)s).aggregate(buckets, new BooleanSeries.BooleanBatchLast());
         default:
           throw new IllegalArgumentException(String.format("Cannot resample series type '%s'", s.type()));
       }
@@ -328,7 +330,7 @@ public class DataFrame {
   public DataFrame resampleBy(String seriesName, long interval, ResamplingStrategy strategy) {
     DataFrame baseDataFrame = this.sortBy(seriesName);
 
-    List<Series.Bucket> buckets = baseDataFrame.toLongs(seriesName).bucketsByInterval(interval);
+    List<Series.Bucket> buckets = baseDataFrame.toLongs(seriesName).groupByInterval(interval);
 
     // new index from intervals
     int startIndex = (int)(baseDataFrame.toLongs(seriesName).min() / interval);
@@ -592,6 +594,73 @@ public class DataFrame {
     return s;
   }
 
+  public static Series toType(Series s, Series.SeriesType type) {
+    switch(type) {
+      case DOUBLE:
+        return s.toDoubles();
+      case LONG:
+        return s.toLongs();
+      case BOOLEAN:
+        return s.toBooleans();
+      case STRING:
+        return s.toStrings();
+      default:
+        throw new IllegalArgumentException(String.format("Unknown series type '%s'", type));
+    }
+  }
+
+  // TODO partition class with typing and key
+  public List<DataFrame> groupBy(Series labels) {
+    if(this.size() != labels.size())
+      throw new IllegalArgumentException("Series size must be equals to DataFrame size");
+    List<Series.Bucket> buckets = labels.groupByValue();
+    List<DataFrame> slices = new ArrayList<>();
+    for(Series.Bucket b : buckets) {
+      slices.add(this.project(b.fromIndex));
+    }
+    return slices;
+  }
+
+  public List<DataFrame> groupBy(String seriesNameLabels) {
+    return this.groupBy(assertSeriesExists(seriesNameLabels));
+  }
+
+  public static DoubleSeries aggregate(List<DataFrame> groups, String seriesName, DoubleSeries.DoubleBatchFunction function) {
+    double[] values = new double[groups.size()];
+    int i = 0;
+    for(DataFrame df : groups) {
+      values[i++] = function.apply(df.toDoubles(seriesName).values());
+    }
+    return new DoubleSeries(values);
+  }
+
+  public static LongSeries aggregate(List<DataFrame> groups, String seriesName, LongSeries.LongBatchFunction function) {
+    long[] values = new long[groups.size()];
+    int i = 0;
+    for(DataFrame df : groups) {
+      values[i++] = function.apply(df.toLongs(seriesName).values());
+    }
+    return new LongSeries(values);
+  }
+
+  public static StringSeries aggregate(List<DataFrame> groups, String seriesName, StringSeries.StringBatchFunction function) {
+    String[] values = new String[groups.size()];
+    int i = 0;
+    for(DataFrame df : groups) {
+      values[i++] = function.apply(df.toStrings(seriesName).values());
+    }
+    return new StringSeries(values);
+  }
+
+  public static BooleanSeries aggregate(List<DataFrame> groups, String seriesName, BooleanSeries.BooleanBatchFunction function) {
+    boolean[] values = new boolean[groups.size()];
+    int i = 0;
+    for(DataFrame df : groups) {
+      values[i++] = function.apply(df.toBooleans(seriesName).values());
+    }
+    return new BooleanSeries(values);
+  }
+
   public DataFrame dropNullRows() {
     int[] fromIndex = new int[this.size()];
     for(int i=0; i<fromIndex.length; i++) {
@@ -625,6 +694,16 @@ public class DataFrame {
         df.addSeries(e.getKey(), e.getValue());
     }
     return df;
+  }
+
+  public DataFrame joinOuter(DataFrame other, String onLeftSeries, String onRightSeries) {
+    DataFrame left = this.sortBy(onLeftSeries);
+    DataFrame right = other.sortBy(onRightSeries);
+
+    int[] sortedLeft = this.get(onLeftSeries).sortedIndex();
+    int[] sortedRight = other.get(onRightSeries).sortedIndex();
+
+    return null; // TODO
   }
 
   @Override

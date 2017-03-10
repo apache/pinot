@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.detector.functionex.dataframe;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -42,7 +43,9 @@ public final class DoubleSeries extends Series {
   public static class DoubleBatchMean implements DoubleBatchFunction {
     @Override
     public double apply(double[] values) {
-      assertNotEmpty(values);
+      if(values.length <= 0)
+        return NULL_VALUE;
+
       // TODO sorted, add low to high for accuracy
       double sum = 0.0d;
       int count = 0;
@@ -59,6 +62,8 @@ public final class DoubleSeries extends Series {
   public static class DoubleBatchLast implements DoubleBatchFunction {
     @Override
     public double apply(double[] values) {
+      if(values.length <= 0)
+        return NULL_VALUE;
       return values[values.length - 1];
     }
   }
@@ -216,22 +221,10 @@ public final class DoubleSeries extends Series {
     return builder.toString();
   }
 
-  // TODO bucketsBy...
-
-  public DoubleSeries groupBy(List<Bucket> buckets, DoubleBatchFunction grouper) {
-    return this.groupBy(buckets, NULL_VALUE, grouper);
-  }
-
-  public DoubleSeries groupBy(List<Bucket> buckets, double nullValue, DoubleBatchFunction grouper) {
+  public DoubleSeries aggregate(List<Bucket> buckets, DoubleBatchFunction grouper) {
     double[] values = new double[buckets.size()];
     for(int i=0; i<buckets.size(); i++) {
       Bucket b = buckets.get(i);
-
-      // no elements in group
-      if(b.fromIndex.length <= 0) {
-        values[i] = nullValue;
-        continue;
-      }
 
       // group
       double[] gvalues = new double[b.fromIndex.length];
@@ -262,6 +255,7 @@ public final class DoubleSeries extends Series {
   }
 
   public double mean() {
+    assertNotEmpty(this.values);
     return new DoubleBatchMean().apply(this.values);
   }
 
@@ -347,6 +341,38 @@ public final class DoubleSeries extends Series {
   }
 
   @Override
+  List<JoinPair> joinLeft(Series other) {
+    return null;
+  }
+
+  @Override
+  public List<Bucket> groupByValue() {
+    if(this.isEmpty())
+      return Collections.emptyList();
+
+    List<Bucket> buckets = new ArrayList<>();
+    int[] sortedIndex = this.sortedIndex();
+
+    int bucketOffset = 0;
+    double lastValue = this.values[sortedIndex[0]];
+
+    for(int i=1; i<sortedIndex.length; i++) {
+      double currVal = this.values[sortedIndex[i]];
+      if(Double.compare(lastValue, currVal) != 0) {
+        int[] fromIndex = Arrays.copyOfRange(sortedIndex, bucketOffset, i);
+        buckets.add(new Bucket(fromIndex));
+        bucketOffset = i;
+        lastValue = currVal;
+      }
+    }
+
+    int[] fromIndex = Arrays.copyOfRange(sortedIndex, bucketOffset, sortedIndex.length);
+    buckets.add(new Bucket(fromIndex));
+
+    return buckets;
+  }
+
+  @Override
   public boolean equals(Object o) {
     if (this == o) {
       return true;
@@ -384,7 +410,7 @@ public final class DoubleSeries extends Series {
     final double value;
     final int index;
 
-    public DoubleSortTuple(double value, int index) {
+    DoubleSortTuple(double value, int index) {
       this.value = value;
       this.index = index;
     }
