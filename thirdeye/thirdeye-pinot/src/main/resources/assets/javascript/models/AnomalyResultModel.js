@@ -166,8 +166,10 @@ AnomalyResultModel.prototype = {
    */
   formatAnomalies() {
     this.anomaliesWrapper.anomalyDetailsList.forEach((anomaly) => {
-      anomaly.duration = this.getRegionDuration(anomaly.anomalyRegionStart, anomaly.anomalyRegionEnd);
-      anomaly.changeDelta = this.getChangeDelta(anomaly.current, anomaly.baseline);
+      if (anomaly) {
+        anomaly.duration = this.getRegionDuration(anomaly.anomalyRegionStart, anomaly.anomalyRegionEnd);
+        anomaly.changeDelta = this.getChangeDelta(anomaly.current, anomaly.baseline);
+      }
     });
   },
 

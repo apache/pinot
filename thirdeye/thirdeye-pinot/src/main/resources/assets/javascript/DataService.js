@@ -114,13 +114,13 @@ DataService.prototype = {
       this.getDataAsynchronous(url, data, callback, 'anomaly-spin-area');
     },
     // Fetch anomalies for anomaly ids in array in time range
-    fetchAnomaliesForAnomalyIds : function(startTime, endTime, pageNumber, anomalyIds, functionName, callback) {
+    fetchAnomaliesForAnomalyIds : function(startTime, endTime, pageNumber, anomalyIds, functionName, callback, spinner = 'anomaly-spin-area') {
       var url = constants.SEARCH_ANOMALIES_ANOMALYIDS + startTime + this.URL_SEPARATOR + endTime + this.URL_SEPARATOR + pageNumber;
       var data = {
           anomalyIds : anomalyIds,
           functionName : functionName
       };
-      this.getDataAsynchronous(url, data, callback, 'anomaly-spin-area');
+      this.getDataAsynchronous(url, data, callback, spinner);
     },
     // Fetch anomalies for anomaly ids in array in time range
     fetchAnomaliesForTime : function(startTime, endTime, pageNumber, callback) {

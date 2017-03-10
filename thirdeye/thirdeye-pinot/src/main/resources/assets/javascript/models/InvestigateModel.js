@@ -20,7 +20,7 @@ InvestigateModel.prototype = {
 
   fetchMetricInformation(anomalyId) {
     dataService.fetchAnomaliesForAnomalyIds(
-          this.startDate, this.endDate, this.pageNumber, anomalyId, this.functionName, this.updateModelAndNotifyView.bind(this));
+          this.startDate, this.endDate, this.pageNumber, anomalyId, this.functionName, this.updateModelAndNotifyView.bind(this), 'investigate-spin-area');
   },
 
   getWowData() {

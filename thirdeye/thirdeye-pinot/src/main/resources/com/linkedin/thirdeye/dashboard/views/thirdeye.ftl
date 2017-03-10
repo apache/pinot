@@ -191,6 +191,7 @@
 		</div>
 		<div class="tab-pane" id="anomalies">
 			<div id="anomalies-place-holder"></div>
+			<div id='investigate-spin-area'></div>
 			<div id="investigate-place-holder""></div>
 		</div>
 
