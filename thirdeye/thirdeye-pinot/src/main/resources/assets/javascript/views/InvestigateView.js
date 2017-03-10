@@ -20,8 +20,8 @@ InvestigateView.prototype = {
   },
 
   render () {
-    const anomaliesWrapper = this.investigateModel.getAnomaliesWrapper();
-    const anomaly = anomaliesWrapper.anomalyDetailsList[0];
+    const anomaly = this.investigateModel.getAnomaly();
+
     const template_with_anomaly = this.investigate_template_compiled(anomaly);
     $("#investigate-place-holder").html(template_with_anomaly);
     this.renderAnomalyChart(anomaly);
@@ -29,41 +29,31 @@ InvestigateView.prototype = {
   },
 
   setupListenerOnViewContributionLink() {
-    const investigateParams = this.investigateModel;
+    const anomaly = this.investigateModel.getAnomaly();
     $('.thirdeye-link').click((e) => {
       const wowType = e.target.id;
 
-      console.log(investigateParams);
-      console.log(e);
-      this.viewContributionClickEvent.notify(investigateParams);
-      // var anomaliesSearchMode = $('#anomalies-search-mode').val();
-      // var metricIds = undefined;
-      // var dashboardId = undefined;
-      // var anomalyIds = undefined;
+      const wowMapping = {
+        wow1: 7,
+        wow2: 14,
+        wow3: 21
+      };
+      const offset = wowMapping[wowType] || 7;
 
-      // var functionName = $('#anomaly-function-dropdown').val();
-      // var startDate = $('#anomalies-time-range-start').data('daterangepicker').startDate;
-      // var endDate = $('#anomalies-time-range-start').data('daterangepicker').endDate;
+      const analysisParams = {
+        metricId: anomaly.metricId,
+        currentStart: moment(anomaly.currentStart),
+        currentEnd: moment(anomaly.currentEnd),
+        baselineStart: moment(anomaly.currentStart).subtract(offset, 'days'),
+        baselineEnd: moment(anomaly.currentEnd).subtract(offset, 'days')
+      };
 
-      // var anomaliesParams = {
-      //   anomaliesSearchMode : anomaliesSearchMode,
-      //   startDate : startDate,
-      //   endDate : endDate,
-      //   pageNumber : 1,
-      //   functionName : functionName
+      // if (anomaly.anomalyFunctionDimension.length) {
+      //   const dimension = JSON.parse(anomaly.anomalyFunctionDimension);
+      //   analysisParams.dimension = Object.keys(dimension)[0];
       // }
 
-      // if (anomaliesSearchMode == constants.MODE_METRIC) {
-      //   anomaliesParams.metricIds = $('#anomalies-search-metrics-input').val().join();
-      // } else if (anomaliesSearchMode == constants.MODE_DASHBOARD) {
-      //   anomaliesParams.dashboardId = $('#anomalies-search-dashboard-input').val();
-      // } else if (anomaliesSearchMode == constants.MODE_ID) {
-      //   anomaliesParams.anomalyIds = $('#anomalies-search-anomaly-input').val().join();
-      //   delete anomaliesParams.startDate;
-      //   delete anomaliesParams.endDate;
-      // }
-
-      // this.applyButtonEvent.notify(anomaliesParams);
+      this.viewContributionClickEvent.notify(analysisParams);
     });
   },
 

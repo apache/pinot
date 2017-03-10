@@ -96,7 +96,6 @@
         100k
       </div>
       <div class="wow-card-footer">
-        <a class="thirdeye-link">View Contribution Analysis</a>
       </div>
     </div>
 
