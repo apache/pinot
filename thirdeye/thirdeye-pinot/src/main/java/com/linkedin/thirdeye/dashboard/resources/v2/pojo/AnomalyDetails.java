@@ -11,6 +11,7 @@ public class AnomalyDetails {
   private String metric;
   private Long metricId;
   private String dataset;
+  private String externalUrl;
 
   List<String> dates;
   private String currentEnd;
@@ -46,6 +47,14 @@ public class AnomalyDetails {
 
   public void setAnomalyId(Long anomalyId) {
     this.anomalyId = anomalyId;
+  }
+
+  public String getExternalUrl() {
+    return externalUrl;
+  }
+
+  public void setExternalUrl(String externalUrl) {
+    this.externalUrl = externalUrl;
   }
 
   public String getMetric() {

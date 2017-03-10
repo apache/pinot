@@ -14,6 +14,7 @@ import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalyDetails;
 
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
+import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -39,6 +40,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.text.StrSubstitutor;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormat;
@@ -609,7 +611,8 @@ public class AnomaliesResource {
           DateTimeFormatter startEndDateFormatterHours = DateTimeFormat.forPattern(START_END_DATE_FORMAT_HOURS).withZone(Utils.getDataTimeZone(dataset));
 
           return getAnomalyDetails(mergedAnomaly, datasetConfig, timeSeriesDateFormatter,
-              startEndDateFormatterHours, startEndDateFormatterDays);
+              startEndDateFormatterHours, startEndDateFormatterDays,
+              getExternalURL(mergedAnomaly));
         }
       };
       anomalyDetailsListFutures.add(threadPool.submit(callable));
@@ -628,6 +631,29 @@ public class AnomaliesResource {
     return anomaliesWrapper;
   }
 
+  private String getExternalURL(MergedAnomalyResultDTO mergedAnomaly) {
+
+    String metric = mergedAnomaly.getMetric();
+    String dataset = mergedAnomaly.getCollection();
+    Long startTime = mergedAnomaly.getStartTime();
+    Long endTime = mergedAnomaly.getEndTime();
+    MetricConfigDTO metricConfigDTO = metricConfigDAO.findByMetricAndDataset(metric, dataset);
+    Map<String, String> context = new HashMap<>();
+    context.put(MetricConfigBean.URL_TEMPLATE_START_TIME, String.valueOf(startTime));
+    context.put(MetricConfigBean.URL_TEMPLATE_END_TIME, String.valueOf(endTime));
+    StrSubstitutor strSubstitutor = new StrSubstitutor(context);
+    Map<String, String> urlTemplates = metricConfigDTO.getExtSourceLinkInfo();
+    if (urlTemplates == null) {
+      return "";
+    }
+    for (Map.Entry<String, String> entry : urlTemplates.entrySet()) {
+      String sourceName = entry.getKey();
+      String urlTemplate = entry.getValue();
+      String extSourceUrl = strSubstitutor.replace(urlTemplate);
+      urlTemplates.put(sourceName, extSourceUrl);
+    }
+    return new JSONObject(urlTemplates).toString();
+  }
 
   /**
    * Generates Anomaly Details for each merged anomaly
@@ -636,11 +662,12 @@ public class AnomaliesResource {
    * @param timeSeriesDateFormatter
    * @param startEndDateFormatterHours
    * @param startEndDateFormatterDays
+   * @param externalUrl
    * @return
    */
   private AnomalyDetails getAnomalyDetails(MergedAnomalyResultDTO mergedAnomaly, DatasetConfigDTO datasetConfig,
       DateTimeFormatter timeSeriesDateFormatter, DateTimeFormatter startEndDateFormatterHours,
-      DateTimeFormatter startEndDateFormatterDays) {
+      DateTimeFormatter startEndDateFormatterDays, String externalUrl) {
 
     String dataset = datasetConfig.getDataset();
     String metricName = mergedAnomaly.getMetric();
@@ -668,7 +695,7 @@ public class AnomaliesResource {
         mergedAnomaly, anomalyFunction,
         currentStartTime, currentEndTime, baselineStartTime, baselineEndTime,
         currentTimeseriesResponse, baselineTimeseriesResponse,
-        timeSeriesDateFormatter, startEndDateFormatterHours, startEndDateFormatterDays);
+        timeSeriesDateFormatter, startEndDateFormatterHours, startEndDateFormatterDays, externalUrl);
     } catch (Exception e) {
       LOG.error("Exception in constructing anomaly wrapper for anomaly {}", mergedAnomaly.getId(), e);
     }
@@ -698,7 +725,7 @@ public class AnomaliesResource {
       MergedAnomalyResultDTO mergedAnomaly, AnomalyFunctionDTO anomalyFunction,
       long currentStartTime, long currentEndTime, long baselineStartTime, long baselineEndTime,
       JSONObject currentTimeseriesResponse, JSONObject baselineTimeseriesResponse,
-      DateTimeFormatter timeSeriesDateFormatter, DateTimeFormatter startEndDateFormatterHours, DateTimeFormatter startEndDateFormatterDays) throws JSONException {
+      DateTimeFormatter timeSeriesDateFormatter, DateTimeFormatter startEndDateFormatterHours, DateTimeFormatter startEndDateFormatterDays, String externalUrl) throws JSONException {
 
     MetricConfigDTO metricConfigDTO = metricConfigDAO.findByMetricAndDataset(metricName, dataset);
 
@@ -737,6 +764,7 @@ public class AnomaliesResource {
     if (mergedAnomaly.getFeedback() != null) {
       anomalyDetails.setAnomalyFeedback(AnomalyDetails.getFeedbackStringFromFeedbackType(mergedAnomaly.getFeedback().getFeedbackType()));
     }
+    anomalyDetails.setExternalUrl(externalUrl);
     return anomalyDetails;
   }
 
