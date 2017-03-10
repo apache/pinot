@@ -277,7 +277,10 @@ AnomalyResultView.prototype = {
         },
         axis : {
           y : {
-            show : true
+            show : true,
+            tick: {
+              format: d3.format(".2f")
+            }
           },
           x : {
             type : 'timeseries',

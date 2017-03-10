@@ -4,6 +4,10 @@ function InvestigateView(investigateModel) {
   this.investigate_template_compiled = Handlebars.compile(investigate);
   this.investigateModel = investigateModel;
 
+  this.anomalyID;
+  this.anomaly;
+  this.wowData;
+  this.inves
   this.viewContributionClickEvent = new Event(this);
 
   this.investigateModel.renderViewEvent.attach(this.renderViewEventHandler.bind(this));
@@ -12,15 +16,19 @@ function InvestigateView(investigateModel) {
 InvestigateView.prototype = {
   init(params = {}) {
     const { anomalyId } = params;
+    if (this.anomalyId == anomalyId) {
+      this.render();
+    }
     this.anomalyId = anomalyId;
   },
 
   renderViewEventHandler() {
+    this.setViewData();
     this.render();
   },
 
-  render () {
-    const anomaly = this.investigateModel.getAnomaly();
+  setViewData() {
+    this.anomaly = this.investigateModel.getAnomaly();
     const wowData = this.investigateModel.getWowData();
     const currentValue = wowData.currentVal;
     wowData.compareResults.forEach((result) => {
@@ -28,17 +36,19 @@ InvestigateView.prototype = {
     });
     const [ wow, wow2, wow3 ] = wowData.compareResults;
 
-    const investigateData = {
-      anomaly,
+    this.investigateData = {
+      anomaly: this.anomaly,
       currentValue,
       wow,
       wow2,
       wow3
     };
+  },
 
-    const template_with_anomaly = this.investigate_template_compiled(investigateData);
+  render () {
+    const template_with_anomaly = this.investigate_template_compiled(this.investigateData);
     $("#investigate-place-holder").html(template_with_anomaly);
-    this.renderAnomalyChart(anomaly);
+    this.renderAnomalyChart(this.anomaly);
     // this.setupListenerOnViewContributionLink();
     this.setupListenerOnUserFeedback();
   },
@@ -88,7 +98,7 @@ InvestigateView.prototype = {
   getGranularity(start, end) {
     const hoursDiff = end.diff(start, 'hours');
     if (hoursDiff < 3) {
-      return '5_MINUTES'
+      return '5_MINUTES';
     } else if (hoursDiff < 120) {
       return 'HOURS';
     } else {

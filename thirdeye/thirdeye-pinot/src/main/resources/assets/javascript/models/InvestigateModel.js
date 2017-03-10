@@ -9,8 +9,10 @@ function InvestigateModel() {
 
 InvestigateModel.prototype = {
   init({anomalyId}) {
-    this.anomalyId = anomalyId;
-    this.fetchMetricInformation(anomalyId);
+    if (this.anomalyId != anomalyId) {
+      this.anomalyId = anomalyId;
+      this.fetchMetricInformation(anomalyId);
+    }
   },
 
   update(anomaly) {
