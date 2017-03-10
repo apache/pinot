@@ -28,26 +28,28 @@ public class AverageAnomalyMergeModel extends AbstractMergeModel implements NoPr
 
     double weight = 0d;
     double score = 0d;
-    double baseline = 0d;
-    double current = 0d;
+    double avgBaseline = 0d;
+    double avgCurrent = 0d;
     for (RawAnomalyResultDTO rawAnomaly : rawAnomalyResultDTOs) {
       weight += rawAnomaly.getWeight();
       score += rawAnomaly.getScore();
-      current += rawAnomaly.getAvgCurrentVal();
-      baseline += rawAnomaly.getAvgBaselineVal();
+      avgCurrent += rawAnomaly.getAvgCurrentVal();
+      avgBaseline += rawAnomaly.getAvgBaselineVal();
     }
     if (rawAnomalyResultDTOs.size() != 0) {
       double size = rawAnomalyResultDTOs.size();
       weight /= size;
       score /= size;
-      current /= size;
-      anomalyToUpdated.setAvgCurrentVal(current);
-      baseline /= size;
-      anomalyToUpdated.setAvgBaselineVal(baseline);
+      avgCurrent /= size;
+      anomalyToUpdated.setAvgCurrentVal(avgCurrent);
+      avgBaseline /= size;
+      anomalyToUpdated.setAvgBaselineVal(avgBaseline);
     }
 
     anomalyToUpdated.setWeight(weight);
     anomalyToUpdated.setScore(score);
-    anomalyToUpdated.setMessage(String.format(DEFAULT_MESSAGE_TEMPLATE, baseline, current, weight, score));
+    anomalyToUpdated.setAvgCurrentVal(avgCurrent);
+    anomalyToUpdated.setAvgBaselineVal(avgBaseline);
+    anomalyToUpdated.setMessage(String.format(DEFAULT_MESSAGE_TEMPLATE, avgBaseline, avgCurrent, weight, score));
   }
 }

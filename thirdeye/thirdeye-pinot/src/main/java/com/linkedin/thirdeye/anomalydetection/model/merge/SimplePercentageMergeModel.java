@@ -55,8 +55,8 @@ public class SimplePercentageMergeModel extends AbstractMergeModel {
     TimeSeries observedTimeSeries = anomalyDetectionContext.getTransformedCurrent(mainMetric);
     long observedStartTime = observedTimeSeries.getTimeSeriesInterval().getStartMillis();
 
-    double avgObserved = 0d;
-    double avgExpected = 0d;
+    double avgCurrent = 0d;
+    double avgBaseline = 0d;
     int count = 0;
     Interval anomalyInterval =
         new Interval(anomalyToUpdated.getStartTime(), anomalyToUpdated.getEndTime());
@@ -67,18 +67,18 @@ public class SimplePercentageMergeModel extends AbstractMergeModel {
         long expectedTimestamp = expectedStartTime + offset;
 
         if (expectedTimeSeries.hasTimestamp(expectedTimestamp)) {
-          avgObserved += observedTimeSeries.get(observedTimestamp);
-          avgExpected += expectedTimeSeries.get(expectedTimestamp);
+          avgCurrent += observedTimeSeries.get(observedTimestamp);
+          avgBaseline += expectedTimeSeries.get(expectedTimestamp);
           ++count;
         }
       }
     }
 
     double weight = 0d;
-    if (count != 0 && avgExpected != 0d) {
-      weight = (avgObserved - avgExpected) / avgExpected;
-      avgObserved /= count;
-      avgExpected /= count;
+    if (count != 0 && avgBaseline != 0d) {
+      weight = (avgCurrent - avgBaseline) / avgBaseline;
+      avgCurrent /= count;
+      avgBaseline /= count;
     } else {
       weight = 0d;
     }
@@ -97,7 +97,9 @@ public class SimplePercentageMergeModel extends AbstractMergeModel {
 
     anomalyToUpdated.setWeight(weight);
     anomalyToUpdated.setScore(score);
+    anomalyToUpdated.setAvgCurrentVal(avgCurrent);
+    anomalyToUpdated.setAvgBaselineVal(avgBaseline);
     anomalyToUpdated.setMessage(
-        String.format(DEFAULT_MESSAGE_TEMPLATE, weight * 100, avgObserved, avgExpected, score));
+        String.format(DEFAULT_MESSAGE_TEMPLATE, weight * 100, avgCurrent, avgBaseline, score));
   }
 }
