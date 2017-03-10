@@ -1,4 +1,5 @@
 function InvestigateModel() {
+  this.anomalyId;
   this.startDate = moment().subtract(1, 'days').startOf('day');
   this.endDate = moment().subtract(0, 'days').startOf('day');
   this.pageNumber = 1;
@@ -8,6 +9,7 @@ function InvestigateModel() {
 
 InvestigateModel.prototype = {
   init({anomalyId}) {
+    this.anomalyId = anomalyId;
     this.fetchMetricInformation(anomalyId);
   },
 
@@ -19,6 +21,10 @@ InvestigateModel.prototype = {
   fetchMetricInformation(anomalyId) {
     dataService.fetchAnomaliesForAnomalyIds(
           this.startDate, this.endDate, this.pageNumber, anomalyId, this.functionName, this.updateModelAndNotifyView.bind(this));
+  },
+
+  getWowData() {
+    return dataService.fetchAnomalyWowData(this.anomalyId);
   },
 
   getAnomaly() {

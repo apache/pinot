@@ -178,6 +178,10 @@ DataService.prototype = {
     console.log("heatmap data fetch URL ----> ");
     console.log(url);
     return this.getDataSynchronous(url);
-  }
+  },
 
+  fetchAnomalyWowData(anomalyId){
+    const url = `/anomalies/${anomalyId}`;
+    return this.getDataSynchronous(url);
+  },
 };

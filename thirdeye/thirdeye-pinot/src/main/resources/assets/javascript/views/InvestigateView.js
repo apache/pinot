@@ -21,8 +21,22 @@ InvestigateView.prototype = {
 
   render () {
     const anomaly = this.investigateModel.getAnomaly();
+    const wowData = this.investigateModel.getWowData();
+    const currentValue = wowData.currentVal;
+    wowData.compareResults.forEach((result) => {
+      result.change *= 100;
+    });
+    const [ wow, wow2, wow3 ] = wowData.compareResults;
 
-    const template_with_anomaly = this.investigate_template_compiled(anomaly);
+    const investigateData = {
+      anomaly,
+      currentValue,
+      wow,
+      wow2,
+      wow3
+    };
+
+    const template_with_anomaly = this.investigate_template_compiled(investigateData);
     $("#investigate-place-holder").html(template_with_anomaly);
     this.renderAnomalyChart(anomaly);
     this.setupListenerOnViewContributionLink();
