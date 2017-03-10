@@ -40,6 +40,7 @@ InvestigateView.prototype = {
     $("#investigate-place-holder").html(template_with_anomaly);
     this.renderAnomalyChart(anomaly);
     this.setupListenerOnViewContributionLink();
+    this.setupListenerOnUserFeedback();
   },
 
   setupListenerOnViewContributionLink() {
@@ -70,6 +71,17 @@ InvestigateView.prototype = {
       //   analysisParams.dimension = Object.keys(dimension)[0];
       // }
       this.viewContributionClickEvent.notify(analysisParams);
+    });
+  },
+
+  setupListenerOnUserFeedback() {
+    $('#feedback-radio-yes, #feedback-radio-no').click((event) => {
+      const feedback = {
+        yes: 'Confirmed Anomaly',
+        no: 'False Alarm'
+      }[event.target.value];
+
+      $('#anomaly-feedback').html(`Resolved (${feedback})`);
     });
   },
 
