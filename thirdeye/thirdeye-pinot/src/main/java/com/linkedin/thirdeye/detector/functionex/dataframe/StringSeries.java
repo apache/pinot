@@ -35,10 +35,6 @@ public final class StringSeries extends Series {
   public static class StringBatchConcat implements StringBatchFunction {
     final String delimiter;
 
-    public StringBatchConcat() {
-      this.delimiter = "|";
-    }
-
     public StringBatchConcat(String delimiter) {
       this.delimiter = delimiter;
     }

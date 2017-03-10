@@ -12,6 +12,8 @@ import org.testng.annotations.Test;
 
 
 public class DataFrameTest {
+  final static double COMPARE_DOUBLE_DELTA = 0.001;
+
   final static long[] INDEX = new long[] { -1, 1, -2, 4, 3 };
   final static double[] VALUES_DOUBLE = new double[] { -2.1, -0.1, 0.0, 0.5, 1.3 };
   final static long[] VALUES_LONG = new long[] { -2, 1, 0, 1, 2 };
@@ -527,6 +529,19 @@ public class DataFrameTest {
   }
 
   @Test
+  public void testDataFrameGroupBy() {
+    List<DataFrame> groups = df.groupBy("boolean");
+    DoubleSeries ds = DataFrame.aggregate(groups, "double", new DoubleSeries.DoubleBatchSum());
+    assertEqualsDoubles(ds.values(), new double[] { 0.0, -0.4 });
+
+    LongSeries ls = DataFrame.aggregate(groups, "long", new LongSeries.LongBatchSum());
+    Assert.assertEquals(ls.values(), new long[] { 0, 2 });
+
+    StringSeries ss = DataFrame.aggregate(groups, "string", new StringSeries.StringBatchConcat("|"));
+    Assert.assertEquals(ss.values(), new String[] { "0.0", "-2.3|-1|0.5|0.13e1" });
+  }
+
+  @Test
   public void testResampleEndToEnd() {
     DataFrame ndf = df.resampleBy("index", 2, new DataFrame.ResampleLast());
 
@@ -990,5 +1005,13 @@ public class DataFrameTest {
     Assert.assertTrue(DataFrame.toSeries(0, 3, 4).equals(DataFrame.toSeries(0.0, 3.0, 4.0).toLongs()));
     Assert.assertTrue(DataFrame.toSeries(false, true, true).equals(DataFrame.toSeries("0", "1", "1").toBooleans()));
     Assert.assertTrue(DataFrame.toSeries("1", "3", "4").equals(DataFrame.toSeries(1, 3, 4).toStrings()));
+  }
+
+  static void assertEqualsDoubles(double[] actual, double[] expected) {
+    if(actual.length != expected.length)
+      Assert.fail(String.format("expected array length [%d] but found [%d]", actual.length, expected.length));
+    for(int i=0; i<actual.length; i++) {
+      Assert.assertEquals(actual[i], expected[i], COMPARE_DOUBLE_DELTA);
+    }
   }
 }
