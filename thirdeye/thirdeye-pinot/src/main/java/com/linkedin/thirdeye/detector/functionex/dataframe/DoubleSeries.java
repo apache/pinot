@@ -326,11 +326,12 @@ public final class DoubleSeries extends Series {
   }
 
   @Override
-  public List<DoubleBucket> groupByValue() {
+  public SeriesGrouping groupByValue() {
     if(this.isEmpty())
-      return Collections.emptyList();
+      return new SeriesGrouping(this);
 
-    List<DoubleBucket> buckets = new ArrayList<>();
+    List<Double> keys = new ArrayList<>();
+    List<Bucket> buckets = new ArrayList<>();
     int[] sortedIndex = this.sortedIndex();
 
     int bucketOffset = 0;
@@ -340,16 +341,18 @@ public final class DoubleSeries extends Series {
       double currVal = this.values[sortedIndex[i]];
       if(Double.compare(lastValue, currVal) != 0) {
         int[] fromIndex = Arrays.copyOfRange(sortedIndex, bucketOffset, i);
-        buckets.add(new DoubleBucket(lastValue, fromIndex, this));
+        keys.add(lastValue);
+        buckets.add(new Bucket(fromIndex));
         bucketOffset = i;
         lastValue = currVal;
       }
     }
 
     int[] fromIndex = Arrays.copyOfRange(sortedIndex, bucketOffset, sortedIndex.length);
-    buckets.add(new DoubleBucket(lastValue, fromIndex, this));
+    keys.add(lastValue);
+    buckets.add(new Bucket(fromIndex));
 
-    return buckets;
+    return new SeriesGrouping(DataFrame.toSeriesFromDouble(keys), this, buckets);
   }
 
   @Override

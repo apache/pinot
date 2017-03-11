@@ -38,12 +38,11 @@ public abstract class Series {
 
   public static class Bucket {
     final int[] fromIndex;
-    final Series source;
 
-    Bucket(int[] fromIndex, Series source) {
+    Bucket(int[] fromIndex) {
       this.fromIndex = fromIndex;
-      this.source = source;
     }
+
     public int size() {
       return this.fromIndex.length;
     }
@@ -51,68 +50,142 @@ public abstract class Series {
 
   public static class SeriesGrouping {
     final Series keys;
-    final Bucket[] buckets;
+    final Series source;
+    final List<Bucket> buckets;
 
-    public SeriesGrouping(Series keys, Bucket[] buckets) {
+    SeriesGrouping(Series keys, Series source, List<Bucket> buckets) {
+      if(keys.size() != buckets.size())
+        throw new IllegalArgumentException("key series and bucket count must be equal");
       this.keys = keys;
+      this.source = source;
       this.buckets = buckets;
     }
+
+    SeriesGrouping(Series source) {
+      this.keys = new LongSeries();
+      this.source = source;
+      this.buckets = Collections.emptyList();
+    }
+
+    public SeriesGrouping applyTo(Series s) {
+      return new SeriesGrouping(this.keys, s, this.buckets);
+    }
+
     public int size() {
-      return this.size();
+      return this.keys.size();
+    }
+
+    public int sourceSize() {
+      return this.source.size();
+    }
+
+    public Series keys() {
+      return this.keys;
+    }
+
+    public Series source() {
+      return this.source;
+    }
+
+    public boolean isEmpty() {
+      return this.keys.isEmpty();
+    }
+
+    public DataFrame aggregate(DoubleBatchFunction function) {
+      double[] values = new double[this.size()];
+      int i = 0;
+      for(Bucket b : this.buckets) {
+        values[i++] = function.apply(this.source.project(b.fromIndex).toDoubles().values());
+      }
+      return makeAggregate(this.keys, DataFrame.toSeries(values));
+    }
+
+    public DataFrame aggregate(LongBatchFunction function) {
+      long[] values = new long[this.size()];
+      int i = 0;
+      for(Bucket b : this.buckets) {
+        values[i++] = function.apply(this.source.project(b.fromIndex).toLongs().values());
+      }
+      return makeAggregate(this.keys, DataFrame.toSeries(values));
+    }
+
+    public DataFrame aggregate(StringBatchFunction function) {
+      String[] values = new String[this.size()];
+      int i = 0;
+      for(Bucket b : this.buckets) {
+        values[i++] = function.apply(this.source.project(b.fromIndex).toStrings().values());
+      }
+      return makeAggregate(this.keys, DataFrame.toSeries(values));
+    }
+
+    public DataFrame aggregate(BooleanBatchFunction function) {
+      boolean[] values = new boolean[this.size()];
+      int i = 0;
+      for(Bucket b : this.buckets) {
+        values[i++] = function.apply(this.source.project(b.fromIndex).toBooleans().values());
+      }
+      return makeAggregate(this.keys, DataFrame.toSeries(values));
+    }
+
+    static DataFrame makeAggregate(Series keys, Series values) {
+      DataFrame df = new DataFrame();
+      df.addSeries(COLUMN_KEY, keys);
+      df.addSeries(COLUMN_VALUE, values);
+      return df;
     }
   }
 
-  public static final class DoubleBucket extends Bucket {
-    final double key;
-
-    DoubleBucket(double key, int[] fromIndex, Series source) {
-      super(fromIndex, source);
-      this.key = key;
-    }
-
-    public double key() {
-      return key;
-    }
-  }
-
-  public static final class LongBucket extends Bucket {
-    final long key;
-
-    LongBucket(long key, int[] fromIndex, Series source) {
-      super(fromIndex, source);
-      this.key = key;
-    }
-
-    public long key() {
-      return key;
-    }
-  }
-
-  public static final class BooleanBucket extends Bucket {
-    final boolean key;
-
-    BooleanBucket(boolean key, int[] fromIndex, Series source) {
-      super(fromIndex, source);
-      this.key = key;
-    }
-
-    public boolean key() {
-      return key;
-    }
-  }
-
-  public static final class StringBucket extends Bucket {
-    final String key;
-
-    StringBucket(String key, int[] fromIndex, Series source) {
-      super(fromIndex, source);
-      this.key = key;
-    }
-
-    public String key() {
-      return key;
-    }
-  }
+//  public static final class DoubleBucket extends Bucket {
+//    final double key;
+//
+//    DoubleBucket(double key, int[] fromIndex, Series source) {
+//      super(fromIndex, source);
+//      this.key = key;
+//    }
+//
+//    public double key() {
+//      return key;
+//    }
+//  }
+//
+//  public static final class LongBucket extends Bucket {
+//    final long key;
+//
+//    LongBucket(long key, int[] fromIndex, Series source) {
+//      super(fromIndex, source);
+//      this.key = key;
+//    }
+//
+//    public long key() {
+//      return key;
+//    }
+//  }
+//
+//  public static final class BooleanBucket extends Bucket {
+//    final boolean key;
+//
+//    BooleanBucket(boolean key, int[] fromIndex, Series source) {
+//      super(fromIndex, source);
+//      this.key = key;
+//    }
+//
+//    public boolean key() {
+//      return key;
+//    }
+//  }
+//
+//  public static final class StringBucket extends Bucket {
+//    final String key;
+//
+//    StringBucket(String key, int[] fromIndex, Series source) {
+//      super(fromIndex, source);
+//      this.key = key;
+//    }
+//
+//    public String key() {
+//      return key;
+//    }
+//  }
 
   public static final class JoinPair {
     final int left;
@@ -142,35 +215,42 @@ public abstract class Series {
   abstract int[] sortedIndex();
   abstract int[] nullIndex();
 
-  public abstract List<? extends Bucket> groupByValue();
+  public abstract SeriesGrouping groupByValue();
 
-  public List<LongBucket> groupByCount(int bucketSize) {
+  public SeriesGrouping groupByCount(int bucketSize) {
     if(bucketSize <= 0)
       throw new IllegalArgumentException("bucketSize must be greater than 0");
+    if(this.isEmpty())
+      return new SeriesGrouping(this);
 
     bucketSize = Math.min(bucketSize, this.size());
 
-    List<LongBucket> buckets = new ArrayList<>();
-    for(int from=0; from<this.size(); from+=bucketSize) {
-      int to = Math.min(from+bucketSize, this.size());
+    int numBuckets = (this.size() - 1) / bucketSize + 1;
+    long[] keys = new long[numBuckets];
+    List<Bucket> buckets = new ArrayList<>();
+    for(int i=0; i<numBuckets; i++) {
+      int from = i*bucketSize;
+      int to = Math.min((i+1)*bucketSize, this.size());
       int[] fromIndex = new int[to-from];
       for(int j=0; j<fromIndex.length; j++) {
         fromIndex[j] = j + from;
       }
-      buckets.add(new LongBucket(from / bucketSize, fromIndex, this));
+      buckets.add(new Bucket(fromIndex));
+      keys[i] = i;
     }
-    return buckets;
+    return new SeriesGrouping(DataFrame.toSeries(keys), this, buckets);
   }
 
-  public List<LongBucket> groupByPartitions(int partitionCount) {
+  public SeriesGrouping groupByPartitions(int partitionCount) {
     if(partitionCount <= 0)
       throw new IllegalArgumentException("partitionCount must be greater than 0");
     if(this.isEmpty())
-      return Collections.emptyList();
+      return new SeriesGrouping(this);
 
     double perPartition = this.size() /  (double)partitionCount;
 
-    List<LongBucket> buckets = new ArrayList<>();
+    long[] keys = new long[partitionCount];
+    List<Bucket> buckets = new ArrayList<>();
     for(int i=0; i<partitionCount; i++) {
       int from = (int)Math.round(i * perPartition);
       int to = (int)Math.round((i+1) * perPartition);
@@ -178,9 +258,10 @@ public abstract class Series {
       for(int j=0; j<fromIndex.length; j++) {
         fromIndex[j] = j + from;
       }
-      buckets.add(new LongBucket(i, fromIndex, this));
+      buckets.add(new Bucket(fromIndex));
+      keys[i] = i;
     }
-    return buckets;
+    return new SeriesGrouping(DataFrame.toSeries(keys), this, buckets);
   }
 
   public boolean isEmpty() {
@@ -202,204 +283,5 @@ public abstract class Series {
   }
   public Series toType(SeriesType type) {
     return DataFrame.toType(this, type);
-  }
-
-  public DataFrame aggregateDouble(List<DoubleBucket> buckets, DoubleBatchFunction aggregator) {
-    double[] keys = new double[buckets.size()];
-    double[] values = new double[buckets.size()];
-    int i = 0;
-    for(DoubleBucket b : buckets) {
-      keys[i] = b.key();
-      values[i] = aggregator.apply(b.source.project(b.fromIndex).toDoubles().values());
-      i++;
-    }
-    return makeAggregate(DataFrame.toSeries(keys), DataFrame.toSeries(values));
-  }
-
-  public DataFrame aggregateDouble(List<DoubleBucket> buckets, LongBatchFunction aggregator) {
-    double[] keys = new double[buckets.size()];
-    long[] values = new long[buckets.size()];
-    int i = 0;
-    for(DoubleBucket b : buckets) {
-      keys[i] = b.key();
-      values[i] = aggregator.apply(b.source.project(b.fromIndex).toLongs().values());
-      i++;
-    }
-    return makeAggregate(DataFrame.toSeries(keys), DataFrame.toSeries(values));
-  }
-
-  public DataFrame aggregateDouble(List<DoubleBucket> buckets, StringBatchFunction aggregator) {
-    double[] keys = new double[buckets.size()];
-    String[] values = new String[buckets.size()];
-    int i = 0;
-    for(DoubleBucket b : buckets) {
-      keys[i] = b.key();
-      values[i] = aggregator.apply(b.source.project(b.fromIndex).toStrings().values());
-      i++;
-    }
-    return makeAggregate(DataFrame.toSeries(keys), DataFrame.toSeries(values));
-  }
-
-  public DataFrame aggregateDouble(List<DoubleBucket> buckets, BooleanBatchFunction aggregator) {
-    double[] keys = new double[buckets.size()];
-    boolean[] values = new boolean[buckets.size()];
-    int i = 0;
-    for(DoubleBucket b : buckets) {
-      keys[i] = b.key();
-      values[i] = aggregator.apply(b.source.project(b.fromIndex).toBooleans().values());
-      i++;
-    }
-    return makeAggregate(DataFrame.toSeries(keys), DataFrame.toSeries(values));
-  }
-
-  public DataFrame aggregateLong(List<LongBucket> buckets, DoubleBatchFunction aggregator) {
-    long[] keys = new long[buckets.size()];
-    double[] values = new double[buckets.size()];
-    int i = 0;
-    for(LongBucket b : buckets) {
-      keys[i] = b.key();
-      values[i] = aggregator.apply(b.source.project(b.fromIndex).toDoubles().values());
-      i++;
-    }
-    return makeAggregate(DataFrame.toSeries(keys), DataFrame.toSeries(values));
-  }
-
-  public DataFrame aggregateLong(List<LongBucket> buckets, LongBatchFunction aggregator) {
-    long[] keys = new long[buckets.size()];
-    long[] values = new long[buckets.size()];
-    int i = 0;
-    for(LongBucket b : buckets) {
-      keys[i] = b.key();
-      values[i] = aggregator.apply(b.source.project(b.fromIndex).toLongs().values());
-      i++;
-    }
-    return makeAggregate(DataFrame.toSeries(keys), DataFrame.toSeries(values));
-  }
-
-  public DataFrame aggregateLong(List<LongBucket> buckets, StringBatchFunction aggregator) {
-    long[] keys = new long[buckets.size()];
-    String[] values = new String[buckets.size()];
-    int i = 0;
-    for(LongBucket b : buckets) {
-      keys[i] = b.key();
-      values[i] = aggregator.apply(b.source.project(b.fromIndex).toStrings().values());
-      i++;
-    }
-    return makeAggregate(DataFrame.toSeries(keys), DataFrame.toSeries(values));
-  }
-
-  public DataFrame aggregateLong(List<LongBucket> buckets, BooleanBatchFunction aggregator) {
-    long[] keys = new long[buckets.size()];
-    boolean[] values = new boolean[buckets.size()];
-    int i = 0;
-    for(LongBucket b : buckets) {
-      keys[i] = b.key();
-      values[i] = aggregator.apply(b.source.project(b.fromIndex).toBooleans().values());
-      i++;
-    }
-    return makeAggregate(DataFrame.toSeries(keys), DataFrame.toSeries(values));
-  }
-
-  public DataFrame aggregateString(List<StringBucket> buckets, DoubleBatchFunction aggregator) {
-    String[] keys = new String[buckets.size()];
-    double[] values = new double[buckets.size()];
-    int i = 0;
-    for(StringBucket b : buckets) {
-      keys[i] = b.key();
-      values[i] = aggregator.apply(b.source.project(b.fromIndex).toDoubles().values());
-      i++;
-    }
-    return makeAggregate(DataFrame.toSeries(keys), DataFrame.toSeries(values));
-  }
-
-  public DataFrame aggregateString(List<StringBucket> buckets, LongBatchFunction aggregator) {
-    String[] keys = new String[buckets.size()];
-    long[] values = new long[buckets.size()];
-    int i = 0;
-    for(StringBucket b : buckets) {
-      keys[i] = b.key();
-      values[i] = aggregator.apply(b.source.project(b.fromIndex).toLongs().values());
-      i++;
-    }
-    return makeAggregate(DataFrame.toSeries(keys), DataFrame.toSeries(values));
-  }
-
-  public DataFrame aggregateString(List<StringBucket> buckets, StringBatchFunction aggregator) {
-    String[] keys = new String[buckets.size()];
-    String[] values = new String[buckets.size()];
-    int i = 0;
-    for(StringBucket b : buckets) {
-      keys[i] = b.key();
-      values[i] = aggregator.apply(b.source.project(b.fromIndex).toStrings().values());
-      i++;
-    }
-    return makeAggregate(DataFrame.toSeries(keys), DataFrame.toSeries(values));
-  }
-
-  public DataFrame aggregateString(List<StringBucket> buckets, BooleanBatchFunction aggregator) {
-    String[] keys = new String[buckets.size()];
-    boolean[] values = new boolean[buckets.size()];
-    int i = 0;
-    for(StringBucket b : buckets) {
-      keys[i] = b.key();
-      values[i] = aggregator.apply(b.source.project(b.fromIndex).toBooleans().values());
-      i++;
-    }
-    return makeAggregate(DataFrame.toSeries(keys), DataFrame.toSeries(values));
-  }
-
-  public DataFrame aggregateBoolean(List<BooleanBucket> buckets, DoubleBatchFunction aggregator) {
-    boolean[] keys = new boolean[buckets.size()];
-    double[] values = new double[buckets.size()];
-    int i = 0;
-    for(BooleanBucket b : buckets) {
-      keys[i] = b.key();
-      values[i] = aggregator.apply(b.source.project(b.fromIndex).toDoubles().values());
-      i++;
-    }
-    return makeAggregate(DataFrame.toSeries(keys), DataFrame.toSeries(values));
-  }
-
-  public DataFrame aggregateBoolean(List<BooleanBucket> buckets, LongBatchFunction aggregator) {
-    boolean[] keys = new boolean[buckets.size()];
-    long[] values = new long[buckets.size()];
-    int i = 0;
-    for(BooleanBucket b : buckets) {
-      keys[i] = b.key();
-      values[i] = aggregator.apply(b.source.project(b.fromIndex).toLongs().values());
-      i++;
-    }
-    return makeAggregate(DataFrame.toSeries(keys), DataFrame.toSeries(values));
-  }
-
-  public DataFrame aggregateBoolean(List<BooleanBucket> buckets, StringBatchFunction aggregator) {
-    boolean[] keys = new boolean[buckets.size()];
-    String[] values = new String[buckets.size()];
-    int i = 0;
-    for(BooleanBucket b : buckets) {
-      keys[i] = b.key();
-      values[i] = aggregator.apply(b.source.project(b.fromIndex).toStrings().values());
-      i++;
-    }
-    return makeAggregate(DataFrame.toSeries(keys), DataFrame.toSeries(values));
-  }
-
-  public DataFrame aggregateBoolean(List<BooleanBucket> buckets, BooleanBatchFunction aggregator) {
-    boolean[] keys = new boolean[buckets.size()];
-    boolean[] values = new boolean[buckets.size()];
-    int i = 0;
-    for(BooleanBucket b : buckets) {
-      keys[i] = b.key();
-      values[i] = aggregator.apply(b.source.project(b.fromIndex).toBooleans().values());
-      i++;
-    }
-    return makeAggregate(DataFrame.toSeries(keys), DataFrame.toSeries(values));
-  }
-
-  static DataFrame makeAggregate(Series keys, Series values) {
-    DataFrame df = new DataFrame();
-    df.addSeries(COLUMN_KEY, keys);
-    df.addSeries(COLUMN_VALUE, values);
-    return df;
   }
 }

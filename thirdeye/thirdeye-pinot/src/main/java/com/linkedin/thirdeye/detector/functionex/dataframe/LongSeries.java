@@ -202,56 +202,44 @@ public final class LongSeries extends Series {
     return builder.toString();
   }
 
-  public List<LongBucket> groupByInterval(long interval) {
+  public SeriesGrouping groupByInterval(long interval) {
     if(interval <= 0)
       throw new IllegalArgumentException("interval must be greater than 0");
     if(this.size() <= 0)
-      return Collections.emptyList();
+      return new SeriesGrouping(this);
 
-    // sorted series and find ranges
-    LongSeries series = this.sorted();
+    long start = this.min() / interval; // align with interval
+    long stop = this.max() / interval + 1;
 
-    long startOffset = series.first() / interval * interval; // align with interval
     List<Range> ranges = new ArrayList<>();
-
-    int j = 0;
-    for(int bucket=0; bucket * interval <= series.last() - startOffset; bucket++) {
-      long lower = series.values[j];
-      while(j < series.size() && series.values[j] - startOffset < (bucket + 1) * interval) {
-        j++;
-      }
-
-      long upper;
-      if(j < series.size()) {
-        upper = series.values[j];
-      } else {
-        upper = series.values[j - 1] + 1;
-      }
-
-      ranges.add(new Range(lower, upper));
+    for(long i=start; i<stop; i++) {
+      ranges.add(new Range(i * interval, (i+1) * interval));
     }
 
     // turn ranges into buckets from original series
     // TODO use nlogm solution to find matching range, e.g. ordered tree
-    List<LongBucket> buckets = new ArrayList<>();
+    long[] keys = new long[ranges.size()];
+    List<Bucket> buckets = new ArrayList<>();
 
+    int i = 0;
     for(Range r : ranges) {
       ArrayList<Integer> ind = new ArrayList<>();
-      for(int i=0; i<this.size(); i++) {
-        if(this.values[i] >= r.lower && this.values[i] < r.upper) {
-          ind.add(i);
+      for(int j=0; j<this.size(); j++) {
+        if(this.values[j] >= r.lower && this.values[j] < r.upper) {
+          ind.add(j);
         }
       }
 
       int[] fromIndex = new int[ind.size()];
-      for(int i=0; i<ind.size(); i++) {
-        fromIndex[i] = ind.get(i);
+      for(int j=0; j<ind.size(); j++) {
+        fromIndex[j] = ind.get(j);
       }
 
-      buckets.add(new LongBucket(r.lower, fromIndex, this));
+      buckets.add(new Bucket(fromIndex));
+      keys[i++] = r.lower;
     }
 
-    return buckets;
+    return new SeriesGrouping(DataFrame.toSeries(keys), this, buckets);
   }
 
   public long min() {
@@ -350,11 +338,12 @@ public final class LongSeries extends Series {
   }
 
   @Override
-  public List<LongBucket> groupByValue() {
+  public SeriesGrouping groupByValue() {
     if(this.isEmpty())
-      return Collections.emptyList();
+      return new SeriesGrouping(this);
 
-    List<LongBucket> buckets = new ArrayList<>();
+    List<Long> keys = new ArrayList<>();
+    List<Bucket> buckets = new ArrayList<>();
     int[] sortedIndex = this.sortedIndex();
 
     int bucketOffset = 0;
@@ -364,16 +353,18 @@ public final class LongSeries extends Series {
       long currVal = this.values[sortedIndex[i]];
       if(Long.compare(lastValue, currVal) != 0) {
         int[] fromIndex = Arrays.copyOfRange(sortedIndex, bucketOffset, i);
-        buckets.add(new LongBucket(lastValue, fromIndex, this));
+        keys.add(lastValue);
+        buckets.add(new Bucket(fromIndex));
         bucketOffset = i;
         lastValue = currVal;
       }
     }
 
     int[] fromIndex = Arrays.copyOfRange(sortedIndex, bucketOffset, sortedIndex.length);
-    buckets.add(new LongBucket(lastValue, fromIndex, this));
+    keys.add(lastValue);
+    buckets.add(new Bucket(fromIndex));
 
-    return buckets;
+    return new SeriesGrouping(DataFrame.toSeriesFromLong(keys), this, buckets);
   }
 
   @Override

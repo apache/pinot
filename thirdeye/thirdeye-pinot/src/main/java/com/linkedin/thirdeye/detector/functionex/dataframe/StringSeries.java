@@ -266,11 +266,12 @@ public final class StringSeries extends Series {
   }
 
   @Override
-  public List<StringBucket> groupByValue() {
+  public SeriesGrouping groupByValue() {
     if(this.isEmpty())
-      return Collections.emptyList();
+      return new SeriesGrouping(this);
 
-    List<StringBucket> buckets = new ArrayList<>();
+    List<String> keys = new ArrayList<>();
+    List<Bucket> buckets = new ArrayList<>();
     int[] sortedIndex = this.sortedIndex();
 
     int bucketOffset = 0;
@@ -280,16 +281,18 @@ public final class StringSeries extends Series {
       String currVal = this.values[sortedIndex[i]];
       if(!Objects.equals(lastValue, currVal)) {
         int[] fromIndex = Arrays.copyOfRange(sortedIndex, bucketOffset, i);
-        buckets.add(new StringBucket(lastValue, fromIndex, this));
+        keys.add(lastValue);
+        buckets.add(new Bucket(fromIndex));
         bucketOffset = i;
         lastValue = currVal;
       }
     }
 
     int[] fromIndex = Arrays.copyOfRange(sortedIndex, bucketOffset, sortedIndex.length);
-    buckets.add(new StringBucket(lastValue, fromIndex, this));
+    keys.add(lastValue);
+    buckets.add(new Bucket(fromIndex));
 
-    return buckets;
+    return new SeriesGrouping(DataFrame.toSeriesFromString(keys), this, buckets);
   }
 
   @Override

@@ -2,8 +2,8 @@ package com.linkedin.thirdeye.detector.functionex.dataframe;
 
 import com.udojava.evalex.Expression;
 import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.math.NumberUtils;
 
 
@@ -22,108 +23,75 @@ public class DataFrame {
   public static final String COLUMN_JOIN = "join";
 
   public interface ResamplingStrategy {
-    DataFrame apply(Series values, List<Series.LongBucket> buckets);
+    DataFrame apply(Series.SeriesGrouping grouping, Series s);
   }
 
   public static class ResampleLast implements ResamplingStrategy {
     @Override
-    public DataFrame apply(Series s, List<Series.LongBucket> buckets) {
+    public DataFrame apply(Series.SeriesGrouping grouping, Series s) {
       switch(s.type()) {
         case DOUBLE:
-          return s.aggregateLong(buckets, new DoubleSeries.DoubleBatchLast());
+          return grouping.applyTo(s).aggregate(new DoubleSeries.DoubleBatchLast());
         case LONG:
-          return s.aggregateLong(buckets, new LongSeries.LongBatchLast());
+          return grouping.applyTo(s).aggregate(new LongSeries.LongBatchLast());
         case STRING:
-          return s.aggregateLong(buckets, new StringSeries.StringBatchLast());
+          return grouping.applyTo(s).aggregate(new StringSeries.StringBatchLast());
         case BOOLEAN:
-          return s.aggregateLong(buckets, new BooleanSeries.BooleanBatchLast());
+          return grouping.applyTo(s).aggregate(new BooleanSeries.BooleanBatchLast());
         default:
           throw new IllegalArgumentException(String.format("Cannot resample series type '%s'", s.type()));
       }
     }
   }
 
-  public static class Group {
-    final int[] fromIndex;
+  public static class DataFrameGrouping {
+    final Series keys;
+    final List<Series.Bucket> buckets;
     final DataFrame source;
 
-    Group(int[] fromIndex, DataFrame source) {
-      this.fromIndex = fromIndex;
+    DataFrameGrouping(Series keys, DataFrame source, List<Series.Bucket> buckets) {
+      this.keys = keys;
+      this.buckets = buckets;
       this.source = source;
     }
 
-    public DataFrame values() {
-      return this.source.project(this.fromIndex);
+    public int size() {
+      return this.keys.size();
     }
 
-    DoubleGroup toDoubleGroup(double key) {
-      return new DoubleGroup(key, this.fromIndex, this.source);
+    public int sourceSize() {
+      return this.source.size();
     }
 
-    LongGroup toLongGroup(long key) {
-      return new LongGroup(key, this.fromIndex, this.source);
+    public DataFrame source() {
+      return this.source;
     }
 
-    StringGroup toStringGroup(String key) {
-      return new StringGroup(key, this.fromIndex, this.source);
+    public boolean isEmpty() {
+      return this.keys.isEmpty();
     }
 
-    BooleanGroup toBooleanGroup(boolean key) {
-      return new BooleanGroup(key, this.fromIndex, this.source);
-    }
-  }
-
-  public static final class DoubleGroup extends Group {
-    final double key;
-
-    DoubleGroup(double key, int[] fromIndex, DataFrame source) {
-      super(fromIndex, source);
-      this.key = key;
+    public Series.SeriesGrouping get(String seriesName) {
+      return new Series.SeriesGrouping(keys, this.source.get(seriesName), this.buckets);
     }
 
-    public double key() {
-      return key;
-    }
-  }
-
-  public static final class LongGroup extends Group {
-    final long key;
-
-    LongGroup(long key, int[] fromIndex, DataFrame source) {
-      super(fromIndex, source);
-      this.key = key;
+    public DataFrame aggregate(String seriesName, Series.DoubleBatchFunction function) {
+      return this.get(seriesName).aggregate(function);
     }
 
-    public long key() {
-      return key;
+    public DataFrame aggregate(String seriesName, Series.LongBatchFunction function) {
+      return this.get(seriesName).aggregate(function);
+    }
+
+    public DataFrame aggregate(String seriesName, Series.StringBatchFunction function) {
+      return this.get(seriesName).aggregate(function);
+    }
+
+    public DataFrame aggregate(String seriesName, Series.BooleanBatchFunction function) {
+      return this.get(seriesName).aggregate(function);
     }
   }
 
-  public static final class StringGroup extends Group {
-    final String key;
-
-    StringGroup(String key, int[] fromIndex, DataFrame source) {
-      super(fromIndex, source);
-      this.key = key;
-    }
-
-    public String key() {
-      return key;
-    }
-  }
-
-  public static final class BooleanGroup extends Group {
-    final boolean key;
-
-    BooleanGroup(boolean key, int[] fromIndex, DataFrame source) {
-      super(fromIndex, source);
-      this.key = key;
-    }
-
-    public boolean key() {
-      return key;
-    }
-  }
 
   Map<String, Series> series = new HashMap<>();
 
@@ -141,6 +109,22 @@ public class DataFrame {
 
   public static StringSeries toSeries(String... values) {
     return new StringSeries(values);
+  }
+
+  public static DoubleSeries toSeriesFromDouble(Collection<Double> values) {
+    return DataFrame.toSeries(ArrayUtils.toPrimitive(values.toArray(new Double[values.size()])));
+  }
+
+  public static LongSeries toSeriesFromLong(Collection<Long> values) {
+    return DataFrame.toSeries(ArrayUtils.toPrimitive(values.toArray(new Long[values.size()])));
+  }
+
+  public static StringSeries toSeriesFromString(Collection<String> values) {
+    return DataFrame.toSeries(values.toArray(new String[values.size()]));
+  }
+
+  public static BooleanSeries toSeriesFromBoolean(Collection<Boolean> values) {
+    return DataFrame.toSeries(ArrayUtils.toPrimitive(values.toArray(new Boolean[values.size()])));
   }
 
   public DataFrame(int defaultIndexSize) {
@@ -412,7 +396,7 @@ public class DataFrame {
   public DataFrame resampleBy(String seriesName, long interval, ResamplingStrategy strategy) {
     DataFrame baseDataFrame = this.sortBy(seriesName);
 
-    List<Series.LongBucket> buckets = baseDataFrame.toLongs(seriesName).groupByInterval(interval);
+    Series.SeriesGrouping grouping = baseDataFrame.toLongs(seriesName).groupByInterval(interval);
 
     // resample series
     DataFrame newDataFrame = new DataFrame();
@@ -420,17 +404,11 @@ public class DataFrame {
     for(Map.Entry<String, Series> e : baseDataFrame.getSeries().entrySet()) {
       if(e.getKey().equals(seriesName))
         continue;
-      newDataFrame.addSeries(e.getKey(), strategy.apply(e.getValue(), buckets).get(Series.COLUMN_VALUE));
+      newDataFrame.addSeries(e.getKey(), strategy.apply(grouping, e.getValue()).get(Series.COLUMN_VALUE));
     }
 
     // new series
-    long[] keys = new long[buckets.size()];
-    int i = 0;
-    for(Series.LongBucket b : buckets) {
-      keys[i++] = b.key() + interval;
-    }
-
-    newDataFrame.addSeries(seriesName, new LongSeries(keys));
+    newDataFrame.addSeries(seriesName, grouping.keys());
     return newDataFrame;
   }
 
@@ -690,82 +668,13 @@ public class DataFrame {
     }
   }
 
-  public List<DoubleGroup> groupBy(DoubleSeries labels) {
-    assertSameLength(labels);
-    List<Series.DoubleBucket> buckets = labels.groupByValue();
-    List<DoubleGroup> groups = new ArrayList<>();
-    for(Series.DoubleBucket b : buckets) {
-      groups.add(new DoubleGroup(b.key(), b.fromIndex, this));
-    }
-    return groups;
+  public DataFrameGrouping groupBy(Series labels) {
+    Series.SeriesGrouping grouping = labels.groupByValue();
+    return new DataFrameGrouping(grouping.keys(), this, grouping.buckets);
   }
 
-  public List<LongGroup> groupBy(LongSeries labels) {
-    assertSameLength(labels);
-    List<Series.LongBucket> buckets = labels.groupByValue();
-    List<LongGroup> groups = new ArrayList<>();
-    for(Series.LongBucket b : buckets) {
-      groups.add(new LongGroup(b.key(), b.fromIndex, this));
-    }
-    return groups;
-  }
-
-
-  public List<StringGroup> groupBy(StringSeries labels) {
-    assertSameLength(labels);
-    List<Series.StringBucket> buckets = labels.groupByValue();
-    List<StringGroup> groups = new ArrayList<>();
-    for(Series.StringBucket b : buckets) {
-      groups.add(new StringGroup(b.key(), b.fromIndex, this));
-    }
-    return groups;
-  }
-
-
-  public List<BooleanGroup> groupBy(BooleanSeries labels) {
-    assertSameLength(labels);
-    List<Series.BooleanBucket> buckets = labels.groupByValue();
-    List<BooleanGroup> groups = new ArrayList<>();
-    for(Series.BooleanBucket b : buckets) {
-      groups.add(new BooleanGroup(b.key(), b.fromIndex, this));
-    }
-    return groups;
-  }
-
-  public static DataFrame aggregate(List<DoubleSeries> groups, String seriesName, DoubleSeries.DoubleBatchFunction function) {
-    double[] values = new double[groups.size()];
-    int i = 0;
-    for(DataFrame df : groups) {
-      values[i++] = function.apply(df.toDoubles(seriesName).values());
-    }
-    return new DoubleSeries(values);
-  }
-
-  public static LongSeries aggregate(List<DataFrame> groups, String seriesName, LongSeries.LongBatchFunction function) {
-    long[] values = new long[groups.size()];
-    int i = 0;
-    for(DataFrame df : groups) {
-      values[i++] = function.apply(df.toLongs(seriesName).values());
-    }
-    return new LongSeries(values);
-  }
-
-  public static StringSeries aggregate(List<DataFrame> groups, String seriesName, StringSeries.StringBatchFunction function) {
-    String[] values = new String[groups.size()];
-    int i = 0;
-    for(DataFrame df : groups) {
-      values[i++] = function.apply(df.toStrings(seriesName).values());
-    }
-    return new StringSeries(values);
-  }
-
-  public static BooleanSeries aggregate(List<DataFrame> groups, String seriesName, BooleanSeries.BooleanBatchFunction function) {
-    boolean[] values = new boolean[groups.size()];
-    int i = 0;
-    for(DataFrame df : groups) {
-      values[i++] = function.apply(df.toBooleans(seriesName).values());
-    }
-    return new BooleanSeries(values);
+  public DataFrameGrouping groupBy(String seriesName) {
+    return this.groupBy(this.get(seriesName));
   }
 
   public DataFrame dropNullRows() {

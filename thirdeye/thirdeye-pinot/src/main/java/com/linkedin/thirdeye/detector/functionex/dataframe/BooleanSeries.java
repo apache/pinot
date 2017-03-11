@@ -244,9 +244,9 @@ public final class BooleanSeries extends Series {
   }
 
   @Override
-  public List<BooleanBucket> groupByValue() {
+  public SeriesGrouping groupByValue() {
     if(this.isEmpty())
-      return Collections.emptyList();
+      return new SeriesGrouping(this);
 
     int[] sortedIndex = this.sortedIndex();
 
@@ -260,13 +260,18 @@ public final class BooleanSeries extends Series {
     int[] indexFalse = Arrays.copyOfRange(sortedIndex, 0, countFalse);
     int[] indexTrue = Arrays.copyOfRange(sortedIndex, countFalse, sortedIndex.length);
 
-    List<BooleanBucket> buckets = new ArrayList<>();
-    if(indexFalse.length > 0)
-      buckets.add(new BooleanBucket(false, indexFalse, this));
-    if(indexTrue.length > 0)
-      buckets.add(new BooleanBucket(true, indexTrue, this));
+    List<Boolean> keys = new ArrayList<>();
+    List<Bucket> buckets = new ArrayList<>();
+    if(indexFalse.length > 0) {
+      keys.add(false);
+      buckets.add(new Bucket(indexFalse));
+    }
+    if(indexTrue.length > 0) {
+      keys.add(true);
+      buckets.add(new Bucket(indexTrue));
+    }
 
-    return buckets;
+    return new SeriesGrouping(DataFrame.toSeriesFromBoolean(keys), this, buckets);
   }
 
   @Override
