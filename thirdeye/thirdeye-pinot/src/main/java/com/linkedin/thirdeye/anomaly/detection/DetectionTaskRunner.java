@@ -1,8 +1,9 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
 import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.ListMultimap;
 import com.linkedin.pinot.pql.parsers.utils.Pair;
-import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeExecutor;
+import com.linkedin.thirdeye.anomaly.merge.TimeBasedAnomalyMerger;
 import com.linkedin.thirdeye.anomaly.override.OverrideConfigHelper;
 import com.linkedin.thirdeye.anomaly.task.TaskContext;
 import com.linkedin.thirdeye.anomaly.task.TaskInfo;
@@ -14,6 +15,8 @@ import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.ResponseParserUtils;
+import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -105,7 +108,7 @@ public class DetectionTaskRunner implements TaskRunner {
     // TODO: Change to DataFetchers/DataSources
     AnomalyDetectionInputContext adContext = fetchData(windowStart, windowEnd);
 
-    Map<DimensionMap, List<RawAnomalyResultDTO>> resultRawAnomalies = dimensionalShuffleAndUnifyAnalyze(windowStart, windowEnd, adContext);
+    ListMultimap<DimensionMap, RawAnomalyResultDTO> resultRawAnomalies = dimensionalShuffleAndUnifyAnalyze(windowStart, windowEnd, adContext);
     detectionTaskSuccessCounter.inc();
 
     boolean isBackfill = false;
@@ -119,9 +122,17 @@ public class DetectionTaskRunner implements TaskRunner {
     // syncAnomalyMergeExecutor is supposed to perform lightweight merges (i.e., anomalies that have the same function
     // id and at the same dimensions) after each detection task. Consequently, a null thread pool is passed the merge
     // executor on purpose in order to prevent an undesired asynchronous merge happens.
-    AnomalyMergeExecutor syncAnomalyMergeExecutor = new AnomalyMergeExecutor(null, anomalyFunctionFactory);
-    syncAnomalyMergeExecutor.synchronousMergeBasedOnFunctionIdAndDimension(anomalyFunctionSpec, isBackfill);
+//    AnomalyMergeExecutor syncAnomalyMergeExecutor = new AnomalyMergeExecutor(null, anomalyFunctionFactory);
+//    syncAnomalyMergeExecutor.synchronousMergeBasedOnFunctionIdAndDimension(anomalyFunctionSpec, isBackfill);
+    TimeBasedAnomalyMerger timeBasedAnomalyMerger = new TimeBasedAnomalyMerger(anomalyFunctionFactory);
+    ListMultimap<DimensionMap, MergedAnomalyResultDTO> resultMergedAnomalies =
+      timeBasedAnomalyMerger.mergeAnomalies(anomalyFunctionSpec, resultRawAnomalies, isBackfill);
     detectionTaskSuccessCounter.inc();
+
+    AnomalyDetectionOutputContext adOutputContext = new AnomalyDetectionOutputContext();
+    adOutputContext.setRawAnomalies(resultRawAnomalies);
+    adOutputContext.setMergedAnomalies(resultMergedAnomalies);
+    storeData(adOutputContext);
   }
 
 
@@ -197,22 +208,34 @@ public class DetectionTaskRunner implements TaskRunner {
     return adContext;
   }
 
-  private Map<DimensionMap, List<RawAnomalyResultDTO>> dimensionalShuffleAndUnifyAnalyze(DateTime windowStart, DateTime windowEnd,
+  private void storeData(AnomalyDetectionOutputContext anomalyDetectionOutputContext) {
+    RawAnomalyResultManager rawAnomalyDAO = DAO_REGISTRY.getRawAnomalyResultDAO();
+    MergedAnomalyResultManager mergedAmomalyDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
+
+    for (RawAnomalyResultDTO rawAnomalyResultDTO : anomalyDetectionOutputContext.getRawAnomalies().values()) {
+      rawAnomalyDAO.save(rawAnomalyResultDTO);
+    }
+
+    for (MergedAnomalyResultDTO mergedAnomalyResultDTO : anomalyDetectionOutputContext.getMergedAnomalies().values()) {
+      mergedAmomalyDAO.update(mergedAnomalyResultDTO);
+    }
+  }
+
+  private ListMultimap<DimensionMap, RawAnomalyResultDTO> dimensionalShuffleAndUnifyAnalyze(DateTime windowStart, DateTime windowEnd,
       AnomalyDetectionInputContext anomalyDetectionInputContext) {
     int anomalyCounter = 0;
-    Map<DimensionMap, List<RawAnomalyResultDTO>> resultRawAnomalies = new HashMap<>();
+    ListMultimap<DimensionMap, RawAnomalyResultDTO> resultRawAnomalies = ArrayListMultimap.create();
 
     for (DimensionMap dimensionMap : anomalyDetectionInputContext.getDimensionKeyMetricTimeSeriesMap().keySet()) {
       List<RawAnomalyResultDTO> resultsOfAnEntry = runAnalyze(windowStart, windowEnd, anomalyDetectionInputContext, dimensionMap);
 
-      // TODO: Move to outside of analyze method
-      // Set raw anomalies' properties and store them to DB
+      // Set raw anomalies' properties
       handleResults(resultsOfAnEntry);
 
       LOG.info("Dimension {} has {} anomalies in window {} to {}", dimensionMap, resultsOfAnEntry.size(),
           windowStart, windowEnd);
       anomalyCounter += resultsOfAnEntry.size();
-      resultRawAnomalies.put(dimensionMap, resultsOfAnEntry);
+      resultRawAnomalies.putAll(dimensionMap, resultsOfAnEntry);
     }
 
     LOG.info("{} anomalies found in total", anomalyCounter);
@@ -429,7 +452,7 @@ public class DetectionTaskRunner implements TaskRunner {
         result.setScore(normalize(result.getScore()));
         result.setWeight(normalize(result.getWeight()));
         result.setFunction(spec);
-        DAO_REGISTRY.getRawAnomalyResultDAO().save(result);
+//        DAO_REGISTRY.getRawAnomalyResultDAO().save(result);
       } catch (Exception e) {
         LOG.error("Exception in saving anomaly result : " + result.toString(), e);
       }
