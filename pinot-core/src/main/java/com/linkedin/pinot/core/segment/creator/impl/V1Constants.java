@@ -159,6 +159,8 @@ public class V1Constants {
       public static final String DEFAULT_NULL_VALUE = "defaultNullValue";
       public static final String DERIVED_METRIC_TYPE = "derivedMetricType";
       public static final String ORIGIN_COLUMN = "originColumn";
+      public static final String MIN_VALUE = "minValue";
+      public static final String MAX_VALUE = "maxValue";
 
       private static final String COLUMN_PROPS_KEY_PREFIX = "column.";
       public static String getKeyFor(String column, String key) {

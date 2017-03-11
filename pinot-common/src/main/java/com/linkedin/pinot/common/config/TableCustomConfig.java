@@ -17,25 +17,26 @@ package com.linkedin.pinot.common.config;
 
 import java.lang.reflect.Field;
 import java.util.Map;
-
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class TableCustomConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentsValidationAndRetentionConfig.class);
 
   public static final String MESSAGE_BASED_REFRESH_KEY = "messageBasedRefresh";
+  public static final String COLUMN_MIN_MAX_VALUE_GENERATOR_MODE_KEY = "columnMinMaxValueGeneratorMode";
 
-  private Map<String, String> customConfigs;
+  private Map<String, String> _customConfigs;
 
   public Map<String, String> getCustomConfigs() {
-    return customConfigs;
+    return _customConfigs;
   }
 
   public void setCustomConfigs(Map<String, String> customConfigs) {
-    this.customConfigs = customConfigs;
+    _customConfigs = customConfigs;
   }
 
   @Override

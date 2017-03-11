@@ -20,7 +20,6 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-
 import org.apache.commons.configuration.Configuration;
 
 
@@ -29,28 +28,36 @@ import org.apache.commons.configuration.Configuration;
  *
  */
 public class IndexLoadingConfigMetadata {
-
   public static final String KEY_OF_LOADING_INVERTED_INDEX = "metadata.loading.inverted.index.columns";
   public static final String KEY_OF_SEGMENT_FORMAT_VERSION = "segment.format.version";
   public static final String KEY_OF_ENABLE_DEFAULT_COLUMNS = "enable.default.columns";
   public static final String KEY_OF_STAR_TREE_FORMAT_VERSION = "startree.format.version";
+  public static final String KEY_OF_COLUMN_MIN_MAX_VALUE_GENERATOR_MODE = "column.min.max.value.generator.mode";
 
-  private final Set<String> _loadingInvertedIndexColumnSet = new HashSet<String>();
-  private final String DEFAULT_SEGMENT_FORMAT = "v1";
-  private String segmentVersionToLoad;
-  private boolean enableDefaultColumns;
-  private final String starTreeVersionToLoad;
+  private static final String DEFAULT_SEGMENT_FORMAT = "v1";
+  private static final String DEFAULT_COLUMN_MIN_MAX_VALUE_GENERATOR_MODE = "NONE";
 
+  private final Set<String> _loadingInvertedIndexColumnSet = new HashSet<>();
+  private final String _segmentVersionToLoad;
+  private final String _starTreeVersionToLoad;
+  private boolean _enableDefaultColumns;
+  private String _generateColumnMinMaxValueMode;
+
+  @SuppressWarnings("unchecked")
   public IndexLoadingConfigMetadata(Configuration tableDataManagerConfig) {
-    List<String> valueOfLoadingInvertedIndexConfig = tableDataManagerConfig.getList(KEY_OF_LOADING_INVERTED_INDEX, null);
+    List<String> valueOfLoadingInvertedIndexConfig =
+        tableDataManagerConfig.getList(KEY_OF_LOADING_INVERTED_INDEX, null);
     if ((valueOfLoadingInvertedIndexConfig != null) && (!valueOfLoadingInvertedIndexConfig.isEmpty())) {
-      initLoadingInvertedIndexColumnSet(valueOfLoadingInvertedIndexConfig.toArray(new String[0]));
+      initLoadingInvertedIndexColumnSet(
+          valueOfLoadingInvertedIndexConfig.toArray(new String[valueOfLoadingInvertedIndexConfig.size()]));
     }
 
-    segmentVersionToLoad = tableDataManagerConfig.getString(KEY_OF_SEGMENT_FORMAT_VERSION, DEFAULT_SEGMENT_FORMAT);
-    enableDefaultColumns = tableDataManagerConfig.getBoolean(KEY_OF_ENABLE_DEFAULT_COLUMNS, false);
-    starTreeVersionToLoad = tableDataManagerConfig.getString(KEY_OF_STAR_TREE_FORMAT_VERSION,
+    _segmentVersionToLoad = tableDataManagerConfig.getString(KEY_OF_SEGMENT_FORMAT_VERSION, DEFAULT_SEGMENT_FORMAT);
+    _enableDefaultColumns = tableDataManagerConfig.getBoolean(KEY_OF_ENABLE_DEFAULT_COLUMNS, false);
+    _starTreeVersionToLoad = tableDataManagerConfig.getString(KEY_OF_STAR_TREE_FORMAT_VERSION,
         CommonConstants.Server.DEFAULT_STAR_TREE_FORMAT_VERSION);
+    _generateColumnMinMaxValueMode = tableDataManagerConfig.getString(KEY_OF_COLUMN_MIN_MAX_VALUE_GENERATOR_MODE,
+        DEFAULT_COLUMN_MIN_MAX_VALUE_GENERATOR_MODE);
   }
 
   public void initLoadingInvertedIndexColumnSet(String[] columnCollections) {
@@ -66,7 +73,7 @@ public class IndexLoadingConfigMetadata {
   }
 
   public String segmentVersionToLoad() {
-    return segmentVersionToLoad;
+    return _segmentVersionToLoad;
   }
 
   public static String getKeyOfLoadingInvertedIndex() {
@@ -74,14 +81,22 @@ public class IndexLoadingConfigMetadata {
   }
 
   public void setEnableDefaultColumns(boolean enableDefaultColumns) {
-    this.enableDefaultColumns = enableDefaultColumns;
+    _enableDefaultColumns = enableDefaultColumns;
   }
 
   public boolean isEnableDefaultColumns() {
-    return enableDefaultColumns;
+    return _enableDefaultColumns;
+  }
+
+  public void setGenerateColumnMinMaxValueMode(String generateColumnMinMaxValueMode) {
+    _generateColumnMinMaxValueMode = generateColumnMinMaxValueMode;
+  }
+
+  public String getGenerateColumnMinMaxValueMode() {
+    return _generateColumnMinMaxValueMode;
   }
 
   public String getStarTreeVersionToLoad() {
-    return starTreeVersionToLoad;
+    return _starTreeVersionToLoad;
   }
 }
