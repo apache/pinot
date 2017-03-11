@@ -1,6 +1,10 @@
 package com.linkedin.thirdeye.anomaly.merge;
 
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.ListMultimap;
+import com.google.common.collect.MultimapBuilder;
 import com.linkedin.pinot.pql.parsers.utils.Pair;
+import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionOutputContext;
 import com.linkedin.thirdeye.anomaly.detection.TimeSeriesUtil;
 import com.linkedin.thirdeye.anomaly.override.OverrideConfigHelper;
 import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
@@ -8,7 +12,6 @@ import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.DAORegistry;
-import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
@@ -78,25 +81,27 @@ public class TimeBasedAnomalyMerger {
    *
    * @return the number of merged anomalies after merging
    */
-  public List<MergedAnomalyResultDTO> mergeAnomalies(AnomalyFunctionDTO functionSpec, boolean isBackfill) {
-      AnomalyMergeConfig mergeConfig = functionSpec.getAnomalyMergeConfig();
-      if (mergeConfig == null) {
-        mergeConfig = DEFAULT_TIME_BASED_MERGE_CONFIG;
-      }
+  public ListMultimap<DimensionMap, MergedAnomalyResultDTO> mergeAnomalies(AnomalyFunctionDTO functionSpec,
+      ListMultimap<DimensionMap, RawAnomalyResultDTO> unmergedAnomalies, boolean isBackfill) {
 
-    List<RawAnomalyResultDTO> unmergedAnomalies = anomalyResultDAO.findUnmergedByFunctionId(functionSpec.getId());
+    int rawAnomaliesCount = 0;
+    for (DimensionMap dimensionMap : unmergedAnomalies.keySet()) {
+      rawAnomaliesCount += unmergedAnomalies.get(dimensionMap).size();
+    }
+    LOG.info("Running merge for function id : [{}], found [{}] raw anomalies", functionSpec.getId(), rawAnomaliesCount);
 
-    LOG.info("Running merge for function id : [{}], found [{}] raw anomalies", functionSpec.getId(), unmergedAnomalies.size());
+    AnomalyMergeConfig mergeConfig = functionSpec.getAnomalyMergeConfig();
+    if (mergeConfig == null) {
+      mergeConfig = DEFAULT_TIME_BASED_MERGE_CONFIG;
+    }
 
     if (unmergedAnomalies.size() == 0) {
-      return Collections.emptyList();
+      return ArrayListMultimap.create();
     } else {
-      List<MergedAnomalyResultDTO> mergedAnomalies = new ArrayList<>();
-
-      timeBasedMerge(functionSpec, mergeConfig, unmergedAnomalies, mergedAnomalies);
+      ListMultimap<DimensionMap, MergedAnomalyResultDTO> mergedAnomalies = timeBasedMerge(functionSpec, mergeConfig, unmergedAnomalies);
 
       // Update information of merged anomalies
-      for (MergedAnomalyResultDTO mergedAnomalyResultDTO : mergedAnomalies) {
+      for (MergedAnomalyResultDTO mergedAnomalyResultDTO : mergedAnomalies.values()) {
         if (isBackfill) {
           mergedAnomalyResultDTO.setNotified(isBackfill);
         } // else notified flag is left as is
@@ -107,17 +112,11 @@ public class TimeBasedAnomalyMerger {
     }
   }
 
-  private void timeBasedMerge(AnomalyFunctionDTO function,
-      AnomalyMergeConfig mergeConfig, List<RawAnomalyResultDTO> unmergedResults,
-      List<MergedAnomalyResultDTO> output) {
-    Map<DimensionMap, List<RawAnomalyResultDTO>> dimensionsResultMap = new HashMap<>();
-    for (RawAnomalyResultDTO anomalyResult : unmergedResults) {
-      DimensionMap exploredDimensions = anomalyResult.getDimensions();
-      if (!dimensionsResultMap.containsKey(exploredDimensions)) {
-        dimensionsResultMap.put(exploredDimensions, new ArrayList<>());
-      }
-      dimensionsResultMap.get(exploredDimensions).add(anomalyResult);
-    }
+  private ListMultimap<DimensionMap, MergedAnomalyResultDTO> timeBasedMerge(AnomalyFunctionDTO function,
+      AnomalyMergeConfig mergeConfig, ListMultimap<DimensionMap, RawAnomalyResultDTO> dimensionsResultMap) {
+
+    ListMultimap<DimensionMap, MergedAnomalyResultDTO> mergedAnomalies = ArrayListMultimap.create();
+
     for (DimensionMap exploredDimensions : dimensionsResultMap.keySet()) {
       List<RawAnomalyResultDTO> unmergedResultsByDimensions = dimensionsResultMap.get(exploredDimensions);
       long anomalyWindowStart = Long.MAX_VALUE;
@@ -127,7 +126,7 @@ public class TimeBasedAnomalyMerger {
         anomalyWindowEnd = Math.max(anomalyWindowEnd, unmergedResultsByDimension.getEndTime());
       }
 
-      // NOTE: We get "latest overlapped (Conflict)" merged anomaly instead of "latest" merged anomaly in order to
+      // NOTE: We get "latest overlapped (Conflict)" merged anomaly instead of "recent" merged anomaly in order to
       // prevent the merge results of current (online) detection interfere the merge results of back-fill (offline)
       // detection.
       // Moreover, the window start is modified by mergeConfig.getSequentialAllowedGap() in order to allow a gap between
@@ -146,8 +145,10 @@ public class TimeBasedAnomalyMerger {
       LOG.info(
           "Merging [{}] raw anomalies into [{}] merged anomalies for function id : [{}] and dimensions : [{}]",
           unmergedResultsByDimensions.size(), mergedResults.size(), function.getId(), exploredDimensions);
-      output.addAll(mergedResults);
+      mergedAnomalies.putAll(exploredDimensions, mergedResults);
     }
+
+    return mergedAnomalies;
   }
 
   private void updateMergedScoreAndPersist(MergedAnomalyResultDTO mergedResult, AnomalyMergeConfig mergeConfig) {
