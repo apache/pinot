@@ -2,14 +2,12 @@ package com.linkedin.thirdeye.detector.functionex.dataframe;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import org.apache.commons.lang3.ArrayUtils;
 
 
 public final class StringSeries extends Series {
@@ -27,12 +25,7 @@ public final class StringSeries extends Series {
     boolean apply(String value);
   }
 
-  @FunctionalInterface
-  public interface StringBatchFunction {
-    String apply(String[] values);
-  }
-
-  public static class StringBatchConcat implements StringBatchFunction {
+  public static class StringBatchConcat implements Series.StringBatchFunction {
     final String delimiter;
 
     public StringBatchConcat(String delimiter) {
@@ -51,7 +44,7 @@ public final class StringSeries extends Series {
     }
   }
 
-  public static class StringBatchLast implements StringBatchFunction {
+  public static class StringBatchLast implements Series.StringBatchFunction {
     @Override
     public String apply(String[] values) {
       if(values.length <= 0)
@@ -189,21 +182,6 @@ public final class StringSeries extends Series {
     return builder.toString();
   }
 
-  public StringSeries aggregate(List<Bucket> buckets, StringBatchFunction grouper) {
-    String[] values = new String[buckets.size()];
-    for(int i=0; i<buckets.size(); i++) {
-      Bucket b = buckets.get(i);
-
-      // group
-      String[] gvalues = new String[b.fromIndex.length];
-      for(int j=0; j<gvalues.length; j++) {
-        gvalues[j] = this.values[b.fromIndex[j]];
-      }
-      values[i] = grouper.apply(gvalues);
-    }
-    return new StringSeries(values);
-  }
-
   public StringSeries fillNull(String value) {
     String[] values = Arrays.copyOf(this.values, this.values.length);
     for(int i=0; i<values.length; i++) {
@@ -288,11 +266,11 @@ public final class StringSeries extends Series {
   }
 
   @Override
-  public List<Bucket> groupByValue() {
+  public List<StringBucket> groupByValue() {
     if(this.isEmpty())
       return Collections.emptyList();
 
-    List<Bucket> buckets = new ArrayList<>();
+    List<StringBucket> buckets = new ArrayList<>();
     int[] sortedIndex = this.sortedIndex();
 
     int bucketOffset = 0;
@@ -302,14 +280,14 @@ public final class StringSeries extends Series {
       String currVal = this.values[sortedIndex[i]];
       if(!Objects.equals(lastValue, currVal)) {
         int[] fromIndex = Arrays.copyOfRange(sortedIndex, bucketOffset, i);
-        buckets.add(new Bucket(fromIndex));
+        buckets.add(new StringBucket(lastValue, fromIndex, this));
         bucketOffset = i;
         lastValue = currVal;
       }
     }
 
     int[] fromIndex = Arrays.copyOfRange(sortedIndex, bucketOffset, sortedIndex.length);
-    buckets.add(new Bucket(fromIndex));
+    buckets.add(new StringBucket(lastValue, fromIndex, this));
 
     return buckets;
   }

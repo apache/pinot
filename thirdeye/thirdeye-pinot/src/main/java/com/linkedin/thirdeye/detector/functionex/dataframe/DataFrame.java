@@ -22,24 +22,106 @@ public class DataFrame {
   public static final String COLUMN_JOIN = "join";
 
   public interface ResamplingStrategy {
-    Series apply(Series s, List<Series.Bucket> buckets);
+    DataFrame apply(Series values, List<Series.LongBucket> buckets);
   }
 
   public static class ResampleLast implements ResamplingStrategy {
     @Override
-    public Series apply(Series s, List<Series.Bucket> buckets) {
+    public DataFrame apply(Series s, List<Series.LongBucket> buckets) {
       switch(s.type()) {
         case DOUBLE:
-          return ((DoubleSeries)s).aggregate(buckets, new DoubleSeries.DoubleBatchLast());
+          return s.aggregateLong(buckets, new DoubleSeries.DoubleBatchLast());
         case LONG:
-          return ((LongSeries)s).aggregate(buckets, new LongSeries.LongBatchLast());
+          return s.aggregateLong(buckets, new LongSeries.LongBatchLast());
         case STRING:
-          return ((StringSeries)s).aggregate(buckets, new StringSeries.StringBatchLast());
+          return s.aggregateLong(buckets, new StringSeries.StringBatchLast());
         case BOOLEAN:
-          return ((BooleanSeries)s).aggregate(buckets, new BooleanSeries.BooleanBatchLast());
+          return s.aggregateLong(buckets, new BooleanSeries.BooleanBatchLast());
         default:
           throw new IllegalArgumentException(String.format("Cannot resample series type '%s'", s.type()));
       }
+    }
+  }
+
+  public static class Group {
+    final int[] fromIndex;
+    final DataFrame source;
+
+    Group(int[] fromIndex, DataFrame source) {
+      this.fromIndex = fromIndex;
+      this.source = source;
+    }
+
+    public DataFrame values() {
+      return this.source.project(this.fromIndex);
+    }
+
+    DoubleGroup toDoubleGroup(double key) {
+      return new DoubleGroup(key, this.fromIndex, this.source);
+    }
+
+    LongGroup toLongGroup(long key) {
+      return new LongGroup(key, this.fromIndex, this.source);
+    }
+
+    StringGroup toStringGroup(String key) {
+      return new StringGroup(key, this.fromIndex, this.source);
+    }
+
+    BooleanGroup toBooleanGroup(boolean key) {
+      return new BooleanGroup(key, this.fromIndex, this.source);
+    }
+  }
+
+  public static final class DoubleGroup extends Group {
+    final double key;
+
+    DoubleGroup(double key, int[] fromIndex, DataFrame source) {
+      super(fromIndex, source);
+      this.key = key;
+    }
+
+    public double key() {
+      return key;
+    }
+  }
+
+  public static final class LongGroup extends Group {
+    final long key;
+
+    LongGroup(long key, int[] fromIndex, DataFrame source) {
+      super(fromIndex, source);
+      this.key = key;
+    }
+
+    public long key() {
+      return key;
+    }
+  }
+
+  public static final class StringGroup extends Group {
+    final String key;
+
+    StringGroup(String key, int[] fromIndex, DataFrame source) {
+      super(fromIndex, source);
+      this.key = key;
+    }
+
+    public String key() {
+      return key;
+    }
+  }
+
+  public static final class BooleanGroup extends Group {
+    final boolean key;
+
+    BooleanGroup(boolean key, int[] fromIndex, DataFrame source) {
+      super(fromIndex, source);
+      this.key = key;
+    }
+
+    public boolean key() {
+      return key;
     }
   }
 
@@ -330,15 +412,7 @@ public class DataFrame {
   public DataFrame resampleBy(String seriesName, long interval, ResamplingStrategy strategy) {
     DataFrame baseDataFrame = this.sortBy(seriesName);
 
-    List<Series.Bucket> buckets = baseDataFrame.toLongs(seriesName).groupByInterval(interval);
-
-    // new index from intervals
-    int startIndex = (int)(baseDataFrame.toLongs(seriesName).min() / interval);
-
-    long[] rvalues = new long[buckets.size()];
-    for(int i=0; i<buckets.size(); i++) {
-      rvalues[i] = (i + startIndex) * interval;
-    }
+    List<Series.LongBucket> buckets = baseDataFrame.toLongs(seriesName).groupByInterval(interval);
 
     // resample series
     DataFrame newDataFrame = new DataFrame();
@@ -346,10 +420,17 @@ public class DataFrame {
     for(Map.Entry<String, Series> e : baseDataFrame.getSeries().entrySet()) {
       if(e.getKey().equals(seriesName))
         continue;
-      newDataFrame.addSeries(e.getKey(), strategy.apply(e.getValue(), buckets));
+      newDataFrame.addSeries(e.getKey(), strategy.apply(e.getValue(), buckets).get(Series.COLUMN_VALUE));
     }
 
-    newDataFrame.addSeries(seriesName, new LongSeries(rvalues));
+    // new series
+    long[] keys = new long[buckets.size()];
+    int i = 0;
+    for(Series.LongBucket b : buckets) {
+      keys[i++] = b.key() + interval;
+    }
+
+    newDataFrame.addSeries(seriesName, new LongSeries(keys));
     return newDataFrame;
   }
 
@@ -609,23 +690,49 @@ public class DataFrame {
     }
   }
 
-  // TODO partition class with typing and key
-  public List<DataFrame> groupBy(Series labels) {
-    if(this.size() != labels.size())
-      throw new IllegalArgumentException("Series size must be equals to DataFrame size");
-    List<Series.Bucket> buckets = labels.groupByValue();
-    List<DataFrame> slices = new ArrayList<>();
-    for(Series.Bucket b : buckets) {
-      slices.add(this.project(b.fromIndex));
+  public List<DoubleGroup> groupBy(DoubleSeries labels) {
+    assertSameLength(labels);
+    List<Series.DoubleBucket> buckets = labels.groupByValue();
+    List<DoubleGroup> groups = new ArrayList<>();
+    for(Series.DoubleBucket b : buckets) {
+      groups.add(new DoubleGroup(b.key(), b.fromIndex, this));
     }
-    return slices;
+    return groups;
   }
 
-  public List<DataFrame> groupBy(String seriesNameLabels) {
-    return this.groupBy(assertSeriesExists(seriesNameLabels));
+  public List<LongGroup> groupBy(LongSeries labels) {
+    assertSameLength(labels);
+    List<Series.LongBucket> buckets = labels.groupByValue();
+    List<LongGroup> groups = new ArrayList<>();
+    for(Series.LongBucket b : buckets) {
+      groups.add(new LongGroup(b.key(), b.fromIndex, this));
+    }
+    return groups;
   }
 
-  public static DoubleSeries aggregate(List<DataFrame> groups, String seriesName, DoubleSeries.DoubleBatchFunction function) {
+
+  public List<StringGroup> groupBy(StringSeries labels) {
+    assertSameLength(labels);
+    List<Series.StringBucket> buckets = labels.groupByValue();
+    List<StringGroup> groups = new ArrayList<>();
+    for(Series.StringBucket b : buckets) {
+      groups.add(new StringGroup(b.key(), b.fromIndex, this));
+    }
+    return groups;
+  }
+
+
+  public List<BooleanGroup> groupBy(BooleanSeries labels) {
+    assertSameLength(labels);
+    List<Series.BooleanBucket> buckets = labels.groupByValue();
+    List<BooleanGroup> groups = new ArrayList<>();
+    for(Series.BooleanBucket b : buckets) {
+      groups.add(new BooleanGroup(b.key(), b.fromIndex, this));
+    }
+    return groups;
+  }
+
+  public static DataFrame aggregate(List<DoubleSeries> groups, String seriesName, DoubleSeries.DoubleBatchFunction function) {
     double[] values = new double[groups.size()];
     int i = 0;
     for(DataFrame df : groups) {
@@ -741,6 +848,11 @@ public class DataFrame {
   private void assertNotNull(String... names) {
     for(String s : names)
       assertNotNull(s);
+  }
+
+  private void assertSameLength(Series s) {
+    if(this.size() != s.size())
+      throw new IllegalArgumentException("Series size must be equals to DataFrame size");
   }
 
   private Set<String> extractSeriesNames(String doubleExpression) {

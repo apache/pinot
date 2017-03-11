@@ -23,12 +23,7 @@ public final class LongSeries extends Series {
     boolean apply(long value);
   }
 
-  @FunctionalInterface
-  public interface LongBatchFunction {
-    long apply(long[] values);
-  }
-
-  public static class LongBatchSum implements LongBatchFunction {
+  public static class LongBatchSum implements Series.LongBatchFunction {
     @Override
     public long apply(long[] values) {
       long sum = 0;
@@ -39,7 +34,7 @@ public final class LongSeries extends Series {
     }
   }
 
-  public static class LongBatchLast implements LongBatchFunction {
+  public static class LongBatchLast implements Series.LongBatchFunction {
     @Override
     public long apply(long[] values) {
       if(values.length <= 0)
@@ -207,7 +202,7 @@ public final class LongSeries extends Series {
     return builder.toString();
   }
 
-  public List<Bucket> groupByInterval(long interval) {
+  public List<LongBucket> groupByInterval(long interval) {
     if(interval <= 0)
       throw new IllegalArgumentException("interval must be greater than 0");
     if(this.size() <= 0)
@@ -238,7 +233,7 @@ public final class LongSeries extends Series {
 
     // turn ranges into buckets from original series
     // TODO use nlogm solution to find matching range, e.g. ordered tree
-    List<Bucket> buckets = new ArrayList<>();
+    List<LongBucket> buckets = new ArrayList<>();
 
     for(Range r : ranges) {
       ArrayList<Integer> ind = new ArrayList<>();
@@ -253,25 +248,10 @@ public final class LongSeries extends Series {
         fromIndex[i] = ind.get(i);
       }
 
-      buckets.add(new Bucket(fromIndex));
+      buckets.add(new LongBucket(r.lower, fromIndex, this));
     }
 
     return buckets;
-  }
-
-  public LongSeries aggregate(List<Bucket> buckets, LongBatchFunction grouper) {
-    long[] values = new long[buckets.size()];
-    for(int i=0; i<buckets.size(); i++) {
-      Bucket b = buckets.get(i);
-
-      // group
-      long[] gvalues = new long[b.fromIndex.length];
-      for(int j=0; j<gvalues.length; j++) {
-        gvalues[j] = this.values[b.fromIndex[j]];
-      }
-      values[i] = grouper.apply(gvalues);
-    }
-    return new LongSeries(values);
   }
 
   public long min() {
@@ -370,11 +350,11 @@ public final class LongSeries extends Series {
   }
 
   @Override
-  public List<Bucket> groupByValue() {
+  public List<LongBucket> groupByValue() {
     if(this.isEmpty())
       return Collections.emptyList();
 
-    List<Bucket> buckets = new ArrayList<>();
+    List<LongBucket> buckets = new ArrayList<>();
     int[] sortedIndex = this.sortedIndex();
 
     int bucketOffset = 0;
@@ -384,14 +364,14 @@ public final class LongSeries extends Series {
       long currVal = this.values[sortedIndex[i]];
       if(Long.compare(lastValue, currVal) != 0) {
         int[] fromIndex = Arrays.copyOfRange(sortedIndex, bucketOffset, i);
-        buckets.add(new Bucket(fromIndex));
+        buckets.add(new LongBucket(lastValue, fromIndex, this));
         bucketOffset = i;
         lastValue = currVal;
       }
     }
 
     int[] fromIndex = Arrays.copyOfRange(sortedIndex, bucketOffset, sortedIndex.length);
-    buckets.add(new Bucket(fromIndex));
+    buckets.add(new LongBucket(lastValue, fromIndex, this));
 
     return buckets;
   }

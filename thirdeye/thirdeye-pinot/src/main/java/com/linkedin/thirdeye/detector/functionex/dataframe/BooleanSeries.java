@@ -4,7 +4,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.lang.math.NumberUtils;
 
 
@@ -13,12 +16,7 @@ public final class BooleanSeries extends Series {
 
   boolean[] values;
 
-  @FunctionalInterface
-  public interface BooleanBatchFunction {
-    boolean apply(boolean[] values);
-  }
-
-  public static class BooleanBatchAnd implements BooleanBatchFunction {
+  public static class BooleanBatchAnd implements Series.BooleanBatchFunction {
     @Override
     public boolean apply(boolean[] values) {
       if(values.length <= 0)
@@ -31,7 +29,7 @@ public final class BooleanSeries extends Series {
     }
   }
 
-  public static class BooleanBatchOr implements BooleanBatchFunction {
+  public static class BooleanBatchOr implements Series.BooleanBatchFunction {
     @Override
     public boolean apply(boolean[] values) {
       if(values.length <= 0)
@@ -44,7 +42,7 @@ public final class BooleanSeries extends Series {
     }
   }
 
-  public static class BooleanBatchLast implements BooleanBatchFunction {
+  public static class BooleanBatchLast implements Series.BooleanBatchFunction {
     @Override
     public boolean apply(boolean[] values) {
       if(values.length <= 0)
@@ -188,21 +186,6 @@ public final class BooleanSeries extends Series {
     return builder.toString();
   }
 
-  public BooleanSeries aggregate(List<Bucket> buckets, BooleanBatchFunction grouper) {
-    boolean[] values = new boolean[buckets.size()];
-    for(int i=0; i<buckets.size(); i++) {
-      Bucket b = buckets.get(i);
-
-      // group
-      boolean[] gvalues = new boolean[b.fromIndex.length];
-      for(int j=0; j<gvalues.length; j++) {
-        gvalues[j] = this.values[b.fromIndex[j]];
-      }
-      values[i] = grouper.apply(gvalues);
-    }
-    return new BooleanSeries(values);
-  }
-
   @Override
   public BooleanSeries shift(int offset) {
     boolean[] values = new boolean[this.values.length];
@@ -261,7 +244,7 @@ public final class BooleanSeries extends Series {
   }
 
   @Override
-  public List<Bucket> groupByValue() {
+  public List<BooleanBucket> groupByValue() {
     if(this.isEmpty())
       return Collections.emptyList();
 
@@ -277,11 +260,11 @@ public final class BooleanSeries extends Series {
     int[] indexFalse = Arrays.copyOfRange(sortedIndex, 0, countFalse);
     int[] indexTrue = Arrays.copyOfRange(sortedIndex, countFalse, sortedIndex.length);
 
-    List<Bucket> buckets = new ArrayList<>();
+    List<BooleanBucket> buckets = new ArrayList<>();
     if(indexFalse.length > 0)
-      buckets.add(new Bucket(indexFalse));
+      buckets.add(new BooleanBucket(false, indexFalse, this));
     if(indexTrue.length > 0)
-      buckets.add(new Bucket(indexTrue));
+      buckets.add(new BooleanBucket(true, indexTrue, this));
 
     return buckets;
   }

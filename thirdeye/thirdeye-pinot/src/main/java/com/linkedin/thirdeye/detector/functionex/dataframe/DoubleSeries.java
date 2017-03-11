@@ -23,12 +23,7 @@ public final class DoubleSeries extends Series {
     boolean apply(double value);
   }
 
-  @FunctionalInterface
-  public interface DoubleBatchFunction {
-    double apply(double[] values);
-  }
-
-  public static class DoubleBatchSum implements DoubleBatchFunction {
+  public static class DoubleBatchSum implements Series.DoubleBatchFunction {
     @Override
     public double apply(double[] values) {
       // TODO sorted, add low to high for accuracy
@@ -40,7 +35,7 @@ public final class DoubleSeries extends Series {
     }
   }
 
-  public static class DoubleBatchMean implements DoubleBatchFunction {
+  public static class DoubleBatchMean implements Series.DoubleBatchFunction {
     @Override
     public double apply(double[] values) {
       if(values.length <= 0)
@@ -59,7 +54,7 @@ public final class DoubleSeries extends Series {
     }
   }
 
-  public static class DoubleBatchLast implements DoubleBatchFunction {
+  public static class DoubleBatchLast implements Series.DoubleBatchFunction {
     @Override
     public double apply(double[] values) {
       if(values.length <= 0)
@@ -221,21 +216,6 @@ public final class DoubleSeries extends Series {
     return builder.toString();
   }
 
-  public DoubleSeries aggregate(List<Bucket> buckets, DoubleBatchFunction grouper) {
-    double[] values = new double[buckets.size()];
-    for(int i=0; i<buckets.size(); i++) {
-      Bucket b = buckets.get(i);
-
-      // group
-      double[] gvalues = new double[b.fromIndex.length];
-      for(int j=0; j<gvalues.length; j++) {
-        gvalues[j] = this.values[b.fromIndex[j]];
-      }
-      values[i] = grouper.apply(gvalues);
-    }
-    return new DoubleSeries(values);
-  }
-
   public double min() {
     assertNotEmpty(this.values);
     double m = this.values[0];
@@ -346,11 +326,11 @@ public final class DoubleSeries extends Series {
   }
 
   @Override
-  public List<Bucket> groupByValue() {
+  public List<DoubleBucket> groupByValue() {
     if(this.isEmpty())
       return Collections.emptyList();
 
-    List<Bucket> buckets = new ArrayList<>();
+    List<DoubleBucket> buckets = new ArrayList<>();
     int[] sortedIndex = this.sortedIndex();
 
     int bucketOffset = 0;
@@ -360,14 +340,14 @@ public final class DoubleSeries extends Series {
       double currVal = this.values[sortedIndex[i]];
       if(Double.compare(lastValue, currVal) != 0) {
         int[] fromIndex = Arrays.copyOfRange(sortedIndex, bucketOffset, i);
-        buckets.add(new Bucket(fromIndex));
+        buckets.add(new DoubleBucket(lastValue, fromIndex, this));
         bucketOffset = i;
         lastValue = currVal;
       }
     }
 
     int[] fromIndex = Arrays.copyOfRange(sortedIndex, bucketOffset, sortedIndex.length);
-    buckets.add(new Bucket(fromIndex));
+    buckets.add(new DoubleBucket(lastValue, fromIndex, this));
 
     return buckets;
   }
