@@ -21,7 +21,7 @@ function AnomalyResultView(anomalyResultModel) {
         },
         processResults : function(data) {
           var results = [];
-          mode = $('#anomalies-search-mode').val();
+          const mode = $('#anomalies-search-mode').val();
             $.each(data, function(index, item) {
               results.push({
                 id : item.id,
@@ -53,7 +53,7 @@ function AnomalyResultView(anomalyResultModel) {
         },
         processResults : function(data) {
           var results = [];
-          mode = $('#anomalies-search-mode').val();
+          const mode = $('#anomalies-search-mode').val();
             $.each(data, function(index, item) {
               results.push({
                 id : item.id,
