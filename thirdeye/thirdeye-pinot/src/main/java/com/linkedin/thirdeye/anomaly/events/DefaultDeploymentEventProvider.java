@@ -12,22 +12,22 @@ import org.joda.time.DateTime;
 
 public class DefaultDeploymentEventProvider implements EventDataProvider<EventDTO> {
 
-  private final InformedQueryUtil informedQueryUtil;
+  private final ExternalApiQueryUtil informedQueryUtil;
   private static final String SITEOPS = "siteops";
 
   public DefaultDeploymentEventProvider (String informedAPIUrl) {
-    informedQueryUtil = new InformedQueryUtil(informedAPIUrl);
+    informedQueryUtil = new ExternalApiQueryUtil(informedAPIUrl);
   }
 
   @Override
   public List<EventDTO> getEvents(EventFilter eventFilter) {
     List<EventDTO> qualifiedDeploymentEvents = new ArrayList<>();
-    InformedQueryUtil.InFormedPosts inFormedPosts = informedQueryUtil
+    ExternalApiQueryUtil.InFormedPosts inFormedPosts = informedQueryUtil
         .retrieveInformedEvents(SITEOPS, new DateTime(eventFilter.getStartTime()),
             new DateTime(eventFilter.getEndTime()));
     if (inFormedPosts != null && inFormedPosts.getData() != null
         && inFormedPosts.getData().size() > 0) {
-      for (InformedQueryUtil.InFormedPost inFormedPost : inFormedPosts.getData()) {
+      for (ExternalApiQueryUtil.InFormedPost inFormedPost : inFormedPosts.getData()) {
         // TODO: have a better string matching once service name is extracted from content - informed API.
         if (!Strings.isNullOrEmpty(eventFilter.getServiceName()) && !inFormedPost.getContent()
             .contains(eventFilter.getServiceName())) {
@@ -40,7 +40,7 @@ public class DefaultDeploymentEventProvider implements EventDataProvider<EventDT
     return qualifiedDeploymentEvents;
   }
 
-  private EventDTO getEventFromInformed (InformedQueryUtil.InFormedPost inFormedPost) {
+  private EventDTO getEventFromInformed (ExternalApiQueryUtil.InFormedPost inFormedPost) {
     EventDTO eventDTO = new EventDTO();
     eventDTO.setName(SITEOPS);
     eventDTO.setStartTime((long)(Double.parseDouble(inFormedPost.getPost_time()) * 1000));

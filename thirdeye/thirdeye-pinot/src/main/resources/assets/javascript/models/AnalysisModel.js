@@ -5,13 +5,10 @@ function AnalysisModel() {
   this.granularity;
   this.dimension;
   this.filters;
-
-  var currentTime = moment();
-  currentTime = currentTime - (currentTime % 3600000) - 2 * 3600000;  // 2 hours behind current time
-  this.currentStart = moment(currentTime).subtract(4, 'days');
-  this.currentEnd = moment(currentTime);
-  this.baselineStart= moment(currentTime).subtract(10, 'days');
-  this.baselineEnd = moment(currentTime).subtract(6, 'days');
+  this.currentStart;
+  this.currentEndl;
+  this.baselineStart;
+  this.baselineEnd;
 }
 
 AnalysisModel.prototype = {
@@ -21,6 +18,7 @@ AnalysisModel.prototype = {
   update: function (params) {
     if (params.metricId) {
       this.metricId = params.metricId;
+      this.metricName = this.fetchMetricName(params.metricId).name;
     }
     if (params.timeRange) {
       this.timeRange = params.timeRange;
@@ -46,6 +44,10 @@ AnalysisModel.prototype = {
     if (params.baselineEnd) {
       this.baselineEnd = params.baselineEnd;
     }
+  },
+
+  fetchMetricName(metricId) {
+    return dataService.fetchMetricByMetricId(metricId);
   },
 
   fetchGranularityForMetric: function (metricId) {

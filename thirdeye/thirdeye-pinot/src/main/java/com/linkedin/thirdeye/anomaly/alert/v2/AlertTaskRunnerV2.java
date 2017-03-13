@@ -105,10 +105,15 @@ public class AlertTaskRunnerV2 implements TaskRunner {
         if (resultsForFunction != null && resultsForFunction.size() > 0) {
           mergedAnomaliesAllResults.addAll(resultsForFunction);
         }
-        // TODO: @pjaiswal / @ychang
         // fetch anomalies having id lesser than the watermark for the same function with notified = false & endTime > last one day
         // these anomalies are the ones that did not qualify filtration rule and got modified.
         // We should add these again so that these could be included in email if qualified through filtration rule
+        List<MergedAnomalyResultDTO> filteredAnomalies = anomalyMergedResultDAO
+            .findUnNotifiedByFunctionIdAndIdLesserThanAndEndTimeGreaterThanLastOneDay(functionId,
+                lastNotifiedAnomaly);
+        if (filteredAnomalies != null && filteredAnomalies.size() > 0) {
+          mergedAnomaliesAllResults.addAll(filteredAnomalies);
+        }
       }
 
       // apply filtration rule

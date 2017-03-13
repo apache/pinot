@@ -8,28 +8,34 @@ function InvestigateModel() {
 }
 
 InvestigateModel.prototype = {
-  init: function ({ anomalyId }) {
-    this.anomalyId = anomalyId;
-    this.fetchMetricInformation();
-  },
-
-  update: function (params) {
-    if (params.metricId) {
-      this.metricId = params.metricId;
+  init({anomalyId}) {
+    if (this.anomalyId != anomalyId) {
+      this.anomalyId = anomalyId;
+      this.fetchMetricInformation(anomalyId);
     }
   },
 
-  fetchMetricInformation() {
+  update(anomaly) {
+    this.anomaly = anomaly;
+    this.metricId = anomaly.metricId;
+  },
+
+  fetchMetricInformation(anomalyId) {
     dataService.fetchAnomaliesForAnomalyIds(
-          this.startDate, this.endDate, this.pageNumber, this.anomalyId, this.functionName, this.updateModelAndNotifyView.bind(this));
+          this.startDate, this.endDate, this.pageNumber, anomalyId, this.functionName, this.updateModelAndNotifyView.bind(this), 'investigate-spin-area');
   },
 
-  getAnomaliesWrapper : function() {
-    return this.anomaliesWrapper;
+  getWowData() {
+    return dataService.fetchAnomalyWowData(this.anomalyId);
   },
 
-  updateModelAndNotifyView(anomaliesWrapper) {
-    this.anomaliesWrapper = anomaliesWrapper;
+  getAnomaly() {
+    return this.anomaly;
+  },
+
+  updateModelAndNotifyView({anomalyDetailsList}) {
+    const [anomaly]  = anomalyDetailsList;
+    this.update(anomaly);
     this.formatAnomaly();
     this.renderViewEvent.notify();
   },
@@ -83,9 +89,8 @@ InvestigateModel.prototype = {
    * @return {null}
    */
   formatAnomaly() {
-    this.anomaliesWrapper.anomalyDetailsList.forEach((anomaly) => {
-      anomaly.duration = this.getRegionDuration(anomaly.anomalyRegionStart, anomaly.anomalyRegionEnd);
-      anomaly.changeDelta = this.getChangeDelta(anomaly.current, anomaly.baseline);
-    });
+    const anomaly = this.anomaly;
+    this.anomaly.duration = this.getRegionDuration(anomaly.anomalyRegionStart, anomaly.anomalyRegionEnd);
+    this.anomaly.changeDelta = this.getChangeDelta(anomaly.current, anomaly.baseline);
   },
 };

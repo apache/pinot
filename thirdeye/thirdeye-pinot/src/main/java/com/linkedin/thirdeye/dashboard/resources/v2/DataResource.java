@@ -106,6 +106,12 @@ public class DataResource {
     return metricConfigDTOs;
   }
 
+  @GET
+  @Path("metric/{metricId}")
+  public MetricConfigDTO getMetricById(@PathParam("metricId") long metricId) {
+    return metricConfigDAO.findById(metricId);
+  }
+
   //------------- endpoints to fetch summary -------------
   @GET
   @Path("summary/metrics")

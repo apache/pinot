@@ -235,6 +235,14 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
     return batchConvertMergedAnomalyBean2DTO(list, false);
   }
 
+  public List<MergedAnomalyResultDTO> findUnNotifiedByFunctionIdAndIdLesserThanAndEndTimeGreaterThanLastOneDay(long functionId, long anomalyId) {
+    Predicate predicate = Predicate
+        .AND(Predicate.EQ("functionId", functionId), Predicate.LT("baseId", anomalyId),
+            Predicate.EQ("notified", false), Predicate.GT("endTime", System.currentTimeMillis() - TimeUnit.DAYS.toMillis(1)));
+    List<MergedAnomalyResultBean> list = genericPojoDao.get(predicate, MergedAnomalyResultBean.class);
+    return batchConvertMergedAnomalyBean2DTO(list, true);
+  }
+
   @Override
   public MergedAnomalyResultDTO findLatestConflictByFunctionIdDimensions(Long functionId, String dimensions,
       long conflictWindowStart, long conflictWindowEnd) {

@@ -160,7 +160,7 @@
 						<div id="main-tabs" class="pull-right">
 							<ul class="nav navbar-nav">
 								<li class=""><a href="#anomalies">Anomalies</a></li>
-								<li class=""><a href="#analysis">Root Cause Analysis</a></li>
+								<!-- <li class=""><a href="#analysis">Root Cause Analysis</a></li> -->
 							</ul>
 
             <!-- Hidding this until it's fully fleshed out -->
@@ -191,6 +191,7 @@
 		</div>
 		<div class="tab-pane" id="anomalies">
 			<div id="anomalies-place-holder"></div>
+			<div id='investigate-spin-area'></div>
 			<div id="investigate-place-holder""></div>
 		</div>
 

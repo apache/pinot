@@ -114,13 +114,13 @@ DataService.prototype = {
       this.getDataAsynchronous(url, data, callback, 'anomaly-spin-area');
     },
     // Fetch anomalies for anomaly ids in array in time range
-    fetchAnomaliesForAnomalyIds : function(startTime, endTime, pageNumber, anomalyIds, functionName, callback) {
+    fetchAnomaliesForAnomalyIds : function(startTime, endTime, pageNumber, anomalyIds, functionName, callback, spinner = 'anomaly-spin-area') {
       var url = constants.SEARCH_ANOMALIES_ANOMALYIDS + startTime + this.URL_SEPARATOR + endTime + this.URL_SEPARATOR + pageNumber;
       var data = {
           anomalyIds : anomalyIds,
           functionName : functionName
       };
-      this.getDataAsynchronous(url, data, callback, 'anomaly-spin-area');
+      this.getDataAsynchronous(url, data, callback, spinner);
     },
     // Fetch anomalies for anomaly ids in array in time range
     fetchAnomaliesForTime : function(startTime, endTime, pageNumber, callback) {
@@ -152,15 +152,6 @@ DataService.prototype = {
       return this.getDataSynchronous(url);
     },
 
-    fetchMetricId(name) {
-      const url = "/data/data/metricId";
-      const data = {
-        name
-      };
-
-      return this.getDataAsynchronous(url, data).then(([data]) => data.id);
-    },
-
     fetchTimeseriesCompare: function (metricId, currentStart, currentEnd, baselineStart, baselineEnd,
         dimension = "ALL", filters = {}, granularity = "DAYS") {
       var url = "/timeseries/compare/" + metricId + "/" + currentStart + "/" + currentEnd + "/"
@@ -178,6 +169,15 @@ DataService.prototype = {
     console.log("heatmap data fetch URL ----> ");
     console.log(url);
     return this.getDataSynchronous(url);
-  }
+  },
 
+  fetchAnomalyWowData(anomalyId){
+    const url = `/anomalies/${anomalyId}`;
+    return this.getDataSynchronous(url);
+  },
+
+  fetchMetricByMetricId(metricId) {
+    const url = `/data/metric/${metricId}`;
+    return this.getDataSynchronous(url);
+  }
 };
