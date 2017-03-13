@@ -72,7 +72,10 @@ public class TimeOnTimeResponseParser {
 
     metricFunctions = baselineResponse.getMetricFunctions();
     numMetrics = metricFunctions.size();
-    numTimeBuckets = baselineRanges.size();
+    numTimeBuckets = Math.min(currentRanges.size(), baselineRanges.size());
+    if (currentRanges.size() != baselineRanges.size()) {
+      LOGGER.info("Current and baseline time series have different length, which could be induced by DST.");
+    }
     rows = new ArrayList<>();
 
     if (hasGroupByTime) {
