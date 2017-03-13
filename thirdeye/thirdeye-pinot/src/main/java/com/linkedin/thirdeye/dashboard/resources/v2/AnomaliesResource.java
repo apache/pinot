@@ -4,7 +4,6 @@ import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import com.linkedin.thirdeye.anomaly.alert.util.EmailHelper;
 import com.linkedin.thirdeye.anomaly.detection.TimeSeriesUtil;
-import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomaliesSummary;
@@ -274,7 +273,10 @@ public class AnomaliesResource {
     List<MergedAnomalyResultDTO> mergedAnomalies = new ArrayList<>();
     for (String id : anomalyIds) {
       Long anomalyId = Long.valueOf(id);
-      mergedAnomalies.add(mergedAnomalyResultDAO.findById(anomalyId));
+      MergedAnomalyResultDTO anomaly = mergedAnomalyResultDAO.findById(anomalyId);
+      if (anomaly != null) {
+        mergedAnomalies.add(anomaly);
+      }
     }
     AnomaliesWrapper anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(mergedAnomalies, pageNumber);
     return anomaliesWrapper;
@@ -621,7 +623,10 @@ public class AnomaliesResource {
     List<AnomalyDetails> anomalyDetailsList = new ArrayList<>();
     for (Future<AnomalyDetails> anomalyDetailsFuture : anomalyDetailsListFutures) {
       try {
-        anomalyDetailsList.add(anomalyDetailsFuture.get(120, TimeUnit.SECONDS));
+        AnomalyDetails anomalyDetails = anomalyDetailsFuture.get(120, TimeUnit.SECONDS);
+        if (anomalyDetails != null) {
+          anomalyDetailsList.add(anomalyDetails);
+        }
       } catch (InterruptedException | ExecutionException | TimeoutException e) {
         LOG.error("Exception in getting AnomalyDetails", e);
       }
