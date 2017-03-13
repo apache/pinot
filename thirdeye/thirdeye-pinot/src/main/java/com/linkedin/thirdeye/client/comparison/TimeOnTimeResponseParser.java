@@ -72,7 +72,7 @@ public class TimeOnTimeResponseParser {
 
     metricFunctions = baselineResponse.getMetricFunctions();
     numMetrics = metricFunctions.size();
-    numTimeBuckets = baselineRanges.size();
+    numTimeBuckets = Math.min(currentRanges.size(), baselineRanges.size());
     rows = new ArrayList<>();
 
     if (hasGroupByTime) {
