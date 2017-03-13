@@ -212,12 +212,8 @@ public class AnomalyReportGenerator {
   }
 
   String getAnomalyURL(MergedAnomalyResultDTO anomalyResultDTO, String dashboardUrl) {
-    String urlPart =
-        "/dashboard#view=anomalies&dataset=%s&metrics=%s&currentStart=%s&currentEnd=%s";
-    // return dashboardUrl + String
-        // .format(urlPart, anomalyResultDTO.getCollection(), anomalyResultDTO.getMetric(),
-            // anomalyResultDTO.getStartTime(), anomalyResultDTO.getEndTime());
-    return "http://localhost:1426/thirdeye#investigate?anomalyId=";
+    String urlPart = "/thirdeye#investigate?anomalyId=";
+    return dashboardUrl + urlPart;
   }
 
   @JsonIgnoreProperties(ignoreUnknown = true)
