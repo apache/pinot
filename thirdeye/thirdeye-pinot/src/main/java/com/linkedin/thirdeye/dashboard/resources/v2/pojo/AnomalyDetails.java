@@ -9,6 +9,7 @@ public class AnomalyDetails {
   // anomaly details
   private Long anomalyId;
   private String metric;
+  private Long metricId;
   private String dataset;
 
   List<String> dates;
@@ -33,6 +34,14 @@ public class AnomalyDetails {
 
   public Long getAnomalyId() {
     return anomalyId;
+  }
+
+  public Long getMetricId() {
+    return metricId;
+  }
+
+  public void setMetricId(Long metricId) {
+    this.metricId = metricId;
   }
 
   public void setAnomalyId(Long anomalyId) {

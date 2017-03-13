@@ -189,7 +189,7 @@ public class AlertConfigBean extends AbstractBean {
   }
 
   public enum COMPARE_MODE {
-    WoW, Wo2W, Wo3W
+    WoW, Wo2W, Wo3W, Wo4W
   }
 
   @Override

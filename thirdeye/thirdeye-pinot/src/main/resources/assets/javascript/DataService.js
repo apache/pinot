@@ -152,15 +152,6 @@ DataService.prototype = {
       return this.getDataSynchronous(url);
     },
 
-    fetchMetricId(name) {
-      const url = "/data/data/metricId";
-      const data = {
-        name
-      };
-
-      return this.getDataAsynchronous(url, data).then(([data]) => data.id);
-    },
-
     fetchTimeseriesCompare: function (metricId, currentStart, currentEnd, baselineStart, baselineEnd,
         dimension = "ALL", filters = {}, granularity = "DAYS") {
       var url = "/timeseries/compare/" + metricId + "/" + currentStart + "/" + currentEnd + "/"
@@ -178,6 +169,15 @@ DataService.prototype = {
     console.log("heatmap data fetch URL ----> ");
     console.log(url);
     return this.getDataSynchronous(url);
-  }
+  },
 
+  fetchAnomalyWowData(anomalyId){
+    const url = `/anomalies/${anomalyId}`;
+    return this.getDataSynchronous(url);
+  },
+
+  fetchMetricByMetricId(metricId) {
+    const url = `/data/metric/${metricId}`;
+    return this.getDataSynchronous(url);
+  }
 };

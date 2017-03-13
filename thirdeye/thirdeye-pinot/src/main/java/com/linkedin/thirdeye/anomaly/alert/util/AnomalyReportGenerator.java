@@ -118,15 +118,22 @@ public class AnomalyReportGenerator {
             nonActionable++;
           }
         }
-        String feedbackVal = getFeedback(
-            anomaly.getFeedback() == null ? "NA" : anomaly.getFeedback().getFeedbackType().name());
 
-        AnomalyReportDTO anomalyReportDTO =
-            new AnomalyReportDTO(String.valueOf(anomaly.getId()), feedbackVal,
-                String.format("%+.2f", anomaly.getWeight()), anomaly.getMetric(),
-                new Date(anomaly.getStartTime()).toString(), String
-                .format("%.2f", getTimeDiffInHours(anomaly.getStartTime(), anomaly.getEndTime())),
-                getAnomalyURL(anomaly, configuration.getDashboardHost()));
+        String feedbackVal = getFeedback(
+            anomaly.getFeedback() == null ? "N/A" : anomaly.getFeedback().getFeedbackType().name());
+
+        AnomalyReportDTO anomalyReportDTO = new AnomalyReportDTO(String.valueOf(anomaly.getId()),
+            getAnomalyURL(anomaly, configuration.getDashboardHost()),
+            String.valueOf(anomaly.getAvgBaselineVal()),
+            String.valueOf(anomaly.getAvgCurrentVal()),
+            anomaly.getDimensions().toString(),
+            String.format("%.2f", getTimeDiffInHours(anomaly.getStartTime(), anomaly.getEndTime())), // duration
+            feedbackVal,
+            anomaly.getFunction().getFunctionName(),
+            String.format("%+.2f", anomaly.getWeight()), // lift
+            anomaly.getMetric()
+        );
+
 
         if (anomaly.isNotified()) {
           alertedAnomalies++;
@@ -177,7 +184,7 @@ public class AnomalyReportGenerator {
       freemarkerConfig.setClassForTemplateLoading(getClass(), "/com/linkedin/thirdeye/detector");
       freemarkerConfig.setDefaultEncoding(AlertTaskRunner.CHARSET);
       freemarkerConfig.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);
-      Template template = freemarkerConfig.getTemplate("custom-anomaly-report.ftl");
+      Template template = freemarkerConfig.getTemplate("anomaly-report-v2.ftl");
       template.process(paramMap, out);
 
       String alertEmailHtml = new String(baos.toByteArray(), AlertTaskRunner.CHARSET);
@@ -212,26 +219,74 @@ public class AnomalyReportGenerator {
             anomalyResultDTO.getStartTime(), anomalyResultDTO.getEndTime());
   }
 
-  @JsonIgnoreProperties(ignoreUnknown = true) public static class AnomalyReportDTO {
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public static class AnomalyReportDTO {
     String metric;
     String startDateTime;
-    String windowSize;
     String lift;
     String feedback;
     String anomalyId;
     String anomalyURL;
+    String currentVal;
+    String baselineVal;
+    String dimensions;
+    String function;
+    String duration;
 
-    public AnomalyReportDTO(String anomalyId, String feedback, String lift, String metric,
-        String startDateTime, String windowSize, String anomalyURL) {
+    public AnomalyReportDTO(String anomalyId, String anomalyURL, String baselineVal,
+        String currentVal, String dimensions, String duration, String feedback, String function,
+        String lift, String metric) {
       this.anomalyId = anomalyId;
+      this.anomalyURL = anomalyURL;
+      this.baselineVal = baselineVal;
+      this.currentVal = currentVal;
+      this.dimensions = dimensions;
+      this.duration = duration;
       this.feedback = feedback;
+      this.function = function;
       this.lift = lift;
       this.metric = metric;
-      this.startDateTime = startDateTime;
-      this.windowSize = windowSize;
-      this.anomalyURL = anomalyURL;
     }
 
+    public String getBaselineVal() {
+      return baselineVal;
+    }
+
+    public void setBaselineVal(String baselineVal) {
+      this.baselineVal = baselineVal;
+    }
+
+    public String getCurrentVal() {
+      return currentVal;
+    }
+
+    public void setCurrentVal(String currentVal) {
+      this.currentVal = currentVal;
+    }
+
+    public String getDimensions() {
+      return dimensions;
+    }
+
+    public void setDimensions(String dimensions) {
+      this.dimensions = dimensions;
+    }
+
+    public String getDuration() {
+      return duration;
+    }
+
+    public void setDuration(String duration) {
+      this.duration = duration;
+    }
+
+    public String getFunction() {
+      return function;
+    }
+
+    public void setFunction(String function) {
+      this.function = function;
+    }
     public String getAnomalyId() {
       return anomalyId;
     }
@@ -270,14 +325,6 @@ public class AnomalyReportGenerator {
 
     public void setStartDateTime(String startDateTime) {
       this.startDateTime = startDateTime;
-    }
-
-    public String getWindowSize() {
-      return windowSize;
-    }
-
-    public void setWindowSize(String windowSize) {
-      this.windowSize = windowSize;
     }
 
     public String getAnomalyURL() {
