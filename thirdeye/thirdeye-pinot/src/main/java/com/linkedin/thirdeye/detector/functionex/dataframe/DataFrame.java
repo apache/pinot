@@ -26,7 +26,7 @@ public class DataFrame {
     DataFrame apply(Series.SeriesGrouping grouping, Series s);
   }
 
-  public static class ResampleLast implements ResamplingStrategy {
+  public static final class ResampleLast implements ResamplingStrategy {
     @Override
     public DataFrame apply(Series.SeriesGrouping grouping, Series s) {
       switch(s.type()) {
@@ -44,7 +44,7 @@ public class DataFrame {
     }
   }
 
-  public static class DataFrameGrouping {
+  public static final class DataFrameGrouping {
     final Series keys;
     final List<Series.Bucket> buckets;
     final DataFrame source;
@@ -91,6 +91,7 @@ public class DataFrame {
       return this.get(seriesName).aggregate(function);
     }
   }
+
 
 
   Map<String, Series> series = new HashMap<>();
@@ -412,14 +413,6 @@ public class DataFrame {
     return newDataFrame;
   }
 
-  DataFrame filter(int[] fromIndex) {
-    DataFrame df = new DataFrame();
-    for(Map.Entry<String, Series> e : this.getSeries().entrySet()) {
-      df.addSeries(e.getKey(), e.getValue().project(fromIndex));
-    }
-    return df;
-  }
-
   public DataFrame filter(BooleanSeries series) {
     if(series.size() != this.size())
       throw new IllegalArgumentException("Series size must be equal to index size");
@@ -435,7 +428,7 @@ public class DataFrame {
 
     int[] fromIndexCompressed = Arrays.copyOf(fromIndex, fromIndexCount);
 
-    return this.filter(fromIndexCompressed);
+    return this.project(fromIndexCompressed);
   }
 
   public DataFrame filter(String seriesName) {
@@ -700,7 +693,7 @@ public class DataFrame {
 
     int[] fromIndexCompressed = Arrays.copyOf(fromIndex, countNotNull);
 
-    return this.filter(fromIndexCompressed);
+    return this.project(fromIndexCompressed);
   }
 
   public DataFrame dropNullColumns() {
@@ -712,18 +705,62 @@ public class DataFrame {
     return df;
   }
 
-  public DataFrame joinOuter(DataFrame other, String onLeftSeries, String onRightSeries) {
-    DataFrame left = this.sortBy(onLeftSeries);
-    DataFrame right = other.sortBy(onRightSeries);
+  public DataFrame joinInner(DataFrame other, String onSeriesLeft, String onSeriesRight) {
+    List<Series.JoinPair> pairs = DataFrame.makeJoinPairs(this, other, onSeriesLeft, onSeriesRight, Series.JoinType.INNER);
+    return DataFrame.join(this, other, pairs);
+  }
 
-    int[] sortedLeft = this.get(onLeftSeries).sortedIndex();
-    int[] sortedRight = other.get(onRightSeries).sortedIndex();
+  public DataFrame joinLeft(DataFrame other, String onSeriesLeft, String onSeriesRight) {
+    List<Series.JoinPair> pairs = DataFrame.makeJoinPairs(this, other, onSeriesLeft, onSeriesRight, Series.JoinType.LEFT);
+    return DataFrame.join(this, other, pairs);
+  }
 
-    // NOTE: assuming long
-    LongSeries l = this.toLongs(onLeftSeries);
-    LongSeries r = other.toLongs(onRightSeries);
+  public DataFrame joinRight(DataFrame other, String onSeriesLeft, String onSeriesRight) {
+    List<Series.JoinPair> pairs = DataFrame.makeJoinPairs(this, other, onSeriesLeft, onSeriesRight, Series.JoinType.RIGHT);
+    return DataFrame.join(this, other, pairs);
+  }
 
-    return null; // TODO
+  public DataFrame joinOuter(DataFrame other, String onSeriesLeft, String onSeriesRight) {
+    List<Series.JoinPair> pairs = DataFrame.makeJoinPairs(this, other, onSeriesLeft, onSeriesRight, Series.JoinType.OUTER);
+    return DataFrame.join(this, other, pairs);
+  }
+
+  static List<Series.JoinPair> makeJoinPairs(DataFrame left, DataFrame right, String onSeriesLeft, String onSeriesRight, Series.JoinType type) {
+    Series sLeft = left.get(onSeriesLeft);
+    Series sRight = right.get(onSeriesRight);
+
+    // TODO: automatic renaming
+    Set<String> seriesLeft = left.getSeriesNames();
+    Set<String> seriesRight = right.getSeriesNames();
+    for (String s : seriesLeft) {
+      if (seriesRight.contains(s))
+        throw new IllegalArgumentException("Series '%s' exists in both DataFrames");
+    }
+
+    return sLeft.join(sRight, type);
+  }
+
+  static DataFrame join(DataFrame left, DataFrame right, List<Series.JoinPair> pairs) {
+    int[] fromIndexLeft = new int[pairs.size()];
+    int i=0;
+    for(Series.JoinPair p : pairs) {
+      fromIndexLeft[i++] = p.left;
+    }
+
+    int[] fromIndexRight = new int[pairs.size()];
+    int j=0;
+    for(Series.JoinPair p : pairs) {
+      fromIndexRight[j++] = p.right;
+    }
+
+    DataFrame leftData = left.project(fromIndexLeft);
+    DataFrame rightData = right.project(fromIndexRight);
+
+    for(Map.Entry<String, Series> e : rightData.getSeries().entrySet()) {
+      leftData.addSeries(e.getKey(), e.getValue());
+    }
+
+    return leftData;
   }
 
   @Override

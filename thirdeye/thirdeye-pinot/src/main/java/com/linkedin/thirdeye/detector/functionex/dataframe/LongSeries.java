@@ -86,6 +86,7 @@ public final class LongSeries extends Series {
     return this.values;
   }
 
+  @Override
   public LongSeries unique() {
     if(this.values.length <= 0)
       return new LongSeries();
@@ -281,7 +282,11 @@ public final class LongSeries extends Series {
   LongSeries project(int[] fromIndex) {
     long[] values = new long[fromIndex.length];
     for(int i=0; i<fromIndex.length; i++) {
-      values[i] = this.values[fromIndex[i]];
+      if(fromIndex[i] == -1) {
+        values[i] = NULL_VALUE;
+      } else {
+        values[i] = this.values[fromIndex[i]];
+      }
     }
     return new LongSeries(values);
   }
@@ -330,59 +335,6 @@ public final class LongSeries extends Series {
     }
 
     return Arrays.copyOf(nulls, nullCount);
-  }
-
-//  static List<JoinPair> partialCrossProduct(int l, long[] lval, int[] lref, int r, long[] rval, int[] rref) {
-//    List<JoinPair> pairs = new ArrayList<>();
-//
-//    int lcount = 1;
-//    while(l + lcount + 1 < lval.length && lval[lref[l + lcount + 1]] == lval[lref[l + lcount]]) {
-//      lcount++;
-//    }
-//
-//    // count similar values on the right
-//    int rcount = 1;
-//    while(r + rcount + 1 < rval.length && rval[rref[r + rcount + 1]] == rval[rref[r + rcount]]) {
-//      rcount++;
-//    }
-//
-//    for(int i=0; i<lcount; i++) {
-//      for(int j=0; j<rcount; j++) {
-//        pairs.add(new JoinPair(lref[i], rref[j]));
-//      }
-//    }
-//
-//    return pairs;
-//  }
-
-  @Override
-  public SeriesGrouping groupByValue() {
-    if(this.isEmpty())
-      return new SeriesGrouping(this);
-
-    List<Long> keys = new ArrayList<>();
-    List<Bucket> buckets = new ArrayList<>();
-    int[] sortedIndex = this.sortedIndex();
-
-    int bucketOffset = 0;
-    long lastValue = this.values[sortedIndex[0]];
-
-    for(int i=1; i<sortedIndex.length; i++) {
-      long currVal = this.values[sortedIndex[i]];
-      if(Long.compare(lastValue, currVal) != 0) {
-        int[] fromIndex = Arrays.copyOfRange(sortedIndex, bucketOffset, i);
-        keys.add(lastValue);
-        buckets.add(new Bucket(fromIndex));
-        bucketOffset = i;
-        lastValue = currVal;
-      }
-    }
-
-    int[] fromIndex = Arrays.copyOfRange(sortedIndex, bucketOffset, sortedIndex.length);
-    keys.add(lastValue);
-    buckets.add(new Bucket(fromIndex));
-
-    return new SeriesGrouping(DataFrame.toSeriesFromLong(keys), this, buckets);
   }
 
   @Override

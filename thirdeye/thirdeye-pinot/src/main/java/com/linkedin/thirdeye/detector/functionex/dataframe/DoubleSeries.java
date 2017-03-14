@@ -106,6 +106,7 @@ public final class DoubleSeries extends Series {
     return this.values;
   }
 
+  @Override
   public DoubleSeries unique() {
     if(this.values.length <= 0)
       return new DoubleSeries();
@@ -270,7 +271,11 @@ public final class DoubleSeries extends Series {
   DoubleSeries project(int[] fromIndex) {
     double[] values = new double[fromIndex.length];
     for(int i=0; i<fromIndex.length; i++) {
-      values[i] = this.values[fromIndex[i]];
+      if(fromIndex[i] == -1) {
+        values[i] = NULL_VALUE;
+      } else {
+        values[i] = this.values[fromIndex[i]];
+      }
     }
     return new DoubleSeries(values);
   }
@@ -318,36 +323,6 @@ public final class DoubleSeries extends Series {
     }
 
     return Arrays.copyOf(nulls, nullCount);
-  }
-
-  @Override
-  public SeriesGrouping groupByValue() {
-    if(this.isEmpty())
-      return new SeriesGrouping(this);
-
-    List<Double> keys = new ArrayList<>();
-    List<Bucket> buckets = new ArrayList<>();
-    int[] sortedIndex = this.sortedIndex();
-
-    int bucketOffset = 0;
-    double lastValue = this.values[sortedIndex[0]];
-
-    for(int i=1; i<sortedIndex.length; i++) {
-      double currVal = this.values[sortedIndex[i]];
-      if(Double.compare(lastValue, currVal) != 0) {
-        int[] fromIndex = Arrays.copyOfRange(sortedIndex, bucketOffset, i);
-        keys.add(lastValue);
-        buckets.add(new Bucket(fromIndex));
-        bucketOffset = i;
-        lastValue = currVal;
-      }
-    }
-
-    int[] fromIndex = Arrays.copyOfRange(sortedIndex, bucketOffset, sortedIndex.length);
-    keys.add(lastValue);
-    buckets.add(new Bucket(fromIndex));
-
-    return new SeriesGrouping(DataFrame.toSeriesFromDouble(keys), this, buckets);
   }
 
   @Override

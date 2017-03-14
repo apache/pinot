@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.detector.functionex.dataframe;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -187,8 +188,9 @@ public abstract class Series {
   public abstract Series copy();
   public abstract Series shift(int offset);
   public abstract boolean hasNull();
+  public abstract Series unique();
 
-  public abstract SeriesGrouping groupByValue();
+//  public abstract SeriesGrouping groupByValue();
 
   abstract Series project(int[] fromIndex);
   abstract int[] sortedIndex();
@@ -218,6 +220,28 @@ public abstract class Series {
 
   public Series toType(SeriesType type) {
     return DataFrame.toType(this, type);
+  }
+
+  public SeriesGrouping groupByValue() {
+    if(this.isEmpty())
+      return new SeriesGrouping(this);
+
+    List<Bucket> buckets = new ArrayList<>();
+    int[] sref = this.sortedIndex();
+
+    int bucketOffset = 0;
+    for(int i=1; i<sref.length; i++) {
+      if(this.compare(this, sref[i-1], sref[i]) != 0) {
+        int[] fromIndex = Arrays.copyOfRange(sref, bucketOffset, i);
+        buckets.add(new Bucket(fromIndex));
+        bucketOffset = i;
+      }
+    }
+
+    int[] fromIndex = Arrays.copyOfRange(sref, bucketOffset, sref.length);
+    buckets.add(new Bucket(fromIndex));
+
+    return new SeriesGrouping(this.unique(), this, buckets);
   }
 
   public SeriesGrouping groupByCount(int bucketSize) {

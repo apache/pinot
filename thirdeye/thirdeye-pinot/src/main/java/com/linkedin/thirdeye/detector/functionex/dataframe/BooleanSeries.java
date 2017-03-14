@@ -125,6 +125,7 @@ public final class BooleanSeries extends Series {
   }
 
   public boolean allTrue() {
+    assertNotEmpty(this.values);
     boolean result = true;
     for(boolean b : this.values) {
       result &= b;
@@ -141,11 +142,20 @@ public final class BooleanSeries extends Series {
   }
 
   public boolean allFalse() {
-    return !hasTrue();
+    assertNotEmpty(this.values);
+    boolean result = true;
+    for(boolean b : this.values) {
+      result &= !b;
+    }
+    return result;
   }
 
   public boolean hasFalse() {
-    return !allTrue();
+    boolean result = false;
+    for(boolean b : this.values) {
+      result |= !b;
+    }
+    return result;
   }
 
   public BooleanSeries not() {
@@ -172,6 +182,20 @@ public final class BooleanSeries extends Series {
     Arrays.fill(values, count_false, values.length, true);
 
     return new BooleanSeries(values);
+  }
+
+  @Override
+  public BooleanSeries unique() {
+    boolean hasTrue = this.hasTrue();
+    boolean hasFalse = this.hasFalse();
+
+    List<Boolean> values = new ArrayList<>();
+    if(hasFalse)
+      values.add(false);
+    if(hasTrue)
+      values.add(true);
+
+    return DataFrame.toSeriesFromBoolean(values);
   }
 
   @Override
@@ -203,7 +227,11 @@ public final class BooleanSeries extends Series {
   BooleanSeries project(int[] fromIndex) {
     boolean[] values = new boolean[fromIndex.length];
     for(int i=0; i<fromIndex.length; i++) {
-      values[i] = this.values[fromIndex[i]];
+      if(fromIndex[i] == -1) {
+        values[i] = NULL_VALUE;
+      } else {
+        values[i] = this.values[fromIndex[i]];
+      }
     }
     return new BooleanSeries(values);
   }
@@ -236,37 +264,6 @@ public final class BooleanSeries extends Series {
   @Override
   int[] nullIndex() {
     return new int[0];
-  }
-
-  @Override
-  public SeriesGrouping groupByValue() {
-    if(this.isEmpty())
-      return new SeriesGrouping(this);
-
-    int[] sortedIndex = this.sortedIndex();
-
-    int countFalse = 0;
-    for(int si : sortedIndex) {
-      if(this.values[si])
-        break;
-      countFalse++;
-    }
-
-    int[] indexFalse = Arrays.copyOfRange(sortedIndex, 0, countFalse);
-    int[] indexTrue = Arrays.copyOfRange(sortedIndex, countFalse, sortedIndex.length);
-
-    List<Boolean> keys = new ArrayList<>();
-    List<Bucket> buckets = new ArrayList<>();
-    if(indexFalse.length > 0) {
-      keys.add(false);
-      buckets.add(new Bucket(indexFalse));
-    }
-    if(indexTrue.length > 0) {
-      keys.add(true);
-      buckets.add(new Bucket(indexTrue));
-    }
-
-    return new SeriesGrouping(DataFrame.toSeriesFromBoolean(keys), this, buckets);
   }
 
   @Override

@@ -96,6 +96,7 @@ public final class StringSeries extends Series {
     return this.values;
   }
 
+  @Override
   public StringSeries unique() {
     Set<String> uniques = new HashSet<>(Arrays.asList(this.values));
     String[] values = new String[uniques.size()];
@@ -209,7 +210,11 @@ public final class StringSeries extends Series {
   StringSeries project(int[] fromIndex) {
     String[] values = new String[fromIndex.length];
     for(int i=0; i<fromIndex.length; i++) {
-      values[i] = this.values[fromIndex[i]];
+      if(fromIndex[i] == -1) {
+        values[i] = NULL_VALUE;
+      } else {
+        values[i] = this.values[fromIndex[i]];
+      }
     }
     return new StringSeries(values);
   }
@@ -258,36 +263,6 @@ public final class StringSeries extends Series {
     }
 
     return Arrays.copyOf(nulls, nullCount);
-  }
-
-  @Override
-  public SeriesGrouping groupByValue() {
-    if(this.isEmpty())
-      return new SeriesGrouping(this);
-
-    List<String> keys = new ArrayList<>();
-    List<Bucket> buckets = new ArrayList<>();
-    int[] sortedIndex = this.sortedIndex();
-
-    int bucketOffset = 0;
-    String lastValue = this.values[sortedIndex[0]];
-
-    for(int i=1; i<sortedIndex.length; i++) {
-      String currVal = this.values[sortedIndex[i]];
-      if(!Objects.equals(lastValue, currVal)) {
-        int[] fromIndex = Arrays.copyOfRange(sortedIndex, bucketOffset, i);
-        keys.add(lastValue);
-        buckets.add(new Bucket(fromIndex));
-        bucketOffset = i;
-        lastValue = currVal;
-      }
-    }
-
-    int[] fromIndex = Arrays.copyOfRange(sortedIndex, bucketOffset, sortedIndex.length);
-    keys.add(lastValue);
-    buckets.add(new Bucket(fromIndex));
-
-    return new SeriesGrouping(DataFrame.toSeriesFromString(keys), this, buckets);
   }
 
   @Override
