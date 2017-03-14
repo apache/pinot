@@ -21,11 +21,15 @@
   </div>
 
   <div class="container">
-    <div class="investigate-title">
-      <span>{{metric}}</span>
+    <div class="investigate-header">
+      <span class="investigate-title">
+        {{metric}} <span>from</span> {{dataset}} <span>(&num;{{anomalyId}})</span>
+      </span>
       <div class="investigate-button">
         <!-- <a href="#" class="thirdeye-link">Share</a> -->
-        <a href="#" class="thirdeye-link">InGraphs</a>
+        {{#if ../externalUrls.INGRAPH}}
+          <a href={{../externalUrls.INGRAPH}} target="_blank" class="thirdeye-link">InGraphs</a>
+        {{/if}}
       </div>
     </div>
 
@@ -88,8 +92,9 @@
       </div>
     </div>
   {{/with}}
-
-    <div class="investigate-title">Change Over Time</div>
+    <div class="investigate-header">
+      <span class="investigate-title">Change Over Time</span>
+    </div>
 
     <div class="investigate-wow">
       <div class="wow-card">

@@ -187,7 +187,8 @@ AnomalyResultView.prototype = {
       totalPages: numPages,
       visiblePages: 7,
       startPage: pageNumber,
-      onPageClick: (event, page) => {
+      onPageClick: function (event, page) {
+          $('body').scrollTop(0);
           console.log("Page " + page + " PageNumber " + pageNumber);
           if (page != pageNumber) {
             var anomaliesParams = {

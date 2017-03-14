@@ -33,6 +33,7 @@ InvestigateView.prototype = {
     const anomaly = this.investigateModel.getAnomaly();
     const wowData = this.investigateModel.getWowData();
     const currentValue = wowData.currentVal;
+    const externalUrls = JSON.parse(anomaly.externalUrl);
     wowData.compareResults.forEach((result) => {
       result.change *= 100;
     });
@@ -40,6 +41,7 @@ InvestigateView.prototype = {
 
     this.investigateData = {
       anomaly,
+      externalUrls,
       currentValue,
       wow,
       wow2,

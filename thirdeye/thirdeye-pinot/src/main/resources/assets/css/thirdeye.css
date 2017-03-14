@@ -673,12 +673,20 @@ text {
   margin-right: 24px;
 }
 
-.investigate-title {
+.investigate-title,
+.investigate-button {
   font-size: 21px;
+}
+
+.investigate-button {
+  margin-left: 24px;
+}
+
+.investigate-header {
   margin: 24px 0;
   display: flex;
-  justify-content: space-between;
 }
+
 
 .investigate-wow {
   display: flex;
