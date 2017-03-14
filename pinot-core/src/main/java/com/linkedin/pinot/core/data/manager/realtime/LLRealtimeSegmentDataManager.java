@@ -584,7 +584,10 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   // Inform the controller that the server had to stop consuming due to an error.
   protected void postStopConsumedMsg(String reason) {
     do {
-      SegmentCompletionProtocol.Response response = _protocolHandler.segmentStoppedConsuming(_segmentNameStr, _currentOffset, reason);
+      SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
+      params.setOffset(_currentOffset).setReason(reason).setSegmentName(_segmentNameStr);
+
+      SegmentCompletionProtocol.Response response = _protocolHandler.segmentStoppedConsuming(params);
       if (response.getStatus() == SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED) {
         LOGGER.info("Got response {}", response.toJsonString());
         break;
@@ -597,7 +600,9 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   protected SegmentCompletionProtocol.Response postSegmentConsumedMsg() {
     // Post segmentConsumed to current leader.
     // Retry maybe once if leader is not found.
-    return _protocolHandler.segmentConsumed(_segmentNameStr, _currentOffset);
+    SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
+    params.setOffset(_currentOffset).setSegmentName(_segmentNameStr);
+    return _protocolHandler.segmentConsumed(params);
   }
 
   public void goOnlineFromConsuming(RealtimeSegmentZKMetadata metadata) throws InterruptedException {

@@ -51,8 +51,10 @@ public class LLCSegmentStoppedConsuming extends PinotSegmentUploadRestletResourc
     if (offset == null || segmentName == null || instanceId == null) {
       return new StringRepresentation(SegmentCompletionProtocol.RESP_FAILED.toJsonString());
     }
+    SegmentCompletionProtocol.Request.Params reqParams = new SegmentCompletionProtocol.Request.Params();
+    reqParams.setSegmentName(segmentName).setOffset(Long.valueOf(offset)).setInstanceId(instanceId).setReason(reason);
     LOGGER.info("Request: segment={} offset={} instance={} ", segmentName, offset, instanceId);
-    SegmentCompletionProtocol.Response response = SegmentCompletionManager.getInstance().segmentStoppedConsuming(segmentName, instanceId, Long.valueOf(offset), reason);
+    SegmentCompletionProtocol.Response response = SegmentCompletionManager.getInstance().segmentStoppedConsuming(reqParams);
     LOGGER.info("Response: instance={} segment={} status={} offset={}", instanceId, segmentName, response.getStatus(), response.getOffset());
     return new StringRepresentation(response.toJsonString());
   }

@@ -16,8 +16,6 @@
 
 package com.linkedin.pinot.controller.api.restlet.resources;
 
-import com.linkedin.pinot.common.metrics.ControllerMetrics;
-import com.yammer.metrics.core.MetricsRegistry;
 import java.io.IOException;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.helix.HelixManager;
@@ -27,11 +25,13 @@ import org.restlet.representation.Representation;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 import com.alibaba.fastjson.JSONObject;
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.ControllerTestUtils;
 import com.linkedin.pinot.controller.helix.core.realtime.SegmentCompletionManager;
+import com.yammer.metrics.core.MetricsRegistry;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -152,18 +152,18 @@ public class LLCSegmentCommitTest {
     }
 
     @Override
-    public SegmentCompletionProtocol.Response segmentConsumed(final String segmentNameStr, final String instanceId, final long offset) {
+    public SegmentCompletionProtocol.Response segmentConsumed(SegmentCompletionProtocol.Request.Params reqParams) {
       return null;
     }
 
     @Override
-    public SegmentCompletionProtocol.Response segmentCommitStart(final String segmentNameStr, final String instanceId, final long offset) {
+    public SegmentCompletionProtocol.Response segmentCommitStart(SegmentCompletionProtocol.Request.Params reqParams) {
       commitStartCalled = true;
       return commitStartResponse;
     }
 
     @Override
-    public SegmentCompletionProtocol.Response segmentCommitEnd(final String segmentNameStr, final String instanceId, final long offset, boolean success) {
+    public SegmentCompletionProtocol.Response segmentCommitEnd(SegmentCompletionProtocol.Request.Params reqParams, boolean success) {
       commitEndCalled = true;
       uploadSuccess = success;
       return commitEndResponse;
