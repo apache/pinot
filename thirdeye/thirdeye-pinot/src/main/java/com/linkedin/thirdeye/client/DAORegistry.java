@@ -8,7 +8,7 @@ import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DetectionStatusManager;
 import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
 import com.linkedin.thirdeye.datalayer.bao.EventManager;
-import com.linkedin.thirdeye.datalayer.bao.FunctionAutotuneConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.AutotuneConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.IngraphDashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.IngraphMetricConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
@@ -25,7 +25,7 @@ import com.linkedin.thirdeye.datalayer.bao.jdbc.DatasetConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.DetectionStatusManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.EmailConfigurationManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.EventManagerImpl;
-import com.linkedin.thirdeye.datalayer.bao.jdbc.FunctionAutotuneConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.AutotuneConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.IngraphDashboardConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.IngraphMetricConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.JobManagerImpl;
@@ -143,8 +143,8 @@ public class DAORegistry {
     return DaoProviderUtil.getInstance(DetectionStatusManagerImpl.class);
   }
 
-  public FunctionAutotuneConfigManager getFunctionAutotuneDAO() {
-    return DaoProviderUtil.getInstance(FunctionAutotuneConfigManagerImpl.class);
+  public AutotuneConfigManager getAutotuneConfigDAO() {
+    return DaoProviderUtil.getInstance(AutotuneConfigManagerImpl.class);
   }
 
 }

@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.datalayer.entity;
 
-public class FunctionAutotuneConfigIndex extends AbstractIndexEntity{
+public class AutotuneConfigIndex extends AbstractIndexEntity{
   String functionId;
   String autotuneMethod;
   String performanceEvaluationMethod;

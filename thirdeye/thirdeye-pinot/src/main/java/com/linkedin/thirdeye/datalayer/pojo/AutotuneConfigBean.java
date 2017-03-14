@@ -6,10 +6,11 @@ import com.linkedin.thirdeye.anomaly.detection.lib.AutotuneMethodType;
 import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluationMethod;
 import java.util.Map;
 import java.util.Objects;
+import org.joda.time.DateTime;
 
 
 @JsonIgnoreProperties(ignoreUnknown=true)
-public class FunctionAutotuneConfigBean extends AbstractBean {
+public class AutotuneConfigBean extends AbstractBean {
   // The function id which is autotuned
   private long functionId;
   // The start time of the autotune monitoring window
@@ -21,7 +22,7 @@ public class FunctionAutotuneConfigBean extends AbstractBean {
   // The performance evaluation method which is used for performance evaluation
   private PerformanceEvaluationMethod performanceEvaluationMethod;
   // The performance value
-  private double performance;
+  private Map<String, Double> performance;
   // The goal of the autotune
   private double goal;
   // The tuned properties configuration
@@ -32,6 +33,8 @@ public class FunctionAutotuneConfigBean extends AbstractBean {
   private long overallRunningTime;
   // the message containing the intermediate results
   private String message;
+  // the last update timestamp
+  private long lastUpdateTimestamp;
 
   public long getFunctionId() {
     return functionId;
@@ -73,11 +76,11 @@ public class FunctionAutotuneConfigBean extends AbstractBean {
     this.performanceEvaluationMethod = performanceEvaluationMethod;
   }
 
-  public double getPerformance() {
+  public Map<String, Double> getPerformance() {
     return performance;
   }
 
-  public void setPerformance(double performance) {
+  public void setPerformance(Map<String, Double> performance) {
     this.performance = performance;
   }
 
@@ -121,12 +124,20 @@ public class FunctionAutotuneConfigBean extends AbstractBean {
     this.message = message;
   }
 
+  public long getLastUpdateTimestamp() {
+    return lastUpdateTimestamp;
+  }
+
+  public void setLastUpdateTimestamp(long lastUpdateTimestamp) {
+    this.lastUpdateTimestamp = lastUpdateTimestamp;
+  }
+
   @Override
   public boolean equals(Object o){
-    if(!(o instanceof FunctionAutotuneConfigBean)){
+    if(!(o instanceof AutotuneConfigBean)){
       return false;
     }
-    FunctionAutotuneConfigBean fac = (FunctionAutotuneConfigBean) o;
+    AutotuneConfigBean fac = (AutotuneConfigBean) o;
     return Objects.equals(getFunctionId(), fac.getFunctionId()) && Objects.equals(getStartTime(), fac.getStartTime())
         && Objects.equals(getEndTime(), fac.getEndTime()) && Objects.equals(getAutotuneMethod(), fac.getAutotuneMethod())
         && Objects.equals(getConfiguration(), fac.getConfiguration()) && Objects.equals(getPerformance(), fac.getPerformance())

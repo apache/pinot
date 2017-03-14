@@ -16,7 +16,7 @@ import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionStatusDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
-import com.linkedin.thirdeye.datalayer.dto.FunctionAutotuneConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.AutotuneConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.IngraphDashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.IngraphMetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
@@ -60,7 +60,7 @@ public abstract class AbstractManagerTestBase {
   protected DataCompletenessConfigManager dataCompletenessConfigDAO;
   protected EventManager eventManager;
   protected DetectionStatusManager detectionStatusDAO;
-  protected FunctionAutotuneConfigManager functionAutotuneConfigDAO;
+  protected AutotuneConfigManager autotuneConfigDAO;
 
   //  protected TestDBResources testDBResources;
   protected DAORegistry daoRegistry;
@@ -94,7 +94,7 @@ public abstract class AbstractManagerTestBase {
       eventManager = daoRegistry.getEventDAO();
       anomalyFunctionDAO = daoRegistry.getAnomalyFunctionDAO();
       detectionStatusDAO = daoRegistry.getDetectionStatusDAO();
-      functionAutotuneConfigDAO = daoRegistry.getFunctionAutotuneDAO();
+      autotuneConfigDAO = daoRegistry.getAutotuneConfigDAO();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -334,16 +334,19 @@ public abstract class AbstractManagerTestBase {
     return detectionStatusDTO;
   }
 
-  protected FunctionAutotuneConfigDTO getTestFunctionAutotuneConfig(long functionId, long start, long end) {
-    FunctionAutotuneConfigDTO functionAutotuneConfigDTO = new FunctionAutotuneConfigDTO();
-    functionAutotuneConfigDTO.setFunctionId(functionId);
-    functionAutotuneConfigDTO.setStartTime(start);
-    functionAutotuneConfigDTO.setEndTime(end);
-    functionAutotuneConfigDTO.setPerformanceEvaluationMethod(PerformanceEvaluationMethod.ANOMALY_PERCENTAGE);
+  protected AutotuneConfigDTO getTestAutotuneConfig(long functionId, long start, long end) {
+    AutotuneConfigDTO autotuneConfigDTO = new AutotuneConfigDTO();
+    autotuneConfigDTO.setFunctionId(functionId);
+    autotuneConfigDTO.setStartTime(start);
+    autotuneConfigDTO.setEndTime(end);
+    autotuneConfigDTO.setPerformanceEvaluationMethod(PerformanceEvaluationMethod.ANOMALY_PERCENTAGE);
+    autotuneConfigDTO.setLastUpdateTimestamp(DateTime.now().getMillis());
     Map<String, String> config = new HashMap<>();
     config.put("ConfigKey", "ConfigValue");
-    functionAutotuneConfigDTO.setConfiguration(config);
-    functionAutotuneConfigDTO.setPerformance(0.5);
-    return functionAutotuneConfigDTO;
+    autotuneConfigDTO.setConfiguration(config);
+    Map<String, Double> performance = new HashMap<>();
+    performance.put(autotuneConfigDTO.getPerformanceEvaluationMethod().name(), 0.5);
+    autotuneConfigDTO.setPerformance(performance);
+    return autotuneConfigDTO;
   }
 }
