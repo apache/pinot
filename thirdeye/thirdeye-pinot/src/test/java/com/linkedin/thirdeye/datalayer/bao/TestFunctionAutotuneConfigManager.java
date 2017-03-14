@@ -2,7 +2,7 @@ package com.linkedin.thirdeye.datalayer.bao;
 
 import com.linkedin.thirdeye.anomaly.detection.lib.AutotuneMethodType;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.FunctionAutotuneConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.AutotuneConfigDTO;
 import java.util.List;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -37,30 +37,30 @@ public class TestFunctionAutotuneConfigManager extends AbstractManagerTestBase {
     Assert.assertNotNull(functionAutotuneId);
 
     // test fetch all
-    List<FunctionAutotuneConfigDTO> functions = functionAutotuneConfigDAO.findAll();
+    List<AutotuneConfigDTO> functions = functionAutotuneConfigDAO.findAll();
     Assert.assertEquals(functions.size(), 1);
   }
 
   @Test(dependsOnMethods = {"testCreate"})
   public void testFindAllByFunctionId() {
-    List<FunctionAutotuneConfigDTO> functions = functionAutotuneConfigDAO.findAllByFunctionId(functionId);
+    List<AutotuneConfigDTO> functions = functionAutotuneConfigDAO.findAllByFunctionId(functionId);
     Assert.assertEquals(functions.size(), 1);
   }
 
   @Test(dependsOnMethods = { "testFindAllByFunctionId" })
   public void testUpdate() {
-    FunctionAutotuneConfigDTO spec = functionAutotuneConfigDAO.findById(functionAutotuneId);
+    AutotuneConfigDTO spec = functionAutotuneConfigDAO.findById(functionAutotuneId);
     Assert.assertNotNull(spec);
     spec.setAutotuneMethod(AutotuneMethodType.EXHAUSTIVE);
     functionAutotuneConfigDAO.save(spec);
-    FunctionAutotuneConfigDTO specReturned = functionAutotuneConfigDAO.findById(functionAutotuneId);
+    AutotuneConfigDTO specReturned = functionAutotuneConfigDAO.findById(functionAutotuneId);
     Assert.assertEquals(specReturned.getAutotuneMethod(), AutotuneMethodType.EXHAUSTIVE);
   }
 
   @Test(dependsOnMethods = { "testUpdate" })
   public void testDelete() {
     functionAutotuneConfigDAO.deleteById(functionAutotuneId);
-    FunctionAutotuneConfigDTO spec = functionAutotuneConfigDAO.findById(functionAutotuneId);
+    AutotuneConfigDTO spec = functionAutotuneConfigDAO.findById(functionAutotuneId);
     Assert.assertNull(spec);
   }
 }
