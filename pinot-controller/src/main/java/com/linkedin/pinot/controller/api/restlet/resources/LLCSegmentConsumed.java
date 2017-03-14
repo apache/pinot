@@ -50,8 +50,10 @@ public class LLCSegmentConsumed extends ServerResource {
     if (offset == null || segmentName == null || instanceId == null) {
       return new StringRepresentation(SegmentCompletionProtocol.RESP_FAILED.toJsonString());
     }
+    SegmentCompletionProtocol.Request.Params reqParams = new SegmentCompletionProtocol.Request.Params();
+    reqParams.withSegmentName(segmentName).withInstanceId(instanceId).withOffset(Long.valueOf(offset));
     LOGGER.info("Request: segment={} offset={} instance={} ", segmentName, offset, instanceId);
-    SegmentCompletionProtocol.Response response = SegmentCompletionManager.getInstance().segmentConsumed(segmentName, instanceId, Long.valueOf(offset));
+    SegmentCompletionProtocol.Response response = SegmentCompletionManager.getInstance().segmentConsumed(reqParams);
     LOGGER.info("Response: instance={} segment={} status={} offset={}", instanceId, segmentName, response.getStatus(), response.getOffset());
     return new StringRepresentation(response.toJsonString());
   }

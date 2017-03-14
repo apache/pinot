@@ -63,14 +63,15 @@ public class LLCSegmentCommit extends PinotSegmentUploadRestletResource {
     LOGGER.info("segment={} offset={} instance={} ", _segmentNameStr, _offset, _instanceId);
     final SegmentCompletionManager segmentCompletionManager = getSegmentCompletionManager();
 
-    SegmentCompletionProtocol.Response response = segmentCompletionManager.segmentCommitStart(_segmentNameStr,
-        _instanceId, _offset);
+    final SegmentCompletionProtocol.Request.Params reqParams = new SegmentCompletionProtocol.Request.Params();
+    reqParams.withInstanceId(_instanceId).withSegmentName(_segmentNameStr).withOffset(_offset);
+    SegmentCompletionProtocol.Response response = segmentCompletionManager.segmentCommitStart(reqParams);
     if (response.equals(SegmentCompletionProtocol.RESP_COMMIT_CONTINUE)) {
 
       // Get the segment and put it in the right place.
       boolean success = uploadSegment(_instanceId, _segmentNameStr);
 
-      response = segmentCompletionManager.segmentCommitEnd(_segmentNameStr, _instanceId, _offset, success);
+      response = segmentCompletionManager.segmentCommitEnd(reqParams, success);
     }
 
     LOGGER.info("Response: instance={}  segment={} status={} offset={}", _instanceId, _segmentNameStr, response.getStatus(), response.getOffset());

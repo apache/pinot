@@ -155,8 +155,9 @@ public class SegmentCompletionIntegrationTests extends RealtimeClusterIntegratio
 
     // Now report to the controller that we had to stop consumption
     ServerSegmentCompletionProtocolHandler protocolHandler = new ServerSegmentCompletionProtocolHandler(_serverInstance);
-    SegmentCompletionProtocol.Response response = protocolHandler.segmentStoppedConsuming(_segmentName, 45688L,
-        "RandomReason");
+    SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
+    params.withOffset(45688L).withSegmentName(_segmentName).withReason("RandomReason");
+    SegmentCompletionProtocol.Response response = protocolHandler.segmentStoppedConsuming(params);
     Assert.assertTrue(response.getStatus() == SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED);
 
     while (now() < endTime) {

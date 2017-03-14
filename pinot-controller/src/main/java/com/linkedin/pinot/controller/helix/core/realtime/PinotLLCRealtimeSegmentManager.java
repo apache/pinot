@@ -16,8 +16,6 @@
 
 package com.linkedin.pinot.controller.helix.core.realtime;
 
-import com.linkedin.pinot.common.config.IndexingConfig;
-import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
@@ -57,6 +55,7 @@ import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
@@ -982,7 +981,7 @@ public class PinotLLCRealtimeSegmentManager {
     }
 
     if (!updateKafkaAssignment) {
-      LOGGER.info("Not updating Kafka partition assignment for table {}");
+      LOGGER.info("Not updating Kafka partition assignment for table {}", realtimeTableName);
       return;
     }
 
@@ -993,7 +992,7 @@ public class PinotLLCRealtimeSegmentManager {
     }
     ZNRecord newPartitionAssignment = generatePartitionAssignment(kafkaStreamMetadata.getKafkaTopicName(), currentPartitionCount, currentInstances, currentReplicaCount);
     writeKafkaPartitionAssignemnt(realtimeTableName, newPartitionAssignment);
-    LOGGER.info("Successfully updated Kafka partition assignment for table {}");
+    LOGGER.info("Successfully updated Kafka partition assignment for table {}", realtimeTableName);
   }
 
   /*

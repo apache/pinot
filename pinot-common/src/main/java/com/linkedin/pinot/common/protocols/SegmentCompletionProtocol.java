@@ -43,6 +43,7 @@ import com.alibaba.fastjson.JSONObject;
  * https://github.com/linkedin/pinot/wiki/Low-level-kafka-consumers
  */
 public class SegmentCompletionProtocol {
+
   /**
    * MAX_HOLD_TIME_MS is the maximum time (msecs) for which a server will be in HOLDING state, after which it will
    * send in a SegmentConsumedRequest with its current offset in kafka.
@@ -103,12 +104,20 @@ public class SegmentCompletionProtocol {
   public static final String PARAM_REASON = "reason";
 
   // Canned responses
-  public static final Response RESP_NOT_LEADER = new Response(ControllerResponseStatus.NOT_LEADER, -1L);
-  public static final Response RESP_FAILED = new Response(ControllerResponseStatus.FAILED, -1L);
-  public static final Response RESP_DISCARD = new Response(ControllerResponseStatus.DISCARD, -1L);
-  public static final Response RESP_COMMIT_SUCCESS = new Response(ControllerResponseStatus.COMMIT_SUCCESS, -1L);
-  public static final Response RESP_COMMIT_CONTINUE = new Response(ControllerResponseStatus.COMMIT_CONTINUE, -1L);
-  public static final Response RESP_PROCESSED = new Response(ControllerResponseStatus.PROCESSED, -1L);
+  public static final Response RESP_NOT_LEADER = new Response(new Response.Params().setStatus(
+      ControllerResponseStatus.NOT_LEADER));
+  public static final Response RESP_FAILED = new Response(new Response.Params().setStatus(
+      ControllerResponseStatus.FAILED));
+  public static final Response RESP_DISCARD = new Response(new Response.Params().setStatus(
+      ControllerResponseStatus.DISCARD));
+  public static final Response RESP_COMMIT_SUCCESS = new Response(new Response.Params().setStatus(
+      ControllerResponseStatus.COMMIT_SUCCESS));
+  public static final Response RESP_COMMIT_CONTINUE = new Response(new Response.Params().setStatus(
+      ControllerResponseStatus.COMMIT_CONTINUE));
+  public static final Response RESP_PROCESSED = new Response(new Response.Params().setStatus(
+      ControllerResponseStatus.PROCESSED));
+  public static final Response RESP_NOT_SENT = new Response(new Response.Params().setStatus(
+      ControllerResponseStatus.NOT_SENT));
 
   public static long getMaxSegmentCommitTimeMs() {
     return MAX_SEGMENT_COMMIT_TIME_MS;
@@ -128,11 +137,11 @@ public class SegmentCompletionProtocol {
     final String _instanceId;
     final String _reason;
 
-    public Request(String segmentName, long offset, String instanceId, String reason) {
-      _segmentName = segmentName;
-      _instanceId = instanceId;
-      _offset = offset;
-      _reason = reason;
+    private Request(Params params) {
+      _segmentName = params.getSegmentName();
+      _instanceId = params.getInstanceId();
+      _offset = params.getOffset();
+      _reason = params.getReason();
     }
 
     public abstract String getUrl(String hostPort);
@@ -144,17 +153,58 @@ public class SegmentCompletionProtocol {
         PARAM_INSTANCE_ID + "=" + _instanceId +
           (_reason == null ? "" : ("&" + PARAM_REASON + "=" + _reason));
     }
+
+    public static class Params {
+      private static final String UNKNOWN_SEGMENT = "UNKNOWN_SEGMENT";
+      private static final long UNKNOWN_OFFSET = -1L;
+      private static final String UNKNOWN_INSTANCE = "UNKNOWN_INSTANCE";
+
+      private long _offset;
+      private String _segmentName;
+      private String _instanceId;
+      private String _reason;
+
+      public Params() {
+        _offset = UNKNOWN_OFFSET;
+        _segmentName = UNKNOWN_SEGMENT;
+        _instanceId = UNKNOWN_INSTANCE;
+      }
+      public Params withOffset(long offset) {
+        _offset = offset;
+        return this;
+      }
+      public Params withSegmentName(String segmentName) {
+        _segmentName = segmentName;
+        return this;
+      }
+      public Params withInstanceId(String instanceId) {
+        _instanceId = instanceId;
+        return this;
+      }
+      public Params withReason(String reason) {
+        _reason = reason;
+        return this;
+      }
+
+      public String getSegmentName() {
+        return _segmentName;
+      }
+      public long getOffset() {
+        return _offset;
+      }
+      public String getReason() {
+        return _reason;
+      }
+      public String getInstanceId() {
+        return _instanceId;
+      }
+    }
   }
 
+
   public static class SegmentConsumedRequest extends Request {
-    /**
-     *
-     * @param segmentName Name of the LLC segment
-     * @param offset Next offset from which the kafka client will consume, if it does.
-     * @param instanceId Name of the instance reporting this event.
-     */
-    public SegmentConsumedRequest(String segmentName, long offset, String instanceId) {
-      super(segmentName, offset, instanceId, null);
+    public SegmentConsumedRequest(Params params) {
+      super(params);
     }
     @Override
       public String getUrl(final String hostPort) {
@@ -163,14 +213,9 @@ public class SegmentCompletionProtocol {
   }
 
   public static class SegmentCommitRequest extends Request {
-    /**
-     *
-     * @param segmentName Name of the LLC segment
-     * @param offset Next offset from which the kafka client will consume, if it does.
-     * @param instanceId Name of the instance reporting this event.
-     */
-    public SegmentCommitRequest(String segmentName, long offset, String instanceId) {
-      super(segmentName, offset, instanceId, null);
+
+    public SegmentCommitRequest(Params params) {
+      super(params);
     }
     @Override
       public String getUrl(final String hostPort) {
@@ -180,9 +225,10 @@ public class SegmentCompletionProtocol {
 
   public static class SegmentStoppedConsuming extends Request {
 
-    public SegmentStoppedConsuming(String segmentName, long offset, String instanceId, String reason) {
-      super(segmentName, offset, instanceId, reason);
+    public SegmentStoppedConsuming(Params params) {
+      super(params);
     }
+
     @Override
     public String getUrl(final String hostPort) {
       return "http://" + hostPort + getUri(MSG_TYPE_STOPPED_CONSUMING);
@@ -211,9 +257,9 @@ public class SegmentCompletionProtocol {
       _status = status;
     }
 
-    public Response(ControllerResponseStatus status, long offset) {
-      _status = status;
-      _offset = offset;
+    public Response(Params params) {
+      _status = params.getStatus();
+      _offset = params.getOffset();
     }
 
     public ControllerResponseStatus getStatus() {
@@ -225,8 +271,39 @@ public class SegmentCompletionProtocol {
     }
 
     public String toJsonString() {
-      return "{\"" + STATUS_KEY + "\":" + "\"" + _status.name() + "\"," +
-        "\"" + OFFSET_KEY + "\":" + _offset + "}";
+      StringBuilder builder = new StringBuilder();
+      builder.append("{\"" + STATUS_KEY + "\":" + "\"" + _status.name() + "\"," + "\"" + OFFSET_KEY + "\":" + _offset);
+      builder.append("}");
+      return builder.toString();
+    }
+
+    public static class Params {
+      private static ControllerResponseStatus DEFAULT_RESPONSE_STATUS = ControllerResponseStatus.FAILED;
+      private static long DEFAULT_RESP_OFFSET = -1L;
+
+      private ControllerResponseStatus _status;
+      private long _offset;
+
+      public Params() {
+        _offset = DEFAULT_RESP_OFFSET;
+        _status = DEFAULT_RESPONSE_STATUS;
+      }
+
+      public Params setOffset(long offset) {
+        _offset = offset;
+        return this;
+      }
+      public Params setStatus(ControllerResponseStatus status) {
+        _status = status;
+        return this;
+      }
+
+      public ControllerResponseStatus getStatus() {
+        return _status;
+      }
+      public long getOffset() {
+        return _offset;
+      }
     }
   }
 }

@@ -51,7 +51,10 @@ public class ServerSegmentCompletionProtocolHandler {
   }
 
   public SegmentCompletionProtocol.Response segmentCommit(long offset, final String segmentName, final File segmentTarFile) throws FileNotFoundException {
-    SegmentCompletionProtocol.SegmentCommitRequest request = new SegmentCompletionProtocol.SegmentCommitRequest(segmentName, offset, _instance);
+    SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
+    params.withInstanceId(_instance).withOffset(offset).withSegmentName(segmentName);
+    SegmentCompletionProtocol.SegmentCommitRequest request = new SegmentCompletionProtocol.SegmentCommitRequest(params);
+
     final InputStream inputStream = new FileInputStream(segmentTarFile);
     Part[] parts = {
         new FilePart(segmentName, new PartSource() {
@@ -74,25 +77,26 @@ public class ServerSegmentCompletionProtocolHandler {
     return doHttp(request, parts);
   }
 
-  public SegmentCompletionProtocol.Response segmentConsumed(String segmentName, long offset) {
-    SegmentCompletionProtocol.SegmentConsumedRequest request = new SegmentCompletionProtocol.SegmentConsumedRequest(segmentName, offset, _instance);
+  public SegmentCompletionProtocol.Response segmentConsumed(SegmentCompletionProtocol.Request.Params params) {
+    params.withInstanceId(_instance);
+    SegmentCompletionProtocol.SegmentConsumedRequest request = new SegmentCompletionProtocol.SegmentConsumedRequest(params);
     return doHttp(request, null);
   }
 
-  public SegmentCompletionProtocol.Response segmentStoppedConsuming(String segmentName, long offset, String reason) {
-    SegmentCompletionProtocol.SegmentStoppedConsuming request = new SegmentCompletionProtocol.SegmentStoppedConsuming(segmentName, offset, _instance, reason);
+  public SegmentCompletionProtocol.Response segmentStoppedConsuming(SegmentCompletionProtocol.Request.Params params) {
+    params.withInstanceId(_instance);
+    SegmentCompletionProtocol.SegmentStoppedConsuming request = new SegmentCompletionProtocol.SegmentStoppedConsuming(params);
     return doHttp(request, null);
   }
 
   private SegmentCompletionProtocol.Response doHttp(SegmentCompletionProtocol.Request request, Part[] parts) {
-    SegmentCompletionProtocol.Response response =
-        new SegmentCompletionProtocol.Response(SegmentCompletionProtocol.ControllerResponseStatus.NOT_SENT, -1L);
+    SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_NOT_SENT;
     HttpClient httpClient = new HttpClient();
     ControllerLeaderLocator leaderLocator = ControllerLeaderLocator.getInstance();
     final String leaderAddress = leaderLocator.getControllerLeader();
     if (leaderAddress == null) {
       LOGGER.error("No leader found {}", this.toString());
-      return new SegmentCompletionProtocol.Response(SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER, -1L);
+      return SegmentCompletionProtocol.RESP_NOT_LEADER;
     }
     final String url = request.getUrl(leaderAddress);
     HttpMethodBase method;
