@@ -576,17 +576,20 @@ text {
 .anomaly-result-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 24px;
 }
 
 .anomaly-result-title {
-  font-weight: 600;
-  font-size: 17px;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
   padding-right: 14px;
+}
+
+.anomaly-result-metric,
+.anomaly-result-dataset {
+  font-weight: 600;
+  font-size: 17px;
 }
 
 .anomaly-details {
