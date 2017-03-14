@@ -20,10 +20,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class IndexingConfig {
@@ -37,6 +37,7 @@ public class IndexingConfig {
   private Map<String, String> _streamConfigs = new HashMap<>();
   private String _segmentFormatVersion;
   private String _starTreeFormat;
+  private String _columnMinMaxValueGeneratorMode;
   private List<String> _noDictionaryColumns;
 
   public List<String> getInvertedIndexColumns() {
@@ -101,6 +102,14 @@ public class IndexingConfig {
 
   public void setStarTreeFormat(String starTreeFormat) {
     this._starTreeFormat = starTreeFormat;
+  }
+
+  public String getColumnMinMaxValueGeneratorMode() {
+    return _columnMinMaxValueGeneratorMode;
+  }
+
+  public void setColumnMinMaxValueGeneratorMode(String columnMinMaxValueGeneratorMode) {
+    _columnMinMaxValueGeneratorMode = columnMinMaxValueGeneratorMode;
   }
 
   public List<String> getNoDictionaryColumns() {

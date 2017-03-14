@@ -17,13 +17,13 @@ package com.linkedin.pinot.core.data.manager.config;
 
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.IndexingConfig;
-import com.linkedin.pinot.common.config.TableCustomConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
+import java.util.List;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
@@ -113,18 +113,21 @@ public class TableDataManagerConfig {
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     _tableDataManagerConfig.setProperty(READ_MODE, indexingConfig.getLoadMode().toLowerCase());
     _tableDataManagerConfig.setProperty(TABLE_DATA_MANAGER_NAME, tableConfig.getTableName());
-    String columnValuePruneMode = tableConfig.getCustomConfigs()
-        .getCustomConfigs()
-        .get(TableCustomConfig.COLUMN_MIN_MAX_VALUE_GENERATOR_MODE_KEY);
-    if (columnValuePruneMode != null) {
-      _tableDataManagerConfig.setProperty(IndexLoadingConfigMetadata.KEY_OF_COLUMN_MIN_MAX_VALUE_GENERATOR_MODE,
-          columnValuePruneMode.toUpperCase());
+
+    List<String> invertedIndexColumns = indexingConfig.getInvertedIndexColumns();
+    if (invertedIndexColumns != null) {
+      _tableDataManagerConfig.setProperty(IndexLoadingConfigMetadata.KEY_OF_LOADING_INVERTED_INDEX,
+          invertedIndexColumns);
     }
-    _tableDataManagerConfig.setProperty(IndexLoadingConfigMetadata.getKeyOfLoadingInvertedIndex(),
-        indexingConfig.getInvertedIndexColumns());
-    _tableDataManagerConfig.setProperty(IndexLoadingConfigMetadata.KEY_OF_STAR_TREE_FORMAT_VERSION,
-        indexingConfig.getStarTreeFormat());
-    String segmentVersionKey = IndexLoadingConfigMetadata.KEY_OF_SEGMENT_FORMAT_VERSION;
+    String starTreeFormat = indexingConfig.getStarTreeFormat();
+    if (starTreeFormat != null) {
+      _tableDataManagerConfig.setProperty(IndexLoadingConfigMetadata.KEY_OF_STAR_TREE_FORMAT_VERSION, starTreeFormat);
+    }
+    String columnMinMaxValueGeneratorMode = indexingConfig.getColumnMinMaxValueGeneratorMode();
+    if (columnMinMaxValueGeneratorMode != null) {
+      _tableDataManagerConfig.setProperty(IndexLoadingConfigMetadata.KEY_OF_COLUMN_MIN_MAX_VALUE_GENERATOR_MODE,
+          columnMinMaxValueGeneratorMode);
+    }
 
     // Server configuration is always to DEFAULT or configured value
     // Apply table configuration only if the server configuration is set with table config
@@ -145,7 +148,8 @@ public class TableDataManagerConfig {
     if (SegmentVersion.compare(tableConfigVersion, serverConfigVersion) < 0) {
       LOGGER.info("Overriding server segment format version: {} with table version: {} for table: {}",
           serverConfigVersion, tableConfigVersion, tableName);
-      _tableDataManagerConfig.setProperty(segmentVersionKey, indexingConfig.getSegmentFormatVersion());
+      _tableDataManagerConfig.setProperty(IndexLoadingConfigMetadata.KEY_OF_SEGMENT_FORMAT_VERSION,
+          indexingConfig.getSegmentFormatVersion());
     } else {
       LOGGER.info("Loading table: {} with server configured segment format version: {}", tableName,
           serverConfigVersion);
