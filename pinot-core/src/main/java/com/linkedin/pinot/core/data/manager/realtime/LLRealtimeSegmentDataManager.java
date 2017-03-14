@@ -585,7 +585,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   protected void postStopConsumedMsg(String reason) {
     do {
       SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
-      params.setOffset(_currentOffset).setReason(reason).setSegmentName(_segmentNameStr);
+      params.withOffset(_currentOffset).withReason(reason).withSegmentName(_segmentNameStr);
 
       SegmentCompletionProtocol.Response response = _protocolHandler.segmentStoppedConsuming(params);
       if (response.getStatus() == SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED) {
@@ -601,7 +601,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     // Post segmentConsumed to current leader.
     // Retry maybe once if leader is not found.
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
-    params.setOffset(_currentOffset).setSegmentName(_segmentNameStr);
+    params.withOffset(_currentOffset).withSegmentName(_segmentNameStr);
     return _protocolHandler.segmentConsumed(params);
   }
 

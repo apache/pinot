@@ -104,13 +104,20 @@ public class SegmentCompletionProtocol {
   public static final String PARAM_REASON = "reason";
 
   // Canned responses
-  public static final Response RESP_NOT_LEADER = new Response(new Response.Params().setStatus(ControllerResponseStatus.NOT_LEADER));
-  public static final Response RESP_FAILED = new Response(new Response.Params().setStatus(ControllerResponseStatus.FAILED));
-  public static final Response RESP_DISCARD = new Response(new Response.Params().setStatus(ControllerResponseStatus.DISCARD));
-  public static final Response RESP_COMMIT_SUCCESS = new Response(new Response.Params().setStatus(ControllerResponseStatus.COMMIT_SUCCESS));
-  public static final Response RESP_COMMIT_CONTINUE = new Response(new Response.Params().setStatus(ControllerResponseStatus.COMMIT_CONTINUE));
-  public static final Response RESP_PROCESSED = new Response(new Response.Params().setStatus(ControllerResponseStatus.PROCESSED));
-  public static final Response RESP_NOT_SENT = new Response(new Response.Params().setStatus(ControllerResponseStatus.NOT_SENT));
+  public static final Response RESP_NOT_LEADER = new Response(new Response.Params().setStatus(
+      ControllerResponseStatus.NOT_LEADER));
+  public static final Response RESP_FAILED = new Response(new Response.Params().setStatus(
+      ControllerResponseStatus.FAILED));
+  public static final Response RESP_DISCARD = new Response(new Response.Params().setStatus(
+      ControllerResponseStatus.DISCARD));
+  public static final Response RESP_COMMIT_SUCCESS = new Response(new Response.Params().setStatus(
+      ControllerResponseStatus.COMMIT_SUCCESS));
+  public static final Response RESP_COMMIT_CONTINUE = new Response(new Response.Params().setStatus(
+      ControllerResponseStatus.COMMIT_CONTINUE));
+  public static final Response RESP_PROCESSED = new Response(new Response.Params().setStatus(
+      ControllerResponseStatus.PROCESSED));
+  public static final Response RESP_NOT_SENT = new Response(new Response.Params().setStatus(
+      ControllerResponseStatus.NOT_SENT));
 
   public static long getMaxSegmentCommitTimeMs() {
     return MAX_SEGMENT_COMMIT_TIME_MS;
@@ -152,36 +159,29 @@ public class SegmentCompletionProtocol {
       private static final long UNKNOWN_OFFSET = -1L;
       private static final String UNKNOWN_INSTANCE = "UNKNOWN_INSTANCE";
 
-      long _offset;
-      String _segmentName;
-      String _instanceId;
-      String _reason;
+      private long _offset;
+      private String _segmentName;
+      private String _instanceId;
+      private String _reason;
 
       public Params() {
-        resetInternal();
-      }
-      public Params reset() {
-        resetInternal();
-        return this;
-      }
-      private void resetInternal() {
         _offset = UNKNOWN_OFFSET;
         _segmentName = UNKNOWN_SEGMENT;
         _instanceId = UNKNOWN_INSTANCE;
       }
-      public Params setOffset(long offset) {
+      public Params withOffset(long offset) {
         _offset = offset;
         return this;
       }
-      public Params setSegmentName(String segmentName) {
+      public Params withSegmentName(String segmentName) {
         _segmentName = segmentName;
         return this;
       }
-      public Params setInstanceId(String instanceId) {
+      public Params withInstanceId(String instanceId) {
         _instanceId = instanceId;
         return this;
       }
-      public Params setReason(String reason) {
+      public Params withReason(String reason) {
         _reason = reason;
         return this;
       }
@@ -281,17 +281,10 @@ public class SegmentCompletionProtocol {
       private static ControllerResponseStatus DEFAULT_RESPONSE_STATUS = ControllerResponseStatus.FAILED;
       private static long DEFAULT_RESP_OFFSET = -1L;
 
-      ControllerResponseStatus _status;
-      long _offset;
+      private ControllerResponseStatus _status;
+      private long _offset;
 
       public Params() {
-        resetInternal();
-      }
-      public Params reset() {
-        resetInternal();
-        return this;
-      }
-      private void resetInternal() {
         _offset = DEFAULT_RESP_OFFSET;
         _status = DEFAULT_RESPONSE_STATUS;
       }

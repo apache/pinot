@@ -52,7 +52,7 @@ public class ServerSegmentCompletionProtocolHandler {
 
   public SegmentCompletionProtocol.Response segmentCommit(long offset, final String segmentName, final File segmentTarFile) throws FileNotFoundException {
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
-    params.setInstanceId(_instance).setOffset(offset).setSegmentName(segmentName);
+    params.withInstanceId(_instance).withOffset(offset).withSegmentName(segmentName);
     SegmentCompletionProtocol.SegmentCommitRequest request = new SegmentCompletionProtocol.SegmentCommitRequest(params);
 
     final InputStream inputStream = new FileInputStream(segmentTarFile);
@@ -78,13 +78,13 @@ public class ServerSegmentCompletionProtocolHandler {
   }
 
   public SegmentCompletionProtocol.Response segmentConsumed(SegmentCompletionProtocol.Request.Params params) {
-    params.setInstanceId(_instance);
+    params.withInstanceId(_instance);
     SegmentCompletionProtocol.SegmentConsumedRequest request = new SegmentCompletionProtocol.SegmentConsumedRequest(params);
     return doHttp(request, null);
   }
 
   public SegmentCompletionProtocol.Response segmentStoppedConsuming(SegmentCompletionProtocol.Request.Params params) {
-    params.setInstanceId(_instance);
+    params.withInstanceId(_instance);
     SegmentCompletionProtocol.SegmentStoppedConsuming request = new SegmentCompletionProtocol.SegmentStoppedConsuming(params);
     return doHttp(request, null);
   }
