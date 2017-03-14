@@ -14,7 +14,7 @@
               <span>&num;{{anomalyId}} {{metric}}</span>
             </div>
             <div id="investigate-button-{{anomalyIndex}}">
-              <a type="button" class="btn thirdeye-btn pull-right">Investigate</a>
+              <a href="/thirdeye#investigate?anomalyId={{anomalyId}}" type="button" class="btn thirdeye-btn pull-right">Investigate</a>
             </div>
           </div>
 
