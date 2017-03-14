@@ -27,6 +27,7 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.converter.SegmentV1V2ToV3FormatConverter;
+import com.linkedin.pinot.core.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import com.linkedin.pinot.core.segment.store.ColumnIndexType;
 import com.linkedin.pinot.core.segment.store.SegmentDirectory;
@@ -37,7 +38,6 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.attribute.FileTime;
 import java.util.Collections;
-import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.testng.Assert;
@@ -49,6 +49,7 @@ import org.testng.annotations.Test;
 public class SegmentPreProcessorTest {
   private static final String AVRO_DATA = "data/test_data-mv.avro";
   private static final File INDEX_DIR = new File(SegmentPreProcessor.class.toString());
+  private static final String SCHEMA = "data/testDataMVSchema.json";
   private static final String V3_SEGMENT_NAME = "v3";
 
   // For create inverted indices tests.
@@ -69,34 +70,38 @@ public class SegmentPreProcessorTest {
   private static final String NEW_INT_SV_DIMENSION_COLUMN_NAME = "newIntSVDimension";
   private static final String NEW_STRING_MV_DIMENSION_COLUMN_NAME = "newStringMVDimension";
 
-  private File segmentDirectoryFile;
-  private IndexLoadingConfigMetadata indexLoadingConfigMetadata;
-  private Schema newColumnsSchema1;
-  private Schema newColumnsSchema2;
-  private Schema newColumnsSchema3;
+  private File _segmentDirectoryFile;
+  private IndexLoadingConfigMetadata _indexLoadingConfigMetadata;
+  private Schema _schema;
+  private Schema _newColumnsSchema1;
+  private Schema _newColumnsSchema2;
+  private Schema _newColumnsSchema3;
 
   @BeforeClass
   public void setUp()
       throws Exception {
     // For indexLoadingConfigMetadata, we specify two columns without inverted index ('column1', 'column13'), one
     // non-existing column ('noSuchColumn') and one column with existed inverted index ('column7').
-    indexLoadingConfigMetadata = new IndexLoadingConfigMetadata(new PropertiesConfiguration());
-    indexLoadingConfigMetadata.initLoadingInvertedIndexColumnSet(
+    _indexLoadingConfigMetadata = new IndexLoadingConfigMetadata(new PropertiesConfiguration());
+    _indexLoadingConfigMetadata.initLoadingInvertedIndexColumnSet(
         new String[]{COLUMN1_NAME, COLUMN7_NAME, COLUMN13_NAME, NO_SUCH_COLUMN_NAME});
-    indexLoadingConfigMetadata.setEnableDefaultColumns(true);
+    _indexLoadingConfigMetadata.setEnableDefaultColumns(true);
 
     // For newColumnsSchema, we add 4 different data type metric columns with one user-defined default null value, and
     // 3 different data type dimension columns with one user-defined default null value and one multi-value column.
     ClassLoader classLoader = getClass().getClassLoader();
-    URL resourceUrl = classLoader.getResource(NEW_COLUMNS_SCHEMA1);
+    URL resourceUrl = classLoader.getResource(SCHEMA);
     Preconditions.checkNotNull(resourceUrl);
-    newColumnsSchema1 = Schema.fromFile(new File(resourceUrl.getFile()));
+    _schema = Schema.fromFile(new File(resourceUrl.getFile()));
+    resourceUrl = classLoader.getResource(NEW_COLUMNS_SCHEMA1);
+    Preconditions.checkNotNull(resourceUrl);
+    _newColumnsSchema1 = Schema.fromFile(new File(resourceUrl.getFile()));
     resourceUrl = classLoader.getResource(NEW_COLUMNS_SCHEMA2);
     Preconditions.checkNotNull(resourceUrl);
-    newColumnsSchema2 = Schema.fromFile(new File(resourceUrl.getFile()));
+    _newColumnsSchema2 = Schema.fromFile(new File(resourceUrl.getFile()));
     resourceUrl = classLoader.getResource(NEW_COLUMNS_SCHEMA3);
     Preconditions.checkNotNull(resourceUrl);
-    newColumnsSchema3 = Schema.fromFile(new File(resourceUrl.getFile()));
+    _newColumnsSchema3 = Schema.fromFile(new File(resourceUrl.getFile()));
   }
 
   @AfterClass
@@ -108,21 +113,21 @@ public class SegmentPreProcessorTest {
   private void constructSegment()
       throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
-    File avroFile = new File(TestUtils.getFileFromResourceUrl(getClass().getClassLoader().getResource(AVRO_DATA)));
+    URL resourceUrl = getClass().getClassLoader().getResource(AVRO_DATA);
+    Assert.assertNotNull(resourceUrl);
+    File avroFile = new File(TestUtils.getFileFromResourceUrl(resourceUrl));
 
     // NOTE: We create inverted index for 'column7' when constructing the segment.
     // Intentionally changed this to TimeUnit.Hours to make it non-default for testing.
-    SegmentGeneratorConfig config =
-        SegmentTestUtils.getSegmentGenSpecWithSchemAndProjectedColumns(avroFile, INDEX_DIR, "daysSinceEpoch",
-            TimeUnit.HOURS, "testTable");
-    config.setSegmentNamePostfix("1");
-    config.getInvertedIndexCreationColumns().clear();
-    config.setInvertedIndexCreationColumns(Collections.singletonList(COLUMN7_NAME));
+    SegmentGeneratorConfig segmentGeneratorConfig =
+        SegmentTestUtils.getSegmentGeneratorConfigWithSchema(avroFile, INDEX_DIR, "testTable", _schema);
+    segmentGeneratorConfig.setSegmentNamePostfix("1");
+    segmentGeneratorConfig.setInvertedIndexCreationColumns(Collections.singletonList(COLUMN7_NAME));
     SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
-    driver.init(config);
+    driver.init(segmentGeneratorConfig);
     driver.build();
 
-    segmentDirectoryFile = new File(INDEX_DIR, driver.getSegmentName());
+    _segmentDirectoryFile = new File(INDEX_DIR, driver.getSegmentName());
   }
 
   @Test
@@ -130,7 +135,7 @@ public class SegmentPreProcessorTest {
       throws Exception {
     constructSegment();
 
-    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(segmentDirectoryFile);
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_segmentDirectoryFile);
     String segmentVersion = segmentMetadata.getVersion();
     Assert.assertEquals(SegmentVersion.valueOf(segmentVersion), SegmentVersion.v1);
 
@@ -138,10 +143,10 @@ public class SegmentPreProcessorTest {
     String col7FileName = segmentMetadata.getBitmapInvertedIndexFileName(COLUMN7_NAME, segmentVersion);
     String col13FileName = segmentMetadata.getBitmapInvertedIndexFileName(COLUMN13_NAME, segmentVersion);
     String badColFileName = segmentMetadata.getBitmapInvertedIndexFileName(NO_SUCH_COLUMN_NAME, segmentVersion);
-    File col1File = new File(segmentDirectoryFile, col1FileName);
-    File col7File = new File(segmentDirectoryFile, col7FileName);
-    File col13File = new File(segmentDirectoryFile, col13FileName);
-    File badColFile = new File(segmentDirectoryFile, badColFileName);
+    File col1File = new File(_segmentDirectoryFile, col1FileName);
+    File col7File = new File(_segmentDirectoryFile, col7FileName);
+    File col13File = new File(_segmentDirectoryFile, col13FileName);
+    File badColFile = new File(_segmentDirectoryFile, badColFileName);
     Assert.assertFalse(col1File.exists());
     Assert.assertTrue(col7File.exists());
     Assert.assertFalse(col13File.exists());
@@ -152,7 +157,7 @@ public class SegmentPreProcessorTest {
     Thread.sleep(2000);
 
     // Create inverted index the first time.
-    checkInvertedIndexCreation(segmentDirectoryFile, segmentMetadata, false);
+    checkInvertedIndexCreation(_segmentDirectoryFile, segmentMetadata, false);
     Assert.assertTrue(col1File.exists());
     Assert.assertTrue(col7File.exists());
     Assert.assertTrue(col13File.exists());
@@ -167,7 +172,7 @@ public class SegmentPreProcessorTest {
     Thread.sleep(2000);
 
     // Create inverted index the second time.
-    checkInvertedIndexCreation(segmentDirectoryFile, segmentMetadata, true);
+    checkInvertedIndexCreation(_segmentDirectoryFile, segmentMetadata, true);
     Assert.assertTrue(col1File.exists());
     Assert.assertTrue(col7File.exists());
     Assert.assertTrue(col13File.exists());
@@ -184,8 +189,8 @@ public class SegmentPreProcessorTest {
 
     // Convert segment format to v3.
     SegmentV1V2ToV3FormatConverter converter = new SegmentV1V2ToV3FormatConverter();
-    converter.convert(segmentDirectoryFile);
-    File v3SegmentDirectoryFile = new File(segmentDirectoryFile, V3_SEGMENT_NAME);
+    converter.convert(_segmentDirectoryFile);
+    File v3SegmentDirectoryFile = new File(_segmentDirectoryFile, V3_SEGMENT_NAME);
 
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(v3SegmentDirectoryFile);
     String segmentVersion = segmentMetadata.getVersion();
@@ -249,8 +254,7 @@ public class SegmentPreProcessorTest {
       }
     }
 
-    SegmentPreProcessor processor =
-        new SegmentPreProcessor(segmentDirectoryFile, indexLoadingConfigMetadata, null);
+    SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectoryFile, _indexLoadingConfigMetadata, null);
     processor.process();
 
     try (
@@ -270,13 +274,13 @@ public class SegmentPreProcessorTest {
       throws Exception {
     constructSegment();
 
-    checkUpdateDefaultColumns(segmentDirectoryFile);
+    checkUpdateDefaultColumns(_segmentDirectoryFile);
 
     // Try to use the third schema and update default value again.
     // For the third schema, we changed the default value for column 'newStringMVDimension' to 'notSameLength', which
     // is not the same length as before. This should be fine for segment format v1.
     SegmentPreProcessor processor =
-        new SegmentPreProcessor(segmentDirectoryFile, indexLoadingConfigMetadata, newColumnsSchema3);
+        new SegmentPreProcessor(_segmentDirectoryFile, _indexLoadingConfigMetadata, _newColumnsSchema3);
     processor.process();
   }
 
@@ -287,8 +291,8 @@ public class SegmentPreProcessorTest {
 
     // Convert segment format to v3.
     SegmentV1V2ToV3FormatConverter converter = new SegmentV1V2ToV3FormatConverter();
-    converter.convert(segmentDirectoryFile);
-    File v3SegmentDirectoryFile = new File(segmentDirectoryFile, V3_SEGMENT_NAME);
+    converter.convert(_segmentDirectoryFile);
+    File v3SegmentDirectoryFile = new File(_segmentDirectoryFile, V3_SEGMENT_NAME);
 
     checkUpdateDefaultColumns(v3SegmentDirectoryFile);
 
@@ -297,7 +301,7 @@ public class SegmentPreProcessorTest {
     // is not the same length as before. This should throw exception for segment format v3.
     try {
       SegmentPreProcessor processor =
-          new SegmentPreProcessor(v3SegmentDirectoryFile, indexLoadingConfigMetadata, newColumnsSchema3);
+          new SegmentPreProcessor(v3SegmentDirectoryFile, _indexLoadingConfigMetadata, _newColumnsSchema3);
       processor.process();
       Assert.fail("For segment format v3, should throw exception when trying to update with different length index");
     } catch (Exception e) {
@@ -309,7 +313,7 @@ public class SegmentPreProcessorTest {
       throws Exception {
     // Update default value.
     SegmentPreProcessor processor =
-        new SegmentPreProcessor(segmentDirectoryFile, indexLoadingConfigMetadata, newColumnsSchema1);
+        new SegmentPreProcessor(segmentDirectoryFile, _indexLoadingConfigMetadata, _newColumnsSchema1);
     processor.process();
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(segmentDirectoryFile);
 
@@ -390,7 +394,7 @@ public class SegmentPreProcessorTest {
     // Use the second schema and update default value again.
     // For the second schema, we changed the default value for column 'newIntMetric' to 2, and added default value
     // 'abcd' (keep the same length as 'null') to column 'newStringMVDimension'.
-    processor = new SegmentPreProcessor(segmentDirectoryFile, indexLoadingConfigMetadata, newColumnsSchema2);
+    processor = new SegmentPreProcessor(segmentDirectoryFile, _indexLoadingConfigMetadata, _newColumnsSchema2);
     processor.process();
     segmentMetadata = new SegmentMetadataImpl(segmentDirectoryFile);
 
@@ -407,9 +411,74 @@ public class SegmentPreProcessorTest {
       throws Exception {
     constructSegment();
 
-    SegmentPreProcessor processor = new SegmentPreProcessor(segmentDirectoryFile, null, null);
+    SegmentPreProcessor processor = new SegmentPreProcessor(_segmentDirectoryFile, null, null);
     processor.process();
     // No exception is the validation that we handle null value for indexLoadingConfigMetadata and newColumnsSchema
     // correctly.
+  }
+
+  @Test
+  public void testAddColumnMinMaxValue()
+      throws Exception {
+    constructSegment();
+
+    IndexLoadingConfigMetadata indexLoadingConfigMetadata =
+        new IndexLoadingConfigMetadata(new PropertiesConfiguration());
+    indexLoadingConfigMetadata.setGenerateColumnMinMaxValueMode(ColumnMinMaxValueGeneratorMode.NONE.toString());
+    SegmentPreProcessor processor = new SegmentPreProcessor(_segmentDirectoryFile, indexLoadingConfigMetadata, null);
+    processor.process();
+    SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(_segmentDirectoryFile);
+    ColumnMetadata timeColumnMetadata = segmentMetadata.getColumnMetadataFor("daysSinceEpoch");
+    ColumnMetadata dimensionColumnMetadata = segmentMetadata.getColumnMetadataFor("column1");
+    ColumnMetadata metricColumnMetadata = segmentMetadata.getColumnMetadataFor("count");
+    Assert.assertNull(timeColumnMetadata.getMinValue());
+    Assert.assertNull(timeColumnMetadata.getMaxValue());
+    Assert.assertNull(dimensionColumnMetadata.getMinValue());
+    Assert.assertNull(dimensionColumnMetadata.getMaxValue());
+    Assert.assertNull(metricColumnMetadata.getMinValue());
+    Assert.assertNull(metricColumnMetadata.getMaxValue());
+
+    indexLoadingConfigMetadata = new IndexLoadingConfigMetadata(new PropertiesConfiguration());
+    indexLoadingConfigMetadata.setGenerateColumnMinMaxValueMode(ColumnMinMaxValueGeneratorMode.TIME.toString());
+    processor = new SegmentPreProcessor(_segmentDirectoryFile, indexLoadingConfigMetadata, null);
+    processor.process();
+    segmentMetadata = new SegmentMetadataImpl(_segmentDirectoryFile);
+    timeColumnMetadata = segmentMetadata.getColumnMetadataFor("daysSinceEpoch");
+    dimensionColumnMetadata = segmentMetadata.getColumnMetadataFor("column5");
+    metricColumnMetadata = segmentMetadata.getColumnMetadataFor("count");
+    Assert.assertEquals(timeColumnMetadata.getMinValue(), 1756015683);
+    Assert.assertEquals(timeColumnMetadata.getMaxValue(), 1756015683);
+    Assert.assertNull(dimensionColumnMetadata.getMinValue());
+    Assert.assertNull(dimensionColumnMetadata.getMaxValue());
+    Assert.assertNull(metricColumnMetadata.getMinValue());
+    Assert.assertNull(metricColumnMetadata.getMaxValue());
+
+    indexLoadingConfigMetadata.setGenerateColumnMinMaxValueMode(ColumnMinMaxValueGeneratorMode.NON_METRIC.toString());
+    processor = new SegmentPreProcessor(_segmentDirectoryFile, indexLoadingConfigMetadata, null);
+    processor.process();
+    segmentMetadata = new SegmentMetadataImpl(_segmentDirectoryFile);
+    timeColumnMetadata = segmentMetadata.getColumnMetadataFor("daysSinceEpoch");
+    dimensionColumnMetadata = segmentMetadata.getColumnMetadataFor("column5");
+    metricColumnMetadata = segmentMetadata.getColumnMetadataFor("count");
+    Assert.assertEquals(timeColumnMetadata.getMinValue(), 1756015683);
+    Assert.assertEquals(timeColumnMetadata.getMaxValue(), 1756015683);
+    Assert.assertEquals(dimensionColumnMetadata.getMinValue(), "AKXcXcIqsqOJFsdwxZ");
+    Assert.assertEquals(dimensionColumnMetadata.getMaxValue(), "yQkJTLOQoOqqhkAClgC");
+    Assert.assertNull(metricColumnMetadata.getMinValue());
+    Assert.assertNull(metricColumnMetadata.getMaxValue());
+
+    indexLoadingConfigMetadata.setGenerateColumnMinMaxValueMode(ColumnMinMaxValueGeneratorMode.ALL.toString());
+    processor = new SegmentPreProcessor(_segmentDirectoryFile, indexLoadingConfigMetadata, null);
+    processor.process();
+    segmentMetadata = new SegmentMetadataImpl(_segmentDirectoryFile);
+    timeColumnMetadata = segmentMetadata.getColumnMetadataFor("daysSinceEpoch");
+    dimensionColumnMetadata = segmentMetadata.getColumnMetadataFor("column5");
+    metricColumnMetadata = segmentMetadata.getColumnMetadataFor("count");
+    Assert.assertEquals(timeColumnMetadata.getMinValue(), 1756015683);
+    Assert.assertEquals(timeColumnMetadata.getMaxValue(), 1756015683);
+    Assert.assertEquals(dimensionColumnMetadata.getMinValue(), "AKXcXcIqsqOJFsdwxZ");
+    Assert.assertEquals(dimensionColumnMetadata.getMaxValue(), "yQkJTLOQoOqqhkAClgC");
+    Assert.assertEquals(metricColumnMetadata.getMinValue(), 890662862);
+    Assert.assertEquals(metricColumnMetadata.getMaxValue(), 890662862);
   }
 }

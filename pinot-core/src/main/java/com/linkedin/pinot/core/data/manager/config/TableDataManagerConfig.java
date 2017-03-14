@@ -17,11 +17,13 @@ package com.linkedin.pinot.core.data.manager.config;
 
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.IndexingConfig;
+import com.linkedin.pinot.common.config.TableCustomConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
@@ -33,7 +35,6 @@ import org.slf4j.LoggerFactory;
  * The config used for TableDataManager.
  */
 public class TableDataManagerConfig {
-
   private static final Logger LOGGER = LoggerFactory.getLogger(TableDataManagerConfig.class);
 
   private static final String TABLE_DATA_MANAGER_TYPE = "dataManagerType";
@@ -43,7 +44,8 @@ public class TableDataManagerConfig {
 
   private final Configuration _tableDataManagerConfig;
 
-  public TableDataManagerConfig(Configuration tableDataManagerConfig) throws ConfigurationException {
+  public TableDataManagerConfig(Configuration tableDataManagerConfig)
+      throws ConfigurationException {
     _tableDataManagerConfig = tableDataManagerConfig;
   }
 
@@ -68,23 +70,27 @@ public class TableDataManagerConfig {
   }
 
   public static TableDataManagerConfig getDefaultHelixTableDataManagerConfig(
-      InstanceDataManagerConfig _instanceDataManagerConfig, String tableName) throws ConfigurationException {
+      InstanceDataManagerConfig instanceDataManagerConfig, String tableName)
+      throws ConfigurationException {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+    assert tableType != null;
 
     Configuration defaultConfig = new PropertiesConfiguration();
     defaultConfig.addProperty(TABLE_DATA_MANAGER_NAME, tableName);
-    String dataDir = _instanceDataManagerConfig.getInstanceDataDir() + "/" + tableName;
+    String dataDir = instanceDataManagerConfig.getInstanceDataDir() + "/" + tableName;
     defaultConfig.addProperty(TABLE_DATA_MANAGER_DATA_DIRECTORY, dataDir);
-    if (_instanceDataManagerConfig.getReadMode() != null) {
-      defaultConfig.addProperty(READ_MODE, _instanceDataManagerConfig.getReadMode().toString());
+    defaultConfig.addProperty(IndexLoadingConfigMetadata.KEY_OF_COLUMN_MIN_MAX_VALUE_GENERATOR_MODE,
+        ColumnMinMaxValueGeneratorMode.TIME.toString());
+    if (instanceDataManagerConfig.getReadMode() != null) {
+      defaultConfig.addProperty(READ_MODE, instanceDataManagerConfig.getReadMode().toString());
     } else {
       defaultConfig.addProperty(READ_MODE, ReadMode.heap);
     }
-    if (_instanceDataManagerConfig.getSegmentFormatVersion() != null) {
+    if (instanceDataManagerConfig.getSegmentFormatVersion() != null) {
       defaultConfig.addProperty(IndexLoadingConfigMetadata.KEY_OF_SEGMENT_FORMAT_VERSION,
-          _instanceDataManagerConfig.getSegmentFormatVersion());
+          instanceDataManagerConfig.getSegmentFormatVersion());
     }
-    if (_instanceDataManagerConfig.isEnableDefaultColumns()) {
+    if (instanceDataManagerConfig.isEnableDefaultColumns()) {
       defaultConfig.addProperty(IndexLoadingConfigMetadata.KEY_OF_ENABLE_DEFAULT_COLUMNS, true);
     }
     TableDataManagerConfig tableDataManagerConfig = new TableDataManagerConfig(defaultConfig);
@@ -107,6 +113,13 @@ public class TableDataManagerConfig {
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     _tableDataManagerConfig.setProperty(READ_MODE, indexingConfig.getLoadMode().toLowerCase());
     _tableDataManagerConfig.setProperty(TABLE_DATA_MANAGER_NAME, tableConfig.getTableName());
+    String columnValuePruneMode = tableConfig.getCustomConfigs()
+        .getCustomConfigs()
+        .get(TableCustomConfig.COLUMN_MIN_MAX_VALUE_GENERATOR_MODE_KEY);
+    if (columnValuePruneMode != null) {
+      _tableDataManagerConfig.setProperty(IndexLoadingConfigMetadata.KEY_OF_COLUMN_MIN_MAX_VALUE_GENERATOR_MODE,
+          columnValuePruneMode.toUpperCase());
+    }
     _tableDataManagerConfig.setProperty(IndexLoadingConfigMetadata.getKeyOfLoadingInvertedIndex(),
         indexingConfig.getInvertedIndexColumns());
     _tableDataManagerConfig.setProperty(IndexLoadingConfigMetadata.KEY_OF_STAR_TREE_FORMAT_VERSION,
@@ -134,12 +147,12 @@ public class TableDataManagerConfig {
           serverConfigVersion, tableConfigVersion, tableName);
       _tableDataManagerConfig.setProperty(segmentVersionKey, indexingConfig.getSegmentFormatVersion());
     } else {
-      LOGGER.info("Loading table: {} with server configured segment format version: {}", tableName, serverConfigVersion);
+      LOGGER.info("Loading table: {} with server configured segment format version: {}", tableName,
+          serverConfigVersion);
     }
   }
 
   public IndexLoadingConfigMetadata getIndexLoadingConfigMetadata() {
-    IndexLoadingConfigMetadata indexLoadingConfigMetadata = new IndexLoadingConfigMetadata(_tableDataManagerConfig);
-    return indexLoadingConfigMetadata;
+    return new IndexLoadingConfigMetadata(_tableDataManagerConfig);
   }
 }

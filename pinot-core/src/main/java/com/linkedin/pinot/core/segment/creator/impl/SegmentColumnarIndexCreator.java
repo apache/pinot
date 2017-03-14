@@ -396,6 +396,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         String.valueOf(defaultNullValue));
   }
 
+  public static void addColumnMinMaxValueInfo(PropertiesConfiguration properties, String column, String minValue,
+      String maxValue) {
+    properties.setProperty(getKeyFor(column, MIN_VALUE), minValue);
+    properties.setProperty(getKeyFor(column, MAX_VALUE), maxValue);
+  }
+
   public static void removeColumnMetadataInfo(PropertiesConfiguration properties, String column) {
     properties.clearProperty(getKeyFor(column, CARDINALITY));
     properties.clearProperty(getKeyFor(column, TOTAL_DOCS));
@@ -414,6 +420,10 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     properties.clearProperty(getKeyFor(column, TOTAL_NUMBER_OF_ENTRIES));
     properties.clearProperty(getKeyFor(column, IS_AUTO_GENERATED));
     properties.clearProperty(getKeyFor(column, DEFAULT_NULL_VALUE));
+    properties.clearProperty(getKeyFor(column, DERIVED_METRIC_TYPE));
+    properties.clearProperty(getKeyFor(column, ORIGIN_COLUMN));
+    properties.clearProperty(getKeyFor(column, MIN_VALUE));
+    properties.clearProperty(getKeyFor(column, MAX_VALUE));
   }
 
   /**

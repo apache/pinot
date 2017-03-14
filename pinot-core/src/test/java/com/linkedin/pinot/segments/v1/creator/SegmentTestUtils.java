@@ -69,6 +69,19 @@ public class SegmentTestUtils {
     return segmentGenSpec;
   }
 
+  public static SegmentGeneratorConfig getSegmentGeneratorConfigWithSchema(File inputAvro, File outputDir,
+      String tableName, Schema schema) {
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(schema);
+    segmentGeneratorConfig.setInputFilePath(inputAvro.getAbsolutePath());
+    segmentGeneratorConfig.setOutDir(outputDir.getAbsolutePath());
+    segmentGeneratorConfig.setFormat(FileFormat.AVRO);
+    segmentGeneratorConfig.setSegmentVersion(SegmentVersion.v1);
+    segmentGeneratorConfig.setTableName(tableName);
+    segmentGeneratorConfig.setTimeColumnName(schema.getTimeColumnName());
+    segmentGeneratorConfig.setSegmentTimeUnit(schema.getOutgoingTimeUnit());
+    return segmentGeneratorConfig;
+  }
+
   public static List<String> getColumnNamesFromAvro(File avro) throws FileNotFoundException, IOException {
     List<String> ret = new ArrayList<String>();
     DataFileStream<GenericRecord> dataStream =

@@ -16,13 +16,9 @@
 package com.linkedin.pinot.integration.tests;
 
 import com.linkedin.pinot.broker.broker.BrokerServerBuilder;
-import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.core.data.manager.offline.FileBasedInstanceDataManager;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadataLoader;
 import com.linkedin.pinot.core.query.executor.ServerQueryExecutorV1Impl;
-import com.linkedin.pinot.core.query.pruner.DataSchemaSegmentPruner;
-import com.linkedin.pinot.core.query.pruner.TimeSegmentPruner;
-import com.linkedin.pinot.core.query.pruner.ValidSegmentPruner;
 import com.linkedin.pinot.server.conf.ServerConf;
 import com.linkedin.pinot.server.starter.ServerInstance;
 import com.yammer.metrics.core.MetricsRegistry;
@@ -110,9 +106,8 @@ public class FileBasedServerBrokerStarters {
     serverConfiguration.addProperty("pinot.server.instance.segment.metadata.loader.class",
         ColumnarSegmentMetadataLoader.class.getName());
     serverConfiguration.addProperty("pinot.server.query.executor.pruner.class",
-        StringUtil.join(",", TimeSegmentPruner.class.getSimpleName(), DataSchemaSegmentPruner.class.getSimpleName(),
-            ValidSegmentPruner.class.getSimpleName()));
-    serverConfiguration.addProperty("pinot.server.query.executor.pruner.TimeSegmentPruner.id", "0");
+        "ColumnValueSegmentPruner,DataSchemaSegmentPruner,ValidSegmentPruner");
+    serverConfiguration.addProperty("pinot.server.query.executor.pruner.ColumnValueSegmentPruner.id", "0");
     serverConfiguration.addProperty("pinot.server.query.executor.pruner.DataSchemaSegmentPruner.id", "1");
     serverConfiguration.addProperty("pinot.server.query.executor.pruner.ValidSegmentPruner.id", "2");
     serverConfiguration.addProperty("pinot.server.query.executor.class", ServerQueryExecutorV1Impl.class.getName());
