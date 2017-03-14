@@ -187,16 +187,18 @@ AnomalyResultView.prototype = {
       totalPages: numPages,
       visiblePages: 7,
       startPage: pageNumber,
-      onPageClick: function (event, page) {
+      onPageClick: (event, page) => {
           console.log("Page " + page + " PageNumber " + pageNumber);
           if (page != pageNumber) {
             var anomaliesParams = {
                 pageNumber : page,
-                metricIds : self.anomalyResultModel.metricIds,
-                dashboardId : self.anomalyResultModel.dashboardId,
-                anomalyIds : self.anomalyResultModel.anomalyIds,
+                metricIds : this.anomalyResultModel.metricIds,
+                dashboardId : this.anomalyResultModel.dashboardId,
+                anomalyIds : this.anomalyResultModel.anomalyIds,
+                startDate : this.anomalyResultModel.startDate,
+                endDate : this.anomalyResultModel.endDate,
               }
-            self.applyButtonEvent.notify(anomaliesParams);
+            this.applyButtonEvent.notify(anomaliesParams);
           }
       }
     });

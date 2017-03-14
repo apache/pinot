@@ -78,7 +78,7 @@
           </div>
         </div>
       {{/with}}
-    {{/else}}
+    {{else}}
       <div class="anomaly-card">
         No anomalies found.
       </div>
