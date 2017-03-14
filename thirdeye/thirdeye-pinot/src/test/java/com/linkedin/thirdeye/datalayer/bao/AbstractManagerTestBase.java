@@ -94,7 +94,7 @@ public abstract class AbstractManagerTestBase {
       eventManager = daoRegistry.getEventDAO();
       anomalyFunctionDAO = daoRegistry.getAnomalyFunctionDAO();
       detectionStatusDAO = daoRegistry.getDetectionStatusDAO();
-      functionAutotuneConfigDAO = daoRegistry.getFunctionAutotuneDAO();
+      functionAutotuneConfigDAO = daoRegistry.getAutotuneConfigDAO();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

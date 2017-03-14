@@ -143,7 +143,7 @@ public class DAORegistry {
     return DaoProviderUtil.getInstance(DetectionStatusManagerImpl.class);
   }
 
-  public AutotuneConfigManager getFunctionAutotuneDAO() {
+  public AutotuneConfigManager getAutotuneConfigDAO() {
     return DaoProviderUtil.getInstance(AutotuneConfigManagerImpl.class);
   }
 
