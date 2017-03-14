@@ -210,6 +210,7 @@ public class DetectionJobResource {
       @QueryParam("end") String endTimeIso,
       @QueryParam("force") @DefaultValue("false") String isForceBackfill) throws Exception {
     long functionId = Long.valueOf(id);
+    boolean forceBackfill = Boolean.valueOf(isForceBackfill);
     AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
     if (anomalyFunction == null) {
       return Response.noContent().build();
@@ -242,7 +243,7 @@ public class DetectionJobResource {
     List<MergedAnomalyResultDTO> mergedResults =
         mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(startTime.getMillis(), endTime.getMillis(),
             functionId);
-    if (CollectionUtils.isNotEmpty(mergedResults)) {
+    if (CollectionUtils.isNotEmpty(mergedResults) && !forceBackfill) {
       throw new IllegalArgumentException(String.format(
           "[functionId %s] Merged anomaly results should be cleaned up before regeneration", id));
     }
@@ -250,7 +251,7 @@ public class DetectionJobResource {
     //  Check if the raw anomaly results have been cleaned up before regeneration
     List<RawAnomalyResultDTO> rawResults =
         rawAnomalyResultDAO.findAllByTimeAndFunctionId(startTime.getMillis(), endTime.getMillis(), functionId);
-    if(CollectionUtils.isNotEmpty(rawResults)){
+    if(CollectionUtils.isNotEmpty(rawResults) && !forceBackfill){
       throw new IllegalArgumentException(String.format(
           "[functionId {}] Raw anomaly results should be cleaned up before regeneration", id));
     }
@@ -268,7 +269,7 @@ public class DetectionJobResource {
     new Thread(new Runnable() {
       @Override
       public void run() {
-        detectionJobScheduler.runBackfill(functionId, innerStartTime, innerEndTime, Boolean.valueOf(isForceBackfill));
+        detectionJobScheduler.runBackfill(functionId, innerStartTime, innerEndTime, forceBackfill);
       }
     }).start();
 
