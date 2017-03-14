@@ -306,15 +306,12 @@ AnomalyResultView.prototype = {
   },
 
   dataEventHandler : function(e) {
+    e.preventDefault();
     var currentTargetId = e.currentTarget.id;
     if (currentTargetId.startsWith('investigate-button-')) {
       this.investigateButtonClickEvent.notify(e.data);
     } else if (currentTargetId.startsWith('show-details-')) {
       this.showDetailsLinkClickEvent.notify(e.data);
-    } else if (currentTargetId.startsWith('anomaly-feedback-')) {
-      var option = $("#" + currentTargetId + " option:selected").text();
-      e.data['feedback'] = option;
-      this.anomalyFeedbackSelectEvent.notify(e.data);
     }
   },
   setupListenerOnApplyButton : function() {
