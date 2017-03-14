@@ -1,8 +1,9 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
 import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.ListMultimap;
 import com.linkedin.pinot.pql.parsers.utils.Pair;
-import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeExecutor;
+import com.linkedin.thirdeye.anomaly.merge.TimeBasedAnomalyMerger;
 import com.linkedin.thirdeye.anomaly.override.OverrideConfigHelper;
 import com.linkedin.thirdeye.anomaly.task.TaskContext;
 import com.linkedin.thirdeye.anomaly.task.TaskInfo;
@@ -14,6 +15,8 @@ import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.ResponseParserUtils;
+import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -25,13 +28,16 @@ import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
+import java.util.concurrent.ExecutionException;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.NullArgumentException;
 import org.joda.time.DateTime;
+import org.quartz.JobExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import static com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricUtil.*;
@@ -49,28 +55,31 @@ public class DetectionTaskRunner implements TaskRunner {
   private long jobExecutionId;
 
   private List<String> collectionDimensions;
-  private List<MergedAnomalyResultDTO> knownMergedAnomalies;
-  private List<ScalingFactor> scalingFactors;
-  private List<RawAnomalyResultDTO> existingRawAnomalies;
+  private AnomalyFunctionFactory anomalyFunctionFactory;
   private BaseAnomalyFunction anomalyFunction;
 
-  protected void setupTask(TaskInfo taskInfo) {
+  public List<TaskResult> execute(TaskInfo taskInfo, TaskContext taskContext) throws Exception {
+    detectionTaskCounter.inc();
+    List<TaskResult> taskResult = new ArrayList<>();
+
+    LOG.info("Setting up task {}", taskInfo);
+    setupTask(taskInfo, taskContext);
+
+    // Run for all pairs of window start and window end
+    for (int i = 0; i < windowStarts.size(); i ++) {
+      runTask(windowStarts.get(i), windowEnds.get(i));
+    }
+
+    return taskResult;
+  }
+
+  private void setupTask(TaskInfo taskInfo, TaskContext taskContext) throws Exception {
     DetectionTaskInfo detectionTaskInfo = (DetectionTaskInfo) taskInfo;
     windowStarts = detectionTaskInfo.getWindowStartTime();
     windowEnds = detectionTaskInfo.getWindowEndTime();
     anomalyFunctionSpec = detectionTaskInfo.getAnomalyFunctionSpec();
     jobExecutionId = detectionTaskInfo.getJobExecutionId();
-  }
-
-  public List<TaskResult> execute(TaskInfo taskInfo, TaskContext taskContext) throws Exception {
-    detectionTaskCounter.inc();
-    LOG.info("Begin executing task {}", taskInfo);
-
-    setupTask(taskInfo);
-
-    List<TaskResult> taskResult = new ArrayList<>();
-
-    AnomalyFunctionFactory anomalyFunctionFactory = taskContext.getAnomalyFunctionFactory();
+    anomalyFunctionFactory = taskContext.getAnomalyFunctionFactory();
     anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
 
     String dataset = anomalyFunctionSpec.getCollection();
@@ -88,75 +97,50 @@ public class DetectionTaskRunner implements TaskRunner {
         "Running anomaly detection job with metricFunction: [{}], topic metric [{}], collection: [{}]",
         anomalyFunctionSpec.getFunctionName(), anomalyFunctionSpec.getTopicMetric(),
         anomalyFunctionSpec.getCollection());
-
-
-    // Run for all pairs of window start and window end
-    for (int i = 0; i < windowStarts.size(); i ++) {
-      DateTime windowStart = windowStarts.get(i);
-      DateTime windowEnd = windowEnds.get(i);
-      LOG.info("Running for time range {} to  {}", windowStart, windowEnd);
-
-      // Get Time Series
-      List<Pair<Long, Long>> startEndTimeRanges = anomalyFunction.getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis());
-      Map<DimensionKey, MetricTimeSeries> dimensionKeyMetricTimeSeriesMap = TimeSeriesUtil.getTimeSeriesForAnomalyDetection(anomalyFunctionSpec, startEndTimeRanges);
-
-      // Get existing anomalies for this time range and this function id for all combinations of dimensions
-      if (anomalyFunction.useHistoryAnomaly()) {
-        // if this anomaly function uses history data, then we get all time ranges
-        knownMergedAnomalies = getKnownMergedAnomalies(anomalyFunctionSpec.getId(),
-            anomalyFunction.getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis()));
-      } else {
-        // otherwise, we only get the merge anomaly for current window in order to remove duplicate raw anomalies
-        List<Pair<Long, Long>> currentTimeRange = new ArrayList<>();
-        currentTimeRange.add(new Pair<>(windowStart.getMillis(), windowEnd.getMillis()));
-        knownMergedAnomalies = getKnownMergedAnomalies(anomalyFunctionSpec.getId(), currentTimeRange);
-      }
-      // We always find existing raw anomalies to prevent duplicate raw anomalies are generated
-      existingRawAnomalies = getExistingRawAnomalies(anomalyFunctionSpec.getId(), windowStart.getMillis(), windowEnd.getMillis());
-
-      scalingFactors = OverrideConfigHelper
-          .getTimeSeriesScalingFactors(DAO_REGISTRY.getOverrideConfigDAO(), anomalyFunctionSpec.getCollection(),
-              anomalyFunctionSpec.getMetric(), anomalyFunctionSpec.getId(),
-              anomalyFunction.getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis()));
-
-      exploreDimensionsAndAnalyze(dimensionKeyMetricTimeSeriesMap, windowStart, windowEnd);
-
-      boolean isBackfill = false;
-      // If the current job is a backfill (adhoc) detection job, set notified flag to true so the merged anomalies do not
-      // induce alerts and emails.
-      String jobName = DAO_REGISTRY.getJobDAO().getJobNameByJobId(jobExecutionId);
-      if (jobName != null && jobName.toLowerCase().startsWith(BACKFILL_PREFIX)) {
-        isBackfill = true;
-      }
-      detectionTaskSuccessCounter.inc();
-
-      // TODO: Create AnomalyMergeExecutor in class level in order to reuse the resource
-      // syncAnomalyMergeExecutor is supposed to perform lightweight merges (i.e., anomalies that have the same function
-      // id and at the same dimensions) after each detection task. Consequently, a null thread pool is passed the merge
-      // executor on purpose in order to prevent an undesired asynchronous merge happens.
-      AnomalyMergeExecutor syncAnomalyMergeExecutor = new AnomalyMergeExecutor(null, anomalyFunctionFactory);
-      syncAnomalyMergeExecutor.synchronousMergeBasedOnFunctionIdAndDimension(anomalyFunctionSpec, isBackfill);
-      detectionTaskSuccessCounter.inc();
-    }
-    return taskResult;
   }
 
 
-  private void exploreDimensionsAndAnalyze(Map<DimensionKey, MetricTimeSeries> dimensionKeyMetricTimeSeriesMap,
-      DateTime windowStart, DateTime windowEnd) {
-    int anomalyCounter = 0;
+  private void runTask(DateTime windowStart, DateTime windowEnd)
+      throws JobExecutionException, ExecutionException {
 
-    // Sort the known merged and raw anomalies by their dimension names
-    ArrayListMultimap<DimensionMap, MergedAnomalyResultDTO> dimensionNamesToKnownMergedAnomalies = ArrayListMultimap.create();
-    for (MergedAnomalyResultDTO knownMergedAnomaly : knownMergedAnomalies) {
-      dimensionNamesToKnownMergedAnomalies.put(knownMergedAnomaly.getDimensions(), knownMergedAnomaly);
-    }
-    ArrayListMultimap<DimensionMap, RawAnomalyResultDTO> dimensionNamesToKnownRawAnomalies = ArrayListMultimap.create();
-    for (RawAnomalyResultDTO existingRawAnomaly : existingRawAnomalies) {
-      dimensionNamesToKnownRawAnomalies.put(existingRawAnomaly.getDimensions(), existingRawAnomaly);
+    LOG.info("Running anomaly detection for time range {} to  {}", windowStart, windowEnd);
+
+    // TODO: Change to DataFetchers/DataSources
+    AnomalyDetectionInputContext adContext = fetchData(windowStart, windowEnd);
+
+    ListMultimap<DimensionMap, RawAnomalyResultDTO> resultRawAnomalies = dimensionalShuffleAndUnifyAnalyze(windowStart, windowEnd, adContext);
+    detectionTaskSuccessCounter.inc();
+
+    boolean isBackfill = false;
+    // If the current job is a backfill (adhoc) detection job, set notified flag to true so the merged anomalies do not
+    // induce alerts and emails.
+    String jobName = DAO_REGISTRY.getJobDAO().getJobNameByJobId(jobExecutionId);
+    if (jobName != null && jobName.toLowerCase().startsWith(BACKFILL_PREFIX)) {
+      isBackfill = true;
     }
 
-    String metricName = anomalyFunction.getSpec().getTopicMetric();
+    // Update merged anomalies
+    TimeBasedAnomalyMerger timeBasedAnomalyMerger = new TimeBasedAnomalyMerger(anomalyFunctionFactory);
+    ListMultimap<DimensionMap, MergedAnomalyResultDTO> resultMergedAnomalies =
+      timeBasedAnomalyMerger.mergeAnomalies(anomalyFunctionSpec, resultRawAnomalies, isBackfill);
+    detectionTaskSuccessCounter.inc();
+
+    // TODO: Change to DataSink
+    AnomalyDetectionOutputContext adOutputContext = new AnomalyDetectionOutputContext();
+    adOutputContext.setRawAnomalies(resultRawAnomalies);
+    adOutputContext.setMergedAnomalies(resultMergedAnomalies);
+    storeData(adOutputContext);
+  }
+
+
+  private AnomalyDetectionInputContext fetchData(DateTime windowStart, DateTime windowEnd)
+      throws JobExecutionException, ExecutionException {
+    AnomalyDetectionInputContext adContext = new AnomalyDetectionInputContext();
+
+    // Get Time Series
+    List<Pair<Long, Long>> startEndTimeRanges = anomalyFunction.getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis());
+    Map<DimensionKey, MetricTimeSeries> dimensionKeyMetricTimeSeriesMap = TimeSeriesUtil.getTimeSeriesForAnomalyDetection(anomalyFunctionSpec, startEndTimeRanges);
+    Map<DimensionMap, MetricTimeSeries> dimensionMapMetricTimeSeriesMap = new HashMap<>();
     for (Map.Entry<DimensionKey, MetricTimeSeries> entry : dimensionKeyMetricTimeSeriesMap.entrySet()) {
       DimensionKey dimensionKey = entry.getKey();
 
@@ -166,8 +150,7 @@ public class DetectionTaskRunner implements TaskRunner {
       String[] dimensionValues = dimensionKey.getDimensionValues();
       boolean isOTHERDimension = false;
       for (String dimensionValue : dimensionValues) {
-        if (dimensionValue.equalsIgnoreCase(ResponseParserUtils.OTHER) ||
-            dimensionValue.equalsIgnoreCase(ResponseParserUtils.UNKNOWN)) {
+        if (dimensionValue.equalsIgnoreCase(ResponseParserUtils.OTHER) || dimensionValue.equalsIgnoreCase(ResponseParserUtils.UNKNOWN)) {
           isOTHERDimension = true;
           break;
         }
@@ -176,65 +159,136 @@ public class DetectionTaskRunner implements TaskRunner {
         continue;
       }
 
-      DimensionMap exploredDimensions = DimensionMap.fromDimensionKey(dimensionKey, collectionDimensions);
+      DimensionMap dimensionMap = DimensionMap.fromDimensionKey(dimensionKey, collectionDimensions);
+      dimensionMapMetricTimeSeriesMap.put(dimensionMap, entry.getValue());
 
       if (entry.getValue().getTimeWindowSet().size() < 1) {
-        LOG.warn("Insufficient data for {} to run anomaly detection function", exploredDimensions);
+        LOG.warn("Insufficient data for {} to run anomaly detection function", dimensionMap);
         continue;
       }
-
-      // Get current entry's knownMergedAnomalies, which should have the same explored dimensions
-      List<MergedAnomalyResultDTO> knownMergedAnomaliesOfAnEntry = dimensionNamesToKnownMergedAnomalies.get(exploredDimensions);
-
-      try {
-        // Run algorithm
-        MetricTimeSeries metricTimeSeries = entry.getValue();
-        LOG.info("Analyzing anomaly function with explored dimensions: {}, windowStart: {}, windowEnd: {}",
-            exploredDimensions, windowStart, windowEnd);
-
-        List<MergedAnomalyResultDTO> historyMergedAnomalies;
-        if (anomalyFunction.useHistoryAnomaly()) {
-          historyMergedAnomalies = retainHistoryMergedAnomalies(windowStart.getMillis(), knownMergedAnomaliesOfAnEntry);
-        } else {
-          historyMergedAnomalies = Collections.emptyList();
-        }
-
-        LOG.info("Checking if any known anomalies overlap with the monitoring window of anomaly detection, which could result in unwanted holes in current values.");
-        AnomalyUtils.logAnomaliesOverlapWithWindow(windowStart, windowEnd, historyMergedAnomalies);
-
-        // Scaling time series according to the scaling factor
-        if (CollectionUtils.isNotEmpty(scalingFactors)) {
-          Properties properties = anomalyFunction.getProperties();
-          MetricTransfer.rescaleMetric(metricTimeSeries, windowStart.getMillis(), scalingFactors,
-              metricName, properties);
-        }
-
-        List<RawAnomalyResultDTO> resultsOfAnEntry = anomalyFunction
-            .analyze(exploredDimensions, metricTimeSeries, windowStart, windowEnd, historyMergedAnomalies);
-
-        // Remove detected anomalies that have existed in database
-        if (CollectionUtils.isNotEmpty(resultsOfAnEntry)) {
-          List<RawAnomalyResultDTO> existingRawAnomaliesOfAnEntry =
-              dimensionNamesToKnownRawAnomalies.get(exploredDimensions);
-          resultsOfAnEntry = removeFromExistingRawAnomalies(resultsOfAnEntry, existingRawAnomaliesOfAnEntry);
-        }
-        if (CollectionUtils.isNotEmpty(resultsOfAnEntry)) {
-          List<MergedAnomalyResultDTO> existingMergedAnomalies =
-              retainExistingMergedAnomalies(windowStart.getMillis(), windowEnd.getMillis(), knownMergedAnomaliesOfAnEntry);
-          resultsOfAnEntry = removeFromExistingMergedAnomalies(resultsOfAnEntry, existingMergedAnomalies);
-        }
-
-        // Handle results
-        handleResults(resultsOfAnEntry);
-
-        LOG.info("Dimension {} has {} anomalies in window {} to {}", exploredDimensions, resultsOfAnEntry.size(),
-            windowStart, windowEnd);
-        anomalyCounter += resultsOfAnEntry.size();
-      } catch (Exception e) {
-        LOG.error("Could not compute for {}", exploredDimensions, e);
-      }
     }
+    adContext.setDimensionKeyMetricTimeSeriesMap(dimensionMapMetricTimeSeriesMap);
+
+    // Get existing anomalies for this time range and this function id for all combinations of dimensions
+    List<MergedAnomalyResultDTO> knownMergedAnomalies;
+    if (anomalyFunction.useHistoryAnomaly()) {
+      // if this anomaly function uses history data, then we get all time ranges
+      knownMergedAnomalies = getKnownMergedAnomalies(anomalyFunctionSpec.getId(),
+          anomalyFunction.getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis()));
+    } else {
+      // otherwise, we only get the merge anomaly for current window in order to remove duplicate raw anomalies
+      List<Pair<Long, Long>> currentTimeRange = new ArrayList<>();
+      currentTimeRange.add(new Pair<>(windowStart.getMillis(), windowEnd.getMillis()));
+      knownMergedAnomalies = getKnownMergedAnomalies(anomalyFunctionSpec.getId(), currentTimeRange);
+    }
+    // Sort the known merged and raw anomalies by their dimension names
+    ArrayListMultimap<DimensionMap, MergedAnomalyResultDTO> dimensionMapToKnownMergedAnomalies = ArrayListMultimap.create();
+    for (MergedAnomalyResultDTO knownMergedAnomaly : knownMergedAnomalies) {
+      dimensionMapToKnownMergedAnomalies.put(knownMergedAnomaly.getDimensions(), knownMergedAnomaly);
+    }
+    adContext.setKnownMergedAnomalies(dimensionMapToKnownMergedAnomalies);
+
+    // We always find existing raw anomalies to prevent duplicate raw anomalies are generated
+    List<RawAnomalyResultDTO> existingRawAnomalies = getExistingRawAnomalies(anomalyFunctionSpec.getId(), windowStart.getMillis(), windowEnd.getMillis());
+    ArrayListMultimap<DimensionMap, RawAnomalyResultDTO> dimensionNamesToKnownRawAnomalies = ArrayListMultimap.create();
+    for (RawAnomalyResultDTO existingRawAnomaly : existingRawAnomalies) {
+      dimensionNamesToKnownRawAnomalies.put(existingRawAnomaly.getDimensions(), existingRawAnomaly);
+    }
+    adContext.setExistingRawAnomalies(dimensionNamesToKnownRawAnomalies);
+
+    List<ScalingFactor> scalingFactors = OverrideConfigHelper
+        .getTimeSeriesScalingFactors(DAO_REGISTRY.getOverrideConfigDAO(), anomalyFunctionSpec.getCollection(),
+            anomalyFunctionSpec.getMetric(), anomalyFunctionSpec.getId(),
+            anomalyFunction.getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis()));
+    adContext.setScalingFactors(scalingFactors);
+
+    return adContext;
+  }
+
+  private void storeData(AnomalyDetectionOutputContext anomalyDetectionOutputContext) {
+    RawAnomalyResultManager rawAnomalyDAO = DAO_REGISTRY.getRawAnomalyResultDAO();
+    MergedAnomalyResultManager mergedAmomalyDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
+
+    for (RawAnomalyResultDTO rawAnomalyResultDTO : anomalyDetectionOutputContext.getRawAnomalies().values()) {
+      rawAnomalyDAO.save(rawAnomalyResultDTO);
+    }
+
+    for (MergedAnomalyResultDTO mergedAnomalyResultDTO : anomalyDetectionOutputContext.getMergedAnomalies().values()) {
+      mergedAmomalyDAO.update(mergedAnomalyResultDTO);
+    }
+  }
+
+  private ListMultimap<DimensionMap, RawAnomalyResultDTO> dimensionalShuffleAndUnifyAnalyze(DateTime windowStart, DateTime windowEnd,
+      AnomalyDetectionInputContext anomalyDetectionInputContext) {
+    int anomalyCounter = 0;
+    ListMultimap<DimensionMap, RawAnomalyResultDTO> resultRawAnomalies = ArrayListMultimap.create();
+
+    for (DimensionMap dimensionMap : anomalyDetectionInputContext.getDimensionKeyMetricTimeSeriesMap().keySet()) {
+      List<RawAnomalyResultDTO> resultsOfAnEntry = runAnalyze(windowStart, windowEnd, anomalyDetectionInputContext, dimensionMap);
+
+      // Set raw anomalies' properties
+      handleResults(resultsOfAnEntry);
+
+      LOG.info("Dimension {} has {} anomalies in window {} to {}", dimensionMap, resultsOfAnEntry.size(),
+          windowStart, windowEnd);
+      anomalyCounter += resultsOfAnEntry.size();
+      resultRawAnomalies.putAll(dimensionMap, resultsOfAnEntry);
+    }
+
     LOG.info("{} anomalies found in total", anomalyCounter);
+    return resultRawAnomalies;
+  }
+
+  private List<RawAnomalyResultDTO> runAnalyze(DateTime windowStart, DateTime windowEnd,
+      AnomalyDetectionInputContext anomalyDetectionInputContext, DimensionMap dimensionMap) {
+    String metricName = anomalyFunction.getSpec().getTopicMetric();
+    MetricTimeSeries metricTimeSeries = anomalyDetectionInputContext.getDimensionKeyMetricTimeSeriesMap().get(dimensionMap);
+
+    // Get current entry's knownMergedAnomalies, which should have the same explored dimensions
+    List<MergedAnomalyResultDTO> knownMergedAnomaliesOfAnEntry =
+        anomalyDetectionInputContext.getKnownMergedAnomalies().get(dimensionMap);
+    List<MergedAnomalyResultDTO> historyMergedAnomalies;
+    if (anomalyFunction.useHistoryAnomaly()) {
+      historyMergedAnomalies = retainHistoryMergedAnomalies(windowStart.getMillis(), knownMergedAnomaliesOfAnEntry);
+    } else {
+      historyMergedAnomalies = Collections.emptyList();
+    }
+
+    LOG.info("Analyzing anomaly function with explored dimensions: {}, windowStart: {}, windowEnd: {}",
+        dimensionMap, windowStart, windowEnd);
+
+    AnomalyUtils.logAnomaliesOverlapWithWindow(windowStart, windowEnd, historyMergedAnomalies);
+
+    List<RawAnomalyResultDTO> resultsOfAnEntry = Collections.emptyList();
+    try {
+      // Run algorithm
+      // Scaling time series according to the scaling factor
+      List<ScalingFactor> scalingFactors = anomalyDetectionInputContext.getScalingFactors();
+      if (CollectionUtils.isNotEmpty(scalingFactors)) {
+        Properties properties = anomalyFunction.getProperties();
+        MetricTransfer.rescaleMetric(metricTimeSeries, windowStart.getMillis(), scalingFactors,
+            metricName, properties);
+      }
+
+      resultsOfAnEntry = anomalyFunction
+          .analyze(dimensionMap, metricTimeSeries, windowStart, windowEnd, historyMergedAnomalies);
+    } catch (Exception e) {
+      LOG.error("Could not compute for {}", dimensionMap, e);
+    }
+
+    // Remove detected anomalies that have existed in database
+    if (CollectionUtils.isNotEmpty(resultsOfAnEntry)) {
+      List<RawAnomalyResultDTO> existingRawAnomaliesOfAnEntry =
+          anomalyDetectionInputContext.getExistingRawAnomalies().get(dimensionMap);
+      resultsOfAnEntry = removeFromExistingRawAnomalies(resultsOfAnEntry, existingRawAnomaliesOfAnEntry);
+    }
+    if (CollectionUtils.isNotEmpty(resultsOfAnEntry)) {
+      List<MergedAnomalyResultDTO> existingMergedAnomalies =
+          retainExistingMergedAnomalies(windowStart.getMillis(), windowEnd.getMillis(), knownMergedAnomaliesOfAnEntry);
+      resultsOfAnEntry = removeFromExistingMergedAnomalies(resultsOfAnEntry, existingMergedAnomalies);
+    }
+
+    return resultsOfAnEntry;
   }
 
   /**
@@ -395,7 +449,6 @@ public class DetectionTaskRunner implements TaskRunner {
         result.setScore(normalize(result.getScore()));
         result.setWeight(normalize(result.getWeight()));
         result.setFunction(spec);
-        DAO_REGISTRY.getRawAnomalyResultDAO().save(result);
       } catch (Exception e) {
         LOG.error("Exception in saving anomaly result : " + result.toString(), e);
       }

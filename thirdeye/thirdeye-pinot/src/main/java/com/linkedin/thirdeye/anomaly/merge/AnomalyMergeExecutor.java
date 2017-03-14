@@ -122,9 +122,8 @@ public class AnomalyMergeExecutor implements Runnable {
   }
 
   /**
-   * Performs a light weight merge based on function id and dimensions. This method is supposed to be performed by
-   * anomaly detectors right after their anomaly detection. For complex merge logics which merge anomalies across
-   * different dimensions, function, metrics, etc., the tasks should be performed by a dedicated merger.
+   * Performs a time based merge, which merged anomalies that have the same function id and dimensions.
+   * This method is supposed to be performed by anomaly detectors right after their anomaly detection.
    *
    * @param functionSpec the spec of the function that detects anomalies
    * @param isBackfill set to true to disable the alert of the merged anomalies
@@ -376,6 +375,7 @@ public class AnomalyMergeExecutor implements Runnable {
     return results;
   }
 
+  @Deprecated
   private void performMergeBasedOnFunctionId(AnomalyFunctionDTO function,
       AnomalyMergeConfig mergeConfig, List<RawAnomalyResultDTO> unmergedResults,
       List<MergedAnomalyResultDTO> output) {
@@ -423,7 +423,6 @@ public class AnomalyMergeExecutor implements Runnable {
           mergedResultDAO.findLatestConflictByFunctionIdDimensions(function.getId(), exploredDimensions.toString(),
               anomalyWindowStart - mergeConfig.getSequentialAllowedGap(), anomalyWindowEnd);
 
-      // TODO : get mergeConfig from MergeStrategy
       List<MergedAnomalyResultDTO> mergedResults = AnomalyTimeBasedSummarizer
           .mergeAnomalies(latestOverlappedMergedResult, unmergedResultsByDimensions,
               mergeConfig.getMaxMergeDurationLength(), mergeConfig.getSequentialAllowedGap());
