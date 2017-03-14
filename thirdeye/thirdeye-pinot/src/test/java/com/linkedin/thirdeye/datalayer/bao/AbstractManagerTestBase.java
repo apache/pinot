@@ -60,7 +60,7 @@ public abstract class AbstractManagerTestBase {
   protected DataCompletenessConfigManager dataCompletenessConfigDAO;
   protected EventManager eventManager;
   protected DetectionStatusManager detectionStatusDAO;
-  protected AutotuneConfigManager functionAutotuneConfigDAO;
+  protected AutotuneConfigManager autotuneConfigDAO;
 
   //  protected TestDBResources testDBResources;
   protected DAORegistry daoRegistry;
@@ -94,7 +94,7 @@ public abstract class AbstractManagerTestBase {
       eventManager = daoRegistry.getEventDAO();
       anomalyFunctionDAO = daoRegistry.getAnomalyFunctionDAO();
       detectionStatusDAO = daoRegistry.getDetectionStatusDAO();
-      functionAutotuneConfigDAO = daoRegistry.getAutotuneConfigDAO();
+      autotuneConfigDAO = daoRegistry.getAutotuneConfigDAO();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -334,12 +334,13 @@ public abstract class AbstractManagerTestBase {
     return detectionStatusDTO;
   }
 
-  protected AutotuneConfigDTO getTestFunctionAutotuneConfig(long functionId, long start, long end) {
+  protected AutotuneConfigDTO getTestAutotuneConfig(long functionId, long start, long end) {
     AutotuneConfigDTO autotuneConfigDTO = new AutotuneConfigDTO();
     autotuneConfigDTO.setFunctionId(functionId);
     autotuneConfigDTO.setStartTime(start);
     autotuneConfigDTO.setEndTime(end);
     autotuneConfigDTO.setPerformanceEvaluationMethod(PerformanceEvaluationMethod.ANOMALY_PERCENTAGE);
+    autotuneConfigDTO.setLastUpdateTimestamp(DateTime.now().getMillis());
     Map<String, String> config = new HashMap<>();
     config.put("ConfigKey", "ConfigValue");
     autotuneConfigDTO.setConfiguration(config);

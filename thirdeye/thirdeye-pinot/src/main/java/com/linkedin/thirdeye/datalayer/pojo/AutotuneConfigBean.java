@@ -6,6 +6,7 @@ import com.linkedin.thirdeye.anomaly.detection.lib.AutotuneMethodType;
 import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluationMethod;
 import java.util.Map;
 import java.util.Objects;
+import org.joda.time.DateTime;
 
 
 @JsonIgnoreProperties(ignoreUnknown=true)
@@ -32,6 +33,8 @@ public class AutotuneConfigBean extends AbstractBean {
   private long overallRunningTime;
   // the message containing the intermediate results
   private String message;
+  // the last update timestamp
+  private long lastUpdateTimestamp;
 
   public long getFunctionId() {
     return functionId;
@@ -119,6 +122,14 @@ public class AutotuneConfigBean extends AbstractBean {
 
   public void setMessage(String message) {
     this.message = message;
+  }
+
+  public long getLastUpdateTimestamp() {
+    return lastUpdateTimestamp;
+  }
+
+  public void setLastUpdateTimestamp(long lastUpdateTimestamp) {
+    this.lastUpdateTimestamp = lastUpdateTimestamp;
   }
 
   @Override

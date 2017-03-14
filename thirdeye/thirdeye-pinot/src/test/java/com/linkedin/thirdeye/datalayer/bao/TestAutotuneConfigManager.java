@@ -10,8 +10,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 
-public class TestFunctionAutotuneConfigManager extends AbstractManagerTestBase {
-  private long functionAutotuneId;
+public class TestAutotuneConfigManager extends AbstractManagerTestBase {
+  private long autotuneId;
   AnomalyFunctionDTO function = getTestFunctionSpec("metric", "dataset");
   private long functionId = 1l;
   private static long start = 1l;
@@ -31,36 +31,36 @@ public class TestFunctionAutotuneConfigManager extends AbstractManagerTestBase {
     functionId = anomalyFunctionDAO.save(function);
     Assert.assertNotNull(function.getId());
 
-    functionAutotuneId = functionAutotuneConfigDAO.save(
-        getTestFunctionAutotuneConfig(functionId, start, end)
+    autotuneId = autotuneConfigDAO.save(
+        getTestAutotuneConfig(functionId, start, end)
     );
-    Assert.assertNotNull(functionAutotuneId);
+    Assert.assertNotNull(autotuneId);
 
     // test fetch all
-    List<AutotuneConfigDTO> functions = functionAutotuneConfigDAO.findAll();
+    List<AutotuneConfigDTO> functions = autotuneConfigDAO.findAll();
     Assert.assertEquals(functions.size(), 1);
   }
 
   @Test(dependsOnMethods = {"testCreate"})
   public void testFindAllByFunctionId() {
-    List<AutotuneConfigDTO> functions = functionAutotuneConfigDAO.findAllByFunctionId(functionId);
+    List<AutotuneConfigDTO> functions = autotuneConfigDAO.findAllByFunctionId(functionId);
     Assert.assertEquals(functions.size(), 1);
   }
 
   @Test(dependsOnMethods = { "testFindAllByFunctionId" })
   public void testUpdate() {
-    AutotuneConfigDTO spec = functionAutotuneConfigDAO.findById(functionAutotuneId);
+    AutotuneConfigDTO spec = autotuneConfigDAO.findById(autotuneId);
     Assert.assertNotNull(spec);
     spec.setAutotuneMethod(AutotuneMethodType.EXHAUSTIVE);
-    functionAutotuneConfigDAO.save(spec);
-    AutotuneConfigDTO specReturned = functionAutotuneConfigDAO.findById(functionAutotuneId);
+    autotuneConfigDAO.save(spec);
+    AutotuneConfigDTO specReturned = autotuneConfigDAO.findById(autotuneId);
     Assert.assertEquals(specReturned.getAutotuneMethod(), AutotuneMethodType.EXHAUSTIVE);
   }
 
   @Test(dependsOnMethods = { "testUpdate" })
   public void testDelete() {
-    functionAutotuneConfigDAO.deleteById(functionAutotuneId);
-    AutotuneConfigDTO spec = functionAutotuneConfigDAO.findById(functionAutotuneId);
+    autotuneConfigDAO.deleteById(autotuneId);
+    AutotuneConfigDTO spec = autotuneConfigDAO.findById(autotuneId);
     Assert.assertNull(spec);
   }
 }
