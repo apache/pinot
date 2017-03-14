@@ -61,7 +61,7 @@
 				</div>
 	  	</div>
   	</div>
-
+    <div id='anomaly-spin-area'></div>
 		<div class="page-results" id="anomaly-results-place-holder"></div>
   </div>
 </div>

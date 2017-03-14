@@ -187,7 +187,7 @@ AnomalyResultView.prototype = {
       totalPages: numPages,
       visiblePages: 7,
       startPage: pageNumber,
-      onPageClick: function (event, page) {
+      onPageClick: (event, page) => {
           $('body').scrollTop(0);
           console.log("Page " + page + " PageNumber " + pageNumber);
           if (page != pageNumber) {
@@ -198,7 +198,7 @@ AnomalyResultView.prototype = {
                 anomalyIds : this.anomalyResultModel.anomalyIds,
                 startDate : this.anomalyResultModel.startDate,
                 endDate : this.anomalyResultModel.endDate,
-              }
+              };
             this.applyButtonEvent.notify(anomaliesParams);
           }
       }

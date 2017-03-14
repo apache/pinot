@@ -6,7 +6,6 @@
     <span>
   </div>
   <div class="anomaly-cards-wrapper padding-all">
-    <div id='anomaly-spin-area'></div>
     {{#each this.anomalyDetailsList as |anomalyData anomalyIndex|}}
       {{#with anomalyData}}
         <div class="anomaly-card">
