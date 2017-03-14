@@ -12,7 +12,6 @@ import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
@@ -187,15 +186,6 @@ public class TimeBasedAnomalyMerger {
             function.getCollection(), function.getTopicMetric(), function.getFunctionName(), new DateTime(mergedResult.getStartTime()), new DateTime(mergedResult.getEndTime()), e);
       }
     }
-//    try {
-//      // persist the merged result
-//      mergedResultDAO.update(mergedResult);
-//      for (RawAnomalyResultDTO rawAnomalyResultDTO : mergedResult.getAnomalyResults()) {
-//        anomalyResultDAO.update(rawAnomalyResultDTO);
-//      }
-//    } catch (Exception e) {
-//      LOG.error("Could not persist merged result : [" + mergedResult.toString() + "]", e);
-//    }
   }
 
   /**

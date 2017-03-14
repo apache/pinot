@@ -118,17 +118,14 @@ public class DetectionTaskRunner implements TaskRunner {
     if (jobName != null && jobName.toLowerCase().startsWith(BACKFILL_PREFIX)) {
       isBackfill = true;
     }
-    // TODO: Create AnomalyMergeExecutor in class level in order to reuse the resource
-    // syncAnomalyMergeExecutor is supposed to perform lightweight merges (i.e., anomalies that have the same function
-    // id and at the same dimensions) after each detection task. Consequently, a null thread pool is passed the merge
-    // executor on purpose in order to prevent an undesired asynchronous merge happens.
-//    AnomalyMergeExecutor syncAnomalyMergeExecutor = new AnomalyMergeExecutor(null, anomalyFunctionFactory);
-//    syncAnomalyMergeExecutor.synchronousMergeBasedOnFunctionIdAndDimension(anomalyFunctionSpec, isBackfill);
+
+    // Update merged anomalies
     TimeBasedAnomalyMerger timeBasedAnomalyMerger = new TimeBasedAnomalyMerger(anomalyFunctionFactory);
     ListMultimap<DimensionMap, MergedAnomalyResultDTO> resultMergedAnomalies =
       timeBasedAnomalyMerger.mergeAnomalies(anomalyFunctionSpec, resultRawAnomalies, isBackfill);
     detectionTaskSuccessCounter.inc();
 
+    // TODO: Change to DataSink
     AnomalyDetectionOutputContext adOutputContext = new AnomalyDetectionOutputContext();
     adOutputContext.setRawAnomalies(resultRawAnomalies);
     adOutputContext.setMergedAnomalies(resultMergedAnomalies);
@@ -452,7 +449,6 @@ public class DetectionTaskRunner implements TaskRunner {
         result.setScore(normalize(result.getScore()));
         result.setWeight(normalize(result.getWeight()));
         result.setFunction(spec);
-//        DAO_REGISTRY.getRawAnomalyResultDAO().save(result);
       } catch (Exception e) {
         LOG.error("Exception in saving anomaly result : " + result.toString(), e);
       }
