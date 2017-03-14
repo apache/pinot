@@ -64,7 +64,7 @@ InvestigateView.prototype = {
   },
 
   destroy() {
-    $("#investigate-place-holder").html('');
+    $("#investigate-place-holder").children().remove();
   },
 
   setupListenerOnViewContributionLink() {

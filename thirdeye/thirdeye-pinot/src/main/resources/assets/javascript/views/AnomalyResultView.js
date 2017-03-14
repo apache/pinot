@@ -215,7 +215,7 @@ AnomalyResultView.prototype = {
   },
 
   destroy() {
-    $("#anomaly-results-place-holder").html('');
+    $("#anomaly-results-place-holder").children().remove();
   },
   showSearchBarBasedOnMode : function() {
     var anomaliesSearchMode = $('#anomalies-search-mode').val();
