@@ -3,9 +3,13 @@ package com.linkedin.thirdeye.anomaly.detection;
 import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutoTune;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
+import com.linkedin.thirdeye.anomaly.detection.lib.AutotuneMethodType;
+import com.linkedin.thirdeye.anomaly.detection.lib.FunctionAutotuneRunnable;
+import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluateHelper;
 import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluationMethod;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
+import com.linkedin.thirdeye.datalayer.bao.AutotuneConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.AutotuneConfigDTO;
@@ -16,9 +20,14 @@ import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterEvaluationUtil;
 import com.linkedin.thirdeye.util.SeverityComputationUtil;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.StringTokenizer;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import javax.validation.constraints.NotNull;
@@ -36,12 +45,17 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.NullArgumentException;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.joda.time.Interval;
 import org.joda.time.format.ISODateTimeFormat;
 
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,6 +70,7 @@ public class DetectionJobResource {
   private final AnomalyFunctionManager anomalyFunctionDAO;
   private final MergedAnomalyResultManager mergedAnomalyResultDAO;
   private final RawAnomalyResultManager rawAnomalyResultDAO;
+  private final AutotuneConfigManager autotuneConfigDAO;
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
   private final AlertFilterAutotuneFactory alertFilterAutotuneFactory;
@@ -69,6 +84,7 @@ public class DetectionJobResource {
     this.anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     this.rawAnomalyResultDAO = DAO_REGISTRY.getRawAnomalyResultDAO();
+    this.autotuneConfigDAO = DAO_REGISTRY.getAutotuneConfigDAO();
     this.alertFilterAutotuneFactory = alertFilterAutotuneFactory;
     this.alertFilterFactory = alertFilterFactory;
   }
@@ -474,6 +490,7 @@ public class DetectionJobResource {
   }
 
   /**
+<<<<<<< HEAD
    * To evaluate alert filte directly by autotune Id using autotune_config_index table
    * This is to leverage the intermediate step before updating tuned alert filter configurations
    * @param id: autotune Id
@@ -507,4 +524,154 @@ public class DetectionJobResource {
     return Response.ok(evaluator.toProperties().toString()).build();
   }
 
+  /**
+   * Perform anomaly function autotune:
+   *  - run backfill on all possible combinations of tuning parameters
+   *  - keep all the parameter combinations which lie in the goal range
+   *  - return list of parameter combinations along with their performance evaluation
+   * @param functionId
+   * the id of the target anomaly function
+   * @param replayStartTime
+   * the start time of the anomaly function replay in ISO format, e.g. 2017-02-27T00:00:00.000Z
+   * @param replayEndTime
+   * the end time of the anomaly function replay in ISO format
+   * @param timezone
+   * the timezone of replay time
+   * @param tuningJSON
+   * the json object includes all tuning fields and list of parameters
+   * ex: {"baselineLift": [0.9, 0.95, 1, 1.05, 1.1], "baselineSeasonalPeriod": [2, 3, 4]}
+   * @param goal
+   * the expected performance assigned by user
+   * @return
+   * A response containing all satisfied properties with their evaluation result
+   */
+  @POST
+  @Path("function/{id}/autotune")
+  public Response anomalyFunctionAutotune(@PathParam("id") long functionId, @QueryParam("start") String replayStartTime,
+      @QueryParam("end") String replayEndTime, @QueryParam("timezone") String timezone,
+      @QueryParam("tune") String tuningJSON, @QueryParam("goal") double goal,
+      @QueryParam("evalMethod") @DefaultValue("ANOMALY_PERCENTAGE") String performanceEvaluationMethod){
+    DateTimeZone dateTimeZone = DateTimeZone.forID(timezone);
+    // DateTime monitoringWindowStartTime = ISODateTimeFormat.dateTimeParser().parseDateTime(monitoringDateTime).withZone(dateTimeZone);
+    DateTime replayStart = ISODateTimeFormat.dateTimeParser().parseDateTime(replayStartTime).withZone(dateTimeZone);
+    DateTime replayEnd = ISODateTimeFormat.dateTimeParser().parseDateTime(replayEndTime).withZone(dateTimeZone);
+    Interval replayInterval = new Interval(replayStart.getMillis(), replayEnd.getMillis());
+    Set<String> satisfiedProperties = new HashSet<>();
+
+    // List all tuning parameter sets
+    List<Map<String, String>> tuningParameters = null;
+    try {
+      tuningParameters = listAllTuningParameters(new JSONObject(tuningJSON));
+    }
+    catch(JSONException e){
+      LOG.error("Unable to parse json string: {}", tuningJSON, e );
+      return Response.status(Response.Status.BAD_REQUEST).build();
+    }
+    if(tuningParameters.size() == 0) { // no tuning combinations
+      LOG.warn("No tuning parameter is found in json string {}", tuningJSON);
+      return Response.status(Response.Status.BAD_REQUEST).build();
+    }
+    AutotuneMethodType autotuneMethodType = AutotuneMethodType.EXHAUSTIVE;
+    PerformanceEvaluationMethod performanceEvalMethod = PerformanceEvaluationMethod.valueOf(performanceEvaluationMethod.toUpperCase());
+
+    // select the functionAutotuneConfigDTO in DB
+    Long targetId = null;
+    List<AutotuneConfigDTO> functionAutoTuneConfigDTOList =
+        autotuneConfigDAO.findAllByFuctionIdAndWindow(functionId,replayStart.getMillis(), replayEnd.getMillis());
+    for(AutotuneConfigDTO configDTO : functionAutoTuneConfigDTOList) {
+      if(configDTO.getAutotuneMethod().equals(autotuneMethodType) &&
+          configDTO.getPerformanceEvaluationMethod().equals(performanceEvalMethod) &&
+          configDTO.getStartTime() == replayStart.getMillis() && configDTO.getEndTime() == replayEnd.getMillis() &&
+          configDTO.getGoal() == goal) {
+        // clear message;
+        configDTO.setMessage("");
+        targetId = autotuneConfigDAO.save(configDTO);
+        break;
+      }
+    }
+
+    if(targetId == null) {  // Cannot find existing dto
+      AutotuneConfigDTO target = new AutotuneConfigDTO();
+      target.setFunctionId(functionId);
+      target.setAutotuneMethod(autotuneMethodType);
+      target.setPerformanceEvaluationMethod(performanceEvalMethod);
+      target.setStartTime(replayStart.getMillis());
+      target.setEndTime(replayEnd.getMillis());
+      target.setGoal(goal);
+      target.setMessage("");
+      Map<String, Double> performance = new HashMap<>();
+      performance.put(performanceEvalMethod.name(), PerformanceEvaluateHelper.getPerformanceEvaluator(performanceEvalMethod, functionId,
+          functionId, new Interval(replayStart.getMillis(), replayEnd.getMillis()), mergedAnomalyResultDAO).evaluate());
+      target.setPerformance(performance);
+      targetId = autotuneConfigDAO.save(target);
+    }
+
+    // Setup threads and start to run
+    for(Map<String, String> config : tuningParameters) {
+      LOG.info("Running backfill replay with parameter configuration: {}" + config.toString());
+      FunctionAutotuneRunnable backfillRunnable = new FunctionAutotuneRunnable(detectionJobScheduler, anomalyFunctionDAO,
+          mergedAnomalyResultDAO, rawAnomalyResultDAO, autotuneConfigDAO);
+      backfillRunnable.setTuningFunctionId(functionId);
+      backfillRunnable.setFunctionAutotuneConfigId(targetId);
+      backfillRunnable.setReplayStart(replayStart);
+      backfillRunnable.setReplayEnd(replayEnd);
+      backfillRunnable.setForceBackfill(true);
+      backfillRunnable.setGoal(goal);
+      backfillRunnable.setPerformanceEvaluationMethod(performanceEvalMethod);
+      backfillRunnable.setAutotuneMethodType(autotuneMethodType);
+      backfillRunnable.setTuningParameter(config);
+
+      new Thread(backfillRunnable).start();
+    }
+
+    return Response.ok("Function AutoTune is running").build();
+  }
+
+  /**
+   * Parse the jsonobject and list all the possible configuration combinations
+   * @param tuningJSON the input json string from user
+   * @return full list of all the possible configurations
+   * @throws JSONException
+   */
+  private List<Map<String, String>> listAllTuningParameters(JSONObject tuningJSON) throws JSONException {
+    List<Map<String, String>> tuningParameters = new ArrayList<>();
+    Iterator<String> jsonFieldIterator = tuningJSON.keys();
+    Map<String, List<String>> fieldToParams = new HashMap<>();
+
+    int numPermutations = 1;
+    while(jsonFieldIterator.hasNext()){
+      String field = jsonFieldIterator.next();
+
+      if(field != null && !field.isEmpty()){
+        // JsonArray to String List
+        List<String> params = new ArrayList<>();
+        JSONArray paramArray = tuningJSON.getJSONArray(field);
+        if(paramArray.length() == 0){
+          continue;
+        }
+        for(int i = 0; i < paramArray.length(); i++){
+          params.add(paramArray.get(i).toString());
+        }
+        numPermutations *= params.size();
+        fieldToParams.put(field, params);
+      }
+    }
+
+    if(fieldToParams.size() == 0) { // No possible tuning parameters
+      return tuningParameters;
+    }
+    List<String> fieldList = new ArrayList<>(fieldToParams.keySet());
+    for(int i = 0; i < numPermutations; i++){
+      Map<String, String> combination = new HashMap<>();
+      int index = i;
+      for(String field : fieldList) {
+        List<String> params = fieldToParams.get(field);
+        combination.put(field, params.get(index % params.size()));
+        index /= params.size();
+      }
+      tuningParameters.add(combination);
+    }
+
+    return tuningParameters;
+  }
 }
