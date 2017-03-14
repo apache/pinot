@@ -117,9 +117,9 @@ HashService.prototype = {
       this.clear();
       var paramsUrl = window.location.hash.replace('#', '');
       const [newTab, newParams] = paramsUrl.split('?');
-      if (newParams) {
-        this.set(HASH_PARAMS.TAB, newTab);
+      this.set(HASH_PARAMS.TAB, newTab);
 
+      if (newParams) {
         newParams.split('&').forEach((part) => {
           const [key, value] = part.split('=');
           this.set(key, decodeURIComponent(value));
@@ -150,6 +150,10 @@ HashService.prototype = {
 
     // getting the tab and params from the hash
     const [newTab, newParams] = newHash.split('?');
+
+    if (!newParams) {
+      return true;
+    }
     // getting rid of 'rand' or '&rand' params
     const [paramsToCheck] = newParams.split(/[&]*rand/);
 

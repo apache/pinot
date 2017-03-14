@@ -23,7 +23,8 @@
   <div class="container">
     <div class="investigate-header">
       <span class="investigate-title">
-        {{metric}} <span>from</span> {{dataset}} <span>(&num;{{anomalyId}})</span>
+        {{metric}} <span> from </span> {{dataset}}
+        <div>&num;{{anomalyId}}</div>
       </span>
       <div class="investigate-button">
         <!-- <a href="#" class="thirdeye-link">Share</a> -->

@@ -11,7 +11,8 @@
         <div class="anomaly-card">
           <div class="anomaly-result-header">
             <div class="anomaly-result-title">
-              <span class="anomaly-result-metric">{{metric}}</span> from <span class="anomaly-result-dataset">{{dataset}}</span> (&num;{{anomalyId}})
+              <span class="anomaly-result-metric">{{metric}}</span> from <span class="anomaly-result-dataset">{{dataset}}</span>
+              <div>&num;{{anomalyId}}</div>
             </div>
             <div id="investigate-button-{{anomalyIndex}}">
               <a href="/thirdeye#investigate?anomalyId={{anomalyId}}" type="button" class="btn thirdeye-btn pull-right">Investigate</a>
