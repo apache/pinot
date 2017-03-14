@@ -31,10 +31,10 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.yammer.metrics.core.MetricsRegistry;
+import static com.linkedin.pinot.common.protocols.SegmentCompletionProtocol.ControllerResponseStatus;
+import static com.linkedin.pinot.common.protocols.SegmentCompletionProtocol.Request;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-
-import static com.linkedin.pinot.common.protocols.SegmentCompletionProtocol.*;
 
 
 public class SegmentCompletionTest {
@@ -42,6 +42,7 @@ public class SegmentCompletionTest {
   private MockPinotLLCRealtimeSegmentManager segmentManager;
   private MockSegmentCompletionManager segmentCompletionMgr;
   private Map<String, Object> fsmMap;
+  private Map<String, Long> commitTimeMap;
   private String segmentNameStr;
   private final String s1 = "S1";
   private final String s2 = "S2";
@@ -75,6 +76,10 @@ public class SegmentCompletionTest {
     Field fsmMapField = SegmentCompletionManager.class.getDeclaredField("_fsmMap");
     fsmMapField.setAccessible(true);
     fsmMap = (Map<String, Object>)fsmMapField.get(segmentCompletionMgr);
+
+    Field ctMapField = SegmentCompletionManager.class.getDeclaredField("_commitTimeMap");
+    ctMapField.setAccessible(true);
+    commitTimeMap = (Map<String, Long>)ctMapField.get(segmentCompletionMgr);
   }
 
   // Simulate a new controller taking over with an empty completion manager object,
@@ -160,7 +165,8 @@ public class SegmentCompletionTest {
     final String reason = "IAmLazy";
     // s1 stops consuming at t = 5;
     segmentCompletionMgr._secconds = 5;
-    params = new Request.Params().withInstanceId(s1).withOffset(s1Offset).withSegmentName(segmentNameStr).withReason(reason);
+    params = new Request.Params().withInstanceId(s1).withOffset(s1Offset).withSegmentName(segmentNameStr).withReason(
+        reason);
     response = segmentCompletionMgr.segmentStoppedConsuming(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.PROCESSED);
     Assert.assertEquals(new LLCSegmentName(segmentNameStr), segmentManager._stoppedSegmentName);
@@ -422,6 +428,125 @@ public class SegmentCompletionTest {
     Assert.assertTrue(fsmMap.containsKey(segmentNameStr));
   }
 
+  @Test
+  public void testHappyPathSlowCommit() throws Exception {
+    SegmentCompletionProtocol.Response response;
+    Request.Params params;
+    // s1 sends offset of 20, gets HOLD at t = 5s;
+    final long startTime = 5;
+    final String tableName = new LLCSegmentName(segmentNameStr).getTableName();
+    Assert.assertNull(commitTimeMap.get(tableName));
+    segmentCompletionMgr._secconds = startTime;
+    params = new Request.Params().withInstanceId(s1).withOffset(s1Offset).withSegmentName(segmentNameStr);
+    response = segmentCompletionMgr.segmentConsumed(params);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
+    // s2 sends offset of 40, gets HOLD
+    segmentCompletionMgr._secconds += 1;
+    params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr);
+    response = segmentCompletionMgr.segmentConsumed(params);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
+    // s3 sends offset of 30, gets catchup to 40
+    segmentCompletionMgr._secconds += 1;
+    params = new Request.Params().withInstanceId(s3).withOffset(s3Offset).withSegmentName(segmentNameStr);
+    response = segmentCompletionMgr.segmentConsumed(params);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.CATCH_UP);
+    Assert.assertEquals(response.getOffset(), s2Offset);
+    // Now s1 comes back, and is asked to catchup.
+    segmentCompletionMgr._secconds += 1;
+    params = new Request.Params().withInstanceId(s1).withOffset(s1Offset).withSegmentName(segmentNameStr);
+    response = segmentCompletionMgr.segmentConsumed(params);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.CATCH_UP);
+    // s2 is asked to commit.
+    segmentCompletionMgr._secconds += 1;
+    params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr);
+    response = segmentCompletionMgr.segmentConsumed(params);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
+    long commitTimeSec = response.getBuildTimeSec();
+    Assert.assertTrue(commitTimeSec > 0);
+
+    // Fast forward to one second before commit time, and send a lease renewal request for 20s
+    segmentCompletionMgr._secconds = startTime + commitTimeSec - 1;
+    params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr).withExtTimeSec(
+        20);
+    response = segmentCompletionMgr.extendBuildTime(params);
+    Assert.assertEquals(response.getStatus(), ControllerResponseStatus.PROCESSED);
+    Assert.assertTrue((fsmMap.containsKey(segmentNameStr)));
+
+    // Another lease extension in 19s.
+    segmentCompletionMgr._secconds += 19;
+    params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr).withExtTimeSec(
+        20);
+    response = segmentCompletionMgr.extendBuildTime(params);
+    Assert.assertEquals(response.getStatus(), ControllerResponseStatus.PROCESSED);
+    Assert.assertTrue((fsmMap.containsKey(segmentNameStr)));
+
+    // Commit in 15s
+    segmentCompletionMgr._secconds += 15;
+    params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr);
+    response = segmentCompletionMgr.segmentCommitStart(params);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE);
+    long commitTimeMs = (segmentCompletionMgr._secconds - startTime) * 1000;
+    Assert.assertEquals(commitTimeMap.get(tableName).longValue(), commitTimeMs);
+    segmentCompletionMgr._secconds += 55;
+    response = segmentCompletionMgr.segmentCommitEnd(params, true);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
+    // now FSM should be out of the map.
+    Assert.assertFalse((fsmMap.containsKey(segmentNameStr)));
+  }
+
+  @Test
+  public void testFailedSlowCommit() throws Exception
+  {
+    SegmentCompletionProtocol.Response response;
+    Request.Params params;
+    final String tableName = new LLCSegmentName(segmentNameStr).getTableName();
+    // s1 sends offset of 20, gets HOLD at t = 5s;
+    final long startTime = 5;
+    segmentCompletionMgr._secconds = startTime;
+    params = new Request.Params().withInstanceId(s1).withOffset(s1Offset).withSegmentName(segmentNameStr);
+    response = segmentCompletionMgr.segmentConsumed(params);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
+    // s2 sends offset of 40, gets HOLD
+    segmentCompletionMgr._secconds += 1;
+    params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr);
+    response = segmentCompletionMgr.segmentConsumed(params);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
+    // s3 sends offset of 30, gets catchup to 40
+    segmentCompletionMgr._secconds += 1;
+    params = new Request.Params().withInstanceId(s3).withOffset(s3Offset).withSegmentName(segmentNameStr);
+    response = segmentCompletionMgr.segmentConsumed(params);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.CATCH_UP);
+    Assert.assertEquals(response.getOffset(), s2Offset);
+    // Now s1 comes back, and is asked to catchup.
+    segmentCompletionMgr._secconds += 1;
+    params = new Request.Params().withInstanceId(s1).withOffset(s1Offset).withSegmentName(segmentNameStr);
+    response = segmentCompletionMgr.segmentConsumed(params);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.CATCH_UP);
+    // s2 is asked to commit.
+    segmentCompletionMgr._secconds += 1;
+    params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr);
+    response = segmentCompletionMgr.segmentConsumed(params);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
+    long commitTimeSec = response.getBuildTimeSec();
+    Assert.assertTrue(commitTimeSec > 0);
+
+    // Fast forward to one second before commit time, and send a lease renewal request for 20s
+    segmentCompletionMgr._secconds = startTime + commitTimeSec - 1;
+    params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr).withExtTimeSec(
+        20);
+    response = segmentCompletionMgr.extendBuildTime(params);
+    Assert.assertEquals(response.getStatus(), ControllerResponseStatus.PROCESSED);
+    Assert.assertTrue((fsmMap.containsKey(segmentNameStr)));
+
+    // Come back too late.
+    segmentCompletionMgr._secconds += 25;
+    params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr);
+    response = segmentCompletionMgr.segmentCommitStart(params);
+    Assert.assertEquals(response.getStatus(), ControllerResponseStatus.HOLD);
+    // now FSM should be out of the map.
+    Assert.assertFalse((fsmMap.containsKey(segmentNameStr)));
+    Assert.assertFalse(commitTimeMap.containsKey(tableName));
+  }
   @Test
   public void testControllerFailureDuringCommit() throws Exception {
     SegmentCompletionProtocol.Response response;

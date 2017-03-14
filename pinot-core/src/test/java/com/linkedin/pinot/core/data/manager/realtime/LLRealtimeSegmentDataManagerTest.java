@@ -183,7 +183,9 @@ public class LLRealtimeSegmentDataManagerTest {
     // We should consume initially...
     segmentDataManager._consumeOffsets.add(endOffset);
     final SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(
-        new SegmentCompletionProtocol.Response.Params().setStatus(SegmentCompletionProtocol.ControllerResponseStatus.HOLD).setOffset(endOffset));
+        new SegmentCompletionProtocol.Response.Params().withStatus(
+            SegmentCompletionProtocol.ControllerResponseStatus.HOLD).withOffset(
+            endOffset));
     // And then never consume as long as we get a hold response, 100 times.
     for (int i = 0; i < 100; i++) {
       segmentDataManager._responses.add(response);
@@ -209,10 +211,10 @@ public class LLRealtimeSegmentDataManagerTest {
     // We should consume initially...
     segmentDataManager._consumeOffsets.add(endOffset);
     final SegmentCompletionProtocol.Response holdResponse = new SegmentCompletionProtocol.Response(
-        new SegmentCompletionProtocol.Response.Params().setOffset(endOffset).setStatus(
+        new SegmentCompletionProtocol.Response.Params().withOffset(endOffset).withStatus(
             SegmentCompletionProtocol.ControllerResponseStatus.HOLD));
     final SegmentCompletionProtocol.Response commitResponse = new SegmentCompletionProtocol.Response(
-        new SegmentCompletionProtocol.Response.Params().setOffset(endOffset).setStatus(
+        new SegmentCompletionProtocol.Response.Params().withOffset(endOffset).withStatus(
             SegmentCompletionProtocol.ControllerResponseStatus.COMMIT));
     // And then never consume as long as we get a hold response, 100 times.
     segmentDataManager._responses.add(holdResponse);
@@ -240,15 +242,18 @@ public class LLRealtimeSegmentDataManagerTest {
     segmentDataManager._consumeOffsets.add(firstOffset);
     segmentDataManager._consumeOffsets.add(catchupOffset); // Offset after catchup
     final SegmentCompletionProtocol.Response holdResponse1 = new SegmentCompletionProtocol.Response(
-        new SegmentCompletionProtocol.Response.Params().setStatus(SegmentCompletionProtocol.ControllerResponseStatus.HOLD).
-            setOffset(firstOffset));
+        new SegmentCompletionProtocol.Response.Params().withStatus(
+            SegmentCompletionProtocol.ControllerResponseStatus.HOLD).
+            withOffset(firstOffset));
     final SegmentCompletionProtocol.Response catchupResponse = new SegmentCompletionProtocol.Response(
-        new SegmentCompletionProtocol.Response.Params().setStatus(SegmentCompletionProtocol.ControllerResponseStatus.CATCH_UP).setOffset(catchupOffset));
+        new SegmentCompletionProtocol.Response.Params().withStatus(
+            SegmentCompletionProtocol.ControllerResponseStatus.CATCH_UP).withOffset(
+            catchupOffset));
     final SegmentCompletionProtocol.Response holdResponse2 = new SegmentCompletionProtocol.Response(
-        new SegmentCompletionProtocol.Response.Params().setOffset(catchupOffset).setStatus(
+        new SegmentCompletionProtocol.Response.Params().withOffset(catchupOffset).withStatus(
             SegmentCompletionProtocol.ControllerResponseStatus.HOLD));
     final SegmentCompletionProtocol.Response commitResponse = new SegmentCompletionProtocol.Response(
-        new SegmentCompletionProtocol.Response.Params().setOffset(catchupOffset).setStatus(
+        new SegmentCompletionProtocol.Response.Params().withOffset(catchupOffset).withStatus(
             SegmentCompletionProtocol.ControllerResponseStatus.COMMIT));
     // And then never consume as long as we get a hold response, 100 times.
     segmentDataManager._responses.add(holdResponse1);
@@ -274,7 +279,7 @@ public class LLRealtimeSegmentDataManagerTest {
     final long endOffset = _startOffset + 500;
     segmentDataManager._consumeOffsets.add(endOffset);
     final SegmentCompletionProtocol.Response discardResponse = new SegmentCompletionProtocol.Response(
-        new SegmentCompletionProtocol.Response.Params().setOffset(endOffset).setStatus(
+        new SegmentCompletionProtocol.Response.Params().withOffset(endOffset).withStatus(
             SegmentCompletionProtocol.ControllerResponseStatus.DISCARD));
     segmentDataManager._responses.add(discardResponse);
 
@@ -296,7 +301,7 @@ public class LLRealtimeSegmentDataManagerTest {
     final long endOffset = _startOffset + 500;
     segmentDataManager._consumeOffsets.add(endOffset);
     SegmentCompletionProtocol.Response.Params params = new SegmentCompletionProtocol.Response.Params();
-    params.setOffset(endOffset).setStatus(SegmentCompletionProtocol.ControllerResponseStatus.KEEP);
+    params.withOffset(endOffset).withStatus(SegmentCompletionProtocol.ControllerResponseStatus.KEEP);
     final SegmentCompletionProtocol.Response keepResponse = new SegmentCompletionProtocol.Response(params);
     segmentDataManager._responses.add(keepResponse);
 
@@ -319,7 +324,7 @@ public class LLRealtimeSegmentDataManagerTest {
     // We should consume initially...
     segmentDataManager._consumeOffsets.add(endOffset);
     final SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(
-        new SegmentCompletionProtocol.Response.Params().setOffset(endOffset).setStatus(
+        new SegmentCompletionProtocol.Response.Params().withOffset(endOffset).withStatus(
             SegmentCompletionProtocol.ControllerResponseStatus.NOT_LEADER));
     // And then never consume as long as we get a Not leader response, 100 times.
     for (int i = 0; i < 100; i++) {

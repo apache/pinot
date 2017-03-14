@@ -63,6 +63,7 @@ public class SegmentCompletionManager {
   private final HelixManager _helixManager;
   // A map that holds the FSM for each segment.
   private final Map<String, SegmentCompletionFSM> _fsmMap = new ConcurrentHashMap<>();
+  private final Map<String, Long> _commitTimeMap = new ConcurrentHashMap<>();
   private final PinotLLCRealtimeSegmentManager _segmentManager;
   private final ControllerMetrics _controllerMetrics;
 
@@ -99,8 +100,7 @@ public class SegmentCompletionManager {
   }
 
   // We need to make sure that we never create multiple FSMs for the same segment, so this method must be synchronized.
-  private synchronized SegmentCompletionFSM lookupOrCreateFsm(final LLCSegmentName segmentName, String msgType,
-      long offset) {
+  private synchronized SegmentCompletionFSM lookupOrCreateFsm(final LLCSegmentName segmentName, String msgType) {
     final String segmentNameStr = segmentName.getSegmentName();
     SegmentCompletionFSM fsm = _fsmMap.get(segmentNameStr);
     if (fsm == null) {
@@ -153,7 +153,7 @@ public class SegmentCompletionManager {
     final long offset = reqParams.getOffset();
 
     LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
-    SegmentCompletionFSM fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_CONSUMED, offset);
+    SegmentCompletionFSM fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_CONSUMED);
     SegmentCompletionProtocol.Response response = fsm.segmentConsumed(instanceId, offset);
     if (fsm.isDone()) {
       LOGGER.info("Removing FSM (if present):{}", fsm.toString());
@@ -181,8 +181,26 @@ public class SegmentCompletionManager {
     final String instanceId = reqParams.getInstanceId();
     final long offset = reqParams.getOffset();
     LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
-    SegmentCompletionFSM fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMMIT, offset);
+    SegmentCompletionFSM fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMMIT);
     SegmentCompletionProtocol.Response response = fsm.segmentCommitStart(instanceId, offset);
+    if (fsm.isDone()) {
+      LOGGER.info("Removing FSM (if present):{}", fsm.toString());
+      _fsmMap.remove(segmentNameStr);
+    }
+    return response;
+  }
+
+  public SegmentCompletionProtocol.Response extendBuildTime(final SegmentCompletionProtocol.Request.Params reqParams) {
+    if (!_helixManager.isLeader()) {
+      return SegmentCompletionProtocol.RESP_NOT_LEADER;
+    }
+    final String segmentNameStr = reqParams.getSegmentName();
+    final String instanceId = reqParams.getInstanceId();
+    final long offset = reqParams.getOffset();
+    final int extTimeSec = reqParams.getExtTimeSec();
+    LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
+    SegmentCompletionFSM fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMMIT);
+    SegmentCompletionProtocol.Response response = fsm.extendBuildTime(instanceId, offset, extTimeSec);
     if (fsm.isDone()) {
       LOGGER.info("Removing FSM (if present):{}", fsm.toString());
       _fsmMap.remove(segmentNameStr);
@@ -205,7 +223,7 @@ public class SegmentCompletionManager {
     final long offset = reqParams.getOffset();
     final String reason = reqParams.getReason();
     LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
-    SegmentCompletionFSM fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_STOPPED_CONSUMING, offset);
+    SegmentCompletionFSM fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_STOPPED_CONSUMING);
     SegmentCompletionProtocol.Response response = fsm.stoppedConsuming(instanceId, offset, reason);
     if (fsm.isDone()) {
       LOGGER.info("Removing FSM (if present):{}", fsm.toString());
@@ -232,7 +250,7 @@ public class SegmentCompletionManager {
     final String instanceId = reqParams.getInstanceId();
     final long offset = reqParams.getOffset();
     LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
-    SegmentCompletionFSM fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMMIT, offset);
+    SegmentCompletionFSM fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMMIT);
     SegmentCompletionProtocol.Response response = fsm.segmentCommitEnd(instanceId, offset, success);
     if (fsm.isDone()) {
       LOGGER.info("Removing FSM (if present):{}", fsm.toString());
@@ -288,6 +306,7 @@ public class SegmentCompletionManager {
     private final SegmentCompletionManager _segmentCompletionManager;
     private final long _maxTimeToPickWinnerMs;
     private final long _maxTimeToNotifyWinnerMs;
+    private final long _initialCommitTimeMs;
     // Once the winner is notified, they are expected to commit right away. At this point, it is the segment build
     // time that we need to consider.
     // We may need to add some time here to allow for getting the lock? For now 0
@@ -320,8 +339,14 @@ public class SegmentCompletionManager {
       _startTimeMs = _segmentCompletionManager.getCurrentTimeMs();
       _maxTimeToPickWinnerMs = _startTimeMs + MAX_TIME_TO_PICK_WINNER_MS;
       _maxTimeToNotifyWinnerMs = _startTimeMs + MAX_TIME_TO_NOTIFY_WINNER_MS;
-      _maxTimeAllowedToCommitMs = _startTimeMs + MAX_TIME_TO_NOTIFY_WINNER_MS +
-          _segmentManager.getCommitTimeoutMS(_segmentName.getTableName());
+      long initialCommitTimeMs = MAX_TIME_TO_NOTIFY_WINNER_MS +
+              _segmentManager.getCommitTimeoutMS(_segmentName.getTableName());
+      Long savedCommitTime = _segmentCompletionManager._commitTimeMap.get(segmentName.getTableName());
+      if (savedCommitTime != null && savedCommitTime > initialCommitTimeMs) {
+        initialCommitTimeMs = savedCommitTime;
+      }
+      _initialCommitTimeMs = initialCommitTimeMs;
+      _maxTimeAllowedToCommitMs = _startTimeMs + _initialCommitTimeMs;
       LOGGER = LoggerFactory.getLogger("SegmentFinalizerFSM_"  + segmentName.getSegmentName());
     }
 
@@ -481,6 +506,27 @@ public class SegmentCompletionManager {
       }
     }
 
+    public SegmentCompletionProtocol.Response extendBuildTime(final String instanceId, final long offset, final int extTimeSec) {
+      final long now = _segmentCompletionManager.getCurrentTimeMs();
+      synchronized (this) {
+         LOGGER.info("Processing extendBuildTime({}, {}, {})", instanceId, offset, extTimeSec);
+        switch (_state) {
+          case PARTIAL_CONSUNIMG:
+          case HOLDING:
+          case COMMITTER_DECIDED:
+            return fail(instanceId, offset);
+          case COMMITTER_NOTIFIED:
+            return COMMITTER_NOTIFIED__extendBuidlTime(instanceId, offset, extTimeSec, now);
+          case COMMITTER_UPLOADING:
+          case COMMITTING:
+          case COMMITTED:
+          case ABORTED:
+          default:
+            return fail(instanceId, offset);
+        }
+      }
+    }
+
     /*
      * We can get this call only when the state is COMMITTER_UPLOADING. Also, the instanceId should be equal to
      * the _winner.
@@ -522,9 +568,10 @@ public class SegmentCompletionManager {
     }
 
     private SegmentCompletionProtocol.Response commit(String instanceId, long offset) {
-      LOGGER.info("{}:COMMIT for instance={} offset={}", _state, instanceId, offset);
-      return new SegmentCompletionProtocol.Response(new SegmentCompletionProtocol.Response.Params().setOffset(offset).setStatus(
-          SegmentCompletionProtocol.ControllerResponseStatus.COMMIT));
+      long allowedBuildTimeSec = (_maxTimeAllowedToCommitMs - _startTimeMs)/1000;
+      LOGGER.info("{}:COMMIT for instance={} offset={} buldTimeSec={}", _state, instanceId, offset, allowedBuildTimeSec);
+      return new SegmentCompletionProtocol.Response(new SegmentCompletionProtocol.Response.Params().withOffset(offset)
+          .withBuildTimeSec(allowedBuildTimeSec).withStatus( SegmentCompletionProtocol.ControllerResponseStatus.COMMIT));
     }
 
     private SegmentCompletionProtocol.Response discard(String instanceId, long offset) {
@@ -534,20 +581,20 @@ public class SegmentCompletionManager {
 
     private SegmentCompletionProtocol.Response keep(String instanceId, long offset) {
       LOGGER.info("{}:KEEP for instance={} offset={}", _state, instanceId, offset);
-      return new SegmentCompletionProtocol.Response(new SegmentCompletionProtocol.Response.Params().setOffset(offset).setStatus(
+      return new SegmentCompletionProtocol.Response(new SegmentCompletionProtocol.Response.Params().withOffset(offset).withStatus(
           SegmentCompletionProtocol.ControllerResponseStatus.KEEP));
     }
 
     private SegmentCompletionProtocol.Response catchup(String instanceId, long offset) {
       LOGGER.info("{}:CATCHUP for instance={} offset={}", _state, instanceId, offset);
-      return new SegmentCompletionProtocol.Response(new SegmentCompletionProtocol.Response.Params().setOffset(_winningOffset).setStatus(
-          SegmentCompletionProtocol.ControllerResponseStatus.CATCH_UP));
+      return new SegmentCompletionProtocol.Response(new SegmentCompletionProtocol.Response.Params().withOffset(
+          _winningOffset).withStatus(SegmentCompletionProtocol.ControllerResponseStatus.CATCH_UP));
     }
 
     private SegmentCompletionProtocol.Response hold(String instanceId, long offset) {
       LOGGER.info("{}:HOLD for instance={} offset={}", _state, instanceId, offset);
-      return new SegmentCompletionProtocol.Response(new SegmentCompletionProtocol.Response.Params().setStatus(
-          SegmentCompletionProtocol.ControllerResponseStatus.HOLD).setOffset(offset));
+      return new SegmentCompletionProtocol.Response(new SegmentCompletionProtocol.Response.Params().withStatus(
+          SegmentCompletionProtocol.ControllerResponseStatus.HOLD).withOffset(offset));
     }
 
     private SegmentCompletionProtocol.Response abortAndReturnHold(long now, String instanceId, long offset) {
@@ -744,12 +791,28 @@ public class SegmentCompletionManager {
       }
       LOGGER.info("{}:Uploading for instance={} offset={}", _state, instanceId, offset);
       _state = State.COMMITTER_UPLOADING;
+      long commitTimeMs = now - _startTimeMs;
+      if (commitTimeMs > _initialCommitTimeMs) {
+        // We assume that the commit time holds for all partitions. It is possible, though, that one partition
+        // commits at a lower time than another partition, and the two partitions are going simultaneously,
+        // and we may not get the maximum value all the time.
+        _segmentCompletionManager._commitTimeMap.put(_segmentName.getTableName(), commitTimeMs);
+      }
       return SegmentCompletionProtocol.RESP_COMMIT_CONTINUE;
     }
 
     private SegmentCompletionProtocol.Response COMMITTER_NOTIFIED__stoppedConsuming(String instanceId, long offset,
         String reason) {
       return processStoppedConsuming(instanceId, offset, reason, false);
+    }
+
+    private SegmentCompletionProtocol.Response COMMITTER_NOTIFIED__extendBuidlTime(String instanceId, long offset, int extTimeSec, long now) {
+      SegmentCompletionProtocol.Response response = abortIfTooLateAndReturnHold(now, instanceId, offset);
+      if (response == null) {
+        _maxTimeAllowedToCommitMs = now + extTimeSec * 1000;
+        response = SegmentCompletionProtocol.RESP_PROCESSED;
+      }
+      return response;
     }
 
     private SegmentCompletionProtocol.Response COMMITTER_UPLOADING__consumed(String instanceId, long offset, long now) {
@@ -873,7 +936,7 @@ public class SegmentCompletionManager {
         return response;
       }
       // Another committer (or same) came in while one was uploading. Ask them to hold in case this one fails.
-      return new SegmentCompletionProtocol.Response(new SegmentCompletionProtocol.Response.Params().setOffset(offset).setStatus(
+      return new SegmentCompletionProtocol.Response(new SegmentCompletionProtocol.Response.Params().withOffset(offset).withStatus(
           SegmentCompletionProtocol.ControllerResponseStatus.HOLD));
     }
 
