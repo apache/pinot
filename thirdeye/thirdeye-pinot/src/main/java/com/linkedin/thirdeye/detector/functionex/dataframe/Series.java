@@ -16,6 +16,13 @@ public abstract class Series {
     BOOLEAN
   }
 
+  enum JoinType {
+    INNER,
+    OUTER,
+    LEFT,
+    RIGHT
+  }
+
   @FunctionalInterface
   public interface DoubleBatchFunction {
     double apply(double[] values);
@@ -36,7 +43,7 @@ public abstract class Series {
     boolean apply(boolean[] values);
   }
 
-  public static class Bucket {
+  public static final class Bucket {
     final int[] fromIndex;
 
     Bucket(int[] fromIndex) {
@@ -48,7 +55,7 @@ public abstract class Series {
     }
   }
 
-  public static class SeriesGrouping {
+  public static final class SeriesGrouping {
     final Series keys;
     final Series source;
     final List<Bucket> buckets;
@@ -135,58 +142,6 @@ public abstract class Series {
     }
   }
 
-//  public static final class DoubleBucket extends Bucket {
-//    final double key;
-//
-//    DoubleBucket(double key, int[] fromIndex, Series source) {
-//      super(fromIndex, source);
-//      this.key = key;
-//    }
-//
-//    public double key() {
-//      return key;
-//    }
-//  }
-//
-//  public static final class LongBucket extends Bucket {
-//    final long key;
-//
-//    LongBucket(long key, int[] fromIndex, Series source) {
-//      super(fromIndex, source);
-//      this.key = key;
-//    }
-//
-//    public long key() {
-//      return key;
-//    }
-//  }
-//
-//  public static final class BooleanBucket extends Bucket {
-//    final boolean key;
-//
-//    BooleanBucket(boolean key, int[] fromIndex, Series source) {
-//      super(fromIndex, source);
-//      this.key = key;
-//    }
-//
-//    public boolean key() {
-//      return key;
-//    }
-//  }
-//
-//  public static final class StringBucket extends Bucket {
-//    final String key;
-//
-//    StringBucket(String key, int[] fromIndex, Series source) {
-//      super(fromIndex, source);
-//      this.key = key;
-//    }
-//
-//    public String key() {
-//      return key;
-//    }
-//  }
-
   public static final class JoinPair {
     final int left;
     final int right;
@@ -194,6 +149,30 @@ public abstract class Series {
     public JoinPair(int left, int right) {
       this.left = left;
       this.right = right;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (o == null || getClass() != o.getClass()) {
+        return false;
+      }
+
+      JoinPair joinPair = (JoinPair) o;
+
+      if (left != joinPair.left) {
+        return false;
+      }
+      return right == joinPair.right;
+    }
+
+    @Override
+    public int hashCode() {
+      int result = left;
+      result = 31 * result + right;
+      return result;
     }
   }
 
@@ -209,13 +188,37 @@ public abstract class Series {
   public abstract Series shift(int offset);
   public abstract boolean hasNull();
 
-  abstract Series project(int[] fromIndex);
-  abstract List<JoinPair> joinLeft(Series other);
+  public abstract SeriesGrouping groupByValue();
 
+  abstract Series project(int[] fromIndex);
   abstract int[] sortedIndex();
   abstract int[] nullIndex();
+  abstract int compare(Series that, int indexThis, int indexThat);
 
-  public abstract SeriesGrouping groupByValue();
+  public boolean isEmpty() {
+    return this.size() <= 0;
+  }
+
+  public Series head(int n) {
+    return this.slice(0, Math.min(n, this.size()));
+  }
+
+  public Series tail(int n) {
+    int len = this.size();
+    return this.slice(len - Math.min(n, len), len);
+  }
+
+  public Series reverse() {
+    int[] fromIndex = new int[this.size()];
+    for (int i = 0; i < fromIndex.length; i++) {
+      fromIndex[i] = fromIndex.length - i - 1;
+    }
+    return this.project(fromIndex);
+  }
+
+  public Series toType(SeriesType type) {
+    return DataFrame.toType(this, type);
+  }
 
   public SeriesGrouping groupByCount(int bucketSize) {
     if(bucketSize <= 0)
@@ -264,24 +267,60 @@ public abstract class Series {
     return new SeriesGrouping(DataFrame.toSeries(keys), this, buckets);
   }
 
-  public boolean isEmpty() {
-    return this.size() <= 0;
-  }
-  public Series head(int n) {
-    return this.slice(0, Math.min(n, this.size()));
-  }
-  public Series tail(int n) {
-    int len = this.size();
-    return this.slice(len - Math.min(n, len), len);
-  }
-  public Series reverse() {
-    int[] fromIndex = new int[this.size()];
-    for (int i = 0; i < fromIndex.length; i++) {
-      fromIndex[i] = fromIndex.length - i - 1;
+  List<JoinPair> join(Series other, JoinType type) {
+    // NOTE: merge join
+    Series that = other.toType(this.type());
+
+    int[] lref = this.sortedIndex();
+    int[] rref = that.sortedIndex();
+
+    List<JoinPair> pairs = new ArrayList<>();
+    int i = 0;
+    int j = 0;
+    while(i < this.size() || j < that.size()) {
+      if(j >= that.size() || (i < this.size() && this.compare(that, lref[i], rref[j]) < 0)) {
+        switch(type) {
+          case LEFT:
+          case OUTER:
+            pairs.add(new JoinPair(lref[i], -1));
+          default:
+        }
+        i++;
+      } else if(i >= this.size() || (j < that.size() && this.compare(that, lref[i], rref[j]) > 0)) {
+        switch(type) {
+          case RIGHT:
+          case OUTER:
+            pairs.add(new JoinPair(-1, rref[j]));
+          default:
+        }
+        j++;
+      } else if(i < this.size() && j < that.size()) {
+        // generate cross product
+
+        // count similar values on the left
+        int lcount = 1;
+        while(i + lcount < this.size() && this.compare(this, lref[i + lcount], lref[i + lcount - 1]) == 0) {
+          lcount++;
+        }
+
+        // count similar values on the right
+        int rcount = 1;
+        while(j + rcount < that.size() && that.compare(that, rref[j + rcount], rref[j + rcount - 1]) == 0) {
+          rcount++;
+        }
+
+        for(int l=0; l<lcount; l++) {
+          for(int r=0; r<rcount; r++) {
+            pairs.add(new JoinPair(lref[i + l], rref[j + r]));
+          }
+        }
+
+        i += lcount;
+        j += rcount;
+      }
     }
-    return this.project(fromIndex);
+
+    return pairs;
   }
-  public Series toType(SeriesType type) {
-    return DataFrame.toType(this, type);
-  }
+
 }

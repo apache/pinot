@@ -261,11 +261,6 @@ public final class StringSeries extends Series {
   }
 
   @Override
-  List<JoinPair> joinLeft(Series other) {
-    return null;
-  }
-
-  @Override
   public SeriesGrouping groupByValue() {
     if(this.isEmpty())
       return new SeriesGrouping(this);
@@ -310,12 +305,30 @@ public final class StringSeries extends Series {
   }
 
   @Override
+  int compare(Series that, int indexThis, int indexThat) {
+    return nullSafeStringComparator(this.values[indexThis], ((StringSeries)that).values[indexThat]);
+  }
+
+  @Override
   public int hashCode() {
     return Arrays.hashCode(this.values);
   }
 
   public static boolean isNull(String value) {
     return Objects.equals(value, NULL_VALUE);
+  }
+
+  static int nullSafeStringComparator(final String one, final String two) {
+    // NOTE: http://stackoverflow.com/questions/481813/how-to-simplify-a-null-safe-compareto-implementation
+    if (one == null ^ two == null) {
+      return (one == null) ? -1 : 1;
+    }
+
+    if (one == null && two == null) {
+      return 0;
+    }
+
+    return one.compareToIgnoreCase(two);
   }
 
   private void assertNotNull() {

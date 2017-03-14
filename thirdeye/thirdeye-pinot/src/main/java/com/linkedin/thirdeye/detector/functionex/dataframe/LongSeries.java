@@ -332,10 +332,28 @@ public final class LongSeries extends Series {
     return Arrays.copyOf(nulls, nullCount);
   }
 
-  @Override
-  List<JoinPair> joinLeft(Series other) {
-    return null;
-  }
+//  static List<JoinPair> partialCrossProduct(int l, long[] lval, int[] lref, int r, long[] rval, int[] rref) {
+//    List<JoinPair> pairs = new ArrayList<>();
+//
+//    int lcount = 1;
+//    while(l + lcount + 1 < lval.length && lval[lref[l + lcount + 1]] == lval[lref[l + lcount]]) {
+//      lcount++;
+//    }
+//
+//    // count similar values on the right
+//    int rcount = 1;
+//    while(r + rcount + 1 < rval.length && rval[rref[r + rcount + 1]] == rval[rref[r + rcount]]) {
+//      rcount++;
+//    }
+//
+//    for(int i=0; i<lcount; i++) {
+//      for(int j=0; j<rcount; j++) {
+//        pairs.add(new JoinPair(lref[i], rref[j]));
+//      }
+//    }
+//
+//    return pairs;
+//  }
 
   @Override
   public SeriesGrouping groupByValue() {
@@ -379,6 +397,11 @@ public final class LongSeries extends Series {
     LongSeries that = (LongSeries) o;
 
     return Arrays.equals(this.values, that.values);
+  }
+
+  @Override
+  int compare(Series that, int indexThis, int indexThat) {
+    return Long.compare(this.values[indexThis], ((LongSeries)that).values[indexThat]);
   }
 
   @Override

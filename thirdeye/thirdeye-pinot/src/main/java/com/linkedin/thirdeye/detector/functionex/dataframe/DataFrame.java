@@ -719,6 +719,10 @@ public class DataFrame {
     int[] sortedLeft = this.get(onLeftSeries).sortedIndex();
     int[] sortedRight = other.get(onRightSeries).sortedIndex();
 
+    // NOTE: assuming long
+    LongSeries l = this.toLongs(onLeftSeries);
+    LongSeries r = other.toLongs(onRightSeries);
+
     return null; // TODO
   }
 

@@ -321,11 +321,6 @@ public final class DoubleSeries extends Series {
   }
 
   @Override
-  List<JoinPair> joinLeft(Series other) {
-    return null;
-  }
-
-  @Override
   public SeriesGrouping groupByValue() {
     if(this.isEmpty())
       return new SeriesGrouping(this);
@@ -367,6 +362,11 @@ public final class DoubleSeries extends Series {
     DoubleSeries that = (DoubleSeries) o;
 
     return Arrays.equals(this.values, that.values);
+  }
+
+  @Override
+  int compare(Series that, int indexThis, int indexThat) {
+    return Double.compare(this.values[indexThis], ((DoubleSeries)that).values[indexThat]);
   }
 
   @Override

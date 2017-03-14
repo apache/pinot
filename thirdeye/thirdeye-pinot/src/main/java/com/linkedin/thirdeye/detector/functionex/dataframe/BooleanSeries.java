@@ -239,11 +239,6 @@ public final class BooleanSeries extends Series {
   }
 
   @Override
-  List<JoinPair> joinLeft(Series other) {
-    return null;
-  }
-
-  @Override
   public SeriesGrouping groupByValue() {
     if(this.isEmpty())
       return new SeriesGrouping(this);
@@ -286,6 +281,11 @@ public final class BooleanSeries extends Series {
     BooleanSeries that = (BooleanSeries) o;
 
     return Arrays.equals(this.values, that.values);
+  }
+
+  @Override
+  int compare(Series that, int indexThis, int indexThat) {
+    return Boolean.compare(this.values[indexThis], ((BooleanSeries)that).values[indexThat]);
   }
 
   @Override
