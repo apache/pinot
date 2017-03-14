@@ -5,8 +5,6 @@ function AnomalyResultController(parentController) {
 
   this.anomalyResultView.applyButtonEvent.attach(this.applyButtonEventHandler.bind(this));
   this.anomalyResultView.investigateButtonClickEvent.attach(this.investigateButtonClickEventHandler.bind(this));
-  this.anomalyResultView.showDetailsLinkClickEvent.attach(this.showDetailsLinkClickEventHandler.bind(this));
-  this.anomalyResultView.anomalyFeedbackSelectEvent.attach(this.anomalyFeedbackSelectEventHandler.bind(this));
 
   this.anomalyResultView.init();
 }
@@ -14,13 +12,16 @@ function AnomalyResultController(parentController) {
 AnomalyResultController.prototype = {
   handleAppEvent: function () {
     console.log("Inside handle app event of AnomalyResultController");
-    this.anomalyResultModel.reset();
-    this.anomalyResultModel.setParams();
-    this.anomalyResultModel.rebuild();
-  },
-  handleAnomalyFeedbackChangeEvent: function(params) {
-    this.anomalyResultModel.setParams(params);
-    this.anomalyResultModel.updateAnomalyFeedback();
+    const params = HASH_SERVICE.getParams();
+    const hasSameParams = this.anomalyResultModel.hasSameParams(params);
+    if (hasSameParams) {
+      this.anomalyResultView.render();
+    } else {
+      this.anomalyResultView.destroy();
+      this.anomalyResultModel.reset();
+      this.anomalyResultModel.setParams(params);
+      this.anomalyResultModel.rebuild();
+    }
   },
   applyButtonEventHandler: function(sender, args) {
     console.log("Apply button Event in AnomalyResultController");
@@ -39,14 +40,4 @@ AnomalyResultController.prototype = {
     HASH_SERVICE.routeTo('app');
     // Send this event and the args to parent controller, to route to AnalysisController
   },
-  showDetailsLinkClickEventHandler: function (sender, args) {
-    console.log("received show details link click event at AnomalyResultController");
-    console.log(args);
-
-    // Send this event and the args to parent controller, to route to details page
-  },
-  anomalyFeedbackSelectEventHandler: function(sender, args) {
-    console.log("received anomaly feedback select event at AnomalyResultController");
-    this.handleAnomalyFeedbackChangeEvent(args);
-  }
 };

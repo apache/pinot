@@ -210,6 +210,10 @@ AnomalyResultView.prototype = {
 
 
   },
+
+  destroy() {
+    $("#anomaly-results-place-holder").html('');
+  },
   showSearchBarBasedOnMode : function() {
     var anomaliesSearchMode = $('#anomalies-search-mode').val();
     $('#anomalies-search-dashboard-container').hide();

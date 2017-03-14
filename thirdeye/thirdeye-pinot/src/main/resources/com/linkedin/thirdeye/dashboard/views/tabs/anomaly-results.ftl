@@ -6,6 +6,7 @@
     <span>
   </div>
   <div class="anomaly-cards-wrapper padding-all">
+    <div id='anomaly-spin-area'></div>
     {{#each this.anomalyDetailsList as |anomalyData anomalyIndex|}}
       {{#with anomalyData}}
         <div class="anomaly-card">
@@ -77,6 +78,10 @@
           </div>
         </div>
       {{/with}}
+    {{/else}}
+      <div class="anomaly-card">
+        No anomalies found.
+      </div>
     {{/each}}
   </div>
   <div class="text-center padding-all">

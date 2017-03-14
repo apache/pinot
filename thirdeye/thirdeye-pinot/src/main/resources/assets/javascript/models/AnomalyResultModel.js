@@ -30,6 +30,22 @@ function AnomalyResultModel() {
 }
 
 AnomalyResultModel.prototype = {
+  hasSameParams(params) {
+    if (!params.anomaliesSearchMode || !this.anomaliesSearchMode) {
+      return false;
+    }
+    const paramKeys = Object.keys(params);
+    for (let index in paramKeys){
+      let key = paramKeys[index];
+      if (key !== 'tab' && key !== 'rand') {
+        if (!!this[key] && !HASH_PARAMS.isSame(key, params[key],this[key])) {
+          return false;
+        }
+      }
+    }
+    return true;
+  },
+
   reset : function() {
     console.log('Reset of anomaly result model');
     this.metricIds = null;
@@ -40,9 +56,8 @@ AnomalyResultModel.prototype = {
 
   },
   // Call setParams every time there is a change to the model
-  setParams : function() {
+  setParams : function(params) {
     console.log("Set params of Anomaly Result Model");
-    var params = HASH_SERVICE.getParams();
     if (params != undefined) {
       console.log("params");
       if (params[HASH_PARAMS.ANOMALIES_ANOMALIES_SEARCH_MODE] != undefined) {
@@ -166,10 +181,8 @@ AnomalyResultModel.prototype = {
    */
   formatAnomalies() {
     this.anomaliesWrapper.anomalyDetailsList.forEach((anomaly) => {
-      if (anomaly) {
-        anomaly.duration = this.getRegionDuration(anomaly.anomalyRegionStart, anomaly.anomalyRegionEnd);
-        anomaly.changeDelta = this.getChangeDelta(anomaly.current, anomaly.baseline);
-      }
+      anomaly.duration = this.getRegionDuration(anomaly.anomalyRegionStart, anomaly.anomalyRegionEnd);
+      anomaly.changeDelta = this.getChangeDelta(anomaly.current, anomaly.baseline);
     });
   },
 
