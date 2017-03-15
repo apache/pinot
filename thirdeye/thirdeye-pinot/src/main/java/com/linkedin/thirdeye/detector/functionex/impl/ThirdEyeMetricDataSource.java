@@ -85,15 +85,15 @@ public class ThirdEyeMetricDataSource implements AnomalyFunctionExDataSource<Str
     result.renameSeries(dto.getTimeColumn(),COLUMN_TIMESTAMP);
     result.renameSeries(function + "_" + metric, COLUMN_METRIC);
 
-    Series s = result.toLongs(COLUMN_TIMESTAMP).map(new LongSeries.LongFunction() {
+    Series s = result.getLongs(COLUMN_TIMESTAMP).map(new LongSeries.LongFunction() {
       @Override
-      public long apply(long value) {
-        return tg.toMillis(value);
+      public long apply(long... values) {
+        return tg.toMillis(values[0]);
       }
     });
     result.addSeries(COLUMN_TIMESTAMP, s);
 
-    return result.sortBy(COLUMN_TIMESTAMP);
+    return result.sortedBy(COLUMN_TIMESTAMP);
   }
 
   static Collection<Filter> getAdvancedFilters(List<NameValuePair> params) {

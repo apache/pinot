@@ -2,13 +2,7 @@ package com.linkedin.thirdeye.detector.functionex.dataframe;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
-import org.apache.commons.lang.math.NumberUtils;
 
 
 public final class BooleanSeries extends Series {
@@ -16,7 +10,7 @@ public final class BooleanSeries extends Series {
 
   boolean[] values;
 
-  public static class BooleanBatchAnd implements Series.BooleanBatchFunction {
+  public static class BooleanBatchAnd implements BooleanFunction {
     @Override
     public boolean apply(boolean[] values) {
       if(values.length <= 0)
@@ -29,7 +23,7 @@ public final class BooleanSeries extends Series {
     }
   }
 
-  public static class BooleanBatchOr implements Series.BooleanBatchFunction {
+  public static class BooleanBatchOr implements BooleanFunction {
     @Override
     public boolean apply(boolean[] values) {
       if(values.length <= 0)
@@ -42,7 +36,7 @@ public final class BooleanSeries extends Series {
     }
   }
 
-  public static class BooleanBatchLast implements Series.BooleanBatchFunction {
+  public static class BooleanBatchLast implements BooleanFunction {
     @Override
     public boolean apply(boolean[] values) {
       if(values.length <= 0)
@@ -61,23 +55,23 @@ public final class BooleanSeries extends Series {
   }
 
   @Override
-  public DoubleSeries toDoubles() {
-    return DataFrame.toDoubles(this);
+  public DoubleSeries getDoubles() {
+    return DataFrame.getDoubles(this);
   }
 
   @Override
-  public LongSeries toLongs() {
-    return DataFrame.toLongs(this);
+  public LongSeries getLongs() {
+    return DataFrame.getLongs(this);
   }
 
   @Override
-  public BooleanSeries toBooleans() {
+  public BooleanSeries getBooleans() {
     return DataFrame.toBooleans(this);
   }
 
   @Override
-  public StringSeries toStrings() {
-    return DataFrame.toStrings(this);
+  public StringSeries getStrings() {
+    return DataFrame.getStrings(this);
   }
 
   @Override
@@ -120,8 +114,40 @@ public final class BooleanSeries extends Series {
   }
 
   @Override
+  public BooleanSeries sliceFrom(int from) {
+    return (BooleanSeries)super.sliceFrom(from);
+  }
+
+  @Override
+  public BooleanSeries sliceTo(int to) {
+    return (BooleanSeries)super.sliceTo(to);
+  }
+
+  @Override
   public BooleanSeries reverse() {
     return (BooleanSeries)super.reverse();
+  }
+
+  @Override
+  public BooleanSeries map(BooleanFunction function) {
+    boolean[] newValues = new boolean[this.values.length];
+    for(int i=0; i<this.values.length; i++) {
+      newValues[i] = function.apply(this.values[i]);
+    }
+    return new BooleanSeries(newValues);
+  }
+
+  @Override
+  public BooleanSeries aggregate(BooleanFunction function) {
+    return new BooleanSeries(function.apply(this.values));
+  }
+
+  @Override
+  public BooleanSeries append(Series series) {
+    boolean[] values = new boolean[this.size() + series.size()];
+    System.arraycopy(this.values, 0, values, 0, this.size());
+    System.arraycopy(series.getBooleans().values, 0, values, this.size(), series.size());
+    return new BooleanSeries(values);
   }
 
   public boolean allTrue() {

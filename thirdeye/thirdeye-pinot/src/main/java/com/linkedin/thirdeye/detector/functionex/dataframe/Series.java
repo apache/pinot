@@ -25,23 +25,38 @@ public abstract class Series {
   }
 
   @FunctionalInterface
-  public interface DoubleBatchFunction {
-    double apply(double[] values);
+  public interface DoubleConditional {
+    boolean apply(double value);
   }
 
   @FunctionalInterface
-  public interface LongBatchFunction {
-    long apply(long[] values);
+  public interface LongConditional {
+    boolean apply(long value);
   }
 
   @FunctionalInterface
-  public interface StringBatchFunction {
-    String apply(String[] values);
+  public interface StringConditional {
+    boolean apply(String value);
   }
 
   @FunctionalInterface
-  public interface BooleanBatchFunction {
-    boolean apply(boolean[] values);
+  public interface DoubleFunction {
+    double apply(double... values);
+  }
+
+  @FunctionalInterface
+  public interface LongFunction {
+    long apply(long... values);
+  }
+
+  @FunctionalInterface
+  public interface StringFunction {
+    String apply(String... values);
+  }
+
+  @FunctionalInterface
+  public interface BooleanFunction {
+    boolean apply(boolean... values);
   }
 
   public static final class Bucket {
@@ -99,40 +114,32 @@ public abstract class Series {
       return this.keys.isEmpty();
     }
 
-    public DataFrame aggregate(DoubleBatchFunction function) {
-      double[] values = new double[this.size()];
-      int i = 0;
-      for(Bucket b : this.buckets) {
-        values[i++] = function.apply(this.source.project(b.fromIndex).toDoubles().values());
-      }
-      return makeAggregate(this.keys, DataFrame.toSeries(values));
+    public DataFrame aggregate(DoubleFunction function) {
+      DoubleSeries s = new DoubleSeries();
+      for(Bucket b : this.buckets)
+        s = s.append(this.source.project(b.fromIndex).aggregate(function));
+      return makeAggregate(this.keys, s);
     }
 
-    public DataFrame aggregate(LongBatchFunction function) {
-      long[] values = new long[this.size()];
-      int i = 0;
-      for(Bucket b : this.buckets) {
-        values[i++] = function.apply(this.source.project(b.fromIndex).toLongs().values());
-      }
-      return makeAggregate(this.keys, DataFrame.toSeries(values));
+    public DataFrame aggregate(LongFunction function) {
+      LongSeries s = new LongSeries();
+      for(Bucket b : this.buckets)
+        s = s.append(this.source.project(b.fromIndex).aggregate(function));
+      return makeAggregate(this.keys, s);
     }
 
-    public DataFrame aggregate(StringBatchFunction function) {
-      String[] values = new String[this.size()];
-      int i = 0;
-      for(Bucket b : this.buckets) {
-        values[i++] = function.apply(this.source.project(b.fromIndex).toStrings().values());
-      }
-      return makeAggregate(this.keys, DataFrame.toSeries(values));
+    public DataFrame aggregate(StringFunction function) {
+      StringSeries s = new StringSeries();
+      for(Bucket b : this.buckets)
+        s = s.append(this.source.project(b.fromIndex).aggregate(function));
+      return makeAggregate(this.keys, s);
     }
 
-    public DataFrame aggregate(BooleanBatchFunction function) {
-      boolean[] values = new boolean[this.size()];
-      int i = 0;
-      for(Bucket b : this.buckets) {
-        values[i++] = function.apply(this.source.project(b.fromIndex).toBooleans().values());
-      }
-      return makeAggregate(this.keys, DataFrame.toSeries(values));
+    public DataFrame aggregate(BooleanFunction function) {
+      BooleanSeries s = new BooleanSeries();
+      for(Bucket b : this.buckets)
+        s = s.append(this.source.project(b.fromIndex).aggregate(function));
+      return makeAggregate(this.keys, s);
     }
 
     static DataFrame makeAggregate(Series keys, Series values) {
@@ -178,10 +185,10 @@ public abstract class Series {
   }
 
   public abstract int size();
-  public abstract DoubleSeries toDoubles();
-  public abstract LongSeries toLongs();
-  public abstract BooleanSeries toBooleans();
-  public abstract StringSeries toStrings();
+  public abstract DoubleSeries getDoubles();
+  public abstract LongSeries getLongs();
+  public abstract BooleanSeries getBooleans();
+  public abstract StringSeries getStrings();
   public abstract SeriesType type();
   public abstract Series slice(int from, int to);
   public abstract Series sorted();
@@ -189,8 +196,7 @@ public abstract class Series {
   public abstract Series shift(int offset);
   public abstract boolean hasNull();
   public abstract Series unique();
-
-//  public abstract SeriesGrouping groupByValue();
+  public abstract Series append(Series series);
 
   abstract Series project(int[] fromIndex);
   abstract int[] sortedIndex();
@@ -210,12 +216,76 @@ public abstract class Series {
     return this.slice(len - Math.min(n, len), len);
   }
 
+  public Series sliceFrom(int from) {
+    return this.slice(from, this.size());
+  }
+
+  public Series sliceTo(int to) {
+    return this.slice(0, to);
+  }
+
   public Series reverse() {
     int[] fromIndex = new int[this.size()];
     for (int i = 0; i < fromIndex.length; i++) {
       fromIndex[i] = fromIndex.length - i - 1;
     }
     return this.project(fromIndex);
+  }
+
+  public BooleanSeries map(DoubleConditional conditional) {
+    return this.getDoubles().map(conditional);
+  }
+
+  public BooleanSeries map(LongConditional conditional) {
+    return this.getLongs().map(conditional);
+  }
+
+  public BooleanSeries map(StringConditional conditional) {
+    return this.getStrings().map(conditional);
+  }
+
+  public DoubleSeries map(DoubleFunction function) {
+    return this.getDoubles().map(function);
+  }
+
+  public LongSeries map(LongFunction function) {
+    return this.getLongs().map(function);
+  }
+
+  public StringSeries map(StringFunction function) {
+    return this.getStrings().map(function);
+  }
+
+  public BooleanSeries map(BooleanFunction function) {
+    return this.getBooleans().map(function);
+  }
+
+  public DoubleSeries aggregate(DoubleFunction function) {
+    return this.getDoubles().aggregate(function);
+  }
+
+  public LongSeries aggregate(LongFunction function) {
+    return this.getLongs().aggregate(function);
+  }
+
+  public StringSeries aggregate(StringFunction function) {
+    return this.getStrings().aggregate(function);
+  }
+
+  public BooleanSeries aggregate(BooleanFunction function) {
+    return this.getBooleans().aggregate(function);
+  }
+
+  public DoubleSeries fillNull(double value) {
+    return this.getDoubles().fillNull(value);
+  }
+
+  public LongSeries fillNull(long value) {
+    return this.getLongs().fillNull(value);
+  }
+
+  public StringSeries fillNull(String value) {
+    return this.getStrings().fillNull(value);
   }
 
   public Series toType(SeriesType type) {

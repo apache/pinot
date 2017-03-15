@@ -2,7 +2,6 @@ package com.linkedin.thirdeye.detector.functionex.dataframe;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -13,17 +12,7 @@ public final class LongSeries extends Series {
 
   long[] values;
 
-  @FunctionalInterface
-  public interface LongFunction {
-    long apply(long value);
-  }
-
-  @FunctionalInterface
-  public interface LongConditional {
-    boolean apply(long value);
-  }
-
-  public static class LongBatchSum implements Series.LongBatchFunction {
+  public static class LongBatchSum implements LongFunction {
     @Override
     public long apply(long[] values) {
       long sum = 0;
@@ -34,7 +23,7 @@ public final class LongSeries extends Series {
     }
   }
 
-  public static class LongBatchLast implements Series.LongBatchFunction {
+  public static class LongBatchLast implements LongFunction {
     @Override
     public long apply(long[] values) {
       if(values.length <= 0)
@@ -48,23 +37,23 @@ public final class LongSeries extends Series {
   }
 
   @Override
-  public DoubleSeries toDoubles() {
-    return DataFrame.toDoubles(this);
+  public DoubleSeries getDoubles() {
+    return DataFrame.getDoubles(this);
   }
 
   @Override
-  public LongSeries toLongs() {
-    return DataFrame.toLongs(this);
+  public LongSeries getLongs() {
+    return DataFrame.getLongs(this);
   }
 
   @Override
-  public BooleanSeries toBooleans() {
+  public BooleanSeries getBooleans() {
     return DataFrame.toBooleans(this);
   }
 
   @Override
-  public StringSeries toStrings() {
-    return DataFrame.toStrings(this);
+  public StringSeries getStrings() {
+    return DataFrame.getStrings(this);
   }
 
   @Override
@@ -133,34 +122,57 @@ public final class LongSeries extends Series {
   }
 
   @Override
+  public LongSeries sliceFrom(int from) {
+    return (LongSeries)super.sliceFrom(from);
+  }
+
+  @Override
+  public LongSeries sliceTo(int to) {
+    return (LongSeries)super.sliceTo(to);
+  }
+
+  @Override
   public LongSeries reverse() {
     return (LongSeries)super.reverse();
   }
 
+  @Override
   public LongSeries map(LongFunction function) {
-    assertNotNull();
-    return this.mapWithNull(function);
-  }
-
-  public LongSeries mapWithNull(LongFunction function) {
     long[] newValues = new long[this.values.length];
     for(int i=0; i<this.values.length; i++) {
-      newValues[i] = function.apply(this.values[i]);
+      if(isNull(this.values[i])) {
+        newValues[i] = NULL_VALUE;
+      } else {
+        newValues[i] = function.apply(this.values[i]);
+      }
     }
     return new LongSeries(newValues);
   }
 
+  @Override
   public BooleanSeries map(LongConditional conditional) {
-    assertNotNull();
-    return this.mapWithNull(conditional);
-  }
-
-  public BooleanSeries mapWithNull(LongConditional conditional) {
     boolean[] newValues = new boolean[this.values.length];
     for(int i=0; i<this.values.length; i++) {
-      newValues[i] = conditional.apply(this.values[i]);
+      if(isNull(this.values[i])) {
+        newValues[i] = BooleanSeries.NULL_VALUE;
+      } else {
+        newValues[i] = conditional.apply(this.values[i]);
+      }
     }
     return new BooleanSeries(newValues);
+  }
+
+  @Override
+  public LongSeries aggregate(LongFunction function) {
+    return new LongSeries(function.apply(this.values));
+  }
+
+  @Override
+  public LongSeries append(Series series) {
+    long[] values = new long[this.size() + series.size()];
+    System.arraycopy(this.values, 0, values, 0, this.size());
+    System.arraycopy(series.getLongs().values, 0, values, this.size(), series.size());
+    return new LongSeries(values);
   }
 
   @Override
@@ -244,20 +256,24 @@ public final class LongSeries extends Series {
   }
 
   public long min() {
-    assertNotEmpty(this.values);
-    long m = this.values[0];
+    long m = NULL_VALUE;
     for(long n : this.values) {
-      m = Math.min(m, n);
+      if(!isNull(n) && (isNull(m) || n < m))
+        m = n;
     }
+    if(isNull(m))
+      throw new IllegalStateException("No valid minimum value");
     return m;
   }
 
   public long max() {
-    assertNotEmpty(this.values);
-    long m = this.values[0];
+    long m = NULL_VALUE;
     for(long n : this.values) {
-      m = Math.max(m, n);
+      if(!isNull(n) && (isNull(m) || n > m))
+        m = n;
     }
+    if(isNull(m))
+      throw new IllegalStateException("No valid maximum value");
     return m;
   }
 
@@ -291,6 +307,7 @@ public final class LongSeries extends Series {
     return new LongSeries(values);
   }
 
+  @Override
   public LongSeries fillNull(long value) {
     long[] values = Arrays.copyOf(this.values, this.values.length);
     for(int i=0; i<values.length; i++) {

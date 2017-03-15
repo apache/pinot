@@ -15,17 +15,7 @@ public final class StringSeries extends Series {
 
   String[] values;
 
-  @FunctionalInterface
-  public interface StringFunction {
-    String apply(String value);
-  }
-
-  @FunctionalInterface
-  public interface StringConditional {
-    boolean apply(String value);
-  }
-
-  public static class StringBatchConcat implements Series.StringBatchFunction {
+  public static class StringBatchConcat implements StringFunction {
     final String delimiter;
 
     public StringBatchConcat(String delimiter) {
@@ -34,6 +24,9 @@ public final class StringSeries extends Series {
 
     @Override
     public String apply(String[] values) {
+      if(values.length <= 0)
+        return "";
+
       StringBuilder builder = new StringBuilder();
       for(int i=0; i<values.length - 1; i++) {
         builder.append(values[i]);
@@ -44,7 +37,7 @@ public final class StringSeries extends Series {
     }
   }
 
-  public static class StringBatchLast implements Series.StringBatchFunction {
+  public static class StringBatchLast implements StringFunction {
     @Override
     public String apply(String[] values) {
       if(values.length <= 0)
@@ -58,23 +51,23 @@ public final class StringSeries extends Series {
   }
 
   @Override
-  public DoubleSeries toDoubles() {
-    return DataFrame.toDoubles(this);
+  public DoubleSeries getDoubles() {
+    return DataFrame.getDoubles(this);
   }
 
   @Override
-  public LongSeries toLongs() {
-    return DataFrame.toLongs(this);
+  public LongSeries getLongs() {
+    return DataFrame.getLongs(this);
   }
 
   @Override
-  public BooleanSeries toBooleans() {
+  public BooleanSeries getBooleans() {
     return DataFrame.toBooleans(this);
   }
 
   @Override
-  public StringSeries toStrings() {
-    return DataFrame.toStrings(this);
+  public StringSeries getStrings() {
+    return DataFrame.getStrings(this);
   }
 
   @Override
@@ -133,34 +126,57 @@ public final class StringSeries extends Series {
   }
 
   @Override
+  public StringSeries sliceFrom(int from) {
+    return (StringSeries)super.sliceFrom(from);
+  }
+
+  @Override
+  public StringSeries sliceTo(int to) {
+    return (StringSeries)super.sliceTo(to);
+  }
+
+  @Override
   public StringSeries reverse() {
     return (StringSeries) super.reverse();
   }
 
+  @Override
   public StringSeries map(StringFunction function) {
-    assertNotNull();
-    return this.mapWithNull(function);
-  }
-
-  public StringSeries mapWithNull(StringFunction function) {
     String[] newValues = new String[this.values.length];
     for(int i=0; i<this.values.length; i++) {
-      newValues[i] = function.apply(this.values[i]);
+      if(isNull(this.values[i])) {
+        newValues[i] = NULL_VALUE;
+      } else {
+        newValues[i] = function.apply(this.values[i]);
+      }
     }
     return new StringSeries(newValues);
   }
 
+  @Override
   public BooleanSeries map(StringConditional conditional) {
-    assertNotNull();
-    return this.mapWithNull(conditional);
-  }
-
-  public BooleanSeries mapWithNull(StringConditional conditional) {
     boolean[] newValues = new boolean[this.values.length];
     for(int i=0; i<this.values.length; i++) {
-      newValues[i] = conditional.apply(this.values[i]);
+      if(isNull(this.values[i])) {
+        newValues[i] = BooleanSeries.NULL_VALUE;
+      } else {
+        newValues[i] = conditional.apply(this.values[i]);
+      }
     }
     return new BooleanSeries(newValues);
+  }
+
+  @Override
+  public StringSeries aggregate(StringFunction function) {
+    return new StringSeries(function.apply(this.values));
+  }
+
+  @Override
+  public StringSeries append(Series series) {
+    String[] values = new String[this.size() + series.size()];
+    System.arraycopy(this.values, 0, values, 0, this.size());
+    System.arraycopy(series.getStrings().values, 0, values, this.size(), series.size());
+    return new StringSeries(values);
   }
 
   @Override
@@ -183,6 +199,7 @@ public final class StringSeries extends Series {
     return builder.toString();
   }
 
+  @Override
   public StringSeries fillNull(String value) {
     String[] values = Arrays.copyOf(this.values, this.values.length);
     for(int i=0; i<values.length; i++) {

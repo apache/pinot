@@ -75,19 +75,19 @@ public class DataFrame {
       return new Series.SeriesGrouping(keys, this.source.get(seriesName), this.buckets);
     }
 
-    public DataFrame aggregate(String seriesName, Series.DoubleBatchFunction function) {
+    public DataFrame aggregate(String seriesName, Series.DoubleFunction function) {
       return this.get(seriesName).aggregate(function);
     }
 
-    public DataFrame aggregate(String seriesName, Series.LongBatchFunction function) {
+    public DataFrame aggregate(String seriesName, Series.LongFunction function) {
       return this.get(seriesName).aggregate(function);
     }
 
-    public DataFrame aggregate(String seriesName, Series.StringBatchFunction function) {
+    public DataFrame aggregate(String seriesName, Series.StringFunction function) {
       return this.get(seriesName).aggregate(function);
     }
 
-    public DataFrame aggregate(String seriesName, Series.BooleanBatchFunction function) {
+    public DataFrame aggregate(String seriesName, Series.BooleanFunction function) {
       return this.get(seriesName).aggregate(function);
     }
   }
@@ -155,11 +155,11 @@ public class DataFrame {
   }
 
   public DataFrame sliceRows(int from, int to) {
-    DataFrame newDataFrame = new DataFrame();
+    DataFrame df = new DataFrame();
     for(Map.Entry<String, Series> e : this.series.entrySet()) {
-      newDataFrame.addSeries(e.getKey(), e.getValue().slice(from, to));
+      df.addSeries(e.getKey(), e.getValue().slice(from, to));
     }
-    return newDataFrame;
+    return df;
   }
 
   public boolean isEmpty() {
@@ -167,45 +167,47 @@ public class DataFrame {
   }
 
   public DataFrame copy() {
-    DataFrame newDataFrame = new DataFrame();
+    DataFrame df = new DataFrame();
     for(Map.Entry<String, Series> e : this.series.entrySet()) {
-      newDataFrame.addSeries(e.getKey(), e.getValue().copy());
+      df.addSeries(e.getKey(), e.getValue().copy());
     }
-    return newDataFrame;
+    return df;
   }
 
-  public void addSeries(String seriesName, Series s) {
+  public DataFrame addSeries(String seriesName, Series s) {
     if(seriesName == null || !SERIES_NAME_PATTERN.matcher(seriesName).matches())
       throw new IllegalArgumentException(String.format("Series name must match pattern '%s'", SERIES_NAME_PATTERN));
     if(!this.series.isEmpty() && s.size() != this.size())
       throw new IllegalArgumentException("DataFrame index and series must be of same length");
-    series.put(seriesName, s);
+    this.series.put(seriesName, s);
+    return this;
   }
 
-  public void addSeries(String seriesName, double... values) {
-    addSeries(seriesName, DataFrame.toSeries(values));
+  public DataFrame addSeries(String seriesName, double... values) {
+    return addSeries(seriesName, DataFrame.toSeries(values));
   }
 
-  public void addSeries(String seriesName, long... values) {
-    addSeries(seriesName, DataFrame.toSeries(values));
+  public DataFrame addSeries(String seriesName, long... values) {
+    return addSeries(seriesName, DataFrame.toSeries(values));
   }
 
-  public void addSeries(String seriesName, String... values) {
-    addSeries(seriesName, DataFrame.toSeries(values));
+  public DataFrame addSeries(String seriesName, String... values) {
+    return addSeries(seriesName, DataFrame.toSeries(values));
   }
 
-  public void addSeries(String seriesName, boolean... values) {
-    addSeries(seriesName, DataFrame.toSeries(values));
+  public DataFrame addSeries(String seriesName, boolean... values) {
+    return addSeries(seriesName, DataFrame.toSeries(values));
   }
 
-  public void dropSeries(String seriesName) {
+  public DataFrame dropSeries(String seriesName) {
+    assertSeriesExists(seriesName);
     this.series.remove(seriesName);
+    return this;
   }
 
-  public void renameSeries(String oldName, String newName) {
+  public DataFrame renameSeries(String oldName, String newName) {
     Series s = assertSeriesExists(oldName);
-    this.dropSeries(oldName);
-    this.addSeries(newName, s);
+    return this.dropSeries(oldName).addSeries(newName, s);
   }
 
   public Set<String> getSeriesNames() {
@@ -224,107 +226,176 @@ public class DataFrame {
     return this.series.containsKey(seriesName);
   }
 
-  public DoubleSeries toDoubles(String seriesName) {
-    return assertSeriesExists(seriesName).toDoubles();
+  public DoubleSeries getDoubles(String seriesName) {
+    return assertSeriesExists(seriesName).getDoubles();
   }
 
-  public LongSeries toLongs(String seriesName) {
-    return assertSeriesExists(seriesName).toLongs();
+  public LongSeries getLongs(String seriesName) {
+    return assertSeriesExists(seriesName).getLongs();
   }
 
-  public StringSeries toStrings(String seriesName) {
-    return assertSeriesExists(seriesName).toStrings();
+  public StringSeries getStrings(String seriesName) {
+    return assertSeriesExists(seriesName).getStrings();
   }
 
   public BooleanSeries toBooleans(String seriesName) {
-   return assertSeriesExists(seriesName).toBooleans();
+   return assertSeriesExists(seriesName).getBooleans();
   }
 
-  public DoubleSeries map(DoubleSeries.DoubleBatchFunction function, String... seriesNames) {
-    assertNotNull(seriesNames);
-    return this.mapWithNull(function, seriesNames);
+  //
+  // double function
+  //
+
+  public DoubleSeries map(Series.DoubleFunction function, String... seriesNames) {
+    return map(function, names2series(seriesNames));
   }
 
-  public DoubleSeries mapWithNull(DoubleSeries.DoubleBatchFunction function, String... seriesNames) {
-    DoubleSeries[] inputSeries = new DoubleSeries[seriesNames.length];
-    for(int i=0; i<seriesNames.length; i++) {
-      inputSeries[i] = assertSeriesExists(seriesNames[i]).toDoubles();
+  public static DoubleSeries map(Series.DoubleFunction function, Series... series) {
+    if(series.length <= 0)
+      return new DoubleSeries();
+
+    assertSameLength(series);
+
+    DoubleSeries[] doubleSeries = new DoubleSeries[series.length];
+    for(int i=0; i<series.length; i++) {
+      doubleSeries[i] = series[i].getDoubles();
     }
 
-    double[] output = new double[this.size()];
-    for(int i=0; i<this.size(); i++) {
-      double[] input = new double[seriesNames.length];
-      for(int j=0; j<inputSeries.length; j++) {
-        input[j] = inputSeries[j].values[i];
+    double[] output = new double[series[0].size()];
+    for(int i=0; i<series[0].size(); i++) {
+      double[] input = new double[series.length];
+
+      boolean isNull = false;
+      for(int j=0; j<series.length; j++) {
+        double value = doubleSeries[j].values[i];
+        if(DoubleSeries.isNull(value)) {
+          isNull = true;
+          break;
+        } else {
+          input[j] = value;
+        }
       }
-      output[i] = function.apply(input);
+
+      if(isNull) {
+        output[i] = DoubleSeries.NULL_VALUE;
+      } else {
+        output[i] = function.apply(input);
+      }
     }
 
     return new DoubleSeries(output);
   }
 
-  public LongSeries map(LongSeries.LongBatchFunction function, String... seriesNames) {
-    assertNotNull(seriesNames);
-    return this.mapWithNull(function, seriesNames);
+  //
+  // long function
+  //
+
+  public LongSeries map(Series.LongFunction function, String... seriesNames) {
+    return map(function, names2series(seriesNames));
   }
 
-  public LongSeries mapWithNull(LongSeries.LongBatchFunction function, String... seriesNames) {
-    LongSeries[] inputSeries = new LongSeries[seriesNames.length];
-    for(int i=0; i<seriesNames.length; i++) {
-      inputSeries[i] = assertSeriesExists(seriesNames[i]).toLongs();
+  public static LongSeries map(Series.LongFunction function, Series... series) {
+    if(series.length <= 0)
+      return new LongSeries();
+
+    assertSameLength(series);
+
+    LongSeries[] longSeries = new LongSeries[series.length];
+    for(int i=0; i<series.length; i++) {
+      longSeries[i] = series[i].getLongs();
     }
 
-    long[] output = new long[this.size()];
-    for(int i=0; i<this.size(); i++) {
-      long[] input = new long[seriesNames.length];
-      for(int j=0; j<inputSeries.length; j++) {
-        input[j] = inputSeries[j].values[i];
+    long[] output = new long[series[0].size()];
+    for(int i=0; i<series[0].size(); i++) {
+      long[] input = new long[series.length];
+      boolean isNull = false;
+      for(int j=0; j<series.length; j++) {
+        long value = longSeries[j].values[i];
+        if(LongSeries.isNull(value)) {
+          isNull = true;
+          break;
+        } else {
+          input[j] = value;
+        }
       }
-      output[i] = function.apply(input);
+
+      if(isNull) {
+        output[i] = LongSeries.NULL_VALUE;
+      } else {
+        output[i] = function.apply(input);
+      }
     }
 
     return new LongSeries(output);
   }
 
-  public StringSeries map(StringSeries.StringBatchFunction function, String... seriesNames) {
-    assertNotNull(seriesNames);
-    return this.mapWithNull(function, seriesNames);
+  //
+  // string function
+  //
+
+  public StringSeries map(Series.StringFunction function, String... seriesNames) {
+    return map(function, names2series(seriesNames));
   }
 
-  public StringSeries mapWithNull(StringSeries.StringBatchFunction function, String... seriesNames) {
-    StringSeries[] inputSeries = new StringSeries[seriesNames.length];
-    for(int i=0; i<seriesNames.length; i++) {
-      inputSeries[i] = assertSeriesExists(seriesNames[i]).toStrings();
+  public static StringSeries map(Series.StringFunction function, Series... series) {
+    if(series.length <= 0)
+      return new StringSeries();
+
+    assertSameLength(series);
+
+    StringSeries[] stringSeries = new StringSeries[series.length];
+    for(int i=0; i<series.length; i++) {
+      stringSeries[i] = series[i].getStrings();
     }
 
-    String[] output = new String[this.size()];
-    for(int i=0; i<this.size(); i++) {
-      String[] input = new String[seriesNames.length];
-      for(int j=0; j<inputSeries.length; j++) {
-        input[j] = inputSeries[j].values[i];
+    String[] output = new String[series[0].size()];
+    for(int i=0; i<series[0].size(); i++) {
+      String[] input = new String[series.length];
+      boolean isNull = false;
+      for(int j=0; j<series.length; j++) {
+        String value = stringSeries[j].values[i];
+        if(StringSeries.isNull(value)) {
+          isNull = true;
+          break;
+        } else {
+          input[j] = value;
+        }
       }
-      output[i] = function.apply(input);
+
+      if(isNull) {
+        output[i] = StringSeries.NULL_VALUE;
+      } else {
+        output[i] = function.apply(input);
+      }
     }
 
     return new StringSeries(output);
   }
 
-  public BooleanSeries map(BooleanSeries.BooleanBatchFunction function, String... seriesNames) {
-    assertNotNull(seriesNames);
-    return this.mapWithNull(function, seriesNames);
+  //
+  // boolean function
+  //
+
+  public BooleanSeries map(Series.BooleanFunction function, String... seriesNames) {
+    return map(function, names2series(seriesNames));
   }
 
-  public BooleanSeries mapWithNull(BooleanSeries.BooleanBatchFunction function, String... seriesNames) {
-    BooleanSeries[] inputSeries = new BooleanSeries[seriesNames.length];
-    for(int i=0; i<seriesNames.length; i++) {
-      inputSeries[i] = assertSeriesExists(seriesNames[i]).toBooleans();
+  public static BooleanSeries map(Series.BooleanFunction function, Series... series) {
+    if(series.length <= 0)
+      return new BooleanSeries();
+
+    assertSameLength(series);
+
+    BooleanSeries[] booleanSeries = new BooleanSeries[series.length];
+    for(int i=0; i<series.length; i++) {
+      booleanSeries[i] = series[i].getBooleans();
     }
 
-    boolean[] output = new boolean[this.size()];
-    for(int i=0; i<this.size(); i++) {
-      boolean[] input = new boolean[seriesNames.length];
-      for(int j=0; j<inputSeries.length; j++) {
-        input[j] = inputSeries[j].values[i];
+    boolean[] output = new boolean[series[0].size()];
+    for(int i=0; i<series[0].size(); i++) {
+      boolean[] input = new boolean[series.length];
+      for(int j=0; j<series.length; j++) {
+        input[j] = booleanSeries[j].values[i];
       }
       output[i] = function.apply(input);
     }
@@ -332,20 +403,17 @@ public class DataFrame {
     return new BooleanSeries(output);
   }
 
-  public DoubleSeries map(String doubleExpression, String... seriesNames) {
-    assertNotNull(seriesNames);
-    return this.mapWithNull(doubleExpression, seriesNames);
-  }
+  //
+  // double expression
+  //
 
-  public DoubleSeries mapWithNull(String doubleExpression, String... seriesNames) {
+  public DoubleSeries map(String doubleExpression, String... seriesNames) {
     Expression e = new Expression(doubleExpression);
 
-    return this.mapWithNull(new DoubleSeries.DoubleBatchFunction() {
+    return this.map(new Series.DoubleFunction() {
       @Override
       public double apply(double[] values) {
         for(int i=0; i<values.length; i++) {
-          if(DoubleSeries.isNull(values[i]))
-            return DoubleSeries.NULL_VALUE;
           e.with(seriesNames[i], new BigDecimal(values[i]));
         }
         return e.eval().doubleValue();
@@ -358,11 +426,6 @@ public class DataFrame {
     return this.map(doubleExpression, variables.toArray(new String[variables.size()]));
   }
 
-  public DoubleSeries mapWithNull(String doubleExpression) {
-    Set<String> variables = extractSeriesNames(doubleExpression);
-    return this.mapWithNull(doubleExpression, variables.toArray(new String[variables.size()]));
-  }
-
   public DataFrame project(int[] fromIndex) {
     DataFrame newDataFrame = new DataFrame();
     for(Map.Entry<String, Series> e : this.series.entrySet()) {
@@ -373,12 +436,12 @@ public class DataFrame {
 
   /**
    * Sort data frame by series values.  The resulting sorted order is the equivalent of applying
-   * a stable sorted to nth series first, and then sorting iteratively until the 1st series.
+   * a stable sort to the nth series first, and then sorting iteratively by series until the 1st series.
    *
    * @param seriesNames 1st series, 2nd series, ..., nth series
    * @return sorted data frame
    */
-  public DataFrame sortBy(String... seriesNames) {
+  public DataFrame sortedBy(String... seriesNames) {
     DataFrame df = this;
     for(int i=seriesNames.length-1; i>=0; i--) {
       df = df.project(assertSeriesExists(seriesNames[i]).sortedIndex());
@@ -394,10 +457,10 @@ public class DataFrame {
     return newDataFrame;
   }
 
-  public DataFrame resampleBy(String seriesName, long interval, ResamplingStrategy strategy) {
-    DataFrame baseDataFrame = this.sortBy(seriesName);
+  public DataFrame resampledBy(String seriesName, long interval, ResamplingStrategy strategy) {
+    DataFrame baseDataFrame = this.sortedBy(seriesName);
 
-    Series.SeriesGrouping grouping = baseDataFrame.toLongs(seriesName).groupByInterval(interval);
+    Series.SeriesGrouping grouping = baseDataFrame.getLongs(seriesName).groupByInterval(interval);
 
     // resample series
     DataFrame newDataFrame = new DataFrame();
@@ -436,15 +499,15 @@ public class DataFrame {
   }
 
   public DataFrame filter(String seriesName, DoubleSeries.DoubleConditional conditional) {
-    return this.filter(assertSeriesExists(seriesName).toDoubles().map(conditional));
+    return this.filter(assertSeriesExists(seriesName).getDoubles().map(conditional));
   }
 
   public DataFrame filter(String seriesName, LongSeries.LongConditional conditional) {
-    return this.filter(assertSeriesExists(seriesName).toLongs().map(conditional));
+    return this.filter(assertSeriesExists(seriesName).getLongs().map(conditional));
   }
 
   public DataFrame filter(String seriesName, StringSeries.StringConditional conditional) {
-    return this.filter(assertSeriesExists(seriesName).toStrings().map(conditional));
+    return this.filter(assertSeriesExists(seriesName).getStrings().map(conditional));
   }
 
   public DataFrame filterEquals(String seriesName, double value) {
@@ -475,26 +538,26 @@ public class DataFrame {
   }
 
   public double getDouble(String seriesName) {
-    return assertSingleValue(seriesName).toDoubles().first();
+    return assertSingleValue(seriesName).getDoubles().first();
   }
 
   public long getLong(String seriesName) {
-    return assertSingleValue(seriesName).toLongs().first();
+    return assertSingleValue(seriesName).getLongs().first();
   }
 
   public String getString(String seriesName) {
-    return assertSingleValue(seriesName).toStrings().first();
+    return assertSingleValue(seriesName).getStrings().first();
   }
 
   public boolean getBoolean(String seriesName) {
-    return assertSingleValue(seriesName).toBooleans().first();
+    return assertSingleValue(seriesName).getBooleans().first();
   }
 
-  public static DoubleSeries toDoubles(DoubleSeries s) {
+  public static DoubleSeries getDoubles(DoubleSeries s) {
     return s;
   }
 
-  public static DoubleSeries toDoubles(LongSeries s) {
+  public static DoubleSeries getDoubles(LongSeries s) {
     double[] values = new double[s.size()];
     for(int i=0; i<values.length; i++) {
       if(LongSeries.isNull(s.values[i])) {
@@ -506,7 +569,7 @@ public class DataFrame {
     return new DoubleSeries(values);
   }
 
-  public static DoubleSeries toDoubles(StringSeries s) {
+  public static DoubleSeries getDoubles(StringSeries s) {
     double[] values = new double[s.size()];
     for(int i=0; i<values.length; i++) {
       if(StringSeries.isNull(s.values[i])) {
@@ -518,7 +581,7 @@ public class DataFrame {
     return new DoubleSeries(values);
   }
 
-  public static DoubleSeries toDoubles(BooleanSeries s) {
+  public static DoubleSeries getDoubles(BooleanSeries s) {
     double[] values = new double[s.size()];
     for(int i=0; i<values.length; i++) {
       values[i] = s.values[i] ? 1.0d : 0.0d;
@@ -526,7 +589,7 @@ public class DataFrame {
     return new DoubleSeries(values);
   }
 
-  public static LongSeries toLongs(DoubleSeries s) {
+  public static LongSeries getLongs(DoubleSeries s) {
     long[] values = new long[s.size()];
     for(int i=0; i<values.length; i++) {
       if(DoubleSeries.isNull(s.values[i])) {
@@ -538,11 +601,11 @@ public class DataFrame {
     return new LongSeries(values);
   }
 
-  public static LongSeries toLongs(LongSeries s) {
+  public static LongSeries getLongs(LongSeries s) {
     return s;
   }
 
-  public static LongSeries toLongs(StringSeries s) {
+  public static LongSeries getLongs(StringSeries s) {
     long[] values = new long[s.size()];
     for(int i=0; i<values.length; i++) {
       if(StringSeries.isNull(s.values[i])) {
@@ -558,7 +621,7 @@ public class DataFrame {
     return new LongSeries(values);
   }
 
-  public static LongSeries toLongs(BooleanSeries s) {
+  public static LongSeries getLongs(BooleanSeries s) {
     long[] values = new long[s.size()];
     for(int i=0; i<values.length; i++) {
       values[i] = s.values[i] ? 1L : 0L;
@@ -610,7 +673,7 @@ public class DataFrame {
     return new BooleanSeries(values);
   }
 
-  public static StringSeries toStrings(DoubleSeries s) {
+  public static StringSeries getStrings(DoubleSeries s) {
     String[] values = new String[s.size()];
     for(int i=0; i<values.length; i++) {
       if(DoubleSeries.isNull(s.values[i])) {
@@ -622,7 +685,7 @@ public class DataFrame {
     return new StringSeries(values);
   }
 
-  public static StringSeries toStrings(LongSeries s) {
+  public static StringSeries getStrings(LongSeries s) {
     String[] values = new String[s.size()];
     for(int i=0; i<values.length; i++) {
       if(LongSeries.isNull(s.values[i])) {
@@ -634,7 +697,7 @@ public class DataFrame {
     return new StringSeries(values);
   }
 
-  public static StringSeries toStrings(BooleanSeries s) {
+  public static StringSeries getStrings(BooleanSeries s) {
     String[] values = new String[s.size()];
     for(int i=0; i<values.length; i++) {
       values[i] = String.valueOf(s.values[i]);
@@ -642,20 +705,20 @@ public class DataFrame {
     return new StringSeries(values);
   }
 
-  public static StringSeries toStrings(StringSeries s) {
+  public static StringSeries getStrings(StringSeries s) {
     return s;
   }
 
   public static Series toType(Series s, Series.SeriesType type) {
     switch(type) {
       case DOUBLE:
-        return s.toDoubles();
+        return s.getDoubles();
       case LONG:
-        return s.toLongs();
+        return s.getLongs();
       case BOOLEAN:
-        return s.toBooleans();
+        return s.getBooleans();
       case STRING:
-        return s.toStrings();
+        return s.getStrings();
       default:
         throw new IllegalArgumentException(String.format("Unknown series type '%s'", type));
     }
@@ -701,6 +764,20 @@ public class DataFrame {
     for(Map.Entry<String, Series> e : this.getSeries().entrySet()) {
       if(!e.getValue().hasNull())
         df.addSeries(e.getKey(), e.getValue());
+    }
+    return df;
+  }
+
+  public DataFrame fillNull(String seriesName, double value) {
+    DoubleSeries filled = assertSeriesExists(seriesName).fillNull(value);
+
+    DataFrame df = new DataFrame();
+    for(Map.Entry<String, Series> e : this.getSeries().entrySet()) {
+      if(seriesName.equals(e.getKey())) {
+        df.addSeries(seriesName, filled);
+      } else {
+        df.addSeries(e.getKey(), e.getValue());
+      }
     }
     return df;
   }
@@ -768,6 +845,33 @@ public class DataFrame {
     return builder.toString();
   }
 
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+
+    DataFrame dataFrame = (DataFrame) o;
+
+    return series != null ? series.equals(dataFrame.series) : dataFrame.series == null;
+  }
+
+  @Override
+  public int hashCode() {
+    return series != null ? series.hashCode() : 0;
+  }
+
+  private Series[] names2series(String... names) {
+    Series[] inputSeries = new Series[names.length];
+    for(int i=0; i<names.length; i++) {
+      inputSeries[i] = assertSeriesExists(names[i]);
+    }
+    return inputSeries;
+  }
+
   private Series assertSeriesExists(String name) {
     if(!series.containsKey(name))
       throw new IllegalArgumentException(String.format("Unknown series '%s'", name));
@@ -781,9 +885,7 @@ public class DataFrame {
   }
 
   private Series assertNotNull(String name) {
-    if(assertSeriesExists(name).hasNull())
-      throw new IllegalStateException(String.format("Series '%s' Must not contain null values", name));
-    return series.get(name);
+    return assertNotNull(assertSeriesExists(name));
   }
 
   private void assertNotNull(String... names) {
@@ -791,9 +893,27 @@ public class DataFrame {
       assertNotNull(s);
   }
 
+  private static Series assertNotNull(Series series) {
+    if(series.hasNull())
+      throw new IllegalStateException("Series Must not contain null values");
+    return series;
+  }
+
+  private static void assertNotNull(Series... series) {
+    for(Series s : series)
+      assertNotNull(s);
+  }
+
   private void assertSameLength(Series s) {
     if(this.size() != s.size())
       throw new IllegalArgumentException("Series size must be equals to DataFrame size");
+  }
+
+  private static void assertSameLength(Series... series) {
+    for(int i=0; i<series.length-1; i++) {
+      if (series[i].size() != series[i+1].size())
+        throw new IllegalArgumentException("Series size must be equals to DataFrame size");
+    }
   }
 
   private Set<String> extractSeriesNames(String doubleExpression) {

@@ -2,7 +2,6 @@ package com.linkedin.thirdeye.detector.functionex.dataframe;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -13,17 +12,7 @@ public final class DoubleSeries extends Series {
 
   double[] values;
 
-  @FunctionalInterface
-  public interface DoubleFunction {
-    double apply(double value);
-  }
-
-  @FunctionalInterface
-  public interface DoubleConditional {
-    boolean apply(double value);
-  }
-
-  public static class DoubleBatchSum implements Series.DoubleBatchFunction {
+  public static class DoubleBatchSum implements DoubleFunction {
     @Override
     public double apply(double[] values) {
       // TODO sorted, add low to high for accuracy
@@ -35,7 +24,7 @@ public final class DoubleSeries extends Series {
     }
   }
 
-  public static class DoubleBatchMean implements Series.DoubleBatchFunction {
+  public static class DoubleBatchMean implements DoubleFunction {
     @Override
     public double apply(double[] values) {
       if(values.length <= 0)
@@ -54,7 +43,7 @@ public final class DoubleSeries extends Series {
     }
   }
 
-  public static class DoubleBatchLast implements Series.DoubleBatchFunction {
+  public static class DoubleBatchLast implements DoubleFunction {
     @Override
     public double apply(double[] values) {
       if(values.length <= 0)
@@ -73,23 +62,23 @@ public final class DoubleSeries extends Series {
   }
 
   @Override
-  public DoubleSeries toDoubles() {
-    return DataFrame.toDoubles(this);
+  public DoubleSeries getDoubles() {
+    return DataFrame.getDoubles(this);
   }
 
   @Override
-  public LongSeries toLongs() {
-    return DataFrame.toLongs(this);
+  public LongSeries getLongs() {
+    return DataFrame.getLongs(this);
   }
 
   @Override
-  public BooleanSeries toBooleans() {
+  public BooleanSeries getBooleans() {
     return DataFrame.toBooleans(this);
   }
 
   @Override
-  public StringSeries toStrings() {
-    return DataFrame.toStrings(this);
+  public StringSeries getStrings() {
+    return DataFrame.getStrings(this);
   }
 
   @Override
@@ -153,37 +142,60 @@ public final class DoubleSeries extends Series {
   }
 
   @Override
+  public DoubleSeries sliceFrom(int from) {
+    return (DoubleSeries)super.sliceFrom(from);
+  }
+
+  @Override
+  public DoubleSeries sliceTo(int to) {
+    return (DoubleSeries)super.sliceTo(to);
+  }
+
+  @Override
   public DoubleSeries reverse() {
     return (DoubleSeries)super.reverse();
   }
 
+  @Override
   public DoubleSeries map(DoubleFunction function) {
-    assertNotNull();
-    return this.mapWithNull(function);
-  }
-
-  public DoubleSeries mapWithNull(DoubleFunction function) {
     double[] newValues = new double[this.values.length];
     for(int i=0; i<this.values.length; i++) {
-      newValues[i] = function.apply(this.values[i]);
+      if(isNull(this.values[i])) {
+        newValues[i] = NULL_VALUE;
+      } else {
+        newValues[i] = function.apply(this.values[i]);
+      }
     }
     return new DoubleSeries(newValues);
   }
 
+  @Override
   public BooleanSeries map(DoubleConditional conditional) {
-    assertNotNull();
-    return this.mapWithNull(conditional);
-  }
-
-  public BooleanSeries mapWithNull(DoubleConditional conditional) {
     boolean[] newValues = new boolean[this.values.length];
     for(int i=0; i<this.values.length; i++) {
-      newValues[i] = conditional.apply(this.values[i]);
+      if(isNull(this.values[i])) {
+        newValues[i] = BooleanSeries.NULL_VALUE;
+      } else {
+        newValues[i] = conditional.apply(this.values[i]);
+      }
     }
     return new BooleanSeries(newValues);
   }
 
-  public DoubleSeries applyMovingWindow(int size, int minSize, DoubleBatchFunction function) {
+  @Override
+  public DoubleSeries aggregate(DoubleFunction function) {
+    return new DoubleSeries(function.apply(this.values));
+  }
+
+  @Override
+  public DoubleSeries append(Series series) {
+    double[] values = new double[this.size() + series.size()];
+    System.arraycopy(this.values, 0, values, 0, this.size());
+    System.arraycopy(series.getDoubles().values, 0, values, this.size(), series.size());
+    return new DoubleSeries(values);
+  }
+
+  public DoubleSeries applyMovingWindow(int size, int minSize, DoubleFunction function) {
     double[] values = new double[this.values.length];
 
     // fill minSize - 1 with null values
@@ -218,20 +230,24 @@ public final class DoubleSeries extends Series {
   }
 
   public double min() {
-    assertNotEmpty(this.values);
-    double m = this.values[0];
+    double m = NULL_VALUE;
     for(double n : this.values) {
-      m = Math.min(m, n);
+      if(!isNull(n) && (isNull(m) || n < m))
+        m = n;
     }
+    if(isNull(m))
+      throw new IllegalStateException("No valid minimum value");
     return m;
   }
 
   public double max() {
-    assertNotEmpty(this.values);
-    double m = this.values[0];
+    double m = NULL_VALUE;
     for(double n : this.values) {
-      m = Math.max(m, n);
+      if(!isNull(n) && (isNull(m) || n > m))
+        m = n;
     }
+    if(isNull(m))
+      throw new IllegalStateException("No valid maximum value");
     return m;
   }
 
@@ -244,6 +260,7 @@ public final class DoubleSeries extends Series {
     return new DoubleBatchSum().apply(this.values);
   }
 
+  @Override
   public DoubleSeries fillNull(double value) {
     double[] values = Arrays.copyOf(this.values, this.values.length);
     for(int i=0; i<values.length; i++) {

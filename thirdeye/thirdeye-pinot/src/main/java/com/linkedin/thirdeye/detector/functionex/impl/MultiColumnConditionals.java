@@ -36,7 +36,7 @@ public class MultiColumnConditionals extends AnomalyFunctionEx {
       boolean condition_pass = true;
       if(NumberUtils.isNumber(value)) {
         double d = Double.valueOf(value);
-        condition_pass = series.toDoubles().map(new CustomDoubleConditional(op, d)).allTrue();
+        condition_pass = series.getDoubles().map(new CustomDoubleConditional(op, d)).allTrue();
         message = String.format("%s: %b", condition, condition_pass);
       } else {
         // TODO implement boolean

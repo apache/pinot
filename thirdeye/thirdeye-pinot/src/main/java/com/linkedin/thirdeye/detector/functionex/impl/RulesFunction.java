@@ -52,10 +52,10 @@ public class RulesFunction extends AnomalyFunctionEx {
     for (Map.Entry<String, String> e : rules.entrySet()) {
       String rule = e.getValue();
       DoubleSeries ruleResults = data.map(rule);
-      DataFrame violations = data.filter(ruleResults.toBooleans());
+      DataFrame violations = data.filter(ruleResults.getBooleans());
       LOG.info("Rule '{}' violated at {} / {} timestamps", e.getKey(), violations.size(), ruleResults.size());
 
-      long[] timestamps = violations.toLongs(COLUMN_TIMESTAMP).values();
+      long[] timestamps = violations.getLongs(COLUMN_TIMESTAMP).values();
       for (int i = 0; i < timestamps.length; i++) {
         DataFrame slice = violations.sliceRows(i, i+1);
 
@@ -107,17 +107,14 @@ public class RulesFunction extends AnomalyFunctionEx {
     if(df.size() <= 1)
       return 0;
 
-    DataFrame ndf = new DataFrame();
-    ndf.addSeries("curr", df.toLongs(COLUMN_TIMESTAMP));
-    ndf.addSeries("prev", df.toLongs(COLUMN_TIMESTAMP).shift(-1));
-    ndf = ndf.dropNullRows();
+    Series ts = df.getLongs(COLUMN_TIMESTAMP);
 
-    return ndf.map(new Series.LongBatchFunction() {
+    return DataFrame.map(new Series.LongFunction() {
       @Override
       public long apply(long[] values) {
         return values[0] - values[1];
       }
-    }, "curr", "prev").min();
+    }, ts, ts.shift(-1)).min();
   }
 
   static String extractNumericPortion(String rule) {

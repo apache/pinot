@@ -89,28 +89,28 @@ public class DetectionExTaskRunner implements TaskRunner {
       DataFrame df = a.getData();
       if(!df.isEmpty()) {
         if (df.contains("collection")) {
-          dto.setCollection(df.toStrings("collection").first());
+          dto.setCollection(df.getStrings("collection").first());
         }
         if (df.contains("metric")) {
-          dto.setMetric(df.toStrings("metric").first());
+          dto.setMetric(df.getStrings("metric").first());
         }
         if (df.contains("dimension")) {
           DimensionMap m = new DimensionMap();
-          String[] s = df.toStrings("dimension").first().split("=", 2);
+          String[] s = df.getStrings("dimension").first().split("=", 2);
           m.put(s[0], s[1]);
           dto.setDimensions(m);
         }
         if (df.contains("score")) {
-          dto.setScore(df.toDoubles("score").mean());
+          dto.setScore(df.getDoubles("score").mean());
         }
         if (df.contains("weight")) {
-          dto.setWeight(df.toDoubles("weight").mean());
+          dto.setWeight(df.getDoubles("weight").mean());
         }
         if (df.contains("current")) {
-          dto.setAvgCurrentVal(df.toDoubles("current").mean());
+          dto.setAvgCurrentVal(df.getDoubles("current").mean());
         }
         if (df.contains("baseline")) {
-          dto.setAvgBaselineVal(df.toDoubles("baseline").mean());
+          dto.setAvgBaselineVal(df.getDoubles("baseline").mean());
         }
       }
 

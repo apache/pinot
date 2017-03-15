@@ -77,10 +77,10 @@ public class ThirdEyeEventDataSourceTest {
 
     Assert.assertEquals(df.size(), 3);
     Assert.assertEquals(df.getSeriesNames(), new HashSet<>(Arrays.asList("type", "name", "start", "end")));
-    Assert.assertEquals(df.toStrings("type").values(), new String[] { "HOLIDAY", "HOLIDAY", "holiday" });
-    Assert.assertEquals(df.toStrings("name").values(), new String[] { "New Years 2016", "New Years 2017", "New Years 2018" });
-    Assert.assertEquals(df.toLongs("start").values(), new long[] { 1451606400000L, 1483228800000L, 1514764800000L });
-    Assert.assertEquals(df.toLongs("end").values(), new long[] { 1451606400000L + 86400000, 1483228800000L + 86400000, 1514764800000L + 86400000 });
+    Assert.assertEquals(df.getStrings("type").values(), new String[] { "HOLIDAY", "HOLIDAY", "holiday" });
+    Assert.assertEquals(df.getStrings("name").values(), new String[] { "New Years 2016", "New Years 2017", "New Years 2018" });
+    Assert.assertEquals(df.getLongs("start").values(), new long[] { 1451606400000L, 1483228800000L, 1514764800000L });
+    Assert.assertEquals(df.getLongs("end").values(), new long[] { 1451606400000L + 86400000, 1483228800000L + 86400000, 1514764800000L + 86400000 });
   }
 
   private static EventDTO makeEvent(String type, String name, long start, long end) {
