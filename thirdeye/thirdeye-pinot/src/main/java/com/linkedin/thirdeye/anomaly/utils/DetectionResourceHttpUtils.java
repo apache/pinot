@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomaly.utils;
 
+import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluationMethod;
 import java.io.IOException;
 
 import org.apache.http.HttpHost;
@@ -20,6 +21,8 @@ public class DetectionResourceHttpUtils extends AbstractResourceHttpUtils {
   private static final String EVAL_AUTOTUNE = "eval/autotune/";
   private static final String CHECK_HAS_LABELS = "initautotune/checkhaslabel/";
   private static final String INIT_AUTOTUNE = "initautotune/filter/";
+  private static final String FUNCTION = "function/";
+  private static final String AUTOTUNE = "/autotune";
 
   public DetectionResourceHttpUtils(String detectionHost, int detectionPort) {
     super(new HttpHost(detectionHost, detectionPort));
@@ -104,6 +107,16 @@ public class DetectionResourceHttpUtils extends AbstractResourceHttpUtils {
             + "&nExpected=" + nExpected
             + "&holidayStarts=" + holidayStarts
             + "&holidayEnds=" + holidayEnds
+    );
+    return callJobEndpoint(req);
+  }
+
+  public String runFunctionReplay(Long id, String startTimeISO, String endTimeISO, String timezone, String tuningParameters,
+      PerformanceEvaluationMethod evaluationMethod, double goal)
+      throws ClientProtocolException, IOException {
+    HttpPost req = new HttpPost(
+        DETECTION_JOB_ENDPOINT + FUNCTION + id + AUTOTUNE + "?start=" + startTimeISO + "&end=" + endTimeISO
+            + "&tune=" + tuningParameters + "&goal=" + goal + "&timezone=" + timezone + "&evalMethod=" + evaluationMethod.name()
     );
     return callJobEndpoint(req);
   }
