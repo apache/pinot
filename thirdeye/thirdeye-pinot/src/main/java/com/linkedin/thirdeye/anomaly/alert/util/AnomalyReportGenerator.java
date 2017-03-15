@@ -166,14 +166,18 @@ public class AnomalyReportGenerator {
       templateData.put("alertConfigName", alertConfigName);
       templateData.put("includeSummary", includeSummary);
       templateData.put("reportGenerationTimeMillis", System.currentTimeMillis());
+      boolean isSingleAnomalyEmail = true;
+      if (anomalyReportDTOList.size() > 1) {
+        isSingleAnomalyEmail = false;
+      }
       buildEmailTemplateAndSendAlert(templateData, configuration.getSmtpConfiguration(), subject,
-          emailRecipients, fromEmail);
+          emailRecipients, fromEmail, isSingleAnomalyEmail);
     }
   }
 
   void buildEmailTemplateAndSendAlert(Map<String, Object> paramMap,
       SmtpConfiguration smtpConfiguration, String subject, String emailRecipients,
-      String fromEmail) {
+      String fromEmail, boolean isSingleAnomalyEmail) {
     if (Strings.isNullOrEmpty(fromEmail)) {
       throw new IllegalArgumentException("Invalid sender's email");
     }
@@ -184,7 +188,12 @@ public class AnomalyReportGenerator {
       freemarkerConfig.setClassForTemplateLoading(getClass(), "/com/linkedin/thirdeye/detector");
       freemarkerConfig.setDefaultEncoding(AlertTaskRunner.CHARSET);
       freemarkerConfig.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);
-      Template template = freemarkerConfig.getTemplate("anomaly-report-v2.ftl");
+      Template template = null;
+      if (isSingleAnomalyEmail) {
+        template = freemarkerConfig.getTemplate("single-anomaly-email-template.ftl");
+      } else {
+        template = freemarkerConfig.getTemplate("multiple-anomalies-email-template.ftl");
+      }
       template.process(paramMap, out);
 
       String alertEmailHtml = new String(baos.toByteArray(), AlertTaskRunner.CHARSET);

@@ -1,12 +1,19 @@
 package com.linkedin.thirdeye.tools;
 
+import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
@@ -14,6 +21,7 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.autoload.pinot.metrics.ConfigGenerator;
+import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DataCompletenessConfigManager;
@@ -25,7 +33,9 @@ import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.AlertConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.DetectionStatusManagerImpl;
+import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
@@ -35,6 +45,7 @@ import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
+import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.EmailConfig;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
@@ -57,6 +68,7 @@ public class RunAdhocDatabaseQueriesTool {
   private DataCompletenessConfigManager dataCompletenessConfigDAO;
   private DatasetConfigManager datasetConfigDAO;
   private DetectionStatusManager detectionStatusDAO;
+  private AlertConfigManager alertConfigDAO;
 
   public RunAdhocDatabaseQueriesTool(File persistenceFile)
       throws Exception {
@@ -88,6 +100,7 @@ public class RunAdhocDatabaseQueriesTool {
     datasetConfigDAO = DaoProviderUtil
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.DatasetConfigManagerImpl.class);
     detectionStatusDAO = DaoProviderUtil.getInstance(DetectionStatusManagerImpl.class);
+    alertConfigDAO = DaoProviderUtil.getInstance(AlertConfigManagerImpl.class);
   }
 
   private void toggleAnomalyFunction(Long id) {
@@ -233,6 +246,44 @@ public class RunAdhocDatabaseQueriesTool {
     }
   }
 
+  private void playWithAlertCOnfigs() {
+    List<EmailConfigurationDTO> emailConfigs = emailConfigurationDAO.findAll();
+    Multimap<String, EmailConfigurationDTO> datasetToEmailConfig = ArrayListMultimap.create();
+    for (EmailConfigurationDTO emailConfig : emailConfigs) {
+      if (emailConfig.isActive() && !emailConfig.getFunctionIds().isEmpty()) {
+        datasetToEmailConfig.put(emailConfig.getCollection(), emailConfig);
+      }
+    }
+    for (String dataset : datasetToEmailConfig.keySet()) {
+      List<EmailConfigurationDTO> emailConfigsList = Lists.newArrayList(datasetToEmailConfig.get(dataset));
+
+      String name = "Beta " + dataset + " Alert Config";
+      String cron = emailConfigsList.get(0).getCron();
+      boolean active = true;
+      long watermark = 0L;
+      Set<Long> functionIds = new HashSet<>();
+      for (EmailConfigurationDTO config : emailConfigsList) {
+        functionIds.addAll(config.getFunctionIds());
+      }
+      EmailConfig emailConfig = new EmailConfig();
+      emailConfig.setAnomalyWatermark(watermark);
+      emailConfig.setFunctionIds(Lists.newArrayList(functionIds));
+      String recipients = "thirdeyeproductteam@linkedin.com";
+      String fromAddress = "thirdeye-dev@linkedin.com";
+
+      AlertConfigDTO alertConfig = new AlertConfigDTO();
+      alertConfig.setName(name);
+      alertConfig.setCronExpression(cron);
+      alertConfig.setActive(active);
+      alertConfig.setEmailConfig(emailConfig);
+      alertConfig.setRecipients(recipients);
+      alertConfig.setFromAddress(fromAddress);
+      System.out.println(alertConfig);
+      alertConfigDAO.save(alertConfig);
+
+    }
+  }
+
   public static void main(String[] args) throws Exception {
 
     File persistenceFile = new File(args[0]);
@@ -241,6 +292,7 @@ public class RunAdhocDatabaseQueriesTool {
       System.exit(1);
     }
     RunAdhocDatabaseQueriesTool dq = new RunAdhocDatabaseQueriesTool(persistenceFile);
+    dq.playWithAlertCOnfigs();
   }
 
 }
