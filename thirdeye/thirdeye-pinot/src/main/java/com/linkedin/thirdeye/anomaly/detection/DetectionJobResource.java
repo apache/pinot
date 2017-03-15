@@ -20,6 +20,7 @@ import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterEvaluationUtil;
 import com.linkedin.thirdeye.util.SeverityComputationUtil;
 
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -38,6 +39,7 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
@@ -531,12 +533,10 @@ public class DetectionJobResource {
    *  - return list of parameter combinations along with their performance evaluation
    * @param functionId
    * the id of the target anomaly function
-   * @param replayStartTime
+   * @param replayStartTimeIso
    * the start time of the anomaly function replay in ISO format, e.g. 2017-02-27T00:00:00.000Z
-   * @param replayEndTime
+   * @param replayEndTimeIso
    * the end time of the anomaly function replay in ISO format
-   * @param timezone
-   * the timezone of replay time
    * @param tuningJSON
    * the json object includes all tuning fields and list of parameters
    * ex: {"baselineLift": [0.9, 0.95, 1, 1.05, 1.1], "baselineSeasonalPeriod": [2, 3, 4]}
@@ -547,16 +547,20 @@ public class DetectionJobResource {
    */
   @POST
   @Path("function/{id}/autotune")
-  public Response anomalyFunctionAutotune(@PathParam("id") long functionId, @QueryParam("start") String replayStartTime,
-      @QueryParam("end") String replayEndTime, @QueryParam("timezone") String timezone,
+  public Response anomalyFunctionAutotune(@PathParam("id") long functionId, @QueryParam("start") String replayStartTimeIso,
+      @QueryParam("end") String replayEndTimeIso,
       @QueryParam("tune") String tuningJSON, @QueryParam("goal") double goal,
       @QueryParam("evalMethod") @DefaultValue("ANOMALY_PERCENTAGE") String performanceEvaluationMethod){
-    DateTimeZone dateTimeZone = DateTimeZone.forID(timezone);
-    // DateTime monitoringWindowStartTime = ISODateTimeFormat.dateTimeParser().parseDateTime(monitoringDateTime).withZone(dateTimeZone);
-    DateTime replayStart = ISODateTimeFormat.dateTimeParser().parseDateTime(replayStartTime).withZone(dateTimeZone);
-    DateTime replayEnd = ISODateTimeFormat.dateTimeParser().parseDateTime(replayEndTime).withZone(dateTimeZone);
-    Interval replayInterval = new Interval(replayStart.getMillis(), replayEnd.getMillis());
-    Set<String> satisfiedProperties = new HashSet<>();
+    DateTime replayStart = null;
+    DateTime replayEnd = null;
+    try {
+      replayStart = ISODateTimeFormat.dateTimeParser().parseDateTime(replayStartTimeIso);
+      replayEnd = ISODateTimeFormat.dateTimeParser().parseDateTime(replayEndTimeIso);
+    }
+    catch (DateTimeParseException e) {
+      throw new WebApplicationException("Unable to parse strings, "+ replayStartTimeIso + " and " + replayEndTimeIso +
+          ", in ISO DateTime format", e);
+    }
 
     // List all tuning parameter sets
     List<Map<String, String>> tuningParameters = null;
