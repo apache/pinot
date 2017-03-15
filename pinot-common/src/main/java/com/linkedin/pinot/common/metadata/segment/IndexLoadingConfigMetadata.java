@@ -35,7 +35,7 @@ public class IndexLoadingConfigMetadata {
   public static final String KEY_OF_COLUMN_MIN_MAX_VALUE_GENERATOR_MODE = "column.min.max.value.generator.mode";
 
   private static final String DEFAULT_SEGMENT_FORMAT = "v1";
-  private static final String DEFAULT_COLUMN_MIN_MAX_VALUE_GENERATOR_MODE = "NONE";
+  private static final String DEFAULT_COLUMN_MIN_MAX_VALUE_GENERATOR_MODE = "TIME";
 
   private final Set<String> _loadingInvertedIndexColumnSet = new HashSet<>();
   private final String _segmentVersionToLoad;
@@ -74,10 +74,6 @@ public class IndexLoadingConfigMetadata {
 
   public String segmentVersionToLoad() {
     return _segmentVersionToLoad;
-  }
-
-  public static String getKeyOfLoadingInvertedIndex() {
-    return KEY_OF_LOADING_INVERTED_INDEX;
   }
 
   public void setEnableDefaultColumns(boolean enableDefaultColumns) {
