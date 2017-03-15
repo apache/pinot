@@ -1162,15 +1162,34 @@ public class DataFrameTest {
     Assert.assertEquals(joined.toStrings("rightValue").values(), new String[] { "u", "w", "y", "z", "x", StringSeries.NULL_VALUE, "v" });
   }
 
-  @Test(expectedExceptions = IllegalArgumentException.class)
-  public void testJoinSameSeriesNames() {
+  @Test
+  public void testJoinSameNameSameContent() {
     DataFrame left = new DataFrame();
-    left.addSeries("name", 1, 2, 3);
+    left.addSeries("name", 1, 2, 3, 4);
 
     DataFrame right = new DataFrame();
-    right.addSeries("name", 4, 5, 6);
+    right.addSeries("name", 3, 4, 5, 6);
 
-    left.joinInner(right, "name", "name");
+    DataFrame df = left.joinInner(right, "name", "name");
+
+    Assert.assertEquals(df.getSeriesNames().size(), 1);
+    Assert.assertTrue(df.contains("name"));
+    Assert.assertFalse(df.contains("name_right"));
+  }
+
+  @Test
+  public void testJoinSameNameDifferentContent() {
+    DataFrame left = new DataFrame();
+    left.addSeries("name", 1, 2, 3, 4);
+
+    DataFrame right = new DataFrame();
+    right.addSeries("name", 3, 4, 5, 6);
+
+    DataFrame df = left.joinOuter(right, "name", "name");
+
+    Assert.assertEquals(df.getSeriesNames().size(), 2);
+    Assert.assertTrue(df.contains("name"));
+    Assert.assertTrue(df.contains("name_right"));
   }
 
   @Test

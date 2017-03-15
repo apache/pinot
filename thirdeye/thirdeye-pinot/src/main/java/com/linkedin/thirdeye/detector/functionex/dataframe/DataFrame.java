@@ -706,38 +706,23 @@ public class DataFrame {
   }
 
   public DataFrame joinInner(DataFrame other, String onSeriesLeft, String onSeriesRight) {
-    List<Series.JoinPair> pairs = DataFrame.makeJoinPairs(this, other, onSeriesLeft, onSeriesRight, Series.JoinType.INNER);
+    List<Series.JoinPair> pairs = this.get(onSeriesLeft).join(other.get(onSeriesRight), Series.JoinType.INNER);
     return DataFrame.join(this, other, pairs);
   }
 
   public DataFrame joinLeft(DataFrame other, String onSeriesLeft, String onSeriesRight) {
-    List<Series.JoinPair> pairs = DataFrame.makeJoinPairs(this, other, onSeriesLeft, onSeriesRight, Series.JoinType.LEFT);
+    List<Series.JoinPair> pairs = this.get(onSeriesLeft).join(other.get(onSeriesRight), Series.JoinType.LEFT);
     return DataFrame.join(this, other, pairs);
   }
 
   public DataFrame joinRight(DataFrame other, String onSeriesLeft, String onSeriesRight) {
-    List<Series.JoinPair> pairs = DataFrame.makeJoinPairs(this, other, onSeriesLeft, onSeriesRight, Series.JoinType.RIGHT);
+    List<Series.JoinPair> pairs = this.get(onSeriesLeft).join(other.get(onSeriesRight), Series.JoinType.RIGHT);
     return DataFrame.join(this, other, pairs);
   }
 
   public DataFrame joinOuter(DataFrame other, String onSeriesLeft, String onSeriesRight) {
-    List<Series.JoinPair> pairs = DataFrame.makeJoinPairs(this, other, onSeriesLeft, onSeriesRight, Series.JoinType.OUTER);
+    List<Series.JoinPair> pairs = this.get(onSeriesLeft).join(other.get(onSeriesRight), Series.JoinType.OUTER);
     return DataFrame.join(this, other, pairs);
-  }
-
-  static List<Series.JoinPair> makeJoinPairs(DataFrame left, DataFrame right, String onSeriesLeft, String onSeriesRight, Series.JoinType type) {
-    Series sLeft = left.get(onSeriesLeft);
-    Series sRight = right.get(onSeriesRight);
-
-    // TODO: automatic renaming
-    Set<String> seriesLeft = left.getSeriesNames();
-    Set<String> seriesRight = right.getSeriesNames();
-    for (String s : seriesLeft) {
-      if (seriesRight.contains(s))
-        throw new IllegalArgumentException("Series '%s' exists in both DataFrames");
-    }
-
-    return sLeft.join(sRight, type);
   }
 
   static DataFrame join(DataFrame left, DataFrame right, List<Series.JoinPair> pairs) {
@@ -756,8 +741,14 @@ public class DataFrame {
     DataFrame leftData = left.project(fromIndexLeft);
     DataFrame rightData = right.project(fromIndexRight);
 
+    Set<String> seriesLeft = left.getSeriesNames();
     for(Map.Entry<String, Series> e : rightData.getSeries().entrySet()) {
-      leftData.addSeries(e.getKey(), e.getValue());
+      String seriesName = e.getKey();
+      if(seriesLeft.contains(seriesName) && !leftData.get(seriesName).equals(rightData.get(seriesName))) {
+        seriesName = e.getKey() + "_right";
+      }
+
+      leftData.addSeries(seriesName, e.getValue());
     }
 
     return leftData;
