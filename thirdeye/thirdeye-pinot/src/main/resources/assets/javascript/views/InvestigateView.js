@@ -33,10 +33,8 @@ InvestigateView.prototype = {
     const anomaly = this.investigateModel.getAnomaly();
     const wowData = this.investigateModel.getWowData();
     const currentValue = wowData.currentVal;
-    const externalUrls = anomaly.externalUrl ? JSON.parse(anomaly.externalUrl) : null;
-    wowData.compareResults.forEach((result) => {
-      result.change *= 100;
-    });
+
+    this.formatWowData(wowData.compareResults, anomaly);
     const [ wow, wow2, wow3 ] = wowData.compareResults;
 
     this.investigateData = {
@@ -49,7 +47,26 @@ InvestigateView.prototype = {
     };
   },
 
-  render() {
+  formatWowData(wowData, {start, end, dataset, metric}){
+    const wowMapping = {
+      WoW: 7,
+      Wo2W: 14,
+      Wo3W: 21,
+      Wo4W: 28
+    };
+
+    wowData.forEach((wow) => {
+      let currentStart = moment(start);
+      let currentEnd = moment(end);
+      let offset = wowMapping[wow.compareMode];
+      let baselineStart = currentStart.clone().subtract(offset, 'days');
+      let baselineEnd = currentEnd.clone().subtract(offset, 'days');
+      wow.change *= 100;
+      wow.url = `dashboard#view=compare&dataset=${dataset}&compareMode=WoW&aggTimeGranularity=aggregateAll&currentStart=${currentStart}&currentEnd=${currentEnd}&baselineStart=${baselineStart}&baselineEnd=${baselineEnd}&metrics=${metric}`;
+    });
+  },
+
+  render () {
     const template_with_anomaly = this.investigate_template_compiled(this.investigateData);
     $("#investigate-place-holder").html(template_with_anomaly);
 
