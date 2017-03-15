@@ -71,20 +71,22 @@ public class SimpleThresholdDetectionModel extends AbstractDetectionModel {
       if (!expectedTimeSeries.hasTimestamp(expectedTimestamp)) {
         continue;
       }
-      double expectedValue = expectedTimeSeries.get(expectedTimestamp);
+      double baselineValue = expectedTimeSeries.get(expectedTimestamp);
       double currentValue = currentTimeSeries.get(currentTimestamp);
-      if (isAnomaly(currentValue, expectedValue, changeThreshold)) {
+      if (isAnomaly(currentValue, baselineValue, changeThreshold)) {
         RawAnomalyResultDTO anomalyResult = new RawAnomalyResultDTO();
         anomalyResult.setDimensions(dimensionMap);
         anomalyResult.setProperties(getProperties().toString());
         anomalyResult.setStartTime(currentTimestamp);
         anomalyResult.setEndTime(currentTimestamp + bucketSizeInMillis); // point-in-time
         anomalyResult.setScore(averageValue);
-        anomalyResult.setWeight(calculateChange(currentValue, expectedValue));
-        String message = getAnomalyResultMessage(changeThreshold, currentValue, expectedValue);
+        anomalyResult.setWeight(calculateChange(currentValue, baselineValue));
+        anomalyResult.setAvgCurrentVal(currentValue);
+        anomalyResult.setAvgBaselineVal(baselineValue);
+        String message = getAnomalyResultMessage(changeThreshold, currentValue, baselineValue);
         anomalyResult.setMessage(message);
         anomalyResults.add(anomalyResult);
-        if (currentValue == 0.0 || expectedValue == 0.0) {
+        if (currentValue == 0.0 || baselineValue == 0.0) {
           anomalyResult.setDataMissing(true);
         }
       }

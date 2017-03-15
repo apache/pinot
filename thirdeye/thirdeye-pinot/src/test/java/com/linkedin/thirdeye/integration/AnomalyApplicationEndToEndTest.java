@@ -323,11 +323,7 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
     List<RawAnomalyResultDTO> rawAnomalies = rawAnomalyResultDAO.findUnmergedByFunctionId(functionId);
     Assert.assertTrue(rawAnomalies.size() == 0);
 
-    // start merge
-    // startMerger();
-
     // check merged anomalies
-    // Thread.sleep(4000);
     List<MergedAnomalyResultDTO> mergedAnomalies = mergedAnomalyResultDAO.findByFunctionId(functionId);
     Assert.assertTrue(mergedAnomalies.size() > 0);
 
@@ -355,6 +351,7 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
     dataCompletenessScheduler.start();
   }
 
+  // TODO: Change to startGrouper
   private void startMerger() throws Exception {
     ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
     anomalyMergeExecutor = new AnomalyMergeExecutor(executorService, anomalyFunctionFactory);
