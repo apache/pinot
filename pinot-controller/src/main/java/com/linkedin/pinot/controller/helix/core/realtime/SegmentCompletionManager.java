@@ -351,6 +351,11 @@ public class SegmentCompletionManager {
       if (savedCommitTime != null && savedCommitTime > initialCommitTimeMs) {
         initialCommitTimeMs = savedCommitTime;
       }
+      if (initialCommitTimeMs > MAX_COMMIT_TIME_FOR_ALL_SEGMENTS_SEC * 1000) {
+        // The table has a really high value configured for max commit time. Set it to a higher value than default
+        // and go from there.
+        initialCommitTimeMs = MAX_COMMIT_TIME_FOR_ALL_SEGMENTS_SEC * 1000;
+      }
       _initialCommitTimeMs = initialCommitTimeMs;
       _maxTimeAllowedToCommitMs = _startTimeMs + _initialCommitTimeMs;
       LOGGER = LoggerFactory.getLogger("SegmentFinalizerFSM_"  + segmentName.getSegmentName());
