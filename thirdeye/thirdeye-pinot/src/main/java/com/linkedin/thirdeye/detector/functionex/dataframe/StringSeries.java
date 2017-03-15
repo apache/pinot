@@ -201,7 +201,7 @@ public final class StringSeries extends Series {
       System.arraycopy(this.values, 0, values, Math.min(offset, values.length), Math.max(values.length - offset, 0));
     } else {
       System.arraycopy(this.values, Math.min(-offset, values.length), values, 0, Math.max(values.length + offset, 0));
-      Arrays.fill(values, Math.max(values.length + offset, 0), Math.min(-offset, values.length), NULL_VALUE);
+      Arrays.fill(values, Math.max(values.length + offset, 0), values.length, NULL_VALUE);
     }
     return new StringSeries(values);
   }

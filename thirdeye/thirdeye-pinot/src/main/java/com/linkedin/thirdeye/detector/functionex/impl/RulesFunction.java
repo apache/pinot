@@ -4,8 +4,10 @@ import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionEx;
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExResult;
 import com.linkedin.thirdeye.detector.functionex.dataframe.DataFrame;
 import com.linkedin.thirdeye.detector.functionex.dataframe.DoubleSeries;
+import com.linkedin.thirdeye.detector.functionex.dataframe.Series;
 import java.net.URI;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.regex.Matcher;
@@ -39,6 +41,8 @@ public class RulesFunction extends AnomalyFunctionEx {
 
     DataFrame data = mergeDataFrames(dataFrames);
 
+    LOG.info("{}", data);
+
     long timestepSize = estimateStepSize(data);
 
     AnomalyFunctionExResult anomalyResult = new AnomalyFunctionExResult();
@@ -70,24 +74,22 @@ public class RulesFunction extends AnomalyFunctionEx {
   }
 
   static DataFrame mergeDataFrames(Map<String, DataFrame> dataFrames) {
-    // TODO: move to data frame, check indices and timestamps
-
-    if (dataFrames.isEmpty()) {
+    if(dataFrames.isEmpty())
       return new DataFrame(0);
+
+    Iterator<Map.Entry<String, DataFrame>> it = dataFrames.entrySet().iterator();
+
+    Map.Entry<String, DataFrame> entry = it.next();
+    entry.getValue().renameSeries(COLUMN_METRIC, entry.getKey());
+    DataFrame data = entry.getValue();
+
+    while(it.hasNext()) {
+      Map.Entry<String, DataFrame> e = it.next();
+      e.getValue().renameSeries(COLUMN_METRIC, e.getKey());
+      data = data.joinInner(e.getValue(), COLUMN_TIMESTAMP, COLUMN_TIMESTAMP);
     }
 
-    DataFrame first = dataFrames.values().iterator().next();
-    DataFrame df = new DataFrame();
-    df.addSeries(COLUMN_TIMESTAMP, first.toLongs(COLUMN_TIMESTAMP));
-
-    for (Map.Entry<String, DataFrame> e : dataFrames.entrySet()) {
-      DataFrame candidate = e.getValue();
-      if(!first.toLongs(COLUMN_TIMESTAMP).equals(candidate.toLongs(COLUMN_TIMESTAMP)))
-        throw new IllegalStateException("series timestamps do not align");
-      df.addSeries(e.getKey(), candidate.get(COLUMN_METRIC));
-    }
-
-    return df;
+    return data.dropNullRows();
   }
 
   static Map<String, String> getSubConfig(Map<String, String> map, String prefix) {
@@ -104,8 +106,18 @@ public class RulesFunction extends AnomalyFunctionEx {
   static long estimateStepSize(DataFrame df) {
     if(df.size() <= 1)
       return 0;
-    long[] index = df.toLongs(COLUMN_TIMESTAMP).values();
-    return index[1] - index[0];
+
+    DataFrame ndf = new DataFrame();
+    ndf.addSeries("curr", df.toLongs(COLUMN_TIMESTAMP));
+    ndf.addSeries("prev", df.toLongs(COLUMN_TIMESTAMP).shift(-1));
+    ndf = ndf.dropNullRows();
+
+    return ndf.map(new Series.LongBatchFunction() {
+      @Override
+      public long apply(long[] values) {
+        return values[0] - values[1];
+      }
+    }, "curr", "prev").min();
   }
 
   static String extractNumericPortion(String rule) {
