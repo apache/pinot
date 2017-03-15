@@ -466,8 +466,8 @@ public class SegmentCompletionTest {
 
     // Fast forward to one second before commit time, and send a lease renewal request for 20s
     segmentCompletionMgr._secconds = startTime + commitTimeSec - 1;
-    params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr).withExtTimeSec(
-        20);
+    params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(
+        segmentNameStr).withExtTimeSec(20);
     response = segmentCompletionMgr.extendBuildTime(params);
     Assert.assertEquals(response.getStatus(), ControllerResponseStatus.PROCESSED);
     Assert.assertTrue((fsmMap.containsKey(segmentNameStr)));
@@ -547,6 +547,70 @@ public class SegmentCompletionTest {
     Assert.assertFalse((fsmMap.containsKey(segmentNameStr)));
     Assert.assertFalse(commitTimeMap.containsKey(tableName));
   }
+
+  @Test
+  public void testLeaseTooLong() throws Exception {
+    SegmentCompletionProtocol.Response response;
+    Request.Params params;
+    final String tableName = new LLCSegmentName(segmentNameStr).getTableName();
+    // s1 sends offset of 20, gets HOLD at t = 5s;
+    final long startTime = 5;
+    segmentCompletionMgr._secconds = startTime;
+    params = new Request.Params().withInstanceId(s1).withOffset(s1Offset).withSegmentName(segmentNameStr);
+    response = segmentCompletionMgr.segmentConsumed(params);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
+    // s2 sends offset of 40, gets HOLD
+    segmentCompletionMgr._secconds += 1;
+    params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr);
+    response = segmentCompletionMgr.segmentConsumed(params);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
+    // s3 sends offset of 30, gets catchup to 40
+    segmentCompletionMgr._secconds += 1;
+    params = new Request.Params().withInstanceId(s3).withOffset(s3Offset).withSegmentName(segmentNameStr);
+    response = segmentCompletionMgr.segmentConsumed(params);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.CATCH_UP);
+    Assert.assertEquals(response.getOffset(), s2Offset);
+    // Now s1 comes back, and is asked to catchup.
+    segmentCompletionMgr._secconds += 1;
+    params = new Request.Params().withInstanceId(s1).withOffset(s1Offset).withSegmentName(segmentNameStr);
+    response = segmentCompletionMgr.segmentConsumed(params);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.CATCH_UP);
+    // s2 is asked to commit.
+    segmentCompletionMgr._secconds += 1;
+    params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr);
+    response = segmentCompletionMgr.segmentConsumed(params);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
+    long commitTimeSec = response.getBuildTimeSec();
+    Assert.assertTrue(commitTimeSec > 0);
+
+    // Fast forward to one second before commit time, and send a lease renewal request for 20s
+    segmentCompletionMgr._secconds = startTime + commitTimeSec - 1;
+    params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr).withExtTimeSec(
+        20);
+    response = segmentCompletionMgr.extendBuildTime(params);
+    Assert.assertEquals(response.getStatus(), ControllerResponseStatus.PROCESSED);
+    Assert.assertTrue((fsmMap.containsKey(segmentNameStr)));
+
+    final int leaseTimeSec = 20;
+    // Lease will not be granted if the time taken so far plus lease time exceeds the max allowabale.
+    while (segmentCompletionMgr._secconds + leaseTimeSec <= startTime + SegmentCompletionManager.getMaxCommitTimeForAllSegmentsSec()) {
+      System.out.println("time=" + segmentCompletionMgr._secconds);
+      params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr).withExtTimeSec(
+          leaseTimeSec);
+      response = segmentCompletionMgr.extendBuildTime(params);
+      Assert.assertEquals(response.getStatus(), ControllerResponseStatus.PROCESSED);
+      Assert.assertTrue((fsmMap.containsKey(segmentNameStr)));
+      segmentCompletionMgr._secconds += leaseTimeSec;
+    }
+
+    // Now the lease request should fail.
+    params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr).withExtTimeSec(
+        leaseTimeSec);
+    response = segmentCompletionMgr.extendBuildTime(params);
+    Assert.assertEquals(response.getStatus(), ControllerResponseStatus.FAILED);
+    Assert.assertFalse((fsmMap.containsKey(segmentNameStr)));
+  }
+
   @Test
   public void testControllerFailureDuringCommit() throws Exception {
     SegmentCompletionProtocol.Response response;

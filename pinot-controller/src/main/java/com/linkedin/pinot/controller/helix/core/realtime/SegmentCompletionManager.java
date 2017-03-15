@@ -67,6 +67,12 @@ public class SegmentCompletionManager {
   private final PinotLLCRealtimeSegmentManager _segmentManager;
   private final ControllerMetrics _controllerMetrics;
 
+  private static final int MAX_COMMIT_TIME_FOR_ALL_SEGMENTS_SEC = 1800; // Half hour max commit time for all segments
+
+  public static int getMaxCommitTimeForAllSegmentsSec() {
+    return MAX_COMMIT_TIME_FOR_ALL_SEGMENTS_SEC;
+  }
+
   // TODO keep some history of past committed segments so that we can avoid looking up PROPERTYSTORE if some server comes in late.
 
   protected SegmentCompletionManager(HelixManager helixManager, PinotLLCRealtimeSegmentManager segmentManager,
@@ -516,7 +522,7 @@ public class SegmentCompletionManager {
           case COMMITTER_DECIDED:
             return fail(instanceId, offset);
           case COMMITTER_NOTIFIED:
-            return COMMITTER_NOTIFIED__extendBuidlTime(instanceId, offset, extTimeSec, now);
+            return COMMITTER_NOTIFIED__extendBuildlTime(instanceId, offset, extTimeSec, now);
           case COMMITTER_UPLOADING:
           case COMMITTING:
           case COMMITTED:
@@ -602,6 +608,13 @@ public class SegmentCompletionManager {
       _segmentCompletionManager._controllerMetrics.addMeteredTableValue(_segmentName.getTableName(),
           ControllerMeter.LLC_STATE_MACHINE_ABORTS, 1);
       return hold(instanceId, offset);
+    }
+
+    private SegmentCompletionProtocol.Response abortAndReturnFailed(long now, String instanceId, long offset) {
+      _state = State.ABORTED;
+      _segmentCompletionManager._controllerMetrics.addMeteredTableValue(_segmentName.getTableName(),
+          ControllerMeter.LLC_STATE_MACHINE_ABORTS, 1);
+      return SegmentCompletionProtocol.RESP_FAILED;
     }
 
     private SegmentCompletionProtocol.Response abortIfTooLateAndReturnHold(long now, String instanceId, long offset) {
@@ -806,10 +819,16 @@ public class SegmentCompletionManager {
       return processStoppedConsuming(instanceId, offset, reason, false);
     }
 
-    private SegmentCompletionProtocol.Response COMMITTER_NOTIFIED__extendBuidlTime(String instanceId, long offset, int extTimeSec, long now) {
+    private SegmentCompletionProtocol.Response COMMITTER_NOTIFIED__extendBuildlTime(String instanceId, long offset,
+        int extTimeSec, long now) {
       SegmentCompletionProtocol.Response response = abortIfTooLateAndReturnHold(now, instanceId, offset);
       if (response == null) {
-        _maxTimeAllowedToCommitMs = now + extTimeSec * 1000;
+        long maxTimeAllowedToCommitMs = now + extTimeSec * 1000;
+        if (maxTimeAllowedToCommitMs > MAX_COMMIT_TIME_FOR_ALL_SEGMENTS_SEC * 1000) {
+          LOGGER.warn("Not accepting lease extension from {} requestedTime={}", _startTimeMs, maxTimeAllowedToCommitMs);
+          return abortAndReturnFailed(now, instanceId, offset);
+        }
+        _maxTimeAllowedToCommitMs = maxTimeAllowedToCommitMs;
         response = SegmentCompletionProtocol.RESP_PROCESSED;
       }
       return response;
