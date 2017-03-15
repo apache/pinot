@@ -31,6 +31,7 @@ import org.slf4j.LoggerFactory;
 
 public class TimeBasedAnomalyMerger {
   private final static Logger LOG = LoggerFactory.getLogger(TimeBasedAnomalyMerger.class);
+  private final static double NORMALIZATION_FACTOR = 1000; // to prevent from double overflow
 
   private final MergedAnomalyResultManager mergedResultDAO;
   private final OverrideConfigManager overrideConfigDAO;
@@ -146,36 +147,49 @@ public class TimeBasedAnomalyMerger {
   }
 
   private void updateMergedAnomalyInfo(MergedAnomalyResultDTO mergedResult, AnomalyMergeConfig mergeConfig) {
-    // Calculate default score and weight in case of the failure during updating score and weight through Pinot's value
-    double weightedScoreSum = 0.0;
-    double weightedWeightSum = 0.0;
-    double totalBucketSize = 0.0;
-    double avgCurrent = 0.0;
-    double avgBaseline = 0.0;
-
-    double normalizationFactor = 1000; // to prevent from double overflow
     List<RawAnomalyResultDTO> rawAnomalies = mergedResult.getAnomalyResults();
-    String anomalyMessage = "";
-    for (RawAnomalyResultDTO anomalyResult : rawAnomalies) {
-      anomalyResult.setMerged(true);
-      double bucketSizeSeconds = (anomalyResult.getEndTime() - anomalyResult.getStartTime()) / 1000;
-      weightedScoreSum += (anomalyResult.getScore() / normalizationFactor) * bucketSizeSeconds;
-      weightedWeightSum += (anomalyResult.getWeight() / normalizationFactor) * bucketSizeSeconds;
-      totalBucketSize += bucketSizeSeconds;
-      avgCurrent += anomalyResult.getAvgCurrentVal();
-      avgBaseline += anomalyResult.getAvgBaselineVal();
-      anomalyMessage = anomalyResult.getMessage();
-    }
-    if (totalBucketSize != 0) {
-      mergedResult.setScore((weightedScoreSum / totalBucketSize) * normalizationFactor);
-      mergedResult.setWeight((weightedWeightSum / totalBucketSize) * normalizationFactor);
-      mergedResult.setAvgCurrentVal(avgCurrent / rawAnomalies.size());
-      mergedResult.setAvgBaselineVal(avgBaseline / rawAnomalies.size());
+    if (CollectionUtils.isEmpty(rawAnomalies)) {
+      LOG.warn("Skip updating anomaly (id={}) because its does not have any children anomalies.", mergedResult.getId());
+      return;
     }
 
-    mergedResult.setMessage(anomalyMessage);
+    // Update the info of merged anomalies
+    if (rawAnomalies.size() == 1) {
+      RawAnomalyResultDTO rawAnomaly = rawAnomalies.get(0);
+      mergedResult.setScore(rawAnomaly.getScore());
+      mergedResult.setWeight(rawAnomaly.getWeight());
+      mergedResult.setAvgCurrentVal(rawAnomaly.getAvgCurrentVal());
+      mergedResult.setAvgBaselineVal(rawAnomaly.getAvgBaselineVal());
+      mergedResult.setMessage(rawAnomaly.getMessage());
+    } else {
+      // Calculate default score and weight in case of any failure (e.g., DB exception) during the update
+      double weightedScoreSum = 0.0;
+      double weightedWeightSum = 0.0;
+      double totalBucketSize = 0.0;
+      double avgCurrent = 0.0;
+      double avgBaseline = 0.0;
+      String anomalyMessage = "";
 
-    if (rawAnomalies.size() > 1) {
+      for (RawAnomalyResultDTO anomalyResult : rawAnomalies) {
+        anomalyResult.setMerged(true);
+        double bucketSizeSeconds = (anomalyResult.getEndTime() - anomalyResult.getStartTime()) / 1000;
+        double normalizedBucketSize = getNormalizedBucketSize(bucketSizeSeconds);
+        totalBucketSize += bucketSizeSeconds;
+        weightedScoreSum += anomalyResult.getScore() * normalizedBucketSize;
+        weightedWeightSum += anomalyResult.getWeight() * normalizedBucketSize;
+        avgCurrent += anomalyResult.getAvgCurrentVal() * normalizedBucketSize;
+        avgBaseline += anomalyResult.getAvgBaselineVal() * normalizedBucketSize;
+        anomalyMessage = anomalyResult.getMessage();
+      }
+      if (totalBucketSize != 0) {
+        double normalizedTotalBucketSize = getNormalizedBucketSize(totalBucketSize);
+        mergedResult.setScore(weightedScoreSum / normalizedTotalBucketSize);
+        mergedResult.setWeight(weightedWeightSum / normalizedTotalBucketSize);
+        mergedResult.setAvgCurrentVal(avgCurrent / normalizedTotalBucketSize);
+        mergedResult.setAvgBaselineVal(avgBaseline / normalizedTotalBucketSize);
+      }
+      mergedResult.setMessage(anomalyMessage);
+
       // recompute weight using anomaly function specific method
       try {
         computeMergedAnomalyInfo(mergedResult, mergeConfig);
@@ -186,6 +200,10 @@ public class TimeBasedAnomalyMerger {
             function.getCollection(), function.getTopicMetric(), function.getFunctionName(), new DateTime(mergedResult.getStartTime()), new DateTime(mergedResult.getEndTime()), e);
       }
     }
+  }
+
+  private static double getNormalizedBucketSize(double secondsInABucket) {
+    return secondsInABucket / NORMALIZATION_FACTOR;
   }
 
   /**
