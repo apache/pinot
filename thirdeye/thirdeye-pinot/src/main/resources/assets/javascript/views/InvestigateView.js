@@ -47,7 +47,9 @@ InvestigateView.prototype = {
     };
   },
 
-  formatWowData(wowData, {start, end, dataset, metric}){
+  formatWowData(wowData, {currentStart, currentEnd, dataset, metric}){
+    const start = moment(currentStart);
+    const end = moment(currentEnd);
     const wowMapping = {
       WoW: 7,
       Wo2W: 14,
@@ -56,13 +58,11 @@ InvestigateView.prototype = {
     };
 
     wowData.forEach((wow) => {
-      let currentStart = moment(start);
-      let currentEnd = moment(end);
-      let offset = wowMapping[wow.compareMode];
-      let baselineStart = currentStart.clone().subtract(offset, 'days');
-      let baselineEnd = currentEnd.clone().subtract(offset, 'days');
+      const offset = wowMapping[wow.compareMode];
+      const baselineStart = start.clone().subtract(offset, 'days');
+      const baselineEnd = end.clone().subtract(offset, 'days');
       wow.change *= 100;
-      wow.url = `dashboard#view=compare&dataset=${dataset}&compareMode=WoW&aggTimeGranularity=aggregateAll&currentStart=${currentStart}&currentEnd=${currentEnd}&baselineStart=${baselineStart}&baselineEnd=${baselineEnd}&metrics=${metric}`;
+      wow.url = `dashboard#view=compare&dataset=${dataset}&compareMode=WoW&aggTimeGranularity=aggregateAll&currentStart=${start}&currentEnd=${end}&baselineStart=${baselineStart}&baselineEnd=${baselineEnd}&metrics=${metric}`;
     });
   },
 
