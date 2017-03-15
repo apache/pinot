@@ -34,16 +34,15 @@ AnomalyResultModel.prototype = {
     if (!params.anomaliesSearchMode || !this.anomaliesSearchMode) {
       return false;
     }
-    const paramKeys = Object.keys(params);
-    for (let index in paramKeys){
-      let key = paramKeys[index];
-      if (key !== 'tab' && key !== 'rand') {
-        if (!!this[key] && !HASH_PARAMS.isSame(key, params[key],this[key])) {
-          return false;
-        }
-      }
-    }
-    return true;
+
+    // Check that the params are tab or rand
+    // and is the same as the HASH_PARAMS
+    return Object.keys(params).every((key) => {
+      const isParamTabOrRandom = ['tab', 'rand'].includes(key);
+      const isParamSameAsHash = !!this[key] && HASH_PARAMS.isSame(key, params[key], this[key]);
+
+      return isParamTabOrRandom || isParamSameAsHash;
+    });
   },
 
   reset : function() {
