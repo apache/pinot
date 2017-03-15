@@ -2,7 +2,6 @@ package com.linkedin.thirdeye.anomalydetection.alertFilterAutotune;
 
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
