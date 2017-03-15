@@ -594,7 +594,6 @@ public class SegmentCompletionTest {
     final int leaseTimeSec = 20;
     // Lease will not be granted if the time taken so far plus lease time exceeds the max allowabale.
     while (segmentCompletionMgr._secconds + leaseTimeSec <= startTime + SegmentCompletionManager.getMaxCommitTimeForAllSegmentsSec()) {
-      System.out.println("time=" + segmentCompletionMgr._secconds);
       params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr).withExtTimeSec(
           leaseTimeSec);
       response = segmentCompletionMgr.extendBuildTime(params);
