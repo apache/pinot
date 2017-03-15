@@ -209,11 +209,13 @@ public class DataCompletenessTaskUtils {
     Map<Long, Long> timeValueToCount = new HashMap<>();
     try {
       ResultSetGroup resultSetGroup = CACHE_REGISTRY.getResultSetGroupCache().get(new PinotQuery(pql, dataset));
-      ResultSet resultSet = resultSetGroup.getResultSet(0);
-      for (int i = 0; i < resultSet.getRowCount(); i++) {
-        Long timeValue = Long.valueOf(resultSet.getGroupKeyString(i, 0));
-        Long count = resultSet.getLong(i, 0);
-        timeValueToCount.put(timeValue, count);
+      if (resultSetGroup == null || resultSetGroup.getResultSetCount() <= 0) {
+        ResultSet resultSet = resultSetGroup.getResultSet(0);
+        for (int i = 0; i < resultSet.getRowCount(); i++) {
+          Long timeValue = Long.valueOf(resultSet.getGroupKeyString(i, 0));
+          Long count = resultSet.getLong(i, 0);
+          timeValueToCount.put(timeValue, count);
+        }
       }
 
     } catch (ExecutionException e) {
