@@ -13,19 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.linkedin.pinot.core.segment.creator;
 
-import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.data.extractors.FieldExtractor;
+import com.linkedin.pinot.core.data.readers.RecordReader;
 
-public interface SegmentPreIndexStatsCollector extends SegmentPreIndexStatsContainer {
 
-  void init();
+/**
+ * Data source used to build segments
+ */
+public interface SegmentCreationDataSource {
+  SegmentPreIndexStatsCollector gatherStats(FieldExtractor fieldExtractor);
 
-  void build() throws Exception;
-
-  void collectRow(GenericRow row) throws Exception;
-
-  void collectRow(GenericRow row, boolean isAggregated) throws Exception;
-
-  void logStats();
+  RecordReader getRecordReader();
 }

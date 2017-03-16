@@ -15,17 +15,15 @@
  */
 package com.linkedin.pinot.core.segment.creator;
 
-import com.linkedin.pinot.core.data.GenericRow;
+/**
+ * Container for per-column stats for a segment
+ */
+public interface SegmentPreIndexStatsContainer {
+  AbstractColumnStatisticsCollector getColumnProfileFor(String column) throws Exception;
 
-public interface SegmentPreIndexStatsCollector extends SegmentPreIndexStatsContainer {
+  int getRawDocCount();
 
-  void init();
+  int getAggregatedDocCount();
 
-  void build() throws Exception;
-
-  void collectRow(GenericRow row) throws Exception;
-
-  void collectRow(GenericRow row, boolean isAggregated) throws Exception;
-
-  void logStats();
+  int getTotalDocCount();
 }

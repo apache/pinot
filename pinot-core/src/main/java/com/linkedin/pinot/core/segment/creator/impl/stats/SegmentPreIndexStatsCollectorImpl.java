@@ -28,15 +28,15 @@ import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector
 import com.linkedin.pinot.core.segment.creator.SegmentPreIndexStatsCollector;
 
 
-/**
- * Nov 7, 2014
- */
-
 public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCollector {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPreIndexStatsCollectorImpl.class);
 
   private final Schema dataSchema;
-  Map<String, AbstractColumnStatisticsCollector> columnStatsCollectorMap;
+  private Map<String, AbstractColumnStatisticsCollector> columnStatsCollectorMap;
+
+  private int rawDocCount;
+  private int aggregatedDocCount;
+  private int totalDocCount;
 
   public SegmentPreIndexStatsCollectorImpl(Schema dataSchema) {
     this.dataSchema = dataSchema;
@@ -102,6 +102,28 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
         }
       }
     }
+
+    ++totalDocCount;
+    if (!isAggregated) {
+      ++rawDocCount;
+    } else {
+      ++aggregatedDocCount;
+    }
+  }
+
+  @Override
+  public int getRawDocCount() {
+    return rawDocCount;
+  }
+
+  @Override
+  public int getAggregatedDocCount() {
+    return aggregatedDocCount;
+  }
+
+  @Override
+  public int getTotalDocCount() {
+    return totalDocCount;
   }
 
   public static <T> T convertInstanceOfObject(Object o, Class<T> clazz) {
