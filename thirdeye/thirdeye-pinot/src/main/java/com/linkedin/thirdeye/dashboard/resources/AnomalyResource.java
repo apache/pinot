@@ -3,25 +3,31 @@ package com.linkedin.thirdeye.dashboard.resources;
 import com.google.common.cache.LoadingCache;
 import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
-import com.linkedin.thirdeye.anomaly.detection.TimeSeriesUtil;
+import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContext;
+import com.linkedin.thirdeye.anomaly.merge.TimeBasedAnomalyMerger;
 import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dashboard.views.TimeBucket;
 
+import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
-import com.linkedin.thirdeye.detector.function.AnomalyFunction;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
+import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
+import com.linkedin.thirdeye.detector.metric.transfer.MetricTransfer;
+import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
 import java.io.IOException;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -37,6 +43,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.text.StrSubstitutor;
 import org.joda.time.DateTime;
@@ -87,6 +94,7 @@ public class AnomalyResource {
   private EmailConfigurationManager emailConfigurationDAO;
   private MetricConfigManager metricConfigDAO;
   private MergedAnomalyResultManager mergedAnomalyResultDAO;
+  private OverrideConfigManager overrideConfigDAO;
   private AnomalyFunctionFactory anomalyFunctionFactory;
   private AlertFilterFactory alertFilterFactory;
   private LoadingCache<String, Long> collectionMaxDataTimeCache;
@@ -100,6 +108,7 @@ public class AnomalyResource {
     this.emailConfigurationDAO = DAO_REGISTRY.getEmailConfigurationDAO();
     this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
     this.mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
+    this.overrideConfigDAO = DAO_REGISTRY.getOverrideConfigDAO();
     this.anomalyFunctionFactory = anomalyFunctionFactory;
     this.alertFilterFactory = alertFilterFactory;
     this.collectionMaxDataTimeCache = CACHE_REGISTRY_INSTANCE.getCollectionMaxDataTimeCache();
@@ -574,7 +583,7 @@ public class AnomalyResource {
     MergedAnomalyResultDTO anomalyResult = anomalyMergedResultDAO.findById(anomalyResultId, loadRawAnomalies);
     DimensionMap dimensions = anomalyResult.getDimensions();
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyResult.getFunction();
-    AnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
+    BaseAnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
 
     // Calculate view window start and end if they are not given by the user, which should be 0 if it is not given.
     // By default, the padding window size is half of the anomaly window.
@@ -609,11 +618,11 @@ public class AnomalyResource {
           (anomalyResult.getEndTime() > maxDataTime) ? anomalyResult.getEndTime() : maxDataTime;
     }
 
-    List<Pair<Long, Long>> startEndTimeRanges =
-        anomalyFunction.getDataRangeIntervals(viewWindowStartTime, viewWindowEndTime);
+    AnomalyDetectionInputContext adInputContext = TimeBasedAnomalyMerger
+        .fetchDataByDimension(viewWindowStartTime, viewWindowEndTime, dimensions, anomalyFunction,
+            anomalyMergedResultDAO, overrideConfigDAO);
 
-    MetricTimeSeries metricTimeSeries =
-        TimeSeriesUtil.getTimeSeriesByDimension(anomalyFunctionSpec, startEndTimeRanges, dimensions, timeGranularity);
+    MetricTimeSeries metricTimeSeries = adInputContext.getDimensionKeyMetricTimeSeriesMap().get(dimensions);
 
     if (metricTimeSeries == null) {
       // If this case happened, there was something wrong with anomaly detection because we are not able to retrieve
@@ -621,11 +630,20 @@ public class AnomalyResource {
       return new AnomalyTimelinesView();
     }
 
+    List<MergedAnomalyResultDTO> knownAnomalies = adInputContext.getKnownMergedAnomalies().get(dimensions);
+    // Transform time series with scaling factor
+    List<ScalingFactor> scalingFactors = adInputContext.getScalingFactors();
+    if (CollectionUtils.isNotEmpty(scalingFactors)) {
+      Properties properties = anomalyFunction.getProperties();
+      MetricTransfer.rescaleMetric(metricTimeSeries, viewWindowStartTime, scalingFactors,
+          anomalyFunctionSpec.getTopicMetric(), properties);
+    }
+
     // Known anomalies are ignored (the null parameter) because 1. we can reduce users' waiting time and 2. presentation
     // data does not need to be as accurate as the one used for detecting anomalies
     AnomalyTimelinesView anomalyTimelinesView =
         anomalyFunction.getTimeSeriesView(metricTimeSeries, bucketMillis, anomalyFunctionSpec.getTopicMetric(),
-            viewWindowStartTime, viewWindowEndTime, null);
+            viewWindowStartTime, viewWindowEndTime, knownAnomalies);
 
     // Generate summary for frontend
     List<TimeBucket> timeBuckets = anomalyTimelinesView.getTimeBuckets();

@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
-import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.ListMultimap;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -11,8 +11,8 @@ import java.util.Map;
 
 public class AnomalyDetectionInputContext {
   Map<DimensionMap, MetricTimeSeries> dimensionKeyMetricTimeSeriesMap;
-  ArrayListMultimap<DimensionMap, RawAnomalyResultDTO> existingRawAnomalies;
-  ArrayListMultimap<DimensionMap, MergedAnomalyResultDTO> knownMergedAnomalies;
+  ListMultimap<DimensionMap, RawAnomalyResultDTO> existingRawAnomalies;
+  ListMultimap<DimensionMap, MergedAnomalyResultDTO> knownMergedAnomalies;
   List<ScalingFactor> scalingFactors;
 
   public Map<DimensionMap, MetricTimeSeries> getDimensionKeyMetricTimeSeriesMap() {
@@ -24,19 +24,19 @@ public class AnomalyDetectionInputContext {
     this.dimensionKeyMetricTimeSeriesMap = dimensionKeyMetricTimeSeriesMap;
   }
 
-  public ArrayListMultimap<DimensionMap, RawAnomalyResultDTO> getExistingRawAnomalies() {
+  public ListMultimap<DimensionMap, RawAnomalyResultDTO> getExistingRawAnomalies() {
     return existingRawAnomalies;
   }
 
-  public void setExistingRawAnomalies(ArrayListMultimap<DimensionMap, RawAnomalyResultDTO> existingRawAnomalies) {
+  public void setExistingRawAnomalies(ListMultimap<DimensionMap, RawAnomalyResultDTO> existingRawAnomalies) {
     this.existingRawAnomalies = existingRawAnomalies;
   }
 
-  public ArrayListMultimap<DimensionMap, MergedAnomalyResultDTO> getKnownMergedAnomalies() {
+  public ListMultimap<DimensionMap, MergedAnomalyResultDTO> getKnownMergedAnomalies() {
     return knownMergedAnomalies;
   }
 
-  public void setKnownMergedAnomalies(ArrayListMultimap<DimensionMap, MergedAnomalyResultDTO> knownMergedAnomalies) {
+  public void setKnownMergedAnomalies(ListMultimap<DimensionMap, MergedAnomalyResultDTO> knownMergedAnomalies) {
     this.knownMergedAnomalies = knownMergedAnomalies;
   }
 

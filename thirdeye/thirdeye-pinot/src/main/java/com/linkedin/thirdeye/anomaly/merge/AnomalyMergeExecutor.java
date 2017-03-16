@@ -41,6 +41,7 @@ import org.slf4j.LoggerFactory;
  * finds raw anomalies grouped by a strategy and merges them with an existing (in the same group) or
  * new {@link com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO}
  */
+@Deprecated
 public class AnomalyMergeExecutor implements Runnable {
   private final MergedAnomalyResultManager mergedResultDAO;
   private final RawAnomalyResultManager anomalyResultDAO;
