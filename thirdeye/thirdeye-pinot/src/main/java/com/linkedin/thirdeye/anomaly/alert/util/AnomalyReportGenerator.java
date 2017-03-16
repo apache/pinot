@@ -198,7 +198,7 @@ public class AnomalyReportGenerator {
       templateData.put("dashboardHost", configuration.getDashboardHost());
       templateData.put("anomalyIds", Joiner.on(",").join(anomalyIds));
       boolean isSingleAnomalyEmail = false;
-      //if (anomalyReportDTOList.size() == 1) {
+      if (anomalyReportDTOList.size() == 1) {
         isSingleAnomalyEmail = true;
         try {
           String imgPath = takeGraphScreenShot(anomalyReportDTOList.get(0).getAnomalyId(), configuration);
@@ -207,7 +207,7 @@ public class AnomalyReportGenerator {
         } catch (Exception e) {
           LOG.error("Exception while embedding screenshot for anomaly {}", anomalyReportDTOList.get(0).getAnomalyId(), e);
         }
-      //}
+      }
 
       buildEmailTemplateAndSendAlert(templateData, configuration.getSmtpConfiguration(), subject,
           emailRecipients, fromEmail, isSingleAnomalyEmail, email);
