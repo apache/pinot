@@ -191,10 +191,6 @@ public abstract class EmailHelper {
       for (String address : toAddress.split(EMAIL_ADDRESS_SEPARATOR)) {
         email.addTo(address);
       }
-
-      //String cid = email.embed(new File("/tmp/graph3247528.png"));
-      //email.setHtmlMsg("<html>Anomaly Test  <img src=\"cid:"+cid+"\"></html>");
-
       email.send();
       LOG.info("Email sent with subject [{}] to address [{}]!", subject, toAddress);
     } else {

@@ -45,7 +45,7 @@
                   <td colspan="50%" style="border: 1px solid #CCC; width:50%; padding: 14px;"><div style="color: #737373;">${r.function}</div><div style="font-weight:600;">Function</div></td>
                 </tr>
                 <tr>
-                  <td colspan="50%" style="border: 1px solid #CCC; width:50%; padding: 14px;"><div style="color: #737373;">${r.duration} hours</div><div style="font-weight:600;">Duration</div></td>
+                  <td colspan="50%" style="border: 1px solid #CCC; width:50%; padding: 14px;"><div style="color: #737373;">${r.duration}</div><div style="font-weight:600;">Duration</div></td>
                   <td colspan="50%" style="border: 1px solid #CCC; width:50%; padding: 14px;"><div style="color: #737373;">${r.feedback}</div><div style="font-weight:600;">Status</div></td>
                 </tr>
               </table>

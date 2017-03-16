@@ -7,8 +7,10 @@ import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.alert.AlertTaskRunner;
 import com.linkedin.thirdeye.anomaly.alert.v2.AlertTaskRunnerV2;
+import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
+import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
@@ -32,7 +34,9 @@ import java.util.Set;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.mail.HtmlEmail;
+import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
+import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,6 +51,7 @@ public class AnomalyReportGenerator {
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyReportGenerator.class);
 
   private static final AnomalyReportGenerator INSTANCE = new AnomalyReportGenerator();
+  private static final String DATE_PATTERN = "MMM dd, hh:mm a";
 
   public static AnomalyReportGenerator getInstance() {
     return INSTANCE;
@@ -136,15 +141,20 @@ public class AnomalyReportGenerator {
         String feedbackVal = getFeedback(
             anomaly.getFeedback() == null ? "Not Resolved" : "Resolved(" + anomaly.getFeedback().getFeedbackType().name() + ")");
 
+        DateTimeZone dateTimeZone = Utils.getDataTimeZone(anomaly.getCollection());
         AnomalyReportDTO anomalyReportDTO = new AnomalyReportDTO(String.valueOf(anomaly.getId()),
             getAnomalyURL(anomaly, configuration.getDashboardHost()),
-            String.valueOf(anomaly.getAvgBaselineVal()),
-            String.valueOf(anomaly.getAvgCurrentVal()),
-            anomaly.getDimensions().toString(),
-            String.format("%.2f", getTimeDiffInHours(anomaly.getStartTime(), anomaly.getEndTime())), // duration
+            String.format("%.2f", anomaly.getAvgBaselineVal()),
+            String.format("%.2f", anomaly.getAvgCurrentVal()),
+            getDimensionsString(anomaly.getDimensions()),
+            String.format("%.2f hours (%s to %s)",
+                getTimeDiffInHours(anomaly.getStartTime(), anomaly.getEndTime()),
+                getDateString(anomaly.getStartTime(), dateTimeZone),
+                getDateString(anomaly.getEndTime(), dateTimeZone)), // duration
             feedbackVal,
             anomaly.getFunction().getFunctionName(),
-            String.format("%+.2f", anomaly.getWeight()), // lift
+            String.format("%+.2f%%", anomaly.getWeight()), // lift
+            getLiftDirection(anomaly.getWeight()),
             anomaly.getMetric()
         );
 
@@ -234,8 +244,25 @@ public class AnomalyReportGenerator {
     }
   }
 
+  String getDateString(Long millis, DateTimeZone dateTimeZone) {
+    String dateString = new DateTime(millis, dateTimeZone).toString(DATE_PATTERN);
+    return dateString;
+  }
+
   double getTimeDiffInHours(long start, long end) {
     return Double.valueOf((end - start) / 1000) / 3600;
+  }
+
+  String getDimensionsString(DimensionMap dimensionMap) {
+    String dimensionsString = "N/A";
+    if (dimensionMap != null && !dimensionMap.isEmpty()) {
+      dimensionsString = dimensionMap.toString();
+    }
+    return dimensionsString;
+  }
+
+  boolean getLiftDirection(double lift) {
+    return lift < 0 ? false : true;
   }
 
   String getFeedback(String feedbackType) {
@@ -260,6 +287,7 @@ public class AnomalyReportGenerator {
     String metric;
     String startDateTime;
     String lift;
+    boolean positiveLift;
     String feedback;
     String anomalyId;
     String anomalyURL;
@@ -271,7 +299,7 @@ public class AnomalyReportGenerator {
 
     public AnomalyReportDTO(String anomalyId, String anomalyURL, String baselineVal,
         String currentVal, String dimensions, String duration, String feedback, String function,
-        String lift, String metric) {
+        String lift, boolean positiveLift, String metric) {
       this.anomalyId = anomalyId;
       this.anomalyURL = anomalyURL;
       this.baselineVal = baselineVal;
@@ -281,6 +309,7 @@ public class AnomalyReportGenerator {
       this.feedback = feedback;
       this.function = function;
       this.lift = lift;
+      this.positiveLift = positiveLift;
       this.metric = metric;
     }
 
@@ -345,6 +374,15 @@ public class AnomalyReportGenerator {
 
     public void setLift(String lift) {
       this.lift = lift;
+    }
+
+
+    public boolean isPositiveLift() {
+      return positiveLift;
+    }
+
+    public void setPositiveLift(boolean positiveLift) {
+      this.positiveLift = positiveLift;
     }
 
     public String getMetric() {
