@@ -91,10 +91,4 @@ public class TableSize extends BasePinotControllerRestletResource {
     }
   }
 
-  private StringRepresentation responseRepresentation(Status status, String jsonMsg) {
-    setStatus(status);
-    StringRepresentation repr = new StringRepresentation(jsonMsg);
-    repr.setMediaType(MediaType.APPLICATION_JSON);
-    return repr;
-  }
 }

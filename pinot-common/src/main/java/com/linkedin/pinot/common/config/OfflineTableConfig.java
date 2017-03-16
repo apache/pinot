@@ -15,11 +15,7 @@
  */
 package com.linkedin.pinot.common.config;
 
-import java.io.IOException;
 import javax.annotation.Nullable;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.json.JSONException;
-import org.json.JSONObject;
 
 
 public class OfflineTableConfig extends AbstractTableConfig {
@@ -47,20 +43,5 @@ public class OfflineTableConfig extends AbstractTableConfig {
     StringBuilder bld = new StringBuilder(super.toString());
     bld.append(indexConfig.toString());
     return bld.toString();
-  }
-
-  @Override
-  public JSONObject toJSON() throws JSONException, IOException {
-    JSONObject ret = new JSONObject();
-    ret.put("tableName", tableName);
-    ret.put("tableType", tableType);
-    ret.put("segmentsConfig", new JSONObject(new ObjectMapper().writeValueAsString(validationConfig)));
-    ret.put("tenants", new JSONObject(new ObjectMapper().writeValueAsString(tenantConfig)));
-    ret.put("tableIndexConfig", new JSONObject(new ObjectMapper().writeValueAsString(indexConfig)));
-    ret.put("metadata", new JSONObject(new ObjectMapper().writeValueAsString(customConfigs)));
-    if (quotaConfig != null) {
-      ret.put("quota", new JSONObject(new ObjectMapper().writeValueAsString(quotaConfig)));
-    }
-    return ret;
   }
 }

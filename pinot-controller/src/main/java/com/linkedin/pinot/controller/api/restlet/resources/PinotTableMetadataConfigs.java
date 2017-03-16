@@ -35,6 +35,7 @@ public class PinotTableMetadataConfigs extends BasePinotControllerRestletResourc
     }
   }
 
+  @Deprecated
   @Override
   @Put("json")
   public Representation put(Representation entity) {
@@ -51,8 +52,9 @@ public class PinotTableMetadataConfigs extends BasePinotControllerRestletResourc
     }
   }
 
+  @Deprecated
   @HttpVerb("put")
-  @Summary("Updates the metadata configuration for a table")
+  @Summary("DEPRECATED: Updates the metadata configuration for a table")
   @Tags({"table"})
   @Paths({
       "/tables/{tableName}/metadataConfigs"

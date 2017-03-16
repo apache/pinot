@@ -43,7 +43,7 @@ public abstract class AbstractTableConfig {
   protected SegmentsValidationAndRetentionConfig validationConfig;
   protected TenantConfig tenantConfig;
   protected TableCustomConfig customConfigs;
-  protected final @Nullable QuotaConfig quotaConfig;
+  protected @Nullable QuotaConfig quotaConfig;
 
   protected AbstractTableConfig(String tableName, String tableType,
       SegmentsValidationAndRetentionConfig validationConfig,
@@ -169,6 +169,10 @@ public abstract class AbstractTableConfig {
     this.customConfigs = customConfigs;
   }
 
+  public void setQuotaConfig(@Nullable QuotaConfig quotaConfig) {
+    this.quotaConfig = quotaConfig;
+  }
+
   public String getTableName() {
     return tableName;
   }
@@ -213,5 +217,18 @@ public abstract class AbstractTableConfig {
     return result.toString();
   }
 
-  public abstract JSONObject toJSON() throws JSONException, IOException;
+  public JSONObject toJSON() throws JSONException, JsonGenerationException, JsonMappingException, IOException {
+    JSONObject ret = new JSONObject();
+    ret.put("tableName", tableName);
+    ret.put("tableType", tableType);
+    ret.put("segmentsConfig", new JSONObject(new ObjectMapper().writeValueAsString(validationConfig)));
+    ret.put("tenants", new JSONObject(new ObjectMapper().writeValueAsString(tenantConfig)));
+    ret.put("tableIndexConfig", new JSONObject(new ObjectMapper().writeValueAsString(getIndexingConfig())));
+    ret.put("metadata", new JSONObject(new ObjectMapper().writeValueAsString(customConfigs)));
+    if (quotaConfig != null) {
+      ret.put("quota", new JSONObject(new ObjectMapper().writeValueAsString(quotaConfig)));
+    }
+    return ret;
+  }
+
 }

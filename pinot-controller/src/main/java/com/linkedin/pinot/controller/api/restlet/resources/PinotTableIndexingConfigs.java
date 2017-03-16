@@ -38,6 +38,7 @@ public class PinotTableIndexingConfigs extends BasePinotControllerRestletResourc
     }
   }
 
+  @Deprecated
   @Override
   @Put("json")
   public Representation put(Representation entity) {
@@ -62,8 +63,9 @@ public class PinotTableIndexingConfigs extends BasePinotControllerRestletResourc
     }
   }
 
+  @Deprecated
   @HttpVerb("put")
-  @Summary("Updates the indexing configuration for a table")
+  @Summary("DEPRECATED: Updates the indexing configuration for a table")
   @Tags({"table"})
   @Paths({
       "/tables/{tableName}/indexingConfigs"
