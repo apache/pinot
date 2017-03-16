@@ -33,22 +33,18 @@ InvestigateView.prototype = {
     const anomaly = this.investigateModel.getAnomaly();
     const wowData = this.investigateModel.getWowData();
     const currentValue = wowData.currentVal;
-
-    this.formatWowData(wowData.compareResults, anomaly);
-    const [ wow, wow2, wow3 ] = wowData.compareResults;
+    const wowResults = this.formatWowResults(wowData.compareResults, anomaly);
 
     this.investigateData = {
       anomaly,
       currentValue,
-      wow,
-      wow2,
-      wow3
+      wowResults,
     };
   },
 
-  formatWowData(wowData, { currentStart, currentEnd, dataset, metric }){
-    const start = moment(currentStart);
-    const end = moment(currentEnd);
+  formatWowResults( wowResults, { anomalyRegionStart, anomalyRegionEnd, dataset, metric }){
+    const start = moment(anomalyRegionStart);
+    const end = moment(anomalyRegionEnd);
     const wowMapping = {
       WoW: 7,
       Wo2W: 14,
@@ -56,13 +52,16 @@ InvestigateView.prototype = {
       Wo4W: 28
     };
 
-    wowData.forEach((wow) => {
-      const offset = wowMapping[wow.compareMode];
-      const baselineStart = start.clone().subtract(offset, 'days');
-      const baselineEnd = end.clone().subtract(offset, 'days');
-      wow.change *= 100;
-      wow.url = `dashboard#view=compare&dataset=${dataset}&compareMode=WoW&aggTimeGranularity=aggregateAll&currentStart=${start}&currentEnd=${end}&baselineStart=${baselineStart}&baselineEnd=${baselineEnd}&metrics=${metric}`;
-    });
+    return wowResults
+      .filter(wow => wow.compareMode !== 'Wo4W')
+      .map((wow) => {
+        const offset = wowMapping[wow.compareMode];
+        const baselineStart = start.clone().subtract(offset, 'days');
+        const baselineEnd = end.clone().subtract(offset, 'days');
+        wow.change *= 100;
+        wow.url = `dashboard#view=compare&dataset=${dataset.valueOf()}&compareMode=WoW&aggTimeGranularity=aggregateAll&currentStart=${start.valueOf()}&currentEnd=${end.valueOf()}&baselineStart=${baselineStart.valueOf()}&baselineEnd=${baselineEnd.valueOf()}&metrics=${metric}`;
+        return wow;
+      });
   },
 
   render () {
