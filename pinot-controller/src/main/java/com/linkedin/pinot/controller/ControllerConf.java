@@ -142,7 +142,7 @@ public class ControllerConf extends PropertiesConfiguration {
     if (containsKey(SEGMENT_COMMIT_TIMEOUT_SECONDS)) {
       return Integer.parseInt((String)getProperty(SEGMENT_COMMIT_TIMEOUT_SECONDS));
     }
-    return SegmentCompletionProtocol.getDefaultMaxSegmentCommitTimeSec();
+    return SegmentCompletionProtocol.getDefaultMaxSegmentCommitTimeSeconds();
   }
 
   public boolean isUpdateSegmentStateModel() {

@@ -461,7 +461,7 @@ public class SegmentCompletionTest {
     params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
-    long commitTimeSec = response.getBuildTimeSec();
+    long commitTimeSec = response.getBuildTimeSeconds();
     Assert.assertTrue(commitTimeSec > 0);
 
     // Fast forward to one second before commit time, and send a lease renewal request for 20s
@@ -527,7 +527,7 @@ public class SegmentCompletionTest {
     params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
-    long commitTimeSec = response.getBuildTimeSec();
+    long commitTimeSec = response.getBuildTimeSeconds();
     Assert.assertTrue(commitTimeSec > 0);
 
     // Fast forward to one second before commit time, and send a lease renewal request for 20s
@@ -580,7 +580,7 @@ public class SegmentCompletionTest {
     params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT);
-    long commitTimeSec = response.getBuildTimeSec();
+    long commitTimeSec = response.getBuildTimeSeconds();
     Assert.assertTrue(commitTimeSec > 0);
 
     // Fast forward to one second before commit time, and send a lease renewal request for 20s
@@ -593,7 +593,7 @@ public class SegmentCompletionTest {
 
     final int leaseTimeSec = 20;
     // Lease will not be granted if the time taken so far plus lease time exceeds the max allowabale.
-    while (segmentCompletionMgr._secconds + leaseTimeSec <= startTime + SegmentCompletionManager.getMaxCommitTimeForAllSegmentsSec()) {
+    while (segmentCompletionMgr._secconds + leaseTimeSec <= startTime + SegmentCompletionManager.getMaxCommitTimeForAllSegmentsSeconds()) {
       params = new Request.Params().withInstanceId(s2).withOffset(s2Offset).withSegmentName(segmentNameStr).withExtTimeSec(
           leaseTimeSec);
       response = segmentCompletionMgr.extendBuildTime(params);

@@ -67,10 +67,10 @@ public class SegmentCompletionManager {
   private final PinotLLCRealtimeSegmentManager _segmentManager;
   private final ControllerMetrics _controllerMetrics;
 
-  private static final int MAX_COMMIT_TIME_FOR_ALL_SEGMENTS_SEC = 1800; // Half hour max commit time for all segments
+  private static final int MAX_COMMIT_TIME_FOR_ALL_SEGMENTS_SECONDS = 1800; // Half hour max commit time for all segments
 
-  public static int getMaxCommitTimeForAllSegmentsSec() {
-    return MAX_COMMIT_TIME_FOR_ALL_SEGMENTS_SEC;
+  public static int getMaxCommitTimeForAllSegmentsSeconds() {
+    return MAX_COMMIT_TIME_FOR_ALL_SEGMENTS_SECONDS;
   }
 
   // TODO keep some history of past committed segments so that we can avoid looking up PROPERTYSTORE if some server comes in late.
@@ -351,14 +351,16 @@ public class SegmentCompletionManager {
       if (savedCommitTime != null && savedCommitTime > initialCommitTimeMs) {
         initialCommitTimeMs = savedCommitTime;
       }
-      if (initialCommitTimeMs > MAX_COMMIT_TIME_FOR_ALL_SEGMENTS_SEC * 1000) {
+      LOGGER = LoggerFactory.getLogger("SegmentFinalizerFSM_"  + segmentName.getSegmentName());
+      if (initialCommitTimeMs > MAX_COMMIT_TIME_FOR_ALL_SEGMENTS_SECONDS * 1000) {
         // The table has a really high value configured for max commit time. Set it to a higher value than default
         // and go from there.
-        initialCommitTimeMs = MAX_COMMIT_TIME_FOR_ALL_SEGMENTS_SEC * 1000;
+        LOGGER.info("Configured max commit time {}s too high for table {}, changing to {}s", initialCommitTimeMs/1000,
+            segmentName.getTableName(), MAX_COMMIT_TIME_FOR_ALL_SEGMENTS_SECONDS);
+        initialCommitTimeMs = MAX_COMMIT_TIME_FOR_ALL_SEGMENTS_SECONDS * 1000;
       }
       _initialCommitTimeMs = initialCommitTimeMs;
       _maxTimeAllowedToCommitMs = _startTimeMs + _initialCommitTimeMs;
-      LOGGER = LoggerFactory.getLogger("SegmentFinalizerFSM_"  + segmentName.getSegmentName());
     }
 
     // Ctor that starts the FSM in COMMITTED state
@@ -582,7 +584,7 @@ public class SegmentCompletionManager {
       long allowedBuildTimeSec = (_maxTimeAllowedToCommitMs - _startTimeMs)/1000;
       LOGGER.info("{}:COMMIT for instance={} offset={} buldTimeSec={}", _state, instanceId, offset, allowedBuildTimeSec);
       return new SegmentCompletionProtocol.Response(new SegmentCompletionProtocol.Response.Params().withOffset(offset)
-          .withBuildTimeSec(allowedBuildTimeSec).withStatus( SegmentCompletionProtocol.ControllerResponseStatus.COMMIT));
+          .withBuildTimeSeconds(allowedBuildTimeSec).withStatus( SegmentCompletionProtocol.ControllerResponseStatus.COMMIT));
     }
 
     private SegmentCompletionProtocol.Response discard(String instanceId, long offset) {
@@ -829,8 +831,8 @@ public class SegmentCompletionManager {
       SegmentCompletionProtocol.Response response = abortIfTooLateAndReturnHold(now, instanceId, offset);
       if (response == null) {
         long maxTimeAllowedToCommitMs = now + extTimeSec * 1000;
-        if (maxTimeAllowedToCommitMs > MAX_COMMIT_TIME_FOR_ALL_SEGMENTS_SEC * 1000) {
-          LOGGER.warn("Not accepting lease extension from {} requestedTime={}", _startTimeMs, maxTimeAllowedToCommitMs);
+        if (maxTimeAllowedToCommitMs > MAX_COMMIT_TIME_FOR_ALL_SEGMENTS_SECONDS * 1000) {
+          LOGGER.warn("Not accepting lease extension from {} startTime={} requestedTime={}", instanceId, _startTimeMs, maxTimeAllowedToCommitMs);
           return abortAndReturnFailed(now, instanceId, offset);
         }
         _maxTimeAllowedToCommitMs = maxTimeAllowedToCommitMs;

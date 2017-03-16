@@ -103,13 +103,13 @@ public class SegmentCompletionProtocol {
   public static final String PARAM_OFFSET = "offset";
   public static final String PARAM_INSTANCE_ID = "instance";
   public static final String PARAM_REASON = "reason";
-  public static final String PARAM_EXT_TIME_SEC = "extTimeSec"; // Sent by servers to request additional time to build
-  public static final String PARAM_NUM_ROWS = "nRows"; // Sent by servers to indicate the number of rows read so far
-  public static final String PARAM_BUILD_TIME_MS = "buildTimeMs"; // Time taken to build segment
-  public static final String PARAM_WAIT_TIME_MS = "waitTimeMs";   // Time taken to wait for build to start.
+  public static final String PARAM_EXTRA_TIME_SEC = "extraTimeSec"; // Sent by servers to request additional time to build
+  public static final String PARAM_ROW_COUNT = "rowCount"; // Sent by servers to indicate the number of rows read so far
+  public static final String PARAM_BUILD_TIME_MILLIS = "buildTimeMillis"; // Time taken to build segment
+  public static final String PARAM_WAIT_TIME_MILLIS = "waitTimeMillis";   // Time taken to wait for build to start.
 
-  public static final String REASON_REACHED_MAX_ROWS = "maxRows";  // Stop reason sent by server as max num rows reached
-  public static final String REASON_REACHED_MAX_TIME = "maxTime";  // Stop reason sent by server as max time reached
+  public static final String REASON_ROW_LIMIT = "rowLimit";  // Stop reason sent by server as max num rows reached
+  public static final String REASON_TIME_LIMIT = "timeLimit";  // Stop reason sent by server as max time reached
 
   // Canned responses
   public static final Response RESP_NOT_LEADER = new Response(new Response.Params().withStatus(
@@ -135,7 +135,7 @@ public class SegmentCompletionProtocol {
     MAX_SEGMENT_COMMIT_TIME_MS = commitTimeMs;
   }
 
-  public static int getDefaultMaxSegmentCommitTimeSec() {
+  public static int getDefaultMaxSegmentCommitTimeSeconds() {
     return DEFAULT_MAX_SEGMENT_COMMIT_TIME_SEC;
   }
 
@@ -154,10 +154,10 @@ public class SegmentCompletionProtocol {
         PARAM_OFFSET + "=" + _params.getOffset() + "&" +
         PARAM_INSTANCE_ID + "=" + _params.getInstanceId() +
           (_params.getReason() == null ? "" : ("&" + PARAM_REASON + "=" + _params.getReason())) +
-          (_params.getBuildTimeMs() <= 0 ? "" :("&" + PARAM_BUILD_TIME_MS + "=" + _params.getBuildTimeMs())) +
-          (_params.getWaitTimeMs() <= 0 ? "" : ("&" + PARAM_WAIT_TIME_MS + "=" + _params.getWaitTimeMs())) +
-          (_params.getExtTimeSec() <= 0 ? "" : ("&" + PARAM_EXT_TIME_SEC + "=" + _params.getExtTimeSec())) +
-          (_params.getNumRows() <= 0 ? "" : ("&" + PARAM_NUM_ROWS + "=" + _params.getNumRows()));
+          (_params.getBuildTimeMillis() <= 0 ? "" :("&" + PARAM_BUILD_TIME_MILLIS + "=" + _params.getBuildTimeMillis())) +
+          (_params.getWaitTimeMillis() <= 0 ? "" : ("&" + PARAM_WAIT_TIME_MILLIS + "=" + _params.getWaitTimeMillis())) +
+          (_params.getExtTimeSec() <= 0 ? "" : ("&" + PARAM_EXTRA_TIME_SEC + "=" + _params.getExtTimeSec())) +
+          (_params.getNumRows() <= 0 ? "" : ("&" + PARAM_ROW_COUNT + "=" + _params.getNumRows()));
     }
 
     public static class Params {
@@ -166,8 +166,8 @@ public class SegmentCompletionProtocol {
       private String _instanceId;
       private String _reason;
       private int _numRows;
-      private long _buildTimeMs;
-      private long _waitTimeMs;
+      private long _buildTimeMillis;
+      private long _waitTimeMillis;
       private int _extTimeSec;
 
       public Params() {
@@ -175,8 +175,8 @@ public class SegmentCompletionProtocol {
         _segmentName = "UNKNOWN_SEGMENT";
         _instanceId = "UNKNOWN_INSTANCE";
         _numRows = -1;
-        _buildTimeMs = -1;
-        _waitTimeMs = -1;
+        _buildTimeMillis = -1;
+        _waitTimeMillis = -1;
         _extTimeSec = -1;
       }
       public Params withOffset(long offset) {
@@ -199,12 +199,12 @@ public class SegmentCompletionProtocol {
         _numRows = numRows;
         return this;
       }
-      public Params withBuildTimeMs(long buildTimeMs) {
-        _buildTimeMs = buildTimeMs;
+      public Params withBuildTimeMillis(long buildTimeMillis) {
+        _buildTimeMillis = buildTimeMillis;
         return this;
       }
-      public Params withWaitTimeMs(long waitTimeMs) {
-        _waitTimeMs = waitTimeMs;
+      public Params withWaitTimeMillis(long waitTimeMillis) {
+        _waitTimeMillis = waitTimeMillis;
         return this;
       }
       public Params withExtTimeSec(int extTimeSec) {
@@ -227,11 +227,11 @@ public class SegmentCompletionProtocol {
       public int getNumRows() {
         return _numRows;
       }
-      public long getBuildTimeMs() {
-        return _buildTimeMs;
+      public long getBuildTimeMillis() {
+        return _buildTimeMillis;
       }
-      public long getWaitTimeMs() {
-        return _waitTimeMs;
+      public long getWaitTimeMillis() {
+        return _waitTimeMillis;
       }
       public int getExtTimeSec() {
         return _extTimeSec;
@@ -276,7 +276,7 @@ public class SegmentCompletionProtocol {
   public static class Response {
     final ControllerResponseStatus _status;
     final long _offset;
-    final long _buildTimeSec;
+    final long _buildTimeSeconds;
 
     public Response(String jsonRespStr) {
       JSONObject jsonObject = JSONObject.parseObject(jsonRespStr);
@@ -297,16 +297,16 @@ public class SegmentCompletionProtocol {
 
       Long buildTimeObj = jsonObject.getLong(BUILD_TIME_KEY);
       if (buildTimeObj == null) {
-        _buildTimeSec = -1;
+        _buildTimeSeconds = -1;
       } else {
-        _buildTimeSec = buildTimeObj;
+        _buildTimeSeconds = buildTimeObj;
       }
     }
 
     public Response(Params params) {
       _status = params.getStatus();
       _offset = params.getOffset();
-      _buildTimeSec = params.getBuildTimeSec();
+      _buildTimeSeconds = params.getBuildTimeSeconds();
     }
 
     public ControllerResponseStatus getStatus() {
@@ -317,8 +317,8 @@ public class SegmentCompletionProtocol {
       return _offset;
     }
 
-    public long getBuildTimeSec() {
-      return _buildTimeSec;
+    public long getBuildTimeSeconds() {
+      return _buildTimeSeconds;
     }
 
     public String toJsonString() {
@@ -347,8 +347,8 @@ public class SegmentCompletionProtocol {
         _status = status;
         return this;
       }
-      public Params withBuildTimeSec(long buildTimeSec) {
-        _buildTimeSec = buildTimeSec;
+      public Params withBuildTimeSeconds(long buildTimeSeconds) {
+        _buildTimeSec = buildTimeSeconds;
         return this;
       }
 
@@ -358,7 +358,7 @@ public class SegmentCompletionProtocol {
       public long getOffset() {
         return _offset;
       }
-      public long getBuildTimeSec() {
+      public long getBuildTimeSeconds() {
         return _buildTimeSec;
       }
     }
