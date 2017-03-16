@@ -153,7 +153,7 @@ public class AnomalyReportGenerator {
                 getDateString(anomaly.getEndTime(), dateTimeZone)), // duration
             feedbackVal,
             anomaly.getFunction().getFunctionName(),
-            String.format("%+.2f%%", anomaly.getWeight()), // lift
+            String.format("%+.2f%%", anomaly.getWeight() * 100), // lift
             getLiftDirection(anomaly.getWeight()),
             anomaly.getMetric()
         );
@@ -197,16 +197,16 @@ public class AnomalyReportGenerator {
       templateData.put("dashboardHost", configuration.getDashboardHost());
       templateData.put("windowUnit", "HOURS");
       boolean isSingleAnomalyEmail = false;
-      if (anomalyReportDTOList.size() == 1) {
+      //if (anomalyReportDTOList.size() == 1) {
         isSingleAnomalyEmail = true;
         try {
-          String imgPath = takeGraphScreenShot(anomalyReportDTOList.get(0).getAnomalyId());
+          String imgPath = takeGraphScreenShot(anomalyReportDTOList.get(0).getAnomalyId(), configuration);
           String cid = email.embed(new File(imgPath));
           templateData.put("cid", cid);
         } catch (Exception e) {
           LOG.error("Exception while embedding screenshot for anomaly {}", anomalyReportDTOList.get(0).getAnomalyId(), e);
         }
-      }
+      //}
 
       buildEmailTemplateAndSendAlert(templateData, configuration.getSmtpConfiguration(), subject,
           emailRecipients, fromEmail, isSingleAnomalyEmail, email);
@@ -410,15 +410,15 @@ public class AnomalyReportGenerator {
   }
 
 
-  public String takeGraphScreenShot(String anomalyId) throws Exception {
+  public String takeGraphScreenShot(String anomalyId, ThirdEyeAnomalyConfiguration configuration) throws Exception {
     String imgPath = null;
     try {
 
-      String imgRoute = "http://lva1-app0583.corp.linkedin.com:1426/thirdeye#anomalies?anomaliesSearchMode=id&pageNumber=1&anomalyIds=" + anomalyId;
+      String imgRoute = configuration.getDashboardHost() + "/thirdeye#anomalies?anomaliesSearchMode=id&pageNumber=1&anomalyIds=" + anomalyId;
       String phantomScript = "src/main/resources/scripts/getGraphPnj.js";
       imgPath = "/tmp/graph" + anomalyId +".png";
       Process proc = Runtime.getRuntime().exec(
-                    new String[]{"/usr/local/linkedin/bin/jstf", "phantomjs", "--ssl-protocol=any", "--ignore-ssl-errors=true",
+                    new String[]{configuration.getPhantomJsPath(), "phantomjs", "--ssl-protocol=any", "--ignore-ssl-errors=true",
                             phantomScript, imgRoute, imgPath});
 
       InputStream stderr = proc.getErrorStream();

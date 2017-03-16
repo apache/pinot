@@ -27,6 +27,8 @@ public abstract class ThirdEyeConfiguration extends Configuration {
   private String smtpHost = "";
   private int smtpPort = 0;
 
+  private String phantomJsPath = "";
+
   public String getRootDir() {
     return rootDir;
   }
@@ -103,6 +105,14 @@ public abstract class ThirdEyeConfiguration extends Configuration {
 
   public void setSmtpPort(int smtpPort) {
     this.smtpPort = smtpPort;
+  }
+
+  public String getPhantomJsPath() {
+    return phantomJsPath;
+  }
+
+  public void setPhantomJsPath(String phantomJsPath) {
+    this.phantomJsPath = phantomJsPath;
   }
 
 }
