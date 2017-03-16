@@ -99,7 +99,7 @@ public class HLRealtimeSegmentDataManager extends SegmentDataManager {
     final String segmentVersionStr = tableConfig.getIndexingConfig().getSegmentFormatVersion();
     _segmentVersion = SegmentVersion.fromString(segmentVersionStr, SegmentVersion.DEFAULT_TABLE_VERSION);
     this.schema = schema;
-    this.extractor = (PlainFieldExtractor) FieldExtractorFactory.getPlainFieldExtractor(schema);
+    this.extractor = FieldExtractorFactory.getPlainFieldExtractor(schema);
     this.serverMetrics =serverMetrics;
     this.segmentName = segmentMetadata.getSegmentName();
     this.tableName = tableConfig.getTableName();

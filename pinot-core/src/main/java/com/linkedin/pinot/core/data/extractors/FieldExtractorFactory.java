@@ -21,11 +21,11 @@ import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 
 public class FieldExtractorFactory {
 
-  public static FieldExtractor getPlainFieldExtractor(final SegmentGeneratorConfig indexingConfig) {
+  public static PlainFieldExtractor getPlainFieldExtractor(final SegmentGeneratorConfig indexingConfig) {
     return new PlainFieldExtractor(indexingConfig.getSchema());
   }
 
-  public static FieldExtractor getPlainFieldExtractor(final Schema schema) {
+  public static PlainFieldExtractor getPlainFieldExtractor(final Schema schema) {
     return new PlainFieldExtractor(schema);
   }
 }

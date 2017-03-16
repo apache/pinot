@@ -808,7 +808,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     _clientId = _kafkaPartitionId + "-" + NetUtil.getHostnameOrAddress();
 
     // Create field extractor
-    _fieldExtractor = (PlainFieldExtractor) FieldExtractorFactory.getPlainFieldExtractor(schema);
+    _fieldExtractor = FieldExtractorFactory.getPlainFieldExtractor(schema);
     makeConsumerWrapper();
     _startOffset = _segmentZKMetadata.getStartOffset();
     _currentOffset = _startOffset;

@@ -127,7 +127,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
     addDerivedFieldsInSchema();
 
-    extractor = (PlainFieldExtractor) FieldExtractorFactory.getPlainFieldExtractor(dataSchema);
+    extractor = FieldExtractorFactory.getPlainFieldExtractor(dataSchema);
 
     // Initialize stats collection
     statsCollector = new SegmentPreIndexStatsCollectorImpl(recordReader.getSchema());
