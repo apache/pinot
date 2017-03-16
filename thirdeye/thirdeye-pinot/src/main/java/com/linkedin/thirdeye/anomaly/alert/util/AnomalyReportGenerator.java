@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.anomaly.alert.util;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.google.common.base.Joiner;
 import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
 import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
@@ -122,7 +123,7 @@ public class AnomalyReportGenerator {
       int nonActionable = 0;
 
       List<AnomalyReportDTO> anomalyReportDTOList = new ArrayList<>();
-
+      List<String> anomalyIds = new ArrayList<>();
       for (MergedAnomalyResultDTO anomaly : anomalies) {
         metrics.add(anomaly.getMetric());
 
@@ -166,9 +167,11 @@ public class AnomalyReportGenerator {
         if (includeSentAnomaliesOnly) {
           if (anomaly.isNotified()) {
             anomalyReportDTOList.add(anomalyReportDTO);
+            anomalyIds.add(anomalyReportDTO.getAnomalyId());
           }
         } else {
           anomalyReportDTOList.add(anomalyReportDTO);
+          anomalyIds.add(anomalyReportDTO.getAnomalyId());
         }
       }
 
@@ -177,8 +180,6 @@ public class AnomalyReportGenerator {
       DateTimeZone timeZone = DateTimeZone.forTimeZone(AlertTaskRunnerV2.DEFAULT_TIME_ZONE);
       DataReportHelper.DateFormatMethod dateFormatMethod = new DataReportHelper.DateFormatMethod(timeZone);
       Map<String, Object> templateData = new HashMap<>();
-      templateData.put("collection", "test_c");
-      templateData.put("metric", "test_m");
       templateData.put("timeZone", timeZone);
       templateData.put("dateFormat", dateFormatMethod);
       templateData.put("startTime", startTime);
@@ -195,7 +196,7 @@ public class AnomalyReportGenerator {
       templateData.put("includeSummary", includeSummary);
       templateData.put("reportGenerationTimeMillis", System.currentTimeMillis());
       templateData.put("dashboardHost", configuration.getDashboardHost());
-      templateData.put("windowUnit", "HOURS");
+      templateData.put("anomalyIds", Joiner.on(",").join(anomalyIds));
       boolean isSingleAnomalyEmail = false;
       //if (anomalyReportDTOList.size() == 1) {
         isSingleAnomalyEmail = true;
