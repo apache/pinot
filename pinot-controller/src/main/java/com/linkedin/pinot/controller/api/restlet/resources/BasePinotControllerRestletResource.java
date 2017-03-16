@@ -12,9 +12,8 @@ import java.util.concurrent.Executor;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.restlet.Response;
+import org.restlet.data.Header;
 import org.restlet.data.MediaType;
-import org.restlet.engine.header.Header;
-import org.restlet.engine.header.HeaderConstants;
 import org.restlet.representation.StringRepresentation;
 import org.restlet.resource.ServerResource;
 import org.restlet.util.Series;
@@ -115,11 +114,7 @@ public class BasePinotControllerRestletResource extends ServerResource {
   }
 
   public static void addExtraHeaders(Response response) {
-    Series<Header> responseHeaders = (Series<Header>)response.getAttributes().get(HeaderConstants.ATTRIBUTE_HEADERS);
-    if (responseHeaders == null) {
-      responseHeaders = new Series(Header.class);
-      response.getAttributes().put(HeaderConstants.ATTRIBUTE_HEADERS, responseHeaders);
-    }
+    Series<Header> responseHeaders = response.getHeaders();
 
     responseHeaders.add(new Header(HDR_CONTROLLER_HOST, getHostName()));
     responseHeaders.add(new Header(HDR_CONTROLLER_VERSION, getControllerVersion()));
