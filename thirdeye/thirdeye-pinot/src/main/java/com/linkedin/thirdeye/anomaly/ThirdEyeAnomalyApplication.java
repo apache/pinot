@@ -2,6 +2,8 @@ package com.linkedin.thirdeye.anomaly;
 
 import com.linkedin.thirdeye.anomaly.alert.v2.AlertJobSchedulerV2;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
+import com.linkedin.thirdeye.client.DAORegistry;
+import com.linkedin.thirdeye.completeness.checker.DataCompletenessResource;
 import com.linkedin.thirdeye.dashboard.resources.AnomalyFunctionResource;
 
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
@@ -127,6 +129,7 @@ public class ThirdEyeAnomalyApplication
         if (config.isDataCompleteness()) {
           dataCompletenessScheduler = new DataCompletenessScheduler();
           dataCompletenessScheduler.start();
+          environment.jersey().register(new DataCompletenessResource(DAO_REGISTRY.getDataCompletenessConfigDAO()));
         }
       }
 
