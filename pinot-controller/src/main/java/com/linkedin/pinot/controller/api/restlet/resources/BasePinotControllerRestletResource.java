@@ -13,6 +13,7 @@ import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.restlet.Response;
 import org.restlet.data.MediaType;
+import org.restlet.data.Status;
 import org.restlet.engine.header.Header;
 import org.restlet.engine.header.HeaderConstants;
 import org.restlet.representation.StringRepresentation;
@@ -135,5 +136,16 @@ public class BasePinotControllerRestletResource extends ServerResource {
     JSONObject errorMsgJson = new JSONObject();
     errorMsgJson.put("ERROR", errorMsg);
     return errorMsgJson;
+  }
+
+  protected StringRepresentation responseRepresentation(Status status, String jsonMsg) {
+    setStatus(status);
+    StringRepresentation repr = new StringRepresentation(jsonMsg);
+    repr.setMediaType(MediaType.APPLICATION_JSON);
+    return repr;
+  }
+
+  protected StringRepresentation errorResponseRepresentation(Status status, String msg) {
+    return responseRepresentation(status, "{\"error\" : \"" + msg + "\"}");
   }
 }

@@ -32,10 +32,8 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
-import org.restlet.data.MediaType;
 import org.restlet.data.Status;
 import org.restlet.representation.Representation;
-import org.restlet.representation.StringRepresentation;
 import org.restlet.resource.Get;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -187,14 +185,6 @@ public class TableViews extends BasePinotControllerRestletResource {
       tableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableNameOptType);
     }
     return tableName;
-  }
-
-
-  private StringRepresentation responseRepresentation(Status status, String jsonMsg) {
-    setStatus(status);
-    StringRepresentation repr = new StringRepresentation(jsonMsg);
-    repr.setMediaType(MediaType.APPLICATION_JSON);
-    return repr;
   }
 
 }

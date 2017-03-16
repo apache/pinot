@@ -38,6 +38,7 @@ public class PinotTableSegmentConfigs extends BasePinotControllerRestletResource
     }
   }
 
+  @Deprecated
   @Override
   @Put("json")
   public Representation put(Representation entity) {
@@ -59,8 +60,9 @@ public class PinotTableSegmentConfigs extends BasePinotControllerRestletResource
 
   }
 
+  @Deprecated
   @HttpVerb("put")
-  @Summary("Updates the segment configuration (validation and retention) for a table")
+  @Summary("DEPRECATED: Updates the segment configuration (validation and retention) for a table")
   @Tags({"table"})
   @Paths({
       "/tables/{tableName}/segmentConfigs"

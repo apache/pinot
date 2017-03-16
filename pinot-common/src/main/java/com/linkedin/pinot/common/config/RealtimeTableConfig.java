@@ -15,14 +15,7 @@
  */
 package com.linkedin.pinot.common.config;
 
-import java.io.IOException;
-
 import org.antlr.v4.runtime.misc.Nullable;
-import org.codehaus.jackson.JsonGenerationException;
-import org.codehaus.jackson.map.JsonMappingException;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.json.JSONException;
-import org.json.JSONObject;
 
 
 public class RealtimeTableConfig extends AbstractTableConfig {
@@ -52,16 +45,5 @@ public class RealtimeTableConfig extends AbstractTableConfig {
     return bld.toString();
   }
 
-  @Override
-  public JSONObject toJSON() throws JSONException, JsonGenerationException, JsonMappingException, IOException {
-    JSONObject ret = new JSONObject();
-    ret.put("tableName", tableName);
-    ret.put("tableType", tableType);
-    ret.put("segmentsConfig", new JSONObject(new ObjectMapper().writeValueAsString(validationConfig)));
-    ret.put("tenants", new JSONObject(new ObjectMapper().writeValueAsString(tenantConfig)));
-    ret.put("tableIndexConfig", new JSONObject(new ObjectMapper().writeValueAsString(indexConfig)));
-    ret.put("metadata", new JSONObject(new ObjectMapper().writeValueAsString(customConfigs)));
-    return ret;
-  }
 
 }

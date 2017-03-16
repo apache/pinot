@@ -17,6 +17,7 @@
 package com.linkedin.pinot.controller.api.restlet.resources;
 
 import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.QuotaConfig;
 import com.linkedin.pinot.common.request.helper.ControllerRequestBuilder;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
@@ -115,7 +116,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
       throws JSONException, IOException {
     JSONObject request = ControllerRequestBuilder
         .buildCreateOfflineTableJSON(tableName, "default", "default", "potato", "DAYS", "DAYS", "5", tableReplication,
-            "BalanceNumSegmentAssignmentStrategy", Collections.<String>emptyList(), "MMAP", "v1");
+            "BalanceNumSegmentAssignmentStrategy", Collections.<String>emptyList(), "MMAP", "v3");
 
     sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), request.toString());
     // table creation should succeed
@@ -152,4 +153,61 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     String offlineString = json.getJSONObject(type).toString();
     return AbstractTableConfig.init(offlineString);
   }
+
+  @Test
+  public void testUpdateTableConfig()
+      throws IOException, JSONException {
+    String tableName = "updateTC";
+    JSONObject request = ControllerRequestBuilder
+        .buildCreateOfflineTableJSON(tableName, "default", "default", "potato", "DAYS", "DAYS", "5", 2,
+            "BalanceNumSegmentAssignmentStrategy", Collections.<String>emptyList(), "MMAP", "v3");
+    ControllerRequestURLBuilder controllerUrlBuilder = ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL);
+    sendPostRequest(controllerUrlBuilder.forTableCreate(), request.toString());
+    // table creation should succeed
+    AbstractTableConfig tableConfig = getTableConfig(tableName, "OFFLINE");
+    Assert.assertEquals(tableConfig.getValidationConfig().getRetentionTimeValue(), "5");
+    Assert.assertEquals(tableConfig.getValidationConfig().getRetentionTimeUnit(), "DAYS");
+
+    tableConfig.getValidationConfig().setRetentionTimeUnit("HOURS");
+    tableConfig.getValidationConfig().setRetentionTimeValue("10");
+
+    String output = sendPutRequest(controllerUrlBuilder.forUpdateTableConfig(tableName), tableConfig.toJSON().toString());
+    JSONObject jsonResponse = new JSONObject(output);
+    Assert.assertTrue(jsonResponse.has("status"));
+    Assert.assertEquals(jsonResponse.getString("status"), "Success");
+
+    AbstractTableConfig modifiedConfig = getTableConfig(tableName, "OFFLINE");
+    Assert.assertEquals(modifiedConfig.getValidationConfig().getRetentionTimeUnit(), "HOURS");
+    Assert.assertEquals(modifiedConfig.getValidationConfig().getRetentionTimeValue(), "10");
+
+    // Realtime
+    JSONObject metadata = new JSONObject();
+    metadata.put("streamType", "kafka");
+    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.CONSUMER_TYPE, Kafka.ConsumerType.highLevel.toString());
+    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.TOPIC_NAME, "fakeTopic");
+    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.DECODER_CLASS, "fakeClass");
+    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.ZK_BROKER_URL, "fakeUrl");
+    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.HighLevelConsumer.ZK_CONNECTION_STRING, "potato");
+    metadata.put(DataSource.Realtime.REALTIME_SEGMENT_FLUSH_SIZE, Integer.toString(1234));
+    metadata.put(DataSource.STREAM_PREFIX + "." + Kafka.KAFKA_CONSUMER_PROPS_PREFIX + "." + Kafka.AUTO_OFFSET_RESET,
+        "smallest");
+
+    request = ControllerRequestBuilder.buildCreateRealtimeTableJSON(tableName, "default", "default",
+        "potato", "DAYS", "DAYS", "5", 2, "BalanceNumSegmentAssignmentStrategy", metadata, "fakeSchema", "fakeColumn",
+        Collections.<String>emptyList(), "MMAP", false /*lowLevel*/);
+    sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), request.toString());
+    tableConfig = getTableConfig(tableName, "REALTIME");
+    Assert.assertEquals(tableConfig.getValidationConfig().getRetentionTimeValue(), "5");
+    Assert.assertEquals(tableConfig.getValidationConfig().getRetentionTimeUnit(), "DAYS");
+    Assert.assertNull(tableConfig.getQuotaConfig());
+
+    QuotaConfig quota = new QuotaConfig();
+    quota.setStorage("10G");
+    tableConfig.setQuotaConfig(quota);
+    sendPutRequest(controllerUrlBuilder.forUpdateTableConfig(tableName), tableConfig.toJSON().toString());
+    modifiedConfig = getTableConfig(tableName, "REALTIME");
+    Assert.assertEquals(modifiedConfig.getQuotaConfig().getStorage(), "10G");
+  }
+
+
 }

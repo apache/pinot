@@ -38,6 +38,7 @@ public class PinotTableTenantConfigs extends BasePinotControllerRestletResource 
     }
   }
 
+  @Deprecated
   @Override
   @Put("json")
   public Representation put(Representation entity) {
@@ -51,8 +52,9 @@ public class PinotTableTenantConfigs extends BasePinotControllerRestletResource 
     }
   }
 
+  @Deprecated
   @HttpVerb("put")
-  @Summary("Updates the tenant configuration for a table")
+  @Summary("DEPRECATED: Updates the tenant configuration for a table")
   @Tags({"table"})
   @Paths({
       "/tables/{tableName}/tenantConfigs"

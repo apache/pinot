@@ -1097,7 +1097,7 @@ public class PinotHelixResourceManager {
     }
   }
 
-  private void setTableConfig(AbstractTableConfig config, String tableNameWithSuffix, TableType type)
+  public void setTableConfig(AbstractTableConfig config, String tableNameWithSuffix, TableType type)
       throws JsonGenerationException, JsonMappingException, IOException {
     if (type == TableType.REALTIME) {
       ZKMetadataProvider.setRealtimeTableConfig(_propertyStore, tableNameWithSuffix,
