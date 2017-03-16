@@ -8,7 +8,7 @@
           style="width:200px;color:#fff;font-size:20px;display:inline;position:relative;top:-3px;font-weight:200;font-family: 'Proxima Nova','Arial', 'Helvetica Neue',Helvetica, sans-serif;">ThirdEye</span>
     </td>
   </tr>
-  <tr>
+  <!--<tr>
     <td style="min-height: 30px; font-family: 'Proxima Nova','Arial', 'Helvetica Neue',Helvetica, sans-serif;font-size:16px;font-weight:300; width:100%;display:inline;">
       <p>Hello,</p>
       <p>You are receiving this email because you have subscribed to ThirdEye service for '${collection}:${metric}'.<br/></p>
@@ -45,7 +45,7 @@
               ${anomalySequenceIndex?c}
               </td>
               <td style="padding:5px 3px">
-              <#-- Assuming start time is always present -->
+              
                 <#if r.endTime??>
                 ${dateFormat(r.startTime)} to ${dateFormat(r.endTime)}
                 <#else>
@@ -64,7 +64,7 @@
       </table>
     </td>
   </tr>
-</#if>
+</#if> 
   <tr>
     <td>
       Go to <a
@@ -146,5 +146,5 @@
         ThirdEye Team
       </p>
     </td>
-  </tr>
+  </tr>-->
 </table>

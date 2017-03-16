@@ -76,8 +76,8 @@ page.onLoadFinished = function(status) {
         return document.querySelector('#anomaly-chart-0').getBoundingClientRect();
       });
       page.clipRect = {
-        top:    clipRect.top,
-        left:   clipRect.left,
+        top:    clipRect.top + 10,
+        left:   clipRect.left + 15,
         width:  clipRect.width,
         height: clipRect.height
       };

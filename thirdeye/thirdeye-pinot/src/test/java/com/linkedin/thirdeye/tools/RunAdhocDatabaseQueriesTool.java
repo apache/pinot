@@ -140,9 +140,9 @@ public class RunAdhocDatabaseQueriesTool {
   }
 
   private void updateEmailConfigs() {
-    List<EmailConfigurationDTO> emailConfigs = emailConfigurationDAO.findByCollection("login_additive");
+    List<EmailConfigurationDTO> emailConfigs = emailConfigurationDAO.findAll();
     for (EmailConfigurationDTO emailConfig : emailConfigs) {
-      emailConfig.setToAddresses("thirdeye-dev@linkedin.com,zilin@linkedin.com,ehuang@linkedin.com,login-alerts@linkedin.com");
+      emailConfig.setActive(false);
       emailConfigurationDAO.update(emailConfig);
     }
   }
@@ -224,7 +224,7 @@ public class RunAdhocDatabaseQueriesTool {
   private void addRequiresCompletenessCheck(List<String> datasets) {
     for (String dataset : datasets) {
       DatasetConfigDTO dto = datasetConfigDAO.findByDataset(dataset);
-      dto.setRequiresCompletenessCheck(true);
+      dto.setActive(false);
       datasetConfigDAO.update(dto);
     }
   }
@@ -243,6 +243,14 @@ public class RunAdhocDatabaseQueriesTool {
     for (DataCompletenessConfigDTO dto : dtos) {
       dto.setDataComplete(true);
       dataCompletenessConfigDAO.update(dto);
+    }
+  }
+
+  private void disableAlertConfigs() {
+    List<AlertConfigDTO> alertConfigs = alertConfigDAO.findAll();
+    for (AlertConfigDTO alertConfigDTO : alertConfigs) {
+      alertConfigDTO.setActive(false);
+      alertConfigDAO.save(alertConfigDTO);
     }
   }
 
@@ -292,7 +300,7 @@ public class RunAdhocDatabaseQueriesTool {
       System.exit(1);
     }
     RunAdhocDatabaseQueriesTool dq = new RunAdhocDatabaseQueriesTool(persistenceFile);
-    dq.playWithAlertCOnfigs();
+    dq.addRequiresCompletenessCheck(Lists.newArrayList("kbmi_hourly_additive", "kbmi_email_hourly_additive", "kbmi_m2m_hourly_additive"));
   }
 
 }

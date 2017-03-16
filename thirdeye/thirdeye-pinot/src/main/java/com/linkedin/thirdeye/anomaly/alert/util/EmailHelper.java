@@ -2,7 +2,6 @@ package com.linkedin.thirdeye.anomaly.alert.util;
 
 import com.google.common.cache.LoadingCache;
 import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
-
 import com.linkedin.thirdeye.anomaly.alert.v2.AlertTaskRunnerV2;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.cache.QueryCache;
@@ -12,6 +11,10 @@ import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewHandler;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewRequest;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewResponse;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
+
+import java.io.File;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -188,6 +191,10 @@ public abstract class EmailHelper {
       for (String address : toAddress.split(EMAIL_ADDRESS_SEPARATOR)) {
         email.addTo(address);
       }
+
+      //String cid = email.embed(new File("/tmp/graph3247528.png"));
+      //email.setHtmlMsg("<html>Anomaly Test  <img src=\"cid:"+cid+"\"></html>");
+
       email.send();
       LOG.info("Email sent with subject [{}] to address [{}]!", subject, toAddress);
     } else {

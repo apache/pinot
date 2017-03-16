@@ -14,9 +14,11 @@ import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+
 import freemarker.template.Configuration;
 import freemarker.template.Template;
 import freemarker.template.TemplateExceptionHandler;
+
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
@@ -27,10 +29,18 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.mail.HtmlEmail;
 import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 
 public class AnomalyReportGenerator {
 
@@ -90,6 +100,9 @@ public class AnomalyReportGenerator {
         alertConfig.getRecipients(), alertConfig.getFromAddress(), alertConfig.getName(), false);
   }
 
+
+
+
   public void buildReport(long startTime, long endTime, List<MergedAnomalyResultDTO> anomalies,
       String subject, ThirdEyeAnomalyConfiguration configuration, boolean includeSentAnomaliesOnly,
       String emailRecipients, String fromEmail, String alertConfigName, boolean includeSummary) {
@@ -107,6 +120,7 @@ public class AnomalyReportGenerator {
 
       for (MergedAnomalyResultDTO anomaly : anomalies) {
         metrics.add(anomaly.getMetric());
+
         if (anomaly.getFeedback() != null) {
           feedbackCollected++;
           if (anomaly.getFeedback().getFeedbackType().equals(AnomalyFeedbackType.ANOMALY)) {
@@ -148,9 +162,14 @@ public class AnomalyReportGenerator {
         }
       }
 
-      Map<String, Object> templateData = new HashMap<>();
+      HtmlEmail email = new HtmlEmail();
+
       DateTimeZone timeZone = DateTimeZone.forTimeZone(AlertTaskRunnerV2.DEFAULT_TIME_ZONE);
       DataReportHelper.DateFormatMethod dateFormatMethod = new DataReportHelper.DateFormatMethod(timeZone);
+      Map<String, Object> templateData = new HashMap<>();
+      templateData.put("collection", "test_c");
+      templateData.put("metric", "test_m");
+      templateData.put("dimensionStr", "test_d");
       templateData.put("timeZone", timeZone);
       templateData.put("dateFormat", dateFormatMethod);
       templateData.put("startTime", new Date(startTime));
@@ -166,22 +185,31 @@ public class AnomalyReportGenerator {
       templateData.put("alertConfigName", alertConfigName);
       templateData.put("includeSummary", includeSummary);
       templateData.put("reportGenerationTimeMillis", System.currentTimeMillis());
-      boolean isSingleAnomalyEmail = true;
-      if (anomalyReportDTOList.size() > 1) {
-        isSingleAnomalyEmail = false;
+      boolean isSingleAnomalyEmail = false;
+      if (anomalyReportDTOList.size() == 1) {
+        isSingleAnomalyEmail = true;
+        try {
+          String imgPath = takeGraphScreenShot(anomalyReportDTOList.get(0).getAnomalyId());
+          String cid = email.embed(new File(imgPath));
+          templateData.put("cid", cid);
+        } catch (Exception e) {
+          LOG.error("Exception while embedding screenshot for anomaly {}", anomalyReportDTOList.get(0).getAnomalyId(), e);
+        }
       }
+
       buildEmailTemplateAndSendAlert(templateData, configuration.getSmtpConfiguration(), subject,
-          emailRecipients, fromEmail, isSingleAnomalyEmail);
+          emailRecipients, fromEmail, isSingleAnomalyEmail, email);
+      //FileUtils.deleteQuietly(new File(imgPath));
     }
   }
 
   void buildEmailTemplateAndSendAlert(Map<String, Object> paramMap,
       SmtpConfiguration smtpConfiguration, String subject, String emailRecipients,
-      String fromEmail, boolean isSingleAnomalyEmail) {
+      String fromEmail, boolean isSingleAnomalyEmail, HtmlEmail email) {
     if (Strings.isNullOrEmpty(fromEmail)) {
       throw new IllegalArgumentException("Invalid sender's email");
     }
-    HtmlEmail email = new HtmlEmail();
+
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     try (Writer out = new OutputStreamWriter(baos, AlertTaskRunner.CHARSET)) {
       Configuration freemarkerConfig = new Configuration(Configuration.VERSION_2_3_21);
@@ -340,6 +368,38 @@ public class AnomalyReportGenerator {
     public void setAnomalyURL(String anomalyURL) {
       this.anomalyURL = anomalyURL;
     }
+  }
+
+
+  public String takeGraphScreenShot(String anomalyId) throws Exception {
+    String imgPath = null;
+    try {
+
+      String imgRoute = "http://lva1-app0583.corp.linkedin.com:1426/thirdeye#anomalies?anomaliesSearchMode=id&pageNumber=1&anomalyIds=" + anomalyId;
+      String phantomScript = "src/main/resources/scripts/getGraphPnj.js";
+      imgPath = "/tmp/graph" + anomalyId +".png";
+      Process proc = Runtime.getRuntime().exec(
+                    new String[]{"/usr/local/linkedin/bin/jstf", "phantomjs", "--ssl-protocol=any", "--ignore-ssl-errors=true",
+                            phantomScript, imgRoute, imgPath});
+
+      InputStream stderr = proc.getErrorStream();
+      InputStreamReader isr = new InputStreamReader(stderr);
+      BufferedReader br = new BufferedReader(isr);
+      // exhaust the error stream before waiting for the process to exit
+      String line = br.readLine();
+      if (line != null) {
+        do {
+          line = br.readLine();
+        } while (line != null);
+      }
+      int exitVal = proc.waitFor();
+      if (exitVal != 0) {
+        throw new Exception("PhantomJS process failed with error code: " + exitVal);
+      }
+    } catch (Exception e) {
+      throw new Exception("Exception with openPageInPhantom", e);
+    }
+    return imgPath;
   }
 }
 

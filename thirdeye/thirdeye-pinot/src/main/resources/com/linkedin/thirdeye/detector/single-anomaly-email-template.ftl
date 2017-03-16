@@ -26,11 +26,12 @@
             <td style="text-align: right; padding: 24px"><a href="${r.anomalyURL}${r.anomalyId}" target="_blank" style="color: white;font-weight: 600;background-color: #0084bf;font-size: 17px;padding: 0 16px;line-height: 32px;border-radius: 2px;cursor: pointer;display: inline-block;border: 1px solid transparent;text-decoration: none;">Investigate</a></td>
           </tr>
 
- <!--          <tr>
+          <tr>
             <td style="padding: 24px;" colspan="2">
-              <div style="height: 100px; width: 100%; background-color: black; color: white">Graph placeholder</div>
+              <!-- <div style="height: 100px; width: 100%; background-color: black; color: white">Graph placeholder</div> -->
+              <img style="width: 100%;" src="cid:${cid}"\>
             </td>
-          </tr> -->
+          </tr> 
           <tr>
             <td style="padding: 24px;" colspan="2">
               <table border="0"  width="100%" align="center" style="width:100%; text-align: center; padding:0; margin:0; border-collapse: collapse; border: 1px solid #CCC">
