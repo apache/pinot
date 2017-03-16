@@ -179,7 +179,6 @@ public class AnomalyReportGenerator {
       Map<String, Object> templateData = new HashMap<>();
       templateData.put("collection", "test_c");
       templateData.put("metric", "test_m");
-      templateData.put("dimensionStr", "test_d");
       templateData.put("timeZone", timeZone);
       templateData.put("dateFormat", dateFormatMethod);
       templateData.put("startTime", startTime);
@@ -195,7 +194,7 @@ public class AnomalyReportGenerator {
       templateData.put("alertConfigName", alertConfigName);
       templateData.put("includeSummary", includeSummary);
       templateData.put("reportGenerationTimeMillis", System.currentTimeMillis());
-      templateData.put("dashboardHost", "localhost");
+      templateData.put("dashboardHost", configuration.getDashboardHost());
       templateData.put("windowUnit", "HOURS");
       boolean isSingleAnomalyEmail = false;
       if (anomalyReportDTOList.size() == 1) {
