@@ -576,17 +576,20 @@ text {
 .anomaly-result-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 24px;
 }
 
 .anomaly-result-title {
-  font-weight: 600;
-  font-size: 17px;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
   padding-right: 14px;
+}
+
+.anomaly-result-metric,
+.anomaly-result-dataset {
+  font-weight: 600;
+  font-size: 17px;
 }
 
 .anomaly-details {
@@ -670,12 +673,21 @@ text {
   margin-right: 24px;
 }
 
-.investigate-title {
+.investigate-title,
+.investigate-button {
   font-size: 21px;
+}
+
+.investigate-button {
+  margin-left: 24px;
+}
+
+.investigate-header {
   margin: 24px 0;
   display: flex;
   justify-content: space-between;
 }
+
 
 .investigate-wow {
   display: flex;

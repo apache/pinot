@@ -33,6 +33,29 @@ InvestigateModel.prototype = {
     return this.anomaly;
   },
 
+  updateFeedback(userFeedback) {
+    const feedbackString = this.getFeedbackString(userFeedback);
+    this.anomaly.anomalyFeedback = feedbackString;
+
+    dataService.updateFeedback(this.anomalyId, userFeedback);
+  },
+
+  getFeedbackString(userFeedback){
+    return {
+      [constants.FEEDBACK_TYPE_ANOMALY]: constants.FEEDBACK_STRING_CONFIRMED_ANOMALY,
+      [constants.FEEDBACK_TYPE_NOT_ANOMALY]: constants.FEEDBACK_STRING_FALSE_ALARM,
+      [constants.FEEDBACK_TYPE_ANOMALY_NO_ACTION]: constants.FEEDBACK_STRING_CONFIRMED_NOT_ACTIONABLE
+    }[userFeedback];
+  },
+
+  getFeedbackType(){
+    return {
+      [constants.FEEDBACK_STRING_CONFIRMED_ANOMALY]: constants.FEEDBACK_TYPE_ANOMALY ,
+      [constants.FEEDBACK_STRING_FALSE_ALARM]: constants.FEEDBACK_TYPE_NOT_ANOMALY,
+      [constants.FEEDBACK_STRING_CONFIRMED_NOT_ACTIONABLE]: constants.FEEDBACK_TYPE_ANOMALY_NO_ACTION
+    }[this.anomaly.anomalyFeedback];
+  },
+
   updateModelAndNotifyView({anomalyDetailsList}) {
     const [anomaly]  = anomalyDetailsList;
     this.update(anomaly);

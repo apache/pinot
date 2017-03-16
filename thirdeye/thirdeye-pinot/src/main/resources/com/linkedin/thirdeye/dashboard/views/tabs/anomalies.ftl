@@ -34,20 +34,8 @@
 		</div>
 	</div>
 </div>
-				<!-- Hidding this until fleshed out -->
-				<!-- Jira: https://jira01.corp.linkedin.com:8443/browse/THIRDEYE-1043 -->
-				<!-- <div class="col-md-4">
-					<div>
-						<label style="font-size: 15px; font-weight: 500">Filter by Function: </label>
-					</div>
-					<div>
-						<select class="form-control" id="anomaly-function-dropdown">
-						</select>
-					</div>
-				</div> -->
 
 <div class="container top-buffer bottom-buffer">
-  <div id='anomaly-spin-area'></div>
   <div class="page-content">
   	<div class="page-filter">
 	  	<div class="anomalies-panel">
@@ -73,7 +61,7 @@
 				</div>
 	  	</div>
   	</div>
-
+    <div id='anomaly-spin-area'></div>
 		<div class="page-results" id="anomaly-results-place-holder"></div>
   </div>
 </div>

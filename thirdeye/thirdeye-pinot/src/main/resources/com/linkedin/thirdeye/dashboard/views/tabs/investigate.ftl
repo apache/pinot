@@ -1,29 +1,36 @@
 {{#with anomaly}}
-  {{#unless anomalyFeedback}}
-    <div class="anomaly-feedback padding-all">
-      <div class="container">
-          <h3 class="anomaly-feedback-title">Is this an anomaly?</h3>
-            <form class="anomaly-feedback-radio" id="anomaly-feedback-radio">
-                <label class="radio-inline label-medium-semibold"" for="feedback-radio-yes">
-                  <input type="radio" id="feedback-radio-yes" name="feedback-radio" value="yes">
-                  Yes
-                </label>
-                <label for=feedback-radio-no class="radio-inline label-medium-semibold">
-                  <input class="" type="radio" id="feedback-radio-no" name="feedback-radio" value="no">
-                  No
-                </label>
-            </form>
-          <p>Your feedback will help us improve the accuracy of our anomaly detection techniques.</p>
-      </div>
+  <div class="anomaly-feedback padding-all">
+    <div class="container">
+        <h3 class="anomaly-feedback-title">Is this an anomaly?</h3>
+          <form class="anomaly-feedback-radio" id="anomaly-feedback-radio">
+              <label class="radio-inline" for="feedback-radio-yes">
+                <input type="radio" id="feedback-radio-yes" name="feedback-radio" value="ANOMALY">
+                <span class="label-medium-semibold">Yes</span> (True Anomaly)
+              </label>
+              <label for=feedback-radio-na class="radio-inline">
+                <input class="" type="radio" id="feedback-radio-na" name="feedback-radio" value="ANOMALY_NO_ACTION">
+                <span class="label-medium-semibold">Yes </span> <span>(but non-actionable)<span>
+              </label>
+              <label for=feedback-radio-no class="radio-inline">
+                <input class="" type="radio" id="feedback-radio-no" name="feedback-radio" value="NOT_ANOMALY">
+                <span class="label-medium-semibold">No</span> (False Alarm)
+              </label>
+          </form>
+        <p>Your feedback will help us improve the accuracy of our anomaly detection techniques.</p>
     </div>
-  {{/unless}}
+  </div>
 
   <div class="container">
-    <div class="investigate-title">
-      <span>{{metric}}</span>
+    <div class="investigate-header">
+      <span class="investigate-title">
+        {{metric}} <span> from </span> {{dataset}}
+        <div>&num;{{anomalyId}}</div>
+      </span>
       <div class="investigate-button">
         <!-- <a href="#" class="thirdeye-link">Share</a> -->
-        <a href="#" class="thirdeye-link">InGraphs</a>
+        {{#if ../externalUrls.INGRAPH}}
+          <a href={{../externalUrls.INGRAPH}} target="_blank" class="thirdeye-link">InGraphs</a>
+        {{/if}}
       </div>
     </div>
 
@@ -86,8 +93,9 @@
       </div>
     </div>
   {{/with}}
-
-    <div class="investigate-title">Change Over Time</div>
+    <div class="investigate-header">
+      <span class="investigate-title">Change Over Time</span>
+    </div>
 
     <div class="investigate-wow">
       <div class="wow-card">

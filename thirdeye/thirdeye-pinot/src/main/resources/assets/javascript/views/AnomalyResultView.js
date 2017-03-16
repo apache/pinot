@@ -187,16 +187,19 @@ AnomalyResultView.prototype = {
       totalPages: numPages,
       visiblePages: 7,
       startPage: pageNumber,
-      onPageClick: function (event, page) {
+      onPageClick: (event, page) => {
+          $('body').scrollTop(0);
           console.log("Page " + page + " PageNumber " + pageNumber);
           if (page != pageNumber) {
             var anomaliesParams = {
                 pageNumber : page,
-                metricIds : self.anomalyResultModel.metricIds,
-                dashboardId : self.anomalyResultModel.dashboardId,
-                anomalyIds : self.anomalyResultModel.anomalyIds,
-              }
-            self.applyButtonEvent.notify(anomaliesParams);
+                metricIds : this.anomalyResultModel.metricIds,
+                dashboardId : this.anomalyResultModel.dashboardId,
+                anomalyIds : this.anomalyResultModel.anomalyIds,
+                startDate : this.anomalyResultModel.startDate,
+                endDate : this.anomalyResultModel.endDate,
+              };
+            this.applyButtonEvent.notify(anomaliesParams);
           }
       }
     });
@@ -209,6 +212,10 @@ AnomalyResultView.prototype = {
     });
 
 
+  },
+
+  destroy() {
+    $("#anomaly-results-place-holder").children().remove();
   },
   showSearchBarBasedOnMode : function() {
     var anomaliesSearchMode = $('#anomalies-search-mode').val();
@@ -306,15 +313,12 @@ AnomalyResultView.prototype = {
   },
 
   dataEventHandler : function(e) {
+    e.preventDefault();
     var currentTargetId = e.currentTarget.id;
     if (currentTargetId.startsWith('investigate-button-')) {
       this.investigateButtonClickEvent.notify(e.data);
     } else if (currentTargetId.startsWith('show-details-')) {
       this.showDetailsLinkClickEvent.notify(e.data);
-    } else if (currentTargetId.startsWith('anomaly-feedback-')) {
-      var option = $("#" + currentTargetId + " option:selected").text();
-      e.data['feedback'] = option;
-      this.anomalyFeedbackSelectEvent.notify(e.data);
     }
   },
   setupListenerOnApplyButton : function() {

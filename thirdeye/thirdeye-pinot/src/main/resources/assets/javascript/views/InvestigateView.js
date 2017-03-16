@@ -18,6 +18,8 @@ InvestigateView.prototype = {
     const { anomalyId } = params;
     if (this.anomalyId == anomalyId) {
       this.render();
+    } else {
+      this.destroy();
     }
     this.anomalyId = anomalyId;
   },
@@ -28,16 +30,18 @@ InvestigateView.prototype = {
   },
 
   setViewData() {
-    this.anomaly = this.investigateModel.getAnomaly();
+    const anomaly = this.investigateModel.getAnomaly();
     const wowData = this.investigateModel.getWowData();
     const currentValue = wowData.currentVal;
+    const externalUrls = anomaly.externalUrl ? JSON.parse(anomaly.externalUrl) : null;
     wowData.compareResults.forEach((result) => {
       result.change *= 100;
     });
     const [ wow, wow2, wow3 ] = wowData.compareResults;
 
     this.investigateData = {
-      anomaly: this.anomaly,
+      anomaly,
+      externalUrls,
       currentValue,
       wow,
       wow2,
@@ -45,12 +49,22 @@ InvestigateView.prototype = {
     };
   },
 
-  render () {
+  render() {
     const template_with_anomaly = this.investigate_template_compiled(this.investigateData);
     $("#investigate-place-holder").html(template_with_anomaly);
-    this.renderAnomalyChart(this.anomaly);
+
+    const anomalyFeedback = this.investigateModel.getFeedbackType();
+
+    if (anomalyFeedback) {
+      $(`input[name=feedback-radio][value=${anomalyFeedback}]`).prop('checked', true);
+    }
+    this.renderAnomalyChart(this.investigateModel.getAnomaly());
     // this.setupListenerOnViewContributionLink();
     this.setupListenerOnUserFeedback();
+  },
+
+  destroy() {
+    $("#investigate-place-holder").children().remove();
   },
 
   setupListenerOnViewContributionLink() {
@@ -85,13 +99,12 @@ InvestigateView.prototype = {
   },
 
   setupListenerOnUserFeedback() {
-    $('#feedback-radio-yes, #feedback-radio-no').click((event) => {
-      const feedback = {
-        yes: 'Confirmed Anomaly',
-        no: 'False Alarm'
-      }[event.target.value];
+    $("input[name=feedback-radio]").change((event) => {
+      const userFeedback = event.target.value;
+      const feedbackString = this.investigateModel.getFeedbackString(userFeedback);
+      this.investigateModel.updateFeedback(userFeedback);
 
-      $('#anomaly-feedback').html(`Resolved (${feedback})`);
+      $('#anomaly-feedback').html(`Resolved (${feedbackString})`);
     });
   },
 
