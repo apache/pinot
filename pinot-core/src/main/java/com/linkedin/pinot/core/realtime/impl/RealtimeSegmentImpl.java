@@ -546,55 +546,53 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     return intIterators;
   }
 
-  public Iterator<Integer> getSortedDocIdIteratorOnColumn(final String columnToSortOn) {
-    IntIterator[] iterators = null;
+  /**
+   * Returns the docIds to use for iteration when the data is sorted by <code>columnToSortOn</code>
+   * @param columnToSortOn The column to use for sorting
+   * @return The docIds to use for iteration
+   */
+  public int[] getSortedDocIdIterationOrderWithSortedColumn(final String columnToSortOn) {
+    int[] docIds = new int[numDocsIndexed];
+    final IntIterator[] iterators;
 
+    // Get docId iterators that iterate in order on the data
     switch (dataSchema.getFieldSpecFor(columnToSortOn).getDataType()) {
-    case INT:
-      iterators = getSortedBitmapIntIteratorsForIntegerColumn(columnToSortOn);
-      break;
-    case LONG:
-      iterators = getSortedBitmapIntIteratorsForLongColumn(columnToSortOn);
-      break;
-    case FLOAT:
-      iterators = getSortedBitmapIntIteratorsForFloatColumn(columnToSortOn);
-      break;
-    case DOUBLE:
-      iterators = getSortedBitmapIntIteratorsForDoubleColumn(columnToSortOn);
-      break;
-    case STRING:
-    case BOOLEAN:
-      iterators = getSortedBitmapIntIteratorsForStringColumn(columnToSortOn);
-      break;
-    default:
-      iterators = null;
-      break;
+      case INT:
+        iterators = getSortedBitmapIntIteratorsForIntegerColumn(columnToSortOn);
+        break;
+      case LONG:
+        iterators = getSortedBitmapIntIteratorsForLongColumn(columnToSortOn);
+        break;
+      case FLOAT:
+        iterators = getSortedBitmapIntIteratorsForFloatColumn(columnToSortOn);
+        break;
+      case DOUBLE:
+        iterators = getSortedBitmapIntIteratorsForDoubleColumn(columnToSortOn);
+        break;
+      case STRING:
+      case BOOLEAN:
+        iterators = getSortedBitmapIntIteratorsForStringColumn(columnToSortOn);
+        break;
+      default:
+        iterators = null;
+        break;
     }
 
-    final IntIterator[] intIterators = iterators;
-
-    return new Iterator<Integer>() {
-      int arrayIndex = 0;
-
-      @Override
-      public boolean hasNext() {
-        return intIterators[intIterators.length - 1].hasNext();
+    // Drain the iterators into the docIds array
+    int i = 0;
+    for (IntIterator iterator : iterators) {
+      while(iterator.hasNext()) {
+        docIds[i] = iterator.next();
+        ++i;
       }
+    }
 
-      @Override
-      public Integer next() {
-        if (intIterators[arrayIndex].hasNext()) {
-          return intIterators[arrayIndex].next();
-        }
-        arrayIndex += 1;
-        return intIterators[arrayIndex].next();
-      }
+    // Sanity check
+    if (i != numDocsIndexed) {
+      throw new RuntimeException("The number of docs indexed is not equal to the number of sorted documents");
+    }
 
-      @Override
-      public void remove() {
-        throw new UnsupportedOperationException("remove not supported");
-      }
-    };
+    return docIds;
   }
 
   @Override
