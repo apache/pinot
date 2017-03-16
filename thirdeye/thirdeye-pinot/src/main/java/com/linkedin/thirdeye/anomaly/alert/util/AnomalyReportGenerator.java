@@ -172,8 +172,8 @@ public class AnomalyReportGenerator {
       templateData.put("dimensionStr", "test_d");
       templateData.put("timeZone", timeZone);
       templateData.put("dateFormat", dateFormatMethod);
-      templateData.put("startTime", new Date(startTime));
-      templateData.put("endTime", new Date(endTime));
+      templateData.put("startTime", startTime);
+      templateData.put("endTime", endTime);
       templateData.put("anomalyCount", anomalies.size());
       templateData.put("metricsCount", metrics.size());
       templateData.put("notifiedCount", alertedAnomalies);
@@ -185,6 +185,8 @@ public class AnomalyReportGenerator {
       templateData.put("alertConfigName", alertConfigName);
       templateData.put("includeSummary", includeSummary);
       templateData.put("reportGenerationTimeMillis", System.currentTimeMillis());
+      templateData.put("dashboardHost", "localhost");
+      templateData.put("windowUnit", "HOURS");
       boolean isSingleAnomalyEmail = false;
       if (anomalyReportDTOList.size() == 1) {
         isSingleAnomalyEmail = true;
