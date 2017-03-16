@@ -312,7 +312,7 @@ public class DataFrameTest {
     Assert.assertEquals(df.getDoubles("double").values(), new double[] { 0.0, -2.1, -0.1, 1.3, 0.5 });
     Assert.assertEquals(df.getLongs("long").values(), new long[] { 0, -2, 1, 2, 1 });
     Assert.assertEquals(df.getStrings("string").values(), new String[] { "0.0", "-2.3", "-1", "0.13e1", "0.5" });
-    Assert.assertEquals(df.toBooleans("boolean").values(), new boolean[] { false, true, true, true, true });
+    Assert.assertEquals(df.getBooleans("boolean").values(), new boolean[] { false, true, true, true, true });
   }
 
   @Test
@@ -356,7 +356,7 @@ public class DataFrameTest {
     Assert.assertEquals(df.getDoubles("double").values(), new double[] { 1.3, 0.5, 0.0, -0.1, -2.1 });
     Assert.assertEquals(df.getLongs("long").values(), new long[] { 2, 1, 0, 1, -2 });
     Assert.assertEquals(df.getStrings("string").values(), new String[] { "0.13e1", "0.5", "0.0", "-1", "-2.3" });
-    Assert.assertEquals(df.toBooleans("boolean").values(), new boolean[] { true, true, false, true, true });
+    Assert.assertEquals(df.getBooleans("boolean").values(), new boolean[] { true, true, false, true, true });
   }
 
   @Test
@@ -601,7 +601,7 @@ public class DataFrameTest {
     Assert.assertEquals(df.getDoubles("double").values(), new double[] { -2.1, -0.1, 1.3, 0.5 });
     Assert.assertEquals(df.getLongs("long").values(), new long[] { -2, 1, 2, 1 });
     Assert.assertEquals(df.getStrings("string").values(), new String[] { "-2.3", "-1", "0.13e1", "0.5" });
-    Assert.assertEquals(df.toBooleans("boolean").values(), new boolean[] { true, true, true, true });
+    Assert.assertEquals(df.getBooleans("boolean").values(), new boolean[] { true, true, true, true });
   }
 
   @Test
@@ -644,7 +644,7 @@ public class DataFrameTest {
     Assert.assertEquals(df.getDoubles("double").values(), new double[] { -2.1, 0.0, 0.5 });
     Assert.assertEquals(df.getLongs("long").values(), new long[] { -2, 0, 1 });
     Assert.assertEquals(df.getStrings("string").values(), new String[] { "-2.3", "0.0", "0.5"  });
-    Assert.assertEquals(df.toBooleans("boolean").values(), new boolean[] { true, false, true });
+    Assert.assertEquals(df.getBooleans("boolean").values(), new boolean[] { true, false, true });
   }
 
   @Test
@@ -657,27 +657,6 @@ public class DataFrameTest {
   public void testFilterNone() {
     df = df.filter(DataFrame.toSeries(false, false, false, false, false));
     Assert.assertEquals(df.size(), 0);
-  }
-
-  @Test
-  public void testGetSingleValue() {
-    df = df.filter(DataFrame.toSeries(true, false, false, false, false));
-
-    Assert.assertEquals(df.getDouble("double"), -2.1);
-    Assert.assertEquals(df.getLong("long"), -2);
-    Assert.assertEquals(df.getString("string"), "-2.3");
-    Assert.assertEquals(df.getBoolean("boolean"), true);
-  }
-
-  @Test(expectedExceptions = IllegalArgumentException.class)
-  public void testGetSingleValueMultipleDoubleFail() {
-    df.getDouble("double");
-  }
-
-  @Test(expectedExceptions = IllegalArgumentException.class)
-  public void testGetSingleValueNoDoubleFail() {
-    DataFrame ndf = df.filter(DataFrame.toSeries(false, false, false, false, false));
-    ndf.getDouble("double");
   }
 
   @Test
@@ -719,8 +698,8 @@ public class DataFrameTest {
     ndf.getStrings("string").values()[0] = "other string";
     Assert.assertNotEquals(df.getStrings("string").first(), ndf.getStrings("string").first());
 
-    ndf.toBooleans("boolean").values()[0] = false;
-    Assert.assertNotEquals(df.toBooleans("boolean").first(), ndf.toBooleans("boolean").first());
+    ndf.getBooleans("boolean").values()[0] = false;
+    Assert.assertNotEquals(df.getBooleans("boolean").first(), ndf.getBooleans("boolean").first());
   }
 
   @Test
@@ -986,7 +965,7 @@ public class DataFrameTest {
     Assert.assertEquals(ddf.getDoubles("double").values(), new double[] { 2.0, 4.0, 6.0 });
     Assert.assertEquals(ddf.getLongs("long").values(), new long[] { 2, 4, 6 });
     Assert.assertEquals(ddf.getStrings("string").values(), new String[] { "2", "true", "aaa" });
-    Assert.assertEquals(ddf.toBooleans("boolean").values(), new boolean[] { true, false, false });
+    Assert.assertEquals(ddf.getBooleans("boolean").values(), new boolean[] { true, false, false });
   }
 
   @Test

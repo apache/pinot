@@ -38,22 +38,46 @@ public final class LongSeries extends Series {
 
   @Override
   public DoubleSeries getDoubles() {
-    return DataFrame.getDoubles(this);
+    double[] values = new double[this.size()];
+    for(int i=0; i<values.length; i++) {
+      if(LongSeries.isNull(this.values[i])) {
+        values[i] = DoubleSeries.NULL_VALUE;
+      } else {
+        values[i] = (double) this.values[i];
+      }
+    }
+    return new DoubleSeries(values);
   }
 
   @Override
   public LongSeries getLongs() {
-    return DataFrame.getLongs(this);
+    return this;
   }
 
   @Override
   public BooleanSeries getBooleans() {
-    return DataFrame.toBooleans(this);
+    boolean[] values = new boolean[this.size()];
+    for(int i=0; i<values.length; i++) {
+      if(LongSeries.isNull(this.values[i])) {
+        values[i] = BooleanSeries.NULL_VALUE;
+      } else {
+        values[i] = this.values[i] != 0L;
+      }
+    }
+    return new BooleanSeries(values);
   }
 
   @Override
   public StringSeries getStrings() {
-    return DataFrame.getStrings(this);
+    String[] values = new String[this.size()];
+    for(int i=0; i<values.length; i++) {
+      if(LongSeries.isNull(this.values[i])) {
+        values[i] = StringSeries.NULL_VALUE;
+      } else {
+        values[i] = String.valueOf(this.values[i]);
+      }
+    }
+    return new StringSeries(values);
   }
 
   @Override
@@ -208,7 +232,11 @@ public final class LongSeries extends Series {
     StringBuilder builder = new StringBuilder();
     builder.append("LongSeries{");
     for(long l : this.values) {
-      builder.append(l);
+      if(isNull(l)) {
+        builder.append("null");
+      } else {
+        builder.append(l);
+      }
       builder.append(" ");
     }
     builder.append("}");
@@ -307,7 +335,6 @@ public final class LongSeries extends Series {
     return new LongSeries(values);
   }
 
-  @Override
   public LongSeries fillNull(long value) {
     long[] values = Arrays.copyOf(this.values, this.values.length);
     for(int i=0; i<values.length; i++) {
@@ -380,11 +407,6 @@ public final class LongSeries extends Series {
 
   public static boolean isNull(long value) {
     return value == NULL_VALUE;
-  }
-
-  private void assertNotNull() {
-    if(hasNull())
-      throw new IllegalStateException("Must not contain null values");
   }
 
   private static long[] assertNotEmpty(long[] values) {

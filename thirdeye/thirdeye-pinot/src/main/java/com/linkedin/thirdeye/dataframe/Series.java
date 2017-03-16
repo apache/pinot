@@ -150,7 +150,7 @@ public abstract class Series {
     }
   }
 
-  final class JoinPair {
+  static final class JoinPair {
     final int left;
     final int right;
 
@@ -170,10 +170,7 @@ public abstract class Series {
 
       JoinPair joinPair = (JoinPair) o;
 
-      if (left != joinPair.left) {
-        return false;
-      }
-      return right == joinPair.right;
+      return (left == joinPair.left) && (right == joinPair.right);
     }
 
     @Override
@@ -276,20 +273,8 @@ public abstract class Series {
     return this.getBooleans().aggregate(function);
   }
 
-  public DoubleSeries fillNull(double value) {
-    return this.getDoubles().fillNull(value);
-  }
-
-  public LongSeries fillNull(long value) {
-    return this.getLongs().fillNull(value);
-  }
-
-  public StringSeries fillNull(String value) {
-    return this.getStrings().fillNull(value);
-  }
-
   public Series toType(SeriesType type) {
-    return DataFrame.toType(this, type);
+    return DataFrame.asType(this, type);
   }
 
   public SeriesGrouping groupByValue() {

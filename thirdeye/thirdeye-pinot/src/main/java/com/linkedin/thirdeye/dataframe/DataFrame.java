@@ -20,7 +20,7 @@ public class DataFrame {
   public static Pattern SERIES_NAME_PATTERN = Pattern.compile("([A-Za-z_]\\w*)");
 
   public static final String COLUMN_INDEX = "index";
-  public static final String COLUMN_JOIN = "join";
+  public static final String COLUMN_JOIN_POSTFIX = "_right";
 
   public interface ResamplingStrategy {
     DataFrame apply(Series.SeriesGrouping grouping, Series s);
@@ -57,10 +57,6 @@ public class DataFrame {
 
     public int size() {
       return this.keys.size();
-    }
-
-    public int sourceSize() {
-      return this.source.size();
     }
 
     public DataFrame source() {
@@ -210,6 +206,11 @@ public class DataFrame {
     return this.dropSeries(oldName).addSeries(newName, s);
   }
 
+  public DataFrame convertSeries(String seriesName, Series.SeriesType type) {
+    this.series.put(seriesName, assertSeriesExists(seriesName).toType(type));
+    return this;
+  }
+
   public Set<String> getSeriesNames() {
     return Collections.unmodifiableSet(this.series.keySet());
   }
@@ -238,7 +239,7 @@ public class DataFrame {
     return assertSeriesExists(seriesName).getStrings();
   }
 
-  public BooleanSeries toBooleans(String seriesName) {
+  public BooleanSeries getBooleans(String seriesName) {
    return assertSeriesExists(seriesName).getBooleans();
   }
 
@@ -495,7 +496,7 @@ public class DataFrame {
   }
 
   public DataFrame filter(String seriesName) {
-    return this.filter(this.toBooleans(seriesName));
+    return this.filter(this.getBooleans(seriesName));
   }
 
   public DataFrame filter(String seriesName, DoubleSeries.DoubleConditional conditional) {
@@ -537,179 +538,7 @@ public class DataFrame {
     });
   }
 
-  public double getDouble(String seriesName) {
-    return assertSingleValue(seriesName).getDoubles().first();
-  }
-
-  public long getLong(String seriesName) {
-    return assertSingleValue(seriesName).getLongs().first();
-  }
-
-  public String getString(String seriesName) {
-    return assertSingleValue(seriesName).getStrings().first();
-  }
-
-  public boolean getBoolean(String seriesName) {
-    return assertSingleValue(seriesName).getBooleans().first();
-  }
-
-  public static DoubleSeries getDoubles(DoubleSeries s) {
-    return s;
-  }
-
-  public static DoubleSeries getDoubles(LongSeries s) {
-    double[] values = new double[s.size()];
-    for(int i=0; i<values.length; i++) {
-      if(LongSeries.isNull(s.values[i])) {
-        values[i] = DoubleSeries.NULL_VALUE;
-      } else {
-        values[i] = (double) s.values[i];
-      }
-    }
-    return new DoubleSeries(values);
-  }
-
-  public static DoubleSeries getDoubles(StringSeries s) {
-    double[] values = new double[s.size()];
-    for(int i=0; i<values.length; i++) {
-      if(StringSeries.isNull(s.values[i])) {
-        values[i] = DoubleSeries.NULL_VALUE;
-      } else {
-        values[i] = Double.parseDouble(s.values[i]);
-      }
-    }
-    return new DoubleSeries(values);
-  }
-
-  public static DoubleSeries getDoubles(BooleanSeries s) {
-    double[] values = new double[s.size()];
-    for(int i=0; i<values.length; i++) {
-      values[i] = s.values[i] ? 1.0d : 0.0d;
-    }
-    return new DoubleSeries(values);
-  }
-
-  public static LongSeries getLongs(DoubleSeries s) {
-    long[] values = new long[s.size()];
-    for(int i=0; i<values.length; i++) {
-      if(DoubleSeries.isNull(s.values[i])) {
-        values[i] = LongSeries.NULL_VALUE;
-      } else {
-        values[i] = (long) s.values[i];
-      }
-    }
-    return new LongSeries(values);
-  }
-
-  public static LongSeries getLongs(LongSeries s) {
-    return s;
-  }
-
-  public static LongSeries getLongs(StringSeries s) {
-    long[] values = new long[s.size()];
-    for(int i=0; i<values.length; i++) {
-      if(StringSeries.isNull(s.values[i])) {
-        values[i] = LongSeries.NULL_VALUE;
-      } else {
-        try {
-          values[i] = Long.parseLong(s.values[i]);
-        } catch (NumberFormatException e) {
-          values[i] = (long) Double.parseDouble(s.values[i]);
-        }
-      }
-    }
-    return new LongSeries(values);
-  }
-
-  public static LongSeries getLongs(BooleanSeries s) {
-    long[] values = new long[s.size()];
-    for(int i=0; i<values.length; i++) {
-      values[i] = s.values[i] ? 1L : 0L;
-    }
-    return new LongSeries(values);
-  }
-
-  public static BooleanSeries toBooleans(DoubleSeries s) {
-    boolean[] values = new boolean[s.size()];
-    for(int i=0; i<values.length; i++) {
-      if(DoubleSeries.isNull(s.values[i])) {
-        values[i] = BooleanSeries.NULL_VALUE;
-      } else {
-        values[i] = s.values[i] != 0.0d;
-      }
-    }
-    return new BooleanSeries(values);
-  }
-
-  public static BooleanSeries toBooleans(LongSeries s) {
-    boolean[] values = new boolean[s.size()];
-    for(int i=0; i<values.length; i++) {
-      if(LongSeries.isNull(s.values[i])) {
-        values[i] = BooleanSeries.NULL_VALUE;
-      } else {
-        values[i] = s.values[i] != 0L;
-      }
-    }
-    return new BooleanSeries(values);
-  }
-
-  public static BooleanSeries toBooleans(BooleanSeries s) {
-    return s;
-  }
-
-  public static BooleanSeries toBooleans(StringSeries s) {
-    boolean[] values = new boolean[s.size()];
-    for(int i=0; i<values.length; i++) {
-      if(StringSeries.isNull(s.values[i])) {
-        values[i] = BooleanSeries.NULL_VALUE;
-      } else {
-        if(NumberUtils.isNumber(s.values[i])) {
-          values[i] = Double.parseDouble(s.values[i]) != 0.0d;
-        } else {
-          values[i] = Boolean.parseBoolean(s.values[i]);
-        }
-      }
-    }
-    return new BooleanSeries(values);
-  }
-
-  public static StringSeries getStrings(DoubleSeries s) {
-    String[] values = new String[s.size()];
-    for(int i=0; i<values.length; i++) {
-      if(DoubleSeries.isNull(s.values[i])) {
-        values[i] = StringSeries.NULL_VALUE;
-      } else {
-        values[i] = String.valueOf(s.values[i]);
-      }
-    }
-    return new StringSeries(values);
-  }
-
-  public static StringSeries getStrings(LongSeries s) {
-    String[] values = new String[s.size()];
-    for(int i=0; i<values.length; i++) {
-      if(LongSeries.isNull(s.values[i])) {
-        values[i] = StringSeries.NULL_VALUE;
-      } else {
-        values[i] = String.valueOf(s.values[i]);
-      }
-    }
-    return new StringSeries(values);
-  }
-
-  public static StringSeries getStrings(BooleanSeries s) {
-    String[] values = new String[s.size()];
-    for(int i=0; i<values.length; i++) {
-      values[i] = String.valueOf(s.values[i]);
-    }
-    return new StringSeries(values);
-  }
-
-  public static StringSeries getStrings(StringSeries s) {
-    return s;
-  }
-
-  public static Series toType(Series s, Series.SeriesType type) {
+  public static Series asType(Series s, Series.SeriesType type) {
     switch(type) {
       case DOUBLE:
         return s.getDoubles();
@@ -768,20 +597,6 @@ public class DataFrame {
     return df;
   }
 
-  public DataFrame fillNull(String seriesName, double value) {
-    DoubleSeries filled = assertSeriesExists(seriesName).fillNull(value);
-
-    DataFrame df = new DataFrame();
-    for(Map.Entry<String, Series> e : this.getSeries().entrySet()) {
-      if(seriesName.equals(e.getKey())) {
-        df.addSeries(seriesName, filled);
-      } else {
-        df.addSeries(e.getKey(), e.getValue());
-      }
-    }
-    return df;
-  }
-
   public DataFrame joinInner(DataFrame other, String onSeriesLeft, String onSeriesRight) {
     List<Series.JoinPair> pairs = this.get(onSeriesLeft).join(other.get(onSeriesRight), Series.JoinType.INNER);
     return DataFrame.join(this, other, pairs);
@@ -802,7 +617,7 @@ public class DataFrame {
     return DataFrame.join(this, other, pairs);
   }
 
-  static DataFrame join(DataFrame left, DataFrame right, List<Series.JoinPair> pairs) {
+  private static DataFrame join(DataFrame left, DataFrame right, List<Series.JoinPair> pairs) {
     int[] fromIndexLeft = new int[pairs.size()];
     int i=0;
     for(Series.JoinPair p : pairs) {
@@ -821,8 +636,9 @@ public class DataFrame {
     Set<String> seriesLeft = left.getSeriesNames();
     for(Map.Entry<String, Series> e : rightData.getSeries().entrySet()) {
       String seriesName = e.getKey();
+      // TODO: better approach to conditional rename
       if(seriesLeft.contains(seriesName) && !leftData.get(seriesName).equals(rightData.get(seriesName))) {
-        seriesName = e.getKey() + "_right";
+        seriesName = e.getKey() + COLUMN_JOIN_POSTFIX;
       }
 
       leftData.addSeries(seriesName, e.getValue());
@@ -876,32 +692,6 @@ public class DataFrame {
     if(!series.containsKey(name))
       throw new IllegalArgumentException(String.format("Unknown series '%s'", name));
     return series.get(name);
-  }
-
-  private Series assertSingleValue(String name) {
-    if(assertSeriesExists(name).size() != 1)
-      throw new IllegalArgumentException(String.format("Series '%s' must have exactly one element", name));
-    return series.get(name);
-  }
-
-  private Series assertNotNull(String name) {
-    return assertNotNull(assertSeriesExists(name));
-  }
-
-  private void assertNotNull(String... names) {
-    for(String s : names)
-      assertNotNull(s);
-  }
-
-  private static Series assertNotNull(Series series) {
-    if(series.hasNull())
-      throw new IllegalStateException("Series Must not contain null values");
-    return series;
-  }
-
-  private static void assertNotNull(Series... series) {
-    for(Series s : series)
-      assertNotNull(s);
   }
 
   private void assertSameLength(Series s) {

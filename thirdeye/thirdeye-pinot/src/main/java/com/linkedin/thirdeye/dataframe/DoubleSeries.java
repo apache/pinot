@@ -63,22 +63,46 @@ public final class DoubleSeries extends Series {
 
   @Override
   public DoubleSeries getDoubles() {
-    return DataFrame.getDoubles(this);
+    return this;
   }
 
   @Override
   public LongSeries getLongs() {
-    return DataFrame.getLongs(this);
+    long[] values = new long[this.size()];
+    for(int i=0; i<values.length; i++) {
+      if(DoubleSeries.isNull(this.values[i])) {
+        values[i] = LongSeries.NULL_VALUE;
+      } else {
+        values[i] = (long) this.values[i];
+      }
+    }
+    return new LongSeries(values);
   }
 
   @Override
   public BooleanSeries getBooleans() {
-    return DataFrame.toBooleans(this);
+    boolean[] values = new boolean[this.size()];
+    for(int i=0; i<values.length; i++) {
+      if(DoubleSeries.isNull(this.values[i])) {
+        values[i] = BooleanSeries.NULL_VALUE;
+      } else {
+        values[i] = this.values[i] != 0.0d;
+      }
+    }
+    return new BooleanSeries(values);
   }
 
   @Override
   public StringSeries getStrings() {
-    return DataFrame.getStrings(this);
+    String[] values = new String[this.size()];
+    for(int i=0; i<values.length; i++) {
+      if(DoubleSeries.isNull(this.values[i])) {
+        values[i] = StringSeries.NULL_VALUE;
+      } else {
+        values[i] = String.valueOf(this.values[i]);
+      }
+    }
+    return new StringSeries(values);
   }
 
   @Override
@@ -222,7 +246,11 @@ public final class DoubleSeries extends Series {
     StringBuilder builder = new StringBuilder();
     builder.append("DoubleSeries{");
     for(double d : this.values) {
-      builder.append(d);
+      if(isNull(d)) {
+        builder.append("null");
+      } else {
+        builder.append(d);
+      }
       builder.append(" ");
     }
     builder.append("}");
@@ -260,7 +288,6 @@ public final class DoubleSeries extends Series {
     return new DoubleBatchSum().apply(this.values);
   }
 
-  @Override
   public DoubleSeries fillNull(double value) {
     double[] values = Arrays.copyOf(this.values, this.values.length);
     for(int i=0; i<values.length; i++) {
@@ -368,11 +395,6 @@ public final class DoubleSeries extends Series {
 
   public static boolean isNull(double value) {
     return Double.isNaN(value);
-  }
-
-  private void assertNotNull() {
-    if(hasNull())
-      throw new IllegalStateException("Must not contain null values");
   }
 
   private static double[] assertNotEmpty(double[] values) {

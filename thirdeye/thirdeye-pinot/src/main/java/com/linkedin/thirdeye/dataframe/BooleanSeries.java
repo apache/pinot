@@ -56,22 +56,34 @@ public final class BooleanSeries extends Series {
 
   @Override
   public DoubleSeries getDoubles() {
-    return DataFrame.getDoubles(this);
+    double[] values = new double[this.size()];
+    for(int i=0; i<values.length; i++) {
+      values[i] = this.values[i] ? 1.0d : 0.0d;
+    }
+    return new DoubleSeries(values);
   }
 
   @Override
   public LongSeries getLongs() {
-    return DataFrame.getLongs(this);
+    long[] values = new long[this.size()];
+    for(int i=0; i<values.length; i++) {
+      values[i] = this.values[i] ? 1L : 0L;
+    }
+    return new LongSeries(values);
   }
 
   @Override
   public BooleanSeries getBooleans() {
-    return DataFrame.toBooleans(this);
+    return this;
   }
 
   @Override
   public StringSeries getStrings() {
-    return DataFrame.getStrings(this);
+    String[] values = new String[this.size()];
+    for(int i=0; i<values.length; i++) {
+      values[i] = String.valueOf(this.values[i]);
+    }
+    return new StringSeries(values);
   }
 
   @Override

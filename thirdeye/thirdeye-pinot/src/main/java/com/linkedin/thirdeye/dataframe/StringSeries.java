@@ -8,6 +8,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import org.apache.commons.lang.math.NumberUtils;
 
 
 public final class StringSeries extends Series {
@@ -52,22 +53,54 @@ public final class StringSeries extends Series {
 
   @Override
   public DoubleSeries getDoubles() {
-    return DataFrame.getDoubles(this);
+    double[] values = new double[this.size()];
+    for(int i=0; i<values.length; i++) {
+      if(StringSeries.isNull(this.values[i])) {
+        values[i] = DoubleSeries.NULL_VALUE;
+      } else {
+        values[i] = Double.parseDouble(this.values[i]);
+      }
+    }
+    return new DoubleSeries(values);
   }
 
   @Override
   public LongSeries getLongs() {
-    return DataFrame.getLongs(this);
+    long[] values = new long[this.size()];
+    for(int i=0; i<values.length; i++) {
+      if(StringSeries.isNull(this.values[i])) {
+        values[i] = LongSeries.NULL_VALUE;
+      } else {
+        try {
+          values[i] = Long.parseLong(this.values[i]);
+        } catch (NumberFormatException e) {
+          values[i] = (long) Double.parseDouble(this.values[i]);
+        }
+      }
+    }
+    return new LongSeries(values);
   }
 
   @Override
   public BooleanSeries getBooleans() {
-    return DataFrame.toBooleans(this);
+    boolean[] values = new boolean[this.size()];
+    for(int i=0; i<values.length; i++) {
+      if(StringSeries.isNull(this.values[i])) {
+        values[i] = BooleanSeries.NULL_VALUE;
+      } else {
+        if(NumberUtils.isNumber(this.values[i])) {
+          values[i] = Double.parseDouble(this.values[i]) != 0.0d;
+        } else {
+          values[i] = Boolean.parseBoolean(this.values[i]);
+        }
+      }
+    }
+    return new BooleanSeries(values);
   }
 
   @Override
   public StringSeries getStrings() {
-    return DataFrame.getStrings(this);
+    return this;
   }
 
   @Override
@@ -191,15 +224,18 @@ public final class StringSeries extends Series {
     StringBuilder builder = new StringBuilder();
     builder.append("StringSeries{");
     for(String s : this.values) {
-      builder.append("'");
-      builder.append(s);
-      builder.append("' ");
+      if(isNull(s)) {
+        builder.append("null");
+      } else {
+        builder.append("'");
+        builder.append(s);
+        builder.append("' ");
+      }
     }
     builder.append("}");
     return builder.toString();
   }
 
-  @Override
   public StringSeries fillNull(String value) {
     String[] values = Arrays.copyOf(this.values, this.values.length);
     for(int i=0; i<values.length; i++) {
@@ -310,7 +346,7 @@ public final class StringSeries extends Series {
     return Objects.equals(value, NULL_VALUE);
   }
 
-  static int nullSafeStringComparator(final String one, final String two) {
+  private static int nullSafeStringComparator(final String one, final String two) {
     // NOTE: http://stackoverflow.com/questions/481813/how-to-simplify-a-null-safe-compareto-implementation
     if (one == null ^ two == null) {
       return (one == null) ? -1 : 1;
@@ -321,11 +357,6 @@ public final class StringSeries extends Series {
     }
 
     return one.compareToIgnoreCase(two);
-  }
-
-  private void assertNotNull() {
-    if(hasNull())
-      throw new IllegalStateException("Must not contain null values");
   }
 
   private static String[] assertNotEmpty(String[] values) {
