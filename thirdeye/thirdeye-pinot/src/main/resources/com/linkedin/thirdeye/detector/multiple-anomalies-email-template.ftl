@@ -16,7 +16,7 @@
         Analysis End: ${dateFormat(endTime)}
       </p>
       <p style="color: #737373; font-size: 14px;"> ThirdEye has analyzed your dataset and has detected
-        <b>${anomalyCount} ${(anomalyCount == 1)?string("anomaly", "anomalies")}.</b> Below is the full list of anomalies detected during this time period.</p>
+        <b>${anomalyCount} ${(anomalyCount == 1)?string("anomaly", "anomalies")}.</b> Below is the full list of anomalies detected during this time period or you can view them <b><a href="${dashboardHost}/thirdeye#anomalies?anomaliesSearchMode=id&anomalyIds=${anomalyIds}">here</a></b></p>
     </td>
   </tr>
 
@@ -77,7 +77,7 @@
             <th style="border:1px solid #CCC; padding:0 8px;">Metric</th>
             <th style="border:1px solid #CCC; padding:0 8px;">Dimension</th>
             <th style="border:1px solid #CCC; padding:0 8px; width:18%;" colspan="18%">Duration</th>
-            <th style="border:1px solid #CCC; padding:0 8px;">Details</th>
+            <th colspan="20%" style="border:1px solid #CCC; padding:0 8px; width:20%;">Details</th>
             <#if includeSummary?has_content>
               <th style="border:1px solid #CCC; padding:0 8px;">Status</th>
             </#if>
@@ -90,7 +90,7 @@
               <td style="border:1px solid #CCC; padding:0 8px;">${r.metric}</td>
               <td style="border:1px solid #CCC; padding:0 8px;">${r.dimensions}</td>
               <td style="border:1px solid #CCC; padding:0 8px; width:18%;" colspan="18%">${r.duration}</td>
-              <td style="border:1px solid #CCC; padding:0 8px;">
+              <td colspan="20%" style="border:1px solid #CCC; padding:0 8px; width:20%;">
                 <b>Change: </b>${r.lift} <br>
                 <b>Current: </b>${r.currentVal} <br>
                 <b>Baseline: </b>${r.baselineVal}
@@ -106,121 +106,7 @@
       </td>
     </tr>
   </#if>
-  <!-- OLD  -->
-<#if (groupedAnomalyResults?has_content)>
-  <tr>
-    <td>
-      <table align="left" border="1" cellpadding="4px"
-             style="width:100%;border-collapse: collapse; border-spacing: 0 margin-bottom: 15px; border: 1px solid #ddd;">
-        <tr>
-          <th style="padding:5px 3px">Dimensions</th>
-          <th>No.</th>
-          <th>Time (${timeZone})</th>
-          <th>Reason</th>
-          <th>Function</th>
-        </tr>
-        <#assign anomalySequenceIndex = 1>
-        <#list groupedAnomalyResults?keys as dimensionMap>
-          <#assign results = groupedAnomalyResults[dimensionMap]>
-          <#assign dimensionStr = dimensionMap>
-          <#list results as r>
-            <tr>
-              <#if r == results?first>
-                <td rowspan="${results?size}" style="padding:5px 3px">${dimensionStr}</td>
-              </#if>
-              <td style="padding:5px 3px">
-              ${anomalySequenceIndex?c}
-              </td>
-              <td style="padding:5px 3px">
 
-                <#if r.endTime??>
-                ${dateFormat(r.startTime)} to ${dateFormat(r.endTime)}
-                <#else>
-                ${dateFormat(r.startTime)}
-                </#if>
-              </td>
-              <td style="padding:5px 3px">${r.message!"N/A"}
-              </td>
-              <td style="padding:5px 3px">
-              ${r.function.functionName} (${r.function.type})
-              </td>
-            </tr>
-            <#assign anomalySequenceIndex = anomalySequenceIndex + 1>
-          </#list>
-        </#list>
-      </table>
-    </td>
-  </tr>
-</#if>
-  <tr>
-    <td>
-      Go to <a
-        href="${dashboardHost}/dashboard#view=anomalies&dataset=${collection}&compareMode=WoW&aggTimeGranularity=${windowUnit}&metrics=${metric}<#if (anomalyCount > 0) >&currentStart=${startTime?c}&currentEnd=${endTime?c}</#if>"
-        target="_top">ThirdEye Anomalies Dashboard</a>
-    </td>
-  </tr>
-<#if (metricDimensionValueReports?has_content)>
-  <#setting time_zone=timeZone >
-  <tr>
-    <td>
-      <hr/>
-      <p>
-        Report start time : ${dateFormat(reportStartDateTime)}
-      </p>
-    </td>
-  </tr>
-  <#assign reportCount = 1>
-  <#list metricDimensionValueReports as metricReport>
-    <tr>
-      <td><b>
-      ${reportCount} - <a href="${dashboardHost}/dashboard#view=compare&dataset=${collection}&metrics=${metricReport.metricName}&dimensions=${metricReport.dimensionName}&compareMode=WoW&aggTimeGranularity=HOURS&currentStart=${metricReport.currentStartTime?c}&currentEnd=${metricReport.currentEndTime?c}&baselineStart=${metricReport.baselineStartTime?c}&baselineEnd=${metricReport.baselineEndTime?c}">
-      ${metric} by ${metricReport.dimensionName}
-      </a>
-      </b></td>
-    </tr>
-    <#assign subDimensionValueMap = metricReport.subDimensionValueMap >
-    <tr>
-      <td>
-        <table align="left" border="1"
-               style="width:100%;border-collapse: collapse; border-spacing: 0 margin-bottom:15px;border-color:#ddd;"
-               cellspacing="0px" cellpadding="4px">
-          <tr>
-            <td>${metricReport.dimensionName}</td>
-            <td>Share</td>
-            <td>Total</td>
-            <#assign itrCount = 1 >
-            <#list subDimensionValueMap?keys as groupByDimension>
-              <#assign timeBucketValueMap = subDimensionValueMap[groupByDimension]>
-              <#if itrCount == 1>
-                <#list timeBucketValueMap?keys as timeBucket>
-                  <td>
-                  ${timeBucket?number?number_to_time?string("HH:mm")}
-                  </td>
-                </#list>
-              </#if>
-              <#assign itrCount = itrCount + 1>
-            </#list>
-          </tr>
-          <#list subDimensionValueMap?keys as dimensionKey>
-            <tr>
-              <td>
-              ${dimensionKey}
-              </td>
-              <td>${metricReport.subDimensionShareValueMap[dimensionKey]}</td>
-              <td>${metricReport.subDimensionTotalValueMap[dimensionKey]}</td>
-              <#assign timevalmap = subDimensionValueMap[dimensionKey] >
-              <#list timevalmap?keys as timebucketkey>
-                <td> ${timevalmap[timebucketkey]}%</td>
-              </#list>
-            </tr>
-          </#list>
-        </table>
-      </td>
-    </tr>
-
-    <#assign reportCount = reportCount + 1>
-  </#list>
-</#if>
 <tr>
   <td style="font-family:'Proxima Nova','Arial', 'Helvetica Neue',Helvetica, sans-serif;font-size:14px; color: #737373;font-weight:300; text-align: center;" colspan="2">
     <p>If you have any questions regarding this report, please email <br/>
