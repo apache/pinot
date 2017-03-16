@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.detector.functionex.dataframe;
+package com.linkedin.thirdeye.dataframe;
 
 import com.udojava.evalex.Expression;
 import java.math.BigDecimal;

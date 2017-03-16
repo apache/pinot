@@ -4,7 +4,7 @@ import com.linkedin.thirdeye.datalayer.bao.EventManager;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExContext;
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExDataSource;
-import com.linkedin.thirdeye.detector.functionex.dataframe.DataFrame;
+import com.linkedin.thirdeye.dataframe.DataFrame;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;

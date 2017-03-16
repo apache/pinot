@@ -4,7 +4,7 @@ import com.linkedin.thirdeye.datalayer.bao.EventManager;
 import com.linkedin.thirdeye.datalayer.bao.MockManager;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExContext;
-import com.linkedin.thirdeye.detector.functionex.dataframe.DataFrame;
+import com.linkedin.thirdeye.dataframe.DataFrame;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;

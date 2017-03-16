@@ -12,7 +12,7 @@ import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionEx;
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExContext;
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExFactory;
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExResult;
-import com.linkedin.thirdeye.detector.functionex.dataframe.DataFrame;
+import com.linkedin.thirdeye.dataframe.DataFrame;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;

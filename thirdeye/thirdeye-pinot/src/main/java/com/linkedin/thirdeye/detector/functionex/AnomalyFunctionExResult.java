@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.detector.functionex;
 
-import com.linkedin.thirdeye.detector.functionex.dataframe.DataFrame;
+import com.linkedin.thirdeye.dataframe.DataFrame;
 import java.util.ArrayList;
 import java.util.List;
 

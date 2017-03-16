@@ -2,7 +2,7 @@ package com.linkedin.thirdeye.detector.functionex.impl;
 
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionEx;
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExResult;
-import com.linkedin.thirdeye.detector.functionex.dataframe.DataFrame;
+import com.linkedin.thirdeye.dataframe.DataFrame;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

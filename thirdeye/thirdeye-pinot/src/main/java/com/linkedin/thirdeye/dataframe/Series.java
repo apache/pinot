@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.detector.functionex.dataframe;
+package com.linkedin.thirdeye.dataframe;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -150,7 +150,7 @@ public abstract class Series {
     }
   }
 
-  public static final class JoinPair {
+  final class JoinPair {
     final int left;
     final int right;
 

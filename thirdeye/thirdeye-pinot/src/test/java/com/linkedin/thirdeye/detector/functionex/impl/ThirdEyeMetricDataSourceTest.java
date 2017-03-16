@@ -5,7 +5,7 @@ import com.linkedin.thirdeye.datalayer.bao.MockManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExContext;
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExDataSource;
-import com.linkedin.thirdeye.detector.functionex.dataframe.DataFrame;
+import com.linkedin.thirdeye.dataframe.DataFrame;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;

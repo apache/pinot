@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.detector.functionex.dataframe;
+package com.linkedin.thirdeye.dataframe;
 
 import java.util.ArrayList;
 import java.util.Arrays;

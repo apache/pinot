@@ -2,9 +2,9 @@ package com.linkedin.thirdeye.detector.functionex.impl;
 
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionEx;
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExResult;
-import com.linkedin.thirdeye.detector.functionex.dataframe.DataFrame;
-import com.linkedin.thirdeye.detector.functionex.dataframe.DoubleSeries;
-import com.linkedin.thirdeye.detector.functionex.dataframe.Series;
+import com.linkedin.thirdeye.dataframe.DataFrame;
+import com.linkedin.thirdeye.dataframe.DoubleSeries;
+import com.linkedin.thirdeye.dataframe.Series;
 import java.util.Arrays;
 import java.util.Collection;
 import org.apache.commons.lang3.math.NumberUtils;

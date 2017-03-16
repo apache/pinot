@@ -2,7 +2,7 @@ package com.linkedin.thirdeye.detector.functionex.impl;
 
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExContext;
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExDataSource;
-import com.linkedin.thirdeye.detector.functionex.dataframe.DataFrame;
+import com.linkedin.thirdeye.dataframe.DataFrame;
 
 
 public class ThirdEyeMockDataSource implements AnomalyFunctionExDataSource<Object, DataFrame> {

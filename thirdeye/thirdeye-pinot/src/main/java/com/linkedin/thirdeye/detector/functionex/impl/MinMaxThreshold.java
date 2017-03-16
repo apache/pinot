@@ -2,8 +2,8 @@ package com.linkedin.thirdeye.detector.functionex.impl;
 
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionEx;
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExResult;
-import com.linkedin.thirdeye.detector.functionex.dataframe.DataFrame;
-import com.linkedin.thirdeye.detector.functionex.dataframe.DoubleSeries;
+import com.linkedin.thirdeye.dataframe.DataFrame;
+import com.linkedin.thirdeye.dataframe.DoubleSeries;
 
 
 public class MinMaxThreshold extends AnomalyFunctionEx {
