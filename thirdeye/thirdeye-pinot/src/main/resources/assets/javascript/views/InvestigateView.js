@@ -39,7 +39,6 @@ InvestigateView.prototype = {
 
     this.investigateData = {
       anomaly,
-      externalUrls,
       currentValue,
       wow,
       wow2,
@@ -47,7 +46,7 @@ InvestigateView.prototype = {
     };
   },
 
-  formatWowData(wowData, {currentStart, currentEnd, dataset, metric}){
+  formatWowData(wowData, { currentStart, currentEnd, dataset, metric }){
     const start = moment(currentStart);
     const end = moment(currentEnd);
     const wowMapping = {
