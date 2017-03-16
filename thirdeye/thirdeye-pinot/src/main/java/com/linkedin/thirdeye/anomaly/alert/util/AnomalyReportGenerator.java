@@ -26,7 +26,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -34,10 +33,10 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.mail.HtmlEmail;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
-import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,6 +45,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.nio.file.Files;
 
 public class AnomalyReportGenerator {
 
@@ -198,20 +198,29 @@ public class AnomalyReportGenerator {
       templateData.put("dashboardHost", configuration.getDashboardHost());
       templateData.put("anomalyIds", Joiner.on(",").join(anomalyIds));
       boolean isSingleAnomalyEmail = false;
+      String imgPath = null;
       if (anomalyReportDTOList.size() == 1) {
         isSingleAnomalyEmail = true;
+        imgPath = takeGraphScreenShot(anomalyReportDTOList.get(0).getAnomalyId(), configuration);
         try {
-          String imgPath = takeGraphScreenShot(anomalyReportDTOList.get(0).getAnomalyId(), configuration);
           String cid = email.embed(new File(imgPath));
           templateData.put("cid", cid);
         } catch (Exception e) {
           LOG.error("Exception while embedding screenshot for anomaly {}", anomalyReportDTOList.get(0).getAnomalyId(), e);
         }
+
       }
 
       buildEmailTemplateAndSendAlert(templateData, configuration.getSmtpConfiguration(), subject,
           emailRecipients, fromEmail, isSingleAnomalyEmail, email);
-      //FileUtils.deleteQuietly(new File(imgPath));
+
+      if (StringUtils.isNotBlank(imgPath)) {
+        try {
+          Files.deleteIfExists(new File(imgPath).toPath());
+        } catch (IOException e) {
+          LOG.error("Exception in deleting screenshot {}", imgPath, e);
+        }
+      }
     }
   }
 
@@ -411,7 +420,7 @@ public class AnomalyReportGenerator {
   }
 
 
-  public String takeGraphScreenShot(String anomalyId, ThirdEyeAnomalyConfiguration configuration) throws Exception {
+  public String takeGraphScreenShot(String anomalyId, ThirdEyeAnomalyConfiguration configuration) {
     String imgPath = null;
     try {
 
@@ -437,7 +446,7 @@ public class AnomalyReportGenerator {
         throw new Exception("PhantomJS process failed with error code: " + exitVal);
       }
     } catch (Exception e) {
-      throw new Exception("Exception with openPageInPhantom", e);
+      LOG.error("Exception with openPageInPhantom", e);
     }
     return imgPath;
   }

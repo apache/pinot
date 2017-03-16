@@ -203,7 +203,8 @@ public class EmailResource {
       @QueryParam("to") String toAddr,@QueryParam("subject") String subject,
       @QueryParam("includeSentAnomaliesOnly") boolean includeSentAnomaliesOnly,
       @QueryParam("teHost") String teHost, @QueryParam("smtpHost") String smtpHost,
-      @QueryParam("smtpPort") int smtpPort) {
+      @QueryParam("smtpPort") int smtpPort,
+      @QueryParam("phantomJsPath") String phantomJsPath) {
     if (Strings.isNullOrEmpty(metrics)) {
       throw new WebApplicationException("metrics null or empty: " + metrics);
     }
@@ -230,6 +231,7 @@ public class EmailResource {
 
     configuration.setSmtpConfiguration(smtpConfiguration);
     configuration.setDashboardHost(teHost);
+    configuration.setPhantomJsPath(phantomJsPath);
     String emailSub = Strings.isNullOrEmpty(subject) ? "Thirdeye Anomaly Report" : subject;
     anomalyReportGenerator
         .buildReport(startTime, endTime, anomalies, emailSub, configuration,
