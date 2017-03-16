@@ -695,6 +695,8 @@ text {
   text-align: center;
   border: 1px solid #CCC;
   background-color: white;
+  list-style: none;
+  padding: 0;
 }
 
 .wow-card {

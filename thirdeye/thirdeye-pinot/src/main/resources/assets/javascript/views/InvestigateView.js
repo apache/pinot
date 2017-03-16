@@ -59,12 +59,12 @@ InvestigateView.prototype = {
         const baselineStart = start.clone().subtract(offset, 'days');
         const baselineEnd = end.clone().subtract(offset, 'days');
         wow.change *= 100;
-        wow.url = `dashboard#view=compare&dataset=${dataset.valueOf()}&compareMode=WoW&aggTimeGranularity=aggregateAll&currentStart=${start.valueOf()}&currentEnd=${end.valueOf()}&baselineStart=${baselineStart.valueOf()}&baselineEnd=${baselineEnd.valueOf()}&metrics=${metric}`;
+        wow.url = `dashboard#view=compare&dataset=${dataset}&compareMode=WoW&aggTimeGranularity=aggregateAll&currentStart=${start.valueOf()}&currentEnd=${end.valueOf()}&baselineStart=${baselineStart.valueOf()}&baselineEnd=${baselineEnd.valueOf()}&metrics=${metric}`;
         return wow;
       });
   },
 
-  render () {
+  render() {
     const template_with_anomaly = this.investigate_template_compiled(this.investigateData);
     $("#investigate-place-holder").html(template_with_anomaly);
 
