@@ -21,6 +21,7 @@ import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.utils.SchemaUtils;
 import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 import java.io.BufferedReader;
@@ -93,8 +94,6 @@ public class AutoAddInvertedIndex {
   public static final int DEFAULT_MAX_NUM_INVERTED_INDEX_ADDED = 2;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(AutoAddInvertedIndex.class);
-  private static final String TABLE_CONFIG_PATH = "/CONFIGS/TABLE/";
-  private static final String SCHEMA_PATH = "/SCHEMAS/";
 
   private final String _clusterName;
   private final String _controllerAddress;
@@ -311,12 +310,13 @@ public class AutoAddInvertedIndex {
 
   private AbstractTableConfig getTableConfig(String tableName)
       throws Exception {
-    return AbstractTableConfig.fromZnRecord(_propertyStore.get(TABLE_CONFIG_PATH + tableName, null, 0));
+    return AbstractTableConfig.fromZnRecord(
+        _propertyStore.get(ZKMetadataProvider.constructPropertyStorePathForResourceConfig(tableName), null, 0));
   }
 
   private Schema getTableSchema(String tableName)
       throws Exception {
-    ZNRecord znRecord = _propertyStore.get(SCHEMA_PATH + tableName, null, 0);
+    ZNRecord znRecord = _propertyStore.get(ZKMetadataProvider.constructPropertyStorePathForSchema(tableName), null, 0);
     if (znRecord == null) {
       return null;
     } else {
