@@ -85,7 +85,8 @@ public class SegmentPreProcessor implements AutoCloseable {
         defaultColumnHandler.updateDefaultColumns();
       }
 
-      if (_columnMinMaxValueGeneratorMode != ColumnMinMaxValueGeneratorMode.NONE) {
+      if ((_columnMinMaxValueGeneratorMode != ColumnMinMaxValueGeneratorMode.NONE)
+          && (_segmentMetadata.getTotalDocs() != 0)) {
         // Add min/max value to column metadata according to the prune mode.
         // For star-tree index, because it can only increase the range, so min/max value can still be used in pruner.
         // NOTE: This step may modify the segment metadata. When adding new steps after this, reload the metadata.
