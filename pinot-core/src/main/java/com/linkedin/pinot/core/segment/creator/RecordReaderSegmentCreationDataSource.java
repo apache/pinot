@@ -19,6 +19,8 @@ package com.linkedin.pinot.core.segment.creator;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.extractors.FieldExtractor;
+import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
+import com.linkedin.pinot.core.data.extractors.PlainFieldExtractor;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.segment.creator.impl.stats.SegmentPreIndexStatsCollectorImpl;
 import org.slf4j.Logger;
@@ -47,9 +49,11 @@ public class RecordReaderSegmentCreationDataSource implements SegmentCreationDat
   private RecordReader _recordReader;
 
   @Override
-  public SegmentPreIndexStatsCollector gatherStats(FieldExtractor fieldExtractor) {
+  public SegmentPreIndexStatsCollector gatherStats(StatsCollectorConfig statsCollectorConfig) {
     try {
-      SegmentPreIndexStatsCollector collector = new SegmentPreIndexStatsCollectorImpl(_recordReader.getSchema());
+      PlainFieldExtractor fieldExtractor = FieldExtractorFactory.getPlainFieldExtractor(statsCollectorConfig.getSchema());
+
+      SegmentPreIndexStatsCollector collector = new SegmentPreIndexStatsCollectorImpl(statsCollectorConfig);
       collector.init();
 
       // Gather the stats

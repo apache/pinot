@@ -15,11 +15,16 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl.stats;
 
-import com.linkedin.pinot.core.segment.creator.ColumnStatistics;
-
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
+import com.linkedin.pinot.core.data.partition.PartitionFunction;
+import com.linkedin.pinot.core.segment.creator.ColumnStatistics;
+import com.linkedin.pinot.core.segment.creator.StatsCollectorConfig;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import java.util.List;
+import org.apache.commons.lang.math.IntRange;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -34,13 +39,20 @@ import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
  */
 
 public abstract class AbstractColumnStatisticsCollector implements ColumnStatistics {
-  protected static final int INITIAL_HASH_SET_SIZE = 1000;
+  private static final Logger LOGGER = LoggerFactory.getLogger(AbstractColumnStatisticsCollector.class);
 
+  protected static final int INITIAL_HASH_SET_SIZE = 1000;
   private Object previousValue = null;
   protected final FieldSpec fieldSpec;
   private boolean isSorted = true;
+
+  private final String column;
   protected int totalNumberOfEntries = 0;
   protected int maxNumberOfMultiValues = 0;
+  private int numInputNullValues = 0;  // Number of rows in which this column was null in the input.
+  private PartitionFunction partitionFunction;
+  private List<IntRange> partitionValues;
+  private boolean columnPartitioned = true;
 
   void updateTotalNumberOfEntries(Object[] entries) {
     totalNumberOfEntries += entries.length;
@@ -50,8 +62,11 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
     return totalNumberOfEntries;
   }
 
-  AbstractColumnStatisticsCollector(FieldSpec spec) {
-    fieldSpec = spec;
+  public AbstractColumnStatisticsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
+    this.column = column;
+    fieldSpec = statsCollectorConfig.getFieldSpecForColumn(column);
+    partitionFunction = statsCollectorConfig.getPartitionFunction(column);
+    partitionValues = statsCollectorConfig.getPartitionValue(column);
     addressNull(previousValue, fieldSpec.getDataType());
     previousValue = null;
   }
@@ -95,7 +110,14 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
    */
   public abstract void collect(Object entry, boolean isAggregated);
 
-  @Override
+  public abstract Object getMinValue();
+
+  public abstract Object getMaxValue();
+
+  public abstract Object getUniqueValuesSet();
+
+  public abstract int getCardinality();
+
   public int getLengthOfLargestElement() {
     return -1;
   }
@@ -119,5 +141,64 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
       }
     }
     return entry;
+  }
+
+  /**
+   * Returns the {@link PartitionFunction} for the column.
+   * @return Partition function for the column.
+   */
+  public PartitionFunction getPartitionFunction() {
+    return partitionFunction;
+  }
+
+  /**
+   * Returns the partition ranges within which the column values exist.
+   *
+   * @return List of ranges for the column values.
+   */
+  public List<IntRange> getPartitionRanges() {
+    return partitionValues;
+  }
+
+  /**
+   * Checks if the given value lies within one of the partition ranges. If the value is not within
+   * any of the partition ranges, partitioning is dropped. The effect of that is:
+   * <ul>
+   *   <li> Subsequent values will not be checked against partition ranges. </li>
+   *   <li> Partition information will not be written out to the metadata for this column. </li>
+   * </ul>
+   *
+   * @param value Column value to check.
+   */
+  protected void checkPartition(Object value) {
+    if (partitionFunction != null) {
+      int partition = partitionFunction.getPartition(value);
+
+      for (IntRange partitionValue : partitionValues) {
+        if (partition >= partitionValue.getMinimumInteger() && partition <= partitionValue.getMaximumInteger()) {
+          return;
+        }
+      }
+
+      LOGGER.warn("Column '{}' not partitioned as specified for value: '{}', dropping partition metadata.", column,
+          value);
+      partitionFunction = null;
+      partitionValues = null;
+      columnPartitioned = false;
+    }
+  }
+
+  /**
+   * Returns true if column was detected to be partitioned as per the specified partitioning scheme,
+   * false otherwise.
+   *
+   * @return True if partitioning failed, false otherwise.
+   */
+  public boolean isColumnPartitioned() {
+    return columnPartitioned;
+  }
+
+  public void setColumnPartitioned(boolean columnPartitioned) {
+    this.columnPartitioned = columnPartitioned;
   }
 }

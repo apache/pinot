@@ -106,10 +106,11 @@ public class FileBasedServerBrokerStarters {
     serverConfiguration.addProperty("pinot.server.instance.segment.metadata.loader.class",
         ColumnarSegmentMetadataLoader.class.getName());
     serverConfiguration.addProperty("pinot.server.query.executor.pruner.class",
-        "ColumnValueSegmentPruner,DataSchemaSegmentPruner,ValidSegmentPruner");
+        "ColumnValueSegmentPruner,DataSchemaSegmentPruner,ValidSegmentPruner,PartitionSegmentPruner");
     serverConfiguration.addProperty("pinot.server.query.executor.pruner.ColumnValueSegmentPruner.id", "0");
     serverConfiguration.addProperty("pinot.server.query.executor.pruner.DataSchemaSegmentPruner.id", "1");
     serverConfiguration.addProperty("pinot.server.query.executor.pruner.ValidSegmentPruner.id", "2");
+    serverConfiguration.addProperty("pinot.server.query.executor.pruner.PartitionSegmentPruner.id", "3");
     serverConfiguration.addProperty("pinot.server.query.executor.class", ServerQueryExecutorV1Impl.class.getName());
     serverConfiguration.addProperty("pinot.server.netty.port", SERVER_PORT);
     serverConfiguration.setDelimiterParsingDisabled(false);

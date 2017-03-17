@@ -82,6 +82,7 @@ public class SegmentGeneratorConfig {
   private char _paddingCharacter = V1Constants.Str.DEFAULT_STRING_PAD_CHAR;
   private HllConfig _hllConfig = null;
   private SegmentNameGenerator _segmentNameGenerator = null;
+  private SegmentPartitionConfig _segmentPartitionConfig = null;
   private int _sequenceId = -1;
 
   public SegmentGeneratorConfig() {
@@ -486,6 +487,14 @@ public class SegmentGeneratorConfig {
   @JsonIgnore
   public String getDimensions() {
     return getQualifyingDimensions(FieldType.DIMENSION);
+  }
+
+  public void setSegmentPartitionConfig(SegmentPartitionConfig segmentPartitionConfig) {
+    _segmentPartitionConfig = segmentPartitionConfig;
+  }
+
+  public SegmentPartitionConfig getSegmentPartitionConfig() {
+    return _segmentPartitionConfig;
   }
 
   /**

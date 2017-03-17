@@ -15,11 +15,10 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl.stats;
 
+import com.linkedin.pinot.core.segment.creator.StatsCollectorConfig;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import java.util.Arrays;
-
-import com.linkedin.pinot.common.data.FieldSpec;
 
 
 public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
@@ -30,8 +29,8 @@ public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCo
   private long[] sortedLongList;
   private boolean sealed = false;
 
-  public LongColumnPreIndexStatsCollector(FieldSpec spec) {
-    super(spec);
+  public LongColumnPreIndexStatsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
+    super(column, statsCollectorConfig);
     rawLongSet = new LongOpenHashSet(INITIAL_HASH_SET_SIZE);
     aggregatedLongSet = new LongOpenHashSet(INITIAL_HASH_SET_SIZE);
   }
@@ -57,6 +56,7 @@ public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCo
     } else {
       long value = ((Number) entry).longValue();
       addressSorted(value);
+      checkPartition(value);
       set.add(value);
       totalNumberOfEntries++;
     }

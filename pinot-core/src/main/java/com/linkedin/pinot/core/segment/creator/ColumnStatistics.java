@@ -15,6 +15,11 @@
  */
 package com.linkedin.pinot.core.segment.creator;
 
+import com.linkedin.pinot.core.data.partition.PartitionFunction;
+import java.util.List;
+import org.apache.commons.lang.math.IntRange;
+
+
 /**
  * An interface to read the column statistics from statistics collectors.
  */
@@ -67,4 +72,8 @@ public interface ColumnStatistics {
      * @return Returns if any of the values have nulls in the segments.
      */
     boolean hasNull();
+
+    PartitionFunction getPartitionFunction();
+
+    List<IntRange> getPartitionRanges();
 }
