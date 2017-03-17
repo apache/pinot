@@ -7,6 +7,7 @@ import com.linkedin.thirdeye.anomaly.alert.util.AnomalyReportGenerator;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+
 import java.util.Arrays;
 import java.util.List;
 
@@ -22,12 +23,14 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 import com.linkedin.thirdeye.client.DAORegistry;
+import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 
 import org.apache.commons.lang3.StringUtils;
+import org.testng.collections.Lists;
 
 @Path("thirdeye/email")
 @Produces(MediaType.APPLICATION_JSON)
@@ -37,11 +40,13 @@ public class EmailResource {
   private final EmailConfigurationManager emailDAO;
   private final AlertConfigManager alertDAO;
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
+  private ThirdEyeConfiguration thirdeyeConfiguration = null;
 
-  public EmailResource() {
+  public EmailResource(ThirdEyeConfiguration thirdeyeConfiguration) {
     this.functionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.emailDAO = DAO_REGISTRY.getEmailConfigurationDAO();
     this.alertDAO = DAO_REGISTRY.getAlertConfigDAO();
+    this.thirdeyeConfiguration = thirdeyeConfiguration;
   }
 
   @POST
@@ -158,8 +163,7 @@ public class EmailResource {
       @QueryParam("subject") String subject,
       @QueryParam("includeSentAnomaliesOnly") boolean includeSentAnomaliesOnly,
       @QueryParam("teHost") String teHost, @QueryParam("smtpHost") String smtpHost,
-      @QueryParam("smtpPort") int smtpPort,
-      @QueryParam("phantomJsPath") String phantomJsPath) {
+      @QueryParam("smtpPort") int smtpPort) {
     if (Strings.isNullOrEmpty(datasets)) {
       throw new WebApplicationException("datasets null or empty : " + datasets);
     }
@@ -179,6 +183,7 @@ public class EmailResource {
     AnomalyReportGenerator anomalyReportGenerator = AnomalyReportGenerator.getInstance();
     List<MergedAnomalyResultDTO> anomalies = anomalyReportGenerator
         .getAnomaliesForDatasets(Arrays.asList(dataSetArr), startTime, endTime);
+    List<MergedAnomalyResultDTO> singleAnomaly = Lists.newArrayList(anomalies.get(0));
     ThirdEyeAnomalyConfiguration configuration = new ThirdEyeAnomalyConfiguration();
     SmtpConfiguration smtpConfiguration = new SmtpConfiguration();
     smtpConfiguration.setSmtpHost(smtpHost);
@@ -186,11 +191,12 @@ public class EmailResource {
 
     configuration.setSmtpConfiguration(smtpConfiguration);
     configuration.setDashboardHost(teHost);
-    configuration.setPhantomJsPath(phantomJsPath);
+    configuration.setPhantomJsPath(thirdeyeConfiguration.getPhantomJsPath());
+    configuration.setRootDir(thirdeyeConfiguration.getRootDir());
     String emailSub = Strings.isNullOrEmpty(subject) ? "Thirdeye Anomaly Report" : subject;
 
     anomalyReportGenerator
-        .buildReport(startTime, endTime, anomalies, emailSub, configuration,
+        .buildReport(startTime, endTime, singleAnomaly, emailSub, configuration,
             includeSentAnomaliesOnly, toAddr, fromAddr, "Thirdeye Anomaly Report", true);
     return Response.ok().build();
   }

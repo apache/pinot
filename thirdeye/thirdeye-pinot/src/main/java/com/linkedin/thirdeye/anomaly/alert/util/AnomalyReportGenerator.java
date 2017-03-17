@@ -31,6 +31,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TimeZone;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.mail.HtmlEmail;
@@ -39,11 +40,8 @@ import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.nio.file.Files;
 
 public class AnomalyReportGenerator {
@@ -52,6 +50,8 @@ public class AnomalyReportGenerator {
 
   private static final AnomalyReportGenerator INSTANCE = new AnomalyReportGenerator();
   private static final String DATE_PATTERN = "MMM dd, hh:mm a";
+  private static final String SINGLE_ANOMALY_EMAIL_TEMPLATE = "single-anomaly-email-template.ftl";
+  private static final String MULTIPLE_ANOMALIES_EMAIL_TEMPLATE = "multiple-anomalies-email-template.ftl";
 
   public static AnomalyReportGenerator getInstance() {
     return INSTANCE;
@@ -147,10 +147,11 @@ public class AnomalyReportGenerator {
             String.format("%.2f", anomaly.getAvgBaselineVal()),
             String.format("%.2f", anomaly.getAvgCurrentVal()),
             getDimensionsString(anomaly.getDimensions()),
-            String.format("%.2f hours (%s to %s)",
+            String.format("%.2f hours (%s to %s) %s",
                 getTimeDiffInHours(anomaly.getStartTime(), anomaly.getEndTime()),
                 getDateString(anomaly.getStartTime(), dateTimeZone),
-                getDateString(anomaly.getEndTime(), dateTimeZone)), // duration
+                getDateString(anomaly.getEndTime(), dateTimeZone),
+                getTimezoneString(dateTimeZone)), // duration
             feedbackVal,
             anomaly.getFunction().getFunctionName(),
             String.format("%+.2f%%", anomaly.getWeight() * 100), // lift
@@ -202,14 +203,14 @@ public class AnomalyReportGenerator {
         isSingleAnomalyEmail = true;
         AnomalyReportDTO singleAnomaly = anomalyReportDTOList.get(0);
         subject = subject + " - " + singleAnomaly.getMetric();
-        imgPath = takeGraphScreenShot(singleAnomaly.getAnomalyId(), configuration);
+        imgPath = EmailScreenshotHelper.takeGraphScreenShot(singleAnomaly.getAnomalyId(), configuration);
+        String cid = "";
         try {
-          String cid = email.embed(new File(imgPath));
-          templateData.put("cid", cid);
+          cid = email.embed(new File(imgPath));
         } catch (Exception e) {
           LOG.error("Exception while embedding screenshot for anomaly {}", singleAnomaly.getAnomalyId(), e);
         }
-
+        templateData.put("cid", cid);
       }
 
       buildEmailTemplateAndSendAlert(templateData, configuration.getSmtpConfiguration(), subject,
@@ -240,9 +241,9 @@ public class AnomalyReportGenerator {
       freemarkerConfig.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);
       Template template = null;
       if (isSingleAnomalyEmail) {
-        template = freemarkerConfig.getTemplate("single-anomaly-email-template.ftl");
+        template = freemarkerConfig.getTemplate(SINGLE_ANOMALY_EMAIL_TEMPLATE);
       } else {
-        template = freemarkerConfig.getTemplate("multiple-anomalies-email-template.ftl");
+        template = freemarkerConfig.getTemplate(MULTIPLE_ANOMALIES_EMAIL_TEMPLATE);
       }
       template.process(paramMap, out);
 
@@ -273,6 +274,11 @@ public class AnomalyReportGenerator {
 
   boolean getLiftDirection(double lift) {
     return lift < 0 ? false : true;
+  }
+
+  String getTimezoneString(DateTimeZone dateTimeZone) {
+    TimeZone tz = TimeZone.getTimeZone(dateTimeZone.getID());
+    return tz.getDisplayName(true, 0);
   }
 
   String getFeedback(String feedbackType) {
@@ -420,36 +426,5 @@ public class AnomalyReportGenerator {
     }
   }
 
-
-  public String takeGraphScreenShot(String anomalyId, ThirdEyeAnomalyConfiguration configuration) {
-    String imgPath = null;
-    try {
-
-      String imgRoute = configuration.getDashboardHost() + "/thirdeye#anomalies?anomaliesSearchMode=id&pageNumber=1&anomalyIds=" + anomalyId;
-      String phantomScript = "src/main/resources/scripts/getGraphPnj.js";
-      imgPath = "/tmp/graph" + anomalyId +".png";
-      Process proc = Runtime.getRuntime().exec(
-                    new String[]{configuration.getPhantomJsPath(), "phantomjs", "--ssl-protocol=any", "--ignore-ssl-errors=true",
-                            phantomScript, imgRoute, imgPath});
-
-      InputStream stderr = proc.getErrorStream();
-      InputStreamReader isr = new InputStreamReader(stderr);
-      BufferedReader br = new BufferedReader(isr);
-      // exhaust the error stream before waiting for the process to exit
-      String line = br.readLine();
-      if (line != null) {
-        do {
-          line = br.readLine();
-        } while (line != null);
-      }
-      int exitVal = proc.waitFor();
-      if (exitVal != 0) {
-        throw new Exception("PhantomJS process failed with error code: " + exitVal);
-      }
-    } catch (Exception e) {
-      LOG.error("Exception with openPageInPhantom", e);
-    }
-    return imgPath;
-  }
 }
 

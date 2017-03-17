@@ -65,7 +65,7 @@ public class ThirdEyeDashboardApplication
     AnomalyFunctionFactory anomalyFunctionFactory = new AnomalyFunctionFactory(config.getFunctionConfigPath());
     AlertFilterFactory alertFilterFactory = new AlertFilterFactory(config.getAlertFilterConfigPath());
     env.jersey().register(new AnomalyResource(anomalyFunctionFactory, alertFilterFactory));
-    env.jersey().register(new EmailResource());
+    env.jersey().register(new EmailResource(config));
     env.jersey().register(new EntityManagerResource());
     env.jersey().register(new IngraphMetricConfigResource());
     env.jersey().register(new MetricConfigResource());
