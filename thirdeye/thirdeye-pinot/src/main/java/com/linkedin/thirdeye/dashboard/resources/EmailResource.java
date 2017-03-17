@@ -191,7 +191,7 @@ public class EmailResource {
 
     anomalyReportGenerator
         .buildReport(startTime, endTime, anomalies, emailSub, configuration,
-            includeSentAnomaliesOnly, toAddr, fromAddr, "UI-Generated", true);
+            includeSentAnomaliesOnly, toAddr, fromAddr, "Thirdeye Anomaly Report", true);
     return Response.ok().build();
   }
 
@@ -235,7 +235,7 @@ public class EmailResource {
     String emailSub = Strings.isNullOrEmpty(subject) ? "Thirdeye Anomaly Report" : subject;
     anomalyReportGenerator
         .buildReport(startTime, endTime, anomalies, emailSub, configuration,
-            includeSentAnomaliesOnly, toAddr, fromAddr, "UI-Generated", true);
+            includeSentAnomaliesOnly, toAddr, fromAddr, "Thirdeye Anomaly Report", true);
     return Response.ok().build();
   }
 }
