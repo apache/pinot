@@ -10,6 +10,10 @@ import java.util.List;
  * Container for a one-dimensional series of elements with a common primitive type.
  * Supports transparent conversion between different primitive types and implements
  * common logic for element management, transformation and aggregation.
+ *
+ * Series are designed to be immutable (albeit with some limitations due to Java's
+ * primitive array model). Operations return new Series instances without modifying
+ * the underlying data structures.
  */
 public abstract class Series {
   public static final String COLUMN_KEY = "key";

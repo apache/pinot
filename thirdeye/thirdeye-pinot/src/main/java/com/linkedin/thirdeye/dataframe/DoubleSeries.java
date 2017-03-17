@@ -7,10 +7,14 @@ import java.util.Comparator;
 import java.util.List;
 
 
+/**
+ * Series container for primitive double.
+ */
 public final class DoubleSeries extends Series {
   public static final double NULL_VALUE = Double.NaN;
 
-  double[] values;
+  // CAUTION: The array is final, but values are inherently modifiable
+  final double[] values;
 
   public static class DoubleBatchSum implements DoubleFunction {
     @Override
@@ -140,11 +144,23 @@ public final class DoubleSeries extends Series {
     return new DoubleSeries(Arrays.copyOf(values, uniqueCount));
   }
 
+  /**
+   * Returns the value of the first element in the series
+   *
+   * @throws IllegalStateException if the series is empty
+   * @return first element in the series
+   */
   public double first() {
     assertNotEmpty(this.values);
     return this.values[0];
   }
 
+  /**
+   * Returns the value of the last element in the series
+   *
+   * @throws IllegalStateException if the series is empty
+   * @return last element in the series
+   */
   public double last() {
     assertNotEmpty(this.values);
     return this.values[this.values.length-1];
@@ -288,6 +304,13 @@ public final class DoubleSeries extends Series {
     return new DoubleBatchSum().apply(this.values);
   }
 
+  /**
+   * Return a copy of the series with all <b>null</b> values replaced by
+   * <b>value</b>.
+   *
+   * @param value replacement value for <b>null</b>
+   * @return series copy without nulls
+   */
   public DoubleSeries fillNull(double value) {
     double[] values = Arrays.copyOf(this.values, this.values.length);
     for(int i=0; i<values.length; i++) {

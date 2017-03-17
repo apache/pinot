@@ -11,10 +11,14 @@ import java.util.Set;
 import org.apache.commons.lang.math.NumberUtils;
 
 
+/**
+ * Series container for String objects.
+ */
 public final class StringSeries extends Series {
   public static final String NULL_VALUE = null;
 
-  String[] values;
+  // CAUTION: The array is final, but values are inherently modifiable
+  final String[] values;
 
   public static class StringBatchConcat implements StringFunction {
     final String delimiter;
@@ -129,15 +133,32 @@ public final class StringSeries extends Series {
     return new StringSeries(uniques.toArray(values));
   }
 
+  /**
+   * Returns the contents of the series wrapped as list.
+   *
+   * @return list of series elements
+   */
   public List<String> toList() {
     return Arrays.asList(this.values);
   }
 
+  /**
+   * Returns the value of the first element in the series
+   *
+   * @throws IllegalStateException if the series is empty
+   * @return first element in the series
+   */
   public String first() {
     assertNotEmpty(this.values);
     return this.values[0];
   }
 
+  /**
+   * Returns the value of the last element in the series
+   *
+   * @throws IllegalStateException if the series is empty
+   * @return last element in the series
+   */
   public String last() {
     assertNotEmpty(this.values);
     return this.values[this.values.length-1];
@@ -236,6 +257,13 @@ public final class StringSeries extends Series {
     return builder.toString();
   }
 
+  /**
+   * Return a copy of the series with all <b>null</b> values replaced by
+   * <b>value</b>.
+   *
+   * @param value replacement value for <b>null</b>
+   * @return series copy without nulls
+   */
   public StringSeries fillNull(String value) {
     String[] values = Arrays.copyOf(this.values, this.values.length);
     for(int i=0; i<values.length; i++) {

@@ -7,10 +7,14 @@ import java.util.Comparator;
 import java.util.List;
 
 
+/**
+ * Series container for primitive long.
+ */
 public final class LongSeries extends Series {
   public static final long NULL_VALUE = Long.MIN_VALUE;
 
-  long[] values;
+  // CAUTION: The array is final, but values are inherently modifiable
+  final long[] values;
 
   public static class LongBatchSum implements LongFunction {
     @Override
@@ -120,11 +124,23 @@ public final class LongSeries extends Series {
     return new LongSeries(Arrays.copyOf(values, uniqueCount));
   }
 
+  /**
+   * Returns the value of the first element in the series
+   *
+   * @throws IllegalStateException if the series is empty
+   * @return first element in the series
+   */
   public long first() {
     assertNotEmpty(this.values);
     return this.values[0];
   }
 
+  /**
+   * Returns the value of the last element in the series
+   *
+   * @throws IllegalStateException if the series is empty
+   * @return last element in the series
+   */
   public long last() {
     assertNotEmpty(this.values);
     return this.values[this.values.length-1];
@@ -335,6 +351,13 @@ public final class LongSeries extends Series {
     return new LongSeries(values);
   }
 
+  /**
+   * Return a copy of the series with all <b>null</b> values replaced by
+   * <b>value</b>.
+   *
+   * @param value replacement value for <b>null</b>
+   * @return series copy without nulls
+   */
   public LongSeries fillNull(long value) {
     long[] values = Arrays.copyOf(this.values, this.values.length);
     for(int i=0; i<values.length; i++) {

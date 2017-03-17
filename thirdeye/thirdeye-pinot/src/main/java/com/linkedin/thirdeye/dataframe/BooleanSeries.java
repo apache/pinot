@@ -5,10 +5,14 @@ import java.util.Arrays;
 import java.util.List;
 
 
+/**
+ * Series container for primitive boolean.
+ */
 public final class BooleanSeries extends Series {
   public static final boolean NULL_VALUE = false;
 
-  boolean[] values;
+  // CAUTION: The array is final, but values are inherently modifiable
+  final boolean[] values;
 
   public static class BooleanBatchAnd implements BooleanFunction {
     @Override
@@ -100,11 +104,23 @@ public final class BooleanSeries extends Series {
     return this.values;
   }
 
+  /**
+   * Returns the value of the first element in the series
+   *
+   * @throws IllegalStateException if the series is empty
+   * @return first element in the series
+   */
   public boolean first() {
     assertNotEmpty(this.values);
     return this.values[0];
   }
 
+  /**
+   * Returns the value of the last element in the series
+   *
+   * @throws IllegalStateException if the series is empty
+   * @return last element in the series
+   */
   public boolean last() {
     assertNotEmpty(this.values);
     return this.values[this.values.length-1];
