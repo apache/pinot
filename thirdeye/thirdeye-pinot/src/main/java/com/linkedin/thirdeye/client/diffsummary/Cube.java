@@ -262,7 +262,7 @@ public class Cube { // the cube (Ca|Cb)
 
     Collections.sort(costSet, Collections.reverseOrder());
     System.out.println("Cost set");
-    for (DimNameValueCostEntry entry : costSet.subList(0, 20)) {
+    for (DimNameValueCostEntry entry : costSet.subList(0, Math.min(costSet.size(), 20))) {
       System.out.println(entry);
     }
 
