@@ -34,7 +34,7 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
 
   // Average number of values in multi-valued columns in any table in this instance.
   // This value is used to allocate initial memory for multi-valued columns in realtime segments in consuming state.
-  private static final String AVERAGE_MV_COUNT = "realtime.avgMultiValueCount";
+  private static final String AVERAGE_MV_COUNT = "realtime.averageMultiValueEntriesPerRow";
   private static final String INSTANCE_SEGMENT_METADATA_LOADER_CLASS = "segment.metadata.loader.class";
   // Key of instance id
   public static final String INSTANCE_ID = "id";
