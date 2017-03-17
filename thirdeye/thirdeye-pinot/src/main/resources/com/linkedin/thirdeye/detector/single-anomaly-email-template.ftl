@@ -22,21 +22,20 @@
       <#if anomalyDetails?has_content>
         <#list anomalyDetails as r>
           <tr>
-            <td style="font-size: 19px; font-weight:600; padding: 24px;">#${r.anomalyId} ${r.metric}</td>
+            <td style="font-size: 19px; font-weight:600; padding: 24px;">${r.metric} (#${r.anomalyId})</td>
             <td style="text-align: right; padding: 24px"><a href="${r.anomalyURL}${r.anomalyId}" target="_blank" style="color: white;font-weight: 600;background-color: #0084bf;font-size: 17px;padding: 0 16px;line-height: 32px;border-radius: 2px;cursor: pointer;display: inline-block;border: 1px solid transparent;text-decoration: none;">Investigate</a></td>
           </tr>
 
           <tr>
             <td style="padding: 24px;" colspan="2">
-              <!-- <div style="height: 100px; width: 100%; background-color: black; color: white">Graph placeholder</div> -->
-              <img style="width: 100%;" src="cid:${cid}"\>
             </td>
-          </tr> 
+          </tr>
           <tr>
             <td style="padding: 24px;" colspan="2">
               <table border="0"  width="100%" align="center" style="width:100%; text-align: center; padding:0; margin:0; border-collapse: collapse; border: 1px solid #CCC">
                 <tr>
-                  <td colspan="33%" style="border: 1px solid #CCC; padding: 14px;font-family: 'Proxima Nova','Arial', 'Helvetica Neue',Helvetica, sans-serif;"><div style="color: #737373;">${r.lift}</div><div style="font-weight:600;">Change</div></td>
+                  <td colspan="33%" style="border: 1px solid #CCC; padding: 14px;font-family: 'Proxima Nova','Arial', 'Helvetica Neue',Helvetica, sans-serif;"><div style="color: #737373;"><span style="color:
+                ${r.positiveLift?string('#398b18','#ee1620')};">${r.lift}</span></div><div style="font-weight:600;">Change</div></td>
                   <td colspan="33%" style="border: 1px solid #CCC; width:33%; padding: 14px;"><div style="color: #737373;">${r.currentVal}</div><div style="font-weight:600;">Current Avg</div></td>
                   <td colspan="33%" style="border: 1px solid #CCC; width:33%; padding: 14px;"><div style="color: #737373;">${r.baselineVal}</div><div style="font-weight:600;">Baseline Avg</div></td>
                 </tr>
