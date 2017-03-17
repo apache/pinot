@@ -16,6 +16,15 @@
           <span style="color: #737373;font-size: 15px;display: inline-block;vertical-align: middle;">THIRDEYE</span>
         </td>
       </tr>
+
+      <tr>
+        <td style="padding: 0 24px;" colspan="2">
+          <p style="font-size: 20px; font-weight: 600;">Hi,</p>
+          <p style="color: #737373; font-size: 14px;">You are receiving this email because you have subscribed to ThirdEye Alert Service for <strong>'${alertConfigName}'</strong>.</p>
+          <p style="color: #737373; font-size: 14px;"> ThirdEye has analyzed your dataset and has detected the anomaly below.</p>
+        </td>
+      </tr>
+
       <tr>
         <td colspan="2" style="border-bottom: 1px solid #CCC"></td>
       </tr>
@@ -28,6 +37,7 @@
 
           <tr>
             <td style="padding: 24px;" colspan="2">
+              <img style="width: 100%;" src="cid:${cid}"\>
             </td>
           </tr>
           <tr>
