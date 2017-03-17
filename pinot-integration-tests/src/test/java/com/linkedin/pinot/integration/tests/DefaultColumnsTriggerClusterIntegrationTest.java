@@ -15,35 +15,59 @@
  */
 package com.linkedin.pinot.integration.tests;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.json.JSONObject;
+import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
 
 
 /**
  * Integration test that extends DefaultColumnsClusterIntegrationTest to test triggering of default columns creation.
  */
 public class DefaultColumnsTriggerClusterIntegrationTest extends DefaultColumnsClusterIntegrationTest {
-  private static final Logger LOGGER = LoggerFactory.getLogger(DefaultColumnsClusterIntegrationTest.class);
+  private static final String SCHEMA_WITH_MISSING_COLUMNS =
+      "On_Time_On_Time_Performance_2014_100k_subset_nonulls_default_column_test_missing_columns.schema";
 
   @BeforeClass
   @Override
   public void setUp()
       throws Exception {
-    LOGGER.info("Set up cluster without new schema.");
     setUp(false);
+    sendSchema("On_Time_On_Time_Performance_2014_100k_subset_nonulls_default_column_test_extra_columns.schema");
+    triggerReload();
+  }
 
-    // Bring table OFFLINE and ONLINE to trigger reloading of the segments.
-    LOGGER.info("Disable the table.");
+  /**
+   * Removed the new added columns and the following existing columns:
+   * <ul>
+   *   <li>"ActualElapsedTime", METRIC, INT</li>
+   *   <li>"AirTime", METRIC, INT</li>
+   *   <li>"AirlineID", DIMENSION, LONG</li>
+   *   <li>"ArrTime", DIMENSION, INT</li>
+   * </ul>
+   */
+  @Test
+  public void testRemoveNewAddedColumns()
+      throws Exception {
+    JSONObject queryResponse = postQuery("SELECT * FROM mytable");
+    Assert.assertEquals(queryResponse.getJSONObject("selectionResults").getJSONArray("columns").length(), 88);
+
+    sendSchema(SCHEMA_WITH_MISSING_COLUMNS);
+    triggerReload();
+    queryResponse = postQuery("SELECT * FROM mytable");
+    Assert.assertEquals(queryResponse.getJSONObject("selectionResults").getJSONArray("columns").length(), 79);
+
+    sendSchema(SCHEMA_WITH_EXTRA_COLUMNS);
+    triggerReload();
+    queryResponse = postQuery("SELECT * FROM mytable");
+    Assert.assertEquals(queryResponse.getJSONObject("selectionResults").getJSONArray("columns").length(), 88);
+  }
+
+  private void triggerReload()
+      throws Exception {
     sendGetRequest(CONTROLLER_BASE_API_URL + "/tables/mytable?type=offline&state=disable");
     Thread.sleep(1000);
-    LOGGER.info("Send the new schema.");
-    sendSchema();
-    Thread.sleep(1000);
-    LOGGER.info("Enable the table to reload the segments.");
     sendGetRequest(CONTROLLER_BASE_API_URL + "/tables/mytable?type=offline&state=enable");
-
-    // Wait for all segments to be ONLINE again.
     waitForSegmentsOnline();
   }
 }

@@ -19,7 +19,6 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import java.io.File;
-import java.io.FileInputStream;
 import java.net.URL;
 import java.util.Collections;
 import java.util.List;
@@ -31,8 +30,6 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -57,8 +54,8 @@ import org.testng.annotations.Test;
  * </ul>
  */
 public class DefaultColumnsClusterIntegrationTest extends BaseClusterIntegrationTest {
-  private static final Logger LOGGER = LoggerFactory.getLogger(DefaultColumnsClusterIntegrationTest.class);
-
+  protected static final String SCHEMA_WITH_EXTRA_COLUMNS =
+      "On_Time_On_Time_Performance_2014_100k_subset_nonulls_default_column_test_extra_columns.schema";
   private static final File TMP_DIR = new File("/tmp/DefaultColumnsClusterIntegrationTest");
   private static final File SEGMENT_DIR = new File("/tmp/DefaultColumnsClusterIntegrationTest/segmentDir");
   private static final File TAR_DIR = new File("/tmp/DefaultColumnsClusterIntegrationTest/tarDir");
@@ -68,7 +65,6 @@ public class DefaultColumnsClusterIntegrationTest extends BaseClusterIntegration
   @BeforeClass
   public void setUp()
       throws Exception {
-    LOGGER.info("Set up cluster with new schema.");
     setUp(true);
   }
 
@@ -91,7 +87,7 @@ public class DefaultColumnsClusterIntegrationTest extends BaseClusterIntegration
 
     // Add the schema.
     if (sendSchema) {
-      sendSchema();
+      sendSchema(SCHEMA_WITH_EXTRA_COLUMNS);
     }
 
     // Unpack the Avro files.
@@ -130,10 +126,9 @@ public class DefaultColumnsClusterIntegrationTest extends BaseClusterIntegration
     configuration.addProperty(CommonConstants.Server.CONFIG_OF_ENABLE_DEFAULT_COLUMNS, true);
   }
 
-  protected void sendSchema()
+  protected void sendSchema(String resourceName)
       throws Exception {
-    URL resource = DefaultColumnsClusterIntegrationTest.class.getClassLoader()
-        .getResource("On_Time_On_Time_Performance_2014_100k_subset_nonulls_extra_columns.schema");
+    URL resource = DefaultColumnsClusterIntegrationTest.class.getClassLoader().getResource(resourceName);
     Assert.assertNotNull(resource);
     File schemaFile = new File(resource.getFile());
     addSchema(schemaFile, "mytable_OFFLINE");
@@ -164,7 +159,6 @@ public class DefaultColumnsClusterIntegrationTest extends BaseClusterIntegration
         query = _queryGenerator.generateQuery();
         pqlQuery = query.generatePql();
       }
-      LOGGER.debug("Running query: {}", pqlQuery);
       runQuery(pqlQuery, query.generateH2Sql());
     }
   }
