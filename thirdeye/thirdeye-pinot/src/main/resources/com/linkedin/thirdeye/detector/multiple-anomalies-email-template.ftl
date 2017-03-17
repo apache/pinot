@@ -19,8 +19,7 @@
         <b>${anomalyCount} ${(anomalyCount == 1)?string("anomaly", "anomalies")}.</b> Below is the full list of anomalies detected during this time period or you can view them <b><a href="${dashboardHost}/thirdeye#anomalies?anomaliesSearchMode=id&anomalyIds=${anomalyIds}">here</a></b></p>
     </td>
   </tr>
-
-  <#if includeSummary?has_content>
+  <#if includeSummary>
   <tr>
     <td style="padding: 0 24px;" colspan="2">
       <div style="padding: 24px; background-color:#edf0f3;">
@@ -78,24 +77,23 @@
             <th style="border:1px solid #CCC; padding:0 8px;">Dimension</th>
             <th style="border:1px solid #CCC; padding:0 8px; width:18%;" colspan="18%">Duration</th>
             <th colspan="20%" style="border:1px solid #CCC; padding:0 8px; width:20%;">Details</th>
-            <#if includeSummary?has_content>
+            <#if includeSummary>
               <th style="border:1px solid #CCC; padding:0 8px;">Status</th>
             </#if>
             <th style="border:1px solid #CCC; padding:0 8px;">Investigate</th>
-            <t
           </tr>
-
           <#list anomalyDetails as r>
             <tr>
               <td style="border:1px solid #CCC; padding:0 8px;">${r.metric}</td>
               <td style="border:1px solid #CCC; padding:0 8px;">${r.dimensions}</td>
               <td style="border:1px solid #CCC; padding:0 8px; width:18%;" colspan="18%">${r.duration}</td>
               <td colspan="20%" style="border:1px solid #CCC; padding:0 8px; width:20%;">
-                <b>Change: </b>${r.lift} <br>
+                <b>Change: </b><span style="color:
+                ${r.positiveLift?string('#398b18','#ee1620')};">${r.lift}</span><br>
                 <b>Current: </b>${r.currentVal} <br>
                 <b>Baseline: </b>${r.baselineVal}
               </td>
-              <#if includeSummary?has_content>
+              <#if includeSummary>
                 <td style="border:1px solid #CCC; padding:0 8px;">${r.feedback}</td>
               </#if>
               <td style="border:1px solid #CCC; padding:0 8px;"><a href="${r.anomalyURL}${r.anomalyId}" target="_blank" style="color: white;font-weight: 600;background-color: #0084bf;font-size: 12px;padding: 0 8px;line-height: 20px;border-radius: 2px;cursor: pointer;display: inline-block;border: 1px solid transparent;text-decoration: none;">Investigate</a></td>
