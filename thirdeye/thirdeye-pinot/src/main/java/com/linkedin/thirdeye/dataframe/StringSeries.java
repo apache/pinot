@@ -65,6 +65,10 @@ public final class StringSeries extends Series {
       return this;
     }
 
+    public Builder add(String... values) {
+      this.values.addAll(Arrays.asList(values));
+      return this;
+    }
 
     public Builder add(Collection<String> values) {
       this.values.addAll(values);
@@ -72,7 +76,7 @@ public final class StringSeries extends Series {
     }
 
     public StringSeries build() {
-      return buildFrom(this.values);
+      return new StringSeries(values.toArray(new String[values.size()]));
     }
   }
 
@@ -85,7 +89,7 @@ public final class StringSeries extends Series {
   }
 
   public static StringSeries buildFrom(Collection<String> values) {
-    return new StringSeries(values.toArray(new String[values.size()]));
+    return builder().add(values).build();
   }
 
   public static StringSeries empty() {

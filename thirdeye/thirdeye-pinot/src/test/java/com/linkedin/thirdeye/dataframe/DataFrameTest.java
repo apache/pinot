@@ -222,6 +222,26 @@ public class DataFrameTest {
   }
 
   @Test
+  public void testDoubleBuilderNull() {
+    Assert.assertEquals(DoubleSeries.builder().add((Double)null).build().values(), new double[] { DoubleSeries.NULL_VALUE });
+  }
+
+  @Test
+  public void testLongBuilderNull() {
+    Assert.assertEquals(LongSeries.builder().add((Long)null).build().values(), new long[] { LongSeries.NULL_VALUE });
+  }
+
+  @Test
+  public void testStringBuilderNull() {
+    Assert.assertEquals(StringSeries.builder().add((String)null).build().values(), new String[] { StringSeries.NULL_VALUE });
+  }
+
+  @Test
+  public void testBooleanBuilderNull() {
+    Assert.assertEquals(BooleanSeries.builder().add((Boolean)null).build().values(), new boolean[] { BooleanSeries.NULL_VALUE });
+  }
+
+  @Test
   public void testDoubleNull() {
     Series s = DataFrame.toSeries(1.0, DoubleSeries.NULL_VALUE, 2.0);
     Assert.assertEquals(s.getDoubles().values(), new double[] { 1.0, DoubleSeries.NULL_VALUE, 2.0 });

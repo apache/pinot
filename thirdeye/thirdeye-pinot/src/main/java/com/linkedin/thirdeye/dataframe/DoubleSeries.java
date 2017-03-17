@@ -71,7 +71,11 @@ public final class DoubleSeries extends Series {
     }
 
     public Builder add(Double value) {
-      this.values.add(value);
+      if(value == null) {
+        this.values.add(NULL_VALUE);
+      } else {
+        this.values.add(value);
+      }
       return this;
     }
 
@@ -80,17 +84,24 @@ public final class DoubleSeries extends Series {
     }
 
     public Builder add(Double... values) {
-      this.values.addAll(Arrays.asList(values));
+      for(Double v : values)
+        this.add(v);
       return this;
     }
 
     public Builder add(Collection<Double> values) {
-      this.values.addAll(values);
+      for(Double v : values)
+        this.add(v);
       return this;
     }
 
     public DoubleSeries build() {
-      return buildFrom(this.values);
+      double[] values = new double[this.values.size()];
+      int i = 0;
+      for(Double v : this.values) {
+        values[i++] = v;
+      }
+      return new DoubleSeries(values);
     }
   }
 
@@ -103,8 +114,7 @@ public final class DoubleSeries extends Series {
   }
 
   public static DoubleSeries buildFrom(Collection<Double> values) {
-    return new DoubleSeries(ArrayUtils.toPrimitive(
-        values.toArray(new Double[values.size()])));
+    return builder().add(values).build();
   }
 
   public static DoubleSeries empty() {

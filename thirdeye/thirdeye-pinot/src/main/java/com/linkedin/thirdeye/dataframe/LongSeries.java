@@ -51,7 +51,11 @@ public final class LongSeries extends Series {
     }
 
     public Builder add(Long value) {
-      this.values.add(value);
+      if(value == null) {
+        this.values.add(NULL_VALUE);
+      } else {
+        this.values.add(value);
+      }
       return this;
     }
 
@@ -60,17 +64,24 @@ public final class LongSeries extends Series {
     }
 
     public Builder add(Long... values) {
-      this.values.addAll(Arrays.asList(values));
+      for(Long v : values)
+        this.add(v);
       return this;
     }
 
     public Builder add(Collection<Long> values) {
-      this.values.addAll(values);
+      for(Long v : values)
+        this.add(v);
       return this;
     }
 
     public LongSeries build() {
-      return buildFrom(this.values);
+      long[] values = new long[this.values.size()];
+      int i = 0;
+      for(Long v : this.values) {
+        values[i++] = v;
+      }
+      return new LongSeries(values);
     }
   }
 
@@ -83,8 +94,7 @@ public final class LongSeries extends Series {
   }
 
   public static LongSeries buildFrom(Collection<Long> values) {
-    return new LongSeries(ArrayUtils.toPrimitive(
-        values.toArray(new Long[values.size()])));
+    return builder().add(values).build();
   }
 
   public static LongSeries empty() {

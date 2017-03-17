@@ -65,7 +65,11 @@ public final class BooleanSeries extends Series {
     }
 
     public Builder add(Boolean value) {
-      this.values.add(value);
+      if(value == null) {
+        this.values.add(NULL_VALUE);
+      } else {
+        this.values.add(value);
+      }
       return this;
     }
 
@@ -74,17 +78,24 @@ public final class BooleanSeries extends Series {
     }
 
     public Builder add(Boolean... values) {
-      this.values.addAll(Arrays.asList(values));
+      for(Boolean v : values)
+        this.add(v);
       return this;
     }
 
     public Builder add(Collection<Boolean> values) {
-      this.values.addAll(values);
+      for(Boolean v : values)
+        this.add(v);
       return this;
     }
 
     public BooleanSeries build() {
-      return buildFrom(this.values);
+      boolean[] values = new boolean[this.values.size()];
+      int i = 0;
+      for(Boolean v : this.values) {
+        values[i++] = v;
+      }
+      return new BooleanSeries(values);
     }
   }
 
@@ -97,8 +108,7 @@ public final class BooleanSeries extends Series {
   }
 
   public static BooleanSeries buildFrom(Collection<Boolean> values) {
-    return new BooleanSeries(ArrayUtils.toPrimitive(
-        values.toArray(new Boolean[values.size()])));
+    return builder().add(values).build();
   }
 
   public static BooleanSeries empty() {
