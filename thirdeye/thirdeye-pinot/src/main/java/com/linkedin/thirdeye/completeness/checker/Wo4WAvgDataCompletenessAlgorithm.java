@@ -31,11 +31,9 @@ public class Wo4WAvgDataCompletenessAlgorithm implements DataCompletenessAlgorit
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final Logger LOG = LoggerFactory.getLogger(Wo4WAvgDataCompletenessAlgorithm.class);
 
-  private DataCompletenessResource dataCompletenessResource = null;
   private DataCompletenessConfigManager dataCompletenessConfigDAO = null;
 
   public Wo4WAvgDataCompletenessAlgorithm() {
-    dataCompletenessResource = new DataCompletenessResource();
     dataCompletenessConfigDAO = DAO_REGISTRY.getDataCompletenessConfigDAO();
   }
 
@@ -109,8 +107,8 @@ public class Wo4WAvgDataCompletenessAlgorithm implements DataCompletenessAlgorit
     input.setAlgorithm(DataCompletenessAlgorithmName.WO4W_AVERAGE);
     input.setBaselineCounts(baselineCounts);
     input.setCurrentCount(currentCount);
-    String jsonString = PercentCompletenessFunctionInput.toJson(input);
-    double percentCompleteness = dataCompletenessResource.getPercentCompleteness(jsonString);
+
+    double percentCompleteness = DataCompletenessUtil.getPercentCompleteness(input);
     return percentCompleteness;
   }
 
