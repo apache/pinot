@@ -1,17 +1,23 @@
 package com.linkedin.thirdeye.dataframe;
 
 import com.udojava.evalex.Expression;
+import java.io.IOException;
+import java.io.Reader;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVRecord;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.math.NumberUtils;
 
@@ -100,28 +106,28 @@ public class DataFrame {
     return new LongSeries(values);
   }
 
-  public static BooleanSeries toSeries(boolean... values) {
-    return new BooleanSeries(values);
-  }
-
   public static StringSeries toSeries(String... values) {
     return new StringSeries(values);
   }
 
-  public static DoubleSeries toSeriesFromDouble(Collection<Double> values) {
-    return DataFrame.toSeries(ArrayUtils.toPrimitive(values.toArray(new Double[values.size()])));
+  public static BooleanSeries toSeries(boolean... values) {
+    return new BooleanSeries(values);
   }
 
-  public static LongSeries toSeriesFromLong(Collection<Long> values) {
-    return DataFrame.toSeries(ArrayUtils.toPrimitive(values.toArray(new Long[values.size()])));
+  public static DoubleSeries.Builder buildDoubles() {
+    return DoubleSeries.builder();
   }
 
-  public static StringSeries toSeriesFromString(Collection<String> values) {
-    return DataFrame.toSeries(values.toArray(new String[values.size()]));
+  public static LongSeries.Builder buildLongs() {
+    return LongSeries.builder();
   }
 
-  public static BooleanSeries toSeriesFromBoolean(Collection<Boolean> values) {
-    return DataFrame.toSeries(ArrayUtils.toPrimitive(values.toArray(new Boolean[values.size()])));
+  public static StringSeries.Builder buildStrings() {
+    return StringSeries.builder();
+  }
+
+  public static BooleanSeries.Builder buildBooleans() {
+    return BooleanSeries.builder();
   }
 
   public DataFrame(int defaultIndexSize) {
@@ -170,12 +176,12 @@ public class DataFrame {
     return df;
   }
 
-  public DataFrame addSeries(String seriesName, Series s) {
+  public DataFrame addSeries(String seriesName, Series series) {
     if(seriesName == null || !SERIES_NAME_PATTERN.matcher(seriesName).matches())
       throw new IllegalArgumentException(String.format("Series name must match pattern '%s'", SERIES_NAME_PATTERN));
-    if(!this.series.isEmpty() && s.size() != this.size())
+    if(!this.series.isEmpty() && series.size() != this.size())
       throw new IllegalArgumentException("DataFrame index and series must be of same length");
-    this.series.put(seriesName, s);
+    this.series.put(seriesName, series);
     return this;
   }
 
@@ -718,4 +724,36 @@ public class DataFrame {
     return variables;
   }
 
+  public static DataFrame fromCsv(Reader in) throws IOException {
+    Iterator<CSVRecord> it = CSVFormat.RFC4180.withFirstRecordAsHeader().parse(in).iterator();
+    if(!it.hasNext())
+      return new DataFrame();
+
+    CSVRecord first = it.next();
+    Set<String> headers = first.toMap().keySet();
+
+    Map<String, StringSeries.Builder> builders = new HashMap<>();
+    for(String h : headers) {
+      StringSeries.Builder builder = StringSeries.builder();
+      builder.add(first.get(h));
+      builders.put(h, builder);
+    }
+
+    while(it.hasNext()) {
+      CSVRecord record = it.next();
+      for(String key : headers) {
+        String value = record.get(key);
+        builders.get(key).add(value);
+      }
+    }
+
+    DataFrame df = new DataFrame();
+    for(Map.Entry<String, StringSeries.Builder> e : builders.entrySet()) {
+      StringSeries s = e.getValue().build();
+      Series conv = s.toType(s.inferType());
+      df.addSeries(e.getKey(), conv);
+    }
+
+    return df;
+  }
 }

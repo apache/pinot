@@ -2,9 +2,11 @@ package com.linkedin.thirdeye.dataframe;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import org.apache.commons.lang.ArrayUtils;
 
 
 /**
@@ -54,6 +56,59 @@ public final class DoubleSeries extends Series {
         return NULL_VALUE;
       return values[values.length - 1];
     }
+  }
+
+  public static class Builder {
+    final List<Double> values = new ArrayList<>();
+
+    private Builder() {
+      // left blank
+    }
+
+    public Builder add(double value) {
+      this.values.add(value);
+      return this;
+    }
+
+    public Builder add(Double value) {
+      this.values.add(value);
+      return this;
+    }
+
+    public Builder add(double... values) {
+      return this.add(ArrayUtils.toObject(values));
+    }
+
+    public Builder add(Double... values) {
+      this.values.addAll(Arrays.asList(values));
+      return this;
+    }
+
+    public Builder add(Collection<Double> values) {
+      this.values.addAll(values);
+      return this;
+    }
+
+    public DoubleSeries build() {
+      return buildFrom(this.values);
+    }
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static DoubleSeries buildFrom(double... values) {
+    return new DoubleSeries(values);
+  }
+
+  public static DoubleSeries buildFrom(Collection<Double> values) {
+    return new DoubleSeries(ArrayUtils.toPrimitive(
+        values.toArray(new Double[values.size()])));
+  }
+
+  public static DoubleSeries empty() {
+    return new DoubleSeries();
   }
 
   DoubleSeries(double... values) {

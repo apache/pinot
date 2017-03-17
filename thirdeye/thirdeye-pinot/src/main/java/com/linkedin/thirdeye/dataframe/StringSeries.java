@@ -2,12 +2,14 @@ package com.linkedin.thirdeye.dataframe;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.math.NumberUtils;
 
 
@@ -51,7 +53,46 @@ public final class StringSeries extends Series {
     }
   }
 
-  public StringSeries(String... values) {
+  public static class Builder {
+    final List<String> values = new ArrayList<>();
+
+    private Builder() {
+      // left blank
+    }
+
+    public Builder add(String value) {
+      this.values.add(value);
+      return this;
+    }
+
+
+    public Builder add(Collection<String> values) {
+      this.values.addAll(values);
+      return this;
+    }
+
+    public StringSeries build() {
+      return buildFrom(this.values);
+    }
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static StringSeries buildFrom(String... values) {
+    return new StringSeries(values);
+  }
+
+  public static StringSeries buildFrom(Collection<String> values) {
+    return new StringSeries(values.toArray(new String[values.size()]));
+  }
+
+  public static StringSeries empty() {
+    return new StringSeries();
+  }
+
+  StringSeries(String... values) {
     this.values = values;
   }
 
@@ -59,10 +100,11 @@ public final class StringSeries extends Series {
   public DoubleSeries getDoubles() {
     double[] values = new double[this.size()];
     for(int i=0; i<values.length; i++) {
-      if(StringSeries.isNull(this.values[i])) {
+      String value = this.values[i];
+      if(StringSeries.isNull(value) || value.length() <= 0) {
         values[i] = DoubleSeries.NULL_VALUE;
       } else {
-        values[i] = Double.parseDouble(this.values[i]);
+        values[i] = Double.parseDouble(value);
       }
     }
     return new DoubleSeries(values);
@@ -72,13 +114,14 @@ public final class StringSeries extends Series {
   public LongSeries getLongs() {
     long[] values = new long[this.size()];
     for(int i=0; i<values.length; i++) {
-      if(StringSeries.isNull(this.values[i])) {
+      String value = this.values[i];
+      if(StringSeries.isNull(value) || value.length() <= 0) {
         values[i] = LongSeries.NULL_VALUE;
       } else {
         try {
-          values[i] = Long.parseLong(this.values[i]);
+          values[i] = Long.parseLong(value);
         } catch (NumberFormatException e) {
-          values[i] = (long) Double.parseDouble(this.values[i]);
+          values[i] = (long) Double.parseDouble(value);
         }
       }
     }
@@ -89,13 +132,14 @@ public final class StringSeries extends Series {
   public BooleanSeries getBooleans() {
     boolean[] values = new boolean[this.size()];
     for(int i=0; i<values.length; i++) {
-      if(StringSeries.isNull(this.values[i])) {
+      String value = this.values[i];
+      if(StringSeries.isNull(value) || value.length() <= 0) {
         values[i] = BooleanSeries.NULL_VALUE;
       } else {
-        if(NumberUtils.isNumber(this.values[i])) {
-          values[i] = Double.parseDouble(this.values[i]) != 0.0d;
+        if(NumberUtils.isNumber(value)) {
+          values[i] = Double.parseDouble(value) != 0.0d;
         } else {
-          values[i] = Boolean.parseBoolean(this.values[i]);
+          values[i] = Boolean.parseBoolean(value);
         }
       }
     }
@@ -140,6 +184,35 @@ public final class StringSeries extends Series {
    */
   public List<String> toList() {
     return Arrays.asList(this.values);
+  }
+
+  /**
+   * Attempts to infer a tighter native series type based on pattern matching
+   * against individual values in the series.
+   *
+   * @return inferred series type
+   */
+  public SeriesType inferType() {
+    if(this.isEmpty())
+      return SeriesType.STRING;
+
+    boolean isBoolean = true;
+    boolean isLong = true;
+    boolean isDouble = true;
+
+    for(String s : this.values) {
+      isBoolean &= (s == null) || (s.length() <= 0) || (s.compareToIgnoreCase("true") == 0 || s.compareToIgnoreCase("false") == 0);
+      isLong &= (s == null) || (s.length() <= 0) || (NumberUtils.isNumber(s) && !s.contains(".") && !s.contains("e"));
+      isDouble &= (s == null) || (s.length() <= 0) || NumberUtils.isNumber(s);
+    }
+
+    if(isBoolean)
+      return SeriesType.BOOLEAN;
+    if(isLong)
+      return SeriesType.LONG;
+    if(isDouble)
+      return SeriesType.DOUBLE;
+    return SeriesType.STRING;
   }
 
   /**

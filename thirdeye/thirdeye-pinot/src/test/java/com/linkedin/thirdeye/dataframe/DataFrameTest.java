@@ -182,6 +182,12 @@ public class DataFrameTest {
   }
 
   @Test
+  public void testStringToDoubleNulls() {
+    Series s = DataFrame.toSeries("", null, "-2.1e1");
+    Assert.assertEquals(s.getDoubles().values(), new double[] { DoubleSeries.NULL_VALUE, DoubleSeries.NULL_VALUE, -21.0d });
+  }
+
+  @Test
   public void testStringToLong() {
     // NOTE: transparent conversion via double
     Series s = DataFrame.toSeries(VALUES_STRING);
@@ -189,10 +195,24 @@ public class DataFrameTest {
   }
 
   @Test
+  public void testStringToLongNulls() {
+    // NOTE: transparent conversion via double
+    Series s = DataFrame.toSeries("", null, "-1.0");
+    Assert.assertEquals(s.getLongs().values(), new long[] { LongSeries.NULL_VALUE, LongSeries.NULL_VALUE, -1 });
+  }
+
+  @Test
   public void testStringToBoolean() {
     // NOTE: transparent conversion via double
     Series s = DataFrame.toSeries(VALUES_STRING);
     Assert.assertEquals(s.getBooleans().values(), new boolean[] { true, true, false, true, true });
+  }
+
+  @Test
+  public void testStringToBooleanNulls() {
+    // NOTE: transparent conversion via double
+    Series s = DataFrame.toSeries("", null, "true");
+    Assert.assertEquals(s.getBooleans().values(), new boolean[] { false, false, true });
   }
 
   @Test
@@ -1266,6 +1286,36 @@ public class DataFrameTest {
     BooleanSeries s4 = DataFrame.toSeries(true, false);
     Assert.assertFalse(s4.allFalse());
     Assert.assertFalse(s4.allTrue());
+  }
+
+  @Test
+  public void testStringInferSeriesTypeDoubleDot() {
+    Series.SeriesType t = StringSeries.buildFrom("1", "2", "3.", "", null).inferType();
+    Assert.assertEquals(t, Series.SeriesType.DOUBLE);
+  }
+
+  @Test
+  public void testStringInferSeriesTypeDoubleExp() {
+    Series.SeriesType t = StringSeries.buildFrom("1", "2e1", "3", "", null).inferType();
+    Assert.assertEquals(t, Series.SeriesType.DOUBLE);
+  }
+
+  @Test
+  public void testStringInferSeriesTypeLong() {
+    Series.SeriesType t = StringSeries.buildFrom("2", "-4", "-0", "", null).inferType();
+    Assert.assertEquals(t, Series.SeriesType.LONG);
+  }
+
+  @Test
+  public void testStringInferSeriesTypeBoolean() {
+    Series.SeriesType t = StringSeries.buildFrom("true", "False", "false", "", null).inferType();
+    Assert.assertEquals(t, Series.SeriesType.BOOLEAN);
+  }
+
+  @Test
+  public void testStringInferSeriesTypeString() {
+    Series.SeriesType t = StringSeries.buildFrom("true", "", "-0.2e1", null).inferType();
+    Assert.assertEquals(t, Series.SeriesType.STRING);
   }
 
   static void assertEqualsDoubles(double[] actual, double[] expected) {

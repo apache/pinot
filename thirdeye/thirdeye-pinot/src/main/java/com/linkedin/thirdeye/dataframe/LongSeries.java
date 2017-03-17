@@ -2,9 +2,11 @@ package com.linkedin.thirdeye.dataframe;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import org.apache.commons.lang.ArrayUtils;
 
 
 /**
@@ -34,6 +36,59 @@ public final class LongSeries extends Series {
         return NULL_VALUE;
       return values[values.length - 1];
     }
+  }
+
+  public static class Builder {
+    final List<Long> values = new ArrayList<>();
+
+    private Builder() {
+      // left blank
+    }
+
+    public Builder add(long value) {
+      this.values.add(value);
+      return this;
+    }
+
+    public Builder add(Long value) {
+      this.values.add(value);
+      return this;
+    }
+
+    public Builder add(long... values) {
+      return this.add(ArrayUtils.toObject(values));
+    }
+
+    public Builder add(Long... values) {
+      this.values.addAll(Arrays.asList(values));
+      return this;
+    }
+
+    public Builder add(Collection<Long> values) {
+      this.values.addAll(values);
+      return this;
+    }
+
+    public LongSeries build() {
+      return buildFrom(this.values);
+    }
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static LongSeries buildFrom(long... values) {
+    return new LongSeries(values);
+  }
+
+  public static LongSeries buildFrom(Collection<Long> values) {
+    return new LongSeries(ArrayUtils.toPrimitive(
+        values.toArray(new Long[values.size()])));
+  }
+
+  public static LongSeries empty() {
+    return new LongSeries();
   }
 
   LongSeries(long... values) {

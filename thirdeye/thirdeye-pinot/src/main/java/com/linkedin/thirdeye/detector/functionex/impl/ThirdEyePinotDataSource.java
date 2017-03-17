@@ -90,7 +90,7 @@ public class ThirdEyePinotDataSource implements AnomalyFunctionExDataSource<Stri
   static Series makeSelectionSeries(ResultSet resultSet, int colIndex) {
     int rowCount = resultSet.getRowCount();
     if(rowCount <= 0)
-      return new StringSeries(new String[0]);
+      return StringSeries.empty();
 
     //DataFrame.SeriesType type = inferType(resultSet.getString(0, colIndex));
 
@@ -105,7 +105,7 @@ public class ThirdEyePinotDataSource implements AnomalyFunctionExDataSource<Stri
   static Series makeGroupByValueSeries(ResultSet resultSet) {
     int rowCount = resultSet.getRowCount();
     if(rowCount <= 0)
-      return new StringSeries(new String[0]);
+      return StringSeries.empty();
 
     String[] values = new String[rowCount];
     for(int i=0; i<rowCount; i++) {
@@ -118,7 +118,7 @@ public class ThirdEyePinotDataSource implements AnomalyFunctionExDataSource<Stri
   static Series makeGroupByGroupSeries(ResultSet resultSet, int keyIndex) {
     int rowCount = resultSet.getRowCount();
     if(rowCount <= 0)
-      return new StringSeries(new String[0]);
+      return StringSeries.empty();
 
     String[] values = new String[rowCount];
     for(int i=0; i<rowCount; i++) {

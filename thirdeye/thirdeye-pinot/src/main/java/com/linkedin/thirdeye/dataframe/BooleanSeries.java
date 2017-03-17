@@ -2,7 +2,10 @@ package com.linkedin.thirdeye.dataframe;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
+import org.apache.commons.cli.BasicParser;
+import org.apache.commons.lang.ArrayUtils;
 
 
 /**
@@ -47,6 +50,59 @@ public final class BooleanSeries extends Series {
         return NULL_VALUE;
       return values[values.length-1];
     }
+  }
+
+  public static class Builder {
+    final List<Boolean> values = new ArrayList<>();
+
+    private Builder() {
+      // left blank
+    }
+
+    public Builder add(boolean value) {
+      this.values.add(value);
+      return this;
+    }
+
+    public Builder add(Boolean value) {
+      this.values.add(value);
+      return this;
+    }
+
+    public Builder add(boolean... values) {
+      return this.add(ArrayUtils.toObject(values));
+    }
+
+    public Builder add(Boolean... values) {
+      this.values.addAll(Arrays.asList(values));
+      return this;
+    }
+
+    public Builder add(Collection<Boolean> values) {
+      this.values.addAll(values);
+      return this;
+    }
+
+    public BooleanSeries build() {
+      return buildFrom(this.values);
+    }
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static BooleanSeries buildFrom(boolean... values) {
+    return new BooleanSeries(values);
+  }
+
+  public static BooleanSeries buildFrom(Collection<Boolean> values) {
+    return new BooleanSeries(ArrayUtils.toPrimitive(
+        values.toArray(new Boolean[values.size()])));
+  }
+
+  public static BooleanSeries empty() {
+    return new BooleanSeries();
   }
 
   BooleanSeries(boolean... values) {
@@ -243,13 +299,13 @@ public final class BooleanSeries extends Series {
     boolean hasTrue = this.hasTrue();
     boolean hasFalse = this.hasFalse();
 
-    List<Boolean> values = new ArrayList<>();
+    if(hasFalse && hasTrue)
+      return new BooleanSeries(false, true);
     if(hasFalse)
-      values.add(false);
+      return new BooleanSeries(false);
     if(hasTrue)
-      values.add(true);
-
-    return DataFrame.toSeriesFromBoolean(values);
+      return new BooleanSeries(true);
+    return new BooleanSeries();
   }
 
   @Override
