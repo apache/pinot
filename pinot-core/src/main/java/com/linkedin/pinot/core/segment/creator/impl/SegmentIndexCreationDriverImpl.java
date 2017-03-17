@@ -28,7 +28,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang.mutable.MutableLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.google.common.collect.HashBiMap;
@@ -43,7 +42,6 @@ import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.data.readers.RecordReaderFactory;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector;
 import com.linkedin.pinot.core.segment.creator.ColumnIndexCreationInfo;
 import com.linkedin.pinot.core.segment.creator.ColumnStatistics;
 import com.linkedin.pinot.core.segment.creator.ForwardIndexType;
@@ -442,14 +440,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
     // Persist creation metadata to disk
     persistCreationMeta(segmentOutputDir, crc);
-    Map<String, MutableLong> nullCountMap = recordReader.getNullCountMap();
-    if (nullCountMap != null) {
-      for (Map.Entry<String, MutableLong> entry : nullCountMap.entrySet()) {
-        AbstractColumnStatisticsCollector columnStatisticsCollector =
-            segmentStats.getColumnProfileFor(entry.getKey());
-        columnStatisticsCollector.setNumInputNullValues(entry.getValue().intValue());
-      }
-    }
 
     convertFormatIfNeeded(segmentOutputDir);
     LOGGER.info("Driver, record read time : {}", totalRecordReadTime);

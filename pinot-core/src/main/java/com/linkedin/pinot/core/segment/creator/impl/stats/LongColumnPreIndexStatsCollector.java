@@ -20,21 +20,14 @@ import it.unimi.dsi.fastutil.longs.LongSet;
 import java.util.Arrays;
 
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector;
 
-
-/**
- * Nov 7, 2014
- */
 
 public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
-
   private Long min = null;
   private Long max = null;
   private final LongSet rawLongSet;
   private final LongSet aggregatedLongSet;
   private long[] sortedLongList;
-  private boolean hasNull = false;
   private boolean sealed = false;
 
   public LongColumnPreIndexStatsCollector(FieldSpec spec) {
@@ -53,7 +46,6 @@ public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCo
    * @param set
    */
   private void collectEntry(Object entry, LongSet set) {
-
     if (entry instanceof Object[]) {
       for (final Object e : (Object[]) entry) {
         set.add(((Number) e).longValue());
@@ -94,35 +86,35 @@ public class LongColumnPreIndexStatsCollector extends AbstractColumnStatisticsCo
   }
 
   @Override
-  public Long getMinValue() throws Exception {
+  public Long getMinValue() {
     if (sealed) {
       return min;
     }
-    throw new IllegalAccessException("you must seal the collector first before asking for min value");
+    throw new IllegalStateException("you must seal the collector first before asking for min value");
   }
 
   @Override
-  public Long getMaxValue() throws Exception {
+  public Long getMaxValue() {
     if (sealed) {
       return max;
     }
-    throw new IllegalAccessException("you must seal the collector first before asking for min value");
+    throw new IllegalStateException("you must seal the collector first before asking for min value");
   }
 
   @Override
-  public Object getUniqueValuesSet() throws Exception {
+  public Object getUniqueValuesSet() {
     if (sealed) {
       return sortedLongList;
     }
-    throw new IllegalAccessException("you must seal the collector first before asking for min value");
+    throw new IllegalStateException("you must seal the collector first before asking for min value");
   }
 
   @Override
-  public int getCardinality() throws Exception {
+  public int getCardinality() {
     if (sealed) {
       return sortedLongList.length;
     }
-    throw new IllegalAccessException("you must seal the collector first before asking for min value");
+    throw new IllegalStateException("you must seal the collector first before asking for min value");
   }
 
   @Override

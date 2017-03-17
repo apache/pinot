@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.segment.creator;
+package com.linkedin.pinot.core.segment.creator.impl.stats;
 
-import org.apache.avro.util.Utf8;
+import com.linkedin.pinot.core.segment.creator.ColumnStatistics;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.DataType;
@@ -23,9 +23,6 @@ import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 
 
 /**
- *
- * Nov 7, 2014
- *
  * This class in initialized per column and all the data is
  * sent to it before actual indexes are created
  * the job of this class is to collect
@@ -34,22 +31,18 @@ import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
  * compute min
  * compute max
  * see if column isSorted
- *
  */
 
-public abstract class AbstractColumnStatisticsCollector implements  ColumnStatistics {
+public abstract class AbstractColumnStatisticsCollector implements ColumnStatistics {
   protected static final int INITIAL_HASH_SET_SIZE = 1000;
 
   private Object previousValue = null;
   protected final FieldSpec fieldSpec;
   private boolean isSorted = true;
-  private int prevBiggerThanNextCount = 0;
-  private int numberOfChanges = 0;
   protected int totalNumberOfEntries = 0;
   protected int maxNumberOfMultiValues = 0;
-  private int numInputNullValues = 0;  // Number of rows in which this column was null in the input.
 
-  public void updateTotalNumberOfEntries(Object[] entries) {
+  void updateTotalNumberOfEntries(Object[] entries) {
     totalNumberOfEntries += entries.length;
   }
 
@@ -57,7 +50,7 @@ public abstract class AbstractColumnStatisticsCollector implements  ColumnStatis
     return totalNumberOfEntries;
   }
 
-  public AbstractColumnStatisticsCollector(FieldSpec spec) {
+  AbstractColumnStatisticsCollector(FieldSpec spec) {
     fieldSpec = spec;
     addressNull(previousValue, fieldSpec.getDataType());
     previousValue = null;
@@ -67,16 +60,9 @@ public abstract class AbstractColumnStatisticsCollector implements  ColumnStatis
     return maxNumberOfMultiValues;
   }
 
-  public void addressSorted(Object entry) {
+  void addressSorted(Object entry) {
     if (isSorted) {
       if (previousValue != null) {
-        if (((Comparable) entry).compareTo(previousValue) != 0) {
-          numberOfChanges++;
-        }
-        if (((Comparable) entry).compareTo(previousValue) < 0) {
-          prevBiggerThanNextCount++;
-        }
-
         if (!entry.equals(previousValue) && previousValue != null) {
           final Comparable prevValue = (Comparable) previousValue;
           final Comparable origin = (Comparable) entry;
@@ -89,16 +75,9 @@ public abstract class AbstractColumnStatisticsCollector implements  ColumnStatis
     }
   }
 
+  @Override
   public boolean isSorted() {
     return fieldSpec.isSingleValueField() && isSorted;
-  }
-
-  public int getNumInputNullValues() {
-    return numInputNullValues;
-  }
-
-  public void setNumInputNullValues(int numInputNullValues) {
-    this.numInputNullValues = numInputNullValues;
   }
 
   /**
@@ -116,23 +95,14 @@ public abstract class AbstractColumnStatisticsCollector implements  ColumnStatis
    */
   public abstract void collect(Object entry, boolean isAggregated);
 
-  public abstract Object getMinValue() throws Exception;
-
-  public abstract Object getMaxValue() throws Exception;
-
-  public abstract Object getUniqueValuesSet() throws Exception;
-
-  public abstract int getCardinality() throws Exception;
-
-  public int getLengthOfLargestElement() throws Exception {
+  @Override
+  public int getLengthOfLargestElement() {
     return -1;
   }
 
-  public abstract boolean hasNull();
-
   public abstract void seal();
 
-  public Object addressNull(Object entry, DataType e) {
+  Object addressNull(Object entry, DataType e) {
     if (entry == null) {
       if (e == DataType.STRING) {
         entry = V1Constants.Str.NULL_STRING;

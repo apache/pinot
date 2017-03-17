@@ -24,7 +24,7 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector;
+import com.linkedin.pinot.core.segment.creator.ColumnStatistics;
 import com.linkedin.pinot.core.segment.creator.SegmentPreIndexStatsCollector;
 
 
@@ -44,7 +44,7 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
 
   @Override
   public void init() {
-    columnStatsCollectorMap = new HashMap<String, AbstractColumnStatisticsCollector>();
+    columnStatsCollectorMap = new HashMap<>();
 
     for (final FieldSpec spec : dataSchema.getAllFieldSpecs()) {
       switch (spec.getDataType()) {
@@ -71,14 +71,14 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
   }
 
   @Override
-  public void build() throws Exception {
+  public void build() {
     for (final String column : columnStatsCollectorMap.keySet()) {
       columnStatsCollectorMap.get(column).seal();
     }
   }
 
   @Override
-  public AbstractColumnStatisticsCollector getColumnProfileFor(String column) throws Exception {
+  public ColumnStatistics getColumnProfileFor(String column) {
     return columnStatsCollectorMap.get(column);
   }
 
@@ -124,15 +124,6 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
   @Override
   public int getTotalDocCount() {
     return totalDocCount;
-  }
-
-  public static <T> T convertInstanceOfObject(Object o, Class<T> clazz) {
-    try {
-      return clazz.cast(o);
-    } catch (final ClassCastException e) {
-      LOGGER.warn("Caught exception while converting instance", e);
-      return null;
-    }
   }
 
   @Override

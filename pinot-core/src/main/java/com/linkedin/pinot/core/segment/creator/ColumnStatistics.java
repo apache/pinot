@@ -17,50 +17,43 @@ package com.linkedin.pinot.core.segment.creator;
 
 /**
  * An interface to read the column statistics from statistics collectors.
- *
  */
 public interface ColumnStatistics {
     /**
      * @return Minimum value of the column
-     * @throws Exception
      */
-    Object getMinValue() throws Exception;
+    Object getMinValue();
 
     /**
      * @return Maximum value of the column
-     * @throws Exception
      */
-    Object getMaxValue() throws Exception;
+    Object getMaxValue();
 
     /**
      *
      * @return An array of elements that has the unique values for this column, sorted order.
-     * @throws Exception
      */
-    Object getUniqueValuesSet() throws Exception;
+    Object getUniqueValuesSet();
 
     /**
      *
      * @return The number of unique values of this column.
-     * @throws Exception
      */
-    int getCardinality() throws Exception;
+    int getCardinality();
 
     /**
      *
      * @return For string objects, returns the length of the longest string value. For others, returns -1.
-     * @throws Exception
      */
-    int getLengthOfLargestElement() throws Exception;
+    int getLengthOfLargestElement();
 
     /**
-     *
-     * @return The number of null values in the input for this column.
+     * Whether or not the data in this column is in ascending order.
+     * @return true if the data is in ascending order.
      */
-    int getNumInputNullValues();
+    boolean isSorted();
 
     /**
-     *
      * @return total number of entries
      */
     int getTotalNumberOfEntries();
@@ -71,7 +64,6 @@ public interface ColumnStatistics {
     int getMaxNumberOfMultiValues();
 
     /**
-     * @note
      * @return Returns if any of the values have nulls in the segments.
      */
     boolean hasNull();

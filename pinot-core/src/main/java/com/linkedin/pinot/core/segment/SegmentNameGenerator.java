@@ -15,12 +15,12 @@
  */
 package com.linkedin.pinot.core.segment;
 
-import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector;
+import com.linkedin.pinot.core.segment.creator.ColumnStatistics;
 
 
 /**
  * An interface that allows generates names for segments depending on the naming scheme.
  */
 public interface SegmentNameGenerator {
-  public String getSegmentName(AbstractColumnStatisticsCollector timeColStatsCollector) throws Exception;
+  String getSegmentName(ColumnStatistics timeColStatsCollector) throws Exception;
 }

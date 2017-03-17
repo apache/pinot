@@ -16,7 +16,7 @@
 package com.linkedin.pinot.core.segment;
 
 import com.linkedin.pinot.common.utils.StringUtil;
-import com.linkedin.pinot.core.segment.creator.AbstractColumnStatisticsCollector;
+import com.linkedin.pinot.core.segment.creator.ColumnStatistics;
 
 
 public class DefaultSegmentNameGenerator implements SegmentNameGenerator {
@@ -77,7 +77,7 @@ public class DefaultSegmentNameGenerator implements SegmentNameGenerator {
    * @throws Exception
    */
   @Override
-  public String getSegmentName(AbstractColumnStatisticsCollector statsCollector) throws Exception {
+  public String getSegmentName(ColumnStatistics statsCollector) throws Exception {
     if (_segmentName != null) {
       return _segmentName;
     }
