@@ -4,9 +4,6 @@ import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 
-import jersey.repackaged.com.google.common.base.Joiner;
-import jersey.repackaged.com.google.common.collect.Lists;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -22,17 +19,12 @@ public class EmailScreenshotHelper {
 
       String imgRoute = configuration.getDashboardHost() + "/thirdeye#anomalies?anomaliesSearchMode=id&pageNumber=1&anomalyIds=" + anomalyId;
       String phantomScript = configuration.getRootDir() + "/getGraphPnj.js";
-      System.out.println("Phantom Script : " + phantomScript);
-
+      LOG.info("Phantom JS script {}", phantomScript);
       imgPath = "/tmp/graph" + anomalyId +".png";
-      String[] cmdarray = new String[]{configuration.getPhantomJsPath(), "phantomjs", "--ssl-protocol=any", "--ignore-ssl-errors=true",
-              phantomScript, imgRoute, imgPath};
-      System.out.println(Joiner.on(" ").join(Lists.newArrayList(cmdarray)));
-      Process proc = Runtime.getRuntime().exec(
-                    cmdarray);
+      Process proc = Runtime.getRuntime().exec(new String[]{configuration.getPhantomJsPath(), "phantomjs", "--ssl-protocol=any", "--ignore-ssl-errors=true",
+          phantomScript, imgRoute, imgPath});
 
       InputStream stderr = proc.getErrorStream();
-      InputStreamReader stderrReader = new InputStreamReader(stderr);
       InputStreamReader isr = new InputStreamReader(stderr);
       BufferedReader br = new BufferedReader(isr);
       // exhaust the error stream before waiting for the process to exit
