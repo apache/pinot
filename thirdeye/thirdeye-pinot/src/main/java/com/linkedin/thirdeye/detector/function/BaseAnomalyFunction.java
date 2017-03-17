@@ -4,11 +4,10 @@ import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.dashboard.views.TimeBucket;
-import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 
@@ -66,7 +65,7 @@ public abstract class BaseAnomalyFunction implements AnomalyFunction {
   @Override
   public AnomalyTimelinesView getTimeSeriesView(MetricTimeSeries timeSeries, long bucketMillis,
       String metric, long viewWindowStartTime, long viewWindowEndTime,
-      List<RawAnomalyResultDTO> knownAnomalies) {
+      List<MergedAnomalyResultDTO> knownAnomalies) {
 
     AnomalyTimelinesView anomalyTimelinesView = new AnomalyTimelinesView();
 

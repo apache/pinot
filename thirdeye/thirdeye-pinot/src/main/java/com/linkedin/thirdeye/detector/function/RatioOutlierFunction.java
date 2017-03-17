@@ -126,7 +126,7 @@ public class RatioOutlierFunction extends BaseAnomalyFunction {
   @Override
   public AnomalyTimelinesView getTimeSeriesView(MetricTimeSeries timeSeries, long bucketMillis,
       String metric, long viewWindowStartTime, long viewWindowEndTime,
-      List<RawAnomalyResultDTO> knownAnomalies) {
+      List<MergedAnomalyResultDTO> knownAnomalies) {
 
     double min = 0.0d;
 

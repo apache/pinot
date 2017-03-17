@@ -217,7 +217,7 @@ public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunc
   @Override
   public AnomalyTimelinesView getTimeSeriesView(MetricTimeSeries timeSeries,
       long bucketMillis, String metric, long viewWindowStartTime, long viewWindowEndTime,
-      List<RawAnomalyResultDTO> knownAnomalies) {
+      List<MergedAnomalyResultDTO> knownAnomalies) {
     AnomalyDetectionContext anomalyDetectionContext = BackwardAnomalyFunctionUtils
         .buildAnomalyDetectionContext(this, timeSeries, spec.getTopicMetric(), null,
             spec.getBucketSize(), spec.getBucketUnit(), new DateTime(viewWindowStartTime),
