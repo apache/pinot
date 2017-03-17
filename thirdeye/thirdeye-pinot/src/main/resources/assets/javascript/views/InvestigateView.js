@@ -42,7 +42,8 @@ InvestigateView.prototype = {
     };
   },
 
-  formatWowResults( wowResults, { anomalyRegionStart, anomalyRegionEnd, dataset, metric }){
+  formatWowResults( wowResults, args = {}){
+    const { anomalyRegionStart, anomalyRegionEnd, dataset, metric } = args;
     const start = moment(anomalyRegionStart);
     const end = moment(anomalyRegionEnd);
     const wowMapping = {
