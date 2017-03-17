@@ -4,6 +4,7 @@ function InvestigateView(investigateModel) {
   this.investigate_template_compiled = Handlebars.compile(investigate);
   this.investigateModel = investigateModel;
 
+
   this.anomalyID;
   this.anomaly;
   this.wowData;
@@ -34,10 +35,12 @@ InvestigateView.prototype = {
     const wowData = this.investigateModel.getWowData();
     const currentValue = wowData.currentVal;
     const wowResults = this.formatWowResults(wowData.compareResults, anomaly);
+    const externalUrls = anomaly.externalUrl ? JSON.parse(anomaly.externalUrl) : null;
 
     this.investigateData = {
       anomaly,
       currentValue,
+      externalUrls,
       wowResults,
     };
   },

@@ -27,7 +27,6 @@
         <div>&num;{{anomalyId}}</div>
       </span>
       <div class="investigate-button">
-        <!-- <a href="#" class="thirdeye-link">Share</a> -->
         {{#if ../externalUrls.INGRAPH}}
           <a href={{../externalUrls.INGRAPH}} target="_blank" class="thirdeye-link">InGraphs</a>
         {{/if}}
