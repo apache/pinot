@@ -200,12 +200,14 @@ public class AnomalyReportGenerator {
       String imgPath = null;
       if (anomalyReportDTOList.size() == 1) {
         isSingleAnomalyEmail = true;
-        imgPath = takeGraphScreenShot(anomalyReportDTOList.get(0).getAnomalyId(), configuration);
+        AnomalyReportDTO singleAnomaly = anomalyReportDTOList.get(0);
+        subject = subject + " - " + singleAnomaly.getMetric();
+        imgPath = takeGraphScreenShot(singleAnomaly.getAnomalyId(), configuration);
         try {
           String cid = email.embed(new File(imgPath));
           templateData.put("cid", cid);
         } catch (Exception e) {
-          LOG.error("Exception while embedding screenshot for anomaly {}", anomalyReportDTOList.get(0).getAnomalyId(), e);
+          LOG.error("Exception while embedding screenshot for anomaly {}", singleAnomaly.getAnomalyId(), e);
         }
 
       }
