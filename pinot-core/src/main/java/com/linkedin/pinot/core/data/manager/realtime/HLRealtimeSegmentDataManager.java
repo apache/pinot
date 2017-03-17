@@ -15,6 +15,15 @@
  */
 package com.linkedin.pinot.core.data.manager.realtime;
 
+import java.io.File;
+import java.util.List;
+import java.util.Map;
+import java.util.TimerTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import org.apache.commons.io.FileUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.IndexingConfig;
@@ -40,16 +49,6 @@ import com.linkedin.pinot.core.realtime.converter.RealtimeSegmentConverter;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaHighLevelStreamProviderConfig;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
-import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.TimerTask;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
-import org.apache.commons.io.FileUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class HLRealtimeSegmentDataManager extends SegmentDataManager {
@@ -160,7 +159,8 @@ public class HLRealtimeSegmentDataManager extends SegmentDataManager {
     // lets create a new realtime segment
     segmentLogger.info("Started kafka stream provider");
     realtimeSegment = new RealtimeSegmentImpl(schema, kafkaStreamProviderConfig.getSizeThresholdToFlushSegment(), tableName,
-        segmentMetadata.getSegmentName(), kafkaStreamProviderConfig.getStreamName(), serverMetrics, invertedIndexColumns);
+        segmentMetadata.getSegmentName(), kafkaStreamProviderConfig.getStreamName(), serverMetrics, invertedIndexColumns,
+        _realtimeTableDataManager.getAvgMultiValueCount());
     realtimeSegment.setSegmentMetadata(segmentMetadata, this.schema);
     notifier = realtimeTableDataManager;
 

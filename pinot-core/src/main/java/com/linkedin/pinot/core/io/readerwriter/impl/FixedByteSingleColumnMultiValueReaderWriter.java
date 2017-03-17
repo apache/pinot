@@ -15,13 +15,13 @@
  */
 package com.linkedin.pinot.core.io.readerwriter.impl;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
 import com.linkedin.pinot.core.io.readerwriter.BaseSingleColumnMultiValueReaderWriter;
 import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 
 
 /**
@@ -80,18 +80,13 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
   private int columnSizeInBytes;
   private int maxNumberOfMultiValuesPerRow;
 
-  public FixedByteSingleColumnMultiValueReaderWriter(int rows, int columnSizeInBytes, int maxNumberOfMultiValuesPerRow)
+  public FixedByteSingleColumnMultiValueReaderWriter(int rows, int columnSizeInBytes, int maxNumberOfMultiValuesPerRow,
+      int avgMultiValueCount)
       throws IOException {
-    int initialCapacity = Math.max(maxNumberOfMultiValuesPerRow, rows * AVERAGE_NUM_VALUES_PER_ROW);
+    int initialCapacity = Math.max(maxNumberOfMultiValuesPerRow, rows * avgMultiValueCount);
     int incrementalCapacity =
         Math.max(maxNumberOfMultiValuesPerRow, (int) (initialCapacity * 1.0f * INCREMENT_PERCENTAGE / 100));
     init(rows, columnSizeInBytes, maxNumberOfMultiValuesPerRow, initialCapacity, incrementalCapacity);
-  }
-
-  public FixedByteSingleColumnMultiValueReaderWriter(int rows, int columnSizeInBytes, int maxNumberOfMultiValuesPerRow,
-      int initialCapacity, int incrementalCapacity) throws IOException {
-    init(rows, columnSizeInBytes, maxNumberOfMultiValuesPerRow, initialCapacity, incrementalCapacity);
-
   }
 
   private void init(int rows, int columnSizeInBytes, int maxNumberOfMultiValuesPerRow, int initialCapacity,

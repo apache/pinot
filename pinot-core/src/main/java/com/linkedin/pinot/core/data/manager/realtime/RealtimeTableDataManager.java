@@ -57,6 +57,10 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
     super();
   }
 
+  public int getAvgMultiValueCount() {
+    return _tableDataManagerConfig.getRealtimeAvgMvCount();
+  }
+
   @Override
   protected void doShutdown() {
     _segmentAsyncExecutorService.shutdown();

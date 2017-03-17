@@ -27,18 +27,26 @@ public class MultiValueDictionaryTest {
   private static final String COL_NAME = "greek";
   private static final int NROWS = 1000;
   private static final int MAX_N_VALUES = FixedByteSingleColumnMultiValueReaderWriter.DEFAULT_MAX_NUMBER_OF_MULTIVALUES;
-  private static final long RANDOM_SEED = System.nanoTime();
 
   @Test
-  public void testMultiValueIndexing()
+  public void testMultiValueIndexing() {
+    final long seed = System.nanoTime();
+    try {
+      testMultiValueIndexing(seed);
+    } catch (Exception e) {
+      Assert.fail("Failed with seed=" + seed);
+    }
+  }
+
+  public void testMultiValueIndexing(final long seed)
       throws Exception {
     final FieldSpec mvIntFs = new DimensionFieldSpec(COL_NAME, FieldSpec.DataType.LONG, false);
     final LongMutableDictionary dict = new LongMutableDictionary(COL_NAME);
     final FixedByteSingleColumnMultiValueReaderWriter indexer =
-        new FixedByteSingleColumnMultiValueReaderWriter(NROWS, Integer.SIZE / 8, MAX_N_VALUES);
+        new FixedByteSingleColumnMultiValueReaderWriter(NROWS, Integer.SIZE / 8, MAX_N_VALUES, 2);
 
     // Insert rows into the indexer and dictionary
-    Random random = new Random(RANDOM_SEED);
+    Random random = new Random(seed);
     for (int row = 0; row < NROWS; row++) {
       int nValues = Math.abs(random.nextInt()) % MAX_N_VALUES;
       Long[] val = new Long[nValues];
@@ -54,17 +62,17 @@ public class MultiValueDictionaryTest {
     }
 
     // Read back rows and make sure that the values are good.
-    random = new Random(RANDOM_SEED);
+    random = new Random(seed);
     final int[] dictIds = new int[MAX_N_VALUES];
     for (int row = 0; row < NROWS; row++) {
       int nValues = indexer.getIntArray(row, dictIds);
       Assert.assertEquals(nValues, Math.abs(random.nextInt()) % MAX_N_VALUES,
-          "Mismatching number of values, random seed is: " + RANDOM_SEED);
+          "Mismatching number of values, random seed is: " + seed);
 
       for (int i = 0; i < nValues; i++) {
         Long val = dict.getLongValue(dictIds[i]);
         Assert.assertEquals(val.longValue(), random.nextLong(),
-            "Value mismatch at row " + row + ", random seed is: " + RANDOM_SEED);
+            "Value mismatch at row " + row + ", random seed is: " + seed);
       }
     }
   }

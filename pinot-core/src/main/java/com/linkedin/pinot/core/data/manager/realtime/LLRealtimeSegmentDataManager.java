@@ -800,7 +800,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
 
     // Start new realtime segment
     _realtimeSegment = new RealtimeSegmentImpl(schema, _segmentMaxRowCount, tableConfig.getTableName(),
-        segmentZKMetadata.getSegmentName(), _kafkaTopic, _serverMetrics, invertedIndexColumns);
+        segmentZKMetadata.getSegmentName(), _kafkaTopic, _serverMetrics, invertedIndexColumns, _realtimeTableDataManager.getAvgMultiValueCount());
     _realtimeSegment.setSegmentMetadata(segmentZKMetadata, schema);
 
     // Create message decoder

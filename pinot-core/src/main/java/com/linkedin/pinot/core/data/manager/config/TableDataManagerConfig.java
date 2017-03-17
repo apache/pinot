@@ -15,6 +15,12 @@
  */
 package com.linkedin.pinot.core.data.manager.config;
 
+import java.util.List;
+import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.ConfigurationException;
+import org.apache.commons.configuration.PropertiesConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
@@ -23,12 +29,6 @@ import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
-import java.util.List;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.ConfigurationException;
-import org.apache.commons.configuration.PropertiesConfiguration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -41,6 +41,8 @@ public class TableDataManagerConfig {
   private static final String READ_MODE = "readMode";
   private static final String TABLE_DATA_MANAGER_DATA_DIRECTORY = "directory";
   private static final String TABLE_DATA_MANAGER_NAME = "name";
+  private static final String REALTIME_AVG_MULTI_VALUE_COUNT = "avgMvCount";
+  private static final int DEFAULT_REALTIME_AVG_MULTI_VALUE_COUNT = 2;
 
   private final Configuration _tableDataManagerConfig;
 
@@ -69,6 +71,10 @@ public class TableDataManagerConfig {
     return _tableDataManagerConfig.getString(TABLE_DATA_MANAGER_NAME);
   }
 
+  public int getRealtimeAvgMvCount() {
+    return _tableDataManagerConfig.getInt(REALTIME_AVG_MULTI_VALUE_COUNT);
+  }
+
   public static TableDataManagerConfig getDefaultHelixTableDataManagerConfig(
       InstanceDataManagerConfig instanceDataManagerConfig, String tableName)
       throws ConfigurationException {
@@ -86,6 +92,16 @@ public class TableDataManagerConfig {
     } else {
       defaultConfig.addProperty(READ_MODE, ReadMode.heap);
     }
+    int avgMultiValueCount = DEFAULT_REALTIME_AVG_MULTI_VALUE_COUNT;
+    if (instanceDataManagerConfig.getAvgMultiValueCount() != null) {
+      try {
+        avgMultiValueCount = Integer.valueOf(instanceDataManagerConfig.getAvgMultiValueCount());
+      } catch (NumberFormatException e) {
+        // Ignore
+      }
+    }
+    defaultConfig.addProperty(REALTIME_AVG_MULTI_VALUE_COUNT, new Integer(avgMultiValueCount));
+
     if (instanceDataManagerConfig.getSegmentFormatVersion() != null) {
       defaultConfig.addProperty(IndexLoadingConfigMetadata.KEY_OF_SEGMENT_FORMAT_VERSION,
           instanceDataManagerConfig.getSegmentFormatVersion());

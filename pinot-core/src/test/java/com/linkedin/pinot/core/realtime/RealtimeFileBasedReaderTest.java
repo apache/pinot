@@ -42,6 +42,7 @@ import com.linkedin.pinot.core.realtime.converter.RealtimeSegmentConverter;
 import com.linkedin.pinot.core.realtime.impl.FileBasedStreamProviderConfig;
 import com.linkedin.pinot.core.realtime.impl.FileBasedStreamProviderImpl;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
+import com.linkedin.pinot.core.realtime.impl.kafka.RealtimeSegmentImplTest;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
 import com.yammer.metrics.core.MetricsRegistry;
@@ -82,7 +83,7 @@ public class RealtimeFileBasedReaderTest {
     final String tableName = RealtimeFileBasedReaderTest.class.getSimpleName()+".noTable";
     provider.init(config, tableName, new ServerMetrics(new MetricsRegistry()));
 
-    realtimeSegment = new RealtimeSegmentImpl(schema, 100000, tableName, segmentName, AVRO_DATA, new
+    realtimeSegment = RealtimeSegmentImplTest.createRealtimeSegmentImpl(schema, 100000, tableName, segmentName, AVRO_DATA, new
         ServerMetrics(new MetricsRegistry()));
     GenericRow row = provider.next(new GenericRow());
     while (row != null) {

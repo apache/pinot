@@ -15,14 +15,11 @@
  */
 package com.linkedin.pinot.core.realtime.impl;
 
-import com.linkedin.pinot.common.metrics.ServerMeter;
-import com.linkedin.pinot.common.metrics.ServerMetrics;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -36,6 +33,8 @@ import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import com.linkedin.pinot.common.metrics.ServerMeter;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.time.TimeConverter;
 import com.linkedin.pinot.common.utils.time.TimeConverterProvider;
@@ -95,7 +94,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   private final String tableAndStreamName;
 
   public RealtimeSegmentImpl(Schema schema, int capacity, String tableName, String segmentName, String streamName,
-      ServerMetrics serverMetrics, List<String> invertedIndexColumns) throws IOException {
+      ServerMetrics serverMetrics, List<String> invertedIndexColumns, int avgMultiValueCount) throws IOException {
     // initial variable setup
     this.segmentName = segmentName;
     this.serverMetrics = serverMetrics;
@@ -140,7 +139,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
             V1Constants.Dict.INT_DICTIONARY_COL_SIZE));
       } else {
         columnIndexReaderWriterMap.put(dimension, new FixedByteSingleColumnMultiValueReaderWriter(capacity,
-            Integer.SIZE / 8, FixedByteSingleColumnMultiValueReaderWriter.DEFAULT_MAX_NUMBER_OF_MULTIVALUES));
+            Integer.SIZE / 8, FixedByteSingleColumnMultiValueReaderWriter.DEFAULT_MAX_NUMBER_OF_MULTIVALUES, avgMultiValueCount));
       }
     }
 
@@ -159,11 +158,6 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
         V1Constants.Dict.INT_DICTIONARY_COL_SIZE));
 
     tableAndStreamName = tableName + "-" + streamName;
-  }
-
-  public RealtimeSegmentImpl(Schema schema, int sizeThresholdToFlushSegment, String tableName, String segmentName, String streamName,
-      ServerMetrics serverMetrics) throws IOException {
-    this(schema, sizeThresholdToFlushSegment, tableName, segmentName, streamName, serverMetrics, new ArrayList<String>());
   }
 
   @Override
@@ -641,9 +635,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
       }
     }
 
-    row.putField(
-        outgoingTimeColumnName,
-        dictionaryMap.get(outgoingTimeColumnName).get(
+    row.putField(outgoingTimeColumnName, dictionaryMap.get(outgoingTimeColumnName).get(
             ((FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWriterMap.get(outgoingTimeColumnName))
                 .getInt(docId)));
 
