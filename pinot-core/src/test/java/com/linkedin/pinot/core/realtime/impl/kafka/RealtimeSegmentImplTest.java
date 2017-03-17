@@ -15,8 +15,8 @@
  */
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.yammer.metrics.core.MetricsRegistry;
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -24,14 +24,21 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
+import com.yammer.metrics.core.MetricsRegistry;
 
 
 /**
  * Test for RealtimeSegmentImpl
  */
 public class RealtimeSegmentImplTest {
+  public static RealtimeSegmentImpl createRealtimeSegmentImpl(Schema schema, int sizeThresholdToFlushSegment, String tableName, String segmentName, String streamName,
+      ServerMetrics serverMetrics) throws IOException {
+    return new RealtimeSegmentImpl(schema, sizeThresholdToFlushSegment, tableName, segmentName, streamName, serverMetrics, new ArrayList<String>(),
+        2);
+  }
   @Test
   public void testDropInvalidRows() throws Exception {
     Schema schema = new Schema.SchemaBuilder()
@@ -41,8 +48,8 @@ public class RealtimeSegmentImplTest {
         .addTime("time", TimeUnit.SECONDS, FieldSpec.DataType.LONG)
         .build();
 
-    RealtimeSegmentImpl realtimeSegment = new RealtimeSegmentImpl(schema, 100, "noTable", "noSegment", schema.getSchemaName(),
-        new ServerMetrics(new MetricsRegistry()));
+    RealtimeSegmentImpl realtimeSegment = createRealtimeSegmentImpl(schema, 100, "noTable", "noSegment",
+        schema.getSchemaName(), new ServerMetrics(new MetricsRegistry()));
 
     // Segment should be empty
     Assert.assertEquals(realtimeSegment.getRawDocumentCount(), 0);

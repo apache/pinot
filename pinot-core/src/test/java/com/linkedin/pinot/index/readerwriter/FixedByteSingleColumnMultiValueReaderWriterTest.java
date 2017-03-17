@@ -15,27 +15,37 @@
  */
 package com.linkedin.pinot.index.readerwriter;
 
-import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnMultiValueReaderWriter;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnMultiValueReaderWriter;
 
 
 public class FixedByteSingleColumnMultiValueReaderWriterTest {
 
   @Test
-  public void testIntArray()
+  public void testIntArray() {
+    Random r = new Random();
+    final long seed = r.nextLong();
+    try {
+      testIntArray(seed);
+    } catch (Exception e) {
+      Assert.fail("Failed with seed " + seed);
+    }
+  }
+
+  public void testIntArray(final long seed)
       throws IOException {
     FixedByteSingleColumnMultiValueReaderWriter readerWriter;
     int rows = 1000;
     int columnSizeInBytes = Integer.SIZE / 8;
     int maxNumberOfMultiValuesPerRow = 2000;
     readerWriter =
-        new FixedByteSingleColumnMultiValueReaderWriter(rows, columnSizeInBytes, maxNumberOfMultiValuesPerRow);
+        new FixedByteSingleColumnMultiValueReaderWriter(rows, columnSizeInBytes, maxNumberOfMultiValuesPerRow, 2);
 
-    Random r = new Random();
+    Random r = new Random(seed);
     int[][] data = new int[rows][];
     for (int i = 0; i < rows; i++) {
       data[i] = new int[r.nextInt(maxNumberOfMultiValuesPerRow)];
@@ -46,10 +56,9 @@ public class FixedByteSingleColumnMultiValueReaderWriterTest {
     }
     int[] ret = new int[maxNumberOfMultiValuesPerRow];
     for (int i = 0; i < rows; i++) {
-
       int length = readerWriter.getIntArray(i, ret);
-      Assert.assertEquals(data[i].length, length);
-      Assert.assertTrue(Arrays.equals(data[i], Arrays.copyOf(ret, length)));
+      Assert.assertEquals(data[i].length, length, "Failed with seed="+seed);
+      Assert.assertTrue(Arrays.equals(data[i], Arrays.copyOf(ret, length)), "Failed with seed="+seed);
     }
     readerWriter.close();
   }

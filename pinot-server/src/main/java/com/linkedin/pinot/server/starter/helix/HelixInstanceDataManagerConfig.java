@@ -18,11 +18,10 @@ package com.linkedin.pinot.server.starter.helix;
 import java.util.Iterator;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
-
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
 
 
 /**
@@ -33,6 +32,9 @@ import org.slf4j.LoggerFactory;
 public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixInstanceDataManagerConfig.class);
 
+  // Average number of values in multi-valued columns in any table in this instance.
+  // This value is used to allocate initial memory for multi-valued columns in realtime segments in consuming state.
+  private static final String AVERAGE_MV_COUNT = "realtime.averageMultiValueEntriesPerRow";
   private static final String INSTANCE_SEGMENT_METADATA_LOADER_CLASS = "segment.metadata.loader.class";
   // Key of instance id
   public static final String INSTANCE_ID = "id";
@@ -119,6 +121,11 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   @Override
   public boolean isEnableDefaultColumns() {
     return _instanceDataManagerConfiguration.getBoolean(ENABLE_DEFAULT_COLUMNS, false);
+  }
+
+  @Override
+  public String getAvgMultiValueCount() {
+    return _instanceDataManagerConfiguration.getString(AVERAGE_MV_COUNT, null);
   }
 
   @Override
