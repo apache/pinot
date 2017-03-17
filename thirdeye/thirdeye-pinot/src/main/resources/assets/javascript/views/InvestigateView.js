@@ -33,20 +33,36 @@ InvestigateView.prototype = {
     const anomaly = this.investigateModel.getAnomaly();
     const wowData = this.investigateModel.getWowData();
     const currentValue = wowData.currentVal;
-    const externalUrls = anomaly.externalUrl ? JSON.parse(anomaly.externalUrl) : null;
-    wowData.compareResults.forEach((result) => {
-      result.change *= 100;
-    });
-    const [ wow, wow2, wow3 ] = wowData.compareResults;
+    const wowResults = this.formatWowResults(wowData.compareResults, anomaly);
 
     this.investigateData = {
       anomaly,
-      externalUrls,
       currentValue,
-      wow,
-      wow2,
-      wow3
+      wowResults,
     };
+  },
+
+  formatWowResults( wowResults, args = {}){
+    const { anomalyRegionStart, anomalyRegionEnd, dataset, metric } = args;
+    const start = moment(anomalyRegionStart);
+    const end = moment(anomalyRegionEnd);
+    const wowMapping = {
+      WoW: 7,
+      Wo2W: 14,
+      Wo3W: 21,
+      Wo4W: 28
+    };
+
+    return wowResults
+      .filter(wow => wow.compareMode !== 'Wo4W')
+      .map((wow) => {
+        const offset = wowMapping[wow.compareMode];
+        const baselineStart = start.clone().subtract(offset, 'days');
+        const baselineEnd = end.clone().subtract(offset, 'days');
+        wow.change *= 100;
+        wow.url = `dashboard#view=compare&dataset=${dataset}&compareMode=WoW&aggTimeGranularity=aggregateAll&currentStart=${start.valueOf()}&currentEnd=${end.valueOf()}&baselineStart=${baselineStart.valueOf()}&baselineEnd=${baselineEnd.valueOf()}&metrics=${metric}`;
+        return wow;
+      });
   },
 
   render() {

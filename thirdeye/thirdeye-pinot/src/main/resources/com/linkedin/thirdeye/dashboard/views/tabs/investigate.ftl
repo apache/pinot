@@ -97,58 +97,33 @@
       <span class="investigate-title">Change Over Time</span>
     </div>
 
-    <div class="investigate-wow">
-      <div class="wow-card">
+    <ul class="investigate-wow">
+      <li class="wow-card">
         <div class="wow-card-header">
           <label class="label-medium-semibold">Current Total</label>
         </div>
         <div class="wow-card-body">
           {{formatDouble currentValue}}
         </div>
-<!--         <div class="wow-card-footer">
-        </div> -->
-      </div>
+        <div class="wow-card-footer">
+        </div>
+      </li>
 
-      <div class="wow-card">
-        <div class="wow-card-header">
-          <label class="label-medium-semibold">WoW</label>
-        </div>
-        <div class="wow-card-body">
-          {{formatDouble wow.baselineValue}}
-          <span class="anomaly-change-delta {{colorDelta wow.change}}">({{formatPercent wow.change}})</span>
-        </div>
-<!--         <div class="wow-card-footer">
-          <a id="wow1" class="thirdeye-link">View Contribution Analysis</a>
-        </div> -->
-      </div>
-
-      <div class="wow-card">
-        <div class="wow-card-header">
-          <label class="label-medium-semibold">Wo2W</label>
-        </div>
-        <div class="wow-card-body">
-          {{formatDouble wow2.baselineValue}}
-          <span class="anomaly-change-delta {{colorDelta wow2.change}}">({{formatPercent wow2.change}})</span>
-        </div>
-<!--         <div class="wow-card-footer">
-          <a id ="wow2" class="thirdeye-link">View Contribution Analysis</a>
-        </div> -->
-      </div>
-
-      <div class="wow-card">
-        <div class="wow-card-header">
-          <label class="label-medium-semibold">Wo3W</label>
-        </div>
-        <div class="wow-card-body">
-          {{formatDouble wow3.baselineValue}}
-          <span class="anomaly-change-delta {{colorDelta wow3.change}}">({{formatPercent wow3.change}})<span>
-        </div>
-<!--         <div class="wow-card-footer">
-          <a id="wow3" class="thirdeye-link">View Contribution Analysis</a>
-        </div> -->
-      </div>
-    </div>
-
+      {{#each wowResults as |wow|}}
+        <li class="wow-card">
+          <div class="wow-card-header">
+            <label class="label-medium-semibold">{{wow.compareMode}}</label>
+          </div>
+          <div class="wow-card-body">
+            {{formatDouble wow.baselineValue}}
+            <span class="anomaly-change-delta {{colorDelta wow.change}}">({{formatPercent wow.change}})</span>
+          </div>
+          <div class="wow-card-footer">
+            <a href="{{wow.url}}" target="_blank" class="thirdeye-link">View Contribution Analysis</a>
+          </div>
+        </li>
+      {{/each}}
+    </ul>
 
   <!-- <div class="investigate-tips padding-all">
     <div class="investigate-icon">
