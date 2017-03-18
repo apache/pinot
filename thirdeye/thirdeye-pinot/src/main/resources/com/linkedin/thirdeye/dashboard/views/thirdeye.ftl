@@ -155,7 +155,7 @@
 				<nav class="navbar navbar-inverse" role="navigation">
           <div class="container">
 						<div id="global-navbar" class="navbar-header pull-left">
-							<span class="navbar-brand logo" href="#anomalies" data-toggle="tab">ThirdEye</span>
+							<a class="navbar-brand logo" href="#anomalies" id="thirdeye-home">ThirdEye</a>
 						</div>
 						<div id="main-tabs" class="pull-right">
 							<ul class="nav navbar-nav">
