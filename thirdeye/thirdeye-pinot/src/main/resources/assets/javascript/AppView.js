@@ -20,8 +20,10 @@ AppView.prototype = {
         self.tabClickEvent.notify(args);
       }
     };
+
     $('#main-tabs').click(tabSelectionEventHandler);
     $('#admin-tabs').click(tabSelectionEventHandler);
+    // $('#thirdeye-home').click(goHome)
     // compile thirdeye.ftl
   },
 
