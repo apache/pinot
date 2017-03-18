@@ -183,7 +183,6 @@ public class EmailResource {
     AnomalyReportGenerator anomalyReportGenerator = AnomalyReportGenerator.getInstance();
     List<MergedAnomalyResultDTO> anomalies = anomalyReportGenerator
         .getAnomaliesForDatasets(Arrays.asList(dataSetArr), startTime, endTime);
-    List<MergedAnomalyResultDTO> singleAnomaly = Lists.newArrayList(anomalies.get(0));
     ThirdEyeAnomalyConfiguration configuration = new ThirdEyeAnomalyConfiguration();
     SmtpConfiguration smtpConfiguration = new SmtpConfiguration();
     smtpConfiguration.setSmtpHost(smtpHost);
@@ -196,7 +195,7 @@ public class EmailResource {
     String emailSub = Strings.isNullOrEmpty(subject) ? "Thirdeye Anomaly Report" : subject;
 
     anomalyReportGenerator
-        .buildReport(startTime, endTime, singleAnomaly, emailSub, configuration,
+        .buildReport(startTime, endTime, anomalies, emailSub, configuration,
             includeSentAnomaliesOnly, toAddr, fromAddr, "Thirdeye Anomaly Report", true);
     return Response.ok().build();
   }

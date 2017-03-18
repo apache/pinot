@@ -49,7 +49,7 @@ public class AnomalyReportGenerator {
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyReportGenerator.class);
 
   private static final AnomalyReportGenerator INSTANCE = new AnomalyReportGenerator();
-  private static final String DATE_PATTERN = "MMM dd, hh:mm a";
+  private static final String DATE_PATTERN = "MMM dd, HH:mm";
   private static final String SINGLE_ANOMALY_EMAIL_TEMPLATE = "single-anomaly-email-template.ftl";
   private static final String MULTIPLE_ANOMALIES_EMAIL_TEMPLATE = "multiple-anomalies-email-template.ftl";
 
