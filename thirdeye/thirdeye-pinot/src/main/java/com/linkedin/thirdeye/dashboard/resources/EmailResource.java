@@ -30,7 +30,6 @@ import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 
 import org.apache.commons.lang3.StringUtils;
-import org.testng.collections.Lists;
 
 @Path("thirdeye/email")
 @Produces(MediaType.APPLICATION_JSON)
