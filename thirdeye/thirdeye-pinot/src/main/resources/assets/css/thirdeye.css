@@ -599,6 +599,11 @@ text {
   text-align: center;
 }
 
+.anomaly-details-items > span {
+  width: 100%;
+  word-wrap: break-word;
+}
+
 .anomaly-details-row {
   display: flex;
   flex-wrap: no-wrap;

@@ -21,10 +21,11 @@ function Constants() {
 
   //
   this.TIMESERIES_DATE_FORMAT = 'YYYY-MM-DD HH:mm';
-  this.DETAILS_DATE_DAYS_FORMAT = 'MMM D, hh:mm a';
-  this.DETAILS_DATE_HOURS_FORMAT = 'hh:mm a';
+  this.DETAILS_DATE_DAYS_FORMAT = 'MMM D, HH:mm z';
+  this.DETAILS_DATE_HOURS_FORMAT = 'HH:mm z';
   this.DATE_RANGE_CUSTOM = 'Custom Range';
   this.DATE_RANGE_FORMAT = 'MMM D, YYYY hh:mm a';
+  this.TIME_ZONE = 'America/Los_Angeles';
 
   // modes
   this.MODE_METRIC = 'metric';

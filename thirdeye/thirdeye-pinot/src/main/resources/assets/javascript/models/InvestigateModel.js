@@ -73,8 +73,8 @@ InvestigateModel.prototype = {
     if (!(start && end)) {
       return 'N/A';
     }
-    const regionStart = moment(start, constants.TIMESERIES_DATE_FORMAT);
-    const regionEnd = moment(end, constants.TIMESERIES_DATE_FORMAT);
+    const regionStart = moment.tz(start, constants.TIMESERIES_DATE_FORMAT, constants.TIME_ZONE);
+    const regionEnd = moment.tz(end, constants.TIMESERIES_DATE_FORMAT, constants.TIME_ZONE);
     const isSameDay = regionStart.isSame(regionEnd, 'day');
     const timeDelta = regionEnd.diff(regionStart);
     const regionDuration = moment.duration(timeDelta);
