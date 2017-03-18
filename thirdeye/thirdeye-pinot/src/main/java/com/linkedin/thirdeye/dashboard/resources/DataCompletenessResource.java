@@ -22,10 +22,10 @@ import org.apache.commons.collections.CollectionUtils;
 @Produces(MediaType.APPLICATION_JSON)
 public class DataCompletenessResource {
 
-  private final DataCompletenessConfigManager dataCompletenessManager;
+  private final DataCompletenessConfigManager dataCompletenessDAO;
 
-  public DataCompletenessResource(DataCompletenessConfigManager dataCompletenessManager) {
-    this.dataCompletenessManager = dataCompletenessManager;
+  public DataCompletenessResource(DataCompletenessConfigManager dataCompletenessDAO) {
+    this.dataCompletenessDAO = dataCompletenessDAO;
   }
 
   @GET
@@ -56,7 +56,7 @@ public class DataCompletenessResource {
   }
 
   List<Long> getDataCompletenessForRange(String dataset, long start, long end, boolean complete) {
-    List<DataCompletenessConfigDTO> dtos = this.dataCompletenessManager.findAllByDatasetAndInTimeRangeAndStatus(dataset, start, end, complete);
+    List<DataCompletenessConfigDTO> dtos = this.dataCompletenessDAO.findAllByDatasetAndInTimeRangeAndStatus(dataset, start, end, complete);
 
     List<Long> timestamps = new ArrayList<>();
     for(DataCompletenessConfigDTO dto : dtos) {
