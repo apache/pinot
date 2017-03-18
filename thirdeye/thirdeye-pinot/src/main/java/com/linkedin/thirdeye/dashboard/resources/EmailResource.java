@@ -7,6 +7,7 @@ import com.linkedin.thirdeye.anomaly.alert.util.AnomalyReportGenerator;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+
 import java.util.Arrays;
 import java.util.List;
 
@@ -22,6 +23,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 
 import com.linkedin.thirdeye.client.DAORegistry;
+import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
@@ -37,11 +39,13 @@ public class EmailResource {
   private final EmailConfigurationManager emailDAO;
   private final AlertConfigManager alertDAO;
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
+  private ThirdEyeConfiguration thirdeyeConfiguration = null;
 
-  public EmailResource() {
+  public EmailResource(ThirdEyeConfiguration thirdeyeConfiguration) {
     this.functionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.emailDAO = DAO_REGISTRY.getEmailConfigurationDAO();
     this.alertDAO = DAO_REGISTRY.getAlertConfigDAO();
+    this.thirdeyeConfiguration = thirdeyeConfiguration;
   }
 
   @POST
@@ -185,11 +189,13 @@ public class EmailResource {
 
     configuration.setSmtpConfiguration(smtpConfiguration);
     configuration.setDashboardHost(teHost);
+    configuration.setPhantomJsPath(thirdeyeConfiguration.getPhantomJsPath());
+    configuration.setRootDir(thirdeyeConfiguration.getRootDir());
     String emailSub = Strings.isNullOrEmpty(subject) ? "Thirdeye Anomaly Report" : subject;
 
     anomalyReportGenerator
         .buildReport(startTime, endTime, anomalies, emailSub, configuration,
-            includeSentAnomaliesOnly, toAddr, fromAddr, "UI-Generated", true);
+            includeSentAnomaliesOnly, toAddr, fromAddr, "Thirdeye Anomaly Report", true);
     return Response.ok().build();
   }
 
@@ -201,7 +207,8 @@ public class EmailResource {
       @QueryParam("to") String toAddr,@QueryParam("subject") String subject,
       @QueryParam("includeSentAnomaliesOnly") boolean includeSentAnomaliesOnly,
       @QueryParam("teHost") String teHost, @QueryParam("smtpHost") String smtpHost,
-      @QueryParam("smtpPort") int smtpPort) {
+      @QueryParam("smtpPort") int smtpPort,
+      @QueryParam("phantomJsPath") String phantomJsPath) {
     if (Strings.isNullOrEmpty(metrics)) {
       throw new WebApplicationException("metrics null or empty: " + metrics);
     }
@@ -228,10 +235,11 @@ public class EmailResource {
 
     configuration.setSmtpConfiguration(smtpConfiguration);
     configuration.setDashboardHost(teHost);
+    configuration.setPhantomJsPath(phantomJsPath);
     String emailSub = Strings.isNullOrEmpty(subject) ? "Thirdeye Anomaly Report" : subject;
     anomalyReportGenerator
         .buildReport(startTime, endTime, anomalies, emailSub, configuration,
-            includeSentAnomaliesOnly, toAddr, fromAddr, "UI-Generated", true);
+            includeSentAnomaliesOnly, toAddr, fromAddr, "Thirdeye Anomaly Report", true);
     return Response.ok().build();
   }
 }
