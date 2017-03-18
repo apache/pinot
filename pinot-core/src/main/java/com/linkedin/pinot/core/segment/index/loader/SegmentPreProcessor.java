@@ -77,25 +77,27 @@ public class SegmentPreProcessor implements AutoCloseable {
           new InvertedIndexHandler(_indexDir, _segmentMetadata, _indexConfig, segmentWriter);
       invertedIndexHandler.createInvertedIndices();
 
-      if (_enableDefaultColumns) {
-        // Update default columns according to the schema.
-        // NOTE: This step may modify the segment metadata. When adding new steps after this, reload the metadata.
-        DefaultColumnHandler defaultColumnHandler =
-            DefaultColumnHandlerFactory.getDefaultColumnHandler(_indexDir, _schema, _segmentMetadata, segmentWriter);
-        defaultColumnHandler.updateDefaultColumns();
-      }
+      if (_segmentMetadata.getTotalDocs() != 0) {
+        if (_enableDefaultColumns && (_schema != null)) {
+          // Update default columns according to the schema.
+          // NOTE: This step may modify the segment metadata. When adding new steps after this, reload the metadata.
+          DefaultColumnHandler defaultColumnHandler =
+              DefaultColumnHandlerFactory.getDefaultColumnHandler(_indexDir, _schema, _segmentMetadata, segmentWriter);
+          defaultColumnHandler.updateDefaultColumns();
+        }
 
-      if ((_columnMinMaxValueGeneratorMode != ColumnMinMaxValueGeneratorMode.NONE)
-          && (_segmentMetadata.getTotalDocs() != 0)) {
-        // Add min/max value to column metadata according to the prune mode.
-        // For star-tree index, because it can only increase the range, so min/max value can still be used in pruner.
-        // NOTE: This step may modify the segment metadata. When adding new steps after this, reload the metadata.
+        if (_columnMinMaxValueGeneratorMode != ColumnMinMaxValueGeneratorMode.NONE) {
+          // Add min/max value to column metadata according to the prune mode.
+          // For star-tree index, because it can only increase the range, so min/max value can still be used in pruner.
+          // NOTE: This step may modify the segment metadata. When adding new steps after this, reload the metadata.
 
-        // Reload the metadata.
-        _segmentMetadata = new SegmentMetadataImpl(_indexDir);
-        ColumnMinMaxValueGenerator columnMinMaxValueGenerator =
-            new ColumnMinMaxValueGenerator(_indexDir, _segmentMetadata, segmentWriter, _columnMinMaxValueGeneratorMode);
-        columnMinMaxValueGenerator.addColumnMinMaxValue();
+          // Reload the metadata.
+          _segmentMetadata = new SegmentMetadataImpl(_indexDir);
+          ColumnMinMaxValueGenerator columnMinMaxValueGenerator =
+              new ColumnMinMaxValueGenerator(_indexDir, _segmentMetadata, segmentWriter,
+                  _columnMinMaxValueGeneratorMode);
+          columnMinMaxValueGenerator.addColumnMinMaxValue();
+        }
       }
     } finally {
       if (segmentWriter != null) {
