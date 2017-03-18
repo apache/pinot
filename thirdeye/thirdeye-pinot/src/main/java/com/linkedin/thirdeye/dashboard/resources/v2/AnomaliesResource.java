@@ -55,6 +55,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.text.StrSubstitutor;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
+import org.joda.time.Period;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.json.JSONArray;
@@ -528,7 +529,7 @@ public class AnomaliesResource {
   private List<String> getDateFromTimeSeriesObject(List<TimeBucket> timeBucket, DateTimeFormatter timeSeriesDateFormatter) throws JSONException {
     List<String> list = new ArrayList<>();
     for (int i = 0; i < timeBucket.size(); i++) {
-        list.add(timeSeriesDateFormatter.print(timeBucket.get(i).getCurrentStart()));
+      list.add(timeSeriesDateFormatter.print(timeBucket.get(i).getCurrentStart()));
     }
     LOG.info("List {}", list);
     return list;
@@ -805,22 +806,28 @@ public class AnomaliesResource {
 
   private TimeRange getTimeseriesOffsetedTimes(long anomalyStartTime, long anomalyEndTime, DatasetConfigDTO datasetConfig) {
     TimeUnit dataTimeunit = datasetConfig.getTimeUnit();
-    long offsetMillis = 0;
+    Period offsetPeriod;
     switch (dataTimeunit) {
       case DAYS: // 2 days
-        offsetMillis = TimeUnit.MILLISECONDS.convert(2, dataTimeunit);
+        offsetPeriod = new Period(0, 0, 0, 2, 0, 0, 0, 0);
         break;
       case HOURS: // 10 hours
-        offsetMillis = TimeUnit.MILLISECONDS.convert(10, dataTimeunit);
+        offsetPeriod = new Period(0, 0, 0, 0, 10, 0, 0, 0);
         break;
       case MINUTES: // 60 minutes
-        offsetMillis = TimeUnit.MILLISECONDS.convert(60, dataTimeunit);
+        offsetPeriod = new Period(0, 0, 0, 0, 0, 60, 0, 0);
         break;
       default:
-        break;
+        offsetPeriod = new Period();
     }
-    anomalyStartTime = anomalyStartTime - offsetMillis;
-    anomalyEndTime = anomalyEndTime + offsetMillis;
+
+    DateTimeZone dateTimeZone = DateTimeZone.forID(datasetConfig.getTimezone());
+    DateTime anomalyStartDateTime = new DateTime(anomalyStartTime, dateTimeZone);
+    DateTime anomalyEndDateTime = new DateTime(anomalyEndTime, dateTimeZone);
+    anomalyStartDateTime = anomalyStartDateTime.minus(offsetPeriod);
+    anomalyEndDateTime = anomalyEndDateTime.plus(offsetPeriod);
+    anomalyStartTime = anomalyStartDateTime.getMillis();
+    anomalyEndTime = anomalyEndDateTime.getMillis();
     try {
       Long maxDataTime = CACHE_REGISTRY.getCollectionMaxDataTimeCache().get(datasetConfig.getDataset());
       if (anomalyEndTime > maxDataTime) {
