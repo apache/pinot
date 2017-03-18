@@ -59,11 +59,13 @@ public class ThirdEyeDashboardApplication
     } catch (Exception e) {
       LOG.error("Exception while loading caches", e);
     }
+
+    AnomalyFunctionFactory anomalyFunctionFactory = new AnomalyFunctionFactory(config.getFunctionConfigPath());
+    AlertFilterFactory alertFilterFactory = new AlertFilterFactory(config.getAlertFilterConfigPath());
+
     env.jersey().register(new AnomalyFunctionResource(config.getFunctionConfigPath()));
     env.jersey().register(new DashboardResource());
     env.jersey().register(new CacheResource());
-    AnomalyFunctionFactory anomalyFunctionFactory = new AnomalyFunctionFactory(config.getFunctionConfigPath());
-    AlertFilterFactory alertFilterFactory = new AlertFilterFactory(config.getAlertFilterConfigPath());
     env.jersey().register(new AnomalyResource(anomalyFunctionFactory, alertFilterFactory));
     env.jersey().register(new EmailResource());
     env.jersey().register(new EntityManagerResource());
@@ -76,8 +78,8 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new SummaryResource());
     env.jersey().register(new ThirdEyeResource());
     env.jersey().register(new OverrideConfigResource());
-    env.jersey().register(new DataResource(alertFilterFactory));
-    env.jersey().register(new AnomaliesResource(alertFilterFactory));
+    env.jersey().register(new DataResource(anomalyFunctionFactory, alertFilterFactory));
+    env.jersey().register(new AnomaliesResource(anomalyFunctionFactory, alertFilterFactory));
     env.jersey().register(new TimeSeriesResource());
     env.jersey().register(new OnboardResource());
     env.jersey().register(new EventResource(config.getInformedApiUrl()));

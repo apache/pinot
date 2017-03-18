@@ -630,7 +630,6 @@ public class AnomalyResource {
       return new AnomalyTimelinesView();
     }
 
-    List<MergedAnomalyResultDTO> knownAnomalies = adInputContext.getKnownMergedAnomalies().get(dimensions);
     // Transform time series with scaling factor
     List<ScalingFactor> scalingFactors = adInputContext.getScalingFactors();
     if (CollectionUtils.isNotEmpty(scalingFactors)) {
@@ -639,6 +638,7 @@ public class AnomalyResource {
           anomalyFunctionSpec.getTopicMetric(), properties);
     }
 
+    List<MergedAnomalyResultDTO> knownAnomalies = adInputContext.getKnownMergedAnomalies().get(dimensions);
     // Known anomalies are ignored (the null parameter) because 1. we can reduce users' waiting time and 2. presentation
     // data does not need to be as accurate as the one used for detecting anomalies
     AnomalyTimelinesView anomalyTimelinesView =
