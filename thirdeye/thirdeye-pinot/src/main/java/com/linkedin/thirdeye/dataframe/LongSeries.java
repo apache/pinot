@@ -75,6 +75,12 @@ public final class LongSeries extends Series {
       return this;
     }
 
+    public Builder add(LongSeries series) {
+      for(long v : series.values)
+        this.add(v);
+      return this;
+    }
+
     public LongSeries build() {
       long[] values = new long[this.values.size()];
       int i = 0;
@@ -101,7 +107,7 @@ public final class LongSeries extends Series {
     return new LongSeries();
   }
 
-  LongSeries(long... values) {
+  private LongSeries(long... values) {
     this.values = values;
   }
 
@@ -115,7 +121,7 @@ public final class LongSeries extends Series {
         values[i] = (double) this.values[i];
       }
     }
-    return new DoubleSeries(values);
+    return DoubleSeries.buildFrom(values);
   }
 
   @Override
@@ -125,15 +131,15 @@ public final class LongSeries extends Series {
 
   @Override
   public BooleanSeries getBooleans() {
-    boolean[] values = new boolean[this.size()];
+    byte[] values = new byte[this.size()];
     for(int i=0; i<values.length; i++) {
       if(LongSeries.isNull(this.values[i])) {
         values[i] = BooleanSeries.NULL_VALUE;
       } else {
-        values[i] = this.values[i] != 0L;
+        values[i] = BooleanSeries.valueOf(this.values[i] != 0L);
       }
     }
-    return new BooleanSeries(values);
+    return BooleanSeries.buildFrom(values);
   }
 
   @Override
@@ -146,12 +152,12 @@ public final class LongSeries extends Series {
         values[i] = String.valueOf(this.values[i]);
       }
     }
-    return new StringSeries(values);
+    return StringSeries.buildFrom(values);
   }
 
   @Override
   public LongSeries copy() {
-    return new LongSeries(Arrays.copyOf(this.values, this.values.length));
+    return buildFrom(Arrays.copyOf(this.values, this.values.length));
   }
 
   @Override
@@ -171,7 +177,7 @@ public final class LongSeries extends Series {
   @Override
   public LongSeries unique() {
     if(this.values.length <= 0)
-      return new LongSeries();
+      return buildFrom();
 
     long[] values = Arrays.copyOf(this.values, this.values.length);
     Arrays.sort(values);
@@ -186,7 +192,7 @@ public final class LongSeries extends Series {
       }
     }
 
-    return new LongSeries(Arrays.copyOf(values, uniqueCount));
+    return buildFrom(Arrays.copyOf(values, uniqueCount));
   }
 
   /**
@@ -213,7 +219,7 @@ public final class LongSeries extends Series {
 
   @Override
   public LongSeries slice(int from, int to) {
-    return new LongSeries(Arrays.copyOfRange(this.values, from, to));
+    return buildFrom(Arrays.copyOfRange(this.values, from, to));
   }
 
   @Override
@@ -242,6 +248,11 @@ public final class LongSeries extends Series {
   }
 
   @Override
+  public LongSeries sorted() {
+    return (LongSeries)super.sorted();
+  }
+
+  @Override
   public LongSeries map(LongFunction function) {
     long[] newValues = new long[this.values.length];
     for(int i=0; i<this.values.length; i++) {
@@ -251,25 +262,25 @@ public final class LongSeries extends Series {
         newValues[i] = function.apply(this.values[i]);
       }
     }
-    return new LongSeries(newValues);
+    return buildFrom(newValues);
   }
 
   @Override
   public BooleanSeries map(LongConditional conditional) {
-    boolean[] newValues = new boolean[this.values.length];
+    byte[] newValues = new byte[this.values.length];
     for(int i=0; i<this.values.length; i++) {
       if(isNull(this.values[i])) {
         newValues[i] = BooleanSeries.NULL_VALUE;
       } else {
-        newValues[i] = conditional.apply(this.values[i]);
+        newValues[i] = BooleanSeries.valueOf(conditional.apply(this.values[i]));
       }
     }
-    return new BooleanSeries(newValues);
+    return BooleanSeries.buildFrom(newValues);
   }
 
   @Override
   public LongSeries aggregate(LongFunction function) {
-    return new LongSeries(function.apply(this.values));
+    return buildFrom(function.apply(this.values));
   }
 
   @Override
@@ -277,7 +288,7 @@ public final class LongSeries extends Series {
     long[] values = new long[this.size() + series.size()];
     System.arraycopy(this.values, 0, values, 0, this.size());
     System.arraycopy(series.getLongs().values, 0, values, this.size(), series.size());
-    return new LongSeries(values);
+    return buildFrom(values);
   }
 
   @Override
@@ -299,13 +310,6 @@ public final class LongSeries extends Series {
       fromIndex[i] = tuples.get(i).index;
     }
     return fromIndex;
-  }
-
-  @Override
-  public LongSeries sorted() {
-    long[] values = Arrays.copyOf(this.values, this.values.length);
-    Arrays.sort(values);
-    return new LongSeries(values);
   }
 
   @Override
@@ -413,7 +417,7 @@ public final class LongSeries extends Series {
         values[i] = this.values[fromIndex[i]];
       }
     }
-    return new LongSeries(values);
+    return buildFrom(values);
   }
 
   /**
@@ -430,7 +434,7 @@ public final class LongSeries extends Series {
         values[i] = value;
       }
     }
-    return new LongSeries(values);
+    return buildFrom(values);
   }
 
   @Override
@@ -443,7 +447,7 @@ public final class LongSeries extends Series {
       System.arraycopy(this.values, Math.min(-offset, values.length), values, 0, Math.max(values.length + offset, 0));
       Arrays.fill(values, Math.max(values.length + offset, 0), values.length, NULL_VALUE);
     }
-    return new LongSeries(values);
+    return buildFrom(values);
   }
 
   @Override

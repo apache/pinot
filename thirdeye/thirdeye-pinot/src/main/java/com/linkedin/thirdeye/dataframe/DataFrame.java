@@ -99,19 +99,23 @@ public class DataFrame {
   Map<String, Series> series = new HashMap<>();
 
   public static DoubleSeries toSeries(double... values) {
-    return new DoubleSeries(values);
+    return DoubleSeries.buildFrom(values);
   }
 
   public static LongSeries toSeries(long... values) {
-    return new LongSeries(values);
+    return LongSeries.buildFrom(values);
   }
 
   public static StringSeries toSeries(String... values) {
-    return new StringSeries(values);
+    return StringSeries.buildFrom(values);
+  }
+
+  public static BooleanSeries toSeries(byte... values) {
+    return BooleanSeries.buildFrom(values);
   }
 
   public static BooleanSeries toSeries(boolean... values) {
-    return new BooleanSeries(values);
+    return BooleanSeries.buildFrom(values);
   }
 
   public static DoubleSeries.Builder buildDoubles() {
@@ -135,11 +139,11 @@ public class DataFrame {
     for(int i=0; i<defaultIndexSize; i++) {
       indexValues[i] = i;
     }
-    this.addSeries(COLUMN_INDEX, new LongSeries(indexValues));
+    this.addSeries(COLUMN_INDEX, LongSeries.buildFrom(indexValues));
   }
 
   public DataFrame(long[] indexValues) {
-    this.addSeries(COLUMN_INDEX, new LongSeries(indexValues));
+    this.addSeries(COLUMN_INDEX, LongSeries.buildFrom(indexValues));
   }
 
   public DataFrame(LongSeries index) {
@@ -194,6 +198,10 @@ public class DataFrame {
   }
 
   public DataFrame addSeries(String seriesName, String... values) {
+    return addSeries(seriesName, DataFrame.toSeries(values));
+  }
+
+  public DataFrame addSeries(String seriesName, byte... values) {
     return addSeries(seriesName, DataFrame.toSeries(values));
   }
 
@@ -259,7 +267,7 @@ public class DataFrame {
 
   public static DoubleSeries map(Series.DoubleFunction function, Series... series) {
     if(series.length <= 0)
-      return new DoubleSeries();
+      return DoubleSeries.empty();
 
     assertSameLength(series);
 
@@ -290,7 +298,7 @@ public class DataFrame {
       }
     }
 
-    return new DoubleSeries(output);
+    return DoubleSeries.buildFrom(output);
   }
 
   //
@@ -303,7 +311,7 @@ public class DataFrame {
 
   public static LongSeries map(Series.LongFunction function, Series... series) {
     if(series.length <= 0)
-      return new LongSeries();
+      return LongSeries.empty();
 
     assertSameLength(series);
 
@@ -333,7 +341,7 @@ public class DataFrame {
       }
     }
 
-    return new LongSeries(output);
+    return LongSeries.buildFrom(output);
   }
 
   //
@@ -346,7 +354,7 @@ public class DataFrame {
 
   public static StringSeries map(Series.StringFunction function, Series... series) {
     if(series.length <= 0)
-      return new StringSeries();
+      return StringSeries.empty();
 
     assertSameLength(series);
 
@@ -376,7 +384,7 @@ public class DataFrame {
       }
     }
 
-    return new StringSeries(output);
+    return StringSeries.buildFrom(output);
   }
 
   //
@@ -389,7 +397,7 @@ public class DataFrame {
 
   public static BooleanSeries map(Series.BooleanFunction function, Series... series) {
     if(series.length <= 0)
-      return new BooleanSeries();
+      return BooleanSeries.empty();
 
     assertSameLength(series);
 
@@ -398,16 +406,28 @@ public class DataFrame {
       booleanSeries[i] = series[i].getBooleans();
     }
 
-    boolean[] output = new boolean[series[0].size()];
+    byte[] output = new byte[series[0].size()];
     for(int i=0; i<series[0].size(); i++) {
-      boolean[] input = new boolean[series.length];
+      byte[] input = new byte[series.length];
+      boolean isNull = false;
       for(int j=0; j<series.length; j++) {
-        input[j] = booleanSeries[j].values[i];
+        byte value = booleanSeries[j].values[i];
+        if(BooleanSeries.isNull(value)) {
+          isNull = true;
+          break;
+        } else {
+          input[j] = value;
+        }
       }
-      output[i] = function.apply(input);
+
+      if(isNull) {
+        output[i] = BooleanSeries.NULL_VALUE;
+      } else {
+        output[i] = function.apply(input);
+      }
     }
 
-    return new BooleanSeries(output);
+    return BooleanSeries.buildFrom(output);
   }
 
   //
@@ -490,7 +510,7 @@ public class DataFrame {
     int[] fromIndex = new int[series.size()];
     int fromIndexCount = 0;
     for(int i=0; i<series.size(); i++) {
-      if(series.values[i]) {
+      if(BooleanSeries.isTrue(series.values[i])) {
         fromIndex[fromIndexCount] = i;
         fromIndexCount++;
       }

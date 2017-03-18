@@ -9,43 +9,46 @@ import org.apache.commons.lang.ArrayUtils;
 
 
 /**
- * Series container for primitive boolean.
+ * Series container for primitive tri-state boolean (true, false, null). Implementation uses
+ * byte as internal representation.
  */
 public final class BooleanSeries extends Series {
-  public static final boolean NULL_VALUE = false;
+  public static final byte NULL_VALUE = Byte.MIN_VALUE;
+  public static final byte TRUE_VALUE = 1;
+  public static final byte FALSE_VALUE = 0;
 
   // CAUTION: The array is final, but values are inherently modifiable
-  final boolean[] values;
+  final byte[] values;
 
   public static class BooleanBatchAnd implements BooleanFunction {
     @Override
-    public boolean apply(boolean[] values) {
+    public byte apply(byte... values) {
       if(values.length <= 0)
         return NULL_VALUE;
-      for(boolean b : values) {
-        if(!b)
-          return false;
+      for(byte b : values) {
+        if(isFalse(b))
+          return FALSE_VALUE;
       }
-      return true;
+      return TRUE_VALUE;
     }
   }
 
   public static class BooleanBatchOr implements BooleanFunction {
     @Override
-    public boolean apply(boolean[] values) {
+    public byte apply(byte... values) {
       if(values.length <= 0)
         return NULL_VALUE;
-      for(boolean b : values) {
-        if(b)
-          return true;
+      for(byte b : values) {
+        if(isTrue(b))
+          return TRUE_VALUE;
       }
-      return false;
+      return FALSE_VALUE;
     }
   }
 
   public static class BooleanBatchLast implements BooleanFunction {
     @Override
-    public boolean apply(boolean[] values) {
+    public byte apply(byte... values) {
       if(values.length <= 0)
         return NULL_VALUE;
       return values[values.length-1];
@@ -53,28 +56,44 @@ public final class BooleanSeries extends Series {
   }
 
   public static class Builder {
-    final List<Boolean> values = new ArrayList<>();
+    final List<Byte> values = new ArrayList<>();
 
     private Builder() {
       // left blank
     }
 
     public Builder add(boolean value) {
-      this.values.add(value);
+      return this.add(valueOf(value));
+    }
+
+    public Builder add(byte value) {
+      this.values.add(assertValidValue(value));
       return this;
     }
 
     public Builder add(Boolean value) {
+      return this.add(valueOf(value));
+    }
+
+    public Builder add(Byte value) {
       if(value == null) {
         this.values.add(NULL_VALUE);
       } else {
-        this.values.add(value);
+        this.values.add(assertValidValue(value));
       }
       return this;
     }
 
     public Builder add(boolean... values) {
-      return this.add(ArrayUtils.toObject(values));
+      for(boolean v : values)
+        this.add(v);
+      return this;
+    }
+
+    public Builder add(byte... values) {
+      for(byte v : values)
+        this.add(v);
+      return this;
     }
 
     public Builder add(Boolean... values) {
@@ -83,16 +102,34 @@ public final class BooleanSeries extends Series {
       return this;
     }
 
-    public Builder add(Collection<Boolean> values) {
+    public Builder add(Byte... values) {
+      for(Byte v : values)
+        this.add(v);
+      return this;
+    }
+
+    public Builder addBooleans(Collection<Boolean> values) {
       for(Boolean v : values)
         this.add(v);
       return this;
     }
 
+    public Builder add(Collection<Byte> values) {
+      for(Byte v : values)
+        this.add(v);
+      return this;
+    }
+
+    public Builder add(BooleanSeries series) {
+      for(byte v : series.values)
+        this.add(v);
+      return this;
+    }
+
     public BooleanSeries build() {
-      boolean[] values = new boolean[this.values.size()];
+      byte[] values = new byte[this.values.size()];
       int i = 0;
-      for(Boolean v : this.values) {
+      for(Byte v : this.values) {
         values[i++] = v;
       }
       return new BooleanSeries(values);
@@ -103,43 +140,61 @@ public final class BooleanSeries extends Series {
     return new Builder();
   }
 
-  public static BooleanSeries buildFrom(boolean... values) {
+  public static BooleanSeries buildFrom(byte... values) {
     return new BooleanSeries(values);
   }
 
-  public static BooleanSeries buildFrom(Collection<Boolean> values) {
+  public static BooleanSeries buildFrom(boolean... values) {
     return builder().add(values).build();
+  }
+
+  public static BooleanSeries buildFrom(Collection<Byte> values) {
+    return builder().add(values).build();
+  }
+
+  public static BooleanSeries buildFromBooleans(Collection<Boolean> values) {
+    return builder().addBooleans(values).build();
   }
 
   public static BooleanSeries empty() {
     return new BooleanSeries();
   }
 
-  BooleanSeries(boolean... values) {
+  private BooleanSeries(byte... values) {
     this.values = values;
   }
 
   @Override
   public BooleanSeries copy() {
-    return new BooleanSeries(Arrays.copyOf(this.values, this.values.length));
+    return buildFrom(Arrays.copyOf(this.values, this.values.length));
   }
 
   @Override
   public DoubleSeries getDoubles() {
     double[] values = new double[this.size()];
     for(int i=0; i<values.length; i++) {
-      values[i] = this.values[i] ? 1.0d : 0.0d;
+      byte value = this.values[i];
+      if(isNull(value)) {
+        values[i] = DoubleSeries.NULL_VALUE;
+      } else {
+        values[i] = isTrue(value) ? 1.0d : 0.0d;
+      }
     }
-    return new DoubleSeries(values);
+    return DoubleSeries.buildFrom(values);
   }
 
   @Override
   public LongSeries getLongs() {
     long[] values = new long[this.size()];
     for(int i=0; i<values.length; i++) {
-      values[i] = this.values[i] ? 1L : 0L;
+      byte value = this.values[i];
+      if(isNull(value)) {
+        values[i] = LongSeries.NULL_VALUE;
+      } else {
+        values[i] = isTrue(value) ? 1L : 0L;
+      }
     }
-    return new LongSeries(values);
+    return LongSeries.buildFrom(values);
   }
 
   @Override
@@ -151,9 +206,14 @@ public final class BooleanSeries extends Series {
   public StringSeries getStrings() {
     String[] values = new String[this.size()];
     for(int i=0; i<values.length; i++) {
-      values[i] = String.valueOf(this.values[i]);
+      byte value = this.values[i];
+      if(isNull(value)) {
+        values[i] = StringSeries.NULL_VALUE;
+      } else {
+        values[i] = isTrue(value) ? "true" : "false";
+      }
     }
-    return new StringSeries(values);
+    return StringSeries.buildFrom(values);
   }
 
   @Override
@@ -166,8 +226,16 @@ public final class BooleanSeries extends Series {
     return SeriesType.BOOLEAN;
   }
 
-  public boolean[] values() {
+  public byte[] values() {
     return this.values;
+  }
+
+  public boolean[] valuesBoolean() {
+    boolean[] values = new boolean[this.values.length];
+    for(int i=0; i<this.values.length; i++) {
+      values[i] = isTrue(this.values[i]);
+    }
+    return values;
   }
 
   /**
@@ -176,7 +244,7 @@ public final class BooleanSeries extends Series {
    * @throws IllegalStateException if the series is empty
    * @return first element in the series
    */
-  public boolean first() {
+  public byte first() {
     assertNotEmpty(this.values);
     return this.values[0];
   }
@@ -187,14 +255,14 @@ public final class BooleanSeries extends Series {
    * @throws IllegalStateException if the series is empty
    * @return last element in the series
    */
-  public boolean last() {
+  public byte last() {
     assertNotEmpty(this.values);
     return this.values[this.values.length-1];
   }
 
   @Override
   public BooleanSeries slice(int from, int to) {
-    return new BooleanSeries(Arrays.copyOfRange(this.values, from, to));
+    return buildFrom(Arrays.copyOfRange(this.values, from, to));
   }
 
   @Override
@@ -223,40 +291,45 @@ public final class BooleanSeries extends Series {
   }
 
   @Override
+  public BooleanSeries sorted() {
+    return (BooleanSeries)super.sorted();
+  }
+
+  @Override
   public BooleanSeries map(BooleanFunction function) {
-    boolean[] newValues = new boolean[this.values.length];
+    byte[] newValues = new byte[this.values.length];
     for(int i=0; i<this.values.length; i++) {
       newValues[i] = function.apply(this.values[i]);
     }
-    return new BooleanSeries(newValues);
+    return buildFrom(newValues);
   }
 
   @Override
   public BooleanSeries aggregate(BooleanFunction function) {
-    return new BooleanSeries(function.apply(this.values));
+    return buildFrom(function.apply(this.values));
   }
 
   @Override
   public BooleanSeries append(Series series) {
-    boolean[] values = new boolean[this.size() + series.size()];
+    byte[] values = new byte[this.size() + series.size()];
     System.arraycopy(this.values, 0, values, 0, this.size());
     System.arraycopy(series.getBooleans().values, 0, values, this.size(), series.size());
-    return new BooleanSeries(values);
+    return buildFrom(values);
   }
 
   public boolean allTrue() {
     assertNotEmpty(this.values);
     boolean result = true;
-    for(boolean b : this.values) {
-      result &= b;
+    for(byte b : this.values) {
+      result &= isTrue(b);
     }
     return result;
   }
 
   public boolean hasTrue() {
     boolean result = false;
-    for(boolean b : this.values) {
-      result |= b;
+    for(byte b : this.values) {
+      result |= isTrue(b);
     }
     return result;
   }
@@ -264,75 +337,91 @@ public final class BooleanSeries extends Series {
   public boolean allFalse() {
     assertNotEmpty(this.values);
     boolean result = true;
-    for(boolean b : this.values) {
-      result &= !b;
+    for(byte b : this.values) {
+      result &= isFalse(b);
     }
     return result;
   }
 
   public boolean hasFalse() {
     boolean result = false;
-    for(boolean b : this.values) {
-      result |= !b;
+    for(byte b : this.values) {
+      result |= isFalse(b);
     }
     return result;
   }
 
   public BooleanSeries not() {
-    boolean[] bvalues = new boolean[this.values.length];
+    byte[] values = new byte[this.values.length];
     for(int i=0; i<this.values.length; i++) {
-      bvalues[i] = !this.values[i];
+      byte value = this.values[i];
+      if(isNull(value)) {
+        values[i] = NULL_VALUE;
+      } else {
+        values[i] = isTrue(value) ? FALSE_VALUE : TRUE_VALUE;
+      }
     }
-    return new BooleanSeries(bvalues);
-  }
-
-  @Override
-  public BooleanSeries sorted() {
-    boolean[] values = new boolean[this.values.length];
-    int count_false = 0;
-
-    // count true
-    for(boolean b : this.values) {
-      if(!b)
-        count_false++;
-    }
-
-    // first false, then true
-    Arrays.fill(values, 0, count_false, false);
-    Arrays.fill(values, count_false, values.length, true);
-
-    return new BooleanSeries(values);
+    return buildFrom(values);
   }
 
   @Override
   public BooleanSeries unique() {
-    boolean hasTrue = this.hasTrue();
-    boolean hasFalse = this.hasFalse();
+    boolean hasNull = false;
+    boolean hasTrue = false;
+    boolean hasFalse = false;
 
-    if(hasFalse && hasTrue)
-      return new BooleanSeries(false, true);
+    for(byte v : this.values) {
+      hasNull |= isNull(v);
+      hasFalse |= isFalse(v);
+      hasTrue |= isTrue(v);
+    }
+
+    Builder b = builder();
+    if(hasNull)
+      b.add(NULL_VALUE);
     if(hasFalse)
-      return new BooleanSeries(false);
+      b.add(FALSE_VALUE);
     if(hasTrue)
-      return new BooleanSeries(true);
-    return new BooleanSeries();
+      b.add(TRUE_VALUE);
+
+    return b.build();
   }
 
   @Override
   public String toString() {
     StringBuilder builder = new StringBuilder();
     builder.append("BooleanSeries{");
-    for(boolean b : this.values) {
-      builder.append(b);
+    for(byte b : this.values) {
+      if(isNull(b)) {
+        builder.append("null");
+      } else {
+        builder.append(isTrue(b) ? "true" : "false");
+      }
       builder.append(" ");
     }
     builder.append("}");
     return builder.toString();
   }
 
+  /**
+   * Return a copy of the series with all <b>null</b> values replaced by
+   * <b>value</b>.
+   *
+   * @param value replacement value for <b>null</b>
+   * @return series copy without nulls
+   */
+  public BooleanSeries fillNull(byte value) {
+    byte[] values = Arrays.copyOf(this.values, this.values.length);
+    for(int i=0; i<values.length; i++) {
+      if(isNull(values[i])) {
+        values[i] = value;
+      }
+    }
+    return buildFrom(values);
+  }
   @Override
   public BooleanSeries shift(int offset) {
-    boolean[] values = new boolean[this.values.length];
+    byte[] values = new byte[this.values.length];
     if(offset >= 0) {
       Arrays.fill(values, 0, Math.min(offset, values.length), NULL_VALUE);
       System.arraycopy(this.values, 0, values, Math.min(offset, values.length), Math.max(values.length - offset, 0));
@@ -340,12 +429,12 @@ public final class BooleanSeries extends Series {
       System.arraycopy(this.values, Math.min(-offset, values.length), values, 0, Math.max(values.length + offset, 0));
       Arrays.fill(values, Math.max(values.length + offset, 0), values.length, NULL_VALUE);
     }
-    return new BooleanSeries(values);
+    return buildFrom(values);
   }
 
   @Override
   BooleanSeries project(int[] fromIndex) {
-    boolean[] values = new boolean[fromIndex.length];
+    byte[] values = new byte[fromIndex.length];
     for(int i=0; i<fromIndex.length; i++) {
       if(fromIndex[i] == -1) {
         values[i] = NULL_VALUE;
@@ -353,7 +442,7 @@ public final class BooleanSeries extends Series {
         values[i] = this.values[fromIndex[i]];
       }
     }
-    return new BooleanSeries(values);
+    return buildFrom(values);
   }
 
   @Override
@@ -361,15 +450,21 @@ public final class BooleanSeries extends Series {
     int[] fromIndex = new int[this.values.length];
     int j=0;
 
-    // false first
+    // first null
     for(int i=0; i<this.values.length; i++) {
-      if(!this.values[i])
+      if(isNull(this.values[i]))
+        fromIndex[j++] = i;
+    }
+
+    // then false
+    for(int i=0; i<this.values.length; i++) {
+      if(isFalse(this.values[i]))
         fromIndex[j++] = i;
     }
 
     // then true
     for(int i=0; i<this.values.length; i++) {
-      if(this.values[i])
+      if(isTrue(this.values[i]))
         fromIndex[j++] = i;
     }
 
@@ -378,12 +473,23 @@ public final class BooleanSeries extends Series {
 
   @Override
   public boolean hasNull() {
+    for(byte b : this.values)
+      if(isNull(b))
+        return true;
     return false;
   }
 
   @Override
   int[] nullIndex() {
-    return new int[0];
+    int[] fromIndex = new int[this.values.length];
+    int nullCount = 0;
+
+    for(int i=0; i<this.values.length; i++) {
+      if(isNull(this.values[i]))
+        fromIndex[nullCount++] = i;
+    }
+
+    return Arrays.copyOf(fromIndex, nullCount);
   }
 
   @Override
@@ -402,7 +508,7 @@ public final class BooleanSeries extends Series {
 
   @Override
   int compare(Series that, int indexThis, int indexThat) {
-    return Boolean.compare(this.values[indexThis], ((BooleanSeries)that).values[indexThat]);
+    return Byte.compare(this.values[indexThis], ((BooleanSeries)that).values[indexThat]);
   }
 
   @Override
@@ -410,10 +516,36 @@ public final class BooleanSeries extends Series {
     return Arrays.hashCode(this.values);
   }
 
-  private static boolean[] assertNotEmpty(boolean[] values) {
+  public static boolean isNull(byte value) {
+    return value == NULL_VALUE;
+  }
+
+  public static boolean isTrue(byte value) {
+    return value == TRUE_VALUE;
+  }
+
+  public static boolean isFalse(byte value) {
+    return value == FALSE_VALUE;
+  }
+
+  public static byte valueOf(boolean value) {
+    return value ? TRUE_VALUE : FALSE_VALUE;
+  }
+
+  public static byte valueOf(Boolean value) {
+    return value == null ? NULL_VALUE : valueOf(value.booleanValue());
+  }
+
+  private static byte[] assertNotEmpty(byte[] values) {
     if(values.length <= 0)
       throw new IllegalStateException("Must contain at least one value");
     return values;
+  }
+
+  private static byte assertValidValue(byte value) {
+    if(value != NULL_VALUE && value != TRUE_VALUE && value != FALSE_VALUE)
+      throw new IllegalArgumentException(String.format("Must be either %d, %d, or %d", FALSE_VALUE, TRUE_VALUE, NULL_VALUE));
+    return value;
   }
 
 }

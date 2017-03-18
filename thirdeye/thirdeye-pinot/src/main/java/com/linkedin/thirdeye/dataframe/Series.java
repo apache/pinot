@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import org.apache.commons.lang.ArrayUtils;
 
 
 /**
@@ -65,7 +66,7 @@ public abstract class Series {
 
   @FunctionalInterface
   public interface BooleanFunction {
-    boolean apply(boolean... values);
+    byte apply(byte... values);
   }
 
   /**
@@ -101,7 +102,7 @@ public abstract class Series {
     }
 
     SeriesGrouping(Series source) {
-      this.keys = new LongSeries();
+      this.keys = LongSeries.buildFrom();
       this.source = source;
       this.buckets = Collections.emptyList();
     }
@@ -165,10 +166,10 @@ public abstract class Series {
      * @return grouped aggregation series
      */
     public DataFrame aggregate(DoubleFunction function) {
-      DoubleSeries s = new DoubleSeries();
+      DoubleSeries.Builder builder = DoubleSeries.builder();
       for(Bucket b : this.buckets)
-        s = s.append(this.source.project(b.fromIndex).aggregate(function));
-      return makeAggregate(this.keys, s);
+        builder.add(this.source.project(b.fromIndex).aggregate(function));
+      return makeAggregate(this.keys, builder.build());
     }
 
     /**
@@ -183,10 +184,10 @@ public abstract class Series {
      * @return grouped aggregation series
      */
     public DataFrame aggregate(LongFunction function) {
-      LongSeries s = new LongSeries();
+      LongSeries.Builder builder = LongSeries.builder();
       for(Bucket b : this.buckets)
-        s = s.append(this.source.project(b.fromIndex).aggregate(function));
-      return makeAggregate(this.keys, s);
+        builder.add(this.source.project(b.fromIndex).aggregate(function));
+      return makeAggregate(this.keys, builder.build());
     }
 
     /**
@@ -201,10 +202,10 @@ public abstract class Series {
      * @return grouped aggregation series
      */
     public DataFrame aggregate(StringFunction function) {
-      StringSeries s = new StringSeries();
+      StringSeries.Builder builder = StringSeries.builder();
       for(Bucket b : this.buckets)
-        s = s.append(this.source.project(b.fromIndex).aggregate(function));
-      return makeAggregate(this.keys, s);
+        builder.add(this.source.project(b.fromIndex).aggregate(function));
+      return makeAggregate(this.keys, builder.build());
     }
 
     /**
@@ -219,10 +220,10 @@ public abstract class Series {
      * @return grouped aggregation series
      */
     public DataFrame aggregate(BooleanFunction function) {
-      BooleanSeries s = new BooleanSeries();
+      BooleanSeries.Builder builder = BooleanSeries.builder();
       for(Bucket b : this.buckets)
-        s = s.append(this.source.project(b.fromIndex).aggregate(function));
-      return makeAggregate(this.keys, s);
+        builder.add(this.source.project(b.fromIndex).aggregate(function));
+      return makeAggregate(this.keys, builder.build());
     }
 
     static DataFrame makeAggregate(Series keys, Series values) {
@@ -270,7 +271,7 @@ public abstract class Series {
   /**
    * Returns the number of elements contained in the series.
    *
-   * <b>NOTE:</b> for this method <b>null</b> values count as elements.
+   * <b>NOTE:</b> <b>null</b> values count as elements.
    *
    * @return series size
    */
@@ -295,9 +296,6 @@ public abstract class Series {
   /**
    * Returns the series as BooleanSeries. The underlying series is converted
    * transparently if the series' native type is different.
-   *
-   * <b>NOTE:</b> BooleanSeries does not support null values. Missing values
-   * are converter to <b>false</b>.
    *
    * @return BooleanSeries equivalent
    */
@@ -329,16 +327,6 @@ public abstract class Series {
   public abstract Series slice(int from, int to);
 
   /**
-   * Returns a copy of the series with values ordered
-   * in ascending order.
-   *
-   * <b>NOTE:</b> BooleanSeries interprets <b>false</b> smaller than <b>true</b>.
-   *
-   * @return sorted series copy
-   */
-  public abstract Series sorted();
-
-  /**
    * Returns as copy of the series with the same native type.
    *
    * @return series copy
@@ -367,14 +355,6 @@ public abstract class Series {
   public abstract boolean hasNull();
 
   /**
-   * Returns a copy of the series with each distinct value of the
-   * source series appearing exactly once. The values are further sorted in ascending order.
-   *
-   * @return sorted series copy with distinct unique values
-   */
-  public abstract Series unique();
-
-  /**
    * Returns a copy of the series with values from <b>other</b>
    * appended at the end. If <b>other</b> has a different type it is converted transparently.
    *
@@ -389,6 +369,7 @@ public abstract class Series {
    * Returns projection of the series.
    *
    * <b>NOTE:</b> fromIndex <= -1 is filled with <b>null</b>.
+   * <b>NOTE:</b> array with length 0 returns empty series.
    *
    * @param fromIndex array with indices to project from (must be <= series size)
    * @return series projection
@@ -409,8 +390,6 @@ public abstract class Series {
    * Returns an array of indices with size less than or equal to the series size, such that
    * each index references a null value in the original series.
    *
-   * <b>NOTE:</b> BooleanSeries does not support null values.
-   *
    * @return indices of null values
    */
   abstract int[] nullIndex();
@@ -429,7 +408,7 @@ public abstract class Series {
   /**
    * Returns <b>true</b> is there are no values in the series. Otherwise returns <b>false</b>.
    *
-   * <b>NOTE:</b> for this method <b>null</b> values count as elements.
+   * <b>NOTE:</b> <b>null</b> values count as elements.
    *
    * @return <b>true</b> if empty, <b>false</b> otherwise
    */
@@ -487,6 +466,18 @@ public abstract class Series {
   }
 
   /**
+   * Returns a copy of the series with values ordered
+   * in ascending order.
+   *
+   * <b>NOTE:</b> BooleanSeries interprets <b>false</b> as smaller than <b>true</b>.
+   *
+   * @return sorted series copy
+   */
+  public Series sorted() {
+    return this.project(this.sortedIndex());
+  }
+
+  /**
    * Returns a copy of the series with elements in reverse order from the original series.
    *
    * @return reversed series
@@ -500,12 +491,32 @@ public abstract class Series {
   }
 
   /**
+   * Returns a copy of the series with each distinct value of the
+   * source series appearing exactly once. The values are further sorted in ascending order.
+   *
+   * @return sorted series copy with distinct unique values
+   */
+  public Series unique() {
+    if(this.size() <= 1)
+      return this;
+
+    Series sorted = this.sorted();
+    List<Integer> indices = new ArrayList<>();
+
+    indices.add(0);
+    for(int i=1; i<this.size(); i++) {
+      if(sorted.compare(sorted, i-1, i) != 0)
+        indices.add(i);
+    }
+
+    int[] fromIndex = ArrayUtils.toPrimitive(indices.toArray(new Integer[indices.size()]));
+    return this.project(fromIndex);
+  }
+
+  /**
    * Applies <b>conditional</b> to the series row by row and returns the results as a BooleanSeries.
    * If the series' native type does not match the required input type of <b>conditional</b>,
    * the series is converted transparently.
-   *
-   * <b>NOTE:</b> BooleanSeries does not support <n>null</n> values. Any <b>null</b> values
-   * encountered default to <b>false</b>.
    *
    * @param conditional condition to apply to each element in the series
    * @return BooleanSeries with evaluation results
@@ -519,9 +530,6 @@ public abstract class Series {
    * If the series' native type does not match the required input type of <b>conditional</b>,
    * the series is converted transparently.
    *
-   * <b>NOTE:</b> BooleanSeries does not support <n>null</n> values. Any <b>null</b> values
-   * encountered default to <b>false</b>.
-   *
    * @param conditional condition to apply to each element in the series
    * @return BooleanSeries with evaluation results
    */
@@ -533,9 +541,6 @@ public abstract class Series {
    * Applies a <b>conditional</b> to the series row by row and returns the results as a BooleanSeries.
    * If the series' native type does not match the required input type of <b>conditional</b>,
    * the series is converted transparently.
-   *
-   * <b>NOTE:</b> BooleanSeries does not support <n>null</n> values. Any <b>null</b> values
-   * encountered default to <b>false</b>.
    *
    * @param conditional condition to apply to each element in the series
    * @return BooleanSeries with evaluation results

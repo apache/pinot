@@ -75,6 +75,11 @@ public final class StringSeries extends Series {
       return this;
     }
 
+    public Builder add(StringSeries series) {
+      this.values.addAll(Arrays.asList(series.values));
+      return this;
+    }
+
     public StringSeries build() {
       return new StringSeries(values.toArray(new String[values.size()]));
     }
@@ -96,7 +101,7 @@ public final class StringSeries extends Series {
     return new StringSeries();
   }
 
-  StringSeries(String... values) {
+  private StringSeries(String... values) {
     this.values = values;
   }
 
@@ -111,7 +116,7 @@ public final class StringSeries extends Series {
         values[i] = Double.parseDouble(value);
       }
     }
-    return new DoubleSeries(values);
+    return DoubleSeries.buildFrom(values);
   }
 
   @Override
@@ -129,25 +134,25 @@ public final class StringSeries extends Series {
         }
       }
     }
-    return new LongSeries(values);
+    return LongSeries.buildFrom(values);
   }
 
   @Override
   public BooleanSeries getBooleans() {
-    boolean[] values = new boolean[this.size()];
+    byte[] values = new byte[this.size()];
     for(int i=0; i<values.length; i++) {
       String value = this.values[i];
       if(StringSeries.isNull(value) || value.length() <= 0) {
         values[i] = BooleanSeries.NULL_VALUE;
       } else {
         if(NumberUtils.isNumber(value)) {
-          values[i] = Double.parseDouble(value) != 0.0d;
+          values[i] = BooleanSeries.valueOf(Double.parseDouble(value) != 0.0d);
         } else {
-          values[i] = Boolean.parseBoolean(value);
+          values[i] = BooleanSeries.valueOf(Boolean.parseBoolean(value));
         }
       }
     }
-    return new BooleanSeries(values);
+    return BooleanSeries.buildFrom(values);
   }
 
   @Override
@@ -157,7 +162,7 @@ public final class StringSeries extends Series {
 
   @Override
   public StringSeries copy() {
-    return new StringSeries(Arrays.copyOf(this.values, this.values.length));
+    return StringSeries.buildFrom(Arrays.copyOf(this.values, this.values.length));
   }
 
   @Override
@@ -178,7 +183,7 @@ public final class StringSeries extends Series {
   public StringSeries unique() {
     Set<String> uniques = new HashSet<>(Arrays.asList(this.values));
     String[] values = new String[uniques.size()];
-    return new StringSeries(uniques.toArray(values));
+    return StringSeries.buildFrom(uniques.toArray(values));
   }
 
   /**
@@ -243,7 +248,7 @@ public final class StringSeries extends Series {
 
   @Override
   public StringSeries slice(int from, int to) {
-    return new StringSeries(Arrays.copyOfRange(this.values, from, to));
+    return StringSeries.buildFrom(Arrays.copyOfRange(this.values, from, to));
   }
 
   @Override
@@ -272,6 +277,11 @@ public final class StringSeries extends Series {
   }
 
   @Override
+  public StringSeries sorted() {
+    return (StringSeries)super.sorted();
+  }
+
+  @Override
   public StringSeries map(StringFunction function) {
     String[] newValues = new String[this.values.length];
     for(int i=0; i<this.values.length; i++) {
@@ -281,25 +291,25 @@ public final class StringSeries extends Series {
         newValues[i] = function.apply(this.values[i]);
       }
     }
-    return new StringSeries(newValues);
+    return StringSeries.buildFrom(newValues);
   }
 
   @Override
   public BooleanSeries map(StringConditional conditional) {
-    boolean[] newValues = new boolean[this.values.length];
+    byte[] newValues = new byte[this.values.length];
     for(int i=0; i<this.values.length; i++) {
       if(isNull(this.values[i])) {
         newValues[i] = BooleanSeries.NULL_VALUE;
       } else {
-        newValues[i] = conditional.apply(this.values[i]);
+        newValues[i] = BooleanSeries.valueOf(conditional.apply(this.values[i]));
       }
     }
-    return new BooleanSeries(newValues);
+    return BooleanSeries.buildFrom(newValues);
   }
 
   @Override
   public StringSeries aggregate(StringFunction function) {
-    return new StringSeries(function.apply(this.values));
+    return StringSeries.buildFrom(function.apply(this.values));
   }
 
   @Override
@@ -307,14 +317,7 @@ public final class StringSeries extends Series {
     String[] values = new String[this.size() + series.size()];
     System.arraycopy(this.values, 0, values, 0, this.size());
     System.arraycopy(series.getStrings().values, 0, values, this.size(), series.size());
-    return new StringSeries(values);
-  }
-
-  @Override
-  public StringSeries sorted() {
-    String[] values = Arrays.copyOf(this.values, this.values.length);
-    Arrays.sort(values);
-    return new StringSeries(values);
+    return StringSeries.buildFrom(values);
   }
 
   @Override
@@ -348,7 +351,7 @@ public final class StringSeries extends Series {
         values[i] = value;
       }
     }
-    return new StringSeries(values);
+    return buildFrom(values);
   }
 
   @Override
@@ -361,7 +364,7 @@ public final class StringSeries extends Series {
       System.arraycopy(this.values, Math.min(-offset, values.length), values, 0, Math.max(values.length + offset, 0));
       Arrays.fill(values, Math.max(values.length + offset, 0), values.length, NULL_VALUE);
     }
-    return new StringSeries(values);
+    return StringSeries.buildFrom(values);
   }
 
   @Override
@@ -374,7 +377,7 @@ public final class StringSeries extends Series {
         values[i] = this.values[fromIndex[i]];
       }
     }
-    return new StringSeries(values);
+    return StringSeries.buildFrom(values);
   }
 
   @Override
@@ -451,17 +454,15 @@ public final class StringSeries extends Series {
     return Objects.equals(value, NULL_VALUE);
   }
 
-  private static int nullSafeStringComparator(final String one, final String two) {
-    // NOTE: http://stackoverflow.com/questions/481813/how-to-simplify-a-null-safe-compareto-implementation
-    if (one == null ^ two == null) {
-      return (one == null) ? -1 : 1;
-    }
-
-    if (one == null && two == null) {
+  private static int nullSafeStringComparator(String a, String b) {
+    if (isNull(a) && isNull(b))
       return 0;
-    }
+    if (isNull(a))
+      return -1;
+    if (isNull(b))
+      return 1;
 
-    return one.compareToIgnoreCase(two);
+    return a.compareToIgnoreCase(b);
   }
 
   private static String[] assertNotEmpty(String[] values) {

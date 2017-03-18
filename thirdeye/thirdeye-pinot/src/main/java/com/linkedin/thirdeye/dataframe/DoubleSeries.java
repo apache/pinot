@@ -95,6 +95,12 @@ public final class DoubleSeries extends Series {
       return this;
     }
 
+    public Builder add(DoubleSeries series) {
+      for(double v : series.values)
+        this.add(v);
+      return this;
+    }
+
     public DoubleSeries build() {
       double[] values = new double[this.values.size()];
       int i = 0;
@@ -121,13 +127,13 @@ public final class DoubleSeries extends Series {
     return new DoubleSeries();
   }
 
-  DoubleSeries(double... values) {
+  private DoubleSeries(double... values) {
     this.values = values;
   }
 
   @Override
   public DoubleSeries copy() {
-    return new DoubleSeries(Arrays.copyOf(this.values, this.values.length));
+    return buildFrom(Arrays.copyOf(this.values, this.values.length));
   }
 
   @Override
@@ -145,20 +151,20 @@ public final class DoubleSeries extends Series {
         values[i] = (long) this.values[i];
       }
     }
-    return new LongSeries(values);
+    return LongSeries.buildFrom(values);
   }
 
   @Override
   public BooleanSeries getBooleans() {
-    boolean[] values = new boolean[this.size()];
+    byte[] values = new byte[this.size()];
     for(int i=0; i<values.length; i++) {
       if(DoubleSeries.isNull(this.values[i])) {
         values[i] = BooleanSeries.NULL_VALUE;
       } else {
-        values[i] = this.values[i] != 0.0d;
+        values[i] = BooleanSeries.valueOf(this.values[i] != 0.0d);
       }
     }
-    return new BooleanSeries(values);
+    return BooleanSeries.buildFrom(values);
   }
 
   @Override
@@ -171,7 +177,7 @@ public final class DoubleSeries extends Series {
         values[i] = String.valueOf(this.values[i]);
       }
     }
-    return new StringSeries(values);
+    return StringSeries.buildFrom(values);
   }
 
   @Override
@@ -191,7 +197,7 @@ public final class DoubleSeries extends Series {
   @Override
   public DoubleSeries unique() {
     if(this.values.length <= 0)
-      return new DoubleSeries();
+      return buildFrom();
 
     double[] values = Arrays.copyOf(this.values, this.values.length);
     Arrays.sort(values);
@@ -206,7 +212,7 @@ public final class DoubleSeries extends Series {
       }
     }
 
-    return new DoubleSeries(Arrays.copyOf(values, uniqueCount));
+    return buildFrom(Arrays.copyOf(values, uniqueCount));
   }
 
   /**
@@ -233,7 +239,7 @@ public final class DoubleSeries extends Series {
 
   @Override
   public DoubleSeries slice(int from, int to) {
-    return new DoubleSeries(Arrays.copyOfRange(this.values, from, to));
+    return buildFrom(Arrays.copyOfRange(this.values, from, to));
   }
 
   @Override
@@ -262,6 +268,11 @@ public final class DoubleSeries extends Series {
   }
 
   @Override
+  public DoubleSeries sorted() {
+    return (DoubleSeries)super.sorted();
+  }
+
+  @Override
   public DoubleSeries map(DoubleFunction function) {
     double[] newValues = new double[this.values.length];
     for(int i=0; i<this.values.length; i++) {
@@ -271,25 +282,25 @@ public final class DoubleSeries extends Series {
         newValues[i] = function.apply(this.values[i]);
       }
     }
-    return new DoubleSeries(newValues);
+    return buildFrom(newValues);
   }
 
   @Override
   public BooleanSeries map(DoubleConditional conditional) {
-    boolean[] newValues = new boolean[this.values.length];
+    byte[] newValues = new byte[this.values.length];
     for(int i=0; i<this.values.length; i++) {
       if(isNull(this.values[i])) {
         newValues[i] = BooleanSeries.NULL_VALUE;
       } else {
-        newValues[i] = conditional.apply(this.values[i]);
+        newValues[i] = BooleanSeries.valueOf(conditional.apply(this.values[i]));
       }
     }
-    return new BooleanSeries(newValues);
+    return BooleanSeries.buildFrom(newValues);
   }
 
   @Override
   public DoubleSeries aggregate(DoubleFunction function) {
-    return new DoubleSeries(function.apply(this.values));
+    return buildFrom(function.apply(this.values));
   }
 
   @Override
@@ -297,7 +308,7 @@ public final class DoubleSeries extends Series {
     double[] values = new double[this.size() + series.size()];
     System.arraycopy(this.values, 0, values, 0, this.size());
     System.arraycopy(series.getDoubles().values, 0, values, this.size(), series.size());
-    return new DoubleSeries(values);
+    return buildFrom(values);
   }
 
   public DoubleSeries applyMovingWindow(int size, int minSize, DoubleFunction function) {
@@ -312,14 +323,7 @@ public final class DoubleSeries extends Series {
       values[to-1] = function.apply(input);
     }
 
-    return new DoubleSeries(values);
-  }
-
-  @Override
-  public DoubleSeries sorted() {
-    double[] values = Arrays.copyOf(this.values, this.values.length);
-    Arrays.sort(values);
-    return new DoubleSeries(values);
+    return buildFrom(values);
   }
 
   @Override
@@ -383,7 +387,7 @@ public final class DoubleSeries extends Series {
         values[i] = value;
       }
     }
-    return new DoubleSeries(values);
+    return buildFrom(values);
   }
 
   @Override
@@ -396,7 +400,7 @@ public final class DoubleSeries extends Series {
       System.arraycopy(this.values, Math.min(-offset, values.length), values, 0, Math.max(values.length + offset, 0));
       Arrays.fill(values, Math.max(values.length + offset, 0), values.length, NULL_VALUE);
     }
-    return new DoubleSeries(values);
+    return buildFrom(values);
   }
 
   @Override
@@ -409,7 +413,7 @@ public final class DoubleSeries extends Series {
         values[i] = this.values[fromIndex[i]];
       }
     }
-    return new DoubleSeries(values);
+    return buildFrom(values);
   }
 
   @Override
@@ -422,7 +426,7 @@ public final class DoubleSeries extends Series {
     Collections.sort(tuples, new Comparator<DoubleSortTuple>() {
       @Override
       public int compare(DoubleSortTuple a, DoubleSortTuple b) {
-        return Double.compare(a.value, b.value);
+        return nullSafeDoubleComparator(a.value, b.value);
       }
     });
 
@@ -473,7 +477,17 @@ public final class DoubleSeries extends Series {
 
   @Override
   int compare(Series that, int indexThis, int indexThat) {
-    return Double.compare(this.values[indexThis], ((DoubleSeries)that).values[indexThat]);
+    return nullSafeDoubleComparator(this.values[indexThis], ((DoubleSeries)that).values[indexThat]);
+  }
+
+  private static int nullSafeDoubleComparator(double a, double b) {
+    if(isNull(a) && isNull(b))
+      return 0;
+    if(isNull(a))
+      return -1;
+    if(isNull(b))
+      return 1;
+    return Double.compare(a, b);
   }
 
   @Override
