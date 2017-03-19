@@ -96,8 +96,9 @@ public class SegmentCompletionProtocol {
   public static final String BUILD_TIME_KEY = "buildTimeSec";  // Sent by controller in COMMIT message
 
   public static final String MSG_TYPE_CONSUMED = "segmentConsumed";
-  public static final String MSG_TYPE_COMMMIT = "segmentCommit";
+  public static final String MSG_TYPE_COMMIT = "segmentCommit";
   public static final String MSG_TYPE_STOPPED_CONSUMING = "segmentStoppedConsuming";
+  public static final String MSG_TYPE_EXTEND_BUILD_TIME = "extendBuildTime";
 
   public static final String PARAM_SEGMENT_NAME = "name";
   public static final String PARAM_OFFSET = "offset";
@@ -156,7 +157,7 @@ public class SegmentCompletionProtocol {
           (_params.getReason() == null ? "" : ("&" + PARAM_REASON + "=" + _params.getReason())) +
           (_params.getBuildTimeMillis() <= 0 ? "" :("&" + PARAM_BUILD_TIME_MILLIS + "=" + _params.getBuildTimeMillis())) +
           (_params.getWaitTimeMillis() <= 0 ? "" : ("&" + PARAM_WAIT_TIME_MILLIS + "=" + _params.getWaitTimeMillis())) +
-          (_params.getExtTimeSec() <= 0 ? "" : ("&" + PARAM_EXTRA_TIME_SEC + "=" + _params.getExtTimeSec())) +
+          (_params.getExtraTimeSec() <= 0 ? "" : ("&" + PARAM_EXTRA_TIME_SEC + "=" + _params.getExtraTimeSec())) +
           (_params.getNumRows() <= 0 ? "" : ("&" + PARAM_ROW_COUNT + "=" + _params.getNumRows()));
     }
 
@@ -168,7 +169,7 @@ public class SegmentCompletionProtocol {
       private int _numRows;
       private long _buildTimeMillis;
       private long _waitTimeMillis;
-      private int _extTimeSec;
+      private int _extraTimeSec;
 
       public Params() {
         _offset = -1L;
@@ -177,7 +178,7 @@ public class SegmentCompletionProtocol {
         _numRows = -1;
         _buildTimeMillis = -1;
         _waitTimeMillis = -1;
-        _extTimeSec = -1;
+        _extraTimeSec = -1;
       }
       public Params withOffset(long offset) {
         _offset = offset;
@@ -207,8 +208,8 @@ public class SegmentCompletionProtocol {
         _waitTimeMillis = waitTimeMillis;
         return this;
       }
-      public Params withExtTimeSec(int extTimeSec) {
-        _extTimeSec = extTimeSec;
+      public Params withExtraTimeSec(int exttraTimeSec) {
+        _extraTimeSec = exttraTimeSec;
         return this;
       }
 
@@ -233,12 +234,21 @@ public class SegmentCompletionProtocol {
       public long getWaitTimeMillis() {
         return _waitTimeMillis;
       }
-      public int getExtTimeSec() {
-        return _extTimeSec;
+      public int getExtraTimeSec() {
+        return _extraTimeSec;
       }
     }
   }
 
+  public static class ExtendBuildTimeRequest extends Request {
+    public ExtendBuildTimeRequest(Params params) {
+      super(params);
+    }
+    @Override
+    public String getUrl(final String hostPort) {
+      return "http://" + hostPort + getUri(MSG_TYPE_EXTEND_BUILD_TIME);
+    }
+  }
 
   public static class SegmentConsumedRequest extends Request {
     public SegmentConsumedRequest(Params params) {
@@ -257,7 +267,7 @@ public class SegmentCompletionProtocol {
     }
     @Override
       public String getUrl(final String hostPort) {
-        return "http://" + hostPort + getUri(MSG_TYPE_COMMMIT);
+        return "http://" + hostPort + getUri(MSG_TYPE_COMMIT);
       }
   }
 

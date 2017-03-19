@@ -143,6 +143,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   private long _startTimeMs = 0;
   private final String _segmentNameStr;
   private final SegmentVersion _segmentVersion;
+  private final SegmentBuildTimeLeaseExtender _leaseExtender;
 
   // Segment end criteria
   private volatile long _consumeEndTime = 0;
@@ -168,7 +169,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   private Logger segmentLogger = LOGGER;
   private final String _tableStreamName;
   private AtomicLong _lastUpdatedRawDocuments = new AtomicLong(0);
-  private final String _instance;
+  private final String _instanceId;
   private final ServerSegmentCompletionProtocolHandler _protocolHandler;
   private final long _consumeStartTime;
   private final long _startOffset;
@@ -449,7 +450,8 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
             case COMMIT:
               _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.LLC_CONTROLLER_RESPONSE_COMMIT, 1);
               _state = State.COMMITTING;
-              success = buildSegment(true);
+              long buildTimeSeconds = response.getBuildTimeSeconds();
+              success = buildSegment(true, buildTimeSeconds*1000L);
               if (!success) {
                 // We could not build the segment. Go into error state.
                 _state = State.ERROR;
@@ -494,10 +496,24 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
 
   /**
    *
-   * @param buildTgz true if you want the method to also build tgz file
+   * @param forCommit true if you want the method to also build tgz file for committing
+   * @param buildTimeLeaseMs
    * @return true if all succeeds.
    */
-  protected boolean buildSegment(boolean buildTgz) {
+  protected boolean buildSegment(boolean forCommit, long buildTimeLeaseMs) {
+    try {
+      if (forCommit) {
+        _leaseExtender.addSegment(_segmentNameStr, buildTimeLeaseMs, _currentOffset);
+      }
+      return buildSegmentInternal(forCommit);
+    } finally {
+      if (forCommit) {
+        _leaseExtender.removeSegment(_segmentNameStr);
+      }
+    }
+  }
+
+  private boolean buildSegmentInternal(boolean forCommit) {
     long startTimeMillis = System.currentTimeMillis();
     // Build a segment from in-memory rows.If buildTgz is true, then build the tar.gz file as well
     // TODO Use an auto-closeable object to delete temp resources.
@@ -525,7 +541,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     FileUtils.deleteQuietly(destDir);
     try {
       FileUtils.moveDirectory(tempSegmentFolder.listFiles()[0], destDir);
-      if (buildTgz) {
+      if (forCommit) {
         TarGzCompressionUtils.createTarGzOfDirectory(destDir.getAbsolutePath());
       }
     } catch (IOException e) {
@@ -565,7 +581,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   }
 
   protected boolean buildSegmentAndReplace() {
-    boolean success = buildSegment(false);
+    boolean success = buildSegmentInternal(false);
     if (!success) {
       return success;
     }
@@ -607,6 +623,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
 
   public void goOnlineFromConsuming(RealtimeSegmentZKMetadata metadata) throws InterruptedException {
     LLCRealtimeSegmentZKMetadata llcMetadata = (LLCRealtimeSegmentZKMetadata)metadata;
+    _leaseExtender.removeSegment(_segmentNameStr);
     final long endOffset = llcMetadata.getEndOffset();
     segmentLogger.info("State: {}, transitioning from CONSUMING to ONLINE (startOffset: {}, endOffset: {})",
         _state.toString(), _startOffset, endOffset);
@@ -740,8 +757,9 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     _serverMetrics = serverMetrics;
     _segmentVersion = SegmentVersion.fromString(tableConfig.getIndexingConfig().getSegmentFormatVersion(),
         SegmentVersion.DEFAULT_TABLE_VERSION);
-    _instance = _realtimeTableDataManager.getServerInstance();
-    _protocolHandler = new ServerSegmentCompletionProtocolHandler(_instance);
+    _instanceId = _realtimeTableDataManager.getServerInstance();
+    _leaseExtender = SegmentBuildTimeLeaseExtender.getLeaseExtender(_instanceId);
+    _protocolHandler = new ServerSegmentCompletionProtocolHandler(_instanceId);
 
     // TODO Validate configs
     IndexingConfig indexingConfig = _tableConfig.getIndexingConfig();

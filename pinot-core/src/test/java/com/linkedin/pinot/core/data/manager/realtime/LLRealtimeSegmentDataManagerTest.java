@@ -110,8 +110,10 @@ public class LLRealtimeSegmentDataManagerTest {
   }
 
   private RealtimeTableDataManager createTableDataManager() {
+    final String instanceId = "server-1";
+    SegmentBuildTimeLeaseExtender.create(instanceId);
     RealtimeTableDataManager tableDataManager = mock(RealtimeTableDataManager.class);
-    when(tableDataManager.getServerInstance()).thenReturn("server-1");
+    when(tableDataManager.getServerInstance()).thenReturn(instanceId);
     return tableDataManager;
   }
   private LLCRealtimeSegmentZKMetadata createZkMetadata() {
@@ -633,7 +635,7 @@ public class LLRealtimeSegmentDataManagerTest {
     }
 
     @Override
-    protected boolean buildSegment(boolean buildTgz) {
+    protected boolean buildSegment(boolean buildTgz, long buildTimeLeaseMs) {
       _buildSegmentCalled = true;
       return true;
     }

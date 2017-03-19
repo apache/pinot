@@ -129,19 +129,19 @@ public class HelixServerStarter {
 
     _serverInstance.getServerMetrics()
         .addCallbackGauge("helix.connected", new Callable<Long>() {
-              @Override
-              public Long call()
-                  throws Exception {
-                return _helixManager.isConnected() ? 1L : 0L;
-              }
-            });
-
-    _helixManager.addPreConnectCallback(new PreConnectCallback() {
           @Override
-          public void onPreConnect() {
-            _serverInstance.getServerMetrics().addMeteredGlobalValue(ServerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L);
+          public Long call()
+              throws Exception {
+            return _helixManager.isConnected() ? 1L : 0L;
           }
         });
+
+    _helixManager.addPreConnectCallback(new PreConnectCallback() {
+      @Override
+      public void onPreConnect() {
+        _serverInstance.getServerMetrics().addMeteredGlobalValue(ServerMeter.HELIX_ZOOKEEPER_RECONNECTS, 1L);
+      }
+    });
 
     // Register the service status handler
     ServiceStatus.setServiceStatusCallback(
