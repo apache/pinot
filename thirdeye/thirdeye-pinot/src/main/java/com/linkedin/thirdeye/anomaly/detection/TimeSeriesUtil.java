@@ -81,7 +81,8 @@ public abstract class TimeSeriesUtil {
         anomalyFunctionSpec.getBucketUnit());
 
     TimeSeriesResponse timeSeriesResponse =
-      getTimeSeriesResponseImpl(anomalyFunctionSpec, startEndTimeRanges, timeGranularity, filters, groupByDimensions);
+      getTimeSeriesResponseImpl(anomalyFunctionSpec, startEndTimeRanges, timeGranularity, filters, groupByDimensions,
+          false);
 
     try {
       Map<DimensionKey, MetricTimeSeries> dimensionKeyMetricTimeSeriesMap =
@@ -103,14 +104,15 @@ public abstract class TimeSeriesUtil {
    * @param dimensionMap a dimension map that is used to construct the filter for retrieving the corresponding data
    *                     that was used to detected the anomaly
    * @param timeGranularity time granularity of the time series
-   *
+   * @param endTimeInclusive set to true if the end time should be inclusive; mainly used by the query for UI
    * @return the time series in the same format as those used by the given anomaly function for anomaly detection
    *
    * @throws JobExecutionException
    * @throws ExecutionException
    */
   public static MetricTimeSeries getTimeSeriesByDimension(AnomalyFunctionDTO anomalyFunctionSpec,
-      List<Pair<Long, Long>> startEndTimeRanges, DimensionMap dimensionMap, TimeGranularity timeGranularity)
+      List<Pair<Long, Long>> startEndTimeRanges, DimensionMap dimensionMap, TimeGranularity timeGranularity,
+      boolean endTimeInclusive)
       throws JobExecutionException, ExecutionException {
 
     // Get the original filter
@@ -143,7 +145,8 @@ public abstract class TimeSeriesUtil {
     }
 
     TimeSeriesResponse response =
-        getTimeSeriesResponseImpl(anomalyFunctionSpec, startEndTimeRanges, timeGranularity, filters, groupByDimensions);
+        getTimeSeriesResponseImpl(anomalyFunctionSpec, startEndTimeRanges, timeGranularity, filters, groupByDimensions,
+            endTimeInclusive);
     try {
       Map<DimensionKey, MetricTimeSeries> metricTimeSeriesMap = TimeSeriesResponseConverter.toMap(response,
           Utils.getSchemaDimensionNames(anomalyFunctionSpec.getCollection()));
@@ -203,7 +206,7 @@ public abstract class TimeSeriesUtil {
 
   private static TimeSeriesResponse getTimeSeriesResponseImpl(AnomalyFunctionDTO anomalyFunctionSpec,
       List<Pair<Long, Long>> startEndTimeRanges, TimeGranularity timeGranularity, Multimap<String, String> filters,
-      List<String> groupByDimensions)
+      List<String> groupByDimensions, boolean endTimeInclusive)
       throws JobExecutionException, ExecutionException {
 
     TimeSeriesHandler timeSeriesHandler =
@@ -222,6 +225,7 @@ public abstract class TimeSeriesUtil {
     request.setEndDateInclusive(false);
     request.setFilterSet(filters);
     request.setGroupByDimensions(groupByDimensions);
+    request.setEndDateInclusive(endTimeInclusive);
 
     LOG.info("Found [{}] time ranges to fetch data", startEndTimeRanges.size());
     for (Pair<Long, Long> timeRange : startEndTimeRanges) {

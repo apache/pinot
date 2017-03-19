@@ -18,7 +18,6 @@ import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalyDetails;
 import com.linkedin.thirdeye.dashboard.views.TimeBucket;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
@@ -29,6 +28,8 @@ import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -154,7 +155,7 @@ public class AnomaliesResource {
       Pair<Long, Long> currentTmeRange = new Pair<>(anomaly.getStartTime(), anomaly.getEndTime());
       MetricTimeSeries ts = TimeSeriesUtil
           .getTimeSeriesByDimension(anomaly.getFunction(), Arrays.asList(currentTmeRange),
-              anomaly.getDimensions(), granularity);
+              anomaly.getDimensions(), granularity, false);
       double currentVal = getTotalFromTimeSeries(ts, dataset.isAdditive());
       response.setCurrentVal(currentVal);
 
@@ -164,7 +165,7 @@ public class AnomaliesResource {
             anomaly.getEndTime() - baselineOffset);
         MetricTimeSeries baselineTs = TimeSeriesUtil
             .getTimeSeriesByDimension(anomaly.getFunction(), Arrays.asList(baselineTmeRange),
-                anomaly.getDimensions(), granularity);
+                anomaly.getDimensions(), granularity, false);
         AnomalyDataCompare.CompareResult cr = new AnomalyDataCompare.CompareResult();
         double baseLineval = getTotalFromTimeSeries(baselineTs, dataset.isAdditive());
         cr.setBaselineValue(baseLineval);
@@ -608,6 +609,9 @@ public class AnomaliesResource {
       toIndex = mergedAnomalies.size();
     }
 
+    // Show most recent anomalies first, i.e., the anomaly whose end time is most recent then largest id shown at top
+    Collections.sort(mergedAnomalies, new MergedAnomalyEndTimeComparator().reversed());
+
     List<MergedAnomalyResultDTO> displayedAnomalies = mergedAnomalies.subList(fromIndex, toIndex);
     anomaliesWrapper.setNumAnomaliesOnPage(displayedAnomalies.size());
     LOG.info("Page number: {} Page size: {} Num anomalies on page: {}", pageNumber, pageSize, displayedAnomalies.size());
@@ -646,6 +650,21 @@ public class AnomaliesResource {
     anomaliesWrapper.setAnomalyDetailsList(anomalyDetailsList);
 
     return anomaliesWrapper;
+  }
+
+  /**
+   * Return the natural order of MergedAnomaly by comparing their anomaly's end time.
+   * The tie breaker is their anomaly ID.
+   */
+  private static class MergedAnomalyEndTimeComparator implements Comparator<MergedAnomalyResultDTO> {
+    @Override
+    public int compare(MergedAnomalyResultDTO anomaly1, MergedAnomalyResultDTO anomaly2) {
+      if (anomaly1.getEndTime() != anomaly2.getEndTime()) {
+        return (int) (anomaly1.getEndTime() - anomaly2.getEndTime());
+      } else {
+        return (int) (anomaly1.getId() - anomaly2.getId());
+      }
+    }
   }
 
   private String getExternalURL(MergedAnomalyResultDTO mergedAnomaly) {
@@ -699,8 +718,6 @@ public class AnomaliesResource {
     TimeRange range = getTimeseriesOffsetedTimes(anomalyStartTime, anomalyEndTime, datasetConfig);
     long currentStartTime = range.getStart();
     long currentEndTime = range.getEnd();
-    long baselineStartTime = new DateTime(currentStartTime).minusDays(7).getMillis();
-    long baselineEndTime = new DateTime(currentEndTime).minusDays(7).getMillis();
 
     DimensionMap dimensions = mergedAnomaly.getDimensions();
     TimeGranularity timeGranularity =
@@ -710,7 +727,7 @@ public class AnomaliesResource {
     try {
       AnomalyDetectionInputContext adInputContext = TimeBasedAnomalyMerger
           .fetchDataByDimension(currentStartTime, currentEndTime, dimensions, anomalyFunction,
-              mergedAnomalyResultDAO, overrideConfigDAO);
+              mergedAnomalyResultDAO, overrideConfigDAO, true);
 
       MetricTimeSeries metricTimeSeries = adInputContext.getDimensionKeyMetricTimeSeriesMap().get(dimensions);
 
@@ -730,8 +747,8 @@ public class AnomaliesResource {
               currentStartTime, currentEndTime, knownAnomalies);
 
       anomalyDetails = constructAnomalyDetails(metricName, dataset, datasetConfig, mergedAnomaly, anomalyFunctionSpec,
-          currentStartTime, currentEndTime, baselineStartTime, baselineEndTime, anomalyTimelinesView,
-          timeSeriesDateFormatter, startEndDateFormatterHours, startEndDateFormatterDays, externalUrl);
+          currentStartTime, currentEndTime, anomalyTimelinesView, timeSeriesDateFormatter, startEndDateFormatterHours,
+          startEndDateFormatterDays, externalUrl);
     } catch (Exception e) {
       LOG.error("Exception in constructing anomaly wrapper for anomaly {}", mergedAnomaly.getId(), e);
     }
@@ -745,10 +762,8 @@ public class AnomaliesResource {
    * @param datasetConfig
    * @param mergedAnomaly
    * @param anomalyFunction
-   * @param currentStartTime
-   * @param currentEndTime
-   * @param baselineStartTime
-   * @param baselineEndTime
+   * @param currentStartTime inclusive
+   * @param currentEndTime inclusive
    * @param anomalyTimelinesView
    * @param timeSeriesDateFormatter
    * @param startEndDateFormatterHours
@@ -758,9 +773,9 @@ public class AnomaliesResource {
    */
   private AnomalyDetails constructAnomalyDetails(String metricName, String dataset, DatasetConfigDTO datasetConfig,
       MergedAnomalyResultDTO mergedAnomaly, AnomalyFunctionDTO anomalyFunction, long currentStartTime,
-      long currentEndTime, long baselineStartTime, long baselineEndTime, AnomalyTimelinesView anomalyTimelinesView,
-      DateTimeFormatter timeSeriesDateFormatter, DateTimeFormatter startEndDateFormatterHours,
-      DateTimeFormatter startEndDateFormatterDays, String externalUrl) throws JSONException {
+      long currentEndTime, AnomalyTimelinesView anomalyTimelinesView, DateTimeFormatter timeSeriesDateFormatter,
+      DateTimeFormatter startEndDateFormatterHours, DateTimeFormatter startEndDateFormatterDays, String externalUrl)
+      throws JSONException {
 
     MetricConfigDTO metricConfigDTO = metricConfigDAO.findByMetricAndDataset(metricName, dataset);
 
@@ -772,22 +787,41 @@ public class AnomaliesResource {
       anomalyDetails.setMetricId(metricConfigDTO.getId());
     }
 
+    // The filter ensures that the returned time series from anomalies function only includes the values that are
+    // located inside the request windows (i.e., between currentStartTime and currentEndTime, inclusive).
+    List<TimeBucket> timeBuckets = anomalyTimelinesView.getTimeBuckets();
+    int timeStartIndex = -1;
+    int timeEndIndex = -1;
+    for (int i = 0; i < timeBuckets.size(); ++i) {
+      long currentTimeStamp = timeBuckets.get(i).getCurrentStart();
+      if (timeStartIndex < 0 &&  currentTimeStamp >= currentStartTime) {
+        timeStartIndex = i;
+        timeEndIndex = i + 1;
+      } else if (currentTimeStamp <= currentEndTime) {
+        timeEndIndex = i + 1;
+      } else if (currentTimeStamp > currentEndTime) {
+        break;
+      }
+    }
+    if (timeStartIndex < 0 || timeEndIndex < 0) {
+      timeStartIndex = 0;
+      timeEndIndex = 0;
+    }
+
     // get this from timeseries calls
-    List<String> dateValues = getDateFromTimeSeriesObject(anomalyTimelinesView.getTimeBuckets(), timeSeriesDateFormatter);
+    List<String> dateValues = getDateFromTimeSeriesObject(timeBuckets.subList(timeStartIndex, timeEndIndex), timeSeriesDateFormatter);
     anomalyDetails.setDates(dateValues);
     anomalyDetails.setCurrentEnd(getFormattedDateTime(currentEndTime, datasetConfig, startEndDateFormatterHours, startEndDateFormatterDays));
     anomalyDetails.setCurrentStart(getFormattedDateTime(currentStartTime, datasetConfig, startEndDateFormatterHours, startEndDateFormatterDays));
-    anomalyDetails.setBaselineEnd(getFormattedDateTime(baselineEndTime, datasetConfig, startEndDateFormatterHours, startEndDateFormatterDays));
-    anomalyDetails.setBaselineStart(getFormattedDateTime(baselineStartTime, datasetConfig, startEndDateFormatterHours, startEndDateFormatterDays));
-    List<String> baselineValues = getDataFromTimeSeriesObject(anomalyTimelinesView.getBaselineValues());
+    List<String> baselineValues = getDataFromTimeSeriesObject(anomalyTimelinesView.getBaselineValues().subList(timeStartIndex, timeEndIndex));
     anomalyDetails.setBaselineValues(baselineValues);
-    List<String> currentValues = getDataFromTimeSeriesObject(anomalyTimelinesView.getCurrentValues());
+    List<String> currentValues = getDataFromTimeSeriesObject(anomalyTimelinesView.getCurrentValues().subList(timeStartIndex, timeEndIndex));
     anomalyDetails.setCurrentValues(currentValues);
 
     // from function and anomaly
     anomalyDetails.setAnomalyId(mergedAnomaly.getId());
-    anomalyDetails.setAnomalyRegionStart(timeSeriesDateFormatter.print(Long.valueOf(mergedAnomaly.getStartTime())));
-    anomalyDetails.setAnomalyRegionEnd(timeSeriesDateFormatter.print(Long.valueOf(mergedAnomaly.getEndTime())));
+    anomalyDetails.setAnomalyRegionStart(timeSeriesDateFormatter.print(mergedAnomaly.getStartTime()));
+    anomalyDetails.setAnomalyRegionEnd(timeSeriesDateFormatter.print(mergedAnomaly.getEndTime()));
     Map<String, String> messageDataMap = getAnomalyMessageDataMap(mergedAnomaly.getMessage());
     anomalyDetails.setCurrent(messageDataMap.get(ANOMALY_CURRENT_VAL_KEY));
     anomalyDetails.setBaseline(messageDataMap.get(ANOMALY_BASELINE_VAL_KEY));
@@ -808,8 +842,8 @@ public class AnomaliesResource {
     TimeUnit dataTimeunit = datasetConfig.getTimeUnit();
     Period offsetPeriod;
     switch (dataTimeunit) {
-      case DAYS: // 2 days
-        offsetPeriod = new Period(0, 0, 0, 2, 0, 0, 0, 0);
+      case DAYS: // 3 days
+        offsetPeriod = new Period(0, 0, 0, 3, 0, 0, 0, 0);
         break;
       case HOURS: // 10 hours
         offsetPeriod = new Period(0, 0, 0, 0, 10, 0, 0, 0);

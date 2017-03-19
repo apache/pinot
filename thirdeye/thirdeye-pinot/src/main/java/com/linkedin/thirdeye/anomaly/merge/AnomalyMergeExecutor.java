@@ -256,7 +256,7 @@ public class AnomalyMergeExecutor implements Runnable {
 
     MetricTimeSeries metricTimeSeries =
         TimeSeriesUtil.getTimeSeriesByDimension(anomalyFunctionSpec, startEndTimeRanges,
-            anomalyMergedResult.getDimensions(), timeGranularity);
+            anomalyMergedResult.getDimensions(), timeGranularity, false);
 
     if (metricTimeSeries != null) {
       DateTime windowStart = new DateTime(anomalyMergedResult.getStartTime());

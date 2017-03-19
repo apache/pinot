@@ -16,8 +16,6 @@ public class AnomalyDetails {
   List<String> dates;
   private String currentEnd;
   private String currentStart;
-  private String baselineEnd;
-  private String baselineStart;
   private List<String> baselineValues;
   private List<String> currentValues;
   private String current = "1000";
@@ -95,22 +93,6 @@ public class AnomalyDetails {
 
   public void setCurrentStart(String currentStart) {
     this.currentStart = currentStart;
-  }
-
-  public String getBaselineEnd() {
-    return baselineEnd;
-  }
-
-  public void setBaselineEnd(String baselineEnd) {
-    this.baselineEnd = baselineEnd;
-  }
-
-  public String getBaselineStart() {
-    return baselineStart;
-  }
-
-  public void setBaselineStart(String baselineStart) {
-    this.baselineStart = baselineStart;
   }
 
   public List<String> getBaselineValues() {

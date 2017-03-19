@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
 import com.google.common.cache.LoadingCache;
-import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContext;
 import com.linkedin.thirdeye.anomaly.merge.TimeBasedAnomalyMerger;
@@ -21,7 +20,6 @@ import java.io.IOException;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -620,7 +618,7 @@ public class AnomalyResource {
 
     AnomalyDetectionInputContext adInputContext = TimeBasedAnomalyMerger
         .fetchDataByDimension(viewWindowStartTime, viewWindowEndTime, dimensions, anomalyFunction,
-            anomalyMergedResultDAO, overrideConfigDAO);
+            anomalyMergedResultDAO, overrideConfigDAO, false);
 
     MetricTimeSeries metricTimeSeries = adInputContext.getDimensionKeyMetricTimeSeriesMap().get(dimensions);
 
