@@ -16,8 +16,6 @@ public class AnomalyDetails {
   List<String> dates;
   private String currentEnd;
   private String currentStart;
-  private String baselineEnd;
-  private String baselineStart;
   private List<String> baselineValues;
   private List<String> currentValues;
   private String current = "1000";
@@ -26,6 +24,7 @@ public class AnomalyDetails {
   //function details
   private String anomalyRegionStart;
   private String anomalyRegionEnd;
+  private long anomalyRegionEndMillis; // for sorting anomalies
   private Long anomalyFunctionId = 5L;
   private String anomalyFunctionName;
   private String anomalyFunctionType;
@@ -97,22 +96,6 @@ public class AnomalyDetails {
     this.currentStart = currentStart;
   }
 
-  public String getBaselineEnd() {
-    return baselineEnd;
-  }
-
-  public void setBaselineEnd(String baselineEnd) {
-    this.baselineEnd = baselineEnd;
-  }
-
-  public String getBaselineStart() {
-    return baselineStart;
-  }
-
-  public void setBaselineStart(String baselineStart) {
-    this.baselineStart = baselineStart;
-  }
-
   public List<String> getBaselineValues() {
     return baselineValues;
   }
@@ -163,6 +146,14 @@ public class AnomalyDetails {
 
   public Long getAnomalyFunctionId() {
     return anomalyFunctionId;
+  }
+
+  public void setAnomalyRegionEndMillis(long anomalyRegionEndMillis) {
+    this.anomalyRegionEndMillis = anomalyRegionEndMillis;
+  }
+
+  public long getAnomalyRegionEndMillis() {
+    return anomalyRegionEndMillis;
   }
 
   public void setAnomalyFunctionId(Long anomalyFunctionId) {

@@ -224,7 +224,7 @@ public class TimeBasedAnomalyMerger {
 
     AnomalyDetectionInputContext adInputContext =
         fetchDataByDimension(windowStartMillis, windowEndMillis, dimensions, anomalyFunction, mergedResultDAO,
-            overrideConfigDAO);
+            overrideConfigDAO, false);
 
     MetricTimeSeries metricTimeSeries = adInputContext.getDimensionKeyMetricTimeSeriesMap().get(dimensions);
 
@@ -255,12 +255,13 @@ public class TimeBasedAnomalyMerger {
    * @param anomalyFunction the anomaly function that produces the anomaly
    * @param mergedResultDAO DAO for merged anomalies
    * @param overrideConfigDAO DAO for override configuration
+   * @param endTimeInclusive set to true if the end time should be inclusive; mainly used by the queries from UI
    * @return an anomaly detection input context that contains all the retrieved data
    * @throws Exception if it fails to retrieve time series from DB.
    */
   public static AnomalyDetectionInputContext fetchDataByDimension(long windowStartTime, long windowEndTime,
       DimensionMap dimensions, BaseAnomalyFunction anomalyFunction, MergedAnomalyResultManager mergedResultDAO,
-      OverrideConfigManager overrideConfigDAO)
+      OverrideConfigManager overrideConfigDAO, boolean endTimeInclusive)
       throws Exception {
     AnomalyFunctionDTO functionSpec = anomalyFunction.getSpec();
     List<Pair<Long, Long>> startEndTimeRanges = anomalyFunction.getDataRangeIntervals(windowStartTime, windowEndTime);
@@ -270,7 +271,7 @@ public class TimeBasedAnomalyMerger {
 
     // Retrieve Time Series
     MetricTimeSeries metricTimeSeries =
-        TimeSeriesUtil.getTimeSeriesByDimension(functionSpec, startEndTimeRanges, dimensions, timeGranularity);
+        TimeSeriesUtil.getTimeSeriesByDimension(functionSpec, startEndTimeRanges, dimensions, timeGranularity, endTimeInclusive);
     Map<DimensionMap, MetricTimeSeries> metricTimeSeriesMap = new HashMap<>();
     metricTimeSeriesMap.put(dimensions, metricTimeSeries);
     adInputContext.setDimensionKeyMetricTimeSeriesMap(metricTimeSeriesMap);
