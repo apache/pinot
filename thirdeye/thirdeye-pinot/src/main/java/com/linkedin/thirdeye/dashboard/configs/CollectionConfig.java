@@ -146,7 +146,7 @@ public class CollectionConfig extends AbstractConfig {
 
   public void setDimensionsHaveNoPreAggregation(List<String> dimensionsHaveNoPreAggregation) {
     this.dimensionsHaveNoPreAggregation =
-        (dimensionsHaveNoPreAggregation == null) ? Collections.emptyList() : dimensionsHaveNoPreAggregation;
+        (dimensionsHaveNoPreAggregation == null) ? Collections.<String>emptyList() : dimensionsHaveNoPreAggregation;
   }
 
   public String getPreAggregatedKeyword() {

@@ -4,6 +4,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListenableFutureTask;
 
 import java.util.Map;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -85,8 +86,12 @@ public class CollectionMaxDataTimeCacheLoader extends CacheLoader<String, Long> 
   }
 
   @Override
-  public ListenableFuture<Long> reload(String collection, Long preMaxDataTime) {
-    ListenableFutureTask<Long> reloadTask = ListenableFutureTask.create(() -> load(collection));
+  public ListenableFuture<Long> reload(final String collection, Long preMaxDataTime) {
+    ListenableFutureTask<Long> reloadTask = ListenableFutureTask.create(new Callable<Long>() {
+      @Override public Long call() throws Exception {
+        return CollectionMaxDataTimeCacheLoader.this.load(collection);
+      }
+    });
     reloadExecutor.execute(reloadTask);
     LOGGER.info("Passively refreshing max data time of collection: {}", collection);
     return reloadTask;

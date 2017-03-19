@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.client;
 
+import com.google.common.cache.Weigher;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -126,14 +127,16 @@ public class ThirdEyeCacheRegistry {
         .removalListener(listener)
         .expireAfterAccess(1, TimeUnit.HOURS)
         .maximumWeight(maxBucketNumber)
-        .weigher((pinotQuery, resultSetGroup) -> {
-          int resultSetCount = resultSetGroup.getResultSetCount();
-          int weight = 0;
-          for (int idx = 0; idx < resultSetCount; ++idx) {
-            com.linkedin.pinot.client.ResultSet resultSet = resultSetGroup.getResultSet(idx);
-            weight += (resultSet.getColumnCount() * resultSet.getRowCount());
+        .weigher(new Weigher<PinotQuery, ResultSetGroup>() {
+          @Override public int weigh(PinotQuery pinotQuery, ResultSetGroup resultSetGroup) {
+            int resultSetCount = resultSetGroup.getResultSetCount();
+            int weight = 0;
+            for (int idx = 0; idx < resultSetCount; ++idx) {
+              com.linkedin.pinot.client.ResultSet resultSet = resultSetGroup.getResultSet(idx);
+              weight += (resultSet.getColumnCount() * resultSet.getRowCount());
+            }
+            return weight;
           }
-          return weight;
         })
         .build(new ResultSetGroupCacheLoader(pinotThirdeyeClientConfig));
     cacheRegistry.registerResultSetGroupCache(resultSetGroupCache);
@@ -187,14 +190,16 @@ public class ThirdEyeCacheRegistry {
     // causing NPE in reading collectionsCache
 
     // Start initial cache loading asynchronously to reduce application start time
-    Executors.newSingleThreadExecutor().submit(() -> {
-      cacheResource.refreshCollections();
-      cacheResource.refreshDatasetConfigCache();
-      cacheResource.refreshDashoardConfigsCache();
-      cacheResource.refreshDashboardsCache();
-      cacheResource.refreshMetricConfigCache();
-      cacheResource.refreshMaxDataTimeCache();
-      cacheResource.refreshDimensionFiltersCache();
+    Executors.newSingleThreadExecutor().submit(new Runnable() {
+      @Override public void run() {
+        cacheResource.refreshCollections();
+        cacheResource.refreshDatasetConfigCache();
+        cacheResource.refreshDashoardConfigsCache();
+        cacheResource.refreshDashboardsCache();
+        cacheResource.refreshMetricConfigCache();
+        cacheResource.refreshMaxDataTimeCache();
+        cacheResource.refreshDimensionFiltersCache();
+      }
     });
 
     ScheduledExecutorService minuteService = Executors.newSingleThreadScheduledExecutor();

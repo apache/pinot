@@ -55,41 +55,42 @@ public class TaskDriver {
 
   public void start() throws Exception {
     for (int i = 0; i < MAX_PARALLEL_TASK; i++) {
-      Callable callable = () -> {
-        while (!shutdown) {
-          LOG.info(
-              Thread.currentThread().getId() + " : Finding next task to execute for threadId:{}",
-              Thread.currentThread().getId());
+      Callable callable = new Callable() {
+        @Override public Object call() throws Exception {
+          while (!shutdown) {
+            LOG.info(Thread.currentThread().getId() + " : Finding next task to execute for threadId:{}",
+                Thread.currentThread().getId());
 
-          // select a task to execute, and update it to RUNNING
-          TaskDTO anomalyTaskSpec = acquireTask();
+            // select a task to execute, and update it to RUNNING
+            TaskDTO anomalyTaskSpec = TaskDriver.this.acquireTask();
 
-          try {
-            LOG.info(Thread.currentThread().getId() + " : Executing task: {} {}",
-                anomalyTaskSpec.getId(), anomalyTaskSpec.getTaskInfo());
-
-            // execute the selected task
-            TaskType taskType = anomalyTaskSpec.getTaskType();
-            TaskRunner taskRunner = TaskRunnerFactory.getTaskRunnerFromTaskType(taskType);
-            TaskInfo taskInfo =
-                TaskInfoFactory.getTaskInfoFromTaskType(taskType, anomalyTaskSpec.getTaskInfo());
-            LOG.info(Thread.currentThread().getId() + " : Task Info {}", taskInfo);
-            List<TaskResult> taskResults = taskRunner.execute(taskInfo, taskContext);
-            LOG.info(Thread.currentThread().getId() + " : DONE Executing task: {}",
-                anomalyTaskSpec.getId());
-            // update status to COMPLETED
-            updateStatusAndTaskEndTime(anomalyTaskSpec.getId(), TaskStatus.RUNNING, TaskStatus.COMPLETED);
-          } catch (Exception e) {
-            LOG.error("Exception in electing and executing task", e);
             try {
-              // update task status failed
-              updateStatusAndTaskEndTime(anomalyTaskSpec.getId(), TaskStatus.RUNNING, TaskStatus.FAILED);
-            } catch (Exception e1) {
-              LOG.error("Error in updating failed status", e1);
+              LOG.info(Thread.currentThread().getId() + " : Executing task: {} {}", anomalyTaskSpec.getId(),
+                  anomalyTaskSpec.getTaskInfo());
+
+              // execute the selected task
+              TaskType taskType = anomalyTaskSpec.getTaskType();
+              TaskRunner taskRunner = TaskRunnerFactory.getTaskRunnerFromTaskType(taskType);
+              TaskInfo taskInfo = TaskInfoFactory.getTaskInfoFromTaskType(taskType, anomalyTaskSpec.getTaskInfo());
+              LOG.info(Thread.currentThread().getId() + " : Task Info {}", taskInfo);
+              List<TaskResult> taskResults = taskRunner.execute(taskInfo, taskContext);
+              LOG.info(Thread.currentThread().getId() + " : DONE Executing task: {}", anomalyTaskSpec.getId());
+              // update status to COMPLETED
+              TaskDriver.this
+                  .updateStatusAndTaskEndTime(anomalyTaskSpec.getId(), TaskStatus.RUNNING, TaskStatus.COMPLETED);
+            } catch (Exception e) {
+              LOG.error("Exception in electing and executing task", e);
+              try {
+                // update task status failed
+                TaskDriver.this
+                    .updateStatusAndTaskEndTime(anomalyTaskSpec.getId(), TaskStatus.RUNNING, TaskStatus.FAILED);
+              } catch (Exception e1) {
+                LOG.error("Error in updating failed status", e1);
+              }
             }
           }
+          return 0;
         }
-        return 0;
       };
       taskExecutorService.submit(callable);
       LOG.info(Thread.currentThread().getId() + " : Started task driver");

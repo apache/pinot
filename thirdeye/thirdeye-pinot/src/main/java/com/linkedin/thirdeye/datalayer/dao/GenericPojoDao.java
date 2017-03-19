@@ -156,7 +156,7 @@ public class GenericPojoDao {
     return dataSource.getConnection();
   }
 
-  public <E extends AbstractBean> Long put(E pojo) {
+  public <E extends AbstractBean> Long put(final E pojo) {
     //insert into its base table
     //get the generated id
     //update indexes
@@ -211,7 +211,7 @@ public class GenericPojoDao {
     return update(pojo, Predicate.EQ("id", pojo.getId()));
   }
 
-  public <E extends AbstractBean> int update(E pojo, final Predicate predicate) {
+  public <E extends AbstractBean> int update(final E pojo, final Predicate predicate) {
     //update base table
     //update indexes
     return runTask(new QueryTask<Integer>() {
@@ -252,7 +252,7 @@ public class GenericPojoDao {
     }, 0);
   }
 
-  public <E extends AbstractBean> List<E> getAll(Class<E> beanClass) {
+  public <E extends AbstractBean> List<E> getAll(final Class<E> beanClass) {
     return runTask(new QueryTask<List<E>>() {
       @Override
       public List<E> handle(Connection connection) throws Exception {
@@ -274,10 +274,10 @@ public class GenericPojoDao {
         }
         return ret;
       }
-    }, Collections.emptyList());
+    }, Collections.<E>emptyList());
   }
 
-  public <E extends AbstractBean> E get(Long id, Class<E> pojoClass) {
+  public <E extends AbstractBean> E get(final Long id, final Class<E> pojoClass) {
     return runTask(new QueryTask<E>() {
       @Override
       public E handle(Connection connection) throws Exception {
@@ -299,7 +299,7 @@ public class GenericPojoDao {
     }, null);
   }
 
-  public <E extends AbstractBean> List<E> get(List<Long> idList, Class<E> pojoClass) {
+  public <E extends AbstractBean> List<E> get(final List<Long> idList, final Class<E> pojoClass) {
     return runTask(new QueryTask<List<E>>() {
       @Override
       public List<E> handle(Connection connection) throws Exception {
@@ -321,7 +321,7 @@ public class GenericPojoDao {
         }
         return result;
       }
-    }, Collections.emptyList());
+    }, Collections.<E>emptyList());
   }
   /**
    *
@@ -329,8 +329,8 @@ public class GenericPojoDao {
    * @param parameterMap
    * @return
    */
-  public <E extends AbstractBean> List<E> executeParameterizedSQL(String parameterizedSQL,
-      Map<String, Object> parameterMap, Class<E> pojoClass) {
+  public <E extends AbstractBean> List<E> executeParameterizedSQL(final String parameterizedSQL,
+      final Map<String, Object> parameterMap, final Class<E> pojoClass) {
     return runTask(new QueryTask<List<E>>() {
       @Override
       public List<E> handle(Connection connection) throws Exception {
@@ -371,7 +371,7 @@ public class GenericPojoDao {
         return ret;
 
       }
-    }, Collections.emptyList());
+    }, Collections.<E>emptyList());
   }
 
 
@@ -387,7 +387,7 @@ public class GenericPojoDao {
 
   }
 
-  public <E extends AbstractBean> List<E> get(Predicate predicate, Class<E> pojoClass) {
+  public <E extends AbstractBean> List<E> get(final Predicate predicate, final Class<E> pojoClass) {
     //apply the predicates and fetch the primary key ids
     //look up the id and convert them to bean
     return runTask(new QueryTask<List<E>>() {
@@ -431,7 +431,7 @@ public class GenericPojoDao {
         return ret;
       }
 
-    }, Collections.emptyList());
+    }, Collections.<E>emptyList());
   }
 
   private void dumpTable(Connection connection, Class<? extends AbstractEntity> entityClass)
@@ -449,7 +449,7 @@ public class GenericPojoDao {
     }
   }
 
-  public <E extends AbstractBean> int delete(Long id, Class<E> pojoClass) {
+  public <E extends AbstractBean> int delete(final Long id, final Class<E> pojoClass) {
     return runTask(new QueryTask<Integer>() {
       @Override
       public Integer handle(Connection connection) throws Exception {
@@ -471,8 +471,8 @@ public class GenericPojoDao {
     }, 0);
   }
 
-  public <E extends AbstractBean> int deleteByParams(Map<String, Object> filters,
-      Class<E> pojoClass) {
+  public <E extends AbstractBean> int deleteByParams(final Map<String, Object> filters,
+      final Class<E> pojoClass) {
     return runTask(new QueryTask<Integer>() {
       @Override
       public Integer handle(Connection connection) throws Exception {

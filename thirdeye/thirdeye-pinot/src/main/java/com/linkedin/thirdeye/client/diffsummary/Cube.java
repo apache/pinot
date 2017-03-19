@@ -76,12 +76,12 @@ public class Cube { // the cube (Ca|Cb)
 
   public void buildWithAutoDimensionOrder(OLAPDataBaseClient olapClient, Dimensions dimensions)
       throws Exception {
-    buildWithAutoDimensionOrder(olapClient, dimensions, DEFAULT_TOP_DIMENSION, Collections.emptyList());
+    buildWithAutoDimensionOrder(olapClient, dimensions, DEFAULT_TOP_DIMENSION, Collections.<List<String>>emptyList());
   }
 
   public void buildWithAutoDimensionOrder(OLAPDataBaseClient olapClient, Dimensions dimensions, int topDimensions)
       throws Exception {
-    buildWithAutoDimensionOrder(olapClient, dimensions, topDimensions, Collections.emptyList());
+    buildWithAutoDimensionOrder(olapClient, dimensions, topDimensions, Collections.<List<String>>emptyList());
   }
 
   public void buildWithAutoDimensionOrder(OLAPDataBaseClient olapClient, Dimensions dimensions, int topDimension,
@@ -148,7 +148,7 @@ public class Cube { // the cube (Ca|Cb)
     List<List<Row>> rowOfLevels = olapClient.getAggregatedValuesOfLevels(dimensions);
     for (int i = 0; i <= dimensions.size(); ++i) {
       List<Row> rowAtLevelI = rowOfLevels.get(i);
-      rowAtLevelI.sort(new RowDimensionValuesComparator());
+      Collections.sort(rowAtLevelI, new RowDimensionValuesComparator());
       hierarchicalRows.add(rowAtLevelI);
       size += rowAtLevelI.size();
     }
@@ -187,7 +187,7 @@ public class Cube { // the cube (Ca|Cb)
     HashMap<String, HierarchyNode> nextParent = new HashMap<>();
 
     for (int level = 0; level <= this.dimensions.size(); ++level) {
-      hierarchicalNodes.add(new ArrayList<>(hierarchicalRows.get(level).size()));
+      hierarchicalNodes.add(new ArrayList<HierarchyNode>(hierarchicalRows.get(level).size()));
 
       if (level != 0) {
 
@@ -339,7 +339,7 @@ public class Cube { // the cube (Ca|Cb)
     }
 
     // Sort dimensions according to their costs in a descending order
-    dimensionCostPairs.sort((new DimensionCostPairSorter()).reversed());
+    Collections.sort(dimensionCostPairs, Collections.reverseOrder(new DimensionCostPairSorter()));
 
     // If there exists a huge gap (e.g., 1/10 of cost) between two cost pairs, then we chop of the dimensions because
     // pairs with small costs does not provide useful information

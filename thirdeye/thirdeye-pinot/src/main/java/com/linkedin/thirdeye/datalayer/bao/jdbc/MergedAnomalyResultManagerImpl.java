@@ -16,6 +16,7 @@ import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.pojo.EmailConfigurationBean;
 import com.linkedin.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -351,11 +352,16 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
   }
 
   protected List<MergedAnomalyResultDTO> batchConvertMergedAnomalyBean2DTO(
-      List<MergedAnomalyResultBean> mergedAnomalyResultBeanList, boolean loadRawAnomalies) {
+      List<MergedAnomalyResultBean> mergedAnomalyResultBeanList, final boolean loadRawAnomalies) {
     List<Future<MergedAnomalyResultDTO>> mergedAnomalyResultDTOFutureList = new ArrayList<>(mergedAnomalyResultBeanList.size());
-    for (MergedAnomalyResultBean mergedAnomalyResultBean : mergedAnomalyResultBeanList) {
+    for (final MergedAnomalyResultBean mergedAnomalyResultBean : mergedAnomalyResultBeanList) {
       Future<MergedAnomalyResultDTO> future =
-          executorService.submit(() -> convertMergedAnomalyBean2DTO(mergedAnomalyResultBean, loadRawAnomalies));
+          executorService.submit(new Callable<MergedAnomalyResultDTO>() {
+            @Override public MergedAnomalyResultDTO call() throws Exception {
+              return MergedAnomalyResultManagerImpl.this
+                  .convertMergedAnomalyBean2DTO(mergedAnomalyResultBean, loadRawAnomalies);
+            }
+          });
       mergedAnomalyResultDTOFutureList.add(future);
     }
 

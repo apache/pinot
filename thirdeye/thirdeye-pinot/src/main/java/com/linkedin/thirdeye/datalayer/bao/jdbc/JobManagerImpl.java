@@ -30,7 +30,7 @@ public class JobManagerImpl extends AbstractManagerImpl<JobDTO> implements JobMa
   @Override
   @Transactional
   public List<JobDTO> findByStatus(JobStatus status) {
-    return super.findByParams(ImmutableMap.of("status", status.toString()));
+    return super.findByParams(ImmutableMap.<String, Object>of("status", status.toString()));
   }
 
   @Override

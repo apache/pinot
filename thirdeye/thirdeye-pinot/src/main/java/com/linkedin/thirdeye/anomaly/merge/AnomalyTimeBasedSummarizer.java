@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.anomaly.merge;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 import org.slf4j.Logger;
@@ -44,7 +45,11 @@ public abstract class AnomalyTimeBasedSummarizer {
 
     // sort anomalies in natural order of start time
     Collections
-        .sort(anomalies, (o1, o2) -> (int) ((o1.getStartTime() - o2.getStartTime()) / 1000));
+        .sort(anomalies, new Comparator<RawAnomalyResultDTO>() {
+          @Override public int compare(RawAnomalyResultDTO o1, RawAnomalyResultDTO o2) {
+            return (int) ((o1.getStartTime() - o2.getStartTime()) / 1000);
+          }
+        });
 
     boolean applySequentialGapBasedSplit = false;
     boolean applyMaxDurationBasedSplit = false;

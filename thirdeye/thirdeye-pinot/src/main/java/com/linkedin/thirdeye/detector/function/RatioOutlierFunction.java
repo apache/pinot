@@ -35,7 +35,7 @@ public class RatioOutlierFunction extends BaseAnomalyFunction {
 
   final static Logger LOG = LoggerFactory.getLogger(RatioOutlierFunction.class);
 
-  public static String[] getPropertyKeys() {
+  public String[] getPropertyKeys() {
     return new String [] {MIN_VAL, MAX_VAL};
   }
 

@@ -27,7 +27,7 @@ public class MinMaxThresholdFunction extends AbstractModularizedAnomalyFunction 
   private DetectionModel detectionModel = new NoopDetectionModel();
   private MergeModel mergeModel = new NoopMergeModel();
 
-  public static String[] getPropertyKeys() {
+  public String[] getPropertyKeys() {
     return new String [] {MIN_VAL, MAX_VAL};
   }
 

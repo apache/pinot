@@ -98,15 +98,17 @@ public class AnomalyMergeExecutor implements Runnable {
     List<AnomalyFunctionDTO> activeFunctions = anomalyFunctionDAO.findAllActiveFunctions();
 
     // for each anomaly function, find raw unmerged results and perform merge
-    for (AnomalyFunctionDTO function : activeFunctions) {
-      Callable<Integer> task = () -> {
-        final boolean isBackfill = false;
-        // TODO : move merge config within the AnomalyFunction; Every function should have its own merge config.
-        AnomalyMergeConfig anomalyMergeConfig = function.getAnomalyMergeConfig();
-        if (anomalyMergeConfig == null) {
-          anomalyMergeConfig = DEFAULT_MERGE_CONFIG;
+    for (final AnomalyFunctionDTO function : activeFunctions) {
+      Callable<Integer> task = new Callable<Integer>() {
+        @Override public Integer call() throws Exception {
+          final boolean isBackfill = false;
+          // TODO : move merge config within the AnomalyFunction; Every function should have its own merge config.
+          AnomalyMergeConfig anomalyMergeConfig = function.getAnomalyMergeConfig();
+          if (anomalyMergeConfig == null) {
+            anomalyMergeConfig = DEFAULT_MERGE_CONFIG;
+          }
+          return AnomalyMergeExecutor.this.mergeAnomalies(function, anomalyMergeConfig, isBackfill);
         }
-        return mergeAnomalies(function, anomalyMergeConfig, isBackfill);
       };
       Future<Integer> taskFuture = taskExecutorService.submit(task);
       taskCallbacks.add(taskFuture);
@@ -402,7 +404,7 @@ public class AnomalyMergeExecutor implements Runnable {
     for (RawAnomalyResultDTO anomalyResult : unmergedResults) {
       DimensionMap exploredDimensions = anomalyResult.getDimensions();
       if (!dimensionsResultMap.containsKey(exploredDimensions)) {
-        dimensionsResultMap.put(exploredDimensions, new ArrayList<>());
+        dimensionsResultMap.put(exploredDimensions, new ArrayList<RawAnomalyResultDTO>());
       }
       dimensionsResultMap.get(exploredDimensions).add(anomalyResult);
     }

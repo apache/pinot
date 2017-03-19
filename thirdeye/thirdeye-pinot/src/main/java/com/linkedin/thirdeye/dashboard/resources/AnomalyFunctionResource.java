@@ -7,6 +7,7 @@ import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
@@ -71,11 +72,14 @@ public class AnomalyFunctionResource {
       try {
         Class<AnomalyFunction> clz = (Class<AnomalyFunction>) Class.forName(props.get(functionName).toString());
         Method getFunctionProps = clz.getMethod("getPropertyKeys");
-        anomalyFunctionMetadata.put(functionName, getFunctionProps.invoke(null));
+        AnomalyFunction anomalyFunction = clz.newInstance();
+        anomalyFunctionMetadata.put(functionName, getFunctionProps.invoke(anomalyFunction));
       } catch (ClassNotFoundException e) {
         LOG.warn("Unknown class for function : " + functionName);
       } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException e) {
         LOG.error("Unknown method", e);
+      } catch (InstantiationException e) {
+        LOG.error("Unsupported anomaly function", e);
       }
     }
   }
@@ -137,7 +141,7 @@ public class AnomalyFunctionResource {
 
         List<RawAnomalyResultDTO> resultsOfAnEntry = anomalyFunction
             .analyze(dimensionMap, metricTimeSeries, new DateTime(startTime), new DateTime(endTime),
-                new ArrayList<>());
+                new ArrayList<MergedAnomalyResultDTO>());
         if (resultsOfAnEntry.size() != 0) {
           results.addAll(resultsOfAnEntry);
         }

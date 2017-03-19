@@ -101,7 +101,5 @@ public interface AnomalyFunction {
    *
    * @return List of property keys applied in case of specific anomaly function
    */
-  static String [] getPropertyKeys() {
-    return new String[] {};
-  }
+  String[] getPropertyKeys();
 }
