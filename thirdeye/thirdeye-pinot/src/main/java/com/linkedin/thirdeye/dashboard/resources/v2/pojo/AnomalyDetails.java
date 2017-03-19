@@ -24,7 +24,6 @@ public class AnomalyDetails {
   //function details
   private String anomalyRegionStart;
   private String anomalyRegionEnd;
-  private long anomalyRegionEndMillis; // for sorting anomalies
   private Long anomalyFunctionId = 5L;
   private String anomalyFunctionName;
   private String anomalyFunctionType;
@@ -146,14 +145,6 @@ public class AnomalyDetails {
 
   public Long getAnomalyFunctionId() {
     return anomalyFunctionId;
-  }
-
-  public void setAnomalyRegionEndMillis(long anomalyRegionEndMillis) {
-    this.anomalyRegionEndMillis = anomalyRegionEndMillis;
-  }
-
-  public long getAnomalyRegionEndMillis() {
-    return anomalyRegionEndMillis;
   }
 
   public void setAnomalyFunctionId(Long anomalyFunctionId) {

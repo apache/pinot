@@ -609,6 +609,9 @@ public class AnomaliesResource {
       toIndex = mergedAnomalies.size();
     }
 
+    // Show most recent anomalies first, i.e., the anomaly whose end time is most recent then largest id shown at top
+    Collections.sort(mergedAnomalies, new MergedAnomalyEndTimeComparator().reversed());
+
     List<MergedAnomalyResultDTO> displayedAnomalies = mergedAnomalies.subList(fromIndex, toIndex);
     anomaliesWrapper.setNumAnomaliesOnPage(displayedAnomalies.size());
     LOG.info("Page number: {} Page size: {} Num anomalies on page: {}", pageNumber, pageSize, displayedAnomalies.size());
@@ -644,24 +647,22 @@ public class AnomaliesResource {
         LOG.error("Exception in getting AnomalyDetails", e);
       }
     }
-    // Show most recent anomalies first, i.e., the anomaly whose end time is most recent then largest id shown at top
-    Collections.sort(anomalyDetailsList, new AnomalyDetailsAnomalyEndTimeComparator().reversed());
     anomaliesWrapper.setAnomalyDetailsList(anomalyDetailsList);
 
     return anomaliesWrapper;
   }
 
   /**
-   * Return the natural order of AnomalyDetails by comparing their anomaly's end time.
+   * Return the natural order of MergedAnomaly by comparing their anomaly's end time.
    * The tie breaker is their anomaly ID.
    */
-  private static class AnomalyDetailsAnomalyEndTimeComparator implements Comparator<AnomalyDetails> {
+  private static class MergedAnomalyEndTimeComparator implements Comparator<MergedAnomalyResultDTO> {
     @Override
-    public int compare(AnomalyDetails anomaly1, AnomalyDetails anomaly2) {
-      if (anomaly1.getAnomalyRegionEndMillis() != anomaly2.getAnomalyRegionEndMillis()) {
-        return (int) (anomaly1.getAnomalyRegionEndMillis() - anomaly2.getAnomalyRegionEndMillis());
+    public int compare(MergedAnomalyResultDTO anomaly1, MergedAnomalyResultDTO anomaly2) {
+      if (anomaly1.getEndTime() != anomaly2.getEndTime()) {
+        return (int) (anomaly1.getEndTime() - anomaly2.getEndTime());
       } else {
-        return (int) (anomaly1.getAnomalyId() - anomaly2.getAnomalyId());
+        return (int) (anomaly1.getId() - anomaly2.getId());
       }
     }
   }
@@ -821,7 +822,6 @@ public class AnomaliesResource {
     anomalyDetails.setAnomalyId(mergedAnomaly.getId());
     anomalyDetails.setAnomalyRegionStart(timeSeriesDateFormatter.print(mergedAnomaly.getStartTime()));
     anomalyDetails.setAnomalyRegionEnd(timeSeriesDateFormatter.print(mergedAnomaly.getEndTime()));
-    anomalyDetails.setAnomalyRegionEndMillis(mergedAnomaly.getEndTime());
     Map<String, String> messageDataMap = getAnomalyMessageDataMap(mergedAnomaly.getMessage());
     anomalyDetails.setCurrent(messageDataMap.get(ANOMALY_CURRENT_VAL_KEY));
     anomalyDetails.setBaseline(messageDataMap.get(ANOMALY_BASELINE_VAL_KEY));
