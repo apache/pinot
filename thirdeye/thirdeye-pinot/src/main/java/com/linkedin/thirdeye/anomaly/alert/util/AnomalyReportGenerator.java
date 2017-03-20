@@ -158,7 +158,10 @@ public class AnomalyReportGenerator {
             anomaly.getFunction().getFunctionName(),
             String.format("%+.2f%%", anomaly.getWeight() * 100), // lift
             getLiftDirection(anomaly.getWeight()),
-            anomaly.getMetric()
+            anomaly.getMetric(),
+            getDateString(anomaly.getStartTime(), dateTimeZone),
+            getDateString(anomaly.getEndTime(), dateTimeZone),
+            getTimezoneString(dateTimeZone)
         );
 
 
@@ -315,10 +318,14 @@ public class AnomalyReportGenerator {
     String dimensions;
     String function;
     String duration;
+    String startTime;
+    String endTime;
+    String timezone;
+
 
     public AnomalyReportDTO(String anomalyId, String anomalyURL, String baselineVal,
         String currentVal, String dimensions, String duration, String feedback, String function,
-        String lift, boolean positiveLift, String metric) {
+        String lift, boolean positiveLift, String metric, String startTime, String endTime, String timezone) {
       this.anomalyId = anomalyId;
       this.anomalyURL = anomalyURL;
       this.baselineVal = baselineVal;
@@ -330,6 +337,9 @@ public class AnomalyReportGenerator {
       this.lift = lift;
       this.positiveLift = positiveLift;
       this.metric = metric;
+      this.startDateTime = startTime;
+      this.endTime = endTime;
+      this.timezone = timezone;
     }
 
     public String getBaselineVal() {
@@ -427,6 +437,32 @@ public class AnomalyReportGenerator {
     public void setAnomalyURL(String anomalyURL) {
       this.anomalyURL = anomalyURL;
     }
+
+    public String getStartTime() {
+      return startTime;
+    }
+
+    public void setStartTime(String startTime) {
+      this.startTime = startTime;
+    }
+
+    public String getEndTime() {
+      return endTime;
+    }
+
+    public void setEndTime(String endTime) {
+      this.endTime = endTime;
+    }
+
+    public String getTimezone() {
+      return timezone;
+    }
+
+    public void setTimezone(String timezone) {
+      this.timezone = timezone;
+    }
+
+
   }
 
 }
