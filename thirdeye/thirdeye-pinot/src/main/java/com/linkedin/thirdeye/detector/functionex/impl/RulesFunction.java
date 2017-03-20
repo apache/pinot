@@ -57,7 +57,7 @@ public class RulesFunction extends AnomalyFunctionEx {
 
       long[] timestamps = violations.getLongs(COLUMN_TIMESTAMP).values();
       for (int i = 0; i < timestamps.length; i++) {
-        DataFrame slice = violations.sliceRows(i, i+1);
+        DataFrame slice = violations.slice(i, i+1);
 
         String numeric = extractNumericPortion(rule);
         String threshold = extractThresholdPortion(rule);
@@ -89,7 +89,7 @@ public class RulesFunction extends AnomalyFunctionEx {
       data = data.joinInner(e.getValue(), COLUMN_TIMESTAMP, COLUMN_TIMESTAMP);
     }
 
-    return data.dropNullRows();
+    return data.dropNull();
   }
 
   static Map<String, String> getSubConfig(Map<String, String> map, String prefix) {

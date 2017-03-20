@@ -1010,7 +1010,7 @@ public class DataFrameTest {
         .addSeries("string", "1.0", "2", "bbb", "true", StringSeries.NULL_VALUE, "aaa")
         .addSeries("boolean", true, true, false, false, false, false);
 
-    DataFrame ddf = mdf.dropNullRows();
+    DataFrame ddf = mdf.dropNull();
     Assert.assertEquals(ddf.size(), 3);
     Assert.assertEquals(ddf.getLongs("index").values(), new long[] { 2, 4, 6 });
     Assert.assertEquals(ddf.getDoubles("double").values(), new double[] { 2.0, 4.0, 6.0 });
@@ -1021,7 +1021,7 @@ public class DataFrameTest {
 
   @Test
   public void testDropNullRowsIdentity() {
-    Assert.assertEquals(df.dropNullRows().size(), df.size());
+    Assert.assertEquals(df.dropNull().size(), df.size());
   }
 
   @Test

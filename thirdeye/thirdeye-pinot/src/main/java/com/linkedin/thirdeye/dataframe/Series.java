@@ -556,7 +556,7 @@ public abstract class Series {
    * determined by <b>function</b>'s output type.
    *
    * @param function function to apply to each element in the series
-   * @return BooleanSeries with evaluation results
+   * @return series with evaluation results
    */
   public DoubleSeries map(DoubleFunction function) {
     return this.getDoubles().map(function);
@@ -569,7 +569,7 @@ public abstract class Series {
    * determined by <b>function</b>'s output type.
    *
    * @param function function to apply to each element in the series
-   * @return BooleanSeries with evaluation results
+   * @return series with evaluation results
    */
   public LongSeries map(LongFunction function) {
     return this.getLongs().map(function);
@@ -582,7 +582,7 @@ public abstract class Series {
    * determined by <b>function</b>'s output type.
    *
    * @param function function to apply to each element in the series
-   * @return BooleanSeries with evaluation results
+   * @return series with evaluation results
    */
   public StringSeries map(StringFunction function) {
     return this.getStrings().map(function);
@@ -595,7 +595,7 @@ public abstract class Series {
    * determined by <b>function</b>'s output type.
    *
    * @param function function to apply to each element in the series
-   * @return BooleanSeries with evaluation results
+   * @return series with evaluation results
    */
   public BooleanSeries map(BooleanFunction function) {
     return this.getBooleans().map(function);
