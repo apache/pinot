@@ -10,13 +10,15 @@
   <tr>
     <td style="padding: 0 24px;" colspan="2">
       <p style="font-size: 20px; font-weight: 600;">Hi,</p>
-      <p style="color: #737373; font-size: 14px;">You are receiving this email because you have subscribed to ThirdEye Alert Service for <strong>'${alertConfigName}'</strong>.</p>
-      <p style="color: #737373; font-size: 14px;">
-        Analysis Start: ${dateFormat(startTime)}<br/>
-        Analysis End: ${dateFormat(endTime)}
-      </p>
       <p style="color: #737373; font-size: 14px;"> ThirdEye has analyzed your dataset and has detected
-        <b>${anomalyCount} ${(anomalyCount == 1)?string("anomaly", "anomalies")}.</b> Below is the full list of anomalies detected during this time period or you can view them <b><a href="${dashboardHost}/thirdeye#anomalies?anomaliesSearchMode=id&anomalyIds=${anomalyIds}">here</a></b></p>
+        <b>${anomalyCount} ${(anomalyCount == 1)?string("anomaly", "anomalies")} for:</b>
+      </p>
+      <p style="color: #737373; font-size: 14px;">
+        Start: ${dateFormat(startTime)}<br/>
+        End: ${dateFormat(endTime)}
+      </p>
+
+      <p style="color: #737373; font-size: 14px;">Below is a summary, please go <b><a href="${dashboardHost}/thirdeye#anomalies?anomaliesSearchMode=id&anomalyIds=${anomalyIds}">here</a></b> for a detailed view.</p>
     </td>
   </tr>
   <#if includeSummary>
@@ -107,7 +109,7 @@
 
 <tr>
   <td style="font-family:'Proxima Nova','Arial', 'Helvetica Neue',Helvetica, sans-serif;font-size:14px; color: #737373;font-weight:300; text-align: center;" colspan="2">
-    <p>If you have any questions regarding this report, please email <br/>
+    <p> You are receiving this email because you have subscribed to ThirdEye Alert Service for <strong>'${alertConfigName}'</strong>.<br>If you have any questions regarding this report, please email <br>
       <a href="mailto:ask_thirdeye@linkedin.com" target="_top">ask_thirdeye@linkedin.com</a>
     </p>
     <p>
