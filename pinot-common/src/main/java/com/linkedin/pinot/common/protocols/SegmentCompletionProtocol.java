@@ -142,15 +142,15 @@ public class SegmentCompletionProtocol {
 
   public static abstract class Request {
     final Params _params;
+    final String _msgType;
 
-    private Request(Params params) {
+    private Request(Params params, String msgType) {
       _params = params;
+      _msgType = msgType;
     }
 
-    public abstract String getUrl(String hostPort);
-
-    protected String getUri(String msgType) {
-      return "/" + msgType + "?" +
+    public String getUrl(String hostPort) {
+      return "http://" + hostPort +  "/" + _msgType + "?" +
         PARAM_SEGMENT_NAME + "=" + _params.getSegmentName() + "&" +
         PARAM_OFFSET + "=" + _params.getOffset() + "&" +
         PARAM_INSTANCE_ID + "=" + _params.getInstanceId() +
@@ -208,8 +208,8 @@ public class SegmentCompletionProtocol {
         _waitTimeMillis = waitTimeMillis;
         return this;
       }
-      public Params withExtraTimeSec(int exttraTimeSec) {
-        _extraTimeSec = exttraTimeSec;
+      public Params withExtraTimeSec(int extraTimeSec) {
+        _extraTimeSec = extraTimeSec;
         return this;
       }
 
@@ -242,44 +242,25 @@ public class SegmentCompletionProtocol {
 
   public static class ExtendBuildTimeRequest extends Request {
     public ExtendBuildTimeRequest(Params params) {
-      super(params);
-    }
-    @Override
-    public String getUrl(final String hostPort) {
-      return "http://" + hostPort + getUri(MSG_TYPE_EXTEND_BUILD_TIME);
+      super(params, MSG_TYPE_EXTEND_BUILD_TIME);
     }
   }
 
   public static class SegmentConsumedRequest extends Request {
     public SegmentConsumedRequest(Params params) {
-      super(params);
+      super(params, MSG_TYPE_CONSUMED);
     }
-    @Override
-      public String getUrl(final String hostPort) {
-        return "http://" + hostPort + getUri(MSG_TYPE_CONSUMED);
-      }
   }
 
   public static class SegmentCommitRequest extends Request {
-
     public SegmentCommitRequest(Params params) {
-      super(params);
+      super(params, MSG_TYPE_COMMIT);
     }
-    @Override
-      public String getUrl(final String hostPort) {
-        return "http://" + hostPort + getUri(MSG_TYPE_COMMIT);
-      }
   }
 
   public static class SegmentStoppedConsuming extends Request {
-
     public SegmentStoppedConsuming(Params params) {
-      super(params);
-    }
-
-    @Override
-    public String getUrl(final String hostPort) {
-      return "http://" + hostPort + getUri(MSG_TYPE_STOPPED_CONSUMING);
+      super(params, MSG_TYPE_STOPPED_CONSUMING);
     }
   }
 

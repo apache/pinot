@@ -502,6 +502,9 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
    */
   protected boolean buildSegment(boolean forCommit, long buildTimeLeaseMs) {
     try {
+      if (buildTimeLeaseMs <= 0) {
+        buildTimeLeaseMs = SegmentCompletionProtocol.getDefaultMaxSegmentCommitTimeSeconds() * 1000L;
+      }
       if (forCommit) {
         _leaseExtender.addSegment(_segmentNameStr, buildTimeLeaseMs, _currentOffset);
       }
