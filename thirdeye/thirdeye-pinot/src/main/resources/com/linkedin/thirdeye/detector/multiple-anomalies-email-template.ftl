@@ -19,7 +19,7 @@
           <td style="padding: 0 24px;" colspan="2">
             <p>
               <p style="font-size: 20px; margin-bottom: 8px;">Hi,</p> <br>
-              <span style="color: rgba(0,0,0,0.55);"> ThirdEye has detected <strong style="color: black;">${anomalyCount} ${(anomalyCount == 1)?string("anomaly", "anomalies")}</strong> for DATASET: <strong style="color: black;">${datasets}</strong> from <strong style="color: black;">${startTime}</strong> to <strong style="color: black;">${endTime}</strong>.</span> <br>
+              <span style="color: rgba(0,0,0,0.55);"> ThirdEye has detected <strong style="color: black;">${anomalyCount} ${(anomalyCount == 1)?string("anomaly", "anomalies")}</strong> for DATASET: <strong style="color: black;">${datasets}</strong> from <strong style="color: black;">${startTime} ${timeZone}</strong> to <strong style="color: black;">${endTime} ${timeZone}</strong>.</span> <br>
               <span style="color: rgba(0,0,0,0.55);">Below is a summary, please go <strong><a style="color:#33aada; text-decoration:none;" href="${dashboardHost}/thirdeye#anomalies?anomaliesSearchMode=id&anomalyIds=${anomalyIds}">here</a></strong> for a detailed view.</span>
             </p>
           </td>
@@ -32,9 +32,29 @@
         <tr>
           <td style="padding: 0 24px;" colspan="2">
             <p style="color: rgba(0,0,0,0.55); font-size:16px; margin-bottom:0;">DATASET</p>
-            <p style="margin-top:8px;"><a style="color:#33aada; text-decoration:none; font-size:20px;margin-top:0;" href="${dashboardHost}/thirdeye#anomalies?anomaliesSearchMode=id&anomalyIds=${anomalyIds}">${datasets}</a></p>
+            <p style="margin-top:8px; margin-bottom:24px;"><a style="color:#33aada; text-decoration:none; font-size:20px;margin-top:0;" href="${dashboardHost}/thirdeye#anomalies?anomaliesSearchMode=id&anomalyIds=${anomalyIds}">${datasets}</a></p>
           </td>
         </tr>
+
+        <tr>
+          <td style="padding: 0 24px;" colspan="2">
+            <table align="left" border="0" width="100%" style="width:100%; border-collapse:collapse; border-spacing:0;">
+            <tr>
+              <th align="left">
+                <span style="text-transform: uppercase; color:#B6B6B6; font-weight:normal; font-size:14px;">Alert Start<span>
+              </th>
+              <th align="left">
+                <span style="text-transform: uppercase; color:#B6B6B6;font-weight:normal; font-size:14px;">Alert End<span>
+              </th>
+            </tr>
+            <tr>
+              <td style="font-size: 20px;font-weight:600;">${startTime} ${timeZone}</td>
+              <td style="font-size: 20px;font-weight:600;">${endTime} ${timeZone}</td>
+            </tr>
+            </table>
+          </td>
+        </tr>
+
 
         <#if anomalyDetails?has_content>
           <tr>
@@ -51,7 +71,10 @@
                 <#list anomalyDetails as r>
                   <tr style="border-top:1px solid #CFCFCF; border-bottom:1px solid #CFCFCF; background-color:#F5F5F5;">
                     <td style="padding:12px;"><a href="${r.anomalyURL}${r.anomalyId}" target="_blank" style="font-size: 16px; color: #33aada; font-weight: 600;text-decoration: none;">${r.metric}</a><br> ${r.dimensions}</td>
-                    <td style="padding:12px;">${r.duration}</td>
+                    <td style="padding:12px;">
+                      <span style="white-space: nowrap;">${r.startDateTime} ${r.timezone}</span><br>
+                      <span style="white-space: nowrap;">${r.endTime} ${r.timezone}</span>
+                    </td>
                     <td style="padding:12px;">
                       <span style="font-size: 16px; color:
                       ${r.positiveLift?string('#398b18','#ee1620')};">${r.positiveLift?string('&#9650;','&#9660;')} ${r.lift}</span><br>
@@ -70,7 +93,7 @@
         </#if>
         <tr>
           <td style="padding:24px; padding-top:0;" colspan="2">
-            <p style="font-size:16px; margin-top:0;"><strong>Is this an anomaly?</strong> <span style="color: rgba(0,0,0,0.55);">To improve our detection abilities, <span style="color: #33aada;">click on each anomaly</span> and provide feedback. </span></p>
+            <p style="font-size:16px; margin:0;"><strong>Is this an anomaly?</strong> <span style="color: rgba(0,0,0,0.55);">To improve our detection abilities, <span style="color: #33aada;">click on each anomaly</span> and provide feedback. </span></p>
           </td>
         </tr>
 
