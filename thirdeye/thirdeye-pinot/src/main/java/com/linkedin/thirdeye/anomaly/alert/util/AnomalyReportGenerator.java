@@ -123,8 +123,10 @@ public class AnomalyReportGenerator {
 
       List<AnomalyReportDTO> anomalyReportDTOList = new ArrayList<>();
       List<String> anomalyIds = new ArrayList<>();
+      Set<String> datasets = new HashSet<>();
       for (MergedAnomalyResultDTO anomaly : anomalies) {
         metrics.add(anomaly.getMetric());
+        datasets.add(anomaly.getCollection());
 
         if (anomaly.getFeedback() != null) {
           feedbackCollected++;
@@ -180,6 +182,7 @@ public class AnomalyReportGenerator {
       DateTimeZone timeZone = DateTimeZone.forTimeZone(AlertTaskRunnerV2.DEFAULT_TIME_ZONE);
       DataReportHelper.DateFormatMethod dateFormatMethod = new DataReportHelper.DateFormatMethod(timeZone);
       Map<String, Object> templateData = new HashMap<>();
+      templateData.put("datasets", Joiner.on(", ").join(datasets));
       templateData.put("timeZone", timeZone);
       templateData.put("dateFormat", dateFormatMethod);
       templateData.put("startTime", startTime);
