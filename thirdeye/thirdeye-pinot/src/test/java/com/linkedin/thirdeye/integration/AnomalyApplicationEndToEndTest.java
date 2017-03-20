@@ -147,7 +147,7 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
 
     ResultSet mockResultSet = Mockito.mock(ResultSet.class);
     Mockito.when(mockResultSet.getRowCount()).thenReturn(0);
-    ResultSetGroup mockResultSetGroup = Mockito.mock(ResultSetGroup.class);
+    final ResultSetGroup mockResultSetGroup = Mockito.mock(ResultSetGroup.class);
     Mockito.when(mockResultSetGroup.getResultSet(0)).thenReturn(mockResultSet);
     LoadingCache<PinotQuery, ResultSetGroup> mockResultSetGroupCache = Mockito.mock(LoadingCache.class);
     Mockito.when(mockResultSetGroupCache.get(Matchers.any(PinotQuery.class)))

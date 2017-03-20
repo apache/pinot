@@ -610,7 +610,7 @@ public class AnomaliesResource {
     }
 
     // Show most recent anomalies first, i.e., the anomaly whose end time is most recent then largest id shown at top
-    Collections.sort(mergedAnomalies, new MergedAnomalyEndTimeComparator().reversed());
+    Collections.sort(mergedAnomalies, Collections.reverseOrder(new MergedAnomalyEndTimeComparator()));
 
     List<MergedAnomalyResultDTO> displayedAnomalies = mergedAnomalies.subList(fromIndex, toIndex);
     anomaliesWrapper.setNumAnomaliesOnPage(displayedAnomalies.size());
@@ -618,7 +618,7 @@ public class AnomaliesResource {
 
     // for each anomaly, create anomaly details
     List<Future<AnomalyDetails>> anomalyDetailsListFutures = new ArrayList<>();
-    for (MergedAnomalyResultDTO mergedAnomaly : displayedAnomalies) {
+    for (final MergedAnomalyResultDTO mergedAnomaly : displayedAnomalies) {
       Callable<AnomalyDetails> callable = new Callable<AnomalyDetails>() {
         @Override
         public AnomalyDetails call() throws Exception {

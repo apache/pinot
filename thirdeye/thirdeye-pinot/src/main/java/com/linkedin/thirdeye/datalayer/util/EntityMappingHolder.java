@@ -36,7 +36,7 @@ public class EntityMappingHolder {
     String columnNamePattern = null;
     LinkedHashMap<String, ColumnInfo> columnInfoMap = new LinkedHashMap<>();
     tableToEntityNameMap.put(tableName, entityClass.getSimpleName());
-    columnMappingPerTable.put(tableName, HashBiMap.create());
+    columnMappingPerTable.put(tableName, HashBiMap.<String, String>create());
     boolean foundTable = false;
     for (String tableNamePattern : new String[] {tableName.toLowerCase(),
         tableName.toUpperCase()}) {

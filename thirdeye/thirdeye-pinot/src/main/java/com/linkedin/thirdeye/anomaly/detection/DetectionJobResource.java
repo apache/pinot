@@ -209,8 +209,8 @@ public class DetectionJobResource {
       @QueryParam("start") String startTimeIso,
       @QueryParam("end") String endTimeIso,
       @QueryParam("force") @DefaultValue("false") String isForceBackfill) throws Exception {
-    long functionId = Long.valueOf(id);
-    boolean forceBackfill = Boolean.valueOf(isForceBackfill);
+    final long functionId = Long.valueOf(id);
+    final boolean forceBackfill = Boolean.valueOf(isForceBackfill);
     AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
     if (anomalyFunction == null) {
       return Response.noContent().build();
@@ -263,8 +263,8 @@ public class DetectionJobResource {
 
     String response = null;
 
-    DateTime innerStartTime = startTime;
-    DateTime innerEndTime = endTime;
+    final DateTime innerStartTime = startTime;
+    final DateTime innerEndTime = endTime;
 
     new Thread(new Runnable() {
       @Override

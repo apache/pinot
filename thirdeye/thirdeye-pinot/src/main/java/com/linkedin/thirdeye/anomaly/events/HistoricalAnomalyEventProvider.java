@@ -45,8 +45,14 @@ public class HistoricalAnomalyEventProvider implements EventDataProvider<EventDT
     Map<String, List<String>> dimensionValuesMap = new HashMap<>();
     if (anomalyResultDTO.getDimensions() != null && anomalyResultDTO.getDimensions().size() > 0) {
       for (String dimension : anomalyResultDTO.getDimensions().keySet()) {
-        dimensionValuesMap.putIfAbsent(dimension, new ArrayList<>());
-        dimensionValuesMap.get(dimension).add(anomalyResultDTO.getDimensions().get(dimension));
+        List<String> dimensionValues;
+        if (dimensionValuesMap.containsKey(dimension)) {
+          dimensionValues = dimensionValuesMap.get(dimension);
+        } else {
+          dimensionValues = new ArrayList<>();
+          dimensionValuesMap.put(dimension, dimensionValues);
+        }
+        dimensionValues.add(anomalyResultDTO.getDimensions().get(dimension));
       }
     }
     eventDTO.setTargetDimensionMap(dimensionValuesMap);

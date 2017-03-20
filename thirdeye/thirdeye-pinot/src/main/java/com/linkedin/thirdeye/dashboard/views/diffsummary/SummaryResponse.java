@@ -131,7 +131,7 @@ public class SummaryResponse {
       NameTag tag = new NameTag(targetLevelCount);
       nameTags.put(node, tag);
       tag.copyNames(node.getDimensionValues());
-      otherDimensionValues.put(node, new ArrayList<>());
+      otherDimensionValues.put(node, new ArrayList<String>());
     }
     //   pre-condition: parent node is processed before its children nodes
     for (HierarchyNode node : nodes) {

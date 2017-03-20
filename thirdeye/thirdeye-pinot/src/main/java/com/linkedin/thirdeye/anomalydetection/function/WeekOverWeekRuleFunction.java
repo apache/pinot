@@ -33,7 +33,7 @@ public class WeekOverWeekRuleFunction extends AbstractModularizedAnomalyFunction
   private DetectionModel detectionModel = new NoopDetectionModel();
   private MergeModel mergeModel = new NoopMergeModel();
 
-  public static String[] getPropertyKeys() {
+  public String[] getPropertyKeys() {
     return new String[] { BASELINE, ENABLE_SMOOTHING,
         MovingAverageSmoothingFunction.MOVING_AVERAGE_SMOOTHING_WINDOW_SIZE,
         SimpleThresholdDetectionModel.AVERAGE_VOLUME_THRESHOLD,

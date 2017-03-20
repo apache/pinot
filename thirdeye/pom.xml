@@ -18,7 +18,7 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <pinot.version>0.016</pinot.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <jdk.version>1.8</jdk.version>
+    <jdk.version>1.7</jdk.version>
     <dropwizard.version>0.8.4</dropwizard.version>
     <jackson.version>2.8.3</jackson.version>
     <mysql.connector.version>5.1.39</mysql.connector.version>

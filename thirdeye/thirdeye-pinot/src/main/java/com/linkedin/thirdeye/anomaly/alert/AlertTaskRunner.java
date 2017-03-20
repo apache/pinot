@@ -114,7 +114,7 @@ public class AlertTaskRunner implements TaskRunner {
     for (MergedAnomalyResultDTO result : results) {
       DimensionMap dimensions = result.getDimensions();
       if (!groupedResults.containsKey(dimensions)) {
-        groupedResults.put(dimensions, new ArrayList<>());
+        groupedResults.put(dimensions, new ArrayList<MergedAnomalyResultDTO>());
       }
       groupedResults.get(dimensions).add(result);
     }

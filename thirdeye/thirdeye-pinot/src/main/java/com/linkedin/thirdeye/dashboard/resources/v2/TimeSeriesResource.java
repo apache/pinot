@@ -373,7 +373,7 @@ public class TimeSeriesResource {
         values.setCumulativeBaselineValues(cumBaselineValues);
         values.setCumulativePercentageChange(cumPercentageChangeValues);
 
-        timeSeriesCompareView.setSubDimensionContributionMap(new LinkedHashMap<>());
+        timeSeriesCompareView.setSubDimensionContributionMap(new LinkedHashMap<String, ValuesContainer>());
         timeSeriesCompareView.getSubDimensionContributionMap().put(ALL, values);
       }
     } catch (Exception e) {
