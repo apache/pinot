@@ -185,8 +185,8 @@ public class AnomalyReportGenerator {
       templateData.put("datasets", Joiner.on(", ").join(datasets));
       templateData.put("timeZone", timeZone);
       templateData.put("dateFormat", dateFormatMethod);
-      templateData.put("startTime", startTime);
-      templateData.put("endTime", endTime);
+      templateData.put("startTime", getDateString(startTime, timeZone));
+      templateData.put("endTime", getDateString(endTime, timeZone));
       templateData.put("anomalyCount", anomalies.size());
       templateData.put("metricsCount", metrics.size());
       templateData.put("notifiedCount", alertedAnomalies);
