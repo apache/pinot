@@ -10,82 +10,29 @@
   <tr>
     <td style="padding: 0 24px;" colspan="2">
       <p style="font-size: 20px; font-weight: 600;">Hi,</p>
-      <p style="color: #737373; font-size: 14px;">You are receiving this email because you have subscribed to ThirdEye Alert Service for <strong>'${alertConfigName}'</strong>.</p>
-      <p style="color: #737373; font-size: 14px;">
-        Analysis Start: ${dateFormat(startTime)}<br/>
-        Analysis End: ${dateFormat(endTime)}
+      <p style="color: #737373; font-size: 14px;"> ThirdEye has detected
+        <strong>${anomalyCount} </strong> ${(anomalyCount == 1)?string("anomaly", "anomalies")} for <strong>${datasets}</strong> from <strong>${startTime}</strong> to <strong>${endTime}</strong>.
       </p>
-      <p style="color: #737373; font-size: 14px;"> ThirdEye has analyzed your dataset and has detected
-        <b>${anomalyCount} ${(anomalyCount == 1)?string("anomaly", "anomalies")}.</b> Below is the full list of anomalies detected during this time period or you can view them <b><a href="${dashboardHost}/thirdeye#anomalies?anomaliesSearchMode=id&anomalyIds=${anomalyIds}">here</a></b></p>
+      <p style="color: #737373; font-size: 14px;">Below is a summary, please go <strong><a style="color:#0084bf;" href="${dashboardHost}/thirdeye#anomalies?anomaliesSearchMode=id&anomalyIds=${anomalyIds}">here</a></strong> for a detailed view.</p>
     </td>
   </tr>
-  <#if includeSummary>
-  <tr>
-    <td style="padding: 0 24px;" colspan="2">
-      <div style="padding: 24px; background-color:#edf0f3;">
-        <table border="0" align="center"  width="100%" style="width:100%;border-collapse: collapse; border-spacing: 0; margin-bottom: 15px;border-color:#ddd; padding:24px;">
-          <tr>
-            <td colspan="100%" style="width:100%; padding-bottom:8px;">
-            <span style="color: #737373">Summary</span></td>
-          </tr>
-          <tr>
-            <td colspan="33%" style="width: 33%; padding-bottom:8px;">
-              <div style="color: #737373">Anomalies:</div>
-              <div style="color: #737373">${anomalyCount}</div>
-            </td>
-            <td colspan="33%" style="width: 33%; padding-bottom:8px;">
-              <div style="color: #737373">Metrics:</div>
-              <div style="color: #737373">${metricsCount}</div>
-            </td>
-            <td colspan="33%" style="width: 33%; padding-bottom:8px;">
-              <div style="color: #737373">Notified:</div>
-              <div style="color: #737373">${notifiedCount}</div>
-            </td>
-          </tr>
-          <tr>
-            <td colspan="33%" style="width: 33%; padding-bottom:8px;">
-              <div style="color: #737373">Feedback:</div>
-              <div style="color: #737373">${feedbackCount}</div>
-            </td>
-            <td colspan="33%" style="width: 33%; padding-bottom:8px;">
-              <div style="color: #737373">True Alert:</div>
-              <div style="color: #737373">${trueAlertCount}</div>
-            </td>
-            <td colspan="33%" style="width: 33%; padding-bottom:8px;">
-              <div style="color: #737373">False Alert:</div>
-              <div style="color: #737373">${falseAlertCount}</div>
-            </td>
-          </tr>
-          <tr>
-            <td colspan="100%" style="width: 100%; padding-bottom:8px;">
-              <div style="color: #737373">Non Actionable</div>
-              <div style="color: #737373">${nonActionableCount}</div>
-            </td>
-          </tr>
-        </table>
-      </div>
-    </td>
-  </tr>
-  </#if>
 
   <#if anomalyDetails?has_content>
     <tr>
       <td style="padding: 24px;" colspan="2">
         <table align="center" border="0" width="100%" style="width:100%; border-collapse:collapse; border-spacing:0;margin-bottom:24px;font-size: 12px;">
           <tr>
-            <th style="border:1px solid #CCC; padding:0 8px;">Metric</th>
-            <th style="border:1px solid #CCC; padding:0 8px;">Dimension</th>
-            <th style="border:1px solid #CCC; padding:0 8px; width:18%;" colspan="18%">Duration</th>
+            <th style="border:1px solid #CCC; padding: 8px;">Metric/<br>Dimension</th>
+            <th style="border:1px solid #CCC; padding: 8px; width:18%;" colspan="18%">Duration</th>
             <th colspan="20%" style="border:1px solid #CCC; padding:0 8px; width:20%;">Details</th>
             <#if includeSummary>
-              <th style="border:1px solid #CCC; padding:0 8px;">Status</th>
+              <th style="border:1px solid #CCC; padding: 8px;">Status</th>
             </#if>
-            <th style="border:1px solid #CCC; padding:0 8px;">Investigate</th>
+            <th style="border:1px solid #CCC; padding: 8px;">Investigate</th>
           </tr>
           <#list anomalyDetails as r>
             <tr>
-              <td style="border:1px solid #CCC; padding:0 8px;">${r.metric}</td>
-              <td style="border:1px solid #CCC; padding:0 8px;">${r.dimensions}</td>
+              <td style="border:1px solid #CCC; padding:0 8px;">${r.metric}<br> ${r.dimensions}</td>
               <td style="border:1px solid #CCC; padding:0 8px; width:18%;" colspan="18%">${r.duration}</td>
               <td colspan="20%" style="border:1px solid #CCC; padding:0 8px; width:20%;">
                 <b>Change: </b><span style="color:
@@ -107,7 +54,7 @@
 
 <tr>
   <td style="font-family:'Proxima Nova','Arial', 'Helvetica Neue',Helvetica, sans-serif;font-size:14px; color: #737373;font-weight:300; text-align: center;" colspan="2">
-    <p>If you have any questions regarding this report, please email <br/>
+    <p> You are receiving this email because you have subscribed to ThirdEye Alert Service for <strong>'${alertConfigName}'</strong>.<br>If you have any questions regarding this report, please email <br>
       <a href="mailto:ask_thirdeye@linkedin.com" target="_top">ask_thirdeye@linkedin.com</a>
     </p>
     <p>
