@@ -26,7 +26,7 @@ if [ $? -eq 0 ]; then
     exit 0
   fi
 
-  cd thirdeye/thirdeye-pinot
+  cd thirdeye
   mvn test
   failed=$?
   # Remove Pinot/ThirdEye files from local Maven repository to avoid a useless cache rebuild

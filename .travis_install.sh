@@ -42,7 +42,7 @@ fi
 
 # Build ThirdEye for ThirdEye related changes
 if [ $noThirdEyeChange -eq 0 ]; then
-  cd thirdeye/thirdeye-pinot
+  cd thirdeye
   mvn clean install -DskipTests
   exit $?
 fi
