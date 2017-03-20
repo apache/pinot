@@ -210,7 +210,7 @@ public class Summary {
     double targetRatio = (parentArray.targetRatio + childArray.targetRatio) / 2.;
     recomputeCostAndRemoveSmallNodes(parentNode, parentArray, targetRatio);
     List<HierarchyNode> childNodeList = new ArrayList<>(childArray.getAnswer());
-    childNodeList.sort(NODE_COMPARATOR);
+    Collections.sort(childNodeList, NODE_COMPARATOR);
     for (HierarchyNode childNode : childNodeList) {
       insertRowWithAdaptiveRatio(parentArray, childNode, targetRatio);
     }
