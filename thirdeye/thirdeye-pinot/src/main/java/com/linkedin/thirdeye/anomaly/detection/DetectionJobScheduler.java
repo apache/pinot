@@ -309,7 +309,9 @@ public class DetectionJobScheduler implements Runnable {
     }
 
     BackfillKey backfillKey = new BackfillKey(functionId, backfillStartTime, backfillEndTime);
-    Thread returnedThread = existingBackfillJobs.putIfAbsent(backfillKey, Thread.currentThread());
+    Thread returnedThread = Thread.currentThread();
+    if(!existingBackfillJobs.containsKey(backfillKey))
+      existingBackfillJobs.put(backfillKey, Thread.currentThread());
     // If returned thread is not current thread, then a backfill job is already running
     if (returnedThread != null) {
       LOG.info("Function: {} Dataset: {} Aborting... An existing back-fill job is running...", functionId, dataset);
@@ -366,7 +368,8 @@ public class DetectionJobScheduler implements Runnable {
       LOG.info("Function: {} Dataset: {} Generated job for detecting anomalies for each monitoring window "
           + "whose start is located in range {} -- {}", functionId, dataset, backfillStartTime, currentStart);
     } finally {
-      existingBackfillJobs.remove(backfillKey, Thread.currentThread());
+      if(existingBackfillJobs.get(backfillKey) == Thread.currentThread())
+        existingBackfillJobs.remove(backfillKey);
     }
     return jobId;
   }

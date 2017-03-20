@@ -224,7 +224,7 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
           Log.warn(e);
         }
       }
-      if (Double.compare(0d, value) < 0 && Double.isFinite(value)) {
+      if (Double.compare(0d, value) < 0 && !Double.isInfinite(value)) {
         List<String> dimensionValues = response.getRow(rowIdx).getDimensions();
         Row row = rowTable.get(dimensionValues);
         if (row == null) {

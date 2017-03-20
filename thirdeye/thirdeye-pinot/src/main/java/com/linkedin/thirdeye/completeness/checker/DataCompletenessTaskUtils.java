@@ -229,7 +229,10 @@ public class DataCompletenessTaskUtils {
       List<Long> timeValues = bucketNameToTimeValues.get(bucketName);
       Long sumOfCountForBucket = 0L;
       for (Long timeValue : timeValues) {
-        sumOfCountForBucket = sumOfCountForBucket + timeValueToCount.getOrDefault(timeValue, 0L);
+        long val = 0L;
+        if(timeValueToCount.containsKey(timeValue))
+          val = timeValueToCount.get(timeValue);
+        sumOfCountForBucket = sumOfCountForBucket + val;
       }
       bucketNameToCountStar.put(bucketName, sumOfCountForBucket);
     }

@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.dashboard.views.diffsummary;
 import com.linkedin.thirdeye.client.diffsummary.DimNameValueCostEntry;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -85,7 +86,7 @@ public class Summary {
    */
   public void testCorrectnessOfWowValues() {
     List<HierarchyNode> nodeList = new ArrayList<>(dpArrays.get(0).getAnswer());
-    nodeList.sort(NODE_COMPARATOR); // Process lower level nodes first
+    Collections.sort(nodeList, NODE_COMPARATOR); // Process lower level nodes first
     for (HierarchyNode node : nodeList) {
       HierarchyNode parent = findAncestor(node, null, dpArrays.get(0).getAnswer());
       if (parent != null) parent.addNodeValues(node);
@@ -186,7 +187,8 @@ public class Summary {
   }
 
   private static void rollbackInsertions(HierarchyNode node, Set<HierarchyNode> answer, List<HierarchyNode> removedNodes) {
-    removedNodes.sort(NODE_COMPARATOR.reversed()); // Rollback from top to bottom nodes
+    Collections.sort(removedNodes, NODE_COMPARATOR); // Rollback from top to bottom nodes
+    Collections.reverse(removedNodes);
     Set<HierarchyNode> targetSet = new HashSet<>(answer);
     targetSet.addAll(removedNodes);
     for (HierarchyNode removedNode : removedNodes) {
@@ -239,7 +241,7 @@ public class Summary {
   private static void updateWowValuesDueToRemoval(HierarchyNode node, Set<HierarchyNode> answer,
       Set<HierarchyNode> removedNodes) {
     List<HierarchyNode> removedNodesList = new ArrayList<>(removedNodes);
-    removedNodesList.sort(NODE_COMPARATOR); // Process lower level nodes first
+    Collections.sort(removedNodesList, NODE_COMPARATOR); // Process lower level nodes first
     for (HierarchyNode removedNode : removedNodesList) {
       HierarchyNode parents = findAncestor(removedNode, node, answer);
       if (parents != null) parents.addNodeValues(removedNode);
@@ -265,7 +267,7 @@ public class Summary {
   private void recomputeCostAndRemoveSmallNodes(HierarchyNode parentNode, DPArray dp, double targetRatio) {
     Set<HierarchyNode> removedNodes = new HashSet<>(dp.getAnswer());
     List<HierarchyNode> ans = new ArrayList<>(dp.getAnswer());
-    ans.sort(NODE_COMPARATOR);
+    Collections.sort(ans, NODE_COMPARATOR);
     dp.reset();
     for (HierarchyNode node : ans) {
       insertRowWithAdaptiveRatioNoOneSideError(dp, node, targetRatio);
