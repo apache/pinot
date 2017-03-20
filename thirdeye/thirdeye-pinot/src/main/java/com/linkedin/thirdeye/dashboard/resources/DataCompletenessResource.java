@@ -1,8 +1,6 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
-import com.linkedin.thirdeye.completeness.checker.DataCompletenessConstants;
-import com.linkedin.thirdeye.completeness.checker.DataCompletenessConstants.DataCompletenessAlgorithmName;
-import com.linkedin.thirdeye.completeness.checker.DataCompletenessUtil;
+import com.linkedin.thirdeye.completeness.checker.DataCompletenessUtils;
 import com.linkedin.thirdeye.completeness.checker.PercentCompletenessFunctionInput;
 import com.linkedin.thirdeye.datalayer.bao.DataCompletenessConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
@@ -15,7 +13,6 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.commons.collections.CollectionUtils;
 
 
 @Path(value = "/data-completeness")
@@ -33,7 +30,7 @@ public class DataCompletenessResource {
   @Produces(MediaType.APPLICATION_JSON)
   public double getPercentCompleteness(String payload) {
     PercentCompletenessFunctionInput input = PercentCompletenessFunctionInput.fromJson(payload);
-    return DataCompletenessUtil.getPercentCompleteness(input);
+    return DataCompletenessUtils.getPercentCompleteness(input);
   }
 
   @GET

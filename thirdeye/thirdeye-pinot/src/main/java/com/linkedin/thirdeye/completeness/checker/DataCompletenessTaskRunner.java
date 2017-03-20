@@ -85,12 +85,12 @@ public class DataCompletenessTaskRunner implements TaskRunner {
           TimeSpec timeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
           DateTimeZone dateTimeZone = Utils.getDataTimeZone(dataset);
           long adjustedStart =
-              DataCompletenessTaskUtils.getAdjustedTimeForDataset(timeSpec, dataCompletenessStartTime, dateTimeZone);
+              DataCompletenessUtils.getAdjustedTimeForDataset(timeSpec, dataCompletenessStartTime, dateTimeZone);
           long adjustedEnd =
-              DataCompletenessTaskUtils.getAdjustedTimeForDataset(timeSpec, dataCompletenessEndTime, dateTimeZone);
-          long bucketSize = DataCompletenessTaskUtils.getBucketSizeInMSForDataset(timeSpec);
+              DataCompletenessUtils.getAdjustedTimeForDataset(timeSpec, dataCompletenessEndTime, dateTimeZone);
+          long bucketSize = DataCompletenessUtils.getBucketSizeInMSForDataset(timeSpec);
           DateTimeFormatter dateTimeFormatter =
-              DataCompletenessTaskUtils.getDateTimeFormatterForDataset(timeSpec, dateTimeZone);
+              DataCompletenessUtils.getDateTimeFormatterForDataset(timeSpec, dateTimeZone);
           LOG.info("Adjusted start:{} i.e. {} Adjusted end:{} i.e. {} and Bucket size:{}",
               adjustedStart, new DateTime(adjustedStart), adjustedEnd, new DateTime(adjustedEnd), bucketSize);
 
@@ -111,7 +111,7 @@ public class DataCompletenessTaskRunner implements TaskRunner {
 
             // get current counts for all current buckets to process
             Map<String, Long> bucketNameToCount =
-                DataCompletenessTaskUtils.getCountsForBucketsOfDataset(dataset, timeSpec, bucketNameToBucketValueMS);
+                DataCompletenessUtils.getCountsForBucketsOfDataset(dataset, timeSpec, bucketNameToBucketValueMS);
             LOG.info("Bucket name to count {}", bucketNameToCount);
 
             // run completeness check for all buckets

@@ -17,7 +17,6 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessConstants.DataCompletenessAlgorithmName;
-import com.linkedin.thirdeye.dashboard.resources.DataCompletenessResource;
 import com.linkedin.thirdeye.datalayer.bao.DataCompletenessConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
 
@@ -63,7 +62,7 @@ public class Wo4WAvgDataCompletenessAlgorithm implements DataCompletenessAlgorit
       if (!baselineBucketNameToBucketValueMS.isEmpty()) {
 
         Map<String, Long> baselineCountsForBuckets =
-            DataCompletenessTaskUtils.getCountsForBucketsOfDataset(dataset, timeSpec, baselineBucketNameToBucketValueMS);
+            DataCompletenessUtils.getCountsForBucketsOfDataset(dataset, timeSpec, baselineBucketNameToBucketValueMS);
         LOG.info("Baseline bucket counts {}", baselineCountsForBuckets);
 
         for (Entry<String, Long> entry : baselineCountsForBuckets.entrySet()) {
@@ -108,7 +107,7 @@ public class Wo4WAvgDataCompletenessAlgorithm implements DataCompletenessAlgorit
     input.setBaselineCounts(baselineCounts);
     input.setCurrentCount(currentCount);
 
-    double percentCompleteness = DataCompletenessUtil.getPercentCompleteness(input);
+    double percentCompleteness = DataCompletenessUtils.getPercentCompleteness(input);
     return percentCompleteness;
   }
 
