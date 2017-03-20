@@ -1,9 +1,9 @@
 package com.linkedin.thirdeye.detector.functionex.impl;
 
+import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExContext;
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExDataSource;
 import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExResult;
-import com.linkedin.thirdeye.dataframe.DataFrame;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -39,9 +39,10 @@ public class MultiColumnConditionalsTest {
     config.put("datasource", "mock");
     config.put("query", "select * from my_table");
 
+    AnomalyFunctionExDataSource ds = new MockDataSource();
     AnomalyFunctionExContext context = new AnomalyFunctionExContext();
     context.setConfig(config);
-    context.setDataSources(Collections.singletonMap("mock", new MockDataSource()));
+    context.setDataSources(Collections.singletonMap("mock", ds));
 
     func = new MultiColumnConditionals();
     func.setContext(context);
@@ -108,11 +109,13 @@ public class MultiColumnConditionalsTest {
   }
 
   private static String collectMessages(AnomalyFunctionExResult result) {
+    StringBuilder builder = new StringBuilder();
     List<String> messages = new ArrayList<>();
     for(AnomalyFunctionExResult.Anomaly a : result.getAnomalies()) {
-      messages.add(a.getMessage());
+      builder.append(a.getMessage());
+      builder.append(", ");
     }
-    return String.join(", ", messages);
+    return builder.toString();
   }
 
 }

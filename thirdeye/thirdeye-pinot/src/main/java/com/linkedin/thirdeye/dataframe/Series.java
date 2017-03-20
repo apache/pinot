@@ -34,37 +34,37 @@ public abstract class Series {
     RIGHT
   }
 
-  @FunctionalInterface
+//  @FunctionalInterface
   public interface DoubleConditional {
     boolean apply(double value);
   }
 
-  @FunctionalInterface
+//  @FunctionalInterface
   public interface LongConditional {
     boolean apply(long value);
   }
 
-  @FunctionalInterface
+//  @FunctionalInterface
   public interface StringConditional {
     boolean apply(String value);
   }
 
-  @FunctionalInterface
+//  @FunctionalInterface
   public interface DoubleFunction {
     double apply(double... values);
   }
 
-  @FunctionalInterface
+//  @FunctionalInterface
   public interface LongFunction {
     long apply(long... values);
   }
 
-  @FunctionalInterface
+//  @FunctionalInterface
   public interface StringFunction {
     String apply(String... values);
   }
 
-  @FunctionalInterface
+//  @FunctionalInterface
   public interface BooleanFunction {
     byte apply(byte... values);
   }

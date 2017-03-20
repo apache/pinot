@@ -69,7 +69,7 @@ public class ThirdEyeMetricDataSource implements AnomalyFunctionExDataSource<Str
     if(dto == null)
       throw new IllegalArgumentException(String.format("Could not find dataset '%s'", dataset));
 
-    TimeGranularity tg = new TimeGranularity(dto.getTimeDuration(), dto.getTimeUnit());
+    final TimeGranularity tg = new TimeGranularity(dto.getTimeDuration(), dto.getTimeUnit());
     filters.addAll(getTimeFilters(dto.getTimeColumn(), tg, context.getMonitoringWindowStart(), context.getMonitoringWindowEnd()));
 
     // build query

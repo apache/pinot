@@ -356,28 +356,25 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
       List<MergedAnomalyResultBean> mergedAnomalyResultBeanList, final boolean loadRawAnomalies) {
     List<Future<MergedAnomalyResultDTO>> mergedAnomalyResultDTOFutureList = new ArrayList<>(mergedAnomalyResultBeanList.size());
     for (final MergedAnomalyResultBean mergedAnomalyResultBean : mergedAnomalyResultBeanList) {
-      Future<MergedAnomalyResultDTO> future =
-          executorService.submit(new Callable<MergedAnomalyResultDTO>() {
-            @Override public MergedAnomalyResultDTO call() throws Exception {
-              return MergedAnomalyResultManagerImpl.this
-                  .convertMergedAnomalyBean2DTO(mergedAnomalyResultBean, loadRawAnomalies);
-            }
-          });
+      Future<MergedAnomalyResultDTO> future = executorService.submit(new Callable<MergedAnomalyResultDTO>() {
+        @Override
+        public MergedAnomalyResultDTO call() throws Exception {
+          return MergedAnomalyResultManagerImpl.this.convertMergedAnomalyBean2DTO(mergedAnomalyResultBean,
+              loadRawAnomalies);
+        }
+      });
       mergedAnomalyResultDTOFutureList.add(future);
     }
 
-    List<MergedAnomalyResultDTO> mergedAnomalyResultDTOList = new ArrayList<>(mergedAnomalyResultBeanList.size());
-    for (Future future : mergedAnomalyResultDTOFutureList) {
-
     List<MergedAnomalyResultDTO> dtos = new ArrayList<>();
-    for(MergedAnomalyResultBean b : mergedAnomalyResultBeanList) {
-      try {
-        dtos.add(convertMergedAnomalyBean2DTO(b, loadRawAnomalies));
-      } catch (Exception e) {
-        LOG.warn("Could not convert bean to dto", e);
+    List<MergedAnomalyResultDTO> mergedAnomalyResultDTOList = new ArrayList<>(mergedAnomalyResultBeanList.size());
+    for (Future<MergedAnomalyResultDTO> future : mergedAnomalyResultDTOFutureList) {
+        try {
+          dtos.add(convertMergedAnomalyBean2DTO(future.get(), loadRawAnomalies));
+        } catch (Exception e) {
+          LOG.warn("Could not convert bean to dto", e);
+        }
       }
+      return dtos;
     }
-    return dtos;
-  }
-
 }

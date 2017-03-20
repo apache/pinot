@@ -789,8 +789,8 @@ public class DataFrame {
    * @throws IllegalArgumentException if the series does not exist
    * @return series with evaluation results
    */
-  public DoubleSeries map(String doubleExpression, String... seriesNames) {
-    Expression e = new Expression(doubleExpression);
+  public DoubleSeries map(String doubleExpression, final String... seriesNames) {
+    final Expression e = new Expression(doubleExpression);
 
     return this.map(new Series.DoubleFunction() {
       @Override
@@ -942,7 +942,7 @@ public class DataFrame {
     return this.filter(assertSeriesExists(seriesName).getStrings().map(conditional));
   }
 
-  public DataFrame filterEquals(String seriesName, double value) {
+  public DataFrame filterEquals(String seriesName, final double value) {
     return this.filter(seriesName, new DoubleSeries.DoubleConditional() {
       @Override
       public boolean apply(double v) {
@@ -951,7 +951,7 @@ public class DataFrame {
     });
   }
 
-  public DataFrame filterEquals(String seriesName, long value) {
+  public DataFrame filterEquals(String seriesName, final long value) {
     return this.filter(seriesName, new LongSeries.LongConditional() {
       @Override
       public boolean apply(long v) {
@@ -960,7 +960,7 @@ public class DataFrame {
     });
   }
 
-  public DataFrame filterEquals(String seriesName, String value) {
+  public DataFrame filterEquals(String seriesName, final String value) {
     return this.filter(seriesName, new StringSeries.StringConditional() {
       @Override
       public boolean apply(String v) {

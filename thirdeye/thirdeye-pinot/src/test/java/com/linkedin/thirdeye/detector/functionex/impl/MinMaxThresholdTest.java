@@ -38,9 +38,10 @@ public class MinMaxThresholdTest {
     config.put("min", "3");
     config.put("max", "4");
 
+    AnomalyFunctionExDataSource ds = new MockDataSource();
     AnomalyFunctionExContext context = new AnomalyFunctionExContext();
     context.setConfig(config);
-    context.setDataSources(Collections.singletonMap("mock", new MockDataSource()));
+    context.setDataSources(Collections.singletonMap("mock", ds));
 
     func = new MinMaxThreshold();
     func.setContext(context);
