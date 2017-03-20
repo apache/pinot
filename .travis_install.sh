@@ -28,11 +28,6 @@ git diff --name-only $TRAVIS_COMMIT_RANGE | egrep '^(thirdeye)'
 noThirdEyeChange=$?
 if [ $noThirdEyeChange -eq 0 ]; then
   echo 'ThirdEye changes.'
-
-  if [ "$TRAVIS_JDK_VERSION" != 'oraclejdk8' ]; then
-    echo 'Skip ThirdEye install for version other than oracle jdk8.'
-    exit 0
-  fi
 fi
 
 mvn clean install -B -DskipTests=true -Dmaven.javadoc.skip=true -Dassembly.skipAssembly=true

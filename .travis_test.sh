@@ -20,12 +20,6 @@ git diff --name-only $TRAVIS_COMMIT_RANGE | egrep '^(thirdeye)'
 if [ $? -eq 0 ]; then
   echo 'ThirdEye changes.'
 
-  # Only run ThirdEye tests for JDK 8
-  if [ "$TRAVIS_JDK_VERSION" != 'oraclejdk8' ]; then
-    echo 'Skip ThirdEye tests for version other than oracle jdk8.'
-    exit 0
-  fi
-
   cd thirdeye
   mvn test
   failed=$?
