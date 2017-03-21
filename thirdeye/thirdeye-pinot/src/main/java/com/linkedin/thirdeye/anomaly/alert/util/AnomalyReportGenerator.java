@@ -205,9 +205,11 @@ public class AnomalyReportGenerator {
       if (anomalyReportDTOList.size() == 1) {
         AnomalyReportDTO singleAnomaly = anomalyReportDTOList.get(0);
         subject = subject + " - " + singleAnomaly.getMetric();
-        imgPath = EmailScreenshotHelper.takeGraphScreenShot(singleAnomaly.getAnomalyId(), configuration);
         try {
-          cid = email.embed(new File(imgPath));
+          imgPath = EmailScreenshotHelper.takeGraphScreenShot(singleAnomaly.getAnomalyId(), configuration);
+          if (StringUtils.isNotBlank(imgPath)) {
+            cid = email.embed(new File(imgPath));
+          }
         } catch (Exception e) {
           LOG.error("Exception while embedding screenshot for anomaly {}", singleAnomaly.getAnomalyId(), e);
         }
