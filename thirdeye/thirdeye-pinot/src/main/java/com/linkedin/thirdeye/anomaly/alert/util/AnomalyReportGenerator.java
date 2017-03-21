@@ -11,7 +11,6 @@ import com.linkedin.thirdeye.anomaly.alert.v2.AlertTaskRunnerV2;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
-import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
@@ -25,6 +24,7 @@ import freemarker.template.TemplateExceptionHandler;
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -52,6 +52,7 @@ public class AnomalyReportGenerator {
   private static final AnomalyReportGenerator INSTANCE = new AnomalyReportGenerator();
   private static final String DATE_PATTERN = "MMM dd, HH:mm";
   private static final String MULTIPLE_ANOMALIES_EMAIL_TEMPLATE = "multiple-anomalies-email-template.ftl";
+  private static final DecimalFormat TWO_DECIMALS_FORMAT = new DecimalFormat("##.##");
 
   public static AnomalyReportGenerator getInstance() {
     return INSTANCE;
@@ -114,6 +115,7 @@ public class AnomalyReportGenerator {
     if (anomalies == null || anomalies.size() == 0) {
       LOG.info("No anomalies found to send email, please check the parameters.. exiting");
     } else {
+      DateTimeZone timeZone = DateTimeZone.forTimeZone(AlertTaskRunnerV2.DEFAULT_TIME_ZONE);
       Set<String> metrics = new HashSet<>();
       int alertedAnomalies = 0;
       int feedbackCollected = 0;
@@ -143,22 +145,20 @@ public class AnomalyReportGenerator {
         String feedbackVal = getFeedback(
             anomaly.getFeedback() == null ? "Not Resolved" : "Resolved(" + anomaly.getFeedback().getFeedbackType().name() + ")");
 
-        DateTimeZone dateTimeZone = Utils.getDataTimeZone(anomaly.getCollection());
         AnomalyReportDTO anomalyReportDTO = new AnomalyReportDTO(String.valueOf(anomaly.getId()),
             getAnomalyURL(anomaly, configuration.getDashboardHost()),
-            String.format("%.2f", anomaly.getAvgBaselineVal()),
-            String.format("%.2f", anomaly.getAvgCurrentVal()),
+            TWO_DECIMALS_FORMAT.format(anomaly.getAvgBaselineVal()),
+            TWO_DECIMALS_FORMAT.format(anomaly.getAvgCurrentVal()),
             getDimensionsList(anomaly.getDimensions()),
-            String.format("%.2f hours",
-                getTimeDiffInHours(anomaly.getStartTime(), anomaly.getEndTime())), // duration
+            getTimeDiffInHours(anomaly.getStartTime(), anomaly.getEndTime()), // duration
             feedbackVal,
             anomaly.getFunction().getFunctionName(),
-            String.format("%+.2f%%", anomaly.getWeight() * 100), // lift
+            TWO_DECIMALS_FORMAT.format(anomaly.getWeight() * 100) + "%",
             getLiftDirection(anomaly.getWeight()),
             anomaly.getMetric(),
-            getDateString(anomaly.getStartTime(), dateTimeZone),
-            getDateString(anomaly.getEndTime(), dateTimeZone),
-            getTimezoneString(dateTimeZone)
+            getDateString(anomaly.getStartTime(), timeZone),
+            getDateString(anomaly.getEndTime(), timeZone),
+            getTimezoneString(timeZone)
         );
 
 
@@ -179,7 +179,6 @@ public class AnomalyReportGenerator {
 
       HtmlEmail email = new HtmlEmail();
 
-      DateTimeZone timeZone = DateTimeZone.forTimeZone(AlertTaskRunnerV2.DEFAULT_TIME_ZONE);
       DataReportHelper.DateFormatMethod dateFormatMethod = new DataReportHelper.DateFormatMethod(timeZone);
       Map<String, Object> templateData = new HashMap<>();
       templateData.put("datasets", Joiner.on(", ").join(datasets));
@@ -258,8 +257,10 @@ public class AnomalyReportGenerator {
     return dateString;
   }
 
-  private double getTimeDiffInHours(long start, long end) {
-    return Double.valueOf((end - start) / 1000) / 3600;
+  private String getTimeDiffInHours(long start, long end) {
+    double duration = Double.valueOf((end - start) / 1000) / 3600;
+    String durationString = TWO_DECIMALS_FORMAT.format(duration) + ((duration == 1) ? (" hour") : (" hours"));
+    return durationString;
   }
 
   private List<String> getDimensionsList(DimensionMap dimensionMap) {
