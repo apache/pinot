@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.HashSet;
+import org.apache.commons.lang.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Period;
@@ -52,7 +53,7 @@ public class FetchAnomaliesInRangeAndOutputCSV {
 
       int rowCount = 0;
       if(resultNodes.size() > 0) {
-        bw.write(String.join(",", resultNodes.get(0).getSchema()));
+        bw.write(StringUtils.join(resultNodes.get(0).getSchema(), ","));
         bw.newLine();
         for (FetchMetricDataAndExistingAnomaliesTool.ResultNode n : resultNodes) {
           bw.write(n.toString());

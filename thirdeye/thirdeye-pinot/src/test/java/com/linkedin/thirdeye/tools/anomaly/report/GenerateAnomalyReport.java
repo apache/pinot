@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.validation.Validation;
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.mail.HtmlEmail;
 
 public class GenerateAnomalyReport {
@@ -158,7 +159,7 @@ public class GenerateAnomalyReport {
       templateData.put("trueAlertCount", trueAlert);
       templateData.put("falseAlertCount", falseAlert);
       templateData.put("nonActionableCount", nonActionable);
-      templateData.put("datasets", String.join(", ", collections));
+      templateData.put("datasets", StringUtils.join(collections, ", "));
       templateData.put("anomalyDetails", anomalyReportDTOList);
       buildEmailTemplateAndSendAlert(templateData);
     }

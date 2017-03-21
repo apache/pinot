@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.dashboard.views.diffsummary;
 
 import com.linkedin.thirdeye.client.diffsummary.Cube;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
@@ -32,7 +33,7 @@ public class SummaryResponseTree {
 
     List<SummaryResponseTreeNode> treeNodes = new ArrayList<>();
     // Build the response tree
-    nodes.sort(Summary.NODE_COMPARATOR.reversed()); // pre-order traversal
+    Collections.sort(nodes, Collections.reverseOrder(Summary.NODE_COMPARATOR)); // pre-order traversal
     for (HierarchyNode node : nodes) {
       SummaryResponseTreeNode treeNode = new SummaryResponseTreeNode();
       treeNode.hierarchyNode = node;
@@ -84,7 +85,7 @@ public class SummaryResponseTree {
     for (SummaryResponseTreeNode child : node.children) {
       computeCost(child, ratio, totalValue);
     }
-    node.children.sort(new SummaryResponseTreeNodeCostComparator().reversed());
+    Collections.sort(node.children, Collections.reverseOrder(new SummaryResponseTreeNodeCostComparator()));
   }
 
   private static void computeCost(SummaryResponseTreeNode node, double targetRatio, double totalValue) {

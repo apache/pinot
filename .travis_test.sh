@@ -20,9 +20,15 @@ git diff --name-only $TRAVIS_COMMIT_RANGE | egrep '^(thirdeye)'
 if [ $? -eq 0 ]; then
   echo 'ThirdEye changes.'
 
-  # Only run ThirdEye tests for JDK 8
-  if [ "$TRAVIS_JDK_VERSION" != 'oraclejdk8' ]; then
-    echo 'Skip ThirdEye tests for version other than oracle jdk8.'
+  if [ "$TRAVIS_JDK_VERSION" != 'oraclejdk7' ]; then
+    echo 'Skip ThirdEye tests for version other than oracle jdk7.'
+    rm -rf ~/.m2/repository/com/linkedin/pinot ~/.m2/repository/com/linkedin/thirdeye
+    exit 0
+  fi
+
+  if [ "$RUN_INTEGRATION_TESTS" == 'false' ]; then
+    echo 'Skip ThirdEye tests when integration tests off'
+    rm -rf ~/.m2/repository/com/linkedin/pinot ~/.m2/repository/com/linkedin/thirdeye
     exit 0
   fi
 

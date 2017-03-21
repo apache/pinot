@@ -72,7 +72,7 @@ public class RatioOutlierFunction extends BaseAnomalyFunction {
     // This function only detects anomalies on one metric, i.e., metrics[0]
     assert (getSpec().getMetrics().size() == 2);
 
-    LOG.info("Testing ratios {} for outliers", String.join(", ", getSpec().getMetrics()));
+    LOG.info("Testing ratios {} for outliers", getSpec().getMetrics());
 
     // Compute the bucket size, so we can iterate in those steps
     long bucketMillis = TimeUnit.MILLISECONDS.convert(getSpec().getBucketSize(), getSpec().getBucketUnit());

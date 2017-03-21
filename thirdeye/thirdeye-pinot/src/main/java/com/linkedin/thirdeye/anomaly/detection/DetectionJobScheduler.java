@@ -50,7 +50,7 @@ public class DetectionJobScheduler implements Runnable {
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY  = ThirdEyeCacheRegistry.getInstance();
   private DetectionJobRunner detectionJobRunner = new DetectionJobRunner();
 
-  private final Map<BackfillKey, Thread> existingBackfillJobs = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<BackfillKey, Thread> existingBackfillJobs = new ConcurrentHashMap<>();
 
   public DetectionJobScheduler() {
     scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();

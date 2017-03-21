@@ -216,7 +216,7 @@ public abstract class TimeSeriesUtil {
     TimeSeriesRequest request = new TimeSeriesRequest();
     request.setCollectionName(anomalyFunctionSpec.getCollection());
     // TODO: Check low level support for multiple metrics retrieval
-    String metricsToRetrieve = String.join(",", anomalyFunctionSpec.getMetrics());
+    String metricsToRetrieve = StringUtils.join(anomalyFunctionSpec.getMetrics(), ",");
     List<MetricExpression> metricExpressions = Utils
         .convertToMetricExpressions(metricsToRetrieve,
             anomalyFunctionSpec.getMetricFunction(), anomalyFunctionSpec.getCollection());

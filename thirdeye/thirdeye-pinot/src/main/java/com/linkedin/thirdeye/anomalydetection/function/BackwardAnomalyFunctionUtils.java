@@ -47,7 +47,7 @@ public class BackwardAnomalyFunctionUtils {
     }
     // Sort time series by their start time in reversed natural order, i.e., the latest time series
     // is arranged in the front of the list
-    Collections.sort(timeSeriesList, new TimeSeriesStartTimeComparator().reversed());
+    Collections.sort(timeSeriesList, Collections.reverseOrder(new TimeSeriesStartTimeComparator()));
 
     // If a timestamp is contained in the interval of a time series, then the timestamp and its
     // value is inserted into that time series. If the intervals of time series have overlap, then

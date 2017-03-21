@@ -252,7 +252,10 @@ public class DataCompletenessTaskRunner implements TaskRunner {
     for (Entry<String, Long> entry : bucketNameToBucketValueMS.entrySet()) {
       String bucketName = entry.getKey();
       Long bucketValue = entry.getValue();
-      Long currentCount = bucketNameToCount.getOrDefault(bucketName, 0L);
+      Long currentCount = 0L;
+      if(bucketNameToCount.containsKey(bucketName)) {
+        currentCount = bucketNameToCount.get(bucketName);
+      }
       LOG.info("Bucket name:{} Current count:{}", bucketName, currentCount);
 
       // get baseline counts for this bucket
