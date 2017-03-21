@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.lang.StringUtils;
 import org.joda.time.Interval;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
@@ -398,7 +399,7 @@ public class TestWeekOverWeekRuleFunction {
         propertyEntry.add(sb.toString());
         sb.setLength(0);
       }
-      return String.join(";", propertyEntry);
+      return StringUtils.join(propertyEntry, ";");
     }
     return "";
   }

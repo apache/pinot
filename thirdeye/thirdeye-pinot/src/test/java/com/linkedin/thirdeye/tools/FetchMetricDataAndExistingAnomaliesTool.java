@@ -67,7 +67,7 @@ public class FetchMetricDataAndExistingAnomaliesTool {
       }
       String[] filterArray = filterStr.split(",");
       StringBuilder fs = new StringBuilder();
-      fs.append(String.join(";", filterArray));
+      fs.append(StringUtils.join(filterArray, ";"));
       this.filters = fs.toString();
     }
 
