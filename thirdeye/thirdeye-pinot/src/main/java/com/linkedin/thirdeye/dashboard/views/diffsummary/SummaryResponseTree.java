@@ -33,8 +33,7 @@ public class SummaryResponseTree {
 
     List<SummaryResponseTreeNode> treeNodes = new ArrayList<>();
     // Build the response tree
-    Collections.sort(nodes, Summary.NODE_COMPARATOR); // pre-order traversal
-    Collections.reverse(nodes);
+    Collections.sort(nodes, Collections.reverseOrder(Summary.NODE_COMPARATOR)); // pre-order traversal
     for (HierarchyNode node : nodes) {
       SummaryResponseTreeNode treeNode = new SummaryResponseTreeNode();
       treeNode.hierarchyNode = node;
@@ -86,8 +85,7 @@ public class SummaryResponseTree {
     for (SummaryResponseTreeNode child : node.children) {
       computeCost(child, ratio, totalValue);
     }
-    Collections.sort(node.children, new SummaryResponseTreeNodeCostComparator());
-    Collections.reverse(node.children);
+    Collections.sort(node.children, Collections.reverseOrder(new SummaryResponseTreeNodeCostComparator()));
   }
 
   private static void computeCost(SummaryResponseTreeNode node, double targetRatio, double totalValue) {
