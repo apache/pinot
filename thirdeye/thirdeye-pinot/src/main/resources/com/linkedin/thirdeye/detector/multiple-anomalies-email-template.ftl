@@ -76,9 +76,14 @@
                 <#list anomalyDetails as r>
                   <tr style="border-top:1px solid #CFCFCF; border-bottom:1px solid #CFCFCF; background-color:#F5F5F5;">
                     <td style="padding:12px;"><a href="${r.anomalyURL}${r.anomalyId}" target="_blank" style="font-size: 16px; color: #33aada; font-weight: 600;">${r.metric}</a><br>
-                      <#list r.dimensions as dimension>
-                        ${dimension} <br>
-                      </#list>
+
+                      <#if r.dimensions?size == 0>
+                        N/A (No Dimensions)
+                      <#else>
+                        <#list r.dimensions as dimension>
+                          ${dimension} <br>
+                        </#list>
+                      </#if>
                     </td>
                     <td style="padding:12px;">
                       <span style="font-size: 16px; color:
