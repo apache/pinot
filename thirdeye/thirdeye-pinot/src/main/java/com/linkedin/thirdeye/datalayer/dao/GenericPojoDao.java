@@ -151,7 +151,8 @@ public class GenericPojoDao {
    * @throws SQLException
    */
   public Connection getConnection() throws SQLException {
-    ThirdeyeMetricUtil.dbCallCounter.inc();
+    // TODO: use static util for counting rather than abstract class
+    //ThirdeyeMetricUtil.dbCallCounter.inc();
     // ensure to close the connection
     return dataSource.getConnection();
   }
