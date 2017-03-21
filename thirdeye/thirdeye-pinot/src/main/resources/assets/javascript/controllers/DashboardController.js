@@ -21,9 +21,7 @@ DashboardController.prototype = {
   },
 
   handleAppEvent : function() {
-    console.log("DashboardController.handleAppEvent");
     const mode = HASH_SERVICE.get(HASH_PARAMS.DASHBOARD_MODE);
-    console.log("tabName:" + tabName + " mode: " + mode);
     let controllerName;
     switch(mode){
       case constants.DASHBOARD_MODE_METRIC_SUMMARY:
@@ -45,8 +43,6 @@ DashboardController.prototype = {
   },
 
   onSubTabSelectionEventHandler : function(sender, args) {
-    console.log('onSubTabSelectionEventHandler');
-    console.log(args);
     args.targetTab = args.targetTab.replace("#", "");
     var mode = constants.DASHBOARD_MODE_ANOMALY_SUMMARY;
     switch (args.targetTab) {
@@ -67,7 +63,6 @@ DashboardController.prototype = {
   },
 
   onDashboardSelectionEventHandler : function(sender, args) {
-    console.log('dashboard selection event handler');
     HASH_SERVICE.update(args);
     HASH_SERVICE.refreshWindowHashForRouting('dashboard');
     HASH_SERVICE.routeTo('dashboard');

@@ -16,17 +16,14 @@ function AppController() {
 
 AppController.prototype = {
   init : function() {
-    console.log("App controller init ");
     this.appView.init();
     this.compileTemplates();
     HASH_SERVICE.setHashParamsFromUrl();
   },
 
   handleAppEvent : function() {
-    console.log('In AppController.handleAppEvent');
     let tabName = HASH_SERVICE.get('tab');
     this.appModel.tabSelected = tabName;
-    console.log('tabName:' + tabName);
     var controllerName = 'anomalies';
     if (tabName.startsWith('dashboard')) {
       this.appModel.tabSelected = 'dashboard';
@@ -58,9 +55,6 @@ AppController.prototype = {
   },
 
   onTabClickEventHandler : function(sender, args) {
-    console.log('App controller onTabCLickEventHandler');
-    console.log("targetTab:" + args.targetTab);
-    console.log("previousTab:" + args.previousTab);
     if (args.targetTab != args.previousTab) {
       args.targetTab = args.targetTab.replace("#", "");
       HASH_SERVICE.set("tab", args.targetTab);

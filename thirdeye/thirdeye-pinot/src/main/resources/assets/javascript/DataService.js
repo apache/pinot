@@ -6,7 +6,6 @@ DataService.prototype = {
 
     // Make synchronous get call
     getDataSynchronous: function(url, data)  {
-      console.log("request url:", url)
       var results = undefined;
       $.ajax({
         url: url,
@@ -18,7 +17,6 @@ DataService.prototype = {
           results = data;
         },
         error: function(e) {
-          console.log(e);
         }
       });
       return results;
@@ -30,7 +28,6 @@ DataService.prototype = {
       let results;
       spinner.spin(target);
 
-      console.log("request url:", url)
       return $.ajax({
         url: url,
         data: data,
@@ -40,7 +37,6 @@ DataService.prototype = {
           results = data;
         },
         error: function(e) {
-          console.log(e);
         }
       }).done(function(data) {
         spinner.stop();
@@ -54,7 +50,6 @@ DataService.prototype = {
 
     // Make post call
     postData: function(url, data) {
-      console.log("request url:", url)
       return $.ajax({
         url: url,
         headers: {
@@ -134,7 +129,6 @@ DataService.prototype = {
       var url = constants.UPDATE_ANOMALY_FEEDBACK + anomalyId;
       var data = '{ "feedbackType": "' + feedbackType + '","comment": ""}';
       var response = this.postData(url, data);
-      console.log("Updated backend feedback " + feedbackType);
     },
 
     fetchGranularityForMetric: function (metricId) {
@@ -157,8 +151,6 @@ DataService.prototype = {
       var url = "/timeseries/compare/" + metricId + "/" + currentStart + "/" + currentEnd + "/"
           + baselineStart + "/" + baselineEnd + "?dimension=" + dimension + "&filters="
           + JSON.stringify(filters) + "&granularity=" + granularity;
-      console.log("timeseries data fetch URL ----> ");
-      console.log(url);
       return this.getDataSynchronous(url);
     },
 
@@ -166,8 +158,6 @@ DataService.prototype = {
       filters = {}) {
     var url = "/data/heatmap/" + metricId + "/" + currentStart + "/" + currentEnd + "/"
         + baselineStart + "/" + baselineEnd + "?filters=" + JSON.stringify(filters);
-    console.log("heatmap data fetch URL ----> ");
-    console.log(url);
     return this.getDataSynchronous(url);
   },
 

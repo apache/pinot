@@ -1,8 +1,6 @@
 /** AJAX and HASH RELATED METHODS **/
 
 function getData(url, tab) {
-    console.log("request url:", url)
-
     tab = tab ? tab : hash.view;
     return $.ajax({
         url: url,
@@ -40,8 +38,6 @@ function getData(url, tab) {
 }
 
 function getDataCustomCallback(url, tab) {
-    console.log("request url:", url)
-
     tab = tab ? tab : hash.view;
     return $.ajax({
         url: url,
@@ -85,7 +81,6 @@ function submitData(url, data, tab) {
     if (!tab) {
         tab = hash.view;
     }
-    console.log("post url:", url)
     return $.ajax({
         url: url,
         headers: {
@@ -127,7 +122,6 @@ function deleteData(url, data, tab) {
     if (!tab) {
         tab = hash.view;
     }
-    console.log("delete url:", url)
     return $.ajax({
         url: url,
         type: 'delete',
@@ -674,7 +668,6 @@ function toggleSumDetails(target) {
             .getElementsByClassName("details-cell");
         //Alert
         if (detailsCells.length > 1000) {
-            console.log('details cells to paint:', detailsCells.length)
         }
 
         for (var dIndex = 0, detailsLen = detailsCells.length; dIndex < detailsLen; dIndex++) {

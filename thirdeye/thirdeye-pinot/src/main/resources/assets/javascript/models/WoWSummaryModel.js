@@ -15,12 +15,9 @@ WoWSummaryModel.prototype = {
 
   },
   setParams : function() {
-    console.log("Set params for WOW");
     var params = HASH_SERVICE.getParams();
     if (params != undefined) {
-      console.log('params');
       if (params[HASH_PARAMS.DASHBOARD_DASHBOARD_NAME] != undefined) {
-        console.log('dashboard');
         this.previousDashboardName = this.dashboardName;
         this.dashboardName = params[HASH_PARAMS.DASHBOARD_DASHBOARD_NAME];
         this.summaryDashboardId = params[HASH_PARAMS.DASHBOARD_SUMMARY_DASHBOARD_ID];
@@ -37,8 +34,6 @@ WoWSummaryModel.prototype = {
     }
   },
   updateModelAndNotifyView : function(wowSummary) {
-    console.log('Results');
-    console.log(wowSummary);
     this.wowSummary = wowSummary;
     this.renderViewEvent.notify();
   }

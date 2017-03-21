@@ -8,17 +8,11 @@ function HashService() {
 
 HashService.prototype = {
   init : function() {
-    console.log('HashService.init');
     window.onhashchange = this.onHashChangeEventHandler.bind(this);
-    console.log("window.location:" + window.location + " path " + window.location.pathname);
-    console.log(window.location);
     let tab = '';
-    console.log(tab);
-    console.log(constants);
     if (window.location.hash) {
       let splits = window.location.hash.split('/');
       if (splits.length > 0) {
-        console.log("hash split[0]" + splits[0]);
         tab = splits[0].replace("#", "");
       }
     }
@@ -27,22 +21,16 @@ HashService.prototype = {
       this.set(HASH_PARAMS.TAB, tab);
       this.refreshWindowHashForRouting('app');
     }
-    console.log("Setting tab to:" + tab)
     this.set(HASH_PARAMS.TAB, tab);
     let urlFragment = window.location.hash.replace("#", "").replace("!", "");
-    console.log(urlFragment);
-    console.log('HashService.init ends');
   },
   registerController : function(controllerName, controller) {
-    console.log('registerController ' + controllerName);
     this.controllerNameToControllerMap[controllerName] = controller;
   },
   clear : function() {
-    console.log('hash service.clear')
     this.params = {};
   },
   set(key, value) {
-    console.log('set ' + key + ' ' + value);
     // casting the value to the correct type
     switch (key) {
       case HASH_PARAMS.ANOMALIES_START_DATE:
@@ -71,20 +59,15 @@ HashService.prototype = {
     return this.params[key];
   },
   update : function(paramsToUpdate) {
-    console.log('hash service.update');
-    console.log(paramsToUpdate)
     Object.keys(paramsToUpdate).forEach(key => this.set(key, paramsToUpdate[key]));
   },
   getParams : function() {
-    console.log('getParams');
     return this.params;
   },
   refreshWindowHashForRouting : function(controllerName){
-    console.log('RefreshWindowHashForRouting ' + controllerName);
     window.location.href="#" + this.params[HASH_PARAMS.TAB] + this.getParamsStringForController(controllerName);
   },
   getParamsStringForController : function(controllerName) {
-    console.log('getParamsStringForController ' + controllerName)
     var paramNamesToDefaultValuesMap = HASH_PARAMS.controllerNameToParamNamesMap[controllerName];
     var paramsString = "?";
     var separator = "";
@@ -106,12 +89,9 @@ HashService.prototype = {
       }
     }
     paramsString = paramsString + separator + HASH_PARAMS.RAND + "=" + Math.random();
-    console.log('Params string : ' + paramsString)
     return paramsString;
   },
   setHashParamsFromUrl : function() {
-    console.log("Hash Params from URL:");
-    console.log(window.location);
 
     if (window.location.hash) {
       this.clear();
@@ -124,12 +104,10 @@ HashService.prototype = {
           const [key, value] = part.split('=');
           this.set(key, decodeURIComponent(value));
         });
-        console.log(this.params);
       }
     }
   },
   routeTo : function(controllerName) {
-    console.log('routeTo' + controllerName);
     this.currentControllerName = controllerName;
     this.currentController = this.controllerNameToControllerMap[controllerName];
     this.currentController.handleAppEvent();
@@ -183,10 +161,6 @@ HashService.prototype = {
     if (transitionTo) {
       this.setHashParamsFromUrl();
       this.routeTo('app');
-    } else {
-      console.log('OnHashChangeEventhandler');
-      console.log(this.params);
-      console.log(this.currentController);
     }
   }
 };

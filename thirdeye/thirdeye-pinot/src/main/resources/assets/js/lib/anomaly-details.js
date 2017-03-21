@@ -9,7 +9,6 @@ function showAnomalyDetails(id) {
             anomalyIndex = i;
         }
     }
-    console.log(mergeAnomalyData);
 
     // render page with incomplete data, another ajax call would populate the details
     renderAnomalyDetails(mergeAnomalyData);

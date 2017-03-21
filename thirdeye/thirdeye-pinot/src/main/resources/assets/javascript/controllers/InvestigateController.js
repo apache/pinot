@@ -13,7 +13,6 @@ InvestigateController.prototype = {
   },
 
   viewContributionEventHandler(sender, args) {
-    console.log(args);
     HASH_SERVICE.clear();
     HASH_SERVICE.set('tab', 'analysis');
     HASH_SERVICE.update(args);

@@ -28,7 +28,6 @@ AppView.prototype = {
   },
 
   render : function() {
-    console.log("Switching to tab:" + this.appModel.tabSelected);
     switch (this.appModel.tabSelected) {
     case "dashboard":
     case "analysis":
@@ -42,7 +41,7 @@ AppView.prototype = {
     case "investigate":
       $('#main-tabs a[href=#anomalies]').tab('show');
       $('#anomalies-place-holder').hide();
-      $('#investigate-place-holder').show()
+      $('#investigate-place-holder').show();
       break;
     }
     // compiledHtml
