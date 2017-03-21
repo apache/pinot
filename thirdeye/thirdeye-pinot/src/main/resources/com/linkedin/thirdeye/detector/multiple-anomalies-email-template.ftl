@@ -18,8 +18,7 @@
         <tr>
           <td style="padding: 0 24px;" colspan="2">
               <p style="font-size: 20px; margin-bottom: 8px;">Hi,</p> <br>
-              <p style="color: rgba(0,0,0,0.55); margin-top: 0px;"> ThirdEye has detected <strong style="color: black;">${anomalyCount} ${(anomalyCount == 1)?string("anomaly", "anomalies")}</strong> for DATASET: <strong style="color: black;">${datasets}</strong> from <strong style="color: black;">${startTime} ${timeZone}</strong> to <strong style="color: black;">${endTime} ${timeZone}</strong>.</p>
-              <p style="color: rgba(0,0,0,0.55);">Below is a summary, please go <strong><a style="color:#33aada; text-decoration:none;" href="${dashboardHost}/thirdeye#anomalies?anomaliesSearchMode=id&anomalyIds=${anomalyIds}">here</a></strong> for a detailed view.</p>
+              <p style="color: rgba(0,0,0,0.55); margin-top: 0px;"> ThirdEye has detected <strong style="color: black;">${anomalyCount} ${(anomalyCount == 1)?string("anomaly", "anomalies")}</strong>. Below is a summary, please go <strong><a style="color:#33aada;" href="${dashboardHost}/thirdeye#anomalies?anomaliesSearchMode=id&anomalyIds=${anomalyIds}">here</a></strong> for a detailed view.</p>
             </p>
           </td>
         </tr>
@@ -31,7 +30,7 @@
         <tr>
           <td style="padding: 0 24px;" colspan="2">
             <p style="color: rgba(0,0,0,0.55); font-size:16px; margin-bottom:0;">DATASET</p>
-            <p style="margin-top:8px; margin-bottom:24px;"><a style="color:#33aada; text-decoration:none; font-size:20px;margin-top:0;" href="${dashboardHost}/thirdeye#anomalies?anomaliesSearchMode=id&anomalyIds=${anomalyIds}">${datasets}</a></p>
+            <p style="margin-top:8px; margin-bottom:24px;"><a style="color:#33aada; font-size:20px;margin-top:0;">${datasets}</p>
           </td>
         </tr>
 
@@ -69,7 +68,11 @@
                 </tr>
                 <#list anomalyDetails as r>
                   <tr style="border-top:1px solid #CFCFCF; border-bottom:1px solid #CFCFCF; background-color:#F5F5F5;">
-                    <td style="padding:12px;"><a href="${r.anomalyURL}${r.anomalyId}" target="_blank" style="font-size: 16px; color: #33aada; font-weight: 600;text-decoration: none;">${r.metric}</a><br> ${r.dimensions}</td>
+                    <td style="padding:12px;"><a href="${r.anomalyURL}${r.anomalyId}" target="_blank" style="font-size: 16px; color: #33aada; font-weight: 600;">${r.metric}</a><br>
+                      <#list r.dimensions as dimension>
+                        ${dimension} <br>
+                      </#list>
+                    </td>
                     <td style="padding:12px;">
                       <span style="font-size: 16px; color:
                       ${r.positiveLift?string('#398b18','#ee1620')};">${r.positiveLift?string('&#9650;','&#9660;')} ${r.lift}</span><br>
@@ -77,6 +80,7 @@
                       <span style="white-space: nowrap;">${r.currentVal} / ${r.baselineVal}</span>
                     </td>
                     <td style="padding:12px;">
+                      <span style="white-space: nowrap;">${r.duration}</span><br>
                       <span style="white-space: nowrap;">${r.startDateTime} ${r.timezone}</span><br>
                       <span style="white-space: nowrap;">${r.endTime} ${r.timezone}</span>
                     </td>
@@ -90,11 +94,6 @@
             </td>
           </tr>
         </#if>
-        <tr>
-          <td style="padding:24px; padding-top:0;" colspan="2">
-            <p style="font-size:16px; margin:0;"><strong>Is this an anomaly?</strong> <span style="color: rgba(0,0,0,0.55);">To improve our detection abilities, <span style="color: #33aada;">click on each anomaly</span> and provide feedback. </span></p>
-          </td>
-        </tr>
 
         <tr>
           <td colspan="2" style="border-bottom: 1px solid #E9E9E9;">
@@ -104,7 +103,7 @@
         <tr>
           <td style="font-family:'Proxima Nova','Arial', 'Helvetica Neue',Helvetica, sans-serif; color: rgba(0,0,0,0.55); padding: 24px; font-size:14px;" colspan="2">
             <p style="margin-top:0;"> You are receiving this email because you have subscribed to ThirdEye Alert Service for <strong>'${alertConfigName}'</strong>. If you have any questions regarding this report, please email
-              <a style="text-decoration: none; color: #33aada;" href="mailto:ask_thirdeye@linkedin.com" target="_top">ask_thirdeye@linkedin.com</a>
+              <a style="color: #33aada;" href="mailto:ask_thirdeye@linkedin.com" target="_top">ask_thirdeye@linkedin.com</a>
             </p>
             <p style="margin-bottom:0; margin-top: 24px;">
               Thanks,<br>

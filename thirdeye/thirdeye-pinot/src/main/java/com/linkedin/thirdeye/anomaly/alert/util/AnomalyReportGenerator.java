@@ -149,11 +149,8 @@ public class AnomalyReportGenerator {
             String.format("%.2f", anomaly.getAvgBaselineVal()),
             String.format("%.2f", anomaly.getAvgCurrentVal()),
             getDimensionsList(anomaly.getDimensions()),
-            String.format("%.2f hours (%s to %s) %s",
-                getTimeDiffInHours(anomaly.getStartTime(), anomaly.getEndTime()),
-                getDateString(anomaly.getStartTime(), dateTimeZone),
-                getDateString(anomaly.getEndTime(), dateTimeZone),
-                getTimezoneString(dateTimeZone)), // duration
+            String.format("%.2f hours",
+                getTimeDiffInHours(anomaly.getStartTime(), anomaly.getEndTime())), // duration
             feedbackVal,
             anomaly.getFunction().getFunctionName(),
             String.format("%+.2f%%", anomaly.getWeight() * 100), // lift
