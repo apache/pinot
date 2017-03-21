@@ -28,6 +28,10 @@ git diff --name-only $TRAVIS_COMMIT_RANGE | egrep '^(thirdeye)'
 noThirdEyeChange=$?
 if [ $noThirdEyeChange -eq 0 ]; then
   echo 'ThirdEye changes.'
+  if [ "$RUN_INTEGRATION_TESTS" -eq 'false' ]; then
+    echo 'Skip ThirdEye build when integration tests off'
+    exit 0
+  fi
 fi
 
 mvn clean install -B -DskipTests=true -Dmaven.javadoc.skip=true -Dassembly.skipAssembly=true
