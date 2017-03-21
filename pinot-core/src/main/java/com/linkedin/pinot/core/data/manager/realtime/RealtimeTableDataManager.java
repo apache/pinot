@@ -52,6 +52,7 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
   private final ExecutorService _segmentAsyncExecutorService = Executors
       .newSingleThreadExecutor(new NamedThreadFactory("SegmentAsyncExecutorService"));
   private ZkHelixPropertyStore<ZNRecord> _helixPropertyStore;
+  private SegmentBuildTimeLeaseExtender _leaseExtender;
 
   public RealtimeTableDataManager() {
     super();
@@ -68,9 +69,13 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
       segmentDataManager.destroy();
     }
     KafkaConsumerManager.closeAllConsumers();
+    if (_leaseExtender != null) {
+      _leaseExtender.shutDown();
+    }
   }
 
   protected void doInit() {
+    _leaseExtender = SegmentBuildTimeLeaseExtender.create(getServerInstance());
     LOGGER = LoggerFactory.getLogger(_tableName + "-RealtimeTableDataManager");
   }
 

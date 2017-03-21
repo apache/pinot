@@ -187,7 +187,7 @@ public class SegmentCompletionManager {
     final String instanceId = reqParams.getInstanceId();
     final long offset = reqParams.getOffset();
     LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
-    SegmentCompletionFSM fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMMIT);
+    SegmentCompletionFSM fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMIT);
     SegmentCompletionProtocol.Response response = fsm.segmentCommitStart(instanceId, offset);
     if (fsm.isDone()) {
       LOGGER.info("Removing FSM (if present):{}", fsm.toString());
@@ -203,9 +203,9 @@ public class SegmentCompletionManager {
     final String segmentNameStr = reqParams.getSegmentName();
     final String instanceId = reqParams.getInstanceId();
     final long offset = reqParams.getOffset();
-    final int extTimeSec = reqParams.getExtTimeSec();
+    final int extTimeSec = reqParams.getExtraTimeSec();
     LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
-    SegmentCompletionFSM fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMMIT);
+    SegmentCompletionFSM fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMIT);
     SegmentCompletionProtocol.Response response = fsm.extendBuildTime(instanceId, offset, extTimeSec);
     if (fsm.isDone()) {
       LOGGER.info("Removing FSM (if present):{}", fsm.toString());
@@ -256,7 +256,7 @@ public class SegmentCompletionManager {
     final String instanceId = reqParams.getInstanceId();
     final long offset = reqParams.getOffset();
     LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
-    SegmentCompletionFSM fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMMIT);
+    SegmentCompletionFSM fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMIT);
     SegmentCompletionProtocol.Response response = fsm.segmentCommitEnd(instanceId, offset, success);
     if (fsm.isDone()) {
       LOGGER.info("Removing FSM (if present):{}", fsm.toString());

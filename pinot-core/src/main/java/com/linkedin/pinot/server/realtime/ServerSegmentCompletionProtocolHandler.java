@@ -44,15 +44,15 @@ import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
 public class ServerSegmentCompletionProtocolHandler {
   private static Logger LOGGER = LoggerFactory.getLogger(ServerSegmentCompletionProtocolHandler.class);
 
-  private final String _instance;
+  private final String _instanceId;
 
-  public ServerSegmentCompletionProtocolHandler(String instance) {
-    _instance = instance;
+  public ServerSegmentCompletionProtocolHandler(String instanceId) {
+    _instanceId = instanceId;
   }
 
   public SegmentCompletionProtocol.Response segmentCommit(long offset, final String segmentName, final File segmentTarFile) throws FileNotFoundException {
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
-    params.withInstanceId(_instance).withOffset(offset).withSegmentName(segmentName);
+    params.withInstanceId(_instanceId).withOffset(offset).withSegmentName(segmentName);
     SegmentCompletionProtocol.SegmentCommitRequest request = new SegmentCompletionProtocol.SegmentCommitRequest(params);
 
     final InputStream inputStream = new FileInputStream(segmentTarFile);
@@ -77,14 +77,20 @@ public class ServerSegmentCompletionProtocolHandler {
     return doHttp(request, parts);
   }
 
+  public SegmentCompletionProtocol.Response extendBuildTime(SegmentCompletionProtocol.Request.Params params) {
+    params.withInstanceId(_instanceId);
+    SegmentCompletionProtocol.ExtendBuildTimeRequest request = new SegmentCompletionProtocol.ExtendBuildTimeRequest(params);
+    return doHttp(request, null);
+  }
+
   public SegmentCompletionProtocol.Response segmentConsumed(SegmentCompletionProtocol.Request.Params params) {
-    params.withInstanceId(_instance);
+    params.withInstanceId(_instanceId);
     SegmentCompletionProtocol.SegmentConsumedRequest request = new SegmentCompletionProtocol.SegmentConsumedRequest(params);
     return doHttp(request, null);
   }
 
   public SegmentCompletionProtocol.Response segmentStoppedConsuming(SegmentCompletionProtocol.Request.Params params) {
-    params.withInstanceId(_instance);
+    params.withInstanceId(_instanceId);
     SegmentCompletionProtocol.SegmentStoppedConsuming request = new SegmentCompletionProtocol.SegmentStoppedConsuming(params);
     return doHttp(request, null);
   }

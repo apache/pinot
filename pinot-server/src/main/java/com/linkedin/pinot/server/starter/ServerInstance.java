@@ -15,21 +15,18 @@
  */
 package com.linkedin.pinot.server.starter;
 
-import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
-import com.yammer.metrics.core.MetricsRegistry;
 import java.lang.reflect.InvocationTargetException;
-import org.apache.commons.configuration.BaseConfiguration;
-import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.common.data.DataManager;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.query.QueryExecutor;
+import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
 import com.linkedin.pinot.server.conf.ServerConf;
 import com.linkedin.pinot.transport.netty.NettyServer;
 import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
+import com.yammer.metrics.core.MetricsRegistry;
 
 
 /**

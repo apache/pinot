@@ -55,7 +55,7 @@ public class LLCSegmentCommit extends PinotSegmentUploadRestletResource {
   @HttpVerb("post")
   @Description("Uploads an LLC segment coming in from a server")
   @Summary("Uploads an LLC segment coming in from a server")
-  @Paths({"/" + SegmentCompletionProtocol.MSG_TYPE_COMMMIT})
+  @Paths({"/" + SegmentCompletionProtocol.MSG_TYPE_COMMIT})
   public Representation post(Representation entity) {
     if (!extractParams()) {
       return new StringRepresentation(SegmentCompletionProtocol.RESP_FAILED.toJsonString());
