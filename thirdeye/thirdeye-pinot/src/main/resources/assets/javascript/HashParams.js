@@ -111,9 +111,6 @@ HashParams.prototype = {
       paramNamesToDefaultValuesMap[this.TAB] = constants.TAB_INVESTIGATE;
       paramNamesToDefaultValuesMap[this.INVESTIGATE_ANOMALY_ID] = null;
       this.controllerNameToParamNamesMap[this.INVESTIGATE_CONTROLLER] = paramNamesToDefaultValuesMap;
-
-      console.log('hash Params init');
-      console.log(this.controllerNameToParamNamesMap);
     },
 
     isSame(key, currentValue, newValue) {

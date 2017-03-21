@@ -131,8 +131,6 @@ AnomalyResultView.prototype = {
       minimumResultsForSearch : -1,
       theme : "bootstrap"
     }).on("change", function(e) {
-      console.log('On change of search mode');
-      console.log(e);
       self.showSearchBarBasedOnMode();
     });
 
@@ -189,7 +187,6 @@ AnomalyResultView.prototype = {
       startPage: pageNumber,
       onPageClick: (event, page) => {
           $('body').scrollTop(0);
-          console.log("Page " + page + " PageNumber " + pageNumber);
           if (page != pageNumber) {
             var anomaliesParams = {
                 pageNumber : page,
@@ -224,10 +221,8 @@ AnomalyResultView.prototype = {
     $('#anomalies-search-metrics-container').hide();
     $('#anomalies-search-time-container').hide();
     if (anomaliesSearchMode == constants.MODE_METRIC) {
-      console.log('showing metric');
       $('#anomalies-search-metrics-container').show();
     } else if (anomaliesSearchMode == constants.MODE_DASHBOARD) {
-      console.log('showing dashboard');
       $('#anomalies-search-dashboard-container').show();
     } else if (anomaliesSearchMode == constants.MODE_ID) {
       $('#anomalies-search-anomaly-container').show()
@@ -255,7 +250,6 @@ AnomalyResultView.prototype = {
         return;
       }
 
-      console.log(anomaly);
 
       const date = ['date'].concat(anomaly.dates);
       const currentValues = ['current'].concat(anomaly.currentValues);

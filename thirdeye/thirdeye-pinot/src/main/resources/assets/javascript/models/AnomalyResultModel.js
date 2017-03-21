@@ -46,7 +46,6 @@ AnomalyResultModel.prototype = {
   },
 
   reset : function() {
-    console.log('Reset of anomaly result model');
     this.metricIds = null;
     this.dashboardId = null;
     this.anomalyIds = null;
@@ -56,46 +55,32 @@ AnomalyResultModel.prototype = {
   },
   // Call setParams every time there is a change to the model
   setParams : function(params) {
-    console.log("Set params of Anomaly Result Model");
     if (params != undefined) {
-      console.log("params");
       if (params[HASH_PARAMS.ANOMALIES_ANOMALIES_SEARCH_MODE] != undefined) {
-        console.log('anomaliesSearchMode');
         this.anomaliesSearchMode = params[HASH_PARAMS.ANOMALIES_ANOMALIES_SEARCH_MODE];
       }
       if (params[HASH_PARAMS.ANOMALIES_METRIC_IDS] != undefined) {
-        console.log("metricIds");
         this.metricIds = params[HASH_PARAMS.ANOMALIES_METRIC_IDS];
-        console.log(this.metricIds);
       }
       if (params[HASH_PARAMS.ANOMALIES_DASHBOARD_ID] != undefined) {
-        console.log("dashboardId");
         this.dashboardId = params[HASH_PARAMS.ANOMALIES_DASHBOARD_ID];
-        console.log(this.dashboardId);
       }
       if (params[HASH_PARAMS.ANOMALIES_ANOMALY_IDS] != undefined) {
-        console.log("anomalyIds");
         this.anomalyIds = params[HASH_PARAMS.ANOMALIES_ANOMALY_IDS];
-        console.log(this.anomalyIds);
       }
       if (params[HASH_PARAMS.ANOMALIES_START_DATE] != undefined) {
-        console.log("startDate");
         this.startDate = params[HASH_PARAMS.ANOMALIES_START_DATE];
       }
       if (params[HASH_PARAMS.ANOMALIES_END_DATE] != undefined) {
-        console.log("endDate");
         this.endDate = params[HASH_PARAMS.ANOMALIES_END_DATE];
       }
       if (params[HASH_PARAMS.ANOMALIES_PAGE_NUMBER] != undefined) {
-        console.log("pageNumber");
         this.pageNumber = params[HASH_PARAMS.ANOMALIES_PAGE_NUMBER];
       }
       if (params['functionName'] != undefined) {
-        console.log("functionName");
         this.functionName = params['functionName'];
       }
       if (params['feedback'] != undefined) {
-        console.log("feedback");
         var idx = params['idx'];
         this.anomaliesWrapper.anomalyDetailsList[idx].anomalyFeedback = params['feedback'];
         this.anomalyForFeedbackUpdate = this.anomaliesWrapper.anomalyDetailsList[idx];
@@ -187,7 +172,6 @@ AnomalyResultModel.prototype = {
 
   // Instead of calling rebuild for a simple anomaly feedback change, made a smaller function
   updateAnomalyFeedback : function() {
-    console.log("Updating feedback at backend");
     var feedbackType = this.getFeedbackTypeFromString(this.anomalyForFeedbackUpdate.anomalyFeedback);
     dataService.updateFeedback(this.anomalyForFeedbackUpdate.anomalyId, feedbackType);
   },

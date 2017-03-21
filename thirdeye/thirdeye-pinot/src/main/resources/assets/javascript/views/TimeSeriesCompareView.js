@@ -56,7 +56,6 @@ TimeSeriesCompareView.prototype = {
   },
 
   renderPercentageChangeSection: function () {
-    console.log(this.timeSeriesCompareModel);
     var contributorTableResult = this.contributor_table_template_compiled(
         this.timeSeriesCompareModel);
     $(this.contributor_table_placeHolderId).html(contributorTableResult);
@@ -138,7 +137,6 @@ TimeSeriesCompareView.prototype = {
 
   collectAndUpdateViewParamsForHeatMapRendering: function (subDimension, bucketIndex) {
     var self = this;
-    console.log(self.timeSeriesCompareModel.subDimensionContributionDetails);
 
     var currentStart = self.timeSeriesCompareModel.subDimensionContributionDetails.timeBucketsCurrent[bucketIndex];
     var baselineStart = self.timeSeriesCompareModel.subDimensionContributionDetails.timeBucketsBaseline[bucketIndex];

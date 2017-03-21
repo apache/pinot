@@ -18,7 +18,6 @@ DashboardView.prototype = {
   },
   init : function() {
     var self = this;
-    console.log(self.dashboardModel);
     var result = self.dashboard_template_compiled(self.dashboardModel);
 
     // autocomplete
@@ -26,7 +25,6 @@ DashboardView.prototype = {
     if(HASH_SERVICE.get(HASH_PARAMS.DASHBOARD_DASHBOARD_NAME) != null) {
       $("#dashboard-content").show();
     }
-    console.log("this.dashboardModel.tabSelected:" + self.dashboardModel.tabSelected);
     $('#dashboard-tabs a[href="#' + self.dashboardModel.tabSelected + '"]').tab('show');
 
     // DASHBOARD SELECTION
@@ -79,7 +77,6 @@ DashboardView.prototype = {
   setupListeners : function() {
     var self = this;
     var tabSelectionEventHandler = function(e) {
-      console.log("Switching tabs")
       var targetTab = $(e.target).attr('href');
       var previousTab = $(e.relatedTarget).attr('href');
       var args = {

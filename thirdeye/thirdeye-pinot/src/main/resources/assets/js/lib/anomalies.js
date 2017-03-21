@@ -79,8 +79,6 @@ function getAnomalies(tab) {
                 //AJAX for get metric config
                 var extSourceLinkInfo;
                 getData(metricUrl).done(function (metricConfig) {
-                  console.log("metricConfig");
-                  console.log(metricConfig);
                   extSourceLinkInfo = metricConfig.extSourceLinkInfo;
                   getTimeseriesData(anomaliesDisplayData, extSourceLinkInfo);
                 });
@@ -412,8 +410,6 @@ function calculateBucketSize(timeSeriesData) {
 }
 
 function drawAnomalyTimeSeries(timeSeriesData, anomalyData, tab, placeholder, options) {
-    console.log(" in drawAnomalyTimeSeries")
-
      var currentView = $("#anomalies");
 
      // Calculate the time format according to bucket size

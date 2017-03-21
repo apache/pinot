@@ -21,7 +21,6 @@ TimeSeriesCompareController.prototype = {
   },
 
   handleHeatMapRenderEvent: function (viewObject) {
-    console.log(HASH_SERVICE.getParams());
 
     // TODO: separate refreshWindowHash within update
     HASH_SERVICE.update(viewObject.viewParams);
