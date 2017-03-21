@@ -26,7 +26,7 @@ if [ $? -eq 0 ]; then
     exit 0
   fi
 
-  if [ "$RUN_INTEGRATION_TESTS" -eq 'false' ]; then
+  if [ "$RUN_INTEGRATION_TESTS" == 'false' ]; then
     echo 'Skip ThirdEye tests when integration tests off'
     rm -rf ~/.m2/repository/com/linkedin/pinot ~/.m2/repository/com/linkedin/thirdeye
     exit 0
