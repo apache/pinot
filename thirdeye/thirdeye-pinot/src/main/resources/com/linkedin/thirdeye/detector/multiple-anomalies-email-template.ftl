@@ -77,13 +77,10 @@
                   <tr style="border-top:1px solid #CFCFCF; border-bottom:1px solid #CFCFCF; background-color:#F5F5F5;">
                     <td style="padding:12px;"><a href="${r.anomalyURL}${r.anomalyId}" target="_blank" style="font-size: 16px; color: #33aada; font-weight: 600;">${r.metric}</a><br>
 
-                      <#if r.dimensions?size == 0>
-                        N/A (No Dimensions)
-                      <#else>
-                        <#list r.dimensions as dimension>
-                          ${dimension} <br>
-                        </#list>
-                      </#if>
+                      <#list r.dimensions as dimension>
+                        ${dimension} <br>
+                      </#list>
+
                     </td>
                     <td style="padding:12px;">
                       <span style="font-size: 16px; color:
