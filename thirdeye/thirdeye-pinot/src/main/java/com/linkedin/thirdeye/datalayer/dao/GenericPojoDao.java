@@ -2,10 +2,12 @@ package com.linkedin.thirdeye.datalayer.dao;
 
 import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricUtil;
 import com.linkedin.thirdeye.datalayer.entity.AlertConfigIndex;
+import com.linkedin.thirdeye.datalayer.entity.AnomalyFunctionExIndex;
 import com.linkedin.thirdeye.datalayer.entity.EventIndex;
 import com.linkedin.thirdeye.datalayer.entity.AutotuneConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.OverrideConfigIndex;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
+import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionExBean;
 import com.linkedin.thirdeye.datalayer.pojo.EventBean;
 import com.linkedin.thirdeye.datalayer.pojo.AutotuneConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.OverrideConfigBean;
@@ -117,7 +119,8 @@ public class GenericPojoDao {
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, DetectionStatusIndex.class));
     pojoInfoMap.put(AutotuneConfigBean.class,
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, AutotuneConfigIndex.class));
-
+    pojoInfoMap.put(AnomalyFunctionExBean.class,
+        newPojoInfo(DEFAULT_BASE_TABLE_NAME, AnomalyFunctionExIndex.class));
   }
 
   private static PojoInfo newPojoInfo(String baseTableName,
@@ -151,7 +154,8 @@ public class GenericPojoDao {
    * @throws SQLException
    */
   public Connection getConnection() throws SQLException {
-    ThirdeyeMetricUtil.dbCallCounter.inc();
+    // TODO remove static dependency, breaks logging when used without instantiating BaseThirdEyeApplication first
+    //BaseThirdEyeApplication.dbCallCounter.inc();
     // ensure to close the connection
     return dataSource.getConnection();
   }

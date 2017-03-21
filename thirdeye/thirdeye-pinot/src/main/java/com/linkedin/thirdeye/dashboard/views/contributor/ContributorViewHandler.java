@@ -204,7 +204,7 @@ public class ContributorViewHandler implements
     Map<String, List<Integer>> keyToRowIdListMapping = new TreeMap<>();
     List<String[]> rowData = new ArrayList<>();
     // for each metric, dimension pair compute the total value for each dimension. This will be used
-    // to sort the dimension values
+    // to sorted the dimension values
     Map<String, Map<String, Map<String, Double>>> baselineTotalMapPerDimensionValue =
         new HashMap<>();
     Map<String, Map<String, Map<String, Double>>> currentTotalMapPerDimensionValue =
@@ -253,7 +253,7 @@ public class ContributorViewHandler implements
   }
 
   /**
-   * sort the values based on their values
+   * sorted the values based on their values
    * @param dimensionValues
    * @param baselineTotalMapPerDimensionValue
    * @param currentTotalMapPerDimensionValue
@@ -262,7 +262,7 @@ public class ContributorViewHandler implements
       final Map<String, Map<String, Map<String, Double>>> baselineTotalMapPerDimensionValue,
       final Map<String, Map<String, Map<String, Double>>> currentTotalMapPerDimensionValue) {
     final String metricName = metricNames.get(0);
-    // sort using current values for now
+    // sorted using current values for now
     final Map<String, Double> baselineValuesMap =
         baselineTotalMapPerDimensionValue.get(metricName).get(dimensionName);
     final Map<String, Double> currentValuesMap =

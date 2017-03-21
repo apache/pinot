@@ -74,7 +74,7 @@ public class SummaryResponseTree {
   }
 
   /**
-   * A recursive function to sort response tree.
+   * A recursive function to sorted response tree.
    */
   private static void sortChildNodes(SummaryResponseTreeNode node, double totalValue) {
     if (node.children.size() == 0) return;

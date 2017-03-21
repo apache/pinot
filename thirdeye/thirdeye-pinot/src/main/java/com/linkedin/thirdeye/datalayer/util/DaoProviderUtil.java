@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.datalayer.util;
 
 import com.linkedin.thirdeye.datalayer.entity.AlertConfigIndex;
+import com.linkedin.thirdeye.datalayer.entity.AnomalyFunctionExIndex;
 import com.linkedin.thirdeye.datalayer.entity.EventIndex;
 import com.linkedin.thirdeye.datalayer.entity.AutotuneConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.OverrideConfigIndex;
@@ -137,6 +138,8 @@ public abstract class DaoProviderUtil {
             convertCamelCaseToUnderscore(DetectionStatusIndex.class.getSimpleName()));
         entityMappingHolder.register(conn, AutotuneConfigIndex.class,
             convertCamelCaseToUnderscore(AutotuneConfigIndex.class.getSimpleName()));
+        entityMappingHolder.register(conn, AnomalyFunctionExIndex.class,
+            convertCamelCaseToUnderscore(AnomalyFunctionExIndex.class.getSimpleName()));
       } catch (Exception e) {
         throw new RuntimeException(e);
       }

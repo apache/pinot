@@ -29,9 +29,14 @@ import io.dropwizard.assets.AssetsBundle;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 import io.dropwizard.views.ViewBundle;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 public class ThirdEyeDashboardApplication
     extends BaseThirdEyeApplication<ThirdEyeDashboardConfiguration> {
+
+  private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeDashboardApplication.class);
 
   @Override
   public String getName() {

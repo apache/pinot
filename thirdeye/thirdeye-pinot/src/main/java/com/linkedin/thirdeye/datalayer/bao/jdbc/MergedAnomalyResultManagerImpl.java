@@ -323,7 +323,8 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
     MergedAnomalyResultDTO mergedAnomalyResultDTO;
     mergedAnomalyResultDTO =
         MODEL_MAPPER.map(mergedAnomalyResultBean, MergedAnomalyResultDTO.class);
-    if (mergedAnomalyResultBean.getFunctionId() != null) {
+    if (mergedAnomalyResultBean.getFunctionId() != null &&
+        mergedAnomalyResultBean.getFunctionId() >= 0) {
       AnomalyFunctionBean anomalyFunctionBean =
           genericPojoDao.get(mergedAnomalyResultBean.getFunctionId(), AnomalyFunctionBean.class);
       AnomalyFunctionDTO anomalyFunctionDTO =
@@ -355,26 +356,25 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
       List<MergedAnomalyResultBean> mergedAnomalyResultBeanList, final boolean loadRawAnomalies) {
     List<Future<MergedAnomalyResultDTO>> mergedAnomalyResultDTOFutureList = new ArrayList<>(mergedAnomalyResultBeanList.size());
     for (final MergedAnomalyResultBean mergedAnomalyResultBean : mergedAnomalyResultBeanList) {
-      Future<MergedAnomalyResultDTO> future =
-          executorService.submit(new Callable<MergedAnomalyResultDTO>() {
-            @Override public MergedAnomalyResultDTO call() throws Exception {
-              return MergedAnomalyResultManagerImpl.this
-                  .convertMergedAnomalyBean2DTO(mergedAnomalyResultBean, loadRawAnomalies);
-            }
-          });
+      Future<MergedAnomalyResultDTO> future = executorService.submit(new Callable<MergedAnomalyResultDTO>() {
+        @Override
+        public MergedAnomalyResultDTO call() throws Exception {
+          return MergedAnomalyResultManagerImpl.this.convertMergedAnomalyBean2DTO(mergedAnomalyResultBean,
+              loadRawAnomalies);
+        }
+      });
       mergedAnomalyResultDTOFutureList.add(future);
     }
 
+    List<MergedAnomalyResultDTO> dtos = new ArrayList<>();
     List<MergedAnomalyResultDTO> mergedAnomalyResultDTOList = new ArrayList<>(mergedAnomalyResultBeanList.size());
-    for (Future future : mergedAnomalyResultDTOFutureList) {
-      try {
-        mergedAnomalyResultDTOList.add((MergedAnomalyResultDTO) future.get(60, TimeUnit.SECONDS));
-      } catch (InterruptedException | TimeoutException | ExecutionException e) {
-        LOG.warn("Failed to convert MergedAnomalyResultDTO from bean: {}", e.toString());
+    for (Future<MergedAnomalyResultDTO> future : mergedAnomalyResultDTOFutureList) {
+        try {
+          dtos.add(convertMergedAnomalyBean2DTO(future.get(), loadRawAnomalies));
+        } catch (Exception e) {
+          LOG.warn("Could not convert bean to dto", e);
+        }
       }
+      return dtos;
     }
-
-    return mergedAnomalyResultDTOList;
-  }
-
 }

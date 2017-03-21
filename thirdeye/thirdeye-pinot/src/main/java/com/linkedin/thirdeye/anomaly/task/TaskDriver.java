@@ -1,6 +1,14 @@
 package com.linkedin.thirdeye.anomaly.task;
 
+import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
+import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
+import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
+import com.linkedin.thirdeye.client.DAORegistry;
+import com.linkedin.thirdeye.datalayer.bao.TaskManager;
+import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
+import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
+import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExFactory;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -9,17 +17,8 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
-import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
-import com.linkedin.thirdeye.client.DAORegistry;
-import com.linkedin.thirdeye.datalayer.bao.TaskManager;
-import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
-import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
 public class TaskDriver {
 
@@ -41,7 +40,7 @@ public class TaskDriver {
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   public TaskDriver(ThirdEyeAnomalyConfiguration thirdEyeAnomalyConfiguration,
-      AnomalyFunctionFactory anomalyFunctionFactory, AlertFilterFactory alertFilterFactory) {
+      AnomalyFunctionFactory anomalyFunctionFactory, AnomalyFunctionExFactory anomalyFunctionExFactory, AlertFilterFactory alertFilterFactory) {
     this.workerId = thirdEyeAnomalyConfiguration.getId();
     this.anomalyTaskDAO = DAO_REGISTRY.getTaskDAO();
     taskExecutorService = Executors.newFixedThreadPool(MAX_PARALLEL_TASK);
@@ -49,6 +48,7 @@ public class TaskDriver {
     taskContext.setAnomalyFunctionFactory(anomalyFunctionFactory);
     taskContext.setThirdEyeAnomalyConfiguration(thirdEyeAnomalyConfiguration);
     taskContext.setAlertFilterFactory(alertFilterFactory);
+    taskContext.setAnomalyFunctionExFactory(anomalyFunctionExFactory);
     allowedOldTaskStatus.add(TaskStatus.FAILED);
     allowedOldTaskStatus.add(TaskStatus.WAITING);
   }

@@ -11,12 +11,14 @@ import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
+import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExFactory;
+
 
 public class TaskContext {
 
   private AnomalyFunctionFactory anomalyFunctionFactory;
   private AlertFilterFactory alertFilterFactory;
-
+  private AnomalyFunctionExFactory anomalyFunctionExFactory;
   private ThirdEyeAnomalyConfiguration thirdEyeAnomalyConfiguration;
 
   public ThirdEyeAnomalyConfiguration getThirdEyeAnomalyConfiguration() {
@@ -38,7 +40,15 @@ public class TaskContext {
 
   public AlertFilterFactory getAlertFilterFactory(){ return  alertFilterFactory; }
 
-  public void setAlertFilterFactory(AlertFilterFactory alertFilterFactory){
+  public void setAlertFilterFactory(AlertFilterFactory alertFilterFactory) {
     this.alertFilterFactory = alertFilterFactory;
+  }
+
+  public AnomalyFunctionExFactory getAnomalyFunctionExFactory() {
+    return anomalyFunctionExFactory;
+  }
+
+  public void setAnomalyFunctionExFactory(AnomalyFunctionExFactory anomalyFunctionExFactory) {
+    this.anomalyFunctionExFactory = anomalyFunctionExFactory;
   }
 }

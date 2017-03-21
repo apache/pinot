@@ -43,7 +43,7 @@ public abstract class AnomalyTimeBasedSummarizer {
   public static List<MergedAnomalyResultDTO> mergeAnomalies(MergedAnomalyResultDTO mergedAnomaly,
       List<RawAnomalyResultDTO> anomalies, long maxMergedDurationMillis, long sequentialAllowedGap) {
 
-    // sort anomalies in natural order of start time
+    // sorted anomalies in natural order of start time
     Collections
         .sort(anomalies, new Comparator<RawAnomalyResultDTO>() {
           @Override public int compare(RawAnomalyResultDTO o1, RawAnomalyResultDTO o2) {

@@ -1,43 +1,56 @@
 package com.linkedin.thirdeye.anomaly;
 
-import com.linkedin.thirdeye.anomaly.alert.v2.AlertJobSchedulerV2;
-import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
-import com.linkedin.thirdeye.dashboard.resources.AnomalyFunctionResource;
-
-import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-
 import com.linkedin.thirdeye.anomaly.alert.AlertJobResource;
 import com.linkedin.thirdeye.anomaly.alert.AlertJobScheduler;
+import com.linkedin.thirdeye.anomaly.alert.v2.AlertJobSchedulerV2;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobResource;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
+import com.linkedin.thirdeye.anomaly.detectionex.DetectionExJobResource;
+import com.linkedin.thirdeye.anomaly.detectionex.DetectionExJobScheduler;
 import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeExecutor;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorJobScheduler;
 import com.linkedin.thirdeye.anomaly.task.TaskDriver;
+import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import com.linkedin.thirdeye.autoload.pinot.metrics.AutoLoadPinotMetricsService;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessScheduler;
+import com.linkedin.thirdeye.dashboard.resources.AnomalyFunctionResource;
+import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
+import com.linkedin.thirdeye.detector.functionex.AnomalyFunctionExFactory;
+import com.linkedin.thirdeye.detector.functionex.impl.ThirdEyeMetricDataSource;
+import com.linkedin.thirdeye.detector.functionex.impl.ThirdEyeMockDataSource;
+import com.linkedin.thirdeye.detector.functionex.impl.ThirdEyePinotConnection;
+import com.linkedin.thirdeye.detector.functionex.impl.ThirdEyePinotDataSource;
 import com.yammer.metrics.core.Counter;
 import io.dropwizard.assets.AssetsBundle;
 import io.dropwizard.lifecycle.Managed;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 public class ThirdEyeAnomalyApplication
     extends BaseThirdEyeApplication<ThirdEyeAnomalyConfiguration> {
 
+  private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeAnomalyApplication.class);
+
   private DetectionJobScheduler detectionJobScheduler = null;
+  private DetectionExJobScheduler detectionExJobScheduler = null;
   private TaskDriver taskDriver = null;
   private MonitorJobScheduler monitorJobScheduler = null;
   private AlertJobScheduler alertJobScheduler = null;
   private AlertJobSchedulerV2 alertJobSchedulerV2;
   private AnomalyFunctionFactory anomalyFunctionFactory = null;
+  private AnomalyFunctionExFactory anomalyFunctionExFactory = null;
   private AnomalyMergeExecutor anomalyMergeExecutor = null;
   private AutoLoadPinotMetricsService autoLoadPinotMetricsService = null;
   private DataCompletenessScheduler dataCompletenessScheduler = null;
@@ -81,18 +94,26 @@ public class ThirdEyeAnomalyApplication
       public void start() throws Exception {
 
         if (config.isWorker()) {
-          anomalyFunctionFactory = new AnomalyFunctionFactory(config.getFunctionConfigPath());
-          alertFilterFactory = new AlertFilterFactory(config.getAlertFilterConfigPath());
-
-          taskDriver = new TaskDriver(config, anomalyFunctionFactory, alertFilterFactory);
+          if(alertFilterFactory == null)
+            alertFilterFactory = new AlertFilterFactory(config.getAlertFilterConfigPath());
+          anomalyFunctionFactory = makeAnomalyFunctionFactory(config);
+          anomalyFunctionExFactory = makeAnomalyFunctionExFactory(config);
+          taskDriver = new TaskDriver(config, anomalyFunctionFactory, anomalyFunctionExFactory, alertFilterFactory);
           taskDriver.start();
         }
         if (config.isScheduler()) {
+          if(alertFilterFactory == null)
+            alertFilterFactory = new AlertFilterFactory(config.getAlertFilterConfigPath());
           detectionJobScheduler = new DetectionJobScheduler();
-          alertFilterFactory = new AlertFilterFactory(config.getAlertFilterConfigPath());
           alertFilterAutotuneFactory = new AlertFilterAutotuneFactory(config.getFilterAutotuneConfigPath());
+          detectionJobScheduler = new DetectionJobScheduler();
+          detectionExJobScheduler = new DetectionExJobScheduler();
+
           detectionJobScheduler.start();
+          detectionExJobScheduler.start();
+
           environment.jersey().register(new DetectionJobResource(detectionJobScheduler, alertFilterFactory, alertFilterAutotuneFactory));
+          environment.jersey().register(new DetectionExJobResource(detectionExJobScheduler));
           environment.jersey().register(new AnomalyFunctionResource(config.getFunctionConfigPath()));
         }
         if (config.isMonitor()) {
@@ -137,6 +158,7 @@ public class ThirdEyeAnomalyApplication
         }
         if (config.isScheduler()) {
           detectionJobScheduler.shutdown();
+          detectionExJobScheduler.shutdown();
         }
         if (config.isMonitor()) {
           monitorJobScheduler.stop();
@@ -156,5 +178,23 @@ public class ThirdEyeAnomalyApplication
         }
       }
     });
+  }
+
+  private AnomalyFunctionFactory makeAnomalyFunctionFactory(ThirdEyeAnomalyConfiguration config) throws Exception {
+    return new AnomalyFunctionFactory(config.getFunctionConfigPath());
+  }
+
+  private AnomalyFunctionExFactory makeAnomalyFunctionExFactory(ThirdEyeAnomalyConfiguration config) throws Exception {
+    PinotThirdEyeClientConfig clientConfig = PinotThirdEyeClientConfig.createThirdEyeClientConfig(config);
+
+    ThirdEyePinotConnection pinotConn = new ThirdEyePinotConnection(clientConfig);
+    ThirdEyePinotDataSource pinot = new ThirdEyePinotDataSource(pinotConn);
+
+    AnomalyFunctionExFactory factory = new AnomalyFunctionExFactory();
+    factory.addDataSource("mock", new ThirdEyeMockDataSource());
+    factory.addDataSource("pinot", pinot);
+    factory.addDataSource("metric", new ThirdEyeMetricDataSource(pinot, datasetConfigDAO));
+
+    return factory;
   }
 }

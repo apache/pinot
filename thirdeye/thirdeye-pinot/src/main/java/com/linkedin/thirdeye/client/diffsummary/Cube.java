@@ -136,7 +136,7 @@ public class Cube { // the cube (Ca|Cb)
     }
 
     int size = 0;
-    // Get the rows at each level and sort them in the post-order of their hierarchical relationship,
+    // Get the rows at each level and sorted them in the post-order of their hierarchical relationship,
     // in which a parent row aggregates the details rows under it. For instance, in the following
     // hierarchy row b aggregates rows d and e, and row a aggregates rows b and c.
     //     Level 0              a

@@ -112,5 +112,4 @@ public class TestDBResources {
     }
     System.out.println("Cleaning database: done!");
   }
-
 }

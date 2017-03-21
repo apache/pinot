@@ -175,7 +175,7 @@ public class MergedAnomalyResultBean extends AbstractBean
     if (diff != 0) {
       return diff;
     }
-    diff = -ObjectUtils.compare(startTime, o.getStartTime()); // inverted to sort by
+    diff = -ObjectUtils.compare(startTime, o.getStartTime()); // inverted to sorted by
     // decreasing time
     if (diff != 0) {
       return diff;
@@ -185,7 +185,7 @@ public class MergedAnomalyResultBean extends AbstractBean
 
   @Override
   public String toString() {
-    return "MergedAnomalyResultBean{" + "anomalyFeedbackId=" + anomalyFeedbackId + ", functionId="
+    return "MergedAnomalyResultBean{" + "id=" + getId() + ", anomalyFeedbackId=" + anomalyFeedbackId + ", functionId="
         + functionId + ", rawAnomalyIdList=" + rawAnomalyIdList + ", collection='" + collection
         + '\'' + ", metric='" + metric + '\'' + ", dimensions='" + dimensions + '\''
         + ", startTime=" + startTime + ", endTime=" + endTime + ", score=" + score + ", weight="
