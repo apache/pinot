@@ -197,8 +197,8 @@ public class DataFrame {
   }
 
   /**
-   * Creates a new DataFrame with a column "INDEX" (as determined by <b>COLUMN_INDEX</b>) with
-   * length <b>defaultIndexSize</b>, ranging from 0 to <b>defaultIndexSize - 1</b>.
+   * Creates a new DataFrame with a column "INDEX" (as determined by {@code COLUMN_INDEX}) with
+   * length {@code defaultIndexSize}, ranging from 0 to {@code defaultIndexSize - 1}.
    *
    * @param defaultIndexSize index column size
    */
@@ -211,8 +211,8 @@ public class DataFrame {
   }
 
   /**
-   * Creates a new DataFrame with a column "INDEX" (as determined by <b>COLUMN_INDEX</b>) that
-   * wraps the array <b>indexValues</b>.
+   * Creates a new DataFrame with a column "INDEX" (as determined by {@code COLUMN_INDEX}) that
+   * wraps the array {@code indexValues}.
    *
    * @param indexValues index values
    */
@@ -221,8 +221,8 @@ public class DataFrame {
   }
 
   /**
-   * Creates a new DataFrame with a column "INDEX" (as determined by <b>COLUMN_INDEX</b>) referencing
-   * the Series <b>index</b>.
+   * Creates a new DataFrame with a column "INDEX" (as determined by {@code COLUMN_INDEX}) referencing
+   * the Series {@code index}.
    *
    * @param index index series
    */
@@ -250,7 +250,7 @@ public class DataFrame {
   }
 
   /**
-   * Returns a copy of the DataFrame sliced from index <b>from</b> (inclusive) to index <b>to</b>
+   * Returns a copy of the DataFrame sliced from index {@code from} (inclusive) to index {@code to}
    * (exclusive).
    *
    * @param from start index (inclusive), must be >= 0
@@ -266,33 +266,33 @@ public class DataFrame {
   }
 
   /**
-   * Returns a copy of the DataFrame omitting any elements before index <b>n</b>.
-   * If <b>n</b> is <b>0</b>, the entire DataFrame is returned. If <b>n</b> is greater than
+   * Returns a copy of the DataFrame omitting any elements before index {@code n}.
+   * If {@code n} is {@code 0}, the entire DataFrame is returned. If {@code n} is greater than
    * the DataFrame size, an empty DataFrame is returned.
    *
    * @param from start index of copy (inclusive)
-   * @return DataFrame copy with elements from index <b>from</b>.
+   * @return DataFrame copy with elements from index {@code from}.
    */
   public DataFrame sliceFrom(int from) {
     return this.slice(from, this.size());
   }
 
   /**
-   * Returns a copy of the DataFrame omitting any elements equal to or after index <b>n</b>.
-   * If <b>n</b> is equal or greater than the DataFrame size, the entire series is returned.
-   * If <b>n</b> is <b>0</b>, an empty DataFrame is returned.
+   * Returns a copy of the DataFrame omitting any elements equal to or after index {@code n}.
+   * If {@code n} is equal or greater than the DataFrame size, the entire series is returned.
+   * If {@code n} is {@code 0}, an empty DataFrame is returned.
    *
    * @param to end index of copy (exclusive)
-   * @return DataFrame copy with elements before from index <b>from</b>.
+   * @return DataFrame copy with elements before from index {@code from}.
    */
   public DataFrame sliceTo(int to) {
     return this.slice(0, to);
   }
 
   /**
-   * Returns <b>true</b> is the DataFrame does not hold any rows. Otherwise, returns <b>false</b>.
+   * Returns {@code true} is the DataFrame does not hold any rows. Otherwise, returns {@code false}.
    *
-   * @return <b>true</b> is empty, <b>false</b> otherwise.
+   * @return {@code true} is empty, {@code false} otherwise.
    */
   public boolean isEmpty() {
     return this.size() <= 0;
@@ -315,9 +315,9 @@ public class DataFrame {
   /**
    * Adds a new series to the DataFrame in-place. The new series must have the same row count
    * as the DataFrame. If this is the first series added to an empty DataFrame, it determines
-   * the DataFrame size. Further, <b>seriesName</b> must match the pattern <b>SERIES_NAME_PATTERN</b>.
-   * If a series with <b>seriesName</b> already exists in the DataFrame it is replaced by
-   * <b>series</b>.
+   * the DataFrame size. Further, {@code seriesName} must match the pattern {@code SERIES_NAME_PATTERN}.
+   * If a series with {@code seriesName} already exists in the DataFrame it is replaced by
+   * {@code series}.
    *
    * @param seriesName series name
    * @param series series
@@ -334,8 +334,8 @@ public class DataFrame {
   }
 
   /**
-   * Adds a new series to the DataFrame in-place. Wraps <b>values</b> with a series before adding
-   * it to the DataFrame with semantics similar to <b>addSeries(String seriesName, Series series)</b>
+   * Adds a new series to the DataFrame in-place. Wraps {@code values} with a series before adding
+   * it to the DataFrame with semantics similar to {@code addSeries(String seriesName, Series series)}
    *
    * @param seriesName series name
    * @param values series
@@ -346,8 +346,8 @@ public class DataFrame {
   }
 
   /**
-   * Adds a new series to the DataFrame in-place. Wraps <b>values</b> with a series before adding
-   * it to the DataFrame with semantics similar to <b>addSeries(String seriesName, Series series)</b>
+   * Adds a new series to the DataFrame in-place. Wraps {@code values} with a series before adding
+   * it to the DataFrame with semantics similar to {@code addSeries(String seriesName, Series series)}
    *
    * @param seriesName series name
    * @param values series
@@ -358,8 +358,8 @@ public class DataFrame {
   }
 
   /**
-   * Adds a new series to the DataFrame in-place. Wraps <b>values</b> with a series before adding
-   * it to the DataFrame with semantics similar to <b>addSeries(String seriesName, Series series)</b>
+   * Adds a new series to the DataFrame in-place. Wraps {@code values} with a series before adding
+   * it to the DataFrame with semantics similar to {@code addSeries(String seriesName, Series series)}
    *
    * @param seriesName series name
    * @param values series
@@ -370,8 +370,8 @@ public class DataFrame {
   }
 
   /**
-   * Adds a new series to the DataFrame in-place. Wraps <b>values</b> with a series before adding
-   * it to the DataFrame with semantics similar to <b>addSeries(String seriesName, Series series)</b>
+   * Adds a new series to the DataFrame in-place. Wraps {@code values} with a series before adding
+   * it to the DataFrame with semantics similar to {@code addSeries(String seriesName, Series series)}
    *
    * @param seriesName series name
    * @param values series
@@ -382,8 +382,8 @@ public class DataFrame {
   }
 
   /**
-   * Adds a new series to the DataFrame in-place. Wraps <b>values</b> with a series before adding
-   * it to the DataFrame with semantics similar to <b>addSeries(String seriesName, Series series)</b>
+   * Adds a new series to the DataFrame in-place. Wraps {@code values} with a series before adding
+   * it to the DataFrame with semantics similar to {@code addSeries(String seriesName, Series series)}
    *
    * @param seriesName series name
    * @param values series
@@ -407,12 +407,12 @@ public class DataFrame {
   }
 
   /**
-   * Renames a series in the DataFrame in-place. If a series with name <b>newName</b> already
-   * exists it is replaced by the series referenced by <b>oldName</b>.
+   * Renames a series in the DataFrame in-place. If a series with name {@code newName} already
+   * exists it is replaced by the series referenced by {@code oldName}.
    *
    * @param oldName name of existing series
    * @param newName new name of series
-   * @throws IllegalArgumentException if the series referenced by <b>oldName</b> does not exist
+   * @throws IllegalArgumentException if the series referenced by {@code oldName} does not exist
    * @return reference to the modified DataFrame (this)
    */
   public DataFrame renameSeries(String oldName, String newName) {
@@ -453,7 +453,7 @@ public class DataFrame {
   }
 
   /**
-   * Returns the series referenced by <b>seriesName</b>.
+   * Returns the series referenced by {@code seriesName}.
    *
    * @param seriesName series name
    * @throws IllegalArgumentException if the series does not exist
@@ -464,19 +464,19 @@ public class DataFrame {
   }
 
   /**
-   * Returns <b>true</b> if the DataFrame contains a series <b>seriesName</b>. Otherwise,
-   * return <b>false</b>.
+   * Returns {@code true} if the DataFrame contains a series {@code seriesName}. Otherwise,
+   * return {@code false}.
    *
    * @param seriesName series name
-   * @return <b>true</b> if series exists, <b>false</b> otherwise.
+   * @return {@code true} if series exists, {@code false} otherwise.
    */
   public boolean contains(String seriesName) {
     return this.series.containsKey(seriesName);
   }
 
   /**
-   * Returns the series referenced by <b>seriesName</b>. If the series' native type is not
-   * <b>DoubleSeries</b> it is converted transparently.
+   * Returns the series referenced by {@code seriesName}. If the series' native type is not
+   * {@code DoubleSeries} it is converted transparently.
    *
    * @param seriesName series name
    * @throws IllegalArgumentException if the series does not exist
@@ -487,8 +487,8 @@ public class DataFrame {
   }
 
   /**
-   * Returns the series referenced by <b>seriesName</b>. If the series' native type is not
-   * <b>LongSeries</b> it is converted transparently.
+   * Returns the series referenced by {@code seriesName}. If the series' native type is not
+   * {@code LongSeries} it is converted transparently.
    *
    * @param seriesName series name
    * @throws IllegalArgumentException if the series does not exist
@@ -499,8 +499,8 @@ public class DataFrame {
   }
 
   /**
-   * Returns the series referenced by <b>seriesName</b>. If the series' native type is not
-   * <b>StringSeries</b> it is converted transparently.
+   * Returns the series referenced by {@code seriesName}. If the series' native type is not
+   * {@code StringSeries} it is converted transparently.
    *
    * @param seriesName series name
    * @throws IllegalArgumentException if the series does not exist
@@ -511,8 +511,8 @@ public class DataFrame {
   }
 
   /**
-   * Returns the series referenced by <b>seriesName</b>. If the series' native type is not
-   * <b>BooleanSeries</b> it is converted transparently.
+   * Returns the series referenced by {@code seriesName}. If the series' native type is not
+   * {@code BooleanSeries} it is converted transparently.
    *
    * @param seriesName series name
    * @throws IllegalArgumentException if the series does not exist
@@ -523,12 +523,12 @@ public class DataFrame {
   }
 
   /**
-   * Applies <b>function</b> to the series referenced by <b>seriesNames</b> row by row
+   * Applies {@code function} to the series referenced by {@code seriesNames} row by row
    * and returns the results as a new series. The series' values are mapped to arguments
-   * of <b>function</b> in the same order as they appear in <b>seriesNames</b>.
-   * If the series' native types do not match the required input types of <b>function</b>,
+   * of {@code function} in the same order as they appear in {@code seriesNames}.
+   * If the series' native types do not match the required input types of {@code function},
    * the series are converted transparently. The native type of the returned series is
-   * determined by <b>function</b>'s output type.
+   * determined by {@code function}'s output type.
    *
    * @param function function to apply to each element in the series
    * @throws IllegalArgumentException if the series does not exist
@@ -539,12 +539,12 @@ public class DataFrame {
   }
 
   /**
-   * Applies <b>function</b> to <b>series</b> row by row
+   * Applies {@code function} to {@code series} row by row
    * and returns the results as a new series. The series' values are mapped to arguments
-   * of <b>function</b> in the same order as they appear in <b>series</b>.
-   * If the series' native types do not match the required input types of <b>function</b>,
+   * of {@code function} in the same order as they appear in {@code series}.
+   * If the series' native types do not match the required input types of {@code function},
    * the series are converted transparently. The native type of the returned series is
-   * determined by <b>function</b>'s output type.
+   * determined by {@code function}'s output type.
    *
    * @param function function to apply to each element in the series
    * @throws IllegalArgumentException if the series does not exist
@@ -587,12 +587,12 @@ public class DataFrame {
   }
 
   /**
-   * Applies <b>function</b> to the series referenced by <b>seriesNames</b> row by row
+   * Applies {@code function} to the series referenced by {@code seriesNames} row by row
    * and returns the results as a new series. The series' values are mapped to arguments
-   * of <b>function</b> in the same order as they appear in <b>seriesNames</b>.
-   * If the series' native types do not match the required input types of <b>function</b>,
+   * of {@code function} in the same order as they appear in {@code seriesNames}.
+   * If the series' native types do not match the required input types of {@code function},
    * the series are converted transparently. The native type of the returned series is
-   * determined by <b>function</b>'s output type.
+   * determined by {@code function}'s output type.
    *
    * @param function function to apply to each element in the series
    * @throws IllegalArgumentException if the series does not exist
@@ -603,12 +603,12 @@ public class DataFrame {
   }
 
   /**
-   * Applies <b>function</b> to <b>series</b> row by row
+   * Applies {@code function} to {@code series} row by row
    * and returns the results as a new series. The series' values are mapped to arguments
-   * of <b>function</b> in the same order as they appear in <b>series</b>.
-   * If the series' native types do not match the required input types of <b>function</b>,
+   * of {@code function} in the same order as they appear in {@code series}.
+   * If the series' native types do not match the required input types of {@code function},
    * the series are converted transparently. The native type of the returned series is
-   * determined by <b>function</b>'s output type.
+   * determined by {@code function}'s output type.
    *
    * @param function function to apply to each element in the series
    * @throws IllegalArgumentException if the series does not exist
@@ -650,12 +650,12 @@ public class DataFrame {
   }
 
   /**
-   * Applies <b>function</b> to the series referenced by <b>seriesNames</b> row by row
+   * Applies {@code function} to the series referenced by {@code seriesNames} row by row
    * and returns the results as a new series. The series' values are mapped to arguments
-   * of <b>function</b> in the same order as they appear in <b>seriesNames</b>.
-   * If the series' native types do not match the required input types of <b>function</b>,
+   * of {@code function} in the same order as they appear in {@code seriesNames}.
+   * If the series' native types do not match the required input types of {@code function},
    * the series are converted transparently. The native type of the returned series is
-   * determined by <b>function</b>'s output type.
+   * determined by {@code function}'s output type.
    *
    * @param function function to apply to each element in the series
    * @throws IllegalArgumentException if the series does not exist
@@ -666,12 +666,12 @@ public class DataFrame {
   }
 
   /**
-   * Applies <b>function</b> to <b>series</b> row by row
+   * Applies {@code function} to {@code series} row by row
    * and returns the results as a new series. The series' values are mapped to arguments
-   * of <b>function</b> in the same order as they appear in <b>series</b>.
-   * If the series' native types do not match the required input types of <b>function</b>,
+   * of {@code function} in the same order as they appear in {@code series}.
+   * If the series' native types do not match the required input types of {@code function},
    * the series are converted transparently. The native type of the returned series is
-   * determined by <b>function</b>'s output type.
+   * determined by {@code function}'s output type.
    *
    * @param function function to apply to each element in the series
    * @throws IllegalArgumentException if the series does not exist
@@ -713,12 +713,12 @@ public class DataFrame {
   }
 
   /**
-   * Applies <b>function</b> to the series referenced by <b>seriesNames</b> row by row
+   * Applies {@code function} to the series referenced by {@code seriesNames} row by row
    * and returns the results as a new series. The series' values are mapped to arguments
-   * of <b>function</b> in the same order as they appear in <b>seriesNames</b>.
-   * If the series' native types do not match the required input types of <b>function</b>,
+   * of {@code function} in the same order as they appear in {@code seriesNames}.
+   * If the series' native types do not match the required input types of {@code function},
    * the series are converted transparently. The native type of the returned series is
-   * determined by <b>function</b>'s output type.
+   * determined by {@code function}'s output type.
    *
    * @param function function to apply to each element in the series
    * @throws IllegalArgumentException if the series does not exist
@@ -729,12 +729,12 @@ public class DataFrame {
   }
 
   /**
-   * Applies <b>function</b> to <b>series</b> row by row
+   * Applies {@code function} to {@code series} row by row
    * and returns the results as a new series. The series' values are mapped to arguments
-   * of <b>function</b> in the same order as they appear in <b>series</b>.
-   * If the series' native types do not match the required input types of <b>function</b>,
+   * of {@code function} in the same order as they appear in {@code series}.
+   * If the series' native types do not match the required input types of {@code function},
    * the series are converted transparently. The native type of the returned series is
-   * determined by <b>function</b>'s output type.
+   * determined by {@code function}'s output type.
    *
    * @param function function to apply to each element in the series
    * @throws IllegalArgumentException if the series does not exist
@@ -776,14 +776,14 @@ public class DataFrame {
   }
 
   /**
-   * Applies <b>doubleExpression</b> compiled to an expression to the series referenced by
-   * <b>seriesNames</b> row by row and returns the results as a new series. The series' values
-   * are mapped to variables in <b>doubleExpression</b> by series names. Only series referenced
-   * by <b>seriesNames</b> can be referenced by the expression.
-   * The series are converted to <b>DoubleSeries</b> transparently and the results
+   * Applies {@code doubleExpression} compiled to an expression to the series referenced by
+   * {@code seriesNames} row by row and returns the results as a new series. The series' values
+   * are mapped to variables in {@code doubleExpression} by series names. Only series referenced
+   * by {@code seriesNames} can be referenced by the expression.
+   * The series are converted to {@code DoubleSeries} transparently and the results
    * are returned as DoubleSeries as well.
    *
-   * <b>NOTE:</b> doubleExpression is compiled to an <b>EvalEx</b> expression.
+   * <b>NOTE:</b> doubleExpression is compiled to an {@code EvalEx} expression.
    *
    * @param doubleExpression expression to be compiled and applied using EvalEx
    * @throws IllegalArgumentException if the series does not exist
@@ -804,14 +804,14 @@ public class DataFrame {
   }
 
   /**
-   * Applies <b>doubleExpression</b> compiled to an expression to the series referenced by
-   * <b>seriesNames</b> row by row and returns the results as a new series. The series' values
-   * are mapped to variables in <b>doubleExpression</b> by series names. All series contained
+   * Applies {@code doubleExpression} compiled to an expression to the series referenced by
+   * {@code seriesNames} row by row and returns the results as a new series. The series' values
+   * are mapped to variables in {@code doubleExpression} by series names. All series contained
    * in the DataFrame can be referenced by the expression.
-   * The series are converted to <b>DoubleSeries</b> transparently and the results
+   * The series are converted to {@code DoubleSeries} transparently and the results
    * are returned as DoubleSeries as well.
    *
-   * <b>NOTE:</b> doubleExpression is compiled to an <b>EvalEx</b> expression.
+   * <b>NOTE:</b> doubleExpression is compiled to an {@code EvalEx} expression.
    *
    * @param doubleExpression expression to be compiled and applied using EvalEx
    * @throws IllegalArgumentException if the series does not exist
@@ -825,7 +825,7 @@ public class DataFrame {
   /**
    * Returns a projection of the DataFrame.
    *
-   * <b>NOTE:</b> fromIndex <= -1 is filled with <b>null</b>.
+   * <b>NOTE:</b> fromIndex <= -1 is filled with {@code null}.
    * <b>NOTE:</b> array with length 0 produces empty series.
    *
    * @param fromIndex array with indices to project from (must be <= series size)
@@ -840,7 +840,7 @@ public class DataFrame {
   }
 
   /**
-   * Returns a copy of the DataFrame sorted by series values referenced by <b>seriesNames</b>.
+   * Returns a copy of the DataFrame sorted by series values referenced by {@code seriesNames}.
    * The resulting sorted order is the equivalent of applying a stable sort to the nth series
    * first, and then sorting iteratively by series until the 1st series.
    *
@@ -870,10 +870,10 @@ public class DataFrame {
   }
 
   /**
-   * Returns a copy of the DataFrame with values resampled by <b>interval</b> using <b>strategy</b>
-   * on the series referenced by <b>seriesName</b>. The method first applies an interval-based
+   * Returns a copy of the DataFrame with values resampled by {@code interval} using {@code strategy}
+   * on the series referenced by {@code seriesName}. The method first applies an interval-based
    * grouping to the series and then aggregates the DataFrame using the specified strategy. If
-   * the series referenced by <b>seriesName</b> is not of native type <b>LongSeries</b> it is
+   * the series referenced by {@code seriesName} is not of native type {@code LongSeries} it is
    * converted transparently.
    *
    * @param seriesName target series for resampling
@@ -902,8 +902,8 @@ public class DataFrame {
   }
 
   /**
-   * Returns a copy of the DataFrame with rows filtered by <b>series</b>. If the value of <b>series</b>
-   * Associated with a row is <b>true</b> the row is included, otherwise it is omitted.
+   * Returns a copy of the DataFrame with rows filtered by {@code series}. If the value of {@code series}
+   * Associated with a row is {@code true} the row is included, otherwise it is omitted.
    *
    * @param series filter series
    * @return filtered DataFrame copy
@@ -970,7 +970,7 @@ public class DataFrame {
   }
 
   /**
-   * Returns series <b>s</b> converted to type <b>type</b> unless native type matches already.
+   * Returns series {@code s} converted to type {@code type} unless native type matches already.
    *
    * @param s input series
    * @param type target type
@@ -992,8 +992,8 @@ public class DataFrame {
   }
 
   /**
-   * Returns a DataFrameGrouping based on the labels provided by <b>labels</b> row by row.
-   * The size of <b>labels</b> must match the size of the DataFrame.
+   * Returns a DataFrameGrouping based on the labels provided by {@code labels} row by row.
+   * The size of {@code labels} must match the size of the DataFrame.
    *
    * @param labels grouping labels
    * @return DataFrameGrouping
@@ -1005,7 +1005,7 @@ public class DataFrame {
 
   /**
    * Returns a DataFrameGrouping based on the labels provided by the series referenced by
-   * <b>seriesName</b> row by row.
+   * {@code seriesName} row by row.
    *
    * @param seriesName series containing grouping labels
    * @return DataFrameGrouping
@@ -1015,7 +1015,7 @@ public class DataFrame {
   }
 
   /**
-   * Returns a copy of the DataFrame omitting rows that contain a <b>null</b> value in any series.
+   * Returns a copy of the DataFrame omitting rows that contain a {@code null} value in any series.
    *
    * @return DataFrame copy without null rows
    */
@@ -1046,7 +1046,7 @@ public class DataFrame {
   }
 
   /**
-   * Returns a copy of the DataFrame omitting series that contain a <b>null</b> value.
+   * Returns a copy of the DataFrame omitting series that contain a {@code null} value.
    *
    * @return DataFrame copy without null series
    */

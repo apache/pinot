@@ -375,7 +375,7 @@ public final class DoubleSeries extends Series {
 
   /**
    * Return a copy of the series with all <b>null</b> values replaced by
-   * <b>value</b>.
+   * {@code value}.
    *
    * @param value replacement value for <b>null</b>
    * @return series copy without nulls

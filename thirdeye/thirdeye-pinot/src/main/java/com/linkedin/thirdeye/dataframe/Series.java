@@ -146,21 +146,21 @@ public abstract class Series {
     }
 
     /**
-     * Returns <b>true</b> if the grouping container does not hold any groups.
+     * Returns {@code true} if the grouping container does not hold any groups.
      *
-     * @return <b>true</b> is empty, <b>false</b> otherwise.
+     * @return {@code true} is empty, {@code false} otherwise.
      */
     public boolean isEmpty() {
       return this.keys.isEmpty();
     }
 
     /**
-     * Applies <b>function</b> as aggregation function to all values per group and
+     * Applies {@code function} as aggregation function to all values per group and
      * returns the result as a new series with the number of elements equal to the size
      * of the key series.
-     * If the series' native types do not match the required input type of <b>function</b>,
+     * If the series' native types do not match the required input type of {@code function},
      * the series are converted transparently. The native type of the returned series is
-     * determined by <b>function</b>'s output type.
+     * determined by {@code function}'s output type.
      *
      * @param function aggregation function to apply to each grouped series
      * @return grouped aggregation series
@@ -173,12 +173,12 @@ public abstract class Series {
     }
 
     /**
-     * Applies <b>function</b> as aggregation function to all values per group and
+     * Applies {@code function} as aggregation function to all values per group and
      * returns the result as a new series with the number of elements equal to the size
      * of the key series.
-     * If the series' native types do not match the required input type of <b>function</b>,
+     * If the series' native types do not match the required input type of {@code function},
      * the series are converted transparently. The native type of the returned series is
-     * determined by <b>function</b>'s output type.
+     * determined by {@code function}'s output type.
      *
      * @param function aggregation function to apply to each grouped series
      * @return grouped aggregation series
@@ -191,12 +191,12 @@ public abstract class Series {
     }
 
     /**
-     * Applies <b>function</b> as aggregation function to all values per group and
+     * Applies {@code function} as aggregation function to all values per group and
      * returns the result as a new series with the number of elements equal to the size
      * of the key series.
-     * If the series' native types do not match the required input type of <b>function</b>,
+     * If the series' native types do not match the required input type of {@code function},
      * the series are converted transparently. The native type of the returned series is
-     * determined by <b>function</b>'s output type.
+     * determined by {@code function}'s output type.
      *
      * @param function aggregation function to apply to each grouped series
      * @return grouped aggregation series
@@ -209,12 +209,12 @@ public abstract class Series {
     }
 
     /**
-     * Applies <b>function</b> as aggregation function to all values per group and
+     * Applies {@code function} as aggregation function to all values per group and
      * returns the result as a new series with the number of elements equal to the size
      * of the key series.
-     * If the series' native types do not match the required input type of <b>function</b>,
+     * If the series' native types do not match the required input type of {@code function},
      * the series are converted transparently. The native type of the returned series is
-     * determined by <b>function</b>'s output type.
+     * determined by {@code function}'s output type.
      *
      * @param function aggregation function to apply to each grouped series
      * @return grouped aggregation series
@@ -271,7 +271,7 @@ public abstract class Series {
   /**
    * Returns the number of elements contained in the series.
    *
-   * <b>NOTE:</b> <b>null</b> values count as elements.
+   * <b>NOTE:</b> {@code null} values count as elements.
    *
    * @return series size
    */
@@ -317,7 +317,7 @@ public abstract class Series {
   public abstract SeriesType type();
 
   /**
-   * Slices the series from index <b>from</b> (inclusive) to index <b>to</b>
+   * Slices the series from index {@code from} (inclusive) to index {@code to}
    * (exclusive) and returns the result as a series of the same native type.
    *
    * @param from start index (inclusive), must be >= 0
@@ -335,9 +335,9 @@ public abstract class Series {
 
   /**
    * Returns a copy of the series with all values' indices
-   * shifted by <b>offset</b> positions while
+   * shifted by {@code offset} positions while
    * leaving the series size unchanged. Values shifted outside to upper (or lower)
-   * bounds of the series are dropped. Vacated positions are padded with <b>null</b>.
+   * bounds of the series are dropped. Vacated positions are padded with {@code null}.
    *
    * <b>NOTE:</b> for each value, newIndex = oldIndex + offset
    *
@@ -347,16 +347,16 @@ public abstract class Series {
   public abstract Series shift(int offset);
 
   /**
-   * Returns <b>true</b> if the series contains at least one <b>null</b>. Otherwise
-   * returns <b>false</b>.
+   * Returns {@code true} if the series contains at least one {@code null}. Otherwise
+   * returns {@code false}.
    *
-   * @return <b>true</b> if empty, <b>false</b> otherwise
+   * @return {@code true} if empty, {@code false} otherwise
    */
   public abstract boolean hasNull();
 
   /**
-   * Returns a copy of the series with values from <b>other</b>
-   * appended at the end. If <b>other</b> has a different type it is converted transparently.
+   * Returns a copy of the series with values from {@code other}
+   * appended at the end. If {@code other} has a different type it is converted transparently.
    *
    * <b>NOTE:</b> newSize = oldSize + otherSize
    *
@@ -368,7 +368,7 @@ public abstract class Series {
   /**
    * Returns projection of the series.
    *
-   * <b>NOTE:</b> fromIndex <= -1 is filled with <b>null</b>.
+   * <b>NOTE:</b> fromIndex <= -1 is filled with {@code null}.
    * <b>NOTE:</b> array with length 0 returns empty series.
    *
    * @param fromIndex array with indices to project from (must be <= series size)
@@ -380,7 +380,7 @@ public abstract class Series {
    * Returns an array of indices with a size equal to the series size, such that the values
    * references by the indices are sorted in ascending order.
    *
-   * <b>NOTE:</b> output can be used directly by <b>project()</b> to create a sorted copy of the series.
+   * <b>NOTE:</b> output can be used directly by {@code project()} to create a sorted copy of the series.
    *
    * @return indices of sorted values
    */
@@ -395,46 +395,46 @@ public abstract class Series {
   abstract int[] nullIndex();
 
   /**
-   * Compares values across two series with the <b>same</b> native type based on index. The
-   * semantics follow <b>Long.compare()</b> (and similar) in Java.
+   * Compares values across two series with the {@code same} native type based on index. The
+   * semantics follow {@code Long.compare()} (and similar) in Java.
    *
    * @param that other series with same native type (may reference itself)
    * @param indexThis index in this series
    * @param indexThat index in the other series
-   * @return 0 if the referenced values are equal, -1 if <b>this</b> is less than <b>that</b>, 1 otherwise
+   * @return 0 if the referenced values are equal, -1 if {@code this} is less than {@code that}, 1 otherwise
    */
   abstract int compare(Series that, int indexThis, int indexThat);
 
   /**
-   * Returns <b>true</b> is there are no values in the series. Otherwise returns <b>false</b>.
+   * Returns {@code true} is there are no values in the series. Otherwise returns {@code false}.
    *
-   * <b>NOTE:</b> <b>null</b> values count as elements.
+   * <b>NOTE:</b> {@code null} values count as elements.
    *
-   * @return <b>true</b> if empty, <b>false</b> otherwise
+   * @return {@code true} if empty, {@code false} otherwise
    */
   public boolean isEmpty() {
     return this.size() <= 0;
   }
 
   /**
-   * Returns a copy of the series containing at maximum the first <b>n</b> elements of the series.
-   * If <b>n</b> is larger than the series size, the entire series is returned. Additional values
-   * to make up the difference between <b>n</b> and the size are not padded.
+   * Returns a copy of the series containing at maximum the first {@code n} elements of the series.
+   * If {@code n} is larger than the series size, the entire series is returned. Additional values
+   * to make up the difference between {@code n} and the size are not padded.
    *
    * @param n number of elements
-   * @return series copy with at most the first <b>n</b> elements
+   * @return series copy with at most the first {@code n} elements
    */
   public Series head(int n) {
     return this.slice(0, Math.min(n, this.size()));
   }
 
   /**
-   * Returns a copy of the series containing at maximum the last <b>n</b> elements of the series.
-   * If <b>n</b> is larger than the series size, the entire series is returned. Additional values
-   * to make up the difference between <b>n</b> and the size are not padded.
+   * Returns a copy of the series containing at maximum the last {@code n} elements of the series.
+   * If {@code n} is larger than the series size, the entire series is returned. Additional values
+   * to make up the difference between {@code n} and the size are not padded.
    *
    * @param n number of elements
-   * @return series copy with at most the last <b>n</b> elements
+   * @return series copy with at most the last {@code n} elements
    */
   public Series tail(int n) {
     int len = this.size();
@@ -442,24 +442,24 @@ public abstract class Series {
   }
 
   /**
-   * Returns a copy of the series omitting any elements before index <b>n</b>.
-   * If <b>n</b> is <b>0</b>, the entire series is returned. If <b>n</b> is greater than
+   * Returns a copy of the series omitting any elements before index {@code n}.
+   * If {@code n} is {@code 0}, the entire series is returned. If {@code n} is greater than
    * the series size, an empty series is returned.
    *
    * @param from start index of copy (inclusive)
-   * @return series copy with elements from index <b>from</b>.
+   * @return series copy with elements from index {@code from}.
    */
   public Series sliceFrom(int from) {
     return this.slice(Math.max(from, 0), this.size());
   }
 
   /**
-   * Returns a copy of the series omitting any elements equal to or after index <b>n</b>.
-   * If <b>n</b> is equal or greater than the series size, the entire series is returned.
-   * If <b>n</b> is <b>0</b>, an empty series is returned.
+   * Returns a copy of the series omitting any elements equal to or after index {@code n}.
+   * If {@code n} is equal or greater than the series size, the entire series is returned.
+   * If {@code n} is {@code 0}, an empty series is returned.
    *
    * @param to end index of copy (exclusive)
-   * @return series copy with elements before from index <b>from</b>.
+   * @return series copy with elements before from index {@code from}.
    */
   public Series sliceTo(int to) {
     return this.slice(0, Math.min(to, this.size()));
@@ -469,7 +469,7 @@ public abstract class Series {
    * Returns a copy of the series with values ordered
    * in ascending order.
    *
-   * <b>NOTE:</b> BooleanSeries interprets <b>false</b> as smaller than <b>true</b>.
+   * <b>NOTE:</b> BooleanSeries interprets {@code false} as smaller than {@code true}.
    *
    * @return sorted series copy
    */
@@ -514,8 +514,8 @@ public abstract class Series {
   }
 
   /**
-   * Applies <b>conditional</b> to the series row by row and returns the results as a BooleanSeries.
-   * If the series' native type does not match the required input type of <b>conditional</b>,
+   * Applies {@code conditional} to the series row by row and returns the results as a BooleanSeries.
+   * If the series' native type does not match the required input type of {@code conditional},
    * the series is converted transparently.
    *
    * @param conditional condition to apply to each element in the series
@@ -526,8 +526,8 @@ public abstract class Series {
   }
 
   /**
-   * Applies a <b>conditional</b> to the series row by row and returns the results as a BooleanSeries.
-   * If the series' native type does not match the required input type of <b>conditional</b>,
+   * Applies a {@code conditional} to the series row by row and returns the results as a BooleanSeries.
+   * If the series' native type does not match the required input type of {@code conditional},
    * the series is converted transparently.
    *
    * @param conditional condition to apply to each element in the series
@@ -538,8 +538,8 @@ public abstract class Series {
   }
 
   /**
-   * Applies a <b>conditional</b> to the series row by row and returns the results as a BooleanSeries.
-   * If the series' native type does not match the required input type of <b>conditional</b>,
+   * Applies a {@code conditional} to the series row by row and returns the results as a BooleanSeries.
+   * If the series' native type does not match the required input type of {@code conditional},
    * the series is converted transparently.
    *
    * @param conditional condition to apply to each element in the series
@@ -550,10 +550,10 @@ public abstract class Series {
   }
 
   /**
-   * Applies <b>function</b> to the series row by row and returns the results as a new series.
-   * If the series' native type does not match the required input type of <b>function</b>,
+   * Applies {@code function} to the series row by row and returns the results as a new series.
+   * If the series' native type does not match the required input type of {@code function},
    * the series is converted transparently. The native type of the returned series is
-   * determined by <b>function</b>'s output type.
+   * determined by {@code function}'s output type.
    *
    * @param function function to apply to each element in the series
    * @return series with evaluation results
@@ -563,10 +563,10 @@ public abstract class Series {
   }
 
   /**
-   * Applies <b>function</b> to the series row by row and returns the results as a new series.
-   * If the series' native type does not match the required input type of <b>function</b>,
+   * Applies {@code function} to the series row by row and returns the results as a new series.
+   * If the series' native type does not match the required input type of {@code function},
    * the series is converted transparently. The native type of the returned series is
-   * determined by <b>function</b>'s output type.
+   * determined by {@code function}'s output type.
    *
    * @param function function to apply to each element in the series
    * @return series with evaluation results
@@ -576,10 +576,10 @@ public abstract class Series {
   }
 
   /**
-   * Applies <b>function</b> to the series row by row and returns the results as a new series.
-   * If the series' native type does not match the required input type of <b>function</b>,
+   * Applies {@code function} to the series row by row and returns the results as a new series.
+   * If the series' native type does not match the required input type of {@code function},
    * the series is converted transparently. The native type of the returned series is
-   * determined by <b>function</b>'s output type.
+   * determined by {@code function}'s output type.
    *
    * @param function function to apply to each element in the series
    * @return series with evaluation results
@@ -589,10 +589,10 @@ public abstract class Series {
   }
 
   /**
-   * Applies <b>function</b> to the series row by row and returns the results as a new series.
-   * If the series' native type does not match the required input type of <b>function</b>,
+   * Applies {@code function} to the series row by row and returns the results as a new series.
+   * If the series' native type does not match the required input type of {@code function},
    * the series is converted transparently. The native type of the returned series is
-   * determined by <b>function</b>'s output type.
+   * determined by {@code function}'s output type.
    *
    * @param function function to apply to each element in the series
    * @return series with evaluation results
@@ -602,11 +602,11 @@ public abstract class Series {
   }
 
   /**
-   * Applies <b>function</b> as aggregation function to all values in the series at once and
+   * Applies {@code function} as aggregation function to all values in the series at once and
    * returns the result as a new series with a single element.
-   * If the series' native type does not match the required input type of <b>function</b>,
+   * If the series' native type does not match the required input type of {@code function},
    * the series is converted transparently. The native type of the returned series is
-   * determined by <b>function</b>'s output type.
+   * determined by {@code function}'s output type.
    *
    * @param function aggregation function to apply to the series
    * @return single element series
@@ -616,11 +616,11 @@ public abstract class Series {
   }
 
   /**
-   * Applies <b>function</b> as aggregation function to all values in the series at once and
+   * Applies {@code function} as aggregation function to all values in the series at once and
    * returns the result as a new series with a single element.
-   * If the series' native type does not match the required input type of <b>function</b>,
+   * If the series' native type does not match the required input type of {@code function},
    * the series is converted transparently. The native type of the returned series is
-   * determined by <b>function</b>'s output type.
+   * determined by {@code function}'s output type.
    *
    * @param function aggregation function to apply to the series
    * @return single element series
@@ -630,11 +630,11 @@ public abstract class Series {
   }
 
   /**
-   * Applies <b>function</b> as aggregation function to all values in the series at once and
+   * Applies {@code function} as aggregation function to all values in the series at once and
    * returns the result as a new series with a single element.
-   * If the series' native type does not match the required input type of <b>function</b>,
+   * If the series' native type does not match the required input type of {@code function},
    * the series is converted transparently. The native type of the returned series is
-   * determined by <b>function</b>'s output type.
+   * determined by {@code function}'s output type.
    *
    * @param function aggregation function to apply to the series
    * @return single element series
@@ -644,11 +644,11 @@ public abstract class Series {
   }
 
   /**
-   * Applies <b>function</b> as aggregation function to all values in the series at once and
+   * Applies {@code function} as aggregation function to all values in the series at once and
    * returns the result as a new series with a single element.
-   * If the series' native type does not match the required input type of <b>function</b>,
+   * If the series' native type does not match the required input type of {@code function},
    * the series is converted transparently. The native type of the returned series is
-   * determined by <b>function</b>'s output type.
+   * determined by {@code function}'s output type.
    *
    * @param function aggregation function to apply to the series
    * @return single element series
@@ -658,10 +658,10 @@ public abstract class Series {
   }
 
   /**
-   * Returns a copy of the series with a native type corresponding to <b>type</b>.
+   * Returns a copy of the series with a native type corresponding to {@code type}.
    *
    * @param type series copy native type
-   * @return series copy with native type <b>type</b>
+   * @return series copy with native type {@code type}
    */
   public Series toType(SeriesType type) {
     return DataFrame.asType(this, type);
@@ -671,7 +671,7 @@ public abstract class Series {
    * Returns a SeriesGrouping based on value. Elements are grouped into separate buckets for each
    * distinct value in the series.
    *
-   * <b>NOTE:</b> the resulting keys are equivalent to calling <b>unique()</b> on the series.
+   * <b>NOTE:</b> the resulting keys are equivalent to calling {@code unique()} on the series.
    *
    * @return grouping by value
    */
@@ -700,7 +700,7 @@ public abstract class Series {
   /**
    * Returns a SeriesGrouping based on element count per buckets. Elements are grouped into buckets
    * based on a greedy algorithm with fixed bucket size. The size of all buckets (except for the
-   * last) is guaranteed to be equal to <b>bucketSize</b>.
+   * last) is guaranteed to be equal to {@code bucketSize}.
    *
    * <b>NOTE:</b> the series is not sorted before grouping.
    *
@@ -734,7 +734,7 @@ public abstract class Series {
   /**
    * Returns a SeriesGrouping based on a fixed number of buckets. Elements are grouped into buckets
    * based on a greedy algorithm to approximately evenly fill buckets. The number of buckets
-   * is guaranteed to be equal to <b>partitionCount</b> even if some remain empty.
+   * is guaranteed to be equal to {@code partitionCount} even if some remain empty.
    *
    * <b>NOTE:</b> the series is not sorted before grouping.
    *

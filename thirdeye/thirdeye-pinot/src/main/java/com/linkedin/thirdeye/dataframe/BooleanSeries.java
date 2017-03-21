@@ -10,7 +10,7 @@ import org.apache.commons.lang.ArrayUtils;
 
 /**
  * Series container for primitive tri-state boolean (true, false, null). Implementation uses
- * byte as internal representation.
+ * the primitive byte for internal representation.
  */
 public final class BooleanSeries extends Series {
   public static final byte NULL_VALUE = Byte.MIN_VALUE;
@@ -320,9 +320,13 @@ public final class BooleanSeries extends Series {
   public boolean allTrue() {
     assertNotEmpty(this.values);
     boolean result = true;
+    boolean hasValue = false;
     for(byte b : this.values) {
       result &= isTrue(b);
+      hasValue |= !isNull(b);
     }
+    if(!hasValue)
+      throw new IllegalStateException("requires at least one non-null value");
     return result;
   }
 
@@ -337,9 +341,13 @@ public final class BooleanSeries extends Series {
   public boolean allFalse() {
     assertNotEmpty(this.values);
     boolean result = true;
+    boolean hasValue = false;
     for(byte b : this.values) {
       result &= isFalse(b);
+      hasValue |= !isNull(b);
     }
+    if(!hasValue)
+      throw new IllegalStateException("requires at least one non-null value");
     return result;
   }
 
@@ -404,10 +412,10 @@ public final class BooleanSeries extends Series {
   }
 
   /**
-   * Return a copy of the series with all <b>null</b> values replaced by
-   * <b>value</b>.
+   * Return a copy of the series with all {@code null} values replaced by
+   * {@code value}.
    *
-   * @param value replacement value for <b>null</b>
+   * @param value replacement value for {@code null}
    * @return series copy without nulls
    */
   public BooleanSeries fillNull(byte value) {
