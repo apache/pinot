@@ -19,6 +19,11 @@
 git diff --name-only $TRAVIS_COMMIT_RANGE | egrep '^(thirdeye)'
 if [ $? -eq 0 ]; then
   echo 'ThirdEye changes.'
+  if [ "$TRAVIS_JDK_VERSION" != 'oraclejdk7' ]; then
+    echo 'Skip ThirdEye tests for version other than oracle jdk7.'
+    rm -rf ~/.m2/repository/com/linkedin/pinot ~/.m2/repository/com/linkedin/thirdeye
+    exit 0
+  fi
 
   cd thirdeye
   mvn test
