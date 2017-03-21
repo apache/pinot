@@ -30,7 +30,7 @@
         <tr>
           <td style="padding: 0 24px;" colspan="2">
             <p style="color: rgba(0,0,0,0.55); font-size:16px; margin-bottom:0;">DATASET</p>
-            <p style="margin-top:8px; margin-bottom:24px;"><a style="color:#33aada; font-size:20px;margin-top:0;">${datasets}</p>
+            <p style="margin-top:8px; margin-bottom:24px; font-size:20px">${datasets}</p>
           </td>
         </tr>
 
@@ -53,6 +53,13 @@
           </td>
         </tr>
 
+        <#if cid?has_content>
+          <tr>
+              <td style="padding: 24px;" colspan="2">
+                <img style="width: 100%;" src="cid:${cid}"\>
+              </td>
+          </tr>
+        </#if>
 
         <#if anomalyDetails?has_content>
           <tr>
