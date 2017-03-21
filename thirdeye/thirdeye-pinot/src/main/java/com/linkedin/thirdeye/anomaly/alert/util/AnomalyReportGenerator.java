@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TimeZone;
 
@@ -50,7 +51,6 @@ public class AnomalyReportGenerator {
 
   private static final AnomalyReportGenerator INSTANCE = new AnomalyReportGenerator();
   private static final String DATE_PATTERN = "MMM dd, HH:mm";
-  private static final String SINGLE_ANOMALY_EMAIL_TEMPLATE = "single-anomaly-email-template.ftl";
   private static final String MULTIPLE_ANOMALIES_EMAIL_TEMPLATE = "multiple-anomalies-email-template.ftl";
 
   public static AnomalyReportGenerator getInstance() {
@@ -148,7 +148,7 @@ public class AnomalyReportGenerator {
             getAnomalyURL(anomaly, configuration.getDashboardHost()),
             String.format("%.2f", anomaly.getAvgBaselineVal()),
             String.format("%.2f", anomaly.getAvgCurrentVal()),
-            getDimensionsString(anomaly.getDimensions()),
+            getDimensionsList(anomaly.getDimensions()),
             String.format("%.2f hours (%s to %s) %s",
                 getTimeDiffInHours(anomaly.getStartTime(), anomaly.getEndTime()),
                 getDateString(anomaly.getStartTime(), dateTimeZone),
@@ -186,7 +186,7 @@ public class AnomalyReportGenerator {
       DataReportHelper.DateFormatMethod dateFormatMethod = new DataReportHelper.DateFormatMethod(timeZone);
       Map<String, Object> templateData = new HashMap<>();
       templateData.put("datasets", Joiner.on(", ").join(datasets));
-      templateData.put("timeZone", timeZone);
+      templateData.put("timeZone", getTimezoneString(timeZone));
       templateData.put("dateFormat", dateFormatMethod);
       templateData.put("startTime", getDateString(startTime, timeZone));
       templateData.put("endTime", getDateString(endTime, timeZone));
@@ -203,24 +203,23 @@ public class AnomalyReportGenerator {
       templateData.put("reportGenerationTimeMillis", System.currentTimeMillis());
       templateData.put("dashboardHost", configuration.getDashboardHost());
       templateData.put("anomalyIds", Joiner.on(",").join(anomalyIds));
-      boolean isSingleAnomalyEmail = false;
+
       String imgPath = null;
+      String cid = "";
       if (anomalyReportDTOList.size() == 1) {
-        isSingleAnomalyEmail = true;
         AnomalyReportDTO singleAnomaly = anomalyReportDTOList.get(0);
         subject = subject + " - " + singleAnomaly.getMetric();
         imgPath = EmailScreenshotHelper.takeGraphScreenShot(singleAnomaly.getAnomalyId(), configuration);
-        String cid = "";
         try {
           cid = email.embed(new File(imgPath));
         } catch (Exception e) {
           LOG.error("Exception while embedding screenshot for anomaly {}", singleAnomaly.getAnomalyId(), e);
         }
-        templateData.put("cid", cid);
       }
+      templateData.put("cid", cid);
 
       buildEmailTemplateAndSendAlert(templateData, configuration.getSmtpConfiguration(), subject,
-          emailRecipients, fromEmail, isSingleAnomalyEmail, email);
+          emailRecipients, fromEmail, email);
 
       if (StringUtils.isNotBlank(imgPath)) {
         try {
@@ -234,7 +233,7 @@ public class AnomalyReportGenerator {
 
   void buildEmailTemplateAndSendAlert(Map<String, Object> paramMap,
       SmtpConfiguration smtpConfiguration, String subject, String emailRecipients,
-      String fromEmail, boolean isSingleAnomalyEmail, HtmlEmail email) {
+      String fromEmail, HtmlEmail email) {
     if (Strings.isNullOrEmpty(fromEmail)) {
       throw new IllegalArgumentException("Invalid sender's email");
     }
@@ -245,12 +244,8 @@ public class AnomalyReportGenerator {
       freemarkerConfig.setClassForTemplateLoading(getClass(), "/com/linkedin/thirdeye/detector");
       freemarkerConfig.setDefaultEncoding(AlertTaskRunner.CHARSET);
       freemarkerConfig.setTemplateExceptionHandler(TemplateExceptionHandler.RETHROW_HANDLER);
-      Template template = null;
-      if (isSingleAnomalyEmail) {
-        template = freemarkerConfig.getTemplate(SINGLE_ANOMALY_EMAIL_TEMPLATE);
-      } else {
-        template = freemarkerConfig.getTemplate(MULTIPLE_ANOMALIES_EMAIL_TEMPLATE);
-      }
+      Template template = freemarkerConfig.getTemplate(MULTIPLE_ANOMALIES_EMAIL_TEMPLATE);
+
       template.process(paramMap, out);
 
       String alertEmailHtml = new String(baos.toByteArray(), AlertTaskRunner.CHARSET);
@@ -261,33 +256,35 @@ public class AnomalyReportGenerator {
     }
   }
 
-  String getDateString(Long millis, DateTimeZone dateTimeZone) {
+  private String getDateString(Long millis, DateTimeZone dateTimeZone) {
     String dateString = new DateTime(millis, dateTimeZone).toString(DATE_PATTERN);
     return dateString;
   }
 
-  double getTimeDiffInHours(long start, long end) {
+  private double getTimeDiffInHours(long start, long end) {
     return Double.valueOf((end - start) / 1000) / 3600;
   }
 
-  String getDimensionsString(DimensionMap dimensionMap) {
-    String dimensionsString = "N/A";
+  private List<String> getDimensionsList(DimensionMap dimensionMap) {
+    List<String> dimensionsList = new ArrayList<>();
     if (dimensionMap != null && !dimensionMap.isEmpty()) {
-      dimensionsString = dimensionMap.toString();
+      for (Entry<String, String> entry : dimensionMap.entrySet()) {
+        dimensionsList.add(entry.getKey() + " : " + entry.getValue());
+      }
     }
-    return dimensionsString;
+    return dimensionsList;
   }
 
-  boolean getLiftDirection(double lift) {
+  private boolean getLiftDirection(double lift) {
     return lift < 0 ? false : true;
   }
 
-  String getTimezoneString(DateTimeZone dateTimeZone) {
+  private String getTimezoneString(DateTimeZone dateTimeZone) {
     TimeZone tz = TimeZone.getTimeZone(dateTimeZone.getID());
     return tz.getDisplayName(true, 0);
   }
 
-  String getFeedback(String feedbackType) {
+  private String getFeedback(String feedbackType) {
     switch (feedbackType) {
     case "ANOMALY":
       return "Resolved (Confirmed Anomaly)";
@@ -299,7 +296,7 @@ public class AnomalyReportGenerator {
     return "Not Resolved";
   }
 
-  String getAnomalyURL(MergedAnomalyResultDTO anomalyResultDTO, String dashboardUrl) {
+  private String getAnomalyURL(MergedAnomalyResultDTO anomalyResultDTO, String dashboardUrl) {
     String urlPart = "/thirdeye#investigate?anomalyId=";
     return dashboardUrl + urlPart;
   }
@@ -315,7 +312,7 @@ public class AnomalyReportGenerator {
     String anomalyURL;
     String currentVal;
     String baselineVal;
-    String dimensions;
+    List<String> dimensions;
     String function;
     String duration;
     String startTime;
@@ -324,7 +321,7 @@ public class AnomalyReportGenerator {
 
 
     public AnomalyReportDTO(String anomalyId, String anomalyURL, String baselineVal,
-        String currentVal, String dimensions, String duration, String feedback, String function,
+        String currentVal, List<String> dimensions, String duration, String feedback, String function,
         String lift, boolean positiveLift, String metric, String startTime, String endTime, String timezone) {
       this.anomalyId = anomalyId;
       this.anomalyURL = anomalyURL;
@@ -358,11 +355,11 @@ public class AnomalyReportGenerator {
       this.currentVal = currentVal;
     }
 
-    public String getDimensions() {
+    public List<String> getDimensions() {
       return dimensions;
     }
 
-    public void setDimensions(String dimensions) {
+    public void setDimensions(List<String> dimensions) {
       this.dimensions = dimensions;
     }
 

@@ -17,7 +17,7 @@ public class EmailScreenshotHelper {
     String imgPath = null;
     try {
 
-      String imgRoute = configuration.getDashboardHost() + "/thirdeye#anomalies?anomaliesSearchMode=id&pageNumber=1&anomalyIds=" + anomalyId;
+      String imgRoute = configuration.getDashboardHost() + "/thirdeye#investigate?anomalyId=" + anomalyId;
       String phantomScript = configuration.getRootDir() + "/getGraphPnj.js";
       LOG.info("Phantom JS script {}", phantomScript);
       imgPath = "/tmp/graph" + anomalyId +".png";
