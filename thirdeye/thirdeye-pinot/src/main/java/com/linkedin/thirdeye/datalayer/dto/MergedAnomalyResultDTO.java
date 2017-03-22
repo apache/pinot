@@ -43,7 +43,13 @@ public class MergedAnomalyResultDTO extends MergedAnomalyResultBean implements A
 
   @Override
   public void setAnomalyFeedback(AnomalyFeedback anomalyFeedback) {
-    this.feedback = new AnomalyFeedbackDTO(anomalyFeedback);
+    if (anomalyFeedback == null) {
+      this.feedback = null;
+    } else if (anomalyFeedback instanceof AnomalyFeedbackDTO) {
+      this.feedback = (AnomalyFeedbackDTO) anomalyFeedback;
+    } else {
+      this.feedback = new AnomalyFeedbackDTO(anomalyFeedback);
+    }
   }
 
   @Override

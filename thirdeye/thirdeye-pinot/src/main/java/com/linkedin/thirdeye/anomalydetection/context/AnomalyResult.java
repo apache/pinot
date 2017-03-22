@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.anomalydetection.context;
 
+import java.util.Map;
+
 public interface AnomalyResult {
   /**
    * Set start time in millis, inclusive.
@@ -84,4 +86,16 @@ public interface AnomalyResult {
    * @return anomaly feedback of this anomaly.
    */
   AnomalyFeedback getAnomalyFeedback();
+
+  /**
+   * Set the properties (e.g., pattern=UP, baselineLift=1.7, etc.) of this anomaly.
+   * @param properties the properties of this anomaly.
+   */
+  void setProperties(Map<String, String> properties);
+
+  /**
+   * Return the properties (e.g., pattern=UP, baselineLift=1.7, etc.) of this anomaly.
+   * @return the properties of this anomaly.
+   */
+  Map<String, String> getProperties();
 }

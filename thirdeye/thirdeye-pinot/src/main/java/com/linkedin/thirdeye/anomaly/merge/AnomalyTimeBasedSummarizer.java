@@ -44,12 +44,12 @@ public abstract class AnomalyTimeBasedSummarizer {
       List<RawAnomalyResultDTO> anomalies, long maxMergedDurationMillis, long sequentialAllowedGap) {
 
     // sort anomalies in natural order of start time
-    Collections
-        .sort(anomalies, new Comparator<RawAnomalyResultDTO>() {
-          @Override public int compare(RawAnomalyResultDTO o1, RawAnomalyResultDTO o2) {
-            return (int) ((o1.getStartTime() - o2.getStartTime()) / 1000);
-          }
-        });
+    Collections.sort(anomalies, new Comparator<RawAnomalyResultDTO>() {
+      @Override
+      public int compare(RawAnomalyResultDTO o1, RawAnomalyResultDTO o2) {
+        return (int) ((o1.getStartTime() - o2.getStartTime()) / 1000);
+      }
+    });
 
     boolean applySequentialGapBasedSplit = false;
     boolean applyMaxDurationBasedSplit = false;

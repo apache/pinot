@@ -21,7 +21,7 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
   private double score; // confidence level
   private double weight; // change percentage, whose absolute value is severity
 
-  private Map<String, String> context; // additional anomaly detection result
+  private Map<String, String> properties; // additional anomaly detection properties (e.g., patter=UP, etc.)
 
   private Long createdTime;
   private boolean notified;
@@ -29,22 +29,6 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
   //TODO: deprecate raw anomaly list and message
   private String message;
   private List<Long> rawAnomalyIdList;
-
-  public double getAvgCurrentVal(){
-    return this.avgCurrentVal;
-  }
-
-  public double getAvgBaselineVal(){
-    return this.avgBaselineVal;
-  }
-
-  public void setAvgCurrentVal(double val){
-    this.avgCurrentVal = val;
-  }
-
-  public void setAvgBaselineVal(double val){
-    this.avgBaselineVal = val;
-  }
 
 
   public Long getFunctionId() {
@@ -63,12 +47,12 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
     this.anomalyFeedbackId = anomalyFeedbackId;
   }
 
-  public List<Long> getRawAnomalyIdList() {
-    return rawAnomalyIdList;
+  public String getCollection() {
+    return collection;
   }
 
-  public void setRawAnomalyIdList(List<Long> rawAnomalyIdList) {
-    this.rawAnomalyIdList = rawAnomalyIdList;
+  public void setCollection(String collection) {
+    this.collection = collection;
   }
 
   public String getMetric() {
@@ -103,12 +87,44 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
     this.dimensions = dimensions;
   }
 
+  public double getAvgCurrentVal(){
+    return this.avgCurrentVal;
+  }
+
+  public double getAvgBaselineVal(){
+    return this.avgBaselineVal;
+  }
+
+  public void setAvgCurrentVal(double val){
+    this.avgCurrentVal = val;
+  }
+
+  public void setAvgBaselineVal(double val){
+    this.avgBaselineVal = val;
+  }
+
   public double getScore() {
     return score;
   }
 
   public void setScore(double score) {
     this.score = score;
+  }
+
+  public double getWeight() {
+    return weight;
+  }
+
+  public void setWeight(double weight) {
+    this.weight = weight;
+  }
+
+  public Map<String, String> getProperties() {
+    return properties;
+  }
+
+  public void setProperties(Map<String, String> properties) {
+    this.properties = properties;
   }
 
   public Long getCreatedTime() {
@@ -127,25 +143,6 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
     this.notified = notified;
   }
 
-  public String getCollection() {
-    return collection;
-  }
-
-  public void setCollection(String collection) {
-    this.collection = collection;
-  }
-
-  /**
-   * Weight is change ratio. The absolute value of weight is severity.
-   */
-  public double getWeight() {
-    return weight;
-  }
-
-  public void setWeight(double weight) {
-    this.weight = weight;
-  }
-
   public String getMessage() {
     return message;
   }
@@ -154,12 +151,12 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
     this.message = message;
   }
 
-  public Map<String, String> getContext() {
-    return context;
+  public List<Long> getRawAnomalyIdList() {
+    return rawAnomalyIdList;
   }
 
-  public void setContext(Map<String, String> context) {
-    this.context = context;
+  public void setRawAnomalyIdList(List<Long> rawAnomalyIdList) {
+    this.rawAnomalyIdList = rawAnomalyIdList;
   }
 
   @Override
@@ -200,7 +197,7 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
     return "MergedAnomalyResultBean{" + "functionId=" + functionId + ", anomalyFeedbackId=" + anomalyFeedbackId
         + ", collection='" + collection + '\'' + ", metric='" + metric + '\'' + ", dimensions=" + dimensions.toString()
         + ", startTime=" + startTime + ", endTime=" + endTime + ", avgCurrentVal=" + avgCurrentVal + ", avgBaselineVal="
-        + avgBaselineVal + ", score=" + score + ", weight=" + weight + ", context=" + context.toString() + ", notified="
-        + notified + ", rawAnomalyIdList=" + rawAnomalyIdList + ", createdTime=" + createdTime + '}';
+        + avgBaselineVal + ", score=" + score + ", weight=" + weight + ", properties=" + properties.toString()
+        + ", notified=" + notified + ", rawAnomalyIdList=" + rawAnomalyIdList + ", createdTime=" + createdTime + '}';
   }
 }
