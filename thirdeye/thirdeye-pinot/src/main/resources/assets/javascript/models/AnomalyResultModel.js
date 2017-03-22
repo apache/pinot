@@ -116,11 +116,12 @@ AnomalyResultModel.prototype = {
 
   /**
    * Helper Function that returns formatted anomaly region duration data for UI
-   * @param  {date}   start   the anomaly region start
-   * @param  {date}   end     the anomaly region end
+   * @param  {date}   start       the anomaly region start
+   * @param  {date}   end         the anomaly region end
+   * @param  {string} granularity the granularity of the anomaly
    * @return {string}         formatted start - end date/time
    */
-  getRegionDuration(start, end) {
+  getRegionDuration(start, end, granularity) {
 
     if (!(start && end)) {
       return 'N/A';
@@ -130,17 +131,25 @@ AnomalyResultModel.prototype = {
     const isSameDay = regionStart.isSame(regionEnd, 'day');
     const timeDelta = regionEnd.diff(regionStart);
     const regionDuration = moment.duration(timeDelta);
-    let regionStartFormat;
-    let regionEndFormat;
+    const showTime = granularity !== 'DAYS';
+    let range = '';
+    let regionStartFormat = constants.DETAILS_DATE_FORMAT;
+    let regionEndFormat = constants.DETAILS_DATE_FORMAT;
 
-    if (isSameDay) {
-      regionStartFormat = constants.DETAILS_DATE_DAYS_FORMAT;
-      regionEndFormat = constants.DETAILS_DATE_HOURS_FORMAT;
-    } else {
-      regionStartFormat = regionEndFormat = constants.DETAILS_DATE_DAYS_FORMAT;
+    if (showTime) {
+      regionStartFormat += `, ${constants.DETAILS_DATE_HOURS_FORMAT}`;
+      regionEndFormat += `, ${constants.DETAILS_DATE_HOURS_FORMAT}`;
     }
 
-    return `${regionDuration.humanize()} (${regionStart.format(regionStartFormat)} - ${regionEnd.format(regionEndFormat)})`;
+    if (isSameDay) {
+      regionEndFormat = '';
+    }
+
+    if (isSameDay && showTime) {
+      regionEndFormat = constants.DETAILS_DATE_HOURS_FORMAT;
+    }
+
+    return `${regionDuration.humanize()} (${regionStart.format(regionStartFormat)}${regionEndFormat ? ' - ' + regionEnd.format(regionEndFormat) : ''})`;
   },
 
   /**
@@ -165,7 +174,7 @@ AnomalyResultModel.prototype = {
    */
   formatAnomalies() {
     this.anomaliesWrapper.anomalyDetailsList.forEach((anomaly) => {
-      anomaly.duration = this.getRegionDuration(anomaly.anomalyRegionStart, anomaly.anomalyRegionEnd);
+      anomaly.duration = this.getRegionDuration(anomaly.anomalyStart, anomaly.anomalyEnd, anomaly.timeUnit);
       anomaly.changeDelta = this.getChangeDelta(anomaly.current, anomaly.baseline);
     });
   },

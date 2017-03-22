@@ -21,6 +21,7 @@ function Constants() {
 
   //
   this.TIMESERIES_DATE_FORMAT = 'YYYY-MM-DD HH:mm';
+  this.DETAILS_DATE_FORMAT = 'MMM D';
   this.DETAILS_DATE_DAYS_FORMAT = 'MMM D, HH:mm z';
   this.DETAILS_DATE_HOURS_FORMAT = 'HH:mm z';
   this.DATE_RANGE_CUSTOM = 'Custom Range';
