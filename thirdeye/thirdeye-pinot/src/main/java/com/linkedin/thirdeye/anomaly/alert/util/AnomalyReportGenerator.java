@@ -8,6 +8,7 @@ import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.alert.AlertTaskRunner;
 import com.linkedin.thirdeye.anomaly.alert.v2.AlertTaskRunnerV2;
+import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
@@ -15,6 +16,7 @@ import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 
@@ -126,11 +128,12 @@ public class AnomalyReportGenerator {
       for (MergedAnomalyResultDTO anomaly : anomalies) {
         metrics.add(anomaly.getMetric());
 
-        if (anomaly.getFeedback() != null) {
+        AnomalyFeedback feedback = anomaly.getFeedback();
+        if (feedback != null) {
           feedbackCollected++;
-          if (anomaly.getFeedback().getFeedbackType().equals(AnomalyFeedbackType.ANOMALY)) {
+          if (feedback.getFeedbackType().equals(AnomalyFeedbackType.ANOMALY)) {
             trueAlert++;
-          } else if (anomaly.getFeedback().getFeedbackType()
+          } else if (feedback.getFeedbackType()
               .equals(AnomalyFeedbackType.NOT_ANOMALY)) {
             falseAlert++;
           } else {
@@ -139,7 +142,7 @@ public class AnomalyReportGenerator {
         }
 
         String feedbackVal = getFeedback(
-            anomaly.getFeedback() == null ? "Not Resolved" : "Resolved(" + anomaly.getFeedback().getFeedbackType().name() + ")");
+            feedback == null ? "Not Resolved" : "Resolved(" + feedback.getFeedbackType().name() + ")");
 
         DateTimeZone dateTimeZone = Utils.getDataTimeZone(anomaly.getCollection());
         AnomalyReportDTO anomalyReportDTO = new AnomalyReportDTO(String.valueOf(anomaly.getId()),

@@ -79,13 +79,13 @@ public interface AnomalyResult {
    * Set anomaly feedback (i.e., user label) of this anomaly.
    * @param anomalyFeedback anomaly feedback of this anomaly.
    */
-  void setAnomalyFeedback(AnomalyFeedback anomalyFeedback);
+  void setFeedback(AnomalyFeedback anomalyFeedback);
 
   /**
    * Return anomaly feedback (i.e., user label) of this anomaly.
    * @return anomaly feedback of this anomaly.
    */
-  AnomalyFeedback getAnomalyFeedback();
+  AnomalyFeedback getFeedback();
 
   /**
    * Set the properties (e.g., pattern=UP, baselineLift=1.7, etc.) of this anomaly.

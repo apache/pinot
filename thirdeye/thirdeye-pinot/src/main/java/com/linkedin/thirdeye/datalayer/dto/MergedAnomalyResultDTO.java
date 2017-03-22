@@ -17,12 +17,20 @@ public class MergedAnomalyResultDTO extends MergedAnomalyResultBean implements A
 
   private AnomalyFunctionDTO function;
 
-  public AnomalyFeedbackDTO getFeedback() {
-    return feedback;
+  @Override
+  public void setFeedback(AnomalyFeedback anomalyFeedback) {
+    if (anomalyFeedback == null) {
+      this.feedback = null;
+    } else if (anomalyFeedback instanceof AnomalyFeedbackDTO) {
+      this.feedback = (AnomalyFeedbackDTO) anomalyFeedback;
+    } else {
+      this.feedback = new AnomalyFeedbackDTO(anomalyFeedback);
+    }
   }
 
-  public void setFeedback(AnomalyFeedbackDTO feedback) {
-    this.feedback = feedback;
+  @Override
+  public AnomalyFeedback getFeedback() {
+    return this.feedback;
   }
 
   public List<RawAnomalyResultDTO> getAnomalyResults() {
@@ -39,21 +47,5 @@ public class MergedAnomalyResultDTO extends MergedAnomalyResultBean implements A
 
   public void setFunction(AnomalyFunctionDTO function) {
     this.function = function;
-  }
-
-  @Override
-  public void setAnomalyFeedback(AnomalyFeedback anomalyFeedback) {
-    if (anomalyFeedback == null) {
-      this.feedback = null;
-    } else if (anomalyFeedback instanceof AnomalyFeedbackDTO) {
-      this.feedback = (AnomalyFeedbackDTO) anomalyFeedback;
-    } else {
-      this.feedback = new AnomalyFeedbackDTO(anomalyFeedback);
-    }
-  }
-
-  @Override
-  public AnomalyFeedback getAnomalyFeedback() {
-    return this.feedback;
   }
 }

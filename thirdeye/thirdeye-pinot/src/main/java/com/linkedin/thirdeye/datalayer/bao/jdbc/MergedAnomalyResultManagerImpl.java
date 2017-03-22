@@ -280,28 +280,29 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
 
   public void updateAnomalyFeedback(MergedAnomalyResultDTO entity) {
     MergedAnomalyResultBean bean = convertDTO2Bean(entity, MergedAnomalyResultBean.class);
-    if (entity.getFeedback() != null) {
-      if (entity.getFeedback().getId() == null) {
-        AnomalyFeedbackBean feedbackBean =
-            (AnomalyFeedbackBean) convertDTO2Bean(entity.getFeedback(), AnomalyFeedbackBean.class);
+    AnomalyFeedbackDTO feedbackDTO = (AnomalyFeedbackDTO) entity.getFeedback();
+    if (feedbackDTO != null) {
+      if (feedbackDTO.getId() == null) {
+        AnomalyFeedbackBean feedbackBean = convertDTO2Bean(feedbackDTO, AnomalyFeedbackBean.class);
         Long feedbackId = genericPojoDao.put(feedbackBean);
-        entity.getFeedback().setId(feedbackId);
+        feedbackDTO.setId(feedbackId);
       } else {
-        AnomalyFeedbackBean feedbackBean = genericPojoDao.get(entity.getFeedback().getId(), AnomalyFeedbackBean.class);
-        feedbackBean.setStatus(entity.getFeedback().getStatus());
-        feedbackBean.setFeedbackType(entity.getFeedback().getFeedbackType());
-        feedbackBean.setComment(entity.getFeedback().getComment());
+        AnomalyFeedbackBean feedbackBean = genericPojoDao.get(feedbackDTO.getId(), AnomalyFeedbackBean.class);
+        feedbackBean.setStatus(feedbackDTO.getStatus());
+        feedbackBean.setFeedbackType(feedbackDTO.getFeedbackType());
+        feedbackBean.setComment(feedbackDTO.getComment());
         genericPojoDao.update(feedbackBean);
       }
-      bean.setAnomalyFeedbackId(entity.getFeedback().getId());
+      bean.setAnomalyFeedbackId(feedbackDTO.getId());
     }
     genericPojoDao.update(bean);
   }
 
   protected MergedAnomalyResultBean convertMergeAnomalyDTO2Bean(MergedAnomalyResultDTO entity) {
     MergedAnomalyResultBean bean = convertDTO2Bean(entity, MergedAnomalyResultBean.class);
-    if (entity.getFeedback() != null && entity.getFeedback().getId() != null) {
-        bean.setAnomalyFeedbackId(entity.getFeedback().getId());
+    AnomalyFeedbackDTO feedbackDTO = (AnomalyFeedbackDTO) entity.getFeedback();
+    if (feedbackDTO != null && feedbackDTO.getId() != null) {
+        bean.setAnomalyFeedbackId(feedbackDTO.getId());
     }
 
     if (entity.getFunction() != null) {
