@@ -89,22 +89,16 @@ AnomalyResultModel.prototype = {
   },
   // Call rebuild every time new anomalies are to be loaded with new model
   rebuild : function() {
-    if (this.anomaliesSearchMode == constants.MODE_METRIC && this.metricIds != undefined && this.metricIds.length > 0 && this.metricIds != this.previousMetricIds) {
-      this.previousMetricIds = this.metricIds;
+    if (this.anomaliesSearchMode == constants.MODE_METRIC && this.metricIds != undefined && this.metricIds.length > 0) {
       dataService.fetchAnomaliesForMetricIds(
           this.startDate, this.endDate, this.pageNumber, this.metricIds, this.functionName, this.updateModelAndNotifyView.bind(this));
-    } else if (this.anomaliesSearchMode == constants.MODE_DASHBOARD && this.dashboardId != undefined && this.dashboardId != this.previousDashboardId) {
-      this.previousDashboardId = this.dashboardId;
+    } else if (this.anomaliesSearchMode == constants.MODE_DASHBOARD && this.dashboardId != undefined) {
       dataService.fetchAnomaliesForDashboardId(
           this.startDate, this.endDate, this.pageNumber, this.dashboardId, this.functionName, this.updateModelAndNotifyView.bind(this));
     } else if (this.anomaliesSearchMode == constants.MODE_ID && this.anomalyIds != undefined && this.anomalyIds.length > 0 && this.anomalyIds != this.previousAnomalyIds) {
-      this.previousAnomalyIds = this.anomalyIds;
       dataService.fetchAnomaliesForAnomalyIds(
           this.startDate, this.endDate, this.pageNumber, this.anomalyIds, this.functionName, this.updateModelAndNotifyView.bind(this));
-    } else if (this.anomaliesSearchMode == constants.MODE_TIME && (this.pageNumber != this.previousPageNumber || this.previousStartDate != this.startDate || this.previousEndDate != this.endDate)) {
-      this.previousStartDate = this.startDate;
-      this.previousEndDate = this.endDate;
-      this.previousPageNumber = this.pageNumber;
+    } else if (this.anomaliesSearchMode == constants.MODE_TIME) {
       dataService.fetchAnomaliesForTime(this.startDate, this.endDate, this.pageNumber, this.updateModelAndNotifyView.bind(this));
     }
   },
