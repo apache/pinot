@@ -1,25 +1,30 @@
 package com.linkedin.thirdeye.anomaly.utils;
 
-import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyApplication;
-
-import static com.linkedin.thirdeye.common.BaseThirdEyeApplication.metricsRegistry;
-
-import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import com.yammer.metrics.core.Counter;
+import com.yammer.metrics.core.MetricsRegistry;
+import com.yammer.metrics.reporting.JmxReporter;
 
-public abstract class ThirdeyeMetricUtil {
+
+public class ThirdeyeMetricUtil {
+  private static MetricsRegistry metricsRegistry = new MetricsRegistry();
+  private static JmxReporter jmxReporter = new JmxReporter(metricsRegistry);
+
+  static {
+    jmxReporter.start();
+  }
+
   private ThirdeyeMetricUtil() {
   }
 
   public static final Counter detectionTaskCounter =
-      metricsRegistry.newCounter(ThirdEyeAnomalyApplication.class, "detectionTaskCounter");
+      metricsRegistry.newCounter(ThirdeyeMetricUtil.class, "detectionTaskCounter");
 
   public static final Counter detectionTaskSuccessCounter =
-      metricsRegistry.newCounter(ThirdEyeAnomalyApplication.class, "detectionTaskSuccessCounter");
+      metricsRegistry.newCounter(ThirdeyeMetricUtil.class, "detectionTaskSuccessCounter");
 
   public static final Counter alertTaskSuccessCounter =
-      metricsRegistry.newCounter(ThirdEyeAnomalyApplication.class, "alertTaskSuccessCounter");
+      metricsRegistry.newCounter(ThirdeyeMetricUtil.class, "alertTaskSuccessCounter");
 
   public static final Counter dbCallCounter =
-      metricsRegistry.newCounter(BaseThirdEyeApplication.class, "dbCallCounter");
+      metricsRegistry.newCounter(ThirdeyeMetricUtil.class, "dbCallCounter");
 }
