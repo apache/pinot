@@ -194,27 +194,6 @@ public final class DoubleSeries extends Series {
     return this.values;
   }
 
-  @Override
-  public DoubleSeries unique() {
-    if(this.values.length <= 0)
-      return buildFrom();
-
-    double[] values = Arrays.copyOf(this.values, this.values.length);
-    Arrays.sort(values);
-
-    // first is always unique
-    int uniqueCount = 1;
-
-    for(int i=1; i<values.length; i++) {
-      if(values[i-1] != values[i]) {
-        values[uniqueCount] = values[i];
-        uniqueCount++;
-      }
-    }
-
-    return buildFrom(Arrays.copyOf(values, uniqueCount));
-  }
-
   /**
    * Returns the value of the first element in the series
    *
@@ -270,6 +249,11 @@ public final class DoubleSeries extends Series {
   @Override
   public DoubleSeries sorted() {
     return (DoubleSeries)super.sorted();
+  }
+
+  @Override
+  public DoubleSeries unique() {
+    return (DoubleSeries)super.unique();
   }
 
   @Override

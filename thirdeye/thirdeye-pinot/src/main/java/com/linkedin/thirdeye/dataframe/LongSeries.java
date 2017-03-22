@@ -174,27 +174,6 @@ public final class LongSeries extends Series {
     return this.values;
   }
 
-  @Override
-  public LongSeries unique() {
-    if(this.values.length <= 0)
-      return buildFrom();
-
-    long[] values = Arrays.copyOf(this.values, this.values.length);
-    Arrays.sort(values);
-
-    // first is always unique
-    int uniqueCount = 1;
-
-    for(int i=1; i<values.length; i++) {
-      if(values[i-1] != values[i]) {
-        values[uniqueCount] = values[i];
-        uniqueCount++;
-      }
-    }
-
-    return buildFrom(Arrays.copyOf(values, uniqueCount));
-  }
-
   /**
    * Returns the value of the first element in the series
    *
@@ -250,6 +229,11 @@ public final class LongSeries extends Series {
   @Override
   public LongSeries sorted() {
     return (LongSeries)super.sorted();
+  }
+
+  @Override
+  public LongSeries unique() {
+    return (LongSeries)super.unique();
   }
 
   @Override

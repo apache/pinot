@@ -268,6 +268,10 @@ public abstract class Series {
     }
   }
 
+  /* *************************************************************************
+   * Public abstract interface
+   * *************************************************************************/
+
   /**
    * Returns the number of elements contained in the series.
    *
@@ -365,6 +369,10 @@ public abstract class Series {
    */
   public abstract Series append(Series other);
 
+  /* *************************************************************************
+   * Internal abstract interface
+   * *************************************************************************/
+
   /**
    * Returns projection of the series.
    *
@@ -404,6 +412,10 @@ public abstract class Series {
    * @return 0 if the referenced values are equal, -1 if {@code this} is less than {@code that}, 1 otherwise
    */
   abstract int compare(Series that, int indexThis, int indexThat);
+
+  /* *************************************************************************
+   * Public interface
+   * *************************************************************************/
 
   /**
    * Returns {@code true} is there are no values in the series. Otherwise returns {@code false}.
@@ -510,7 +522,7 @@ public abstract class Series {
     }
 
     int[] fromIndex = ArrayUtils.toPrimitive(indices.toArray(new Integer[indices.size()]));
-    return this.project(fromIndex);
+    return sorted.project(fromIndex);
   }
 
   /**
@@ -763,6 +775,10 @@ public abstract class Series {
     }
     return new SeriesGrouping(DataFrame.toSeries(keys), this, buckets);
   }
+
+  /* *************************************************************************
+   * Internal interface
+   * *************************************************************************/
 
   /**
    * Returns index tuples (pairs) for a join performed based on value.
