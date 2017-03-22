@@ -7,6 +7,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
+import org.joda.time.Period;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 
@@ -107,8 +108,8 @@ public class DetectionJobSchedulerUtils {
    * @param timeSpec
    * @return
    */
-  public static long getBucketSizeInMSForDataset(DatasetConfigDTO datasetConfig, AnomalyFunctionDTO anomalyFunction) {
-    long bucketMillis = 0;
+  public static Period getBucketSizePeriodForDataset(DatasetConfigDTO datasetConfig, AnomalyFunctionDTO anomalyFunction) {
+    Period bucketSizePeriod = null;
     TimeSpec timeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
     TimeUnit dataUnit = timeSpec.getDataGranularity().getUnit();
     TimeGranularity functionFrequency = anomalyFunction.getFrequency();
@@ -117,14 +118,28 @@ public class DetectionJobSchedulerUtils {
     // Calculate time periods according to the function frequency
     if (dataUnit.equals(TimeUnit.MINUTES) || dataUnit.equals(TimeUnit.MILLISECONDS) || dataUnit.equals(TimeUnit.SECONDS)) {
       if (functionFrequency.getUnit().equals(TimeUnit.MINUTES) && (functionFrequency.getSize() <=30)) {
-        bucketMillis = TimeUnit.MILLISECONDS.convert(functionFrequency.getSize(), TimeUnit.MINUTES);
+        bucketSizePeriod = new Period(0, 0, 0, 0, 0, functionFrequency.getSize(), 0, 0);
       } else {
-        bucketMillis = TimeUnit.MILLISECONDS.convert(1, TimeUnit.HOURS); // default to HOURS
+        bucketSizePeriod = getBucketSizePeriodForUnit(TimeUnit.HOURS); // default to 1 HOUR
       }
     } else {
-      bucketMillis = TimeUnit.MILLISECONDS.convert(1, dataUnit);
+      bucketSizePeriod = getBucketSizePeriodForUnit(dataUnit);
     }
-    return bucketMillis;
+    return bucketSizePeriod;
+  }
+
+  private static Period getBucketSizePeriodForUnit(TimeUnit unit) {
+    Period bucketSizePeriod = null;
+    switch (unit) {
+      case DAYS:
+        bucketSizePeriod = new Period(0, 0, 0, 1, 0, 0, 0, 0); // 1 DAY
+        break;
+      case HOURS:
+      default:
+        bucketSizePeriod = new Period(0, 0, 0, 0, 1, 0, 0, 0); //   1 HOUR
+        break;
+    }
+    return bucketSizePeriod;
   }
 
 
@@ -155,17 +170,18 @@ public class DetectionJobSchedulerUtils {
 
     long alignedCurrentMillis =
         DetectionJobSchedulerUtils.getBoundaryAlignedTimeForDataset(datasetConfig, currentDateTime, anomalyFunction);
+    DateTime alignedDateTime = new DateTime(alignedCurrentMillis, dateTimeZone);
 
     // if first ever entry, create it with current time
     if (lastEntryForFunction == null) {
-      String currentDateString = dateTimeFormatterForDataset.print(alignedCurrentMillis);
+      String currentDateString = dateTimeFormatterForDataset.print(alignedDateTime);
       newEntries.put(currentDateString, dateTimeFormatterForDataset.parseMillis(currentDateString));
     } else { // else create all entries from last entry onwards to current time
-      long lastMillis = lastEntryForFunction.getDateToCheckInMS();
-      long bucketSize = DetectionJobSchedulerUtils.getBucketSizeInMSForDataset(datasetConfig, anomalyFunction);
-      while (lastMillis < alignedCurrentMillis) {
-        lastMillis = lastMillis + bucketSize;
-        newEntries.put(dateTimeFormatterForDataset.print(lastMillis), lastMillis);
+      DateTime lastDateTime = new DateTime(lastEntryForFunction.getDateToCheckInMS(), dateTimeZone);
+      Period bucketSizePeriod = DetectionJobSchedulerUtils.getBucketSizePeriodForDataset(datasetConfig, anomalyFunction);
+      while (lastDateTime.isBefore(alignedDateTime)) {
+        lastDateTime = lastDateTime.plus(bucketSizePeriod);
+        newEntries.put(dateTimeFormatterForDataset.print(lastDateTime), lastDateTime.getMillis());
       }
     }
     return newEntries;

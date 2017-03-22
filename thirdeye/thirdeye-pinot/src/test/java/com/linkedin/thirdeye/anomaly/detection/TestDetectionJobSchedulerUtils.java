@@ -95,8 +95,6 @@ public class TestDetectionJobSchedulerUtils {
     AnomalyFunctionDTO anomalyFunction = new AnomalyFunctionDTO();
     anomalyFunction.setFrequency(new TimeGranularity(15, TimeUnit.MINUTES));
 
-
-
     DateTimeFormatter dateTimeFormatter = DetectionJobSchedulerUtils.
         getDateTimeFormatterForDataset(datasetConfig, dateTimeZone);
 
@@ -211,7 +209,133 @@ public class TestDetectionJobSchedulerUtils {
     Assert.assertNotNull(newEntries.get("20170213"));
     Assert.assertNotNull(newEntries.get("20170214"));
     Assert.assertEquals(newEntries.get(currentDateTimeStringRounded), new Long(currentDateTimeRounded.getMillis()));
-
   }
+
+  @Test
+  public void testGetNewEntriesForDSTBegins() throws Exception {
+
+    DatasetConfigDTO datasetConfig = new DatasetConfigDTO();
+    datasetConfig.setTimeColumn("Date");
+    datasetConfig.setTimeUnit(TimeUnit.DAYS);
+    datasetConfig.setTimeDuration(1);
+    DateTimeZone dateTimeZone = DateTimeZone.UTC;
+
+    AnomalyFunctionDTO anomalyFunction = new AnomalyFunctionDTO();
+
+    // DST started on 2017031203
+    DateTimeFormatter dateTimeFormatter = DetectionJobSchedulerUtils.
+        getDateTimeFormatterForDataset(datasetConfig, dateTimeZone);
+    String currentDateTimeString = "201703120437";
+    String currentDateTimeStringRounded = "20170312";
+    DateTime currentDateTime = minuteDateTimeFormatter.parseDateTime(currentDateTimeString);
+    DateTime currentDateTimeRounded = dateTimeFormatter.parseDateTime(currentDateTimeStringRounded);
+    DetectionStatusDTO lastEntryForFunction = null;
+
+    // null last entry
+    Map<String, Long> newEntries = DetectionJobSchedulerUtils.
+        getNewEntries(currentDateTime, lastEntryForFunction, anomalyFunction, datasetConfig, dateTimeZone);
+    Assert.assertEquals(newEntries.size(), 1);
+    Assert.assertEquals(newEntries.get(currentDateTimeStringRounded), new Long(currentDateTimeRounded.getMillis()));
+
+    // last entry same as current time
+    lastEntryForFunction = new DetectionStatusDTO();
+    lastEntryForFunction.setDateToCheckInSDF(currentDateTimeStringRounded);
+    lastEntryForFunction.setDateToCheckInMS(currentDateTimeRounded.getMillis());
+
+    newEntries = DetectionJobSchedulerUtils.
+        getNewEntries(currentDateTime, lastEntryForFunction, anomalyFunction, datasetConfig, dateTimeZone);
+    Assert.assertEquals(newEntries.size(), 0);
+
+    // last entry 1 day before current time, before DST
+    String lastEntryDateTimeString = "20170311";
+    DateTime lastEntryDateTime = dateTimeFormatter.parseDateTime(lastEntryDateTimeString);
+    lastEntryForFunction = new DetectionStatusDTO();
+    lastEntryForFunction.setDateToCheckInSDF(lastEntryDateTimeString);
+    lastEntryForFunction.setDateToCheckInMS(lastEntryDateTime.getMillis());
+
+    newEntries = DetectionJobSchedulerUtils.
+        getNewEntries(currentDateTime, lastEntryForFunction, anomalyFunction, datasetConfig, dateTimeZone);
+    Assert.assertEquals(newEntries.size(), 1);
+    Assert.assertEquals(newEntries.get(currentDateTimeStringRounded), new Long(currentDateTimeRounded.getMillis()));
+
+    // last entry 3 days before current time
+    lastEntryDateTimeString = "20170309";
+    lastEntryDateTime = dateTimeFormatter.parseDateTime(lastEntryDateTimeString);
+    lastEntryForFunction = new DetectionStatusDTO();
+    lastEntryForFunction.setDateToCheckInSDF(lastEntryDateTimeString);
+    lastEntryForFunction.setDateToCheckInMS(lastEntryDateTime.getMillis());
+
+    newEntries = DetectionJobSchedulerUtils.
+        getNewEntries(currentDateTime, lastEntryForFunction, anomalyFunction, datasetConfig, dateTimeZone);
+    Assert.assertEquals(newEntries.size(), 3);
+    Assert.assertNotNull(newEntries.get("20170310"));
+    Assert.assertNotNull(newEntries.get("20170311"));
+    Assert.assertNotNull(newEntries.get("20170312"));
+    Assert.assertEquals(newEntries.get(currentDateTimeStringRounded), new Long(currentDateTimeRounded.getMillis()));
+  }
+
+  @Test
+  public void testGetNewEntriesForDSTEnds() throws Exception {
+
+    DatasetConfigDTO datasetConfig = new DatasetConfigDTO();
+    datasetConfig.setTimeColumn("Date");
+    datasetConfig.setTimeUnit(TimeUnit.DAYS);
+    datasetConfig.setTimeDuration(1);
+    DateTimeZone dateTimeZone = DateTimeZone.UTC;
+
+    AnomalyFunctionDTO anomalyFunction = new AnomalyFunctionDTO();
+
+    // DST ended on 2016110602
+    DateTimeFormatter dateTimeFormatter = DetectionJobSchedulerUtils.
+        getDateTimeFormatterForDataset(datasetConfig, dateTimeZone);
+    String currentDateTimeString = "201611060437";
+    String currentDateTimeStringRounded = "20161106";
+    DateTime currentDateTime = minuteDateTimeFormatter.parseDateTime(currentDateTimeString);
+    DateTime currentDateTimeRounded = dateTimeFormatter.parseDateTime(currentDateTimeStringRounded);
+    DetectionStatusDTO lastEntryForFunction = null;
+
+    // null last entry
+    Map<String, Long> newEntries = DetectionJobSchedulerUtils.
+        getNewEntries(currentDateTime, lastEntryForFunction, anomalyFunction, datasetConfig, dateTimeZone);
+    Assert.assertEquals(newEntries.size(), 1);
+    Assert.assertEquals(newEntries.get(currentDateTimeStringRounded), new Long(currentDateTimeRounded.getMillis()));
+
+    // last entry same as current time
+    lastEntryForFunction = new DetectionStatusDTO();
+    lastEntryForFunction.setDateToCheckInSDF(currentDateTimeStringRounded);
+    lastEntryForFunction.setDateToCheckInMS(currentDateTimeRounded.getMillis());
+
+    newEntries = DetectionJobSchedulerUtils.
+        getNewEntries(currentDateTime, lastEntryForFunction, anomalyFunction, datasetConfig, dateTimeZone);
+    Assert.assertEquals(newEntries.size(), 0);
+
+    // last entry 1 day before current time, before DST ended
+    String lastEntryDateTimeString = "20161105";
+    DateTime lastEntryDateTime = dateTimeFormatter.parseDateTime(lastEntryDateTimeString);
+    lastEntryForFunction = new DetectionStatusDTO();
+    lastEntryForFunction.setDateToCheckInSDF(lastEntryDateTimeString);
+    lastEntryForFunction.setDateToCheckInMS(lastEntryDateTime.getMillis());
+
+    newEntries = DetectionJobSchedulerUtils.
+        getNewEntries(currentDateTime, lastEntryForFunction, anomalyFunction, datasetConfig, dateTimeZone);
+    Assert.assertEquals(newEntries.size(), 1);
+    Assert.assertEquals(newEntries.get(currentDateTimeStringRounded), new Long(currentDateTimeRounded.getMillis()));
+
+    // last entry 3 days before current time
+    lastEntryDateTimeString = "20161103";
+    lastEntryDateTime = dateTimeFormatter.parseDateTime(lastEntryDateTimeString);
+    lastEntryForFunction = new DetectionStatusDTO();
+    lastEntryForFunction.setDateToCheckInSDF(lastEntryDateTimeString);
+    lastEntryForFunction.setDateToCheckInMS(lastEntryDateTime.getMillis());
+
+    newEntries = DetectionJobSchedulerUtils.
+        getNewEntries(currentDateTime, lastEntryForFunction, anomalyFunction, datasetConfig, dateTimeZone);
+    Assert.assertEquals(newEntries.size(), 3);
+    Assert.assertNotNull(newEntries.get("20161104"));
+    Assert.assertNotNull(newEntries.get("20161105"));
+    Assert.assertNotNull(newEntries.get("20161106"));
+    Assert.assertEquals(newEntries.get(currentDateTimeStringRounded), new Long(currentDateTimeRounded.getMillis()));
+  }
+
 
 }
