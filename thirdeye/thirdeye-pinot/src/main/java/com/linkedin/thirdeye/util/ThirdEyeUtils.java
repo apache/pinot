@@ -22,6 +22,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.commons.lang.StringUtils;
+import org.joda.time.Period;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,6 +44,7 @@ import com.linkedin.thirdeye.client.cache.MetricDataset;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.COMPARE_MODE;
 import com.linkedin.thirdeye.datalayer.pojo.DashboardConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.DatasetConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
@@ -332,6 +334,26 @@ public abstract class ThirdEyeUtils {
       LOG.error("Exception in getting dataset name {}", collection, e);
     }
     return dataset;
+  }
+
+  public static Period getbaselineOffsetPeriodByMode(COMPARE_MODE compareMode) {
+    int numWeeksAgo = 1;
+    switch (compareMode) {
+    case Wo2W:
+      numWeeksAgo = 2;
+      break;
+    case Wo3W:
+      numWeeksAgo = 3;
+      break;
+    case Wo4W:
+      numWeeksAgo = 4;
+      break;
+    case WoW:
+    default:
+      numWeeksAgo = 1;
+      break;
+    }
+    return new Period(0, 0, 0, 7 * numWeeksAgo, 0, 0, 0, 0);
   }
 
 }

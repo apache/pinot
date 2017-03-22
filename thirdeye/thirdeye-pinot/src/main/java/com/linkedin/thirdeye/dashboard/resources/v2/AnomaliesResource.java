@@ -148,30 +148,33 @@ public class AnomaliesResource {
     response.setCurrenEnd(anomaly.getEndTime());
     try {
       DatasetConfigDTO dataset = datasetConfigDAO.findByDataset(anomaly.getCollection());
+      DateTimeZone dateTimeZone = Utils.getDataTimeZone(anomaly.getCollection());
       TimeGranularity granularity =
           new TimeGranularity(dataset.getTimeDuration(), dataset.getTimeUnit());
 
       // Lets compute currentTimeRange
-      Pair<Long, Long> currentTmeRange = new Pair<>(anomaly.getStartTime(), anomaly.getEndTime());
-      MetricTimeSeries ts = TimeSeriesUtil
-          .getTimeSeriesByDimension(anomaly.getFunction(), Arrays.asList(currentTmeRange),
+      Pair<Long, Long> currentTimeRange = new Pair<>(anomaly.getStartTime(), anomaly.getEndTime());
+      MetricTimeSeries currentTimeSeries = TimeSeriesUtil
+          .getTimeSeriesByDimension(anomaly.getFunction(), Arrays.asList(currentTimeRange),
               anomaly.getDimensions(), granularity, false);
-      double currentVal = getTotalFromTimeSeries(ts, dataset.isAdditive());
+      double currentVal = getTotalFromTimeSeries(currentTimeSeries, dataset.isAdditive());
       response.setCurrentVal(currentVal);
 
       for (AlertConfigBean.COMPARE_MODE compareMode : AlertConfigBean.COMPARE_MODE.values()) {
-        long baselineOffset = EmailHelper.getBaselineOffset(compareMode);
-        Pair<Long, Long> baselineTmeRange = new Pair<>(anomaly.getStartTime() - baselineOffset,
-            anomaly.getEndTime() - baselineOffset);
-        MetricTimeSeries baselineTs = TimeSeriesUtil
-            .getTimeSeriesByDimension(anomaly.getFunction(), Arrays.asList(baselineTmeRange),
+        Period baselineOffsetPeriod = ThirdEyeUtils.getbaselineOffsetPeriodByMode(compareMode);
+        DateTime anomalyStartTimeOffset = new DateTime(anomaly.getStartTime(), dateTimeZone).minus(baselineOffsetPeriod);
+        DateTime anomalyEndTimeOffset = new DateTime(anomaly.getEndTime(), dateTimeZone).minus(baselineOffsetPeriod);
+        Pair<Long, Long> baselineTimeRange =
+            new Pair<>(anomalyStartTimeOffset.getMillis(), anomalyEndTimeOffset.getMillis());
+        MetricTimeSeries baselineTimeSeries = TimeSeriesUtil
+            .getTimeSeriesByDimension(anomaly.getFunction(), Arrays.asList(baselineTimeRange),
                 anomaly.getDimensions(), granularity, false);
-        AnomalyDataCompare.CompareResult cr = new AnomalyDataCompare.CompareResult();
-        double baseLineval = getTotalFromTimeSeries(baselineTs, dataset.isAdditive());
-        cr.setBaselineValue(baseLineval);
-        cr.setCompareMode(compareMode);
-        cr.setChange(calculateChange(currentVal, baseLineval));
-        response.getCompareResults().add(cr);
+        AnomalyDataCompare.CompareResult compareResult = new AnomalyDataCompare.CompareResult();
+        double baseLineval = getTotalFromTimeSeries(baselineTimeSeries, dataset.isAdditive());
+        compareResult.setBaselineValue(baseLineval);
+        compareResult.setCompareMode(compareMode);
+        compareResult.setChange(calculateChange(currentVal, baseLineval));
+        response.getCompareResults().add(compareResult);
       }
     } catch (Exception e) {
       LOG.error("Error fetching the timeseries data from pinot", e);
