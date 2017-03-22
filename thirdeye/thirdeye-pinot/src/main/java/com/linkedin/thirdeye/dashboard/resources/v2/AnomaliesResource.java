@@ -34,7 +34,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.TreeSet;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -52,14 +51,12 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.text.StrSubstitutor;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Period;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
-import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -67,20 +64,12 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Joiner;
-import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.TimeRange;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.DAORegistry;
-import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.client.timeseries.TimeSeriesHandler;
-import com.linkedin.thirdeye.client.timeseries.TimeSeriesRequest;
-import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponse;
-import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow;
-import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow.TimeSeriesMetric;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.constant.FeedbackStatus;
-import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
@@ -108,6 +97,11 @@ public class AnomaliesResource {
   private static final int DEFAULT_PAGE_NUMBER = 1;
   private static final int DEFAULT_PAGE_SIZE = 10;
   private static final int NUM_EXECS = 40;
+  private static final DateTimeZone DEFAULT_DASHBOARD_TIMEZONE = DateTimeZone.forID("America/Los_Angeles");
+  private static final DateTimeFormatter  timeSeriesDateFormatter = DateTimeFormat.forPattern(TIME_SERIES_DATE_FORMAT).withZone(DEFAULT_DASHBOARD_TIMEZONE);
+  private static final DateTimeFormatter startEndDateFormatterDays = DateTimeFormat.forPattern(START_END_DATE_FORMAT_DAYS).withZone(DEFAULT_DASHBOARD_TIMEZONE);
+  private static final DateTimeFormatter startEndDateFormatterHours = DateTimeFormat.forPattern(START_END_DATE_FORMAT_HOURS).withZone(DEFAULT_DASHBOARD_TIMEZONE);
+
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY = ThirdEyeCacheRegistry.getInstance();
@@ -424,88 +418,6 @@ public class AnomaliesResource {
 
 
   /**
-   * Get timeseries for metric
-   * @param collection
-   * @param filters
-   * @param start
-   * @param end
-   * @param aggTimeGranularity
-   * @param metric
-   * @return
-   * @throws Exception
-   */
-  private JSONObject getTimeSeriesData(String collection, Multimap<String, String> filters,
-      Long start, Long end, String aggTimeGranularity, String metric) throws Exception {
-
-    TimeSeriesRequest request = new TimeSeriesRequest();
-    request.setCollectionName(collection);
-
-    DateTimeZone timeZoneForCollection = Utils.getDataTimeZone(collection);
-    request.setStart(new DateTime(start, timeZoneForCollection));
-    request.setEnd(new DateTime(end, timeZoneForCollection));
-
-    request.setFilterSet(filters);
-
-    List<MetricExpression> metricExpressions =
-        Utils.convertToMetricExpressions(metric, MetricAggFunction.SUM, collection);
-    request.setMetricExpressions(metricExpressions);
-
-    request.setAggregationTimeGranularity(Utils.getAggregationTimeGranularity(aggTimeGranularity, collection));
-    DatasetConfigDTO datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(collection);
-    TimeSpec timespec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
-
-    if (!request.getAggregationTimeGranularity().getUnit().equals(TimeUnit.DAYS) ||
-        !StringUtils.isBlank(timespec.getFormat())) {
-      request.setEndDateInclusive(true);
-    }
-
-    TimeSeriesHandler handler = new TimeSeriesHandler(CACHE_REGISTRY.getQueryCache());
-    JSONObject jsonResponseObject = new JSONObject();
-    try {
-      TimeSeriesResponse response = handler.handle(request);
-      JSONObject timeseriesMap = new JSONObject();
-      JSONArray timeValueArray = new JSONArray();
-      TreeSet<String> keys = new TreeSet<>();
-      TreeSet<Long> times = new TreeSet<>();
-      for (int i = 0; i < response.getNumRows(); i++) {
-        TimeSeriesRow timeSeriesRow = response.getRow(i);
-        times.add(timeSeriesRow.getStart());
-      }
-      for (Long time : times) {
-        timeValueArray.put(time);
-      }
-      timeseriesMap.put("time", timeValueArray);
-      for (int i = 0; i < response.getNumRows(); i++) {
-        TimeSeriesRow timeSeriesRow = response.getRow(i);
-        for (TimeSeriesMetric metricTimeSeries : timeSeriesRow.getMetrics()) {
-          String key = metricTimeSeries.getMetricName();
-
-          JSONArray valueArray;
-          if (!timeseriesMap.has(key)) {
-            valueArray = new JSONArray();
-            timeseriesMap.put(key, valueArray);
-            keys.add(key);
-          } else {
-            valueArray = timeseriesMap.getJSONArray(key);
-          }
-          valueArray.put(metricTimeSeries.getValue());
-        }
-      }
-      JSONObject summaryMap = new JSONObject();
-      summaryMap.put("currentStart", start);
-      summaryMap.put("currentEnd", end);
-
-      jsonResponseObject.put("timeSeriesData", timeseriesMap);
-      jsonResponseObject.put("keys", new JSONArray(keys));
-      jsonResponseObject.put("summary", summaryMap);
-    } catch (Exception e) {
-      throw e;
-    }
-    LOG.info("Response:{}", jsonResponseObject);
-    return jsonResponseObject;
-  }
-
-  /**
    * Extract data values form timeseries object
    * @param dataSeries
    * @return
@@ -568,8 +480,7 @@ public class AnomaliesResource {
    * @param startEndDateFormatterDays
    * @return
    */
-  private String getFormattedDateTime(long timestamp, DatasetConfigDTO datasetConfig,
-      DateTimeFormatter startEndDateFormatterHours, DateTimeFormatter startEndDateFormatterDays) {
+  private String getFormattedDateTime(long timestamp, DatasetConfigDTO datasetConfig) {
     TimeSpec timeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
     TimeUnit dataGranularityUnit = timeSpec.getDataGranularity().getUnit();
     String formattedDateTime = null;
@@ -592,6 +503,7 @@ public class AnomaliesResource {
     AnomaliesWrapper anomaliesWrapper = new AnomaliesWrapper();
     anomaliesWrapper.setTotalAnomalies(mergedAnomalies.size());
     LOG.info("Total anomalies: {}", mergedAnomalies.size());
+
 
     // TODO: get page number and page size from client
     int pageSize = DEFAULT_PAGE_SIZE;
@@ -624,13 +536,8 @@ public class AnomaliesResource {
         public AnomalyDetails call() throws Exception {
           String dataset = mergedAnomaly.getCollection();
           DatasetConfigDTO datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(dataset);
-          DateTimeFormatter  timeSeriesDateFormatter = DateTimeFormat.forPattern(TIME_SERIES_DATE_FORMAT).withZone(Utils.getDataTimeZone(dataset));
-          DateTimeFormatter startEndDateFormatterDays = DateTimeFormat.forPattern(START_END_DATE_FORMAT_DAYS).withZone(Utils.getDataTimeZone(dataset));
-          DateTimeFormatter startEndDateFormatterHours = DateTimeFormat.forPattern(START_END_DATE_FORMAT_HOURS).withZone(Utils.getDataTimeZone(dataset));
 
-          return getAnomalyDetails(mergedAnomaly, datasetConfig, timeSeriesDateFormatter,
-              startEndDateFormatterHours, startEndDateFormatterDays,
-              getExternalURL(mergedAnomaly));
+          return getAnomalyDetails(mergedAnomaly, datasetConfig, getExternalURL(mergedAnomaly));
         }
       };
       anomalyDetailsListFutures.add(threadPool.submit(callable));
@@ -702,8 +609,7 @@ public class AnomaliesResource {
    * @return
    */
   private AnomalyDetails getAnomalyDetails(MergedAnomalyResultDTO mergedAnomaly, DatasetConfigDTO datasetConfig,
-      DateTimeFormatter timeSeriesDateFormatter, DateTimeFormatter startEndDateFormatterHours,
-      DateTimeFormatter startEndDateFormatterDays, String externalUrl) throws Exception {
+      String externalUrl) throws Exception {
 
     String dataset = datasetConfig.getDataset();
     String metricName = mergedAnomaly.getMetric();
@@ -747,8 +653,7 @@ public class AnomaliesResource {
               currentStartTime, currentEndTime, knownAnomalies);
 
       anomalyDetails = constructAnomalyDetails(metricName, dataset, datasetConfig, mergedAnomaly, anomalyFunctionSpec,
-          currentStartTime, currentEndTime, anomalyTimelinesView, timeSeriesDateFormatter, startEndDateFormatterHours,
-          startEndDateFormatterDays, externalUrl);
+          currentStartTime, currentEndTime, anomalyTimelinesView, externalUrl);
     } catch (Exception e) {
       LOG.error("Exception in constructing anomaly wrapper for anomaly {}", mergedAnomaly.getId(), e);
     }
@@ -773,8 +678,7 @@ public class AnomaliesResource {
    */
   private AnomalyDetails constructAnomalyDetails(String metricName, String dataset, DatasetConfigDTO datasetConfig,
       MergedAnomalyResultDTO mergedAnomaly, AnomalyFunctionDTO anomalyFunction, long currentStartTime,
-      long currentEndTime, AnomalyTimelinesView anomalyTimelinesView, DateTimeFormatter timeSeriesDateFormatter,
-      DateTimeFormatter startEndDateFormatterHours, DateTimeFormatter startEndDateFormatterDays, String externalUrl)
+      long currentEndTime, AnomalyTimelinesView anomalyTimelinesView, String externalUrl)
       throws JSONException {
 
     MetricConfigDTO metricConfigDTO = metricConfigDAO.findByMetricAndDataset(metricName, dataset);
@@ -811,8 +715,8 @@ public class AnomaliesResource {
     // get this from timeseries calls
     List<String> dateValues = getDateFromTimeSeriesObject(timeBuckets.subList(timeStartIndex, timeEndIndex), timeSeriesDateFormatter);
     anomalyDetails.setDates(dateValues);
-    anomalyDetails.setCurrentEnd(getFormattedDateTime(currentEndTime, datasetConfig, startEndDateFormatterHours, startEndDateFormatterDays));
-    anomalyDetails.setCurrentStart(getFormattedDateTime(currentStartTime, datasetConfig, startEndDateFormatterHours, startEndDateFormatterDays));
+    anomalyDetails.setCurrentEnd(getFormattedDateTime(currentEndTime, datasetConfig));
+    anomalyDetails.setCurrentStart(getFormattedDateTime(currentStartTime, datasetConfig));
     List<String> baselineValues = getDataFromTimeSeriesObject(anomalyTimelinesView.getBaselineValues().subList(timeStartIndex, timeEndIndex));
     anomalyDetails.setBaselineValues(baselineValues);
     List<String> currentValues = getDataFromTimeSeriesObject(anomalyTimelinesView.getCurrentValues().subList(timeStartIndex, timeEndIndex));

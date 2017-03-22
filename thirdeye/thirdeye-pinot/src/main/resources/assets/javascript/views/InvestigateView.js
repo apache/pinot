@@ -80,10 +80,17 @@ InvestigateView.prototype = {
     this.renderAnomalyChart(this.investigateModel.getAnomaly());
     // this.setupListenerOnViewContributionLink();
     this.setupListenerOnUserFeedback();
+    this.signalPhantomJs();
   },
 
   destroy() {
     $("#investigate-place-holder").children().remove();
+  },
+
+  signalPhantomJs() {
+    if (typeof window.callPhantom === 'function') {
+      window.callPhantom({message: 'ready'});
+    }
   },
 
   setupListenerOnViewContributionLink() {
