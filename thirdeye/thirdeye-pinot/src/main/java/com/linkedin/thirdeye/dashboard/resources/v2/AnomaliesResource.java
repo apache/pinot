@@ -2,7 +2,6 @@ package com.linkedin.thirdeye.dashboard.resources.v2;
 
 import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
-import com.linkedin.thirdeye.anomaly.alert.util.EmailHelper;
 import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContext;
 import com.linkedin.thirdeye.anomaly.detection.TimeSeriesUtil;
 import com.linkedin.thirdeye.anomaly.merge.TimeBasedAnomalyMerger;
@@ -14,7 +13,6 @@ import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomaliesSummary;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomaliesWrapper;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalyDataCompare;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalyDetails;
-
 import com.linkedin.thirdeye.dashboard.views.TimeBucket;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
@@ -25,7 +23,9 @@ import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 import com.linkedin.thirdeye.detector.metric.transfer.MetricTransfer;
 import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
+
 import java.io.IOException;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -91,8 +91,6 @@ public class AnomaliesResource {
   private static final String START_END_DATE_FORMAT_DAYS = "MMM d yyyy";
   private static final String START_END_DATE_FORMAT_HOURS = "MMM d yyyy HH:mm";
   private static final String TIME_SERIES_DATE_FORMAT = "yyyy-MM-dd HH:mm";
-  private static final String ANOMALY_BASELINE_VAL_KEY = "baseLineVal";
-  private static final String ANOMALY_CURRENT_VAL_KEY = "currentVal";
   private static final String COMMA_SEPARATOR = ",";
   private static final int DEFAULT_PAGE_SIZE = 10;
   private static final int NUM_EXECS = 40;
@@ -100,6 +98,7 @@ public class AnomaliesResource {
   private static final DateTimeFormatter  timeSeriesDateFormatter = DateTimeFormat.forPattern(TIME_SERIES_DATE_FORMAT).withZone(DEFAULT_DASHBOARD_TIMEZONE);
   private static final DateTimeFormatter startEndDateFormatterDays = DateTimeFormat.forPattern(START_END_DATE_FORMAT_DAYS).withZone(DEFAULT_DASHBOARD_TIMEZONE);
   private static final DateTimeFormatter startEndDateFormatterHours = DateTimeFormat.forPattern(START_END_DATE_FORMAT_HOURS).withZone(DEFAULT_DASHBOARD_TIMEZONE);
+  private static final DecimalFormat TWO_DECIMALS_FORMAT = new DecimalFormat("##.##");
 
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
@@ -450,20 +449,6 @@ public class AnomaliesResource {
     return list;
   }
 
-
-  private Map<String, String> getAnomalyMessageDataMap(String message) {
-    Map<String, String> messageDataMap = new HashMap<>();
-    String[] tokenPairs = message.split("[,]");
-    for (String tokenPair : tokenPairs) {
-      if (tokenPair.contains(":")) {
-        String[] tokens = tokenPair.split(":");
-        messageDataMap.put(tokens[0].trim(), tokens[1].trim());
-      }
-    }
-    LOG.info("Map {}", messageDataMap);
-    return messageDataMap;
-  }
-
   /**
    * Construct agg granularity for using in timeseries
    * @param datasetConfig
@@ -784,9 +769,8 @@ public class AnomaliesResource {
     long newAnomalyRegionEnd = subtractRegionFromAnomalyEnd(mergedAnomaly.getEndTime(), dateTimeZone, dataUnit);
     anomalyDetails.setAnomalyRegionStart(timeSeriesDateFormatter.print(newAnomalyRegionStart));
     anomalyDetails.setAnomalyRegionEnd(timeSeriesDateFormatter.print(newAnomalyRegionEnd));
-    Map<String, String> messageDataMap = getAnomalyMessageDataMap(mergedAnomaly.getMessage());
-    anomalyDetails.setCurrent(messageDataMap.get(ANOMALY_CURRENT_VAL_KEY));
-    anomalyDetails.setBaseline(messageDataMap.get(ANOMALY_BASELINE_VAL_KEY));
+    anomalyDetails.setCurrent(TWO_DECIMALS_FORMAT.format(mergedAnomaly.getAvgCurrentVal()));
+    anomalyDetails.setBaseline(TWO_DECIMALS_FORMAT.format(mergedAnomaly.getAvgBaselineVal()));
     anomalyDetails.setAnomalyFunctionId(anomalyFunction.getId());
     anomalyDetails.setAnomalyFunctionName(anomalyFunction.getFunctionName());
     anomalyDetails.setAnomalyFunctionType(anomalyFunction.getType());
