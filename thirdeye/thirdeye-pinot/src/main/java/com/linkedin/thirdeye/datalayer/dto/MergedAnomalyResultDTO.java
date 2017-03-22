@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.datalayer.dto;
 
+import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
+import com.linkedin.thirdeye.anomalydetection.context.AnomalyResult;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -7,7 +9,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.linkedin.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class MergedAnomalyResultDTO extends MergedAnomalyResultBean {
+public class MergedAnomalyResultDTO extends MergedAnomalyResultBean implements AnomalyResult {
 
   private AnomalyFeedbackDTO feedback;
 
@@ -37,5 +39,15 @@ public class MergedAnomalyResultDTO extends MergedAnomalyResultBean {
 
   public void setFunction(AnomalyFunctionDTO function) {
     this.function = function;
+  }
+
+  @Override
+  public void setAnomalyFeedback(AnomalyFeedback anomalyFeedback) {
+    this.feedback = new AnomalyFeedbackDTO(anomalyFeedback);
+  }
+
+  @Override
+  public AnomalyFeedback getAnomalyFeedback() {
+    return this.feedback;
   }
 }

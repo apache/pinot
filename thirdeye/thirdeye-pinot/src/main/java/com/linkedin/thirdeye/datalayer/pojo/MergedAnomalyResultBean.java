@@ -13,8 +13,8 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
   private String collection;
   private String metric;
   private DimensionMap dimensions;
-  private Long startTime;
-  private Long endTime;
+  private long startTime;
+  private long endTime;
 
   private double avgCurrentVal; // actual value
   private double avgBaselineVal; // expected value
@@ -79,19 +79,19 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
     this.metric = metric;
   }
 
-  public Long getStartTime() {
+  public long getStartTime() {
     return startTime;
   }
 
-  public void setStartTime(Long startTime) {
+  public void setStartTime(long startTime) {
     this.startTime = startTime;
   }
 
-  public Long getEndTime() {
+  public long getEndTime() {
     return endTime;
   }
 
-  public void setEndTime(Long endTime) {
+  public void setEndTime(long endTime) {
     this.endTime = endTime;
   }
 
