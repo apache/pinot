@@ -8,7 +8,7 @@ import org.joda.time.DateTime;
 
 import com.google.common.base.MoreObjects;
 
-
+@Deprecated
 public class RawAnomalyResultBean extends AbstractBean implements Comparable<RawAnomalyResultBean> {
 
   private Long functionId;

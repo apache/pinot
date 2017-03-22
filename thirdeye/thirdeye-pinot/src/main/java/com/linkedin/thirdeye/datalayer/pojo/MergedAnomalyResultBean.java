@@ -2,29 +2,33 @@ package com.linkedin.thirdeye.datalayer.pojo;
 
 import com.linkedin.thirdeye.api.DimensionMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import org.apache.commons.lang.ObjectUtils;
 
 
-public class MergedAnomalyResultBean extends AbstractBean
-    implements Comparable<MergedAnomalyResultBean> {
+public class MergedAnomalyResultBean extends AbstractBean implements Comparable<MergedAnomalyResultBean> {
   private Long functionId;
   private Long anomalyFeedbackId;
-  private List<Long> rawAnomalyIdList;
   private String collection;
   private String metric;
   private DimensionMap dimensions;
   private Long startTime;
   private Long endTime;
-  // significance level
-  private double score;
-  // severity
-  private double weight;
+
+  private double avgCurrentVal; // actual value
+  private double avgBaselineVal; // expected value
+  private double score; // confidence level
+  private double weight; // change percentage, whose absolute value is severity
+
+  private Map<String, String> context; // additional anomaly detection result
+
   private Long createdTime;
-  private String message;
   private boolean notified;
-  private double avgCurrentVal;
-  private double avgBaselineVal;
+
+  //TODO: deprecate raw anomaly list and message
+  private String message;
+  private List<Long> rawAnomalyIdList;
 
   public double getAvgCurrentVal(){
     return this.avgCurrentVal;
@@ -150,6 +154,14 @@ public class MergedAnomalyResultBean extends AbstractBean
     this.message = message;
   }
 
+  public Map<String, String> getContext() {
+    return context;
+  }
+
+  public void setContext(Map<String, String> context) {
+    this.context = context;
+  }
+
   @Override
   public int hashCode() {
     return Objects.hash(getId(), startTime, endTime, collection, metric, dimensions, score, avgBaselineVal, avgCurrentVal);
@@ -161,11 +173,11 @@ public class MergedAnomalyResultBean extends AbstractBean
       return false;
     }
     MergedAnomalyResultBean m = (MergedAnomalyResultBean) o;
-    return Objects.equals(getId(), m.getId()) && Objects.equals(startTime, m.getStartTime())
-        && Objects.equals(endTime, m.getEndTime()) && Objects.equals(collection, m.getCollection())
-        && Objects.equals(metric, m.getMetric()) && Objects.equals(dimensions, m.getDimensions())
-        && Objects.equals(avgBaselineVal, m.getAvgBaselineVal())
-        && Objects.equals(avgCurrentVal, m.getAvgCurrentVal());
+    return Objects.equals(getId(), m.getId()) && Objects.equals(startTime, m.getStartTime()) && Objects
+        .equals(endTime, m.getEndTime()) && Objects.equals(collection, m.getCollection()) && Objects
+        .equals(metric, m.getMetric()) && Objects.equals(dimensions, m.getDimensions()) && Objects
+        .equals(score, m.getScore()) && Objects.equals(avgBaselineVal, m.getAvgBaselineVal()) && Objects
+        .equals(avgCurrentVal, m.getAvgCurrentVal());
   }
 
   @Override
@@ -185,12 +197,10 @@ public class MergedAnomalyResultBean extends AbstractBean
 
   @Override
   public String toString() {
-    return "MergedAnomalyResultBean{" + "anomalyFeedbackId=" + anomalyFeedbackId + ", functionId="
-        + functionId + ", rawAnomalyIdList=" + rawAnomalyIdList + ", collection='" + collection
-        + '\'' + ", metric='" + metric + '\'' + ", dimensions='" + dimensions + '\''
-        + ", startTime=" + startTime + ", endTime=" + endTime + ", score=" + score + ", weight="
-        + weight + ", createdTime=" + createdTime + ", message='" + message + '\''
-        + ", currentVal=" + avgCurrentVal + ", baseLineVal=" + avgBaselineVal
-        + ", notified=" + notified + '}';
+    return "MergedAnomalyResultBean{" + "functionId=" + functionId + ", anomalyFeedbackId=" + anomalyFeedbackId
+        + ", collection='" + collection + '\'' + ", metric='" + metric + '\'' + ", dimensions=" + dimensions.toString()
+        + ", startTime=" + startTime + ", endTime=" + endTime + ", avgCurrentVal=" + avgCurrentVal + ", avgBaselineVal="
+        + avgBaselineVal + ", score=" + score + ", weight=" + weight + ", context=" + context.toString() + ", notified="
+        + notified + ", rawAnomalyIdList=" + rawAnomalyIdList + ", createdTime=" + createdTime + '}';
   }
 }
