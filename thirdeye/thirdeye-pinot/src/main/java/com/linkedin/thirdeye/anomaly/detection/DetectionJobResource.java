@@ -1,11 +1,14 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
+import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutoTune;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
+import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluationMethod;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.dto.AutotuneConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
@@ -42,6 +45,7 @@ import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static com.linkedin.thirdeye.anomaly.detection.lib.AutotuneMethodType.*;
 
 
 @Path("/detection-job")
@@ -293,10 +297,10 @@ public class DetectionJobResource {
 
     // get anomalies by function id, start time and end time
     AnomalyFunctionDTO anomalyFunctionSpec = DAO_REGISTRY.getAnomalyFunctionDAO().findById(id);
-    AnomalyFunctionManager anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     MergedAnomalyResultManager anomalyMergedResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     List<MergedAnomalyResultDTO> anomalyResultDTOS = anomalyMergedResultDAO.findByStartTimeInRangeAndFunctionId(startTime, endTime, id);
 
+    AutotuneConfigDTO target = new AutotuneConfigDTO();
     // create alert filter and evaluator
     AlertFilter alertFilter = alertFilterFactory.fromSpec(anomalyFunctionSpec.getAlertFilter());
     AlertFilterEvaluationUtil evaluator = new AlertFilterEvaluationUtil(alertFilter);
@@ -316,8 +320,11 @@ public class DetectionJobResource {
       // if alert filter auto tune has updated alert filter, over write alert filter to anomaly function spec
       // otherwise do nothing and return alert filter
       if (alertFilterAutotune.isUpdated()){
-        anomalyFunctionSpec.setAlertFilter(tunedAlertFilter);
-        anomalyFunctionDAO.update(anomalyFunctionSpec);
+        target.setFunctionId(id);
+        target.setAutotuneMethod(ALERT_FILTER_LOGISITC_AUTO_TUNE);
+        target.setConfiguration(tunedAlertFilter);
+        target.setPerformanceEvaluationMethod(PerformanceEvaluationMethod.PRECISION_AND_RECALL);
+        DAO_REGISTRY.getAutotuneConfigDAO().save(target);
         LOG.info("Model has been updated");
       } else {
         LOG.info("Model hasn't been updated because tuned model cannot beat original model");
@@ -327,6 +334,67 @@ public class DetectionJobResource {
     }
     return Response.ok(alertFilterAutotune.isUpdated()).build();
   }
+
+  /**
+   * Endpoint to check if merged anomalies given a time period have at least one positive label
+   * @param id
+   * @param startTime
+   * @param endTime
+   * @return true if the list of merged anomalies has at least one positive label, false otherwise
+   */
+  @POST
+  @Path("/initautotune/checklabel/{functionId}")
+  public Response checkAnomaliesHasPositiveLabel(@PathParam("functionId") long id,
+      @QueryParam("startTime") long startTime,
+      @QueryParam("endTime") long endTime){
+    MergedAnomalyResultManager anomalyMergedResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
+    List<MergedAnomalyResultDTO> anomalyResultDTOS = anomalyMergedResultDAO.findByStartTimeInRangeAndFunctionId(startTime, endTime, id);
+    return Response.ok(AnomalyUtils.checkHasPostiveLabels(anomalyResultDTOS)).build();
+  }
+
+  /**
+   * End point to trigger initiate alert filter auto tune
+   * @param id
+   * @param startTime
+   * @param endTime
+   * @param autoTuneType
+   * @param nExpectedAnomalies
+   * @return true if alert filter has successfully being initiated, false otherwise
+   */
+  @POST
+  @Path("/initautotune/filter/{functionId}")
+  public Response initiateAlertFilterAutoTune(@PathParam("functionId") long id,
+      @QueryParam("startTime") long startTime,
+      @QueryParam("endTime") long endTime,
+      @QueryParam("autoTuneType") String autoTuneType, @QueryParam("nExpected") int nExpectedAnomalies){
+
+    // get anomalies by function id, start time and end time
+    MergedAnomalyResultManager anomalyMergedResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
+    List<MergedAnomalyResultDTO> anomalyResultDTOS = anomalyMergedResultDAO.findByStartTimeInRangeAndFunctionId(startTime, endTime, id);
+
+    //initiate AutoTuneConfigDTO
+    AutotuneConfigDTO target = new AutotuneConfigDTO();
+
+    // create alert filter auto tune
+    AlertFilterAutoTune alertFilterAutotune = alertFilterAutotuneFactory.fromSpec(autoTuneType);
+    try{
+      Map<String,String> tunedAlertFilter = alertFilterAutotune.initiateAutoTune(anomalyResultDTOS, nExpectedAnomalies);
+
+      // if achieved the initial alert filter
+      if (alertFilterAutotune.isUpdated()) {
+        target.setFunctionId(id);
+        target.setConfiguration(tunedAlertFilter);
+        target.setAutotuneMethod(INITIATE_ALERT_FILTER_LOGISTIC_AUTO_TUNE);
+        DAO_REGISTRY.getAutotuneConfigDAO().save(target);
+      } else {
+        LOG.info("Failed init alert filter since model hasn't been updated");
+      }
+    } catch (Exception e){
+      LOG.warn("Failed to achieve init alert filter: {}", e.getMessage());
+    }
+    return Response.ok(alertFilterAutotune).build();
+  }
+
 
   /**
    * The endpoint to evaluate alert filter
