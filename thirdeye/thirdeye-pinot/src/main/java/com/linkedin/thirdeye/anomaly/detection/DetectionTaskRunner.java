@@ -40,7 +40,7 @@ import org.joda.time.DateTime;
 import org.quartz.JobExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import static com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricUtil.*;
+import static com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil.*;
 
 public class DetectionTaskRunner implements TaskRunner {
 

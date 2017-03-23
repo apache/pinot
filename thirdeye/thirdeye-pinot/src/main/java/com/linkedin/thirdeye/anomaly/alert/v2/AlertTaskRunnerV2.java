@@ -12,7 +12,7 @@ import com.linkedin.thirdeye.anomaly.task.TaskContext;
 import com.linkedin.thirdeye.anomaly.task.TaskInfo;
 import com.linkedin.thirdeye.anomaly.task.TaskResult;
 import com.linkedin.thirdeye.anomaly.task.TaskRunner;
-import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricUtil;
+import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewResponse;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
@@ -90,7 +90,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
         alertConfig.getName());
     sendAnomalyReport();
     sendScheduledDataReport();
-    ThirdeyeMetricUtil.alertTaskSuccessCounter.inc();
+    ThirdeyeMetricsUtil.alertTaskSuccessCounter.inc();
   }
 
   private void sendAnomalyReport() throws Exception {

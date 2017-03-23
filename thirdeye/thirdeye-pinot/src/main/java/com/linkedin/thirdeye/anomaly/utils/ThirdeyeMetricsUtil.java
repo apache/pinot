@@ -5,7 +5,7 @@ import com.yammer.metrics.core.MetricsRegistry;
 import com.yammer.metrics.reporting.JmxReporter;
 
 
-public class ThirdeyeMetricUtil {
+public class ThirdeyeMetricsUtil {
   private static MetricsRegistry metricsRegistry = new MetricsRegistry();
   private static JmxReporter jmxReporter = new JmxReporter(metricsRegistry);
 
@@ -13,18 +13,22 @@ public class ThirdeyeMetricUtil {
     jmxReporter.start();
   }
 
-  private ThirdeyeMetricUtil() {
+  private ThirdeyeMetricsUtil() {
   }
 
   public static final Counter detectionTaskCounter =
-      metricsRegistry.newCounter(ThirdeyeMetricUtil.class, "detectionTaskCounter");
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "detectionTaskCounter");
 
   public static final Counter detectionTaskSuccessCounter =
-      metricsRegistry.newCounter(ThirdeyeMetricUtil.class, "detectionTaskSuccessCounter");
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "detectionTaskSuccessCounter");
 
   public static final Counter alertTaskSuccessCounter =
-      metricsRegistry.newCounter(ThirdeyeMetricUtil.class, "alertTaskSuccessCounter");
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "alertTaskSuccessCounter");
 
   public static final Counter dbCallCounter =
-      metricsRegistry.newCounter(ThirdeyeMetricUtil.class, "dbCallCounter");
+      metricsRegistry.newCounter(ThirdeyeMetricsUtil.class, "dbCallCounter");
+
+  public static MetricsRegistry getMetricsRegistry() {
+    return metricsRegistry;
+  }
 }
