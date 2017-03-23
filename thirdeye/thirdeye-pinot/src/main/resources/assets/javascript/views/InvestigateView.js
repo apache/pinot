@@ -156,6 +156,10 @@ InvestigateView.prototype = {
       // CHART GENERATION
       var chart = c3.generate({
         bindto : '#anomaly-investigate-chart',
+        padding : {
+          left : 100,
+          right : 100
+        },
         data : {
           x : 'date',
           xFormat : '%Y-%m-%d %H:%M',
