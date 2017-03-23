@@ -2,7 +2,6 @@ package com.linkedin.thirdeye.dashboard.resources.v2;
 
 import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
-import com.linkedin.thirdeye.anomaly.alert.util.EmailHelper;
 import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContext;
 import com.linkedin.thirdeye.anomaly.detection.TimeSeriesUtil;
 import com.linkedin.thirdeye.anomaly.merge.TimeBasedAnomalyMerger;
@@ -14,7 +13,6 @@ import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomaliesSummary;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomaliesWrapper;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalyDataCompare;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalyDetails;
-
 import com.linkedin.thirdeye.dashboard.views.TimeBucket;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
@@ -25,7 +23,9 @@ import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 import com.linkedin.thirdeye.detector.metric.transfer.MetricTransfer;
 import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
+
 import java.io.IOException;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -91,16 +91,14 @@ public class AnomaliesResource {
   private static final String START_END_DATE_FORMAT_DAYS = "MMM d yyyy";
   private static final String START_END_DATE_FORMAT_HOURS = "MMM d yyyy HH:mm";
   private static final String TIME_SERIES_DATE_FORMAT = "yyyy-MM-dd HH:mm";
-  private static final String ANOMALY_BASELINE_VAL_KEY = "baseLineVal";
-  private static final String ANOMALY_CURRENT_VAL_KEY = "currentVal";
   private static final String COMMA_SEPARATOR = ",";
-  private static final int DEFAULT_PAGE_NUMBER = 1;
   private static final int DEFAULT_PAGE_SIZE = 10;
   private static final int NUM_EXECS = 40;
   private static final DateTimeZone DEFAULT_DASHBOARD_TIMEZONE = DateTimeZone.forID("America/Los_Angeles");
   private static final DateTimeFormatter  timeSeriesDateFormatter = DateTimeFormat.forPattern(TIME_SERIES_DATE_FORMAT).withZone(DEFAULT_DASHBOARD_TIMEZONE);
   private static final DateTimeFormatter startEndDateFormatterDays = DateTimeFormat.forPattern(START_END_DATE_FORMAT_DAYS).withZone(DEFAULT_DASHBOARD_TIMEZONE);
   private static final DateTimeFormatter startEndDateFormatterHours = DateTimeFormat.forPattern(START_END_DATE_FORMAT_HOURS).withZone(DEFAULT_DASHBOARD_TIMEZONE);
+  private static final DecimalFormat TWO_DECIMALS_FORMAT = new DecimalFormat("##.##");
 
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
@@ -451,20 +449,6 @@ public class AnomaliesResource {
     return list;
   }
 
-
-  private Map<String, String> getAnomalyMessageDataMap(String message) {
-    Map<String, String> messageDataMap = new HashMap<>();
-    String[] tokenPairs = message.split("[,]");
-    for (String tokenPair : tokenPairs) {
-      if (tokenPair.contains(":")) {
-        String[] tokens = tokenPair.split(":");
-        messageDataMap.put(tokens[0].trim(), tokens[1].trim());
-      }
-    }
-    LOG.info("Map {}", messageDataMap);
-    return messageDataMap;
-  }
-
   /**
    * Construct agg granularity for using in timeseries
    * @param datasetConfig
@@ -493,6 +477,55 @@ public class AnomaliesResource {
       formattedDateTime = startEndDateFormatterDays.print(timestamp);
     }
     return formattedDateTime;
+  }
+
+
+  /**
+   * We want the anomaly point to be in between the shaded anomaly region.
+   * Hence we will append some buffer to the start and end of the anomaly point
+   * @param startTime
+   * @param dateTimeZone
+   * @param dataUnit
+   * @return new anomaly start time
+   */
+  private long appendRegionToAnomalyStart(long startTime, DateTimeZone dateTimeZone, TimeUnit dataUnit) {
+    Period periodToAppend = new Period(0, 0, 0, 0, 0, 0, 0, 0);
+    switch (dataUnit) {
+      case DAYS: // append 1 HOUR
+        periodToAppend = new Period(0, 0, 0, 0, 1, 0, 0, 0);
+        break;
+      case HOURS: // append 30 MINUTES
+        periodToAppend = new Period(0, 0, 0, 0, 0, 30, 0, 0);
+        break;
+      default:
+        break;
+    }
+    DateTime startDateTime = new DateTime(startTime, dateTimeZone);
+    return startDateTime.minus(periodToAppend).getMillis();
+  }
+
+  /**
+   * We want the anomaly point to be in between the shaded anomaly region.
+   * Hence we will append some buffer to the start and end of the anomaly point
+   * @param startTime
+   * @param dateTimeZone
+   * @param dataUnit
+   * @return new anomaly start time
+   */
+  private long subtractRegionFromAnomalyEnd(long endTime, DateTimeZone dateTimeZone, TimeUnit dataUnit) {
+    Period periodToSubtract = new Period(0, 0, 0, 0, 0, 0, 0, 0);
+    switch (dataUnit) {
+      case DAYS: // subtract 23 HOUR
+        periodToSubtract = new Period(0, 0, 0, 0, 23, 0, 0, 0);
+        break;
+      case HOURS: // subtract 30 MINUTES
+        periodToSubtract = new Period(0, 0, 0, 0, 0, 30, 0, 0);
+        break;
+      default:
+        break;
+    }
+    DateTime endDateTime = new DateTime(endTime, dateTimeZone);
+    return endDateTime.minus(periodToSubtract).getMillis();
   }
 
 
@@ -685,6 +718,8 @@ public class AnomaliesResource {
       throws JSONException {
 
     MetricConfigDTO metricConfigDTO = metricConfigDAO.findByMetricAndDataset(metricName, dataset);
+    DateTimeZone dateTimeZone = Utils.getDataTimeZone(dataset);
+    TimeUnit dataUnit = datasetConfig.getTimeUnit();
 
     AnomalyDetails anomalyDetails = new AnomalyDetails();
     anomalyDetails.setMetric(metricName);
@@ -693,6 +728,7 @@ public class AnomaliesResource {
     if (metricConfigDTO != null) {
       anomalyDetails.setMetricId(metricConfigDTO.getId());
     }
+    anomalyDetails.setTimeUnit(datasetConfig.getTimeUnit().toString());
 
     // The filter ensures that the returned time series from anomalies function only includes the values that are
     // located inside the request windows (i.e., between currentStartTime and currentEndTime, inclusive).
@@ -718,8 +754,8 @@ public class AnomaliesResource {
     // get this from timeseries calls
     List<String> dateValues = getDateFromTimeSeriesObject(timeBuckets.subList(timeStartIndex, timeEndIndex), timeSeriesDateFormatter);
     anomalyDetails.setDates(dateValues);
-    anomalyDetails.setCurrentEnd(getFormattedDateTime(currentEndTime, datasetConfig));
     anomalyDetails.setCurrentStart(getFormattedDateTime(currentStartTime, datasetConfig));
+    anomalyDetails.setCurrentEnd(getFormattedDateTime(currentEndTime, datasetConfig));
     List<String> baselineValues = getDataFromTimeSeriesObject(anomalyTimelinesView.getBaselineValues().subList(timeStartIndex, timeEndIndex));
     anomalyDetails.setBaselineValues(baselineValues);
     List<String> currentValues = getDataFromTimeSeriesObject(anomalyTimelinesView.getCurrentValues().subList(timeStartIndex, timeEndIndex));
@@ -727,11 +763,14 @@ public class AnomaliesResource {
 
     // from function and anomaly
     anomalyDetails.setAnomalyId(mergedAnomaly.getId());
-    anomalyDetails.setAnomalyRegionStart(timeSeriesDateFormatter.print(mergedAnomaly.getStartTime()));
-    anomalyDetails.setAnomalyRegionEnd(timeSeriesDateFormatter.print(mergedAnomaly.getEndTime()));
-    Map<String, String> messageDataMap = getAnomalyMessageDataMap(mergedAnomaly.getMessage());
-    anomalyDetails.setCurrent(messageDataMap.get(ANOMALY_CURRENT_VAL_KEY));
-    anomalyDetails.setBaseline(messageDataMap.get(ANOMALY_BASELINE_VAL_KEY));
+    anomalyDetails.setAnomalyStart(timeSeriesDateFormatter.print(mergedAnomaly.getStartTime()));
+    anomalyDetails.setAnomalyEnd(timeSeriesDateFormatter.print(mergedAnomaly.getEndTime()));
+    long newAnomalyRegionStart = appendRegionToAnomalyStart(mergedAnomaly.getStartTime(), dateTimeZone, dataUnit);
+    long newAnomalyRegionEnd = subtractRegionFromAnomalyEnd(mergedAnomaly.getEndTime(), dateTimeZone, dataUnit);
+    anomalyDetails.setAnomalyRegionStart(timeSeriesDateFormatter.print(newAnomalyRegionStart));
+    anomalyDetails.setAnomalyRegionEnd(timeSeriesDateFormatter.print(newAnomalyRegionEnd));
+    anomalyDetails.setCurrent(TWO_DECIMALS_FORMAT.format(mergedAnomaly.getAvgCurrentVal()));
+    anomalyDetails.setBaseline(TWO_DECIMALS_FORMAT.format(mergedAnomaly.getAvgBaselineVal()));
     anomalyDetails.setAnomalyFunctionId(anomalyFunction.getId());
     anomalyDetails.setAnomalyFunctionName(anomalyFunction.getFunctionName());
     anomalyDetails.setAnomalyFunctionType(anomalyFunction.getType());

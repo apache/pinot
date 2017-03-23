@@ -11,6 +11,7 @@ public class AnomalyDetails {
   private String metric;
   private Long metricId;
   private String dataset;
+  private String timeUnit;
   private String externalUrl;
 
   List<String> dates;
@@ -22,7 +23,9 @@ public class AnomalyDetails {
   private String baseline = "2000";
 
   //function details
-  private String anomalyRegionStart;
+  private String anomalyStart; // start and end of anomaly
+  private String anomalyEnd;
+  private String anomalyRegionStart; // start and end of region to highlight as anomaly
   private String anomalyRegionEnd;
   private Long anomalyFunctionId = 5L;
   private String anomalyFunctionName;
@@ -69,6 +72,14 @@ public class AnomalyDetails {
 
   public void setDataset(String dataset) {
     this.dataset = dataset;
+  }
+
+  public String getTimeUnit() {
+    return timeUnit;
+  }
+
+  public void setTimeUnit(String timeUnit) {
+    this.timeUnit = timeUnit;
   }
 
   public List<String> getDates() {
@@ -125,6 +136,22 @@ public class AnomalyDetails {
 
   public void setBaseline(String baseline) {
     this.baseline = baseline;
+  }
+
+  public String getAnomalyStart() {
+    return anomalyStart;
+  }
+
+  public void setAnomalyStart(String anomalyStart) {
+    this.anomalyStart = anomalyStart;
+  }
+
+  public String getAnomalyEnd() {
+    return anomalyEnd;
+  }
+
+  public void setAnomalyEnd(String anomalyEnd) {
+    this.anomalyEnd = anomalyEnd;
   }
 
   public String getAnomalyRegionStart() {

@@ -89,22 +89,16 @@ AnomalyResultModel.prototype = {
   },
   // Call rebuild every time new anomalies are to be loaded with new model
   rebuild : function() {
-    if (this.anomaliesSearchMode == constants.MODE_METRIC && this.metricIds != undefined && this.metricIds.length > 0 && this.metricIds != this.previousMetricIds) {
-      this.previousMetricIds = this.metricIds;
+    if (this.anomaliesSearchMode == constants.MODE_METRIC && this.metricIds != undefined && this.metricIds.length > 0) {
       dataService.fetchAnomaliesForMetricIds(
           this.startDate, this.endDate, this.pageNumber, this.metricIds, this.functionName, this.updateModelAndNotifyView.bind(this));
-    } else if (this.anomaliesSearchMode == constants.MODE_DASHBOARD && this.dashboardId != undefined && this.dashboardId != this.previousDashboardId) {
-      this.previousDashboardId = this.dashboardId;
+    } else if (this.anomaliesSearchMode == constants.MODE_DASHBOARD && this.dashboardId != undefined) {
       dataService.fetchAnomaliesForDashboardId(
           this.startDate, this.endDate, this.pageNumber, this.dashboardId, this.functionName, this.updateModelAndNotifyView.bind(this));
     } else if (this.anomaliesSearchMode == constants.MODE_ID && this.anomalyIds != undefined && this.anomalyIds.length > 0 && this.anomalyIds != this.previousAnomalyIds) {
-      this.previousAnomalyIds = this.anomalyIds;
       dataService.fetchAnomaliesForAnomalyIds(
           this.startDate, this.endDate, this.pageNumber, this.anomalyIds, this.functionName, this.updateModelAndNotifyView.bind(this));
-    } else if (this.anomaliesSearchMode == constants.MODE_TIME && (this.pageNumber != this.previousPageNumber || this.previousStartDate != this.startDate || this.previousEndDate != this.endDate)) {
-      this.previousStartDate = this.startDate;
-      this.previousEndDate = this.endDate;
-      this.previousPageNumber = this.pageNumber;
+    } else if (this.anomaliesSearchMode == constants.MODE_TIME) {
       dataService.fetchAnomaliesForTime(this.startDate, this.endDate, this.pageNumber, this.updateModelAndNotifyView.bind(this));
     }
   },
@@ -116,11 +110,12 @@ AnomalyResultModel.prototype = {
 
   /**
    * Helper Function that returns formatted anomaly region duration data for UI
-   * @param  {date}   start   the anomaly region start
-   * @param  {date}   end     the anomaly region end
+   * @param  {date}   start       the anomaly region start
+   * @param  {date}   end         the anomaly region end
+   * @param  {string} granularity the granularity of the anomaly
    * @return {string}         formatted start - end date/time
    */
-  getRegionDuration(start, end) {
+  getRegionDuration(start, end, granularity) {
 
     if (!(start && end)) {
       return 'N/A';
@@ -130,17 +125,25 @@ AnomalyResultModel.prototype = {
     const isSameDay = regionStart.isSame(regionEnd, 'day');
     const timeDelta = regionEnd.diff(regionStart);
     const regionDuration = moment.duration(timeDelta);
-    let regionStartFormat;
-    let regionEndFormat;
+    const showTime = granularity !== 'DAYS';
+    let range = '';
+    let regionStartFormat = constants.DETAILS_DATE_FORMAT;
+    let regionEndFormat = constants.DETAILS_DATE_FORMAT;
 
-    if (isSameDay) {
-      regionStartFormat = constants.DETAILS_DATE_DAYS_FORMAT;
-      regionEndFormat = constants.DETAILS_DATE_HOURS_FORMAT;
-    } else {
-      regionStartFormat = regionEndFormat = constants.DETAILS_DATE_DAYS_FORMAT;
+    if (showTime) {
+      regionStartFormat += `, ${constants.DETAILS_DATE_HOURS_FORMAT}`;
+      regionEndFormat += `, ${constants.DETAILS_DATE_HOURS_FORMAT}`;
     }
 
-    return `${regionDuration.humanize()} (${regionStart.format(regionStartFormat)} - ${regionEnd.format(regionEndFormat)})`;
+    if (isSameDay) {
+      regionEndFormat = '';
+    }
+
+    if (isSameDay && showTime) {
+      regionEndFormat = constants.DETAILS_DATE_HOURS_FORMAT;
+    }
+
+    return `${regionDuration.humanize()} (${regionStart.format(regionStartFormat)}${regionEndFormat ? ' - ' + regionEnd.format(regionEndFormat) : ''})`;
   },
 
   /**
@@ -165,7 +168,7 @@ AnomalyResultModel.prototype = {
    */
   formatAnomalies() {
     this.anomaliesWrapper.anomalyDetailsList.forEach((anomaly) => {
-      anomaly.duration = this.getRegionDuration(anomaly.anomalyRegionStart, anomaly.anomalyRegionEnd);
+      anomaly.duration = this.getRegionDuration(anomaly.anomalyStart, anomaly.anomalyEnd, anomaly.timeUnit);
       anomaly.changeDelta = this.getChangeDelta(anomaly.current, anomaly.baseline);
     });
   },
