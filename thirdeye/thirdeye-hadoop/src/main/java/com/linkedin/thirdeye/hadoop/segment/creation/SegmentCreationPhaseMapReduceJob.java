@@ -25,11 +25,13 @@ import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.segment.creator.StatsCollectorConfig;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.core.segment.creator.impl.stats.LongColumnPreIndexStatsCollector;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConfig;
 import com.linkedin.thirdeye.hadoop.config.ThirdEyeConstants;
 import com.linkedin.thirdeye.hadoop.util.ThirdeyePinotSchemaUtils;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -38,6 +40,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
@@ -308,7 +311,7 @@ public class SegmentCreationPhaseMapReduceJob {
       String timeColumnName = schema.getTimeColumnName();
       FieldSpec spec =  schema.getTimeFieldSpec();
       LOGGER.info("Spec for " + timeColumnName + " is " + spec);
-      LongColumnPreIndexStatsCollector timeColumnStatisticsCollector = new LongColumnPreIndexStatsCollector(spec);
+      LongColumnPreIndexStatsCollector timeColumnStatisticsCollector = new LongColumnPreIndexStatsCollector(spec.getName(), new StatsCollectorConfig(schema, null));
       LOGGER.info("StatsCollector :" + timeColumnStatisticsCollector);
       DataFileStream<GenericRecord> dataStream =
           new DataFileStream<GenericRecord>(new FileInputStream(localAvroFile), new GenericDatumReader<GenericRecord>());
