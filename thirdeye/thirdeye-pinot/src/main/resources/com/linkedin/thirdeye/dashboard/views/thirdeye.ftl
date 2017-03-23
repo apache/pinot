@@ -13,14 +13,14 @@
 <link rel="stylesheet" href="assets/css/d3.css" />
 <link rel="stylesheet" href="assets/css/c3.css" />
 
-<link rel="stylesheet" type="text/css" href="//cdn.jsdelivr.net/bootstrap.daterangepicker/2/daterangepicker.css" />
+<link rel="stylesheet" type="text/css" href="assets/daterangepicker/daterangepicker.css" />
 <link href="assets/css/styles.css" rel="stylesheet" type="text/css" />
-<link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.3/css/select2.min.css" rel="stylesheet" />
+<link href="assets/select2/select2.min.css" rel="stylesheet" type="text/css" />
 <link href="assets/select2/select2-bootstrap.min.css" rel="stylesheet" type="text/css" />
 <link href="assets/css/thirdeye.css" rel="stylesheet" type="text/css" />
 
 <!-- javascripts -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-polyfill/6.23.0/polyfill.min.js" type="text/javascript"></script>
+<script src="assets/lib/polyfill.min.js" type="text/javascript"></script>
 <script src="assets/js/vendor/jquery.js" type="text/javascript"></script>
 <script src="assets/bootstrap/js/bootstrap.min.js" type="text/javascript"></script>
 <script src="assets/jquery-ui/jquery-ui.min.js" type="text/javascript"></script>
@@ -32,8 +32,8 @@
 <script src="assets/js/c3/c3.js" defer></script>
 <script src="assets/spin/spin.js" defer></script>
 <script src="assets/twbs/pagination/jquery.twbsPagination.js" defer></script>
-<script type="text/javascript" src="//cdn.jsdelivr.net/bootstrap.daterangepicker/2/daterangepicker.js"></script>
-<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.3/js/select2.min.js" defer></script>
+<script type="text/javascript" src="assets/daterangepicker/daterangepicker.js"></script>
+<script type="text/javascript" src="assets/select2/select2.min.js" defer></script>
 
 <!-- custom scripts -->
 <script src="assets/javascript/libs/page.js" defer></script>
