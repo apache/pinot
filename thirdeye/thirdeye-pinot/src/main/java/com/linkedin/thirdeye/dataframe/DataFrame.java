@@ -561,10 +561,9 @@ public class DataFrame {
       doubleSeries[i] = series[i].getDoubles();
     }
 
+    double[] input = new double[series.length];
     double[] output = new double[series[0].size()];
     for(int i=0; i<series[0].size(); i++) {
-      double[] input = new double[series.length];
-
       boolean isNull = false;
       for(int j=0; j<series.length; j++) {
         double value = doubleSeries[j].values[i];
@@ -625,9 +624,9 @@ public class DataFrame {
       longSeries[i] = series[i].getLongs();
     }
 
+    long[] input = new long[series.length];
     long[] output = new long[series[0].size()];
     for(int i=0; i<series[0].size(); i++) {
-      long[] input = new long[series.length];
       boolean isNull = false;
       for(int j=0; j<series.length; j++) {
         long value = longSeries[j].values[i];
@@ -688,9 +687,9 @@ public class DataFrame {
       stringSeries[i] = series[i].getStrings();
     }
 
+    String[] input = new String[series.length];
     String[] output = new String[series[0].size()];
     for(int i=0; i<series[0].size(); i++) {
-      String[] input = new String[series.length];
       boolean isNull = false;
       for(int j=0; j<series.length; j++) {
         String value = stringSeries[j].values[i];
@@ -751,9 +750,9 @@ public class DataFrame {
       booleanSeries[i] = series[i].getBooleans();
     }
 
+    byte[] input = new byte[series.length];
     byte[] output = new byte[series[0].size()];
     for(int i=0; i<series[0].size(); i++) {
-      byte[] input = new byte[series.length];
       boolean isNull = false;
       for(int j=0; j<series.length; j++) {
         byte value = booleanSeries[j].values[i];
