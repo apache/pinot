@@ -93,7 +93,7 @@ public class QueryGenerator {
       Arrays.asList(new SelectionQueryGenerationStrategy(), new AggregationQueryGenerationStrategy());
   private final List<PredicateGenerator> _singleValuePredicateGenerators =
       Arrays.asList(new SingleValueComparisonPredicateGenerator(), new SingleValueInPredicateGenerator(),
-          new SingleValueBetweenPredicateGenerator());
+          new SingleValueBetweenPredicateGenerator(), new SingleValueRegexPredicateGenerator());
   private final List<PredicateGenerator> _multiValuePredicateGenerators =
       Arrays.asList(new MultiValueComparisonPredicateGenerator(), new MultiValueInPredicateGenerator(),
           new MultiValueBetweenPredicateGenerator());
@@ -799,7 +799,44 @@ public class QueryGenerator {
       return new StringQueryFragment(columnName + " BETWEEN " + leftValue + " AND " + rightValue);
     }
   }
+  /**
+   * Generator for single-value column <code>REGEX</code> predicate query fragment.
+   */
+  private class SingleValueRegexPredicateGenerator implements PredicateGenerator {
+    Random random = new Random();
 
+    @Override
+    public QueryFragment generatePredicate(String columnName) {
+      List<String> columnValues = _columnToValueList.get(columnName);
+      String value;
+      value = pickRandom(columnValues);
+      StringBuilder pqlRegexBuilder = new StringBuilder();
+      StringBuilder sqlRegexBuilder = new StringBuilder();
+      // do regex only for string type
+      if (value.startsWith("'") && value.endsWith("'")) {
+        // replace only one character for now with .* ignore the first and last character
+        int indexToReplaceWithRegex = 1 + random.nextInt(value.length() - 2);
+        for (int i = 1; i < value.length() - 1; i++) {
+          if (i == indexToReplaceWithRegex) {
+            pqlRegexBuilder.append(".*");
+            sqlRegexBuilder.append(".*");
+          } else {
+            pqlRegexBuilder.append(value.charAt(i));
+            sqlRegexBuilder.append(value.charAt(i));
+          }
+        }
+
+        String pql = String.format("%s REGEXP '%s'", columnName, pqlRegexBuilder.toString());
+        String sql = String.format(" REGEXP_LIKE(%s, '%s', 'i')", columnName, sqlRegexBuilder.toString());
+        System.out.println("Value:" + value + " pql:" + pql + " sql:" + sql);
+        return new StringQueryFragment(pql, sql);
+      } else {
+        String equalsPredicate = String.format("%s = %s", columnName, value);
+        return new StringQueryFragment(equalsPredicate);
+      }
+
+    }
+  }
   /**
    * Generator for multi-value column comparison predicate query fragment.
    * <p>DO NOT SUPPORT '<code>NOT EQUAL</code>'.

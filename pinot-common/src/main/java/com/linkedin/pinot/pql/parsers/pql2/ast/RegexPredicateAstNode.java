@@ -19,10 +19,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.TreeSet;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.pql.parsers.Pql2CompilationException;
+import com.linkedin.pinot.pql.parsers.utils.PQLParserUtils;
 
 public class RegexPredicateAstNode extends PredicateAstNode {
   enum MatchType {
@@ -50,9 +52,7 @@ public class RegexPredicateAstNode extends PredicateAstNode {
         String expr = node.getValueAsString();
         //convert LIKE semantics to java semantics, this is not fully compatible with SQL semantics
         if (matchType == MatchType.LIKE) {
-          expr = expr.replace(".", "\\.");
-          expr = expr.replace("_", ".");
-          expr = expr.replaceAll("%", ".*?");
+          expr = PQLParserUtils.convertLikeExpressionToJavaRegex(expr);
         }
         values.add(expr);
       }

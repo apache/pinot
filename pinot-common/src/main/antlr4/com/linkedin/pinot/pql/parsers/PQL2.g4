@@ -89,7 +89,7 @@ betweenClause:
   expression BETWEEN expression AND expression;
 
 regexClause:
-  expression (LIKE | REGEXP ) '(' literal (',' literal)* ')';
+  expression (LIKE | REGEXP )  literal;
   
 booleanOperator: OR | AND;
 

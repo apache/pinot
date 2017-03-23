@@ -124,4 +124,25 @@ public class PQLParserUtils {
       throw new AssertionError("Should not reach this");
     }
   }
+
+  /**
+   * Converts MySQL LIKE expression to java Regex
+   * @param expr
+   * @return
+   */
+  public static String convertLikeExpressionToJavaRegex(String expr) {
+    //escape all special characters used in java regex
+    expr = expr.replaceAll(".", "\\.");
+    expr = expr.replaceAll("[", "\\[");
+    expr = expr.replaceAll("]", "\\]");
+    expr = expr.replaceAll("(", "\\(");
+    expr = expr.replaceAll(")", "\\)");
+    //replace non escaped LIKE characters (% and _) with equivalent java regex
+    expr = expr.replaceAll("[^\\]_", ".");
+    expr = expr.replaceAll("[^\\%]", ".*?");
+    //replace escaped % and _ characters with % and _ since java regex dont have any special meaning for that
+    expr = expr.replaceAll("\\%", "%");
+    expr = expr.replaceAll("\\_", "_");
+    return expr;
+  }
 }
