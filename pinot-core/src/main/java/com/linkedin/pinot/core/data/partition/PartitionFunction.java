@@ -13,17 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-package com.linkedin.pinot.core.segment.creator;
-
-import com.linkedin.pinot.core.data.readers.RecordReader;
-
+package com.linkedin.pinot.core.data.partition;
 
 /**
- * Data source used to build segments
+ * Interface for partition function.
  */
-public interface SegmentCreationDataSource {
-  SegmentPreIndexStatsCollector gatherStats(StatsCollectorConfig statsCollectorConfig);
+public interface PartitionFunction {
 
-  RecordReader getRecordReader();
+  /**
+   * Method to compute and return partition id for the given value.
+   *
+   * @param value Value for which to determine the partition id.
+   * @return partition id for the value.
+   */
+  int getPartition(Object value);
 }

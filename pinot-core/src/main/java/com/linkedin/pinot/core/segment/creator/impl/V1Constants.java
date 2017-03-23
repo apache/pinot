@@ -161,6 +161,9 @@ public class V1Constants {
       public static final String ORIGIN_COLUMN = "originColumn";
       public static final String MIN_VALUE = "minValue";
       public static final String MAX_VALUE = "maxValue";
+      public static final String PARTITION_FUNCTION = "partitionFunction";
+      public static final String PARTITION_VALUES = "partitionValues";
+
 
       private static final String COLUMN_PROPS_KEY_PREFIX = "column.";
       public static String getKeyFor(String column, String key) {

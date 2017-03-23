@@ -25,6 +25,7 @@ import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
 import com.linkedin.pinot.core.segment.creator.impl.stats.AbstractColumnStatisticsCollector;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
+import com.linkedin.pinot.core.segment.creator.StatsCollectorConfig;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentCreationDriverFactory;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentDictionaryCreator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
@@ -76,9 +77,10 @@ public class DictionariesTest {
   }
 
   @BeforeClass
-  public static void before() throws Exception {
-    final String filePath = TestUtils
-        .getFileFromResourceUrl(DictionariesTest.class.getClassLoader().getResource(AVRO_DATA));
+  public static void before()
+      throws Exception {
+    final String filePath =
+        TestUtils.getFileFromResourceUrl(DictionariesTest.class.getClassLoader().getResource(AVRO_DATA));
     if (INDEX_DIR.exists()) {
       FileUtils.deleteQuietly(INDEX_DIR);
     }
@@ -138,15 +140,19 @@ public class DictionariesTest {
   }
 
   @Test
-  public void test1() throws Exception {
+  public void test1()
+      throws Exception {
     final IndexSegmentImpl heapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(segmentDirectory, ReadMode.heap);
     final IndexSegmentImpl mmapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(segmentDirectory, ReadMode.mmap);
 
-    for (final String column : ((SegmentMetadataImpl) mmapSegment.getSegmentMetadata()).getColumnMetadataMap().keySet()) {
+    for (final String column : ((SegmentMetadataImpl) mmapSegment.getSegmentMetadata()).getColumnMetadataMap()
+        .keySet()) {
       final ImmutableDictionaryReader heapDictionary = heapSegment.getDictionaryFor(column);
       final ImmutableDictionaryReader mmapDictionary = mmapSegment.getDictionaryFor(column);
 
-      switch (((SegmentMetadataImpl) mmapSegment.getSegmentMetadata()).getColumnMetadataMap().get(column).getDataType()) {
+      switch (((SegmentMetadataImpl) mmapSegment.getSegmentMetadata()).getColumnMetadataMap()
+          .get(column)
+          .getDataType()) {
         case BOOLEAN:
         case STRING:
           Assert.assertTrue(heapDictionary instanceof StringDictionary);
@@ -178,11 +184,13 @@ public class DictionariesTest {
   }
 
   @Test
-  public void test2() throws Exception {
+  public void test2()
+      throws Exception {
     final IndexSegmentImpl heapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(segmentDirectory, ReadMode.heap);
     final IndexSegmentImpl mmapSegment = (IndexSegmentImpl) ColumnarSegmentLoader.load(segmentDirectory, ReadMode.mmap);
 
-    final Map<String, ColumnMetadata> metadataMap = ((SegmentMetadataImpl) mmapSegment.getSegmentMetadata()).getColumnMetadataMap();
+    final Map<String, ColumnMetadata> metadataMap =
+        ((SegmentMetadataImpl) mmapSegment.getSegmentMetadata()).getColumnMetadataMap();
     for (final String column : metadataMap.keySet()) {
       final ImmutableDictionaryReader heapDictionary = heapSegment.getDictionaryFor(column);
       final ImmutableDictionaryReader mmapDictionary = mmapSegment.getDictionaryFor(column);
@@ -201,9 +209,9 @@ public class DictionariesTest {
   }
 
   @Test
-  public void testIntColumnPreIndexStatsCollector() throws Exception {
-    FieldSpec spec = new DimensionFieldSpec("column1", DataType.INT, true);
-    AbstractColumnStatisticsCollector statsCollector = new IntColumnPreIndexStatsCollector(spec);
+  public void testIntColumnPreIndexStatsCollector()
+      throws Exception {
+    AbstractColumnStatisticsCollector statsCollector = buildStatsCollector("column1", DataType.INT);
     statsCollector.collect(new Integer(1));
     Assert.assertTrue(statsCollector.isSorted());
     statsCollector.collect(new Float(2));
@@ -228,9 +236,9 @@ public class DictionariesTest {
   }
 
   @Test
-  public void testFloatColumnPreIndexStatsCollector() throws Exception {
-    FieldSpec spec = new DimensionFieldSpec("column1", DataType.FLOAT, true);
-    AbstractColumnStatisticsCollector statsCollector = new FloatColumnPreIndexStatsCollector(spec);
+  public void testFloatColumnPreIndexStatsCollector()
+      throws Exception {
+    AbstractColumnStatisticsCollector statsCollector = buildStatsCollector("column1", DataType.FLOAT);
     statsCollector.collect(new Integer(1));
     Assert.assertTrue(statsCollector.isSorted());
     statsCollector.collect(new Float(2));
@@ -255,9 +263,9 @@ public class DictionariesTest {
   }
 
   @Test
-  public void testLongColumnPreIndexStatsCollector() throws Exception {
-    FieldSpec spec = new DimensionFieldSpec("column1", DataType.LONG, true);
-    AbstractColumnStatisticsCollector statsCollector = new LongColumnPreIndexStatsCollector(spec);
+  public void testLongColumnPreIndexStatsCollector()
+      throws Exception {
+    AbstractColumnStatisticsCollector statsCollector = buildStatsCollector("column1", DataType.LONG);
     statsCollector.collect(new Integer(1));
     Assert.assertTrue(statsCollector.isSorted());
     statsCollector.collect(new Float(2));
@@ -282,9 +290,9 @@ public class DictionariesTest {
   }
 
   @Test
-  public void testDoubleColumnPreIndexStatsCollector() throws Exception {
-    FieldSpec spec = new DimensionFieldSpec("column1", DataType.DOUBLE, true);
-    AbstractColumnStatisticsCollector statsCollector = new DoubleColumnPreIndexStatsCollector(spec);
+  public void testDoubleColumnPreIndexStatsCollector()
+      throws Exception {
+    AbstractColumnStatisticsCollector statsCollector = buildStatsCollector("column1", DataType.DOUBLE);
     statsCollector.collect(new Integer(1));
     Assert.assertTrue(statsCollector.isSorted());
     statsCollector.collect(new Float(2));
@@ -309,9 +317,9 @@ public class DictionariesTest {
   }
 
   @Test
-  public void testStringColumnPreIndexStatsCollectorForRandomString() throws Exception {
-    FieldSpec spec = new DimensionFieldSpec("column1", DataType.STRING, true);
-    AbstractColumnStatisticsCollector statsCollector = new StringColumnPreIndexStatsCollector(spec);
+  public void testStringColumnPreIndexStatsCollectorForRandomString()
+      throws Exception {
+    AbstractColumnStatisticsCollector statsCollector = buildStatsCollector("column1", DataType.STRING);
     statsCollector.collect("a");
     Assert.assertTrue(statsCollector.isSorted());
     statsCollector.collect("b");
@@ -336,9 +344,9 @@ public class DictionariesTest {
   }
 
   @Test
-  public void testStringColumnPreIndexStatsCollectorForBoolean() throws Exception {
-    FieldSpec spec = new DimensionFieldSpec("column1", DataType.BOOLEAN, true);
-    AbstractColumnStatisticsCollector statsCollector = new StringColumnPreIndexStatsCollector(spec);
+  public void testStringColumnPreIndexStatsCollectorForBoolean()
+      throws Exception {
+    AbstractColumnStatisticsCollector statsCollector = buildStatsCollector("column1", DataType.BOOLEAN);
     statsCollector.collect("false");
     Assert.assertTrue(statsCollector.isSorted());
     statsCollector.collect("false");
@@ -389,25 +397,23 @@ public class DictionariesTest {
 
     boolean[] isSorted = new boolean[1];
     isSorted[0] = true;
-    SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(false, inputStrings, fieldSpec, indexDir,
-        paddingChar);
+    SegmentDictionaryCreator dictionaryCreator =
+        new SegmentDictionaryCreator(false, inputStrings, fieldSpec, indexDir, paddingChar);
     dictionaryCreator.build(isSorted);
     Assert.assertFalse(isSorted[0]);
 
     // Get the padded string as stored in the dictionary.
     int targetPaddedLength = dictionaryCreator.getStringColumnMaxLength();
     for (int i = 0; i < inputStrings.length; i++) {
-      paddedStrings[i] = SegmentDictionaryCreator.getPaddedString(inputStrings[i], targetPaddedLength,
-          paddingChar);
+      paddedStrings[i] = SegmentDictionaryCreator.getPaddedString(inputStrings[i], targetPaddedLength, paddingChar);
     }
     Arrays.sort(paddedStrings); // Sorted Order: {"abc def%%%%", "abc%%%%%%%"}
 
     // Assert that indexOfSV for un-padded string returns the index of the corresponding padded string.
     for (int i = 0; i < inputStrings.length; i++) {
       int paddedIndex = dictionaryCreator.indexOfSV(inputStrings[i]);
-      Assert.assertTrue(paddedStrings[paddedIndex]
-          .equals(SegmentDictionaryCreator.getPaddedString(inputStrings[i], targetPaddedLength,
-              paddingChar)));
+      Assert.assertTrue(paddedStrings[paddedIndex].equals(
+          SegmentDictionaryCreator.getPaddedString(inputStrings[i], targetPaddedLength, paddingChar)));
     }
 
     dictionaryCreator.close();
@@ -430,14 +436,15 @@ public class DictionariesTest {
     String[] inputStrings = new String[3];
     char paddingChar = '%';
 
-    inputStrings[0] = new String(new byte[] {67, 97, 102, -61, -87}); // "Café";
-    inputStrings[1] = new String(new byte[] {70, 114, 97, 110, -61, -89, 111, 105, 115}); // "François";
-    inputStrings[2] = new String(new byte[] {67, -61, -76, 116, 101, 32, 100, 39, 73, 118, 111, 105, 114, 101}); // "Côte d'Ivoire";
+    inputStrings[0] = new String(new byte[]{67, 97, 102, -61, -87}); // "Café";
+    inputStrings[1] = new String(new byte[]{70, 114, 97, 110, -61, -89, 111, 105, 115}); // "François";
+    inputStrings[2] =
+        new String(new byte[]{67, -61, -76, 116, 101, 32, 100, 39, 73, 118, 111, 105, 114, 101}); // "Côte d'Ivoire";
     Arrays.sort(inputStrings);
 
-    SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(false, inputStrings, fieldSpec, indexDir,
-        paddingChar);
-    dictionaryCreator.build(new boolean[] {false});
+    SegmentDictionaryCreator dictionaryCreator =
+        new SegmentDictionaryCreator(false, inputStrings, fieldSpec, indexDir, paddingChar);
+    dictionaryCreator.build(new boolean[]{false});
 
     for (String inputString : inputStrings) {
       Assert.assertTrue(dictionaryCreator.indexOfSV(inputString) >= 0, "Value not found in dictionary " + inputString);
@@ -472,8 +479,9 @@ public class DictionariesTest {
 
       boolean[] isSorted = new boolean[1];
       isSorted[0] = true;
-      SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(false, inputStrings, fieldSpec, indexDir,
-          V1Constants.Str.DEFAULT_STRING_PAD_CHAR);
+      SegmentDictionaryCreator dictionaryCreator =
+          new SegmentDictionaryCreator(false, inputStrings, fieldSpec, indexDir,
+              V1Constants.Str.DEFAULT_STRING_PAD_CHAR);
       dictionaryCreator.build(isSorted);
 
       // Get the padded string as stored in the dictionary.
@@ -496,10 +504,10 @@ public class DictionariesTest {
       // Verify that empty string got padded
       Assert.assertTrue(paddedStrings[0].equals(
           SegmentDictionaryCreator.getPaddedString(inputStrings[0], targetPaddedLength,
-          V1Constants.Str.DEFAULT_STRING_PAD_CHAR)));
+              V1Constants.Str.DEFAULT_STRING_PAD_CHAR)));
       dictionaryCreator.close();
     } catch (Exception e) {
-        throw e;
+      throw e;
     } finally {
       FileUtils.deleteQuietly(indexDir);
     }
@@ -529,8 +537,8 @@ public class DictionariesTest {
       inputStrings[0] = "";
       inputStrings[1] = "%";
       Arrays.sort(inputStrings); // Sorted order: {"", "%"}
-      SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(false, inputStrings, fieldSpec, indexDir,
-          paddingChar);
+      SegmentDictionaryCreator dictionaryCreator =
+          new SegmentDictionaryCreator(false, inputStrings, fieldSpec, indexDir, paddingChar);
       boolean[] isSorted = new boolean[1];
       isSorted[0] = true;
       dictionaryCreator.build(isSorted);
@@ -587,8 +595,7 @@ public class DictionariesTest {
     FileUtils.deleteQuietly(indexDir);
 
     FileUtils.deleteQuietly(indexDir);
-
-   }
+  }
 
   /**
    * Tests SegmentDictionaryCreator for case when there is only one string
@@ -611,8 +618,9 @@ public class DictionariesTest {
     Arrays.sort(inputStrings); // Sorted order: {"null"}
 
     try {
-      SegmentDictionaryCreator dictionaryCreator = new SegmentDictionaryCreator(false, inputStrings, fieldSpec, indexDir,
-          V1Constants.Str.DEFAULT_STRING_PAD_CHAR);
+      SegmentDictionaryCreator dictionaryCreator =
+          new SegmentDictionaryCreator(false, inputStrings, fieldSpec, indexDir,
+              V1Constants.Str.DEFAULT_STRING_PAD_CHAR);
       boolean[] isSorted = new boolean[1];
       isSorted[0] = true;
       dictionaryCreator.build(isSorted);
@@ -643,4 +651,41 @@ public class DictionariesTest {
       FileUtils.deleteQuietly(indexDir);
     }
   }
+
+  /**
+   * Helper method to build stats collector for a given column.
+   *
+   * @param column Column name
+   * @param dataType Data type for the column
+   * @return StatsCollector for the column
+   */
+  private AbstractColumnStatisticsCollector buildStatsCollector(String column, DataType dataType) {
+    Schema schema = new Schema();
+    schema.addField(new DimensionFieldSpec(column, dataType, true));
+    StatsCollectorConfig statsCollectorConfig = new StatsCollectorConfig(schema, null);
+
+    switch (dataType) {
+      case INT:
+        return new IntColumnPreIndexStatsCollector(column, statsCollectorConfig);
+
+      case LONG:
+        return new LongColumnPreIndexStatsCollector(column, statsCollectorConfig);
+
+      case FLOAT:
+        return new FloatColumnPreIndexStatsCollector(column, statsCollectorConfig);
+
+      case DOUBLE:
+        return new DoubleColumnPreIndexStatsCollector(column, statsCollectorConfig);
+
+      case STRING:
+        return new StringColumnPreIndexStatsCollector(column, statsCollectorConfig);
+
+      case BOOLEAN:
+        return new StringColumnPreIndexStatsCollector(column, statsCollectorConfig);
+
+      default:
+        throw new IllegalArgumentException("Illegal data type for stats builder: " + dataType);
+    }
+  }
+
 }

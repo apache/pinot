@@ -34,7 +34,7 @@ import org.apache.commons.configuration.Configuration;
  * An implementation of SegmentPruner.
  * <p>Pruner will prune segment based on the column value inside the filter.
  */
-public class ColumnValueSegmentPruner implements SegmentPruner {
+public class ColumnValueSegmentPruner extends AbstractSegmentPruner {
 
   @Override
   public void init(Configuration config) {
@@ -73,7 +73,8 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
    * @return True if segment can be pruned out, false otherwise.
    */
   @SuppressWarnings("unchecked")
-  public static boolean pruneSegment(@Nonnull FilterQueryTree filterQueryTree,
+  @Override
+  public boolean pruneSegment(@Nonnull FilterQueryTree filterQueryTree,
       @Nonnull Map<String, ColumnMetadata> columnMetadataMap) {
     FilterOperator filterOperator = filterQueryTree.getOperator();
     List<FilterQueryTree> children = filterQueryTree.getChildren();
@@ -170,42 +171,7 @@ public class ColumnValueSegmentPruner implements SegmentPruner {
       }
     } else {
       // Parent node
-
-      switch (filterOperator) {
-        case AND:
-          for (FilterQueryTree child : children) {
-            if (pruneSegment(child, columnMetadataMap)) {
-              return true;
-            }
-          }
-          return false;
-        case OR:
-          for (FilterQueryTree child : children) {
-            if (!pruneSegment(child, columnMetadataMap)) {
-              return false;
-            }
-          }
-          return true;
-        default:
-          throw new IllegalStateException("Unsupported filter operator: " + filterOperator);
-      }
-    }
-  }
-
-  private static Comparable getValue(String stringValue, FieldSpec.DataType dataType) {
-    switch (dataType) {
-      case INT:
-        return Integer.valueOf(stringValue);
-      case LONG:
-        return Long.valueOf(stringValue);
-      case FLOAT:
-        return Float.valueOf(stringValue);
-      case DOUBLE:
-        return Double.valueOf(stringValue);
-      case STRING:
-        return stringValue;
-      default:
-        throw new IllegalStateException("Unsupported data type: " + dataType);
+      return pruneNonLeaf(filterQueryTree, columnMetadataMap);
     }
   }
 }

@@ -94,6 +94,7 @@ public class ColumnValueSegmentPrunerTest {
   private boolean runPruner(String query) {
     BrokerRequest brokerRequest = COMPILER.compileToBrokerRequest(query);
     FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
-    return ColumnValueSegmentPruner.pruneSegment(filterQueryTree, COLUMN_METADATA_MAP);
+    ColumnValueSegmentPruner pruner = new ColumnValueSegmentPruner();
+    return pruner.pruneSegment(filterQueryTree, COLUMN_METADATA_MAP);
   }
 }

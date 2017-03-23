@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl.stats;
 
+import com.linkedin.pinot.core.segment.creator.StatsCollectorConfig;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -31,38 +32,44 @@ import com.linkedin.pinot.core.segment.creator.SegmentPreIndexStatsCollector;
 public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCollector {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentPreIndexStatsCollectorImpl.class);
 
-  private final Schema dataSchema;
+  private final StatsCollectorConfig _statsCollectorConfig;
   private Map<String, AbstractColumnStatisticsCollector> columnStatsCollectorMap;
 
   private int rawDocCount;
   private int aggregatedDocCount;
   private int totalDocCount;
 
-  public SegmentPreIndexStatsCollectorImpl(Schema dataSchema) {
-    this.dataSchema = dataSchema;
+  public SegmentPreIndexStatsCollectorImpl(StatsCollectorConfig statsCollectorConfig) {
+    this._statsCollectorConfig = statsCollectorConfig;
   }
 
   @Override
   public void init() {
     columnStatsCollectorMap = new HashMap<>();
 
+    Schema dataSchema = _statsCollectorConfig.getSchema();
     for (final FieldSpec spec : dataSchema.getAllFieldSpecs()) {
+      String column = spec.getName();
       switch (spec.getDataType()) {
         case BOOLEAN:
         case STRING:
-          columnStatsCollectorMap.put(spec.getName(), new StringColumnPreIndexStatsCollector(spec));
+          columnStatsCollectorMap.put(spec.getName(), new StringColumnPreIndexStatsCollector(column,
+              _statsCollectorConfig));
           break;
         case INT:
-          columnStatsCollectorMap.put(spec.getName(), new IntColumnPreIndexStatsCollector(spec));
+          columnStatsCollectorMap.put(spec.getName(), new IntColumnPreIndexStatsCollector(column, _statsCollectorConfig));
           break;
         case LONG:
-          columnStatsCollectorMap.put(spec.getName(), new LongColumnPreIndexStatsCollector(spec));
+          columnStatsCollectorMap.put(spec.getName(), new LongColumnPreIndexStatsCollector(column,
+              _statsCollectorConfig));
           break;
         case FLOAT:
-          columnStatsCollectorMap.put(spec.getName(), new FloatColumnPreIndexStatsCollector(spec));
+          columnStatsCollectorMap.put(spec.getName(), new FloatColumnPreIndexStatsCollector(column,
+              _statsCollectorConfig));
           break;
         case DOUBLE:
-          columnStatsCollectorMap.put(spec.getName(), new DoubleColumnPreIndexStatsCollector(spec));
+          columnStatsCollectorMap.put(spec.getName(), new DoubleColumnPreIndexStatsCollector(column,
+              _statsCollectorConfig));
           break;
         default:
           break;
@@ -130,13 +137,19 @@ public class SegmentPreIndexStatsCollectorImpl implements SegmentPreIndexStatsCo
   public void logStats() {
     try {
       for (final String column : columnStatsCollectorMap.keySet()) {
+        AbstractColumnStatisticsCollector statisticsCollector = columnStatsCollectorMap.get(column);
+
         LOGGER.info("********** logging for column : " + column + " ********************* ");
-        LOGGER.info("min value : " + columnStatsCollectorMap.get(column).getMinValue());
-        LOGGER.info("max value : " + columnStatsCollectorMap.get(column).getMaxValue());
-        LOGGER.info("cardinality : " + columnStatsCollectorMap.get(column).getCardinality());
-        LOGGER.info("length of largest column : " + columnStatsCollectorMap.get(column).getLengthOfLargestElement());
-        LOGGER.info("is sorted : " + columnStatsCollectorMap.get(column).isSorted());
-        LOGGER.info("column type : " + dataSchema.getFieldSpecFor(column).getDataType());
+        LOGGER.info("min value : " + statisticsCollector.getMinValue());
+        LOGGER.info("max value : " + statisticsCollector.getMaxValue());
+        LOGGER.info("cardinality : " + statisticsCollector.getCardinality());
+        LOGGER.info("length of largest column : " + statisticsCollector.getLengthOfLargestElement());
+        LOGGER.info("is sorted : " + statisticsCollector.isSorted());
+        LOGGER.info("column type : " + _statsCollectorConfig.getSchema().getFieldSpecFor(column).getDataType());
+
+        if (statisticsCollector.getPartitionFunction() != null) {
+          LOGGER.info("min partition value: " + statisticsCollector.getPartitionRanges().toString());
+        }
         LOGGER.info("***********************************************");
       }
     } catch (final Exception e) {
