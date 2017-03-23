@@ -34,7 +34,7 @@
     </div>
 
     <div class="anomaly-details-wrapper padding-all bg-white">
-      <div class ="anormaly-chart" id="anomaly-investigate-chart"></div>
+      <div class ="anomaly-chart" id="anomaly-investigate-chart"></div>
       <div class="anomaly-details">
         <div class="anomaly-details-row">
           <div class="anomaly-details-items anomaly-details-items--small">
