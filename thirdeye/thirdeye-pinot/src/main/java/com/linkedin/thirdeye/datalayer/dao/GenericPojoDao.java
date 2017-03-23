@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.datalayer.dao;
 
-import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricUtil;
+import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
 import com.linkedin.thirdeye.datalayer.entity.AlertConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.EventIndex;
 import com.linkedin.thirdeye.datalayer.entity.AutotuneConfigIndex;
@@ -151,7 +151,7 @@ public class GenericPojoDao {
    * @throws SQLException
    */
   public Connection getConnection() throws SQLException {
-    ThirdeyeMetricUtil.dbCallCounter.inc();
+    ThirdeyeMetricsUtil.dbCallCounter.inc();
     // ensure to close the connection
     return dataSource.getConnection();
   }

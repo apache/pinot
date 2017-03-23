@@ -4,7 +4,7 @@ import com.linkedin.thirdeye.anomaly.alert.template.pojo.MetricDimensionReport;
 import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import com.linkedin.thirdeye.anomaly.alert.util.DataReportHelper;
 import com.linkedin.thirdeye.anomaly.alert.util.EmailHelper;
-import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricUtil;
+import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewResponse;
@@ -81,7 +81,7 @@ public class AlertTaskRunner implements TaskRunner {
     try {
       LOG.info("Begin executing task {}", taskInfo);
       runTask();
-      ThirdeyeMetricUtil.alertTaskSuccessCounter.inc();
+      ThirdeyeMetricsUtil.alertTaskSuccessCounter.inc();
     } catch (Exception t) {
       LOG.error("Task failed with exception:", t);
       sendFailureEmail(t);
