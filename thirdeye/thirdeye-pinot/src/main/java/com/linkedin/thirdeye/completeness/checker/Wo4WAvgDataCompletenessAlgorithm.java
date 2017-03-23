@@ -17,7 +17,6 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessConstants.DataCompletenessAlgorithmName;
-import com.linkedin.thirdeye.dashboard.resources.DataCompletenessResource;
 import com.linkedin.thirdeye.datalayer.bao.DataCompletenessConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
 
@@ -31,11 +30,9 @@ public class Wo4WAvgDataCompletenessAlgorithm implements DataCompletenessAlgorit
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final Logger LOG = LoggerFactory.getLogger(Wo4WAvgDataCompletenessAlgorithm.class);
 
-  private DataCompletenessResource dataCompletenessResource = null;
   private DataCompletenessConfigManager dataCompletenessConfigDAO = null;
 
   public Wo4WAvgDataCompletenessAlgorithm() {
-    dataCompletenessResource = new DataCompletenessResource();
     dataCompletenessConfigDAO = DAO_REGISTRY.getDataCompletenessConfigDAO();
   }
 
@@ -65,7 +62,7 @@ public class Wo4WAvgDataCompletenessAlgorithm implements DataCompletenessAlgorit
       if (!baselineBucketNameToBucketValueMS.isEmpty()) {
 
         Map<String, Long> baselineCountsForBuckets =
-            DataCompletenessTaskUtils.getCountsForBucketsOfDataset(dataset, timeSpec, baselineBucketNameToBucketValueMS);
+            DataCompletenessUtils.getCountsForBucketsOfDataset(dataset, timeSpec, baselineBucketNameToBucketValueMS);
         LOG.info("Baseline bucket counts {}", baselineCountsForBuckets);
 
         for (Entry<String, Long> entry : baselineCountsForBuckets.entrySet()) {
@@ -109,8 +106,8 @@ public class Wo4WAvgDataCompletenessAlgorithm implements DataCompletenessAlgorit
     input.setAlgorithm(DataCompletenessAlgorithmName.WO4W_AVERAGE);
     input.setBaselineCounts(baselineCounts);
     input.setCurrentCount(currentCount);
-    String jsonString = PercentCompletenessFunctionInput.toJson(input);
-    double percentCompleteness = dataCompletenessResource.getPercentCompleteness(jsonString);
+
+    double percentCompleteness = DataCompletenessUtils.getPercentCompleteness(input);
     return percentCompleteness;
   }
 

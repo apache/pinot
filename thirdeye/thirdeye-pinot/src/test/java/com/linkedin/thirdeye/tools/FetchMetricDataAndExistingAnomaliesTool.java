@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.tools;
 
+import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
 import java.util.Iterator;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -138,7 +139,7 @@ public class FetchMetricDataAndExistingAnomaliesTool {
       res.dimensions = mergedResult.getDimensions();
       res.setFilters(anomalyFunction.getFilters());
       res.severity = mergedResult.getWeight();
-      AnomalyFeedbackDTO feedback = mergedResult.getFeedback();
+      AnomalyFeedback feedback = mergedResult.getFeedback();
       res.feedbackType = (feedback == null)? null : feedback.getFeedbackType();
       resultNodes.add(res);
     }

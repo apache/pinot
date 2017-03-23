@@ -397,7 +397,7 @@ public class DetectionTaskRunner implements TaskRunner {
     for (RawAnomalyResultDTO rawAnomaly : rawAnomalies) {
       boolean isContained = false;
       for (MergedAnomalyResultDTO existingAnomaly : existingAnomalies) {
-        if (existingAnomaly.getStartTime().compareTo(rawAnomaly.getStartTime()) <= 0
+        if (Long.compare(existingAnomaly.getStartTime(), rawAnomaly.getStartTime()) <= 0
             && rawAnomaly.getEndTime().compareTo(existingAnomaly.getEndTime()) <= 0) {
           isContained = true;
           break;

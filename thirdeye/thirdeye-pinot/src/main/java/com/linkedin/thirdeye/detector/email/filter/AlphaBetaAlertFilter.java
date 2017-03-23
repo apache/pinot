@@ -70,7 +70,7 @@ public class AlphaBetaAlertFilter extends BaseAlertFilter {
   @Override
   public boolean isQualified(MergedAnomalyResultDTO anomaly) {
     double lengthInHour =
-        (anomaly.getEndTime().doubleValue() - anomaly.getStartTime().doubleValue()) / 36_00_000;
+        (double) (anomaly.getEndTime() - anomaly.getStartTime()) / 36_00_000d;
     // In ThirdEye, the absolute value of weight is the severity
     double qualificationScore =
         Math.pow(lengthInHour, alpha) * Math.pow(Math.abs(anomaly.getWeight()), beta);

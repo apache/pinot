@@ -13,7 +13,7 @@ import org.joda.time.format.DateTimeFormatter;
 
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.completeness.checker.DataCompletenessTaskUtils;
+import com.linkedin.thirdeye.completeness.checker.DataCompletenessUtils;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionStatusDTO;
@@ -210,7 +210,7 @@ public class DetectionJobSchedulerUtils {
   public static long getExpectedCompleteBuckets(DatasetConfigDTO datasetConfig, long startTime, long endTime) {
     TimeSpec timeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
     // Get this from DataCompletenessUtils because that determines number of buckets to check
-    long bucketSize = DataCompletenessTaskUtils.getBucketSizeInMSForDataset(timeSpec);
+    long bucketSize = DataCompletenessUtils.getBucketSizeInMSForDataset(timeSpec);
     long numBuckets = (endTime - startTime)/bucketSize;
     return numBuckets;
   }
