@@ -98,6 +98,7 @@ var HELPERS = {
 
   executeQuery: function(query, traceEnabled, callback) {
     var url = "/pql?pql=" + query +"&trace=" + traceEnabled;
+    url = encodeURI(url);
     $.ajax({
       type: 'GET',
       url: url,

@@ -72,6 +72,7 @@ predicate:
   | inClause                              # InPredicate
   | betweenClause                         # BetweenPredicate
   | isClause                              # IsPredicate
+  | regexClause                           # RegexPredicate
   ;
 
 inClause:
@@ -87,6 +88,9 @@ comparisonOperator: '<' | '>' | '<>' | '<=' | '>=' | '=';
 betweenClause:
   expression BETWEEN expression AND expression;
 
+regexClause:
+  expression (LIKE | REGEXP ) '(' literal (',' literal)* ')';
+  
 booleanOperator: OR | AND;
 
 groupByClause: GROUP BY groupByList;
@@ -119,6 +123,8 @@ NULL: N U L L;
 LIMIT: L I M I T;
 NOT : N O T;
 OR: O R;
+REGEXP: R E G E X P;
+LIKE: L I K E;
 ORDER: O R D E R;
 SELECT: S E L E C T;
 TOP: T O P;

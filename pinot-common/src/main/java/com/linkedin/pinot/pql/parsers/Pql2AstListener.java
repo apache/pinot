@@ -38,6 +38,7 @@ import com.linkedin.pinot.pql.parsers.pql2.ast.OutputColumnAstNode;
 import com.linkedin.pinot.pql.parsers.pql2.ast.OutputColumnListAstNode;
 import com.linkedin.pinot.pql.parsers.pql2.ast.PredicateListAstNode;
 import com.linkedin.pinot.pql.parsers.pql2.ast.PredicateParenthesisGroupAstNode;
+import com.linkedin.pinot.pql.parsers.pql2.ast.RegexPredicateAstNode;
 import com.linkedin.pinot.pql.parsers.pql2.ast.SelectAstNode;
 import com.linkedin.pinot.pql.parsers.pql2.ast.StarColumnListAstNode;
 import com.linkedin.pinot.pql.parsers.pql2.ast.StarExpressionAstNode;
@@ -276,6 +277,17 @@ public class Pql2AstListener extends PQL2BaseListener {
     popNode();
   }
 
+  @Override
+  public void enterRegexPredicate(@NotNull PQL2Parser.RegexPredicateContext ctx) {
+    String matchType = ctx.getChild(0).getChild(1).getText();
+    pushNode(new RegexPredicateAstNode(matchType));
+  }
+
+  @Override
+  public void exitRegexPredicate(@NotNull PQL2Parser.RegexPredicateContext ctx) {
+    popNode();
+  }
+  
   @Override
   public void enterHaving(@NotNull PQL2Parser.HavingContext ctx) {
     pushNode(new HavingAstNode());

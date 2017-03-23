@@ -18,19 +18,26 @@ package com.linkedin.pinot.core.common.predicate;
 import java.util.Arrays;
 import java.util.List;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.core.common.Predicate;
-import com.linkedin.pinot.core.common.Predicate.Type;
 
 
 public class RegexPredicate extends Predicate {
-
+  String regex;
   public RegexPredicate(String lhs, List<String> rhs) {
     super(lhs, Type.REGEX, rhs);
+    //we should have atleast one regex, we will ignore the remaining part instead of throwing exception
+    Preconditions.checkArgument(rhs.size() >= 1);
+    regex = rhs.get(0);
   }
 
   @Override
   public String toString() {
     return "Predicate: type: " + getType() + ", left : " + getLhs() + ", right : " + Arrays.toString(getRhs().toArray(new String[0])) + "\n";
+  }
+  
+  public String getRegex(){
+   return regex; 
   }
 
 }
