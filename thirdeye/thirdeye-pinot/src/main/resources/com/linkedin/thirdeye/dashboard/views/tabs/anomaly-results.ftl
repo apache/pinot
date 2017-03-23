@@ -19,7 +19,7 @@
             </div>
           </div>
 
-          <div class ="anormaly-chart" id="anomaly-chart-{{anomalyIndex}}"></div>
+          <div class ="anomaly-chart" id="anomaly-chart-{{anomalyIndex}}"></div>
 
           <div class="anomaly-details bg-white">
             <div class="anomaly-details-row">

@@ -339,6 +339,11 @@ hr {
 .c3 .c3-axis-y line {
     stroke: #979797;
 }
+
+.anomaly-chart.c3 text {
+  font-family: inherit;
+}
+
 /* heatmap background colors*/
 
 .heatmap {
