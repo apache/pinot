@@ -1,5 +1,8 @@
 package com.linkedin.thirdeye.dataframe;
 
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -1368,6 +1371,27 @@ public class DataFrameTest {
   public void testStringInferSeriesTypeString() {
     Series.SeriesType t = StringSeries.buildFrom("true", "", "-0.2e1", null).inferType();
     Assert.assertEquals(t, Series.SeriesType.STRING);
+  }
+
+  @Test
+  public void testDataFrameFromCsv() throws IOException {
+    Reader in = new InputStreamReader(this.getClass().getResourceAsStream("test.csv"));
+    DataFrame df = DataFrame.fromCsv(in);
+
+    Assert.assertEquals(df.getSeriesNames().size(), 3);
+    Assert.assertEquals(df.size(), 6);
+
+    Series a = df.get("header_A");
+    Assert.assertEquals(a.type(), Series.SeriesType.STRING);
+    Assert.assertEquals(a.getStrings().values(), new String[] { "a1", "A2", "two words", "", "with comma, semicolon; and more", "" });
+
+    Series b = df.get("_1headerb");
+    Assert.assertEquals(b.type(), Series.SeriesType.LONG);
+    Assert.assertEquals(b.getLongs().values(), new long[] { 1, 2, 3, 4, 5, 6 });
+
+    Series c = df.get("Header_C");
+    Assert.assertEquals(c.type(), Series.SeriesType.BOOLEAN);
+    Assert.assertEquals(c.getBooleans().values(), new byte[] { BooleanSeries.NULL_VALUE, 1, 0, 0, BooleanSeries.NULL_VALUE, 1 });
   }
 
   static void assertEqualsDoubles(double[] actual, double[] expected) {

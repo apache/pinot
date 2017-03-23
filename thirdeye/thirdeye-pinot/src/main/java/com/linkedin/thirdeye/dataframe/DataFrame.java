@@ -1185,11 +1185,17 @@ public class DataFrame {
    ***************************************************************************/
 
   /**
-   * Reads in a CSV structured stream and returns it as a DataFrame.
+   * Reads in a CSV structured stream and returns it as a DataFrame. The native series type is
+   * chosen to be as specific as possible based on the data ingested.
+   * <b>NOTE:</b> Expects the first line to contain
+   * column headers. The column headers are transformed into series names by replacing non-word
+   * character sequences with underscores ({@code "_"}). Leading digits in series names are also
+   * escaped with a leading underscore.
    *
    * @param in input reader
    * @return CSV as DataFrame
    * @throws IOException if a read error is encountered
+   * @throws IllegalArgumentException if the column headers cannot be transformed into valid series names
    */
   public static DataFrame fromCsv(Reader in) throws IOException {
     Iterator<CSVRecord> it = CSVFormat.RFC4180.withFirstRecordAsHeader().parse(in).iterator();
@@ -1199,6 +1205,23 @@ public class DataFrame {
     CSVRecord first = it.next();
     Set<String> headers = first.toMap().keySet();
 
+    // transform column headers into series names
+    Map<String, String> header2name = new HashMap<>();
+    for(String h : headers) {
+      // remove spaces
+      String name = Pattern.compile("\\W+").matcher(h).replaceAll("_");
+
+      // underscore escape leading number
+      if(Pattern.compile("\\A[0-9]").matcher(name).find())
+        name = "_" + name;
+
+      if(!SERIES_NAME_PATTERN.matcher(name).matches()) {
+        throw new IllegalArgumentException(String.format("Series name must match pattern '%s'", SERIES_NAME_PATTERN));
+      }
+      header2name.put(h, name);
+    }
+
+    // read first line and initialize builders
     Map<String, StringSeries.Builder> builders = new HashMap<>();
     for(String h : headers) {
       StringSeries.Builder builder = StringSeries.builder();
@@ -1208,17 +1231,19 @@ public class DataFrame {
 
     while(it.hasNext()) {
       CSVRecord record = it.next();
-      for(String key : headers) {
-        String value = record.get(key);
-        builders.get(key).add(value);
+      for(String h : headers) {
+        String value = record.get(h);
+        builders.get(h).add(value);
       }
     }
 
+    // construct dataframe and detect native data types
     DataFrame df = new DataFrame();
     for(Map.Entry<String, StringSeries.Builder> e : builders.entrySet()) {
       StringSeries s = e.getValue().build();
       Series conv = s.toType(s.inferType());
-      df.addSeries(e.getKey(), conv);
+      String name = header2name.get(e.getKey());
+      df.addSeries(name, conv);
     }
 
     return df;
