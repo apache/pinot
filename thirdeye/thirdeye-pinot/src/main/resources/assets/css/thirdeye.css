@@ -341,7 +341,7 @@ hr {
 }
 
 .anomaly-chart.c3 text {
-  font-family: inherit;
+  font-family: SourceSansPro, sans-serif;
 }
 
 /* heatmap background colors*/
