@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.detector.email.filter;
 
+import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -59,7 +60,7 @@ public class AlertFilterEvaluationUtil {
     int FN = 0;
     for (MergedAnomalyResultDTO anomaly: mergedAnomalyResultDTOS) {
       boolean predLabel = alertFilter.isQualified(anomaly);
-      AnomalyFeedbackDTO feedback = anomaly.getFeedback();
+      AnomalyFeedback feedback = anomaly.getFeedback();
       boolean label = !(feedback == null || feedback.getFeedbackType() == AnomalyFeedbackType.NOT_ANOMALY);
       //predicted true
       if (predLabel) {
@@ -98,7 +99,7 @@ public class AlertFilterEvaluationUtil {
     for(MergedAnomalyResultDTO anomaly: anomalies) {
       totalAnomalies++;
       // evaluate feedbacks
-      AnomalyFeedbackDTO feedback = anomaly.getFeedback();
+      AnomalyFeedback feedback = anomaly.getFeedback();
       if (feedback != null) {
         totalResponses++;
         AnomalyFeedbackType feedbackType = feedback.getFeedbackType();

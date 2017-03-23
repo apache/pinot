@@ -7,6 +7,7 @@ import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.alert.AlertTaskRunner;
 import com.linkedin.thirdeye.anomaly.alert.util.EmailHelper;
+import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
@@ -14,6 +15,7 @@ import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.EmailConfigurationManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.MetricConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
@@ -121,18 +123,19 @@ public class GenerateAnomalyReport {
 
       for (MergedAnomalyResultDTO anomaly : anomalies) {
         metrics.add(anomaly.getMetric());
-        if (anomaly.getFeedback() != null) {
+        AnomalyFeedback feedback = anomaly.getFeedback();
+        if (feedback != null) {
           feedbackCollected++;
-          if (anomaly.getFeedback().getFeedbackType().equals(AnomalyFeedbackType.ANOMALY)) {
+          if (feedback.getFeedbackType().equals(AnomalyFeedbackType.ANOMALY)) {
             trueAlert++;
-          } else if (anomaly.getFeedback().getFeedbackType().equals(AnomalyFeedbackType.NOT_ANOMALY)) {
+          } else if (feedback.getFeedbackType().equals(AnomalyFeedbackType.NOT_ANOMALY)) {
             falseAlert++;
           } else {
             nonActionable++;
           }
         }
         String feedbackVal = getFeedback(
-            anomaly.getFeedback() == null ? "NA" : anomaly.getFeedback().getFeedbackType().name());
+            feedback == null ? "NA" : feedback.getFeedbackType().name());
 
         AnomalyReportDTO anomalyReportDTO =
             new AnomalyReportDTO(String.valueOf(anomaly.getId()), feedbackVal,

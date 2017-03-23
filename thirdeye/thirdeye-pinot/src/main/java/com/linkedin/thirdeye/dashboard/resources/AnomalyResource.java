@@ -5,6 +5,7 @@ import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContext;
 import com.linkedin.thirdeye.anomaly.merge.TimeBasedAnomalyMerger;
 import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
+import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.dashboard.Utils;
@@ -511,7 +512,7 @@ public class AnomalyResource {
         throw new IllegalArgumentException("AnomalyResult not found with id " + anomalyResultId);
       }
       AnomalyFeedbackDTO feedbackRequest = OBJECT_MAPPER.readValue(payload, AnomalyFeedbackDTO.class);
-      AnomalyFeedbackDTO feedback = result.getFeedback();
+      AnomalyFeedback feedback = result.getFeedback();
       if (feedback == null) {
         feedback = new AnomalyFeedbackDTO();
         result.setFeedback(feedback);
