@@ -166,7 +166,7 @@ public class SegmentDeletionManager {
         File targetDir = new File(new File(_localDiskDir, DELETED_SEGMENTS), rawTableName);
         try {
           // Overwrites the file if it already exists in the target directory.
-          FileUtils.copyFileToDirectory(fileToMove, targetDir, true);
+          FileUtils.copyFileToDirectory(fileToMove, targetDir, false);
           LOGGER.info("Moved segment {} from {} to {}", segmentId, fileToMove.getAbsolutePath(), targetDir.getAbsolutePath());
           if (!fileToMove.delete()) {
             LOGGER.warn("Could not delete file", segmentId, fileToMove.getAbsolutePath());
