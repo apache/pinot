@@ -40,12 +40,52 @@ public class PartitionFunctionTest {
 
     for (int i = 0; i < 1000; i++) {
       int divisor = random.nextInt();
+
+      // Avoid divide-by-zero.
+      if (divisor == 0) {
+        divisor = 1;
+      }
+
       String partitionFunctionString = "MoDuLo" + PartitionFunctionFactory.PARTITION_FUNCTION_DELIMITER + divisor;
       PartitionFunction partitionFunction = PartitionFunctionFactory.getPartitionFunction(partitionFunctionString);
+      Assert.assertEquals(partitionFunction.toString().toLowerCase(), partitionFunctionString.toLowerCase());
 
       for (int j = 0; j < 1000; j++) {
         int value = random.nextInt();
         Assert.assertEquals(partitionFunction.getPartition(value), (value % divisor));
+      }
+    }
+  }
+
+  /**
+   * Unit test for {@link DefaultKafkaPartitionFunction}.
+   * <ul>
+   *   <li> Tests that partition values are in expected range. </li>
+   *   <li> Tests that toString returns expected string. </li>
+   * </ul>
+   */
+  @Test
+  public void testDefaultKafkaPartitioner() {
+    long seed = System.currentTimeMillis();
+    Random random = new Random(seed);
+
+    for (int i = 0; i < 1000; i++) {
+      int divisor = Math.abs(random.nextInt());
+
+      // Avoid divide-by-zero.
+      if (divisor == 0) {
+        divisor = 1;
+      }
+
+      String partitionFunctionString =
+          "deFaultkAfkapArtitioNER" + PartitionFunctionFactory.PARTITION_FUNCTION_DELIMITER + divisor;
+      PartitionFunction partitionFunction = PartitionFunctionFactory.getPartitionFunction(partitionFunctionString);
+      Assert.assertEquals(partitionFunction.toString().toLowerCase(), partitionFunctionString.toLowerCase());
+
+      for (int j = 0; j < 1000; j++) {
+        Integer value = random.nextInt();
+        Assert.assertTrue(partitionFunction.getPartition(value.toString()) < divisor,
+            "Illegal: " + partitionFunction.getPartition(value.toString()) + " " + divisor);
       }
     }
   }
