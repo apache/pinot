@@ -19,6 +19,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
@@ -28,38 +29,24 @@ public class AutoloadPinotMetricsServiceTest  extends AbstractManagerTestBase {
   private AutoLoadPinotMetricsService testAutoLoadPinotMetricsService;
   private String dataset = "test-collection";
   private Schema schema;
-  DatasetConfigDTO datasetConfig = null;
 
-  @BeforeClass
-  void beforeClass() {
-    super.init();
-  }
-
-  @AfterClass(alwaysRun = true)
-  void afterClass() {
-    super.cleanup();
-  }
-
-  /**
-   * This test class needs to use a class that accesses the global singleton DAO registry. Therefore,
-   * we need to copy the local DAO registry, which is created for this test, to the global one.
-   * Otherwise, the global singleton one may reference to an arbitrary DB that is created for this
-   * test.
-   */
   @BeforeMethod
-  void beforeMethod(){
-     // DAORegistry.overrideSingletonDAORegistryForTesting(testDBResources.getTestDaoRegistry());
+  void beforeMethod() throws Exception {
+    super.init();
+    testAutoLoadPinotMetricsService = new AutoLoadPinotMetricsService();
+    schema = Schema.fromInputSteam(ClassLoader.getSystemResourceAsStream("sample-pinot-schema.json"));
+    testAutoLoadPinotMetricsService.addPinotDataset(dataset, schema, null);
+  }
+
+  @AfterMethod(alwaysRun = true)
+  void afterMethod() {
+    super.cleanup();
   }
 
   @Test
   public void testAddNewDataset() throws Exception {
-    testAutoLoadPinotMetricsService = new AutoLoadPinotMetricsService();
-    schema = Schema.fromInputSteam(ClassLoader.getSystemResourceAsStream("sample-pinot-schema.json"));
-
-    testAutoLoadPinotMetricsService.addPinotDataset(dataset, schema, datasetConfig);
-
     Assert.assertEquals(datasetConfigDAO.findAll().size(), 1);
-    datasetConfig = datasetConfigDAO.findByDataset(dataset);
+    DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(dataset);
     Assert.assertEquals(datasetConfig.getDataset(), dataset);
     Assert.assertEquals(datasetConfig.getDimensions(), schema.getDimensionNames());
     Assert.assertEquals(datasetConfig.getTimeColumn(), schema.getTimeColumnName());
@@ -84,8 +71,9 @@ public class AutoloadPinotMetricsServiceTest  extends AbstractManagerTestBase {
     Assert.assertEquals(dashboardConfig.getMetricIds(), metricIds);
   }
 
-  @Test(dependsOnMethods = {"testAddNewDataset"})
+  @Test
   public void testRefreshDataset() throws Exception {
+    DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(dataset);
     DimensionFieldSpec dimensionFieldSpec = new DimensionFieldSpec("newDimension", DataType.STRING, true);
     schema.addField(dimensionFieldSpec);
     testAutoLoadPinotMetricsService.addPinotDataset(dataset, schema, datasetConfig);
@@ -112,7 +100,4 @@ public class AutoloadPinotMetricsServiceTest  extends AbstractManagerTestBase {
         findByName(DashboardConfigBean.DEFAULT_DASHBOARD_PREFIX + dataset);
     Assert.assertEquals(dashboardConfig.getMetricIds(), metricIds);
   }
-
-
-
 }
