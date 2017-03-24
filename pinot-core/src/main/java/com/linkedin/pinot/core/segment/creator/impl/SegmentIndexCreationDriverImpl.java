@@ -15,6 +15,24 @@
  */
 package com.linkedin.pinot.core.segment.creator.impl;
 
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import org.apache.commons.io.FileUtils;
+import org.joda.time.DateTime;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.google.common.collect.HashBiMap;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
@@ -51,21 +69,6 @@ import com.linkedin.pinot.core.startree.StarTreeSerDe;
 import com.linkedin.pinot.core.startree.hll.HllConfig;
 import com.linkedin.pinot.core.startree.hll.HllUtil;
 import com.linkedin.pinot.core.util.CrcUtils;
-import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-import org.apache.commons.io.FileUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -424,6 +427,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       throws Exception {
     final String timeColumn = config.getTimeColumnName();
     segmentName = config.getSegmentNameGenerator().getSegmentName(segmentStats.getColumnProfileFor(timeColumn));
+    updateSegmentStartEndTimeIfNecessary(segmentStats.getColumnProfileFor(timeColumn));
 
     // Write the index files to disk
     indexCreator.setSegmentName(segmentName);
@@ -453,6 +457,36 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     LOGGER.info("Driver, record read time : {}", totalRecordReadTime);
     LOGGER.info("Driver, stats collector time : {}", totalStatsCollectorTime);
     LOGGER.info("Driver, indexing time : {}", totalIndexTime);
+  }
+
+  private void updateSegmentStartEndTimeIfNecessary(ColumnStatistics timeColumnStats) {
+    switch (config.getTimeColumnType()) {
+      case EPOCH:
+        break;
+      case SIMPLE_DATE:
+        long startTime = convertStartTimeSDFToMillis(timeColumnStats);
+        config.getCustomProperties().put(V1Constants.MetadataKeys.Segment.SEGMENT_START_TIME, String.valueOf(startTime));
+        long endTime = convertEndTimeSDFToMillis(timeColumnStats);
+        config.getCustomProperties().put(V1Constants.MetadataKeys.Segment.SEGMENT_END_TIME, String.valueOf(endTime));
+        break;
+    }
+  }
+
+  public long convertStartTimeSDFToMillis(ColumnStatistics timeColumnStats) {
+    final String minTimeStr = timeColumnStats.getMinValue().toString();
+    return convertSDFToMillis(minTimeStr);
+  }
+
+  public long convertEndTimeSDFToMillis(ColumnStatistics timeColumnStats) {
+    final String maxTimeStr = timeColumnStats.getMaxValue().toString();
+    return convertSDFToMillis(maxTimeStr);
+  }
+
+  private long convertSDFToMillis(final String colValue) {
+    final String sdfFormatStr = config.getSimpleDateFormat();
+    DateTimeFormatter sdfFormatter = DateTimeFormat.forPattern(sdfFormatStr);
+    DateTime dateTime = DateTime.parse(colValue, sdfFormatter);
+    return dateTime.getMillis();
   }
 
   // Explanation of why we are using format converter:

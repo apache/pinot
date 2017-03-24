@@ -52,6 +52,10 @@ import com.linkedin.pinot.core.startree.hll.HllConfig;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class SegmentGeneratorConfig {
+  public enum TimeColumnType {
+    EPOCH,
+    SIMPLE_DATE
+  }
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGeneratorConfig.class);
 
   private Map<String, String> _customProperties = new HashMap<>();
@@ -84,6 +88,8 @@ public class SegmentGeneratorConfig {
   private SegmentNameGenerator _segmentNameGenerator = null;
   private SegmentPartitionConfig _segmentPartitionConfig = null;
   private int _sequenceId = -1;
+  private TimeColumnType _timeColumnType = TimeColumnType.EPOCH;
+  private String _simpleDateFormat = null;
 
   public SegmentGeneratorConfig() {
   }
@@ -140,6 +146,19 @@ public class SegmentGeneratorConfig {
   public void setCustomProperties(Map<String, String> properties) {
     Preconditions.checkNotNull(properties);
     _customProperties.putAll(properties);
+  }
+
+  public void setSimpleDateFormat(String simpleDateFormat) {
+    _timeColumnType = TimeColumnType.SIMPLE_DATE;
+    _simpleDateFormat = simpleDateFormat;
+  }
+
+  public String getSimpleDateFormat() {
+    return _simpleDateFormat;
+  }
+
+  public TimeColumnType getTimeColumnType() {
+    return _timeColumnType;
   }
 
   public boolean containsCustomProperty(String key) {
