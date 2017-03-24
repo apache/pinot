@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
+import com.google.common.base.MoreObjects;
 import com.linkedin.thirdeye.api.DimensionMap;
 import java.util.HashMap;
 import java.util.List;
@@ -13,7 +14,7 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
   private Long anomalyFeedbackId;
   private String collection;
   private String metric;
-  private DimensionMap dimensions;
+  private DimensionMap dimensions = new DimensionMap();
   private long startTime;
   private long endTime;
 
@@ -21,8 +22,8 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
   private double avgBaselineVal; // expected value
   private double score; // confidence level
   private double weight; // change percentage, whose absolute value is severity
-
-  private Map<String, String> properties; // additional anomaly detection properties (e.g., patter=UP, etc.)
+  // Additional anomaly detection properties (e.g., patter=UP, etc.)
+  private Map<String, String> properties = new HashMap<>();
 
   private Long createdTime;
   private boolean notified;
@@ -30,10 +31,6 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
   //TODO: deprecate raw anomaly list and message
   private String message;
   private List<Long> rawAnomalyIdList;
-
-  public MergedAnomalyResultBean() {
-    properties = new HashMap<>();
-  }
 
 
   public Long getFunctionId() {
@@ -197,12 +194,11 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
     return ObjectUtils.compare(getId(), o.getId());
   }
 
-  @Override
-  public String toString() {
-    return "MergedAnomalyResultBean{" + "functionId=" + functionId + ", anomalyFeedbackId=" + anomalyFeedbackId
-        + ", collection='" + collection + '\'' + ", metric='" + metric + '\'' + ", dimensions=" + dimensions.toString()
-        + ", startTime=" + startTime + ", endTime=" + endTime + ", avgCurrentVal=" + avgCurrentVal + ", avgBaselineVal="
-        + avgBaselineVal + ", score=" + score + ", weight=" + weight + ", properties=" + properties.toString()
-        + ", notified=" + notified + ", rawAnomalyIdList=" + rawAnomalyIdList + ", createdTime=" + createdTime + '}';
+  @Override public String toString() {
+    return MoreObjects.toStringHelper(this).add("functionId", functionId).add("anomalyFeedbackId", anomalyFeedbackId)
+        .add("collection", collection).add("metric", metric).add("dimensions", dimensions).add("startTime", startTime)
+        .add("endTime", endTime).add("avgCurrentVal", avgCurrentVal).add("avgBaselineVal", avgBaselineVal)
+        .add("score", score).add("weight", weight).add("properties", properties).add("createdTime", createdTime)
+        .add("notified", notified).add("message", message).add("rawAnomalyIdList", rawAnomalyIdList).toString();
   }
 }
