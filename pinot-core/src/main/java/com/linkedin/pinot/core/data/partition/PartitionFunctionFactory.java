@@ -16,6 +16,8 @@
 package com.linkedin.pinot.core.data.partition;
 
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 import javax.annotation.Nonnull;
 
 
@@ -27,8 +29,26 @@ public class PartitionFunctionFactory {
 
   // Enum for various partition functions to be added.
   public enum PartitionFunctionType {
-    MODULO
+    Modulo,
+    DefaultKafkaPartitioner;
     // Add more functions here.
+
+    private static final Map<String, PartitionFunctionType> VALUE_MAP = new HashMap<>();
+
+    static {
+      for (PartitionFunctionType functionType : PartitionFunctionType.values()) {
+        VALUE_MAP.put(functionType.name().toLowerCase(), functionType);
+      }
+    }
+
+    public static PartitionFunctionType fromString(String name) {
+      PartitionFunctionType functionType = VALUE_MAP.get(name.toLowerCase());
+
+      if (functionType == null) {
+        throw new IllegalArgumentException("No enum constant for: " + name);
+      }
+      return functionType;
+    }
   }
 
   /**
@@ -48,10 +68,13 @@ public class PartitionFunctionFactory {
     String functionName = tokens[0];
     String[] args = Arrays.copyOfRange(tokens, 1, tokens.length);
 
-    PartitionFunctionType function = PartitionFunctionType.valueOf(functionName.toUpperCase());
+    PartitionFunctionType function = PartitionFunctionType.fromString(functionName);
     switch (function) {
-      case MODULO:
+      case Modulo:
         return new ModuloPartitionFunction(args);
+
+      case DefaultKafkaPartitioner:
+        return new DefaultKafkaPartitionFunction(args);
 
       default:
         throw new IllegalArgumentException("Illegal partition function name: " + functionName);

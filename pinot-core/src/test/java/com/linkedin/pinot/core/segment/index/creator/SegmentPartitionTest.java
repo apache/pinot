@@ -104,7 +104,9 @@ public class SegmentPartitionTest {
     SegmentMetadataImpl metadata = (SegmentMetadataImpl) _segment.getSegmentMetadata();
     ColumnMetadata columnMetadata = metadata.getColumnMetadataFor(PARTITIONED_COLUMN_NAME);
 
-    Assert.assertEquals(columnMetadata.getPartitionFunction().toString(), expectedPartitionFunction.toLowerCase());
+    Assert.assertEquals(columnMetadata.getPartitionFunction().toString().toLowerCase(),
+        expectedPartitionFunction.toLowerCase());
+
     List<IntRange> partitionValues = columnMetadata.getPartitionRanges();
     Assert.assertEquals(partitionValues.size(), 1);
     List<IntRange> expectedPartitionValues = ColumnPartitionConfig.rangesFromString(

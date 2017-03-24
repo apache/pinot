@@ -16,37 +16,32 @@
 package com.linkedin.pinot.core.data.partition;
 
 import com.google.common.base.Preconditions;
+import org.apache.kafka.common.utils.Utils;
 
 
 /**
- * Modulo operation based partition function, where:
- * <ul>
- *   <li> partitionId = value % {@link #_divisor}</li>
- * </ul>
+ * Implementation of {@link ModuloPartitionFunction} that mimics Kafka's
+ * {@link org.apache.kafka.clients.producer.internals.DefaultPartitioner}.
  *
  */
-public class ModuloPartitionFunction implements PartitionFunction {
-  private static final String NAME = "Modulo";
+public class DefaultKafkaPartitionFunction implements PartitionFunction {
+  private static final String NAME = "DefaultKafkaPartitioner";
   private final int _divisor;
 
   /**
    * Constructor for the class.
-   * <ul>
-   *   <li> Requires the divisor to be passed in via args. </li>
-   * </ul>
-   *
-   * @param args Arguments for the function
+   * @param args Arguments for the partition function.
    */
-  public ModuloPartitionFunction(String[] args) {
+  public DefaultKafkaPartitionFunction(String[] args) {
     Preconditions.checkArgument(args.length == 1);
     _divisor = Integer.parseInt(args[0]);
-    Preconditions.checkState(_divisor != 0, "Divisor for ModuloPartitionFunction cannot be zero.");
+    Preconditions.checkState(_divisor > 0, "Divisor for DefaultKafkaPartitionFunction cannot be <= zero.");
   }
 
   @Override
   public int getPartition(Object value) {
-    if (value instanceof Integer) {
-      return ((Integer) value) % _divisor;
+    if (value instanceof String) {
+      return (Utils.murmur2(((String) value).getBytes()) & 0x7fffffff) % _divisor;
     } else {
       throw new IllegalArgumentException(
           "Illegal argument for partitioning, expected Integer, got: " + value.getClass().getName());
