@@ -30,11 +30,4 @@ public class EmailConfigurationIndex extends AbstractIndexEntity {
   public void setActive(boolean active) {
     this.active = active;
   }
-
-  @Override
-  public String toString() {
-    return "EmailConfigurationIndex [collection=" + collection + ", metric=" + metric + ", active="
-        + active + ", baseId=" + baseId + ", id=" + id + ", createTime=" + createTime
-        + ", updateTime=" + updateTime + ", version=" + version + "]";
-  }
 }

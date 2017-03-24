@@ -37,11 +37,4 @@ public class OverrideConfigIndex extends AbstractIndexEntity {
   public void setActive(boolean isActive) {
     this.active = isActive;
   }
-
-  @Override public String toString() {
-    return "OverrideConfigIndex{" + "startTime=" + startTime + ", endTime=" + endTime
-        + ", targetEntity='" + targetEntity + '\'' + ", active=" + active + ", baseId=" + baseId
-        + ", id=" + id + ", createTime=" + createTime
-        + ", updateTime=" + updateTime + ", version=" + version + '}';
-  }
 }
