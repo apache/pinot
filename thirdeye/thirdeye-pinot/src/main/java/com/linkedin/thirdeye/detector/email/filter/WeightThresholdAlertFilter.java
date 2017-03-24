@@ -65,6 +65,6 @@ public class WeightThresholdAlertFilter extends BaseAlertFilter {
   @Override
   public boolean isQualified(MergedAnomalyResultDTO anomaly) {
     double weight = anomaly.getWeight();
-    return (weight >= upThreshold) || (weight <= -1*downThreshold);
+    return (weight >= upThreshold) || (weight <= -1 * downThreshold);
   }
 }
