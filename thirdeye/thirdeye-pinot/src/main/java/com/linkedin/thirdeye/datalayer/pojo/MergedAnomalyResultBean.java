@@ -14,7 +14,7 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
   private Long anomalyFeedbackId;
   private String collection;
   private String metric;
-  private DimensionMap dimensions;
+  private DimensionMap dimensions = new DimensionMap();
   private long startTime;
   private long endTime;
 
@@ -22,8 +22,8 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
   private double avgBaselineVal; // expected value
   private double score; // confidence level
   private double weight; // change percentage, whose absolute value is severity
-
-  private Map<String, String> properties; // additional anomaly detection properties (e.g., patter=UP, etc.)
+  // Additional anomaly detection properties (e.g., patter=UP, etc.)
+  private Map<String, String> properties = new HashMap<>();
 
   private Long createdTime;
   private boolean notified;
@@ -31,10 +31,6 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
   //TODO: deprecate raw anomaly list and message
   private String message;
   private List<Long> rawAnomalyIdList;
-
-  public MergedAnomalyResultBean() {
-    properties = new HashMap<>();
-  }
 
 
   public Long getFunctionId() {
