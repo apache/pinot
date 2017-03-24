@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
 import com.linkedin.thirdeye.api.DimensionMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -29,6 +30,10 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
   //TODO: deprecate raw anomaly list and message
   private String message;
   private List<Long> rawAnomalyIdList;
+
+  public MergedAnomalyResultBean() {
+    properties = new HashMap<>();
+  }
 
 
   public Long getFunctionId() {
