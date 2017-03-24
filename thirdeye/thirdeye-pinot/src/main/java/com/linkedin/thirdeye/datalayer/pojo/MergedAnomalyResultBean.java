@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
+import com.google.common.base.MoreObjects;
 import com.linkedin.thirdeye.api.DimensionMap;
 import java.util.HashMap;
 import java.util.List;
@@ -197,12 +198,11 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
     return ObjectUtils.compare(getId(), o.getId());
   }
 
-  @Override
-  public String toString() {
-    return "MergedAnomalyResultBean{" + "functionId=" + functionId + ", anomalyFeedbackId=" + anomalyFeedbackId
-        + ", collection='" + collection + '\'' + ", metric='" + metric + '\'' + ", dimensions=" + dimensions.toString()
-        + ", startTime=" + startTime + ", endTime=" + endTime + ", avgCurrentVal=" + avgCurrentVal + ", avgBaselineVal="
-        + avgBaselineVal + ", score=" + score + ", weight=" + weight + ", properties=" + properties.toString()
-        + ", notified=" + notified + ", rawAnomalyIdList=" + rawAnomalyIdList + ", createdTime=" + createdTime + '}';
+  @Override public String toString() {
+    return MoreObjects.toStringHelper(this).add("functionId", functionId).add("anomalyFeedbackId", anomalyFeedbackId)
+        .add("collection", collection).add("metric", metric).add("dimensions", dimensions).add("startTime", startTime)
+        .add("endTime", endTime).add("avgCurrentVal", avgCurrentVal).add("avgBaselineVal", avgBaselineVal)
+        .add("score", score).add("weight", weight).add("properties", properties).add("createdTime", createdTime)
+        .add("notified", notified).add("message", message).add("rawAnomalyIdList", rawAnomalyIdList).toString();
   }
 }
