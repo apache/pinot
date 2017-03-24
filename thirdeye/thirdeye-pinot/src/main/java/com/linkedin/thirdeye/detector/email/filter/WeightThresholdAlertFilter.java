@@ -27,7 +27,7 @@ public class WeightThresholdAlertFilter extends BaseAlertFilter {
   public static final String DOWN_THRESHOLD = "downThreshold";
 
   private double upThreshold = Double.parseDouble(DEFAULT_UP_THRESHOLD);
-  private double dwnThreshold = Double.parseDouble(DEFAULT_DOWN_THRESHOLD);
+  private double downThreshold = Double.parseDouble(DEFAULT_DOWN_THRESHOLD);
 
   public double getUpThreshold() {
     return upThreshold;
@@ -38,11 +38,11 @@ public class WeightThresholdAlertFilter extends BaseAlertFilter {
   }
 
   public double getDownThreshold() {
-    return dwnThreshold;
+    return downThreshold;
   }
 
-  public void setDownThreshold(double dwnThreshold) {
-    this.dwnThreshold = Math.abs(dwnThreshold);
+  public void setDownThreshold(double downThreshold) {
+    this.downThreshold = Math.abs(downThreshold);
   }
 
 
@@ -65,6 +65,6 @@ public class WeightThresholdAlertFilter extends BaseAlertFilter {
   @Override
   public boolean isQualified(MergedAnomalyResultDTO anomaly) {
     double weight = anomaly.getWeight();
-    return (weight >= upThreshold) || (weight <= -1*dwnThreshold);
+    return (weight >= upThreshold) || (weight <= -1 * downThreshold);
   }
 }
