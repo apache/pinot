@@ -57,14 +57,4 @@ public class DetectionStatusIndex extends AbstractIndexEntity {
   public void setDetectionRun(boolean detectionRun) {
     this.detectionRun = detectionRun;
   }
-
-
-  @Override
-  public String toString() {
-    return "DataCompletenessConfigIndex [dataset=" + dataset + ", dateToCheckInMS=" + dateToCheckInMS
-        + ", dateToCheckInSDF=" + dateToCheckInSDF + ", detectionRun=" + detectionRun
-        + ", functionId=" + functionId + ", version=" + version + ", baseId=" + baseId + ", id=" + id
-        + ", createTime=" + createTime + ", updateTime=" + updateTime + "]";
-  }
-
 }

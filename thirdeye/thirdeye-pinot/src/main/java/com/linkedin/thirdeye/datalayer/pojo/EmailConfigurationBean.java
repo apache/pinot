@@ -188,14 +188,4 @@ public class EmailConfigurationBean extends AbstractBean {
   public boolean isSendZeroAnomalyEmail() {
     return sendZeroAnomalyEmail;
   }
-
-  @Override
-  public String toString() {
-    return MoreObjects.toStringHelper(this).add("collection", collection).add("metric", metric)
-        .add("fromAddress", fromAddress).add("toAddresses", toAddresses).add("cron", cron)
-        .add("windowSize", windowSize).add("windowUnit", windowUnit).add("isActive", active)
-        .add("sendZeroAnomalyEmail", sendZeroAnomalyEmail)
-        .add("includeReportByDimension", reportEnabled)
-        .add("windowDelay", windowDelay).add("windowDelayUnit", windowDelayUnit).toString();
-  }
 }

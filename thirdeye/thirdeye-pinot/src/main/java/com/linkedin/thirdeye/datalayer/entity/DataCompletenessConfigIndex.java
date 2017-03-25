@@ -8,64 +8,43 @@ public class DataCompletenessConfigIndex extends AbstractIndexEntity {
   boolean dataComplete;
   double percentComplete;
 
-
   public String getDataset() {
     return dataset;
   }
-
 
   public void setDataset(String dataset) {
     this.dataset = dataset;
   }
 
-
   public long getDateToCheckInMS() {
     return dateToCheckInMS;
   }
-
 
   public void setDateToCheckInMS(long dateToCheckInMS) {
     this.dateToCheckInMS = dateToCheckInMS;
   }
 
-
   public String getDateToCheckInSDF() {
     return dateToCheckInSDF;
   }
-
 
   public void setDateToCheckInSDF(String dateToCheckInSDF) {
     this.dateToCheckInSDF = dateToCheckInSDF;
   }
 
-
   public boolean isDataComplete() {
     return dataComplete;
   }
-
 
   public void setDataComplete(boolean dataComplete) {
     this.dataComplete = dataComplete;
   }
 
-
-
   public double getPercentComplete() {
     return percentComplete;
   }
 
-
   public void setPercentComplete(double percentComplete) {
     this.percentComplete = percentComplete;
   }
-
-
-  @Override
-  public String toString() {
-    return "DataCompletenessConfigIndex [dataset=" + dataset + ", dateToCheckInMS=" + dateToCheckInMS
-        + ", dateToCheckInSDF=" + dateToCheckInSDF + ", dataComplete=" + dataComplete
-        + ", percentComplete=" + percentComplete + ", version=" + version + ", baseId=" + baseId + ", id=" + id
-        + ", createTime=" + createTime + ", updateTime=" + updateTime + "]";
-  }
-
 }

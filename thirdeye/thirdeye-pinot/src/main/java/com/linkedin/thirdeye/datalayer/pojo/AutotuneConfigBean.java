@@ -151,12 +151,4 @@ public class AutotuneConfigBean extends AbstractBean {
     return Objects.hash(getId(), functionId, startTime, endTime, autotuneMethod, performanceEvaluationMethod,
         configuration, performance, avgRunningTime, overallRunningTime);
   }
-
-  @Override
-  public String toString(){
-    return MoreObjects.toStringHelper(this).add("functionId", functionId).add("configuration", configuration)
-        .add("startTime", startTime).add("endTime", endTime).add("autotuneMethod", autotuneMethod)
-        .add("performanceEvaluationMethod", performanceEvaluationMethod).add("performance", performance)
-        .add("avgRunningTime", avgRunningTime).add("overallRunningTime", overallRunningTime).toString();
-  }
 }

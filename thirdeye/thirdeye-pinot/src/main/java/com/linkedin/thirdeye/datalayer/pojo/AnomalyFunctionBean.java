@@ -294,16 +294,4 @@ public class AnomalyFunctionBean extends AbstractBean {
         properties, bucketSize, bucketUnit, windowSize, windowUnit, windowDelay, windowDelayUnit,
         exploreDimensions, filters, alertFilter, requiresCompletenessCheck);
   }
-
-  @Override
-  public String toString() {
-    return MoreObjects.toStringHelper(this).add("id", getId()).add("collection", collection)
-        .add("metric", metric).add("metrics", metrics).add("metric_function", getMetricFunction()).add("type", type)
-        .add("isActive", isActive).add("cron", cron).add("frequency", frequency).add("properties", properties)
-        .add("bucketSize", bucketSize).add("bucketUnit", bucketUnit).add("windowSize", windowSize)
-        .add("windowUnit", windowUnit).add("windowDelay", windowDelay)
-        .add("windowDelayUnit", windowDelayUnit).add("exploreDimensions", exploreDimensions)
-        .add("filters", filters).add("alertFilter", alertFilter)
-        .add("requiresCompletenessCheck", requiresCompletenessCheck).toString();
-  }
 }

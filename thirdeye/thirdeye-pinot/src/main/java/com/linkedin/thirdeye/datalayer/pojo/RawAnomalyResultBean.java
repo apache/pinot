@@ -2,11 +2,8 @@ package com.linkedin.thirdeye.datalayer.pojo;
 
 import com.linkedin.thirdeye.api.DimensionMap;
 import java.util.Objects;
-
 import org.apache.commons.lang.ObjectUtils;
 import org.joda.time.DateTime;
-
-import com.google.common.base.MoreObjects;
 
 @Deprecated
 public class RawAnomalyResultBean extends AbstractBean implements Comparable<RawAnomalyResultBean> {
@@ -145,15 +142,6 @@ public class RawAnomalyResultBean extends AbstractBean implements Comparable<Raw
 
   public void setAnomalyFeedbackId(Long anomalyFeedbackId) {
     AnomalyFeedbackId = anomalyFeedbackId;
-  }
-
-  @Override
-  public String toString() {
-    return MoreObjects.toStringHelper(this).add("id", getId()).add("startTimeUtc", startTime)
-        .add("dimensions", dimensions).add("endTimeUtc", endTime).add("score", score)
-        .add("weight", weight).add("properties", properties).add("message", message)
-        .add("creationTimeUtc", creationTimeUtc)
-        .add("currentVal", avgCurrentVal).add("baseLineVal", avgBaselineVal).toString();
   }
 
   @Override

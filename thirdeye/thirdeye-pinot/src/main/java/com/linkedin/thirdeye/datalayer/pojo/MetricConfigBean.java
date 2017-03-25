@@ -1,11 +1,9 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.linkedin.thirdeye.api.MetricType;
 import java.util.Map;
 import java.util.Objects;
-
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.google.common.base.MoreObjects;
-import com.linkedin.thirdeye.api.MetricType;
 
 @JsonIgnoreProperties(ignoreUnknown=true)
 public class MetricConfigBean extends AbstractBean {
@@ -150,13 +148,5 @@ public class MetricConfigBean extends AbstractBean {
   public int hashCode() {
     return Objects.hash(getId(), dataset, alias, derived, derivedMetricExpression, rollupThreshold,
         inverseMetric, cellSizeExpression, active, extSourceLinkInfo);
-  }
-
-  @Override
-  public String toString() {
-    return MoreObjects.toStringHelper(this).add("id", getId()).add("name", name).add("dataset", dataset)
-        .add("alias", alias).add("derived", derived).add("derivedMetricExpression", derivedMetricExpression)
-        .add("rollupThreshold", rollupThreshold).add("cellSizeExpression", cellSizeExpression).add("active", active)
-        .add("extSourceLinkInfo", extSourceLinkInfo).toString();
   }
 }

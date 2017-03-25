@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.tools.anomaly.report;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.google.common.base.MoreObjects;
 import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.alert.AlertTaskRunner;
@@ -15,7 +16,6 @@ import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.EmailConfigurationManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.MetricConfigManagerImpl;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
@@ -329,15 +329,9 @@ public class GenerateAnomalyReport {
 
     @Override
     public String toString() {
-      return "AnomalyReportDTO{" +
-          "anomalyId=" + anomalyId +
-          ", metric='" + metric + '\'' +
-          ", startDateTime='" + startDateTime + '\'' +
-          ", windowSize='" + windowSize + '\'' +
-          ", lift='" + lift + '\'' +
-          ", feedback='" + feedback + '\'' +
-          ", anomalyURL='" + anomalyURL + '\'' +
-          '}';
+      return MoreObjects.toStringHelper(this).add("metric", metric).add("startDateTime", startDateTime)
+          .add("windowSize", windowSize).add("lift", lift).add("feedback", feedback).add("anomalyId", anomalyId)
+          .add("anomalyURL", anomalyURL).toString();
     }
   }
 }

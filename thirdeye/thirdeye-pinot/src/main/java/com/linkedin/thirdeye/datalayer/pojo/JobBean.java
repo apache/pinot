@@ -1,10 +1,8 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
+import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 import java.sql.Timestamp;
 import java.util.Objects;
-
-import com.google.common.base.MoreObjects;
-import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 
 /**
  * This class corresponds to an anomaly job. An anomaly job is created for every execution of an
@@ -78,22 +76,12 @@ public class JobBean extends AbstractBean {
       return false;
     }
     JobBean af = (JobBean) o;
-    return Objects.equals(getId(), af.getId()) && Objects.equals(jobName, af.getJobName())
-        && Objects.equals(status, af.getStatus())
-        && Objects.equals(scheduleStartTime, af.getScheduleStartTime());
+    return Objects.equals(getId(), af.getId()) && Objects.equals(jobName, af.getJobName()) && Objects
+        .equals(status, af.getStatus()) && Objects.equals(scheduleStartTime, af.getScheduleStartTime());
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(getId(), jobName, status, scheduleStartTime);
-  }
-
-  @Override
-  public String toString() {
-
-    return MoreObjects.toStringHelper(this).add("id", getId()).add("jobName", jobName)
-        .add("status", status).add("scheduleStartTime", scheduleStartTime)
-        .add("scheduleEndTime", scheduleEndTime).add("windowStartTime", windowStartTime)
-        .add("windowEndTime", windowEndTime).add("lastModified", lastModified).toString();
   }
 }

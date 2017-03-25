@@ -8,6 +8,8 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.commons.lang.builder.ToStringBuilder;
+import org.apache.commons.lang.builder.ToStringStyle;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -161,15 +163,7 @@ public class ExternalApiQueryUtil {
 
     @Override
     public String toString() {
-      return "InFormedPost{" +
-          "content='" + content + '\'' +
-          ", id=" + id +
-          ", topic='" + topic + '\'' +
-          ", post_time='" + post_time + '\'' +
-          ", source='" + source + '\'' +
-          ", timestamp='" + timestamp + '\'' +
-          ", user='" + user + '\'' +
-          '}';
+      return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
     }
   }
 }
