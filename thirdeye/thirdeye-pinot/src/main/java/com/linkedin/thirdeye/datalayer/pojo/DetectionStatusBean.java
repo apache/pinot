@@ -74,13 +74,6 @@ public class DetectionStatusBean extends AbstractBean implements Comparable<Dete
   }
 
   @Override
-  public String toString() {
-    return MoreObjects.toStringHelper(this).add("id", getId()).add("dataset", dataset)
-        .add("dateToCheckInMS", dateToCheckInMS).add("dateToCheckInSDF", dateToCheckInSDF)
-        .add("functionId", functionId).add("detectionRun", detectionRun).toString();
-  }
-
-  @Override
   public int compareTo(DetectionStatusBean o) {
     return dateToCheckInSDF.compareTo(o.getDateToCheckInSDF());
   }

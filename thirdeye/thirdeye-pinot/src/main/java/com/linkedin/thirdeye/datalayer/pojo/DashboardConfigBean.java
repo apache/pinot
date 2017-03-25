@@ -101,11 +101,4 @@ public class DashboardConfigBean extends AbstractBean {
   public int hashCode() {
     return Objects.hash(getId(), name, metricIds, dataset, filterClause, groupBy, anomalyFunctionIds, active);
   }
-
-  @Override
-  public String toString() {
-    return MoreObjects.toStringHelper(this).add("id", getId()).add("name", name)
-        .add("metricIds", metricIds).add("dataset", getDataset()).add("filterClause", filterClause)
-        .add("groupBy", groupBy).add("anomalyFunctionIds", anomalyFunctionIds).add("active", active).toString();
-  }
 }

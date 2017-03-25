@@ -236,17 +236,4 @@ public class DatasetConfigBean extends AbstractBean {
         metricAsDimension, metricNamesColumn, metricValuesColumn, autoDiscoverMetrics, active, additive,
         dimensionsHaveNoPreAggregation, preAggregatedKeyword, nonAdditiveBucketSize, nonAdditiveBucketUnit, realtime, requiresCompletenessCheck);
   }
-
-  @Override
-  public String toString() {
-    return MoreObjects.toStringHelper(this).add("id", getId()).add("dataset", dataset)
-        .add("dimensions", dimensions).add("timeUnit", timeUnit)
-        .add("timeDuration", timeDuration).add("timeFormat", timeFormat).add("metricAsDimension", metricAsDimension)
-        .add("metricNamesColumn", metricNamesColumn).add("metricValuesColumn", metricValuesColumn)
-        .add("autoDiscoverMetrics", autoDiscoverMetrics).add("active", active).add("additive", additive)
-        .add("dimensionsHaveNoPreAggregation", dimensionsHaveNoPreAggregation)
-        .add("preAggregatedKeyword", preAggregatedKeyword).add("nonAdditiveBucketSize", nonAdditiveBucketSize)
-        .add("nonAdditiveBucketUnit", nonAdditiveBucketUnit).add("offlineOnly", realtime)
-        .add("requiresCompletenessCheck", requiresCompletenessCheck).toString();
-  }
 }

@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.linkedin.thirdeye.anomaly.events.EventType;
 import java.util.List;
 import java.util.Map;
 
@@ -77,18 +76,5 @@ public class EventBean extends AbstractBean {
 
   public void setStartTime(long startTime) {
     this.startTime = startTime;
-  }
-
-  @Override
-  public String toString() {
-    return "EventBean{" +
-        "endTime=" + endTime +
-        ", name='" + name + '\'' +
-        ", metric='" + metric + '\'' +
-        ", service='" + service + '\'' +
-        ", eventType='" + eventType + '\'' +
-        ", startTime=" + startTime +
-        ", targetDimensionMap=" + targetDimensionMap +
-        '}';
   }
 }

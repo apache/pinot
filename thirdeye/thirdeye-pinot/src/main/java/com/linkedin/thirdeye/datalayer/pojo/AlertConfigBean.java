@@ -191,18 +191,4 @@ public class AlertConfigBean extends AbstractBean {
   public enum COMPARE_MODE {
     WoW, Wo2W, Wo3W, Wo4W
   }
-
-  @Override
-  public String toString() {
-    return "AlertConfigBean{" +
-        "active=" + active +
-        ", name='" + name + '\'' +
-        ", cronExpression='" + cronExpression + '\'' +
-        ", emailConfig=" + emailConfig +
-        ", reportConfigCollection=" + reportConfigCollection +
-        ", recipients='" + recipients + '\'' +
-        ", fromAddress='" + fromAddress + '\'' +
-        '}';
-  }
-
 }

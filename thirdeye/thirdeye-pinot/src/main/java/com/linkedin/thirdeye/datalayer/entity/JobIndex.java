@@ -40,11 +40,4 @@ public class JobIndex extends AbstractIndexEntity {
   public void setStatus(String status) {
     this.status = status;
   }
-
-  @Override
-  public String toString() {
-    return "JobIndex [name=" + name + ", status=" + status + ", scheduleStartTime="
-        + scheduleStartTime + ", scheduleEndTime=" + scheduleEndTime + "]";
-  }
-
 }

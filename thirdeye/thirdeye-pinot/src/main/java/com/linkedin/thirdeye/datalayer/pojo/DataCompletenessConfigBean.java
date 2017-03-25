@@ -112,12 +112,4 @@ public class DataCompletenessConfigBean extends AbstractBean {
     return Objects.hash(getId(), dataset, dateToCheckInMS, dateToCheckInSDF, countStar, dataComplete, percentComplete,
         numAttempts, delayNotified, timedOut);
   }
-
-  @Override
-  public String toString() {
-    return MoreObjects.toStringHelper(this).add("id", getId()).add("dataset", dataset)
-        .add("dateToCheckInMS", dateToCheckInMS).add("dateToCheckInSDF", dateToCheckInSDF)
-        .add("countStar", countStar).add("dataComplete", dataComplete).add("percentComplete", percentComplete)
-        .add("numAttempts", numAttempts).add("delayNotified", delayNotified).add("timedOut", timedOut).toString();
-  }
 }

@@ -1,13 +1,11 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
-import com.google.common.base.MoreObjects;
 import com.linkedin.thirdeye.api.DimensionMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import org.apache.commons.lang.ObjectUtils;
-
 
 public class MergedAnomalyResultBean extends AbstractBean implements Comparable<MergedAnomalyResultBean> {
   private Long functionId;
@@ -192,13 +190,5 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
       return diff;
     }
     return ObjectUtils.compare(getId(), o.getId());
-  }
-
-  @Override public String toString() {
-    return MoreObjects.toStringHelper(this).add("functionId", functionId).add("anomalyFeedbackId", anomalyFeedbackId)
-        .add("collection", collection).add("metric", metric).add("dimensions", dimensions).add("startTime", startTime)
-        .add("endTime", endTime).add("avgCurrentVal", avgCurrentVal).add("avgBaselineVal", avgBaselineVal)
-        .add("score", score).add("weight", weight).add("properties", properties).add("createdTime", createdTime)
-        .add("notified", notified).add("message", message).add("rawAnomalyIdList", rawAnomalyIdList).toString();
   }
 }

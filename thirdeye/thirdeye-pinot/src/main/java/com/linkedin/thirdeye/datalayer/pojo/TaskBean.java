@@ -1,11 +1,9 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
-import java.sql.Timestamp;
-import java.util.Objects;
-
-import com.google.common.base.MoreObjects;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
+import java.sql.Timestamp;
+import java.util.Objects;
 
 
 /**
@@ -112,12 +110,5 @@ public class TaskBean extends AbstractBean {
   @Override
   public int hashCode() {
     return Objects.hash(getId(), status, startTime, endTime, taskInfo);
-  }
-
-  @Override
-  public String toString() {
-    return MoreObjects.toStringHelper(this).add("id", getId()).add("status", status)
-        .add("startTime", startTime).add("endTime", endTime).add("taskInfo", taskInfo)
-        .add("lastModified", lastModified).toString();
   }
 }
