@@ -2,6 +2,9 @@ package com.linkedin.thirdeye.anomalydetection.context;
 
 import com.linkedin.thirdeye.anomalydetection.function.AnomalyDetectionFunction;
 import com.linkedin.thirdeye.anomalydetection.model.prediction.PredictionModel;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +25,7 @@ public class AnomalyDetectionContext {
   private Map<String, List<TimeSeries>> baselines = new HashMap<>();
 
   //TODO: Add DAO for accessing historical anomalies or scaling factor
+  private List<MergedAnomalyResultDTO> historicalAnomalies = new ArrayList<>();
 
   // The followings are intermediate results and are appended during anomaly detection
   private Map<String, TimeSeries> transformedCurrent = new HashMap<>();
@@ -69,6 +73,20 @@ public class AnomalyDetectionContext {
    */
   public void setBaselines(String metricName, List<TimeSeries> baselines) {
     this.baselines.put(metricName, baselines);
+  }
+
+  /**
+   * Returns the list of historicalAnomalies.
+   */
+  public List<MergedAnomalyResultDTO> getHistoricalAnomalies() {
+    return this.historicalAnomalies;
+  }
+
+  /**
+   * Sets the set of baseline time series for training the prediction model.
+   */
+  public void setHistoricalAnomalies(List<MergedAnomalyResultDTO> anomalies) {
+    this.historicalAnomalies = anomalies;
   }
 
   /**
