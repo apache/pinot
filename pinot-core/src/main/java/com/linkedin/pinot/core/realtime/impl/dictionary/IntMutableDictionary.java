@@ -15,6 +15,9 @@
  */
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
+import java.util.Arrays;
+
+
 public class IntMutableDictionary extends MutableDictionaryReader {
 
   private Integer min = Integer.MAX_VALUE;
@@ -129,6 +132,20 @@ public class IntMutableDictionary extends MutableDictionaryReader {
       int dictId = dictionaryIds[iter];
       outValues[outStartPos++] = getInt(dictId);
     }
+  }
+
+  @Override
+  public Object getSortedValues() {
+    int valueCount = length();
+    int[] values = new int[valueCount];
+
+    for (int i = 0; i < valueCount; i++) {
+      values[i] = getIntValue(i);
+    }
+
+    Arrays.sort(values);
+
+    return values;
   }
 
   @Override

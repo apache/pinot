@@ -15,6 +15,9 @@
  */
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
+import java.util.Arrays;
+
+
 public class DoubleMutableDictionary extends MutableDictionaryReader {
 
   private Double min = Double.MAX_VALUE;
@@ -151,6 +154,20 @@ public class DoubleMutableDictionary extends MutableDictionaryReader {
     }
 
     return ret;
+  }
+
+  @Override
+  public Object getSortedValues() {
+    int valueCount = length();
+    double[] values = new double[valueCount];
+
+    for (int i = 0; i < valueCount; i++) {
+      values[i] = getDoubleValue(i);
+    }
+
+    Arrays.sort(values);
+
+    return values;
   }
 
   @Override

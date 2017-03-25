@@ -22,9 +22,9 @@ import java.util.List;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.common.data.TimeGranularitySpec;
-import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.realtime.converter.stats.RealtimeSegmentSegmentCreationDataSource;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 
@@ -82,7 +82,7 @@ public class RealtimeSegmentConverter {
 
   public void build(SegmentVersion segmentVersion) throws Exception {
     // lets create a record reader
-    RecordReader reader;
+    RealtimeSegmentRecordReader reader;
     if (sortedColumn == null) {
       reader = new RealtimeSegmentRecordReader(realtimeSegmentImpl, dataSchema);
     } else {
@@ -104,7 +104,7 @@ public class RealtimeSegmentConverter {
     genConfig.setOutDir(outputPath);
     genConfig.setSegmentName(segmentName);
     final SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(genConfig, reader);
+    driver.init(genConfig, new RealtimeSegmentSegmentCreationDataSource(realtimeSegmentImpl, reader, dataSchema));
     driver.build();
   }
 }

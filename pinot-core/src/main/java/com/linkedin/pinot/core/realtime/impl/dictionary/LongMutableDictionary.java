@@ -15,6 +15,9 @@
  */
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
+import java.util.Arrays;
+
+
 public class LongMutableDictionary extends MutableDictionaryReader {
 
   private Long min = Long.MAX_VALUE;
@@ -152,6 +155,20 @@ public class LongMutableDictionary extends MutableDictionaryReader {
     }
 
     return ret;
+  }
+
+  @Override
+  public Object getSortedValues() {
+    int valueCount = length();
+    long[] values = new long[valueCount];
+
+    for (int i = 0; i < valueCount; i++) {
+      values[i] = getLongValue(i);
+    }
+
+    Arrays.sort(values);
+
+    return values;
   }
 
   @Override

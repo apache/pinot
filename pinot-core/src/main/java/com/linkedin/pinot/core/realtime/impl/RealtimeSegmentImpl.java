@@ -349,7 +349,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   }
 
   @Override
-  public DataSource getDataSource(String columnName) {
+  public RealtimeColumnDataSource getDataSource(String columnName) {
     FieldSpec fieldSpec = dataSchema.getFieldSpecFor(columnName);
 
     if (fieldSpec.getFieldType() == FieldType.METRIC) {

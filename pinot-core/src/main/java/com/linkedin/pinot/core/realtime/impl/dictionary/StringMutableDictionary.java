@@ -15,6 +15,9 @@
  */
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
+import java.util.Arrays;
+
+
 public class StringMutableDictionary extends MutableDictionaryReader {
 
   private String min = null;
@@ -130,6 +133,20 @@ public class StringMutableDictionary extends MutableDictionaryReader {
     }
 
     return ret;
+  }
+
+  @Override
+  public Object getSortedValues() {
+    int valueCount = length();
+    Object[] values = new Object[valueCount];
+
+    for (int i = 0; i < valueCount; i++) {
+      values[i] = getStringValue(i);
+    }
+
+    Arrays.sort(values);
+
+    return values;
   }
 
   private String getString(int dictionaryId) {

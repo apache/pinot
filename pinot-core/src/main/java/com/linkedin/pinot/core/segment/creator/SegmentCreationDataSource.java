@@ -20,10 +20,10 @@ import com.linkedin.pinot.core.data.readers.RecordReader;
 
 
 /**
- * Data source used to build segments
+ * Data source used to build segments.
  */
 public interface SegmentCreationDataSource {
-  SegmentPreIndexStatsCollector gatherStats(StatsCollectorConfig statsCollectorConfig);
+  SegmentPreIndexStatsContainer gatherStats(StatsCollectorConfig statsCollectorConfig);
 
   RecordReader getRecordReader();
 }

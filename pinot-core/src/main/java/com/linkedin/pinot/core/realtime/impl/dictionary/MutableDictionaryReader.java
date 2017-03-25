@@ -121,6 +121,8 @@ public abstract class MutableDictionaryReader implements Dictionary {
 
   }
 
+  public abstract Object getSortedValues();
+
   protected Integer getIndexOfFromBiMap(Object val) {
     Integer ret = dictionaryIdBiMap.inverse().get(val);
     if (ret == null) {

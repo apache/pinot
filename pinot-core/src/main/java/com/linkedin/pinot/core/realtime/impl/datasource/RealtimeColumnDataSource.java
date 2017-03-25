@@ -192,7 +192,7 @@ public class RealtimeColumnDataSource extends DataSource {
   }
 
   @Override
-  public Dictionary getDictionary() {
+  public MutableDictionaryReader getDictionary() {
     return dictionary;
   }
 }

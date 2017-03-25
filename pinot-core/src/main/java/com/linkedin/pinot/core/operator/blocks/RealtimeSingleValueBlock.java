@@ -74,6 +74,10 @@ public class RealtimeSingleValueBlock implements Block {
     return new RealtimeSingleValueSet(reader, docIdSearchableOffset + 1, spec.getDataType());
   }
 
+  public FixedByteSingleColumnSingleValueReaderWriter getReader() {
+    return reader;
+  }
+
   @Override
   public BlockDocIdValueSet getBlockDocIdValueSet() {
     return null;
