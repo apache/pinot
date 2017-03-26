@@ -3,6 +3,8 @@ package com.linkedin.thirdeye.api;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
+import org.joda.time.Period;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 public class TimeGranularity {
@@ -29,6 +31,31 @@ public class TimeGranularity {
 
   public long toMillis() {
     return toMillis(1);
+  }
+
+  public Period toPeriod() {
+    Period period = null;
+    switch (unit) {
+    case DAYS:
+      period = new Period(0, 0, 0, size, 0, 0, 0, 0);
+      break;
+    case HOURS:
+      period = new Period(0, 0, 0, 0, size, 0, 0, 0);
+      break;
+    case MINUTES:
+      period = new Period(0, 0, 0, 0, 0, size, 0, 0);
+      break;
+    case SECONDS:
+      period = new Period(0, 0, 0, 0, 0, 0, size, 0);
+      break;
+    case MILLISECONDS:
+      period = new Period(0, 0, 0, 0, 0, 0, 0, size);
+      break;
+    default:
+      period = new Period(0, 0, 0, 0, size, 0, 0, 0);
+      break;
+    }
+    return period;
   }
 
   /**

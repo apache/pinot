@@ -1,12 +1,13 @@
 package com.linkedin.thirdeye.anomaly.alert.util;
 
 import com.google.common.cache.LoadingCache;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.alert.v2.AlertTaskRunnerV2;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.cache.QueryCache;
-import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewHandler;
@@ -14,9 +15,6 @@ import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewRequest;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewResponse;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
 
-import java.io.File;
-import java.net.MalformedURLException;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -41,7 +39,7 @@ import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonHandler;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonRequest;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonResponse;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
@@ -290,7 +288,33 @@ public abstract class EmailHelper {
           .sendEmailWithTextBody(email, thirdeyeConfig.getSmtpConfiguration(), subject, textBody,
               thirdeyeConfig.getFailureFromAddress(), thirdeyeConfig.getFailureToAddress());
     } catch (EmailException e) {
-      throw new JobExecutionException(e);
+      LOG.error("Exception in sending email for failed screenshot", e);
     }
+  }
+
+  public static void sendNotificationForDataIncomplete(
+      Multimap<String, DataCompletenessConfigDTO> incompleteEntriesToNotify, ThirdEyeAnomalyConfiguration thirdeyeConfig) {
+    HtmlEmail email = new HtmlEmail();
+    String subject = String.format("Data Completeness Checker Report");
+    StringBuilder textBody = new StringBuilder();
+    for (String dataset : incompleteEntriesToNotify.keySet()) {
+      List<DataCompletenessConfigDTO> entries = Lists.newArrayList(incompleteEntriesToNotify.get(dataset));
+      textBody.append(String.format("\nDataset: %s\n", dataset));
+      for (DataCompletenessConfigDTO entry : entries) {
+        textBody.append(String.format("Date: %d %s Percent Complete: %f\n",
+            entry.getDateToCheckInMS(), entry.getDateToCheckInSDF(), entry.getPercentComplete()));
+      }
+      textBody.append("\n*******************************************************\n");
+    }
+    LOG.info("Data Completeness Checker Report : Sending email to {} with subject {} and text {}",
+        thirdeyeConfig.getFailureToAddress(), subject, textBody.toString());
+
+    try {
+      EmailHelper.sendEmailWithTextBody(email, thirdeyeConfig.getSmtpConfiguration(), subject, textBody.toString(),
+              thirdeyeConfig.getFailureFromAddress(), thirdeyeConfig.getFailureToAddress());
+    } catch (EmailException e) {
+      LOG.error("Exception in sending email notification for incomplete datasets", e);
+    }
+
   }
 }
