@@ -146,6 +146,23 @@ public class DataCompletenessTaskRunner implements TaskRunner {
               }
             }
           }
+
+          // collect all older than expected delay, and still incomplete
+          Period expectedDelayPeriod = datasetConfig.getExpectedDelay().toPeriod();
+          long expectedDelayStart = new DateTime(adjustedEnd, dateTimeZone).minus(expectedDelayPeriod).getMillis();
+          LOG.info("Expected delay for dataset {} is {}, checking from {} to {}",
+              dataset, expectedDelayPeriod, adjustedStart, expectedDelayStart);
+          if (adjustedStart < expectedDelayStart) {
+            List<DataCompletenessConfigDTO> olderThanExpectedDelayAndNotComplete =
+                DAO_REGISTRY.getDataCompletenessConfigDAO().findAllByDatasetAndInTimeRangeAndStatus(dataset, adjustedStart, expectedDelayStart, false);
+            for (DataCompletenessConfigDTO entry : olderThanExpectedDelayAndNotComplete) {
+              if (!entry.isDelayNotified()) {
+                incompleteEntriesToNotify.putAll(dataset, olderThanExpectedDelayAndNotComplete);
+                entry.setDelayNotified(true);
+                DAO_REGISTRY.getDataCompletenessConfigDAO().update(entry);
+              }
+            }
+          }
         } catch (Exception e) {
           LOG.error("Exception in data completeness checker task for dataset {}.. Continuing with remaining datasets", dataset, e);
         }
