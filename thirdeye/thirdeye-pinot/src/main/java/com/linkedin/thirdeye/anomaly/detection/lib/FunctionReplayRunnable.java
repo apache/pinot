@@ -19,8 +19,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class FunctionAutotuneRunnable implements Runnable {
-  private static final Logger LOG = LoggerFactory.getLogger(FunctionAutotuneRunnable.class);
+public class FunctionReplayRunnable implements Runnable {
+  private static final Logger LOG = LoggerFactory.getLogger(FunctionReplayRunnable.class);
   private DetectionJobScheduler detectionJobScheduler;
   private MergedAnomalyResultManager mergedAnomalyResultDAO;
   private AnomalyFunctionManager anomalyFunctionDAO;
@@ -35,8 +35,9 @@ public class FunctionAutotuneRunnable implements Runnable {
   private boolean isForceBackfill;
   private Map<String, String> tuningParameter;
   private Long functionAutotuneConfigId;
+  private boolean speedUp;
 
-  public FunctionAutotuneRunnable(DetectionJobScheduler detectionJobScheduler, AnomalyFunctionManager anomalyFunctionDAO,
+  public FunctionReplayRunnable(DetectionJobScheduler detectionJobScheduler, AnomalyFunctionManager anomalyFunctionDAO,
       MergedAnomalyResultManager mergedAnomalyResultDAO, RawAnomalyResultManager rawAnomalyResultDAO,
       AutotuneConfigManager autotuneConfigDAO){
     this.detectionJobScheduler = detectionJobScheduler;
@@ -44,14 +45,15 @@ public class FunctionAutotuneRunnable implements Runnable {
     this.anomalyFunctionDAO = anomalyFunctionDAO;
     this.rawAnomalyResultDAO = rawAnomalyResultDAO;
     this.autotuneConfigDAO = autotuneConfigDAO;
+    setSpeedUp(true);
     setForceBackfill(true);
   }
 
-  public FunctionAutotuneRunnable(DetectionJobScheduler detectionJobScheduler, AnomalyFunctionManager anomalyFunctionDAO,
+  public FunctionReplayRunnable(DetectionJobScheduler detectionJobScheduler, AnomalyFunctionManager anomalyFunctionDAO,
       MergedAnomalyResultManager mergedAnomalyResultDAO, RawAnomalyResultManager rawAnomalyResultDAO,
       AutotuneConfigManager autotuneConfigDAO, Map<String, String> tuningParameter,
       long tuningFunctionId, DateTime replayStart, DateTime replayEnd, double goal, long functionAutotuneConfigId,
-      Map<String, Comparable> goalRange, boolean isForceBackfill) {
+      boolean isForceBackfill) {
     this.detectionJobScheduler = detectionJobScheduler;
     this.mergedAnomalyResultDAO = mergedAnomalyResultDAO;
     this.rawAnomalyResultDAO = rawAnomalyResultDAO;
@@ -63,6 +65,7 @@ public class FunctionAutotuneRunnable implements Runnable {
     setForceBackfill(isForceBackfill);
     setTuningParameter(tuningParameter);
     setFunctionAutotuneConfigId(functionAutotuneConfigId);
+    setSpeedUp(true);
     setGoal(goal);
   }
 
@@ -92,28 +95,30 @@ public class FunctionAutotuneRunnable implements Runnable {
     anomalyFunctionDTO.setAlertFilter(null);
 
     // enlarge window size so that we can speed-up the replay speed
-    switch(anomalyFunctionDTO.getWindowUnit()){
-      case NANOSECONDS:
-      case MICROSECONDS:
-      case MILLISECONDS: // In case of future use
-      case SECONDS:
-      case MINUTES:
-        anomalyFunctionDTO.setWindowSize(12);
-        anomalyFunctionDTO.setWindowUnit(TimeUnit.HOURS);
-        anomalyFunctionDTO.setCron("0 0 0/2 * * ? *");
-      case HOURS:
-        anomalyFunctionDTO.setWindowSize(4);
-        anomalyFunctionDTO.setWindowUnit(TimeUnit.DAYS);
-        anomalyFunctionDTO.setCron("0 0 0 */4 * ? *");
-      case DAYS:
-      default:
-        anomalyFunctionDTO.setWindowSize(7);
-        anomalyFunctionDTO.setWindowUnit(TimeUnit.DAYS);
-        anomalyFunctionDTO.setCron("0 0 0 ? * MON *");
+    if(speedUp) {
+      switch (anomalyFunctionDTO.getWindowUnit()) {
+        case NANOSECONDS:
+        case MICROSECONDS:
+        case MILLISECONDS: // In case of future use
+        case SECONDS:
+        case MINUTES:
+          anomalyFunctionDTO.setWindowSize(12);
+          anomalyFunctionDTO.setWindowUnit(TimeUnit.HOURS);
+          anomalyFunctionDTO.setCron("0 0 0/2 * * ? *");
+        case HOURS:
+          anomalyFunctionDTO.setWindowSize(4);
+          anomalyFunctionDTO.setWindowUnit(TimeUnit.DAYS);
+          anomalyFunctionDTO.setCron("0 0 0 */4 * ? *");
+        case DAYS:
+        default:
+          anomalyFunctionDTO.setWindowSize(7);
+          anomalyFunctionDTO.setWindowUnit(TimeUnit.DAYS);
+          anomalyFunctionDTO.setCron("0 0 0 ? * MON *");
+      }
     }
 
     // Set Properties
-    FunctionPropertiesUtils.applyConfigurationToProperties(anomalyFunctionDTO, tuningParameter);
+    anomalyFunctionDTO.setProperties(tuningParameter);
     anomalyFunctionDTO.setActive(true);
 
     anomalyFunctionDAO.update(anomalyFunctionDTO);
@@ -218,5 +223,13 @@ public class FunctionAutotuneRunnable implements Runnable {
 
   public void setFunctionAutotuneConfigId(Long functionAutotuneConfigId) {
     this.functionAutotuneConfigId = functionAutotuneConfigId;
+  }
+
+  public boolean isSpeedUp() {
+    return speedUp;
+  }
+
+  public void setSpeedUp(boolean speedUp) {
+    this.speedUp = speedUp;
   }
 }

@@ -12,9 +12,15 @@ import java.util.Stack;
 import org.joda.time.Interval;
 
 
-public class IntervalUtils {
+public class MergedAnomalyIntervalUtils {
+  /**
+   * This method is designed to merge a list of intervals to a list of intervals with no overlap in between
+   * @param intervals
+   * @return
+   * a list of intervals with no overlap in between
+   */
   public static List<Interval> mergeIntervals (List<Interval> intervals) {
-    if(intervals.size() == 0) {
+    if(intervals == null || intervals.size() == 0) {
       return intervals;
     }
     // Sort Intervals
@@ -33,7 +39,7 @@ public class IntervalUtils {
       Interval top = intervalStack.peek();
       Interval target = intervals.get(i);
 
-      if(top.overlap(target) == null) {
+      if(top.overlap(target) == null && (top.getEnd() != target.getStart())) {
         intervalStack.push(target);
       }
       else if(top.equals(target)) {
@@ -50,17 +56,26 @@ public class IntervalUtils {
     return intervalStack;
   }
 
+  /**
+   * Merge intervals for each dimension map
+   * @param anomalyIntervals
+   */
   public static void mergeIntervals(Map<DimensionMap, List<Interval>> anomalyIntervals) {
     for(DimensionMap dimension : anomalyIntervals.keySet()) {
       anomalyIntervals.put(dimension ,mergeIntervals(anomalyIntervals.get(dimension)));
     }
   }
 
+  /**
+   * convert merge anomalies to a dimension-intervals map
+   * @param mergedAnomalyResultDTOList
+   * @return
+   */
   public static Map<DimensionMap, List<Interval>> mergedAnomalyResultsToIntervalMap (List<MergedAnomalyResultDTO> mergedAnomalyResultDTOList) {
     Map<DimensionMap, List<Interval>> anomalyIntervals = new HashMap<>();
     for(MergedAnomalyResultDTO mergedAnomaly : mergedAnomalyResultDTOList) {
       if(!anomalyIntervals.containsKey(mergedAnomaly.getDimensions())) {
-        anomalyIntervals.put(mergedAnomaly.getDimensions(), new ArrayList<>());
+        anomalyIntervals.put(mergedAnomaly.getDimensions(), new ArrayList<Interval>());
       }
       anomalyIntervals.get(mergedAnomaly.getDimensions()).add(
           new Interval(mergedAnomaly.getStartTime(), mergedAnomaly.getEndTime()));
@@ -68,6 +83,11 @@ public class IntervalUtils {
     return anomalyIntervals;
   }
 
+  /**
+   * convert merge anomalies to interval list without considering the dimension
+   * @param mergedAnomalyResultDTOList
+   * @return
+   */
   public static List<Interval> mergedAnomalyResultsToIntervals (List<MergedAnomalyResultDTO> mergedAnomalyResultDTOList) {
     List<Interval> anomalyIntervals = new ArrayList<>();
     for(MergedAnomalyResultDTO mergedAnomaly : mergedAnomalyResultDTOList) {

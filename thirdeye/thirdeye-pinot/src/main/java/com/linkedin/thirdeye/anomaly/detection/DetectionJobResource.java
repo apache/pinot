@@ -1,10 +1,10 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
 import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
+import com.linkedin.thirdeye.anomaly.detection.lib.AutotuneMethodType;
+import com.linkedin.thirdeye.anomaly.detection.lib.FunctionReplayRunnable;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutoTune;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
-import com.linkedin.thirdeye.anomaly.detection.lib.AutotuneMethodType;
-import com.linkedin.thirdeye.anomaly.detection.lib.FunctionAutotuneRunnable;
 import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluateHelper;
 import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluationMethod;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
@@ -20,10 +20,8 @@ import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterEvaluationUtil;
 import com.linkedin.thirdeye.util.SeverityComputationUtil;
 
-import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -47,7 +45,6 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.NullArgumentException;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
 import org.joda.time.Interval;
 import org.joda.time.format.ISODateTimeFormat;
 
@@ -546,8 +543,8 @@ public class DetectionJobResource {
    * A response containing all satisfied properties with their evaluation result
    */
   @POST
-  @Path("function/{id}/autotune")
-  public Response anomalyFunctionAutotune(@PathParam("id") long functionId, @QueryParam("start") String replayStartTimeIso,
+  @Path("function/{id}/replay")
+  public Response anomalyFunctionReplay(@PathParam("id") long functionId, @QueryParam("start") String replayStartTimeIso,
       @QueryParam("end") String replayEndTimeIso,
       @QueryParam("tune") String tuningJSON, @QueryParam("goal") double goal,
       @QueryParam("evalMethod") @DefaultValue("ANOMALY_PERCENTAGE") String performanceEvaluationMethod){
@@ -557,7 +554,7 @@ public class DetectionJobResource {
       replayStart = ISODateTimeFormat.dateTimeParser().parseDateTime(replayStartTimeIso);
       replayEnd = ISODateTimeFormat.dateTimeParser().parseDateTime(replayEndTimeIso);
     }
-    catch (DateTimeParseException e) {
+    catch (Exception e) {
       throw new WebApplicationException("Unable to parse strings, "+ replayStartTimeIso + " and " + replayEndTimeIso +
           ", in ISO DateTime format", e);
     }
@@ -613,7 +610,7 @@ public class DetectionJobResource {
     // Setup threads and start to run
     for(Map<String, String> config : tuningParameters) {
       LOG.info("Running backfill replay with parameter configuration: {}" + config.toString());
-      FunctionAutotuneRunnable backfillRunnable = new FunctionAutotuneRunnable(detectionJobScheduler, anomalyFunctionDAO,
+      FunctionReplayRunnable backfillRunnable = new FunctionReplayRunnable(detectionJobScheduler, anomalyFunctionDAO,
           mergedAnomalyResultDAO, rawAnomalyResultDAO, autotuneConfigDAO);
       backfillRunnable.setTuningFunctionId(functionId);
       backfillRunnable.setFunctionAutotuneConfigId(targetId);

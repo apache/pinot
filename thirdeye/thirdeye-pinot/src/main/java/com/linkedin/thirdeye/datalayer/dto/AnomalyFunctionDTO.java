@@ -5,6 +5,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import org.apache.commons.collections.CollectionUtils;
 import org.slf4j.Logger;
@@ -56,5 +57,25 @@ public class AnomalyFunctionDTO extends AnomalyFunctionBean {
       }
     }
     return props;
+  }
+
+  /**
+   * Convert Properties to String following the format in TE
+   */
+  public String propertiesToString(Properties props){
+    StringBuilder stringBuilder = new StringBuilder();
+    for(Map.Entry entry : props.entrySet()){
+      stringBuilder.append(entry.getKey() + "=" + entry.getValue() + ";");
+    }
+    stringBuilder.deleteCharAt(stringBuilder.length() - 1);
+    return stringBuilder.toString();
+  }
+
+  public void setProperties(Map<String, String> config) {
+    Properties properties = toProperties();
+    for (Map.Entry<String, String> entry : config.entrySet()) {
+      properties.setProperty(entry.getKey(), entry.getValue());
+    }
+    setProperties(propertiesToString(properties));
   }
 }

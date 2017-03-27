@@ -19,8 +19,8 @@ public class AnomalyPercentagePerformanceEvaluation implements PerformanceEvalua
     long anomalyLength = 0;
     long totalLength = windowInterval.toDurationMillis();
 
-    List<Interval> anomalyIntervals = IntervalUtils.mergedAnomalyResultsToIntervals(detectedResults);
-    anomalyIntervals = IntervalUtils.mergeIntervals(anomalyIntervals);
+    List<Interval> anomalyIntervals = MergedAnomalyIntervalUtils.mergedAnomalyResultsToIntervals(detectedResults);
+    anomalyIntervals = MergedAnomalyIntervalUtils.mergeIntervals(anomalyIntervals);
 
     for(Interval interval : anomalyIntervals) {
       anomalyLength += interval.toDurationMillis();
