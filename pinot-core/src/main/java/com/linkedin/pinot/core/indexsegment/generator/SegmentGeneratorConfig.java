@@ -30,6 +30,7 @@ import org.apache.commons.lang.StringUtils;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.codehaus.jackson.map.ObjectMapper;
+import org.joda.time.format.DateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.google.common.base.Preconditions;
@@ -46,6 +47,8 @@ import com.linkedin.pinot.core.segment.DefaultSegmentNameGenerator;
 import com.linkedin.pinot.core.segment.SegmentNameGenerator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.startree.hll.HllConfig;
+import javax.annotation.Nonnull;
+
 
 /**
  * Configuration properties used in the creation of index segments.
@@ -148,8 +151,13 @@ public class SegmentGeneratorConfig {
     _customProperties.putAll(properties);
   }
 
-  public void setSimpleDateFormat(String simpleDateFormat) {
+  public void setSimpleDateFormat(@Nonnull String simpleDateFormat) {
     _timeColumnType = TimeColumnType.SIMPLE_DATE;
+    try {
+      DateTimeFormat.forPattern(simpleDateFormat);
+    } catch (Exception e) {
+      throw new RuntimeException("Illegal simple date format specification", e);
+    }
     _simpleDateFormat = simpleDateFormat;
   }
 

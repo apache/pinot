@@ -15,6 +15,18 @@
  */
 package com.linkedin.pinot.core.segment.index.creator;
 
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Random;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.RandomStringUtils;
+import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
+import org.testng.annotations.Test;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
@@ -33,18 +45,6 @@ import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverIm
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import com.linkedin.pinot.core.segment.store.ColumnIndexType;
 import com.linkedin.pinot.core.segment.store.SegmentDirectory;
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Random;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.RandomStringUtils;
-import org.testng.Assert;
-import org.testng.annotations.AfterClass;
-import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
 
 
 /**
@@ -221,9 +221,8 @@ public class RawIndexCreatorTest {
 
       for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
         Object value;
-        FieldSpec.DataType dataType = fieldSpec.getDataType();
 
-        value = getRandomValue(dataType);
+        value = getRandomValue(_random, fieldSpec.getDataType());
         map.put(fieldSpec.getName(), value);
       }
 
@@ -248,27 +247,27 @@ public class RawIndexCreatorTest {
    * @param dataType Data type for which to generate the random value
    * @return Random value for the data type.
    */
-  private Object getRandomValue(FieldSpec.DataType dataType) {
+  public static Object getRandomValue(Random random, FieldSpec.DataType dataType) {
     Object value;
     switch (dataType) {
       case INT:
-        value = _random.nextInt();
+        value = random.nextInt();
         break;
 
       case LONG:
-        value = _random.nextLong();
+        value = random.nextLong();
         break;
 
       case FLOAT:
-        value = _random.nextFloat();
+        value = random.nextFloat();
         break;
 
       case DOUBLE:
-        value = _random.nextDouble();
+        value = random.nextDouble();
         break;
 
       case STRING:
-        value = StringUtil.trimTrailingNulls(RandomStringUtils.random(_random.nextInt(MAX_STRING_LENGTH_IN_BYTES)));
+        value = StringUtil.trimTrailingNulls(RandomStringUtils.random(random.nextInt(MAX_STRING_LENGTH_IN_BYTES)));
         break;
 
       default:
