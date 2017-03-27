@@ -13,7 +13,7 @@ public class DataCompletenessScheduler {
 
   private static final Logger LOG = LoggerFactory.getLogger(DataCompletenessScheduler.class);
 
-  private ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();;
+  private ScheduledExecutorService scheduledExecutorService = Executors.newSingleThreadScheduledExecutor();
   private DataCompletenessJobRunner dataCompletenessJobRunner;
   private DataCompletenessJobContext dataCompletenessJobContext;
 
