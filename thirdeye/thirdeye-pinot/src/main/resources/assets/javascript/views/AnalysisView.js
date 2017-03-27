@@ -145,6 +145,7 @@ AnalysisView.prototype = {
     var self = this;
     var granularities = self.analysisModel.fetchGranularityForMetric(metricId);
     var config = {
+      theme: "bootstrap",
       minimumResultsForSearch: -1,
       data: granularities
     };
@@ -158,7 +159,9 @@ AnalysisView.prototype = {
     if(!metricId) return;
     var dimensions = this.analysisModel.fetchDimensionsForMetric(metricId);
     var config = {
-      minimumResultsForSearch: -1, data: dimensions
+      theme: "bootstrap",
+      minimumResultsForSearch: -1,
+      data: dimensions
     };
     if (dimensions) {
       $("#analysis-metric-dimension-input").select2().empty();

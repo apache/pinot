@@ -26,7 +26,6 @@ label {
 .label-medium-semibold {
     font-weight: 600;
     font-size: 15px;
-    margin-bottom: 0;
 }
 .label-small-semibold {
     font-weight: 600;
@@ -151,10 +150,10 @@ hr {
     margin-top: 5px
 }
 .top-buffer {
-    margin-top: 10px;
+    margin-top: 24px;
 }
 .bottom-buffer {
-    margin-bottom: 10px;
+    margin-bottom: 24px;
 }
 .padding-all {
     padding: 24px;
@@ -598,7 +597,6 @@ text {
 
 /* Anomaly Results*/
 .anomalies-panel {
-  margin: 24px 0;
   background-color: white;
   border-radius: 2px;
   border: 1px solid #CCC;
@@ -784,6 +782,50 @@ text {
   margin-bottom: 24px;
 }
 
+.analysis-options {
+  display: flex;
+}
+
+.analysis-options__dropdown {
+  width: 50%;
+  margin-left: 24px;
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.analysis-options__datepicker {
+  width: 50%;
+  margin-right: 24px;
+}
+
+.analysis-options__granularity {
+  margin-right: 24px;
+}
+
+.analysis-options__granularity,
+.analysis-options__dimensions {
+  max-width: 50%;
+  flex-grow: 1;
+}
+
+.analysis-options__filters {
+  flex-basis: 100%;
+}
+
+.analysis-options__apply {
+  position: relative;
+  top: 26px;
+  margin-left: 24px;
+}
+
+.analysis-options__apply > .thirdeye-btn {
+  font-weight: normal;
+}
+
+.analysis-options .datepicker-range {
+  height: 32px;
+}
+
 /* Radio*/
 
 .anomaly-feedback-radio {
@@ -795,6 +837,9 @@ text {
 .analysis-card {
   background-color: white;
   padding: 24px;
-  margin-top: 24px;
   border: 1px solid #CCC;
+}
+
+.analysis-card + .analysis-card {
+  margin-top: 24px;
 }
