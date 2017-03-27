@@ -118,7 +118,7 @@ public class FunctionReplayRunnable implements Runnable {
     }
 
     // Set Properties
-    anomalyFunctionDTO.setProperties(tuningParameter);
+    anomalyFunctionDTO.updateProperties(tuningParameter);
     anomalyFunctionDTO.setActive(true);
 
     anomalyFunctionDAO.update(anomalyFunctionDTO);

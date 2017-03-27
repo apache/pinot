@@ -71,7 +71,12 @@ public class AnomalyFunctionDTO extends AnomalyFunctionBean {
     return stringBuilder.toString();
   }
 
-  public void setProperties(Map<String, String> config) {
+  /**
+   * Update values of entries in Properties
+   * @param config
+   * the configuration need to be updated in the function properties
+   */
+  public void updateProperties(Map<String, String> config) {
     Properties properties = toProperties();
     for (Map.Entry<String, String> entry : config.entrySet()) {
       properties.setProperty(entry.getKey(), entry.getValue());
