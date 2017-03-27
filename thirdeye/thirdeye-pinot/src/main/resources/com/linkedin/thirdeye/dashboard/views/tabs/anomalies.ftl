@@ -48,10 +48,12 @@
 						<label class="label-medium-semibold">Start date</label>
 						<div id="anomalies-time-range-start" class="datepicker-range">
 							<span></span>
+							<b class="caret"></b>
 						</div>
 						<label class="label-medium-semibold">End date</label>
 						<div id="anomalies-time-range-end" class="datepicker-range">
 							<span></span>
+							<b class="caret"></b>
 						</div>
 					</div>
 				</div>

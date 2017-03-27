@@ -18,10 +18,9 @@
 
 <div class="container top-buffer bottom-buffer">
 	<div class="analysis-card">
+		<div class="analysis-title">Trend Analysis</div>
 		<div class="row">
-			<div class="col-md-5">
-			<label>Select time ranges to compare:</label>
-
+			<div class="col-xs-5">
 			<div class="datepicker-field">
 				<label class="label-medium-semibold">Date Range (Current) </label>
 				<div id="current-range" class="datepicker-range">
@@ -37,15 +36,15 @@
 			</div>
 
 		</div>
-		<div class="col-md-2">
+		<div class="col-xs-2">
 			<label for="granularity">Granularity </label>
       <select id="analysis-granularity-input" style="width: 100%" class="label-large-light underlined"></select>
     </div>
-		<div class="col-md-2">
+		<div class="col-xs-2">
 			<label for="add-dimension-button">Dimensions</label>
       <select id="analysis-metric-dimension-input" style="width: 100%;" class="label-large-light underlined filter-select-field"></select>
 		</div>
-		<div class="col-md-3">
+		<div class="col-xs-3">
 			<label for="add-filter-button">Filters </label>
       <select id="analysis-metric-filter-input" style="width: 100%;" class="label-large-light underlined"></select>
 		</div>

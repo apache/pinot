@@ -1,3 +1,4 @@
+<div class="analysis-title">Contribution Analysis:</div>
 <div class="row bottom-buffer">
 	<div class="col-md-12">
 		<div>

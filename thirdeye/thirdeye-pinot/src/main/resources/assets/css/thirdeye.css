@@ -776,6 +776,14 @@ text {
   padding: 8px 0;
 }
 
+/* Analysis */
+
+.analysis-title {
+  font-size: 18px;
+  color: rgba(0,0,0,.55);
+  margin-bottom: 24px;
+}
+
 /* Radio*/
 
 .anomaly-feedback-radio {
