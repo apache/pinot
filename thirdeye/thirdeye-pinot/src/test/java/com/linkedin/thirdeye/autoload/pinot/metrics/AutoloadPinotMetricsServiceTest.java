@@ -12,8 +12,11 @@ import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.DashboardConfigBean;
+
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
@@ -52,6 +55,7 @@ public class AutoloadPinotMetricsServiceTest  extends AbstractManagerTestBase {
     Assert.assertEquals(datasetConfig.getTimeDuration(), new Integer(timeGranularitySpec.getTimeUnitSize()));
     Assert.assertEquals(datasetConfig.getTimeFormat(), timeGranularitySpec.getTimeFormat());
     Assert.assertEquals(datasetConfig.getTimezone(), "UTC");
+    Assert.assertEquals(datasetConfig.getExpectedDelay().getUnit(), TimeUnit.HOURS);
 
     List<MetricConfigDTO> metricConfigs = metricConfigDAO.findByDataset(dataset);
     List<String> schemaMetricNames = schema.getMetricNames();
