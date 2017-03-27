@@ -1,20 +1,20 @@
 <div class="container-fluid ">
 	<div class="row bg-white row-bordered">
 		<div class="container top-buffer bottom-buffer ">
-			<div class=row>
-				<div class="col-md-10">
-					<div style="float: left;">
+				<div class="search-bar">
+
+					<div class="search-title">
 						<label for="metric-input" class="label-large-light">Metric Name: </label>
 					</div>
-					<div style="width: 370px; float: left">
-						<select style="width: 100%" id="analysis-metric-input" class="label-large-light underlined"></select>
+
+					<div class="search-input search-field">
+						<select style="width:100%" id="analysis-metric-input" class="label-large-light underlined"></select>
 					</div>
-				</div>
-        <div class="col-md-2 text-right">
-          <input id="analysis-apply-button" type="button" class="btn thirdeye-btn" value="Apply">
-        </div>
-			</div>
-		</div>
+
+	        <a class="btn thirdeye-btn search-button" type="button" id="analysis-apply-button"><span class="glyphicon glyphicon-search"></span></a>
+	      </div>
+
+
 	</div>
 </div>
 <div class="container-fluid">
