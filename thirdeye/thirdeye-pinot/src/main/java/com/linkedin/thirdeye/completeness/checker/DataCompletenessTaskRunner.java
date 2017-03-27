@@ -102,7 +102,7 @@ public class DataCompletenessTaskRunner implements TaskRunner {
           LOG.info("Adjusted start:{} i.e. {} Adjusted end:{} i.e. {} and Bucket size:{}",
               adjustedStart, new DateTime(adjustedStart), adjustedEnd, new DateTime(adjustedEnd), bucketSize);
 
-          /*// get buckets to process
+          // get buckets to process
           Map<String, Long> bucketNameToBucketValueMS = getBucketsToProcess(dataset, adjustedStart, adjustedEnd,
               dataCompletenessAlgorithm, dateTimeFormatter, bucketSize);
           LOG.info("Got {} buckets to process", bucketNameToBucketValueMS.size());
@@ -125,7 +125,7 @@ public class DataCompletenessTaskRunner implements TaskRunner {
             // run completeness check for all buckets
             runCompletenessCheck(dataset, bucketNameToBucketValueMS, bucketNameToCount,
                 dataCompletenessAlgorithm, expectedCompleteness);
-          }*/
+          }
 
           // collect all older than expected delay, and still incomplete
           Period expectedDelayPeriod = datasetConfig.getExpectedDelay().toPeriod();
