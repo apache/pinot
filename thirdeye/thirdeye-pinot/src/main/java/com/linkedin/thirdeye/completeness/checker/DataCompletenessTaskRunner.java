@@ -10,10 +10,15 @@ import java.util.concurrent.TimeUnit;
 
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
+import org.joda.time.Period;
 import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Multimap;
+import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
+import com.linkedin.thirdeye.anomaly.alert.util.EmailHelper;
 import com.linkedin.thirdeye.anomaly.task.TaskContext;
 import com.linkedin.thirdeye.anomaly.task.TaskInfo;
 import com.linkedin.thirdeye.anomaly.task.TaskResult;
@@ -34,9 +39,11 @@ public class DataCompletenessTaskRunner implements TaskRunner {
 
   private static final Logger LOG = LoggerFactory.getLogger(DataCompletenessTaskRunner.class);
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
+  private static ThirdEyeAnomalyConfiguration thirdeyeConfig = null;
 
   @Override
   public List<TaskResult> execute(TaskInfo taskInfo, TaskContext taskContext) throws Exception {
+    thirdeyeConfig = taskContext.getThirdEyeAnomalyConfiguration();
     DataCompletenessTaskInfo dataCompletenessTaskInfo = (DataCompletenessTaskInfo) taskInfo;
     DataCompletenessType dataCompletenessType = dataCompletenessTaskInfo.getDataCompletenessType();
     if (dataCompletenessType.equals(DataCompletenessType.CHECKER)) {
@@ -66,6 +73,7 @@ public class DataCompletenessTaskRunner implements TaskRunner {
       LOG.info("StartTime {} i.e. {}", dataCompletenessStartTime, new DateTime(dataCompletenessStartTime));
       LOG.info("EndTime {} i.e. {}", dataCompletenessEndTime, new DateTime(dataCompletenessEndTime));
 
+      Multimap<String, DataCompletenessConfigDTO> incompleteEntriesToNotify = ArrayListMultimap.create();
       for (String dataset : datasets) {
         try {
 
@@ -94,7 +102,7 @@ public class DataCompletenessTaskRunner implements TaskRunner {
           LOG.info("Adjusted start:{} i.e. {} Adjusted end:{} i.e. {} and Bucket size:{}",
               adjustedStart, new DateTime(adjustedStart), adjustedEnd, new DateTime(adjustedEnd), bucketSize);
 
-          // get buckets to process
+          /*// get buckets to process
           Map<String, Long> bucketNameToBucketValueMS = getBucketsToProcess(dataset, adjustedStart, adjustedEnd,
               dataCompletenessAlgorithm, dateTimeFormatter, bucketSize);
           LOG.info("Got {} buckets to process", bucketNameToBucketValueMS.size());
@@ -117,11 +125,35 @@ public class DataCompletenessTaskRunner implements TaskRunner {
             // run completeness check for all buckets
             runCompletenessCheck(dataset, bucketNameToBucketValueMS, bucketNameToCount,
                 dataCompletenessAlgorithm, expectedCompleteness);
+          }*/
+
+          // collect all older than expected delay, and still incomplete
+          Period expectedDelayPeriod = datasetConfig.getExpectedDelay().toPeriod();
+          long expectedDelayStart = new DateTime(adjustedEnd, dateTimeZone).minus(expectedDelayPeriod).getMillis();
+          LOG.info("Expected delay for dataset {} is {}, checking from {} to {}",
+              dataset, expectedDelayPeriod, adjustedStart, expectedDelayStart);
+          if (adjustedStart < expectedDelayStart) {
+            List<DataCompletenessConfigDTO> olderThanExpectedDelayAndNotComplete =
+                DAO_REGISTRY.getDataCompletenessConfigDAO().findAllByDatasetAndInTimeRangeAndStatus(dataset, adjustedStart, expectedDelayStart, false);
+            for (DataCompletenessConfigDTO entry : olderThanExpectedDelayAndNotComplete) {
+              if (!entry.isDelayNotified()) {
+                incompleteEntriesToNotify.putAll(dataset, olderThanExpectedDelayAndNotComplete);
+                entry.setDelayNotified(true);
+                DAO_REGISTRY.getDataCompletenessConfigDAO().update(entry);
+              }
+            }
           }
         } catch (Exception e) {
           LOG.error("Exception in data completeness checker task for dataset {}.. Continuing with remaining datasets", dataset, e);
         }
       }
+
+      // notify
+      LOG.info("Sending email notification for incomplete entries");
+      if (!incompleteEntriesToNotify.isEmpty()) {
+        EmailHelper.sendNotificationForDataIncomplete(incompleteEntriesToNotify, thirdeyeConfig);
+      }
+
     } catch (Exception e) {
       LOG.error("Exception in data completeness checker task", e);
     }
