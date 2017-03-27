@@ -30,6 +30,7 @@ import org.apache.commons.lang.StringUtils;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.codehaus.jackson.map.ObjectMapper;
+import org.joda.time.format.DateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.google.common.base.Preconditions;
@@ -46,12 +47,18 @@ import com.linkedin.pinot.core.segment.DefaultSegmentNameGenerator;
 import com.linkedin.pinot.core.segment.SegmentNameGenerator;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.startree.hll.HllConfig;
+import javax.annotation.Nonnull;
+
 
 /**
  * Configuration properties used in the creation of index segments.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class SegmentGeneratorConfig {
+  public enum TimeColumnType {
+    EPOCH,
+    SIMPLE_DATE
+  }
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentGeneratorConfig.class);
 
   private Map<String, String> _customProperties = new HashMap<>();
@@ -84,6 +91,8 @@ public class SegmentGeneratorConfig {
   private SegmentNameGenerator _segmentNameGenerator = null;
   private SegmentPartitionConfig _segmentPartitionConfig = null;
   private int _sequenceId = -1;
+  private TimeColumnType _timeColumnType = TimeColumnType.EPOCH;
+  private String _simpleDateFormat = null;
 
   public SegmentGeneratorConfig() {
   }
@@ -140,6 +149,24 @@ public class SegmentGeneratorConfig {
   public void setCustomProperties(Map<String, String> properties) {
     Preconditions.checkNotNull(properties);
     _customProperties.putAll(properties);
+  }
+
+  public void setSimpleDateFormat(@Nonnull String simpleDateFormat) {
+    _timeColumnType = TimeColumnType.SIMPLE_DATE;
+    try {
+      DateTimeFormat.forPattern(simpleDateFormat);
+    } catch (Exception e) {
+      throw new RuntimeException("Illegal simple date format specification", e);
+    }
+    _simpleDateFormat = simpleDateFormat;
+  }
+
+  public String getSimpleDateFormat() {
+    return _simpleDateFormat;
+  }
+
+  public TimeColumnType getTimeColumnType() {
+    return _timeColumnType;
   }
 
   public boolean containsCustomProperty(String key) {
