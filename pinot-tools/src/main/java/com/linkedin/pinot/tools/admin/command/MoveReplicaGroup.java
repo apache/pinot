@@ -63,8 +63,9 @@ import org.slf4j.LoggerFactory;
 public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Command {
   private static Logger LOGGER = LoggerFactory.getLogger(MoveReplicaGroup.class);
 
-  @Option(name = "-srcHostsFile", aliases = {"-s", "--src"}, required = true, metaVar = "<filePath>", usage = "File with names of source hosts")
-  private String srcHostsFile;
+  @Option(name = "-srcHosts", aliases = {"-s", "--src"}, required = true, metaVar = "<filePath or csv hostnames>",
+      usage = "File with names of source hosts or csv list of hostnames")
+  private String srcHosts;
 
   @Option(name = "-destHostsFile", aliases = {"-d", "--dest"}, required = false, metaVar = "<File Path>",
       usage = "File with destination servers list")
@@ -108,7 +109,7 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
   }
 
   public String toString() {
-    String retString = "MoveReplicaGroup -srcHostsFile " + srcHostsFile + " -tableName " +
+    String retString = "MoveReplicaGroup -srcHosts " + srcHosts + " -tableName " +
         tableName + " -zkHost " + zkHost + " -zkPath " + zkPath +
         (exec ? " -exec" : "");
     return retString;
@@ -129,20 +130,16 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
     if (! isExistingTable(tableName)) {
       LOGGER.error("Table {} does not exist", tableName);
     }
-    List<String> srcHosts = readHostsFromFile(srcHostsFile);
-    if (srcHosts.isEmpty()) {
-      LOGGER.error("Empty list of servers. Nothing to do");
-      // this is not process error but most likely usage error
-      // exiting with status 1 so that scripts can catch this
-      System.exit(1);
-    }
 
-    LOGGER.info("Source hosts: {}", srcHosts);
+    // expects returned host names to be instance names (Server_<hostName>_<port>)
+    List<String> srcHostsList = readSourceHosts();
+    LOGGER.info("Source hosts: {}", srcHostsList);
+
     String serverTenant = getServerTenantName(tableName) + "_OFFLINE";
     LOGGER.debug("Using server tenant: {}", serverTenant);
     List<String> destinationServers = readDestinationServers();
-
-    verifyServerLists(srcHosts, destinationServers);
+    LOGGER.info("Destination servers: {}", destinationServers);
+    verifyServerLists(srcHostsList, destinationServers);
 
     Map<String, Map<String, String>> idealStateMap = helix.getResourceIdealState(zkPath, tableName)
         .getRecord().getMapFields();
@@ -150,11 +147,11 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
     System.out.println("Existing idealstate:");
     printIdealState(idealStateMap);
 
-    PriorityQueue<SourceSegments> segmentsToMove = getSegmentsToMoveQueue(idealStateMap, srcHosts);
+    PriorityQueue<SourceSegments> segmentsToMove = getSegmentsToMoveQueue(idealStateMap, srcHostsList);
     PriorityQueue<ServerInstance> destinationServerQueue = getDestinationServerQueue(idealStateMap, destinationServers);
 
     Map<String, Map<String, String>> proposedIdealState =
-        computeNewIdealState(idealStateMap, segmentsToMove, destinationServerQueue, srcHosts);
+        computeNewIdealState(idealStateMap, segmentsToMove, destinationServerQueue, srcHostsList);
     System.out.println("Proposed idealstate:");
     printIdealState(proposedIdealState);
     printDestinationServerCounts(destinationServerQueue);
@@ -166,6 +163,30 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
     applyIdealState(proposedIdealState);
     zkChanger.waitForStable(tableName);
     return true;
+  }
+
+  private List<String> readSourceHosts()
+      throws IOException {
+    if (this.srcHosts.isEmpty()) {
+     LOGGER.error("Source hosts(-s) are required");
+      System.exit(1);
+    }
+
+    File srcFile = new File(this.srcHosts);
+    List<String> srcHostsList = null;
+    if (srcFile.exists()) {
+       srcHostsList = readHostsFromFile(this.srcHosts);
+      if (srcHostsList.isEmpty()) {
+        LOGGER.error("Empty list of servers. Nothing to do");
+        // this is not process error but most likely usage error
+        // exiting with status 1 so that scripts can catch this
+        System.exit(1);
+      }
+    } else {
+      List<String> hosts = Arrays.asList(this.srcHosts.split("\\s*,\\s*"));
+      srcHostsList = hostNameToInstanceNames(hosts);
+    }
+    return srcHostsList;
   }
 
   private void printDestinationServerCounts(PriorityQueue<ServerInstance> destinationServerQueue) {
@@ -198,7 +219,7 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
 
   private Map<String, Map<String, String>> computeNewIdealState(Map<String, Map<String, String>> idealStateMap,
       PriorityQueue<SourceSegments> segmentsToMove, PriorityQueue<ServerInstance> destinationServers,
-      List<String> srcHosts) {
+      List<String> srcHostsList) {
 
     Map<String, Map<String, String>> newIdealState = copyIdealState(idealStateMap);
 
@@ -212,7 +233,7 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
       String toRemove = null;
 
       for (Map.Entry<String, String> existingInstanceEntry : existingMapping.entrySet()) {
-        if (srcHosts.contains(existingInstanceEntry.getKey())) {
+        if (srcHostsList.contains(existingInstanceEntry.getKey())) {
           toRemove = existingInstanceEntry.getKey();
           break;
         }
@@ -374,10 +395,6 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
       LOGGER.error("This operation is not supported for realtime table. table: {}", tableName);
       System.exit(1);
     }
-    if (!new File(srcHostsFile).exists()) {
-      LOGGER.error("srcHostsFile {} does not exist", srcHostsFile);
-      System.exit(1);
-    }
 
     tableName = tableName.endsWith(CommonConstants.Helix.TableType.OFFLINE.toString()) ?
         tableName : tableName + "_OFFLINE";
@@ -432,6 +449,10 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
   private List<String> readHostsFromFile(String filename)
       throws IOException {
     List<String> hosts = Files.readAllLines(Paths.get(filename), Charset.defaultCharset());
+    return hostNameToInstanceNames(hosts);
+  }
+
+  private List<String> hostNameToInstanceNames(List<String> hosts) {
     List<String> srcHosts = new ArrayList<>(hosts.size());
     for (String host : hosts) {
       if (host.isEmpty()) {
@@ -442,7 +463,6 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
     }
     return srcHosts;
   }
-
   public static void main(String[] args)
       throws Exception {
     MoveReplicaGroup mrg = new MoveReplicaGroup();
