@@ -58,12 +58,15 @@ public class DataCompletenessJobRunner implements JobRunner {
     dataCompletenessJobContext.setJobName(jobName);
 
     Set<String> datasetsToCheck = new HashSet<>();
-    for (AnomalyFunctionDTO anomalyFunction : DAO_REGISTRY.getAnomalyFunctionDAO().findAllActiveFunctions()) {
-      datasetsToCheck.add(anomalyFunction.getCollection());
-    }
     for (DatasetConfigDTO datasetConfig : DAO_REGISTRY.getDatasetConfigDAO().findActiveRequiresCompletenessCheck()) {
       datasetsToCheck.add(datasetConfig.getDataset());
     }
+    for (AnomalyFunctionDTO anomalyFunction : DAO_REGISTRY.getAnomalyFunctionDAO().findAllActiveFunctions()) {
+      if (anomalyFunction.isRequiresCompletenessCheck()) {
+        datasetsToCheck.add(anomalyFunction.getCollection());
+      }
+    }
+
     dataCompletenessJobContext.setDatasetsToCheck(Lists.newArrayList(datasetsToCheck));
 
     // create data completeness job

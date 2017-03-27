@@ -295,14 +295,13 @@ public abstract class EmailHelper {
   public static void sendNotificationForDataIncomplete(
       Multimap<String, DataCompletenessConfigDTO> incompleteEntriesToNotify, ThirdEyeAnomalyConfiguration thirdeyeConfig) {
     HtmlEmail email = new HtmlEmail();
-    String subject = String.format("Data Completeness Checker Report");
+    String subject = String.format("Data Completeness Checker Report - Datasets with missing data");
     StringBuilder textBody = new StringBuilder();
     for (String dataset : incompleteEntriesToNotify.keySet()) {
       List<DataCompletenessConfigDTO> entries = Lists.newArrayList(incompleteEntriesToNotify.get(dataset));
       textBody.append(String.format("\nDataset: %s\n", dataset));
       for (DataCompletenessConfigDTO entry : entries) {
-        textBody.append(String.format("Date: %d %s Percent Complete: %f\n",
-            entry.getDateToCheckInMS(), entry.getDateToCheckInSDF(), entry.getPercentComplete()));
+        textBody.append(String.format("%s ", entry.getDateToCheckInSDF()));
       }
       textBody.append("\n*******************************************************\n");
     }
