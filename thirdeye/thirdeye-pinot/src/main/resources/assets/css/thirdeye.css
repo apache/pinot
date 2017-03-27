@@ -783,8 +783,10 @@ text {
   user-select: none;
 }
 
-.anomaly-details-wrapper {
+.anomaly-details-wrapper,
+.analysis-card {
   background-color: white;
   padding: 24px;
+  margin-top: 24px;
   border: 1px solid #CCC;
 }
