@@ -1,8 +1,9 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.google.common.base.MoreObjects;
+import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
+
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -13,6 +14,8 @@ public class DatasetConfigBean extends AbstractBean {
 
   public static String DEFAULT_PREAGGREGATED_DIMENSION_VALUE = "all";
   public static String DATASET_OFFLINE_PREFIX = "_OFFLINE";
+  public static TimeGranularity DEFAULT_HOURLY_EXPECTED_DELAY = new TimeGranularity(8, TimeUnit.HOURS);
+  public static TimeGranularity DEFAULT_DAILY_EXPECTED_DELAY = new TimeGranularity(36, TimeUnit.HOURS);
 
   private String dataset;
 
@@ -48,6 +51,8 @@ public class DatasetConfigBean extends AbstractBean {
   private boolean realtime = false;
 
   private boolean requiresCompletenessCheck = false;
+
+  private TimeGranularity expectedDelay = DEFAULT_DAILY_EXPECTED_DELAY;
 
   public String getDataset() {
     return dataset;
@@ -202,6 +207,15 @@ public class DatasetConfigBean extends AbstractBean {
     this.requiresCompletenessCheck = requiresCompletenessCheck;
   }
 
+
+  public TimeGranularity getExpectedDelay() {
+    return expectedDelay;
+  }
+
+  public void setExpectedDelay(TimeGranularity expectedDelay) {
+    this.expectedDelay = expectedDelay;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (!(o instanceof DatasetConfigBean)) {
@@ -227,13 +241,16 @@ public class DatasetConfigBean extends AbstractBean {
         && Objects.equals(nonAdditiveBucketUnit, dc.getNonAdditiveBucketUnit())
         && Objects.equals(nonAdditiveBucketSize, dc.getNonAdditiveBucketSize())
         && Objects.equals(realtime, dc.isRealtime())
-        && Objects.equals(requiresCompletenessCheck, dc.isRequiresCompletenessCheck());
+        && Objects.equals(requiresCompletenessCheck, dc.isRequiresCompletenessCheck())
+        && Objects.equals(expectedDelay, dc.getExpectedDelay());
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(getId(), dataset, dimensions, timeColumn, timeUnit, timeDuration, timeFormat, timezone,
         metricAsDimension, metricNamesColumn, metricValuesColumn, autoDiscoverMetrics, active, additive,
-        dimensionsHaveNoPreAggregation, preAggregatedKeyword, nonAdditiveBucketSize, nonAdditiveBucketUnit, realtime, requiresCompletenessCheck);
+        dimensionsHaveNoPreAggregation, preAggregatedKeyword, nonAdditiveBucketSize, nonAdditiveBucketUnit, realtime,
+        requiresCompletenessCheck, expectedDelay);
   }
+
 }
