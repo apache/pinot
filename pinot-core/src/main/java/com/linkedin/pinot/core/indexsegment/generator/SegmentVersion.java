@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.indexsegment.generator;
 
+import com.linkedin.pinot.common.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,8 +31,8 @@ public enum SegmentVersion {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentVersion.class);
 
-  public static SegmentVersion DEFAULT_TABLE_VERSION = SegmentVersion.v3;
-  public static SegmentVersion DEFAULT_SERVER_VERSION = SegmentVersion.v3;
+  public static final SegmentVersion DEFAULT_VERSION =
+      SegmentVersion.valueOf(CommonConstants.Server.DEFAULT_SEGMENT_FORMAT_VERSION);
 
   int versionNumber;
   SegmentVersion(int versionNum) {

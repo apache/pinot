@@ -164,6 +164,18 @@ public abstract class ClusterTest extends ControllerTest {
     sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), request.toString());
   }
 
+  protected void updateOfflineTable(String timeColumnName, int retentionTimeValue, String retentionTimeUnit,
+      String brokerTenant, String serverTenant, List<String> invertedIndexColumns, String loadMode, String tableName,
+      SegmentVersion segmentVersion)
+      throws Exception {
+    JSONObject request =
+        ControllerRequestBuilder.buildCreateOfflineTableJSON(tableName, serverTenant, brokerTenant, timeColumnName,
+            "DAYS", retentionTimeUnit, String.valueOf(retentionTimeValue), 3, "BalanceNumSegmentAssignmentStrategy",
+            invertedIndexColumns, loadMode, segmentVersion.toString());
+    sendPutRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forUpdateTableConfig(tableName),
+        request.toString());
+  }
+
   protected void dropOfflineTable(String tableName) throws Exception {
     sendDeleteRequest(
         ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableDelete(tableName + "_OFFLINE"));

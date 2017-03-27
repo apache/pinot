@@ -15,18 +15,6 @@
  */
 package com.linkedin.pinot.server.starter.helix;
 
-import java.io.File;
-import org.apache.commons.io.FileUtils;
-import org.apache.helix.NotificationContext;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.model.Message;
-import org.apache.helix.participant.statemachine.StateModel;
-import org.apache.helix.participant.statemachine.StateModelFactory;
-import org.apache.helix.participant.statemachine.StateModelInfo;
-import org.apache.helix.participant.statemachine.Transition;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
@@ -43,6 +31,18 @@ import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.data.manager.offline.TableDataManager;
 import com.linkedin.pinot.core.data.manager.realtime.LLRealtimeSegmentDataManager;
+import java.io.File;
+import org.apache.commons.io.FileUtils;
+import org.apache.helix.NotificationContext;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.model.Message;
+import org.apache.helix.participant.statemachine.StateModel;
+import org.apache.helix.participant.statemachine.StateModelFactory;
+import org.apache.helix.participant.statemachine.StateModelInfo;
+import org.apache.helix.participant.statemachine.Transition;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Data Server layer state model to take over how to operate on:
@@ -187,17 +187,21 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
       }
     }
 
-    private void onBecomeOnlineFromOfflineForRealtimeSegment(Message message,
-        NotificationContext context) throws Exception {
+    private void onBecomeOnlineFromOfflineForRealtimeSegment(Message message, NotificationContext context)
+        throws Exception {
       final String segmentId = message.getPartitionName();
       final String tableName = message.getResourceName();
 
       SegmentZKMetadata realtimeSegmentZKMetadata =
           ZKMetadataProvider.getRealtimeSegmentZKMetadata(propertyStore, tableName, segmentId);
+      // InstanceZKMetadata can be null for LL segments
       InstanceZKMetadata instanceZKMetadata =
           ZKMetadataProvider.getInstanceZKMetadata(propertyStore, _instanceId);
       AbstractTableConfig tableConfig =
           ZKMetadataProvider.getRealtimeTableConfig(propertyStore, tableName);
+
+      Preconditions.checkNotNull(tableConfig);
+      Preconditions.checkNotNull(realtimeSegmentZKMetadata);
       ((InstanceDataManager) INSTANCE_DATA_MANAGER).addSegment(propertyStore, tableConfig,
           instanceZKMetadata, realtimeSegmentZKMetadata, _instanceId);
     }

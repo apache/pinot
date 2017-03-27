@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.segment.index.loader.invertedindex;
 
-import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.io.reader.DataFileReader;
 import com.linkedin.pinot.core.io.reader.SingleColumnMultiValueReader;
@@ -25,6 +24,7 @@ import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.creator.impl.inv.OffHeapBitmapInvertedIndexCreator;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.core.segment.index.loader.LoaderUtils;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import com.linkedin.pinot.core.segment.store.ColumnIndexType;
@@ -45,11 +45,11 @@ public class InvertedIndexHandler {
   private final SegmentMetadataImpl segmentMetadata;
   private final String segmentName;
   private final SegmentVersion segmentVersion;
-  private final IndexLoadingConfigMetadata indexConfig;
+  private final IndexLoadingConfig indexConfig;
   private final SegmentDirectory.Writer segmentWriter;
 
   public InvertedIndexHandler(File indexDir, SegmentMetadataImpl segmentMetadata,
-      IndexLoadingConfigMetadata indexConfig, SegmentDirectory.Writer segmentWriter) {
+      IndexLoadingConfig indexConfig, SegmentDirectory.Writer segmentWriter) {
     this.indexDir = indexDir;
     this.segmentMetadata = segmentMetadata;
     segmentName = segmentMetadata.getName();
@@ -78,7 +78,7 @@ public class InvertedIndexHandler {
       return invertedIndexColumns;
     }
 
-    Set<String> invertedIndexColumnsFromConfig = indexConfig.getLoadingInvertedIndexColumns();
+    Set<String> invertedIndexColumnsFromConfig = indexConfig.getInvertedIndexColumns();
     for (String column : invertedIndexColumnsFromConfig) {
       ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
       if (columnMetadata != null && !columnMetadata.isSorted()) {

@@ -18,6 +18,8 @@ package com.linkedin.pinot.common.data;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
 
 
@@ -26,7 +28,12 @@ public interface DataManager {
 
   void start();
 
-  void addSegment(SegmentMetadata segmentMetadata, AbstractTableConfig tableConfig, Schema schema) throws Exception;
+  /**
+   * Adds a segment from local disk into the OFFLINE table.
+   */
+  void addSegment(@Nonnull SegmentMetadata segmentMetadata, @Nullable AbstractTableConfig tableConfig,
+      @Nullable Schema schema)
+      throws Exception;
 
   void removeSegment(String segmentName);
 

@@ -15,7 +15,12 @@
  */
 package com.linkedin.pinot.core.startree;
 
-import com.linkedin.pinot.common.data.*;
+import com.linkedin.pinot.common.data.DimensionFieldSpec;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.MetricFieldSpec;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.data.StarTreeIndexSpec;
+import com.linkedin.pinot.common.data.TimeFieldSpec;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.FileFormat;
@@ -23,17 +28,19 @@ import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.core.startree.hll.HllConfig;
 import com.linkedin.pinot.util.TestUtils;
-import org.apache.commons.lang.mutable.MutableLong;
+import java.io.File;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Random;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.math.util.MathUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.File;
-import java.util.*;
-import java.util.concurrent.TimeUnit;
 
 
 public class StarTreeIndexTestSegmentHelper {
@@ -152,6 +159,9 @@ public class StarTreeIndexTestSegmentHelper {
   public static IndexSegment loadSegment(String segmentDirName, String segmentName)
       throws Exception {
     LOGGER.info("Loading segment {}", segmentName);
-    return Loaders.IndexSegment.load(new File(segmentDirName, segmentName), ReadMode.heap);
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
+    indexLoadingConfig.setReadMode(ReadMode.heap);
+    indexLoadingConfig.setStarTreeVersion(StarTreeFormatVersion.ON_HEAP);
+    return Loaders.IndexSegment.load(new File(segmentDirName, segmentName), indexLoadingConfig);
   }
 }

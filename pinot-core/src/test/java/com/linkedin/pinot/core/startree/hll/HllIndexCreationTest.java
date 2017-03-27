@@ -15,17 +15,18 @@
  */
 package com.linkedin.pinot.core.startree.hll;
 
-import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.common.DataBlockCache;
 import com.linkedin.pinot.core.common.DataFetcher;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.operator.BaseOperator;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.converter.SegmentV1V2ToV3FormatConverter;
+import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
 import java.io.File;
@@ -37,8 +38,6 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.PropertiesConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
@@ -64,8 +63,7 @@ public class HllIndexCreationTest {
 
   private static final int hllLog2m = HllConstants.DEFAULT_LOG2M;
 
-  private IndexLoadingConfigMetadata v1LoadingConfig;
-  private IndexLoadingConfigMetadata v3LoadingConfig;
+  private IndexLoadingConfig v3LoadingConfig;
 
   private HllConfig hllConfig;
 
@@ -73,13 +71,9 @@ public class HllIndexCreationTest {
   public void setUp() throws Exception {
     hllConfig = new HllConfig(hllLog2m, columnsToDeriveHllFields, hllDeriveColumnSuffix);
 
-    Configuration tableConfig = new PropertiesConfiguration();
-    tableConfig.addProperty(IndexLoadingConfigMetadata.KEY_OF_SEGMENT_FORMAT_VERSION, "v1");
-    v1LoadingConfig = new IndexLoadingConfigMetadata(tableConfig);
-
-    tableConfig.clear();
-    tableConfig.addProperty(IndexLoadingConfigMetadata.KEY_OF_SEGMENT_FORMAT_VERSION,  "v3");
-    v3LoadingConfig = new IndexLoadingConfigMetadata(tableConfig);
+    v3LoadingConfig = new IndexLoadingConfig();
+    v3LoadingConfig.setReadMode(ReadMode.mmap);
+    v3LoadingConfig.setSegmentVersion(SegmentVersion.v3);
   }
 
   @AfterMethod
@@ -188,7 +182,7 @@ public class HllIndexCreationTest {
 
       // verify that the segment loads correctly. This is necessary and sufficient
       // full proof way to ensure that segment is correctly translated
-      IndexSegment indexSegment = Loaders.IndexSegment.load(segmentDirectory, ReadMode.mmap, v3LoadingConfig);
+      IndexSegment indexSegment = ColumnarSegmentLoader.load(segmentDirectory, v3LoadingConfig);
       Assert.assertNotNull(indexSegment);
       Assert.assertEquals(indexSegment.getSegmentName(), metadata.getName());
       Assert.assertEquals(SegmentVersion.v3,

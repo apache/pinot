@@ -22,7 +22,10 @@ import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
+import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import java.io.File;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.LoggerFactory;
@@ -46,17 +49,21 @@ public class OfflineTableDataManager extends AbstractTableDataManager {
   }
 
   @Override
-  public void addSegment(SegmentMetadata segmentMetadata, Schema schema)
+  public void addSegment(@Nonnull SegmentMetadata segmentMetadata, @Nonnull IndexLoadingConfig indexLoadingConfig,
+      @Nullable Schema schema)
       throws Exception {
-    IndexSegment indexSegment = ColumnarSegmentLoader.loadSegment(new File(segmentMetadata.getIndexDir()), _readMode,
-        _indexLoadingConfigMetadata, schema);
+    IndexSegment indexSegment =
+        ColumnarSegmentLoader.load(new File(segmentMetadata.getIndexDir()), indexLoadingConfig, schema);
     addSegment(indexSegment);
   }
 
   @Override
-  public void addSegment(ZkHelixPropertyStore<ZNRecord> propertyStore, AbstractTableConfig tableConfig,
-      InstanceZKMetadata instanceZKMetadata, SegmentZKMetadata segmentZKMetadata)
+  public void addSegment(@Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore,
+      @Nonnull AbstractTableConfig tableConfig, @Nullable InstanceZKMetadata instanceZKMetadata,
+      @Nonnull SegmentZKMetadata segmentZKMetadata, @Nonnull IndexLoadingConfig indexLoadingConfig)
       throws Exception {
-    throw new UnsupportedOperationException("Not supported for Offline segments");
+    throw new UnsupportedOperationException(
+        "Unsupported adding segment: " + segmentZKMetadata.getSegmentName() + " to REALTIME table: " + segmentZKMetadata
+            .getTableName() + " using OfflineTableDataManager");
   }
 }

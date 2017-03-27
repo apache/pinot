@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.data.manager.offline;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.Utils;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.data.Schema;
@@ -24,10 +25,13 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
 import com.linkedin.pinot.core.data.manager.config.FileBasedInstanceDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
+import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import java.io.File;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.helix.ZNRecord;
@@ -151,6 +155,7 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
     _tableDataManagerMap.put(tableName, tableDataManager);
   }
 
+  @Nonnull
   @Override
   public Collection<TableDataManager> getTableDataManagers() {
     return _tableDataManagerMap.values();
@@ -176,17 +181,17 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public synchronized void addSegment(SegmentMetadata segmentMetadata, AbstractTableConfig tableConfig, Schema schema)
+  public synchronized void addSegment(@Nonnull SegmentMetadata segmentMetadata,
+      @Nullable AbstractTableConfig tableConfig, @Nullable Schema schema)
       throws Exception {
+    String segmentName = segmentMetadata.getName();
     String tableName = segmentMetadata.getTableName();
-    LOGGER.info("Trying to add segment : " + segmentMetadata.getName());
-    if (_tableDataManagerMap.containsKey(tableName)) {
-      _tableDataManagerMap.get(tableName).addSegment(segmentMetadata, schema);
-      LOGGER.info("Added a segment : " + segmentMetadata.getName() + " to table : " + tableName);
-    } else {
-      LOGGER.error("InstanceDataManager doesn't contain the assigned table for segment : "
-          + segmentMetadata.getName());
-    }
+    LOGGER.info("Trying to add segment: {} to OFFLINE table: {}", segmentName, tableName);
+    Preconditions.checkState(_tableDataManagerMap.containsKey(tableName),
+        "InstanceDataManager does not contain OFFLINE table: " + tableName + " for segment: " + segmentName);
+    _tableDataManagerMap.get(tableName)
+        .addSegment(segmentMetadata, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig), schema);
+    LOGGER.info("Added segment: {} to OFFLINE table: {}", segmentName, tableName);
   }
 
   @Override
@@ -225,9 +230,10 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public void addSegment(ZkHelixPropertyStore<ZNRecord> propertyStore, AbstractTableConfig tableConfig,
-      InstanceZKMetadata instanceZKMetadata, SegmentZKMetadata segmentZKMetadata, String serverInstance) throws Exception {
-    throw new UnsupportedOperationException("Not support addSegment(...) in FileBasedInstanceDataManager yet!");
+  public void addSegment(@Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore, @Nonnull AbstractTableConfig tableConfig,
+      @Nullable InstanceZKMetadata instanceZKMetadata, @Nonnull SegmentZKMetadata segmentZKMetadata,
+      @Nonnull String serverInstance) throws Exception {
+    throw new UnsupportedOperationException(
+        "Unsupported adding segment to REALTIME table in FileBasedInstanceDataManager");
   }
-
 }

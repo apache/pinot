@@ -15,22 +15,6 @@
  */
 package com.linkedin.pinot.perf;
 
-import java.io.File;
-import java.io.FilenameFilter;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.log4j.Level;
-
-import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.common.Block;
@@ -39,10 +23,24 @@ import com.linkedin.pinot.core.common.BlockDocIdSet;
 import com.linkedin.pinot.core.common.Constants;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.plan.FilterPlanNode;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
-import com.linkedin.pinot.core.segment.index.loader.Loaders;
+import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
+import java.io.File;
+import java.io.FilenameFilter;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.log4j.Level;
 
 /**
  * Allows us to benchmark filter operator in isolation
@@ -65,25 +63,23 @@ public class FilterOperatorBenchmark {
     for (int i = 0; i < segmentDirs.length; i++) {
       File indexSegmentDir = segmentDirs[i];
       System.out.println("Loading " + indexSegmentDir.getName());
-      Configuration tableDataManagerConfig = new PropertiesConfiguration();
-      List<String> invertedColumns = new ArrayList<>();
-      FilenameFilter filter = new FilenameFilter() {
 
+      Set<String> invertedColumns = new HashSet<>();
+      String[] indexFiles = indexSegmentDir.list(new FilenameFilter() {
         @Override
         public boolean accept(File dir, String name) {
           return name.endsWith(".bitmap.inv");
         }
-      };
-      String[] indexFiles = indexSegmentDir.list(filter);
+      });
       for (String indexFileName : indexFiles) {
         invertedColumns.add(indexFileName.replace(".bitmap.inv", ""));
       }
-      tableDataManagerConfig.setProperty(IndexLoadingConfigMetadata.KEY_OF_LOADING_INVERTED_INDEX,
-          invertedColumns);
-      IndexLoadingConfigMetadata indexLoadingConfigMetadata =
-          new IndexLoadingConfigMetadata(tableDataManagerConfig);
-      IndexSegmentImpl indexSegmentImpl = (IndexSegmentImpl) Loaders.IndexSegment
-          .load(indexSegmentDir, ReadMode.heap, indexLoadingConfigMetadata);
+      IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
+      indexLoadingConfig.setReadMode(ReadMode.heap);
+      indexLoadingConfig.setInvertedIndexColumns(invertedColumns);
+
+      IndexSegmentImpl indexSegmentImpl =
+          (IndexSegmentImpl) ColumnarSegmentLoader.load(indexSegmentDir, indexLoadingConfig);
       segmentProcessors.add(new SegmentProcessor(i, indexSegmentImpl, brokerRequest,
           totalDocsMatched, timesSpent));
     }

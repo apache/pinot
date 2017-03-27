@@ -70,14 +70,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
   }
 
   protected void createTable() throws Exception {
-    File schemaFile = getSchemaFile();
-
-    // Create a table
-    setUpTable(schemaFile, 1, 1);
-  }
-
-  protected void setUpTable(File schemaFile, int numBroker, int numOffline) throws Exception {
-    addSchema(schemaFile, "schemaFile");
     addOfflineTable("DaysSinceEpoch", "daysSinceEpoch", -1, "", null, null, "mytable", SegmentVersion.v1);
   }
 
@@ -152,11 +144,13 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
 
     // Wait for all segments to be online
     latch.await();
-    TOTAL_DOCS = 115545;
+    waitForSegmentsOnline();
+  }
+
+  protected void waitForSegmentsOnline()
+      throws Exception {
     long timeInTwoMinutes = System.currentTimeMillis() + 2 * 60 * 1000L;
-    long numDocs;
-    while ((numDocs = getCurrentServingNumDocs("mytable")) < TOTAL_DOCS) {
-//      System.out.println("Current number of documents: " + numDocs);
+    while (getCurrentServingNumDocs("mytable") < TOTAL_DOCS) {
       if (System.currentTimeMillis() < timeInTwoMinutes) {
         Thread.sleep(1000);
       } else {

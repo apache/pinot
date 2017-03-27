@@ -15,6 +15,9 @@
  */
 package com.linkedin.pinot.core.segment.index.loader.columnminmaxvalue;
 
+import com.linkedin.pinot.common.utils.CommonConstants;
+
+
 /**
  * Mode for {@link ColumnMinMaxValueGenerator}.
  * <ul>
@@ -28,5 +31,8 @@ public enum ColumnMinMaxValueGeneratorMode {
   NONE,
   TIME,
   NON_METRIC,
-  ALL
+  ALL;
+
+  public static final ColumnMinMaxValueGeneratorMode DEFAULT_MODE =
+      ColumnMinMaxValueGeneratorMode.valueOf(CommonConstants.Server.DEFAULT_COLUMN_MIN_MAX_VALUE_GENERATOR_MODE);
 }

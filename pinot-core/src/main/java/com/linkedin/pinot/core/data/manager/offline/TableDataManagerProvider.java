@@ -15,12 +15,12 @@
  */
 package com.linkedin.pinot.core.data.manager.offline;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.realtime.RealtimeTableDataManager;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 
 /**
@@ -28,41 +28,41 @@ import com.linkedin.pinot.core.data.manager.realtime.RealtimeTableDataManager;
  *
  */
 public class TableDataManagerProvider {
-  private static ServerMetrics SERVER_METRICS;
-
-  private static Map<String, Class<? extends TableDataManager>> keyToFunction =
-      new ConcurrentHashMap<String, Class<? extends TableDataManager>>();
-
-  static {
-    keyToFunction.put("offline", OfflineTableDataManager.class);
-    keyToFunction.put("realtime", RealtimeTableDataManager.class);
+  private TableDataManagerProvider() {
   }
 
-  public static TableDataManager getTableDataManager(TableDataManagerConfig tableDataManagerConfig,
-      String serverInstance) {
-    Preconditions.checkNotNull(SERVER_METRICS);
+  private static final String OFFLINE_TABLE_DATA_MANAGER_TYPE = "OFFLINE";
+  private static final String REALTIME_TABLE_DATA_MANAGER_TYPE = "REALTIME";
 
-    try {
-      Class<? extends TableDataManager> cls =
-          keyToFunction.get(tableDataManagerConfig.getTableDataManagerType().toLowerCase());
-      if (cls != null) {
-        TableDataManager tableDataManager = cls.newInstance();
-        tableDataManager.init(tableDataManagerConfig, SERVER_METRICS, serverInstance);
-        return tableDataManager;
-      } else {
-        throw new UnsupportedOperationException("No tableDataManager type found.");
-      }
-    } catch (Exception ex) {
-      throw new RuntimeException("Not support tableDataManager type with - "
-          + tableDataManagerConfig.getTableDataManagerType(), ex);
+  private static ServerMetrics _serverMetrics;
+
+  public static TableDataManager getTableDataManager(@Nonnull TableDataManagerConfig tableDataManagerConfig,
+      @Nullable String serverInstance) {
+    Preconditions.checkNotNull(_serverMetrics);
+
+    String tableDataManagerType = tableDataManagerConfig.getTableDataManagerType().toUpperCase();
+    TableDataManager tableDataManager;
+    switch (tableDataManagerType) {
+      case OFFLINE_TABLE_DATA_MANAGER_TYPE:
+        tableDataManager = new OfflineTableDataManager();
+        break;
+      case REALTIME_TABLE_DATA_MANAGER_TYPE:
+        tableDataManager = new RealtimeTableDataManager();
+        break;
+      default:
+        throw new UnsupportedOperationException(
+            "Unsupported table data manager type: " + tableDataManagerType + " for table: "
+                + tableDataManagerConfig.getTableName());
     }
+    tableDataManager.init(tableDataManagerConfig, _serverMetrics, serverInstance);
+    return tableDataManager;
   }
 
   public static void setServerMetrics(ServerMetrics serverMetrics) {
-    SERVER_METRICS = serverMetrics;
+    _serverMetrics = serverMetrics;
   }
 
   public static ServerMetrics getServerMetrics() {
-    return SERVER_METRICS;
+    return _serverMetrics;
   }
 }

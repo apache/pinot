@@ -19,7 +19,6 @@ import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
-import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
@@ -29,6 +28,7 @@ import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.data.manager.offline.TableDataManager;
 import com.linkedin.pinot.core.data.manager.offline.TableDataManagerProvider;
+import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import java.io.File;
 import java.util.Collection;
 import java.util.HashMap;
@@ -48,17 +48,14 @@ import org.slf4j.LoggerFactory;
  *
  *
  */
+// TODO: pass a reference to Helix property store during initialization. Both OFFLINE and REALTIME use case need it.
 public class HelixInstanceDataManager implements InstanceDataManager {
+  private static final Logger LOGGER = LoggerFactory.getLogger(HelixInstanceDataManager.class);
 
-  public static final Logger LOGGER = LoggerFactory.getLogger(HelixInstanceDataManager.class);
   private HelixInstanceDataManagerConfig _instanceDataManagerConfig;
-  private Map<String, TableDataManager> _tableDataManagerMap = new HashMap<String, TableDataManager>();
+  private Map<String, TableDataManager> _tableDataManagerMap = new HashMap<>();
   private boolean _isStarted = false;
   private SegmentMetadataLoader _segmentMetadataLoader;
-  private final Object _globalLock = new Object();
-
-  public HelixInstanceDataManager() {
-  }
 
   public synchronized void init(HelixInstanceDataManagerConfig instanceDataManagerConfig)
       throws ConfigurationException, InstantiationException, IllegalAccessException, ClassNotFoundException {
@@ -97,10 +94,9 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
   }
 
-  private SegmentMetadataLoader getSegmentMetadataLoader(String segmentMetadataLoaderClassName)
+  private static SegmentMetadataLoader getSegmentMetadataLoader(String segmentMetadataLoaderClassName)
       throws InstantiationException, IllegalAccessException, ClassNotFoundException {
     return (SegmentMetadataLoader) Class.forName(segmentMetadataLoaderClassName).newInstance();
-
   }
 
   @Override
@@ -123,13 +119,15 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     _tableDataManagerMap.put(tableName, tableDataManager);
   }
 
+  @Nonnull
   @Override
-  public @Nonnull Collection<TableDataManager> getTableDataManagers() {
+  public Collection<TableDataManager> getTableDataManagers() {
     return _tableDataManagerMap.values();
   }
 
+  @Nullable
   @Override
-  public @Nullable TableDataManager getTableDataManager(String tableName) {
+  public TableDataManager getTableDataManager(String tableName) {
     return _tableDataManagerMap.get(tableName);
   }
 
@@ -147,71 +145,65 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     }
   }
 
-  // Called for offline segments only
   @Override
-  public synchronized void addSegment(SegmentMetadata segmentMetadata, AbstractTableConfig tableConfig, Schema schema)
+  public synchronized void addSegment(@Nonnull SegmentMetadata segmentMetadata,
+      @Nullable AbstractTableConfig tableConfig, @Nullable Schema schema)
       throws Exception {
-    if (segmentMetadata == null || segmentMetadata.getTableName() == null) {
-      throw new RuntimeException("Error: adding invalid SegmentMetadata!");
-    }
-    LOGGER.info("Trying to add segment {} of table {}", segmentMetadata.getName(), segmentMetadata.getTableName());
+    String segmentName = segmentMetadata.getName();
+    String tableName = segmentMetadata.getTableName();
+    LOGGER.info("Trying to add segment: {} to OFFLINE table: {}", segmentName, tableName);
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("Trying to add segment with Metadata: " + segmentMetadata.toString());
     }
-    String tableName = segmentMetadata.getTableName();
     if (segmentMetadata.getIndexType().equalsIgnoreCase("realtime")) {
       tableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
     } else {
       tableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
     }
     if (!_tableDataManagerMap.containsKey(tableName)) {
-      LOGGER.info("Trying to add TableDataManager for table name: " + tableName);
-      synchronized (_globalLock) {
-        if (!_tableDataManagerMap.containsKey(tableName)) {
-          addTableIfNeed(tableConfig, tableName, null);
-        }
-      }
+      LOGGER.info("Trying to add TableDataManager for OFFLINE table: {}", tableName);
+      addTableIfNeed(tableConfig, tableName, null);
     }
-    _tableDataManagerMap.get(tableName).addSegment(segmentMetadata, schema);
-    LOGGER.info("Successfully added a segment {} of table {}", segmentMetadata.getName(), segmentMetadata.getTableName());
+    _tableDataManagerMap.get(tableName)
+        .addSegment(segmentMetadata, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig), schema);
+    LOGGER.info("Added segment: {} to OFFLINE table: {}", segmentName, tableName);
   }
 
-  // Called for real-time segments only
   @Override
-  public synchronized void addSegment(ZkHelixPropertyStore<ZNRecord> propertyStore, AbstractTableConfig tableConfig,
-      InstanceZKMetadata instanceZKMetadata, SegmentZKMetadata segmentZKMetadata, String serverInstance) throws Exception {
-    if (segmentZKMetadata == null || segmentZKMetadata.getTableName() == null) {
-      throw new RuntimeException("Error: adding invalid SegmentMetadata!");
-    }
-    LOGGER.info("Trying to add segment with name: " + segmentZKMetadata.getSegmentName());
-    LOGGER.debug("Trying to add segment with Metadata: " + segmentZKMetadata.toString());
+  public synchronized void addSegment(@Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore,
+      @Nonnull AbstractTableConfig tableConfig, @Nullable InstanceZKMetadata instanceZKMetadata,
+      @Nonnull SegmentZKMetadata segmentZKMetadata, @Nonnull String serverInstance)
+      throws Exception {
+    String segmentName = segmentZKMetadata.getSegmentName();
     String tableName = segmentZKMetadata.getTableName();
+    LOGGER.info("Trying to add segment: {} to REALTIME table: {}", segmentName, tableName);
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("Trying to add segment with Metadata: " + segmentZKMetadata.toString());
+    }
     if (segmentZKMetadata instanceof RealtimeSegmentZKMetadata) {
       tableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
-    } else if (segmentZKMetadata instanceof OfflineSegmentZKMetadata) {
+    } else {
       tableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
     }
     if (!_tableDataManagerMap.containsKey(tableName)) {
-      LOGGER.info("Trying to add TableDataManager for table name: " + tableName);
-      synchronized (_globalLock) {
-        if (!_tableDataManagerMap.containsKey(tableName)) {
-          addTableIfNeed(tableConfig, tableName, serverInstance);
-        }
-      }
+      LOGGER.info("Trying to add TableDataManager for REALTIME table: {}", tableName);
+      addTableIfNeed(tableConfig, tableName, serverInstance);
     }
-    _tableDataManagerMap.get(tableName).addSegment(propertyStore, tableConfig, instanceZKMetadata,
-        segmentZKMetadata);
-    LOGGER.info("Successfully added a segment : " + segmentZKMetadata.getSegmentName() + " in HelixInstanceDataManager");
-
+    _tableDataManagerMap.get(tableName)
+        .addSegment(propertyStore, tableConfig, instanceZKMetadata, segmentZKMetadata,
+            new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig));
+    LOGGER.info("Added segment: {} to REALTIME table: {}", segmentName, tableName);
   }
 
-  public synchronized void addTableIfNeed(AbstractTableConfig tableConfig, String tableName, String serverInstance)
+  public synchronized void addTableIfNeed(@Nullable AbstractTableConfig tableConfig, @Nonnull String tableName,
+      @Nullable String serverInstance)
       throws ConfigurationException {
     TableDataManagerConfig tableDataManagerConfig = getDefaultHelixTableDataManagerConfig(tableName);
     if (tableConfig != null) {
-      tableDataManagerConfig.overrideConfigs(tableName, tableConfig);
+      tableDataManagerConfig.overrideConfigs(tableConfig);
     }
-    TableDataManager tableDataManager = TableDataManagerProvider.getTableDataManager(tableDataManagerConfig, serverInstance);
+    TableDataManager tableDataManager =
+        TableDataManagerProvider.getTableDataManager(tableDataManagerConfig, serverInstance);
     tableDataManager.start();
     addTableDataManager(tableName, tableDataManager);
   }

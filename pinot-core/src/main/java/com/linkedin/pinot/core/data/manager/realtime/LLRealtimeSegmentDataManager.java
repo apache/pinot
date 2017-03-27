@@ -16,19 +16,6 @@
 
 package com.linkedin.pinot.core.data.manager.realtime;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicLong;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.tuple.Pair;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
@@ -58,8 +45,24 @@ import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderCo
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaMessageDecoder;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaSimpleConsumerFactoryImpl;
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
+import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
 import kafka.message.MessageAndOffset;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.tuple.Pair;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -132,6 +135,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   private final KafkaMessageDecoder _messageDecoder;
   private final int _segmentMaxRowCount;
   private final String _resourceDataDir;
+  private final IndexLoadingConfig _indexLoadingConfig;
   private final Schema _schema;
   private final String _metricKeyName;
   private final ServerMetrics _serverMetrics;
@@ -573,7 +577,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
         segmentLogger.warn("Received controller response {}", response);
         return false;
       }
-      _realtimeTableDataManager.replaceLLSegment(_segmentNameStr);
+      _realtimeTableDataManager.replaceLLSegment(_segmentNameStr, _indexLoadingConfig);
     } catch (FileNotFoundException e) {
       segmentLogger.error("Tar file {} not found", segTarFileName, e);
       return false;
@@ -588,7 +592,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     if (!success) {
       return success;
     }
-    _realtimeTableDataManager.replaceLLSegment(_segmentZKMetadata.getSegmentName());
+    _realtimeTableDataManager.replaceLLSegment(_segmentNameStr, _indexLoadingConfig);
     return true;
   }
 
@@ -677,7 +681,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   }
 
   protected void downloadSegmentAndReplace(LLCRealtimeSegmentZKMetadata metadata) {
-    _realtimeTableDataManager.downloadAndReplaceSegment(_segmentNameStr, metadata);
+    _realtimeTableDataManager.downloadAndReplaceSegment(_segmentNameStr, metadata, _indexLoadingConfig);
   }
 
   protected long now() {
@@ -751,15 +755,16 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   // If the transition is OFFLINE to ONLINE, the caller should have downloaded the segment and we don't reach here.
   public LLRealtimeSegmentDataManager(RealtimeSegmentZKMetadata segmentZKMetadata, AbstractTableConfig tableConfig,
       InstanceZKMetadata instanceZKMetadata, RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir,
-      Schema schema, ServerMetrics serverMetrics) throws Exception {
+      IndexLoadingConfig indexLoadingConfig, Schema schema, ServerMetrics serverMetrics)
+      throws Exception {
     _segmentZKMetadata = (LLCRealtimeSegmentZKMetadata) segmentZKMetadata;
     _tableConfig = tableConfig;
     _realtimeTableDataManager = realtimeTableDataManager;
     _resourceDataDir = resourceDataDir;
+    _indexLoadingConfig = indexLoadingConfig;
     _schema = schema;
     _serverMetrics = serverMetrics;
-    _segmentVersion = SegmentVersion.fromString(tableConfig.getIndexingConfig().getSegmentFormatVersion(),
-        SegmentVersion.DEFAULT_TABLE_VERSION);
+    _segmentVersion = indexLoadingConfig.getSegmentVersion();
     _instanceId = _realtimeTableDataManager.getServerInstance();
     _leaseExtender = SegmentBuildTimeLeaseExtender.getLeaseExtender(_instanceId);
     _protocolHandler = new ServerSegmentCompletionProtocolHandler(_instanceId);
@@ -779,12 +784,15 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     _metricKeyName = _tableName + "-" + _kafkaTopic + "-" + _kafkaPartitionId;
     segmentLogger = LoggerFactory.getLogger(LLRealtimeSegmentDataManager.class.getName() +
         "_" + _segmentNameStr);
-    if (indexingConfig.getSortedColumn().isEmpty()) {
+    _tableStreamName = _tableName + "_" + kafkaStreamProviderConfig.getStreamName();
+
+    List<String> sortedColumns = indexLoadingConfig.getSortedColumns();
+    if (sortedColumns.isEmpty()) {
       segmentLogger.info("RealtimeDataResourceZKMetadata contains no information about sorted column for segment {}",
           _segmentName);
       _sortedColumn = null;
     } else {
-      String firstSortedColumn = indexingConfig.getSortedColumn().get(0);
+      String firstSortedColumn = sortedColumns.get(0);
       if (_schema.hasColumn(firstSortedColumn)) {
         segmentLogger.info("Setting sorted column name: {} from RealtimeDataResourceZKMetadata for segment {}",
             firstSortedColumn, _segmentName);
@@ -796,19 +804,19 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
         _sortedColumn = null;
       }
     }
-    //inverted index columns
-    _invertedIndexColumns = indexingConfig.getInvertedIndexColumns();
-    _tableStreamName = _tableName + "_" + kafkaStreamProviderConfig.getStreamName();
 
-
-    List<String> invertedIndexColumns = indexingConfig.getInvertedIndexColumns();
-    if (_sortedColumn != null && !invertedIndexColumns.contains(_sortedColumn)) {
+    // Inverted index columns
+    Set<String> invertedIndexColumns = indexLoadingConfig.getInvertedIndexColumns();
+    // We need to add sorted column into inverted index columns because when we convert realtime in memory segment into
+    // offline segment, we use sorted column's inverted index to maintain the order of the records so that the records
+    // are sorted on the sorted column.
+    if (_sortedColumn != null) {
       invertedIndexColumns.add(_sortedColumn);
     }
+    _invertedIndexColumns = new ArrayList<>(invertedIndexColumns);
 
     // No dictionary Columns
-    _noDictionaryColumns = indexingConfig.getNoDictionaryColumns();
-
+    _noDictionaryColumns = new ArrayList<>(indexLoadingConfig.getNoDictionaryColumns());
 
     // Read the max number of rows
     int segmentMaxRowCount = kafkaStreamProviderConfig.getSizeThresholdToFlushSegment();
@@ -821,7 +829,8 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
 
     // Start new realtime segment
     _realtimeSegment = new RealtimeSegmentImpl(schema, _segmentMaxRowCount, tableConfig.getTableName(),
-        segmentZKMetadata.getSegmentName(), _kafkaTopic, _serverMetrics, invertedIndexColumns, _realtimeTableDataManager.getAvgMultiValueCount());
+        segmentZKMetadata.getSegmentName(), _kafkaTopic, _serverMetrics, _invertedIndexColumns,
+        indexLoadingConfig.getRealtimeAvgMultiValueCount());
     _realtimeSegment.setSegmentMetadata(segmentZKMetadata, schema);
 
     // Create message decoder
