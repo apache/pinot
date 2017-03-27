@@ -8,7 +8,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.commons.collections.CollectionUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Period;
@@ -24,10 +23,8 @@ import com.linkedin.thirdeye.anomaly.task.TaskContext;
 import com.linkedin.thirdeye.anomaly.task.TaskInfo;
 import com.linkedin.thirdeye.anomaly.task.TaskResult;
 import com.linkedin.thirdeye.anomaly.task.TaskRunner;
-import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.DAORegistry;
-import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessConstants.DataCompletenessAlgorithmName;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessConstants.DataCompletenessType;
 import com.linkedin.thirdeye.dashboard.Utils;
@@ -106,7 +103,7 @@ public class DataCompletenessTaskRunner implements TaskRunner {
               adjustedStart, new DateTime(adjustedStart), adjustedEnd, new DateTime(adjustedEnd), bucketSize);
 
           // get buckets to process
-          /*Map<String, Long> bucketNameToBucketValueMS = getBucketsToProcess(dataset, adjustedStart, adjustedEnd,
+          Map<String, Long> bucketNameToBucketValueMS = getBucketsToProcess(dataset, adjustedStart, adjustedEnd,
               dataCompletenessAlgorithm, dateTimeFormatter, bucketSize);
           LOG.info("Got {} buckets to process", bucketNameToBucketValueMS.size());
 
@@ -128,23 +125,6 @@ public class DataCompletenessTaskRunner implements TaskRunner {
             // run completeness check for all buckets
             runCompletenessCheck(dataset, bucketNameToBucketValueMS, bucketNameToCount,
                 dataCompletenessAlgorithm, expectedCompleteness);
-          }*/
-
-          // collect all older than expected delay, and still incomplete
-          Period expectedDelayPeriod = datasetConfig.getExpectedDelay().toPeriod();
-          long expectedDelayStart = new DateTime(adjustedEnd, dateTimeZone).minus(expectedDelayPeriod).getMillis();
-          LOG.info("Expected delay for dataset {} is {}, checking from {} to {}",
-              dataset, expectedDelayPeriod, adjustedStart, expectedDelayStart);
-          if (adjustedStart < expectedDelayStart) {
-            List<DataCompletenessConfigDTO> olderThanExpectedDelayAndNotComplete =
-                DAO_REGISTRY.getDataCompletenessConfigDAO().findAllByDatasetAndInTimeRangeAndStatus(dataset, adjustedStart, expectedDelayStart, false);
-            for (DataCompletenessConfigDTO entry : olderThanExpectedDelayAndNotComplete) {
-              if (!entry.isDelayNotified()) {
-                incompleteEntriesToNotify.putAll(dataset, olderThanExpectedDelayAndNotComplete);
-                entry.setDelayNotified(true);
-                DAO_REGISTRY.getDataCompletenessConfigDAO().update(entry);
-              }
-            }
           }
 
           // collect all older than expected delay, and still incomplete
