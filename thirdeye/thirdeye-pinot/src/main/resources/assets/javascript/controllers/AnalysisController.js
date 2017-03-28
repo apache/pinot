@@ -17,13 +17,13 @@ AnalysisController.prototype = {
     this.analysisModel.update(hashParams);
     this.analysisView.init(hashParams);
     this.analysisView.render(hashParams.metricId);
-    this.timeSeriesCompareController.handleAppEvent(this.analysisView.viewParams);
+    this.initTimeSeriesController(this.analysisView.viewParams);
   },
 
   handleApplyAnalysisEvent(viewObject) {
     HASH_SERVICE.update(viewObject.viewParams);
     HASH_SERVICE.refreshWindowHashForRouting('analysis');
-    this.timeSeriesCompareController.handleAppEvent(HASH_SERVICE.getParams());
+    this.initTimeSeriesController(HASH_SERVICE.getParams());
   },
 
   handleSearchEvent(params = {}) {
@@ -33,6 +33,15 @@ AnalysisController.prototype = {
     const hashParams = HASH_SERVICE.getParams();
     this.analysisModel.init(hashParams);
     this.analysisModel.update(hashParams);
+    this.analysisView.renderAnalysisOptions();
+    this.initTimeSeriesController(hashParams);
   },
+
+  initTimeSeriesController(params) {
+    if (params.metricId) {
+      this.timeSeriesCompareController.handleAppEvent(params);
+    }
+
+  }
 };
 

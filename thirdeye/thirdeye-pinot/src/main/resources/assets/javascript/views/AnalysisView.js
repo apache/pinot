@@ -8,8 +8,8 @@ function AnalysisView(analysisModel) {
   this.searchEvent = new Event(this);
   this.viewParams = {granularity: "DAYS", dimension: "All", filters: {}};
   this.baselineRange = {
-    'Last 24 Hours': [moment().subtract(1, 'days'), moment().subtract(1, 'days')],
-    'Yesterday': [moment().subtract(2, 'days'), moment().subtract(2, 'days')],
+    'Last 24 Hours': [moment().subtract(2, 'days'), moment().subtract(1, 'days')],
+    'Yesterday': [moment().subtract(3, 'days'), moment().subtract(2, 'days')],
     'Last 7 Days': [moment().subtract(13, 'days'), moment().subtract(7, 'days')],
     'Last 30 Days': [moment().subtract(59, 'days'), moment().subtract(30, 'days')],
     'This Month': [moment().subtract(1, 'month').startOf('month'), moment().subtract(1 , 'month').endOf('month')],
@@ -144,8 +144,8 @@ AnalysisView.prototype = {
       timePickerIncrement: 5,
       timePicker12Hour: true,
       ranges: {
-        'Last 24 Hours': [moment(), moment()],
-        'Yesterday': [moment().subtract(1, 'days'), moment().subtract(1, 'days')],
+        'Last 24 Hours': [moment().subtract(1, 'days'), moment()],
+        'Yesterday': [moment().subtract(2, 'days'), moment().subtract(1, 'days')],
         'Last 7 Days': [moment().subtract(6, 'days'), moment()],
         'Last 30 Days': [moment().subtract(29, 'days'), moment()],
         'This Month': [moment().startOf('month'), moment().endOf('month')],
@@ -241,7 +241,6 @@ AnalysisView.prototype = {
   setupSearchListeners() {
     $("#analysis-search-button").click(() => {
       this.searchEvent.notify();
-      this.renderAnalysisOptions();
     });
   },
 

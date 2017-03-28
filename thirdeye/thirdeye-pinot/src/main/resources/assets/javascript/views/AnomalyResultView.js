@@ -94,8 +94,8 @@ function AnomalyResultView(anomalyResultModel) {
     timePickerIncrement : 60,
     timePicker12Hour : true,
     ranges : {
-      'Last 24 Hours' : [ moment(), moment() ],
-      'Yesterday' : [ moment().subtract(1, 'days'), moment().subtract(1, 'days') ],
+      'Last 24 Hours' : [ moment().subtract(1, 'days'), moment() ],
+      'Yesterday' : [ moment().subtract(2, 'days'), moment().subtract(1, 'days') ],
       'Last 7 Days' : [ moment().subtract(6, 'days'), moment() ],
       'Last 30 Days' : [ moment().subtract(29, 'days'), moment() ],
       'This Month' : [ moment().startOf('month'), moment().endOf('month') ],
