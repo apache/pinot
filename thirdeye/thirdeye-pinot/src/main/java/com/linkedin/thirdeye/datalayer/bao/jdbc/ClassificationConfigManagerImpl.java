@@ -3,10 +3,9 @@ package com.linkedin.thirdeye.datalayer.bao.jdbc;
 import com.linkedin.thirdeye.datalayer.bao.ClassificationConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.ClassificationConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.ClassificationConfigBean;
-import java.util.Collections;
-import java.util.HashMap;
+import com.linkedin.thirdeye.datalayer.util.Predicate;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import org.apache.commons.collections.CollectionUtils;
 
 public class ClassificationConfigManagerImpl extends AbstractManagerImpl<ClassificationConfigDTO>
@@ -18,24 +17,28 @@ public class ClassificationConfigManagerImpl extends AbstractManagerImpl<Classif
 
   @Override
   public List<ClassificationConfigDTO> findActiveByFunctionId(long functionId) {
-    Map<String, Object> filters = new HashMap<>();
-    filters.put("mainFunctionId", functionId);
-    filters.put("active", true);
-    List<ClassificationConfigDTO> configs = super.findByParams(filters);
-    if (CollectionUtils.isNotEmpty(configs)) {
-      return configs;
-    } else {
-      return Collections.emptyList();
+    Predicate predicate = Predicate.AND(
+        Predicate.EQ("mainFunctionId", functionId),
+        Predicate.EQ("active", true));
+    List<ClassificationConfigBean> configBeenList = genericPojoDao.get(predicate, ClassificationConfigBean.class);
+    List<ClassificationConfigDTO> results = new ArrayList<>();
+    for (ClassificationConfigBean bean : configBeenList) {
+      results.add(MODEL_MAPPER.map(bean, ClassificationConfigDTO.class));
     }
+    return results;
   }
 
   @Override
   public ClassificationConfigDTO findByName(String name) {
-    Map<String, Object> filters = new HashMap<>();
-    filters.put("name", name);
-    List<ClassificationConfigDTO> configs = super.findByParams(filters);
-    if (CollectionUtils.isNotEmpty(configs)) {
-      return configs.get(0);
+    Predicate predicate = Predicate.EQ("name", name);
+
+    List<ClassificationConfigBean> configBeenList = genericPojoDao.get(predicate, ClassificationConfigBean.class);
+    List<ClassificationConfigDTO> results = new ArrayList<>();
+    for (ClassificationConfigBean bean : configBeenList) {
+      results.add(MODEL_MAPPER.map(bean, ClassificationConfigDTO.class));
+    }
+    if (CollectionUtils.isNotEmpty(results)) {
+      return results.get(0);
     } else {
       return null;
     }
