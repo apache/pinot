@@ -46,6 +46,29 @@
       </plugin>
     </plugins>
   </build>
+  <profiles>
+    <profile>
+      <id>build-shaded-jar</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <artifactId>maven-shade-plugin</artifactId>
+            <executions>
+              <execution>
+                <phase>package</phase>
+                <goals>
+                  <goal>shade</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
   <dependencies>
     <!-- Jetty -->
     <dependency>
@@ -65,7 +88,7 @@
       <artifactId>javax.servlet-api</artifactId>
     </dependency>
     <!-- End jetty -->
-    
+
     <dependency>
       <groupId>com.linkedin.pinot</groupId>
       <artifactId>pinot-transport</artifactId>
