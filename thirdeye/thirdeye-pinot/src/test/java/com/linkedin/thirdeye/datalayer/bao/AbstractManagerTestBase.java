@@ -12,6 +12,7 @@ import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.datalayer.ScriptRunner;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.ClassificationConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionStatusDTO;
@@ -20,6 +21,7 @@ import com.linkedin.thirdeye.datalayer.dto.AutotuneConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.IngraphDashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.IngraphMetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
@@ -34,10 +36,13 @@ import java.io.File;
 import java.io.FileReader;
 import java.net.URL;
 import java.sql.Connection;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.tomcat.jdbc.pool.DataSource;
@@ -61,6 +66,7 @@ public abstract class AbstractManagerTestBase {
   protected EventManager eventManager;
   protected DetectionStatusManager detectionStatusDAO;
   protected AutotuneConfigManager autotuneConfigDAO;
+  protected ClassificationConfigManager classificationConfigDAO;
 
   //  protected TestDBResources testDBResources;
   protected DAORegistry daoRegistry;
@@ -95,6 +101,7 @@ public abstract class AbstractManagerTestBase {
       anomalyFunctionDAO = daoRegistry.getAnomalyFunctionDAO();
       detectionStatusDAO = daoRegistry.getDetectionStatusDAO();
       autotuneConfigDAO = daoRegistry.getAutotuneConfigDAO();
+      classificationConfigDAO = daoRegistry.getClassificationConfigDAO();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -348,5 +355,15 @@ public abstract class AbstractManagerTestBase {
     performance.put(autotuneConfigDTO.getPerformanceEvaluationMethod().name(), 0.5);
     autotuneConfigDTO.setPerformance(performance);
     return autotuneConfigDTO;
+  }
+
+  protected ClassificationConfigDTO getTestClassificationConfig(String name, long mainFunctionId,
+      List<Long> functionIds) {
+    ClassificationConfigDTO classificationConfigDTO = new ClassificationConfigDTO();
+    classificationConfigDTO.setName(name);
+    classificationConfigDTO.setMainFunctionId(mainFunctionId);
+    classificationConfigDTO.setFunctionIdList(functionIds);
+    classificationConfigDTO.setActive(true);
+    return classificationConfigDTO;
   }
 }

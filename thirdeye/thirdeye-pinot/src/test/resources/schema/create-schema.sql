@@ -283,3 +283,16 @@ create index autotune_config_function_idx on autotune_config_index(function_id);
 create index autotune_config_autoTuneMethod_idx on autotune_config_index(autotune_method);
 create index autotune_config_performanceEval_idx on autotune_config_index(performance_evaluation_method);
 create index autotune_config_start_time_idx on autotune_config_index(start_time);
+
+create table if not exists classification_config_index (
+    name varchar(200) not null,
+    main_function_id bigint(20),
+    active boolean,
+    base_id bigint(20) not null,
+    create_time timestamp,
+    update_time timestamp default current_timestamp,
+    version int(10)
+) ENGINE=InnoDB;
+ALTER TABLE `classification_config_index` ADD UNIQUE `classification_config_unique_index`(`name`);
+create index classification_config_name_index on classification_config_index(name);
+create index classification_config_function_index on classification_config_index(main_function_id);
