@@ -273,7 +273,7 @@ public abstract class Series {
   /**
    * Returns the number of elements contained in the series.
    *
-   * <b>NOTE:</b> {@code null} values count as elements.
+   * <br/><b>NOTE:</b> {@code null} values count as elements.
    *
    * @return series size
    */
@@ -358,8 +358,9 @@ public abstract class Series {
   /**
    * Returns projection of the series.
    *
-   * <b>NOTE:</b> fromIndex <= -1 is filled with {@code null}.
-   * <b>NOTE:</b> array with length 0 returns empty series.
+   * <br/><b>NOTE:</b> fromIndex <= -1 is filled with {@code null}.
+   * <br/><b>NOTE:</b> array with length 0 returns empty series.
+   * <br/><b>NOTE:</b> could replace {@code slice(int, int)}, but low performance
    *
    * @param fromIndex array with indices to project from (must be <= series size)
    * @return series projection
@@ -371,7 +372,7 @@ public abstract class Series {
    * If the types are different the values in {@code that} are transparently converted to the
    * native type of this series.
    *
-   * <b>Note:</b> the transparent conversion may cause different behavior between
+   * <br/><b>Note:</b> the transparent conversion may cause different behavior between
    * {@code this.compare(that)} and {@code that.compare(this)}.
    *
    * @param that other series with same native type (may reference itself)
@@ -476,7 +477,7 @@ public abstract class Series {
    * appended at the end. If {@code other} has different native types they are
    * converted transparently.
    *
-   * <b>NOTE:</b> newSize = oldSize + otherSize
+   * <br/><b>NOTE:</b> newSize = oldSize + otherSize
    *
    * @param other other series to append at the end
    * @return concatenated series
@@ -527,7 +528,7 @@ public abstract class Series {
    * leaving the series size unchanged. Values shifted outside to upper (or lower)
    * bounds of the series are dropped. Vacated positions are padded with {@code null}.
    *
-   * <b>NOTE:</b> for each value, newIndex = oldIndex + offset
+   * <br/><b>NOTE:</b> for each value, newIndex = oldIndex + offset
    *
    * @param offset offset to shift values by. Can be positive or negative.
    * @return shifted series copy
@@ -550,7 +551,7 @@ public abstract class Series {
   /**
    * Returns {@code true} is there are no values in the series. Otherwise returns {@code false}.
    *
-   * <b>NOTE:</b> {@code null} values count as elements.
+   * <br/><b>NOTE:</b> {@code null} values count as elements.
    *
    * @return {@code true} if empty, {@code false} otherwise
    */
@@ -625,7 +626,7 @@ public abstract class Series {
    * Returns a copy of the series with values ordered
    * in ascending order.
    *
-   * <b>NOTE:</b> BooleanSeries interprets {@code false} as smaller than {@code true}.
+   * <br/><b>NOTE:</b> BooleanSeries interprets {@code false} as smaller than {@code true}.
    *
    * @return sorted series copy
    */
@@ -901,7 +902,7 @@ public abstract class Series {
    * Returns a SeriesGrouping based on value. Elements are grouped into separate buckets for each
    * distinct value in the series.
    *
-   * <b>NOTE:</b> the resulting keys are equivalent to calling {@code unique()} on the series.
+   * <br/><b>NOTE:</b> the resulting keys are equivalent to calling {@code unique()} on the series.
    *
    * @return grouping by value
    */
@@ -932,7 +933,7 @@ public abstract class Series {
    * based on a greedy algorithm with fixed bucket size. The size of all buckets (except for the
    * last) is guaranteed to be equal to {@code bucketSize}.
    *
-   * <b>NOTE:</b> the series is not sorted before grouping.
+   * <br/><b>NOTE:</b> the series is not sorted before grouping.
    *
    * @param bucketSize maximum number of elements per bucket
    * @return grouping by element count
@@ -966,7 +967,7 @@ public abstract class Series {
    * based on a greedy algorithm to approximately evenly fill buckets. The number of buckets
    * is guaranteed to be equal to {@code partitionCount} even if some remain empty.
    *
-   * <b>NOTE:</b> the series is not sorted before grouping.
+   * <br/><b>NOTE:</b> the series is not sorted before grouping.
    *
    * @param partitionCount number of buckets
    * @return grouping by bucket count
@@ -1037,7 +1038,7 @@ public abstract class Series {
    * Returns an array of indices with a size equal to the series size, such that the values
    * references by the indices are sorted in ascending order.
    *
-   * <b>NOTE:</b> output can be used directly by {@code project()} to create a sorted copy of the series.
+   * <br/><b>NOTE:</b> output can be used directly by {@code project()} to create a sorted copy of the series.
    *
    * @return indices of sorted values
    */
@@ -1060,7 +1061,7 @@ public abstract class Series {
   /**
    * Returns index tuples (pairs) for a join performed based on value.
    *
-   * <b>NOTE:</b> the implementation uses merge join. Thus, the index pairs reference
+   * <br/><b>NOTE:</b> the implementation uses merge join. Thus, the index pairs reference
    * values in ascending order.
    *
    * @see Series#compare(Series, int, int)

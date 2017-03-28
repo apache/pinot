@@ -300,7 +300,7 @@ public class DataFrame {
 
   /**
    * Returns a deep copy of the DataFrame. Duplicates each series as well as the DataFrame itself.
-   * <b>NOTE:</b> use caution when applying this to large DataFrames.
+   * <br/><b>NOTE:</b> use caution when applying this to large DataFrames.
    *
    * @return deep copy of DataFrame
    */
@@ -704,7 +704,7 @@ public class DataFrame {
    * The series are converted to {@code DoubleSeries} transparently and the results
    * are returned as DoubleSeries as well.
    *
-   * <b>NOTE:</b> doubleExpression is compiled to an {@code EvalEx} expression.
+   * <br/><b>NOTE:</b> doubleExpression is compiled to an {@code EvalEx} expression.
    *
    * @param doubleExpression expression to be compiled and applied using EvalEx
    * @throws IllegalArgumentException if the series does not exist
@@ -732,7 +732,7 @@ public class DataFrame {
    * The series are converted to {@code DoubleSeries} transparently and the results
    * are returned as DoubleSeries as well.
    *
-   * <b>NOTE:</b> doubleExpression is compiled to an {@code EvalEx} expression.
+   * <br/><b>NOTE:</b> doubleExpression is compiled to an {@code EvalEx} expression.
    *
    * @param doubleExpression expression to be compiled and applied using EvalEx
    * @throws IllegalArgumentException if the series does not exist
@@ -746,8 +746,8 @@ public class DataFrame {
   /**
    * Returns a projection of the DataFrame.
    *
-   * <b>NOTE:</b> fromIndex <= -1 is filled with {@code null}.
-   * <b>NOTE:</b> array with length 0 produces empty series.
+   * <br/><b>NOTE:</b> fromIndex <= -1 is filled with {@code null}.
+   * <br/><b>NOTE:</b> array with length 0 produces empty series.
    *
    * @param fromIndex array with indices to project from (must be <= series size)
    * @return DataFrame projection
@@ -1091,7 +1091,7 @@ public class DataFrame {
   /**
    * Reads in a CSV structured stream and returns it as a DataFrame. The native series type is
    * chosen to be as specific as possible based on the data ingested.
-   * <b>NOTE:</b> Expects the first line to contain
+   * <br/><b>NOTE:</b> Expects the first line to contain
    * column headers. The column headers are transformed into series names by replacing non-word
    * character sequences with underscores ({@code "_"}). Leading digits in series names are also
    * escaped with a leading underscore.
@@ -1156,7 +1156,7 @@ public class DataFrame {
   /**
    * Reads in a Pinot ResultSetGroup and returns it as a DataFrame.
    *
-   * <b>NOTE:</b> cannot parse a query result with multiple group aggregations
+   * <br/><b>NOTE:</b> cannot parse a query result with multiple group aggregations
    *
    * @param resultSetGroup pinot query result
    * @return Pinot query result as DataFrame
