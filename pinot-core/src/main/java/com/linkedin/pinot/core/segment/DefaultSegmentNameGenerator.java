@@ -77,7 +77,7 @@ public class DefaultSegmentNameGenerator implements SegmentNameGenerator {
    * @throws Exception
    */
   @Override
-  public String getSegmentName(ColumnStatistics statsCollector) throws Exception {
+  public String generateSegmentName(ColumnStatistics statsCollector) throws Exception {
     if (_segmentName != null) {
       return _segmentName;
     }

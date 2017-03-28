@@ -426,7 +426,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   private void handlePostCreation()
       throws Exception {
     final String timeColumn = config.getTimeColumnName();
-    segmentName = config.getSegmentNameGenerator().getSegmentName(segmentStats.getColumnProfileFor(timeColumn));
+    segmentName = config.getSegmentNameGenerator().generateSegmentName(segmentStats.getColumnProfileFor(timeColumn));
     updateSegmentStartEndTimeIfNecessary(segmentStats.getColumnProfileFor(timeColumn));
 
     // Write the index files to disk

@@ -22,5 +22,5 @@ import com.linkedin.pinot.core.segment.creator.ColumnStatistics;
  * An interface that allows generates names for segments depending on the naming scheme.
  */
 public interface SegmentNameGenerator {
-  String getSegmentName(ColumnStatistics timeColStatsCollector) throws Exception;
+  public String generateSegmentName(ColumnStatistics timeColStatsCollector) throws Exception;
 }
