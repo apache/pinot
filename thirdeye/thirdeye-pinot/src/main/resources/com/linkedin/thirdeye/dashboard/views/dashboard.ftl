@@ -20,6 +20,7 @@
         </li>
         <li id="self-service-header-tab" class="header-tab" rel="self-service"><a href="#">Self
           Service</a></li>
+        <li id="new-ui-tab" class="header-tab header-tab--secondary"><button class="newui-button">New UI</button></li>
       </ul>
 
       <a id="header-help" class="data-uk-tooltip uk-float-right" title="How to use ThirdEye?"
