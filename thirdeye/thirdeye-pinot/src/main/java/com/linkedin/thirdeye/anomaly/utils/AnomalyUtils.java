@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.anomaly.utils;
 
+import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
+import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.ArrayList;
 import java.util.List;
@@ -47,5 +49,22 @@ public class AnomalyUtils {
       LOG.warn("{} merged anomalies overlap with this window {} -- {}. Anomalies: {}", overlappedAnomalies.size(),
           windowStart, windowEnd, sb.toString());
     }
+  }
+
+  /**
+   * This function checks if the input list of merged anomalies has at least one positive label.
+   * It is a helper for alert filter auto tuning
+   * @param mergedAnomalyResultDTOS
+   * @return true if the list of merged anomalies has at least one positive label, false otherwise
+   */
+  public static Boolean checkHasPostiveLabels(List<MergedAnomalyResultDTO> mergedAnomalyResultDTOS){
+    for(MergedAnomalyResultDTO anomaly: mergedAnomalyResultDTOS){
+      AnomalyFeedback feedback = anomaly.getFeedback();
+      boolean label = (feedback != null && (feedback.getFeedbackType() == AnomalyFeedbackType.ANOMALY || feedback.getFeedbackType() == AnomalyFeedbackType.ANOMALY_NO_ACTION));
+      if (label){
+        return true;
+      }
+    }
+    return false;
   }
 }
