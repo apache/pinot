@@ -73,7 +73,7 @@ AnalysisView.prototype = {
     if (metricId) {
       this.renderAnalysisOptions(metricId);
     }
-    this.setupListeners();
+    this.setupSearchListeners();
   },
 
   renderAnalysisOptions(metricId) {
@@ -88,6 +88,7 @@ AnalysisView.prototype = {
     this.renderGranularity(metricId);
     this.renderDimensions(metricId);
     this.renderFilters(metricId);
+    this.setupApplyListener(metricId);
   },
 
   renderDateRangePickers() {
@@ -237,15 +238,17 @@ AnalysisView.prototype = {
     this.viewParams['heatmapFilters'] = filterMap;
   },
 
-  setupListeners: function () {
-    $("#analysis-apply-button").click(() => {
+  setupSearchListeners() {
+    $("#analysis-search-button").click(() => {
       this.searchEvent.notify();
       this.renderAnalysisOptions();
     });
+  },
 
-    // $("#analysis-apply-button").click((e) => {
-    //   this.collectViewParams();
-    //   this.applyDataChangeEvent.notify();
-    // });
+  setupApplyListener(){
+    $("#analysis-apply-button").click((e) => {
+      this.collectViewParams();
+      this.applyDataChangeEvent.notify();
+    });
   }
 };

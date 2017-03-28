@@ -11,7 +11,7 @@
 					<select style="width:100%" id="analysis-metric-input" class="label-large-light underlined"></select>
 				</div>
 
-        <a class="btn thirdeye-btn search-button" type="button" id="analysis-apply-button"><span class="glyphicon glyphicon-search"></span></a>
+        <a class="btn thirdeye-btn search-button" type="button" id="analysis-search-button"><span class="glyphicon glyphicon-search"></span></a>
       </div>
     </div>
 	</div>

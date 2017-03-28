@@ -1,25 +1,25 @@
-<div class="analysis-card">
-	<div class="analysis-title">Contribution Analysis:</div>
+<div class="analysis-card top-buffer">
+	<div class="analysis-title">Contribution Analysis</div>
 	<div class="row bottom-buffer">
-		<div class="col-md-12">
+		<div class="col-xs-12">
 			<div>
-				<label>num_login_attempt</label> heatmap
+				<label>{{this.metricName}}</label> heatmap
 			</div>
 		</div>
 	</div>
 	<div class="row bottom-buffer">
-		<div class="col-md-2">
+		<div class="col-xs-2">
 			<label class="label-small-semibold pull-right">COMPARING</label>
 		</div>
-		<div class="col-md-3">
+		<div class="col-xs-3">
 			<div id="heatmap-current-range">
 				<i class="glyphicon glyphicon-calendar fa fa-calendar"></i>&nbsp; <span></span> <b class="caret"></b>
 			</div>
 		</div>
-		<div class="col-md-1">
+		<div class="col-xs-1">
 			<label class="label-small-semibold">TO</label>
 		</div>
-		<div class="col-md-3">
+		<div class="col-xs-3">
 			<div id="heatmap-baseline-range">
 				<i class="glyphicon glyphicon-calendar fa fa-calendar"></i>&nbsp; <span></span> <b class="caret"></b>
 			</div>
@@ -28,7 +28,7 @@
 	<hr />
 
 	<div class="row bottom-buffer">
-		<div class="col-md-12">
+		<div class="col-xs-12">
 			<nav class="navbar navbar-transparent" role="navigation">
 				<div class="collapse navbar-collapse">
 					<ul class="nav navbar-nav tree-map-tabs" id="dashboard-tabs">
@@ -41,7 +41,7 @@
 		</div>
 	</div>
 	<div class="row bottom-buffer">
-		<div class="col-md-12">
+		<div class="col-xs-12">
 			<table class="table info-table">
 				<thead>
 					<tr>
@@ -63,20 +63,20 @@
 		</div>
 	</div>
 	<div class="row bottom-buffer">
-		<div class="col-md-12">
+		<div class="col-xs-12">
 			<div class="row">
 				<table class="table table-borderless">
 					<tbody>
 						<tr>
-							<td class="col-md-1"></td>
-							<td class="col-md-11">
+							<td class="col-xs-1"></td>
+							<td class="col-xs-11">
 								<div id="axis-placeholder" style="height: 25px; width: 100%"></div>
 							</td>
 						</tr>
 						{{#each this.dimensions}}
 						<tr>
-							<td class="col-md-1" style="vertical-align: middle" class="label-medium-light">{{this}}</td>
-							<td class="col-md-11">
+							<td class="col-xs-1" style="vertical-align: middle" class="label-medium-light">{{this}}</td>
+							<td class="col-xs-11">
 								<div id="{{this}}-heatmap-placeholder" style="height: 50px; width: 100%"></div>
 							</td>
 						</tr>

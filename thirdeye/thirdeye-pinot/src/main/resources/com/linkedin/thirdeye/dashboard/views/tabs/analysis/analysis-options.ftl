@@ -33,8 +33,8 @@
       </div>
 
       <div class="analysis-options__apply">
-        <a class="btn thirdeye-btn" type="button"><span>Apply</span></a>
+        <a class="btn thirdeye-btn" id="analysis-apply-button" type="button"><span>Apply</span></a>
       </div>
     </div>
-    <div id="timeseries-contributor-placeholder"></div>
+    <div class="top-buffer" id="timeseries-contributor-placeholder"></div>
   </div>
