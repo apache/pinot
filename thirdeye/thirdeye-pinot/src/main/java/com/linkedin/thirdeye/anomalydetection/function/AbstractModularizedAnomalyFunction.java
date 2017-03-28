@@ -95,6 +95,50 @@ public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunc
     mergeModel.update(anomalyDetectionContext, anomalyToUpdated);
   }
 
+  @Override
+  public AnomalyTimelinesView getTimeSeriesView(AnomalyDetectionContext anomalyDetectionContext, long bucketMillis,
+      String metric, long viewWindowStartTime, long viewWindowEndTime, List<MergedAnomalyResultDTO> knownAnomalies) {
+    String mainMetric = anomalyDetectionContext.getAnomalyDetectionFunction().getSpec().getTopicMetric();
+
+    this.transformAndPredictTimeSeries(mainMetric, anomalyDetectionContext);
+
+    // Construct AnomalyTimelinesView
+    AnomalyTimelinesView anomalyTimelinesView = new AnomalyTimelinesView();
+
+    // Add current (observed) time series
+    TimeSeries observedTS = anomalyDetectionContext.getTransformedCurrent(mainMetric);
+    int bucketCount = (int) ((viewWindowEndTime - viewWindowStartTime) / bucketMillis);
+    for (int i = 0; i < bucketCount; ++i) {
+      long currentBucketMillis = viewWindowStartTime + i * bucketMillis;
+      double observedValue = 0d;
+      if (observedTS.hasTimestamp(currentBucketMillis)) {
+        observedValue = observedTS.get(currentBucketMillis);
+      }
+      TimeBucket timebucket =
+          new TimeBucket(currentBucketMillis, currentBucketMillis + bucketMillis, currentBucketMillis,
+              currentBucketMillis + bucketMillis);
+      anomalyTimelinesView.addTimeBuckets(timebucket);
+      anomalyTimelinesView.addCurrentValues(observedValue);
+    }
+
+    // Add baseline time series
+    PredictionModel trainedPredictionModel = anomalyDetectionContext.getTrainedPredictionModel(mainMetric);
+    if (trainedPredictionModel instanceof ExpectedTimeSeriesPredictionModel) {
+      TimeSeries expectedTS = ((ExpectedTimeSeriesPredictionModel) trainedPredictionModel).getExpectedTimeSeries();
+      long expectedTSStartTime = expectedTS.getTimeSeriesInterval().getStartMillis();
+      for (int i = 0; i < bucketCount; ++i) {
+        long baselineBucketMillis = expectedTSStartTime + i * bucketMillis;
+        double expectedValue = 0d;
+        if (expectedTS.hasTimestamp(baselineBucketMillis)) {
+          expectedValue = expectedTS.get(baselineBucketMillis);
+        }
+        anomalyTimelinesView.addBaselineValues(expectedValue);
+      }
+    }
+
+    return anomalyTimelinesView;
+  }
+
   /**
    * Returns true if the following conditions hold:
    * 1. Anomaly detection context is not null.
@@ -222,38 +266,8 @@ public abstract class AbstractModularizedAnomalyFunction extends BaseAnomalyFunc
         .buildAnomalyDetectionContext(this, timeSeries, spec.getTopicMetric(), null,
             spec.getBucketSize(), spec.getBucketUnit(), new DateTime(viewWindowStartTime),
             new DateTime(viewWindowEndTime));
-    String mainMetric = anomalyDetectionContext.getAnomalyDetectionFunction().getSpec().getTopicMetric();
 
-    this.transformAndPredictTimeSeries(mainMetric, anomalyDetectionContext);
-
-    TimeSeries observedTS = anomalyDetectionContext.getTransformedCurrent(mainMetric);
-    TimeSeries expectedTS =
-        ((ExpectedTimeSeriesPredictionModel) anomalyDetectionContext.getTrainedPredictionModel(mainMetric))
-            .getExpectedTimeSeries();
-    long expectedTSStartTime = expectedTS.getTimeSeriesInterval().getStartMillis();
-
-    // Construct AnomalyTimelinesView
-    AnomalyTimelinesView anomalyTimelinesView = new AnomalyTimelinesView();
-    int bucketCount = (int) ((viewWindowEndTime - viewWindowStartTime) / bucketMillis);
-    for (int i = 0; i < bucketCount; ++i) {
-      long currentBucketMillis = viewWindowStartTime + i * bucketMillis;
-      long baselineBucketMillis = expectedTSStartTime + i * bucketMillis;
-      double observedValue = 0d;
-      if (observedTS.hasTimestamp(currentBucketMillis)) {
-        observedValue = observedTS.get(currentBucketMillis);
-      }
-      double expectedValue = 0d;
-      if (expectedTS.hasTimestamp(baselineBucketMillis)) {
-        expectedValue = expectedTS.get(baselineBucketMillis);
-      }
-      TimeBucket timebucket =
-          new TimeBucket(currentBucketMillis, currentBucketMillis + bucketMillis, baselineBucketMillis,
-              baselineBucketMillis + bucketMillis);
-      anomalyTimelinesView.addTimeBuckets(timebucket);
-      anomalyTimelinesView.addCurrentValues(observedValue);
-      anomalyTimelinesView.addBaselineValues(expectedValue);
-    }
-
-    return anomalyTimelinesView;
+    return this.getTimeSeriesView(anomalyDetectionContext, bucketMillis, metric, viewWindowStartTime, viewWindowEndTime,
+        knownAnomalies);
   }
 }
