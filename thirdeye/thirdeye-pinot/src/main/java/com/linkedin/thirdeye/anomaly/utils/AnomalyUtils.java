@@ -1,7 +1,7 @@
 package com.linkedin.thirdeye.anomaly.utils;
 
+import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
 import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.ArrayList;
 import java.util.List;
@@ -59,8 +59,8 @@ public class AnomalyUtils {
    */
   public static Boolean checkHasPostiveLabels(List<MergedAnomalyResultDTO> mergedAnomalyResultDTOS){
     for(MergedAnomalyResultDTO anomaly: mergedAnomalyResultDTOS){
-      AnomalyFeedbackDTO feedback = anomaly.getFeedback();
-      boolean label = !(feedback == null || feedback.getFeedbackType() == AnomalyFeedbackType.NOT_ANOMALY);
+      AnomalyFeedback feedback = anomaly.getFeedback();
+      boolean label = (feedback != null && (feedback.getFeedbackType() == AnomalyFeedbackType.ANOMALY || feedback.getFeedbackType() == AnomalyFeedbackType.ANOMALY_NO_ACTION));
       if (label){
         return true;
       }
