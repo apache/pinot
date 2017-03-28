@@ -157,7 +157,7 @@ public class DataFrame {
    * @return BooleanSeries wrapping the array
    */
   public static BooleanSeries toSeries(boolean... values) {
-    return BooleanSeries.buildFrom(values);
+    return BooleanSeries.builder().addBooleanValues(values).build();
   }
 
   /**
@@ -464,6 +464,22 @@ public class DataFrame {
   }
 
   /**
+   * Returns the series referenced by {@code seriesNames}.
+   *
+   * @param seriesNames series names
+   * @throws IllegalArgumentException if any one series does not exist
+   * @return series array
+   */
+  public Series[] get(String... seriesNames) {
+    Series[] series = new Series[seriesNames.length];
+    int i = 0;
+    for(String name : seriesNames) {
+      series[i++] = assertSeriesExists(name);
+    }
+    return series;
+  }
+
+  /**
    * Returns {@code true} if the DataFrame contains a series {@code seriesName}. Otherwise,
    * return {@code false}.
    *
@@ -530,201 +546,82 @@ public class DataFrame {
    * the series are converted transparently. The native type of the returned series is
    * determined by {@code function}'s output type.
    *
-   * @param function function to apply to each element in the series
+   * @param function function to apply to each row
    * @throws IllegalArgumentException if the series does not exist
    * @return series with evaluation results
+   */
+  public Series map(Series.Function function, String... seriesNames) {
+    return map(function, names2series(seriesNames));
+  }
+
+  /**
+   * @see DataFrame#map(Series.Function, Series...)
    */
   public DoubleSeries map(Series.DoubleFunction function, String... seriesNames) {
-    return map(function, names2series(seriesNames));
+    return (DoubleSeries)map((Series.Function)function, seriesNames);
   }
 
   /**
-   * Applies {@code function} to {@code series} row by row
-   * and returns the results as a new series. The series' values are mapped to arguments
-   * of {@code function} in the same order as they appear in {@code series}.
-   * If the series' native types do not match the required input types of {@code function},
-   * the series are converted transparently. The native type of the returned series is
-   * determined by {@code function}'s output type.
-   *
-   * @param function function to apply to each element in the series
-   * @throws IllegalArgumentException if the series does not exist
-   * @return series with evaluation results
-   */
-  public static DoubleSeries map(Series.DoubleFunction function, Series... series) {
-    if(series.length <= 0)
-      return DoubleSeries.empty();
-
-    assertSameLength(series);
-
-    DoubleSeries[] doubleSeries = new DoubleSeries[series.length];
-    for(int i=0; i<series.length; i++) {
-      doubleSeries[i] = series[i].getDoubles();
-    }
-
-    double[] input = new double[series.length];
-    double[] output = new double[series[0].size()];
-    for(int i=0; i<series[0].size(); i++) {
-      boolean isNull = false;
-      for(int j=0; j<series.length; j++) {
-        double value = doubleSeries[j].values[i];
-        if(DoubleSeries.isNull(value)) {
-          isNull = true;
-          break;
-        } else {
-          input[j] = value;
-        }
-      }
-
-      if(isNull) {
-        output[i] = DoubleSeries.NULL_VALUE;
-      } else {
-        output[i] = function.apply(input);
-      }
-    }
-
-    return DoubleSeries.buildFrom(output);
-  }
-
-  /**
-   * Applies {@code function} to the series referenced by {@code seriesNames} row by row
-   * and returns the results as a new series. The series' values are mapped to arguments
-   * of {@code function} in the same order as they appear in {@code seriesNames}.
-   * If the series' native types do not match the required input types of {@code function},
-   * the series are converted transparently. The native type of the returned series is
-   * determined by {@code function}'s output type.
-   *
-   * @param function function to apply to each element in the series
-   * @throws IllegalArgumentException if the series does not exist
-   * @return series with evaluation results
+   * @see DataFrame#map(Series.Function, Series...)
    */
   public LongSeries map(Series.LongFunction function, String... seriesNames) {
-    return map(function, names2series(seriesNames));
+    return (LongSeries)map((Series.Function)function, seriesNames);
   }
 
   /**
-   * Applies {@code function} to {@code series} row by row
-   * and returns the results as a new series. The series' values are mapped to arguments
-   * of {@code function} in the same order as they appear in {@code series}.
-   * If the series' native types do not match the required input types of {@code function},
-   * the series are converted transparently. The native type of the returned series is
-   * determined by {@code function}'s output type.
-   *
-   * @param function function to apply to each element in the series
-   * @throws IllegalArgumentException if the series does not exist
-   * @return series with evaluation results
-   */
-  public static LongSeries map(Series.LongFunction function, Series... series) {
-    if(series.length <= 0)
-      return LongSeries.empty();
-
-    assertSameLength(series);
-
-    LongSeries[] longSeries = new LongSeries[series.length];
-    for(int i=0; i<series.length; i++) {
-      longSeries[i] = series[i].getLongs();
-    }
-
-    long[] input = new long[series.length];
-    long[] output = new long[series[0].size()];
-    for(int i=0; i<series[0].size(); i++) {
-      boolean isNull = false;
-      for(int j=0; j<series.length; j++) {
-        long value = longSeries[j].values[i];
-        if(LongSeries.isNull(value)) {
-          isNull = true;
-          break;
-        } else {
-          input[j] = value;
-        }
-      }
-
-      if(isNull) {
-        output[i] = LongSeries.NULL_VALUE;
-      } else {
-        output[i] = function.apply(input);
-      }
-    }
-
-    return LongSeries.buildFrom(output);
-  }
-
-  /**
-   * Applies {@code function} to the series referenced by {@code seriesNames} row by row
-   * and returns the results as a new series. The series' values are mapped to arguments
-   * of {@code function} in the same order as they appear in {@code seriesNames}.
-   * If the series' native types do not match the required input types of {@code function},
-   * the series are converted transparently. The native type of the returned series is
-   * determined by {@code function}'s output type.
-   *
-   * @param function function to apply to each element in the series
-   * @throws IllegalArgumentException if the series does not exist
-   * @return series with evaluation results
+   * @see DataFrame#map(Series.Function, Series...)
    */
   public StringSeries map(Series.StringFunction function, String... seriesNames) {
-    return map(function, names2series(seriesNames));
+    return (StringSeries)map((Series.Function)function, seriesNames);
   }
 
   /**
-   * Applies {@code function} to {@code series} row by row
-   * and returns the results as a new series. The series' values are mapped to arguments
-   * of {@code function} in the same order as they appear in {@code series}.
-   * If the series' native types do not match the required input types of {@code function},
-   * the series are converted transparently. The native type of the returned series is
-   * determined by {@code function}'s output type.
-   *
-   * @param function function to apply to each element in the series
-   * @throws IllegalArgumentException if the series does not exist
-   * @return series with evaluation results
-   */
-  public static StringSeries map(Series.StringFunction function, Series... series) {
-    if(series.length <= 0)
-      return StringSeries.empty();
-
-    assertSameLength(series);
-
-    StringSeries[] stringSeries = new StringSeries[series.length];
-    for(int i=0; i<series.length; i++) {
-      stringSeries[i] = series[i].getStrings();
-    }
-
-    String[] input = new String[series.length];
-    String[] output = new String[series[0].size()];
-    for(int i=0; i<series[0].size(); i++) {
-      boolean isNull = false;
-      for(int j=0; j<series.length; j++) {
-        String value = stringSeries[j].values[i];
-        if(StringSeries.isNull(value)) {
-          isNull = true;
-          break;
-        } else {
-          input[j] = value;
-        }
-      }
-
-      if(isNull) {
-        output[i] = StringSeries.NULL_VALUE;
-      } else {
-        output[i] = function.apply(input);
-      }
-    }
-
-    return StringSeries.buildFrom(output);
-  }
-
-  /**
-   * Applies {@code function} to the series referenced by {@code seriesNames} row by row
-   * and returns the results as a new series. The series' values are mapped to arguments
-   * of {@code function} in the same order as they appear in {@code seriesNames}.
-   * If the series' native types do not match the required input types of {@code function},
-   * the series are converted transparently. The native type of the returned series is
-   * determined by {@code function}'s output type.
-   *
-   * @param function function to apply to each element in the series
-   * @throws IllegalArgumentException if the series does not exist
-   * @return series with evaluation results
+   * @see DataFrame#map(Series.Function, Series...)
    */
   public BooleanSeries map(Series.BooleanFunction function, String... seriesNames) {
-    return map(function, names2series(seriesNames));
+    return (BooleanSeries)map((Series.Function)function, seriesNames);
+  }
+
+  /**
+   * @see DataFrame#map(Series.Function, Series...)
+   */
+  public BooleanSeries map(Series.BooleanFunctionEx function, String... seriesNames) {
+    return (BooleanSeries)map((Series.Function)function, seriesNames);
+  }
+
+  /**
+   * @see DataFrame#map(Series.Function, Series...)
+   */
+  public BooleanSeries map(Series.DoubleConditional function, String... seriesNames) {
+    return (BooleanSeries)map((Series.Function)function, seriesNames);
+  }
+
+  /**
+   * @see DataFrame#map(Series.Function, Series...)
+   */
+  public BooleanSeries map(Series.LongConditional function, String... seriesNames) {
+    return (BooleanSeries)map((Series.Function)function, seriesNames);
+  }
+
+  /**
+   * @see DataFrame#map(Series.Function, Series...)
+   */
+  public BooleanSeries map(Series.StringConditional function, String... seriesNames) {
+    return (BooleanSeries)map((Series.Function)function, seriesNames);
+  }
+
+  /**
+   * @see DataFrame#map(Series.Function, Series...)
+   */
+  public BooleanSeries map(Series.BooleanConditional function, String... seriesNames) {
+    return (BooleanSeries)map((Series.Function)function, seriesNames);
+  }
+
+  /**
+   * @see DataFrame#map(Series.Function, Series...)
+   */
+  public BooleanSeries map(Series.BooleanConditionalEx function, String... seriesNames) {
+    return (BooleanSeries)map((Series.Function)function, seriesNames);
   }
 
   /**
@@ -735,43 +632,82 @@ public class DataFrame {
    * the series are converted transparently. The native type of the returned series is
    * determined by {@code function}'s output type.
    *
-   * @param function function to apply to each element in the series
+   * @param function function to apply to each row
    * @throws IllegalArgumentException if the series does not exist
    * @return series with evaluation results
    */
-  public static BooleanSeries map(Series.BooleanFunction function, Series... series) {
-    if(series.length <= 0)
-      return BooleanSeries.empty();
+  public static Series map(Series.Function function, Series... series) {
+    return Series.map(function, series);
+  }
 
-    assertSameLength(series);
+  /**
+   * @see DataFrame#map(Series.Function, Series...)
+   */
+  public DoubleSeries map(Series.DoubleFunction function, Series... series) {
+    return (DoubleSeries)map((Series.Function)function, series);
+  }
 
-    BooleanSeries[] booleanSeries = new BooleanSeries[series.length];
-    for(int i=0; i<series.length; i++) {
-      booleanSeries[i] = series[i].getBooleans();
-    }
+  /**
+   * @see DataFrame#map(Series.Function, Series...)
+   */
+  public LongSeries map(Series.LongFunction function, Series... series) {
+    return (LongSeries)map((Series.Function)function, series);
+  }
 
-    byte[] input = new byte[series.length];
-    byte[] output = new byte[series[0].size()];
-    for(int i=0; i<series[0].size(); i++) {
-      boolean isNull = false;
-      for(int j=0; j<series.length; j++) {
-        byte value = booleanSeries[j].values[i];
-        if(BooleanSeries.isNull(value)) {
-          isNull = true;
-          break;
-        } else {
-          input[j] = value;
-        }
-      }
+  /**
+   * @see DataFrame#map(Series.Function, Series...)
+   */
+  public StringSeries map(Series.StringFunction function, Series... series) {
+    return (StringSeries)map((Series.Function)function, series);
+  }
 
-      if(isNull) {
-        output[i] = BooleanSeries.NULL_VALUE;
-      } else {
-        output[i] = function.apply(input);
-      }
-    }
+  /**
+   * @see DataFrame#map(Series.Function, Series...)
+   */
+  public BooleanSeries map(Series.BooleanFunction function, Series... series) {
+    return (BooleanSeries)map((Series.Function)function, series);
+  }
 
-    return BooleanSeries.buildFrom(output);
+  /**
+   * @see DataFrame#map(Series.Function, Series...)
+   */
+  public BooleanSeries map(Series.BooleanFunctionEx function, Series... series) {
+    return (BooleanSeries)map((Series.Function)function, series);
+  }
+
+  /**
+   * @see DataFrame#map(Series.Function, Series...)
+   */
+  public BooleanSeries map(Series.DoubleConditional function, Series... series) {
+    return (BooleanSeries)map((Series.Function)function, series);
+  }
+
+  /**
+   * @see DataFrame#map(Series.Function, Series...)
+   */
+  public BooleanSeries map(Series.LongConditional function, Series... series) {
+    return (BooleanSeries)map((Series.Function)function, series);
+  }
+
+  /**
+   * @see DataFrame#map(Series.Function, Series...)
+   */
+  public BooleanSeries map(Series.StringConditional function, Series... series) {
+    return (BooleanSeries)map((Series.Function)function, series);
+  }
+
+  /**
+   * @see DataFrame#map(Series.Function, Series...)
+   */
+  public BooleanSeries map(Series.BooleanConditional function, Series... series) {
+    return (BooleanSeries)map((Series.Function)function, series);
+  }
+
+  /**
+   * @see DataFrame#map(Series.Function, Series...)
+   */
+  public BooleanSeries map(Series.BooleanConditionalEx function, Series... series) {
+    return (BooleanSeries)map((Series.Function)function, series);
   }
 
   /**
@@ -791,7 +727,7 @@ public class DataFrame {
   public DoubleSeries map(String doubleExpression, final String... seriesNames) {
     final Expression e = new Expression(doubleExpression);
 
-    return this.map(new Series.DoubleFunction() {
+    return (DoubleSeries)this.map(new Series.DoubleFunction() {
       @Override
       public double apply(double[] values) {
         for(int i=0; i<values.length; i++) {
@@ -929,43 +865,57 @@ public class DataFrame {
     return this.filter(this.getBooleans(seriesName));
   }
 
-  public DataFrame filter(String seriesName, DoubleSeries.DoubleConditional conditional) {
-    return this.filter(assertSeriesExists(seriesName).getDoubles().map(conditional));
+  public DataFrame filter(Series.Conditional conditional, String... seriesNames) {
+    return filter(conditional, names2series(seriesNames));
   }
 
-  public DataFrame filter(String seriesName, LongSeries.LongConditional conditional) {
-    return this.filter(assertSeriesExists(seriesName).getLongs().map(conditional));
-  }
-
-  public DataFrame filter(String seriesName, StringSeries.StringConditional conditional) {
-    return this.filter(assertSeriesExists(seriesName).getStrings().map(conditional));
+  public DataFrame filter(Series.Conditional conditional, Series... series) {
+    return filter((BooleanSeries)Series.map(conditional, series));
   }
 
   public DataFrame filterEquals(String seriesName, final double value) {
-    return this.filter(seriesName, new DoubleSeries.DoubleConditional() {
+    return this.filter(new Series.DoubleConditional() {
       @Override
-      public boolean apply(double v) {
-        return value == v;
+      public boolean apply(double... v) {
+        return value == v[0];
       }
-    });
+    }, seriesName);
   }
 
   public DataFrame filterEquals(String seriesName, final long value) {
-    return this.filter(seriesName, new LongSeries.LongConditional() {
+    return this.filter(new Series.LongConditional() {
       @Override
-      public boolean apply(long v) {
-        return value == v;
+      public boolean apply(long... v) {
+        return value == v[0];
       }
-    });
+    }, seriesName);
   }
 
   public DataFrame filterEquals(String seriesName, final String value) {
-    return this.filter(seriesName, new StringSeries.StringConditional() {
+    return this.filter(new Series.StringConditional() {
       @Override
-      public boolean apply(String v) {
-        return value.equals(v);
+      public boolean apply(String... v) {
+        return value.equals(v[0]);
       }
-    });
+    }, seriesName);
+  }
+
+  public DataFrame filterEquals(String seriesName, final byte value) {
+    return this.filter(new Series.BooleanConditionalEx() {
+      @Override
+      public boolean apply(byte... v) {
+        return value == v[0];
+      }
+    }, seriesName);
+  }
+
+  public DataFrame filterEquals(String seriesName, final boolean value) {
+    return this.filter(new Series.BooleanConditional() {
+      @Override
+      public boolean apply(boolean... v) {
+        return value == v[0];
+      }
+    }, seriesName);
   }
 
   /**
@@ -1141,7 +1091,7 @@ public class DataFrame {
     return series != null ? series.hashCode() : 0;
   }
 
-  private Series[] names2series(String... names) {
+  Series[] names2series(String... names) {
     Series[] inputSeries = new Series[names.length];
     for(int i=0; i<names.length; i++) {
       inputSeries[i] = assertSeriesExists(names[i]);
@@ -1149,25 +1099,25 @@ public class DataFrame {
     return inputSeries;
   }
 
-  private Series assertSeriesExists(String name) {
+  Series assertSeriesExists(String name) {
     if(!series.containsKey(name))
       throw new IllegalArgumentException(String.format("Unknown series '%s'", name));
     return series.get(name);
   }
 
-  private void assertSameLength(Series s) {
+  void assertSameLength(Series s) {
     if(this.size() != s.size())
       throw new IllegalArgumentException("Series size must be equals to DataFrame size");
   }
 
-  private static void assertSameLength(Series... series) {
+  static void assertSameLength(Series... series) {
     for(int i=0; i<series.length-1; i++) {
       if (series[i].size() != series[i+1].size())
         throw new IllegalArgumentException("Series size must be equals to DataFrame size");
     }
   }
 
-  private Set<String> extractSeriesNames(String doubleExpression) {
+  Set<String> extractSeriesNames(String doubleExpression) {
     Matcher m = SERIES_NAME_PATTERN.matcher(doubleExpression);
 
     Set<String> variables = new HashSet<>();
@@ -1224,7 +1174,7 @@ public class DataFrame {
     Map<String, StringSeries.Builder> builders = new HashMap<>();
     for(String h : headers) {
       StringSeries.Builder builder = StringSeries.builder();
-      builder.add(first.get(h));
+      builder.addValues(first.get(h));
       builders.put(h, builder);
     }
 
@@ -1232,7 +1182,7 @@ public class DataFrame {
       CSVRecord record = it.next();
       for(String h : headers) {
         String value = record.get(h);
-        builders.get(h).add(value);
+        builders.get(h).addValues(value);
       }
     }
 

@@ -193,7 +193,7 @@ public class DataFrameBenchmark {
         public double apply(double... values) {
           return values[0] * values[1] + values[2];
         }
-      }, "long", "double", "other");
+      }, "long", "double", "other").getDoubles();
       stopTimer();
 
       checksum ^= checksum(res.values());
