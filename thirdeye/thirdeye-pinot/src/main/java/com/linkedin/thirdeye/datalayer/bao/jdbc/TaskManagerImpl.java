@@ -45,13 +45,8 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
   public List<TaskDTO> findByJobIdStatusNotIn(Long jobId, TaskStatus status) {
     Predicate jobIdPredicate = Predicate.EQ("jobId", jobId);
     Predicate statusPredicate = Predicate.NEQ("status", status.toString());
-    List<TaskBean> list =
-        genericPojoDao.get(Predicate.AND(statusPredicate, jobIdPredicate), TaskBean.class);
-    List<TaskDTO> result = new ArrayList<>();
-    for (TaskBean bean : list) {
-      result.add((TaskDTO) MODEL_MAPPER.map(bean, TaskDTO.class));
-    }
-    return result;
+    Predicate predicate = Predicate.AND(statusPredicate, jobIdPredicate);
+    return findByPredicate(predicate);
   }
 
   @Override
@@ -63,7 +58,7 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
     list = genericPojoDao.executeParameterizedSQL(queryClause, parameterMap, TaskBean.class);
     List<TaskDTO> result = new ArrayList<>();
     for (TaskBean bean : list) {
-      result.add((TaskDTO) MODEL_MAPPER.map(bean, TaskDTO.class));
+      result.add(MODEL_MAPPER.map(bean, TaskDTO.class));
     }
     return result;
   }
@@ -118,11 +113,6 @@ public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements Tas
   @Transactional
   public List<TaskDTO> findByStatusNotIn(TaskStatus status) {
     Predicate statusPredicate = Predicate.NEQ("status", status.toString());
-    List<TaskBean> list = genericPojoDao.get(statusPredicate, TaskBean.class);
-    List<TaskDTO> result = new ArrayList<>();
-    for (TaskBean bean : list) {
-      result.add((TaskDTO) MODEL_MAPPER.map(bean, TaskDTO.class));
-    }
-    return result;
+    return findByPredicate(statusPredicate);
   }
 }

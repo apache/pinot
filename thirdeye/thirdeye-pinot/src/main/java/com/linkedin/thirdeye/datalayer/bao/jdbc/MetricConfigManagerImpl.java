@@ -24,27 +24,15 @@ public class MetricConfigManagerImpl extends AbstractManagerImpl<MetricConfigDTO
   @Override
   public List<MetricConfigDTO> findByDataset(String dataset) {
     Predicate predicate = Predicate.EQ("dataset", dataset);
-    List<MetricConfigBean> list = genericPojoDao.get(predicate, MetricConfigBean.class);
-    List<MetricConfigDTO> result = new ArrayList<>();
-    for (MetricConfigBean abstractBean : list) {
-      MetricConfigDTO dto = MODEL_MAPPER.map(abstractBean, MetricConfigDTO.class);
-      result.add(dto);
-    }
-    return result;
+    return findByPredicate(predicate);
   }
 
   @Override
   public List<MetricConfigDTO> findActiveByDataset(String dataset) {
     Predicate datasetPredicate = Predicate.EQ("dataset", dataset);
     Predicate activePredicate = Predicate.EQ("active", true);
-    List<MetricConfigBean> list = genericPojoDao.get(Predicate.AND(datasetPredicate, activePredicate),
-        MetricConfigBean.class);
-    List<MetricConfigDTO> result = new ArrayList<>();
-    for (MetricConfigBean abstractBean : list) {
-      MetricConfigDTO dto = MODEL_MAPPER.map(abstractBean, MetricConfigDTO.class);
-      result.add(dto);
-    }
-    return result;
+    Predicate predicate = Predicate.AND(datasetPredicate, activePredicate);
+    return findByPredicate(predicate);
   }
 
   @Override
@@ -62,13 +50,7 @@ public class MetricConfigManagerImpl extends AbstractManagerImpl<MetricConfigDTO
 
   public List<MetricConfigDTO> findByMetricName(String metricName) {
     Predicate metricNamePredicate = Predicate.EQ("name", metricName);
-    List<MetricConfigBean> list = genericPojoDao.get(metricNamePredicate, MetricConfigBean.class);
-    List<MetricConfigDTO> result = new ArrayList<>();
-    for (MetricConfigBean abstractBean : list) {
-      MetricConfigDTO dto = MODEL_MAPPER.map(abstractBean, MetricConfigDTO.class);
-      result.add(dto);
-    }
-    return result;
+    return findByPredicate(metricNamePredicate);
   }
 
   @Override

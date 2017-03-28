@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
 import java.sql.Timestamp;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -28,7 +27,7 @@ public class DetectionStatusManagerImpl extends AbstractManagerImpl<DetectionSta
     DetectionStatusDTO result = null;
     if (CollectionUtils.isNotEmpty(list)) {
       Collections.sort(list);
-      result = (DetectionStatusDTO) MODEL_MAPPER.map(list.get(list.size() - 1), DetectionStatusDTO.class);
+      result = MODEL_MAPPER.map(list.get(list.size() - 1), DetectionStatusDTO.class);
     }
     return result;
   }
@@ -42,12 +41,7 @@ public class DetectionStatusManagerImpl extends AbstractManagerImpl<DetectionSta
         Predicate.GE("dateToCheckInMS", startTime),
         Predicate.EQ("detectionRun", detectionRun));
 
-    List<DetectionStatusBean> list = genericPojoDao.get(predicate, DetectionStatusBean.class);
-    List<DetectionStatusDTO> results = new ArrayList<>();
-    for (DetectionStatusBean bean : list) {
-      results.add((DetectionStatusDTO) MODEL_MAPPER.map(bean, DetectionStatusDTO.class));
-    }
-    return results;
+    return findByPredicate(predicate);
   }
 
   @Override

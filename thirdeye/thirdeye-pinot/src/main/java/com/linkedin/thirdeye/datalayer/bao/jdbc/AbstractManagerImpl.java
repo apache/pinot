@@ -31,10 +31,9 @@ public abstract class AbstractManagerImpl<E extends AbstractDTO> implements Abst
     MODEL_MAPPER.getConfiguration().setMatchingStrategy(MatchingStrategies.STRICT);
   }
 
-  Class<? extends AbstractDTO> dtoClass;
-  Class<? extends AbstractBean> beanClass;
-  protected
-  GenericPojoDao genericPojoDao;
+  private Class<? extends AbstractDTO> dtoClass;
+  private Class<? extends AbstractBean> beanClass;
+  protected GenericPojoDao genericPojoDao;
 
   protected AbstractManagerImpl(Class<? extends AbstractDTO> dtoClass,
       Class<? extends AbstractBean> beanClass) {
@@ -105,14 +104,24 @@ public abstract class AbstractManagerImpl<E extends AbstractDTO> implements Abst
   @Override
   public List<E> findByParams(Map<String, Object> filters) {
     List<? extends AbstractBean> list = genericPojoDao.get(filters, beanClass);
+    return convertBeanListToDTOList(list);
+  }
+
+  @Override
+  public List<E> findByPredicate(Predicate predicate) {
+    List<? extends AbstractBean> list = genericPojoDao.get(predicate, beanClass);
+    return convertBeanListToDTOList(list);
+  }
+
+  protected List<E> convertBeanListToDTOList(List<? extends AbstractBean> beans) {
     List<E> result = new ArrayList<>();
-    for (AbstractBean bean : list) {
-      AbstractDTO dto = MODEL_MAPPER.map(bean, dtoClass);
-      result.add((E) dto);
+    for (AbstractBean bean : beans) {
+      result.add((E) convertBean2DTO(bean, dtoClass));
     }
     return result;
   }
 
+  @Deprecated
   protected RawAnomalyResultDTO createRawAnomalyDTOFromBean(
       RawAnomalyResultBean rawAnomalyResultBean) {
     RawAnomalyResultDTO rawAnomalyResultDTO;
@@ -138,9 +147,8 @@ public abstract class AbstractManagerImpl<E extends AbstractDTO> implements Abst
   }
 
   protected <T extends AbstractDTO> T convertBean2DTO(AbstractBean entity, Class<T> dtoClass) {
-    AbstractDTO dto;
     try {
-      dto = dtoClass.newInstance();
+      AbstractDTO dto = dtoClass.newInstance();
       MODEL_MAPPER.map(entity, dto);
       return (T) dto;
     } catch (Exception e) {
@@ -149,9 +157,8 @@ public abstract class AbstractManagerImpl<E extends AbstractDTO> implements Abst
   }
 
   protected <T extends AbstractBean> T convertDTO2Bean(AbstractDTO entity, Class<T> beanClass) {
-    AbstractBean bean;
     try {
-      bean = beanClass.newInstance();
+      AbstractBean bean = beanClass.newInstance();
       MODEL_MAPPER.map(entity, bean);
       return (T) bean;
     } catch (Exception e) {

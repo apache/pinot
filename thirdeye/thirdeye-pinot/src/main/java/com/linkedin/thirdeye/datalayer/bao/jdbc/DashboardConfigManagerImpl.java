@@ -4,8 +4,6 @@ import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.DashboardConfigBean;
 
-import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
@@ -37,27 +35,14 @@ public class DashboardConfigManagerImpl extends AbstractManagerImpl<DashboardCon
   @Override
   public List<DashboardConfigDTO> findByDataset(String dataset) {
     Predicate predicate = Predicate.EQ("dataset", dataset);
-    List<DashboardConfigBean> list = genericPojoDao.get(predicate, DashboardConfigBean.class);
-    List<DashboardConfigDTO> result = new ArrayList<>();
-    for (DashboardConfigBean abstractBean : list) {
-      DashboardConfigDTO dto = MODEL_MAPPER.map(abstractBean, DashboardConfigDTO.class);
-      result.add(dto);
-    }
-    return result;
+    return findByPredicate(predicate);
   }
 
   @Override
   public List<DashboardConfigDTO> findActiveByDataset(String dataset) {
     Predicate datasetPredicate = Predicate.EQ("dataset", dataset);
     Predicate activePredicate = Predicate.EQ("active", true);
-    List<DashboardConfigBean> list = genericPojoDao.get(Predicate.AND(datasetPredicate, activePredicate),
-        DashboardConfigBean.class);
-    List<DashboardConfigDTO> result = new ArrayList<>();
-    for (DashboardConfigBean abstractBean : list) {
-      DashboardConfigDTO dto = MODEL_MAPPER.map(abstractBean, DashboardConfigDTO.class);
-      result.add(dto);
-    }
-    return result;
+    return findByPredicate(Predicate.AND(datasetPredicate, activePredicate));
   }
 
   public List<DashboardConfigDTO> findWhereNameLike(String name) {
@@ -65,11 +50,6 @@ public class DashboardConfigManagerImpl extends AbstractManagerImpl<DashboardCon
     parameterMap.put("name", name);
     List<DashboardConfigBean> list =
         genericPojoDao.executeParameterizedSQL(FIND_BY_NAME_LIKE, parameterMap, DashboardConfigBean.class);
-    List<DashboardConfigDTO> result = new ArrayList<>();
-    for (DashboardConfigBean bean : list) {
-      result.add(MODEL_MAPPER.map(bean, DashboardConfigDTO.class));
-    }
-    return result;
+    return convertBeanListToDTOList(list);
   }
-
 }
