@@ -1097,17 +1097,16 @@ public class PinotHelixResourceManager {
     }
   }
 
-  public void setTableConfig(AbstractTableConfig config, String tableNameWithSuffix, TableType type)
-      throws JsonGenerationException, JsonMappingException, IOException {
+  public void setExistingTableConfig(AbstractTableConfig config, String tableNameWithSuffix, TableType type)
+      throws IOException {
     if (type == TableType.REALTIME) {
       ZKMetadataProvider.setRealtimeTableConfig(_propertyStore, tableNameWithSuffix,
           AbstractTableConfig.toZnRecord(config));
       ensureRealtimeClusterIsSetUp(config, tableNameWithSuffix, config.getIndexingConfig());
-    } else {
+    } else if (type == TableType.OFFLINE) {
       ZKMetadataProvider.setOfflineTableConfig(_propertyStore, tableNameWithSuffix,
           AbstractTableConfig.toZnRecord(config));
     }
-
   }
 
   public void updateMetadataConfigFor(String tableName, TableType type, TableCustomConfig newConfigs) throws Exception {
@@ -1122,7 +1121,7 @@ public class PinotHelixResourceManager {
       throw new RuntimeException("tableName : " + tableName + " of type : " + type + " not found");
     }
     config.setCustomConfigs(newConfigs);
-    setTableConfig(config, actualTableName, type);
+    setExistingTableConfig(config, actualTableName, type);
   }
 
   public void updateSegmentsValidationAndRetentionConfigFor(String tableName, TableType type,
@@ -1139,7 +1138,7 @@ public class PinotHelixResourceManager {
     }
     config.setValidationConfig(newConfigs);
 
-    setTableConfig(config, actualTableName, type);
+    setExistingTableConfig(config, actualTableName, type);
   }
 
   public void updateIndexingConfigFor(String tableName, TableType type, IndexingConfig newConfigs) throws Exception {
@@ -1160,7 +1159,7 @@ public class PinotHelixResourceManager {
       throw new RuntimeException("tableName : " + tableName + " of type : " + type + " not found");
     }
 
-    setTableConfig(config, actualTableName, type);
+    setExistingTableConfig(config, actualTableName, type);
 
     if (type == TableType.REALTIME) {
       ensureRealtimeClusterIsSetUp(config, tableName, newConfigs);
