@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.collections.CollectionUtils;
@@ -20,13 +19,7 @@ implements IngraphMetricConfigManager {
   @Override
   public List<IngraphMetricConfigDTO> findByDashboard(String dashboardName) {
     Predicate predicate = Predicate.EQ("dashboardName", dashboardName);
-    List<IngraphMetricConfigBean> list = genericPojoDao.get(predicate, IngraphMetricConfigBean.class);
-    List<IngraphMetricConfigDTO> result = new ArrayList<>();
-    for (IngraphMetricConfigBean abstractBean : list) {
-      IngraphMetricConfigDTO dto = MODEL_MAPPER.map(abstractBean, IngraphMetricConfigDTO.class);
-      result.add(dto);
-    }
-    return result;
+    return findByPredicate(predicate);
   }
 
   @Override

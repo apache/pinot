@@ -100,13 +100,4 @@ public class RawAnomalyResultManagerImpl extends AbstractManagerImpl<RawAnomalyR
     Predicate predicate = Predicate.EQ("functionId", functionId);
     return findByPredicate(predicate);
   }
-
-  private List<RawAnomalyResultDTO> findByPredicate(Predicate predicate) {
-    List<RawAnomalyResultBean> list = genericPojoDao.get(predicate, RawAnomalyResultBean.class);
-    List<RawAnomalyResultDTO> result = new ArrayList<>();
-    for (RawAnomalyResultBean bean : list) {
-      result.add(createRawAnomalyDTOFromBean(bean));
-    }
-    return result;
-  }
 }

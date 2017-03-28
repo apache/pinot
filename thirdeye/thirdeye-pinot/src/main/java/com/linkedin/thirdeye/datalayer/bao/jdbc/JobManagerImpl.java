@@ -3,7 +3,6 @@ package com.linkedin.thirdeye.datalayer.bao.jdbc;
 import com.linkedin.thirdeye.anomaly.detection.DetectionTaskRunner;
 import java.sql.Timestamp;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;

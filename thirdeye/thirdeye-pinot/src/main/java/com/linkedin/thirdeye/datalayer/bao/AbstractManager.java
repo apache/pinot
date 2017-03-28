@@ -23,5 +23,7 @@ public interface AbstractManager<E extends AbstractDTO> {
 
   List<E> findByParams(Map<String, Object> filters);
 
+  List<E> findByPredicate(Predicate predicate);
+
   int update(E entity, Predicate predicate);
 }

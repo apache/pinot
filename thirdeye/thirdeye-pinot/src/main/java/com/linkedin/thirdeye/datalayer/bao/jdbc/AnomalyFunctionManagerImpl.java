@@ -32,30 +32,17 @@ public class AnomalyFunctionManagerImpl extends AbstractManagerImpl<AnomalyFunct
   @Override
   public List<String> findDistinctTopicMetricsByCollection(String collection) {
     Predicate predicate = Predicate.EQ("collection", collection);
-    List<AnomalyFunctionBean> list = genericPojoDao.get(predicate, AnomalyFunctionBean.class);
+    List<AnomalyFunctionDTO> dtoList = findByPredicate(predicate);
     Set<String> metrics = new HashSet<>();
-    for (AnomalyFunctionBean anomalyFunctionBean : list) {
-      AnomalyFunctionDTO dto = MODEL_MAPPER.map(anomalyFunctionBean, AnomalyFunctionDTO.class);
+    for (AnomalyFunctionDTO dto : dtoList) {
       metrics.add(dto.getTopicMetric());
     }
     return new ArrayList<>(metrics);
   }
 
-  /*
-   * (non-Javadoc)
-   *
-   * @see com.linkedin.thirdeye.datalayer.bao.IAnomalyFunctionManager# findAllActiveFunctions()
-   */
   @Override
   public List<AnomalyFunctionDTO> findAllActiveFunctions() {
     Predicate predicate = Predicate.EQ("active", true);
-    List<AnomalyFunctionBean> list = genericPojoDao.get(predicate, AnomalyFunctionBean.class);
-    List<AnomalyFunctionDTO> result = new ArrayList<>();
-    for (AnomalyFunctionBean abstractBean : list) {
-      AnomalyFunctionDTO dto = MODEL_MAPPER.map(abstractBean, AnomalyFunctionDTO.class);
-      result.add(dto);
-    }
-    return result;
+    return findByPredicate(predicate);
   }
-
 }
