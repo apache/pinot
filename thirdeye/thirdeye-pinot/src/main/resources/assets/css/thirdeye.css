@@ -92,6 +92,7 @@ label {
     margin-bottom: 0px;
     border-bottom: 1px solid #ccc;
 }
+
 .navbar-inverse {
     background-image: none;
     background-color: #080808;
@@ -417,6 +418,32 @@ text {
 
 /* Common */
 
+/* Navbar*/
+
+.thirdeye-nav {
+  display: flex;
+}
+
+.thirdeye-nav__tabs {
+  display: flex;
+  margin-left: 24px;
+}
+
+
+.thirdeye-nav__oldui {
+  display: flex;
+  flex-grow: 1;
+  font-weight: 500;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.thirdeye-nav__divider {
+  margin-right: 24px;
+  border-right: 1px solid rgb(157, 157, 157);
+  height: 32px;
+}
+
 /*button*/
 .thirdeye-btn, .thirdeye-btn:hover  {
   color: white;
@@ -427,20 +454,39 @@ text {
   line-height: 32px;
   border-radius: 2px;
   transition-duration: 167ms;
-  transition-property: background-color,color;
+  transition-property: background-color, box-shadow, color;
   transition-timing-function: cubic-bezier(0,0,.2,1);
 }
 
 .thirdeye-btn:hover,
 .thirdeye-btn:focus {
   background-color: #0073b1;
+  font-weight: 500;
   color: white;
 }
 
-.thirdeye-btn:active{
+.thirdeye-btn:active {
   color: white;
   background-color: #006097;
 }
+
+.thirdeye-btn--secondary {
+  background-color: transparent;
+  border-color: rgb(157, 157, 157);
+  font-weight: 500;
+}
+
+.thirdeye-btn--secondary:hover,
+.thirdeye-btn--secondary:focus {
+  background-color: rgba(255,255,255,.1);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.7), inset 0 0 0 2px rgba(255,255,255,.85), inset 0 0 0 3px transparent;
+}
+
+.thirdeye-btn--secondary:active {
+  background-color: rgba(255,255,255,.3);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.7), inset 0 0 0 2px rgba(255,255,255,.85), inset 0 0 0 3px white;
+}
+
 
 /* link*/
 .thirdeye-link {
