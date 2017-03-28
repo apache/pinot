@@ -3,8 +3,6 @@ package com.linkedin.thirdeye.dataframe;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -15,7 +13,7 @@ import org.apache.commons.lang.math.NumberUtils;
 /**
  * Series container for String objects.
  */
-public final class StringSeries extends Series {
+public final class StringSeries extends TypedSeries<StringSeries> {
   public static final String NULL_VALUE = null;
 
   public static class StringBatchConcat implements Series.StringFunction {
@@ -156,11 +154,6 @@ public final class StringSeries extends Series {
   }
 
   @Override
-  public StringSeries copy() {
-    return StringSeries.buildFrom(Arrays.copyOf(this.values, this.values.length));
-  }
-
-  @Override
   public int size() {
     return this.values.length;
   }
@@ -247,36 +240,6 @@ public final class StringSeries extends Series {
   }
 
   @Override
-  public StringSeries head(int n) {
-    return (StringSeries) super.head(n);
-  }
-
-  @Override
-  public StringSeries tail(int n) {
-    return (StringSeries) super.tail(n);
-  }
-
-  @Override
-  public StringSeries sliceFrom(int from) {
-    return (StringSeries)super.sliceFrom(from);
-  }
-
-  @Override
-  public StringSeries sliceTo(int to) {
-    return (StringSeries)super.sliceTo(to);
-  }
-
-  @Override
-  public StringSeries reverse() {
-    return (StringSeries) super.reverse();
-  }
-
-  @Override
-  public StringSeries sorted() {
-    return (StringSeries)super.sorted();
-  }
-
-  @Override
   public String toString() {
     StringBuilder builder = new StringBuilder();
     builder.append("StringSeries{");
@@ -311,19 +274,6 @@ public final class StringSeries extends Series {
   }
 
   @Override
-  public StringSeries shift(int offset) {
-    String[] values = new String[this.values.length];
-    if(offset >= 0) {
-      Arrays.fill(values, 0, Math.min(offset, values.length), NULL_VALUE);
-      System.arraycopy(this.values, 0, values, Math.min(offset, values.length), Math.max(values.length - offset, 0));
-    } else {
-      System.arraycopy(this.values, Math.min(-offset, values.length), values, 0, Math.max(values.length + offset, 0));
-      Arrays.fill(values, Math.max(values.length + offset, 0), values.length, NULL_VALUE);
-    }
-    return StringSeries.buildFrom(values);
-  }
-
-  @Override
   StringSeries project(int[] fromIndex) {
     String[] values = new String[fromIndex.length];
     for(int i=0; i<fromIndex.length; i++) {
@@ -334,52 +284,6 @@ public final class StringSeries extends Series {
       }
     }
     return StringSeries.buildFrom(values);
-  }
-
-  @Override
-  int[] sortedIndex() {
-    List<StringSortTuple> tuples = new ArrayList<>();
-    for(int i=0; i<this.values.length; i++) {
-      tuples.add(new StringSortTuple(this.values[i], i));
-    }
-
-    Collections.sort(tuples, new Comparator<StringSortTuple>() {
-      @Override
-      public int compare(StringSortTuple a, StringSortTuple b) {
-        if(a.value == null)
-          return b.value == null ? 0 : -1;
-        return a.value.compareTo(b.value);
-      }
-    });
-
-    int[] fromIndex = new int[tuples.size()];
-    for(int i=0; i<tuples.size(); i++) {
-      fromIndex[i] = tuples.get(i).index;
-    }
-    return fromIndex;
-  }
-
-  @Override
-  public boolean hasNull() {
-    for(String v : this.values)
-      if(isNull(v))
-        return true;
-    return false;
-  }
-
-  @Override
-  int[] nullIndex() {
-    int[] nulls = new int[this.values.length];
-    int nullCount = 0;
-
-    for(int i=0; i<this.values.length; i++) {
-      if(isNull(this.values[i])) {
-        nulls[nullCount] = i;
-        nullCount++;
-      }
-    }
-
-    return Arrays.copyOf(nulls, nullCount);
   }
 
   @Override
@@ -510,14 +414,14 @@ public final class StringSeries extends Series {
    * @see Series#aggregate(Function)
    */
   public static StringSeries aggregate(StringFunction function, Series series) {
-    return buildFrom(function.apply(series.getStrings().values));
+    return buildFrom(function.apply(series.dropNull().getStrings().values));
   }
 
   /**
    * @see Series#aggregate(Function)
    */
   public static BooleanSeries aggregate(StringConditional function, Series series) {
-    return BooleanSeries.builder().addBooleanValues(function.apply(series.getStrings().values)).build();
+    return BooleanSeries.builder().addBooleanValues(function.apply(series.dropNull().getStrings().values)).build();
   }
 
   public static boolean isNull(String value) {
@@ -539,15 +443,5 @@ public final class StringSeries extends Series {
     if(values.length <= 0)
       throw new IllegalStateException("Must contain at least one value");
     return values;
-  }
-
-  static final class StringSortTuple {
-    final String value;
-    final int index;
-
-    StringSortTuple(String value, int index) {
-      this.value = value;
-      this.index = index;
-    }
   }
 }

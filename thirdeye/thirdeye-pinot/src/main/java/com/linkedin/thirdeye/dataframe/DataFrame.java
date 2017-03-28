@@ -430,7 +430,7 @@ public class DataFrame {
    * @return reference to the modified DataFrame (this)
    */
   public DataFrame convertSeries(String seriesName, Series.SeriesType type) {
-    this.series.put(seriesName, assertSeriesExists(seriesName).toType(type));
+    this.series.put(seriesName, assertSeriesExists(seriesName).get(type));
     return this;
   }
 
@@ -618,13 +618,6 @@ public class DataFrame {
   }
 
   /**
-   * @see DataFrame#map(Series.Function, Series...)
-   */
-  public BooleanSeries map(Series.BooleanConditionalEx function, String... seriesNames) {
-    return (BooleanSeries)map((Series.Function)function, seriesNames);
-  }
-
-  /**
    * Applies {@code function} to {@code series} row by row
    * and returns the results as a new series. The series' values are mapped to arguments
    * of {@code function} in the same order as they appear in {@code series}.
@@ -700,13 +693,6 @@ public class DataFrame {
    * @see DataFrame#map(Series.Function, Series...)
    */
   public BooleanSeries map(Series.BooleanConditional function, Series... series) {
-    return (BooleanSeries)map((Series.Function)function, series);
-  }
-
-  /**
-   * @see DataFrame#map(Series.Function, Series...)
-   */
-  public BooleanSeries map(Series.BooleanConditionalEx function, Series... series) {
     return (BooleanSeries)map((Series.Function)function, series);
   }
 
@@ -900,15 +886,6 @@ public class DataFrame {
     }, seriesName);
   }
 
-  public DataFrame filterEquals(String seriesName, final byte value) {
-    return this.filter(new Series.BooleanConditionalEx() {
-      @Override
-      public boolean apply(byte... v) {
-        return value == v[0];
-      }
-    }, seriesName);
-  }
-
   public DataFrame filterEquals(String seriesName, final boolean value) {
     return this.filter(new Series.BooleanConditional() {
       @Override
@@ -916,28 +893,6 @@ public class DataFrame {
         return value == v[0];
       }
     }, seriesName);
-  }
-
-  /**
-   * Returns series {@code s} converted to type {@code type} unless native type matches already.
-   *
-   * @param s input series
-   * @param type target type
-   * @return converted series
-   */
-  public static Series asType(Series s, Series.SeriesType type) {
-    switch(type) {
-      case DOUBLE:
-        return s.getDoubles();
-      case LONG:
-        return s.getLongs();
-      case BOOLEAN:
-        return s.getBooleans();
-      case STRING:
-        return s.getStrings();
-      default:
-        throw new IllegalArgumentException(String.format("Unknown series type '%s'", type));
-    }
   }
 
   /**
@@ -1190,7 +1145,7 @@ public class DataFrame {
     DataFrame df = new DataFrame();
     for(Map.Entry<String, StringSeries.Builder> e : builders.entrySet()) {
       StringSeries s = e.getValue().build();
-      Series conv = s.toType(s.inferType());
+      Series conv = s.get(s.inferType());
       String name = header2name.get(e.getKey());
       df.addSeries(name, conv);
     }

@@ -3,16 +3,13 @@ package com.linkedin.thirdeye.dataframe;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
-import org.apache.commons.lang.ArrayUtils;
 
 
 /**
  * Series container for primitive long.
  */
-public final class LongSeries extends Series {
+public final class LongSeries extends TypedSeries<LongSeries> {
   public static final long NULL_VALUE = Long.MIN_VALUE;
 
   public static class LongBatchSum implements Series.LongFunction {
@@ -163,11 +160,6 @@ public final class LongSeries extends Series {
   }
 
   @Override
-  public LongSeries copy() {
-    return buildFrom(Arrays.copyOf(this.values, this.values.length));
-  }
-
-  @Override
   public int size() {
     return this.values.length;
   }
@@ -206,70 +198,6 @@ public final class LongSeries extends Series {
   @Override
   public LongSeries slice(int from, int to) {
     return buildFrom(Arrays.copyOfRange(this.values, from, to));
-  }
-
-  @Override
-  public LongSeries head(int n) {
-    return (LongSeries)super.head(n);
-  }
-
-  @Override
-  public LongSeries tail(int n) {
-    return (LongSeries)super.tail(n);
-  }
-
-  @Override
-  public LongSeries sliceFrom(int from) {
-    return (LongSeries)super.sliceFrom(from);
-  }
-
-  @Override
-  public LongSeries sliceTo(int to) {
-    return (LongSeries)super.sliceTo(to);
-  }
-
-  @Override
-  public LongSeries reverse() {
-    return (LongSeries)super.reverse();
-  }
-
-  @Override
-  public LongSeries sorted() {
-    return (LongSeries)super.sorted();
-  }
-
-  @Override
-  public LongSeries unique() {
-    return (LongSeries)super.unique();
-  }
-
-  @Override
-  public LongSeries append(Series... series) {
-    List<Series> newSeries = new ArrayList<>();
-    newSeries.add(this);
-    newSeries.addAll(Arrays.asList(series));
-    return builder().addSeries(newSeries).build();
-  }
-
-  @Override
-  int[] sortedIndex() {
-    List<LongSortTuple> tuples = new ArrayList<>();
-    for(int i=0; i<this.values.length; i++) {
-      tuples.add(new LongSortTuple(this.values[i], i));
-    }
-
-    Collections.sort(tuples, new Comparator<LongSortTuple>() {
-      @Override
-      public int compare(LongSortTuple a, LongSortTuple b) {
-        return Long.compare(a.value, b.value);
-      }
-    });
-
-    int[] fromIndex = new int[tuples.size()];
-    for(int i=0; i<tuples.size(); i++) {
-      fromIndex[i] = tuples.get(i).index;
-    }
-    return fromIndex;
   }
 
   @Override
@@ -395,42 +323,6 @@ public final class LongSeries extends Series {
       }
     }
     return buildFrom(values);
-  }
-
-  @Override
-  public LongSeries shift(int offset) {
-    long[] values = new long[this.values.length];
-    if(offset >= 0) {
-      Arrays.fill(values, 0, Math.min(offset, values.length), NULL_VALUE);
-      System.arraycopy(this.values, 0, values, Math.min(offset, values.length), Math.max(values.length - offset, 0));
-    } else {
-      System.arraycopy(this.values, Math.min(-offset, values.length), values, 0, Math.max(values.length + offset, 0));
-      Arrays.fill(values, Math.max(values.length + offset, 0), values.length, NULL_VALUE);
-    }
-    return buildFrom(values);
-  }
-
-  @Override
-  public boolean hasNull() {
-    for(long v : this.values)
-      if(isNull(v))
-        return true;
-    return false;
-  }
-
-  @Override
-  int[] nullIndex() {
-    int[] nulls = new int[this.values.length];
-    int nullCount = 0;
-
-    for(int i=0; i<this.values.length; i++) {
-      if(isNull(this.values[i])) {
-        nulls[nullCount] = i;
-        nullCount++;
-      }
-    }
-
-    return Arrays.copyOf(nulls, nullCount);
   }
 
   @Override
@@ -561,14 +453,14 @@ public final class LongSeries extends Series {
    * @see Series#aggregate(Function)
    */
   public static LongSeries aggregate(LongFunction function, Series series) {
-    return buildFrom(function.apply(series.getLongs().values));
+    return buildFrom(function.apply(series.dropNull().getLongs().values));
   }
 
   /**
    * @see Series#aggregate(Function)
    */
   public static BooleanSeries aggregate(LongConditional function, Series series) {
-    return BooleanSeries.builder().addBooleanValues(function.apply(series.getLongs().values)).build();
+    return BooleanSeries.builder().addBooleanValues(function.apply(series.dropNull().getLongs().values)).build();
   }
 
   public static long valueOf(Long value) {
@@ -585,16 +477,6 @@ public final class LongSeries extends Series {
     if(values.length <= 0)
       throw new IllegalStateException("Must contain at least one value");
     return values;
-  }
-
-  static final class LongSortTuple {
-    final long value;
-    final int index;
-
-    LongSortTuple(long value, int index) {
-      this.value = value;
-      this.index = index;
-    }
   }
 
   static class Range {

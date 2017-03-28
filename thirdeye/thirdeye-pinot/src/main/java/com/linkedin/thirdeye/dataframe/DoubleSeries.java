@@ -3,16 +3,13 @@ package com.linkedin.thirdeye.dataframe;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
-import org.apache.commons.lang.ArrayUtils;
 
 
 /**
  * Series container for primitive double.
  */
-public final class DoubleSeries extends Series {
+public final class DoubleSeries extends TypedSeries<DoubleSeries> {
   public static final double NULL_VALUE = Double.NaN;
 
   public static class DoubleBatchSum implements Series.DoubleFunction {
@@ -183,11 +180,6 @@ public final class DoubleSeries extends Series {
   }
 
   @Override
-  public DoubleSeries copy() {
-    return buildFrom(Arrays.copyOf(this.values, this.values.length));
-  }
-
-  @Override
   public int size() {
     return this.values.length;
   }
@@ -226,41 +218,6 @@ public final class DoubleSeries extends Series {
   @Override
   public DoubleSeries slice(int from, int to) {
     return buildFrom(Arrays.copyOfRange(this.values, from, to));
-  }
-
-  @Override
-  public DoubleSeries head(int n) {
-    return (DoubleSeries)super.head(n);
-  }
-
-  @Override
-  public DoubleSeries tail(int n) {
-    return (DoubleSeries)super.tail(n);
-  }
-
-  @Override
-  public DoubleSeries sliceFrom(int from) {
-    return (DoubleSeries)super.sliceFrom(from);
-  }
-
-  @Override
-  public DoubleSeries sliceTo(int to) {
-    return (DoubleSeries)super.sliceTo(to);
-  }
-
-  @Override
-  public DoubleSeries reverse() {
-    return (DoubleSeries)super.reverse();
-  }
-
-  @Override
-  public DoubleSeries sorted() {
-    return (DoubleSeries)super.sorted();
-  }
-
-  @Override
-  public DoubleSeries unique() {
-    return (DoubleSeries)super.unique();
   }
 
   public DoubleSeries applyMovingWindow(int size, int minSize, DoubleFunction function) {
@@ -343,19 +300,6 @@ public final class DoubleSeries extends Series {
   }
 
   @Override
-  public DoubleSeries shift(int offset) {
-    double[] values = new double[this.values.length];
-    if(offset >= 0) {
-      Arrays.fill(values, 0, Math.min(offset, values.length), NULL_VALUE);
-      System.arraycopy(this.values, 0, values, Math.min(offset, values.length), Math.max(values.length - offset, 0));
-    } else {
-      System.arraycopy(this.values, Math.min(-offset, values.length), values, 0, Math.max(values.length + offset, 0));
-      Arrays.fill(values, Math.max(values.length + offset, 0), values.length, NULL_VALUE);
-    }
-    return buildFrom(values);
-  }
-
-  @Override
   DoubleSeries project(int[] fromIndex) {
     double[] values = new double[fromIndex.length];
     for(int i=0; i<fromIndex.length; i++) {
@@ -366,51 +310,6 @@ public final class DoubleSeries extends Series {
       }
     }
     return buildFrom(values);
-  }
-
-  @Override
-  int[] sortedIndex() {
-    List<DoubleSortTuple> tuples = new ArrayList<>();
-    for(int i=0; i<this.values.length; i++) {
-      tuples.add(new DoubleSortTuple(this.values[i], i));
-    }
-
-    Collections.sort(tuples, new Comparator<DoubleSortTuple>() {
-      @Override
-      public int compare(DoubleSortTuple a, DoubleSortTuple b) {
-        return nullSafeDoubleComparator(a.value, b.value);
-      }
-    });
-
-    int[] fromIndex = new int[tuples.size()];
-    for(int i=0; i<tuples.size(); i++) {
-      fromIndex[i] = tuples.get(i).index;
-    }
-    return fromIndex;
-  }
-
-  @Override
-  public boolean hasNull() {
-    for(double v : this.values) {
-      if(isNull(v))
-        return true;
-    }
-    return false;
-  }
-
-  @Override
-  int[] nullIndex() {
-    int[] nulls = new int[this.values.length];
-    int nullCount = 0;
-
-    for(int i=0; i<this.values.length; i++) {
-      if(isNull(this.values[i])) {
-        nulls[nullCount] = i;
-        nullCount++;
-      }
-    }
-
-    return Arrays.copyOf(nulls, nullCount);
   }
 
   @Override
@@ -536,14 +435,14 @@ public final class DoubleSeries extends Series {
    * @see Series#aggregate(Function)
    */
   public static DoubleSeries aggregate(DoubleFunction function, Series series) {
-    return buildFrom(function.apply(series.getDoubles().values));
+    return buildFrom(function.apply(series.dropNull().getDoubles().values));
   }
 
   /**
    * @see Series#aggregate(Function)
    */
   public static BooleanSeries aggregate(DoubleConditional function, Series series) {
-    return BooleanSeries.builder().addBooleanValues(function.apply(series.getDoubles().values)).build();
+    return BooleanSeries.builder().addBooleanValues(function.apply(series.dropNull().getDoubles().values)).build();
   }
 
   private static int nullSafeDoubleComparator(double a, double b) {
@@ -575,15 +474,5 @@ public final class DoubleSeries extends Series {
     if(values.length <= 0)
       throw new IllegalStateException("Must contain at least one value");
     return values;
-  }
-
-  static final class DoubleSortTuple {
-    final double value;
-    final int index;
-
-    DoubleSortTuple(double value, int index) {
-      this.value = value;
-      this.index = index;
-    }
   }
 }

@@ -8,7 +8,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
-import javax.xml.crypto.Data;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
@@ -1458,8 +1457,8 @@ public class DataFrameTest {
   public void testBooleanFunctionExConversion() {
     Series out = df.map(new Series.BooleanFunctionEx() {
       @Override
-      public byte apply(byte... values) {
-        return (byte)(values[0] + 1);
+      public byte apply(boolean... values) {
+        return TRUE;
       }
     }, "long");
     Assert.assertEquals(out.type(), Series.SeriesType.BOOLEAN);
@@ -1510,14 +1509,29 @@ public class DataFrameTest {
   }
 
   @Test
-  public void testBooleanConditionalExConversion() {
-    Series out = df.map(new Series.BooleanConditionalEx() {
-      @Override
-      public boolean apply(byte... values) {
-        return true;
-      }
-    }, "long");
-    Assert.assertEquals(out.type(), Series.SeriesType.BOOLEAN);
+  public void testFillForward() {
+    // must pass
+    LongSeries.empty().fillNullForward();
+
+    // must pass
+    LongSeries.buildFrom(LongSeries.NULL_VALUE).fillNullForward();
+
+    LongSeries in = LongSeries.buildFrom(LongSeries.NULL_VALUE, 1, LongSeries.NULL_VALUE, 2, 3, LongSeries.NULL_VALUE);
+    LongSeries out = in.fillNullForward();
+    Assert.assertEquals(out.values, new long[] { LongSeries.NULL_VALUE, 1, 1, 2, 3, 3 });
+  }
+
+  @Test
+  public void testFillBackward() {
+    // must pass
+    LongSeries.empty().fillNullBackward();
+
+    // must pass
+    LongSeries.buildFrom(LongSeries.NULL_VALUE).fillNullBackward();
+
+    LongSeries in = LongSeries.buildFrom(LongSeries.NULL_VALUE, 1, LongSeries.NULL_VALUE, 2, 3, LongSeries.NULL_VALUE);
+    LongSeries out = in.fillNullBackward();
+    Assert.assertEquals(out.values, new long[] { 1, 1, 2, 2, 3, LongSeries.NULL_VALUE });
   }
 
   static void assertEqualsDoubles(double[] actual, double[] expected) {

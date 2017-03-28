@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Iterator;
+import java.util.Comparator;
 import java.util.List;
 import org.apache.commons.lang.ArrayUtils;
 
@@ -65,11 +65,6 @@ public abstract class Series {
   }
 
   //  @FunctionalInterface
-  interface BooleanConditionalEx extends Conditional {
-    boolean apply(byte... values);
-  }
-
-  //  @FunctionalInterface
   interface DoubleFunction extends Function {
     double apply(double... values);
   }
@@ -91,7 +86,11 @@ public abstract class Series {
 
   //  @FunctionalInterface
   interface BooleanFunctionEx extends Function {
-    byte apply(byte... values);
+    byte TRUE = BooleanSeries.TRUE_VALUE;
+    byte FALSE = BooleanSeries.FALSE_VALUE;
+    byte NULL = BooleanSeries.NULL_VALUE;
+
+    byte apply(boolean... values);
   }
 
   /**
@@ -298,34 +297,6 @@ public abstract class Series {
   public abstract Series slice(int from, int to);
 
   /**
-   * Returns as copy of the series with the same native type.
-   *
-   * @return series copy
-   */
-  public abstract Series copy();
-
-  /**
-   * Returns a copy of the series with all values' indices
-   * shifted by {@code offset} positions while
-   * leaving the series size unchanged. Values shifted outside to upper (or lower)
-   * bounds of the series are dropped. Vacated positions are padded with {@code null}.
-   *
-   * <b>NOTE:</b> for each value, newIndex = oldIndex + offset
-   *
-   * @param offset offset to shift values by. Can be positive or negative.
-   * @return shifted series copy
-   */
-  public abstract Series shift(int offset);
-
-  /**
-   * Returns {@code true} if the series contains at least one {@code null}. Otherwise
-   * returns {@code false}.
-   *
-   * @return {@code true} if empty, {@code false} otherwise
-   */
-  public abstract boolean hasNull();
-
-  /**
    * Returns the value referenced by {@code index} as double. The value is converted
    * transparently if the native type of the underlying series is different. The
    * {@code index} must be between {@code 0} and the size of the series.
@@ -396,24 +367,6 @@ public abstract class Series {
   abstract Series project(int[] fromIndex);
 
   /**
-   * Returns an array of indices with a size equal to the series size, such that the values
-   * references by the indices are sorted in ascending order.
-   *
-   * <b>NOTE:</b> output can be used directly by {@code project()} to create a sorted copy of the series.
-   *
-   * @return indices of sorted values
-   */
-  abstract int[] sortedIndex();
-
-  /**
-   * Returns an array of indices with size less than or equal to the series size, such that
-   * each index references a null value in the original series.
-   *
-   * @return indices of null values
-   */
-  abstract int[] nullIndex();
-
-  /**
    * Compares values across two series with potentially different native types based on index.
    * If the types are different the values in {@code that} are transparently converted to the
    * native type of this series.
@@ -431,6 +384,27 @@ public abstract class Series {
   /* *************************************************************************
    * Public interface
    * *************************************************************************/
+
+  /**
+   * Returns series {@code s} converted to type {@code type} unless native type matches already.
+   *
+   * @param type target type
+   * @return converted series
+   */
+  public final Series get(Series.SeriesType type) {
+    switch(type) {
+      case DOUBLE:
+        return this.getDoubles();
+      case LONG:
+        return this.getLongs();
+      case BOOLEAN:
+        return this.getBooleans();
+      case STRING:
+        return this.getStrings();
+      default:
+        throw new IllegalArgumentException(String.format("Unknown series type '%s'", type));
+    }
+  }
 
   /**
    * Returns a the series as DoubleSeries. The underlying series is converted
@@ -489,6 +463,15 @@ public abstract class Series {
   }
 
   /**
+   * Returns as copy of the series with the same native type.
+   *
+   * @return series copy
+   */
+  public Series copy() {
+    return this.slice(0, this.size());
+  }
+
+  /**
    * Returns a copy of the series with values from {@code other}
    * appended at the end. If {@code other} has different native types they are
    * converted transparently.
@@ -499,7 +482,69 @@ public abstract class Series {
    * @return concatenated series
    */
   public Series append(Series... other) {
-    return builderForType(this.type()).addSeries(other).build();
+    return builderForType(this.type()).addSeries(this).addSeries(other).build();
+  }
+
+  /**
+   * Fills {@code null} values in the series with a copy of the last valid value. The index
+   * is traversed in ascending order. If the last valid value does not exist (such as for the
+   * first element in a series) it is left at {@code null}.
+   *
+   * @return forward filled series
+   */
+  public Series fillNullForward() {
+    int lastValueIndex = -1;
+    int[] fromIndex = new int[this.size()];
+    for(int i=0; i<this.size(); i++) {
+      if(!isNull(i))
+        lastValueIndex = i;
+      fromIndex[i] = lastValueIndex;
+    }
+    return this.project(fromIndex);
+  }
+
+  /**
+   * Fills {@code null} values in the series with a copy of the last valid value. The index
+   * is traversed in descending order. If the last valid value does not exist (such as for the
+   * last element in a series) it is left at {@code null}.
+   *
+   * @return backward filled series
+   */
+  public Series fillNullBackward() {
+    int lastValueIndex = -1;
+    int[] fromIndex = new int[this.size()];
+    for(int i=this.size()-1; i>=0; i--) {
+      if(!isNull(i))
+        lastValueIndex = i;
+      fromIndex[i] = lastValueIndex;
+    }
+    return this.project(fromIndex);
+  }
+
+  /**
+   * Returns a copy of the series with all values' indices
+   * shifted by {@code offset} positions while
+   * leaving the series size unchanged. Values shifted outside to upper (or lower)
+   * bounds of the series are dropped. Vacated positions are padded with {@code null}.
+   *
+   * <b>NOTE:</b> for each value, newIndex = oldIndex + offset
+   *
+   * @param offset offset to shift values by. Can be positive or negative.
+   * @return shifted series copy
+   */
+  public Series shift(int offset) {
+    int[] fromIndex = new int[this.size()];
+    int from = 0;
+    for(int i=0; i<Math.min(offset, this.size()); i++) {
+      fromIndex[from++] = -1;
+    }
+    for(int i=Math.max(offset, 0); i<Math.max(Math.min(this.size() + offset, this.size()), 0); i++) {
+      fromIndex[from++] = i - offset;
+    }
+    for(int i=Math.max(this.size() + offset, 0); i<this.size(); i++) {
+      fromIndex[from++] = -1;
+    }
+    return this.project(fromIndex);
   }
 
   /**
@@ -509,8 +554,22 @@ public abstract class Series {
    *
    * @return {@code true} if empty, {@code false} otherwise
    */
-  public boolean isEmpty() {
+  public final boolean isEmpty() {
     return this.size() <= 0;
+  }
+
+  /**
+   * Returns {@code true} if the series contains at least one {@code null}. Otherwise
+   * returns {@code false}.
+   *
+   * @return {@code true} if empty, {@code false} otherwise
+   */
+  public final boolean hasNull() {
+    for(int i=0; i<this.size(); i++) {
+      if(isNull(i))
+        return true;
+    }
+    return false;
   }
 
   /**
@@ -610,6 +669,21 @@ public abstract class Series {
     return sorted.project(fromIndex);
   }
 
+  /**
+   * Returns a copy of the series omitting any {@code null} values.
+   *
+   * @return series copy without {@code nulls}
+   */
+  public Series dropNull() {
+    int[] fromIndex = new int[this.size()];
+    int count = 0;
+    for(int i=0; i<this.size(); i++) {
+      if(!isNull(i))
+        fromIndex[count++] = i;
+    }
+    return this.project(fromIndex);
+  }
+
   //
   // NOTE: co-variant method messiness
   //
@@ -643,8 +717,6 @@ public abstract class Series {
       return StringSeries.map((StringConditional)function, series);
     } else if(function instanceof BooleanConditional) {
       return BooleanSeries.map((BooleanConditional)function, series);
-    } else if(function instanceof BooleanConditionalEx) {
-      return BooleanSeries.map((BooleanConditionalEx)function, series);
     }
     throw new IllegalArgumentException(String.format("Unknown function type '%s'", function.getClass()));
   }
@@ -658,77 +730,70 @@ public abstract class Series {
    * @param function function to map to each element in the series
    * @return series with evaluation results
    */
-  public Series map(Function function) {
+  public final Series map(Function function) {
     return map(function, this);
   }
 
   /**
    * @see Series#map(Function)
    */
-  public DoubleSeries map(DoubleFunction function) {
+  public final DoubleSeries map(DoubleFunction function) {
     return (DoubleSeries)map(function, this);
   }
 
   /**
    * @see Series#map(Function)
    */
-  public LongSeries map(LongFunction function) {
+  public final LongSeries map(LongFunction function) {
     return (LongSeries)map(function, this);
   }
 
   /**
    * @see Series#map(Function)
    */
-  public StringSeries map(StringFunction function) {
+  public final StringSeries map(StringFunction function) {
     return (StringSeries)map(function, this);
   }
 
   /**
    * @see Series#map(Function)
    */
-  public BooleanSeries map(BooleanFunction function) {
+  public final BooleanSeries map(BooleanFunction function) {
     return (BooleanSeries)map(function, this);
   }
 
   /**
    * @see Series#map(Function)
    */
-  public BooleanSeries map(BooleanFunctionEx function) {
+  public final BooleanSeries map(BooleanFunctionEx function) {
     return (BooleanSeries)map(function, this);
   }
 
   /**
    * @see Series#map(Function)
    */
-  public BooleanSeries map(DoubleConditional function) {
+  public final BooleanSeries map(DoubleConditional function) {
     return (BooleanSeries)map(function, this);
   }
 
   /**
    * @see Series#map(Function)
    */
-  public BooleanSeries map(LongConditional function) {
+  public final BooleanSeries map(LongConditional function) {
     return (BooleanSeries)map(function, this);
   }
 
   /**
    * @see Series#map(Function)
    */
-  public BooleanSeries map(StringConditional function) {
+  public final BooleanSeries map(StringConditional function) {
     return (BooleanSeries)map(function, this);
   }
 
   /**
    * @see Series#map(Function)
    */
-  public BooleanSeries map(BooleanConditional function) {
-    return (BooleanSeries)map(function, this);
-  }
-
-  /**
-   * @see Series#map(Function)
-   */
-  public BooleanSeries map(BooleanConditionalEx function) {
+  public final BooleanSeries map(BooleanConditional function) {
     return (BooleanSeries)map(function, this);
   }
 
@@ -746,7 +811,7 @@ public abstract class Series {
    * @param function aggregation function to map to the series
    * @return single element series
    */
-  public Series aggregate(Function function) {
+  public final Series aggregate(Function function) {
     if(function instanceof DoubleFunction) {
       return DoubleSeries.aggregate((DoubleFunction)function, this);
     } else if(function instanceof LongFunction) {
@@ -765,8 +830,6 @@ public abstract class Series {
       return StringSeries.aggregate((StringConditional)function, this);
     } else if(function instanceof BooleanConditional) {
       return BooleanSeries.aggregate((BooleanConditional)function, this);
-    } else if(function instanceof BooleanConditionalEx) {
-      return BooleanSeries.aggregate((BooleanConditionalEx)function, this);
     }
     throw new IllegalArgumentException(String.format("Unknown function type '%s'", function.getClass()));
   }
@@ -774,81 +837,64 @@ public abstract class Series {
   /**
    * @see Series#aggregate(Function)
    */
-  public DoubleSeries aggregate(DoubleFunction function) {
+  public final DoubleSeries aggregate(DoubleFunction function) {
     return (DoubleSeries)this.aggregate((Function)function);
   }
 
   /**
    * @see Series#aggregate(Function)
    */
-  public LongSeries aggregate(LongFunction function) {
+  public final LongSeries aggregate(LongFunction function) {
     return (LongSeries)this.aggregate((Function)function);
   }
 
   /**
    * @see Series#aggregate(Function)
    */
-  public StringSeries aggregate(StringFunction function) {
+  public final StringSeries aggregate(StringFunction function) {
     return (StringSeries)this.aggregate((Function)function);
   }
 
   /**
    * @see Series#aggregate(Function)
    */
-  public BooleanSeries aggregate(BooleanFunction function) {
+  public final BooleanSeries aggregate(BooleanFunction function) {
     return (BooleanSeries)this.aggregate((Function)function);
   }
 
   /**
    * @see Series#aggregate(Function)
    */
-  public BooleanSeries aggregate(BooleanFunctionEx function) {
+  public final BooleanSeries aggregate(BooleanFunctionEx function) {
     return (BooleanSeries)this.aggregate((Function)function);
   }
 
   /**
    * @see Series#aggregate(Function)
    */
-  public BooleanSeries aggregate(DoubleConditional function) {
+  public final BooleanSeries aggregate(DoubleConditional function) {
     return (BooleanSeries)this.aggregate((Function)function);
   }
 
   /**
    * @see Series#aggregate(Function)
    */
-  public BooleanSeries aggregate(LongConditional function) {
+  public final BooleanSeries aggregate(LongConditional function) {
     return (BooleanSeries)this.aggregate((Function)function);
   }
 
   /**
    * @see Series#aggregate(Function)
    */
-  public BooleanSeries aggregate(StringConditional function) {
+  public final BooleanSeries aggregate(StringConditional function) {
     return (BooleanSeries)this.aggregate((Function)function);
   }
 
   /**
    * @see Series#aggregate(Function)
    */
-  public BooleanSeries aggregate(BooleanConditional function) {
+  public final BooleanSeries aggregate(BooleanConditional function) {
     return (BooleanSeries)this.aggregate((Function)function);
-  }
-
-  /**
-   * @see Series#aggregate(Function)
-   */
-  public BooleanSeries aggregate(BooleanConditionalEx function) {
-    return (BooleanSeries)this.aggregate((Function)function);
-  }
-
-  /**
-   * Returns a copy of the series with a native type corresponding to {@code type}.
-   *
-   * @param type series copy native type
-   * @return series copy with native type {@code type}
-   */
-  public Series toType(SeriesType type) {
-    return DataFrame.asType(this, type);
   }
 
   /**
@@ -859,7 +905,7 @@ public abstract class Series {
    *
    * @return grouping by value
    */
-  public SeriesGrouping groupByValue() {
+  public final SeriesGrouping groupByValue() {
     if(this.isEmpty())
       return new SeriesGrouping(this);
 
@@ -891,7 +937,7 @@ public abstract class Series {
    * @param bucketSize maximum number of elements per bucket
    * @return grouping by element count
    */
-  public SeriesGrouping groupByCount(int bucketSize) {
+  public final SeriesGrouping groupByCount(int bucketSize) {
     if(bucketSize <= 0)
       throw new IllegalArgumentException("bucketSize must be greater than 0");
     if(this.isEmpty())
@@ -925,7 +971,7 @@ public abstract class Series {
    * @param partitionCount number of buckets
    * @return grouping by bucket count
    */
-  public SeriesGrouping groupByPartitions(int partitionCount) {
+  public final SeriesGrouping groupByPartitions(int partitionCount) {
     if(partitionCount <= 0)
       throw new IllegalArgumentException("partitionCount must be greater than 0");
     if(this.isEmpty())
@@ -948,6 +994,14 @@ public abstract class Series {
     return new SeriesGrouping(DataFrame.toSeries(keys), this, buckets);
   }
 
+  /**
+   * Returns a concatenation of {@code series} as a new series with a native type equal
+   * to the first series. If subsequent series have different native types they are
+   * converted transparently.
+   *
+   * @param series series to concatenate
+   * @return concatenated series
+   */
   public static Series concatenate(Series... series) {
     if(series.length <= 0)
       throw new IllegalArgumentException("Must concatenate at least one series");
@@ -961,6 +1015,47 @@ public abstract class Series {
   /* *************************************************************************
    * Internal interface
    * *************************************************************************/
+
+  /**
+   * Returns an array of indices with size less than or equal to the series size, such that
+   * each index references a null value in the original series.
+   *
+   * @return indices of null values
+   */
+  int[] nullIndex() {
+    int[] nulls = new int[this.size()];
+    int count = 0;
+    for(int i=0; i<this.size(); i++) {
+      if(isNull(i)) {
+        nulls[count++] = i;
+      }
+    }
+    return Arrays.copyOf(nulls, count);
+  }
+
+  /**
+   * Returns an array of indices with a size equal to the series size, such that the values
+   * references by the indices are sorted in ascending order.
+   *
+   * <b>NOTE:</b> output can be used directly by {@code project()} to create a sorted copy of the series.
+   *
+   * @return indices of sorted values
+   */
+  int[] sortedIndex() {
+    Integer[] fromIndex = new Integer[this.size()];
+    for(int i=0; i<this.size(); i++)
+      fromIndex[i] = i;
+
+    final Series s = this;
+    Arrays.sort(fromIndex, new Comparator<Integer>() {
+      @Override
+      public int compare(Integer o1, Integer o2) {
+        return s.compare(s, o1, o2);
+      }
+    });
+
+    return ArrayUtils.toPrimitive(fromIndex);
+  }
 
   /**
    * Returns index tuples (pairs) for a join performed based on value.
@@ -1047,8 +1142,6 @@ public abstract class Series {
       return BooleanSeries.builder();
     } else if(function instanceof BooleanConditional) {
       return BooleanSeries.builder();
-    } else if(function instanceof BooleanConditionalEx) {
-      return BooleanSeries.builder();
     }
     throw new IllegalArgumentException(String.format("Unknown function type '%s'", function.getClass()));
   }
@@ -1067,5 +1160,22 @@ public abstract class Series {
         throw new IllegalArgumentException(String.format("Unknown series type '%s'", type));
     }
   }
+
+  /* **************************************************************************
+   * Code grave
+   ***************************************************************************/
+
+//  @Override
+//  public StringSeries shift(int offset) {
+//    String[] values = new String[this.values.length];
+//    if(offset >= 0) {
+//      Arrays.fill(values, 0, Math.min(offset, values.length), NULL_VALUE);
+//      System.arraycopy(this.values, 0, values, Math.min(offset, values.length), Math.max(values.length - offset, 0));
+//    } else {
+//      System.arraycopy(this.values, Math.min(-offset, values.length), values, 0, Math.max(values.length + offset, 0));
+//      Arrays.fill(values, Math.max(values.length + offset, 0), values.length, NULL_VALUE);
+//    }
+//    return StringSeries.buildFrom(values);
+//  }
 
 }
