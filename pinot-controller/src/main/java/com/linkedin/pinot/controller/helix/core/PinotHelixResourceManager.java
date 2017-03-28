@@ -1102,10 +1102,12 @@ public class PinotHelixResourceManager {
     if (type == TableType.REALTIME) {
       ZKMetadataProvider.setRealtimeTableConfig(_propertyStore, tableNameWithSuffix,
           AbstractTableConfig.toZnRecord(config));
+      ensureRealtimeClusterIsSetUp(config, tableNameWithSuffix, config.getIndexingConfig());
     } else {
       ZKMetadataProvider.setOfflineTableConfig(_propertyStore, tableNameWithSuffix,
           AbstractTableConfig.toZnRecord(config));
     }
+
   }
 
   public void updateMetadataConfigFor(String tableName, TableType type, TableCustomConfig newConfigs) throws Exception {
