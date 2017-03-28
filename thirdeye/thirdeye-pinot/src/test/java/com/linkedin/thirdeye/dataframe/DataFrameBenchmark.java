@@ -3,8 +3,11 @@ package com.linkedin.thirdeye.dataframe;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
+import org.apache.commons.lang.ArrayUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -160,9 +163,9 @@ public class DataFrameBenchmark {
     for(int r=0; r<N_ROUNDS; r++) {
       long[] longValues = generateLongData(N_ELEMENTS);
       double[] doubleValues = generateDoubleData(N_ELEMENTS);
-      double[] results = new double[N_ELEMENTS];
 
       startTimer();
+      double[] results = new double[N_ELEMENTS];
       for(int i=0; i<N_ELEMENTS; i++) {
         results[i] = longValues[i] * doubleValues[i];
       }
@@ -210,9 +213,8 @@ public class DataFrameBenchmark {
       double[] doubleValues = generateDoubleData(N_ELEMENTS);
       long[] otherValues = generateLongData(N_ELEMENTS);
 
-      double[] results = new double[N_ELEMENTS];
-
       startTimer();
+      double[] results = new double[N_ELEMENTS];
       for(int i=0; i<N_ELEMENTS; i++) {
         results[i] = longValues[i] * doubleValues[i] + otherValues[i];
       }
@@ -229,7 +231,6 @@ public class DataFrameBenchmark {
 
     for(int r=0; r<N_ROUNDS; r++) {
       long[] longValues = generateLongData(N_ELEMENTS);
-
       LongSeries s = LongSeries.buildFrom(longValues);
 
       startTimer();
@@ -290,7 +291,6 @@ public class DataFrameBenchmark {
     for(int r=0; r<N_ROUNDS; r++) {
       long[] longValues = generateLongData(N_ELEMENTS);
       long[] otherValues = Arrays.copyOf(longValues, longValues.length);
-
       LongSeries series = LongSeries.buildFrom(longValues);
       LongSeries other = LongSeries.buildFrom(otherValues);
 
@@ -306,20 +306,130 @@ public class DataFrameBenchmark {
     logResults("benchmarkEqualsLongSeries", checksum);
   }
 
+  void benchmarkSortLongArray() {
+    long checksum = 0;
+
+    for(int r=0; r<N_ROUNDS_SLOW; r++) {
+      long[] longValues = generateLongData(N_ELEMENTS);
+
+      startTimer();
+      Arrays.sort(longValues);
+      stopTimer();
+
+      checksum ^= checksum(longValues);
+    }
+
+    logResults("benchmarkSortLongArray", checksum);
+  }
+
+  void benchmarkSortLongSeries() {
+    long checksum = 0;
+
+    for(int r=0; r<N_ROUNDS_SLOW; r++) {
+      long[] longValues = generateLongData(N_ELEMENTS);
+      LongSeries series = LongSeries.buildFrom(longValues);
+
+      startTimer();
+      LongSeries out = series.sorted();
+      stopTimer();
+
+      checksum ^= checksum(out.values());
+    }
+
+    logResults("benchmarkSortLongSeries", checksum);
+  }
+
+  void benchmarkUniqueLongArrayWithObjects() {
+    long checksum = 0;
+
+    for(int r=0; r<N_ROUNDS_SLOW; r++) {
+      long[] longValues = generateLongData(N_ELEMENTS);
+
+      startTimer();
+      Set<Long> set = new HashSet<>();
+      for(long l : longValues)
+        set.add(l);
+      long[] out = ArrayUtils.toPrimitive(set.toArray(new Long[set.size()]));
+      stopTimer();
+
+      checksum ^= checksum(out);
+    }
+
+    logResults("benchmarkUniqueLongArrayWithObjects", checksum);
+  }
+
+  void benchmarkUniqueLongSeries() {
+    long checksum = 0;
+
+    for(int r=0; r<N_ROUNDS_SLOW; r++) {
+      long[] longValues = generateLongData(N_ELEMENTS);
+      LongSeries series = LongSeries.buildFrom(longValues);
+
+      startTimer();
+      LongSeries out = series.unique();
+      stopTimer();
+
+      checksum ^= checksum(out.values());
+    }
+
+    logResults("benchmarkUniqueLongSeries", checksum);
+  }
+
+  void benchmarkShiftLongArray() {
+    long checksum = 0;
+
+    for(int r=0; r<N_ROUNDS; r++) {
+      long[] longValues = generateLongData(N_ELEMENTS);
+
+      startTimer();
+      long[] values = new long[N_ELEMENTS];
+      System.arraycopy(longValues, 0, values, N_ELEMENTS / 2, N_ELEMENTS / 2);
+      Arrays.fill(values, 0, N_ELEMENTS / 2, Long.MIN_VALUE);
+      stopTimer();
+
+      checksum ^= checksum(values);
+    }
+
+    logResults("benchmarkShiftLongArray", checksum);
+  }
+
+  void benchmarkShiftLongSeries() {
+    long checksum = 0;
+
+    for(int r=0; r<N_ROUNDS; r++) {
+      long[] longValues = generateLongData(N_ELEMENTS);
+      LongSeries series = LongSeries.buildFrom(longValues);
+
+      startTimer();
+      LongSeries out = series.shift(N_ELEMENTS / 2);
+      stopTimer();
+
+      checksum ^= checksum(out.values());
+    }
+
+    logResults("benchmarkShiftLongSeries", checksum);
+  }
+
   void benchmarkAll() {
-    benchmarkMapDoubleSeries();
-    benchmarkMapDoubleArray();
-    benchmarkMapLongSeries();
-    benchmarkMapLongArray();
     benchmarkMinMaxLongSeries();
     benchmarkMinMaxLongArray();
     benchmarkEqualsLongSeries();
     benchmarkEqualsLongArray();
+    benchmarkShiftLongSeries();
+    benchmarkShiftLongArray();
+    benchmarkSortLongSeries();
+    benchmarkSortLongArray();
+    benchmarkUniqueLongSeries();
+    benchmarkUniqueLongArrayWithObjects();
+    benchmarkMapDoubleSeries();
+    benchmarkMapDoubleArray();
+    benchmarkMapLongSeries();
+    benchmarkMapLongArray();
     benchmarkMapTwoSeries();
     benchmarkMapTwoArrays();
     benchmarkMapThreeSeries();
     benchmarkMapThreeArrays();
-    //benchmarkMapTwoSeriesExpression();
+    benchmarkMapTwoSeriesExpression();
   }
 
   void startTimer() {

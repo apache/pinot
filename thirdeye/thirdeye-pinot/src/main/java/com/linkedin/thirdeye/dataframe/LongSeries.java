@@ -3,6 +3,8 @@ package com.linkedin.thirdeye.dataframe;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 
@@ -486,6 +488,57 @@ public final class LongSeries extends TypedSeries<LongSeries> {
     Range(long lower, long upper) {
       this.lower = lower;
       this.upper = upper;
+    }
+  }
+
+  @Override
+  public LongSeries shift(int offset) {
+    long[] values = new long[this.values.length];
+    if(offset >= 0) {
+      Arrays.fill(values, 0, Math.min(offset, values.length), NULL_VALUE);
+      System.arraycopy(this.values, 0, values, Math.min(offset, values.length), Math.max(values.length - offset, 0));
+    } else {
+      System.arraycopy(this.values, Math.min(-offset, values.length), values, 0, Math.max(values.length + offset, 0));
+      Arrays.fill(values, Math.max(values.length + offset, 0), values.length, NULL_VALUE);
+    }
+    return buildFrom(values);
+  }
+
+  @Override
+  public LongSeries sorted() {
+    long[] values = Arrays.copyOf(this.values, this.values.length);
+    Arrays.sort(values);
+    return buildFrom(values);
+  }
+
+  @Override
+  int[] sortedIndex() {
+    List<LongSortTuple> tuples = new ArrayList<>();
+    for (int i = 0; i < this.values.length; i++) {
+      tuples.add(new LongSortTuple(this.values[i], i));
+    }
+
+    Collections.sort(tuples, new Comparator<LongSortTuple>() {
+      @Override
+      public int compare(LongSortTuple a, LongSortTuple b) {
+        return Long.compare(a.value, b.value);
+      }
+    });
+
+    int[] fromIndex = new int[tuples.size()];
+    for (int i = 0; i < tuples.size(); i++) {
+      fromIndex[i] = tuples.get(i).index;
+    }
+    return fromIndex;
+  }
+
+  static final class LongSortTuple {
+    final long value;
+    final int index;
+
+    LongSortTuple(long value, int index) {
+      this.value = value;
+      this.index = index;
     }
   }
 }

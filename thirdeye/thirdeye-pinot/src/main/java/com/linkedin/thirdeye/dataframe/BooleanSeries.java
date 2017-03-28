@@ -373,6 +373,19 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
   }
 
   @Override
+  public BooleanSeries shift(int offset) {
+    byte[] values = new byte[this.values.length];
+    if(offset >= 0) {
+      Arrays.fill(values, 0, Math.min(offset, values.length), NULL_VALUE);
+      System.arraycopy(this.values, 0, values, Math.min(offset, values.length), Math.max(values.length - offset, 0));
+    } else {
+      System.arraycopy(this.values, Math.min(-offset, values.length), values, 0, Math.max(values.length + offset, 0));
+      Arrays.fill(values, Math.max(values.length + offset, 0), values.length, NULL_VALUE);
+    }
+    return buildFrom(values);
+  }
+
+  @Override
   BooleanSeries project(int[] fromIndex) {
     byte[] values = new byte[fromIndex.length];
     for(int i=0; i<fromIndex.length; i++) {
@@ -382,6 +395,25 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
         values[i] = this.values[fromIndex[i]];
       }
     }
+    return buildFrom(values);
+  }
+
+  @Override
+  public BooleanSeries sorted() {
+    int countNull = 0;
+    int countFalse = 0;
+    // countTrue is rest
+
+    for(int i=0; i<this.values.length; i++) {
+      if (isNull(this.values[i])) countNull++;
+      else if (isFalse(this.values[i])) countFalse++;
+    }
+
+    byte[] values = new byte[this.values.length];
+    Arrays.fill(values, 0, countNull, NULL_VALUE);
+    Arrays.fill(values, countNull, countNull + countFalse, FALSE_VALUE);
+    Arrays.fill(values, countNull + countFalse, this.values.length, TRUE_VALUE);
+
     return buildFrom(values);
   }
 

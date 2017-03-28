@@ -27,11 +27,6 @@ public abstract class TypedSeries<T extends Series> extends Series {
   }
 
   @Override
-  public T sorted() {
-    return (T)super.sorted();
-  }
-
-  @Override
   public T unique() {
     return (T)super.unique();
   }

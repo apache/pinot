@@ -3,6 +3,8 @@ package com.linkedin.thirdeye.dataframe;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -436,12 +438,68 @@ public final class StringSeries extends TypedSeries<StringSeries> {
     if (isNull(b))
       return 1;
 
-    return a.compareToIgnoreCase(b);
+    return a.compareTo(b);
   }
 
   private static String[] assertNotEmpty(String[] values) {
     if(values.length <= 0)
       throw new IllegalStateException("Must contain at least one value");
     return values;
+  }
+
+  @Override
+  public StringSeries shift(int offset) {
+    String[] values = new String[this.values.length];
+    if(offset >= 0) {
+      Arrays.fill(values, 0, Math.min(offset, values.length), NULL_VALUE);
+      System.arraycopy(this.values, 0, values, Math.min(offset, values.length), Math.max(values.length - offset, 0));
+    } else {
+      System.arraycopy(this.values, Math.min(-offset, values.length), values, 0, Math.max(values.length + offset, 0));
+      Arrays.fill(values, Math.max(values.length + offset, 0), values.length, NULL_VALUE);
+    }
+    return buildFrom(values);
+  }
+
+  @Override
+  public StringSeries sorted() {
+    String[] values = Arrays.copyOf(this.values, this.values.length);
+    Arrays.sort(values, new Comparator<String>() {
+      @Override
+      public int compare(String a, String b) {
+        return nullSafeStringComparator(a, b);
+      }
+    });
+    return buildFrom(values);
+  }
+
+  @Override
+  int[] sortedIndex() {
+    List<StringSortTuple> tuples = new ArrayList<>();
+    for (int i = 0; i < this.values.length; i++) {
+      tuples.add(new StringSortTuple(this.values[i], i));
+    }
+
+    Collections.sort(tuples, new Comparator<StringSortTuple>() {
+      @Override
+      public int compare(StringSortTuple a, StringSortTuple b) {
+        return nullSafeStringComparator(a.value, b.value);
+      }
+    });
+
+    int[] fromIndex = new int[tuples.size()];
+    for (int i = 0; i < tuples.size(); i++) {
+      fromIndex[i] = tuples.get(i).index;
+    }
+    return fromIndex;
+  }
+
+  static final class StringSortTuple {
+    final String value;
+    final int index;
+
+    StringSortTuple(String value, int index) {
+      this.value = value;
+      this.index = index;
+    }
   }
 }

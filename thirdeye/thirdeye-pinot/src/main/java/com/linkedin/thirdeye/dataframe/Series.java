@@ -351,6 +351,15 @@ public abstract class Series {
    */
   public abstract boolean isNull(int index);
 
+  /**
+   * Returns a copy of the series with values ordered in ascending order.
+   *
+   * <br/><b>NOTE:</b> BooleanSeries interprets {@code false} as smaller than {@code true}.
+   *
+   * @return sorted series copy
+   */
+  public abstract Series sorted();
+
   /* *************************************************************************
    * Internal abstract interface
    * *************************************************************************/
@@ -381,6 +390,16 @@ public abstract class Series {
    * @return 0 if the referenced values are equal, -1 if {@code this} is less than {@code that}, 1 otherwise
    */
   abstract int compare(Series that, int indexThis, int indexThat);
+
+  /**
+   * Returns an array of indices with a size equal to the series size, such that the values
+   * references by the indices are sorted in ascending order.
+   *
+   * <br/><b>NOTE:</b> output can be used directly by {@code project()} to create a sorted copy of the series.
+   *
+   * @return indices of sorted values
+   */
+  abstract int[] sortedIndex();
 
   /* *************************************************************************
    * Public interface
@@ -533,6 +552,7 @@ public abstract class Series {
    * @param offset offset to shift values by. Can be positive or negative.
    * @return shifted series copy
    */
+  // NOTE: override for performance
   public Series shift(int offset) {
     int[] fromIndex = new int[this.size()];
     int from = 0;
@@ -620,18 +640,6 @@ public abstract class Series {
    */
   public Series sliceTo(int to) {
     return this.slice(0, Math.min(to, this.size()));
-  }
-
-  /**
-   * Returns a copy of the series with values ordered
-   * in ascending order.
-   *
-   * <br/><b>NOTE:</b> BooleanSeries interprets {@code false} as smaller than {@code true}.
-   *
-   * @return sorted series copy
-   */
-  public Series sorted() {
-    return this.project(this.sortedIndex());
   }
 
   /**
@@ -1035,30 +1043,6 @@ public abstract class Series {
   }
 
   /**
-   * Returns an array of indices with a size equal to the series size, such that the values
-   * references by the indices are sorted in ascending order.
-   *
-   * <br/><b>NOTE:</b> output can be used directly by {@code project()} to create a sorted copy of the series.
-   *
-   * @return indices of sorted values
-   */
-  int[] sortedIndex() {
-    Integer[] fromIndex = new Integer[this.size()];
-    for(int i=0; i<this.size(); i++)
-      fromIndex[i] = i;
-
-    final Series s = this;
-    Arrays.sort(fromIndex, new Comparator<Integer>() {
-      @Override
-      public int compare(Integer o1, Integer o2) {
-        return s.compare(s, o1, o2);
-      }
-    });
-
-    return ArrayUtils.toPrimitive(fromIndex);
-  }
-
-  /**
    * Returns index tuples (pairs) for a join performed based on value.
    *
    * <br/><b>NOTE:</b> the implementation uses merge join. Thus, the index pairs reference
@@ -1166,17 +1150,26 @@ public abstract class Series {
    * Code grave
    ***************************************************************************/
 
-//  @Override
-//  public StringSeries shift(int offset) {
-//    String[] values = new String[this.values.length];
-//    if(offset >= 0) {
-//      Arrays.fill(values, 0, Math.min(offset, values.length), NULL_VALUE);
-//      System.arraycopy(this.values, 0, values, Math.min(offset, values.length), Math.max(values.length - offset, 0));
-//    } else {
-//      System.arraycopy(this.values, Math.min(-offset, values.length), values, 0, Math.max(values.length + offset, 0));
-//      Arrays.fill(values, Math.max(values.length + offset, 0), values.length, NULL_VALUE);
-//    }
-//    return StringSeries.buildFrom(values);
+// NOTE: too slow
+//  public Series sorted() {
+//    return this.project(this.sortedIndex());
+//  }
+
+// NOTE: too slow
+//  int[] sortedIndex() {
+//    Integer[] fromIndex = new Integer[this.size()];
+//    for(int i=0; i<this.size(); i++)
+//      fromIndex[i] = i;
+//
+//    final Series s = this;
+//    Arrays.sort(fromIndex, new Comparator<Integer>() {
+//      @Override
+//      public int compare(Integer o1, Integer o2) {
+//        return s.compare(s, o1, o2);
+//      }
+//    });
+//
+//    return ArrayUtils.toPrimitive(fromIndex);
 //  }
 
 }
