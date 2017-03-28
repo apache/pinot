@@ -534,6 +534,8 @@ public class DetectionJobResource {
    * the start time of the anomaly function replay in ISO format, e.g. 2017-02-27T00:00:00.000Z
    * @param replayEndTimeIso
    * the end time of the anomaly function replay in ISO format
+   * @param speedup
+   * whether we speedup the replay process
    * @param tuningJSON
    * the json object includes all tuning fields and list of parameters
    * ex: {"baselineLift": [0.9, 0.95, 1, 1.05, 1.1], "baselineSeasonalPeriod": [2, 3, 4]}
@@ -545,7 +547,7 @@ public class DetectionJobResource {
   @POST
   @Path("function/{id}/replay")
   public Response anomalyFunctionReplay(@PathParam("id") long functionId, @QueryParam("start") String replayStartTimeIso,
-      @QueryParam("end") String replayEndTimeIso,
+      @QueryParam("end") String replayEndTimeIso, @QueryParam("speedup") @DefaultValue("true") boolean speedup,
       @QueryParam("tune") String tuningJSON, @QueryParam("goal") double goal,
       @QueryParam("evalMethod") @DefaultValue("ANOMALY_PERCENTAGE") String performanceEvaluationMethod){
     DateTime replayStart = null;
@@ -618,6 +620,7 @@ public class DetectionJobResource {
       backfillRunnable.setReplayEnd(replayEnd);
       backfillRunnable.setForceBackfill(true);
       backfillRunnable.setGoal(goal);
+      backfillRunnable.setSpeedUp(speedup);
       backfillRunnable.setPerformanceEvaluationMethod(performanceEvalMethod);
       backfillRunnable.setAutotuneMethodType(autotuneMethodType);
       backfillRunnable.setTuningParameter(config);

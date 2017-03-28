@@ -113,12 +113,12 @@ public class DetectionResourceHttpUtils extends AbstractResourceHttpUtils {
   }
 
   public String runFunctionReplay(Long id, String startTimeISO, String endTimeISO, String tuningParameters,
-      PerformanceEvaluationMethod evaluationMethod, double goal)
+      PerformanceEvaluationMethod evaluationMethod, double goal, boolean speedup)
       throws ClientProtocolException, IOException {
     HttpPost req = new HttpPost(
         DETECTION_JOB_ENDPOINT + FUNCTION + id + REPLAY + "?start=" + startTimeISO + "&end=" + endTimeISO
             + "&tune=" + tuningParameters + "&goal=" + goal + "&evalMethod=" + evaluationMethod.name()
-    );
+            + "&speedup=" + Boolean.toString(speedup));
     return callJobEndpoint(req);
   }
 }
