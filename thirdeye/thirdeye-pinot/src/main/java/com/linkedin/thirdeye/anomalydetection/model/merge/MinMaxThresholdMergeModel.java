@@ -52,13 +52,20 @@ public class MinMaxThresholdMergeModel extends AbstractMergeModel {
       }
     }
 
-    if (currentBucketCount != 0d) {
+    if (currentBucketCount > 0) {
       currentAverageValue /= currentBucketCount;
       deviationFromThreshold /= currentBucketCount;
     }
     anomalyToUpdated.setScore(currentAverageValue);
     anomalyToUpdated.setWeight(deviationFromThreshold);
     anomalyToUpdated.setAvgCurrentVal(currentAverageValue);
+    double value = 0d;
+    if (min != null) {
+      value = min;
+    } else if (max != null) {
+      value = max;
+    }
+    anomalyToUpdated.setAvgBaselineVal(value);
 
     String message =
         String.format(DEFAULT_MESSAGE_TEMPLATE, deviationFromThreshold, currentAverageValue, min, max);
