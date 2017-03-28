@@ -422,11 +422,12 @@ text {
 
 .thirdeye-nav {
   display: flex;
+  white-space: nowrap;
 }
 
 .thirdeye-nav__tabs {
   display: flex;
-  margin-left: 24px;
+  margin: 0 24px;
 }
 
 
