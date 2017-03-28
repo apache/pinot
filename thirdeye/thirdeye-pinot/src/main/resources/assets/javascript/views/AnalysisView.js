@@ -1,7 +1,8 @@
 function AnalysisView(analysisModel) {
   // Compile template
-  var analysis_template = $("#analysis-template").html();
+  const analysis_template = $("#analysis-template").html();
   this.analysis_template_compiled = Handlebars.compile(analysis_template);
+
   this.analysisModel = analysisModel;
   this.applyDataChangeEvent = new Event(this);
   this.viewParams = {granularity: "DAYS", dimension: "All", filters: {}};
@@ -18,37 +19,12 @@ function AnalysisView(analysisModel) {
 AnalysisView.prototype = {
   init(params = {}) {
     this.viewParams = params;
+    this.searchParams = {};
     this.viewParams.metricName = this.analysisModel.metricName;
   },
 
   render: function () {
     $("#analysis-place-holder").html(this.analysis_template_compiled);
-    const $currentRangeText = $('#current-range span');
-    const $baselineRangeText= $('#baseline-range span');
-    const $currentRange = $('#current-range');
-    const $baselineRange = $('#baseline-range');
-
-    const setBaselineRange = (start, end) => {
-      this.viewParams['baselineStart'] = start;
-      this.viewParams['baselineEnd'] = end;
-      $baselineRangeText.addClass("time-range").html(
-        `${start.format(constants.DATE_RANGE_FORMAT)} &mdash; ${end.format(constants.DATE_RANGE_FORMAT)}`);
-    };
-    const setCurrentRange = (start, end, rangeType = constants.DATE_RANGE_CUSTOM) => {
-      this.viewParams['currentStart'] = start;
-      this.viewParams['currentEnd'] = end;
-
-      if (rangeType === constants.DATE_RANGE_CUSTOM) {
-        $baselineRange.removeClass('disabled');
-      } else {
-        const [baselineStart, baselineEnd] = this.baselineRange[rangeType];
-        $baselineRange.addClass('disabled');
-        setBaselineRange(baselineStart, baselineEnd);
-      }
-      $currentRangeText.addClass("time-range").html(
-          `<span>${rangeType}</span> ${start.format(constants.DATE_RANGE_FORMAT)} &mdash; ${end.format(constants.DATE_RANGE_FORMAT)}`)
-    };
-
     // METRIC SELECTION
     var analysisMetricSelect = $('#analysis-metric-input').select2({
       theme: "bootstrap", placeholder: "search for Metric(s)", ajax: {
@@ -88,15 +64,55 @@ AnalysisView.prototype = {
         metricName = name;
       }
 
-      this.viewParams['metric'] = {id: metricId, alias: metricAlias, allowClear:true, name:metricName} || this.viewParams['metric'];
-      this.viewParams['metricId'] = metricId || this.viewParams['metricId'];
-      this.viewParams['metricName'] = metricName || this.viewParams['metricName'];
+      this.searchParams['metric'] = {id: metricId, alias: metricAlias, allowClear:true, name:metricName} || this.searchParams['metric'];
+      this.searchParams['metricId'] = metricId || this.searchParams['metricId'];
+      this.searchParams['metricName'] = metricName || this.searchParams['metricName'];
 
-      // Now render the dimensions and filters for selected metric
-      this.renderGranularity(this.viewParams.metricId);
-      this.renderDimensions(this.viewParams.metricId);
-      this.renderFilters(this.viewParams.metricId);
     }).trigger('change');
+    this.setupListeners();
+  },
+
+  renderAnalysisOptions(event) {
+    debugger;
+    const {metricId} = Object.assign(this.viewParams, this.searchParams);
+    // Now render the dimensions and filters for selected metric
+
+    const analysis_options_template = $('#analysis-options-template').html();
+    const compiled_analysis_options_template = Handlebars.compile(analysis_options_template);
+    $('#analysis-options-placeholder').html(compiled_analysis_options_template);
+
+    this.renderDateRangePickers();
+    this.renderGranularity(metricId);
+    this.renderDimensions(metricId);
+    this.renderFilters(metricId);
+  },
+
+  renderDateRangePickers() {
+    const $currentRangeText = $('#current-range span');
+    const $baselineRangeText= $('#baseline-range span');
+    const $currentRange = $('#current-range');
+    const $baselineRange = $('#baseline-range');
+
+    const setBaselineRange = (start, end) => {
+      this.viewParams['baselineStart'] = start;
+      this.viewParams['baselineEnd'] = end;
+      $baselineRangeText.addClass("time-range").html(
+        `${start.format(constants.DATE_RANGE_FORMAT)} &mdash; ${end.format(constants.DATE_RANGE_FORMAT)}`);
+    };
+    const setCurrentRange = (start, end, rangeType = constants.DATE_RANGE_CUSTOM) => {
+      this.viewParams['currentStart'] = start;
+      this.viewParams['currentEnd'] = end;
+
+      if (rangeType === constants.DATE_RANGE_CUSTOM) {
+        $baselineRange.removeClass('disabled');
+      } else {
+        const [baselineStart, baselineEnd] = this.baselineRange[rangeType];
+        $baselineRange.addClass('disabled');
+        setBaselineRange(baselineStart, baselineEnd);
+      }
+      $currentRangeText.addClass("time-range").html(
+          `<span>${rangeType}</span> ${start.format(constants.DATE_RANGE_FORMAT)} &mdash; ${end.format(constants.DATE_RANGE_FORMAT)}`)
+    };
 
     // TIME RANGE SELECTION
     var currentStart = this.analysisModel.currentStart;
@@ -109,8 +125,6 @@ AnalysisView.prototype = {
 
     this.renderDatePicker($currentRange, setCurrentRange, currentStart, currentEnd);
     this.renderDatePicker($baselineRange, setBaselineRange, baselineStart, baselineEnd);
-
-    this.setupListeners();
   },
 
   renderDatePicker: function ($selector, callbackFun, initialStart, initialEnd){
@@ -221,10 +235,13 @@ AnalysisView.prototype = {
   },
 
   setupListeners: function () {
-    var self = this;
-    $("#analysis-apply-button").click(function (e) {
-      self.collectViewParams();
-      self.applyDataChangeEvent.notify();
+    $("#analysis-apply-button").click((e) => {
+      this.renderAnalysisOptions(e);
     });
+
+    // $("#analysis-apply-button").click((e) => {
+    //   this.collectViewParams();
+    //   this.applyDataChangeEvent.notify();
+    // });
   }
 };

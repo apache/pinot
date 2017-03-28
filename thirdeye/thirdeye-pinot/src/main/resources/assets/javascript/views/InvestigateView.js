@@ -8,7 +8,7 @@ function InvestigateView(investigateModel) {
   this.anomalyID;
   this.anomaly;
   this.wowData;
-  this.inves
+  this.investigateData;
   this.viewContributionClickEvent = new Event(this);
 
   this.investigateModel.renderViewEvent.attach(this.renderViewEventHandler.bind(this));

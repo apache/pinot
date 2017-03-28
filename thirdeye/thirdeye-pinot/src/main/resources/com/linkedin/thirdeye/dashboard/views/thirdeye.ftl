@@ -77,6 +77,9 @@
 <script id="wow-summary-template" type="text/x-handlebars-template">
 	<#include "tabs/dashboard/wow-summary-dashboard.ftl">
 </script>
+<script id="analysis-options-template" type="text/x-handlebars-template">
+	<#include "tabs/analysis/analysis-options.ftl"/>
+</script>
 <script id="timeseries-contributor-template" type="text/x-handlebars-template">
 	<#include "tabs/analysis/timeseries-contributor.ftl"/>
 </script>
@@ -161,7 +164,7 @@
 						<ul class="nav navbar-nav thirdeye-nav__tabs" id="main-tabs">
 							<li><a href="#anomalies">Anomalies</a></li>
 							<li class="hidden"><a href="#investigate">Investigate</a></li>
-							<li class="hidden"><a href="#analysis">Root Cause Analysis</a></li>
+							<li><a href="#analysis">Root Cause Analysis</a></li>
 						</ul>
 						<div class="thirdeye-nav__oldui">
 							<div class="thirdeye-nav__divider"></div>

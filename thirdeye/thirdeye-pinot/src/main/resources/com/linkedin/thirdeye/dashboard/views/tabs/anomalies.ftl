@@ -1,7 +1,7 @@
 
 <div class="container-fluid">
 	<div class="row bg-black row-bordered ">
-		<div class="container top-buffer bottom-buffer">
+		<div class="container">
 
 			<div class="search-bar">
 				<div class="search-select">

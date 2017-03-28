@@ -500,14 +500,19 @@ text {
 }
 
 /* anomalies page Search Bar*/
+.search-title {
+  flex-shrink: 0;
+}
 
 .search-bar {
   display: flex;
+  margin: 10px 0;
 }
 
 .search-field {
   flex-grow: 1;
   margin-left: 24px;
+  overflow: hidden;
 }
 
 .search-select {
@@ -787,8 +792,8 @@ text {
 }
 
 .analysis-options__dropdown {
-  width: 50%;
-  margin-left: 24px;
+  padding: 0 12px;
+  flex-grow: 1;
   display: flex;
   flex-wrap: wrap;
 }
@@ -804,18 +809,18 @@ text {
 
 .analysis-options__granularity,
 .analysis-options__dimensions {
-  max-width: 50%;
   flex-grow: 1;
+  margin: 0 12px;
 }
 
 .analysis-options__filters {
   flex-basis: 100%;
+  margin: 0 12px;
 }
 
 .analysis-options__apply {
   position: relative;
   top: 26px;
-  margin-left: 24px;
 }
 
 .analysis-options__apply > .thirdeye-btn {
