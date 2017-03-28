@@ -17,6 +17,7 @@ public class DetectionResourceHttpUtils extends AbstractResourceHttpUtils {
   private static String BACKFILL = "/generateAnomaliesInRange";
   private static String AUTOTUNE_FILTER = "autotune/filter/";
   private static String EVAL_FILTER = "eval/filter/";
+  private static String EVAL_AUTOTUNE = "eval/autotune/";
 
   public DetectionResourceHttpUtils(String detectionHost, int detectionPort) {
     super(new HttpHost(detectionHost, detectionPort));
@@ -46,21 +47,36 @@ public class DetectionResourceHttpUtils extends AbstractResourceHttpUtils {
     return callJobEndpoint(req);
   }
 
-  public String runAutoTune(Long functionId, Long startTime, Long endTime, String autoTuneType) throws Exception {
+  public String runAutoTune(Long functionId, Long startTime, Long endTime, String autoTuneType, String holidayStarts, String holidayEnds) throws Exception {
     HttpPost req = new HttpPost(
         DETECTION_JOB_ENDPOINT + AUTOTUNE_FILTER + functionId
             + "?startTime=" + startTime
         + "&endTime=" + endTime
         + "&autoTuneType=" + autoTuneType
+        + "&holidayStarts=" + holidayStarts
+        + "&holidayEnds=" + holidayEnds
     );
     return callJobEndpoint(req);
   }
 
-  public String getEvalStatsAlertFilter(Long functionId, Long startTime, Long endTime) throws Exception{
+  public String getEvalStatsAlertFilter(Long functionId, Long startTime, Long endTime, String holidayStarts, String holidayEnds) throws Exception{
     HttpPost req = new HttpPost(
         DETECTION_JOB_ENDPOINT + EVAL_FILTER + functionId
             + "?startTime=" + startTime
             + "&endTime=" + endTime
+            + "&holidayStarts=" + holidayStarts
+            + "&holidayEnds=" + holidayEnds
+    );
+    return callJobEndpoint(req);
+  }
+
+  public String evalAutoTune(long autotuneId, long startTime, long endTime, String holidayStarts, String holidayEnds) throws Exception{
+    HttpPost req = new HttpPost(
+        DETECTION_JOB_ENDPOINT + EVAL_AUTOTUNE + autotuneId
+        + "?startTime=" + startTime
+        + "&endTime=" + endTime
+        + "&holidayStarts=" + holidayStarts
+        + "&holidayEnds=" + holidayEnds
     );
     return callJobEndpoint(req);
   }
