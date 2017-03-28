@@ -1109,9 +1109,6 @@ path {
   background-color: transparent;
   border: 1px solid rgb(157, 157, 157);
   border-radius: 2px;
-  transition-duration: 167ms;
-  transition-property: background-color, box-shadow, color;
-  transition-timing-function: cubic-bezier(0,0,.2,1);
   height: 40px;
   font-size: 15px;
   padding: 0 16px;
@@ -1120,12 +1117,12 @@ path {
 .newui-button:hover,
 .newui-button:focus {
   background-color: rgba(255,255,255,.1);
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,.7), inset 0 0 0 2px rgba(255,255,255,.85), inset 0 0 0 3px transparent;
+  border-color: white;
 }
 
 .newui-button:active {
   background-color: rgba(255,255,255,.3);
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,.7), inset 0 0 0 2px rgba(255,255,255,.85), inset 0 0 0 3px white;
+  border-color: white;
 }
 
 .header-tab--secondary {
