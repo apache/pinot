@@ -370,6 +370,16 @@ public abstract class Series {
    */
   public abstract String getString(int index);
 
+  /**
+   * Returns {@code true} if the value referenced by {@code index} is null. Otherwise,
+   * returns {@code false}.
+   *
+   * @param index index of value
+   * @throws IndexOutOfBoundsException if index is outside the series bounds
+   * @return {@code true} if value is null, otherwise {@code false}
+   */
+  public abstract boolean isNull(int index);
+
   /* *************************************************************************
    * Internal abstract interface
    * *************************************************************************/

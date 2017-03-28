@@ -208,6 +208,11 @@ public final class BooleanSeries extends Series {
   }
 
   @Override
+  public boolean isNull(int index) {
+    return isNull(this.values[index]);
+  }
+
+  @Override
   public BooleanSeries copy() {
     return buildFrom(Arrays.copyOf(this.values, this.values.length));
   }
@@ -503,29 +508,17 @@ public final class BooleanSeries extends Series {
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */
-  public static BooleanSeries map(BooleanFunction function, Series... series) {
-    if(series.length <= 0)
-      return empty();
-
-    DataFrame.assertSameLength(series);
-
-    boolean[] input = new boolean[series.length];
-    byte[] output = new byte[series[0].size()];
-    for(int i=0; i<series[0].size(); i++) {
-      output[i] = mapRow(function, series, input, i);
-    }
-
-    return buildFrom(output);
-  }
-
-  private static byte mapRow(BooleanFunction function, Series[] series, boolean[] input, int row) {
-    for(int j=0; j<series.length; j++) {
-      byte value = series[j].getBoolean(row);
-      if(isNull(value))
-        return NULL_VALUE;
-      input[j] = booleanValueOf(value);
-    }
-    return function.apply(input) ? TRUE_VALUE : FALSE_VALUE;
+  public static BooleanSeries map(final BooleanFunction function, Series... series) {
+    final boolean[] input = new boolean[series.length];
+    return map(new BooleanFunctionEx() {
+      @Override
+      public byte apply(byte... values) {
+        for(int i=0; i<input.length; i++) {
+          input[i] = booleanValueOf(values[i]);
+        }
+        return function.apply(input) ? TRUE_VALUE : FALSE_VALUE;
+      }
+    }, series);
   }
 
   /**
@@ -536,6 +529,14 @@ public final class BooleanSeries extends Series {
       return empty();
 
     DataFrame.assertSameLength(series);
+
+    // Note: code-specialization to help hot-spot vm
+    if(series.length == 1)
+      return map(function, series[0]);
+    if(series.length == 2)
+      return map(function, series[0], series[1]);
+    if(series.length == 3)
+      return map(function, series[0], series[1], series[2]);
 
     byte[] input = new byte[series.length];
     byte[] output = new byte[series[0].size()];
@@ -554,6 +555,42 @@ public final class BooleanSeries extends Series {
       input[j] = value;
     }
     return function.apply(input);
+  }
+
+  private static BooleanSeries map(BooleanFunctionEx function, Series a) {
+    byte[] output = new byte[a.size()];
+    for(int i=0; i<a.size(); i++) {
+      if(a.isNull(i)) {
+        output[i] = NULL_VALUE;
+      } else {
+        output[i] = function.apply(a.getBoolean(i));
+      }
+    }
+    return buildFrom(output);
+  }
+
+  private static BooleanSeries map(BooleanFunctionEx function, Series a, Series b) {
+    byte[] output = new byte[a.size()];
+    for(int i=0; i<a.size(); i++) {
+      if(a.isNull(i) || b.isNull(i)) {
+        output[i] = NULL_VALUE;
+      } else {
+        output[i] = function.apply(a.getBoolean(i), b.getBoolean(i));
+      }
+    }
+    return buildFrom(output);
+  }
+
+  private static BooleanSeries map(BooleanFunctionEx function, Series a, Series b, Series c) {
+    byte[] output = new byte[a.size()];
+    for(int i=0; i<a.size(); i++) {
+      if(a.isNull(i) || b.isNull(i) || c.isNull(i)) {
+        output[i] = NULL_VALUE;
+      } else {
+        output[i] = function.apply(a.getBoolean(i), b.getBoolean(i), c.getBoolean(i));
+      }
+    }
+    return buildFrom(output);
   }
 
   /**

@@ -178,6 +178,11 @@ public final class DoubleSeries extends Series {
   }
 
   @Override
+  public boolean isNull(int index) {
+    return isNull(this.values[index]);
+  }
+
+  @Override
   public DoubleSeries copy() {
     return buildFrom(Arrays.copyOf(this.values, this.values.length));
   }
@@ -436,6 +441,14 @@ public final class DoubleSeries extends Series {
 
     DataFrame.assertSameLength(series);
 
+    // Note: code-specialization to help hot-spot vm
+    if(series.length == 1)
+      return map(function, series[0]);
+    if(series.length == 2)
+      return map(function, series[0], series[1]);
+    if(series.length == 3)
+      return map(function, series[0], series[1], series[2]);
+
     double[] input = new double[series.length];
     double[] output = new double[series[0].size()];
     for(int i=0; i<series[0].size(); i++) {
@@ -453,6 +466,42 @@ public final class DoubleSeries extends Series {
       input[j] = value;
     }
     return function.apply(input);
+  }
+
+  private static DoubleSeries map(DoubleFunction function, Series a) {
+    double[] output = new double[a.size()];
+    for(int i=0; i<a.size(); i++) {
+      if(a.isNull(i)) {
+        output[i] = NULL_VALUE;
+      } else {
+        output[i] = function.apply(a.getDouble(i));
+      }
+    }
+    return buildFrom(output);
+  }
+
+  private static DoubleSeries map(DoubleFunction function, Series a, Series b) {
+    double[] output = new double[a.size()];
+    for(int i=0; i<a.size(); i++) {
+      if(a.isNull(i) || b.isNull(i)) {
+        output[i] = NULL_VALUE;
+      } else {
+        output[i] = function.apply(a.getDouble(i), b.getDouble(i));
+      }
+    }
+    return buildFrom(output);
+  }
+
+  private static DoubleSeries map(DoubleFunction function, Series a, Series b, Series c) {
+    double[] output = new double[a.size()];
+    for(int i=0; i<a.size(); i++) {
+      if(a.isNull(i) || b.isNull(i) || c.isNull(i)) {
+        output[i] = NULL_VALUE;
+      } else {
+        output[i] = function.apply(a.getDouble(i), b.getDouble(i), c.getDouble(i));
+      }
+    }
+    return buildFrom(output);
   }
 
   /**
