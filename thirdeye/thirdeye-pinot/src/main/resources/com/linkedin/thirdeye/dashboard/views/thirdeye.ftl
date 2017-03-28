@@ -153,16 +153,20 @@
 		<div class="">
 			<div class="">
 				<nav class="navbar navbar-inverse" role="navigation">
-          <div class="container">
-						<div id="global-navbar" class="navbar-header pull-left">
+          <div class="container thirdeye-nav">
+						<div id="global-navbar" class="navbar-header">
 							<a class="navbar-brand logo" href="#anomalies" id="thirdeye-home">ThirdEye</a>
 						</div>
-						<div id="main-tabs" class="pull-right">
-							<ul class="nav navbar-nav">
-								<li><a href="#anomalies">Anomalies</a></li>
-								<li class="hidden"><a href="#investigate">Investigate</a></li>
-								<li class="hidden"><a href="#analysis">Root Cause Analysis</a></li>
-							</ul>
+
+						<ul class="nav navbar-nav thirdeye-nav__tabs" id="main-tabs">
+							<li><a href="#anomalies">Anomalies</a></li>
+							<li class="hidden"><a href="#investigate">Investigate</a></li>
+							<li class="hidden"><a href="#analysis">Root Cause Analysis</a></li>
+						</ul>
+						<div class="thirdeye-nav__oldui">
+							<div class="thirdeye-nav__divider"></div>
+							<a class="btn thirdeye-btn thirdeye-btn--secondary" href="dashboard">Old UI</a>
+						</div>
 
             <!-- Hidding this until it's fully fleshed out -->
             <!-- Jira: https://jira01.corp.linkedin.com:8443/browse/THIRDEYE-1042 -->
@@ -179,7 +183,6 @@
 									</ul></li>
 								<li><a href="#">Sign In</a></li>
 							</ul> -->
-						</div>
 					</nav>
 				</div>
 			</div>

@@ -92,6 +92,7 @@ label {
     margin-bottom: 0px;
     border-bottom: 1px solid #ccc;
 }
+
 .navbar-inverse {
     background-image: none;
     background-color: #080808;
@@ -417,6 +418,33 @@ text {
 
 /* Common */
 
+/* Navbar*/
+
+.thirdeye-nav {
+  display: flex;
+  white-space: nowrap;
+}
+
+.thirdeye-nav__tabs {
+  display: flex;
+  margin: 0 24px;
+}
+
+
+.thirdeye-nav__oldui {
+  display: flex;
+  flex-grow: 1;
+  font-weight: 500;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.thirdeye-nav__divider {
+  margin-right: 24px;
+  border-right: 1px solid rgb(157, 157, 157);
+  height: 32px;
+}
+
 /*button*/
 .thirdeye-btn, .thirdeye-btn:hover  {
   color: white;
@@ -426,21 +454,39 @@ text {
   padding: 0 16px;
   line-height: 32px;
   border-radius: 2px;
-  transition-duration: 167ms;
-  transition-property: background-color,color;
-  transition-timing-function: cubic-bezier(0,0,.2,1);
 }
 
 .thirdeye-btn:hover,
 .thirdeye-btn:focus {
   background-color: #0073b1;
+  font-weight: 600;
   color: white;
 }
 
-.thirdeye-btn:active{
+.thirdeye-btn:active {
   color: white;
   background-color: #006097;
 }
+
+.thirdeye-btn--secondary {
+  background-color: transparent;
+  border-color: rgb(157, 157, 157);
+  font-weight: 500;
+}
+
+.thirdeye-btn--secondary:hover,
+.thirdeye-btn--secondary:focus {
+  background-color: rgba(255,255,255,.1);
+  border-color: white;
+  font-weight: 500;
+}
+
+.thirdeye-btn--secondary:active {
+  background-color: rgba(255,255,255,.3);
+  border-color: white;
+  font-weight: 500;
+}
+
 
 /* link*/
 .thirdeye-link {
