@@ -88,6 +88,7 @@ public class TestClassificationConfigManager extends AbstractManagerTestBase {
     for (ClassificationConfigDTO classificationConfig : responses) {
       classificationConfigDAO.deleteById(classificationConfig.getId());
     }
-    Assert.assertEquals(classificationConfigDAO.findAll().size(), 1);
+    List<ClassificationConfigDTO> allDTO =  classificationConfigDAO.findAll();
+    Assert.assertEquals(allDTO.size(), 1);
   }
 }
