@@ -5,6 +5,7 @@ function AnalysisView(analysisModel) {
 
   this.analysisModel = analysisModel;
   this.applyDataChangeEvent = new Event(this);
+  this.searchEvent = new Event(this);
   this.viewParams = {granularity: "DAYS", dimension: "All", filters: {}};
   this.baselineRange = {
     'Last 24 Hours': [moment().subtract(1, 'days'), moment().subtract(1, 'days')],
@@ -23,7 +24,7 @@ AnalysisView.prototype = {
     this.viewParams.metricName = this.analysisModel.metricName;
   },
 
-  render: function () {
+  render: function (metricId) {
     $("#analysis-place-holder").html(this.analysis_template_compiled);
     // METRIC SELECTION
     var analysisMetricSelect = $('#analysis-metric-input').select2({
@@ -69,12 +70,14 @@ AnalysisView.prototype = {
       this.searchParams['metricName'] = metricName || this.searchParams['metricName'];
 
     }).trigger('change');
+    if (metricId) {
+      this.renderAnalysisOptions(metricId);
+    }
     this.setupListeners();
   },
 
-  renderAnalysisOptions(event) {
-    debugger;
-    const {metricId} = Object.assign(this.viewParams, this.searchParams);
+  renderAnalysisOptions(metricId) {
+    metricId = metricId || Object.assign(this.viewParams, this.searchParams).metricId;
     // Now render the dimensions and filters for selected metric
 
     const analysis_options_template = $('#analysis-options-template').html();
@@ -235,8 +238,9 @@ AnalysisView.prototype = {
   },
 
   setupListeners: function () {
-    $("#analysis-apply-button").click((e) => {
-      this.renderAnalysisOptions(e);
+    $("#analysis-apply-button").click(() => {
+      this.searchEvent.notify();
+      this.renderAnalysisOptions();
     });
 
     // $("#analysis-apply-button").click((e) => {

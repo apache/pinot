@@ -5,24 +5,34 @@ function AnalysisController(parentController) {
   this.timeSeriesCompareController = new TimeSeriesCompareController(this);
 
   // Event handlers
+  this.analysisView.searchEvent.attach(this.handleSearchEvent.bind(this));
   this.analysisView.applyDataChangeEvent.attach(this.handleApplyAnalysisEvent.bind(this));
 }
 
 AnalysisController.prototype = {
-  handleAppEvent: function () {
-    HASH_SERVICE.refreshWindowHashForRouting('analysis');
+  handleAppEvent() {
+    // HASH_SERVICE.refreshWindowHashForRouting('analysis');
     const hashParams = HASH_SERVICE.getParams();
     this.analysisModel.init(hashParams);
     this.analysisModel.update(hashParams);
     this.analysisView.init(hashParams);
-    this.analysisView.render();
+    this.analysisView.render(hashParams.metricId);
     this.timeSeriesCompareController.handleAppEvent(this.analysisView.viewParams);
   },
 
-  handleApplyAnalysisEvent: function (viewObject) {
+  handleApplyAnalysisEvent(viewObject) {
     HASH_SERVICE.update(viewObject.viewParams);
     HASH_SERVICE.refreshWindowHashForRouting('analysis');
     this.timeSeriesCompareController.handleAppEvent(HASH_SERVICE.getParams());
-  }
+  },
+
+  handleSearchEvent(params = {}) {
+    const { searchParams } = params;
+    HASH_SERVICE.update(searchParams)
+    HASH_SERVICE.refreshWindowHashForRouting('analysis');
+    const hashParams = HASH_SERVICE.getParams();
+    this.analysisModel.init(hashParams);
+    this.analysisModel.update(hashParams);
+  },
 };
 

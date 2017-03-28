@@ -7,7 +7,7 @@ AppView.prototype = {
 
   init : function() {
     var self = this;
-    var tabSelectionEventHandler = function(e) {
+    var tabSelectionEventHandler = (e) => {
       e.preventDefault();
       var targetTab = $(e.target).attr('href');
       var previousTab = $(e.relatedTarget).attr('href');
@@ -17,7 +17,8 @@ AppView.prototype = {
       };
       //don't notify if the tab is already active
       if(!$(e.target).parent().hasClass('active')) {
-        self.tabClickEvent.notify(args);
+        HASH_SERVICE.clear();
+        this.tabClickEvent.notify(args);
       }
     };
 
