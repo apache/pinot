@@ -858,6 +858,21 @@ text {
   height: 100%;
 }
 
+.analysis-chart__checkbox[type=checkbox]  {
+  margin: 0 8px;
+  transform: scale(1.2);
+}
+
+.analysis-chart__dimensions {
+  list-style: none;
+  padding: 0;
+}
+
+.analysis-chart__dimension {
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .analysis-change {
   display: flex;
   align-items: center;
