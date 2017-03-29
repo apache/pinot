@@ -26,7 +26,7 @@ import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 
 
-public class RangeRealtimeDictionaryPredicateEvaluator implements PredicateEvaluator {
+public class RangeRealtimeDictionaryPredicateEvaluator extends BasePredicateEvaluator {
 
   private int[] matchingIds;
   private IntSet dictIdSet;

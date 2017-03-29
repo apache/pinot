@@ -15,11 +15,12 @@
  */
 package com.linkedin.pinot.core.operator.filter.predicate;
 
+import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.common.predicate.NEqPredicate;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 
-public class NotEqualsPredicateEvaluator implements PredicateEvaluator {
+public class NotEqualsPredicateEvaluator extends BasePredicateEvaluator {
 
   private int neqDictValue;
   private int[] matchingDictIds;
@@ -102,4 +103,5 @@ public class NotEqualsPredicateEvaluator implements PredicateEvaluator {
   public boolean alwaysFalse() {
     return nonMatchingDictIds.length == dictionary.length();
   }
+  
 }
