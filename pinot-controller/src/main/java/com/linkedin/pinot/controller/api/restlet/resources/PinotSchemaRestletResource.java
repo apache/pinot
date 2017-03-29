@@ -1,5 +1,18 @@
 package com.linkedin.pinot.controller.api.restlet.resources;
 
+import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.metrics.ControllerMeter;
+import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
+import com.linkedin.pinot.common.restlet.swagger.Parameter;
+import com.linkedin.pinot.common.restlet.swagger.Paths;
+import com.linkedin.pinot.common.restlet.swagger.Response;
+import com.linkedin.pinot.common.restlet.swagger.Responses;
+import com.linkedin.pinot.common.restlet.swagger.Summary;
+import com.linkedin.pinot.common.restlet.swagger.Tags;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
@@ -20,19 +33,6 @@ import org.restlet.resource.Post;
 import org.restlet.resource.Put;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.metrics.ControllerMeter;
-import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
-import com.linkedin.pinot.common.restlet.swagger.Parameter;
-import com.linkedin.pinot.common.restlet.swagger.Paths;
-import com.linkedin.pinot.common.restlet.swagger.Response;
-import com.linkedin.pinot.common.restlet.swagger.Responses;
-import com.linkedin.pinot.common.restlet.swagger.Summary;
-import com.linkedin.pinot.common.restlet.swagger.Tags;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.controller.api.ControllerRestApplication;
 
 
 public class PinotSchemaRestletResource extends BasePinotControllerRestletResource {
@@ -243,7 +243,8 @@ public class PinotSchemaRestletResource extends BasePinotControllerRestletResour
   private File getUploadContents()
       throws Exception {
     File dataFile = null;
-    Representation rep;// 1/ Create a factory for disk-based file items
+
+    // 1/ Create a factory for disk-based file items
     final DiskFileItemFactory factory = new DiskFileItemFactory();
 
     // 2/ Create a new file upload handler based on the Restlet
@@ -256,14 +257,24 @@ public class PinotSchemaRestletResource extends BasePinotControllerRestletResour
     // list of FileItems
     items = upload.parseRequest(getRequest());
 
-    final Iterator<FileItem> it = items.iterator();
-    while (it.hasNext() && dataFile == null) {
-      final FileItem fi = it.next();
-      if (fi.getFieldName() != null) {
-        dataFile = new File(tempDir, fi.getFieldName() + "-" + System.currentTimeMillis());
-        fi.write(dataFile);
+    for (FileItem fileItem : items) {
+      String fieldName = fileItem.getFieldName();
+      if (dataFile == null) {
+        if (fieldName != null) {
+          dataFile = new File(tempDir, fieldName + "-" + System.currentTimeMillis());
+          fileItem.write(dataFile);
+        } else {
+          LOGGER.warn("Null field name");
+        }
+      } else {
+        LOGGER.warn("Got extra file item while uploading schema: " + fieldName);
       }
+
+      // Remove the temp file
+      // When the file is copied to instead of renamed to the new file, the temp file might be left in the dir
+      fileItem.delete();
     }
+
     return dataFile;
   }
 
