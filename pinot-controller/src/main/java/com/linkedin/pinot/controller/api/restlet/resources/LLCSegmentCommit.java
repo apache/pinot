@@ -16,9 +16,15 @@
 
 package com.linkedin.pinot.controller.api.restlet.resources;
 
+import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
+import com.linkedin.pinot.common.restlet.swagger.Description;
+import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
+import com.linkedin.pinot.common.restlet.swagger.Paths;
+import com.linkedin.pinot.common.restlet.swagger.Summary;
+import com.linkedin.pinot.common.utils.LLCSegmentName;
+import com.linkedin.pinot.controller.helix.core.realtime.SegmentCompletionManager;
 import java.io.File;
 import java.io.IOException;
-import java.util.Iterator;
 import java.util.List;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
@@ -28,13 +34,6 @@ import org.restlet.representation.Representation;
 import org.restlet.representation.StringRepresentation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
-import com.linkedin.pinot.common.restlet.swagger.Description;
-import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
-import com.linkedin.pinot.common.restlet.swagger.Paths;
-import com.linkedin.pinot.common.restlet.swagger.Summary;
-import com.linkedin.pinot.common.utils.LLCSegmentName;
-import com.linkedin.pinot.controller.helix.core.realtime.SegmentCompletionManager;
 
 
 /**
@@ -48,7 +47,8 @@ public class LLCSegmentCommit extends PinotSegmentUploadRestletResource {
   String _segmentNameStr;
   String _instanceId;
 
-  public LLCSegmentCommit() throws IOException {
+  public LLCSegmentCommit()
+      throws IOException {
   }
 
   @Override
@@ -74,7 +74,8 @@ public class LLCSegmentCommit extends PinotSegmentUploadRestletResource {
       response = segmentCompletionManager.segmentCommitEnd(reqParams, success);
     }
 
-    LOGGER.info("Response: instance={}  segment={} status={} offset={}", _instanceId, _segmentNameStr, response.getStatus(), response.getOffset());
+    LOGGER.info("Response: instance={}  segment={} status={} offset={}", _instanceId, _segmentNameStr,
+        response.getStatus(), response.getOffset());
     return new StringRepresentation(response.toJsonString());
   }
 
@@ -109,22 +110,32 @@ public class LLCSegmentCommit extends PinotSegmentUploadRestletResource {
     final List<FileItem> items;
 
     try {
-      // The following statement blocks until the entire segment is read into memory.
+      // The following statement blocks until the entire segment is read into memory/disk.
       items = upload.parseRequest(getRequest());
 
-      boolean found = false;
       File dataFile = null;
 
-      for (final Iterator<FileItem> it = items.iterator(); it.hasNext() && !found; ) {
-        final FileItem fi = it.next();
-        if (fi.getFieldName() != null && fi.getFieldName().equals(segmentNameStr)) {
-          found = true;
-          dataFile = new File(tempDir, segmentNameStr);
-          fi.write(dataFile);
+      // TODO: refactor this part into a util method (almost duplicate code in PinotSegmentUploadRestletResource and
+      // PinotSchemaRestletResource)
+      for (FileItem fileItem : items) {
+        String fieldName = fileItem.getFieldName();
+        if (dataFile == null) {
+          if (fieldName != null && fieldName.equals(segmentNameStr)) {
+            dataFile = new File(tempDir, fieldName);
+            fileItem.write(dataFile);
+          } else {
+            LOGGER.warn("Invalid field name: {}", fieldName);
+          }
+        } else {
+          LOGGER.warn("Got extra file item while uploading LLC segments: {}", fieldName);
         }
+
+        // Remove the temp file
+        // When the file is copied to instead of renamed to the new file, the temp file might be left in the dir
+        fileItem.delete();
       }
 
-      if (!found) {
+      if (dataFile == null) {
         LOGGER.error("Segment not included in request. Instance {}, segment {}", instanceId, segmentNameStr);
         return false;
       }

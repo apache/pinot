@@ -353,24 +353,22 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
           items = upload.parseRequest(getRequest());
 
           for (FileItem fileItem : items) {
+            String fieldName = fileItem.getFieldName();
             if (!found) {
-              if (fileItem.getFieldName() != null) {
+              if (fieldName != null) {
                 found = true;
-                dataFile = new File(tempDir, fileItem.getFieldName());
+                dataFile = new File(tempDir, fieldName);
                 fileItem.write(dataFile);
+              } else {
+                LOGGER.warn("Null field name");
               }
             } else {
-              LOGGER.warn("Got extra file item while pushing segments: " + fileItem.getFieldName());
+              LOGGER.warn("Got extra file item while pushing segments: {}", fieldName);
             }
 
-            // TODO: remove the try-catch after verifying it will not throw any exception
-            try {
-              // Remove the temp file
-              // When the file is copied to instead of renamed to the new file, the temp file might be left in the dir
-              fileItem.delete();
-            } catch (Exception e) {
-              LOGGER.error("Caught exception while deleting the temp file, should not reach here", e);
-            }
+            // Remove the temp file
+            // When the file is copied to instead of renamed to the new file, the temp file might be left in the dir
+            fileItem.delete();
           }
       }
       // Once handled, the content of the uploaded file is sent
