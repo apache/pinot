@@ -328,7 +328,7 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
    */
   @HttpVerb("put")
   @Summary("Update table configuration. Request body is offline or realtime table configuration")
-  @Tags({"Table"})
+  @Tags({"table"})
   @Paths({"/tables/{tableName}"})
   public Representation updateTableConfig(@Parameter(name = "tableName", in="path",
       description = "Table name (without type)") String tableName,
@@ -342,26 +342,35 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
           "Invalid json in table configuration");
     } catch (IOException e) {
       LOGGER.error("Failed to read request body while updating configuration for table: {}", tableName, e);
-      errorResponseRepresentation(Status.SERVER_ERROR_INTERNAL,
+      return errorResponseRepresentation(Status.SERVER_ERROR_INTERNAL,
           "Failed to read request");
     }
     try {
       String tableTypeStr = config.getTableType();
       TableType tableType = TableType.valueOf(tableTypeStr.toUpperCase());
       String configTableName = config.getTableName();
-      if (! configTableName.equals(tableName)) {
-        errorResponseRepresentation(Status.CLIENT_ERROR_BAD_REQUEST,
-            "Request table name does not match table name in the body");
+      String requestTablNameWithType = new TableNameBuilder(tableType).forTable(tableName);
+      if (! configTableName.equals(requestTablNameWithType)) {
+        return errorResponseRepresentation(Status.CLIENT_ERROR_BAD_REQUEST,
+            "Request table " + requestTablNameWithType + " does not match table name in the body " + configTableName);
       }
 
       String tableNameWithType = null;
       if (config.getTableType().equalsIgnoreCase(TableType.OFFLINE.name())) {
+        if (! _pinotHelixResourceManager.hasOfflineTable(tableName)) {
+          return errorResponseRepresentation(Status.CLIENT_ERROR_NOT_FOUND,
+              "Table " + tableName + " does not exist");
+        }
         tableNameWithType = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
       } else if (config.getTableType().equalsIgnoreCase(TableType.REALTIME.name())) {
+        if (! _pinotHelixResourceManager.hasRealtimeTable(tableName)) {
+          return errorResponseRepresentation(Status.CLIENT_ERROR_NOT_FOUND,
+              "Table " + tableName + " does not exist");
+        }
         tableNameWithType = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
       }
 
-      _pinotHelixResourceManager.setTableConfig(config, tableNameWithType, tableType);
+      _pinotHelixResourceManager.setExistingTableConfig(config, tableNameWithType, tableType);
       return responseRepresentation(Status.SUCCESS_OK, "{\"status\" : \"Success\"}");
     } catch (IOException e) {
       LOGGER.error("Failed to update table configuration for table: {}", tableName, e);

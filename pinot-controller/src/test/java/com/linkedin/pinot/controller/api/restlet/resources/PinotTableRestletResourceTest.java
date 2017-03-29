@@ -23,6 +23,7 @@ import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
 import com.linkedin.pinot.controller.helix.ControllerTest;
 import com.linkedin.pinot.controller.helix.ControllerTestUtils;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Collections;
 import org.json.JSONException;
@@ -171,7 +172,8 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     tableConfig.getValidationConfig().setRetentionTimeUnit("HOURS");
     tableConfig.getValidationConfig().setRetentionTimeValue("10");
 
-    String output = sendPutRequest(controllerUrlBuilder.forUpdateTableConfig(tableName), tableConfig.toJSON().toString());
+    String output = null;
+    output = sendPutRequest(controllerUrlBuilder.forUpdateTableConfig(tableName), tableConfig.toJSON().toString());
     JSONObject jsonResponse = new JSONObject(output);
     Assert.assertTrue(jsonResponse.has("status"));
     Assert.assertEquals(jsonResponse.getString("status"), "Success");
@@ -207,6 +209,18 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     sendPutRequest(controllerUrlBuilder.forUpdateTableConfig(tableName), tableConfig.toJSON().toString());
     modifiedConfig = getTableConfig(tableName, "REALTIME");
     Assert.assertEquals(modifiedConfig.getQuotaConfig().getStorage(), "10G");
+    boolean notFoundException = false;
+    try {
+      // table does not exist
+      JSONObject jsonConfig = tableConfig.toJSON();
+      jsonConfig.put("tableName", "noSuchTable_REALTIME");
+      String responseStr =
+          sendPutRequest(controllerUrlBuilder.forUpdateTableConfig("noSuchTable"), jsonConfig.toString());
+    } catch (Exception e) {
+      Assert.assertTrue(e instanceof FileNotFoundException);
+      notFoundException = true;
+    }
+    Assert.assertTrue(notFoundException);
   }
 
 
