@@ -1,6 +1,6 @@
 
 <div class="container-fluid">
-	<div class="row bg-black row-bordered ">
+	<div class="row bg-white row-bordered ">
 		<div class="container">
 
 			<div class="search-bar">

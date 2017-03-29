@@ -30,6 +30,10 @@ Handlebars.registerHelper('formatDelta', function (a, b) {
   }
 });
 
+Handlebars.registerHelper('formatNumber', function(num) {
+  return num.toString().replace(/(\d)(?=(\d\d\d)+(?!\d))/g, "1,");
+});
+
 /**
  * Template helper that assigns the correct css class based on the delta
  * @param  {string} value: string value of delta ('2.4%')

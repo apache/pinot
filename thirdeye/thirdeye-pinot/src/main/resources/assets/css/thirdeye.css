@@ -686,11 +686,11 @@ text {
 }
 
 .anomaly-change-delta.negative {
-  color: #ee1620
+  color: #ee1620;
 }
 
 .anomaly-change-delta.positive {
-  color: #398b18
+  color: #398b18;
 }
 
 /* Pagination */
@@ -781,10 +781,18 @@ text {
 
 /* Analysis */
 
+.analysis-summary__data,
 .analysis-title {
   font-size: 18px;
-  color: rgba(0,0,0,.55);
-  margin-bottom: 24px;
+  color: rgba(0,0,0,.70);
+}
+
+.analysis-summary__data.positive {
+  color: #398b18;
+}
+
+.analysis-summary__data.negative{
+  color: #ee1620;
 }
 
 .analysis-options {
@@ -848,6 +856,87 @@ text {
   flex-basis: 20%;
   overflow: scroll;
   height: 100%;
+}
+
+.analysis-change {
+  display: flex;
+  align-items: center;
+}
+
+.analysis-change__description {
+  flex-grow: 1;
+}
+
+.analysis-change__checkbox[type=checkbox] {
+  margin: 0 8px 0 24px;
+  transform: scale(1.2);
+}
+
+.analysis-change__label {
+  flex-shrink: 0;
+}
+
+.contribution-analysis {
+  display: flex;
+  justify-content: space-between;
+}
+
+.contribution-analysis__daterangepicker {
+  flex-grow: 1;
+}
+
+.contribution-analysis__daterangepicker + .contribution-analysis__daterangepicker {
+  margin-left: 48px;
+}
+
+.tree-map__nav {
+  padding: 0;
+}
+
+.tree-map__tab {
+  margin-right: 24px;
+}
+
+.tree-map__tab: + .tree-map__tab {
+  margin-left: 24px;
+}
+
+.tree-map__tab:hover,
+.tree-map__tab.active {
+  border-bottom: 2px solid #0073b1;
+}
+
+.tree-map__link {
+  padding-right: 0!important;
+  padding-left: 0!important;
+  background-color: transparent!important;
+  color: rgba(0,0,0,0.70)!important;
+}
+.tree-map__tab.active .tree-map__link,
+.tree-map__link:hover {
+  color: #0073b1!important;
+  padding-bottom: 13px;
+}
+
+.analysis-summary {
+  display: flex;
+  justify-content: space-between;
+}
+.analysis-summary__label {
+  text-transform: uppercase;
+  font-size: 12px;
+  color: rgba(0,0,0,.55);
+  font-weight: normal;
+}
+
+.analysis-summary__item {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.tree-map__table {
+  /*margin: 0 24px;*/
 }
 
 /* Radio*/
