@@ -1,14 +1,11 @@
-<ul class="analysis-chart__dimensions">
-  {{#if this.subDimensions}}
-  <label class="label-medium-semibold">{{this.dimension}}:</label>
+<ul class="analysis-chart__dimensions" id="chart-dimensions">
+  {{#if subDimensions}}
+  <label class="label-medium-semibold">{{dimension}}:</label>
 
-  {{#each this.subDimensions as |subDimension subDimensionIndex|}}
-<!--   <li id="a-sub-dimension-{{subDimensionIndex}}">
-    <a id="{{subDimensionIndex}}">{{subDimension}}</a>
-  </li> -->
+  {{#each subDimensions as |subDimension subDimensionIndex|}}
     <li class="analysis-chart__dimension">
-      <input class="analysis-chart__checkbox" type="checkbox" id="a-sub-dimension-{{subDimensionIndex}}">
-      <label for="a-sub-dimension-{{subDimensionIndex}}" class="metric-label analysis-change__label">{{subDimension}}</label>
+      <input class="analysis-chart__checkbox" type="checkbox" id="{{subDimensionIndex}}" checked={{true}}>
+      <label for="{{subDimensionIndex}}" class="metric-label analysis-change__label">{{subDimension}}</label>
     </li>
   {{/each}}
   {{/if}}

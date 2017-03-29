@@ -585,6 +585,10 @@ text {
 }
 
 /* root cause analysis date range picker*/
+.datepicker-field + .datepicker-field {
+  padding-top: 12px;
+}
+
 .datepicker-range {
   display: flex;
   justify-content: space-between;

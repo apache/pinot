@@ -96,7 +96,8 @@ TimeSeriesCompareModel.prototype = {
             this.subDimensionContributionDetails.contributionMap[key] = {
               start: moment(timeSeriesResponse.start).format('YYYY-M-D'),
               end: moment(timeSeriesResponse.end).format('YYYY-M-D'),
-              columns: [dateColumn, currentVal, baselineVal]
+              columns: [dateColumn, currentVal, baselineVal],
+              selected: true
             };
             this.subDimensionContributionDetails.currentValues[key] = timeSeriesResponse.subDimensionContributionMap[key].currentValues;
             this.subDimensionContributionDetails.baselineValues[key] = timeSeriesResponse.subDimensionContributionMap[key].baselineValues;
@@ -108,5 +109,43 @@ TimeSeriesCompareModel.prototype = {
         }
       }
     }
-  }
+  },
+
+  getChartData() {
+    const contributionMap = this.subDimensionContributionDetails.contributionMap;
+    if (contributionMap['All'].selected) {
+      return contributionMap['All'];
+    }
+
+    let date = [];
+    let current = [];
+    let baseline = [];
+
+
+    this.subDimensions.forEach((subDimension) => {
+      const subDimensionData = contributionMap[subDimension];
+      if (subDimensionData.selected) {
+        if (!date.length) {
+          [date, current, baseline] = Array.from(subDimensionData.columns);
+        } else {
+          let [ _, subDimensionCurrent, subDimensionBaseline] = subDimensionData.columns;
+          for (let i = 1; i < current.length; i++) {
+            current[i] += subDimensionCurrent[i];
+            baseline[i] += subDimensionBaseline[i];
+          }
+        }
+      }
+    });
+
+    return {columns: [date, current, baseline]};
+  },
+
+  isAllSubDimensionsSelected() {
+    const contributionMap = this.subDimensionContributionDetails.contributionMap;
+    return this.subDimensions
+        .filter(dimension => dimension !== 'All')
+        .reduce((acc, subDimension) => {
+          return acc && contributionMap[subDimension].selected;
+        }, true);
+  },
 };

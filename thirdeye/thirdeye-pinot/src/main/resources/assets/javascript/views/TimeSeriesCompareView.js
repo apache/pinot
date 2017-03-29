@@ -50,6 +50,9 @@ TimeSeriesCompareView.prototype = {
     var timeseriesSubDimensionsHtml = this.timeseries_subdimension_legend_template_compiled(
         this.timeSeriesCompareModel);
     $(this.timeseries_subdimension_legend_placeHolderId).html(timeseriesSubDimensionsHtml);
+
+    // this needs to be called last so that the chart is rendered after the legend
+    // otherwise, we run into overflow issues
     this.loadChart(
         this.timeSeriesCompareModel.subDimensionContributionDetails.contributionMap['All']);
     this.setupListenerForChartSubDimension();
@@ -127,16 +130,59 @@ TimeSeriesCompareView.prototype = {
   },
 
   setupListenerForChartSubDimension: function () {
-    var self = this;
-    for (var i in self.timeSeriesCompareModel.subDimensions) {
-      $('#a-sub-dimension-' + i + ' a').click(self, function (e) {
-        var index = e.currentTarget.getAttribute('id');
-        var subDimension = self.timeSeriesCompareModel.subDimensions[index];
-        self.loadChart(
-            self.timeSeriesCompareModel.subDimensionContributionDetails.contributionMap[subDimension]);
-      });
+    $('#chart-dimensions :checkbox').change((event) => {
+      const subDimensionIndex =  event.currentTarget.getAttribute('id');
+      const subDimension = this.timeSeriesCompareModel.subDimensions[subDimensionIndex];
+      const selected = event.currentTarget.checked;
+
+      if (subDimension === 'All') {
+        this.updateAllSubDimension(selected);
+      } else {
+        this.updateSubDimensionSelection(subDimension, selected);
+        const allSelection = this.timeSeriesCompareModel.isAllSubDimensionsSelected();
+        const allIndex = this.timeSeriesCompareModel.subDimensions.indexOf('All');
+        this.updateSubDimensionSelection('All', allSelection, allIndex);
+      }
+
+      // this.addSubDimension(subDimension);
+      const chartData = this.timeSeriesCompareModel.getChartData();
+      this.loadChart(chartData);
+    });
+  },
+
+  updateAllSubDimension(selection) {
+    this.timeSeriesCompareModel.subDimensions.forEach((dimension, index) => {
+      this.updateSubDimensionSelection(dimension, selection, index);
+    });
+  },
+
+  updateSubDimensionSelection(subDimension, selected, uiIndex) {
+    const subDimensionData = this.timeSeriesCompareModel.subDimensionContributionDetails.contributionMap[subDimension];
+    subDimensionData.selected = selected;
+
+    if (Number.isInteger(uiIndex)) {
+      $(`#chart-dimensions #${uiIndex}`)[0].checked = selected;
     }
   },
+
+
+  //  const allSubDimentionIndex = this.timeSeriesCompareModel.subDimensions.indexOf('All');
+    // const allSubDimentionData = this.timeSeriesCompareModel.subDimensionContributionDetails.contributionMap['All'];
+    // if (allSubDimentionData.selected) {
+    //   allSubDimentionData.selected = false;
+    //   $(`#chart-dimensions #${allSubDimentionIndex}`)[0].checked = false;
+    // }
+
+  // addSubDimension(subDimension) {
+  //   const subDimensionData = this.timeSeriesCompareModel.subDimensionContributionDetails.contributionMap[subDimension];
+
+  //   const position = this.cumulativeColumns.indexOf(subDimensionData);
+  //   if (position === -1) {
+  //     this.cumulativeColumns.push(subDimensionData);
+  //   } else {
+  //     this.cumulativeColumns.splice(position, 1);
+  //   }
+  // },
 
   collectAndUpdateViewParamsForHeatMapRendering: function (subDimension, bucketIndex) {
     var self = this;
