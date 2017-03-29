@@ -2,7 +2,9 @@ package com.linkedin.thirdeye.dataframe;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import org.apache.commons.lang.ArrayUtils;
 
@@ -34,39 +36,61 @@ public abstract class Series {
     RIGHT
   }
 
-//  @FunctionalInterface
-  public interface DoubleConditional {
-    boolean apply(double value);
+  interface Function {
+    // left blank
   }
 
-//  @FunctionalInterface
-  public interface LongConditional {
-    boolean apply(long value);
+  interface Conditional extends Function {
+    // left blank
   }
 
-//  @FunctionalInterface
-  public interface StringConditional {
-    boolean apply(String value);
+  //  @FunctionalInterface
+  interface DoubleConditional extends Conditional {
+    boolean apply(double... values);
   }
 
-//  @FunctionalInterface
-  public interface DoubleFunction {
+  //  @FunctionalInterface
+  interface LongConditional extends Conditional {
+    boolean apply(long... values);
+  }
+
+  //  @FunctionalInterface
+  interface StringConditional extends Conditional {
+    boolean apply(String... values);
+  }
+
+  //  @FunctionalInterface
+  interface BooleanConditional extends Conditional {
+    boolean apply(boolean... values);
+  }
+
+  //  @FunctionalInterface
+  interface DoubleFunction extends Function {
     double apply(double... values);
   }
 
-//  @FunctionalInterface
-  public interface LongFunction {
+  //  @FunctionalInterface
+  interface LongFunction extends Function {
     long apply(long... values);
   }
 
-//  @FunctionalInterface
-  public interface StringFunction {
+  //  @FunctionalInterface
+  interface StringFunction extends Function {
     String apply(String... values);
   }
 
-//  @FunctionalInterface
-  public interface BooleanFunction {
-    byte apply(byte... values);
+  //  @FunctionalInterface
+  interface BooleanFunction extends Function {
+    boolean apply(boolean... values);
+  }
+
+  //  @FunctionalInterface
+  interface BooleanFunctionEx extends Function {
+    byte TRUE = BooleanSeries.TRUE_VALUE;
+    byte FALSE = BooleanSeries.FALSE_VALUE;
+    byte NULL = BooleanSeries.NULL_VALUE;
+
+    byte apply(boolean... values);
   }
 
   /**
@@ -81,6 +105,19 @@ public abstract class Series {
 
     public int size() {
       return this.fromIndex.length;
+    }
+  }
+
+  /**
+   * Base class for specialized Series builders
+   */
+  public static abstract class Builder {
+    public abstract Series build();
+
+    public abstract Builder addSeries(Collection<Series> series);
+
+    public Builder addSeries(Series... series) {
+      return this.addSeries(Arrays.asList(series));
     }
   }
 
@@ -156,73 +193,34 @@ public abstract class Series {
 
     /**
      * Applies {@code function} as aggregation function to all values per group and
-     * returns the result as a new series with the number of elements equal to the size
+     * returns the result as a new DataFrame with the number of elements equal to the size
      * of the key series.
      * If the series' native types do not match the required input type of {@code function},
-     * the series are converted transparently. The native type of the returned series is
+     * the series are converted transparently. The native type of the aggregated series is
      * determined by {@code function}'s output type.
      *
-     * @param function aggregation function to apply to each grouped series
+     * @param function aggregation function to map to each grouped series
      * @return grouped aggregation series
      */
-    public DataFrame aggregate(DoubleFunction function) {
-      DoubleSeries.Builder builder = DoubleSeries.builder();
-      for(Bucket b : this.buckets)
-        builder.add(this.source.project(b.fromIndex).aggregate(function));
+    public DataFrame aggregate(Function function) {
+      Builder builder = builderForFunction(function);
+      for(Bucket b : this.buckets) {
+        builder.addSeries(this.source.project(b.fromIndex).aggregate(function));
+      }
       return makeAggregate(this.keys, builder.build());
     }
 
     /**
-     * Applies {@code function} as aggregation function to all values per group and
-     * returns the result as a new series with the number of elements equal to the size
-     * of the key series.
-     * If the series' native types do not match the required input type of {@code function},
-     * the series are converted transparently. The native type of the returned series is
-     * determined by {@code function}'s output type.
+     * Counts the number of elements in each group and returns the result as a new DataFrame
+     * with the number of elements equal to the size of the key series.
      *
-     * @param function aggregation function to apply to each grouped series
      * @return grouped aggregation series
      */
-    public DataFrame aggregate(LongFunction function) {
+    public DataFrame count() {
       LongSeries.Builder builder = LongSeries.builder();
-      for(Bucket b : this.buckets)
-        builder.add(this.source.project(b.fromIndex).aggregate(function));
-      return makeAggregate(this.keys, builder.build());
-    }
-
-    /**
-     * Applies {@code function} as aggregation function to all values per group and
-     * returns the result as a new series with the number of elements equal to the size
-     * of the key series.
-     * If the series' native types do not match the required input type of {@code function},
-     * the series are converted transparently. The native type of the returned series is
-     * determined by {@code function}'s output type.
-     *
-     * @param function aggregation function to apply to each grouped series
-     * @return grouped aggregation series
-     */
-    public DataFrame aggregate(StringFunction function) {
-      StringSeries.Builder builder = StringSeries.builder();
-      for(Bucket b : this.buckets)
-        builder.add(this.source.project(b.fromIndex).aggregate(function));
-      return makeAggregate(this.keys, builder.build());
-    }
-
-    /**
-     * Applies {@code function} as aggregation function to all values per group and
-     * returns the result as a new series with the number of elements equal to the size
-     * of the key series.
-     * If the series' native types do not match the required input type of {@code function},
-     * the series are converted transparently. The native type of the returned series is
-     * determined by {@code function}'s output type.
-     *
-     * @param function aggregation function to apply to each grouped series
-     * @return grouped aggregation series
-     */
-    public DataFrame aggregate(BooleanFunction function) {
-      BooleanSeries.Builder builder = BooleanSeries.builder();
-      for(Bucket b : this.buckets)
-        builder.add(this.source.project(b.fromIndex).aggregate(function));
+      for(Bucket b : this.buckets) {
+        builder.addValues(b.size());
+      }
       return makeAggregate(this.keys, builder.build());
     }
 
@@ -268,46 +266,18 @@ public abstract class Series {
     }
   }
 
+  /* *************************************************************************
+   * Public abstract interface
+   * *************************************************************************/
+
   /**
    * Returns the number of elements contained in the series.
    *
-   * <b>NOTE:</b> {@code null} values count as elements.
+   * <br/><b>NOTE:</b> {@code null} values count as elements.
    *
    * @return series size
    */
   public abstract int size();
-
-  /**
-   * Returns a the series as DoubleSeries. The underlying series is converted
-   * transparently if the series' native type is different.
-   *
-   * @return DoubleSeries equivalent
-   */
-  public abstract DoubleSeries getDoubles();
-
-  /**
-   * Returns the series as LongSeries. The underlying series is converted
-   * transparently if the series' native type is different.
-   *
-   * @return LongSeries equivalent
-   */
-  public abstract LongSeries getLongs();
-
-  /**
-   * Returns the series as BooleanSeries. The underlying series is converted
-   * transparently if the series' native type is different.
-   *
-   * @return BooleanSeries equivalent
-   */
-  public abstract BooleanSeries getBooleans();
-
-  /**
-   * Returns the series as StringSeries. The underlying series is converted
-   * transparently if the series' native type is different.
-   *
-   * @return StringSeries equivalent
-   */
-  public abstract StringSeries getStrings();
 
   /**
    * Returns the series' native type.
@@ -327,49 +297,79 @@ public abstract class Series {
   public abstract Series slice(int from, int to);
 
   /**
-   * Returns as copy of the series with the same native type.
+   * Returns the value referenced by {@code index} as double. The value is converted
+   * transparently if the native type of the underlying series is different. The
+   * {@code index} must be between {@code 0} and the size of the series.
    *
-   * @return series copy
+   * @param index index of value
+   * @throws IndexOutOfBoundsException if index is outside the series bounds
+   * @return double value
    */
-  public abstract Series copy();
+  public abstract double getDouble(int index);
 
   /**
-   * Returns a copy of the series with all values' indices
-   * shifted by {@code offset} positions while
-   * leaving the series size unchanged. Values shifted outside to upper (or lower)
-   * bounds of the series are dropped. Vacated positions are padded with {@code null}.
+   * Returns the value referenced by {@code index} as long. The value is converted
+   * transparently if the native type of the underlying series is different. The
+   * {@code index} must be between {@code 0} and the size of the series.
    *
-   * <b>NOTE:</b> for each value, newIndex = oldIndex + offset
-   *
-   * @param offset offset to shift values by. Can be positive or negative.
-   * @return shifted series copy
+   * @param index index of value
+   * @throws IndexOutOfBoundsException if index is outside the series bounds
+   * @return long value
    */
-  public abstract Series shift(int offset);
+  public abstract long getLong(int index);
 
   /**
-   * Returns {@code true} if the series contains at least one {@code null}. Otherwise
+   * Returns the value referenced by {@code index} as byte (tri-state boolean).
+   * The value is converted transparently if the native type of the underlying
+   * series is different. The {@code index} must be between {@code 0} and the
+   * size of the series.
+   *
+   * @param index index of value
+   * @throws IndexOutOfBoundsException if index is outside the series bounds
+   * @return byte value
+   */
+  public abstract byte getBoolean(int index);
+
+  /**
+   * Returns the value referenced by {@code index} as String. The value is converted
+   * transparently if the native type of the underlying series is different. The
+   * {@code index} must be between {@code 0} and the size of the series.
+   *
+   * @param index index of value
+   * @throws IndexOutOfBoundsException if index is outside the series bounds
+   * @return string value
+   */
+  public abstract String getString(int index);
+
+  /**
+   * Returns {@code true} if the value referenced by {@code index} is null. Otherwise,
    * returns {@code false}.
    *
-   * @return {@code true} if empty, {@code false} otherwise
+   * @param index index of value
+   * @throws IndexOutOfBoundsException if index is outside the series bounds
+   * @return {@code true} if value is null, otherwise {@code false}
    */
-  public abstract boolean hasNull();
+  public abstract boolean isNull(int index);
 
   /**
-   * Returns a copy of the series with values from {@code other}
-   * appended at the end. If {@code other} has a different type it is converted transparently.
+   * Returns a copy of the series with values ordered in ascending order.
    *
-   * <b>NOTE:</b> newSize = oldSize + otherSize
+   * <br/><b>NOTE:</b> BooleanSeries interprets {@code false} as smaller than {@code true}.
    *
-   * @param other other series to append at the end
-   * @return concatenated series
+   * @return sorted series copy
    */
-  public abstract Series append(Series other);
+  public abstract Series sorted();
+
+  /* *************************************************************************
+   * Internal abstract interface
+   * *************************************************************************/
 
   /**
    * Returns projection of the series.
    *
-   * <b>NOTE:</b> fromIndex <= -1 is filled with {@code null}.
-   * <b>NOTE:</b> array with length 0 returns empty series.
+   * <br/><b>NOTE:</b> fromIndex <= -1 is filled with {@code null}.
+   * <br/><b>NOTE:</b> array with length 0 returns empty series.
+   * <br/><b>NOTE:</b> could replace {@code slice(int, int)}, but low performance
    *
    * @param fromIndex array with indices to project from (must be <= series size)
    * @return series projection
@@ -377,26 +377,12 @@ public abstract class Series {
   abstract Series project(int[] fromIndex);
 
   /**
-   * Returns an array of indices with a size equal to the series size, such that the values
-   * references by the indices are sorted in ascending order.
+   * Compares values across two series with potentially different native types based on index.
+   * If the types are different the values in {@code that} are transparently converted to the
+   * native type of this series.
    *
-   * <b>NOTE:</b> output can be used directly by {@code project()} to create a sorted copy of the series.
-   *
-   * @return indices of sorted values
-   */
-  abstract int[] sortedIndex();
-
-  /**
-   * Returns an array of indices with size less than or equal to the series size, such that
-   * each index references a null value in the original series.
-   *
-   * @return indices of null values
-   */
-  abstract int[] nullIndex();
-
-  /**
-   * Compares values across two series with the {@code same} native type based on index. The
-   * semantics follow {@code Long.compare()} (and similar) in Java.
+   * <br/><b>Note:</b> the transparent conversion may cause different behavior between
+   * {@code this.compare(that)} and {@code that.compare(this)}.
    *
    * @param that other series with same native type (may reference itself)
    * @param indexThis index in this series
@@ -406,14 +392,205 @@ public abstract class Series {
   abstract int compare(Series that, int indexThis, int indexThat);
 
   /**
+   * Returns an array of indices with a size equal to the series size, such that the values
+   * references by the indices are sorted in ascending order.
+   *
+   * <br/><b>NOTE:</b> output can be used directly by {@code project()} to create a sorted copy of the series.
+   *
+   * @return indices of sorted values
+   */
+  abstract int[] sortedIndex();
+
+  /* *************************************************************************
+   * Public interface
+   * *************************************************************************/
+
+  /**
+   * Returns series {@code s} converted to type {@code type} unless native type matches already.
+   *
+   * @param type target type
+   * @return converted series
+   */
+  public final Series get(Series.SeriesType type) {
+    switch(type) {
+      case DOUBLE:
+        return this.getDoubles();
+      case LONG:
+        return this.getLongs();
+      case BOOLEAN:
+        return this.getBooleans();
+      case STRING:
+        return this.getStrings();
+      default:
+        throw new IllegalArgumentException(String.format("Unknown series type '%s'", type));
+    }
+  }
+
+  /**
+   * Returns a the series as DoubleSeries. The underlying series is converted
+   * transparently if the series' native type is different.
+   *
+   * @return DoubleSeries equivalent
+   */
+  public DoubleSeries getDoubles() {
+    double[] values = new double[this.size()];
+    for(int i=0; i<this.size(); i++) {
+      values[i] = this.getDouble(i);
+    }
+    return DoubleSeries.buildFrom(values);
+  }
+
+  /**
+   * Returns the series as LongSeries. The underlying series is converted
+   * transparently if the series' native type is different.
+   *
+   * @return LongSeries equivalent
+   */
+  public LongSeries getLongs() {
+    long[] values = new long[this.size()];
+    for(int i=0; i<this.size(); i++) {
+      values[i] = this.getLong(i);
+    }
+    return LongSeries.buildFrom(values);
+  }
+
+  /**
+   * Returns the series as BooleanSeries. The underlying series is converted
+   * transparently if the series' native type is different.
+   *
+   * @return BooleanSeries equivalent
+   */
+  public BooleanSeries getBooleans() {
+    byte[] values = new byte[this.size()];
+    for(int i=0; i<this.size(); i++) {
+      values[i] = this.getBoolean(i);
+    }
+    return BooleanSeries.buildFrom(values);
+  }
+
+  /**
+   * Returns the series as StringSeries. The underlying series is converted
+   * transparently if the series' native type is different.
+   *
+   * @return StringSeries equivalent
+   */
+  public StringSeries getStrings() {
+    String[] values = new String[this.size()];
+    for(int i=0; i<this.size(); i++) {
+      values[i] = this.getString(i);
+    }
+    return StringSeries.buildFrom(values);
+  }
+
+  /**
+   * Returns as copy of the series with the same native type.
+   *
+   * @return series copy
+   */
+  public Series copy() {
+    return this.slice(0, this.size());
+  }
+
+  /**
+   * Returns a copy of the series with values from {@code other}
+   * appended at the end. If {@code other} has different native types they are
+   * converted transparently.
+   *
+   * <br/><b>NOTE:</b> newSize = oldSize + otherSize
+   *
+   * @param other other series to append at the end
+   * @return concatenated series
+   */
+  public Series append(Series... other) {
+    return builderForType(this.type()).addSeries(this).addSeries(other).build();
+  }
+
+  /**
+   * Fills {@code null} values in the series with a copy of the last valid value. The index
+   * is traversed in ascending order. If the last valid value does not exist (such as for the
+   * first element in a series) it is left at {@code null}.
+   *
+   * @return forward filled series
+   */
+  public Series fillNullForward() {
+    int lastValueIndex = -1;
+    int[] fromIndex = new int[this.size()];
+    for(int i=0; i<this.size(); i++) {
+      if(!isNull(i))
+        lastValueIndex = i;
+      fromIndex[i] = lastValueIndex;
+    }
+    return this.project(fromIndex);
+  }
+
+  /**
+   * Fills {@code null} values in the series with a copy of the last valid value. The index
+   * is traversed in descending order. If the last valid value does not exist (such as for the
+   * last element in a series) it is left at {@code null}.
+   *
+   * @return backward filled series
+   */
+  public Series fillNullBackward() {
+    int lastValueIndex = -1;
+    int[] fromIndex = new int[this.size()];
+    for(int i=this.size()-1; i>=0; i--) {
+      if(!isNull(i))
+        lastValueIndex = i;
+      fromIndex[i] = lastValueIndex;
+    }
+    return this.project(fromIndex);
+  }
+
+  /**
+   * Returns a copy of the series with all values' indices
+   * shifted by {@code offset} positions while
+   * leaving the series size unchanged. Values shifted outside to upper (or lower)
+   * bounds of the series are dropped. Vacated positions are padded with {@code null}.
+   *
+   * <br/><b>NOTE:</b> for each value, newIndex = oldIndex + offset
+   *
+   * @param offset offset to shift values by. Can be positive or negative.
+   * @return shifted series copy
+   */
+  // NOTE: override for performance
+  public Series shift(int offset) {
+    int[] fromIndex = new int[this.size()];
+    int from = 0;
+    for(int i=0; i<Math.min(offset, this.size()); i++) {
+      fromIndex[from++] = -1;
+    }
+    for(int i=Math.max(offset, 0); i<Math.max(Math.min(this.size() + offset, this.size()), 0); i++) {
+      fromIndex[from++] = i - offset;
+    }
+    for(int i=Math.max(this.size() + offset, 0); i<this.size(); i++) {
+      fromIndex[from++] = -1;
+    }
+    return this.project(fromIndex);
+  }
+
+  /**
    * Returns {@code true} is there are no values in the series. Otherwise returns {@code false}.
    *
-   * <b>NOTE:</b> {@code null} values count as elements.
+   * <br/><b>NOTE:</b> {@code null} values count as elements.
    *
    * @return {@code true} if empty, {@code false} otherwise
    */
-  public boolean isEmpty() {
+  public final boolean isEmpty() {
     return this.size() <= 0;
+  }
+
+  /**
+   * Returns {@code true} if the series contains at least one {@code null}. Otherwise
+   * returns {@code false}.
+   *
+   * @return {@code true} if empty, {@code false} otherwise
+   */
+  public final boolean hasNull() {
+    for(int i=0; i<this.size(); i++) {
+      if(isNull(i))
+        return true;
+    }
+    return false;
   }
 
   /**
@@ -466,18 +643,6 @@ public abstract class Series {
   }
 
   /**
-   * Returns a copy of the series with values ordered
-   * in ascending order.
-   *
-   * <b>NOTE:</b> BooleanSeries interprets {@code false} as smaller than {@code true}.
-   *
-   * @return sorted series copy
-   */
-  public Series sorted() {
-    return this.project(this.sortedIndex());
-  }
-
-  /**
    * Returns a copy of the series with elements in reverse order from the original series.
    *
    * @return reversed series
@@ -510,43 +675,59 @@ public abstract class Series {
     }
 
     int[] fromIndex = ArrayUtils.toPrimitive(indices.toArray(new Integer[indices.size()]));
+    return sorted.project(fromIndex);
+  }
+
+  /**
+   * Returns a copy of the series omitting any {@code null} values.
+   *
+   * @return series copy without {@code nulls}
+   */
+  public Series dropNull() {
+    int[] fromIndex = new int[this.size()];
+    int count = 0;
+    for(int i=0; i<this.size(); i++) {
+      if(!isNull(i))
+        fromIndex[count++] = i;
+    }
     return this.project(fromIndex);
   }
 
-  /**
-   * Applies {@code conditional} to the series row by row and returns the results as a BooleanSeries.
-   * If the series' native type does not match the required input type of {@code conditional},
-   * the series is converted transparently.
-   *
-   * @param conditional condition to apply to each element in the series
-   * @return BooleanSeries with evaluation results
-   */
-  public BooleanSeries map(DoubleConditional conditional) {
-    return this.getDoubles().map(conditional);
-  }
+  //
+  // NOTE: co-variant method messiness
+  //
 
   /**
-   * Applies a {@code conditional} to the series row by row and returns the results as a BooleanSeries.
-   * If the series' native type does not match the required input type of {@code conditional},
-   * the series is converted transparently.
+   * Applies {@code function} to the series row by row and returns the results as a new series.
+   * If the series' native types do not match the required input type of {@code function},
+   * the series are converted transparently. The native type of the returned series is
+   * determined by {@code function}'s output type.
    *
-   * @param conditional condition to apply to each element in the series
-   * @return BooleanSeries with evaluation results
+   * @param function function to apply to each row
+   * @param series series to apply function to
+   * @return series with evaluation results
    */
-  public BooleanSeries map(LongConditional conditional) {
-    return this.getLongs().map(conditional);
-  }
-
-  /**
-   * Applies a {@code conditional} to the series row by row and returns the results as a BooleanSeries.
-   * If the series' native type does not match the required input type of {@code conditional},
-   * the series is converted transparently.
-   *
-   * @param conditional condition to apply to each element in the series
-   * @return BooleanSeries with evaluation results
-   */
-  public BooleanSeries map(StringConditional conditional) {
-    return this.getStrings().map(conditional);
+  public static Series map(Function function, Series... series) {
+    if(function instanceof DoubleFunction) {
+      return DoubleSeries.map((DoubleFunction)function, series);
+    } else if(function instanceof LongFunction) {
+      return LongSeries.map((LongFunction)function, series);
+    } else if(function instanceof StringFunction) {
+      return StringSeries.map((StringFunction)function, series);
+    } else if(function instanceof BooleanFunction) {
+      return BooleanSeries.map((BooleanFunction)function, series);
+    } else if(function instanceof BooleanFunctionEx) {
+      return BooleanSeries.map((BooleanFunctionEx)function, series);
+    } else if(function instanceof DoubleConditional) {
+      return DoubleSeries.map((DoubleConditional)function, series);
+    } else if(function instanceof LongConditional) {
+      return LongSeries.map((LongConditional)function, series);
+    } else if(function instanceof StringConditional) {
+      return StringSeries.map((StringConditional)function, series);
+    } else if(function instanceof BooleanConditional) {
+      return BooleanSeries.map((BooleanConditional)function, series);
+    }
+    throw new IllegalArgumentException(String.format("Unknown function type '%s'", function.getClass()));
   }
 
   /**
@@ -555,51 +736,79 @@ public abstract class Series {
    * the series is converted transparently. The native type of the returned series is
    * determined by {@code function}'s output type.
    *
-   * @param function function to apply to each element in the series
+   * @param function function to map to each element in the series
    * @return series with evaluation results
    */
-  public DoubleSeries map(DoubleFunction function) {
-    return this.getDoubles().map(function);
+  public final Series map(Function function) {
+    return map(function, this);
   }
 
   /**
-   * Applies {@code function} to the series row by row and returns the results as a new series.
-   * If the series' native type does not match the required input type of {@code function},
-   * the series is converted transparently. The native type of the returned series is
-   * determined by {@code function}'s output type.
-   *
-   * @param function function to apply to each element in the series
-   * @return series with evaluation results
+   * @see Series#map(Function)
    */
-  public LongSeries map(LongFunction function) {
-    return this.getLongs().map(function);
+  public final DoubleSeries map(DoubleFunction function) {
+    return (DoubleSeries)map(function, this);
   }
 
   /**
-   * Applies {@code function} to the series row by row and returns the results as a new series.
-   * If the series' native type does not match the required input type of {@code function},
-   * the series is converted transparently. The native type of the returned series is
-   * determined by {@code function}'s output type.
-   *
-   * @param function function to apply to each element in the series
-   * @return series with evaluation results
+   * @see Series#map(Function)
    */
-  public StringSeries map(StringFunction function) {
-    return this.getStrings().map(function);
+  public final LongSeries map(LongFunction function) {
+    return (LongSeries)map(function, this);
   }
 
   /**
-   * Applies {@code function} to the series row by row and returns the results as a new series.
-   * If the series' native type does not match the required input type of {@code function},
-   * the series is converted transparently. The native type of the returned series is
-   * determined by {@code function}'s output type.
-   *
-   * @param function function to apply to each element in the series
-   * @return series with evaluation results
+   * @see Series#map(Function)
    */
-  public BooleanSeries map(BooleanFunction function) {
-    return this.getBooleans().map(function);
+  public final StringSeries map(StringFunction function) {
+    return (StringSeries)map(function, this);
   }
+
+  /**
+   * @see Series#map(Function)
+   */
+  public final BooleanSeries map(BooleanFunction function) {
+    return (BooleanSeries)map(function, this);
+  }
+
+  /**
+   * @see Series#map(Function)
+   */
+  public final BooleanSeries map(BooleanFunctionEx function) {
+    return (BooleanSeries)map(function, this);
+  }
+
+  /**
+   * @see Series#map(Function)
+   */
+  public final BooleanSeries map(DoubleConditional function) {
+    return (BooleanSeries)map(function, this);
+  }
+
+  /**
+   * @see Series#map(Function)
+   */
+  public final BooleanSeries map(LongConditional function) {
+    return (BooleanSeries)map(function, this);
+  }
+
+  /**
+   * @see Series#map(Function)
+   */
+  public final BooleanSeries map(StringConditional function) {
+    return (BooleanSeries)map(function, this);
+  }
+
+  /**
+   * @see Series#map(Function)
+   */
+  public final BooleanSeries map(BooleanConditional function) {
+    return (BooleanSeries)map(function, this);
+  }
+
+  //
+  // NOTE: co-variant method messiness
+  //
 
   /**
    * Applies {@code function} as aggregation function to all values in the series at once and
@@ -608,74 +817,104 @@ public abstract class Series {
    * the series is converted transparently. The native type of the returned series is
    * determined by {@code function}'s output type.
    *
-   * @param function aggregation function to apply to the series
+   * @param function aggregation function to map to the series
    * @return single element series
    */
-  public DoubleSeries aggregate(DoubleFunction function) {
-    return this.getDoubles().aggregate(function);
+  public final Series aggregate(Function function) {
+    if(function instanceof DoubleFunction) {
+      return DoubleSeries.aggregate((DoubleFunction)function, this);
+    } else if(function instanceof LongFunction) {
+      return LongSeries.aggregate((LongFunction)function, this);
+    } else if(function instanceof StringFunction) {
+      return StringSeries.aggregate((StringFunction)function, this);
+    } else if(function instanceof BooleanFunction) {
+      return BooleanSeries.aggregate((BooleanFunction)function, this);
+    } else if(function instanceof BooleanFunctionEx) {
+      return BooleanSeries.aggregate((BooleanFunctionEx)function, this);
+    } else if(function instanceof DoubleConditional) {
+      return DoubleSeries.aggregate((DoubleConditional)function, this);
+    } else if(function instanceof LongConditional) {
+      return LongSeries.aggregate((LongConditional)function, this);
+    } else if(function instanceof StringConditional) {
+      return StringSeries.aggregate((StringConditional)function, this);
+    } else if(function instanceof BooleanConditional) {
+      return BooleanSeries.aggregate((BooleanConditional)function, this);
+    }
+    throw new IllegalArgumentException(String.format("Unknown function type '%s'", function.getClass()));
   }
 
   /**
-   * Applies {@code function} as aggregation function to all values in the series at once and
-   * returns the result as a new series with a single element.
-   * If the series' native type does not match the required input type of {@code function},
-   * the series is converted transparently. The native type of the returned series is
-   * determined by {@code function}'s output type.
-   *
-   * @param function aggregation function to apply to the series
-   * @return single element series
+   * @see Series#aggregate(Function)
    */
-  public LongSeries aggregate(LongFunction function) {
-    return this.getLongs().aggregate(function);
+  public final DoubleSeries aggregate(DoubleFunction function) {
+    return (DoubleSeries)this.aggregate((Function)function);
   }
 
   /**
-   * Applies {@code function} as aggregation function to all values in the series at once and
-   * returns the result as a new series with a single element.
-   * If the series' native type does not match the required input type of {@code function},
-   * the series is converted transparently. The native type of the returned series is
-   * determined by {@code function}'s output type.
-   *
-   * @param function aggregation function to apply to the series
-   * @return single element series
+   * @see Series#aggregate(Function)
    */
-  public StringSeries aggregate(StringFunction function) {
-    return this.getStrings().aggregate(function);
+  public final LongSeries aggregate(LongFunction function) {
+    return (LongSeries)this.aggregate((Function)function);
   }
 
   /**
-   * Applies {@code function} as aggregation function to all values in the series at once and
-   * returns the result as a new series with a single element.
-   * If the series' native type does not match the required input type of {@code function},
-   * the series is converted transparently. The native type of the returned series is
-   * determined by {@code function}'s output type.
-   *
-   * @param function aggregation function to apply to the series
-   * @return single element series
+   * @see Series#aggregate(Function)
    */
-  public BooleanSeries aggregate(BooleanFunction function) {
-    return this.getBooleans().aggregate(function);
+  public final StringSeries aggregate(StringFunction function) {
+    return (StringSeries)this.aggregate((Function)function);
   }
 
   /**
-   * Returns a copy of the series with a native type corresponding to {@code type}.
-   *
-   * @param type series copy native type
-   * @return series copy with native type {@code type}
+   * @see Series#aggregate(Function)
    */
-  public Series toType(SeriesType type) {
-    return DataFrame.asType(this, type);
+  public final BooleanSeries aggregate(BooleanFunction function) {
+    return (BooleanSeries)this.aggregate((Function)function);
+  }
+
+  /**
+   * @see Series#aggregate(Function)
+   */
+  public final BooleanSeries aggregate(BooleanFunctionEx function) {
+    return (BooleanSeries)this.aggregate((Function)function);
+  }
+
+  /**
+   * @see Series#aggregate(Function)
+   */
+  public final BooleanSeries aggregate(DoubleConditional function) {
+    return (BooleanSeries)this.aggregate((Function)function);
+  }
+
+  /**
+   * @see Series#aggregate(Function)
+   */
+  public final BooleanSeries aggregate(LongConditional function) {
+    return (BooleanSeries)this.aggregate((Function)function);
+  }
+
+  /**
+   * @see Series#aggregate(Function)
+   */
+  public final BooleanSeries aggregate(StringConditional function) {
+    return (BooleanSeries)this.aggregate((Function)function);
+  }
+
+  /**
+   * @see Series#aggregate(Function)
+   */
+  public final BooleanSeries aggregate(BooleanConditional function) {
+    return (BooleanSeries)this.aggregate((Function)function);
   }
 
   /**
    * Returns a SeriesGrouping based on value. Elements are grouped into separate buckets for each
    * distinct value in the series.
    *
-   * <b>NOTE:</b> the resulting keys are equivalent to calling {@code unique()} on the series.
+   * <br/><b>NOTE:</b> the resulting keys are equivalent to calling {@code unique()} on the series.
    *
    * @return grouping by value
    */
-  public SeriesGrouping groupByValue() {
+  public final SeriesGrouping groupByValue() {
     if(this.isEmpty())
       return new SeriesGrouping(this);
 
@@ -702,12 +941,12 @@ public abstract class Series {
    * based on a greedy algorithm with fixed bucket size. The size of all buckets (except for the
    * last) is guaranteed to be equal to {@code bucketSize}.
    *
-   * <b>NOTE:</b> the series is not sorted before grouping.
+   * <br/><b>NOTE:</b> the series is not sorted before grouping.
    *
    * @param bucketSize maximum number of elements per bucket
    * @return grouping by element count
    */
-  public SeriesGrouping groupByCount(int bucketSize) {
+  public final SeriesGrouping groupByCount(int bucketSize) {
     if(bucketSize <= 0)
       throw new IllegalArgumentException("bucketSize must be greater than 0");
     if(this.isEmpty())
@@ -736,12 +975,12 @@ public abstract class Series {
    * based on a greedy algorithm to approximately evenly fill buckets. The number of buckets
    * is guaranteed to be equal to {@code partitionCount} even if some remain empty.
    *
-   * <b>NOTE:</b> the series is not sorted before grouping.
+   * <br/><b>NOTE:</b> the series is not sorted before grouping.
    *
    * @param partitionCount number of buckets
    * @return grouping by bucket count
    */
-  public SeriesGrouping groupByPartitions(int partitionCount) {
+  public final SeriesGrouping groupByPartitions(int partitionCount) {
     if(partitionCount <= 0)
       throw new IllegalArgumentException("partitionCount must be greater than 0");
     if(this.isEmpty())
@@ -765,10 +1004,51 @@ public abstract class Series {
   }
 
   /**
+   * Returns a concatenation of {@code series} as a new series with a native type equal
+   * to the first series. If subsequent series have different native types they are
+   * converted transparently.
+   *
+   * @param series series to concatenate
+   * @return concatenated series
+   */
+  public static Series concatenate(Series... series) {
+    if(series.length <= 0)
+      throw new IllegalArgumentException("Must concatenate at least one series");
+
+    Series first = series[0];
+    Series[] rest = Arrays.copyOfRange(series, 1, series.length);
+
+    return first.append(rest);
+  }
+
+  /* *************************************************************************
+   * Internal interface
+   * *************************************************************************/
+
+  /**
+   * Returns an array of indices with size less than or equal to the series size, such that
+   * each index references a null value in the original series.
+   *
+   * @return indices of null values
+   */
+  int[] nullIndex() {
+    int[] nulls = new int[this.size()];
+    int count = 0;
+    for(int i=0; i<this.size(); i++) {
+      if(isNull(i)) {
+        nulls[count++] = i;
+      }
+    }
+    return Arrays.copyOf(nulls, count);
+  }
+
+  /**
    * Returns index tuples (pairs) for a join performed based on value.
    *
-   * <b>NOTE:</b> the implementation uses merge join. Thus, the index pairs reference
+   * <br/><b>NOTE:</b> the implementation uses merge join. Thus, the index pairs reference
    * values in ascending order.
+   *
+   * @see Series#compare(Series, int, int)
    *
    * @param other series to match values against
    * @param type type of join to perform
@@ -776,16 +1056,14 @@ public abstract class Series {
    */
   List<JoinPair> join(Series other, JoinType type) {
     // NOTE: merge join
-    Series that = other.toType(this.type());
-
     int[] lref = this.sortedIndex();
-    int[] rref = that.sortedIndex();
+    int[] rref = other.sortedIndex();
 
     List<JoinPair> pairs = new ArrayList<>();
     int i = 0;
     int j = 0;
-    while(i < this.size() || j < that.size()) {
-      if(j >= that.size() || (i < this.size() && this.compare(that, lref[i], rref[j]) < 0)) {
+    while(i < this.size() || j < other.size()) {
+      if(j >= other.size() || (i < this.size() && this.compare(other, lref[i], rref[j]) < 0)) {
         switch(type) {
           case LEFT:
           case OUTER:
@@ -793,7 +1071,7 @@ public abstract class Series {
           default:
         }
         i++;
-      } else if(i >= this.size() || (j < that.size() && this.compare(that, lref[i], rref[j]) > 0)) {
+      } else if(i >= this.size() || (j < other.size() && this.compare(other, lref[i], rref[j]) > 0)) {
         switch(type) {
           case RIGHT:
           case OUTER:
@@ -801,7 +1079,7 @@ public abstract class Series {
           default:
         }
         j++;
-      } else if(i < this.size() && j < that.size()) {
+      } else if(i < this.size() && j < other.size()) {
         // generate cross product
 
         // count similar values on the left
@@ -812,7 +1090,7 @@ public abstract class Series {
 
         // count similar values on the right
         int rcount = 1;
-        while(j + rcount < that.size() && that.compare(that, rref[j + rcount], rref[j + rcount - 1]) == 0) {
+        while(j + rcount < other.size() && other.compare(other, rref[j + rcount], rref[j + rcount - 1]) == 0) {
           rcount++;
         }
 
@@ -829,5 +1107,69 @@ public abstract class Series {
 
     return pairs;
   }
+
+  static Builder builderForFunction(Function function) {
+    if(function instanceof DoubleFunction) {
+      return DoubleSeries.builder();
+    } else if(function instanceof LongFunction) {
+      return LongSeries.builder();
+    } else if(function instanceof StringFunction) {
+      return StringSeries.builder();
+    } else if(function instanceof BooleanFunction) {
+      return BooleanSeries.builder();
+    } else if(function instanceof BooleanFunctionEx) {
+      return BooleanSeries.builder();
+    } else if(function instanceof DoubleConditional) {
+      return BooleanSeries.builder();
+    } else if(function instanceof LongConditional) {
+      return BooleanSeries.builder();
+    } else if(function instanceof StringConditional) {
+      return BooleanSeries.builder();
+    } else if(function instanceof BooleanConditional) {
+      return BooleanSeries.builder();
+    }
+    throw new IllegalArgumentException(String.format("Unknown function type '%s'", function.getClass()));
+  }
+
+  static Builder builderForType(SeriesType type) {
+    switch(type) {
+      case DOUBLE:
+        return DoubleSeries.builder();
+      case LONG:
+        return LongSeries.builder();
+      case STRING:
+        return StringSeries.builder();
+      case BOOLEAN:
+        return BooleanSeries.builder();
+      default:
+        throw new IllegalArgumentException(String.format("Unknown series type '%s'", type));
+    }
+  }
+
+  /* **************************************************************************
+   * Code grave
+   ***************************************************************************/
+
+// NOTE: too slow
+//  public Series sorted() {
+//    return this.project(this.sortedIndex());
+//  }
+
+// NOTE: too slow
+//  int[] sortedIndex() {
+//    Integer[] fromIndex = new Integer[this.size()];
+//    for(int i=0; i<this.size(); i++)
+//      fromIndex[i] = i;
+//
+//    final Series s = this;
+//    Arrays.sort(fromIndex, new Comparator<Integer>() {
+//      @Override
+//      public int compare(Integer o1, Integer o2) {
+//        return s.compare(s, o1, o2);
+//      }
+//    });
+//
+//    return ArrayUtils.toPrimitive(fromIndex);
+//  }
 
 }

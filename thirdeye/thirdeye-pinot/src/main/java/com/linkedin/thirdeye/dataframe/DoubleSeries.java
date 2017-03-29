@@ -6,41 +6,37 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import org.apache.commons.lang.ArrayUtils;
 
 
 /**
  * Series container for primitive double.
  */
-public final class DoubleSeries extends Series {
+public final class DoubleSeries extends TypedSeries<DoubleSeries> {
   public static final double NULL_VALUE = Double.NaN;
 
-  // CAUTION: The array is final, but values are inherently modifiable
-  final double[] values;
-
-  public static class DoubleBatchSum implements DoubleFunction {
+  public static class DoubleBatchSum implements Series.DoubleFunction {
     @Override
     public double apply(double[] values) {
       // TODO sorted, add low to high for accuracy
       double sum = 0.0d;
       for(double v : values)
-        if(!isNull(v))
+        if(!DoubleSeries.isNull(v))
           sum += v;
       return sum;
     }
   }
 
-  public static class DoubleBatchMean implements DoubleFunction {
+  public static class DoubleBatchMean implements Series.DoubleFunction {
     @Override
     public double apply(double[] values) {
       if(values.length <= 0)
-        return NULL_VALUE;
+        return DoubleSeries.NULL_VALUE;
 
       // TODO sorted, add low to high for accuracy
       double sum = 0.0d;
       int count = 0;
       for(double v : values) {
-        if (!isNull(v)) {
+        if (!DoubleSeries.isNull(v)) {
           sum += v;
           count++;
         }
@@ -49,64 +45,67 @@ public final class DoubleSeries extends Series {
     }
   }
 
-  public static class DoubleBatchLast implements DoubleFunction {
+  public static class DoubleBatchLast implements Series.DoubleFunction {
     @Override
     public double apply(double[] values) {
       if(values.length <= 0)
-        return NULL_VALUE;
+        return DoubleSeries.NULL_VALUE;
       return values[values.length - 1];
     }
   }
 
-  public static class Builder {
-    final List<Double> values = new ArrayList<>();
+  public static class Builder extends Series.Builder {
+    final List<double[]> arrays = new ArrayList<>();
 
     private Builder() {
       // left blank
     }
 
-    public Builder add(double value) {
-      this.values.add(value);
+    public Builder addValues(double... values) {
+      this.arrays.add(values);
       return this;
     }
 
-    public Builder add(Double value) {
-      if(value == null) {
-        this.values.add(NULL_VALUE);
-      } else {
-        this.values.add(value);
-      }
-      return this;
+    public Builder addValues(double value) {
+      return this.addValues(new double[] { value });
     }
 
-    public Builder add(double... values) {
-      return this.add(ArrayUtils.toObject(values));
-    }
-
-    public Builder add(Double... values) {
-      for(Double v : values)
-        this.add(v);
-      return this;
-    }
-
-    public Builder add(Collection<Double> values) {
-      for(Double v : values)
-        this.add(v);
-      return this;
-    }
-
-    public Builder add(DoubleSeries series) {
-      for(double v : series.values)
-        this.add(v);
-      return this;
-    }
-
-    public DoubleSeries build() {
-      double[] values = new double[this.values.size()];
+    public Builder addValues(Collection<Double> values) {
+      double[] newValues = new double[values.size()];
       int i = 0;
-      for(Double v : this.values) {
-        values[i++] = v;
+      for(Double v : values)
+        newValues[i++] = valueOf(v);
+      return this.addValues(newValues);
+    }
+
+    public Builder addValues(Double... values) {
+      return this.addValues(Arrays.asList(values));
+    }
+
+    public Builder addValues(Double value) {
+      return this.addValues(new double[] { valueOf(value) });
+    }
+
+    @Override
+    public Builder addSeries(Collection<Series> series) {
+      for(Series s : series)
+        this.addValues(s.getDoubles().values);
+      return this;
+    }
+
+    @Override
+    public DoubleSeries build() {
+      int totalSize = 0;
+      for(double[] array : this.arrays)
+        totalSize += array.length;
+
+      int offset = 0;
+      double[] values = new double[totalSize];
+      for(double[] array : this.arrays) {
+        System.arraycopy(array, 0, values, offset, array.length);
+        offset += array.length;
       }
+
       return new DoubleSeries(values);
     }
   }
@@ -119,21 +118,15 @@ public final class DoubleSeries extends Series {
     return new DoubleSeries(values);
   }
 
-  public static DoubleSeries buildFrom(Collection<Double> values) {
-    return builder().add(values).build();
-  }
-
   public static DoubleSeries empty() {
     return new DoubleSeries();
   }
 
+  // CAUTION: The array is final, but values are inherently modifiable
+  final double[] values;
+
   private DoubleSeries(double... values) {
     this.values = values;
-  }
-
-  @Override
-  public DoubleSeries copy() {
-    return buildFrom(Arrays.copyOf(this.values, this.values.length));
   }
 
   @Override
@@ -142,42 +135,50 @@ public final class DoubleSeries extends Series {
   }
 
   @Override
-  public LongSeries getLongs() {
-    long[] values = new long[this.size()];
-    for(int i=0; i<values.length; i++) {
-      if(DoubleSeries.isNull(this.values[i])) {
-        values[i] = LongSeries.NULL_VALUE;
-      } else {
-        values[i] = (long) this.values[i];
-      }
-    }
-    return LongSeries.buildFrom(values);
+  public double getDouble(int index) {
+    return getDouble(this.values[index]);
+  }
+
+  public static double getDouble(double value) {
+    return value;
   }
 
   @Override
-  public BooleanSeries getBooleans() {
-    byte[] values = new byte[this.size()];
-    for(int i=0; i<values.length; i++) {
-      if(DoubleSeries.isNull(this.values[i])) {
-        values[i] = BooleanSeries.NULL_VALUE;
-      } else {
-        values[i] = BooleanSeries.valueOf(this.values[i] != 0.0d);
-      }
-    }
-    return BooleanSeries.buildFrom(values);
+  public long getLong(int index) {
+    return getLong(this.values[index]);
+  }
+
+  public static long getLong(double value) {
+    if(DoubleSeries.isNull(value))
+      return LongSeries.NULL_VALUE;
+    return (long) value;
   }
 
   @Override
-  public StringSeries getStrings() {
-    String[] values = new String[this.size()];
-    for(int i=0; i<values.length; i++) {
-      if(DoubleSeries.isNull(this.values[i])) {
-        values[i] = StringSeries.NULL_VALUE;
-      } else {
-        values[i] = String.valueOf(this.values[i]);
-      }
-    }
-    return StringSeries.buildFrom(values);
+  public byte getBoolean(int index) {
+    return getBoolean(this.values[index]);
+  }
+
+  public static byte getBoolean(double value) {
+    if(DoubleSeries.isNull(value))
+      return BooleanSeries.NULL_VALUE;
+    return BooleanSeries.valueOf(value != 0.0d);
+  }
+
+  @Override
+  public String getString(int index) {
+    return getString(this.values[index]);
+  }
+
+  public static String getString(double value) {
+    if(DoubleSeries.isNull(value))
+      return StringSeries.NULL_VALUE;
+    return String.valueOf(value);
+  }
+
+  @Override
+  public boolean isNull(int index) {
+    return isNull(this.values[index]);
   }
 
   @Override
@@ -192,27 +193,6 @@ public final class DoubleSeries extends Series {
 
   public double[] values() {
     return this.values;
-  }
-
-  @Override
-  public DoubleSeries unique() {
-    if(this.values.length <= 0)
-      return buildFrom();
-
-    double[] values = Arrays.copyOf(this.values, this.values.length);
-    Arrays.sort(values);
-
-    // first is always unique
-    int uniqueCount = 1;
-
-    for(int i=1; i<values.length; i++) {
-      if(values[i-1] != values[i]) {
-        values[uniqueCount] = values[i];
-        uniqueCount++;
-      }
-    }
-
-    return buildFrom(Arrays.copyOf(values, uniqueCount));
   }
 
   /**
@@ -240,75 +220,6 @@ public final class DoubleSeries extends Series {
   @Override
   public DoubleSeries slice(int from, int to) {
     return buildFrom(Arrays.copyOfRange(this.values, from, to));
-  }
-
-  @Override
-  public DoubleSeries head(int n) {
-    return (DoubleSeries)super.head(n);
-  }
-
-  @Override
-  public DoubleSeries tail(int n) {
-    return (DoubleSeries)super.tail(n);
-  }
-
-  @Override
-  public DoubleSeries sliceFrom(int from) {
-    return (DoubleSeries)super.sliceFrom(from);
-  }
-
-  @Override
-  public DoubleSeries sliceTo(int to) {
-    return (DoubleSeries)super.sliceTo(to);
-  }
-
-  @Override
-  public DoubleSeries reverse() {
-    return (DoubleSeries)super.reverse();
-  }
-
-  @Override
-  public DoubleSeries sorted() {
-    return (DoubleSeries)super.sorted();
-  }
-
-  @Override
-  public DoubleSeries map(DoubleFunction function) {
-    double[] newValues = new double[this.values.length];
-    for(int i=0; i<this.values.length; i++) {
-      if(isNull(this.values[i])) {
-        newValues[i] = NULL_VALUE;
-      } else {
-        newValues[i] = function.apply(this.values[i]);
-      }
-    }
-    return buildFrom(newValues);
-  }
-
-  @Override
-  public BooleanSeries map(DoubleConditional conditional) {
-    byte[] newValues = new byte[this.values.length];
-    for(int i=0; i<this.values.length; i++) {
-      if(isNull(this.values[i])) {
-        newValues[i] = BooleanSeries.NULL_VALUE;
-      } else {
-        newValues[i] = BooleanSeries.valueOf(conditional.apply(this.values[i]));
-      }
-    }
-    return BooleanSeries.buildFrom(newValues);
-  }
-
-  @Override
-  public DoubleSeries aggregate(DoubleFunction function) {
-    return buildFrom(function.apply(this.values));
-  }
-
-  @Override
-  public DoubleSeries append(Series series) {
-    double[] values = new double[this.size() + series.size()];
-    System.arraycopy(this.values, 0, values, 0, this.size());
-    System.arraycopy(series.getDoubles().values, 0, values, this.size(), series.size());
-    return buildFrom(values);
   }
 
   public DoubleSeries applyMovingWindow(int size, int minSize, DoubleFunction function) {
@@ -391,19 +302,6 @@ public final class DoubleSeries extends Series {
   }
 
   @Override
-  public DoubleSeries shift(int offset) {
-    double[] values = new double[this.values.length];
-    if(offset >= 0) {
-      Arrays.fill(values, 0, Math.min(offset, values.length), NULL_VALUE);
-      System.arraycopy(this.values, 0, values, Math.min(offset, values.length), Math.max(values.length - offset, 0));
-    } else {
-      System.arraycopy(this.values, Math.min(-offset, values.length), values, 0, Math.max(values.length + offset, 0));
-      Arrays.fill(values, Math.max(values.length + offset, 0), values.length, NULL_VALUE);
-    }
-    return buildFrom(values);
-  }
-
-  @Override
   DoubleSeries project(int[] fromIndex) {
     double[] values = new double[fromIndex.length];
     for(int i=0; i<fromIndex.length; i++) {
@@ -414,51 +312,6 @@ public final class DoubleSeries extends Series {
       }
     }
     return buildFrom(values);
-  }
-
-  @Override
-  int[] sortedIndex() {
-    List<DoubleSortTuple> tuples = new ArrayList<>();
-    for(int i=0; i<this.values.length; i++) {
-      tuples.add(new DoubleSortTuple(this.values[i], i));
-    }
-
-    Collections.sort(tuples, new Comparator<DoubleSortTuple>() {
-      @Override
-      public int compare(DoubleSortTuple a, DoubleSortTuple b) {
-        return nullSafeDoubleComparator(a.value, b.value);
-      }
-    });
-
-    int[] fromIndex = new int[tuples.size()];
-    for(int i=0; i<tuples.size(); i++) {
-      fromIndex[i] = tuples.get(i).index;
-    }
-    return fromIndex;
-  }
-
-  @Override
-  public boolean hasNull() {
-    for(double v : this.values) {
-      if(isNull(v))
-        return true;
-    }
-    return false;
-  }
-
-  @Override
-  int[] nullIndex() {
-    int[] nulls = new int[this.values.length];
-    int nullCount = 0;
-
-    for(int i=0; i<this.values.length; i++) {
-      if(isNull(this.values[i])) {
-        nulls[nullCount] = i;
-        nullCount++;
-      }
-    }
-
-    return Arrays.copyOf(nulls, nullCount);
   }
 
   @Override
@@ -477,7 +330,121 @@ public final class DoubleSeries extends Series {
 
   @Override
   int compare(Series that, int indexThis, int indexThat) {
-    return nullSafeDoubleComparator(this.values[indexThis], ((DoubleSeries)that).values[indexThat]);
+    return nullSafeDoubleComparator(this.values[indexThis], that.getDouble(indexThat));
+  }
+
+  /**
+   * @see DataFrame#map(Series.Function, Series...)
+   */
+  public static DoubleSeries map(DoubleFunction function, Series... series) {
+    if(series.length <= 0)
+      return empty();
+
+    DataFrame.assertSameLength(series);
+
+    // Note: code-specialization to help hot-spot vm
+    if(series.length == 1)
+      return map(function, series[0]);
+    if(series.length == 2)
+      return map(function, series[0], series[1]);
+    if(series.length == 3)
+      return map(function, series[0], series[1], series[2]);
+
+    double[] input = new double[series.length];
+    double[] output = new double[series[0].size()];
+    for(int i=0; i<series[0].size(); i++) {
+      output[i] = mapRow(function, series, input, i);
+    }
+
+    return buildFrom(output);
+  }
+
+  private static double mapRow(DoubleFunction function, Series[] series, double[] input, int row) {
+    for(int j=0; j<series.length; j++) {
+      double value = series[j].getDouble(row);
+      if(isNull(value))
+        return NULL_VALUE;
+      input[j] = value;
+    }
+    return function.apply(input);
+  }
+
+  private static DoubleSeries map(DoubleFunction function, Series a) {
+    double[] output = new double[a.size()];
+    for(int i=0; i<a.size(); i++) {
+      if(a.isNull(i)) {
+        output[i] = NULL_VALUE;
+      } else {
+        output[i] = function.apply(a.getDouble(i));
+      }
+    }
+    return buildFrom(output);
+  }
+
+  private static DoubleSeries map(DoubleFunction function, Series a, Series b) {
+    double[] output = new double[a.size()];
+    for(int i=0; i<a.size(); i++) {
+      if(a.isNull(i) || b.isNull(i)) {
+        output[i] = NULL_VALUE;
+      } else {
+        output[i] = function.apply(a.getDouble(i), b.getDouble(i));
+      }
+    }
+    return buildFrom(output);
+  }
+
+  private static DoubleSeries map(DoubleFunction function, Series a, Series b, Series c) {
+    double[] output = new double[a.size()];
+    for(int i=0; i<a.size(); i++) {
+      if(a.isNull(i) || b.isNull(i) || c.isNull(i)) {
+        output[i] = NULL_VALUE;
+      } else {
+        output[i] = function.apply(a.getDouble(i), b.getDouble(i), c.getDouble(i));
+      }
+    }
+    return buildFrom(output);
+  }
+
+  /**
+   * @see DataFrame#map(Series.Function, Series...)
+   */
+  public static BooleanSeries map(DoubleConditional function, Series... series) {
+    if(series.length <= 0)
+      return BooleanSeries.empty();
+
+    DataFrame.assertSameLength(series);
+
+    double[] input = new double[series.length];
+    byte[] output = new byte[series[0].size()];
+    for(int i=0; i<series[0].size(); i++) {
+      output[i] = mapRow(function, series, input, i);
+    }
+
+    return BooleanSeries.buildFrom(output);
+  }
+
+  private static byte mapRow(DoubleConditional function, Series[] series, double[] input, int row) {
+    for(int j=0; j<series.length; j++) {
+      double value = series[j].getDouble(row);
+      if(isNull(value))
+        return BooleanSeries.NULL_VALUE;
+      input[j] = value;
+    }
+    return BooleanSeries.valueOf(function.apply(input));
+  }
+
+  /**
+   * @see Series#aggregate(Function)
+   */
+  public static DoubleSeries aggregate(DoubleFunction function, Series series) {
+    return buildFrom(function.apply(series.dropNull().getDoubles().values));
+  }
+
+  /**
+   * @see Series#aggregate(Function)
+   */
+  public static BooleanSeries aggregate(DoubleConditional function, Series series) {
+    return BooleanSeries.builder().addBooleanValues(function.apply(series.dropNull().getDoubles().values)).build();
   }
 
   private static int nullSafeDoubleComparator(double a, double b) {
@@ -495,6 +462,12 @@ public final class DoubleSeries extends Series {
     return Arrays.hashCode(this.values);
   }
 
+  public static double valueOf(Double value) {
+    if(value == null)
+      return NULL_VALUE;
+    return value;
+  }
+
   public static boolean isNull(double value) {
     return Double.isNaN(value);
   }
@@ -503,6 +476,60 @@ public final class DoubleSeries extends Series {
     if(values.length <= 0)
       throw new IllegalStateException("Must contain at least one value");
     return values;
+  }
+
+  @Override
+  public DoubleSeries shift(int offset) {
+    double[] values = new double[this.values.length];
+    if(offset >= 0) {
+      Arrays.fill(values, 0, Math.min(offset, values.length), NULL_VALUE);
+      System.arraycopy(this.values, 0, values, Math.min(offset, values.length), Math.max(values.length - offset, 0));
+    } else {
+      System.arraycopy(this.values, Math.min(-offset, values.length), values, 0, Math.max(values.length + offset, 0));
+      Arrays.fill(values, Math.max(values.length + offset, 0), values.length, NULL_VALUE);
+    }
+    return buildFrom(values);
+  }
+
+  @Override
+  public DoubleSeries sorted() {
+    double[] values = Arrays.copyOf(this.values, this.values.length);
+    Arrays.sort(values);
+
+    // order NaNs first
+    int count = 0;
+    while(count < values.length && isNull(values[values.length - count - 1]))
+      count++;
+
+    if(count <= 0 || count >= values.length)
+      return buildFrom(values);
+
+    double[] newValues = new double[values.length];
+    Arrays.fill(newValues, 0, count, Double.NaN);
+    System.arraycopy(values, 0, newValues, count, values.length - count);
+
+    return buildFrom(newValues);
+  }
+
+  @Override
+  int[] sortedIndex() {
+    List<DoubleSortTuple> tuples = new ArrayList<>();
+    for (int i = 0; i < this.values.length; i++) {
+      tuples.add(new DoubleSortTuple(this.values[i], i));
+    }
+
+    Collections.sort(tuples, new Comparator<DoubleSortTuple>() {
+      @Override
+      public int compare(DoubleSortTuple a, DoubleSortTuple b) {
+        return nullSafeDoubleComparator(a.value, b.value);
+      }
+    });
+
+    int[] fromIndex = new int[tuples.size()];
+    for (int i = 0; i < tuples.size(); i++) {
+      fromIndex[i] = tuples.get(i).index;
+    }
+    return fromIndex;
   }
 
   static final class DoubleSortTuple {

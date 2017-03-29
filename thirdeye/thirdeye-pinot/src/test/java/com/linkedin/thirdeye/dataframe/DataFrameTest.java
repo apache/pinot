@@ -1,5 +1,8 @@
 package com.linkedin.thirdeye.dataframe;
 
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -223,27 +226,27 @@ public class DataFrameTest {
 
   @Test
   public void testDoubleBuilderNull() {
-    Assert.assertEquals(DoubleSeries.builder().add((Double)null).build().values(), new double[] { DoubleSeries.NULL_VALUE });
+    Assert.assertEquals(DoubleSeries.builder().addValues((Double)null).build().values(), new double[] { DoubleSeries.NULL_VALUE });
   }
 
   @Test
   public void testLongBuilderNull() {
-    Assert.assertEquals(LongSeries.builder().add((Long)null).build().values(), new long[] { LongSeries.NULL_VALUE });
+    Assert.assertEquals(LongSeries.builder().addValues((Long)null).build().values(), new long[] { LongSeries.NULL_VALUE });
   }
 
   @Test
   public void testStringBuilderNull() {
-    Assert.assertEquals(StringSeries.builder().add((String)null).build().values(), new String[] { StringSeries.NULL_VALUE });
+    Assert.assertEquals(StringSeries.builder().addValues((String)null).build().values(), new String[] { StringSeries.NULL_VALUE });
   }
 
   @Test
   public void testBooleanBuilderNull() {
-    Assert.assertEquals(BooleanSeries.builder().add((Byte)null).build().values(), new byte[] { BooleanSeries.NULL_VALUE });
+    Assert.assertEquals(BooleanSeries.builder().addValues((Byte)null).build().values(), new byte[] { BooleanSeries.NULL_VALUE });
   }
 
   @Test
   public void testBooleanBuilderNullBoolean() {
-    Assert.assertEquals(BooleanSeries.builder().add((Boolean)null).build().values(), new byte[] { BooleanSeries.NULL_VALUE });
+    Assert.assertEquals(BooleanSeries.builder().addBooleanValues((Boolean)null).build().values(), new byte[] { BooleanSeries.NULL_VALUE });
   }
 
   @Test
@@ -297,8 +300,8 @@ public class DataFrameTest {
   public void testMapDoubleToBoolean() {
     DoubleSeries in = DataFrame.toSeries(VALUES_DOUBLE);
     BooleanSeries out = in.map(new DoubleSeries.DoubleConditional() {
-      public boolean apply(double value) {
-        return value <= 0.3;
+      public boolean apply(double... values) {
+        return values[0] <= 0.3;
       }
     });
     Assert.assertEquals(out.values(), new byte[] { 1, 1, 1, 0, 0 });
@@ -935,7 +938,7 @@ public class DataFrameTest {
     DoubleSeries in = DataFrame.toSeries(1.0, DoubleSeries.NULL_VALUE, 2.0);
     BooleanSeries out = in.map(new Series.DoubleConditional() {
       @Override
-      public boolean apply(double value) {
+      public boolean apply(double... values) {
         return true;
       }
     });
@@ -945,9 +948,9 @@ public class DataFrameTest {
   @Test
   public void testLongMapNullConditional() {
     LongSeries in = DataFrame.toSeries(1, LongSeries.NULL_VALUE, 2);
-    BooleanSeries out = in.map(new LongSeries.LongConditional() {
+    BooleanSeries out = in.map(new Series.LongConditional() {
       @Override
-      public boolean apply(long value) {
+      public boolean apply(long... values) {
         return true;
       }
     });
@@ -957,9 +960,9 @@ public class DataFrameTest {
   @Test
   public void testStringMapNullConditional() {
     StringSeries in = DataFrame.toSeries("1.0", StringSeries.NULL_VALUE, "2.0");
-    BooleanSeries out = in.map(new StringSeries.StringConditional() {
+    BooleanSeries out = in.map(new Series.StringConditional() {
       @Override
-      public boolean apply(String value) {
+      public boolean apply(String... values) {
         return true;
       }
     });
@@ -1368,6 +1371,167 @@ public class DataFrameTest {
   public void testStringInferSeriesTypeString() {
     Series.SeriesType t = StringSeries.buildFrom("true", "", "-0.2e1", null).inferType();
     Assert.assertEquals(t, Series.SeriesType.STRING);
+  }
+
+  @Test
+  public void testCompareInversion() {
+    StringSeries string = StringSeries.buildFrom("0", "", "true");
+    BooleanSeries bool = BooleanSeries.buildFrom(new byte[] { 0, BooleanSeries.NULL_VALUE, 1 });
+
+    Assert.assertTrue(string.compare(bool, 0, 0) < 0); // "0" < "false"
+    Assert.assertTrue(bool.compare(string, 0, 0) == 0);
+
+    Assert.assertTrue(string.compare(bool, 1, 1) > 0); // "" > null
+    Assert.assertTrue(bool.compare(string, 1, 1) == 0);
+
+    Assert.assertTrue(string.compare(bool, 2, 2) == 0);
+    Assert.assertTrue(bool.compare(string, 2, 2) == 0);
+  }
+
+  @Test
+  public void testDataFrameFromCsv() throws IOException {
+    Reader in = new InputStreamReader(this.getClass().getResourceAsStream("test.csv"));
+    DataFrame df = DataFrame.fromCsv(in);
+
+    Assert.assertEquals(df.getSeriesNames().size(), 3);
+    Assert.assertEquals(df.size(), 6);
+
+    Series a = df.get("header_A");
+    Assert.assertEquals(a.type(), Series.SeriesType.STRING);
+    Assert.assertEquals(a.getStrings().values(), new String[] { "a1", "A2", "two words", "", "with comma, semicolon; and more", "" });
+
+    Series b = df.get("_1headerb");
+    Assert.assertEquals(b.type(), Series.SeriesType.LONG);
+    Assert.assertEquals(b.getLongs().values(), new long[] { 1, 2, 3, 4, 5, 6 });
+
+    Series c = df.get("Header_C");
+    Assert.assertEquals(c.type(), Series.SeriesType.BOOLEAN);
+    Assert.assertEquals(c.getBooleans().values(), new byte[] { BooleanSeries.NULL_VALUE, 1, 0, 0, BooleanSeries.NULL_VALUE, 1 });
+  }
+
+  @Test
+  public void testDoubleFunctionConversion() {
+    Series out = df.map(new Series.DoubleFunction() {
+      @Override
+      public double apply(double... values) {
+        return values[0] + 1;
+      }
+    }, "long");
+    Assert.assertEquals(out.type(), Series.SeriesType.DOUBLE);
+  }
+
+  @Test
+  public void testLongFunctionConversion() {
+    Series out = df.map(new Series.LongFunction() {
+      @Override
+      public long apply(long... values) {
+        return values[0] + 1;
+      }
+    }, "double");
+    Assert.assertEquals(out.type(), Series.SeriesType.LONG);
+  }
+
+  @Test
+  public void testStringFunctionConversion() {
+    Series out = df.map(new Series.StringFunction() {
+      @Override
+      public String apply(String... values) {
+        return values[0] + "-";
+      }
+    }, "long");
+    Assert.assertEquals(out.type(), Series.SeriesType.STRING);
+  }
+
+  @Test
+  public void testBooleanFunctionConversion() {
+    Series out = df.map(new Series.BooleanFunction() {
+      @Override
+      public boolean apply(boolean... values) {
+        return !values[0];
+      }
+    }, "long");
+    Assert.assertEquals(out.type(), Series.SeriesType.BOOLEAN);
+  }
+
+  @Test
+  public void testBooleanFunctionExConversion() {
+    Series out = df.map(new Series.BooleanFunctionEx() {
+      @Override
+      public byte apply(boolean... values) {
+        return TRUE;
+      }
+    }, "long");
+    Assert.assertEquals(out.type(), Series.SeriesType.BOOLEAN);
+  }
+
+  @Test
+  public void testDoubleConditionalConversion() {
+    Series out = df.map(new Series.DoubleConditional() {
+      @Override
+      public boolean apply(double... values) {
+        return true;
+      }
+    }, "long");
+    Assert.assertEquals(out.type(), Series.SeriesType.BOOLEAN);
+  }
+
+  @Test
+  public void testLongConditionalConversion() {
+    Series out = df.map(new Series.LongConditional() {
+      @Override
+      public boolean apply(long... values) {
+        return true;
+      }
+    }, "double");
+    Assert.assertEquals(out.type(), Series.SeriesType.BOOLEAN);
+  }
+
+  @Test
+  public void testStringConditionalConversion() {
+    Series out = df.map(new Series.StringConditional() {
+      @Override
+      public boolean apply(String... values) {
+        return true;
+      }
+    }, "long");
+    Assert.assertEquals(out.type(), Series.SeriesType.BOOLEAN);
+  }
+
+  @Test
+  public void testBooleanConditionalConversion() {
+    Series out = df.map(new Series.BooleanConditional() {
+      @Override
+      public boolean apply(boolean... values) {
+        return true;
+      }
+    }, "long");
+    Assert.assertEquals(out.type(), Series.SeriesType.BOOLEAN);
+  }
+
+  @Test
+  public void testFillForward() {
+    // must pass
+    LongSeries.empty().fillNullForward();
+
+    // must pass
+    LongSeries.buildFrom(LongSeries.NULL_VALUE).fillNullForward();
+
+    LongSeries in = LongSeries.buildFrom(LongSeries.NULL_VALUE, 1, LongSeries.NULL_VALUE, 2, 3, LongSeries.NULL_VALUE);
+    LongSeries out = in.fillNullForward();
+    Assert.assertEquals(out.values, new long[] { LongSeries.NULL_VALUE, 1, 1, 2, 3, 3 });
+  }
+
+  @Test
+  public void testFillBackward() {
+    // must pass
+    LongSeries.empty().fillNullBackward();
+
+    // must pass
+    LongSeries.buildFrom(LongSeries.NULL_VALUE).fillNullBackward();
+
+    LongSeries in = LongSeries.buildFrom(LongSeries.NULL_VALUE, 1, LongSeries.NULL_VALUE, 2, 3, LongSeries.NULL_VALUE);
+    LongSeries out = in.fillNullBackward();
+    Assert.assertEquals(out.values, new long[] { 1, 1, 2, 2, 3, LongSeries.NULL_VALUE });
   }
 
   static void assertEqualsDoubles(double[] actual, double[] expected) {
