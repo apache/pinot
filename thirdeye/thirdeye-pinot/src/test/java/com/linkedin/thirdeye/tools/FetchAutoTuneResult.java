@@ -1,8 +1,8 @@
 package com.linkedin.thirdeye.tools;
 
 import java.io.File;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,9 +11,8 @@ import org.slf4j.LoggerFactory;
 public class FetchAutoTuneResult {
   private static final Logger LOG = LoggerFactory.getLogger(FetchAutoTuneResult.class);
 
-  private static final String CLONEDMAPSUFFIX = "ClonedMap";
   private static final String CSVSUFFIX = ".csv";
-  private static final String UNDERSCORE = "_";
+  private static final Integer DEFAULT_NEXPECTEDANOMALIES = 3;
 
   /**
    * Tool to fetch auto tune results using auto tune endpoint based on collection;
@@ -24,10 +23,9 @@ public class FetchAutoTuneResult {
    * args[2]: End time of merged anomaly in milliseconds
    * args[3]: Path to Persistence File
    * args[4]: Collection Name
-   * args[5]: true if clone function is needed. if false, need to have clone map file in directory
    * args[6]: File directory (read and write file)
-   * args[7]: true if merged anomalies on holidays should be removed. Need to provide holiday file name
-   * args[8]: Optional: holiday file name. Holiday file format: {startTime},{endTime}
+   * args[7]: Holiday periods to remove from dataset. Holiday starts in format: milliseconds1,milliseconds2
+   * args[8]: Holiday periods to remove from dataset. Holiday ends in format: milliseconds1,milliseconds2
    * @throws Exception
    */
   public static void main(String[] args) throws Exception{
@@ -42,64 +40,48 @@ public class FetchAutoTuneResult {
     Long ENDTIME = Long.valueOf(args[2]);
     String path2PersistenceFile = args[3];
     String Collection = args[4];
-    Boolean isCloneFunction = Boolean.valueOf(args[5]);
-    String DIR_TO_FILE = args[6];
-    Boolean isRemoveHoliday = Boolean.valueOf(args[7]);
-    String holidayFileName = null;
+    String DIR_TO_FILE = args[5];
+    String holidayStarts = args[6];
+    String holidayEnds = args[7];
 
-    if (isRemoveHoliday) {
-      if (args.length < 9) {
-        LOG.error("Error: Should provide holiday file", new IllegalArgumentException());
-      } else {
-        holidayFileName = args[8];
-      }
-    }
+    AutoTuneAlertFilterTool executor = new AutoTuneAlertFilterTool(new File(path2PersistenceFile));
 
-    CloneFunctionAndAutoTuneAlertFilterTool executor = new CloneFunctionAndAutoTuneAlertFilterTool(new File(path2PersistenceFile));
-
-    String cloneMapName = Collection + UNDERSCORE + CLONEDMAPSUFFIX + CSVSUFFIX;
-
-    // clone functions (and remove holidays)
-    if (isCloneFunction) {
-      Map<String, String> clonedFunctionIds = executor.cloneFunctionsToAutoTune(Collection, isRemoveHoliday, DIR_TO_FILE + holidayFileName);
-      // write relationship to csv
-      executor.writeMapToCSV(clonedFunctionIds, DIR_TO_FILE + cloneMapName, null);
-      LOG.info("Cloned the set of funcitons and write to file: {}", cloneMapName);
-    }
-
-    // read relationship from csv to map
-    Map<Long, Long> clonedMap = executor.readTwoColumnsCSVToMap(DIR_TO_FILE + cloneMapName);
-    LOG.info("Read function mappings from file: {}", DIR_TO_FILE + cloneMapName);
-
-    // getTuned and Evaluate prev, curr alert filter
-    Map<Long, Boolean> tunedResult = new HashMap<>();
+    List<Long> functionIds = executor.getAllFunctionIdsByCollection(Collection);
     Map<String, String> outputMap = new HashMap<>();
-    for(Map.Entry<Long, Long> pair: clonedMap.entrySet()) {
-
+    for(Long functionId : functionIds){
       StringBuilder outputVal = new StringBuilder();
 
-      Long clonedFunctionId = pair.getValue();
+      // evaluate current alert filter
+      String origEvals = executor.evalAnomalyFunctionAlertFilterToEvalNode(functionId, STARTTIME, ENDTIME, holidayStarts, holidayEnds).toCSVString();
 
-      //before tuning, evaluate current
-      String origEvals = executor.evalAlertFilterToEvalNode(clonedFunctionId, STARTTIME, ENDTIME).toCSVString();
+      // evaluate labels, if has no labels, go to initiate alert filter, else go to tune alert filter
+      Long autotuneId;
+      Boolean isInitAutoTune = !executor.checkAnomaliesHasLabels(functionId, STARTTIME, ENDTIME, holidayStarts, holidayEnds);
 
-      // tune by functionId
-      Boolean isUpdated = Boolean.valueOf(executor.getTunedAlertFilterByFunctionId(clonedFunctionId, STARTTIME, ENDTIME, AUTOTUNE_TYPE));
+      if(isInitAutoTune){
+        autotuneId = Long.valueOf(executor.getInitAutoTuneByFunctionId(functionId, STARTTIME, ENDTIME, AUTOTUNE_TYPE, DEFAULT_NEXPECTEDANOMALIES, holidayStarts, holidayEnds));
+      } else{
+        // tune by functionId
+        autotuneId = Long.valueOf(executor.getTunedAlertFilterByFunctionId(functionId, STARTTIME, ENDTIME, AUTOTUNE_TYPE, holidayStarts, holidayEnds));
+      }
 
-      // after tuning, evaluate tuned
-      String tunedEvals = executor.evalAlertFilterToEvalNode(clonedFunctionId, STARTTIME, ENDTIME).toCSVString();
+      boolean isUpdated = autotuneId != -1;
+      String tunedEvals = "";
+      if(isUpdated){
+        // after tuning, evaluate tuned results by autotuneId
+        tunedEvals = executor.evalAutoTunedAlertFilterToEvalNode(autotuneId, STARTTIME, ENDTIME, holidayStarts, holidayEnds).toCSVString();
+      }
 
       outputVal.append(origEvals)
-          .append(tunedEvals)
-          .append(isUpdated);
+          .append(isUpdated)
+          .append(",")
+          .append(tunedEvals);
 
-      outputMap.put(String.valueOf(pair.getKey()), outputVal.toString());
-      tunedResult.put(clonedFunctionId, isUpdated);
+      outputMap.put(String.valueOf(functionId), outputVal.toString());
     }
-    LOG.info("Tuned cloned functions and constructed evaluations");
 
     // write to file
-    String header = "FunctionId" + "," + CloneFunctionAndAutoTuneAlertFilterTool.EvaluationNode.getCSVSchema() + "," + CloneFunctionAndAutoTuneAlertFilterTool.EvaluationNode.getCSVSchema() + "," + "isModelUpdated";
+    String header = "FunctionId" + "," + AutoTuneAlertFilterTool.EvaluationNode.getCSVSchema() + "," + "isModelUpdated" + "," +AutoTuneAlertFilterTool.EvaluationNode.getCSVSchema();
     executor.writeMapToCSV(outputMap, DIR_TO_FILE + Collection + CSVSUFFIX, header);
     LOG.info("Write evaluations to file: {}", DIR_TO_FILE + Collection + CSVSUFFIX);
   }

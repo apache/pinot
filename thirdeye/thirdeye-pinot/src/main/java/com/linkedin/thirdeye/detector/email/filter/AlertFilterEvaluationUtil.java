@@ -9,6 +9,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -41,6 +43,7 @@ public class AlertFilterEvaluationUtil {
   public int getNonActionable(){return this.nonActionable;}
 
   private AlertFilter alertFilter;
+  private static final Logger LOG = LoggerFactory.getLogger(AlertFilterEvaluationUtil.class);
 
   private static final List<String> propertyNames =
       Collections.unmodifiableList(new ArrayList<>(Arrays.asList(PRECISION, RECALL, TOTALANOMALIES, TOTALRESPONSES, TRUEANOMALIES, FALSEALARM, NONACTIONABLE)));
@@ -78,9 +81,11 @@ public class AlertFilterEvaluationUtil {
       throw new Exception("No true labels in dataset. Check data");
     }
     if (TP + FP == 0) {
-      throw new Exception("No predicted true labels. Check model input");
+      this.precision = -1;
+      LOG.info("No predicted true labels. Check model input");
+    } else{
+      this.precision = 1.000 * TP / (TP + FP);
     }
-    this.precision = 1.000 * TP / (TP + FP);
     this.recall = 1.000 * TP / (TP + FN);
   }
 

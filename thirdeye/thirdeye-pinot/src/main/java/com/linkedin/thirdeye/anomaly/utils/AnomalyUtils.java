@@ -57,11 +57,10 @@ public class AnomalyUtils {
    * @param mergedAnomalyResultDTOS
    * @return true if the list of merged anomalies has at least one positive label, false otherwise
    */
-  public static Boolean checkHasPostiveLabels(List<MergedAnomalyResultDTO> mergedAnomalyResultDTOS){
+  public static Boolean checkHasLabels(List<MergedAnomalyResultDTO> mergedAnomalyResultDTOS){
     for(MergedAnomalyResultDTO anomaly: mergedAnomalyResultDTOS){
       AnomalyFeedback feedback = anomaly.getFeedback();
-      boolean label = (feedback != null && (feedback.getFeedbackType() == AnomalyFeedbackType.ANOMALY || feedback.getFeedbackType() == AnomalyFeedbackType.ANOMALY_NO_ACTION));
-      if (label){
+      if (feedback != null){
         return true;
       }
     }
