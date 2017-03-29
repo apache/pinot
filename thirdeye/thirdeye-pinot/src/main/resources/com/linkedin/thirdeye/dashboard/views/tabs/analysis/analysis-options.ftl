@@ -1,4 +1,4 @@
-<div class="analysis-card">
+<div class="analysis-card padding-all">
     <div class="analysis-title">Trend Analysis</div>
     <div class="analysis-options">
       <div class="analysis-options__datepicker">

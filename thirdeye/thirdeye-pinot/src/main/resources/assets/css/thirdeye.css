@@ -831,6 +831,25 @@ text {
   height: 32px;
 }
 
+.analysis-chart {
+  display: flex;
+  height: 448px;
+}
+
+.analysis-chart__graph {
+  flex-grow: 1;
+  width: 80%;
+  height: 400px;
+  margin: 24px;
+}
+
+.analysis-chart__legend {
+  border-left: 1px solid #CCC;
+  flex-basis: 20%;
+  overflow: scroll;
+  height: 100%;
+}
+
 /* Radio*/
 
 .anomaly-feedback-radio {
@@ -841,7 +860,6 @@ text {
 .anomaly-details-wrapper,
 .analysis-card {
   background-color: white;
-  padding: 24px;
   border: 1px solid #CCC;
   border-radius: 2px;
 }

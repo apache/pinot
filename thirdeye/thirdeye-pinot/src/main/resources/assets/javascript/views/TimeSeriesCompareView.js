@@ -69,7 +69,10 @@ TimeSeriesCompareView.prototype = {
     var chart = c3.generate({
       bindto: '#analysis-chart',
       data: {
-        x: 'date', columns: timeSeriesObject.columns, type: 'line'
+        x: 'date',
+        xFormat : '%Y-%m-%d %H:%M',
+        columns: timeSeriesObject.columns,
+        type: 'line'
       },
       legend : {
         position : 'inset',
@@ -79,14 +82,14 @@ TimeSeriesCompareView.prototype = {
       },
       axis: {
         y: {
-          show: true
+          show: true,
+          tick: {
+            format: d3.format('.2f')
+          }
         },
         x: {
-          type: 'timeseries', show: true, tick: {
-            "culling": {"max": 100},
-            "count": 10, // "rotate":30,   // this will rotate the x axis display values
-            "fit": true,
-            "format": "%m-%d %H:%M"
+          type: 'timeseries', show: true, tick: { // "rotate":30,   // this will rotate the x axis display values
+            fit: false
           }
         }
       }

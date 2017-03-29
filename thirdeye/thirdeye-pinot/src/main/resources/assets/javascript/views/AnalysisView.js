@@ -15,6 +15,11 @@ function AnalysisView(analysisModel) {
     'This Month': [moment().subtract(1, 'month').startOf('month'), moment().subtract(1 , 'month').endOf('month')],
     'Last Month': [moment().subtract(2, 'month').startOf('month'), moment().subtract(2, 'month').endOf('month')]
   };
+  // this.baselineRange = {
+  //   'Wo1W': [moment().subtract(2, 'days'), moment().subtract(1, 'days')],
+  //   'Wo2W': [moment().subtract(3, 'days'), moment().subtract(2, 'days')],
+  //   'Wo3W': [moment().subtract(13, 'days'), moment().subtract(7, 'days')]
+  // };
 }
 
 AnalysisView.prototype = {

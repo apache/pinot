@@ -1,4 +1,4 @@
-<div class="analysis-card top-buffer">
+<div class="analysis-card padding-all top-buffer">
 	<div class="analysis-title">Contribution Analysis</div>
 	<div class="row bottom-buffer">
 		<div class="col-xs-12">

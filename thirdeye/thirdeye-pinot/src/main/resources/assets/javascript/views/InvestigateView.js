@@ -179,7 +179,7 @@ InvestigateView.prototype = {
           y : {
             show : true,
             tick: {
-              format: d3.format(".2f")
+              format: d3.format('.2f')
             }
           },
           x : {

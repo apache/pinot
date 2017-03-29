@@ -1,25 +1,13 @@
 <div class="row bottom-buffer">
   <div class="col-xs-12">
-    <div>
       <label class="label-medium-semibold">Metric: </label>
-      <label>{{this.metricName}}</label>
-    </div>
-    <#--<div>-->
-       <#--3 anomalies detected for selected parameters <a href="#anomalies">See Anomalies</a>-->
-    <#--</div>-->
+      <div><label>{{this.metricName}}<label></div>
   </div>
 </div>
 <!-- Chart section -->
-<div class="row">
-  <div class="col-xs-10">
-    <div class="panel">
-      <div id="analysis-chart" style="height: 400px"></div>
-    </div>
-  </div>
-  <div class="col-xs-2">
-    <div id="analysis-chart-legend" style="height: 400px;overflow: scroll;">
-    </div>
-  </div>
+<div class="analysis-card analysis-chart bottom-buffer">
+    <div class="analysis-chart__graph" id="analysis-chart" style=""></div>
+    <div class="analysis-chart__legend padding-all" id="analysis-chart-legend"></div>
 </div>
 
 <!-- Percentage change table -->
