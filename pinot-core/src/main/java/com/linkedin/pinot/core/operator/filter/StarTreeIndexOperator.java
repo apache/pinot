@@ -102,11 +102,12 @@ public class StarTreeIndexOperator extends BaseFilterOperator {
     String column = childFilter.getColumn();
     // Only equality predicates are supported
     Predicate predicate = Predicate.newPredicate(childFilter);
-    Dictionary dictionary = segment.getDataSource(column).getDictionary();
+    DataSource dataSource = segment.getDataSource(column);
+    Dictionary dictionary = dataSource.getDictionary();
     PredicateEntry predicateEntry = null;
 
     PredicateEvaluator predicateEvaluator =
-        PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, dictionary);
+        PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, dataSource);
 
     // If dictionary does not have any values that satisfy the predicate, set emptyResults to
     // true.

@@ -19,7 +19,7 @@ import com.linkedin.pinot.core.common.predicate.RangePredicate;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 
 
-public class RangeOfflineDictionaryPredicateEvaluator implements PredicateEvaluator {
+public class RangeOfflineDictionaryPredicateEvaluator extends BasePredicateEvaluator {
 
   private int[] matchingIds;
   private RangePredicate predicate;

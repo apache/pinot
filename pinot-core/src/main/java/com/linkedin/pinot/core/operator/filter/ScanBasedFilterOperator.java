@@ -50,7 +50,7 @@ public class ScanBasedFilterOperator extends BaseFilterOperator {
    * @param endDocId inclusive
    */
   public ScanBasedFilterOperator(Predicate predicate, DataSource dataSource, Integer startDocId, Integer endDocId) {
-    this.predicateEvaluator = PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, dataSource.getDictionary());
+    this.predicateEvaluator = PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, dataSource);
     this.dataSource = dataSource;
     this.startDocId = startDocId;
     this.endDocId = endDocId;

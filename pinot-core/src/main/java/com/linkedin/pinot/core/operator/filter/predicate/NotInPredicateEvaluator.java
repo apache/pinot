@@ -22,7 +22,7 @@ import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 
 
-public class NotInPredicateEvaluator implements PredicateEvaluator {
+public class NotInPredicateEvaluator extends BasePredicateEvaluator {
 
   private int[] matchingIds;
   private int[] nonMatchingIds;
@@ -99,4 +99,6 @@ public class NotInPredicateEvaluator implements PredicateEvaluator {
   public boolean alwaysFalse() {
     return nonMatchingIds.length == dictionary.length();
   }
+  
+  
 }

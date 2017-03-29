@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.io.reader.impl.v2;
 
 import com.linkedin.pinot.core.io.reader.BaseSingleColumnSingleValueReader;
+import com.linkedin.pinot.core.io.reader.ReaderContext;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import com.linkedin.pinot.core.util.SizeUtil;
 import java.io.IOException;
@@ -173,5 +174,11 @@ public class FixedBitSingleValueReader extends BaseSingleColumnSingleValueReader
     for (int ri = rowStartPos; ri < endPos; ++ri) {
       values[valuesStartPos++] = getInt(rows[ri]);
     }
+  }
+
+  @Override
+  public ReaderContext createContext() {
+    //no need of context for fixedbit 
+    return null;
   }
 }

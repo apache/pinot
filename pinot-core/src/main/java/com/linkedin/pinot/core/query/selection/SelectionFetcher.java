@@ -33,6 +33,7 @@ import com.linkedin.pinot.core.query.selection.iterator.LongSelectionColumnItera
 import com.linkedin.pinot.core.query.selection.iterator.SelectionColumnIterator;
 import com.linkedin.pinot.core.query.selection.iterator.SelectionSingleValueColumnWithDictIterator;
 import com.linkedin.pinot.core.query.selection.iterator.StringArraySelectionColumnIterator;
+import com.linkedin.pinot.core.query.selection.iterator.StringSelectionColumnIterator;
 import com.linkedin.pinot.core.realtime.impl.dictionary.DoubleMutableDictionary;
 import com.linkedin.pinot.core.realtime.impl.dictionary.FloatMutableDictionary;
 import com.linkedin.pinot.core.realtime.impl.dictionary.IntMutableDictionary;
@@ -132,6 +133,9 @@ public class SelectionFetcher {
             break;
           case DOUBLE:
             selectionColumnIterators[i] = new DoubleSelectionColumnIterator(blocks[i]);
+            break;
+          case STRING:
+            selectionColumnIterators[i] = new StringSelectionColumnIterator(blocks[i]);
             break;
           default:
             break;

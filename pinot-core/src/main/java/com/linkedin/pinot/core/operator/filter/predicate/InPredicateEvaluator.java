@@ -17,12 +17,13 @@ package com.linkedin.pinot.core.operator.filter.predicate;
 
 import java.util.Arrays;
 
+import com.linkedin.pinot.core.common.Predicate;
 import com.linkedin.pinot.core.common.predicate.InPredicate;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 
-public class InPredicateEvaluator implements PredicateEvaluator {
+public class InPredicateEvaluator extends BasePredicateEvaluator{
 
   private int[] matchingIds;
   private IntSet dictIdSet;
@@ -88,4 +89,6 @@ public class InPredicateEvaluator implements PredicateEvaluator {
   public boolean alwaysFalse() {
     return matchingIds == null || matchingIds.length == 0;
   }
+  
+
 }

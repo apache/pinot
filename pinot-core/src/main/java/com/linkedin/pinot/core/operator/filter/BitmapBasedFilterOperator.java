@@ -53,7 +53,7 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
    */
   public BitmapBasedFilterOperator(Predicate predicate, DataSource dataSource, int startDocId, int endDocId) {
     this.predicate = predicate;
-    this.predicateEvaluator = PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, dataSource.getDictionary());
+    this.predicateEvaluator = PredicateEvaluatorProvider.getPredicateFunctionFor(predicate, dataSource);
     this.dataSource = dataSource;
     this.startDocId = startDocId;
     this.endDocId = endDocId;
