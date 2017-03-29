@@ -1,6 +1,6 @@
-<div class="col-md-12">
+<div class="col-xs-12">
   <div class="table-responsive">
-    <table class="table table-bordered analysis-table">
+    <table class="table table-bordered analysis-table tree-map__table">
       <thead>
       <tr>
         <th style="width: 10%;"></th>
@@ -17,13 +17,13 @@
         {{#each this.subDimensionContributionDetails.timeBucketsCurrent}}
         <td>
           <div class="row">
-            <div class="col-md-4">
+            <div class="col-xs-4">
               Current
             </div>
-            <div class="col-md-4">
+            <div class="col-xs-4">
               Baseline
             </div>
-            <div class="col-md-4">
+            <div class="col-xs-4">
               Ratio
             </div>
           </div>
@@ -41,17 +41,17 @@
         <td style="background-color: {{computeColor cPercentageChange}};color: {{computeTextColor cPercentageChange}};">
           <div class="row">
             {{#if @root.showDetailsChecked}}
-            <div class="col-md-4">
+            <div class="col-xs-4">
               {{lookup (lookup @root.subDimensionContributionDetails.cumulativeCurrentValues
               cKeyIndex) cidx}}
             </div>
-            <div class="col-md-4">
+            <div class="col-xs-4">
               {{lookup (lookup @root.subDimensionContributionDetails.cumulativeBaselineValues
               cKeyIndex) cidx}}
             </div>
-            <div class="col-md-4">
+            <div class="col-xs-4">
             {{else}}
-            <div class="col-md-12">
+            <div class="col-xs-12">
             {{/if}}
               <a id="{{lookup @root.subDimensionsIndex cKeyIndex}}-{{cidx}}"
                  style="color:{{computeTextColor cPercentageChange}}">
@@ -75,15 +75,15 @@
         <td style="background-color: {{computeColor percentageChange}};color: {{computeTextColor percentageChange}};">
           <div class="row">
             {{#if @root.showDetailsChecked}}
-            <div class="col-md-4">
+            <div class="col-xs-4">
               {{lookup (lookup @root.subDimensionContributionDetails.currentValues keyIndex) idx}}
             </div>
-            <div class="col-md-4">
+            <div class="col-xs-4">
               {{lookup (lookup @root.subDimensionContributionDetails.baselineValues keyIndex) idx}}
             </div>
-            <div class="col-md-4">
+            <div class="col-xs-4">
             {{else}}
-            <div class="col-md-12">
+            <div class="col-xs-12">
             {{/if}}
               <a id="{{lookup @root.subDimensionsIndex keyIndex}}-{{idx}}"
                  style="color:{{computeTextColor percentageChange}}">

@@ -841,20 +841,23 @@ text {
 
 .analysis-chart {
   display: flex;
+  flex-direction: row-reverse;
   height: 448px;
 }
 
 .analysis-chart__graph {
   flex-grow: 1;
-  width: 80%;
   height: 400px;
   margin: 24px;
 }
 
+.analysis-chart__graph > svg {
+  width: 100%;
+}
+
 .analysis-chart__legend {
   border-left: 1px solid #CCC;
-  flex-basis: 20%;
-  overflow: scroll;
+  max-width: 250px;
   height: 100%;
 }
 
@@ -866,11 +869,13 @@ text {
 .analysis-chart__dimensions {
   list-style: none;
   padding: 0;
+  overflow-x: hidden;
+  overflow-y: scroll;
+  height: 100%;
 }
 
 .analysis-chart__dimension {
   white-space: nowrap;
-  text-overflow: ellipsis;
 }
 
 .analysis-change {
@@ -888,7 +893,7 @@ text {
 }
 
 .analysis-change__label {
-  flex-shrink: 0;
+  user-select: none;
 }
 
 .contribution-analysis {
@@ -951,7 +956,7 @@ text {
 }
 
 .tree-map__table {
-  /*margin: 0 24px;*/
+  min-width: 100%;
 }
 
 /* Radio*/

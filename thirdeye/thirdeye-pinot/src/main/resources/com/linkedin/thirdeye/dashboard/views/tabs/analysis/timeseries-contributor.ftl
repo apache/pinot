@@ -6,8 +6,8 @@
 </div>
 <!-- Chart section -->
 <div class="analysis-card analysis-chart bottom-buffer">
-    <div class="analysis-chart__graph" id="analysis-chart" style=""></div>
     <div class="analysis-chart__legend padding-all" id="analysis-chart-legend"></div>
+    <div class="analysis-chart__graph" id="analysis-chart" style=""></div>
 </div>
 
 <!-- Percentage change table -->
