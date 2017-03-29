@@ -8,15 +8,12 @@ import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.AutotuneConfigDTO;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterEvaluationUtil;
-import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -185,6 +182,26 @@ public class AutoTuneAlertFilterTool {
       functionIds.add(anomalyFunctionSpec.getId());
     }
     return functionIds;
+  }
+
+  public Boolean checkAnomaliesHasLabels(Long functionId, Long startTime, Long endTime, String holidayStarts, String holidayEnds){
+    DetectionResourceHttpUtils httpUtils = new DetectionResourceHttpUtils(LOCALHOST, APPLICATION_PORT);
+    try{
+      return Boolean.valueOf(httpUtils.checkHasLabels(functionId, startTime, endTime, holidayStarts, holidayEnds));
+    } catch (Exception e) {
+      LOG.warn(e.getMessage());
+    }
+    return null;
+  }
+
+  public String getInitAutoTuneByFunctionId(Long functionId, Long startTimeISO, Long endTimeISO, String AUTOTUNE_TYPE, int nExpected,String holidayStarts, String holidayEnds) throws Exception{
+    DetectionResourceHttpUtils httpUtils = new DetectionResourceHttpUtils(LOCALHOST, APPLICATION_PORT);
+    try {
+      return httpUtils.initAutoTune(functionId, startTimeISO, endTimeISO, AUTOTUNE_TYPE, nExpected, holidayStarts, holidayEnds);
+    } catch (Exception e) {
+      LOG.warn(e.getMessage());
+    }
+    return null;
   }
 }
 

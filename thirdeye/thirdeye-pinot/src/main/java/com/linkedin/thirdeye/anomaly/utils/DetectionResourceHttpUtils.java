@@ -12,12 +12,14 @@ import org.apache.http.client.methods.HttpPost;
  */
 public class DetectionResourceHttpUtils extends AbstractResourceHttpUtils {
 
-  private static String DETECTION_JOB_ENDPOINT = "/api/detection-job/";
-  private static String ADHOC = "/ad-hoc";
-  private static String BACKFILL = "/generateAnomaliesInRange";
-  private static String AUTOTUNE_FILTER = "autotune/filter/";
-  private static String EVAL_FILTER = "eval/filter/";
-  private static String EVAL_AUTOTUNE = "eval/autotune/";
+  private static final String DETECTION_JOB_ENDPOINT = "/api/detection-job/";
+  private static final String ADHOC = "/ad-hoc";
+  private static final String BACKFILL = "/generateAnomaliesInRange";
+  private static final String AUTOTUNE_FILTER = "autotune/filter/";
+  private static final String EVAL_FILTER = "eval/filter/";
+  private static final String EVAL_AUTOTUNE = "eval/autotune/";
+  private static final String CHECK_HAS_LABELS = "initautotune/checkhaslabel/";
+  private static final String INIT_AUTOTUNE = "initautotune/filter/";
 
   public DetectionResourceHttpUtils(String detectionHost, int detectionPort) {
     super(new HttpHost(detectionHost, detectionPort));
@@ -77,6 +79,31 @@ public class DetectionResourceHttpUtils extends AbstractResourceHttpUtils {
         + "&endTime=" + endTime
         + "&holidayStarts=" + holidayStarts
         + "&holidayEnds=" + holidayEnds
+    );
+    return callJobEndpoint(req);
+  }
+
+  public String checkHasLabels(long functionId, long startTime, long endTime, String holidayStarts, String holidayEnds) throws IOException {
+    HttpPost req = new HttpPost(
+        DETECTION_JOB_ENDPOINT + CHECK_HAS_LABELS + functionId
+        + "?startTime=" + startTime
+        + "&endTime=" + endTime
+        + "&holidayStarts=" + holidayStarts
+        + "&holidayEnds=" + holidayEnds
+    );
+    return callJobEndpoint(req);
+  }
+
+  public String initAutoTune(Long functionId, Long startTime, Long endTime, String autoTuneType, int nExpected, String holidayStarts, String holidayEnds)
+      throws IOException {
+    HttpPost req = new HttpPost(
+        DETECTION_JOB_ENDPOINT + INIT_AUTOTUNE + functionId
+            + "?startTime=" + startTime
+            + "&endTime=" + endTime
+            + "&autoTuneType=" + autoTuneType
+            + "&nExpected=" + nExpected
+            + "&holidayStarts=" + holidayStarts
+            + "&holidayEnds=" + holidayEnds
     );
     return callJobEndpoint(req);
   }

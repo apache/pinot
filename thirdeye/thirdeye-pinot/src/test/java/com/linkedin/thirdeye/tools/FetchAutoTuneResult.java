@@ -12,6 +12,7 @@ public class FetchAutoTuneResult {
   private static final Logger LOG = LoggerFactory.getLogger(FetchAutoTuneResult.class);
 
   private static final String CSVSUFFIX = ".csv";
+  private static final Integer DEFAULT_NEXPECTEDANOMALIES = 3;
 
   /**
    * Tool to fetch auto tune results using auto tune endpoint based on collection;
@@ -23,8 +24,8 @@ public class FetchAutoTuneResult {
    * args[3]: Path to Persistence File
    * args[4]: Collection Name
    * args[6]: File directory (read and write file)
-   * args[7]: Holiday periods to remove from dataset. Holiday starts in format{milliseconds1,milliseconds2}
-   * args[8]: Holiday periods to remove from dataset. Holiday ends in format{milliseconds1,milliseconds2}
+   * args[7]: Holiday periods to remove from dataset. Holiday starts in format: milliseconds1,milliseconds2
+   * args[8]: Holiday periods to remove from dataset. Holiday ends in format: milliseconds1,milliseconds2
    * @throws Exception
    */
   public static void main(String[] args) throws Exception{
@@ -48,19 +49,25 @@ public class FetchAutoTuneResult {
     List<Long> functionIds = executor.getAllFunctionIdsByCollection(Collection);
     Map<String, String> outputMap = new HashMap<>();
     for(Long functionId : functionIds){
-
       StringBuilder outputVal = new StringBuilder();
 
       // evaluate current alert filter
       String origEvals = executor.evalAnomalyFunctionAlertFilterToEvalNode(functionId, STARTTIME, ENDTIME, holidayStarts, holidayEnds).toCSVString();
 
-      // tune by functionId
-      Long autotuneId = Long.valueOf(executor.getTunedAlertFilterByFunctionId(functionId, STARTTIME, ENDTIME, AUTOTUNE_TYPE, holidayStarts, holidayEnds));
+      // evaluate labels, if has no labels, go to initiate alert filter, else go to tune alert filter
+      Long autotuneId;
+      Boolean isInitAutoTune = !executor.checkAnomaliesHasLabels(functionId, STARTTIME, ENDTIME, holidayStarts, holidayEnds);
+
+      if(isInitAutoTune){
+        autotuneId = Long.valueOf(executor.getInitAutoTuneByFunctionId(functionId, STARTTIME, ENDTIME, AUTOTUNE_TYPE, DEFAULT_NEXPECTEDANOMALIES, holidayStarts, holidayEnds));
+      } else{
+        // tune by functionId
+        autotuneId = Long.valueOf(executor.getTunedAlertFilterByFunctionId(functionId, STARTTIME, ENDTIME, AUTOTUNE_TYPE, holidayStarts, holidayEnds));
+      }
 
       boolean isUpdated = autotuneId != -1;
       String tunedEvals = "";
       if(isUpdated){
-
         // after tuning, evaluate tuned results by autotuneId
         tunedEvals = executor.evalAutoTunedAlertFilterToEvalNode(autotuneId, STARTTIME, ENDTIME, holidayStarts, holidayEnds).toCSVString();
       }

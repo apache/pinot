@@ -289,7 +289,7 @@ public class DetectionJobResource {
    * @param holidayEnds: holidayEnds in milliseconds as string, in format {end1, end2,...}
    * @return a list of merged anomalies with holidays removed
    */
-  private List<MergedAnomalyResultDTO> getMergedAnomaliesRemoveHolidays(long functionId, long startTime, long endTime, String holidayStarts, String holidayEnds){
+  public static List<MergedAnomalyResultDTO> getMergedAnomaliesRemoveHolidays(long functionId, long startTime, long endTime, String holidayStarts, String holidayEnds){
     StringTokenizer starts = new StringTokenizer(holidayStarts, ",");
     StringTokenizer ends = new StringTokenizer(holidayEnds, ",");
     MergedAnomalyResultManager anomalyMergedResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
@@ -376,14 +376,14 @@ public class DetectionJobResource {
    * @return true if the list of merged anomalies has at least one positive label, false otherwise
    */
   @POST
-  @Path("/initautotune/checklabel/{functionId}")
-  public Response checkAnomaliesHasPositiveLabel(@PathParam("functionId") long id,
+  @Path("/initautotune/checkhaslabel/{functionId}")
+  public Response checkAnomaliesHasLabel(@PathParam("functionId") long id,
       @QueryParam("startTime") long startTime,
       @QueryParam("endTime") long endTime,
       @QueryParam("holidayStarts") @DefaultValue("") String holidayStarts,
       @QueryParam("holidayEnds") @DefaultValue("") String holidayEnds){
     List<MergedAnomalyResultDTO> anomalyResultDTOS = getMergedAnomaliesRemoveHolidays(id, startTime, endTime, holidayStarts, holidayEnds);
-    return Response.ok(AnomalyUtils.checkHasPostiveLabels(anomalyResultDTOS)).build();
+    return Response.ok(AnomalyUtils.checkHasLabels(anomalyResultDTOS)).build();
   }
 
   /**
