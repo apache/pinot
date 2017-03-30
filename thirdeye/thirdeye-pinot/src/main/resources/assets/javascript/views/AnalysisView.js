@@ -165,35 +165,45 @@ AnalysisView.prototype = {
 
   renderGranularity: function (metricId) {
     if(!metricId) return;
-    var self = this;
-    var granularities = self.analysisModel.fetchGranularityForMetric(metricId);
-    var config = {
+    const $granularitySelector = $("#analysis-granularity-input");
+    const paramGranularity = this.viewParams.granularity;
+    const granularities = this.analysisModel.fetchGranularityForMetric(metricId);
+    const config = {
       theme: "bootstrap",
       minimumResultsForSearch: -1,
-      data: granularities
+      data: granularities,
     };
     if (granularities) {
-      $("#analysis-granularity-input").select2().empty();
-      $("#analysis-granularity-input").select2(config);
+      $granularitySelector.select2().empty();
+      $granularitySelector.select2(config);
+    }
+    if (paramGranularity && granularities.includes(paramGranularity)) {
+      $granularitySelector.val(paramGranularity).trigger('change');
     }
   },
 
   renderDimensions: function (metricId) {
     if(!metricId) return;
-    var dimensions = this.analysisModel.fetchDimensionsForMetric(metricId);
-    var config = {
+    const $dimensionSelector = $("#analysis-metric-dimension-input");
+    const paramDimension = this.viewParams.dimension;
+    const dimensions = this.analysisModel.fetchDimensionsForMetric(metricId);
+    const config = {
       theme: "bootstrap",
       minimumResultsForSearch: -1,
       data: dimensions
     };
     if (dimensions) {
-      $("#analysis-metric-dimension-input").select2().empty();
-      $("#analysis-metric-dimension-input").select2(config);
+      $dimensionSelector.select2().empty();
+      $dimensionSelector.select2(config);
+    }
+    if (paramDimension && dimensions.includes(paramDimension)) {
+      $dimensionSelector.val(paramDimension).trigger('change');
     }
   },
 
   renderFilters: function (metricId) {
     if(!metricId) return;
+    const $filterSelector = $("#analysis-metric-filter-input");
     var filters = this.analysisModel.fetchFiltersForMetric(metricId);
     var filterData = [];
     for (var key in filters) {
@@ -213,8 +223,19 @@ AnalysisView.prototype = {
         multiple: true,
         data: filterData
       };
-      $("#analysis-metric-filter-input").select2().empty();
-      $("#analysis-metric-filter-input").select2(config);
+      $filterSelector.select2().empty();
+      $filterSelector.select2(config);
+
+      let paramFilters = [];
+      Object.keys(this.viewParams.filters).forEach((key) => {
+        this.viewParams.filters[key].forEach((filterName) => {
+          if (filters[key].includes(filterName)) {
+            paramFilters.push(`${key}:${filterName}`);
+          }
+        });
+      });
+
+      $filterSelector.val(paramFilters).trigger("change");
     }
   },
 
