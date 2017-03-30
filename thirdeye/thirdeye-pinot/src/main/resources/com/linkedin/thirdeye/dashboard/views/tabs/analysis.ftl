@@ -20,6 +20,8 @@
 <div class="container top-buffer bottom-buffer">
 	<div id='analysis-spin-area'></div>
 	<div id="analysis-options-placeholder"></div>
+	<div class="spinner-wrapper">
+		<div id="dimension-tree-spin-area"></div>
+	</div>
 	<div id="dimension-tree-map-placeholder"></div>
-	<div id="dimension-tree-spin-area"></div>
 </div>

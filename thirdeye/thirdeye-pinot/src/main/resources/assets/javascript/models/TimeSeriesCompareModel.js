@@ -58,56 +58,66 @@ TimeSeriesCompareModel.prototype = {
   update: function () {
     if (this.metricId) {
       // update the timeseries data
-      var timeSeriesResponse = dataService.fetchTimeseriesCompare(this.metricId, this.currentStart, this.currentEnd, this.baselineStart, this.baselineEnd, this.dimension, this.filters, this.granularity);
+      return dataService.fetchTimeseriesCompare(
+        this.metricId,
+        this.currentStart,
+        this.currentEnd,
+        this.baselineStart,
+        this.baselineEnd,
+        this.dimension,
+        this.filters,
+        this.granularity
+      ).then((timeSeriesResponse) => {
+        if (timeSeriesResponse) {
+          var dateColumn = ['date'];
+          for (var i in timeSeriesResponse.timeBucketsCurrent) {
+            dateColumn.push(timeSeriesResponse.timeBucketsCurrent[i]);
+          }
+          if (timeSeriesResponse.subDimensionContributionMap) {
+            this.subDimensions = [];
+            this.subDimensionContributionDetails = {};
+            this.subDimensionContributionDetails.contributionMap = {};
+            this.subDimensionContributionDetails.percentageChange = {};
+            this.subDimensionContributionDetails.currentValues = {};
+            this.subDimensionContributionDetails.baselineValues = {};
+            this.subDimensionContributionDetails.cumulativeCurrentValues = {};
+            this.subDimensionContributionDetails.cumulativeBaselineValues = {};
+            this.subDimensionContributionDetails.cumulativePercentageChange = {};
+            this.subDimensionContributionDetails.timeBucketsCurrent = timeSeriesResponse.timeBucketsCurrent;
+            this.subDimensionContributionDetails.timeBucketsBaseline = timeSeriesResponse.timeBucketsBaseline;
 
-      // TODO: use time formatter according to granularity selected, currently only DAYS supported
-
-      if (timeSeriesResponse) {
-        var dateColumn = ['date'];
-        for (var i in timeSeriesResponse.timeBucketsCurrent) {
-          dateColumn.push(timeSeriesResponse.timeBucketsCurrent[i]);
-        }
-        if (timeSeriesResponse.subDimensionContributionMap) {
-          this.subDimensions = [];
-          this.subDimensionContributionDetails = {};
-          this.subDimensionContributionDetails.contributionMap = {};
-          this.subDimensionContributionDetails.percentageChange = {};
-          this.subDimensionContributionDetails.currentValues = {};
-          this.subDimensionContributionDetails.baselineValues = {};
-          this.subDimensionContributionDetails.cumulativeCurrentValues = {};
-          this.subDimensionContributionDetails.cumulativeBaselineValues = {};
-          this.subDimensionContributionDetails.cumulativePercentageChange = {};
-          this.subDimensionContributionDetails.timeBucketsCurrent = timeSeriesResponse.timeBucketsCurrent;
-          this.subDimensionContributionDetails.timeBucketsBaseline = timeSeriesResponse.timeBucketsBaseline;
-
-          var count = 0;
-          for (var key in timeSeriesResponse.subDimensionContributionMap) {
-            var currentVal = ['current'];
-            var baselineVal = ['baseline'];
-            // var percentageChange = [];
-            if (timeSeriesResponse.subDimensionContributionMap[key]) {
-              for (var i in timeSeriesResponse.subDimensionContributionMap[key].currentValues) {
-                currentVal.push(timeSeriesResponse.subDimensionContributionMap[key].currentValues[i]);
-                baselineVal.push(timeSeriesResponse.subDimensionContributionMap[key].baselineValues[i]);
+            var count = 0;
+            for (var key in timeSeriesResponse.subDimensionContributionMap) {
+              var currentVal = ['current'];
+              var baselineVal = ['baseline'];
+              // var percentageChange = [];
+              if (timeSeriesResponse.subDimensionContributionMap[key]) {
+                for (var i in timeSeriesResponse.subDimensionContributionMap[key].currentValues) {
+                  currentVal.push(timeSeriesResponse.subDimensionContributionMap[key].currentValues[i]);
+                  baselineVal.push(timeSeriesResponse.subDimensionContributionMap[key].baselineValues[i]);
+                }
               }
+              this.subDimensions.push(key);
+              this.subDimensionsIndex[key] = count++;
+              this.subDimensionContributionDetails.contributionMap[key] = {
+                start: moment(timeSeriesResponse.start).format('YYYY-M-D'),
+                end: moment(timeSeriesResponse.end).format('YYYY-M-D'),
+                columns: [dateColumn, currentVal, baselineVal],
+                selected: true
+              };
+              this.subDimensionContributionDetails.currentValues[key] = timeSeriesResponse.subDimensionContributionMap[key].currentValues;
+              this.subDimensionContributionDetails.baselineValues[key] = timeSeriesResponse.subDimensionContributionMap[key].baselineValues;
+              this.subDimensionContributionDetails.cumulativeCurrentValues[key] = timeSeriesResponse.subDimensionContributionMap[key].cumulativeCurrentValues;
+              this.subDimensionContributionDetails.cumulativeBaselineValues[key] = timeSeriesResponse.subDimensionContributionMap[key].cumulativeBaselineValues;
+              this.subDimensionContributionDetails.percentageChange[key] = timeSeriesResponse.subDimensionContributionMap[key].percentageChange;
+              this.subDimensionContributionDetails.cumulativePercentageChange[key] = timeSeriesResponse.subDimensionContributionMap[key].cumulativePercentageChange;
             }
-            this.subDimensions.push(key);
-            this.subDimensionsIndex[key] = count++;
-            this.subDimensionContributionDetails.contributionMap[key] = {
-              start: moment(timeSeriesResponse.start).format('YYYY-M-D'),
-              end: moment(timeSeriesResponse.end).format('YYYY-M-D'),
-              columns: [dateColumn, currentVal, baselineVal],
-              selected: true
-            };
-            this.subDimensionContributionDetails.currentValues[key] = timeSeriesResponse.subDimensionContributionMap[key].currentValues;
-            this.subDimensionContributionDetails.baselineValues[key] = timeSeriesResponse.subDimensionContributionMap[key].baselineValues;
-            this.subDimensionContributionDetails.cumulativeCurrentValues[key] = timeSeriesResponse.subDimensionContributionMap[key].cumulativeCurrentValues;
-            this.subDimensionContributionDetails.cumulativeBaselineValues[key] = timeSeriesResponse.subDimensionContributionMap[key].cumulativeBaselineValues;
-            this.subDimensionContributionDetails.percentageChange[key] = timeSeriesResponse.subDimensionContributionMap[key].percentageChange;
-            this.subDimensionContributionDetails.cumulativePercentageChange[key] = timeSeriesResponse.subDimensionContributionMap[key].cumulativePercentageChange;
           }
         }
-      }
+
+        return timeSeriesResponse;
+      });
+      // TODO: use time formatter according to granularity selected, currently only DAYS supported
     }
   },
 

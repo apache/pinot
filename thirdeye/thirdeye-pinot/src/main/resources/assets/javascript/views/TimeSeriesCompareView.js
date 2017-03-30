@@ -41,6 +41,12 @@ TimeSeriesCompareView.prototype = {
     }
   },
 
+  destroy() {
+    $('#timeseries-contributor-placeholder').children().remove();
+    $('#contributor-table-placeholder').children().remove();
+    $('#contributor-table-placeholder').children().remove();
+  },
+
   renderChartSection: function () {
     // render chart
     var timeseriesContributorViewResult = this.timeseries_contributor_template_compiled(

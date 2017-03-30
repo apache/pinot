@@ -11,7 +11,9 @@ function AnalysisController(parentController) {
 
 AnalysisController.prototype = {
   handleAppEvent() {
-    // HASH_SERVICE.refreshWindowHashForRouting('analysis');
+    this.timeSeriesCompareController.destroy();
+    this.analysisView.destroyAnalysisOptions();
+
     const hashParams = HASH_SERVICE.getParams();
     this.analysisModel.init(hashParams);
     this.analysisModel.update(hashParams);
@@ -20,21 +22,26 @@ AnalysisController.prototype = {
   },
 
   handleApplyAnalysisEvent(viewObject) {
+    this.timeSeriesCompareController.destroy();
     HASH_SERVICE.update(viewObject.viewParams);
     HASH_SERVICE.refreshWindowHashForRouting('analysis');
     this.initTimeSeriesController(HASH_SERVICE.getParams());
   },
 
   handleSearchEvent(params = {}) {
-
     const { searchParams } = params;
-    HASH_SERVICE.update(searchParams)
-    HASH_SERVICE.refreshWindowHashForRouting('analysis');
-    const hashParams = HASH_SERVICE.getParams();
-    this.analysisModel.init(hashParams);
-    this.analysisModel.update(hashParams);
-    this.analysisView.renderAnalysisOptions();
-    this.initTimeSeriesController(hashParams);
+    this.timeSeriesCompareController.destroy();
+    this.analysisView.destroyAnalysisOptions();
+
+    this.analysisModel.fetchAnalysisOptionsData(searchParams.metricId, 'analysis-spin-area').then((res) => {
+      HASH_SERVICE.update(searchParams);
+      HASH_SERVICE.refreshWindowHashForRouting('analysis');
+      const hashParams = HASH_SERVICE.getParams();
+      this.analysisModel.init(hashParams);
+      this.analysisModel.update(hashParams);
+      this.analysisView.renderAnalysisOptions();
+      this.initTimeSeriesController(hashParams);
+    });
   },
 
   initTimeSeriesController(params) {

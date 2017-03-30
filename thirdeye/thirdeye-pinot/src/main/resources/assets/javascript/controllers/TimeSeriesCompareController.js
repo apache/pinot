@@ -13,15 +13,19 @@ TimeSeriesCompareController.prototype = {
   handleAppEvent: function (params) {
     params = params || HASH_SERVICE.getParams();
     this.timeSeriesCompareModel.init(params);
-    this.timeSeriesCompareModel.update();
-    this.timeSeriesCompareView.render();
-
+    this.timeSeriesCompareModel.update().then(() => {
+      this.timeSeriesCompareView.render();
+    });
   },
 
   handleHeatMapRenderEvent: function (viewObject) {
-
-    // TODO: separate refreshWindowHash within update
+    this.dimensionTreeMapController.destroy();
     HASH_SERVICE.update(viewObject.viewParams);
     this.dimensionTreeMapController.handleAppEvent(HASH_SERVICE.getParams());
+  },
+
+  destroy() {
+    this.timeSeriesCompareView.destroy();
+    this.dimensionTreeMapController.destroy();
   }
 };

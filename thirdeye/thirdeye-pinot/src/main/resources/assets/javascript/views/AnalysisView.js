@@ -88,7 +88,20 @@ AnalysisView.prototype = {
   },
 
   destroyAnalysisOptions() {
-    $('#analysis-options-placeholder').children().remove()
+    this.destroyDatePickers();
+    const $analysisPlaceholder = $('#analysis-options-placeholder');
+    $analysisPlaceholder.children().remove();
+  },
+
+  destroyDatePickers() {
+    const $currentRangePicker = $('#current-range');
+    const $baselineRangePicker = $('#baseline-range');
+    $currentRangePicker.length && $currentRangePicker.data('daterangepicker').remove();
+    $baselineRangePicker.length && $baselineRangePicker.data('daterangepicker').remove();
+  },
+
+  destroyDimensionTreeMap() {
+    $("#timeseries-contributor-placeholder").children().remove();
   },
 
   renderAnalysisOptions(metricId) {
@@ -99,16 +112,16 @@ AnalysisView.prototype = {
     const compiled_analysis_options_template = Handlebars.compile(analysis_options_template);
     $('#analysis-options-placeholder').html(compiled_analysis_options_template);
 
-    this.renderDateRangePickers();
     this.renderGranularity(metricId);
+    this.renderDateRangePickers();
     this.renderDimensions(metricId);
     this.renderFilters(metricId);
     this.setupApplyListener(metricId);
   },
 
-  renderDateRangePickers() {
+  renderDateRangePickers(showTime) {
     const $currentRangeText = $('#current-range span');
-    const $baselineRangeText= $('#baseline-range span');
+    const $baselineRangeText = $('#baseline-range span');
     const $currentRange = $('#current-range');
     const $baselineRange = $('#baseline-range');
 
@@ -142,11 +155,11 @@ AnalysisView.prototype = {
     setCurrentRange(currentStart, currentEnd);
     setBaselineRange(baselineStart, baselineEnd);
 
-    this.renderDatePicker($currentRange, setCurrentRange, currentStart, currentEnd);
-    this.renderDatePicker($baselineRange, setBaselineRange, baselineStart, baselineEnd);
+    this.renderDatePicker($currentRange, setCurrentRange, currentStart, currentEnd, showTime);
+    this.renderDatePicker($baselineRange, setBaselineRange, baselineStart, baselineEnd, showTime);
   },
 
-  renderDatePicker: function ($selector, callbackFun, initialStart, initialEnd){
+  renderDatePicker: function ($selector, callbackFun, initialStart, initialEnd, showTime){
     $selector.daterangepicker({
       startDate: initialStart,
       endDate: initialEnd,
@@ -155,7 +168,7 @@ AnalysisView.prototype = {
       },
       showDropdowns: true,
       showWeekNumbers: true,
-      timePicker: true,
+      timePicker: showTime,
       timePickerIncrement: 5,
       timePicker12Hour: true,
       ranges: {
@@ -186,10 +199,15 @@ AnalysisView.prototype = {
     if (granularities) {
       $granularitySelector.select2().empty();
       $granularitySelector.select2(config);
+      // $granularitySelector.on('change', (event) => {
+      //   const showTime = event.currentTarget.value !== 'DAYS';
+      //   onChangeCallback.call(this, showTime);
+      // });
     }
     if (paramGranularity && granularities.includes(paramGranularity)) {
       $granularitySelector.val(paramGranularity).trigger('change');
     }
+
   },
 
   renderDimensions: function (metricId) {
@@ -279,16 +297,13 @@ AnalysisView.prototype = {
 
   setupSearchListeners() {
     $("#analysis-search-button").click(() => {
-      this.destroyAnalysisOptions();
-      this.analysisModel.fetchAnalysisOptionsData(this.searchParams.metricId, 'analysis-spin-area').then((res) => {
-        return this.searchEvent.notify();
-      })
+      if (!this.searchParams.metricId) return;
+      this.searchEvent.notify()
     });
   },
 
   setupApplyListener(){
     $("#analysis-apply-button").click((e) => {
-      this.destroyAnalysisGraph();
       this.collectViewParams();
       this.applyDataChangeEvent.notify();
     });

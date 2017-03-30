@@ -76,7 +76,8 @@ AnalysisModel.prototype = {
       this.filtersOptions = result;
       return result;
     }).then(() => {
-      return spinner.stop();
+      spinner.stop();
+      return this;
     });
   }
 };

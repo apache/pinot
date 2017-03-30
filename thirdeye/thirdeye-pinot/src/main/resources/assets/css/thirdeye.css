@@ -418,6 +418,12 @@ text {
 
 /* Common */
 
+/* Spinner*/
+
+.spinner-wrapper {
+  position: relative;
+}
+
 /* Navbar*/
 
 .thirdeye-nav {
@@ -806,12 +812,15 @@ text {
 .analysis-options__dropdown {
   padding: 0 12px;
   flex-grow: 1;
+  flex-shrink: 1;
   display: flex;
   flex-wrap: wrap;
 }
 
 .analysis-options__datepicker {
   width: 50%;
+  min-width: 50%;
+  flex-shrink: 0;
   margin-right: 24px;
 }
 

@@ -6,7 +6,7 @@ function DimensionTreeMapView(dimensionTreeMapModel) {
 }
 
 DimensionTreeMapView.prototype = {
-  render: function () {
+  render() {
     if (this.dimensionTreeMapModel.heatmapData) {
       var result = this.template_compiled(this.dimensionTreeMapModel);
       $(this.placeHolderId).html(result);
@@ -16,21 +16,34 @@ DimensionTreeMapView.prototype = {
     }
   },
 
+  destroy() {
+    const $heatMapCurrent = $('#heatmap-current-range');
+    const $heatMapBaseline = $('#heatmap-baseline-range');
+
+    $heatMapCurrent.length && $heatMapCurrent.data('daterangepicker').remove();
+    $heatMapBaseline.length && $heatMapBaseline.data('daterangepicker').remove();
+    $("#dimension-tree-map-placeholder").children().remove();
+  },
+
   renderTreemapHeaderSection : function() {
     var self = this;
+    const showTime = this.dimensionTreeMapModel.granularity !== 'DAYS';
+
     function current_range_cb(start, end) {
       $('#heatmap-current-range span').addClass("time-range").html(start.format('MMM D, ') + start.format('hh:mm a') + '  &mdash;  ' + end.format('MMM D, ') + end.format('hh:mm a'));
     }
     function baseline_range_cb(start, end) {
       $('#heatmap-baseline-range span').addClass("time-range").html(start.format('MMM D, ') + start.format('hh:mm a') + '  &mdash;  ' + end.format('MMM D, ') + end.format('hh:mm a'));
     }
-    this.renderDatePicker('#heatmap-current-range', current_range_cb, self.dimensionTreeMapModel.currentStart, self.dimensionTreeMapModel.currentEnd);
-    this.renderDatePicker('#heatmap-baseline-range', baseline_range_cb, self.dimensionTreeMapModel.baselineStart, self.dimensionTreeMapModel.baselineEnd);
+
+
+    this.renderDatePicker('#heatmap-current-range', current_range_cb, self.dimensionTreeMapModel.currentStart, self.dimensionTreeMapModel.currentEnd, showTime);
+    this.renderDatePicker('#heatmap-baseline-range', baseline_range_cb, self.dimensionTreeMapModel.baselineStart, self.dimensionTreeMapModel.baselineEnd, showTime);
     current_range_cb(self.dimensionTreeMapModel.currentStart, self.dimensionTreeMapModel.currentEnd);
     baseline_range_cb(self.dimensionTreeMapModel.baselineStart, self.dimensionTreeMapModel.baselineEnd);
   },
 
-  renderDatePicker: function (domId, callbackFun, initialStart, initialEnd){
+  renderDatePicker: function (domId, callbackFun, initialStart, initialEnd, showTime){
     $(domId).daterangepicker({
       startDate: initialStart,
       endDate: initialEnd,
@@ -39,7 +52,7 @@ DimensionTreeMapView.prototype = {
       },
       showDropdowns: true,
       showWeekNumbers: true,
-      timePicker: true,
+      timePicker: showTime,
       timePickerIncrement: 5,
       timePicker12Hour: true,
       ranges: {

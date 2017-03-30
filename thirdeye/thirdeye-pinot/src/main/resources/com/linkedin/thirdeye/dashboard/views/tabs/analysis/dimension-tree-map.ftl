@@ -7,7 +7,6 @@
 			</div>
 		</div>
 	</div> -->
-
 	<div class="contribution-analysis">
 		<div class="contribution-analysis__daterangepicker">
 			<label class="label-medium-semibold">Comparing:</label>
@@ -48,10 +47,12 @@
 	<div class="analysis-card analysis-summary bottom-buffer padding-all">
 		<div class="analysis-summary__item">
 			<label class="analysis-summary__label">Current Total</label>
+			<!-- {{displayDate currentStart}} - {{displayDate currentEnd}} -->
 			<span class="analysis-summary__data">{{formatNumber currentTotal}}</span>
 		</div>
 		<div class="analysis-summary__item">
 			<label class="analysis-summary__label">Baseline Total</label>
+			<!-- {{displayDate baselineStart}} - {{displayDate baselineEnd}} -->
 			<span class="analysis-summary__data">{{formatNumber baselineTotal}}</span>
 		</div>
 		<div class="analysis-summary__item">
