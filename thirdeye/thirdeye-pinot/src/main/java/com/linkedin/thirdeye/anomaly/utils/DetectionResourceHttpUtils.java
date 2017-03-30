@@ -21,9 +21,7 @@ public class DetectionResourceHttpUtils extends AbstractResourceHttpUtils {
   private static final String EVAL_AUTOTUNE = "eval/autotune/";
   private static final String CHECK_HAS_LABELS = "initautotune/checkhaslabel/";
   private static final String INIT_AUTOTUNE = "initautotune/filter/";
-  private static final String FUNCTION = "function/";
-  private static final String AUTOTUNE = "/autotune";
-  private static final String REPLAY = "/replay";
+  private static final String REPLAY_FUNCTION = "replay/function/";
 
   public DetectionResourceHttpUtils(String detectionHost, int detectionPort) {
     super(new HttpHost(detectionHost, detectionPort));
@@ -116,7 +114,7 @@ public class DetectionResourceHttpUtils extends AbstractResourceHttpUtils {
       PerformanceEvaluationMethod evaluationMethod, double goal, boolean speedup)
       throws ClientProtocolException, IOException {
     HttpPost req = new HttpPost(
-        DETECTION_JOB_ENDPOINT + FUNCTION + id + REPLAY + "?start=" + startTimeISO + "&end=" + endTimeISO
+        DETECTION_JOB_ENDPOINT + REPLAY_FUNCTION + id + "?start=" + startTimeISO + "&end=" + endTimeISO
             + "&tune=" + tuningParameters + "&goal=" + goal + "&evalMethod=" + evaluationMethod.name()
             + "&speedup=" + Boolean.toString(speedup));
     return callJobEndpoint(req);

@@ -489,7 +489,6 @@ public class DetectionJobResource {
   }
 
   /**
-<<<<<<< HEAD
    * To evaluate alert filte directly by autotune Id using autotune_config_index table
    * This is to leverage the intermediate step before updating tuned alert filter configurations
    * @param id: autotune Id
@@ -545,10 +544,12 @@ public class DetectionJobResource {
    * A response containing all satisfied properties with their evaluation result
    */
   @POST
-  @Path("function/{id}/replay")
-  public Response anomalyFunctionReplay(@PathParam("id") long functionId, @QueryParam("start") String replayStartTimeIso,
-      @QueryParam("end") String replayEndTimeIso, @QueryParam("speedup") @DefaultValue("true") boolean speedup,
-      @QueryParam("tune") String tuningJSON, @QueryParam("goal") double goal,
+  @Path("replay/function/{id}")
+  public Response anomalyFunctionReplay(@PathParam("id") @NotNull long functionId,
+      @QueryParam("start") @NotNull String replayStartTimeIso, @QueryParam("end") @NotNull String replayEndTimeIso,
+      @QueryParam("speedup") @DefaultValue("true") boolean speedup,
+      @QueryParam("tune") @DefaultValue("{\"pValueThreshold\":[0.1,0.05,0.01,0.05,0.01]}") String tuningJSON,
+      @QueryParam("goal") @DefaultValue("0.05") double goal,
       @QueryParam("evalMethod") @DefaultValue("ANOMALY_PERCENTAGE") String performanceEvaluationMethod){
     DateTime replayStart = null;
     DateTime replayEnd = null;
@@ -578,6 +579,7 @@ public class DetectionJobResource {
     PerformanceEvaluationMethod performanceEvalMethod = PerformanceEvaluationMethod.valueOf(performanceEvaluationMethod.toUpperCase());
 
     // select the functionAutotuneConfigDTO in DB
+    //TODO: override existing autotune results by a method "autotuneConfigDAO.udpate()"
     Long targetId = null;
     List<AutotuneConfigDTO> functionAutoTuneConfigDTOList =
         autotuneConfigDAO.findAllByFuctionIdAndWindow(functionId,replayStart.getMillis(), replayEnd.getMillis());
