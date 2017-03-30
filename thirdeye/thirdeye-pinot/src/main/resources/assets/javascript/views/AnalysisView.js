@@ -76,7 +76,9 @@ AnalysisView.prototype = {
 
     }).trigger('change');
     if (metricId) {
-      this.renderAnalysisOptions(metricId);
+      this.analysisModel.fetchAnalysisOptionsData(metricId, 'analysis-spin-area').then(() => {
+        this.renderAnalysisOptions(metricId);
+      })
     }
     this.setupSearchListeners();
   },
@@ -175,7 +177,7 @@ AnalysisView.prototype = {
     if(!metricId) return;
     const $granularitySelector = $("#analysis-granularity-input");
     const paramGranularity = this.viewParams.granularity;
-    const granularities = this.analysisModel.fetchGranularityForMetric(metricId);
+    const granularities = this.analysisModel.granularityOptions;
     const config = {
       theme: "bootstrap",
       minimumResultsForSearch: -1,
@@ -194,7 +196,7 @@ AnalysisView.prototype = {
     if(!metricId) return;
     const $dimensionSelector = $("#analysis-metric-dimension-input");
     const paramDimension = this.viewParams.dimension;
-    const dimensions = this.analysisModel.fetchDimensionsForMetric(metricId);
+    const dimensions = this.analysisModel.dimensionOptions;
     const config = {
       theme: "bootstrap",
       minimumResultsForSearch: -1,
@@ -212,7 +214,8 @@ AnalysisView.prototype = {
   renderFilters: function (metricId) {
     if(!metricId) return;
     const $filterSelector = $("#analysis-metric-filter-input");
-    var filters = this.analysisModel.fetchFiltersForMetric(metricId);
+    const filtersParam = this.viewParams.filters;
+    var filters = this.analysisModel.filtersOptions;
     var filterData = [];
     for (var key in filters) {
       // TODO: introduce category
@@ -234,16 +237,18 @@ AnalysisView.prototype = {
       $filterSelector.select2().empty();
       $filterSelector.select2(config);
 
-      let paramFilters = [];
-      Object.keys(this.viewParams.filters).forEach((key) => {
-        this.viewParams.filters[key].forEach((filterName) => {
-          if (filters[key] && filters[key].includes(filterName)) {
-            paramFilters.push(`${key}:${filterName}`);
-          }
+      if (filtersParam) {
+        let paramFilters = [];
+        Object.keys(this.viewParams.filters).forEach((key) => {
+          this.viewParams.filters[key].forEach((filterName) => {
+            if (filters[key] && filters[key].includes(filterName)) {
+              paramFilters.push(`${key}:${filterName}`);
+            }
+          });
         });
-      });
 
-      $filterSelector.val(paramFilters).trigger("change");
+        $filterSelector.val(paramFilters).trigger("change");
+      }
     }
   },
 
@@ -275,7 +280,9 @@ AnalysisView.prototype = {
   setupSearchListeners() {
     $("#analysis-search-button").click(() => {
       this.destroyAnalysisOptions();
-      this.searchEvent.notify();
+      this.analysisModel.fetchAnalysisOptionsData(this.searchParams.metricId, 'analysis-spin-area').then((res) => {
+        return this.searchEvent.notify();
+      })
     });
   },
 

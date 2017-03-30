@@ -50,15 +50,33 @@ AnalysisModel.prototype = {
     return dataService.fetchMetricByMetricId(metricId);
   },
 
-  fetchGranularityForMetric: function (metricId) {
+  fetchGranularityForMetric(metricId) {
     return dataService.fetchGranularityForMetric(metricId);
   },
 
-  fetchDimensionsForMetric : function(metricId) {
+  fetchDimensionsForMetric(metricId) {
     return dataService.fetchDimensionsForMetric(metricId);
   },
 
-  fetchFiltersForMetric : function(metricId) {
+  fetchFiltersForMetric(metricId) {
     return dataService.fetchFiltersForMetric(metricId);
+  },
+
+  fetchAnalysisOptionsData(metricId, spinArea) {
+    const target = document.getElementById(spinArea);
+    const spinner = new Spinner();
+    spinner.spin(target);
+    return this.fetchGranularityForMetric(metricId).then((result) => {
+      this.granularityOptions = result;
+      return this.fetchDimensionsForMetric(metricId);
+    }).then((result) => {
+      this.dimensionOptions = result;
+      return this.fetchFiltersForMetric(metricId);
+    }).then((result) => {
+      this.filtersOptions = result;
+      return result;
+    }).then(() => {
+      return spinner.stop();
+    });
   }
-}
+};

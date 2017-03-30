@@ -55,10 +55,17 @@ DimensionTreeMapModel.prototype = {
 
   update: function () {
     if (this.metricId) {
-      var heatMapData = dataService.fetchHeatmapData(this.metricId, this.currentStart,
-          this.currentEnd, this.baselineStart, this.baselineEnd, this.heatmapFilters);
-      this.heatmapData = heatMapData;
-      this.transformResponseData(heatMapData);
+      dataService.fetchHeatmapData(
+        this.metricId,
+        this.currentStart,
+        this.currentEnd,
+        this.baselineStart,
+        this.baselineEnd,
+        this.heatmapFilters
+      ).then((heatmapData) => {
+        this.heatmapData = heatMapData;
+        this.transformResponseData(heatMapData);
+      });
     }
   },
 

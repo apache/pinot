@@ -17,7 +17,7 @@ TimeSeriesCompareController.prototype = {
     this.timeSeriesCompareView.render();
 
     // render heatmap if view params are set in hashParams
-    this.dimensionTreeMapController.handleAppEvent(params);
+    // this.dimensionTreeMapController.handleAppEvent(params);
   },
 
   handleHeatMapRenderEvent: function (viewObject) {

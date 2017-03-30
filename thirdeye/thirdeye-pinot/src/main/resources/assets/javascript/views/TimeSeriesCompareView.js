@@ -32,10 +32,10 @@ TimeSeriesCompareView.prototype = {
       // set initial view params for rendering heatmap
       this.viewParams = {
         metricId: self.timeSeriesCompareModel.metricId,
-        currentStart: self.timeSeriesCompareModel.currentStart,
-        currentEnd: self.timeSeriesCompareModel.currentEnd,
-        baselineStart: self.timeSeriesCompareModel.baselineStart,
-        baselineEnd: self.timeSeriesCompareModel.baselineEnd,
+        heatmapCurrentStart: self.timeSeriesCompareModel.currentStart,
+        heatmapCurrentEnd: self.timeSeriesCompareModel.currentEnd,
+        heatmapBaselineStart: self.timeSeriesCompareModel.baselineStart,
+        heatmapBaselineEnd: self.timeSeriesCompareModel.baselineEnd,
         heatmapFilters: self.timeSeriesCompareModel.filters
       };
     }
@@ -102,22 +102,12 @@ TimeSeriesCompareView.prototype = {
     });
   },
 
-  // regions : [ {
-  //         axis : 'x',
-  //         start : anomaly.anomalyRegionStart,
-  //         end : anomaly.anomalyRegionEnd,
-  //         class: 'anomaly-region',
-  //         tick : {
-  //           format : '%m %d %Y'
-  //         }
-  //       } ]
-
   loadAnomalyRegion() {
-    const {currentStart, currentEnd} = this.viewParams;
+    const { heatMapCurrentStart, heatMapCurrentEnd } = this.viewParams;
     const regions = {
         axis: 'x',
-        start: currentStart.format(constants.TIMESERIES_DATE_FORMAT),
-        end: currentEnd.format(constants.TIMESERIES_DATE_FORMAT),
+        start: heatMapCurrentStart.format(constants.TIMESERIES_DATE_FORMAT),
+        end: heatMapCurrentEnd.format(constants.TIMESERIES_DATE_FORMAT),
         class: 'anomaly-region',
         tick: {
           format: '%m %d %Y'
@@ -218,10 +208,10 @@ TimeSeriesCompareView.prototype = {
 
     this.viewParams = {
       metricId: self.timeSeriesCompareModel.metricId,
-      currentStart: moment(currentStart),
-      currentEnd: moment(currentEnd),
-      baselineStart: moment(baselineStart),
-      baselineEnd: moment(baselineEnd),
+      heatMapCurrentStart: moment(currentStart),
+      heatMapCurrentEnd: moment(currentEnd),
+      heatMapBaselineStart: moment(baselineStart),
+      heatMapBaselineEnd: moment(baselineEnd),
       heatmapFilters: heatmapFilters
     };
   }

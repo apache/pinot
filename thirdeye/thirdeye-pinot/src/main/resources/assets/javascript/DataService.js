@@ -133,17 +133,17 @@ DataService.prototype = {
 
     fetchGranularityForMetric: function (metricId) {
       var url = "/data/agg/granularity/metric/"+metricId;
-      return this.getDataSynchronous(url);
+      return this.getDataAsynchronous(url);
     },
 
     fetchDimensionsForMetric : function(metricId) {
       var url = "/data/autocomplete/dimensions/metric/"+metricId;
-      return this.getDataSynchronous(url);
+      return this.getDataAsynchronous(url);
     },
 
     fetchFiltersForMetric : function(metricId) {
       var url = "/data/autocomplete/filters/metric/" + metricId;
-      return this.getDataSynchronous(url);
+      return this.getDataAsynchronous(url);
     },
 
     fetchTimeseriesCompare: function (metricId, currentStart, currentEnd, baselineStart, baselineEnd,
@@ -151,14 +151,14 @@ DataService.prototype = {
       var url = "/timeseries/compare/" + metricId + "/" + currentStart + "/" + currentEnd + "/"
           + baselineStart + "/" + baselineEnd + "?dimension=" + dimension + "&filters="
           + JSON.stringify(filters) + "&granularity=" + granularity;
-      return this.getDataSynchronous(url);
+      return this.getDataAsynchronous(url);
     },
 
   fetchHeatmapData: function (metricId, currentStart, currentEnd, baselineStart, baselineEnd,
       filters = {}) {
     var url = "/data/heatmap/" + metricId + "/" + currentStart + "/" + currentEnd + "/"
         + baselineStart + "/" + baselineEnd + "?filters=" + JSON.stringify(filters);
-    return this.getDataSynchronous(url);
+    return this.getDataAsynchronous(url, {}, null, 'analysis-spin-area');
   },
 
   fetchAnomalyWowData(anomalyId){

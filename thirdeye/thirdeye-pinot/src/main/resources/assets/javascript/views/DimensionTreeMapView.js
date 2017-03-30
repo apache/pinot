@@ -185,18 +185,17 @@ DimensionTreeMapView.prototype = {
   },
 
   setupListenersForMode : function () {
-    var self = this;
-    $("#percent_change a").click(self, function() {
-      self.dimensionTreeMapModel.heatmapMode = "percentChange";
-      self.render();
+    $("#percent_change a").click(() => {
+      this.dimensionTreeMapModel.heatmapMode = "percentChange";
+      this.render();
     });
-    $("#change_in_contribution").click(self, function() {
-      self.dimensionTreeMapModel.heatmapMode = "contributionChange";
-      self.render();
+    $("#change_in_contribution").click(() => {
+      this.dimensionTreeMapModel.heatmapMode = "contributionChange";
+      this.render();
     });
-    $("#contribution_to_overall_change").click(self, function() {
-      self.dimensionTreeMapModel.heatmapMode = "contributionToOverallChange";
-      self.render();
+    $("#contribution_to_overall_change").click(() => {
+      this.dimensionTreeMapModel.heatmapMode = "contributionToOverallChange";
+      this.render();
     });
   },
 }

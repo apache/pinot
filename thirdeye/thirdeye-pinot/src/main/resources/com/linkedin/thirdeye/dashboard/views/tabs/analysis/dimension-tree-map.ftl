@@ -64,29 +64,6 @@
 		</div>
 	</div>
 
-	<!-- <div class="row bottom-buffer">
-		<div class="col-xs-12">
-			<table class="table info-table">
-				<thead>
-					<tr>
-						<th>CURRENT TOTAL({{currentStartTime}} - {{currentEndTime}})</th>
-						<th>BASELINE TOTAL({{baselineStartTime}} - {{baselineEndTime}})</th>
-						<th>CHANGE VALUE</th>
-						<th>% CHANGE</th>
-					</tr>
-				</thead>
-				<tbody>
-					<tr>
-						<td>{{currentTotal}}</td>
-						<td>{{baselineTotal}}</td>
-						<td><p class="text-danger">{{absoluteChange}}</p></td>
-						<td><p class="text-danger">{{percentChange}} %</p></td>
-					</tr>
-				</tbody>
-			</table>
-		</div>
-	</div> -->
-
 	<div class="row">
 		<div class="col-xs-12">
 			<table class="table table-borderless tree-map__table">

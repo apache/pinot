@@ -27,6 +27,7 @@ AnalysisController.prototype = {
   },
 
   handleSearchEvent(params = {}) {
+
     const { searchParams } = params;
     HASH_SERVICE.update(searchParams)
     HASH_SERVICE.refreshWindowHashForRouting('analysis');
