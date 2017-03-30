@@ -6,10 +6,10 @@ function DimensionTreeMapController() {
 DimensionTreeMapController.prototype = {
 
   handleAppEvent : function(params) {
-    debugger;
     params = params || HASH_SERVICE.getParams();
     this.dimensionTreeMapModel.init(params);
-    this.dimensionTreeMapModel.update();
-    // this.dimensionTreeMapView.render();
+    this.dimensionTreeMapModel.update().then(() => {
+      this.dimensionTreeMapView.render();
+    });
   },
-}
+};

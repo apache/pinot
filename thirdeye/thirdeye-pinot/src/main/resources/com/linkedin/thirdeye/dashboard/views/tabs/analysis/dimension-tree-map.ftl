@@ -30,7 +30,7 @@
 			<nav class="navbar navbar-transparent" role="navigation">
 				<div class="collapse navbar-collapse tree-map__nav">
 					<ul class="nav navbar-nav tree-map-tabs" id="dashboard-tabs">
-						<li class="tree-map__tab" id="percent_change">
+						<li class="tree-map__tab active" id="percent_change">
 							<a class="tree-map__link" href="#percent_change" data-toggle="tab">% Change</a>
 						</li>
 						<li class="tree-map__tab" id="change_in_contribution">

@@ -158,7 +158,7 @@ DataService.prototype = {
       filters = {}) {
     var url = "/data/heatmap/" + metricId + "/" + currentStart + "/" + currentEnd + "/"
         + baselineStart + "/" + baselineEnd + "?filters=" + JSON.stringify(filters);
-    return this.getDataAsynchronous(url, {}, null, 'analysis-spin-area');
+    return this.getDataAsynchronous(url, {}, null, 'dimension-tree-spin-area');
   },
 
   fetchAnomalyWowData(anomalyId){

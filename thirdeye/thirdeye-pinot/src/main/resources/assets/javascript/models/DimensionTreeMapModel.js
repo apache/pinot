@@ -25,17 +25,17 @@ DimensionTreeMapModel.prototype = {
       this.metricId = params.metricId;
       this.metricName = params.metricName;
 
-      if (params.currentStart) {
-        this.currentStart = params.currentStart;
+      if (params.heatMapCurrentStart) {
+        this.currentStart = params.heatMapCurrentStart;
       }
-      if (params.currentEnd) {
-        this.currentEnd = params.currentEnd;
+      if (params.heatMapCurrentEnd) {
+        this.currentEnd = params.heatMapCurrentEnd;
       }
-      if (params.baselineStart) {
-        this.baselineStart = params.baselineStart;
+      if (params.heatMapBaselineStart) {
+        this.baselineStart = params.heatMapBaselineStart;
       }
-      if (params.baselineEnd) {
-        this.baselineEnd = params.baselineEnd;
+      if (params.heatMapBaselineEnd) {
+        this.baselineEnd = params.heatMapBaselineEnd;
       }
       if (params.granularity) {
         this.granularity = params.granularity;
@@ -53,19 +53,20 @@ DimensionTreeMapModel.prototype = {
     }
   },
 
-  update: function () {
+  update() {
     if (this.metricId) {
-      dataService.fetchHeatmapData(
+      return dataService.fetchHeatmapData(
         this.metricId,
         this.currentStart,
         this.currentEnd,
         this.baselineStart,
         this.baselineEnd,
         this.heatmapFilters
-      ).then((heatmapData) => {
+      ).then((heatMapData) => {
         this.heatmapData = heatMapData;
         this.transformResponseData(heatMapData);
-      });
+        return heatMapData;
+      })
     }
   },
 
