@@ -215,13 +215,13 @@ public abstract class ThirdEyeUtils {
   }
 
   public static MetricExpression getMetricExpressionFromMetricConfig(MetricConfigDTO metricConfig) {
-    MetricExpression metricExpression = new MetricExpression();
-    metricExpression.setExpressionName(metricConfig.getName());
+    String expression = null;
     if (metricConfig.isDerived()) {
-      metricExpression.setExpression(metricConfig.getDerivedMetricExpression());
+      expression = metricConfig.getDerivedMetricExpression();
     } else {
-      metricExpression.setExpression(MetricConfigBean.DERIVED_METRIC_ID_PREFIX + metricConfig.getId());
+      expression = MetricConfigBean.DERIVED_METRIC_ID_PREFIX + metricConfig.getId();
     }
+    MetricExpression metricExpression = new MetricExpression(metricConfig.getName(), expression, metricConfig.getDataset());
     return metricExpression;
   }
 
@@ -354,6 +354,40 @@ public abstract class ThirdEyeUtils {
       break;
     }
     return new Period(0, 0, 0, 7 * numWeeksAgo, 0, 0, 0, 0);
+  }
+
+  public static DatasetConfigDTO getDatasetConfigFromName(String dataset) {
+    DatasetConfigDTO datasetConfig = null;
+    try {
+      datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(dataset);
+    } catch (ExecutionException e) {
+      LOG.error("Exception in getting dataset config {} from cache", dataset, e);
+    }
+    return datasetConfig;
+  }
+
+  public static String getDatasetFromMetricFunction(MetricFunction metricFunction) {
+    MetricConfigDTO metricConfig = getMetricConfigFromId(metricFunction.getMetricId());
+    return metricConfig.getDataset();
+  }
+
+  public static MetricConfigDTO getMetricConfigFromId(Long metricId) {
+    MetricConfigDTO metricConfig = null;
+    if (metricId != null) {
+      metricConfig = DAO_REGISTRY.getMetricConfigDAO().findById(metricId);
+    }
+    return metricConfig;
+  }
+
+
+  public static MetricConfigDTO getMetricConfigFromNameAndDataset(String metricName, String dataset) {
+    MetricConfigDTO metricConfig = null;
+    try {
+      metricConfig = CACHE_REGISTRY.getMetricConfigCache().get(new MetricDataset(metricName, dataset));
+    } catch (ExecutionException e) {
+      LOG.error("Exception while fetching metric by name {} and dataset {}", metricName, dataset, e);
+    }
+    return metricConfig;
   }
 
 }

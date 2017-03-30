@@ -6,6 +6,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
+
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormat;
@@ -17,14 +18,11 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.MetricFunction;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 /**
@@ -37,7 +35,6 @@ public class PqlUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(PqlUtils.class);
   private static final int DEFAULT_TOP = 100000;
 
-  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   /**
    * Returns sql to calculate the sum of all raw metrics required for <tt>request</tt>, grouped by
@@ -45,12 +42,58 @@ public class PqlUtils {
    * Due to the summation, all metric column values can be assumed to be doubles.
    * @throws ExecutionException
    */
-  public static String getPql(ThirdEyeRequest request, TimeSpec dataTimeSpec) throws ExecutionException {
+  public static String getPql(ThirdEyeRequest request, MetricFunction metricFunction, TimeSpec dataTimeSpec)
+      throws ExecutionException {
     // TODO handle request.getFilterClause()
-    return getPql(request.getCollection(), request.getMetricFunctions(),
+
+    return getPql(metricFunction,
         request.getStartTimeInclusive(), request.getEndTimeExclusive(), request.getFilterSet(),
         request.getGroupBy(), request.getGroupByTimeGranularity(), dataTimeSpec);
   }
+
+
+  private static String getPql(MetricFunction metricFunction, DateTime startTime,
+      DateTime endTimeExclusive, Multimap<String, String> filterSet, List<String> groupBy,
+      TimeGranularity timeGranularity, TimeSpec dataTimeSpec) throws ExecutionException {
+
+    MetricConfigDTO metricConfig = ThirdEyeUtils.getMetricConfigFromId(metricFunction.getMetricId());
+    String dataset = metricFunction.getDataset();
+
+    StringBuilder sb = new StringBuilder();
+    String selectionClause = getSelectionClause(metricConfig, metricFunction);
+
+    String tableName = ThirdEyeUtils.computeTableName(dataset);
+
+    sb.append("SELECT ").append(selectionClause).append(" FROM ").append(tableName);
+    String betweenClause = getBetweenClause(startTime, endTimeExclusive, dataTimeSpec, dataset);
+    sb.append(" WHERE ").append(betweenClause);
+
+    String dimensionWhereClause = getDimensionWhereClause(filterSet);
+    if (StringUtils.isNotBlank(dimensionWhereClause)) {
+      sb.append(" AND ").append(dimensionWhereClause);
+    }
+
+    String groupByClause = getDimensionGroupByClause(groupBy, timeGranularity, dataTimeSpec);
+    if (StringUtils.isNotBlank(groupByClause)) {
+      sb.append(" ").append(groupByClause);
+      sb.append(" TOP ").append(DEFAULT_TOP);
+    }
+
+    return sb.toString();
+  }
+
+  private static String getSelectionClause(MetricConfigDTO metricConfig, MetricFunction metricFunction) {
+    StringBuilder builder = new StringBuilder();
+    String metricName = null;
+    if (metricFunction.getMetricName().equals("*")) {
+      metricName = "*";
+    } else {
+      metricName = metricConfig.getName();
+    }
+    builder.append(metricFunction.getFunctionName()).append("(").append(metricName).append(")");
+    return builder.toString();
+  }
+
 
   /**
    * Returns pqls to handle tables where metric names are a single dimension column,
@@ -61,51 +104,41 @@ public class PqlUtils {
    * @return
    * @throws Exception
    */
-  public static List<String> getMetricAsDimensionPqls(ThirdEyeRequest request, TimeSpec dataTimeSpec,
-      DatasetConfigDTO datasetConfig) throws Exception {
+  public static String getMetricAsDimensionPql(ThirdEyeRequest request, MetricFunction metricFunction,
+      TimeSpec dataTimeSpec, DatasetConfigDTO datasetConfig) throws Exception {
 
     // select sum(metric_values_column) from collection
     // where time_clause and metric_names_column=function.getMetricName
     String metricValuesColumn = datasetConfig.getMetricValuesColumn();
     String metricNamesColumn = datasetConfig.getMetricNamesColumn();
 
-    List<String> metricAsDimensionPqls = getMetricAsDimensionPqls(request.getCollection(), request.getMetricFunctions(),
+    String metricAsDimensionPql = getMetricAsDimensionPql(metricFunction,
         request.getStartTimeInclusive(), request.getEndTimeExclusive(), request.getFilterSet(),
         request.getGroupBy(), request.getGroupByTimeGranularity(), dataTimeSpec,
         metricValuesColumn, metricNamesColumn);
 
-    return metricAsDimensionPqls;
+    return metricAsDimensionPql;
   }
 
-  static List<String> getMetricAsDimensionPqls(String collection, List<MetricFunction> metricFunctions, DateTime startTime,
+
+  private static String getMetricAsDimensionPql(MetricFunction metricFunction, DateTime startTime,
       DateTime endTimeExclusive, Multimap<String, String> filterSet, List<String> groupBy,
       TimeGranularity timeGranularity, TimeSpec dataTimeSpec, String metricValuesColumn,
       String metricNamesColumn) throws ExecutionException {
 
-    List<String> metricAsDimensionPqls = new ArrayList<>();
-    for (MetricFunction metricFunction : metricFunctions) {
-      String metricAsDimensionPql = getMetricAsDimensionPql(collection, metricFunction, startTime, endTimeExclusive,
-          filterSet, groupBy, timeGranularity, dataTimeSpec, metricValuesColumn, metricNamesColumn);
-      metricAsDimensionPqls.add(metricAsDimensionPql);
-    }
-    return metricAsDimensionPqls;
-  }
-
-  static String getMetricAsDimensionPql(String collection, MetricFunction metricFunction, DateTime startTime,
-      DateTime endTimeExclusive, Multimap<String, String> filterSet, List<String> groupBy,
-      TimeGranularity timeGranularity, TimeSpec dataTimeSpec, String metricValuesColumn,
-      String metricNamesColumn) throws ExecutionException {
+    MetricConfigDTO metricConfig = ThirdEyeUtils.getMetricConfigFromId(metricFunction.getMetricId());
+    String dataset = metricFunction.getDataset();
 
     StringBuilder sb = new StringBuilder();
     String selectionClause = getMetricAsDimensionSelectionClause(metricFunction, metricValuesColumn);
 
-    String tableName = ThirdEyeUtils.computeTableName(collection);
+    String tableName = ThirdEyeUtils.computeTableName(dataset);
 
     sb.append("SELECT ").append(selectionClause).append(" FROM ").append(tableName);
-    String betweenClause = getBetweenClause(startTime, endTimeExclusive, dataTimeSpec, collection);
+    String betweenClause = getBetweenClause(startTime, endTimeExclusive, dataTimeSpec, dataset);
     sb.append(" WHERE ").append(betweenClause);
 
-    String metricWhereClause = getMetricWhereClause(metricFunction, metricNamesColumn);
+    String metricWhereClause = getMetricWhereClause(metricConfig, metricFunction, metricNamesColumn);
     sb.append(metricWhereClause);
 
     String dimensionWhereClause = getDimensionWhereClause(filterSet);
@@ -122,69 +155,18 @@ public class PqlUtils {
     return sb.toString();
   }
 
-  static String getPql(String collection, List<MetricFunction> metricFunctions, DateTime startTime,
-      DateTime endTimeExclusive, Multimap<String, String> filterSet, List<String> groupBy,
-      TimeGranularity timeGranularity, TimeSpec dataTimeSpec) throws ExecutionException {
 
-    StringBuilder sb = new StringBuilder();
-    String selectionClause = getSelectionClause(metricFunctions);
-
-    String tableName = ThirdEyeUtils.computeTableName(collection);
-
-    sb.append("SELECT ").append(selectionClause).append(" FROM ").append(tableName);
-    String betweenClause = getBetweenClause(startTime, endTimeExclusive, dataTimeSpec, collection);
-    sb.append(" WHERE ").append(betweenClause);
-
-    String dimensionWhereClause = getDimensionWhereClause(filterSet);
-    if (StringUtils.isNotBlank(dimensionWhereClause)) {
-      sb.append(" AND ").append(dimensionWhereClause);
-    }
-
-    String groupByClause = getDimensionGroupByClause(groupBy, timeGranularity, dataTimeSpec);
-    if (StringUtils.isNotBlank(groupByClause)) {
-      sb.append(" ").append(groupByClause);
-      sb.append(" TOP ").append(DEFAULT_TOP);
-    }
-
-    return sb.toString();
-  }
-
-  static String getMetricWhereClause(MetricFunction metricFunction, String metricNameColumn) {
+  private static String getMetricWhereClause(MetricConfigDTO metricConfig, MetricFunction metricFunction, String metricNameColumn) {
     StringBuilder builder = new StringBuilder();
     if (!metricFunction.getMetricName().equals("*")) {
       builder.append(" AND ");
-      String metricId = metricFunction.getMetricName().replaceAll(MetricConfigBean.DERIVED_METRIC_ID_PREFIX, "");
-      MetricConfigDTO metricConfig = DAO_REGISTRY.getMetricConfigDAO().findById(Long.valueOf(metricId));
-      String metricName = metricConfig.getName();
-      builder.append(String.format("%s='%s'", metricNameColumn, metricName));
+      builder.append(String.format("%s='%s'", metricNameColumn, metricConfig.getName()));
     }
     return builder.toString();
   }
 
-  /**
-   * SUM each metric over the current time bucket.
-   */
-  static String getSelectionClause(List<MetricFunction> metricFunctions) {
-    StringBuilder builder = new StringBuilder();
-    String delim = "";
-    for (MetricFunction function : metricFunctions) {
-      builder.append(delim);
-      String metricName = null;
-      if (function.getMetricName().equals("*")) {
-        metricName = "*";
-      } else {
-        String metricId = function.getMetricName().replaceAll(MetricConfigBean.DERIVED_METRIC_ID_PREFIX, "");
-        MetricConfigDTO metricConfig = DAO_REGISTRY.getMetricConfigDAO().findById(Long.valueOf(metricId));
-        metricName = metricConfig.getName();
-      }
-      builder.append(function.getFunctionName()).append("(").append(metricName)
-          .append(")");
-      delim = ", ";
-    }
-    return builder.toString();
-  }
 
-  static String getMetricAsDimensionSelectionClause(MetricFunction metricFunction, String metricValueColumn) {
+  private static String getMetricAsDimensionSelectionClause(MetricFunction metricFunction, String metricValueColumn) {
     StringBuilder builder = new StringBuilder();
     String metricName = metricValueColumn;
     if (metricFunction.getMetricName().equals("*")) {
@@ -194,7 +176,7 @@ public class PqlUtils {
     return builder.toString();
   }
 
-  static String getBetweenClause(DateTime start, DateTime endExclusive, TimeSpec timeFieldSpec, String collection)
+  static String getBetweenClause(DateTime start, DateTime endExclusive, TimeSpec timeFieldSpec, String dataset)
       throws ExecutionException {
     TimeGranularity dataGranularity = timeFieldSpec.getDataGranularity();
     long startMillis = start.getMillis();
@@ -229,7 +211,7 @@ public class PqlUtils {
       endQueryTimeExclusive = (endInConvertedUnits == startInConvertedUnits + 1) ?
           startQueryTime : String.valueOf(endInConvertedUnits);
     } else {
-      DateTimeFormatter inputDataDateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZone(Utils.getDataTimeZone(collection));
+      DateTimeFormatter inputDataDateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZone(Utils.getDataTimeZone(dataset));
       startQueryTime = inputDataDateTimeFormatter.print(start);
       endQueryTimeExclusive = inputDataDateTimeFormatter.print(endExclusive);
     }
@@ -242,7 +224,7 @@ public class PqlUtils {
     }
   }
 
-  static String getDimensionWhereClause(Multimap<String, String> dimensionValues) {
+  private static String getDimensionWhereClause(Multimap<String, String> dimensionValues) {
     List<String> components = new ArrayList<>();
     for (Map.Entry<String, Collection<String>> entry : dimensionValues.asMap().entrySet()) {
       String key = entry.getKey();
@@ -267,7 +249,7 @@ public class PqlUtils {
     return AND.join(components);
   }
 
-  static String getDimensionGroupByClause(List<String> groupBy,
+  private static String getDimensionGroupByClause(List<String> groupBy,
       TimeGranularity aggregationGranulity, TimeSpec timeSpec) {
     String timeColumnName = timeSpec.getColumnName();
     List<String> groups = new LinkedList<String>();
@@ -283,9 +265,9 @@ public class PqlUtils {
     return String.format("GROUP BY %s", COMMA.join(groups));
   }
 
-  public static String getDataTimeRangeSql(String collection, String timeColumnName) {
+  public static String getDataTimeRangeSql(String dataset, String timeColumnName) {
     return String.format("select min(%s), max(%s) from %s", timeColumnName, timeColumnName,
-        collection);
+        dataset);
   }
 
 }

@@ -1,11 +1,14 @@
 package com.linkedin.thirdeye.client.pinot;
 
 import com.linkedin.thirdeye.client.TimeRangeUtils;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 
@@ -31,7 +34,6 @@ import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.pojo.DatasetConfigBean;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 public class PinotThirdEyeClient implements ThirdEyeClient {
@@ -108,60 +110,47 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
 
   @Override
   public PinotThirdEyeResponse execute(ThirdEyeRequest request) throws Exception {
-    DatasetConfigDTO datasetConfig = CACHE_REGISTRY_INSTANCE.getDatasetConfigCache().get(request.getCollection());
-    TimeSpec dataTimeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
-    List<MetricFunction> metricFunctions = request.getMetricFunctions();
-    List<String> dimensionNames = datasetConfig.getDimensions();
-    List<ResultSetGroup> resultSetGroups = new ArrayList<>();
 
-    // By default, query only offline, unless dataset has been marked as realtime
-    String tableName = ThirdEyeUtils.computeTableName(request.getCollection());
+    LinkedHashMap<MetricFunction, List<ResultSet>> metricFunctionToResultSetList = new LinkedHashMap<>();
 
-    if (datasetConfig.isMetricAsDimension()) {
-       List<String> pqls = PqlUtils.getMetricAsDimensionPqls(request, dataTimeSpec, datasetConfig);
-       for (String pql : pqls) {
-         LOG.debug("PQL isMetricAsDimension : {}", pql);
-         ResultSetGroup result = CACHE_REGISTRY_INSTANCE.getResultSetGroupCache().get(new PinotQuery(pql, tableName));
-         resultSetGroups.add(result);
-       }
-    } else {
-      String sql = PqlUtils.getPql(request, dataTimeSpec);
-      LOG.debug("PQL: {}", sql);
-      ResultSetGroup result = CACHE_REGISTRY_INSTANCE.getResultSetGroupCache().get(new PinotQuery(sql, tableName));
-      resultSetGroups.add(result);
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Result for: {} {}", sql, format(result));
+    TimeSpec timeSpec = null;
+    for (MetricFunction metricFunction : request.getMetricFunctions()) {
+      String dataset = metricFunction.getDataset();
+      DatasetConfigDTO datasetConfig = ThirdEyeUtils.getDatasetConfigFromName(dataset);
+      TimeSpec dataTimeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
+      if (timeSpec == null) {
+        timeSpec = dataTimeSpec;
       }
-    }
-    List<ResultSet> resultSets = getResultSets(resultSetGroups);
-    List<String[]> resultRows = parseResultSets(request, resultSets, metricFunctions, dimensionNames, datasetConfig);
-    PinotThirdEyeResponse resp = new PinotThirdEyeResponse(request, resultRows, dataTimeSpec);
-    return resp;
 
+      // By default, query only offline, unless dataset has been marked as realtime
+      String tableName = ThirdEyeUtils.computeTableName(dataset);
+      String pql = null;
+      if (datasetConfig.isMetricAsDimension()) {
+        pql = PqlUtils.getMetricAsDimensionPql(request, metricFunction, dataTimeSpec, datasetConfig);
+      } else {
+        pql = PqlUtils.getPql(request, metricFunction, dataTimeSpec);
+      }
+      ResultSetGroup resultSetGroup = CACHE_REGISTRY_INSTANCE.getResultSetGroupCache().get(new PinotQuery(pql, tableName));
+      metricFunctionToResultSetList.put(metricFunction, getResultSetList(resultSetGroup));
+    }
+
+    List<String[]> resultRows = parseResultSets(request, metricFunctionToResultSetList);
+    PinotThirdEyeResponse resp = new PinotThirdEyeResponse(request, resultRows, timeSpec);
+    return resp;
   }
 
-  private static List<ResultSet> getResultSets(List<ResultSetGroup> resultSetGroups) {
+
+  private static List<ResultSet> getResultSetList(ResultSetGroup resultSetGroup) {
     List<ResultSet> resultSets = new ArrayList<>();
-    for (ResultSetGroup resultSetGroup : resultSetGroups) {
-      for (int i = 0; i < resultSetGroup.getResultSetCount(); i++) {
+    for (int i = 0; i < resultSetGroup.getResultSetCount(); i++) {
         resultSets.add(resultSetGroup.getResultSet(i));
-      }
     }
     return resultSets;
   }
 
-  private static String format(ResultSetGroup resultSetGroup) {
-    StringBuilder sb = new StringBuilder();
-    for (int i = 0; i < resultSetGroup.getResultSetCount(); i++) {
-      sb.append(resultSetGroup.getResultSet(i));
-      sb.append("\n");
-    }
-    return sb.toString();
-  }
 
-  private List<String[]> parseResultSets(ThirdEyeRequest request, List<ResultSet> resultSets,
-      List<MetricFunction> metricFunctions, List<String> dimensionNames, DatasetConfigDTO datasetConfig)
-          throws ExecutionException {
+  private List<String[]> parseResultSets(ThirdEyeRequest request,
+      Map<MetricFunction, List<ResultSet>> metricFunctionToResultSetList) throws ExecutionException {
 
     int numGroupByKeys = 0;
     boolean hasGroupBy = false;
@@ -177,81 +166,93 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     int numMetrics = request.getMetricFunctions().size();
     int numCols = numGroupByKeys + numMetrics;
     boolean hasGroupByTime = false;
-    String collection = datasetConfig.getDataset();
-    TimeGranularity dataGranularity = null;
-    long startTime = request.getStartTimeInclusive().getMillis();
-    DateTimeZone dateTimeZone = Utils.getDataTimeZone(collection);
-    DateTime startDateTime = new DateTime(startTime, dateTimeZone);
-    TimeSpec timespec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
-    dataGranularity = timespec.getDataGranularity();
-    boolean isISOFormat = false;
-    DateTimeFormatter inputDataDateTimeFormatter = null;
-    String timeFormat = timespec.getFormat();
-    if (timeFormat != null && !timeFormat.equals(TimeSpec.SINCE_EPOCH_FORMAT)) {
-      isISOFormat = true;
-      inputDataDateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZone(dateTimeZone);
-    }
     if (request.getGroupByTimeGranularity() != null) {
       hasGroupByTime = true;
     }
+
+    int position = 0;
     LinkedHashMap<String, String[]> dataMap = new LinkedHashMap<>();
-    for (int i = 0; i < resultSets.size(); i++) {
-      ResultSet resultSet = resultSets.get(i);
-      int numRows = resultSet.getRowCount();
-      for (int r = 0; r < numRows; r++) {
-        boolean skipRowDueToError = false;
-        String[] groupKeys;
-        if (hasGroupBy) {
-          groupKeys = new String[resultSet.getGroupKeyLength()];
-          for (int grpKeyIdx = 0; grpKeyIdx < resultSet.getGroupKeyLength(); grpKeyIdx++) {
-            String groupKeyVal = "";
-            try {
-              groupKeyVal = resultSet.getGroupKeyString(r, grpKeyIdx);
-            } catch (Exception e) {
-              // IGNORE FOR NOW, workaround for Pinot Bug
-            }
-            if (hasGroupByTime && grpKeyIdx == 0) {
-              int timeBucket;
-              long millis;
-              if (!isISOFormat) {
-                millis = dataGranularity.toMillis(Double.valueOf(groupKeyVal).longValue());
-              } else {
-                millis = DateTime.parse(groupKeyVal, inputDataDateTimeFormatter).getMillis();
-              }
-              if (millis < startTime) {
-                LOG.error("Data point earlier than requested start time {}: {}", new Date(startTime), new Date(millis));
-                skipRowDueToError = true;
-                break;
-              }
-              timeBucket = TimeRangeUtils
-                  .computeBucketIndex(request.getGroupByTimeGranularity(), startDateTime,
-                      new DateTime(millis, dateTimeZone));
-              groupKeyVal = String.valueOf(timeBucket);
-            }
-            groupKeys[grpKeyIdx] = groupKeyVal;
-          }
-          if (skipRowDueToError) {
-            continue;
-          }
-        } else {
-          groupKeys = new String[] {};
-        }
-        StringBuilder groupKeyBuilder = new StringBuilder("");
-        for (String grpKey : groupKeys) {
-          groupKeyBuilder.append(grpKey).append("|");
-        }
-        String compositeGroupKey = groupKeyBuilder.toString();
-        String[] rowValues = dataMap.get(compositeGroupKey);
-        if (rowValues == null) {
-          rowValues = new String[numCols];
-          Arrays.fill(rowValues, "0");
-          System.arraycopy(groupKeys, 0, rowValues, 0, groupKeys.length);
-          dataMap.put(compositeGroupKey, rowValues);
-        }
-        rowValues[groupKeys.length + i] =
-            String.valueOf(Double.parseDouble(rowValues[groupKeys.length + i])
-                + Double.parseDouble(resultSet.getString(r, 0)));
+    for (Entry<MetricFunction, List<ResultSet>> entry : metricFunctionToResultSetList.entrySet()) {
+
+      MetricFunction metricFunction = entry.getKey();
+
+      String dataset = metricFunction.getDataset();
+      DatasetConfigDTO datasetConfig = ThirdEyeUtils.getDatasetConfigFromName(dataset);
+      TimeSpec dataTimeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
+
+      TimeGranularity dataGranularity = null;
+      long startTime = request.getStartTimeInclusive().getMillis();
+      DateTimeZone dateTimeZone = Utils.getDataTimeZone(dataset);
+      DateTime startDateTime = new DateTime(startTime, dateTimeZone);
+      dataGranularity = dataTimeSpec.getDataGranularity();
+      boolean isISOFormat = false;
+      DateTimeFormatter inputDataDateTimeFormatter = null;
+      String timeFormat = dataTimeSpec.getFormat();
+      if (timeFormat != null && !timeFormat.equals(TimeSpec.SINCE_EPOCH_FORMAT)) {
+        isISOFormat = true;
+        inputDataDateTimeFormatter = DateTimeFormat.forPattern(timeFormat).withZone(dateTimeZone);
       }
+
+      List<ResultSet> resultSets = entry.getValue();
+      for (int i = 0; i < resultSets.size(); i++) {
+        ResultSet resultSet = resultSets.get(i);
+        int numRows = resultSet.getRowCount();
+        for (int r = 0; r < numRows; r++) {
+          boolean skipRowDueToError = false;
+          String[] groupKeys;
+          if (hasGroupBy) {
+            groupKeys = new String[resultSet.getGroupKeyLength()];
+            for (int grpKeyIdx = 0; grpKeyIdx < resultSet.getGroupKeyLength(); grpKeyIdx++) {
+              String groupKeyVal = "";
+              try {
+                groupKeyVal = resultSet.getGroupKeyString(r, grpKeyIdx);
+              } catch (Exception e) {
+                // IGNORE FOR NOW, workaround for Pinot Bug
+              }
+              if (hasGroupByTime && grpKeyIdx == 0) {
+                int timeBucket;
+                long millis;
+                if (!isISOFormat) {
+                  millis = dataGranularity.toMillis(Double.valueOf(groupKeyVal).longValue());
+                } else {
+                  millis = DateTime.parse(groupKeyVal, inputDataDateTimeFormatter).getMillis();
+                }
+                if (millis < startTime) {
+                  LOG.error("Data point earlier than requested start time {}: {}", new Date(startTime), new Date(millis));
+                  skipRowDueToError = true;
+                  break;
+                }
+                timeBucket = TimeRangeUtils
+                    .computeBucketIndex(request.getGroupByTimeGranularity(), startDateTime,
+                        new DateTime(millis, dateTimeZone));
+                groupKeyVal = String.valueOf(timeBucket);
+              }
+              groupKeys[grpKeyIdx] = groupKeyVal;
+            }
+            if (skipRowDueToError) {
+              continue;
+            }
+          } else {
+            groupKeys = new String[] {};
+          }
+          StringBuilder groupKeyBuilder = new StringBuilder("");
+          for (String grpKey : groupKeys) {
+            groupKeyBuilder.append(grpKey).append("|");
+          }
+          String compositeGroupKey = groupKeyBuilder.toString();
+          String[] rowValues = dataMap.get(compositeGroupKey);
+          if (rowValues == null) {
+            rowValues = new String[numCols];
+            Arrays.fill(rowValues, "0");
+            System.arraycopy(groupKeys, 0, rowValues, 0, groupKeys.length);
+            dataMap.put(compositeGroupKey, rowValues);
+          }
+          rowValues[groupKeys.length + position + i] =
+              String.valueOf(Double.parseDouble(rowValues[groupKeys.length + position + i])
+                  + Double.parseDouble(resultSet.getString(r, 0)));
+        }
+      }
+      position ++;
     }
     List<String[]> rows = new ArrayList<>();
     rows.addAll(dataMap.values());

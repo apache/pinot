@@ -130,7 +130,7 @@ public abstract class EmailHelper {
       comparisonRequest.setEndDateInclusive(true);
 
       List<MetricExpression> metricExpressions = new ArrayList<>();
-      MetricExpression expression = new MetricExpression(config.getMetric());
+      MetricExpression expression = new MetricExpression(config.getMetric(), config.getCollection());
       metricExpressions.add(expression);
       comparisonRequest.setMetricExpressions(metricExpressions);
       comparisonRequest.setAggregationTimeGranularity(bucketGranularity);

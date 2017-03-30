@@ -45,14 +45,13 @@ public class Utils {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static ThirdEyeCacheRegistry CACHE_REGISTRY = ThirdEyeCacheRegistry.getInstance();
 
-  public static List<ThirdEyeRequest> generateRequests(String collection, String requestReference,
+  public static List<ThirdEyeRequest> generateRequests(String dataset, String requestReference,
       MetricFunction metricFunction, List<String> dimensions, DateTime start, DateTime end) {
 
     List<ThirdEyeRequest> requests = new ArrayList<>();
 
     for (String dimension : dimensions) {
       ThirdEyeRequestBuilder requestBuilder = new ThirdEyeRequestBuilder();
-      requestBuilder.setCollection(collection);
       List<MetricFunction> metricFunctions = Arrays.asList(metricFunction);
       requestBuilder.setMetricFunctions(metricFunctions);
 
@@ -67,14 +66,14 @@ public class Utils {
     return requests;
   }
 
-  public static Map<String, List<String>> getFilters(QueryCache queryCache, String collection,
+  public static Map<String, List<String>> getFilters(QueryCache queryCache, String dataset,
       String requestReference, List<String> dimensions, DateTime start,
       DateTime end) throws Exception {
 
-    MetricFunction metricFunction = new MetricFunction(MetricAggFunction.COUNT, "*");
+    MetricFunction metricFunction = new MetricFunction(MetricAggFunction.COUNT, "*", null, dataset);
 
     List<ThirdEyeRequest> requests =
-        generateRequests(collection, requestReference, metricFunction, dimensions, start, end);
+        generateRequests(dataset, requestReference, metricFunction, dimensions, start, end);
 
     Map<ThirdEyeRequest, Future<ThirdEyeResponse>> queryResultMap =
         queryCache.getQueryResultsAsync(requests);
@@ -139,7 +138,7 @@ public class Utils {
   }
 
   public static List<MetricExpression> convertToMetricExpressions(String metricsJson,
-      MetricAggFunction aggFunction, String collection) throws ExecutionException {
+      MetricAggFunction aggFunction, String dataset) throws ExecutionException {
 
     List<MetricExpression> metricExpressions = new ArrayList<>();
     if (metricsJson == null) {
@@ -160,9 +159,9 @@ public class Utils {
       }
     }
     for (String metricExpressionName : metricExpressionNames) {
-      String derivedMetricExpression = ThirdEyeUtils.getDerivedMetricExpression(metricExpressionName, collection);
+      String derivedMetricExpression = ThirdEyeUtils.getDerivedMetricExpression(metricExpressionName, dataset);
       MetricExpression metricExpression = new MetricExpression(metricExpressionName, derivedMetricExpression,
-           aggFunction);
+           aggFunction, dataset);
       metricExpressions.add(metricExpression);
     }
     return metricExpressions;
@@ -255,7 +254,7 @@ public class Utils {
       List<MetricFunction> metricFunctions) {
     List<MetricExpression> metricExpressions = new ArrayList<>();
     for (MetricFunction function : metricFunctions) {
-      metricExpressions.add(new MetricExpression(function.getMetricName()));
+      metricExpressions.add(new MetricExpression(function.getMetricName(), function.getDataset()));
     }
     return metricExpressions;
   }

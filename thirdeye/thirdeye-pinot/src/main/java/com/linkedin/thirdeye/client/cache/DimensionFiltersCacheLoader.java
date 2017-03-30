@@ -23,21 +23,21 @@ public class DimensionFiltersCacheLoader extends CacheLoader<String, String> {
   }
 
   @Override
-  public String load(String collection) throws Exception {
+  public String load(String dataset) throws Exception {
     DateTime startDateTime = new DateTime(System.currentTimeMillis()).minusDays(7);
     DateTime endDateTime = new DateTime(System.currentTimeMillis());
 
     String jsonFilters = null;
     try {
-      LOGGER.info("Loading dimension filters cache {}", collection);
-      List<String> dimensions = Utils.getSortedDimensionNames(collection);
+      LOGGER.info("Loading dimension filters cache {}", dataset);
+      List<String> dimensions = Utils.getSortedDimensionNames(dataset);
       Map<String, List<String>> filters =
-          Utils.getFilters(queryCache, collection, "filters", dimensions, startDateTime, endDateTime);
+          Utils.getFilters(queryCache, dataset, "filters", dimensions, startDateTime, endDateTime);
       jsonFilters = OBJECT_MAPPER.writeValueAsString(filters);
 
     } catch (Exception e) {
       LOGGER.error("Error while fetching dimension values in filter drop down for collection: {}",
-          collection, e);
+          dataset, e);
     }
 
     return jsonFilters;

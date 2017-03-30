@@ -73,7 +73,6 @@ public class SeverityComputationUtil {
   private ThirdEyeRequest createThirdEyeRequest(long currentWindowStart, long currentWindowEnd)
       throws ExecutionException {
     ThirdEyeRequestBuilder requestBuilder = ThirdEyeRequest.newBuilder();
-    requestBuilder.setCollection(collectionName);
     requestBuilder.setStartTimeInclusive(new DateTime(currentWindowStart));
     requestBuilder.setEndTimeExclusive(new DateTime(currentWindowEnd));
     // requestBuilder.setFilterSet(comparisonRequest.getFilterSet());

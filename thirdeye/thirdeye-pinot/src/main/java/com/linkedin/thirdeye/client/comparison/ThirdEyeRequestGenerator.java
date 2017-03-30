@@ -60,7 +60,6 @@ public class ThirdEyeRequestGenerator {
       String groupByDimension, TimeGranularity aggTimeGranularity) {
     ThirdEyeRequestBuilder requestBuilder = new ThirdEyeRequestBuilder();
     // COMMON to ALL REQUESTS
-    requestBuilder.setCollection(comparisonRequest.getCollectionName());
     requestBuilder.setFilterSet(comparisonRequest.getFilterSet());
     requestBuilder.setFilterClause(comparisonRequest.getFilterClause());
 
