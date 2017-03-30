@@ -99,17 +99,15 @@ public class FunctionReplayRunnable implements Runnable {
       switch (anomalyFunctionDTO.getWindowUnit()) {
         case NANOSECONDS:
         case MICROSECONDS:
-        case MILLISECONDS: // In case of future use
+        case MILLISECONDS:
         case SECONDS:
-        case MINUTES:
-          anomalyFunctionDTO.setWindowSize(12);
-          anomalyFunctionDTO.setWindowUnit(TimeUnit.HOURS);
-          anomalyFunctionDTO.setCron("0 0 0/2 * * ? *");
+        case MINUTES:       // These TimeUnits are not currently in use
         case HOURS:
-          anomalyFunctionDTO.setWindowSize(4);
-          anomalyFunctionDTO.setWindowUnit(TimeUnit.DAYS);
-          anomalyFunctionDTO.setCron("0 0 0 */4 * ? *");
         case DAYS:
+          /*
+          SignTest takes HOURS data, but changing to 7 days won't affect the final result
+          SPLINE takes 1 DAYS data, for heuristic, we extend it to 7 days.
+           */
         default:
           anomalyFunctionDTO.setWindowSize(7);
           anomalyFunctionDTO.setWindowUnit(TimeUnit.DAYS);
