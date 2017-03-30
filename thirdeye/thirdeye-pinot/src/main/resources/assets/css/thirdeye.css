@@ -960,7 +960,9 @@ text {
 }
 
 .tree-map__table {
+  width: auto;
   min-width: 100%;
+  table-layout: fixed;
 }
 
 /* Radio*/

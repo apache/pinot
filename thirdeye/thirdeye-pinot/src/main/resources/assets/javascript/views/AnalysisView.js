@@ -81,6 +81,14 @@ AnalysisView.prototype = {
     this.setupSearchListeners();
   },
 
+  destroyAnalysisGraph() {
+    $("#timeseries-contributor-placeholder").children().remove();
+  },
+
+  destroyAnalysisOptions() {
+    $('#analysis-options-placeholder').children().remove()
+  },
+
   renderAnalysisOptions(metricId) {
     metricId = metricId || Object.assign(this.viewParams, this.searchParams).metricId;
     // Now render the dimensions and filters for selected metric
@@ -229,7 +237,7 @@ AnalysisView.prototype = {
       let paramFilters = [];
       Object.keys(this.viewParams.filters).forEach((key) => {
         this.viewParams.filters[key].forEach((filterName) => {
-          if (filters[key].includes(filterName)) {
+          if (filters[key] && filters[key].includes(filterName)) {
             paramFilters.push(`${key}:${filterName}`);
           }
         });
@@ -266,12 +274,14 @@ AnalysisView.prototype = {
 
   setupSearchListeners() {
     $("#analysis-search-button").click(() => {
+      this.destroyAnalysisOptions();
       this.searchEvent.notify();
     });
   },
 
   setupApplyListener(){
     $("#analysis-apply-button").click((e) => {
+      this.destroyAnalysisGraph();
       this.collectViewParams();
       this.applyDataChangeEvent.notify();
     });
