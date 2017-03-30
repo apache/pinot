@@ -16,8 +16,7 @@ AnalysisController.prototype = {
     this.analysisModel.init(hashParams);
     this.analysisModel.update(hashParams);
     this.analysisView.init(hashParams);
-    this.analysisView.render(hashParams.metricId);
-    this.initTimeSeriesController(this.analysisView.viewParams);
+    this.analysisView.render(hashParams.metricId, () => {this.initTimeSeriesController(hashParams)});
   },
 
   handleApplyAnalysisEvent(viewObject) {

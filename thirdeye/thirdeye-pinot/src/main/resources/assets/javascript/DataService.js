@@ -151,7 +151,7 @@ DataService.prototype = {
       var url = "/timeseries/compare/" + metricId + "/" + currentStart + "/" + currentEnd + "/"
           + baselineStart + "/" + baselineEnd + "?dimension=" + dimension + "&filters="
           + JSON.stringify(filters) + "&granularity=" + granularity;
-      return this.getDataAsynchronous(url);
+      return this.getDataSynchronous(url);
     },
 
   fetchHeatmapData: function (metricId, currentStart, currentEnd, baselineStart, baselineEnd,
@@ -163,7 +163,7 @@ DataService.prototype = {
 
   fetchAnomalyWowData(anomalyId){
     const url = `/anomalies/${anomalyId}`;
-    return this.getDataSynchronous(url);
+    return this.getDataAsynchronous(url);
   },
 
   fetchMetricByMetricId(metricId) {

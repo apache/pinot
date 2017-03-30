@@ -29,7 +29,7 @@ AnalysisView.prototype = {
     this.viewParams.metricName = this.analysisModel.metricName;
   },
 
-  render: function (metricId) {
+  render: function (metricId, callback) {
     $("#analysis-place-holder").html(this.analysis_template_compiled);
     // METRIC SELECTION
     var analysisMetricSelect = $('#analysis-metric-input').select2({
@@ -77,8 +77,8 @@ AnalysisView.prototype = {
     }).trigger('change');
     if (metricId) {
       this.analysisModel.fetchAnalysisOptionsData(metricId, 'analysis-spin-area').then(() => {
-        this.renderAnalysisOptions(metricId);
-      })
+        return this.renderAnalysisOptions(metricId);
+      }).then(callback)
     }
     this.setupSearchListeners();
   },
