@@ -27,6 +27,7 @@ import org.testng.annotations.Test;
 public class DefaultColumnsTriggerClusterIntegrationTest extends DefaultColumnsClusterIntegrationTest {
   private static final String SCHEMA_WITH_MISSING_COLUMNS =
       "On_Time_On_Time_Performance_2014_100k_subset_nonulls_default_column_test_missing_columns.schema";
+  private static final long MAX_RELOAD_TIME_IN_MILLIS = 5000L;
 
   @BeforeClass
   @Override
@@ -50,24 +51,38 @@ public class DefaultColumnsTriggerClusterIntegrationTest extends DefaultColumnsC
   public void testRemoveNewAddedColumns()
       throws Exception {
     JSONObject queryResponse = postQuery("SELECT * FROM mytable");
+    Assert.assertEquals(queryResponse.getLong("totalDocs"), TOTAL_DOCS);
     Assert.assertEquals(queryResponse.getJSONObject("selectionResults").getJSONArray("columns").length(), 88);
 
     sendSchema(SCHEMA_WITH_MISSING_COLUMNS);
+    long endTime = System.currentTimeMillis() + MAX_RELOAD_TIME_IN_MILLIS;
     triggerReload();
-    queryResponse = postQuery("SELECT * FROM mytable");
+    while (System.currentTimeMillis() < endTime) {
+      queryResponse = postQuery("SELECT * FROM mytable");
+      // Total docs should not change during reload
+      Assert.assertEquals(queryResponse.getLong("totalDocs"), TOTAL_DOCS);
+      if (queryResponse.getJSONObject("selectionResults").getJSONArray("columns").length() == 79) {
+        break;
+      }
+    }
     Assert.assertEquals(queryResponse.getJSONObject("selectionResults").getJSONArray("columns").length(), 79);
 
     sendSchema(SCHEMA_WITH_EXTRA_COLUMNS);
+    endTime = System.currentTimeMillis() + MAX_RELOAD_TIME_IN_MILLIS;
     triggerReload();
-    queryResponse = postQuery("SELECT * FROM mytable");
+    while (System.currentTimeMillis() < endTime) {
+      queryResponse = postQuery("SELECT * FROM mytable");
+      // Total docs should not change during reload
+      Assert.assertEquals(queryResponse.getLong("totalDocs"), TOTAL_DOCS);
+      if (queryResponse.getJSONObject("selectionResults").getJSONArray("columns").length() == 88) {
+        break;
+      }
+    }
     Assert.assertEquals(queryResponse.getJSONObject("selectionResults").getJSONArray("columns").length(), 88);
   }
 
   private void triggerReload()
       throws Exception {
-    sendGetRequest(CONTROLLER_BASE_API_URL + "/tables/mytable?type=offline&state=disable");
-    Thread.sleep(1000);
-    sendGetRequest(CONTROLLER_BASE_API_URL + "/tables/mytable?type=offline&state=enable");
-    waitForSegmentsOnline();
+    sendGetRequest(CONTROLLER_BASE_API_URL + "/tables/mytable/segments/reload?type=offline");
   }
 }

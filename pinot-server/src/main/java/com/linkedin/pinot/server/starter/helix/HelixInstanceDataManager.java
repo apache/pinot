@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.server.starter.helix;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.Schema;
@@ -23,13 +24,17 @@ import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.offline.InstanceDataManager;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.data.manager.offline.TableDataManager;
 import com.linkedin.pinot.core.data.manager.offline.TableDataManagerProvider;
+import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import java.io.File;
+import java.io.FilenameFilter;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -37,6 +42,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
+import org.apache.commons.io.FileUtils;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
@@ -51,6 +57,8 @@ import org.slf4j.LoggerFactory;
 // TODO: pass a reference to Helix property store during initialization. Both OFFLINE and REALTIME use case need it.
 public class HelixInstanceDataManager implements InstanceDataManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixInstanceDataManager.class);
+
+  private static final String RELOAD_TEMP_DIR_SUFFIX = ".reload.tmp";
 
   private HelixInstanceDataManagerConfig _instanceDataManagerConfig;
   private Map<String, TableDataManager> _tableDataManagerMap = new HashMap<>();
@@ -221,8 +229,59 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public void refreshSegment(String oldSegmentName, SegmentMetadata newSegmentMetadata) {
-    throw new UnsupportedOperationException();
+  public synchronized void reloadSegment(@Nonnull SegmentMetadata segmentMetadata,
+      @Nonnull CommonConstants.Helix.TableType tableType, @Nullable AbstractTableConfig tableConfig,
+      @Nullable Schema schema)
+      throws Exception {
+    String segmentName = segmentMetadata.getName();
+    String tableName = segmentMetadata.getTableName();
+    if (tableType == CommonConstants.Helix.TableType.OFFLINE) {
+      tableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
+    } else {
+      tableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
+    }
+    LOGGER.info("Reloading segment: {} in table: {}", segmentName, tableName);
+
+    File indexDir = new File(segmentMetadata.getIndexDir());
+    Preconditions.checkState(indexDir.isDirectory());
+    File parentDir = indexDir.getParentFile();
+
+    // Clean up all temporary index directories
+    // This is for failure recovery
+    File[] files = parentDir.listFiles(new FilenameFilter() {
+      @Override
+      public boolean accept(File dir, String name) {
+        return name.endsWith(RELOAD_TEMP_DIR_SUFFIX);
+      }
+    });
+    Preconditions.checkNotNull(files);
+    for (File file : files) {
+      FileUtils.deleteQuietly(file);
+    }
+
+    // Copy the original segment to a temporary segment
+    File tempIndexDir = new File(parentDir, indexDir.getName() + RELOAD_TEMP_DIR_SUFFIX);
+    FileUtils.copyDirectory(indexDir, tempIndexDir);
+
+    // Try to load with the temporary segment
+    IndexSegment indexSegment;
+    try {
+      indexSegment =
+          ColumnarSegmentLoader.load(tempIndexDir, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig),
+              schema);
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while trying to reload the segment: {} in table: {}, abort the reloading",
+          segmentName, tableName, e);
+      FileUtils.deleteQuietly(tempIndexDir);
+      return;
+    }
+
+    // Replace the old segment in memory
+    _tableDataManagerMap.get(tableName).addSegment(indexSegment);
+
+    // Replace the original index directory with the temporary one
+    FileUtils.deleteQuietly(indexDir);
+    FileUtils.moveDirectory(tempIndexDir, indexDir);
   }
 
   @Override

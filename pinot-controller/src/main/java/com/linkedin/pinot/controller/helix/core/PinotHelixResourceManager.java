@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.controller.helix.core;
 
+import com.linkedin.pinot.common.messages.SegmentReloadMessage;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -1350,6 +1351,45 @@ public class PinotHelixResourceManager {
     }
 
     return res;
+  }
+
+  public int reloadAllSegments(String tableName) {
+    int numMessagesSent = 0;
+
+    List<String> segments = getAllSegmentsForResource(tableName);
+    for (String segmentName : segments) {
+      numMessagesSent += sendSegmentReloadMessage(tableName, segmentName);
+    }
+
+    return numMessagesSent;
+  }
+
+  public int reloadSegment(String tableName, String segmentName) {
+    return sendSegmentReloadMessage(tableName, segmentName);
+  }
+
+  private int sendSegmentReloadMessage(String tableName, String segmentName) {
+    LOGGER.info("Sending reload message for segment: {} in table: {}", segmentName, tableName);
+
+    // Infinite timeout on the recipient
+    int timeoutMs = -1;
+
+    Criteria recipientCriteria = new Criteria();
+    recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
+    recipientCriteria.setInstanceName("%");
+    recipientCriteria.setResource(tableName);
+    recipientCriteria.setPartition(segmentName);
+    recipientCriteria.setSessionSpecific(true);
+    SegmentReloadMessage segmentReloadMessage = new SegmentReloadMessage(tableName, segmentName);
+    ClusterMessagingService messagingService = _helixZkManager.getMessagingService();
+
+    int numMessagesSent = messagingService.send(recipientCriteria, segmentReloadMessage, null, timeoutMs);
+    if (numMessagesSent > 0) {
+      LOGGER.info("Sent {} reload messages for segment: {} in table: {}", numMessagesSent, segmentName, tableName);
+    } else {
+      LOGGER.warn("No reload message sent for segment: {} in table: {}", numMessagesSent, segmentName, tableName);
+    }
+    return numMessagesSent;
   }
 
   // Check to see if the table has been explicitly configured to NOT use messageBasedRefresh.

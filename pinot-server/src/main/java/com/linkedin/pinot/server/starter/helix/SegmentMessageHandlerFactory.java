@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.server.starter.helix;
 
+import com.linkedin.pinot.common.messages.SegmentReloadMessage;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import org.apache.helix.NotificationContext;
@@ -28,9 +29,12 @@ import com.linkedin.pinot.common.messages.SegmentRefreshMessage;
 
 
 public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
-  private final Logger LOGGER = LoggerFactory.getLogger(SegmentMessageHandlerFactory.class);
-  // To serialize the segment refresh calls.
-  private final Lock _refreshLock = new ReentrantLock();
+  private static final Logger LOGGER = LoggerFactory.getLogger(SegmentMessageHandlerFactory.class);
+
+  // We only allow one segment refresh/reload happens at the same time
+  // The reason for that is segment refresh/reload will temporarily use double-sized memory
+  private final Lock _lock = new ReentrantLock();
+
   private final SegmentFetcherAndLoader _fetcherAndLoader;
 
   public SegmentMessageHandlerFactory(SegmentFetcherAndLoader fetcherAndLoader) {
@@ -40,12 +44,14 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
   // Called each time a message is received.
   @Override
   public MessageHandler createHandler(Message message, NotificationContext context) {
-    try {
-      SegmentRefreshMessage refreshMessage = new SegmentRefreshMessage(message);
-      return new SegmentRefreshMessageHandler(refreshMessage, context, _refreshLock);
-    } catch (IllegalArgumentException e) {
-      LOGGER.warn("Unrecognized message subtype {}", message.getMsgSubType());
-      return null;
+    String msgSubType = message.getMsgSubType();
+    switch (msgSubType) {
+      case SegmentRefreshMessage.REFRESH_SEGMENT_MSG_SUB_TYPE:
+        return new SegmentRefreshMessageHandler(new SegmentRefreshMessage(message), context);
+      case SegmentReloadMessage.RELOAD_SEGMENT_MSG_SUB_TYPE:
+        return new SegmentReloadMessageHandler(new SegmentReloadMessage(message), context);
+      default:
+        throw new UnsupportedOperationException("Unsupported user defined message sub type: " + msgSubType);
     }
   }
 
@@ -60,44 +66,82 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
     LOGGER.info("Reset called");
   }
 
-  public class SegmentRefreshMessageHandler extends MessageHandler {
-
+  private class SegmentRefreshMessageHandler extends MessageHandler {
     private final String _segmentName;
     private final String _tableName;
-    private final Lock _refreshLock;
+    private final Logger _logger;
 
-    private final Logger LOGGER;
-
-    public SegmentRefreshMessageHandler(SegmentRefreshMessage refreshMessage, NotificationContext context, Lock refreshLock) {
+    public SegmentRefreshMessageHandler(SegmentRefreshMessage refreshMessage, NotificationContext context) {
       super(refreshMessage, context);
       _segmentName = refreshMessage.getPartitionName();
       _tableName = refreshMessage.getResourceName();
-      _refreshLock = refreshLock;
-      LOGGER = LoggerFactory.getLogger(_tableName + "-" + SegmentRefreshMessageHandler.class);
+      _logger = LoggerFactory.getLogger(_tableName + "-" + SegmentRefreshMessageHandler.class);
     }
 
     @Override
-    public HelixTaskResult handleMessage() throws InterruptedException {
+    public HelixTaskResult handleMessage()
+        throws InterruptedException {
       HelixTaskResult result = new HelixTaskResult();
-      LOGGER.info("Handling message {}", _message);
+      _logger.info("Handling message: {}", _message);
       try {
-        final long startTime = System.currentTimeMillis();
-        LOGGER.info("Waiting for lock to refresh segment {}", _segmentName);
-        _refreshLock.lock();
-        LOGGER.info("Acquired lock to refresh segment {} (lock-time={}ms)", _segmentName, (System.currentTimeMillis()-startTime));
+        long startTime = System.currentTimeMillis();
+        _logger.info("Waiting for lock to refresh segment: {}", _segmentName);
+        _lock.lock();
+        _logger.info("Acquired lock to refresh segment: {} (lock-time={}ms)", _segmentName,
+            System.currentTimeMillis() - startTime);
         // The addOrReplaceOfflineSegment() call can retry multiple times with back-off for loading the same segment.
         // If it does, future segment loads will be stalled on the one segment that we cannot load.
         _fetcherAndLoader.addOrReplaceOfflineSegment(_tableName, _segmentName, /*retryOnFailure=*/false);
         result.setSuccess(true);
       } finally {
-        _refreshLock.unlock();
+        _lock.unlock();
       }
       return result;
     }
 
     @Override
     public void onError(Exception e, ErrorCode code, ErrorType type) {
-      LOGGER.error("onError: {}, {}", type, code, e);
+      _logger.error("onError: {}, {}", type, code, e);
+    }
+  }
+
+  private class SegmentReloadMessageHandler extends MessageHandler {
+    private final String _segmentName;
+    private final String _tableName;
+    private final Logger _logger;
+
+    public SegmentReloadMessageHandler(SegmentReloadMessage segmentReloadMessage, NotificationContext context) {
+      super(segmentReloadMessage, context);
+      _segmentName = segmentReloadMessage.getPartitionName();
+      _tableName = segmentReloadMessage.getResourceName();
+      _logger = LoggerFactory.getLogger(_tableName + "-" + SegmentReloadMessageHandler.class);
+    }
+
+    @Override
+    public HelixTaskResult handleMessage()
+        throws InterruptedException {
+      HelixTaskResult helixTaskResult = new HelixTaskResult();
+      _logger.info("Handling message: {}", _message);
+      try {
+        long startTime = System.currentTimeMillis();
+        _logger.info("Waiting for lock to reload segment: {}", _segmentName);
+        _lock.lock();
+        _logger.info("Acquired lock to reload segment: {} (lock-time={}ms)", _segmentName,
+            System.currentTimeMillis() - startTime);
+        _fetcherAndLoader.reloadSegment(_tableName, _segmentName);
+        helixTaskResult.setSuccess(true);
+      } catch (Exception e) {
+        throw new RuntimeException(
+            "Caught exception while reloading segment: " + _segmentName + " in table: " + _tableName, e);
+      } finally {
+        _lock.unlock();
+      }
+      return helixTaskResult;
+    }
+
+    @Override
+    public void onError(Exception e, ErrorCode errorCode, ErrorType errorType) {
+      _logger.error("onError: {}, {}", errorType, errorCode, e);
     }
   }
 }

@@ -63,8 +63,9 @@ import static com.linkedin.pinot.core.segment.creator.impl.V1Constants.MetadataK
 
 
 public class SegmentMetadataImpl implements SegmentMetadata {
-
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentMetadataImpl.class);
+
+  private static final String RELOAD_TEMP_DIR_SUFFIX = ".reload.tmp";
 
   private final PropertiesConfiguration _segmentMetadataPropertiesConfiguration;
   private final File _metadataFile;
@@ -106,7 +107,16 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     _columnMetadataMap = new HashMap<String, ColumnMetadata>();
     _allColumns = new HashSet<String>();
     _schema = new Schema();
-    _indexDir = new File(indexDir, V1Constants.MetadataKeys.METADATA_FILE_NAME).getAbsoluteFile().getParent();
+
+    // For segment reload, we will load segment from the temporary index directory, but we need to set indexDir to the
+    // original index directory
+    String indexDirToLoad = indexDir.getPath();
+    if (indexDirToLoad.endsWith(RELOAD_TEMP_DIR_SUFFIX)) {
+      _indexDir = indexDirToLoad.substring(0, indexDirToLoad.length() - RELOAD_TEMP_DIR_SUFFIX.length());
+    } else {
+      _indexDir = indexDirToLoad;
+    }
+
     init();
     File creationMetaFile = SegmentDirectoryPaths.findCreationMetaFile(indexDir);
     if (creationMetaFile != null) {

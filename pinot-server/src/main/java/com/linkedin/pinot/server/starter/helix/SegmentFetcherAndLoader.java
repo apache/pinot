@@ -15,7 +15,21 @@
  */
 package com.linkedin.pinot.server.starter.helix;
 
+import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.data.DataManager;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
+import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.SchemaUtils;
+import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
+import com.linkedin.pinot.common.utils.helix.PinotHelixPropertyStoreZnRecordProvider;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.V3RemoveIndexException;
 import java.io.File;
 import java.io.IOException;
@@ -26,19 +40,7 @@ import org.apache.helix.ZNRecord;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
-import com.linkedin.pinot.common.data.DataManager;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
-import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.common.utils.helix.PinotHelixPropertyStoreZnRecordProvider;
-import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+
 
 public class SegmentFetcherAndLoader {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentFetcherAndLoader.class);
@@ -52,8 +54,7 @@ public class SegmentFetcherAndLoader {
   private final long _segmentLoadMinRetryDelayMs; // Min delay (in msecs) between retries
 
   public SegmentFetcherAndLoader(DataManager dataManager, SegmentMetadataLoader metadataLoader,
-      ZkHelixPropertyStore<ZNRecord> propertyStore, Configuration pinotHelixProperties,
-      String instanceId) {
+      ZkHelixPropertyStore<ZNRecord> propertyStore, Configuration pinotHelixProperties, String instanceId) {
     _propertyStore = propertyStore;
     _dataManager = dataManager;
     _metadataLoader = metadataLoader;
@@ -286,5 +287,47 @@ public class SegmentFetcherAndLoader {
 
   public String getSegmentLocalDirectory(String tableName, String segmentId) {
     return _dataManager.getSegmentDataDirectory() + "/" + tableName + "/" + segmentId;
+  }
+
+  public void reloadSegment(String tableName, String segmentName)
+      throws Exception {
+    SegmentMetadata segmentMetadata = _dataManager.getSegmentMetadata(tableName, segmentName);
+    if (segmentMetadata == null) {
+      LOGGER.warn("Cannot locate segment: {} in table: {]", segmentName, tableName);
+      return;
+    }
+
+    String indexDir = segmentMetadata.getIndexDir();
+    if (indexDir == null) {
+      LOGGER.info("Skip reloading REALTIME consuming segment: {} in table: {}", segmentName, tableName);
+      return;
+    }
+
+    CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+    if (tableType == null) {
+      LOGGER.error("Invalid table name: {}, neither OFFLINE or REALTIME table", tableName);
+      return;
+    }
+    switch (tableType) {
+      case OFFLINE:
+        AbstractTableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
+        // For OFFLINE table, try to get schema for default columns
+        Schema schema = null;
+        try {
+          schema = getSchema(tableName);
+        } catch (Exception e) {
+          LOGGER.error("Caught exception while getting schema for table: {}", tableName, e);
+        }
+        _dataManager.reloadSegment(segmentMetadata, tableType, offlineTableConfig, schema);
+        break;
+      case REALTIME:
+        AbstractTableConfig realtimeTableConfig = ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, tableName);
+        // For REALTIME table, ignore schema for default columns
+        _dataManager.reloadSegment(segmentMetadata, tableType, realtimeTableConfig, null);
+        break;
+      default:
+        LOGGER.error("Invalid table name: {}, neither OFFLINE or REALTIME table", tableName);
+        break;
+    }
   }
 }

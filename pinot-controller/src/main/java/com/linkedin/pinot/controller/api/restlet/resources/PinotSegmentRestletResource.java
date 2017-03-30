@@ -44,6 +44,7 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.restlet.data.MediaType;
+import org.restlet.data.Reference;
 import org.restlet.data.Status;
 import org.restlet.representation.Representation;
 import org.restlet.representation.StringRepresentation;
@@ -70,17 +71,32 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
 
   /**
    * URI Mappings:
-   * - "/tables/{tableName}/segments", "tables/{tableName}/segments/":
-   *   List all segments in the table.
-   *
-   * - "/tables/{tableName}/segments/{segmentName}", "/tables/{tableName}/segments/{segmentName}/":
-   *   List meta-data for the specified segment.
-   *
-   * - "/tables/{tableName}/segments/{segmentName}?state={state}",
-   *    Change the state of the segment to specified {state} (enable|disable|drop)
-   *
-   * - "/tables/{tableName}/segments?state={state}"
-   *    Change the state of all segments of the table to specified {state} (enable|disable|drop)
+   * <ul>
+   *   <li>
+   *     "/tables/{tableName}/segments/{segmentName}/metadata":
+   *     Get segment metadata for a given segment
+   *   </li>
+   *   <li>
+   *     "/tables/{tableName}/segments/metadata":
+   *     List segment metadata for a given table
+   *   </li>
+   *   <li>
+   *     "/tables/{tableName}/segments/{segmentName}?state={state}":
+   *     Change the state of the segment to specified {state} (enable|disable|drop)
+   *   </li>
+   *   <li>
+   *     "/tables/{tableName}/segments?state={state}":
+   *     Change the state of all segments of the table to specified {state} (enable|disable|drop)
+   *   </li>
+   *   <li>
+   *     "/tables/{tableName}/segments/{segmentName}/reload":
+   *     Reload the segment
+   *   </li>
+   *   <li>
+   *     "/tables/{tableName}/segments/reload":
+   *     Reload all segments of the table
+   *   </li>
+   * </ul>
    *
    * {@inheritDoc}
    * @see org.restlet.resource.ServerResource#get()
@@ -88,15 +104,17 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
   @Override
   @Get
   public Representation get() {
-    StringRepresentation presentation = null;
+    StringRepresentation representation;
     try {
-      final String tableName = (String) getRequest().getAttributes().get(TABLE_NAME);
+      String tableName = (String) getRequest().getAttributes().get(TABLE_NAME);
       String segmentName = (String) getRequest().getAttributes().get(SEGMENT_NAME);
       if (segmentName != null) {
         segmentName = URLDecoder.decode(segmentName, "UTF-8");
       }
-      final String state = getReference().getQueryAsForm().getValues(STATE);
-      final String tableType = getReference().getQueryAsForm().getValues(TABLE_TYPE);
+
+      Reference reference = getReference();
+      String state = reference.getQueryAsForm().getValues(STATE);
+      String tableType = reference.getQueryAsForm().getValues(TABLE_TYPE);
 
       if (tableType != null && !isValidTableType(tableType)) {
         LOGGER.error(INVALID_TABLE_TYPE_ERROR);
@@ -111,25 +129,45 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
           return new StringRepresentation(INVALID_STATE_ERROR);
         } else {
           if (segmentName != null) {
+            // '/tables/{tableName}/segments/{segmentName}?state={state}'
             return toggleOneSegmentState(tableName, segmentName, state, tableType);
           } else {
+            // '/tables/{tableName}/segments?state={state}'
             return toggleAllSegmentsState(tableName, state, tableType);
           }
         }
-      } else if (segmentName != null) {
-        return getSegmentMetadataForTable(tableName, segmentName, tableType);
-      } else {
-        return getAllSegmentsMetadataForTable(tableName, tableType);
       }
 
+      String lastPart = reference.getLastSegment();
+      if (lastPart.equals("metadata")) {
+        if (segmentName != null) {
+          // '/tables/{tableName}/segments/{segmentName}/metadata'
+          return getSegmentMetadataForTable(tableName, segmentName, tableType);
+        } else {
+          // '/tables/{tableName}/segments/metadata'
+          return getAllSegmentsMetadataForTable(tableName, tableType);
+        }
+      }
+
+      if (lastPart.equals("reload")) {
+        if (segmentName != null) {
+          // '/tables/{tableName}/segments/{segmentName}/reload'
+          return reloadSegmentForTable(tableName, segmentName, tableType);
+        } else {
+          // '/tables/{tableName}/segments/reload'
+          return reloadAllSegmentsForTable(tableName, tableType);
+        }
+      }
+
+      setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+      return new StringRepresentation("Invalid request.");
     } catch (final Exception e) {
-      presentation = new StringRepresentation(e.getMessage() + "\n" + ExceptionUtils.getStackTrace(e));
+      representation = new StringRepresentation(e.getMessage() + "\n" + ExceptionUtils.getStackTrace(e));
       LOGGER.error("Caught exception while processing get request", e);
       ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_GET_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
+      return representation;
     }
-
-    return presentation;
   }
 
   @HttpVerb("get")
@@ -404,5 +442,56 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
 
     ret.put(jsonObj);
     return new StringRepresentation(ret.toString());
+  }
+
+  @HttpVerb("get")
+  @Summary("Reloads a given segment")
+  @Tags({ "segment", "table" })
+  @Paths({ "/tables/{tableName}/segments/{segmentName}/reload", "/tables/{tableName}/segments/{segmentName}/reload/" })
+  private Representation reloadSegmentForTable(
+      @Parameter(name = "tableName", in = "path", description = "The name of the table for which to reload segment",
+          required = true) String tableName,
+      @Parameter(name = "segmentName", in = "path", description = "The name of the segment for which to reload",
+          required = true) String segmentName,
+      @Parameter(name = "type", in = "query", description = "Type of table {offline|realtime}",
+          required = false) String tableType) {
+    int numReloadMessagesSent = 0;
+
+    if ((tableType == null) || TableType.OFFLINE.name().equalsIgnoreCase(tableType)) {
+      String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
+      numReloadMessagesSent += _pinotHelixResourceManager.reloadSegment(offlineTableName, segmentName);
+    }
+
+    if ((tableType == null) || TableType.REALTIME.name().equalsIgnoreCase(tableType)) {
+      String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
+      numReloadMessagesSent += _pinotHelixResourceManager.reloadSegment(realtimeTableName, segmentName);
+    }
+
+    return new StringRepresentation("Sent " + numReloadMessagesSent + " reload messages");
+  }
+
+
+  @HttpVerb("get")
+  @Summary("Reloads all segments in a given table")
+  @Tags({ "segment", "table" })
+  @Paths({ "/tables/{tableName}/segments/reload", "/tables/{tableName}/segments/reload/" })
+  private Representation reloadAllSegmentsForTable(
+      @Parameter(name = "tableName", in = "path", description = "The name of the table for which to list segment metadata",
+          required = true) String tableName,
+      @Parameter(name = "type", in = "query", description = "Type of table {offline|realtime}",
+          required = false) String tableType) {
+    int numReloadMessagesSent = 0;
+
+    if ((tableType == null) || TableType.OFFLINE.name().equalsIgnoreCase(tableType)) {
+      String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
+      numReloadMessagesSent += _pinotHelixResourceManager.reloadAllSegments(offlineTableName);
+    }
+
+    if ((tableType == null) || TableType.REALTIME.name().equalsIgnoreCase(tableType)) {
+      String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
+      numReloadMessagesSent += _pinotHelixResourceManager.reloadAllSegments(realtimeTableName);
+    }
+
+    return new StringRepresentation("Sent " + numReloadMessagesSent + " reload messages");
   }
 }
