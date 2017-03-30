@@ -22,6 +22,7 @@ import com.linkedin.pinot.core.common.Predicate;
 
 
 public class InPredicate extends Predicate {
+  public static final String DELIMITER = "\t\t";
 
   public InPredicate(String lhs, List<String> rhs) {
     super(lhs, Type.IN, rhs);
@@ -34,7 +35,7 @@ public class InPredicate extends Predicate {
   }
 
   public String[] getInRange() {
-    return getRhs().get(0).split("\t\t");
+    return getRhs().get(0).split(DELIMITER);
   }
 
 }

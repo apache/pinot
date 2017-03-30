@@ -35,7 +35,7 @@ public final class UnSortedSingleValueIterator extends BlockSingleValIterator {
       ColumnMetadata columnMetadata) {
     this(sVReader, columnMetadata, (UnSortedValueReaderContext) sVReader.createContext());
   }
-  
+
   public UnSortedSingleValueIterator(SingleColumnSingleValueReader sVReader,
       ColumnMetadata columnMetadata, UnSortedValueReaderContext context) {
     super();
@@ -66,7 +66,34 @@ public final class UnSortedSingleValueIterator extends BlockSingleValIterator {
       return Constants.EOF;
     }
 
-    return sVReader.getInt(counter++);
+    return sVReader.getInt(counter++, context);
+  }
+
+  @Override
+  public long nextLongVal() {
+    if (counter >= columnMetadata.getTotalDocs()) {
+      return Constants.EOF;
+    }
+
+    return sVReader.getLong(counter++, context);
+  }
+
+  @Override
+  public float nextFloatVal() {
+    if (counter >= columnMetadata.getTotalDocs()) {
+      return Constants.EOF;
+    }
+
+    return sVReader.getFloat(counter++, context);
+  }
+
+  @Override
+  public double nextDoubleVal() {
+    if (counter >= columnMetadata.getTotalDocs()) {
+      return Constants.EOF;
+    }
+
+    return sVReader.getDouble(counter++, context);
   }
 
   @Override
