@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.core.operator.dociditerators;
 
+import com.linkedin.pinot.common.data.FieldSpec;
+import javax.annotation.Nullable;
 import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
@@ -38,6 +40,7 @@ public class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     this.datasourceName = datasourceName;
     this.evaluator = evaluator;
     valueIterator = (BlockSingleValIterator) blockValSet.iterator();
+
     if (evaluator.alwaysFalse()) {
       currentDocId = Constants.EOF;
       setStartDocId(Constants.EOF);
@@ -46,59 +49,18 @@ public class SVScanDocIdIterator implements ScanBasedDocIdIterator {
       setStartDocId(blockMetadata.getStartDocId());
       setEndDocId(blockMetadata.getEndDocId());
     }
+
     if (blockMetadata.hasDictionary()) {
       valueMatcher = new IntMatcher();
     } else {
-      switch (blockMetadata.getDataType()) {
-      case BOOLEAN:
-        break;
-      case BYTE:
-        break;
-      case BYTE_ARRAY:
-        break;
-      case CHAR:
-        break;
-      case CHAR_ARRAY:
-        break;
-      case DOUBLE:
-        break;
-      case DOUBLE_ARRAY:
-        break;
-      case FLOAT:
-        break;
-      case FLOAT_ARRAY:
-        break;
-      case INT:
-        break;
-      case INT_ARRAY:
-        break;
-      case LONG:
-        break;
-      case LONG_ARRAY:
-        break;
-      case OBJECT:
-        break;
-      case SHORT:
-        break;
-      case SHORT_ARRAY:
-        break;
-      case STRING:
-        valueMatcher = new StringMatcher();
-        break;
-      case STRING_ARRAY:
-        break;
-      default:
-        break;
-
-      }
-      valueMatcher.setEvaluator(evaluator);
-
+      valueMatcher = getValueMatcherForType(blockMetadata.getDataType());
     }
+    valueMatcher.setEvaluator(evaluator);
   }
 
   /**
    * After setting the startDocId, next calls will always return from &gt;=startDocId
-   * 
+   *
    * @param startDocId
    */
   public void setStartDocId(int startDocId) {
@@ -110,7 +72,7 @@ public class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   /**
    * After setting the endDocId, next call will return Constants.EOF after currentDocId exceeds
    * endDocId
-   * 
+   *
    * @param endDocId
    */
   public void setEndDocId(int endDocId) {
@@ -208,6 +170,43 @@ public class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   public int getNumEntriesScanned() {
     return _numEntriesScanned;
   }
+
+  /**
+   * Helper method to get value matcher for a given data type.
+   * @param dataType data type for which to get the value matcher
+   * @return value matcher for the data type.
+   */
+  @Nullable
+  private static ValueMatcher getValueMatcherForType(FieldSpec.DataType dataType) {
+    ValueMatcher valueMatcher;
+
+    switch (dataType) {
+      case INT:
+        valueMatcher = new IntMatcher();
+        break;
+
+      case LONG:
+        valueMatcher = new LongMatcher();
+        break;
+
+      case FLOAT:
+        valueMatcher = new FloatMatcher();
+        break;
+
+      case DOUBLE:
+        valueMatcher = new DoubleMatcher();
+        break;
+
+      case STRING:
+        valueMatcher = new StringMatcher();
+        break;
+
+      default:
+        throw new UnsupportedOperationException("Index without dictionary not supported for data type: " + dataType);
+
+    }
+    return valueMatcher;
+  }
 }
 
 abstract class ValueMatcher {
@@ -225,6 +224,30 @@ class IntMatcher extends ValueMatcher {
   @Override
   public boolean doesCurrentEntryMatch(BlockSingleValIterator valueIterator) {
     return evaluator.apply(valueIterator.nextIntVal());
+  }
+}
+
+class LongMatcher extends ValueMatcher {
+
+  @Override
+  public boolean doesCurrentEntryMatch(BlockSingleValIterator valueIterator) {
+    return evaluator.apply(valueIterator.nextLongVal());
+  }
+}
+
+class FloatMatcher extends ValueMatcher {
+
+  @Override
+  public boolean doesCurrentEntryMatch(BlockSingleValIterator valueIterator) {
+    return evaluator.apply(valueIterator.nextFloatVal());
+  }
+}
+
+class DoubleMatcher extends ValueMatcher {
+
+  @Override
+  public boolean doesCurrentEntryMatch(BlockSingleValIterator valueIterator) {
+    return evaluator.apply(valueIterator.nextDoubleVal());
   }
 }
 

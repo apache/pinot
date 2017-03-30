@@ -35,18 +35,20 @@ public class PredicateEvaluatorProvider {
     if (dataSource.getDataSourceMetadata().hasDictionary()) {
       switch (predicate.getType()) {
       case EQ:
-        return EqualsPredicateEvaluator.newDictionaryBasedEvaluator((EqPredicate) predicate, dictionary);
+        return EqualsPredicateEvaluatorFactory.newDictionaryBasedEvaluator((EqPredicate) predicate, dictionary);
       case NEQ:
-        return new NotEqualsPredicateEvaluator((NEqPredicate) predicate, dictionary);
+        return NotEqualsPredicateEvaluatorFactory.newDictionaryBasedEvaluator((NEqPredicate) predicate, dictionary);
       case IN:
-        return new InPredicateEvaluator((InPredicate) predicate, dictionary);
+        return InPredicateEvaluatorFactory.newDictionaryBasedEvaluator((InPredicate) predicate, dictionary);
       case NOT_IN:
-        return new NotInPredicateEvaluator((NotInPredicate) predicate, dictionary);
+        return NotInPredicateEvaluatorFactory.newDictionaryBasedEvaluator((NotInPredicate) predicate, dictionary);
       case RANGE:
         if (dictionary instanceof ImmutableDictionaryReader) {
-          return new RangeOfflineDictionaryPredicateEvaluator((RangePredicate) predicate, (ImmutableDictionaryReader) dictionary);
+          return RangePredicateEvaluatorFactory.newOfflineDictionaryBasedEvaluator((RangePredicate) predicate,
+              (ImmutableDictionaryReader) dictionary);
         } else {
-          return new RangeRealtimeDictionaryPredicateEvaluator((RangePredicate) predicate, (MutableDictionaryReader) dictionary);
+          return RangePredicateEvaluatorFactory.newRealtimeDictionaryBasedEvaluator((RangePredicate) predicate,
+              (MutableDictionaryReader) dictionary);
         }
       case REGEX:
         throw new UnsupportedOperationException("regex is not supported");
@@ -58,18 +60,19 @@ public class PredicateEvaluatorProvider {
 
       switch (predicate.getType()) {
       case EQ:
-        return EqualsPredicateEvaluator.newNoDictionaryBasedEvaluator((EqPredicate) predicate, dataType);
+        return EqualsPredicateEvaluatorFactory.newNoDictionaryBasedEvaluator((EqPredicate) predicate, dataType);
       case NEQ:
-        return new NotEqualsPredicateEvaluator((NEqPredicate) predicate, dictionary);
+        return NotEqualsPredicateEvaluatorFactory.newNoDictionaryBasedEvaluator((NEqPredicate) predicate, dataType);
       case IN:
-        return new InPredicateEvaluator((InPredicate) predicate, dictionary);
+        return InPredicateEvaluatorFactory.newNoDictionaryBasedEvaluator((InPredicate) predicate, dataType);
       case NOT_IN:
-        return new NotInPredicateEvaluator((NotInPredicate) predicate, dictionary);
+        return NotInPredicateEvaluatorFactory.newNoDictionaryBasedEvaluator((NotInPredicate) predicate, dataType);
       case RANGE:
         if (dictionary instanceof ImmutableDictionaryReader) {
-          return new RangeOfflineDictionaryPredicateEvaluator((RangePredicate) predicate, (ImmutableDictionaryReader) dictionary);
+          return RangePredicateEvaluatorFactory.newNoDictionaryBasedEvaluator(
+              (RangePredicate) predicate, dataType);
         } else {
-          return new RangeRealtimeDictionaryPredicateEvaluator((RangePredicate) predicate, (MutableDictionaryReader) dictionary);
+          return RangePredicateEvaluatorFactory.newNoDictionaryBasedEvaluator((RangePredicate) predicate, dataType);
         }
       case REGEXP_LIKE:
         return new RegexPredicateEvaluator((RegexpLikePredicate) predicate, dictionary);
