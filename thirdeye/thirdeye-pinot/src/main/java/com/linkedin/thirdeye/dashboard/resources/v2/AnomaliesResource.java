@@ -639,9 +639,6 @@ public class AnomaliesResource {
    * Generates Anomaly Details for each merged anomaly
    * @param mergedAnomaly
    * @param datasetConfig
-   * @param timeSeriesDateFormatter
-   * @param startEndDateFormatterHours
-   * @param startEndDateFormatterDays
    * @param externalUrl
    * @return
    */
@@ -707,9 +704,7 @@ public class AnomaliesResource {
    * @param currentStartTime inclusive
    * @param currentEndTime inclusive
    * @param anomalyTimelinesView
-   * @param timeSeriesDateFormatter
-   * @param startEndDateFormatterHours
-   * @param startEndDateFormatterDays
+   * @param externalUrl
    * @return
    * @throws JSONException
    */
@@ -787,26 +782,31 @@ public class AnomaliesResource {
 
   private TimeRange getTimeseriesOffsetedTimes(long anomalyStartTime, long anomalyEndTime, DatasetConfigDTO datasetConfig) {
     TimeUnit dataTimeunit = datasetConfig.getTimeUnit();
-    Period offsetPeriod;
+    Period preOffsetPeriod; // The offset we view before the anomaly
+    Period postOffsetPeriod; // The offset we view after the anomaly
     switch (dataTimeunit) {
-      case DAYS: // 3 days
-        offsetPeriod = new Period(0, 0, 0, 3, 0, 0, 0, 0);
+      case DAYS: // 30 days
+        preOffsetPeriod = new Period(0, 0, 0, 30, 0, 0, 0, 0);
+        postOffsetPeriod = new Period(0, 0, 0, 3, 0, 0, 0, 0);
         break;
       case HOURS: // 10 hours
-        offsetPeriod = new Period(0, 0, 0, 0, 10, 0, 0, 0);
+        preOffsetPeriod = new Period(0, 0, 0, 0, 10, 0, 0, 0);
+        postOffsetPeriod = new Period(0, 0, 0, 0, 10, 0, 0, 0);
         break;
       case MINUTES: // 60 minutes
-        offsetPeriod = new Period(0, 0, 0, 0, 0, 60, 0, 0);
+        preOffsetPeriod = new Period(0, 0, 0, 0, 0, 60, 0, 0);
+        postOffsetPeriod = new Period(0, 0, 0, 0, 0, 60, 0, 0);
         break;
       default:
-        offsetPeriod = new Period();
+        preOffsetPeriod = new Period();
+        postOffsetPeriod = new Period();
     }
 
     DateTimeZone dateTimeZone = DateTimeZone.forID(datasetConfig.getTimezone());
     DateTime anomalyStartDateTime = new DateTime(anomalyStartTime, dateTimeZone);
     DateTime anomalyEndDateTime = new DateTime(anomalyEndTime, dateTimeZone);
-    anomalyStartDateTime = anomalyStartDateTime.minus(offsetPeriod);
-    anomalyEndDateTime = anomalyEndDateTime.plus(offsetPeriod);
+    anomalyStartDateTime = anomalyStartDateTime.minus(preOffsetPeriod);
+    anomalyEndDateTime = anomalyEndDateTime.plus(postOffsetPeriod);
     anomalyStartTime = anomalyStartDateTime.getMillis();
     anomalyEndTime = anomalyEndDateTime.getMillis();
     try {
