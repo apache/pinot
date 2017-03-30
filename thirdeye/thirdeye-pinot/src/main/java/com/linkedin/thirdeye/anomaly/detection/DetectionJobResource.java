@@ -628,7 +628,7 @@ public class DetectionJobResource {
       new Thread(backfillRunnable).start();
     }
 
-    return Response.ok("Function AutoTune is running").build();
+    return Response.ok(targetId).build();
   }
 
   /**
