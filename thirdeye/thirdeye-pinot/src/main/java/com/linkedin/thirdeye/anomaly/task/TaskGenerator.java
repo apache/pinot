@@ -1,6 +1,9 @@
 package com.linkedin.thirdeye.anomaly.task;
 
+import com.linkedin.thirdeye.anomaly.classification.ClassificationJobContext;
+import com.linkedin.thirdeye.anomaly.classification.ClassificationTaskInfo;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.ClassificationConfigDTO;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -93,6 +96,19 @@ public class TaskGenerator {
     expireTaskInfo.setExpireDaysAgo(monitorConfiguration.getExpireDaysAgo());
     tasks.add(expireTaskInfo);
 
+    return tasks;
+  }
+
+  public List<ClassificationTaskInfo> createClassificationTasks(ClassificationJobContext classificationJobContext,
+      DateTime monitoringWindowStartTime, DateTime monitoringWindowEndTime) throws Exception {
+    long jobexecutionId = classificationJobContext.getJobExecutionId();
+    ClassificationConfigDTO classificationConfig = classificationJobContext.getConfigDTO();
+    ClassificationTaskInfo classificationTaskInfo =
+        new ClassificationTaskInfo(jobexecutionId, monitoringWindowStartTime, monitoringWindowEndTime,
+            classificationConfig);
+
+    List<ClassificationTaskInfo> tasks = new ArrayList<>();
+    tasks.add(classificationTaskInfo);
     return tasks;
   }
 

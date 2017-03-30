@@ -8,5 +8,5 @@ import java.util.List;
 public interface JobRunner extends Runnable {
 
   Long createJob();
-  List<Long> createTasks();
+  List<Long> createTasks() throws Exception;
 }

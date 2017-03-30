@@ -1,7 +1,10 @@
 package com.linkedin.thirdeye.datalayer.pojo;
 
 import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
+import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
 import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -12,11 +15,14 @@ public class JobBean extends AbstractBean {
 
   private String jobName;
   private JobStatus status;
+  private TaskType taskType;
+  private List<Long> taskIds = new ArrayList<>();
   private long scheduleStartTime;
   private long scheduleEndTime;
   private long windowStartTime;
   private long windowEndTime;
   private Timestamp lastModified;
+  private long anomalyFunctionId; // 0 if this job is not a detection job
 
   public String getJobName() {
     return jobName;
@@ -32,6 +38,22 @@ public class JobBean extends AbstractBean {
 
   public void setStatus(JobStatus status) {
     this.status = status;
+  }
+
+  public TaskType getTaskType() {
+    return taskType;
+  }
+
+  public void setTaskType(TaskType taskType) {
+    this.taskType = taskType;
+  }
+
+  public List<Long> getTaskIds() {
+    return taskIds;
+  }
+
+  public void setTaskIds(List<Long> taskIds) {
+    this.taskIds = taskIds;
   }
 
   public long getScheduleStartTime() {
@@ -70,6 +92,14 @@ public class JobBean extends AbstractBean {
     return lastModified;
   }
 
+  public long getAnomalyFunctionId() {
+    return anomalyFunctionId;
+  }
+
+  public void setAnomalyFunctionId(long anomalyFunctionId) {
+    this.anomalyFunctionId = anomalyFunctionId;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (!(o instanceof JobBean)) {
@@ -77,11 +107,13 @@ public class JobBean extends AbstractBean {
     }
     JobBean af = (JobBean) o;
     return Objects.equals(getId(), af.getId()) && Objects.equals(jobName, af.getJobName()) && Objects
-        .equals(status, af.getStatus()) && Objects.equals(scheduleStartTime, af.getScheduleStartTime());
+        .equals(status, af.getStatus()) && Objects.equals(scheduleStartTime, af.getScheduleStartTime())
+        && Objects.equals(taskType, af.getTaskType()) && Objects.equals(taskIds, af.getTaskIds())
+        && Objects.equals(anomalyFunctionId, af.getAnomalyFunctionId());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(getId(), jobName, status, scheduleStartTime);
+    return Objects.hash(getId(), jobName, status, scheduleStartTime, taskType, taskIds, anomalyFunctionId);
   }
 }

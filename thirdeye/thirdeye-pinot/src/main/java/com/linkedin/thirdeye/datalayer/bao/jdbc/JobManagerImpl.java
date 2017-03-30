@@ -82,21 +82,6 @@ public class JobManagerImpl extends AbstractManagerImpl<JobDTO> implements JobMa
   }
 
   @Override
-  public JobDTO findLatestScheduledJobByName(String jobName) {
-    Predicate namePredicate = Predicate.EQ("name", jobName);
-    Predicate statusPredicate = Predicate.EQ("status", "SCHEDULED");
-
-    List<JobBean> list = genericPojoDao.get(Predicate.AND(statusPredicate, namePredicate), JobBean.class);
-
-    if (CollectionUtils.isNotEmpty(list)) {
-      JobDTO dto = convertBean2DTO(list.get(0), JobDTO.class);
-      return dto;
-    }
-
-    return null;
-  }
-
-  @Override
   public JobDTO findLatestBackfillScheduledJobByFunctionId(long functionId, long backfillWindowStart, long backfillWindowEnd) {
     String parameterizedSQL =
         "where name like \"" + DetectionTaskRunner.BACKFILL_PREFIX + "%" + functionId + "\" ";
@@ -123,5 +108,14 @@ public class JobManagerImpl extends AbstractManagerImpl<JobDTO> implements JobMa
     return null;
   }
 
+  @Override
+  public JobDTO findLatestCompletedAnomalyJobByFunctionId(long functionId) {
+    return null;
+  }
+
+  @Override
+  public JobDTO findLatestCompletedGroupingJobById(long functionId) {
+    return null;
+  }
 
 }
