@@ -31,7 +31,7 @@ Handlebars.registerHelper('formatDelta', function (a, b) {
 });
 
 Handlebars.registerHelper('formatNumber', function(num) {
-  return num.toString().replace(/(\d)(?=(\d\d\d)+(?!\d))/g, "1,");
+  return num.toString().replace(/(\d)(?=(\d\d\d)+(?!\d))/g, "$1,");
 });
 
 /**

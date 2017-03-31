@@ -24,6 +24,12 @@ function HashParams() {
   this.ANALYSIS_GRANULARITY = 'granularity';
   this.ANALYSIS_DIMENSION = 'dimension';
 
+  this.HEATMAP_CURRENT_START = 'heatMapCurrentStart';
+  this.HEATMAP_CURRENT_END = 'heatMapCurrentEnd';
+  this.HEATMAP_BASELINE_START = 'heatMapBaselineStart';
+  this.HEATMAP_BASELINE_END = 'heatMapBaselineEnd';
+  this.HEATMAP_MODE = 'heatmapMode';
+
   this.RAND = 'rand';
 
   // this map has key = <controller name> and value = <map of param names and its default value>
@@ -104,6 +110,13 @@ HashParams.prototype = {
       paramNamesToDefaultValuesMap[this.ANALYSIS_FILTERS] = null;
       paramNamesToDefaultValuesMap[this.ANALYSIS_GRANULARITY] = constants.DEFAULT_ANALYSIS_GRANULARITY;
       paramNamesToDefaultValuesMap[this.ANALYSIS_DIMENSION] = constants.DEFAULT_ANALYSIS_DIMENSION;
+
+      paramNamesToDefaultValuesMap[this.HEATMAP_CURRENT_START] = null;
+      paramNamesToDefaultValuesMap[this.HEATMAP_CURRENT_END] = null;
+      paramNamesToDefaultValuesMap[this.HEATMAP_BASELINE_START] = null;
+      paramNamesToDefaultValuesMap[this.HEATMAP_BASELINE_END] = null;
+      paramNamesToDefaultValuesMap[this.HEATMAP_MODE] = null;
+
       this.controllerNameToParamNamesMap[this.ANALYSIS_CONTROLLER] = paramNamesToDefaultValuesMap;
 
       // investigate
@@ -121,6 +134,11 @@ HashParams.prototype = {
         case this.ANALYSIS_BASELINE_END :
         case this.ANOMALIES_START_DATE :
         case this.ANOMALIES_END_DATE:
+        case this.ANALYSIS_BASELINE_END:
+        case this.HEATMAP_CURRENT_START:
+        case this.HEATMAP_CURRENT_END:
+        case this.HEATMAP_BASELINE_START:
+        case this.HEATMAP_BASELINE_END:
           return currentValue.isSame(newValue, 'day');
 
         case this.ANALYSIS_FILTERS:

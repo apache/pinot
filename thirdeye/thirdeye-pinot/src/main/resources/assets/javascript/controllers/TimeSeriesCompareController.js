@@ -16,11 +16,15 @@ TimeSeriesCompareController.prototype = {
     this.timeSeriesCompareModel.update().then(() => {
       this.timeSeriesCompareView.render();
     });
+    if (params.heatMapCurrentStart && params.heatMapCurrentEnd && params.heatMapBaselineStart && params.heatMapBaselineEnd) {
+      this.dimensionTreeMapController.handleAppEvent(params);
+    }
   },
 
   handleHeatMapRenderEvent: function (viewObject) {
     this.dimensionTreeMapController.destroy();
     HASH_SERVICE.update(viewObject.viewParams);
+    HASH_SERVICE.refreshWindowHashForRouting('analysis');
     this.dimensionTreeMapController.handleAppEvent(HASH_SERVICE.getParams());
   },
 
@@ -29,3 +33,4 @@ TimeSeriesCompareController.prototype = {
     this.dimensionTreeMapController.destroy();
   }
 };
+

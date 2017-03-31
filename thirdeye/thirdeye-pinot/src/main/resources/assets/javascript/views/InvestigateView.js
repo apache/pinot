@@ -65,7 +65,7 @@ InvestigateView.prototype = {
         const baselineEnd = end.clone().subtract(offset, 'days');
         wow.change *= 100;
         // wow.url = `dashboard#view=compare&dataset=${dataset}&compareMode=WoW&aggTimeGranularity=aggregateAll&currentStart=${start.valueOf()}&currentEnd=${end.valueOf()}&baselineStart=${baselineStart.valueOf()}&baselineEnd=${baselineEnd.valueOf()}&metrics=${metric}`;
-        wow.url = `thirdeye#analysis?currentStart=${start}&currentEnd=${end}&baselineStart=${baselineStart}&baselineEnd=${baselineEnd}&metricId=${metricId}&filters={}&granularity=${timeUnit}`;
+        wow.url = `thirdeye#analysis?currentStart=${start.valueOf()}&currentEnd=${end.valueOf()}&baselineStart=${baselineStart.valueOf()}&baselineEnd=${baselineEnd.valueOf()}&metricId=${metricId}&filters={}&granularity=${timeUnit}&dimension=All`;
         return wow;
       });
   },

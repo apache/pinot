@@ -32,16 +32,16 @@ TimeSeriesCompareModel.prototype = {
         this.metricName = params.metricName;
       }
       if (params.currentStart) {
-        this.currentStart = params.currentStart;
+        this.currentStart = moment(params.currentStart);
       }
       if (params.currentEnd) {
-        this.currentEnd = params.currentEnd;
+        this.currentEnd = moment(params.currentEnd);
       }
       if (params.baselineStart) {
-        this.baselineStart = params.baselineStart;
+        this.baselineStart = moment(params.baselineStart);
       }
       if (params.baselineEnd) {
-        this.baselineEnd = params.baselineEnd;
+        this.baselineEnd = moment(params.baselineEnd);
       }
       if (params.granularity) {
         this.granularity = params.granularity;
