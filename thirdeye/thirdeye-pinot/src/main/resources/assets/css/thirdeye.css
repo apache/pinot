@@ -407,6 +407,7 @@ hr {
 .heatmap {
     display: block;
     margin: auto;
+    background-color: #f5f5f5;
 }
 text {
     font-size: 11px;

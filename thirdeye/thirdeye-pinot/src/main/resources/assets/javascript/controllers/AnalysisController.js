@@ -13,7 +13,7 @@ AnalysisController.prototype = {
   handleAppEvent() {
     this.timeSeriesCompareController.destroy();
     this.analysisView.destroyAnalysisOptions();
-    HASH_SERVICE.refreshWindowHashForRouting('analysis');
+    // HASH_SERVICE.refreshWindowHashForRouting('analysis');
     const hashParams = HASH_SERVICE.getParams();
     this.analysisModel.init(hashParams);
     this.analysisModel.update(hashParams);
