@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.anomaly;
 
 import com.linkedin.thirdeye.anomaly.alert.v2.AlertJobSchedulerV2;
+import com.linkedin.thirdeye.anomaly.grouping.GroupingJobScheduler;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import com.linkedin.thirdeye.dashboard.resources.AnomalyFunctionResource;
 
@@ -42,6 +43,7 @@ public class ThirdEyeAnomalyApplication
   private DataCompletenessScheduler dataCompletenessScheduler = null;
   private AlertFilterFactory alertFilterFactory = null;
   private AlertFilterAutotuneFactory alertFilterAutotuneFactory = null;
+  private GroupingJobScheduler groupingJobScheduler = null;
 
   public static void main(final String[] args) throws Exception {
 
@@ -127,6 +129,10 @@ public class ThirdEyeAnomalyApplication
           dataCompletenessScheduler = new DataCompletenessScheduler();
           dataCompletenessScheduler.start();
         }
+        if (config.isGrouper()) {
+          groupingJobScheduler = new GroupingJobScheduler();
+          groupingJobScheduler.start();
+        }
       }
 
       @Override
@@ -152,6 +158,9 @@ public class ThirdEyeAnomalyApplication
         }
         if (config.isDataCompleteness()) {
           dataCompletenessScheduler.shutdown();
+        }
+        if (config.isGrouper()) {
+          groupingJobScheduler.shutdown();
         }
       }
     });

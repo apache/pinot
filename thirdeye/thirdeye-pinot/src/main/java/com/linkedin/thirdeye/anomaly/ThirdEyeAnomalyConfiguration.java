@@ -11,6 +11,7 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
   private boolean merger = false;
   private boolean autoload = false;
   private boolean dataCompleteness = false;
+  private boolean grouper = false;
 
   private long id;
   private String dashboardHost;
@@ -101,6 +102,14 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
 
   public void setDataCompleteness(boolean dataCompleteness) {
     this.dataCompleteness = dataCompleteness;
+  }
+
+  public boolean isGrouper() {
+    return grouper;
+  }
+
+  public void setGrouper(boolean grouper) {
+    this.grouper = grouper;
   }
 
   public void setSmtpConfiguration(SmtpConfiguration smtpConfiguration) {

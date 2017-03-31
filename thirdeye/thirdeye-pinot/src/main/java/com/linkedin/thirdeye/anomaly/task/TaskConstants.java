@@ -11,7 +11,7 @@ public class TaskConstants {
     ALERT2,
     MONITOR,
     DATA_COMPLETENESS,
-    CLASSIFICATION
+    GROUPING
   }
 
   public enum TaskStatus {

@@ -1,18 +1,18 @@
-package com.linkedin.thirdeye.anomaly.classification;
+package com.linkedin.thirdeye.anomaly.grouping;
 
+import com.linkedin.thirdeye.anomaly.task.TaskInfo;
 import com.linkedin.thirdeye.datalayer.dto.ClassificationConfigDTO;
-import org.joda.time.DateTime;
 
-public class ClassificationTaskInfo {
+public class GroupingTaskInfo implements TaskInfo {
   private long jobexecutionId;
-  private DateTime windowStartTime;
-  private DateTime windowEndTime;
+  private long windowStartTime;
+  private long windowEndTime;
   private ClassificationConfigDTO classificationConfigDTO;
 
-  public ClassificationTaskInfo() {
+  public GroupingTaskInfo() {
   }
 
-  public ClassificationTaskInfo(long jobexecutionId, DateTime windowStartTime, DateTime windowEndTime,
+  public GroupingTaskInfo(long jobexecutionId, long windowStartTime, long windowEndTime,
       ClassificationConfigDTO classificationConfigDTO) {
     this.jobexecutionId = jobexecutionId;
     this.windowStartTime = windowStartTime;
@@ -28,19 +28,19 @@ public class ClassificationTaskInfo {
     this.jobexecutionId = jobexecutionId;
   }
 
-  public DateTime getWindowStartTime() {
+  public long getWindowStartTime() {
     return windowStartTime;
   }
 
-  public void setWindowStartTime(DateTime windowStartTime) {
+  public void setWindowStartTime(long windowStartTime) {
     this.windowStartTime = windowStartTime;
   }
 
-  public DateTime getWindowEndTime() {
+  public long getWindowEndTime() {
     return windowEndTime;
   }
 
-  public void setWindowEndTime(DateTime windowEndTime) {
+  public void setWindowEndTime(long windowEndTime) {
     this.windowEndTime = windowEndTime;
   }
 

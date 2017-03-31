@@ -3,8 +3,6 @@ package com.linkedin.thirdeye.datalayer.pojo;
 import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
 import java.sql.Timestamp;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Objects;
 
 /**
@@ -16,7 +14,6 @@ public class JobBean extends AbstractBean {
   private String jobName;
   private JobStatus status;
   private TaskType taskType;
-  private List<Long> taskIds = new ArrayList<>();
   private long scheduleStartTime;
   private long scheduleEndTime;
   private long windowStartTime;
@@ -46,14 +43,6 @@ public class JobBean extends AbstractBean {
 
   public void setTaskType(TaskType taskType) {
     this.taskType = taskType;
-  }
-
-  public List<Long> getTaskIds() {
-    return taskIds;
-  }
-
-  public void setTaskIds(List<Long> taskIds) {
-    this.taskIds = taskIds;
   }
 
   public long getScheduleStartTime() {
@@ -92,6 +81,10 @@ public class JobBean extends AbstractBean {
     return lastModified;
   }
 
+  public void setLastModified(Timestamp lastModified) {
+    this.lastModified = lastModified;
+  }
+
   public long getAnomalyFunctionId() {
     return anomalyFunctionId;
   }
@@ -108,12 +101,11 @@ public class JobBean extends AbstractBean {
     JobBean af = (JobBean) o;
     return Objects.equals(getId(), af.getId()) && Objects.equals(jobName, af.getJobName()) && Objects
         .equals(status, af.getStatus()) && Objects.equals(scheduleStartTime, af.getScheduleStartTime())
-        && Objects.equals(taskType, af.getTaskType()) && Objects.equals(taskIds, af.getTaskIds())
-        && Objects.equals(anomalyFunctionId, af.getAnomalyFunctionId());
+        && Objects.equals(taskType, af.getTaskType()) && Objects.equals(anomalyFunctionId, af.getAnomalyFunctionId());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(getId(), jobName, status, scheduleStartTime, taskType, taskIds, anomalyFunctionId);
+    return Objects.hash(getId(), jobName, status, scheduleStartTime, taskType, anomalyFunctionId);
   }
 }

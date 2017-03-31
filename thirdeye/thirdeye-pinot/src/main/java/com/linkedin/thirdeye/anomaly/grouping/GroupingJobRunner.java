@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.anomaly.classification;
+package com.linkedin.thirdeye.anomaly.grouping;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.linkedin.thirdeye.anomaly.job.JobConstants;
@@ -11,20 +11,19 @@ import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 import java.util.ArrayList;
 import java.util.List;
-import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static com.linkedin.thirdeye.dashboard.resources.EntityManagerResource.OBJECT_MAPPER;
 
-public class ClassificationJobRunner implements JobRunner {
-  private static final Logger LOG = LoggerFactory.getLogger(ClassificationJobRunner.class);
+public class GroupingJobRunner implements JobRunner {
+  private static final Logger LOG = LoggerFactory.getLogger(GroupingJobRunner.class);
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final JobManager jobDAO = DAO_REGISTRY.getJobDAO();
-  private ClassificationJobContext jobContext;
+  private GroupingJobContext jobContext;
   private TaskGenerator taskGenerator = new TaskGenerator();
 
-  public ClassificationJobRunner(ClassificationJobContext classificationJobContext) {
+  public GroupingJobRunner(GroupingJobContext classificationJobContext) {
     this.jobContext = classificationJobContext;
   }
 
@@ -38,13 +37,14 @@ public class ClassificationJobRunner implements JobRunner {
       classificationJobSpec.setWindowEndTime(jobContext.getWindowEndTime());
       classificationJobSpec.setScheduleStartTime(System.currentTimeMillis());
       classificationJobSpec.setStatus(JobConstants.JobStatus.SCHEDULED);
+      classificationJobSpec.setTaskType(TaskConstants.TaskType.GROUPING);
       Long jobExecutionId = jobDAO.save(classificationJobSpec);
       jobContext.setJobName(jobName);
       jobContext.setJobExecutionId(jobExecutionId);
       LOG.info("Created anomalyJobSpec {} with jobExecutionId {}", classificationJobSpec, jobExecutionId);
       return jobExecutionId;
     } catch (Exception e) {
-      LOG.error("Exception in creating detection job", e);
+      LOG.error("Exception in creating classification job", e);
     }
     return null;
   }
@@ -55,20 +55,19 @@ public class ClassificationJobRunner implements JobRunner {
 
     try {
       LOG.info("Creating classification tasks");
-      List<ClassificationTaskInfo> taskInfos = taskGenerator
-          .createClassificationTasks(jobContext, new DateTime(jobContext.getWindowStartTime()),
-              new DateTime(jobContext.getWindowEndTime()));
+      List<GroupingTaskInfo> taskInfos = taskGenerator
+          .createGroupingTasks(jobContext, jobContext.getWindowStartTime(), jobContext.getWindowEndTime());
       LOG.info("Classification tasks {}", taskInfos);
-      for (ClassificationTaskInfo taskInfo : taskInfos) {
+      for (GroupingTaskInfo taskInfo : taskInfos) {
         String taskInfoJson = null;
         try {
           taskInfoJson = OBJECT_MAPPER.writeValueAsString(taskInfo);
         } catch (JsonProcessingException e) {
-          LOG.error("Exception when converting ClassificationTaskInfo {} to jsonString", taskInfo, e);
+          LOG.error("Exception when converting GroupingTaskInfo {} to jsonString", taskInfo, e);
         }
 
         TaskDTO taskSpec = new TaskDTO();
-        taskSpec.setTaskType(TaskConstants.TaskType.CLASSIFICATION);
+        taskSpec.setTaskType(TaskConstants.TaskType.GROUPING);
         taskSpec.setJobName(jobContext.getJobName());
         taskSpec.setStatus(TaskConstants.TaskStatus.WAITING);
         taskSpec.setStartTime(System.currentTimeMillis());
@@ -94,7 +93,7 @@ public class ClassificationJobRunner implements JobRunner {
     }
   }
 
-  private static String createJobName(ClassificationJobContext jobContext) {
+  private static String createJobName(GroupingJobContext jobContext) {
     long configId = jobContext.getConfigDTO().getId();
     String configName = jobContext.getConfigDTO().getName();
     long startTimes = jobContext.getWindowStartTime();

@@ -1,8 +1,8 @@
 package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
 import com.linkedin.thirdeye.anomaly.detection.DetectionTaskRunner;
+import com.linkedin.thirdeye.anomaly.task.TaskConstants;
 import java.sql.Timestamp;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -21,6 +21,12 @@ import com.linkedin.thirdeye.datalayer.pojo.JobBean;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
 
 public class JobManagerImpl extends AbstractManagerImpl<JobDTO> implements JobManager {
+
+  private static final String FIND_LATEST_COMPLETED_ANOMALY_JOB_BY_FUNCTION_ID =
+      "where type=:type and anomalyFunctionId=:anomalyFunctionId and status=:status order by createTime desc";
+
+  private static final String FIND_LATEST_COMPLETED_GROUPING_JOB_BY_FUNCTION_ID =
+      "where type=:type and status=:status order by createTime desc";
 
   public JobManagerImpl() {
     super(JobDTO.class, JobBean.class);
@@ -63,12 +69,7 @@ public class JobManagerImpl extends AbstractManagerImpl<JobDTO> implements JobMa
     String parameterizedSQL = "order by scheduleStartTime desc limit "+n;
     HashMap<String, Object> parameterMap = new HashMap<>();
     List<JobBean> list = genericPojoDao.executeParameterizedSQL(parameterizedSQL, parameterMap, JobBean.class);
-    List<JobDTO> ret = new ArrayList<>();
-    for (JobBean bean : list) {
-      JobDTO dto = convertBean2DTO(bean, JobDTO.class);
-      ret.add(dto);
-    }
-    return ret;
+    return convertBeanListToDTOList(list);
   }
 
   @Override
@@ -110,12 +111,32 @@ public class JobManagerImpl extends AbstractManagerImpl<JobDTO> implements JobMa
 
   @Override
   public JobDTO findLatestCompletedAnomalyJobByFunctionId(long functionId) {
-    return null;
+    HashMap<String, Object> parameterMap = new HashMap<>();
+    parameterMap.put("type", TaskConstants.TaskType.ANOMALY_DETECTION);
+    parameterMap.put("anomalyFunctionId", functionId);
+    parameterMap.put("status", JobStatus.COMPLETED);
+    List<JobBean> list = genericPojoDao
+        .executeParameterizedSQL(FIND_LATEST_COMPLETED_ANOMALY_JOB_BY_FUNCTION_ID, parameterMap, JobBean.class);
+
+    if (CollectionUtils.isNotEmpty(list)) {
+      return convertBean2DTO(list.get(0), JobDTO.class);
+    } else {
+      return null;
+    }
   }
 
   @Override
   public JobDTO findLatestCompletedGroupingJobById(long functionId) {
-    return null;
-  }
+    HashMap<String, Object> parameterMap = new HashMap<>();
+    parameterMap.put("type", TaskConstants.TaskType.GROUPING);
+    parameterMap.put("status", JobStatus.COMPLETED);
+    List<JobBean> list = genericPojoDao
+        .executeParameterizedSQL(FIND_LATEST_COMPLETED_GROUPING_JOB_BY_FUNCTION_ID, parameterMap, JobBean.class);
 
+    if (CollectionUtils.isNotEmpty(list)) {
+      return convertBean2DTO(list.get(0), JobDTO.class);
+    } else {
+      return null;
+    }
+  }
 }
