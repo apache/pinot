@@ -18,6 +18,11 @@ import parsii.eval.Scope;
 import parsii.eval.Variable;
 import parsii.tokenizer.ParseException;
 
+/**
+ * This class maintains the metric name, the metric expression composed of metric ids, and the aggregation function
+ * The dataset is required here, because we need to know which dataset to query in cases of count(*)  and select max(time)
+ * For other cases, it can be derived from the metric id in the expression
+ */
 public class MetricExpression {
 
   private static String COUNT_METRIC = "__COUNT";

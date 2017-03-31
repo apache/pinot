@@ -251,6 +251,8 @@ public class ThirdEyeRequest {
 
     public ThirdEyeRequest build(String requestReference) {
       String dataset = null;
+      // Since we don't have dataset anymore, we are using the first metric function, to derive the dataset name
+      // and then using that dataset to figure out if non additive
       try {
         if (CollectionUtils.isNotEmpty(metricFunctions)) {
           dataset = ThirdEyeUtils.getDatasetFromMetricFunction(metricFunctions.get(0));
