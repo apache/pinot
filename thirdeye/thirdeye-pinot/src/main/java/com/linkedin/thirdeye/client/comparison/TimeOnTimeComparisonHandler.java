@@ -36,8 +36,6 @@ public class TimeOnTimeComparisonHandler {
 
   public TimeOnTimeComparisonResponse handle(TimeOnTimeComparisonRequest comparisonRequest)
       throws Exception {
-    ThirdEyeRequestBuilder builder = new ThirdEyeRequestBuilder();
-    builder.setCollection(comparisonRequest.getCollectionName());
     List<Range<DateTime>> baselineTimeranges = new ArrayList<>();
     List<Range<DateTime>> currentTimeranges = new ArrayList<>();
     TimeGranularity aggregationTimeGranularity = comparisonRequest.getAggregationTimeGranularity();
@@ -147,7 +145,6 @@ public class TimeOnTimeComparisonHandler {
   private static ThirdEyeRequest createThirdEyeRequest(String requestReference,
       TimeOnTimeComparisonRequest comparisonRequest, DateTime start, DateTime end) {
     ThirdEyeRequestBuilder requestBuilder = ThirdEyeRequest.newBuilder();
-    requestBuilder.setCollection(comparisonRequest.getCollectionName());
     requestBuilder.setStartTimeInclusive(start);
     requestBuilder.setEndTimeExclusive(end);
     requestBuilder.setFilterSet(comparisonRequest.getFilterSet());

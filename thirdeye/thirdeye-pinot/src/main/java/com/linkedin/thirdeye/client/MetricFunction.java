@@ -8,15 +8,20 @@ public class MetricFunction implements Comparable<MetricFunction> {
 
   private MetricAggFunction functionName;
   private String metricName;
+  private Long metricId;
+  private String dataset;
 
   public MetricFunction() {
 
   }
 
   public MetricFunction(@JsonProperty("functionName") MetricAggFunction functionName,
-      @JsonProperty("metricName") String metricName) {
+      @JsonProperty("metricName") String metricName, @JsonProperty("metricId") Long metricId,
+      @JsonProperty("dataset") String dataset) {
     this.functionName = functionName;
     this.metricName = metricName;
+    this.metricId = metricId;
+    this.dataset = dataset;
   }
 
   private String format(String functionName, String metricName) {
@@ -32,7 +37,7 @@ public class MetricFunction implements Comparable<MetricFunction> {
 
   @Override
   public int hashCode() {
-    return Objects.hashCode(functionName, metricName);
+    return Objects.hashCode(functionName, metricName, metricId, dataset);
   }
 
   @Override
@@ -40,9 +45,11 @@ public class MetricFunction implements Comparable<MetricFunction> {
     if (!(obj instanceof MetricFunction)) {
       return false;
     }
-    MetricFunction that = (MetricFunction) obj;
-    return Objects.equal(this.functionName, that.functionName)
-        && Objects.equal(this.metricName, that.metricName);
+    MetricFunction mf = (MetricFunction) obj;
+    return Objects.equal(functionName, mf.functionName)
+        && Objects.equal(metricName, mf.metricName)
+        && Objects.equal(metricId, mf.metricId)
+        && Objects.equal(dataset, mf.dataset);
   }
 
   @Override
@@ -65,4 +72,22 @@ public class MetricFunction implements Comparable<MetricFunction> {
   public void setFunctionName(MetricAggFunction functionName) {
     this.functionName = functionName;
   }
+
+  public Long getMetricId() {
+    return metricId;
+  }
+
+  public void setMetricId(Long metricId) {
+    this.metricId = metricId;
+  }
+
+  public String getDataset() {
+    return dataset;
+  }
+
+  public void setDataset(String dataset) {
+    this.dataset = dataset;
+  }
+
+
 }

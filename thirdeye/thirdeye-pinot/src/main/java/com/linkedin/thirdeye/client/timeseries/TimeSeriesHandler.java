@@ -103,7 +103,6 @@ public class TimeSeriesHandler {
   private static ThirdEyeRequest createThirdEyeRequest(String requestReference,
       TimeSeriesRequest timeSeriesRequest, DateTime start, DateTime end) {
     ThirdEyeRequestBuilder requestBuilder = ThirdEyeRequest.newBuilder();
-    requestBuilder.setCollection(timeSeriesRequest.getCollectionName());
     requestBuilder.setStartTimeInclusive(start);
     requestBuilder.setEndTimeExclusive(end);
     requestBuilder.setFilterSet(timeSeriesRequest.getFilterSet());

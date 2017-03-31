@@ -72,7 +72,7 @@ public class TimeOnTimeTest {
     comparisonRequest.setCurrentStart(new DateTime(2016, 4, 8, 00, 00));
     comparisonRequest.setCurrentEnd(new DateTime(2016, 4, 9, 00, 00));
     List<MetricFunction> metricFunctions = new ArrayList<>();
-    metricFunctions.add(new MetricFunction(MetricAggFunction.SUM, "__COUNT"));
+    metricFunctions.add(new MetricFunction(MetricAggFunction.SUM, "__COUNT", null, collection));
     List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metricFunctions);
     metricExpressions.add(new MetricExpression("submit_rate", "submits/impressions"));
     comparisonRequest.setMetricExpressions(metricExpressions);
@@ -94,7 +94,7 @@ public class TimeOnTimeTest {
         Lists.newArrayList("browserName", "contactsOrigin", "deviceName", "continent",
             "countryCode", "environment", "locale", "osName", "pageKey", "source", "sourceApp"));
     List<MetricFunction> metricFunctions = new ArrayList<>();
-    metricFunctions.add(new MetricFunction(MetricAggFunction.SUM, "__COUNT"));
+    metricFunctions.add(new MetricFunction(MetricAggFunction.SUM, "__COUNT", null, collection));
     comparisonRequest.setMetricExpressions(Utils.convertToMetricExpressions(metricFunctions));
     comparisonRequest.setAggregationTimeGranularity(null);
     return comparisonRequest;
@@ -116,7 +116,7 @@ public class TimeOnTimeTest {
     comparisonRequest.setGroupByDimensions(Lists.newArrayList("environment"));
 
     List<MetricFunction> metricFunctions = new ArrayList<>();
-    metricFunctions.add(new MetricFunction(MetricAggFunction.SUM, "__COUNT"));
+    metricFunctions.add(new MetricFunction(MetricAggFunction.SUM, "__COUNT", null, collection));
     comparisonRequest.setMetricExpressions(Utils.convertToMetricExpressions(metricFunctions));
     comparisonRequest.setAggregationTimeGranularity(new TimeGranularity(1, TimeUnit.HOURS));
     return comparisonRequest;

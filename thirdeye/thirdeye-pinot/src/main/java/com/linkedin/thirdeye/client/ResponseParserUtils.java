@@ -62,7 +62,6 @@ public class ResponseParserUtils {
 
     ThirdEyeRequest request = response.getRequest();
     ThirdEyeRequestBuilder requestBuilder = ThirdEyeRequest.newBuilder();
-    requestBuilder.setCollection(request.getCollection());
     requestBuilder.setStartTimeInclusive(request.getStartTimeInclusive());
     requestBuilder.setEndTimeExclusive(request.getEndTimeExclusive());
     requestBuilder.setFilterSet(request.getFilterSet());
@@ -84,7 +83,6 @@ public class ResponseParserUtils {
     ThirdEyeRequest request = response.getRequest();
     Map<Integer, List<Double>> metricSums = new HashMap<>();
     ThirdEyeRequestBuilder requestBuilder = ThirdEyeRequest.newBuilder();
-    requestBuilder.setCollection(request.getCollection());
     requestBuilder.setStartTimeInclusive(request.getStartTimeInclusive());
     requestBuilder.setEndTimeExclusive(request.getEndTimeExclusive());
     requestBuilder.setFilterSet(request.getFilterSet());

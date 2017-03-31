@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.client;
 
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -11,6 +12,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 
@@ -29,7 +31,6 @@ import org.slf4j.LoggerFactory;
  * objects can be constructed via {@link ThirdEyeRequestBuilder}.
  */
 public class ThirdEyeRequest {
-  private final String collection;
   private final List<MetricFunction> metricFunctions;
   private final DateTime startTime;
   private final DateTime endTime;
@@ -44,7 +45,6 @@ public class ThirdEyeRequest {
 
   private ThirdEyeRequest(String requestReference, ThirdEyeRequestBuilder builder) {
     this.requestReference = requestReference;
-    this.collection = builder.collection;
     this.metricFunctions = builder.metricFunctions;
     this.startTime = builder.startTime;
     this.endTime = builder.endTime;
@@ -64,10 +64,6 @@ public class ThirdEyeRequest {
 
   public String getRequestReference() {
     return requestReference;
-  }
-
-  public String getCollection() {
-    return collection;
   }
 
   public List<MetricFunction> getMetricFunctions() {
@@ -107,7 +103,7 @@ public class ThirdEyeRequest {
   @Override
   public int hashCode() {
     // TODO do we intentionally omit request reference here?
-    return Objects.hash(collection, metricFunctions, startTime, endTime, filterSet, filterClause,
+    return Objects.hash(metricFunctions, startTime, endTime, filterSet, filterClause,
         groupByDimensions, groupByTimeGranularity);
   };
 
@@ -118,8 +114,7 @@ public class ThirdEyeRequest {
     }
     ThirdEyeRequest other = (ThirdEyeRequest) o;
     // TODO do we intentionally omit request reference here?
-    return Objects.equals(getCollection(), other.getCollection())
-        && Objects.equals(getMetricFunctions(), other.getMetricFunctions())
+    return Objects.equals(getMetricFunctions(), other.getMetricFunctions())
         && Objects.equals(getStartTimeInclusive(), other.getStartTimeInclusive())
         && Objects.equals(getEndTimeExclusive(), other.getEndTimeExclusive())
         && Objects.equals(getFilterSet(), other.getFilterSet())
@@ -132,7 +127,7 @@ public class ThirdEyeRequest {
   @Override
   public String toString() {
     return MoreObjects.toStringHelper(this).add("requestReference", requestReference)
-        .add("collection", collection).add("metricFunctions", metricFunctions)
+        .add("metricFunctions", metricFunctions)
         .add("startTime", startTime).add("endTime", endTime).add("filterSet", filterSet)
         .add("filterClause", filterClause).add("groupBy", groupByDimensions)
         .add("groupByTimeGranularity", groupByTimeGranularity).toString();
@@ -142,7 +137,6 @@ public class ThirdEyeRequest {
     private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeRequestBuilder.class);
     private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
 
-    private String collection;
     private List<MetricFunction> metricFunctions;
     private DateTime startTime;
     private DateTime endTime;
@@ -158,7 +152,6 @@ public class ThirdEyeRequest {
     }
 
     public ThirdEyeRequestBuilder(ThirdEyeRequest request) {
-      this.collection = request.getCollection();
       this.metricFunctions = request.getMetricFunctions();
       this.startTime = request.getStartTimeInclusive();
       this.endTime = request.getEndTimeExclusive();
@@ -168,8 +161,7 @@ public class ThirdEyeRequest {
       this.groupByTimeGranularity = request.getGroupByTimeGranularity();
     }
 
-    public ThirdEyeRequestBuilder setCollection(String collection) {
-      this.collection = collection;
+    public ThirdEyeRequestBuilder setDatasets(List<String> datasets) {
       return this;
     }
 
@@ -258,15 +250,22 @@ public class ThirdEyeRequest {
     }
 
     public ThirdEyeRequest build(String requestReference) {
+      String dataset = null;
+      // Since we don't have dataset anymore, we are using the first metric function, to derive the dataset name
+      // and then using that dataset to figure out if non additive
       try {
-        DatasetConfigDTO datasetConfig = CACHE_REGISTRY_INSTANCE.getDatasetConfigCache().get(collection);
-        if (!datasetConfig.isAdditive()) {
-          List<String> collectionDimensionNames = datasetConfig.getDimensions();
-          decorateFilterSetForPrecomputedDataset(filterSet, groupBy, collectionDimensionNames,
-              datasetConfig.getDimensionsHaveNoPreAggregation(), datasetConfig.getPreAggregatedKeyword());
+        if (CollectionUtils.isNotEmpty(metricFunctions)) {
+          dataset = ThirdEyeUtils.getDatasetFromMetricFunction(metricFunctions.get(0));
+          DatasetConfigDTO datasetConfig = ThirdEyeUtils.getDatasetConfigFromName(dataset);
+
+          if (!datasetConfig.isAdditive()) {
+            List<String> collectionDimensionNames = datasetConfig.getDimensions();
+            decorateFilterSetForPrecomputedDataset(filterSet, groupBy, collectionDimensionNames,
+                datasetConfig.getDimensionsHaveNoPreAggregation(), datasetConfig.getPreAggregatedKeyword());
+          }
         }
       } catch (Exception e) {
-        LOG.debug("Collection config for collection {} does not exist", collection);
+        LOG.debug("Collection config for collection {} does not exist", dataset);
       }
       return new ThirdEyeRequest(requestReference, this);
     }

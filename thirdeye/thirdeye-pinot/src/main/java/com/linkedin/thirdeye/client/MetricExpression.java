@@ -8,6 +8,9 @@ import java.util.Set;
 import java.util.TreeSet;
 
 import com.linkedin.thirdeye.constant.MetricAggFunction;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 import parsii.eval.Expression;
 import parsii.eval.Parser;
@@ -15,6 +18,11 @@ import parsii.eval.Scope;
 import parsii.eval.Variable;
 import parsii.tokenizer.ParseException;
 
+/**
+ * This class maintains the metric name, the metric expression composed of metric ids, and the aggregation function
+ * The dataset is required here, because we need to know which dataset to query in cases of count(*)  and select max(time)
+ * For other cases, it can be derived from the metric id in the expression
+ */
 public class MetricExpression {
 
   private static String COUNT_METRIC = "__COUNT";
@@ -23,44 +31,37 @@ public class MetricExpression {
   private String expressionName;
   private String expression;
   private MetricAggFunction aggFunction = MetricAggFunction.SUM;
+  private String dataset;
 
-  public MetricExpression() {
-
+  public MetricExpression(String expression, String dataset) {
+    this(expression.replaceAll("[\\s]+", ""), expression, dataset);
   }
 
-  public MetricExpression(String expression) {
-    this(expression.replaceAll("[\\s]+", ""), expression);
+  public MetricExpression(String expressionName, String expression, String dataset) {
+    this(expressionName, expression, MetricAggFunction.SUM, dataset);
   }
 
-  public MetricExpression(String expressionName, String expression) {
-    this(expressionName, expression, MetricAggFunction.SUM);
-  }
-
-  public MetricExpression(String expressionName, String expression, MetricAggFunction aggFunction) {
+  public MetricExpression(String expressionName, String expression, MetricAggFunction aggFunction, String dataset) {
     this.expressionName = expressionName;
     this.expression = expression;
     this.aggFunction = aggFunction;
-  }
-
-  public void setAggFunction(MetricAggFunction aggFunction) {
-    this.aggFunction = aggFunction;
+    this.dataset = dataset;
   }
 
   public String getExpressionName() {
     return expressionName;
   }
 
-  public void setExpressionName(String expressionName) {
-    this.expressionName = expressionName;
-  }
 
   public String getExpression() {
     return expression;
   }
 
-  public void setExpression(String expression) {
-    this.expression = expression;
+
+  public String getDataset() {
+    return dataset;
   }
+
 
   @Override
   public String toString() {
@@ -70,7 +71,7 @@ public class MetricExpression {
   public List<MetricFunction> computeMetricFunctions() {
     try {
       Scope scope = Scope.create();
-      Set<String> metricNames = new TreeSet<>();
+      Set<String> metricTokens = new TreeSet<>(); // can be either metric names or ids ! :-/
 
       // expression parser errors out on variables starting with _
       // we're replacing the __COUNT default metric, with an escaped string
@@ -78,14 +79,22 @@ public class MetricExpression {
       String modifiedExpressions = expression.replace(COUNT_METRIC, COUNT_METRIC_ESCAPED);
 
       Parser.parse(modifiedExpressions, scope);
-      metricNames = scope.getLocalNames();
+      metricTokens = scope.getLocalNames();
 
       ArrayList<MetricFunction> metricFunctions = new ArrayList<>();
-      for (String metricName : metricNames) {
-        if (metricName.equals(COUNT_METRIC_ESCAPED)) {
-          metricName = COUNT_METRIC;
+      for (String metricToken : metricTokens) {
+        Long metricId = null;
+        String metricDataset = dataset;
+        if (metricToken.equals(COUNT_METRIC_ESCAPED)) {
+          metricToken = COUNT_METRIC;
+        } else {
+          metricId = Long.valueOf(metricToken.replace(MetricConfigBean.DERIVED_METRIC_ID_PREFIX, ""));
+          MetricConfigDTO metricConfig = ThirdEyeUtils.getMetricConfigFromId(metricId);
+          if (metricConfig != null) {
+            metricDataset = metricConfig.getDataset();
+          }
         }
-        metricFunctions.add(new MetricFunction(aggFunction, metricName));
+        metricFunctions.add(new MetricFunction(aggFunction, metricToken, metricId, metricDataset));
       }
       return metricFunctions;
     } catch (ParseException e) {

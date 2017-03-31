@@ -17,8 +17,7 @@ public class PinotThirdEyeResponse extends BaseThirdEyeResponse {
   private List<ThirdEyeResponseRow> responseRows;
   private List<String[]> rows;
 
-  public PinotThirdEyeResponse(ThirdEyeRequest request, List<String[]> rows,
-      TimeSpec dataTimeSpec) {
+  public PinotThirdEyeResponse(ThirdEyeRequest request, List<String[]> rows, TimeSpec dataTimeSpec) {
     super(request, dataTimeSpec);
     this.rows = rows;
     this.responseRows = new ArrayList<>(rows.size());

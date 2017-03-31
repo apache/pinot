@@ -144,7 +144,6 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
 
     // baseline requests
     ThirdEyeRequestBuilder builder = ThirdEyeRequest.newBuilder();
-    builder.setCollection(collection);
     builder.setMetricFunctions(metricFunctions);
     builder.setGroupBy(groupBy);
     builder.setStartTimeInclusive(baselineStartInclusive);
@@ -154,7 +153,6 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
 
     // current requests
     builder = ThirdEyeRequest.newBuilder();
-    builder.setCollection(collection);
     builder.setMetricFunctions(metricFunctions);
     builder.setGroupBy(groupBy);
     builder.setStartTimeInclusive(currentStartInclusive);
