@@ -16,36 +16,33 @@
 package com.linkedin.pinot.core.data.partition;
 
 import com.google.common.base.Preconditions;
-import org.apache.kafka.common.utils.Utils;
+import kafka.producer.ByteArrayPartitioner;
 
 
 /**
- * Implementation of {@link ModuloPartitionFunction} that mimics Kafka's
- * {@link org.apache.kafka.clients.producer.internals.DefaultPartitioner}.
+ * Implementation of {@link Byte array partitioner}
+ * {@link org.apache.kafka.producer.ByteArrayPartitioner}.
  *
  */
-public class DefaultKafkaPartitionFunction implements PartitionFunction {
-  private static final String NAME = "DefaultKafkaPartitioner";
+public class ByteArrayPartitionFunction implements PartitionFunction {
+  private static final String NAME = "ByteArray";
   private final int _divisor;
+  public ByteArrayPartitioner _byteArrayPartitioner;
 
   /**
    * Constructor for the class.
    * @param args Arguments for the partition function.
    */
-  public DefaultKafkaPartitionFunction(String[] args) {
+  public ByteArrayPartitionFunction(String[] args) {
     Preconditions.checkArgument(args.length == 1);
     _divisor = Integer.parseInt(args[0]);
-    Preconditions.checkState(_divisor > 0, "Divisor for DefaultKafkaPartitionFunction cannot be <= zero.");
+    Preconditions.checkState(_divisor > 0, "Divisor for ByteArrayPartitionFunction cannot be <= zero.");
+    _byteArrayPartitioner = new ByteArrayPartitioner(null);
   }
 
   @Override
-  public int getPartition(Object value) {
-    if (value instanceof String) {
-      return (Utils.murmur2(((String) value).getBytes()) & 0x7fffffff) % _divisor;
-    } else {
-      throw new IllegalArgumentException(
-          "Illegal argument for partitioning, expected Integer, got: " + value.getClass().getName());
-    }
+  public int getPartition(Object valueIn) {
+    return _byteArrayPartitioner.partition(valueIn.toString().getBytes(), _divisor);
   }
 
   @Override
@@ -53,3 +50,4 @@ public class DefaultKafkaPartitionFunction implements PartitionFunction {
     return NAME + PartitionFunctionFactory.PARTITION_FUNCTION_DELIMITER + _divisor;
   }
 }
+

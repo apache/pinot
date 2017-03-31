@@ -38,6 +38,8 @@ import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
 import com.linkedin.pinot.core.data.extractors.PlainFieldExtractor;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.indexsegment.generator.ColumnPartitionConfig;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentPartitionConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.realtime.converter.RealtimeSegmentConverter;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
@@ -59,6 +61,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import kafka.message.MessageAndOffset;
+import org.apache.commons.collections.map.HashedMap;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
@@ -169,6 +172,9 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   private final String _tableName;
   private final List<String> _invertedIndexColumns;
   private final List<String> _noDictionaryColumns;
+  private final Map<String, String> _column2PartitionersMap;
+  private int _nPartitions;
+  private SegmentPartitionConfig _segmentPartitionConfig = null;
   private final String _sortedColumn;
   private Logger segmentLogger = LOGGER;
   private final String _tableStreamName;
@@ -525,13 +531,11 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     // Build a segment from in-memory rows.If buildTgz is true, then build the tar.gz file as well
     // TODO Use an auto-closeable object to delete temp resources.
     File tempSegmentFolder = new File(_resourceTmpDir, "tmp-" + _segmentNameStr + "-" + String.valueOf(now()));
-
     // lets convert the segment now
     RealtimeSegmentConverter converter =
         new RealtimeSegmentConverter(_realtimeSegment, tempSegmentFolder.getAbsolutePath(), _schema,
             _segmentZKMetadata.getTableName(), _segmentZKMetadata.getSegmentName(), _sortedColumn,
-            _invertedIndexColumns, _noDictionaryColumns );
-
+            _invertedIndexColumns, _noDictionaryColumns);
     logStatistics();
     segmentLogger.info("Trying to build segment");
     final long buildStartTime = now();
@@ -840,6 +844,20 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     // Create field extractor
     _fieldExtractor = FieldExtractorFactory.getPlainFieldExtractor(schema);
     makeConsumerWrapper();
+
+    // Partitioners
+    _column2PartitionersMap = indexingConfig.getPartitioners();
+    if (_column2PartitionersMap != null && !_column2PartitionersMap.isEmpty()) {
+      try {
+        _nPartitions = _consumerWrapper.getPartitionCount(_kafkaTopic, /*maxWaitTimeMs=*/5000L);
+        _segmentPartitionConfig = createPartitionConfig();
+        _realtimeSegment.setSegmentPartitionConfig(_segmentPartitionConfig);
+      } catch (Exception e) {
+        segmentLogger.warn("Couldn't get number of partitions in 5s, not using partition config");
+        _realtimeSegment.setSegmentPartitionConfig(null);
+      }
+    }
+
     _startOffset = _segmentZKMetadata.getStartOffset();
     _currentOffset = _startOffset;
     _resourceTmpDir = new File(resourceDataDir, "_tmp");
@@ -927,5 +945,15 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
 
   public int getMaxTimeForConsumingToOnlineSec() {
     return _maxTimeForConsumingToOnlineSec;
+  }
+
+  private SegmentPartitionConfig createPartitionConfig() {
+    Map<String, ColumnPartitionConfig> map = new HashedMap();
+    for (String column : _column2PartitionersMap.keySet()) {
+      map.put(column, new ColumnPartitionConfig(
+          _column2PartitionersMap.get(column) + ColumnPartitionConfig.PARTITIONER_DELIMITER + _nPartitions,
+          "[" + _kafkaPartitionId + " " + _kafkaPartitionId + "]"));
+    }
+    return new SegmentPartitionConfig(map);
   }
 }

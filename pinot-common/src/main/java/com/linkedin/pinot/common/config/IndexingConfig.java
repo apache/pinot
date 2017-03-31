@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,7 +40,10 @@ public class IndexingConfig {
   private String _starTreeFormat;
   private String _columnMinMaxValueGeneratorMode;
   private List<String> _noDictionaryColumns;
-  private Map<String, Pair<String, int>> columnPartitionConfig;
+
+  // Map with key as column name  value as  partition function
+  @Nullable
+  private Map<String, String> _partitioners;
 
   public List<String> getInvertedIndexColumns() {
     return _invertedIndexColumns;
@@ -121,7 +125,15 @@ public class IndexingConfig {
     _noDictionaryColumns = noDictionaryColumns;
   }
 
-  public 
+  @Nullable
+  public Map<String, String> getPartitioners() {
+    return _partitioners;
+  }
+
+  public void setPartitioners(@Nullable Map<String, String> partitioners) {
+    _partitioners = partitioners;
+  }
+
   @Override
   public String toString() {
     final StringBuilder result = new StringBuilder();

@@ -58,14 +58,14 @@ public class PartitionFunctionTest {
   }
 
   /**
-   * Unit test for {@link DefaultKafkaPartitionFunction}.
+   * Unit test for {@link MurmurPartitionFunction}.
    * <ul>
    *   <li> Tests that partition values are in expected range. </li>
    *   <li> Tests that toString returns expected string. </li>
    * </ul>
    */
   @Test
-  public void testDefaultKafkaPartitioner() {
+  public void testMurmurPartitioner() {
     long seed = System.currentTimeMillis();
     Random random = new Random(seed);
 
@@ -78,7 +78,7 @@ public class PartitionFunctionTest {
       }
 
       String partitionFunctionString =
-          "deFaultkAfkapArtitioNER" + PartitionFunctionFactory.PARTITION_FUNCTION_DELIMITER + divisor;
+          "mUrmur" + PartitionFunctionFactory.PARTITION_FUNCTION_DELIMITER + divisor;
       PartitionFunction partitionFunction = PartitionFunctionFactory.getPartitionFunction(partitionFunctionString);
       Assert.assertEquals(partitionFunction.toString().toLowerCase(), partitionFunctionString.toLowerCase());
 
@@ -86,6 +86,39 @@ public class PartitionFunctionTest {
         Integer value = random.nextInt();
         Assert.assertTrue(partitionFunction.getPartition(value.toString()) < divisor,
             "Illegal: " + partitionFunction.getPartition(value.toString()) + " " + divisor);
+      }
+    }
+  }
+
+  /**
+   * Unit test for {@link MurmurPartitionFunction}.
+   * <ul>
+   *   <li> Tests that partition values are in expected range. </li>
+   *   <li> Tests that toString returns expected string. </li>
+   * </ul>
+   */
+  @Test
+  public void testByteArrayPartitioner() {
+    long seed = System.currentTimeMillis();
+    Random random = new Random(seed);
+
+    for (int i = 0; i < 1000; i++) {
+      int divisor = Math.abs(random.nextInt());
+
+      // Avoid divide-by-zero.
+      if (divisor == 0) {
+        divisor = 1;
+      }
+
+      String partitionFunctionString =
+          "bYteArray" + PartitionFunctionFactory.PARTITION_FUNCTION_DELIMITER + divisor;
+      PartitionFunction partitionFunction = PartitionFunctionFactory.getPartitionFunction(partitionFunctionString);
+      Assert.assertEquals(partitionFunction.toString().toLowerCase(), partitionFunctionString.toLowerCase());
+
+      for (int j = 0; j < 1000; j++) {
+        Integer value = random.nextInt();
+        Assert.assertTrue(partitionFunction.getPartition(value) < divisor,
+            "Illegal: " + partitionFunction.getPartition(value) + " " + divisor);
       }
     }
   }

@@ -76,4 +76,8 @@ public interface ColumnStatistics {
     PartitionFunction getPartitionFunction();
 
     List<IntRange> getPartitionRanges();
+
+    /* A partition function was specified but some rows did not satisfy it */
+    boolean getPartitionMismatch();
+
 }

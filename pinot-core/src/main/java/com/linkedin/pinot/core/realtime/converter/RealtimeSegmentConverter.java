@@ -103,6 +103,7 @@ public class RealtimeSegmentConverter {
     genConfig.setTableName(tableName);
     genConfig.setOutDir(outputPath);
     genConfig.setSegmentName(segmentName);
+    genConfig.setSegmentPartitionConfig(realtimeSegmentImpl.getSegmentPartitionConfig());
     final SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     driver.init(genConfig, new RealtimeSegmentSegmentCreationDataSource(realtimeSegmentImpl, reader, dataSchema));
     driver.build();
