@@ -46,9 +46,10 @@ InvestigateView.prototype = {
   },
 
   formatWowResults( wowResults, args = {}){
-    const { anomalyRegionStart, anomalyRegionEnd, dataset, metric } = args;
-    const start = moment(anomalyRegionStart);
-    const end = moment(anomalyRegionEnd);
+    const { anomalyStart, anomalyEnd, dataset, metricId, timeUnit } = args;
+    const filters = {}
+    const start = moment(anomalyStart); //.tz(constants.TIME_ZONE);
+    const end = moment(anomalyEnd); //.tz(constants.TIME_ZONE);
     const wowMapping = {
       WoW: 7,
       Wo2W: 14,
@@ -63,10 +64,13 @@ InvestigateView.prototype = {
         const baselineStart = start.clone().subtract(offset, 'days');
         const baselineEnd = end.clone().subtract(offset, 'days');
         wow.change *= 100;
-        wow.url = `dashboard#view=compare&dataset=${dataset}&compareMode=WoW&aggTimeGranularity=aggregateAll&currentStart=${start.valueOf()}&currentEnd=${end.valueOf()}&baselineStart=${baselineStart.valueOf()}&baselineEnd=${baselineEnd.valueOf()}&metrics=${metric}`;
+        // wow.url = `dashboard#view=compare&dataset=${dataset}&compareMode=WoW&aggTimeGranularity=aggregateAll&currentStart=${start.valueOf()}&currentEnd=${end.valueOf()}&baselineStart=${baselineStart.valueOf()}&baselineEnd=${baselineEnd.valueOf()}&metrics=${metric}`;
+        wow.url = `thirdeye#analysis?currentStart=${start}&currentEnd=${end}&baselineStart=${baselineStart}&baselineEnd=${baselineEnd}&metricId=${metricId}&filters={}&granularity=${timeUnit}`;
         return wow;
       });
   },
+
+
 
   render() {
     const template_with_anomaly = this.investigate_template_compiled(this.investigateData);
