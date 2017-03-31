@@ -104,6 +104,9 @@ TimeSeriesCompareView.prototype = {
           }
         }
       },
+      zoom: {
+        enabled: true
+      },
       regions
     });
   },
@@ -120,7 +123,8 @@ TimeSeriesCompareView.prototype = {
         }
       };
 
-    this.loadChart(this.timeSeriesObject, [regions]);
+    this.chart.regions([regions]);
+    this.chart.load({});
   },
 
   setupListenersForDetailsAndCumulativeCheckBoxes: function () {
@@ -158,35 +162,22 @@ TimeSeriesCompareView.prototype = {
     $('#chart-dimensions :checkbox').change((event) => {
       const subDimensionIndex =  event.currentTarget.getAttribute('id');
       const subDimension = this.timeSeriesCompareModel.subDimensions[subDimensionIndex];
-      const selected = event.currentTarget.checked;
-
-      if (subDimension === 'All') {
-        this.updateAllSubDimension(selected);
-      } else {
-        this.updateSubDimensionSelection(subDimension, selected);
-        const allSelection = this.timeSeriesCompareModel.isAllSubDimensionsSelected();
-        const allIndex = this.timeSeriesCompareModel.subDimensions.indexOf('All');
-        this.updateSubDimensionSelection('All', allSelection, allIndex);
-      }
-
-      // this.addSubDimension(subDimension);
-      const chartData = this.timeSeriesCompareModel.getChartData();
-      this.loadChart(chartData);
+      const checked = event.currentTarget.checked;
+      this.updateSubDimension(subDimension, checked);
     });
   },
 
-  updateAllSubDimension(selection) {
-    this.timeSeriesCompareModel.subDimensions.forEach((dimension, index) => {
-      this.updateSubDimensionSelection(dimension, selection, index);
-    });
-  },
-
-  updateSubDimensionSelection(subDimension, selected, uiIndex) {
-    const subDimensionData = this.timeSeriesCompareModel.subDimensionContributionDetails.contributionMap[subDimension];
-    subDimensionData.selected = selected;
-
-    if (Number.isInteger(uiIndex)) {
-      $(`#chart-dimensions #${uiIndex}`)[0].checked = selected;
+  updateSubDimension(subDimension, checked) {
+    const { columns } = this.timeSeriesCompareModel.subDimensionContributionDetails.contributionMap[subDimension];
+    const [ _, current, baseline ] = columns;
+    if (checked) {
+      this.chart.load({
+        columns: [current, baseline],
+      });
+    } else {
+      this.chart.load({
+        unload: [current[0], baseline[0]]
+      });
     }
   },
 

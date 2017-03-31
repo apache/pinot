@@ -3,7 +3,7 @@
     <table class="table table-bordered analysis-table tree-map__table">
       <thead>
       <tr>
-        <th style="width: 10%;"></th>
+        <th></th>
         {{#each this.subDimensionContributionDetails.timeBucketsCurrent as |timestamp timeIndex|}}
         <th>{{displayMonthDayHour timestamp}}</th>
         {{/each}}

@@ -4,7 +4,7 @@
 
   {{#each subDimensions as |subDimension subDimensionIndex|}}
     <li class="analysis-chart__dimension">
-      <input class="analysis-chart__checkbox" type="checkbox" id="{{subDimensionIndex}}" checked={{true}}>
+      <input class="analysis-chart__checkbox" type="checkbox" id="{{subDimensionIndex}}" {{#if_eq subDimension 'All'}} checked=true {{/if_eq}}>
       <label for="{{subDimensionIndex}}" class="metric-label analysis-change__label">{{subDimension}}</label>
     </li>
   {{/each}}

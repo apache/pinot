@@ -297,6 +297,7 @@ hr {
     font-weight: 300;
     font-size: 11px;
     text-align: center;
+    white-space: nowrap;
     background-color: #E4E8EC;
 }
 .analysis-table>tbody>tr>td {
@@ -304,16 +305,16 @@ hr {
     font-size: 11px;
     text-align: center;
     background-color: white;
-    width: 50px;
+    /*width: 50px;*/
 }
 .analysis-table>thead>tr>th.dim-label {
-    width: 100px;
+    /*width: 100px;*/
     background-color: #F3F6F8;
     border: none !important;
     font-weight: 400;
 }
 .analysis-table>tbody>tr>td.dim-label {
-    width: 100px;
+    /*width: 100px;*/
     background-color: #F3F6F8;
     border: none !important;
 }
