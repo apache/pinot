@@ -15,31 +15,13 @@
  */
 package com.linkedin.pinot.server.integration.realtime;
 
-import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.yammer.metrics.core.MetricsRegistry;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.TimerTask;
-import java.util.concurrent.TimeUnit;
-
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.ConfigurationException;
-import org.apache.commons.configuration.PropertiesConfiguration;
-import org.apache.helix.ZNRecord;
-import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.testng.annotations.BeforeClass;
-
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
@@ -55,7 +37,24 @@ import com.linkedin.pinot.core.data.manager.realtime.TimerService;
 import com.linkedin.pinot.core.realtime.RealtimeFileBasedReaderTest;
 import com.linkedin.pinot.core.realtime.RealtimeSegment;
 import com.linkedin.pinot.core.realtime.impl.datasource.RealtimeColumnDataSource;
+import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.segments.v1.creator.SegmentTestUtils;
+import com.yammer.metrics.core.MetricsRegistry;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.TimerTask;
+import java.util.concurrent.TimeUnit;
+import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.ConfigurationException;
+import org.apache.commons.configuration.PropertiesConfiguration;
+import org.apache.helix.ZNRecord;
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.testng.annotations.BeforeClass;
 
 
 public class RealtimeTableDataManagerTest {
@@ -130,8 +129,8 @@ public class RealtimeTableDataManagerTest {
   public void testSetup() throws Exception {
     final HLRealtimeSegmentDataManager manager =
         new HLRealtimeSegmentDataManager(realtimeSegmentZKMetadata, tableConfig, instanceZKMetadata, null,
-            tableDataManagerConfig.getDataDir(), ReadMode.valueOf(tableDataManagerConfig.getReadMode()),
-            getTestSchema(), new ServerMetrics(new MetricsRegistry()));
+            tableDataManagerConfig.getDataDir(), new IndexLoadingConfig(null, tableConfig), getTestSchema(),
+            new ServerMetrics(new MetricsRegistry()));
 
     final long start = System.currentTimeMillis();
     TimerService.timer.scheduleAtFixedRate(new TimerTask() {

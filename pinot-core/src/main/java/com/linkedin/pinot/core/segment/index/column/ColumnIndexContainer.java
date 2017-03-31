@@ -16,7 +16,6 @@
 package com.linkedin.pinot.core.segment.index.column;
 
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.core.io.compression.ChunkCompressorFactory;
 import com.linkedin.pinot.core.io.compression.ChunkDecompressor;
 import com.linkedin.pinot.core.io.reader.DataFileReader;
@@ -29,6 +28,7 @@ import com.linkedin.pinot.core.io.reader.impl.v1.FixedBitSingleValueReader;
 import com.linkedin.pinot.core.io.reader.impl.v1.FixedByteChunkSingleValueReader;
 import com.linkedin.pinot.core.io.reader.impl.v1.VarByteChunkSingleValueReader;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
+import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.core.segment.index.readers.BitmapInvertedIndexReader;
 import com.linkedin.pinot.core.segment.index.readers.DoubleDictionary;
 import com.linkedin.pinot.core.segment.index.readers.FloatDictionary;
@@ -41,21 +41,15 @@ import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import com.linkedin.pinot.core.segment.store.ColumnIndexType;
 import com.linkedin.pinot.core.segment.store.SegmentDirectory;
 import java.io.IOException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public abstract class ColumnIndexContainer {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ColumnIndexContainer.class);
-
   public static ColumnIndexContainer init(SegmentDirectory.Reader segmentReader, ColumnMetadata metadata,
-      IndexLoadingConfigMetadata indexLoadingConfigMetadata)
+      IndexLoadingConfig indexLoadingConfig)
       throws IOException {
     String column = metadata.getColumnName();
     boolean loadInverted = false;
-    if (indexLoadingConfigMetadata != null) {
-      if (indexLoadingConfigMetadata.getLoadingInvertedIndexColumns() != null) {
-        loadInverted = indexLoadingConfigMetadata.getLoadingInvertedIndexColumns().contains(metadata.getColumnName());
-      }
+    if (indexLoadingConfig != null) {
+      loadInverted = indexLoadingConfig.getInvertedIndexColumns().contains(column);
     }
 
     ImmutableDictionaryReader dictionary = null;

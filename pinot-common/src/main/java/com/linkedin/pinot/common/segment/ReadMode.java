@@ -15,9 +15,14 @@
  */
 package com.linkedin.pinot.common.segment;
 
+import com.linkedin.pinot.common.utils.CommonConstants;
+
+
 public enum ReadMode {
   heap,
   mmap;
+
+  public static final ReadMode DEFAULT_MODE = ReadMode.valueOf(CommonConstants.Server.DEFAULT_READ_MODE);
 
   public static ReadMode getEnum(String strVal) {
     if (strVal.equalsIgnoreCase("heap")) {

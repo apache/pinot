@@ -13,17 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.core.data.manager.realtime;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.util.LinkedList;
-import org.apache.kafka.common.protocol.Errors;
-import org.json.JSONObject;
-import org.mockito.Mockito;
-import org.testng.annotations.Test;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
@@ -36,8 +27,18 @@ import com.linkedin.pinot.common.utils.LLCSegmentName;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderConfig;
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
+import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.yammer.metrics.core.MetricsRegistry;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.LinkedList;
 import junit.framework.Assert;
+import org.apache.kafka.common.protocol.Errors;
+import org.json.JSONObject;
+import org.mockito.Mockito;
+import org.testng.annotations.Test;
+
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -552,8 +553,8 @@ public class LLRealtimeSegmentDataManagerTest {
         RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir, Schema schema,
         ServerMetrics serverMetrics)
         throws Exception {
-      super(segmentZKMetadata, tableConfig, instanceZKMetadata, realtimeTableDataManager, resourceDataDir, schema,
-          serverMetrics);
+      super(segmentZKMetadata, tableConfig, instanceZKMetadata, realtimeTableDataManager, resourceDataDir,
+          new IndexLoadingConfig(null, tableConfig), schema, serverMetrics);
       _state = LLRealtimeSegmentDataManager.class.getDeclaredField("_state");
       _state.setAccessible(true);
       _shouldStop = LLRealtimeSegmentDataManager.class.getDeclaredField("_shouldStop");

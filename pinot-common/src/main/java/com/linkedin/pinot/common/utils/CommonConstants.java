@@ -15,12 +15,10 @@
  */
 package com.linkedin.pinot.common.utils;
 
+import com.google.common.collect.Sets;
 import java.util.Collections;
 import java.util.Set;
-
 import org.apache.commons.lang.StringUtils;
-
-import com.google.common.collect.Sets;
 
 
 public class CommonConstants {
@@ -228,6 +226,7 @@ public class CommonConstants {
     public static final String PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY = "pinot.server.segment.fetcher";
     public static final String DEFAULT_SEGMENT_FORMAT_VERSION = "v3";
     public static final String DEFAULT_STAR_TREE_FORMAT_VERSION = "OFF_HEAP";
+    public static final String DEFAULT_COLUMN_MIN_MAX_VALUE_GENERATOR_MODE = "TIME";
   }
 
   public static class Metric {

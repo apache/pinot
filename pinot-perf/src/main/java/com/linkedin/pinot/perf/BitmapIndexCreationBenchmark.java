@@ -15,33 +15,26 @@
  */
 package com.linkedin.pinot.perf;
 
-import java.io.File;
-import java.util.List;
-
-import org.apache.commons.configuration.Configuration;
-import org.apache.commons.configuration.PropertiesConfiguration;
-
-import com.google.common.collect.Lists;
-import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.segment.index.loader.Loaders;
+import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
+import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
+import java.io.File;
+import java.util.Arrays;
+import java.util.HashSet;
+
 
 public class BitmapIndexCreationBenchmark {
 
-  public static void main(String[] args) throws Exception {
-
+  public static void main(String[] args)
+      throws Exception {
     System.out.println("Starting generation");
-    Configuration tableDataManagerConfig = new PropertiesConfiguration();
-    List<String> indexColumns = Lists.newArrayList("contract_id", "seat_id");
-    tableDataManagerConfig.setProperty(IndexLoadingConfigMetadata.KEY_OF_LOADING_INVERTED_INDEX,
-        indexColumns);
-    IndexLoadingConfigMetadata indexLoadingConfigMetadata =
-        new IndexLoadingConfigMetadata(tableDataManagerConfig);
-    ReadMode mode = ReadMode.heap;
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig();
+    indexLoadingConfig.setReadMode(ReadMode.heap);
+    indexLoadingConfig.setInvertedIndexColumns(new HashSet<>(Arrays.asList("contract_id", "seat_id")));
     File indexDir = new File(
         "/home/kgopalak/pinot_perf/index_dir/capReportingEvents_OFFLINE/capReportingEvents_capReportingEvents_daily_2");
     long start = System.currentTimeMillis();
-    Loaders.IndexSegment.load(indexDir, mode, indexLoadingConfigMetadata);
+    ColumnarSegmentLoader.load(indexDir, indexLoadingConfig);
     long end = System.currentTimeMillis();
     System.out.println("Took " + (end - start) + " to generate bitmap index");
   }

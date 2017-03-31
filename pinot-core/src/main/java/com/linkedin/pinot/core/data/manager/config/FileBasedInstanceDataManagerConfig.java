@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.data.manager.config;
 
+import com.linkedin.pinot.common.segment.ReadMode;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,7 +23,6 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.common.segment.ReadMode;
 
 
 /**
@@ -139,7 +139,7 @@ public class FileBasedInstanceDataManagerConfig implements InstanceDataManagerCo
 
   @Override
   public String getAvgMultiValueCount() {
-    throw new RuntimeException("Unsupported");
+    return null;
   }
 
   @Override

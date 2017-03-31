@@ -17,9 +17,7 @@ package com.linkedin.pinot.core.segment.index.loader;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.metadata.segment.IndexLoadingConfigMetadata;
 import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.index.IndexSegmentImpl;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
@@ -28,123 +26,101 @@ import com.linkedin.pinot.core.segment.index.converter.SegmentFormatConverter;
 import com.linkedin.pinot.core.segment.index.converter.SegmentFormatConverterFactory;
 import com.linkedin.pinot.core.segment.store.SegmentDirectory;
 import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
-import com.linkedin.pinot.core.startree.StarTreeFormatVersion;
 import com.linkedin.pinot.core.startree.StarTreeInterf;
 import com.linkedin.pinot.core.startree.StarTreeSerDe;
 import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 public class Loaders {
   private static final Logger LOGGER = LoggerFactory.getLogger(Loaders.class);
 
   public static class IndexSegment {
-    public static com.linkedin.pinot.core.indexsegment.IndexSegment load(File indexDir, ReadMode readMode)
+
+    /**
+     * For tests only.
+     */
+    public static com.linkedin.pinot.core.indexsegment.IndexSegment load(@Nonnull File indexDir,
+        @Nonnull ReadMode readMode)
         throws Exception {
-      return load(indexDir, readMode, null, null);
+      IndexLoadingConfig defaultIndexLoadingConfig = new IndexLoadingConfig();
+      defaultIndexLoadingConfig.setReadMode(readMode);
+      return load(indexDir, defaultIndexLoadingConfig, null);
     }
 
-    public static com.linkedin.pinot.core.indexsegment.IndexSegment load(File indexDir, ReadMode readMode,
-        IndexLoadingConfigMetadata indexLoadingConfigMetadata)
+    /**
+     * For tests only.
+     */
+    public static com.linkedin.pinot.core.indexsegment.IndexSegment load(@Nonnull File indexDir,
+        @Nonnull IndexLoadingConfig indexLoadingConfig)
         throws Exception {
-      return load(indexDir, readMode, indexLoadingConfigMetadata, null);
+      return load(indexDir, indexLoadingConfig, null);
     }
 
-    public static com.linkedin.pinot.core.indexsegment.IndexSegment load(File indexDir, ReadMode readMode,
-        IndexLoadingConfigMetadata indexLoadingConfigMetadata, Schema schema)
+    public static com.linkedin.pinot.core.indexsegment.IndexSegment load(@Nonnull File indexDir,
+        @Nonnull IndexLoadingConfig indexLoadingConfig, @Nullable Schema schema)
         throws Exception {
       Preconditions.checkNotNull(indexDir);
       Preconditions.checkArgument(indexDir.exists(), "Index directory: {} does not exist", indexDir);
       Preconditions.checkArgument(indexDir.isDirectory(), "Index directory: {} is not a directory", indexDir);
-      // NOTE: indexLoadingConfigMetadata and schema can be null.
 
+      ReadMode readMode = indexLoadingConfig.getReadMode();
+      SegmentVersion segmentVersion = indexLoadingConfig.getSegmentVersion();
+      StarTreeSerDe.convertStarTreeFormatIfNeeded(indexDir, indexLoadingConfig.getStarTreeVersion());
 
-      if (indexLoadingConfigMetadata != null) {
-        StarTreeFormatVersion starTreeVersionToLoad = getStarTreeVersionToLoad(indexLoadingConfigMetadata);
-        StarTreeSerDe.convertStarTreeFormatIfNeeded(indexDir, starTreeVersionToLoad);
-      }
-
-
-      SegmentVersion configuredVersionToLoad = getSegmentVersionToLoad(indexLoadingConfigMetadata);
-      if (!targetFormatAlreadyExists(indexDir, configuredVersionToLoad)) {
-        SegmentMetadataImpl metadata = new SegmentMetadataImpl(indexDir);
-        SegmentVersion metadataVersion = metadata.getSegmentVersion();
-        if (shouldConvertFormat(metadataVersion, configuredVersionToLoad)) {
-          LOGGER.info("segment:{} needs to be converted from :{} to {} version.", indexDir.getName(), metadataVersion,
-              configuredVersionToLoad);
+      String segmentName = indexDir.getName();
+      if (!targetFormatAlreadyExists(indexDir, segmentVersion)) {
+        SegmentVersion metadataVersion = new SegmentMetadataImpl(indexDir).getSegmentVersion();
+        if (metadataVersion != segmentVersion) {
+          LOGGER.info("Segment: {} needs to be converted from version: {} to {}", segmentName, metadataVersion,
+              segmentVersion);
           SegmentFormatConverter converter =
-              SegmentFormatConverterFactory.getConverter(metadataVersion, configuredVersionToLoad);
-          LOGGER.info("Using converter:{} to up-convert segment: {}", converter.getClass().getName(), indexDir.getName());
+              SegmentFormatConverterFactory.getConverter(metadataVersion, segmentVersion);
+          LOGGER.info("Using converter: {} to up-convert segment: {}", converter.getClass().getName(), segmentName);
           converter.convert(indexDir);
-          LOGGER
-              .info("Successfully up-converted segment:{} from :{} to {} version.", indexDir.getName(), metadataVersion,
-                  configuredVersionToLoad);
+          LOGGER.info("Successfully up-converted segment: {} from version: {} to {}", segmentName, metadataVersion,
+              segmentVersion);
         }
       }
-      // add or removes indexes based on indexLoadingConfigurationMetadata
-      // add or replace new columns with default value
+
+      // Add inverted indexes
+      // Add, remove or replace default columns
+      // Add column min/max values
       // NOTE: this step may modify the segment metadata.
-      File segmentDirectoryPath = SegmentDirectoryPaths.segmentDirectoryFor(indexDir, configuredVersionToLoad);
-      try (SegmentPreProcessor preProcessor = new SegmentPreProcessor(segmentDirectoryPath, indexLoadingConfigMetadata,
+      try (SegmentPreProcessor preProcessor = new SegmentPreProcessor(indexDir, indexLoadingConfig,
           schema)) {
         preProcessor.process();
       }
 
-      // load the metadata again since converter and pre-processor may have changed it
-      SegmentMetadataImpl metadata = new SegmentMetadataImpl(segmentDirectoryPath);
-      SegmentDirectory segmentDirectory = SegmentDirectory.createFromLocalFS(segmentDirectoryPath, metadata, readMode);
-
-      Map<String, ColumnIndexContainer> indexContainerMap = new HashMap<String, ColumnIndexContainer>();
+      // Load the metadata again since converter and pre-processor may have changed it
+      SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
+      File segmentDirectoryPath = SegmentDirectoryPaths.segmentDirectoryFor(indexDir, segmentVersion);
+      SegmentDirectory segmentDirectory =
+          SegmentDirectory.createFromLocalFS(segmentDirectoryPath, segmentMetadata, readMode);
       SegmentDirectory.Reader segmentReader = segmentDirectory.createReader();
-      for (String column : metadata.getColumnMetadataMap().keySet()) {
-        indexContainerMap.put(column, ColumnIndexContainer.init(segmentReader,
-            metadata.getColumnMetadataFor(column), indexLoadingConfigMetadata));
+      Map<String, ColumnIndexContainer> indexContainerMap = new HashMap<>();
+      for (String column : segmentMetadata.getColumnMetadataMap().keySet()) {
+        indexContainerMap.put(column,
+            ColumnIndexContainer.init(segmentReader, segmentMetadata.getColumnMetadataFor(column), indexLoadingConfig));
       }
 
-      // load star tree index if it exists
+      // Load star tree index if it exists
       StarTreeInterf starTree = null;
       if (segmentReader.hasStarTree()) {
-        LOGGER.debug("Loading star tree for segment: {}", segmentDirectory);
+        LOGGER.info("Loading star tree for segment: {}", segmentName);
         starTree = StarTreeSerDe.fromFile(segmentReader.getStarTreeFile(), readMode);
       }
-      return new IndexSegmentImpl(segmentDirectory, metadata, indexContainerMap, starTree);
+
+      return new IndexSegmentImpl(segmentDirectory, segmentMetadata, indexContainerMap, starTree);
     }
 
-    static boolean targetFormatAlreadyExists(File indexDir, SegmentVersion expectedSegmentVersion) {
+    private static boolean targetFormatAlreadyExists(File indexDir, SegmentVersion expectedSegmentVersion) {
       return SegmentDirectoryPaths.segmentDirectoryFor(indexDir, expectedSegmentVersion).exists();
-    }
-
-    static boolean shouldConvertFormat(SegmentVersion metadataVersion, SegmentVersion expectedSegmentVersion) {
-      return (metadataVersion != expectedSegmentVersion);
-    }
-
-    private static SegmentVersion getSegmentVersionToLoad(IndexLoadingConfigMetadata indexLoadingConfigMetadata) {
-      if (indexLoadingConfigMetadata == null) {
-        return SegmentVersion.DEFAULT_TABLE_VERSION;
-      }
-      String versionName = indexLoadingConfigMetadata.segmentVersionToLoad();
-      return SegmentVersion.fromString(versionName, SegmentVersion.DEFAULT_TABLE_VERSION);
-    }
-
-    /**
-     * Helper method to determine the star tree format version to load.
-     * Determines the version based on the index loading config.
-     * If the config is null, returns the default value as specified in
-     * {@link CommonConstants.Server#DEFAULT_STAR_TREE_FORMAT_VERSION}.
-     *
-     * @param indexLoadingConfigMetadata Index loading config
-     * @return Star Tree format version to load
-     */
-    private static StarTreeFormatVersion getStarTreeVersionToLoad(
-        IndexLoadingConfigMetadata indexLoadingConfigMetadata) {
-      String starTreeFormatVersionString = CommonConstants.Server.DEFAULT_STAR_TREE_FORMAT_VERSION;
-
-      if (indexLoadingConfigMetadata != null) {
-        starTreeFormatVersionString = indexLoadingConfigMetadata.getStarTreeVersionToLoad();
-      }
-      return StarTreeFormatVersion.valueOf(starTreeFormatVersionString);
     }
   }
 }

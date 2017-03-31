@@ -24,6 +24,7 @@ import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import java.util.List;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -32,19 +33,12 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 
 
 /**
- * TableDataManager interface.
- * Provided interfaces to do operations on segment level.
- *
- *
+ * The <code>TableDataManager</code> interface provides APIs to manage segments under a table.
  */
 public interface TableDataManager {
-  /**
-   * Initialize TableDataManager based on given config.
-   *
-   * @param tableDataManagerConfig
-   * @param serverInstance
-   */
-  void init(TableDataManagerConfig tableDataManagerConfig, ServerMetrics serverMetrics, String serverInstance);
+
+  void init(@Nonnull TableDataManagerConfig tableDataManagerConfig, @Nonnull ServerMetrics serverMetrics,
+      @Nullable String serverInstance);
 
   void start();
 
@@ -53,39 +47,30 @@ public interface TableDataManager {
   boolean isStarted();
 
   /**
-   * Adding an IndexSegment into the TableDataManager.
-   * Used in testing only
-   *
-   * @param indexSegmentToAdd
+   * Adds a loaded {@link IndexSegment} into the table.
    */
-  void addSegment(IndexSegment indexSegmentToAdd);
+  void addSegment(@Nonnull IndexSegment indexSegment);
 
   /**
-   * Adding a Segment into the TableDataManager by given SegmentMetadata.
-   *
-   * @param segmentMetaToAdd
-   * @param schema
-   * @throws Exception
+   * Adds a segment from local disk into the OFFLINE table.
    */
-  void addSegment(SegmentMetadata segmentMetaToAdd, Schema schema) throws Exception;
+  void addSegment(@Nonnull SegmentMetadata segmentMetadata, @Nonnull IndexLoadingConfig indexLoadingConfig,
+      @Nullable Schema schema)
+      throws Exception;
 
   /**
-   * Adding a Segment into the TableDataManager by given DataTableZKMetadata, InstanceZKMetadata, SegmentZKMetadata.
-   * @param propertyStore
-   * @param tableConfig
-   * @param instanceZKMetadata
-   * @param segmentZKMetadata
-   * @throws Exception
+   * Adds a segment into the REALTIME table.
+   * <p>The segment could be committed or under consuming.
    */
-  void addSegment(ZkHelixPropertyStore<ZNRecord> propertyStore, AbstractTableConfig tableConfig,
-      InstanceZKMetadata instanceZKMetadata, SegmentZKMetadata segmentZKMetadata) throws Exception;
+  void addSegment(@Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore, @Nonnull AbstractTableConfig tableConfig,
+      @Nullable InstanceZKMetadata instanceZKMetadata, @Nonnull SegmentZKMetadata segmentZKMetadata,
+      @Nonnull IndexLoadingConfig indexLoadingConfig)
+      throws Exception;
 
   /**
-   *
-   * Remove an IndexSegment/SegmentMetadata from the partition based on segmentName.
-   * @param segmentToRemove
+   * Removes a segment from the table.
    */
-  void removeSegment(String segmentToRemove);
+  void removeSegment(String segmentName);
 
   /**
    *
@@ -110,12 +95,13 @@ public interface TableDataManager {
    * using the {@link #releaseSegment(SegmentDataManager) releaseSegment} method.
    * @return a segment by giving the name of this segment in this TableDataManager.
    */
-  @Nullable SegmentDataManager acquireSegment(String segmentName);
+  @Nullable
+  SegmentDataManager acquireSegment(String segmentName);
 
   /**
-  *
-  * give back segmentReader, so the segment could be safely deleted.
-  */
+   *
+   * give back segmentReader, so the segment could be safely deleted.
+   */
   void releaseSegment(SegmentDataManager segmentDataManager);
 
   /**

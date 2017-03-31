@@ -16,23 +16,50 @@
 package com.linkedin.pinot.integration.tests;
 
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import java.io.File;
-
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import org.json.JSONObject;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import com.linkedin.pinot.common.data.Schema;
+
 /**
  * enables indexes on a bunch of columns
  *
  */
-@Test
-public class InvertedIndexOfflineIntegrationTest extends OfflineClusterIntegrationTest{
+public class InvertedIndexOfflineIntegrationTest extends OfflineClusterIntegrationTest {
+  private static final List<String> ORIGIN_INVERTED_INDEX_COLUMNS = Arrays.asList("FlightNum", "Origin", "Quarter");
+  private static final List<String> UPDATED_INVERTED_INDEX_COLUMNS =
+      Arrays.asList("FlightNum", "Origin", "Quarter", "DivActualElapsedTime");
+  private static final String TEST_QUERY = "SELECT COUNT(*) FROM mytable WHERE DivActualElapsedTime = 305";
+
   @Override
-  protected void setUpTable(File schemaFile, int numBroker, int numOffline) throws Exception {
-    addSchema(schemaFile, "schemaFile");
-    Schema schema = Schema.fromFile(schemaFile);
-    addOfflineTable("DaysSinceEpoch", "daysSinceEpoch", -1, "", null, null, schema.getDimensionNames(), null, "mytable",
-        SegmentVersion.v1);
+  protected void createTable()
+      throws Exception {
+    addOfflineTable("DaysSinceEpoch", "daysSinceEpoch", -1, "", null, null, ORIGIN_INVERTED_INDEX_COLUMNS, null,
+        "mytable", SegmentVersion.v1);
   }
 
+  @Test
+  public void testInvertedIndexTrigger()
+      throws Exception {
+    runQuery(TEST_QUERY, Collections.singletonList(TEST_QUERY));
+    JSONObject queryResponse = postQuery(TEST_QUERY);
+    Assert.assertEquals(queryResponse.getLong("numEntriesScannedInFilter"), TOTAL_DOCS);
+    updateOfflineTable("DaysSinceEpoch", -1, "", null, null, UPDATED_INVERTED_INDEX_COLUMNS, null, "mytable",
+        SegmentVersion.v1);
+    triggerReload();
+    runQuery(TEST_QUERY, Collections.singletonList(TEST_QUERY));
+    queryResponse = postQuery(TEST_QUERY);
+    Assert.assertEquals(queryResponse.getLong("numEntriesScannedInFilter"), 0L);
+  }
+
+  private void triggerReload()
+      throws Exception {
+    sendGetRequest(CONTROLLER_BASE_API_URL + "/tables/mytable?type=offline&state=disable");
+    Thread.sleep(1000);
+    sendGetRequest(CONTROLLER_BASE_API_URL + "/tables/mytable?type=offline&state=enable");
+    waitForSegmentsOnline();
+  }
 }

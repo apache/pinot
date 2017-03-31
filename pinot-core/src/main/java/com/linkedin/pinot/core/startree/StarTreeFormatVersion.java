@@ -15,6 +15,9 @@
  */
 package com.linkedin.pinot.core.startree;
 
+import com.linkedin.pinot.common.utils.CommonConstants;
+
+
 /**
  * Enum for StarTree in-memory/on-disk format
  * ON_HEAP: On heap using HashMaps
@@ -22,5 +25,8 @@ package com.linkedin.pinot.core.startree;
  */
 public enum StarTreeFormatVersion {
   ON_HEAP,
-  OFF_HEAP
+  OFF_HEAP;
+
+  public static final StarTreeFormatVersion DEFAULT_VERSION =
+      StarTreeFormatVersion.valueOf(CommonConstants.Server.DEFAULT_STAR_TREE_FORMAT_VERSION);
 }

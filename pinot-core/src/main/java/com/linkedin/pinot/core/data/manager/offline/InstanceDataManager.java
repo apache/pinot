@@ -32,11 +32,18 @@ public interface InstanceDataManager extends DataManager {
    * @param tableName table name
    * @return Table data manager for table, null if tableName does not exist
    */
-  @Nullable TableDataManager getTableDataManager(String tableName);
+  @Nullable
+  TableDataManager getTableDataManager(String tableName);
 
-  @Nonnull Collection<TableDataManager> getTableDataManagers();
+  @Nonnull
+  Collection<TableDataManager> getTableDataManagers();
 
-  void addSegment(ZkHelixPropertyStore<ZNRecord> propertyStore, AbstractTableConfig tableConfig,
-      InstanceZKMetadata instanceZKMetadata, SegmentZKMetadata segmentZKMetadata, String serverInstance) throws Exception;
-
+  /**
+   * Adds a segment into the REALTIME table.
+   * <p>The segment could be committed or under consuming.
+   */
+  void addSegment(@Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore, @Nonnull AbstractTableConfig tableConfig,
+      @Nullable InstanceZKMetadata instanceZKMetadata, @Nonnull SegmentZKMetadata segmentZKMetadata,
+      @Nonnull String serverInstance)
+      throws Exception;
 }
