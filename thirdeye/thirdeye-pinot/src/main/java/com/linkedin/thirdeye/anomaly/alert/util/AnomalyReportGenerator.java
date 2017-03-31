@@ -202,6 +202,10 @@ public class AnomalyReportGenerator {
       templateData.put("reportGenerationTimeMillis", System.currentTimeMillis());
       templateData.put("dashboardHost", configuration.getDashboardHost());
       templateData.put("anomalyIds", Joiner.on(",").join(anomalyIds));
+      if(trueAlert + falseAlert > 0 && trueAlert > 0) {
+        templateData.put("precision", trueAlert / (double) (trueAlert + falseAlert));
+        templateData.put("recall", trueAlert / (double) (trueAlert + 0)); // TODO falseNegatives
+      }
 
       String imgPath = null;
       String cid = "";

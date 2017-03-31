@@ -39,10 +39,10 @@
             <table align="left" border="0" width="100%" style="width:100%; border-collapse:collapse; border-spacing:0;">
             <tr>
               <th align="left">
-                <span style="text-transform: uppercase; color:#B6B6B6; font-weight:normal; font-size:14px;">Analysis Start<span>
+                <span style="text-transform: uppercase; color:#B6B6B6; font-weight:normal; font-size:14px;">Analysis Start</span>
               </th>
               <th align="left">
-                <span style="text-transform: uppercase; color:#B6B6B6;font-weight:normal; font-size:14px;">Analysis End<span>
+                <span style="text-transform: uppercase; color:#B6B6B6;font-weight:normal; font-size:14px;">Analysis End</span>
               </th>
             </tr>
             <tr>
@@ -52,6 +52,27 @@
             </table>
           </td>
         </tr>
+
+        <#if precision?has_content>
+          <tr>
+            <td style="padding: 0 24px;" colspan="2">
+              <table align="left" border="0" width="100%" style="width:100%; border-collapse:collapse; border-spacing:0;">
+                <tr>
+                  <th align="left">
+                  <span style="text-transform: uppercase; color:#B6B6B6; font-weight:normal; font-size:14px;">Precision</span>
+                  </th>
+                  <th align="left">
+                  <span style="text-transform: uppercase; color:#B6B6B6;font-weight:normal; font-size:14px;">Recall</span>
+                  </th>
+                </tr>
+                <tr>
+                  <td style="font-size: 20px;">${precision}</td>
+                  <td style="font-size: 20px;">${recall}</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </#if>
 
         <#if cid?has_content>
           <tr>
