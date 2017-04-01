@@ -82,6 +82,7 @@ import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.util.AnomalyOffset;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 @Path(value = "/anomalies")
@@ -656,11 +657,11 @@ public class AnomaliesResource {
 
     String aggGranularity = constructAggGranularity(datasetConfig);
 
-    long anomalyStartTime = mergedAnomaly.getStartTime();
-    long anomalyEndTime = mergedAnomaly.getEndTime();
-    TimeRange range = getTimeseriesOffsetedTimes(anomalyStartTime, anomalyEndTime, datasetConfig);
-    long currentStartTime = range.getStart();
-    long currentEndTime = range.getEnd();
+    // get anomaly window range - this is the data to fetch (anomaly region + some offset if required)
+    // the function will tell us this range, as how much data we fetch can change depending on which function is being executed
+    TimeRange anomalyWindowRange = getAnomalyWindowOffset(mergedAnomaly, anomalyFunction, datasetConfig);
+    long anomalyWindowStart = anomalyWindowRange.getStart();
+    long anomalyWindowEnd = anomalyWindowRange.getEnd();
 
     DimensionMap dimensions = mergedAnomaly.getDimensions();
     TimeGranularity timeGranularity =
@@ -669,7 +670,7 @@ public class AnomaliesResource {
     AnomalyDetails anomalyDetails = null;
     try {
       AnomalyDetectionInputContext adInputContext = TimeBasedAnomalyMerger
-          .fetchDataByDimension(currentStartTime, currentEndTime, dimensions, anomalyFunction,
+          .fetchDataByDimension(anomalyWindowStart, anomalyWindowEnd, dimensions, anomalyFunction,
               mergedAnomalyResultDAO, overrideConfigDAO, true);
 
       MetricTimeSeries metricTimeSeries = adInputContext.getDimensionKeyMetricTimeSeriesMap().get(dimensions);
@@ -678,7 +679,7 @@ public class AnomaliesResource {
       List<ScalingFactor> scalingFactors = adInputContext.getScalingFactors();
       if (CollectionUtils.isNotEmpty(scalingFactors)) {
         Properties properties = anomalyFunction.getProperties();
-        MetricTransfer.rescaleMetric(metricTimeSeries, currentStartTime, scalingFactors,
+        MetricTransfer.rescaleMetric(metricTimeSeries, anomalyWindowStart, scalingFactors,
             anomalyFunctionSpec.getTopicMetric(), properties);
       }
 
@@ -687,10 +688,15 @@ public class AnomaliesResource {
       // data does not need to be as accurate as the one used for detecting anomalies
       AnomalyTimelinesView anomalyTimelinesView =
           anomalyFunction.getTimeSeriesView(metricTimeSeries, bucketMillis, anomalyFunctionSpec.getTopicMetric(),
-              currentStartTime, currentEndTime, knownAnomalies);
+              anomalyWindowStart, anomalyWindowEnd, knownAnomalies);
 
+      // get viewing window range - this is the region to display along with anomaly, from all the fetched data.
+      // the function will tell us this range, as how much data we display can change depending on which function is being executed
+      TimeRange viewWindowRange = getViewWindowOffset(mergedAnomaly, anomalyFunction, datasetConfig);
+      long viewWindowStart = viewWindowRange.getStart();
+      long viewWindowEnd = viewWindowRange.getEnd();
       anomalyDetails = constructAnomalyDetails(metricName, dataset, datasetConfig, mergedAnomaly, anomalyFunctionSpec,
-          currentStartTime, currentEndTime, anomalyTimelinesView, externalUrl);
+          viewWindowStart, viewWindowEnd, anomalyTimelinesView, externalUrl);
     } catch (Exception e) {
       LOG.error("Exception in constructing anomaly wrapper for anomaly {}", mergedAnomaly.getId(), e);
     }
@@ -785,28 +791,33 @@ public class AnomaliesResource {
   }
 
 
-  private TimeRange getTimeseriesOffsetedTimes(long anomalyStartTime, long anomalyEndTime, DatasetConfigDTO datasetConfig) {
-    TimeUnit dataTimeunit = datasetConfig.getTimeUnit();
-    Period offsetPeriod;
-    switch (dataTimeunit) {
-      case DAYS: // 3 days
-        offsetPeriod = new Period(0, 0, 0, 3, 0, 0, 0, 0);
-        break;
-      case HOURS: // 10 hours
-        offsetPeriod = new Period(0, 0, 0, 0, 10, 0, 0, 0);
-        break;
-      case MINUTES: // 60 minutes
-        offsetPeriod = new Period(0, 0, 0, 0, 0, 60, 0, 0);
-        break;
-      default:
-        offsetPeriod = new Period();
-    }
+  private TimeRange getAnomalyWindowOffset(MergedAnomalyResultDTO mergedAnomaly, BaseAnomalyFunction anomalyFunction,
+      DatasetConfigDTO datasetConfig) {
+    AnomalyOffset anomalyWindowOffset = anomalyFunction.getAnomalyWindowOffset(datasetConfig);
+    TimeRange anomalyWindowRange = getAnomalyTimeRangeWithOffsets(anomalyWindowOffset, mergedAnomaly, datasetConfig);
+    return anomalyWindowRange;
+  }
+
+
+  private TimeRange getViewWindowOffset(MergedAnomalyResultDTO mergedAnomaly, BaseAnomalyFunction anomalyFunction,
+      DatasetConfigDTO datasetConfig) {
+    AnomalyOffset viewWindowOffset = anomalyFunction.getViewWindowOffset(datasetConfig);
+    TimeRange viewWindowRange = getAnomalyTimeRangeWithOffsets(viewWindowOffset, mergedAnomaly, datasetConfig);
+    return viewWindowRange;
+  }
+
+  private TimeRange getAnomalyTimeRangeWithOffsets(AnomalyOffset offset, MergedAnomalyResultDTO mergedAnomaly,
+      DatasetConfigDTO datasetConfig) {
+    long anomalyStartTime = mergedAnomaly.getStartTime();
+    long anomalyEndTime = mergedAnomaly.getEndTime();
+    Period preOffsetPeriod = offset.getPreOffsetPeriod();
+    Period postOffsetPeriod = offset.getPostOffsetPeriod();
 
     DateTimeZone dateTimeZone = DateTimeZone.forID(datasetConfig.getTimezone());
     DateTime anomalyStartDateTime = new DateTime(anomalyStartTime, dateTimeZone);
     DateTime anomalyEndDateTime = new DateTime(anomalyEndTime, dateTimeZone);
-    anomalyStartDateTime = anomalyStartDateTime.minus(offsetPeriod);
-    anomalyEndDateTime = anomalyEndDateTime.plus(offsetPeriod);
+    anomalyStartDateTime = anomalyStartDateTime.minus(preOffsetPeriod);
+    anomalyEndDateTime = anomalyEndDateTime.plus(postOffsetPeriod);
     anomalyStartTime = anomalyStartDateTime.getMillis();
     anomalyEndTime = anomalyEndDateTime.getMillis();
     try {
@@ -820,5 +831,6 @@ public class AnomaliesResource {
     TimeRange range = new TimeRange(anomalyStartTime, anomalyEndTime);
     return range;
   }
+
 
 }
