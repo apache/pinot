@@ -23,6 +23,7 @@ import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.core.data.manager.config.FileBasedInstanceDataManagerConfig;
 import com.linkedin.pinot.core.data.manager.config.TableDataManagerConfig;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
@@ -200,8 +201,10 @@ public class FileBasedInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public void refreshSegment(String oldSegmentName, SegmentMetadata newSegmentMetadata) {
-    throw new UnsupportedOperationException();
+  public void reloadSegment(@Nonnull SegmentMetadata segmentMetadata,
+      @Nonnull CommonConstants.Helix.TableType tableType, @Nullable AbstractTableConfig tableConfig,
+      @Nullable Schema schema) {
+    throw new UnsupportedOperationException("Unsupported reloading segment in FileBasedInstanceDataManager");
   }
 
   @Override

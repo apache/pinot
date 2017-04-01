@@ -29,8 +29,8 @@ import org.apache.helix.model.Message;
  * Changing this class to include new fields is a change in the protocol, so the new fields must be made optional,
  * and coded in such a way that either controller or server may be upgraded first.
  */
-public class SegmentRefreshMessage  extends Message {
-  private static final String REFRESH_SEGMENT_MSG = "REFRESH_SEGMENT";
+public class SegmentRefreshMessage extends Message {
+  public static final String REFRESH_SEGMENT_MSG_SUB_TYPE = "REFRESH_SEGMENT";
 
   private static final String SIMPLE_FIELD_CRC = "PINOT_SEGMENT_CRC";
 
@@ -44,7 +44,7 @@ public class SegmentRefreshMessage  extends Message {
     super(MessageType.USER_DEFINE_MSG, UUID.randomUUID().toString());
     setResourceName(tableName);
     setPartitionName(segmentName);
-    setMsgSubType(REFRESH_SEGMENT_MSG);
+    setMsgSubType(REFRESH_SEGMENT_MSG_SUB_TYPE);
     // Give it infinite time to process the message, as long as session is alive
     setExecutionTimeout(-1);
     getRecord().setSimpleField(SIMPLE_FIELD_CRC, Long.toString(crc));
@@ -56,7 +56,7 @@ public class SegmentRefreshMessage  extends Message {
    */
   public SegmentRefreshMessage(final Message message) {
     super(message.getRecord());
-    if (!message.getMsgSubType().equals(REFRESH_SEGMENT_MSG)) {
+    if (!message.getMsgSubType().equals(REFRESH_SEGMENT_MSG_SUB_TYPE)) {
       throw new IllegalArgumentException("Invalid message subtype:" + message.getMsgSubType());
     }
   }

@@ -33,6 +33,7 @@ public class InvertedIndexOfflineIntegrationTest extends OfflineClusterIntegrati
   private static final List<String> UPDATED_INVERTED_INDEX_COLUMNS =
       Arrays.asList("FlightNum", "Origin", "Quarter", "DivActualElapsedTime");
   private static final String TEST_QUERY = "SELECT COUNT(*) FROM mytable WHERE DivActualElapsedTime = 305";
+  private static final long MAX_RELOAD_TIME_IN_MILLIS = 5000L;
 
   @Override
   protected void createTable()
@@ -49,17 +50,23 @@ public class InvertedIndexOfflineIntegrationTest extends OfflineClusterIntegrati
     Assert.assertEquals(queryResponse.getLong("numEntriesScannedInFilter"), TOTAL_DOCS);
     updateOfflineTable("DaysSinceEpoch", -1, "", null, null, UPDATED_INVERTED_INDEX_COLUMNS, null, "mytable",
         SegmentVersion.v1);
+
+    long endTime = System.currentTimeMillis() + MAX_RELOAD_TIME_IN_MILLIS;
     triggerReload();
-    runQuery(TEST_QUERY, Collections.singletonList(TEST_QUERY));
-    queryResponse = postQuery(TEST_QUERY);
+    while (System.currentTimeMillis() < endTime) {
+      runQuery(TEST_QUERY, Collections.singletonList(TEST_QUERY));
+      queryResponse = postQuery(TEST_QUERY);
+      // Total docs should not change during reload
+      Assert.assertEquals(queryResponse.getLong("totalDocs"), TOTAL_DOCS);
+      if (queryResponse.getLong("numEntriesScannedInFilter") == 0L) {
+        break;
+      }
+    }
     Assert.assertEquals(queryResponse.getLong("numEntriesScannedInFilter"), 0L);
   }
 
   private void triggerReload()
       throws Exception {
-    sendGetRequest(CONTROLLER_BASE_API_URL + "/tables/mytable?type=offline&state=disable");
-    Thread.sleep(1000);
-    sendGetRequest(CONTROLLER_BASE_API_URL + "/tables/mytable?type=offline&state=enable");
-    waitForSegmentsOnline();
+    sendGetRequest(CONTROLLER_BASE_API_URL + "/tables/mytable/segments/reload?type=offline");
   }
 }
