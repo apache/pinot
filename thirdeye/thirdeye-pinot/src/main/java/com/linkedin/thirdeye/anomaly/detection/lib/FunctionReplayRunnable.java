@@ -36,6 +36,7 @@ public class FunctionReplayRunnable implements Runnable {
   private Map<String, String> tuningParameter;
   private Long functionAutotuneConfigId;
   private boolean speedUp;
+  private boolean selfKill;
 
   public FunctionReplayRunnable(DetectionJobScheduler detectionJobScheduler, AnomalyFunctionManager anomalyFunctionDAO,
       MergedAnomalyResultManager mergedAnomalyResultDAO, RawAnomalyResultManager rawAnomalyResultDAO,
@@ -47,13 +48,14 @@ public class FunctionReplayRunnable implements Runnable {
     this.autotuneConfigDAO = autotuneConfigDAO;
     setSpeedUp(true);
     setForceBackfill(true);
+    setSelfKill(true);
   }
 
   public FunctionReplayRunnable(DetectionJobScheduler detectionJobScheduler, AnomalyFunctionManager anomalyFunctionDAO,
       MergedAnomalyResultManager mergedAnomalyResultDAO, RawAnomalyResultManager rawAnomalyResultDAO,
       AutotuneConfigManager autotuneConfigDAO, Map<String, String> tuningParameter,
       long tuningFunctionId, DateTime replayStart, DateTime replayEnd, double goal, long functionAutotuneConfigId,
-      boolean isForceBackfill) {
+      boolean isForceBackfill, boolean selfKill) {
     this.detectionJobScheduler = detectionJobScheduler;
     this.mergedAnomalyResultDAO = mergedAnomalyResultDAO;
     this.rawAnomalyResultDAO = rawAnomalyResultDAO;
@@ -67,6 +69,46 @@ public class FunctionReplayRunnable implements Runnable {
     setFunctionAutotuneConfigId(functionAutotuneConfigId);
     setSpeedUp(true);
     setGoal(goal);
+    setSelfKill(selfKill);
+  }
+
+
+  public FunctionReplayRunnable(DetectionJobScheduler detectionJobScheduler, AnomalyFunctionManager anomalyFunctionDAO,
+      MergedAnomalyResultManager mergedAnomalyResultDAO, RawAnomalyResultManager rawAnomalyResultDAO,
+      AutotuneConfigManager autotuneConfigDAO, Map<String, String> tuningParameter,
+      long tuningFunctionId, DateTime replayStart, DateTime replayEnd, boolean selfKill) {
+    this.detectionJobScheduler = detectionJobScheduler;
+    this.mergedAnomalyResultDAO = mergedAnomalyResultDAO;
+    this.rawAnomalyResultDAO = rawAnomalyResultDAO;
+    this.anomalyFunctionDAO = anomalyFunctionDAO;
+    this.autotuneConfigDAO = autotuneConfigDAO;
+    setTuningFunctionId(tuningFunctionId);
+    setReplayStart(replayStart);
+    setReplayEnd(replayEnd);
+    setForceBackfill(true);
+    setTuningParameter(tuningParameter);
+    setSpeedUp(true);
+    setSelfKill(selfKill);
+  }
+
+  public static void speedup(AnomalyFunctionDTO anomalyFunctionDTO) {
+    switch (anomalyFunctionDTO.getWindowUnit()) {
+      case NANOSECONDS:
+      case MICROSECONDS:
+      case MILLISECONDS:
+      case SECONDS:
+      case MINUTES:       // These TimeUnits are not currently in use
+      case HOURS:
+      case DAYS:
+          /*
+          SignTest takes HOURS data, but changing to 7 days won't affect the final result
+          SPLINE takes 1 DAYS data, for heuristic, we extend it to 7 days.
+           */
+      default:
+        anomalyFunctionDTO.setWindowSize(7);
+        anomalyFunctionDTO.setWindowUnit(TimeUnit.DAYS);
+        anomalyFunctionDTO.setCron("0 0 0 ? * MON *");
+    }
   }
 
   @Override
@@ -96,23 +138,7 @@ public class FunctionReplayRunnable implements Runnable {
 
     // enlarge window size so that we can speed-up the replay speed
     if(speedUp) {
-      switch (anomalyFunctionDTO.getWindowUnit()) {
-        case NANOSECONDS:
-        case MICROSECONDS:
-        case MILLISECONDS:
-        case SECONDS:
-        case MINUTES:       // These TimeUnits are not currently in use
-        case HOURS:
-        case DAYS:
-          /*
-          SignTest takes HOURS data, but changing to 7 days won't affect the final result
-          SPLINE takes 1 DAYS data, for heuristic, we extend it to 7 days.
-           */
-        default:
-          anomalyFunctionDTO.setWindowSize(7);
-          anomalyFunctionDTO.setWindowUnit(TimeUnit.DAYS);
-          anomalyFunctionDTO.setCron("0 0 0 ? * MON *");
-      }
+      FunctionReplayRunnable.speedup(anomalyFunctionDTO);
     }
 
     // Set Properties
@@ -123,31 +149,36 @@ public class FunctionReplayRunnable implements Runnable {
 
     detectionJobScheduler.synchronousBackFill(clonedFunctionId, replayStart, replayEnd, isForceBackfill);
 
-    PerformanceEvaluate performanceEvaluator = PerformanceEvaluateHelper.getPerformanceEvaluator(performanceEvaluationMethod,
-        tuningFunctionId, clonedFunctionId, new Interval(replayStart.getMillis(), replayEnd.getMillis()), mergedAnomalyResultDAO);
-    double performance = performanceEvaluator.evaluate();
+    if(functionAutotuneConfigId != null) { // if no functionAutotuneId, skip update
+      PerformanceEvaluate performanceEvaluator =
+          PerformanceEvaluateHelper.getPerformanceEvaluator(performanceEvaluationMethod, tuningFunctionId,
+              clonedFunctionId, new Interval(replayStart.getMillis(), replayEnd.getMillis()), mergedAnomalyResultDAO);
+      double performance = performanceEvaluator.evaluate();
 
-    AutotuneConfigDTO targetAutotuneDTO = autotuneConfigDAO.findById(functionAutotuneConfigId);
+      AutotuneConfigDTO targetAutotuneDTO = autotuneConfigDAO.findById(functionAutotuneConfigId);
 
-    double prevPerformance = targetAutotuneDTO.getPerformance().get(performanceEvaluationMethod.name());
-    if(Math.abs(prevPerformance - goal) > Math.abs(performance - goal)) {
-      targetAutotuneDTO.setConfiguration(tuningParameter);
-      Map<String, Double> newPerformance = targetAutotuneDTO.getPerformance();
-      newPerformance.put(performanceEvaluationMethod.name(), performance);
-      targetAutotuneDTO.setPerformance(newPerformance);
-      targetAutotuneDTO.setAvgRunningTime((System.currentTimeMillis() - currentTime) / 1000);
-      targetAutotuneDTO.setLastUpdateTimestamp(System.currentTimeMillis());
+      double prevPerformance = targetAutotuneDTO.getPerformance().get(performanceEvaluationMethod.name());
+      if (Math.abs(prevPerformance - goal) > Math.abs(performance - goal)) {
+        targetAutotuneDTO.setConfiguration(tuningParameter);
+        Map<String, Double> newPerformance = targetAutotuneDTO.getPerformance();
+        newPerformance.put(performanceEvaluationMethod.name(), performance);
+        targetAutotuneDTO.setPerformance(newPerformance);
+        targetAutotuneDTO.setAvgRunningTime((System.currentTimeMillis() - currentTime) / 1000);
+        targetAutotuneDTO.setLastUpdateTimestamp(System.currentTimeMillis());
+      }
+      String message = (targetAutotuneDTO.getMessage().isEmpty()) ? "" : (targetAutotuneDTO.getMessage() + ";");
+
+      targetAutotuneDTO.setMessage(message + tuningParameter.toString() + ":" + performance);
+
+      autotuneConfigDAO.update(targetAutotuneDTO);
     }
-    String message = (targetAutotuneDTO.getMessage().isEmpty()) ? "" : (targetAutotuneDTO.getMessage() + ";");
-
-    targetAutotuneDTO.setMessage(message + tuningParameter.toString() + ":" + performance);
-
-    autotuneConfigDAO.update(targetAutotuneDTO);
-
 
     // clean up and kill itself
-    onboardResource.deleteExistingAnomalies(Long.toString(clonedFunctionId), replayStart.getMillis(), replayEnd.getMillis());
-    anomalyFunctionDAO.deleteById(clonedFunctionId);
+    if(selfKill) {
+      onboardResource.deleteExistingAnomalies(Long.toString(clonedFunctionId), replayStart.getMillis(),
+          replayEnd.getMillis());
+      anomalyFunctionDAO.deleteById(clonedFunctionId);
+    }
   }
 
 
@@ -229,5 +260,13 @@ public class FunctionReplayRunnable implements Runnable {
 
   public void setSpeedUp(boolean speedUp) {
     this.speedUp = speedUp;
+  }
+
+  public boolean isSelfKill() {
+    return selfKill;
+  }
+
+  public void setSelfKill(boolean selfKill) {
+    this.selfKill = selfKill;
   }
 }

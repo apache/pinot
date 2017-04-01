@@ -282,15 +282,7 @@ public class DetectionJobResource {
 
     String response = null;
 
-    final DateTime innerStartTime = startTime;
-    final DateTime innerEndTime = endTime;
-
-    new Thread(new Runnable() {
-      @Override
-      public void run() {
-        detectionJobScheduler.runBackfill(functionId, innerStartTime, innerEndTime, forceBackfill);
-      }
-    }).start();
+    detectionJobScheduler.runBackfill(functionId, startTime, endTime, forceBackfill);
 
     return Response.ok().build();
   }
