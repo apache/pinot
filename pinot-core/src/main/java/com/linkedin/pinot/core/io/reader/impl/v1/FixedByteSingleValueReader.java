@@ -53,6 +53,11 @@ public class FixedByteSingleValueReader extends BaseSingleColumnSingleValueReade
   }
 
   @Override
+  public int getInt(int row, ReaderContext context) {
+    return dataFileReader.getInt(row, 0);
+  }
+
+  @Override
   public int getInt(int row) {
     return dataFileReader.getInt(row, 0);
   }
