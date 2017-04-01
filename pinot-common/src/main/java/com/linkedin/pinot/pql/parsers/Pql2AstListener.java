@@ -278,13 +278,12 @@ public class Pql2AstListener extends PQL2BaseListener {
   }
 
   @Override
-  public void enterRegexPredicate(@NotNull PQL2Parser.RegexPredicateContext ctx) {
-    String matchType = ctx.getChild(0).getChild(1).getText();
-    pushNode(new RegexPredicateAstNode(matchType));
+  public void enterRegexpLikePredicate(@NotNull PQL2Parser.RegexpLikePredicateContext ctx) {
+    pushNode(new RegexPredicateAstNode());
   }
 
   @Override
-  public void exitRegexPredicate(@NotNull PQL2Parser.RegexPredicateContext ctx) {
+  public void exitRegexpLikePredicate(@NotNull PQL2Parser.RegexpLikePredicateContext ctx) {
     popNode();
   }
   

@@ -27,15 +27,9 @@ import com.linkedin.pinot.pql.parsers.Pql2CompilationException;
 import com.linkedin.pinot.pql.parsers.utils.PQLParserUtils;
 
 public class RegexPredicateAstNode extends PredicateAstNode {
-  enum MatchType {
-    LIKE, REGEXP
-  }
-
   private String _identifier;
-  MatchType matchType;
 
-  public RegexPredicateAstNode(String matchTypeString) {
-    matchType = MatchType.valueOf(matchTypeString.toUpperCase());
+  public RegexPredicateAstNode() {
   }
 
   @Override
@@ -50,10 +44,6 @@ public class RegexPredicateAstNode extends PredicateAstNode {
       if (astNode instanceof LiteralAstNode) {
         LiteralAstNode node = (LiteralAstNode) astNode;
         String expr = node.getValueAsString();
-        //convert LIKE semantics to java semantics, this is not fully compatible with SQL semantics
-        if (matchType == MatchType.LIKE) {
-          expr = PQLParserUtils.convertLikeExpressionToJavaRegex(expr);
-        }
         values.add(expr);
       }
     }
