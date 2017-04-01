@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomaly.alert;
 
+import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
@@ -142,7 +143,7 @@ public class AlertJobScheduler implements JobScheduler, Runnable {
   }
 
   public void shutdown() throws SchedulerException {
-    scheduledExecutorService.shutdown();
+    AnomalyUtils.safelyShutdownExecutionService(scheduledExecutorService, this.getClass());
     quartzScheduler.shutdown();
   }
 

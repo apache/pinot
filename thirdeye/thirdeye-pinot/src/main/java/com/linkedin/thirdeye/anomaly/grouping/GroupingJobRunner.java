@@ -30,18 +30,18 @@ public class GroupingJobRunner implements JobRunner {
   @Override
   public Long createJob() {
     try {
-      JobDTO classificationJobSpec = new JobDTO();
+      JobDTO jobSpec = new JobDTO();
       String jobName = createJobName(jobContext);
-      classificationJobSpec.setJobName(jobName);
-      classificationJobSpec.setWindowStartTime(jobContext.getWindowStartTime());
-      classificationJobSpec.setWindowEndTime(jobContext.getWindowEndTime());
-      classificationJobSpec.setScheduleStartTime(System.currentTimeMillis());
-      classificationJobSpec.setStatus(JobConstants.JobStatus.SCHEDULED);
-      classificationJobSpec.setTaskType(TaskConstants.TaskType.GROUPING);
-      Long jobExecutionId = jobDAO.save(classificationJobSpec);
+      jobSpec.setJobName(jobName);
+      jobSpec.setWindowStartTime(jobContext.getWindowStartTime());
+      jobSpec.setWindowEndTime(jobContext.getWindowEndTime());
+      jobSpec.setScheduleStartTime(System.currentTimeMillis());
+      jobSpec.setStatus(JobConstants.JobStatus.SCHEDULED);
+      jobSpec.setTaskType(TaskConstants.TaskType.GROUPING);
+      Long jobExecutionId = jobDAO.save(jobSpec);
       jobContext.setJobName(jobName);
       jobContext.setJobExecutionId(jobExecutionId);
-      LOG.info("Created anomalyJobSpec {} with jobExecutionId {}", classificationJobSpec, jobExecutionId);
+      LOG.info("Created anomalyJobSpec {} with jobExecutionId {}", jobSpec, jobExecutionId);
       return jobExecutionId;
     } catch (Exception e) {
       LOG.error("Exception in creating classification job", e);

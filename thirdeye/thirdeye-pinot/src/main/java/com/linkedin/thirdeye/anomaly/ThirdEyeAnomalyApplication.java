@@ -138,13 +138,13 @@ public class ThirdEyeAnomalyApplication
       @Override
       public void stop() throws Exception {
         if (config.isWorker()) {
-          taskDriver.stop();
+          taskDriver.shutdown();
         }
         if (config.isScheduler()) {
           detectionJobScheduler.shutdown();
         }
         if (config.isMonitor()) {
-          monitorJobScheduler.stop();
+          monitorJobScheduler.shutdown();
         }
         if (config.isAlert()) {
           alertJobScheduler.shutdown();

@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.anomaly.detection;
 import com.google.common.collect.Lists;
 import com.linkedin.thirdeye.anomaly.job.JobConstants;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants;
+import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
@@ -63,8 +64,8 @@ public class DetectionJobScheduler implements Runnable {
     scheduledExecutorService.scheduleAtFixedRate(this, 0, 15, TimeUnit.MINUTES);
   }
 
-  public void shutdown() throws SchedulerException{
-    scheduledExecutorService.shutdown();
+  public void shutdown() {
+    AnomalyUtils.safelyShutdownExecutionService(scheduledExecutorService, this.getClass());
   }
 
   /**

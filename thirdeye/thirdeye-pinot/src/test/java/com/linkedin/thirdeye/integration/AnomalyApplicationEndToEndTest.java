@@ -6,13 +6,14 @@ import com.linkedin.pinot.client.ResultSetGroup;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.alert.AlertJobScheduler;
 import com.linkedin.thirdeye.anomaly.detection.DetectionJobScheduler;
+import com.linkedin.thirdeye.anomaly.grouping.GroupingJobScheduler;
 import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
-import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeExecutor;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorConfiguration;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorJobScheduler;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
 import com.linkedin.thirdeye.anomaly.task.TaskDriver;
+import com.linkedin.thirdeye.anomaly.task.TaskDriverConfiguration;
 import com.linkedin.thirdeye.anomaly.task.TaskInfoFactory;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
@@ -43,7 +44,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import org.joda.time.DateTime;
@@ -66,8 +66,8 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
   private TaskDriver taskDriver = null;
   private MonitorJobScheduler monitorJobScheduler = null;
   private AlertJobScheduler alertJobScheduler = null;
-  private AnomalyMergeExecutor anomalyMergeExecutor = null;
   private DataCompletenessScheduler dataCompletenessScheduler = null;
+  private GroupingJobScheduler groupingJobScheduler = null;
   private AnomalyFunctionFactory anomalyFunctionFactory = null;
   private AlertFilterFactory alertFilterFactory = null;
   private ThirdEyeCacheRegistry cacheRegistry = ThirdEyeCacheRegistry.getInstance();
@@ -95,7 +95,7 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
     super.cleanup();
   }
 
-  void cleanup_schedulers() throws SchedulerException {
+  private void cleanup_schedulers() throws SchedulerException {
     if (detectionJobScheduler != null) {
       detectionJobScheduler.shutdown();
     }
@@ -103,16 +103,16 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
       alertJobScheduler.shutdown();
     }
     if (monitorJobScheduler != null) {
-      monitorJobScheduler.stop();
-    }
-    if (anomalyMergeExecutor != null) {
-      anomalyMergeExecutor.stop();
+      monitorJobScheduler.shutdown();
     }
     if (taskDriver != null) {
-      taskDriver.stop();
+      taskDriver.shutdown();
     }
     if (dataCompletenessScheduler != null) {
       dataCompletenessScheduler.shutdown();
+    }
+    if (groupingJobScheduler != null) {
+      groupingJobScheduler.shutdown();
     }
   }
 
@@ -165,8 +165,14 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
     thirdeyeAnomalyConfig.setId(id);
     thirdeyeAnomalyConfig.setDashboardHost(dashboardHost);
     MonitorConfiguration monitorConfiguration = new MonitorConfiguration();
-    monitorConfiguration.setMonitorFrequency(new TimeGranularity(30, TimeUnit.SECONDS));
+    monitorConfiguration.setMonitorFrequency(new TimeGranularity(3, TimeUnit.SECONDS));
     thirdeyeAnomalyConfig.setMonitorConfiguration(monitorConfiguration);
+    TaskDriverConfiguration taskDriverConfiguration = new TaskDriverConfiguration();
+    taskDriverConfiguration.setNoTaskDelayInMillis(1000);
+    taskDriverConfiguration.setRandomDelayCapInMillis(200);
+    taskDriverConfiguration.setTaskFailureDelayInMillis(500);
+    taskDriverConfiguration.setMaxParallelTasks(2);
+    thirdeyeAnomalyConfig.setTaskDriverConfiguration(taskDriverConfiguration);
     thirdeyeAnomalyConfig.setRootDir(System.getProperty("dw.rootDir", "NOT_SET(dw.rootDir)"));
 
 
@@ -181,6 +187,9 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
 
     // create test dataset config
     datasetConfigDAO.save(getTestDatasetConfig(collection));
+
+    // create test grouping config
+    classificationConfigDAO.save(getTestGroupingConfiguration(functionId));
 
     // setup function factory for worker and merger
     InputStream factoryStream = AnomalyApplicationEndToEndTest.class.getResourceAsStream(functionPropertiesFile);
@@ -296,7 +305,7 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
         monitorCount++;
       }
     }
-    Assert.assertEquals(monitorCount, 2);
+    Assert.assertTrue(monitorCount > 0);
 
     // check for job status
     jobs = jobDAO.findAll();
@@ -327,25 +336,32 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
     List<MergedAnomalyResultDTO> mergedAnomalies = mergedAnomalyResultDAO.findByFunctionId(functionId);
     Assert.assertTrue(mergedAnomalies.size() > 0);
 
-    // THE FOLLOWING TEST FAILS OCCASIONALLY DUE TO MACHINE COMPUTATION POWER
-    // TODO: Move test away from Thread.sleep
+    // THE FOLLOWING TEST MAY FAIL OCCASIONALLY DUE TO MACHINE COMPUTATION POWER
     // check for job status COMPLETED
-//    jobs = jobDAO.findAll();
-//    int completedJobCount = 0;
-//    for (JobDTO job : jobs) {
-//      int attempt = 0;
-//      while (attempt < 3 && !job.getStatus().equals(JobStatus.COMPLETED)) {
-//        LOG.info("Checking job status with attempt : {}", attempt + 1);
-//        Thread.sleep(5_000);
-//        attempt++;
-//      }
-//      if (job.getStatus().equals(JobStatus.COMPLETED)) {
-//        completedJobCount ++;
-//      }
-//    }
-//    Assert.assertTrue(completedJobCount > 0);
-    // stop schedulers
-    cleanup();
+    jobs = jobDAO.findAll();
+    int completedJobCount = 0;
+    for (JobDTO job : jobs) {
+      int attempt = 0;
+      while (attempt < 3 && !job.getStatus().equals(JobStatus.COMPLETED)) {
+        LOG.info("Checking job status with attempt : {}", attempt + 1);
+        Thread.sleep(5_000);
+        attempt++;
+      }
+      if (job.getStatus().equals(JobStatus.COMPLETED)) {
+        completedJobCount++;
+        break;
+      }
+    }
+    Assert.assertTrue(completedJobCount > 0);
+
+    // start grouper
+    startGrouper();
+    JobDTO latestCompletedDetectionJobDTO = jobDAO.findLatestCompletedDetectionJobByFunctionId(functionId);
+    Assert.assertNotNull(latestCompletedDetectionJobDTO);
+    Thread.sleep(5000);
+    jobs = jobDAO.findAll();
+    JobDTO latestCompletedGroupingJobDTO = jobDAO.findLatestCompletedGroupingJobById(functionId);
+    Assert.assertNotNull(latestCompletedGroupingJobDTO);
   }
 
   private void startDataCompletenessScheduler() throws Exception {
@@ -353,11 +369,9 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
     dataCompletenessScheduler.start();
   }
 
-  // TODO: Change to startGrouper
-  private void startMerger() throws Exception {
-    ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
-    anomalyMergeExecutor = new AnomalyMergeExecutor(executorService, anomalyFunctionFactory);
-    executorService.scheduleWithFixedDelay(anomalyMergeExecutor, 0, 3, TimeUnit.SECONDS);
+  private void startGrouper() {
+    groupingJobScheduler = new GroupingJobScheduler();
+    groupingJobScheduler.start();
   }
 
   private void startMonitor() {

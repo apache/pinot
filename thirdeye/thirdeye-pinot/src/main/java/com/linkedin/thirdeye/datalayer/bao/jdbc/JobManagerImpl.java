@@ -110,7 +110,7 @@ public class JobManagerImpl extends AbstractManagerImpl<JobDTO> implements JobMa
   }
 
   @Override
-  public JobDTO findLatestCompletedAnomalyJobByFunctionId(long functionId) {
+  public JobDTO findLatestCompletedDetectionJobByFunctionId(long functionId) {
     HashMap<String, Object> parameterMap = new HashMap<>();
     parameterMap.put("type", TaskConstants.TaskType.ANOMALY_DETECTION);
     parameterMap.put("anomalyFunctionId", functionId);

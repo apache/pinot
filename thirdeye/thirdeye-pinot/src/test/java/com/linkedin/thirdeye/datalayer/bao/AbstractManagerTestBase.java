@@ -4,6 +4,7 @@ import com.google.common.collect.Lists;
 import com.linkedin.thirdeye.TestDBResources;
 import com.linkedin.thirdeye.anomaly.job.JobConstants;
 import com.linkedin.thirdeye.anomaly.override.OverrideConfigHelper;
+import com.linkedin.thirdeye.anomaly.task.TaskConstants;
 import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluationMethod;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricType;
@@ -38,6 +39,7 @@ import java.net.URL;
 import java.sql.Connection;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -223,6 +225,15 @@ public abstract class AbstractManagerTestBase {
     return emailConfiguration;
   }
 
+  protected ClassificationConfigDTO getTestGroupingConfiguration(long mainFunctionId) {
+    ClassificationConfigDTO configDTO = new ClassificationConfigDTO();
+    configDTO.setName("groupingJob");
+    configDTO.setMainFunctionId(mainFunctionId);
+    configDTO.setFunctionIdList(Collections.singletonList(mainFunctionId));
+    configDTO.setActive(true);
+    return configDTO;
+  }
+
   protected RawAnomalyResultDTO getAnomalyResult() {
     RawAnomalyResultDTO anomalyResult = new RawAnomalyResultDTO();
     anomalyResult.setScore(1.1);
@@ -240,6 +251,7 @@ public abstract class AbstractManagerTestBase {
     JobDTO jobSpec = new JobDTO();
     jobSpec.setJobName("Test_Anomaly_Job");
     jobSpec.setStatus(JobConstants.JobStatus.SCHEDULED);
+    jobSpec.setTaskType(TaskConstants.TaskType.ANOMALY_DETECTION);
     jobSpec.setScheduleStartTime(System.currentTimeMillis());
     jobSpec.setWindowStartTime(new DateTime().minusHours(20).getMillis());
     jobSpec.setWindowEndTime(new DateTime().minusHours(10).getMillis());

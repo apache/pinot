@@ -95,6 +95,7 @@ public class AlertJobRunnerV2 implements Job {
       jobSpec.setWindowEndTime(monitoringWindowEndTime.getMillis());
       jobSpec.setScheduleStartTime(System.currentTimeMillis());
       jobSpec.setStatus(JobConstants.JobStatus.SCHEDULED);
+      jobSpec.setTaskType(TaskConstants.TaskType.ALERT2);
       jobExecutionId = jobDAO.save(jobSpec);
       LOG.info("Created alert job {} with jobExecutionId {}", jobSpec, jobExecutionId);
     } catch (Exception e) {

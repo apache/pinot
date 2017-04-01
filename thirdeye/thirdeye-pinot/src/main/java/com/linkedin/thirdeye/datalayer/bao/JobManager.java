@@ -21,7 +21,7 @@ public interface JobManager extends AbstractManager<JobDTO>{
 
   JobDTO findLatestBackfillScheduledJobByFunctionId(long functionId, long backfillWindowStart, long backfillWindowEnd);
 
-  JobDTO findLatestCompletedAnomalyJobByFunctionId(long functionId);
+  JobDTO findLatestCompletedDetectionJobByFunctionId(long functionId);
 
   JobDTO findLatestCompletedGroupingJobById(long functionId);
 }

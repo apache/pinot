@@ -4,6 +4,7 @@ import com.linkedin.thirdeye.anomaly.alert.AlertJobContext;
 import com.linkedin.thirdeye.anomaly.job.JobContext;
 import com.linkedin.thirdeye.anomaly.job.JobScheduler;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants;
+import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
@@ -131,7 +132,7 @@ public class AlertJobSchedulerV2 implements JobScheduler, Runnable {
   }
 
   public void shutdown() throws SchedulerException {
-    scheduledExecutorService.shutdown();
+    AnomalyUtils.safelyShutdownExecutionService(scheduledExecutorService, this.getClass());
     quartzScheduler.shutdown();
   }
 

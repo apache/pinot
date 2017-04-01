@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomaly.grouping;
 
+import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.ClassificationConfigManager;
@@ -28,7 +29,7 @@ public class GroupingJobScheduler implements Runnable {
   }
 
   public void shutdown() {
-    scheduledExecutorService.shutdown();
+    AnomalyUtils.safelyShutdownExecutionService(scheduledExecutorService, this.getClass());
   }
 
   @Override
@@ -71,7 +72,7 @@ public class GroupingJobScheduler implements Runnable {
     // Check the latest detection time among all anomaly functions in this classification config
     long minDetectionEndTime = Long.MAX_VALUE;
     for (AnomalyFunctionDTO anomalyFunctionDTO : involvedAnomalyFunctions) {
-      JobDTO job = jobDAO.findLatestCompletedAnomalyJobByFunctionId(anomalyFunctionDTO.getId());
+      JobDTO job = jobDAO.findLatestCompletedDetectionJobByFunctionId(anomalyFunctionDTO.getId());
       if (job != null) {
         minDetectionEndTime = Math.min(minDetectionEndTime, job.getWindowEndTime());
       } else {
