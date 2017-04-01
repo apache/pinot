@@ -3,8 +3,11 @@ package com.linkedin.thirdeye.detector.function;
 import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
+import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.dashboard.views.TimeBucket;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -12,12 +15,19 @@ import java.util.List;
 import java.util.Properties;
 
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.util.AnomalyOffset;
+
 import java.util.concurrent.TimeUnit;
+
+import org.joda.time.Period;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public abstract class BaseAnomalyFunction implements AnomalyFunction {
 
+  private static final TimeGranularity DEFAULT_VIEW_OFFSET_FOR_DAILY = new TimeGranularity(3, TimeUnit.DAYS);
+  private static final TimeGranularity DEFAULT_VIEW_OFFSET_FOR_HOURLY = new TimeGranularity(10, TimeUnit.HOURS);
+  private static final TimeGranularity DEFAULT_VIEW_OFFSET_FOR_MINUTE = new TimeGranularity(60, TimeUnit.MINUTES);
   protected final Logger LOGGER = LoggerFactory.getLogger(getClass());
 
   protected AnomalyFunctionDTO spec;
@@ -101,5 +111,45 @@ public abstract class BaseAnomalyFunction implements AnomalyFunction {
    */
   public boolean useHistoryAnomaly() {
     return false;
+  }
+
+  @Override
+  public AnomalyOffset getAnomalyWindowOffset(DatasetConfigDTO datasetConfig) {
+    // based on data granularity, decide offset
+    AnomalyOffset anomalyWindowOffset = getDefaultOffsets(datasetConfig);
+    return anomalyWindowOffset;
+  }
+
+
+  @Override
+  public AnomalyOffset getViewWindowOffset(DatasetConfigDTO datasetConfig) {
+    // based on data granularity, decide offset
+    AnomalyOffset anomalyViewOffset = getDefaultOffsets(datasetConfig);
+    return anomalyViewOffset;
+  }
+
+  private AnomalyOffset getDefaultOffsets(DatasetConfigDTO datasetConfig) {
+    TimeUnit dataTimeUnit = datasetConfig.getTimeUnit();
+    Period preOffsetPeriod = null;
+    Period postOffsetPeriod = null;
+    switch (dataTimeUnit) {
+      case DAYS:
+        preOffsetPeriod = DEFAULT_VIEW_OFFSET_FOR_DAILY.toPeriod();
+        postOffsetPeriod = DEFAULT_VIEW_OFFSET_FOR_DAILY.toPeriod();
+        break;
+      case HOURS:
+        preOffsetPeriod = DEFAULT_VIEW_OFFSET_FOR_HOURLY.toPeriod();
+        postOffsetPeriod = DEFAULT_VIEW_OFFSET_FOR_HOURLY.toPeriod();
+        break;
+      case MINUTES:
+        preOffsetPeriod = DEFAULT_VIEW_OFFSET_FOR_MINUTE.toPeriod();
+        postOffsetPeriod = DEFAULT_VIEW_OFFSET_FOR_MINUTE.toPeriod();
+        break;
+      default:
+        preOffsetPeriod = new Period();
+        postOffsetPeriod = new Period();
+    }
+    AnomalyOffset anomalyOffset = new AnomalyOffset(preOffsetPeriod, postOffsetPeriod);
+    return anomalyOffset;
   }
 }
