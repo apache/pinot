@@ -639,9 +639,6 @@ public class AnomaliesResource {
    * Generates Anomaly Details for each merged anomaly
    * @param mergedAnomaly
    * @param datasetConfig
-   * @param timeSeriesDateFormatter
-   * @param startEndDateFormatterHours
-   * @param startEndDateFormatterDays
    * @param externalUrl
    * @return
    */
@@ -658,7 +655,7 @@ public class AnomaliesResource {
 
     long anomalyStartTime = mergedAnomaly.getStartTime();
     long anomalyEndTime = mergedAnomaly.getEndTime();
-    TimeRange range = getTimeseriesOffsetedTimes(anomalyStartTime, anomalyEndTime, datasetConfig);
+    TimeRange range = getTimeseriesTraingingOffsetedTimes(anomalyStartTime, anomalyEndTime, datasetConfig);
     long currentStartTime = range.getStart();
     long currentEndTime = range.getEnd();
 
@@ -689,6 +686,10 @@ public class AnomaliesResource {
           anomalyFunction.getTimeSeriesView(metricTimeSeries, bucketMillis, anomalyFunctionSpec.getTopicMetric(),
               currentStartTime, currentEndTime, knownAnomalies);
 
+      range = getTimeseriesViewingOffsetedTimes(anomalyStartTime, anomalyEndTime, datasetConfig);
+      currentStartTime = range.getStart();
+      currentEndTime = range.getEnd();
+
       anomalyDetails = constructAnomalyDetails(metricName, dataset, datasetConfig, mergedAnomaly, anomalyFunctionSpec,
           currentStartTime, currentEndTime, anomalyTimelinesView, externalUrl);
     } catch (Exception e) {
@@ -707,9 +708,7 @@ public class AnomaliesResource {
    * @param currentStartTime inclusive
    * @param currentEndTime inclusive
    * @param anomalyTimelinesView
-   * @param timeSeriesDateFormatter
-   * @param startEndDateFormatterHours
-   * @param startEndDateFormatterDays
+   * @param externalUrl
    * @return
    * @throws JSONException
    */
@@ -784,29 +783,34 @@ public class AnomaliesResource {
     return anomalyDetails;
   }
 
-
-  private TimeRange getTimeseriesOffsetedTimes(long anomalyStartTime, long anomalyEndTime, DatasetConfigDTO datasetConfig) {
+  private TimeRange getTimeSeriesOffsetedTimes(long anomalyStartTime, long anomalyEndTime, DatasetConfigDTO datasetConfig,
+      int preOffset, int postOffset) {
     TimeUnit dataTimeunit = datasetConfig.getTimeUnit();
-    Period offsetPeriod;
+    Period preOffsetPeriod; // The offset we view before the anomaly
+    Period postOffsetPeriod; // The offset we view after the anomaly
     switch (dataTimeunit) {
-      case DAYS: // 3 days
-        offsetPeriod = new Period(0, 0, 0, 3, 0, 0, 0, 0);
+      case DAYS:
+        preOffsetPeriod = new Period(0, 0, 0, preOffset, 0, 0, 0, 0);
+        postOffsetPeriod = new Period(0, 0, 0, postOffset, 0, 0, 0, 0);
         break;
-      case HOURS: // 10 hours
-        offsetPeriod = new Period(0, 0, 0, 0, 10, 0, 0, 0);
+      case HOURS:
+        preOffsetPeriod = new Period(0, 0, 0, 0, preOffset, 0, 0, 0);
+        postOffsetPeriod = new Period(0, 0, 0, 0, postOffset, 0, 0, 0);
         break;
-      case MINUTES: // 60 minutes
-        offsetPeriod = new Period(0, 0, 0, 0, 0, 60, 0, 0);
+      case MINUTES:
+        preOffsetPeriod = new Period(0, 0, 0, 0, 0, preOffset, 0, 0);
+        postOffsetPeriod = new Period(0, 0, 0, 0, 0, postOffset, 0, 0);
         break;
       default:
-        offsetPeriod = new Period();
+        preOffsetPeriod = new Period();
+        postOffsetPeriod = new Period();
     }
 
     DateTimeZone dateTimeZone = DateTimeZone.forID(datasetConfig.getTimezone());
     DateTime anomalyStartDateTime = new DateTime(anomalyStartTime, dateTimeZone);
     DateTime anomalyEndDateTime = new DateTime(anomalyEndTime, dateTimeZone);
-    anomalyStartDateTime = anomalyStartDateTime.minus(offsetPeriod);
-    anomalyEndDateTime = anomalyEndDateTime.plus(offsetPeriod);
+    anomalyStartDateTime = anomalyStartDateTime.minus(preOffsetPeriod);
+    anomalyEndDateTime = anomalyEndDateTime.plus(postOffsetPeriod);
     anomalyStartTime = anomalyStartDateTime.getMillis();
     anomalyEndTime = anomalyEndDateTime.getMillis();
     try {
@@ -819,6 +823,52 @@ public class AnomaliesResource {
     }
     TimeRange range = new TimeRange(anomalyStartTime, anomalyEndTime);
     return range;
+  }
+
+  // this function generate the time ragne for viewing purpose.
+  private TimeRange getTimeseriesViewingOffsetedTimes(long anomalyStartTime, long anomalyEndTime, DatasetConfigDTO datasetConfig) {
+    TimeUnit dataTimeunit = datasetConfig.getTimeUnit();
+    int preOffset = 0;
+    int postOffset = 0;
+    switch (dataTimeunit) {
+      case DAYS: // 30 days. User needs to see the trend 30 days ahead
+        preOffset = 30;
+        postOffset = 0;
+        break;
+      case HOURS: // 10 hours
+        preOffset = 10;
+        postOffset = 10;
+        break;
+      case MINUTES: // 60 minutes
+        preOffset = 60;
+        postOffset = 60;
+        break;
+      default:
+    }
+    return getTimeSeriesOffsetedTimes(anomalyStartTime, anomalyEndTime, datasetConfig, preOffset, postOffset);
+  }
+
+
+  private TimeRange getTimeseriesTraingingOffsetedTimes(long anomalyStartTime, long anomalyEndTime, DatasetConfigDTO datasetConfig) {
+    TimeUnit dataTimeunit = datasetConfig.getTimeUnit();
+    int preOffset = 0;
+    int postOffset = 0;
+    switch (dataTimeunit) {
+      case DAYS: // 0 days. No padding to the window for training
+        preOffset = 0;
+        postOffset = 0;
+        break;
+      case HOURS: // 10 hours
+        preOffset = 10;
+        postOffset = 10;
+        break;
+      case MINUTES: // 60 minutes
+        preOffset = 60;
+        postOffset = 60;
+        break;
+      default:
+    }
+    return getTimeSeriesOffsetedTimes(anomalyStartTime, anomalyEndTime, datasetConfig, preOffset, postOffset);
   }
 
 }
