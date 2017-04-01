@@ -828,7 +828,6 @@ public class QueryGenerator {
 
         String pql = String.format(" REGEXP_LIKE(%s, '%s')", columnName, pqlRegexBuilder.toString());
         String sql = String.format(" REGEXP_LIKE(%s, '%s', 'i')", columnName, sqlRegexBuilder.toString());
-        System.out.println("Value:" + value + " pql:" + pql + " sql:" + sql);
         return new StringQueryFragment(pql, sql);
       } else {
         String equalsPredicate = String.format("%s = %s", columnName, value);

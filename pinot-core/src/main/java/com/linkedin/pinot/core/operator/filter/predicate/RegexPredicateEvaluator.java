@@ -67,7 +67,7 @@ public class RegexPredicateEvaluator implements PredicateEvaluator {
     for (int i = 0; i < length; i++) {
       int dictId = dictionaryIds[i];
       String value = dictionary.getStringValue(dictId);
-      if (pattern.matcher(value).matches()) {
+      if (pattern.matcher(value).find()) {
         return true;
       }
     }

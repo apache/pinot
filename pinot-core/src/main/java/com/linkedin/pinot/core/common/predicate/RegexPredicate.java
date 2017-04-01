@@ -23,12 +23,12 @@ import com.linkedin.pinot.core.common.Predicate;
 
 
 public class RegexPredicate extends Predicate {
-  String regex;
+  String _regex;
   public RegexPredicate(String lhs, List<String> rhs) {
     super(lhs, Type.REGEX, rhs);
     //we should have atleast one regex, we will ignore the remaining part instead of throwing exception
     Preconditions.checkArgument(rhs.size() >= 1);
-    regex = rhs.get(0);
+    _regex = rhs.get(0);
   }
 
   @Override
@@ -37,7 +37,7 @@ public class RegexPredicate extends Predicate {
   }
   
   public String getRegex(){
-   return regex; 
+   return _regex; 
   }
 
 }

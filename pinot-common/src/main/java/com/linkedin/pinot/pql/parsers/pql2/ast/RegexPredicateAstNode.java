@@ -16,15 +16,14 @@
 package com.linkedin.pinot.pql.parsers.pql2.ast;
 
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
-import java.util.TreeSet;
+import java.util.Set;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.pql.parsers.Pql2CompilationException;
-import com.linkedin.pinot.pql.parsers.utils.PQLParserUtils;
 
 public class RegexPredicateAstNode extends PredicateAstNode {
   private String _identifier;
@@ -35,10 +34,10 @@ public class RegexPredicateAstNode extends PredicateAstNode {
   @Override
   public FilterQueryTree buildFilterQueryTree() {
     if (_identifier == null) {
-      throw new Pql2CompilationException("IN predicate has no identifier");
+      throw new Pql2CompilationException("REGEXP_LIKE predicate has no identifier");
     }
 
-    TreeSet<String> values = new TreeSet<>();
+    Set<String> values = new HashSet<>();
 
     for (AstNode astNode : getChildren()) {
       if (astNode instanceof LiteralAstNode) {
