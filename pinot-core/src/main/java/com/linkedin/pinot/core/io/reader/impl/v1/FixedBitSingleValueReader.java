@@ -54,6 +54,11 @@ public class FixedBitSingleValueReader extends BaseSingleColumnSingleValueReader
   }
 
   @Override
+  public int getInt(int row, ReaderContext context) {
+    return dataFileReader.getInt(row, 0);
+  }
+
+  @Override
   public void readValues(int[] rows, int rowStartPos, int rowSize, int[] values, int valuesStartPos) {
     dataFileReader.readValues(rows, 0, rowStartPos, rowSize, values, valuesStartPos);
   }
