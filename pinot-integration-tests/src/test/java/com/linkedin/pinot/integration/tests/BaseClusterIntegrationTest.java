@@ -899,8 +899,28 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     }
   }
 
-  public static Future<Map<File, File>> buildSegmentsFromAvro(final List<File> avroFiles, Executor executor, int baseSegmentIndex,
-      final File baseDirectory, final File segmentTarDir, final String tableName, final boolean createStarTreeIndex,
+  public static Future<Map<File, File>> buildSegmentsFromAvro(final List<File> avroFiles, Executor executor, int baseSegmentIndex, final File baseDirectory,
+      final File segmentTarDir, final String tableName, final boolean createStarTreeIndex, final com.linkedin.pinot.common.data.Schema inputPinotSchema) {
+    //columns with no-dictionary
+    List<String> rawIndexColumns = Collections.emptyList();
+    return buildSegmentsFromAvro(avroFiles, executor, baseSegmentIndex, baseDirectory, segmentTarDir, tableName, createStarTreeIndex, rawIndexColumns,
+        inputPinotSchema);
+  }
+  /**
+   * 
+   * @param avroFiles
+   * @param executor
+   * @param baseSegmentIndex
+   * @param baseDirectory
+   * @param segmentTarDir
+   * @param tableName
+   * @param createStarTreeIndex
+   * @param rawIndexColumns -- No dictionary columns
+   * @param inputPinotSchema
+   * @return
+   */
+  public static Future<Map<File, File>> buildSegmentsFromAvro(final List<File> avroFiles, Executor executor, int baseSegmentIndex, final File baseDirectory,
+      final File segmentTarDir, final String tableName, final boolean createStarTreeIndex, final List<String> rawIndexColumns,
       final com.linkedin.pinot.common.data.Schema inputPinotSchema) {
     int segmentCount = avroFiles.size();
     LOGGER.info("Building " + segmentCount + " segments in parallel");
@@ -925,12 +945,13 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
             if (inputPinotSchema != null) {
               genConfig.setSchema(inputPinotSchema);
             }
-
+            
             // jfim: We add a space and a special character to do a regression test for PINOT-3296 Segments with spaces
             // in their filename don't work properly
             genConfig.setSegmentNamePostfix(Integer.toString(segmentNumber) + " %");
             genConfig.setEnableStarTreeIndex(createStarTreeIndex);
-
+            genConfig.setRawIndexCreationColumns(rawIndexColumns);
+            
             // Enable off heap star tree format in the integration test.
             StarTreeIndexSpec starTreeIndexSpec = null;
             if (createStarTreeIndex) {
