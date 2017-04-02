@@ -262,7 +262,7 @@ class SegmentQueryProcessor {
         predicateFilter = new RangePredicateFilter(dictionaryReader, value);
         break;
 
-      case REGEX:
+      case REGEXP_LIKE:
       default:
         throw new UnsupportedOperationException("Unsupported filterType:" + filterType);
     }

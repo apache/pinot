@@ -21,6 +21,7 @@ import com.linkedin.pinot.core.common.predicate.InPredicate;
 import com.linkedin.pinot.core.common.predicate.NEqPredicate;
 import com.linkedin.pinot.core.common.predicate.NotInPredicate;
 import com.linkedin.pinot.core.common.predicate.RangePredicate;
+import com.linkedin.pinot.core.common.predicate.RegexpLikePredicate;
 import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionaryReader;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
@@ -46,8 +47,8 @@ public class PredicateEvaluatorProvider {
           return new RangeRealtimeDictionaryPredicateEvaluator((RangePredicate) predicate,
               (MutableDictionaryReader) dictionary);
         }
-      case REGEX:
-        throw new UnsupportedOperationException("regex is not supported");
+      case REGEXP_LIKE:
+        return new RegexPredicateEvaluator((RegexpLikePredicate) predicate, dictionary);
       default:
         throw new UnsupportedOperationException("UnKnown predicate type");
     }

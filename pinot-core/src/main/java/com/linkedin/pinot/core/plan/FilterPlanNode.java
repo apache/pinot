@@ -127,8 +127,8 @@ public class FilterPlanNode implements PlanNode {
       int startDocId = 0;
       int endDocId = segment.getSegmentMetadata().getTotalRawDocs() - 1; //end is inclusive
       if (dataSourceMetadata.hasInvertedIndex()) {
-        // range evaluation based on inv index is inefficient, so do this only if is NOT range.
-        if (!filterType.equals(FilterOperator.RANGE)) {
+        // range/REGEX evaluation based on inv index is inefficient, so do this only if is NOT range/regex.
+        if (!filterType.equals(FilterOperator.RANGE) && !filterType.equals(FilterOperator.REGEXP_LIKE)) {
           if (dataSourceMetadata.isSingleValue() && dataSourceMetadata.isSorted()) {
             // if the column is sorted use sorted inverted index based implementation
             baseFilterOperator = new SortedInvertedIndexBasedFilterOperator(predicate, ds, startDocId, endDocId);

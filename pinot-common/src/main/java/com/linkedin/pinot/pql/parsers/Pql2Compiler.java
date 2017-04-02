@@ -18,6 +18,7 @@ package com.linkedin.pinot.pql.parsers;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.transform.TransformExpressionTree;
 import com.linkedin.pinot.pql.parsers.pql2.ast.AstNode;
+
 import org.antlr.v4.runtime.ANTLRInputStream;
 import org.antlr.v4.runtime.BailErrorStrategy;
 import org.antlr.v4.runtime.CharStream;
@@ -27,6 +28,7 @@ import org.antlr.v4.runtime.TokenStream;
 import org.antlr.v4.runtime.UnbufferedTokenStream;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.ParseTreeWalker;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 
 
 /**
@@ -58,7 +60,7 @@ public class Pql2Compiler implements AbstractCompiler {
     } catch (Pql2CompilationException e) {
       throw e;
     } catch (Exception e) {
-      throw new Pql2CompilationException(e.getMessage());
+      throw new Pql2CompilationException(ExceptionUtils.getStackTrace(e));
     }
   }
 

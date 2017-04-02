@@ -25,7 +25,7 @@ import com.linkedin.pinot.core.common.predicate.InPredicate;
 import com.linkedin.pinot.core.common.predicate.NEqPredicate;
 import com.linkedin.pinot.core.common.predicate.NotInPredicate;
 import com.linkedin.pinot.core.common.predicate.RangePredicate;
-import com.linkedin.pinot.core.common.predicate.RegexPredicate;
+import com.linkedin.pinot.core.common.predicate.RegexpLikePredicate;
 
 
 public abstract class Predicate {
@@ -33,7 +33,7 @@ public abstract class Predicate {
   public enum Type {
     EQ,
     NEQ,
-    REGEX,
+    REGEXP_LIKE,
     RANGE,
     IN,
     NOT_IN
@@ -81,8 +81,8 @@ public abstract class Predicate {
     case RANGE:
       predicate = new RangePredicate(column, value);
       break;
-    case REGEX:
-      predicate = new RegexPredicate(column, value);
+    case REGEXP_LIKE:
+      predicate = new RegexpLikePredicate(column, value);
       break;
     case NOT:
       predicate = new NEqPredicate(column, value);
