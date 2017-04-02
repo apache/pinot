@@ -50,8 +50,8 @@ public class PredicateEvaluatorProvider {
           return RangePredicateEvaluatorFactory.newRealtimeDictionaryBasedEvaluator((RangePredicate) predicate,
               (MutableDictionaryReader) dictionary);
         }
-      case REGEX:
-        throw new UnsupportedOperationException("regex is not supported");
+      case REGEXP_LIKE:
+        return  RegexpLikePredicateEvaluatorFactory.newDictionaryBasedEvaluator((RegexpLikePredicate) predicate, dictionary);
       default:
         throw new UnsupportedOperationException("UnKnown predicate type");
       }
@@ -75,7 +75,7 @@ public class PredicateEvaluatorProvider {
           return RangePredicateEvaluatorFactory.newNoDictionaryBasedEvaluator((RangePredicate) predicate, dataType);
         }
       case REGEXP_LIKE:
-        return new RegexPredicateEvaluator((RegexpLikePredicate) predicate, dictionary);
+        return  RegexpLikePredicateEvaluatorFactory.newNoDictionaryBasedEvaluator((RegexpLikePredicate) predicate, dictionary);
       default:
         throw new UnsupportedOperationException("UnKnown predicate type");
       }

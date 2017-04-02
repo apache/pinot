@@ -124,7 +124,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     setupH2AndInsertAvro(avroFiles, executor);
 
     // Create segments from Avro data
-    buildSegmentsFromAvro(avroFiles, executor, 0, _segmentDir, _tarDir, "mytable", false, null);
+    buildSegmentsFromAvro(avroFiles, executor, 0, _segmentDir, _tarDir, "mytable", false, getRawIndexColumns(), null);
 
     // Initialize query generator
     setupQueryGenerator(avroFiles, executor);
@@ -158,6 +158,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
         Assert.fail("Segments were not completely loaded within two minutes");
       }
     }
+  }
+  /**
+   * @return columns that don't need dictionary
+   */
+  protected List<String> getRawIndexColumns() {
+    return Collections.emptyList();
   }
 
   @Test
