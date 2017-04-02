@@ -22,7 +22,7 @@ public enum FilterOperator implements org.apache.thrift.TEnum {
   EQUALITY(2),
   NOT(3),
   RANGE(4),
-  REGEX(5),
+  REGEXP_LIKE(5),
   NOT_IN(6),
   IN(7);
 
@@ -56,7 +56,7 @@ public enum FilterOperator implements org.apache.thrift.TEnum {
       case 4:
         return RANGE;
       case 5:
-        return REGEX;
+        return REGEXP_LIKE;
       case 6:
         return NOT_IN;
       case 7:

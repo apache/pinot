@@ -82,7 +82,7 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
         exclusion = true;
         dictionaryIds = predicateEvaluator.getNonMatchingDictionaryIds();
         break;
-      case REGEX:
+      case REGEXP_LIKE:
       default:
         throw new UnsupportedOperationException("Regex is not supported");
     }

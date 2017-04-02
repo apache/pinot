@@ -22,10 +22,10 @@ import com.google.common.base.Preconditions;
 import com.linkedin.pinot.core.common.Predicate;
 
 
-public class RegexPredicate extends Predicate {
+public class RegexpLikePredicate extends Predicate {
   String _regex;
-  public RegexPredicate(String lhs, List<String> rhs) {
-    super(lhs, Type.REGEX, rhs);
+  public RegexpLikePredicate(String lhs, List<String> rhs) {
+    super(lhs, Type.REGEXP_LIKE, rhs);
     //we should have atleast one regex, we will ignore the remaining part instead of throwing exception
     Preconditions.checkArgument(rhs.size() >= 1);
     _regex = rhs.get(0);

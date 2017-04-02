@@ -104,7 +104,7 @@ public class SortedInvertedIndexBasedFilterOperator extends BaseFilterOperator {
         additiveRanges = false;
         dictionaryIds = predicateEvaluator.getNonMatchingDictionaryIds();
         break;
-      case REGEX:
+      case REGEXP_LIKE:
         throw new RuntimeException("Regex is not supported");
       default:
         throw new RuntimeException("Unimplemented!");

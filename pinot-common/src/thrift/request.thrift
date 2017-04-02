@@ -25,7 +25,7 @@ enum FilterOperator {
   EQUALITY,
   NOT,
   RANGE,
-  REGEX,
+  REGEXP_LIKE,
   NOT_IN,
   IN
 }

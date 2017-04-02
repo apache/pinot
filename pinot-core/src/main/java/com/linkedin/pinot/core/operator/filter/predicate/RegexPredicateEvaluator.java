@@ -18,16 +18,16 @@ package com.linkedin.pinot.core.operator.filter.predicate;
 import java.util.regex.Pattern;
 
 import com.linkedin.pinot.core.common.predicate.EqPredicate;
-import com.linkedin.pinot.core.common.predicate.RegexPredicate;
+import com.linkedin.pinot.core.common.predicate.RegexpLikePredicate;
 import com.linkedin.pinot.core.segment.index.readers.Dictionary;
 
 public class RegexPredicateEvaluator implements PredicateEvaluator {
 
-  private RegexPredicate predicate;
+  private RegexpLikePredicate predicate;
   private Dictionary dictionary;
   private Pattern pattern;
 
-  public RegexPredicateEvaluator(RegexPredicate predicate, Dictionary dictionary) {
+  public RegexPredicateEvaluator(RegexpLikePredicate predicate, Dictionary dictionary) {
     this.predicate = predicate;
     this.dictionary = dictionary;
     int flags = Pattern.UNICODE_CASE | Pattern.CASE_INSENSITIVE;

@@ -25,11 +25,9 @@ import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.pql.parsers.Pql2CompilationException;
 
-public class RegexPredicateAstNode extends PredicateAstNode {
+public class RegexpLikePredicateAstNode extends PredicateAstNode {
+  private static final String SEPERATOR = "\t\t";
   private String _identifier;
-
-  public RegexPredicateAstNode() {
-  }
 
   @Override
   public FilterQueryTree buildFilterQueryTree() {
@@ -51,8 +49,8 @@ public class RegexPredicateAstNode extends PredicateAstNode {
     }
 
     String[] valueArray = values.toArray(new String[values.size()]);
-    FilterOperator filterOperator = FilterOperator.REGEX;
-    List<String> value = Collections.singletonList(StringUtil.join("\t\t", valueArray));
+    FilterOperator filterOperator = FilterOperator.REGEXP_LIKE;
+    List<String> value = Collections.singletonList(StringUtil.join(SEPERATOR, valueArray));
     return new FilterQueryTree(_identifier, value, filterOperator, null);
   }
 
@@ -63,7 +61,7 @@ public class RegexPredicateAstNode extends PredicateAstNode {
         IdentifierAstNode node = (IdentifierAstNode) childNode;
         _identifier = node.getName();
       } else {
-        throw new Pql2CompilationException("REGEX predicate has more than one identifier.");
+        throw new Pql2CompilationException("REGEXP_LIKE predicate has more than one identifier.");
       }
     } else {
       super.addChild(childNode);
