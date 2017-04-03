@@ -128,7 +128,7 @@ public class FilterPlanNode implements PlanNode {
       int endDocId = segment.getSegmentMetadata().getTotalRawDocs() - 1; //end is inclusive
       //use inverted index only if the column has dictionary.
       if (dataSourceMetadata.hasInvertedIndex() && dataSourceMetadata.hasDictionary()) {
-        // range evaluation based on inv index is inefficient, so do this only if is NOT range.
+        // RANGE/REGEXP_LIKE evaluation based on inv index is inefficient, so do this only if is NOT range.
         if (!filterType.equals(FilterOperator.RANGE) && !filterType.equals(FilterOperator.REGEXP_LIKE)) {
           if (dataSourceMetadata.isSingleValue() && dataSourceMetadata.isSorted()) {
             // if the column is sorted use sorted inverted index based implementation

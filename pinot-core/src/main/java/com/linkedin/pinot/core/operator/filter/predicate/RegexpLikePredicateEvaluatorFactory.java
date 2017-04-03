@@ -30,8 +30,8 @@ public class RegexpLikePredicateEvaluatorFactory {
     return new DictionaryBasedRegexPredicateEvaluator(predicate, dictionary);
   }
 
-  public static PredicateEvaluator newNoDictionaryBasedEvaluator(RegexpLikePredicate predicate, Dictionary dictionary) {
-    return new NoDictionaryBasedRegexPredicateEvaluator(predicate, dictionary);
+  public static PredicateEvaluator newNoDictionaryBasedEvaluator(RegexpLikePredicate predicate) {
+    return new NoDictionaryBasedRegexPredicateEvaluator(predicate);
   }
 
   private static class DictionaryBasedRegexPredicateEvaluator extends BasePredicateEvaluator {
@@ -85,7 +85,7 @@ public class RegexpLikePredicateEvaluatorFactory {
 
     private Pattern pattern;
 
-    public NoDictionaryBasedRegexPredicateEvaluator(RegexpLikePredicate predicate, Dictionary dictionary) {
+    public NoDictionaryBasedRegexPredicateEvaluator(RegexpLikePredicate predicate) {
       int flags = Pattern.UNICODE_CASE | Pattern.CASE_INSENSITIVE;
       pattern = Pattern.compile(predicate.getRegex(), flags);
     }

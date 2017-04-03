@@ -73,7 +73,7 @@ public class EqualsPredicateEvaluatorFactory {
    *
    * No dictionary equality evaluator for int data type.
    */
-  public static final class IntNoDictionaryBasedEqualsEvaluator extends BasePredicateEvaluator {
+  private static final class IntNoDictionaryBasedEqualsEvaluator extends BasePredicateEvaluator {
     int _expectedValue;
 
     public IntNoDictionaryBasedEqualsEvaluator(EqPredicate predicate) {
@@ -108,7 +108,7 @@ public class EqualsPredicateEvaluatorFactory {
    *
    * No dictionary equality evaluator for long data type.
    */
-  public static final class LongNoDictionaryBasedEqualsEvaluator extends BasePredicateEvaluator {
+  private static final class LongNoDictionaryBasedEqualsEvaluator extends BasePredicateEvaluator {
     long _expectedValue;
 
     public LongNoDictionaryBasedEqualsEvaluator(EqPredicate predicate) {
@@ -143,7 +143,7 @@ public class EqualsPredicateEvaluatorFactory {
    *
    * No dictionary equality evaluator for float data type.
    */
-  public static final class FloatNoDictionaryBasedEqualsEvaluator extends BasePredicateEvaluator {
+  private static final class FloatNoDictionaryBasedEqualsEvaluator extends BasePredicateEvaluator {
     float _expectedValue;
 
     public FloatNoDictionaryBasedEqualsEvaluator(EqPredicate predicate) {
@@ -178,7 +178,7 @@ public class EqualsPredicateEvaluatorFactory {
    *
    * No dictionary equality evaluator for double data type.
    */
-  public static final class DoubleNoDictionaryBasedEqualsEvaluator extends BasePredicateEvaluator {
+  private static final class DoubleNoDictionaryBasedEqualsEvaluator extends BasePredicateEvaluator {
     double _expectedValue;
 
     public DoubleNoDictionaryBasedEqualsEvaluator(EqPredicate predicate) {
@@ -213,7 +213,7 @@ public class EqualsPredicateEvaluatorFactory {
    *
    * No dictionary equality evaluator for string data type.
    */
-  public static final class StringNoDictionaryBasedEqualsEvaluator extends BasePredicateEvaluator {
+  private static final class StringNoDictionaryBasedEqualsEvaluator extends BasePredicateEvaluator {
     String _expectedValue;
 
     public StringNoDictionaryBasedEqualsEvaluator(EqPredicate predicate) {
@@ -249,7 +249,7 @@ public class EqualsPredicateEvaluatorFactory {
    * Dictionary Based Equals predicate Evaluator
    *
    */
-  public static final class DictionaryBasedEqualsPredicateEvaluator extends BasePredicateEvaluator {
+  private static final class DictionaryBasedEqualsPredicateEvaluator extends BasePredicateEvaluator {
     private int[] _matchingIds;
     private int _equalsMatchDictId;
     private EqPredicate _predicate;

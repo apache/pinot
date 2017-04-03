@@ -84,7 +84,7 @@ public class InPredicateEvaluatorFactory extends BasePredicateEvaluator {
   /**
    * Dictionary based implementation for IN predicate evaluator.
    */
-  public static final class DictionaryBasedInPredicateEvaluator extends BasePredicateEvaluator {
+  private static final class DictionaryBasedInPredicateEvaluator extends BasePredicateEvaluator {
     private int[] _matchingIds;
     private IntSet _dictIdSet;
     private InPredicate _predicate;
