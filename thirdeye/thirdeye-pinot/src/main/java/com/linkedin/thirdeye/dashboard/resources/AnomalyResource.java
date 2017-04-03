@@ -456,7 +456,7 @@ public class AnomalyResource {
       throw new IllegalArgumentException("id is a required query param");
     }
 
-    // call endpoint to stop if active
+    // call endpoint to shutdown if active
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
     if (anomalyFunctionSpec == null) {
       throw new IllegalStateException("No anomalyFunctionSpec with id " + id);

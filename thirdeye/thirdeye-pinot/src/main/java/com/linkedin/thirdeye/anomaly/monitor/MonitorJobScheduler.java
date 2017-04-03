@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomaly.monitor;
 
+import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -44,8 +45,8 @@ public class MonitorJobScheduler {
           monitorConfiguration.getMonitorFrequency().getUnit());
   }
 
-  public void stop() {
+  public void shutdown() {
     LOG.info("Stopping monitor service");
-    scheduledExecutorService.shutdown();
+    AnomalyUtils.safelyShutdownExecutionService(scheduledExecutorService, this.getClass());
   }
 }

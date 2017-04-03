@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.anomaly;
 
 import com.linkedin.thirdeye.anomaly.monitor.MonitorConfiguration;
+import com.linkedin.thirdeye.anomaly.task.TaskDriverConfiguration;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 
 public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
@@ -11,11 +12,13 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
   private boolean merger = false;
   private boolean autoload = false;
   private boolean dataCompleteness = false;
+  private boolean grouper = false;
 
   private long id;
   private String dashboardHost;
   private SmtpConfiguration smtpConfiguration;
   private MonitorConfiguration monitorConfiguration = new MonitorConfiguration();
+  private TaskDriverConfiguration taskDriverConfiguration = new TaskDriverConfiguration();
   private String failureFromAddress;
   private String failureToAddress;
 
@@ -67,6 +70,14 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
     this.monitorConfiguration = monitorConfiguration;
   }
 
+  public TaskDriverConfiguration getTaskDriverConfiguration() {
+    return taskDriverConfiguration;
+  }
+
+  public void setTaskDriverConfiguration(TaskDriverConfiguration taskDriverConfiguration) {
+    this.taskDriverConfiguration = taskDriverConfiguration;
+  }
+
   public boolean isAlert() {
     return alert;
   }
@@ -101,6 +112,14 @@ public class ThirdEyeAnomalyConfiguration extends ThirdEyeConfiguration {
 
   public void setDataCompleteness(boolean dataCompleteness) {
     this.dataCompleteness = dataCompleteness;
+  }
+
+  public boolean isGrouper() {
+    return grouper;
+  }
+
+  public void setGrouper(boolean grouper) {
+    this.grouper = grouper;
   }
 
   public void setSmtpConfiguration(SmtpConfiguration smtpConfiguration) {

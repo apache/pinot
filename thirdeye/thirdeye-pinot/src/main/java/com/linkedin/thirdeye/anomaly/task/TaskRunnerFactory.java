@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.anomaly.task;
 import com.linkedin.thirdeye.anomaly.alert.AlertTaskRunner;
 import com.linkedin.thirdeye.anomaly.alert.v2.AlertTaskRunnerV2;
 import com.linkedin.thirdeye.anomaly.detection.DetectionTaskRunner;
+import com.linkedin.thirdeye.anomaly.grouping.GroupingTaskRunner;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorTaskRunner;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskType;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessTaskRunner;
@@ -31,9 +32,11 @@ public class TaskRunnerFactory {
       break;
     case ALERT2:
       taskRunner = new AlertTaskRunnerV2();
-    default:
       break;
-
+    case GROUPING:
+      taskRunner = new GroupingTaskRunner();
+      break;
+    default:
     }
     return taskRunner;
   }

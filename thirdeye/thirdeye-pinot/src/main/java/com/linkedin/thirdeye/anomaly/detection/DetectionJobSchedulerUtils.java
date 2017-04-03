@@ -28,7 +28,6 @@ public class DetectionJobSchedulerUtils {
   /**
    * Get date time formatter according to granularity of dataset
    * This is to store the date in the db, in the correct SDF
-   * @param timeSpec
    * @return
    */
   public static DateTimeFormatter getDateTimeFormatterForDataset(
@@ -60,9 +59,6 @@ public class DetectionJobSchedulerUtils {
    * any dataset with granularity finer than HOUR, will be rounded as per function frequency (assumption is that this is in MINUTES)
    * so 12.53 on 5 MINUTES dataset, with function frequency 15 MINUTES will be rounded to 12.45
    * @param anomalyFunction
-   * @param timeSpec
-   * @param dataCompletenessStartTime
-   * @param dateTimeZone
    * @return
    */
   public static long getBoundaryAlignedTimeForDataset(DatasetConfigDTO datasetConfig, DateTime dateTime,
@@ -105,7 +101,6 @@ public class DetectionJobSchedulerUtils {
    * get bucket size in millis, according to data granularity of dataset
    * Bucket size are 1 HOUR for hourly, 1 DAY for daily
    * For MINUTE level data, bucket size is calculated based on anomaly function frequency
-   * @param timeSpec
    * @return
    */
   public static Period getBucketSizePeriodForDataset(DatasetConfigDTO datasetConfig, AnomalyFunctionDTO anomalyFunction) {

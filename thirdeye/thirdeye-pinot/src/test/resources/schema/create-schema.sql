@@ -42,9 +42,18 @@ create table if not exists email_configuration_index (
     version int(10)
 ) ENGINE=InnoDB;
 
+-- ALTER TABLE thirdeye.job_index ADD type VARCHAR(100) DEFAULT "NULL" NOT NULL;
+-- ALTER TABLE thirdeye.job_index ADD anomaly_function_id BIGINT(20) DEFAULT 0 NULL;
+-- ALTER TABLE thirdeye.job_index
+--   MODIFY COLUMN type VARCHAR(100) NOT NULL DEFAULT "NULL" AFTER status,
+--   MODIFY COLUMN anomaly_function_id BIGINT(20) DEFAULT 0 AFTER type;
+-- CREATE INDEX job_anomaly_function_id_idx ON thirdeye.job_index (anomaly_function_id);
+-- CREATE INDEX job_type_idx ON thirdeye.job_index (type);
 create table if not exists job_index (
     name varchar(200) not null,
     status varchar(100) not null,
+    type varchar(100) not null,
+    anomaly_function_id bigint(20),
     schedule_start_time bigint(20) not null,
     schedule_end_time bigint(20) not null,
     base_id bigint(20) not null,
@@ -53,6 +62,8 @@ create table if not exists job_index (
     version int(10)
 ) ENGINE=InnoDB;
 create index job_status_idx on job_index(status);
+create index job_type_idx on job_index(type);
+create index job_anomaly_function_id_idx on job_index(anomaly_function_id);
 
 create table if not exists task_index (
     name varchar(200) not null,

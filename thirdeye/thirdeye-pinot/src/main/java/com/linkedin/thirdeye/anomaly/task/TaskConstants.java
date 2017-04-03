@@ -9,8 +9,9 @@ public class TaskConstants {
     // todo : mark ALERT deprecated
     ALERT,
     ALERT2,
-    MONITOR, 
-    DATA_COMPLETENESS
+    MONITOR,
+    DATA_COMPLETENESS,
+    GROUPING
   }
 
   public enum TaskStatus {

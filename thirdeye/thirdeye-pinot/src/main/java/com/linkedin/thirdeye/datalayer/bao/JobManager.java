@@ -19,7 +19,9 @@ public interface JobManager extends AbstractManager<JobDTO>{
 
   String getJobNameByJobId(long id);
 
-  JobDTO findLatestScheduledJobByName(String jobName);
-
   JobDTO findLatestBackfillScheduledJobByFunctionId(long functionId, long backfillWindowStart, long backfillWindowEnd);
+
+  JobDTO findLatestCompletedDetectionJobByFunctionId(long functionId);
+
+  JobDTO findLatestCompletedGroupingJobById(long functionId);
 }

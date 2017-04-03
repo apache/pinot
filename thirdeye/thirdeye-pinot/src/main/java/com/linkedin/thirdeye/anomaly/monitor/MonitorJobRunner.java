@@ -62,6 +62,7 @@ public class MonitorJobRunner implements JobRunner {
       jobSpec.setJobName(monitorJobContext.getJobName());
       jobSpec.setScheduleStartTime(System.currentTimeMillis());
       jobSpec.setStatus(JobStatus.SCHEDULED);
+      jobSpec.setTaskType(TaskType.MONITOR);
       jobExecutionId = jobDAO.save(jobSpec);
       LOG.info("Created JobSpec {} with jobExecutionId {}", jobSpec,
           jobExecutionId);

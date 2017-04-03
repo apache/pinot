@@ -35,6 +35,7 @@ public class DetectionJobRunner {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private TaskGenerator taskGenerator;
+  long functionId;
 
   public DetectionJobRunner() {
     taskGenerator = new TaskGenerator();
@@ -48,7 +49,7 @@ public class DetectionJobRunner {
    */
   public Long run(DetectionJobContext detectionJobContext) {
 
-    long functionId = detectionJobContext.getAnomalyFunctionId();
+    functionId = detectionJobContext.getAnomalyFunctionId();
     AnomalyFunctionDTO anomalyFunction = DAO_REGISTRY.getAnomalyFunctionDAO().findById(functionId);
 
     List<DateTime> monitoringWindowStartTimes = new ArrayList<>();
@@ -111,6 +112,8 @@ public class DetectionJobRunner {
       jobSpec.setWindowEndTime(monitoringWindowEndTime.getMillis());
       jobSpec.setScheduleStartTime(System.currentTimeMillis());
       jobSpec.setStatus(JobStatus.SCHEDULED);
+      jobSpec.setTaskType(TaskType.ANOMALY_DETECTION);
+      jobSpec.setAnomalyFunctionId(functionId);
       jobExecutionId = DAO_REGISTRY.getJobDAO().save(jobSpec);
 
       LOG.info("Created anomalyJobSpec {} with jobExecutionId {}", jobSpec, jobExecutionId);

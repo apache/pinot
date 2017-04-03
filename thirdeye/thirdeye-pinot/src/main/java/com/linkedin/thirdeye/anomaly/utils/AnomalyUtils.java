@@ -1,10 +1,11 @@
 package com.linkedin.thirdeye.anomaly.utils;
 
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
-import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.collections.CollectionUtils;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
@@ -65,5 +66,28 @@ public class AnomalyUtils {
       }
     }
     return false;
+  }
+
+  /**
+   * Safely and quitely shutdown executor service.
+   *
+   * @param executorService the executor service to be shutdown.
+   * @param ownerClass the class that owns the executor service.
+   */
+  public static void safelyShutdownExecutionService(ExecutorService executorService, Class ownerClass) {
+    executorService.shutdown(); // Prevent new tasks from being submitted
+    try {
+      // Wait a while for existing tasks to terminate
+      if (!executorService.awaitTermination(30, TimeUnit.SECONDS)) {
+        executorService.shutdownNow(); // Force terminate all currently executing tasks
+        // Wait for tasks to be cancelled
+        if (!executorService.awaitTermination(30, TimeUnit.SECONDS)) {
+          LOG.error("Failed to terminate thread pool for class {}", ownerClass.getSimpleName());
+        }
+      }
+    } catch (InterruptedException e) { // If current thread is interrupted
+      executorService.shutdownNow(); // Interrupt all currently executing tasks for the last time
+      Thread.currentThread().interrupt();
+    }
   }
 }

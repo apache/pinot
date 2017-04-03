@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomaly.task;
 
+import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -24,6 +25,8 @@ import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 public class TaskDriver {
 
   private static final Logger LOG = LoggerFactory.getLogger(TaskDriver.class);
+  private static final Random RANDOM = new Random();
+  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   private ExecutorService taskExecutorService;
 
@@ -31,20 +34,16 @@ public class TaskDriver {
   private TaskContext taskContext;
   private long workerId;
   private final Set<TaskStatus> allowedOldTaskStatus = new HashSet<>();
+  private TaskDriverConfiguration driverConfiguration;
 
   private volatile boolean shutdown = false;
-  private static final int MAX_PARALLEL_TASK = 5;
-  private static final int NO_TASK_IDLE_DELAY_MILLIS = 15_000; // 15 seconds
-  private static final int TASK_FAILURE_DELAY_MILLIS = 2 * 60_000; // 2 minutes
-  private static final int TASK_FETCH_SIZE = 50;
-  private static final Random RANDOM = new Random();
-  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   public TaskDriver(ThirdEyeAnomalyConfiguration thirdEyeAnomalyConfiguration,
       AnomalyFunctionFactory anomalyFunctionFactory, AlertFilterFactory alertFilterFactory) {
-    this.workerId = thirdEyeAnomalyConfiguration.getId();
-    this.anomalyTaskDAO = DAO_REGISTRY.getTaskDAO();
-    taskExecutorService = Executors.newFixedThreadPool(MAX_PARALLEL_TASK);
+    driverConfiguration = thirdEyeAnomalyConfiguration.getTaskDriverConfiguration();
+    workerId = thirdEyeAnomalyConfiguration.getId();
+    anomalyTaskDAO = DAO_REGISTRY.getTaskDAO();
+    taskExecutorService = Executors.newFixedThreadPool(driverConfiguration.getMaxParallelTasks());
     taskContext = new TaskContext();
     taskContext.setAnomalyFunctionFactory(anomalyFunctionFactory);
     taskContext.setThirdEyeAnomalyConfiguration(thirdEyeAnomalyConfiguration);
@@ -54,7 +53,7 @@ public class TaskDriver {
   }
 
   public void start() throws Exception {
-    for (int i = 0; i < MAX_PARALLEL_TASK; i++) {
+    for (int i = 0; i < driverConfiguration.getMaxParallelTasks(); i++) {
       Callable callable = new Callable() {
         @Override public Object call() throws Exception {
           while (!shutdown) {
@@ -63,6 +62,8 @@ public class TaskDriver {
 
             // select a task to execute, and update it to RUNNING
             TaskDTO anomalyTaskSpec = TaskDriver.this.acquireTask();
+
+            if (shutdown || anomalyTaskSpec == null) continue;
 
             try {
               LOG.info(Thread.currentThread().getId() + " : Executing task: {} {}", anomalyTaskSpec.getId(),
@@ -97,8 +98,9 @@ public class TaskDriver {
     }
   }
 
-  public void stop() {
-    taskExecutorService.shutdown();
+  public void shutdown() {
+    shutdown = true;
+    AnomalyUtils.safelyShutdownExecutionService(taskExecutorService, this.getClass());
   }
 
   private TaskDTO acquireTask() {
@@ -111,14 +113,16 @@ public class TaskDriver {
       try {
         boolean orderAscending = System.currentTimeMillis() % 2 == 0;
         anomalyTasks = anomalyTaskDAO
-            .findByStatusOrderByCreateTime(TaskStatus.WAITING, TASK_FETCH_SIZE, orderAscending);
+            .findByStatusOrderByCreateTime(TaskStatus.WAITING, driverConfiguration.getTaskFetchSizeCap(),
+                orderAscending);
       } catch (Exception e) {
         LOG.error("Exception found in fetching new tasks, sleeping for few seconds", e);
         try {
           // TODO : Add better wait / clear call
-          Thread.sleep(TASK_FAILURE_DELAY_MILLIS);
-        } catch (Exception e1) {
+          Thread.sleep(driverConfiguration.getTaskFailureDelayInMillis());
+        } catch (InterruptedException e1) {
           LOG.error(e1.getMessage(), e1);
+          return acquiredTask;
         }
       }
       if (anomalyTasks.size() > 0) {
@@ -128,12 +132,14 @@ public class TaskDriver {
         // sleep for few seconds if not tasks found - avoid cpu thrashing
         // also add some extra random number of milli seconds to allow threads to start at different times
         // TODO : Add better wait / clear call
-        int delay = NO_TASK_IDLE_DELAY_MILLIS + RANDOM.nextInt(NO_TASK_IDLE_DELAY_MILLIS);
+        int delay = driverConfiguration.getNoTaskDelayInMillis() + RANDOM
+            .nextInt(driverConfiguration.getRandomDelayCapInMillis());
         LOG.debug("No tasks found to execute, sleeping for {} MS", delay);
         try {
           Thread.sleep(delay);
-        } catch (Exception e1) {
-          LOG.error(e1.getMessage(), e1);
+        } catch (InterruptedException e) {
+          LOG.error(e.getMessage(), e);
+          return acquiredTask;
         }
       }
 
