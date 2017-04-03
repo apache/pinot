@@ -283,6 +283,52 @@ public class DetectionJobScheduler implements Runnable {
     return jobExecutionId;
   }
 
+  /**
+   * Run offline analysis for given functionId. The offline analysis detects outliers in it training data and save as
+   * anomaly results in the db
+   * @param functionId
+   *      The id of the anomaly function to be analyzed
+   * @param analysisTime
+   *      The DateTime of a given data point, whose traing data will be examined by the function
+   * @return
+   *      the job id who runs the offline analysis
+   */
+  public Long runOfflineAnalysis(long functionId, DateTime analysisTime) {
+    AnomalyFunctionDTO anomalyFunction = DAO_REGISTRY.getAnomalyFunctionDAO().findById(functionId);
+    Long jobId = null;
+
+    boolean isActive = anomalyFunction.getIsActive();
+    if (!isActive) {
+      LOG.info("Skipping function {}", functionId);
+      return null;
+    }
+
+    String dataset = anomalyFunction.getCollection();
+
+    BackfillKey backfillKey = new BackfillKey(functionId, analysisTime, analysisTime);
+    Thread returnedThread = existingBackfillJobs.putIfAbsent(backfillKey, Thread.currentThread());
+    // If returned thread is not current thread, then a backfill job is already running
+    if (returnedThread != null) {
+      LOG.info("Function: {} Dataset: {} Aborting... An existing back-fill job is running...", functionId, dataset);
+      return null;
+    }
+
+    if (Thread.currentThread().isInterrupted()) {
+      LOG.info("Function: {} Dataset: {} Terminating adhoc function.", functionId, dataset);
+      return null;
+    }
+
+    // If any time periods found, for which detection needs to be run, run anomaly function update detection status
+    List<Long> analysisTimeList = new ArrayList<>();
+    analysisTimeList.add(analysisTime.getMillis());
+    List<DetectionStatusDTO> findAllInTimeRange = new ArrayList<>();
+    jobId = runAnomalyFunctionAndUpdateDetectionStatus(analysisTimeList, analysisTimeList,
+        anomalyFunction, findAllInTimeRange);
+    LOG.info("Function: {} Dataset: {} Generated offline analysis job for detecting anomalies for data points "
+        + "whose ends before {}", functionId, dataset, analysisTime);
+
+    return jobId;
+  }
 
   /**
    * Sequentially performs anomaly detection for all the monitoring windows that are located between backfillStartTime

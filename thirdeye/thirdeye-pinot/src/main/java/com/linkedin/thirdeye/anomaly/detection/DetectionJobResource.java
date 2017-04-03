@@ -224,16 +224,15 @@ public class DetectionJobResource {
    */
   @POST
   @Path("/{id}/generateAnomaliesInRange")
-  public Response generateAnomaliesInRange(@PathParam("id") String id,
-      @QueryParam("start") String startTimeIso,
-      @QueryParam("end") String endTimeIso,
+  public Response generateAnomaliesInRange(@PathParam("id") @NotNull String id,
+      @QueryParam("start") @NotNull String startTimeIso,
+      @QueryParam("end") @NotNull String endTimeIso,
       @QueryParam("force") @DefaultValue("false") String isForceBackfill) throws Exception {
     final long functionId = Long.valueOf(id);
     final boolean forceBackfill = Boolean.valueOf(isForceBackfill);
     AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
     if (anomalyFunction == null) {
       return Response.noContent().build();
-
     }
 
     // Check if the timestamps are available
@@ -283,6 +282,34 @@ public class DetectionJobResource {
     String response = null;
 
     detectionJobScheduler.runBackfill(functionId, startTime, endTime, forceBackfill);
+
+    return Response.ok().build();
+  }
+
+  @POST
+  @Path("/{id}/offline_analysis")
+  public Response getOutliersInTrainingData(@PathParam("id") @NotNull long id,
+      @QueryParam("time") String analysisTimeIso) throws Exception {
+
+    AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(id);
+    if (anomalyFunction == null) {
+      return Response.noContent().build();
+    }
+
+    DateTime analysisTime = DateTime.now();
+    if (analysisTimeIso != null && !analysisTimeIso.isEmpty()) {
+      analysisTime = ISODateTimeFormat.dateTimeParser().parseDateTime(analysisTimeIso);
+    }
+
+    final long functionId = id;
+    final DateTime innerTime = analysisTime;
+
+    new Thread(new Runnable() {
+      @Override
+      public void run() {
+        detectionJobScheduler.runOfflineAnalysis(functionId, innerTime);
+      }
+    }).start();
 
     return Response.ok().build();
   }
