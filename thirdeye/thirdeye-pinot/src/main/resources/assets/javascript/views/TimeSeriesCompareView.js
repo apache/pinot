@@ -189,7 +189,7 @@ TimeSeriesCompareView.prototype = {
     var baselineStart = self.timeSeriesCompareModel.subDimensionContributionDetails.timeBucketsBaseline[bucketIndex];
 
     var delta = 5 * 60 * 60 * 1000; // 1 hour
-    if (this.timeSeriesCompareModel.granularity == 'DAYS') {
+    if (this.timeSeriesCompareModel.granularity === 'DAYS') {
       delta = 86400 * 1000;
     }
     if (self.timeSeriesCompareModel.subDimensionContributionDetails.timeBucketsCurrent.length > 1) {

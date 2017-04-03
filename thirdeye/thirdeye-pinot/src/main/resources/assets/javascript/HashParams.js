@@ -23,6 +23,7 @@ function HashParams() {
   this.ANALYSIS_FILTERS = 'filters';
   this.ANALYSIS_GRANULARITY = 'granularity';
   this.ANALYSIS_DIMENSION = 'dimension';
+  this.ANALYSIS_COMPARE_MODE = 'compareMode';
 
   this.HEATMAP_CURRENT_START = 'heatMapCurrentStart';
   this.HEATMAP_CURRENT_END = 'heatMapCurrentEnd';
@@ -110,6 +111,7 @@ HashParams.prototype = {
       paramNamesToDefaultValuesMap[this.ANALYSIS_FILTERS] = null;
       paramNamesToDefaultValuesMap[this.ANALYSIS_GRANULARITY] = constants.DEFAULT_ANALYSIS_GRANULARITY;
       paramNamesToDefaultValuesMap[this.ANALYSIS_DIMENSION] = constants.DEFAULT_ANALYSIS_DIMENSION;
+      paramNamesToDefaultValuesMap[this.ANALYSIS_COMPARE_MODE] = constants.DEFAULT_COMPARE_MODE;
 
       paramNamesToDefaultValuesMap[this.HEATMAP_CURRENT_START] = null;
       paramNamesToDefaultValuesMap[this.HEATMAP_CURRENT_END] = null;

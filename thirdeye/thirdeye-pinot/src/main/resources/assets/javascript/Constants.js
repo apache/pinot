@@ -53,6 +53,14 @@ function Constants() {
   this.FEEDBACK_TYPE_NOT_ANOMALY = 'NOT_ANOMALY';
   this.FEEDBACK_TYPE_ANOMALY_NO_ACTION = 'ANOMALY_NO_ACTION';
 
+  this.DEFAULT_COMPARE_MODE = 'wow';
+  this.WOW_MAPPING = {
+    WoW: 7,
+    Wo2W: 14,
+    Wo3W: 21,
+    Wo4W: 28
+  };
+
 }
 
 Constants.prototype = {

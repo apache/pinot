@@ -50,22 +50,16 @@ InvestigateView.prototype = {
     const filters = {}
     const start = moment(anomalyStart); //.tz(constants.TIME_ZONE);
     const end = moment(anomalyEnd); //.tz(constants.TIME_ZONE);
-    const wowMapping = {
-      WoW: 7,
-      Wo2W: 14,
-      Wo3W: 21,
-      Wo4W: 28
-    };
 
     return wowResults
       .filter(wow => wow.compareMode !== 'Wo4W')
       .map((wow) => {
-        const offset = wowMapping[wow.compareMode];
+        const offset = constants.WOW_MAPPING[wow.compareMode];
         const baselineStart = start.clone().subtract(offset, 'days');
         const baselineEnd = end.clone().subtract(offset, 'days');
         wow.change *= 100;
         // wow.url = `dashboard#view=compare&dataset=${dataset}&compareMode=WoW&aggTimeGranularity=aggregateAll&currentStart=${start.valueOf()}&currentEnd=${end.valueOf()}&baselineStart=${baselineStart.valueOf()}&baselineEnd=${baselineEnd.valueOf()}&metrics=${metric}`;
-        wow.url = `thirdeye#analysis?currentStart=${start.valueOf()}&currentEnd=${end.valueOf()}&baselineStart=${baselineStart.valueOf()}&baselineEnd=${baselineEnd.valueOf()}&metricId=${metricId}&filters={}&granularity=${timeUnit}&dimension=All`;
+        wow.url = `thirdeye#analysis?currentStart=${start.valueOf()}&currentEnd=${end.valueOf()}&baselineStart=${baselineStart.valueOf()}&baselineEnd=${baselineEnd.valueOf()}&compareMode=${wow.compareMode}&metricId=${metricId}&filters={}&granularity=${timeUnit}&dimension=All`;
         return wow;
       });
   },
@@ -101,12 +95,7 @@ InvestigateView.prototype = {
     const anomaly = this.investigateModel.getAnomaly();
     $('.thirdeye-link').click((e) => {
       const wowType = e.target.id;
-      const wowMapping = {
-        wow1: 7,
-        wow2: 14,
-        wow3: 21
-      };
-      const offset = wowMapping[wowType] || 7;
+      const offset = constants.WOW_MAPPING[wowType] || 7;
       const currentStart = moment(anomaly.currentStart);
       const currentEnd = moment(anomaly.currentEnd);
       const granularity = this.getGranularity(currentStart, currentEnd);

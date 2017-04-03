@@ -38,18 +38,19 @@ DimensionTreeMapView.prototype = {
 
 
     this.renderDatePicker('#heatmap-current-range', current_range_cb, self.dimensionTreeMapModel.currentStart, self.dimensionTreeMapModel.currentEnd, showTime);
-    this.renderDatePicker('#heatmap-baseline-range', baseline_range_cb, self.dimensionTreeMapModel.baselineStart, self.dimensionTreeMapModel.baselineEnd, showTime);
+    this.renderDatePicker('#heatmap-baseline-range', baseline_range_cb, self.dimensionTreeMapModel.baselineStart, self.dimensionTreeMapModel.baselineEnd, showTime, 'left');
     current_range_cb(self.dimensionTreeMapModel.currentStart, self.dimensionTreeMapModel.currentEnd);
     baseline_range_cb(self.dimensionTreeMapModel.baselineStart, self.dimensionTreeMapModel.baselineEnd);
   },
 
-  renderDatePicker: function (domId, callbackFun, initialStart, initialEnd, showTime){
+  renderDatePicker: function (domId, callbackFun, initialStart, initialEnd, showTime, opens = 'right'){
     $(domId).daterangepicker({
       startDate: initialStart,
       endDate: initialEnd,
       dateLimit: {
         days: 60
       },
+      opens,
       showDropdowns: true,
       showWeekNumbers: true,
       timePicker: showTime,

@@ -6,20 +6,34 @@ function AnalysisView(analysisModel) {
   this.analysisModel = analysisModel;
   this.applyDataChangeEvent = new Event(this);
   this.searchEvent = new Event(this);
-  this.viewParams = {granularity: "DAYS", dimension: "All", filters: {}};
-  this.baselineRange = {
-    'Last 24 Hours': [moment().subtract(2, 'days'), moment().subtract(1, 'days')],
-    'Yesterday': [moment().subtract(3, 'days'), moment().subtract(2, 'days')],
-    'Last 7 Days': [moment().subtract(13, 'days'), moment().subtract(7, 'days')],
-    'Last 30 Days': [moment().subtract(59, 'days'), moment().subtract(30, 'days')],
-    'This Month': [moment().subtract(1, 'month').startOf('month'), moment().subtract(1 , 'month').endOf('month')],
-    'Last Month': [moment().subtract(2, 'month').startOf('month'), moment().subtract(2, 'month').endOf('month')]
+  this.viewParams = {
+    granularity: "DAYS",
+    dimension: "All",
+    filters: {},
   };
-  // this.baselineRange = {
-  //   'Wo1W': [moment().subtract(2, 'days'), moment().subtract(1, 'days')],
-  //   'Wo2W': [moment().subtract(3, 'days'), moment().subtract(2, 'days')],
-  //   'Wo3W': [moment().subtract(13, 'days'), moment().subtract(7, 'days')]
-  // };
+  this.compareMode = 'WoW';
+  this.compareModeOptions = ['WoW', 'Wo2W', 'Wo3W'];
+
+  this.currentRange = () => {
+    return {
+      'Last 24 Hours': [moment().subtract(1, 'days'), moment()],
+      'Yesterday': [moment().subtract(2, 'days'), moment().subtract(1, 'days')],
+      'Last 7 Days': [moment().subtract(6, 'days'), moment()],
+      'Last 30 Days': [moment().subtract(29, 'days'), moment()],
+      'This Month': [moment().startOf('month'), moment().endOf('month')],
+      'Last Month': [moment().subtract(1, 'month').startOf('month'),
+        moment().subtract(1, 'month').endOf('month')]
+    };
+  };
+
+  this.baselineRange = () => {
+    const range = {};
+    this.compareModeOptions.forEach((options) => {
+      const offset = constants.WOW_MAPPING[options];
+      range[options] = [this.calculateBaselineDate('currentStart', offset),this.calculateBaselineDate('currentEnd', offset)];
+    });
+   return range;
+  };
 }
 
 AnalysisView.prototype = {
@@ -27,6 +41,11 @@ AnalysisView.prototype = {
     this.viewParams = params;
     this.searchParams = {};
     this.viewParams.metricName = this.analysisModel.metricName;
+  },
+
+  calculateBaselineDate(dateType, offset) {
+    const baseDate = this.viewParams[dateType] || moment();
+    return baseDate.clone().subtract(offset, 'days');
   },
 
   render: function (metricId, callback) {
@@ -125,23 +144,29 @@ AnalysisView.prototype = {
     const $currentRange = $('#current-range');
     const $baselineRange = $('#baseline-range');
 
-    const setBaselineRange = (start, end) => {
+    const setBaselineRange = (start, end, compareMode = constants.DATE_RANGE_CUSTOM) => {
       this.viewParams['baselineStart'] = start;
       this.viewParams['baselineEnd'] = end;
+      this.viewParams['compareMode'] = compareMode;
+
       $baselineRangeText.addClass("time-range").html(
-        `${start.format(constants.DATE_RANGE_FORMAT)} &mdash; ${end.format(constants.DATE_RANGE_FORMAT)}`);
+        `<span>${compareMode}</span> ${start.format(constants.DATE_RANGE_FORMAT)} &mdash; ${end.format(constants.DATE_RANGE_FORMAT)}`);
     };
     const setCurrentRange = (start, end, rangeType = constants.DATE_RANGE_CUSTOM) => {
+      const $baselineRangePicker = $('#baseline-range');
+      $baselineRangePicker.length && $baselineRangePicker.data('daterangepicker').remove();
+
       this.viewParams['currentStart'] = start;
       this.viewParams['currentEnd'] = end;
 
-      if (rangeType === constants.DATE_RANGE_CUSTOM) {
-        $baselineRange.removeClass('disabled');
-      } else {
-        const [baselineStart, baselineEnd] = this.baselineRange[rangeType];
-        $baselineRange.addClass('disabled');
-        setBaselineRange(baselineStart, baselineEnd);
-      }
+      const compareMode = this.viewParams['compareMode'];
+      const offset = constants.WOW_MAPPING[compareMode];
+      const baselineStart = start.clone().subtract(offset, 'days');
+      const baselineEnd = end.clone().subtract(offset, 'days');
+
+      this.renderDatePicker($baselineRange, setBaselineRange, baselineStart, baselineEnd, showTime, this.baselineRange);
+      setBaselineRange(baselineStart, baselineEnd, compareMode); // need to change
+
       $currentRangeText.addClass("time-range").html(
           `<span>${rangeType}</span> ${start.format(constants.DATE_RANGE_FORMAT)} &mdash; ${end.format(constants.DATE_RANGE_FORMAT)}`)
     };
@@ -152,14 +177,15 @@ AnalysisView.prototype = {
     var baselineStart = this.analysisModel.baselineStart;
     var baselineEnd = this.analysisModel.baselineEnd;
 
-    setCurrentRange(currentStart, currentEnd);
-    setBaselineRange(baselineStart, baselineEnd);
 
-    this.renderDatePicker($currentRange, setCurrentRange, currentStart, currentEnd, showTime);
-    this.renderDatePicker($baselineRange, setBaselineRange, baselineStart, baselineEnd, showTime);
+    this.renderDatePicker($currentRange, setCurrentRange, currentStart, currentEnd, showTime, this.currentRange);
+    this.renderDatePicker($baselineRange, setBaselineRange, baselineStart, baselineEnd, showTime, this.baselineRange);
+    setCurrentRange(currentStart, currentEnd);
+    setBaselineRange(baselineStart, baselineEnd, this.viewParams['compareMode']);
   },
 
-  renderDatePicker: function ($selector, callbackFun, initialStart, initialEnd, showTime){
+  renderDatePicker: function ($selector, callbackFun, initialStart, initialEnd, showTime, rangeGenerator){
+    const ranges = rangeGenerator();
     $selector.daterangepicker({
       startDate: initialStart,
       endDate: initialEnd,
@@ -171,15 +197,7 @@ AnalysisView.prototype = {
       timePicker: showTime,
       timePickerIncrement: 5,
       timePicker12Hour: true,
-      ranges: {
-        'Last 24 Hours': [moment().subtract(1, 'days'), moment()],
-        'Yesterday': [moment().subtract(2, 'days'), moment().subtract(1, 'days')],
-        'Last 7 Days': [moment().subtract(6, 'days'), moment()],
-        'Last 30 Days': [moment().subtract(29, 'days'), moment()],
-        'This Month': [moment().startOf('month'), moment().endOf('month')],
-        'Last Month': [moment().subtract(1, 'month').startOf('month'),
-          moment().subtract(1, 'month').endOf('month')]
-      },
+      ranges,
       buttonClasses: ['btn', 'btn-sm'],
       applyClass: 'btn-primary',
       cancelClass: 'btn-default'
@@ -297,13 +315,14 @@ AnalysisView.prototype = {
   },
 
   clearHeatMapViewParams() {
-    this.viewParams = {
+    const resetHeatMap = {
       heatMapCurrentStart: null,
       heatMapCurrentEnd: null,
       heatMapBaselineStart: null,
       heatMapBaselineEnd: null,
       heatmapFilters: null
-    };
+    }
+    Object.assign(resetHeatMap, this.viewParams);
   },
 
   setupSearchListeners() {
