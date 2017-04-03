@@ -37,6 +37,7 @@ public class FunctionReplayRunnable implements Runnable {
   private Long functionAutotuneConfigId;
   private boolean speedUp;
   private boolean selfKill;
+  private long clonedFunctionId;
 
   public FunctionReplayRunnable(DetectionJobScheduler detectionJobScheduler, AnomalyFunctionManager anomalyFunctionDAO,
       MergedAnomalyResultManager mergedAnomalyResultDAO, RawAnomalyResultManager rawAnomalyResultDAO,
@@ -118,6 +119,7 @@ public class FunctionReplayRunnable implements Runnable {
     }
     try {
       clonedFunctionId = onboardResource.cloneAnomalyFunctionById(tuningFunctionId, functionName.toString(), false);
+      this.clonedFunctionId = clonedFunctionId;
     }
     catch (Exception e) {
       LOG.error("Unable to clone function {} with given name {}", tuningFunctionId, functionName.toString(), e);
@@ -271,4 +273,6 @@ public class FunctionReplayRunnable implements Runnable {
   public void setSelfKill(boolean selfKill) {
     this.selfKill = selfKill;
   }
+
+  public long getClonedFunctionId(){return clonedFunctionId;}
 }
