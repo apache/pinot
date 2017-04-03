@@ -87,7 +87,7 @@ public class RangePredicateEvaluatorFactory {
     }
   }
 
-  public static class OfflineDictionaryBasedPredicateEvaluator extends BasePredicateEvaluator {
+  private static final class OfflineDictionaryBasedPredicateEvaluator extends BasePredicateEvaluator {
     private int[] _matchingIds;
     private RangePredicate _predicate;
     private int _rangeStartIndex = 0;
@@ -182,7 +182,7 @@ public class RangePredicateEvaluatorFactory {
     }
   }
 
-  public static class RealtimeDictionaryBasedPredicateEvaluator extends BasePredicateEvaluator {
+  private static final class RealtimeDictionaryBasedPredicateEvaluator extends BasePredicateEvaluator {
 
     private int[] _matchingIds;
     private IntSet _dictIdSet;
@@ -276,7 +276,7 @@ public class RangePredicateEvaluatorFactory {
   /**
    * No dictionary implementation of range _predicate evaluator for INT data type.
    */
-  public static class IntNoDictionaryBasedRangeEvaluator extends BasePredicateEvaluator {
+  private static final class IntNoDictionaryBasedRangeEvaluator extends BasePredicateEvaluator {
     private final int _rangeStart;
     private final int _rangeEnd;
     private final boolean _incLower;
@@ -332,7 +332,7 @@ public class RangePredicateEvaluatorFactory {
   /**
    * No dictionary implementation of range _predicate evaluator for LONG data type.
    */
-  public static class LongNoDictionaryBasedRangeEvaluator extends BasePredicateEvaluator {
+  private static final class LongNoDictionaryBasedRangeEvaluator extends BasePredicateEvaluator {
     private final long _rangeStart;
     private final long _rangeEnd;
     private final boolean _incLower;
@@ -388,7 +388,7 @@ public class RangePredicateEvaluatorFactory {
   /**
    * No dictionary implementation of range _predicate evaluator for FLOAT data type.
    */
-  public static class FloatNoDictionaryBasedRangeEvaluator extends BasePredicateEvaluator {
+  private static final class FloatNoDictionaryBasedRangeEvaluator extends BasePredicateEvaluator {
     private final float _rangeStart;
     private final float _rangeEnd;
     private final boolean _incLower;
@@ -444,7 +444,7 @@ public class RangePredicateEvaluatorFactory {
   /**
    * No dictionary implementation of range _predicate evaluator for DOUBLE data type.
    */
-  public static class DoubleNoDictionaryBasedRangeEvaluator extends BasePredicateEvaluator {
+  private static final class DoubleNoDictionaryBasedRangeEvaluator extends BasePredicateEvaluator {
     private final double _rangeStart;
     private final double _rangeEnd;
     private final boolean _incLower;
@@ -500,7 +500,7 @@ public class RangePredicateEvaluatorFactory {
   /**
    * No dictionary implementation of range _predicate evaluator for STRING data type.
    */
-  public static class StringNoDictionaryBasedRangeEvaluator extends BasePredicateEvaluator {
+  private static final class StringNoDictionaryBasedRangeEvaluator extends BasePredicateEvaluator {
     private final String _rangeStart;
     private final String _rangeEnd;
     private final boolean _incLower;

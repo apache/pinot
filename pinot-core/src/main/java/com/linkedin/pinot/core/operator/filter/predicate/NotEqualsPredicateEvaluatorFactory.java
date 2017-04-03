@@ -76,7 +76,7 @@ public class NotEqualsPredicateEvaluatorFactory {
    *
    * No dictionary NEQ evaluator for int data type.
    */
-  public static final class IntNoDictionaryNeqEvaluator extends BasePredicateEvaluator {
+  private static final class IntNoDictionaryNeqEvaluator extends BasePredicateEvaluator {
     private int _neqValue;
 
     private IntNoDictionaryNeqEvaluator(NEqPredicate predicate) {
@@ -110,7 +110,7 @@ public class NotEqualsPredicateEvaluatorFactory {
    *
    * No dictionary NEQ evaluator for long data type.
    */
-  public static final class LongNoDictionaryNeqEvaluator extends BasePredicateEvaluator {
+  private static final class LongNoDictionaryNeqEvaluator extends BasePredicateEvaluator {
     private long _neqValue;
 
     private LongNoDictionaryNeqEvaluator(NEqPredicate predicate) {
@@ -144,7 +144,7 @@ public class NotEqualsPredicateEvaluatorFactory {
    *
    * No dictionary NEQ evaluator for float data type.
    */
-  public static final class FloatNoDictionaryNeqEvaluator extends BasePredicateEvaluator {
+  private static final class FloatNoDictionaryNeqEvaluator extends BasePredicateEvaluator {
     private float _neqValue;
 
     private FloatNoDictionaryNeqEvaluator(NEqPredicate predicate) {
@@ -178,7 +178,7 @@ public class NotEqualsPredicateEvaluatorFactory {
    *
    * No dictionary NEQ evaluator for double data type.
    */
-  public static final class DoubleNoDictionaryNeqEvaluator extends BasePredicateEvaluator {
+  private static final class DoubleNoDictionaryNeqEvaluator extends BasePredicateEvaluator {
     private double _neqValue;
 
     private DoubleNoDictionaryNeqEvaluator(NEqPredicate predicate) {
@@ -212,7 +212,7 @@ public class NotEqualsPredicateEvaluatorFactory {
    *
    * No dictionary NEQ evaluator for string data type.
    */
-  public static final class StringNoDictionaryNeqEvaluator extends BasePredicateEvaluator {
+  private static final class StringNoDictionaryNeqEvaluator extends BasePredicateEvaluator {
     private String _neqValue;
 
     private StringNoDictionaryNeqEvaluator(NEqPredicate predicate) {
@@ -245,7 +245,7 @@ public class NotEqualsPredicateEvaluatorFactory {
   /**
    * Dictionary based implementation for {@link NotEqualsPredicateEvaluatorFactory}
    */
-  public static final class DictionaryBasedNotEqualsPredicateEvaluator extends BasePredicateEvaluator {
+  private static final class DictionaryBasedNotEqualsPredicateEvaluator extends BasePredicateEvaluator {
     private int _neqDictValue;
     private int[] _matchingDictIds;
     private Dictionary _dictionary;
