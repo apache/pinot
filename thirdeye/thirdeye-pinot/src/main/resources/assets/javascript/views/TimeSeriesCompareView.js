@@ -45,6 +45,7 @@ TimeSeriesCompareView.prototype = {
     $('#timeseries-contributor-placeholder').children().remove();
     $('#contributor-table-placeholder').children().remove();
     $('#contributor-table-placeholder').children().remove();
+    // this.clearHeatMapViewParams();
   },
 
   renderChartSection: function () {
@@ -210,6 +211,16 @@ TimeSeriesCompareView.prototype = {
       heatMapBaselineStart: moment(baselineStart),
       heatMapBaselineEnd: moment(baselineEnd),
       heatmapFilters: heatmapFilters
+    };
+  },
+
+  clearHeatMapViewParams() {
+    this.viewParams = {
+      heatMapCurrentStart: null,
+      heatMapCurrentEnd: null,
+      heatMapBaselineStart: null,
+      heatMapBaselineEnd: null,
+      heatmapFilters: null
     };
   }
 }

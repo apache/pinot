@@ -22,8 +22,11 @@ AnalysisController.prototype = {
   },
 
   handleApplyAnalysisEvent(viewObject) {
+    const params = viewObject.viewParams;
     this.timeSeriesCompareController.destroy();
-    HASH_SERVICE.update(viewObject.viewParams);
+    // HASH_SERVICE.clear();
+    // params.tab = 'analysis';
+    HASH_SERVICE.update(params);
     HASH_SERVICE.refreshWindowHashForRouting('analysis');
     this.initTimeSeriesController(HASH_SERVICE.getParams());
   },
@@ -34,6 +37,8 @@ AnalysisController.prototype = {
     this.analysisView.destroyAnalysisOptions();
 
     this.analysisModel.fetchAnalysisOptionsData(searchParams.metricId, 'analysis-spin-area').then((res) => {
+      HASH_SERVICE.clear();
+      searchParams.tab = 'analysis';
       HASH_SERVICE.update(searchParams);
       HASH_SERVICE.refreshWindowHashForRouting('analysis');
       const hashParams = HASH_SERVICE.getParams();

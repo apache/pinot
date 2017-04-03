@@ -272,6 +272,7 @@ AnalysisView.prototype = {
 
   collectViewParams : function () {
     // Collect filters
+    this.clearHeatMapViewParams();
     var selectedFilters = $("#analysis-metric-filter-input").val();
     var filterMap = {};
     for (var i in selectedFilters) {
@@ -293,6 +294,16 @@ AnalysisView.prototype = {
 
     // Also reset the filters for heatmap
     this.viewParams['heatmapFilters'] = filterMap;
+  },
+
+  clearHeatMapViewParams() {
+    this.viewParams = {
+      heatMapCurrentStart: null,
+      heatMapCurrentEnd: null,
+      heatMapBaselineStart: null,
+      heatMapBaselineEnd: null,
+      heatmapFilters: null
+    };
   },
 
   setupSearchListeners() {
