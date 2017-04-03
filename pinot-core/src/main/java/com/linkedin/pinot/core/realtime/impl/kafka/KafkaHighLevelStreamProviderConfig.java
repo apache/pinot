@@ -38,7 +38,7 @@ import kafka.consumer.ConsumerConfig;
 public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig {
   private static final Map<String, String> defaultProps;
 
-  public static final int FIVE_MILLION = 5000000;
+  private static final int DEFAULT_MAX_REALTIME_ROWS_COUNT = 5000000;
   private final static long ONE_MINUTE_IN_MILLSEC = 1000 * 60;
   public static final long ONE_HOUR = ONE_MINUTE_IN_MILLSEC * 60;
 
@@ -68,6 +68,10 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
         .toFormatter();
   }
 
+  public static int getDefaultMaxRealtimeRowsCount() {
+    return DEFAULT_MAX_REALTIME_ROWS_COUNT;
+  }
+
   private String kafkaTopicName;
   private String zkString;
   private String groupId;
@@ -77,7 +81,7 @@ public class KafkaHighLevelStreamProviderConfig implements StreamProviderConfig 
   private Map<String, String> decoderProps;
   private Map<String, String> kafkaConsumerProps;
   private long segmentTimeInMillis = ONE_HOUR;
-  private int realtimeRecordsThreshold = FIVE_MILLION;
+  private int realtimeRecordsThreshold = DEFAULT_MAX_REALTIME_ROWS_COUNT;
 
   public KafkaHighLevelStreamProviderConfig() {
 
