@@ -102,15 +102,14 @@ public class QueryException {
     UNKNOWN_ERROR.setMessage("UnknownError");
   }
 
-  public static ProcessingException getException(ProcessingException processingException, Exception exception,
-      int maxLinesOfStackTrace) {
+  public static ProcessingException getException(ProcessingException processingException, Exception exception) {
     String errorType = processingException.getMessage();
     ProcessingException copiedProcessingException = processingException.deepCopy();
     StringWriter stringWriter = new StringWriter();
     exception.printStackTrace(new PrintWriter(stringWriter));
     String fullStackTrace = stringWriter.toString();
     String[] lines = fullStackTrace.split("\n");
-    int numLinesOfStackTrace = Math.min(lines.length, maxLinesOfStackTrace);
+    int numLinesOfStackTrace = Math.min(lines.length, _maxLinesOfStackTrace);
     int lengthOfStackTrace = numLinesOfStackTrace - 1;
     for (int i = 0; i < numLinesOfStackTrace; i++) {
       lengthOfStackTrace += lines[i].length();
@@ -119,7 +118,10 @@ public class QueryException {
     return copiedProcessingException;
   }
 
-  public static ProcessingException getException(ProcessingException processingException, Exception exception) {
-    return getException(processingException, exception, _maxLinesOfStackTrace);
+  public static ProcessingException getException(ProcessingException processingException, String errorMessage) {
+    String errorType = processingException.getMessage();
+    ProcessingException copiedProcessingException = processingException.deepCopy();
+    copiedProcessingException.setMessage(errorType + ":\n" + errorMessage);
+    return copiedProcessingException;
   }
 }
