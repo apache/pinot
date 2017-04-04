@@ -104,8 +104,7 @@ public class DetectionTaskRunner implements TaskRunner {
   }
 
 
-  private void runTask(DateTime windowStart, DateTime windowEnd)
-      throws JobExecutionException, ExecutionException {
+  private void runTask(DateTime windowStart, DateTime windowEnd) throws JobExecutionException, ExecutionException {
 
     LOG.info("Running anomaly detection for time range {} to  {}", windowStart, windowEnd);
 

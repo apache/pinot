@@ -3,7 +3,6 @@ package com.linkedin.thirdeye.datalayer.pojo;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.base.MoreObjects;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeConfig;
 import com.linkedin.thirdeye.api.TimeGranularity;
@@ -58,6 +57,12 @@ public class AnomalyFunctionBean extends AbstractBean {
   private String filters;
 
   private long metricId;
+
+  // Used to remove time series with small traffic or total count if the information is available
+  // This filter is different from the calculation of OTHER dimensions because it removes the time series if the
+  // count is not satisfied. Moreover, we won't have top level traffic or total count information when this filter
+  // is invoked, i.e., this filter is a local filter to time series with a certain dimensions.
+  private Map<String, String> dataFilter;
 
   private Map<String, String> alertFilter;
 
@@ -253,6 +258,14 @@ public class AnomalyFunctionBean extends AbstractBean {
 
   public void setAlertFilter(Map<String, String> alertFilter) {
     this.alertFilter = alertFilter;
+  }
+
+  public Map<String, String> getDataFilter() {
+    return dataFilter;
+  }
+
+  public void setDataFilter(Map<String, String> dataFilter) {
+    this.dataFilter = dataFilter;
   }
 
   public AnomalyMergeConfig getAnomalyMergeConfig() {

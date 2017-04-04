@@ -40,6 +40,7 @@ public class TimeSeriesResponseParser {
   int numTimeBuckets;
   private List<TimeSeriesRow> rows;
   private Map<String, Double> metricThresholds = new HashMap<>();
+  private boolean doRollUp = true; // roll up small metric to OTHER dimensions
 
   public TimeSeriesResponseParser(ThirdEyeResponse response, List<Range<DateTime>> ranges,
       TimeGranularity timeGranularity, List<String> groupByDimensions) {
@@ -50,7 +51,12 @@ public class TimeSeriesResponseParser {
 
     metricFunctions = response.getMetricFunctions();
     metricThresholds = ThirdEyeUtils.getMetricThresholdsMap(metricFunctions);
+  }
 
+  public TimeSeriesResponseParser(ThirdEyeResponse response, List<Range<DateTime>> ranges,
+      TimeGranularity timeGranularity, List<String> groupByDimensions, boolean doRollUp) {
+    this(response, ranges, timeGranularity, groupByDimensions);
+    this.doRollUp = doRollUp;
   }
 
   public List<TimeSeriesRow> parseResponse() {
@@ -97,7 +103,10 @@ public class TimeSeriesResponseParser {
   private void parseGroupByTimeDimensionResponse() {
     responseMap = ResponseParserUtils.createResponseMapByTimeAndDimension(response);
 
-    Map<Integer, List<Double>> metricSums = ResponseParserUtils.getMetricSumsByTime(response);
+    Map<Integer, List<Double>> metricSums = Collections.emptyMap();
+    if (doRollUp) {
+      metricSums = ResponseParserUtils.getMetricSumsByTime(response);
+    }
 
     // group by time and dimension values
     Set<String> timeDimensionValues = new HashSet<>();
@@ -164,14 +173,19 @@ public class TimeSeriesResponseParser {
         thresholdRows.add(row);
       }
 
-      // check if rows pass threshold
       boolean passedThreshold = false;
-      for (int timeBucketId = 0; timeBucketId < numTimeBuckets; timeBucketId++) {
-        if (checkMetricSums(thresholdRows.get(timeBucketId), metricSums.get(timeBucketId))) {
-          passedThreshold = true;
-          break;
+      if (doRollUp) {
+        // check if rows pass threshold
+        for (int timeBucketId = 0; timeBucketId < numTimeBuckets; timeBucketId++) {
+          if (checkMetricSums(thresholdRows.get(timeBucketId), metricSums.get(timeBucketId))) {
+            passedThreshold = true;
+            break;
+          }
         }
+      } else {
+        passedThreshold = true;
       }
+
       // if any of the cells of a contributor row passes threshold, add all those cells
       if (passedThreshold && !dimensionValues.contains(OTHER)) {
         rows.addAll(thresholdRows);

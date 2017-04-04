@@ -34,9 +34,15 @@ public class TimeSeriesHandler {
   private static final Logger LOG = LoggerFactory.getLogger(TimeSeriesHandler.class);
   private final QueryCache queryCache;
   private ExecutorService executorService;
+  private boolean doRollUp = true; // roll up small metrics to OTHER dimension
 
   public TimeSeriesHandler(QueryCache queryCache) {
     this.queryCache = queryCache;
+  }
+
+  public TimeSeriesHandler(QueryCache queryCache, boolean doRollUp) {
+    this.queryCache = queryCache;
+    this.doRollUp = doRollUp;
   }
 
   public TimeSeriesResponse handle(TimeSeriesRequest timeSeriesRequest) throws Exception {
@@ -60,7 +66,7 @@ public class TimeSeriesHandler {
     TimeSeriesResponseParser timeSeriesResponseParser =
         new TimeSeriesResponseParser(response, timeranges,
             timeSeriesRequest.getAggregationTimeGranularity(),
-            timeSeriesRequest.getGroupByDimensions());
+            timeSeriesRequest.getGroupByDimensions(), doRollUp);
     List<TimeSeriesRow> rows = timeSeriesResponseParser.parseResponse();
     // compute the derived metrics
     computeDerivedMetrics(timeSeriesRequest, rows);

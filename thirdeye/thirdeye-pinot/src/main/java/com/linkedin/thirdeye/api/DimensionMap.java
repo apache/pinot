@@ -72,6 +72,32 @@ public class DimensionMap implements SortedMap<String, String>, Comparable<Dimen
   }
 
   /**
+   * Returns if this dimension map is a child of the given dimension map, i.e., the given dimension map is a subset
+   * of this dimension map.
+   *
+   * @param that the given dimension map.
+   * @return true if this dimension map is a child of the given dimension map.
+   */
+  public boolean isChild(DimensionMap that) {
+    if (that == null) { // equals to an empty dimension map, which is the root level of all dimensions
+      return true;
+    } else if (that.size() < this.size()) {
+      // parent dimension map must be a subset of this dimension map
+      for (Entry<String, String> parentDimensionEntry : that.entrySet()) {
+        String thisDimensionValue = this.get(parentDimensionEntry.getKey());
+        if (!parentDimensionEntry.getValue().equals(thisDimensionValue)) {
+          return false;
+        }
+      }
+      return true;
+    } else if (that.size() == this.size()) {
+      return this.equals(that);
+    } else {
+      return false;
+    }
+  }
+
+  /**
    * Returns a JSON string representation of this dimension map for {@link com.linkedin.thirdeye.datalayer.dao.GenericPojoDao}
    * to persistent the map to backend database.
    *

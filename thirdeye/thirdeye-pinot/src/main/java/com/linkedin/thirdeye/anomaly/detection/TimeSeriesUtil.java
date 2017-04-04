@@ -7,6 +7,7 @@ import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.ResponseParserUtils;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
@@ -17,6 +18,7 @@ import com.linkedin.thirdeye.client.timeseries.TimeSeriesResponseConverter;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 import java.util.ArrayList;
@@ -26,6 +28,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 
@@ -81,9 +84,15 @@ public abstract class TimeSeriesUtil {
     TimeGranularity timeGranularity = new TimeGranularity(anomalyFunctionSpec.getBucketSize(),
         anomalyFunctionSpec.getBucketUnit());
 
+    DatasetConfigDTO dataset = DAORegistry.getInstance().getDatasetConfigDAO().findByDataset(anomalyFunctionSpec.getCollection());
+    boolean doRollUp = true;
+    if (!dataset.isActive()) {
+      doRollUp = false;
+    }
+
     TimeSeriesResponse timeSeriesResponse =
       getTimeSeriesResponseImpl(anomalyFunctionSpec, startEndTimeRanges, timeGranularity, filters, groupByDimensions,
-          false);
+          false, doRollUp);
 
     try {
       Map<DimensionKey, MetricTimeSeries> dimensionKeyMetricTimeSeriesMap =
@@ -145,9 +154,10 @@ public abstract class TimeSeriesUtil {
       groupByDimensions = Arrays.asList(anomalyFunctionSpec.getExploreDimensions().trim().split(","));
     }
 
+    final boolean doRollUp = false;
     TimeSeriesResponse response =
         getTimeSeriesResponseImpl(anomalyFunctionSpec, startEndTimeRanges, timeGranularity, filters, groupByDimensions,
-            endTimeInclusive);
+            endTimeInclusive, doRollUp);
     try {
       Map<DimensionKey, MetricTimeSeries> metricTimeSeriesMap = TimeSeriesResponseConverter.toMap(response,
           Utils.getSchemaDimensionNames(anomalyFunctionSpec.getCollection()));
@@ -207,11 +217,11 @@ public abstract class TimeSeriesUtil {
 
   private static TimeSeriesResponse getTimeSeriesResponseImpl(AnomalyFunctionDTO anomalyFunctionSpec,
       List<Pair<Long, Long>> startEndTimeRanges, TimeGranularity timeGranularity, Multimap<String, String> filters,
-      List<String> groupByDimensions, boolean endTimeInclusive)
+      List<String> groupByDimensions, boolean endTimeInclusive, boolean doRollUp)
       throws JobExecutionException, ExecutionException {
 
     TimeSeriesHandler timeSeriesHandler =
-        new TimeSeriesHandler(ThirdEyeCacheRegistry.getInstance().getQueryCache());
+        new TimeSeriesHandler(ThirdEyeCacheRegistry.getInstance().getQueryCache(), doRollUp);
 
     // Seed request with top-level...
     TimeSeriesRequest seedRequest = new TimeSeriesRequest();
