@@ -164,7 +164,7 @@ public class BrokerRequestHandler {
     try {
       brokerRequest = REQUEST_COMPILER.compileToBrokerRequest(pql);
     } catch (Exception e) {
-      LOGGER.warn("Parsing error on requestId {}: {}", requestId, pql, e);
+      LOGGER.info("Parsing error on requestId {}: {}, {}", requestId, pql, e.getMessage());
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_COMPILATION_EXCEPTIONS, 1);
       return BrokerResponseFactory.getBrokerResponseWithException(DEFAULT_BROKER_RESPONSE_TYPE,
           QueryException.getException(QueryException.PQL_PARSING_ERROR, e));
@@ -173,7 +173,7 @@ public class BrokerRequestHandler {
     try {
       validateRequest(brokerRequest);
     } catch (Exception e) {
-      LOGGER.warn("Validation error on requestId {}: {}", requestId, pql, e);
+      LOGGER.info("Validation error on requestId {}: {}, {}", requestId, pql, e.getMessage());
       _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.QUERY_VALIDATION_EXCEPTIONS, 1);
       return BrokerResponseFactory.getBrokerResponseWithException(DEFAULT_BROKER_RESPONSE_TYPE,
           QueryException.getException(QueryException.QUERY_VALIDATION_ERROR, e));
@@ -275,7 +275,7 @@ public class BrokerRequestHandler {
 
     if ((offlineTableName == null) && (realtimeTableName == null)) {
       // No table matches the broker request.
-      LOGGER.warn("No table matches the name: {}", tableName);
+      LOGGER.info("No table matches the name: {}", tableName);
       _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.RESOURCE_MISSING_EXCEPTIONS, 1);
       return BrokerResponseFactory.getStaticNoTableHitBrokerResponse(responseType);
     } else {
@@ -535,7 +535,7 @@ public class BrokerRequestHandler {
     phaseTimes.addToRoutingTime(System.nanoTime() - routingStartTime);
     if (segmentServices == null || segmentServices.isEmpty()) {
       String tableName = brokerRequest.getQuerySource().getTableName();
-      LOGGER.warn("No server found for table: {}", tableName);
+      LOGGER.info("No server found for table: {}", tableName);
       _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.NO_SERVER_FOUND_EXCEPTIONS, 1);
       return null;
     }

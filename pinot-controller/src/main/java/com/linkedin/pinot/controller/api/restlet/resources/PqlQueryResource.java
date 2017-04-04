@@ -57,7 +57,7 @@ public class PqlQueryResource extends BasePinotControllerRestletResource {
       try {
         tableName = REQUEST_COMPILER.compileToBrokerRequest(pqlQuery).getQuerySource().getTableName();
       } catch (Exception e) {
-        LOGGER.error("Caught exception while compiling PQL query: " + pqlQuery, e);
+        LOGGER.info("Caught exception while compiling PQL query: {}, {}", pqlQuery, e.getMessage());
         return new StringRepresentation(QueryException.getException(QueryException.PQL_PARSING_ERROR, e).toString());
       }
 
