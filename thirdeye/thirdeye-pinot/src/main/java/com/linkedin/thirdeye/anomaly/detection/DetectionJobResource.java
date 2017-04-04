@@ -288,7 +288,7 @@ public class DetectionJobResource {
 
   @POST
   @Path("/{id}/offline_analysis")
-  public Response getOutliersInTrainingData(@PathParam("id") @NotNull long id,
+  public Response generateAnomaliesInTrainingData(@PathParam("id") @NotNull long id,
       @QueryParam("time") String analysisTimeIso) throws Exception {
 
     AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(id);
@@ -304,12 +304,7 @@ public class DetectionJobResource {
     final long functionId = id;
     final DateTime innerTime = analysisTime;
 
-    new Thread(new Runnable() {
-      @Override
-      public void run() {
-        detectionJobScheduler.runOfflineAnalysis(functionId, innerTime);
-      }
-    }).start();
+    detectionJobScheduler.runOfflineAnalysis(functionId, innerTime);
 
     return Response.ok().build();
   }

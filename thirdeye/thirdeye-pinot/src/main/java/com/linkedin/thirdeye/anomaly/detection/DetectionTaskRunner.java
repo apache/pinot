@@ -46,6 +46,7 @@ public class DetectionTaskRunner implements TaskRunner {
 
   private static final Logger LOG = LoggerFactory.getLogger(DetectionTaskRunner.class);
   public static final String BACKFILL_PREFIX = "adhoc_";
+  public static final String OFFLINE_PREFIX = "offline_"; // the prefix indicating this task is running offline analysis
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
@@ -115,7 +116,8 @@ public class DetectionTaskRunner implements TaskRunner {
     // If the current job is a backfill (adhoc) detection job, set notified flag to true so the merged anomalies do not
     // induce alerts and emails.
     String jobName = DAO_REGISTRY.getJobDAO().getJobNameByJobId(jobExecutionId);
-    if (jobName != null && jobName.toLowerCase().startsWith(BACKFILL_PREFIX)) {
+    if (jobName != null &&
+        (jobName.toLowerCase().startsWith(BACKFILL_PREFIX) || jobName.toLowerCase().startsWith(OFFLINE_PREFIX))) {
       isBackfill = true;
     }
 
@@ -244,6 +246,15 @@ public class DetectionTaskRunner implements TaskRunner {
     String metricName = anomalyFunction.getSpec().getTopicMetric();
     MetricTimeSeries metricTimeSeries = anomalyDetectionInputContext.getDimensionKeyMetricTimeSeriesMap().get(dimensionMap);
 
+    /*
+    Check if current task is running offline analysis
+     */
+    boolean isOffline = false;
+    String jobName = DAO_REGISTRY.getJobDAO().getJobNameByJobId(jobExecutionId);
+    if (jobName != null && jobName.toLowerCase().startsWith(OFFLINE_PREFIX)) {
+      isOffline = true;
+    }
+
     // Get current entry's knownMergedAnomalies, which should have the same explored dimensions
     List<MergedAnomalyResultDTO> knownMergedAnomaliesOfAnEntry =
         anomalyDetectionInputContext.getKnownMergedAnomalies().get(dimensionMap);
@@ -270,8 +281,13 @@ public class DetectionTaskRunner implements TaskRunner {
             metricName, properties);
       }
 
-      resultsOfAnEntry = anomalyFunction
-          .analyze(dimensionMap, metricTimeSeries, windowStart, windowEnd, historyMergedAnomalies);
+      if(isOffline) {
+        resultsOfAnEntry = anomalyFunction
+            .offlineAnalyze(dimensionMap, metricTimeSeries, windowStart, windowEnd, historyMergedAnomalies);
+      } else {
+        resultsOfAnEntry =
+            anomalyFunction.analyze(dimensionMap, metricTimeSeries, windowStart, windowEnd, historyMergedAnomalies);
+      }
     } catch (Exception e) {
       LOG.error("Could not compute for {}", dimensionMap, e);
     }

@@ -284,6 +284,25 @@ public class DetectionJobScheduler implements Runnable {
   }
 
   /**
+   * Creates detection context for offline analysis and runs anomaly job, returns jobExecutionId
+   * @param anomalyFunction
+   * @param startTimes
+   * @param endTimes
+   * @return
+   */
+  private Long runOfflineAnomalyFunctionOnRanges(AnomalyFunctionDTO anomalyFunction, List<Long> startTimes, List<Long> endTimes) {
+    DetectionJobContext detectionJobContext = new DetectionJobContext();
+    detectionJobContext.setAnomalyFunctionId(anomalyFunction.getId());
+    detectionJobContext.setAnomalyFunctionSpec(anomalyFunction);
+    detectionJobContext.setJobName("offline_" + DetectionJobSchedulerUtils.createJobName(anomalyFunction, startTimes, endTimes));
+    detectionJobContext.setStartTimes(startTimes);
+    detectionJobContext.setEndTimes(endTimes);
+    Long jobExecutionId = detectionJobRunner.run(detectionJobContext);
+    LOG.info("Function: {} Dataset: {} Created job {}", anomalyFunction.getId(), anomalyFunction.getCollection(), jobExecutionId);
+    return jobExecutionId;
+  }
+
+  /**
    * Run offline analysis for given functionId. The offline analysis detects outliers in it training data and save as
    * anomaly results in the db
    * @param functionId
@@ -322,8 +341,7 @@ public class DetectionJobScheduler implements Runnable {
     List<Long> analysisTimeList = new ArrayList<>();
     analysisTimeList.add(analysisTime.getMillis());
     List<DetectionStatusDTO> findAllInTimeRange = new ArrayList<>();
-    jobId = runAnomalyFunctionAndUpdateDetectionStatus(analysisTimeList, analysisTimeList,
-        anomalyFunction, findAllInTimeRange);
+    jobId = runOfflineAnomalyFunctionOnRanges(anomalyFunction, analysisTimeList, analysisTimeList);
     LOG.info("Function: {} Dataset: {} Generated offline analysis job for detecting anomalies for data points "
         + "whose ends before {}", functionId, dataset, analysisTime);
 
