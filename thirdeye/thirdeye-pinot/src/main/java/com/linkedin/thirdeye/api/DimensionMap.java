@@ -32,16 +32,6 @@ public class DimensionMap implements SortedMap<String, String>, Comparable<Dimen
   }
 
   /**
-   * (Backward compatibility) For cleaning old anomalies from database.
-   *
-   * TODO: Remove this constructor after old anomalies are deleted
-   *
-   * @param dimensionKeyString
-   */
-  public DimensionMap(String dimensionKeyString) {
-  }
-
-  /**
    * Returns a dimension map according to the given dimension key.
    *
    * Assume that the given dimension key is [US,front_page,*,*,...] and the schema dimension names are
@@ -66,20 +56,16 @@ public class DimensionMap implements SortedMap<String, String>, Comparable<Dimen
     return dimensionMap;
   }
 
-  public String toJson()
-      throws JsonProcessingException {
-    return OBJECT_MAPPER.writeValueAsString(this);
-  }
-
   /**
-   * Returns if this dimension map is a child of the given dimension map, i.e., the given dimension map is a subset
-   * of this dimension map.
+   * Returns if this dimension map equals or is a child of the given dimension map, i.e., the given dimension map is
+   * a subset of this dimension map.
    *
    * @param that the given dimension map.
    * @return true if this dimension map is a child of the given dimension map.
    */
-  public boolean isChild(DimensionMap that) {
-    if (that == null) { // equals to an empty dimension map, which is the root level of all dimensions
+  public boolean equalsOrChildOf(DimensionMap that) {
+    // A null dimension map equals to an empty dimension map, which is the root level of all dimensions
+    if (that == null) {
       return true;
     } else if (that.size() < this.size()) {
       // parent dimension map must be a subset of this dimension map
@@ -95,6 +81,11 @@ public class DimensionMap implements SortedMap<String, String>, Comparable<Dimen
     } else {
       return false;
     }
+  }
+
+  public String toJson()
+      throws JsonProcessingException {
+    return OBJECT_MAPPER.writeValueAsString(this);
   }
 
   /**
@@ -138,7 +129,7 @@ public class DimensionMap implements SortedMap<String, String>, Comparable<Dimen
    * Examples:
    * 1. a={}, b={"K"="V"} --> a="", b="KV" --> a < b
    * 2. a={"K"="V"}, b={"K"="V"} --> a="KV", b="KV" --> a = b
-   * 3. a={"K2"="V1"}, b={"K1"="V1","K2"="V2"} --> a="K2V1", b="K1V1K2V2" --> b < a
+   * 3. a={"K2"="V1"}, b={"K1"="V1","K2"="V2"} --> a="K2V1", b="K1V1K2V2" --> a > b
    *
    * @param o the dimension to compare to
    */

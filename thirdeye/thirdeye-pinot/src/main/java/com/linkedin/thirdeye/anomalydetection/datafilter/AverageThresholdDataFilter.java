@@ -11,22 +11,34 @@ import java.util.NavigableMap;
 import java.util.TreeMap;
 import org.apache.commons.lang3.StringUtils;
 
+
+/**
+ * The data filter determines whether the average value of a time series passes the threshold.
+ *
+ * Advance Usage 1: A bucket of the time series is taken into consider only if its value is located inside the live
+ * zone, which is specified by minLiveZone and maxLveZone. In other words, if a bucket's value is smaller than
+ * minLiveZone or is larger than maxLveZone, then this bucket is ignored when calculating the average value.
+ *
+ * Advance Usage 2: The threshold could be overridden for different dimensions. For instance, the default threshold
+ * for any combination of dimensions could be 1000. However, we could override the threshold for any sub-dimensions that
+ * belong to this dimension {country=US}, e.g., {country=US, pageName=homePage} is a sub-dimension of {country=US}.
+ */
 public class AverageThresholdDataFilter extends BaseDataFilter {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private static final String METRIC_NAME_KEY = "metricName";
   private static final String THRESHOLD_KEY = "threshold";
-  // If the value of a bucket is smaller than MIN_DEAD_ZONE_KEY, then that bucket is omitted
-  private static final String MIN_DEAD_ZONE_KEY = "minDeadZone";
-  // If the value of a bucket is larger than MIN_DEAD_ZONE_KEY, then that bucket is omitted
-  private static final String MAX_DEAD_ZONE_KEY = "maxDeadZone";
-
-  private static final double DEFAULT_THRESHOLD = Double.NEGATIVE_INFINITY;
-  private static final double DEFAULT_MIN_DEAD_ZONE = Double.NEGATIVE_INFINITY;
-  private static final double DEFAULT_MAX_DEAD_ZONE = Double.POSITIVE_INFINITY;
-
+  // If the value of a bucket is smaller than MIN_LIVE_ZONE_KEY, then that bucket is omitted
+  private static final String MIN_LIVE_ZONE_KEY = "minLiveZone";
+  // If the value of a bucket is larger than MAX_LIVE_ZONE_KEY, then that bucket is omitted
+  private static final String MAX_LIVE_ZONE_KEY = "maxLiveZone";
   // Override threshold to different dimension map
   private static final String OVERRIDE_THRESHOLD_KEY = "overrideThreshold";
+
+  private static final double DEFAULT_THRESHOLD = Double.NEGATIVE_INFINITY;
+  private static final double DEFAULT_MIN_LIVE_ZONE = Double.NEGATIVE_INFINITY;
+  private static final double DEFAULT_MAX_LIVE_ZONE = Double.POSITIVE_INFINITY;
+
   // The override threshold for different dimension maps, which could form a hierarchy.
   private NavigableMap<DimensionMap, Double> overrideThreshold = new TreeMap<>();
 
@@ -44,18 +56,6 @@ public class AverageThresholdDataFilter extends BaseDataFilter {
     }
   }
 
-  /**
-   * Returns if the average value of a time series, which is specified by metricName and dimensionMap, passes the
-   * threshold.
-   *
-   * Advanced Usage: A bucket is taken into consider only if its value is located inside live zone, which is specified
-   * by minDeadZone and maxDeadZone. In other words, if a value is smaller than minDeadZone or is larger than
-   * maxDeadZone, then this value is ignored when calculating the average value.
-   *
-   * @param context the context for retrieving the time series.
-   * @param dimensionMap the dimension map of the time series.
-   * @return if the average value of the given time series passes the threshold.
-   */
   @Override
   public boolean isQualified(AnomalyDetectionContext context, DimensionMap dimensionMap) {
     // Initialize threshold from users' setting
@@ -80,31 +80,32 @@ public class AverageThresholdDataFilter extends BaseDataFilter {
       throw new IllegalArgumentException("metric name cannot be a blank String.");
     }
 
-    // Initialize minDeadZone from users' setting
-    double minDeadZone = DEFAULT_MIN_DEAD_ZONE;
-    if (props.containsKey(MIN_DEAD_ZONE_KEY)) {
-      minDeadZone = Double.parseDouble(props.get(MIN_DEAD_ZONE_KEY));
-      if (Double.isNaN(minDeadZone)) {
-        minDeadZone = Double.NEGATIVE_INFINITY;
+    // Initialize minLiveZone from users' setting
+    double minLiveZone = DEFAULT_MIN_LIVE_ZONE;
+    if (props.containsKey(MIN_LIVE_ZONE_KEY)) {
+      minLiveZone = Double.parseDouble(props.get(MIN_LIVE_ZONE_KEY));
+      if (Double.isNaN(minLiveZone)) {
+        minLiveZone = Double.NEGATIVE_INFINITY;
       }
     }
-    // Initialize maxDeadZone from users' setting
-    double maxDeadZone = DEFAULT_MAX_DEAD_ZONE;
-    if (props.containsKey(MAX_DEAD_ZONE_KEY)) {
-      maxDeadZone = Double.parseDouble(props.get(MAX_DEAD_ZONE_KEY));
-      if (Double.isNaN(maxDeadZone)) {
-        maxDeadZone = Double.POSITIVE_INFINITY;
+    // Initialize maxLiveZone from users' setting
+    double maxLiveZone = DEFAULT_MAX_LIVE_ZONE;
+    if (props.containsKey(MAX_LIVE_ZONE_KEY)) {
+      maxLiveZone = Double.parseDouble(props.get(MAX_LIVE_ZONE_KEY));
+      if (Double.isNaN(maxLiveZone)) {
+        maxLiveZone = Double.POSITIVE_INFINITY;
       }
     }
 
     // Compute average values among all buckets and check if it passes the threshold
+    // TODO: improve anomaly detection context to get all time series from metric name
     List<TimeSeries> timeSeries = context.getBaselines(metricName);
     double sum = 0d;
     int count = 0;
     for (TimeSeries series : timeSeries) {
       for (long timestamp : series.timestampSet()) {
         double value = series.get(timestamp);
-        if (isLiveBucket(value, minDeadZone, maxDeadZone)) {
+        if (isLiveBucket(value, minLiveZone, maxLiveZone)) {
           sum += value;
           ++count;
         }
@@ -115,19 +116,19 @@ public class AverageThresholdDataFilter extends BaseDataFilter {
 
   /**
    * The value of a bucket is considered during the calculation of average bucket value only if the value is not a NaN
-   * and it is not located in the dead zone, which is defined by minDeadZone and maxDeadZone.
+   * and it is not located in the live zone, which is defined by minLiveZone and maxLiveZone.
    *
    * @param value the value to be tested
-   * @param minDeadZone if the given value is smaller than minDeadZone, then the value is located in the dead zone.
-   * @param maxDeadZone if the given value is larger than maxDeadZone, then the value is located in the dead zone.
+   * @param minLiveZone if the given value is smaller than minLiveZone, then the value is located in the live zone.
+   * @param maxLiveZone if the given value is larger than maxLiveZone, then the value is located in the live zone.
    * @return true is the value should be considered when calculating the average of bucket values.
    */
-  private boolean isLiveBucket(double value, double minDeadZone, double maxDeadZone) {
+  private boolean isLiveBucket(double value, double minLiveZone, double maxLiveZone) {
     if (!Double.isNaN(value)) {
       return false;
-    } else if (Double.compare(minDeadZone, value) > 0) {
+    } else if (Double.compare(minLiveZone, value) > 0) {
       return false;
-    } else if (Double.compare(maxDeadZone, value) < 0) {
+    } else if (Double.compare(maxLiveZone, value) < 0) {
       return false;
     } else return true;
   }
@@ -146,7 +147,7 @@ public class AverageThresholdDataFilter extends BaseDataFilter {
    */
   private double overrideThresholdForDimensions(DimensionMap dimensionMap, double defaultThreshold) {
     for (DimensionMap overrideDimensionMap : overrideThreshold.descendingKeySet()) {
-      if (dimensionMap.isChild(overrideDimensionMap)) {
+      if (dimensionMap.equalsOrChildOf(overrideDimensionMap)) {
         return overrideThreshold.get(overrideDimensionMap);
       }
     }
