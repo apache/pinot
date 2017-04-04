@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.query.reduce;
 
+import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.Selection;
 import com.linkedin.pinot.common.response.ProcessingException;
@@ -27,6 +28,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.PriorityQueue;
 import javax.annotation.Nonnull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -36,6 +39,8 @@ import javax.annotation.Nonnull;
 public class CombineService {
   private CombineService() {
   }
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(CombineService.class);
 
   public static void mergeTwoBlocks(@Nonnull BrokerRequest brokerRequest, @Nonnull IntermediateResultsBlock mergedBlock,
       @Nonnull IntermediateResultsBlock blockToMerge) {
@@ -130,8 +135,12 @@ public class CombineService {
             mergedBlock.setSelectionResult(mergedBlockResultSet);
           } else {
             // Two blocks are not mergeable.
-            throw new RuntimeException("Data schema inconsistency between merged block schema: " + mergedBlockSchema
-                + " and block to merge schema: " + blockToMergeSchema + ", drop block to merge.");
+
+            String errorMessage = "Data schema inconsistency between merged block schema: " + mergedBlockSchema
+                + " and block to merge schema: " + blockToMergeSchema + ", drop block to merge";
+            LOGGER.info(errorMessage);
+            mergedBlock.addToProcessingExceptions(
+                QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, errorMessage));
           }
         }
       }
