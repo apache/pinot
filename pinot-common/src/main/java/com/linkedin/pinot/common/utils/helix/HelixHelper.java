@@ -111,8 +111,11 @@ public class HelixHelper {
           } catch (Exception e) {
             boolean idealStateIsCompressed = updatedIdealState.getRecord().getBooleanField("enableCompression", false);
 
+            // Failure to update due to valid reasons such as node already updated by another thread is also thrown
+            // as exception (KeeperException). Unfortunately, DataAccessor.set() does not have declaration that it
+            // throws KeeperException, and hence we cannot explicitly catch it.
             LOGGER.warn("Caught exception while updating ideal state for resource {} (compressed={}), retrying.",
-                resourceName, idealStateIsCompressed, e);
+                resourceName, idealStateIsCompressed, e.getMessage());
             return false;
           }
 
