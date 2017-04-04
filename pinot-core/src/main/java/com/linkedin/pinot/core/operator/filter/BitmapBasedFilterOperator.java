@@ -15,10 +15,6 @@
  */
 package com.linkedin.pinot.core.operator.filter;
 
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockId;
 import com.linkedin.pinot.core.common.DataSource;
@@ -28,7 +24,11 @@ import com.linkedin.pinot.core.operator.blocks.BitmapBlock;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import com.linkedin.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import com.linkedin.pinot.core.segment.index.readers.InvertedIndexReader;
-import com.linkedin.pinot.core.segment.index.readers.Dictionary;
+import java.util.ArrayList;
+import java.util.List;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class BitmapBasedFilterOperator extends BaseFilterOperator {
@@ -86,11 +86,26 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
       default:
         throw new UnsupportedOperationException("Regex is not supported");
     }
-    ImmutableRoaringBitmap[] bitmaps = new ImmutableRoaringBitmap[dictionaryIds.length];
-    for (int i = 0; i < dictionaryIds.length; i++) {
-      bitmaps[i] = invertedIndex.getImmutable(dictionaryIds[i]);
+
+    // For realtime use case, it is possible that inverted index has not yet generated for the given dict id, so we
+    // filter out null bitmaps
+    int length = dictionaryIds.length;
+    List<ImmutableRoaringBitmap> bitmaps = new ArrayList<>(length);
+    for (int dictionaryId : dictionaryIds) {
+      ImmutableRoaringBitmap bitmap = invertedIndex.getImmutable(dictionaryId);
+      if (bitmap != null) {
+        bitmaps.add(bitmap);
+      }
     }
-    bitmapBlock = new BitmapBlock(dataSource.getOperatorName(), dataSourceBlock.getMetadata(), startDocId, endDocId, bitmaps, exclusion);
+
+    // Log size diff to verify the fix
+    int numBitmaps = bitmaps.size();
+    if (numBitmaps != length) {
+      LOGGER.info("Not all inverted indexes are generated, numDictIds: {}, numBitmaps: {}", length, numBitmaps);
+    }
+
+    bitmapBlock = new BitmapBlock(dataSource.getOperatorName(), dataSourceBlock.getMetadata(), startDocId, endDocId,
+        bitmaps.toArray(new ImmutableRoaringBitmap[numBitmaps]), exclusion);
     return bitmapBlock;
   }
 
