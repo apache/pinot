@@ -51,6 +51,8 @@ DimensionTreeMapModel.prototype = {
       if (params.heatmapMode) {
         this.heatmapMode = params.heatmapMode;
       }
+
+      this.compareMode = params.compareMode || this.compareMode;
     }
   },
 
