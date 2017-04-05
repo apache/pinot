@@ -67,7 +67,7 @@ DimensionTreeMapModel.prototype = {
         this.heatmapData = heatMapData;
         this.transformResponseData(heatMapData);
         return heatMapData;
-      })
+      });
     }
   },
 

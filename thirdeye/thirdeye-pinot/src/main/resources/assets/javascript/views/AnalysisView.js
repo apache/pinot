@@ -153,18 +153,20 @@ AnalysisView.prototype = {
     };
     const setCurrentRange = (start, end, rangeType = constants.DATE_RANGE_CUSTOM) => {
       const $baselineRangePicker = $('#baseline-range');
-      $baselineRangePicker.length && $baselineRangePicker.data('daterangepicker').remove();
 
       this.viewParams['currentStart'] = start;
       this.viewParams['currentEnd'] = end;
 
       const compareMode = this.viewParams['compareMode'];
-      const offset = constants.WOW_MAPPING[compareMode];
-      const baselineStart = start.clone().subtract(offset, 'days');
-      const baselineEnd = end.clone().subtract(offset, 'days');
 
-      this.renderDatePicker($baselineRange, setBaselineRange, baselineStart, baselineEnd, showTime, this.baselineRange);
-      setBaselineRange(baselineStart, baselineEnd, compareMode); // need to change
+      if (compareMode !== constants.DATE_RANGE_CUSTOM) {
+        $baselineRangePicker.length && $baselineRangePicker.data('daterangepicker').remove();
+        const offset = constants.WOW_MAPPING[compareMode];
+        const baselineStart = start.clone().subtract(offset, 'days');
+        const baselineEnd = end.clone().subtract(offset, 'days');
+        this.renderDatePicker($baselineRange, setBaselineRange, baselineStart, baselineEnd, showTime, this.baselineRange);
+        setBaselineRange(baselineStart, baselineEnd, compareMode);
+      }
 
       $currentRangeText.addClass("time-range").html(
           `<span>${rangeType}</span> ${start.format(constants.DATE_RANGE_FORMAT)} &mdash; ${end.format(constants.DATE_RANGE_FORMAT)}`)
@@ -180,7 +182,7 @@ AnalysisView.prototype = {
     this.renderDatePicker($currentRange, setCurrentRange, currentStart, currentEnd, showTime, this.currentRange);
     this.renderDatePicker($baselineRange, setBaselineRange, baselineStart, baselineEnd, showTime, this.baselineRange);
     setCurrentRange(currentStart, currentEnd);
-    setBaselineRange(baselineStart, baselineEnd, this.viewParams['compareMode']);
+    setBaselineRange(baselineStart, baselineEnd, this.viewParams.compareMode);
   },
 
   renderDatePicker: function ($selector, callbackFun, initialStart, initialEnd, showTime, rangeGenerator){

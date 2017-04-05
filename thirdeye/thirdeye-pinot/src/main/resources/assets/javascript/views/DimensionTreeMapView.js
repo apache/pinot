@@ -2,12 +2,11 @@ function DimensionTreeMapView(dimensionTreeMapModel) {
   const template = $("#dimension-tree-map-template").html();
   const graphTemplate = $("#dimension-tree-map-graph-template").html();
   this.compiledTemplate = Handlebars.compile(template);
-  this.compliledGraph = Handlebars.compile(graphTemplate);
+  this.compiledGraph = Handlebars.compile(graphTemplate);
   this.placeHolderId = "#dimension-tree-map-placeholder";
   this.graphPlaceholderId = "#dimension-tree-map-graph-placeholder";
 
   this.dimensionTreeMapModel = dimensionTreeMapModel;
-  this.compareMode = 'WoW';
   this.currentRange = () => {
     return {
       'Last 24 Hours': [moment().subtract(1, 'days'), moment()],
@@ -35,8 +34,6 @@ DimensionTreeMapView.prototype = {
     if (this.dimensionTreeMapModel.heatmapData) {
       var compiledTemplate = this.compiledTemplate(this.dimensionTreeMapModel);
       $(this.placeHolderId).html(compiledTemplate);
-      const compiledGraph = this.compliledGraph(this.dimensionTreeMapModel);
-      $(this.graphPlaceholderId).html(compiledGraph)
       this.renderTreemapHeaderSection();
       this.renderTreemapSection();
       this.setupListenersForMode();
@@ -58,38 +55,46 @@ DimensionTreeMapView.prototype = {
     const $currentRange = $('#heatmap-current-range');
     const $baselineRange = $('#heatmap-baseline-range');
     const showTime = this.dimensionTreeMapModel.granularity !== 'DAYS';
+    const dateFormat = showTime ? constants.DATE_TIME_RANGE_FORMAT : constants.DATE_RANGE_FORMAT;
 
-    const setBaselineRange = (start, end, compareMode = constants.DATE_RANGE_CUSTOM) => {
+    const setRangeText = (selector, start, end, dateFormat, compareMode) => {
+       selector.addClass("time-range").html(
+        `<span>${compareMode}</span> ${start.format(dateFormat)} &mdash; ${end.format(dateFormat)}`);
+    };
+
+    const baselineCallBack = (start, end, compareMode = constants.DATE_RANGE_CUSTOM) => {
       // show time needs to be after
-      const showTime = this.dimensionTreeMapModel.compareMode;
+      const showTime = this.dimensionTreeMapModel.granularity !== 'DAYS';
       const dateFormat = showTime ? constants.DATE_TIME_RANGE_FORMAT : constants.DATE_RANGE_FORMAT;
       this.dimensionTreeMapModel['baselineStart'] = start;
       this.dimensionTreeMapModel['baselineEnd'] = end;
       this.dimensionTreeMapModel['compareMode'] = compareMode;
-
-      $baselineRangeText.addClass("time-range").html(
-        `<span>${compareMode}</span> ${start.format(dateFormat)} &mdash; ${end.format(dateFormat)}`);
+      setRangeText($baselineRangeText, start, end, dateFormat, compareMode);
+      this.destroyTreemapSection();
+      this.dimensionTreeMapModel.update().then(() => {
+        this.renderTreemapSection();
+      });
     };
 
-    const setCurrentRange = (start, end, rangeType = constants.DATE_RANGE_CUSTOM) => {
-      const showTime = this.dimensionTreeMapModel.compareMode;
-      const $baselineRangePicker = $('#heatmap-baseline-range');
+    const currentCallBack = (start, end, rangeType = constants.DATE_RANGE_CUSTOM) => {
+      const showTime = this.dimensionTreeMapModel.granularity !== 'DAYS';
       const dateFormat = showTime ? constants.DATE_TIME_RANGE_FORMAT : constants.DATE_RANGE_FORMAT;
-      $baselineRangePicker.length && $baselineRangePicker.data('daterangepicker').remove();
+      const $baselineRangePicker = $('#heatmap-baseline-range');
+      const baselineCompareMode = this.dimensionTreeMapModel['compareMode'];
+      const compareMode = this.dimensionTreeMapModel['compareMode'];
 
       this.dimensionTreeMapModel['currentStart'] = start;
       this.dimensionTreeMapModel['currentEnd'] = end;
 
-      const compareMode = this.dimensionTreeMapModel['compareMode'];
-      const offset = constants.WOW_MAPPING[compareMode];
-      const baselineStart = start.clone().subtract(offset, 'days');
-      const baselineEnd = end.clone().subtract(offset, 'days');
-
-      this.renderDatePicker($baselineRange, setBaselineRange, baselineStart, baselineEnd, showTime, this.baselineRange, 'left');
-      setBaselineRange(baselineStart, baselineEnd); // need to change
-
-      $currentRangeText.addClass("time-range").html(
-          `<span>${rangeType}</span> ${start.format(dateFormat)} &mdash; ${end.format(dateFormat)}`)
+      if (baselineCompareMode !== constants.DATE_RANGE_CUSTOM) {
+        const offset = constants.WOW_MAPPING[compareMode];
+        const baselineStart = start.clone().subtract(offset, 'days');
+        const baselineEnd = end.clone().subtract(offset, 'days');
+        $baselineRangePicker.length && $baselineRangePicker.data('daterangepicker').remove();
+        this.renderDatePicker($baselineRange, baselineCallBack, baselineStart, baselineEnd, showTime, this.baselineRange, 'left');
+        baselineCallBack(baselineStart, baselineEnd, baselineCompareMode);
+      }
+      setRangeText($currentRangeText, start, end, dateFormat, rangeType);
     };
 
         // TIME RANGE SELECTION
@@ -99,10 +104,11 @@ DimensionTreeMapView.prototype = {
     const baselineEnd = this.dimensionTreeMapModel.baselineEnd;
 
 
-    this.renderDatePicker($currentRange, setCurrentRange, currentStart, currentEnd, showTime, this.currentRange);
-    this.renderDatePicker($baselineRange, setBaselineRange, baselineStart, baselineEnd, showTime, this.baselineRange, 'left');
-    setCurrentRange(currentStart, currentEnd);
-    setBaselineRange(baselineStart, baselineEnd);
+    this.renderDatePicker($currentRange, currentCallBack, currentStart, currentEnd, showTime, this.currentRange);
+    this.renderDatePicker($baselineRange, baselineCallBack, baselineStart, baselineEnd, showTime, this.baselineRange, 'left');
+
+    setRangeText($currentRangeText, currentStart, currentEnd, dateFormat, constants.DATE_RANGE_CUSTOM);
+    setRangeText($baselineRangeText, baselineStart, baselineEnd, dateFormat, this.dimensionTreeMapModel['compareMode']);
   },
 
   renderDatePicker: function (domId, callbackFun, initialStart, initialEnd, showTime, rangeGenerator, opens = 'right'){
@@ -126,7 +132,14 @@ DimensionTreeMapView.prototype = {
     }, callbackFun);
   },
 
-  renderTreemapSection : function() {
+  destroyTreemapSection() {
+    $(this.graphPlaceholderId).children().remove();
+  },
+
+  renderTreemapSection() {
+    this.destroyTreemapSection();
+    const compiledGraph = this.compiledGraph(this.dimensionTreeMapModel);
+    $(this.graphPlaceholderId).html(compiledGraph);
     // DRAW THE AXIS
     // Create the SVG Viewport
     var height = $('#axis-placeholder').height();
@@ -261,15 +274,15 @@ DimensionTreeMapView.prototype = {
   setupListenersForMode : function () {
     $("#percent_change a").click(() => {
       this.dimensionTreeMapModel.heatmapMode = "percentChange";
-      this.render();
+      this.renderTreemapSection();
     });
     $("#change_in_contribution").click(() => {
       this.dimensionTreeMapModel.heatmapMode = "contributionChange";
-      this.render();
+      this.renderTreemapSection();
     });
     $("#contribution_to_overall_change").click(() => {
       this.dimensionTreeMapModel.heatmapMode = "contributionToOverallChange";
-      this.render();
+      this.renderTreemapSection();
     });
   },
 }
