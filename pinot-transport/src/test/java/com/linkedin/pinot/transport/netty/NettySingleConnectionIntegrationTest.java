@@ -15,9 +15,6 @@
  */
 package com.linkedin.pinot.transport.netty;
 
-import com.google.common.util.concurrent.Futures;
-import com.google.common.util.concurrent.ListenableFuture;
-import io.netty.channel.ChannelHandlerContext;
 import java.lang.reflect.Field;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -31,6 +28,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.common.AsyncResponseFuture;
 import com.linkedin.pinot.transport.common.Callback;
@@ -51,6 +50,7 @@ import com.linkedin.pinot.transport.pool.KeyedPoolImpl;
 import com.yammer.metrics.core.MetricsRegistry;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.HashedWheelTimer;
@@ -118,9 +118,9 @@ public class NettySingleConnectionIntegrationTest {
     PooledNettyClientResourceManager resourceManager = new PooledNettyClientResourceManager(eventLoopGroup, new HashedWheelTimer(), metric);
     ExecutorService executorService = Executors.newCachedThreadPool();
     ScheduledExecutorService timeoutExecutor = new ScheduledThreadPoolExecutor(5);
-    AsyncPoolResourceManagerAdapter<ServerInstance, NettyClientConnection> rmAdapter =
-        new AsyncPoolResourceManagerAdapter<ServerInstance, NettyClientConnection>(serverInstance, resourceManager, executorService, metricsRegistry);
-    AsyncPool pool = new AsyncPoolImpl<NettyClientConnection>(serverName, rmAdapter,
+    AsyncPoolResourceManagerAdapter<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection> rmAdapter =
+        new AsyncPoolResourceManagerAdapter<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection>(serverInstance, resourceManager, executorService, metricsRegistry);
+    AsyncPool pool = new AsyncPoolImpl<PooledNettyClientResourceManager.PooledClientConnection>(serverName, rmAdapter,
      /*maxSize=*/5, /*idleTimeoutMs=*/100000, timeoutExecutor,
         executorService, /*maxWaiters=*/10, AsyncPoolImpl.Strategy.LRU, /*minSize=*/2, metricsRegistry);
     pool.start();
@@ -407,9 +407,9 @@ public class NettySingleConnectionIntegrationTest {
     ExecutorService executorService = Executors.newCachedThreadPool();
     ScheduledExecutorService timeoutExecutor = new ScheduledThreadPoolExecutor(5);
 
-    AsyncPoolResourceManagerAdapter<ServerInstance, NettyClientConnection> rmAdapter =
-        new AsyncPoolResourceManagerAdapter<ServerInstance, NettyClientConnection>(serverInstance, resourceManager, executorService, metricsRegistry);
-    KeyedPool<ServerInstance, NettyClientConnection> keyedPool = new KeyedPoolImpl<ServerInstance, NettyClientConnection>(minConns,
+    AsyncPoolResourceManagerAdapter<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection> rmAdapter =
+        new AsyncPoolResourceManagerAdapter<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection>(serverInstance, resourceManager, executorService, metricsRegistry);
+    KeyedPool<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection> keyedPool = new KeyedPoolImpl<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection>(minConns,
         maxConns, maxIdleTimeoutMs, maxBacklogPerServer,
         resourceManager, timeoutExecutor, executorService, metricsRegistry);
     resourceManager.setPool(keyedPool);
@@ -419,7 +419,7 @@ public class NettySingleConnectionIntegrationTest {
     Field keyedPoolMap = KeyedPoolImpl.class.getDeclaredField("_keyedPool");
     keyedPoolMap.setAccessible(true);
 
-    KeyedFuture<ServerInstance, NettyClientConnection> keyedFuture = keyedPool.checkoutObject(serverInstance);
+    KeyedFuture<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection> keyedFuture = keyedPool.checkoutObject(serverInstance);
     // The connection pool for this server is created on demand, so we can now get a reference to the _keyedPool.
     // The act of calling checkoutObject() creates a new AsyncPoolImpl and places a request for a new connection.
     // Since no new connections are available in the beginning, we always end up creating one more than the min.

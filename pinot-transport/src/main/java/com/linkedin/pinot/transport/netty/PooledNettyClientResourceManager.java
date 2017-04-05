@@ -27,11 +27,11 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.util.Timer;
 
 
-public class PooledNettyClientResourceManager implements PooledResourceManager<ServerInstance, NettyClientConnection> {
+public class PooledNettyClientResourceManager implements PooledResourceManager<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection> {
 
   protected static Logger LOGGER = LoggerFactory.getLogger(PooledNettyClientResourceManager.class);
 
-  private KeyedPool<ServerInstance, NettyClientConnection> _pool;
+  private KeyedPool<ServerInstance, PooledClientConnection> _pool;
   private final EventLoopGroup _eventLoop;
   private final NettyClientMetrics _metrics;
   private final Timer _timer;
@@ -42,13 +42,13 @@ public class PooledNettyClientResourceManager implements PooledResourceManager<S
     _timer = timer;
   }
 
-  public void setPool(KeyedPool<ServerInstance, NettyClientConnection> pool) {
+  public void setPool(KeyedPool<ServerInstance, PooledClientConnection> pool) {
     _pool = pool;
   }
 
   @Override
-  public NettyClientConnection create(ServerInstance key) {
-    NettyClientConnection conn = new PooledClientConnection(_pool, key, _eventLoop, _timer, _metrics);
+  public PooledClientConnection create(ServerInstance key) {
+    PooledClientConnection conn = new PooledClientConnection(_pool, key, _eventLoop, _timer, _metrics);
     conn.connect();
     // At this point, we have already waited for a connection to complete. Whether it succeeds or fails,
     // we should return the object to the pool. It is possible to return null if the connection attempt
@@ -61,12 +61,12 @@ public class PooledNettyClientResourceManager implements PooledResourceManager<S
 
   // This destroy method is called ONLY when asyncpoolimpl wants to destroy the connection object.
   @Override
-  public boolean destroy(ServerInstance key, boolean isBad, NettyClientConnection resource) {
+  public boolean destroy(ServerInstance key, boolean isBad, PooledClientConnection resource) {
     LOGGER.info("Destroying client connection {}, isBad: {}", resource, isBad);
     boolean closed = false;
     try {
       resource.close();
-      ((PooledClientConnection)resource).setDestroyed(true);  // TODO define a new interface called PooledResourcet checko
+      resource.setDestroyed(true);
       closed = true;
     } catch (InterruptedException e) {
       LOGGER.error("Got interrupted exception when closing resource {}", resource, e);
@@ -76,7 +76,7 @@ public class PooledNettyClientResourceManager implements PooledResourceManager<S
   }
 
   @Override
-  public boolean validate(ServerInstance key, NettyClientConnection resource) {
+  public boolean validate(ServerInstance key, PooledClientConnection resource) {
     if ( null != resource)
       return resource.validate();
     return false;
@@ -87,10 +87,10 @@ public class PooledNettyClientResourceManager implements PooledResourceManager<S
    *
    */
   public class PooledClientConnection extends NettyTCPClientConnection implements Callback<NoneType> {
-    private final KeyedPool<ServerInstance, NettyClientConnection> _pool;
+    private final KeyedPool<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection> _pool;
     private boolean _destroyed = false;
 
-    public PooledClientConnection(KeyedPool<ServerInstance, NettyClientConnection> pool, ServerInstance server,
+    public PooledClientConnection(KeyedPool<ServerInstance, PooledClientConnection> pool, ServerInstance server,
         EventLoopGroup eventGroup, Timer timer, NettyClientMetrics metric) {
       super(server, eventGroup, timer, metric);
       _pool = pool;
@@ -122,7 +122,8 @@ public class PooledNettyClientResourceManager implements PooledResourceManager<S
        * We got error. Time to discard this connection.
        */
       if (!_destroyed) {
-        LOGGER.info("Destroying connection (onError) {} due to error connId {}", _server, getConnId(), arg0.getMessage());
+        LOGGER.info("Destroying connection (onError) {} due to error connId {}", _server, getConnId(),
+            arg0.getMessage());
         _pool.destroyObject(getServer(), this);
         _destroyed = true;
       }

@@ -42,8 +42,8 @@ import com.linkedin.pinot.transport.common.ReplicaSelection;
 import com.linkedin.pinot.transport.common.ReplicaSelectionGranularity;
 import com.linkedin.pinot.transport.common.SegmentId;
 import com.linkedin.pinot.transport.common.SegmentIdSet;
-import com.linkedin.pinot.transport.netty.NettyClientConnection;
 import com.linkedin.pinot.transport.netty.NettyClientConnection.ResponseFuture;
+import com.linkedin.pinot.transport.netty.PooledNettyClientResourceManager;
 import com.linkedin.pinot.transport.pool.KeyedPool;
 import com.yammer.metrics.core.Histogram;
 import com.yammer.metrics.core.MetricName;
@@ -76,9 +76,9 @@ public class ScatterGatherImpl implements ScatterGather {
   /**
    * Connection Pool for sending scatter-gather requests
    */
-  private final KeyedPool<ServerInstance, NettyClientConnection> _connPool;
+  private final KeyedPool<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection> _connPool;
 
-  public ScatterGatherImpl(KeyedPool<ServerInstance, NettyClientConnection> pool, ExecutorService service) {
+  public ScatterGatherImpl(KeyedPool<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection> pool, ExecutorService service) {
     _connPool = pool;
     _executorService = service;
   }
@@ -390,7 +390,7 @@ public class ScatterGatherImpl implements ScatterGather {
     private volatile ResponseFuture _responseFuture;
 
     // Connection Pool: Used if we need to checkin/destroy object in case of timeout
-    private final KeyedPool<ServerInstance, NettyClientConnection> _connPool;
+    private final KeyedPool<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection> _connPool;
 
     // Track if request has been dispatched
     private final AtomicBoolean _isSent = new AtomicBoolean(false);
@@ -406,7 +406,7 @@ public class ScatterGatherImpl implements ScatterGather {
     private long _startTime;
     private long _endTime;
 
-    public SingleRequestHandler(KeyedPool<ServerInstance, NettyClientConnection> connPool, ServerInstance server,
+    public SingleRequestHandler(KeyedPool<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection> connPool, ServerInstance server,
         ScatterGatherRequest request, SegmentIdSet segmentIds, long timeoutMS, CountDownLatch latch,
         final BrokerMetrics brokerMetrics) {
       _connPool = connPool;
@@ -450,8 +450,8 @@ public class ScatterGatherImpl implements ScatterGather {
         return;
       }
 
-      NettyClientConnection conn = null;
-      KeyedFuture<ServerInstance, NettyClientConnection> keyedFuture = null;
+      PooledNettyClientResourceManager.PooledClientConnection conn = null;
+      KeyedFuture<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection> keyedFuture = null;
       boolean gotConnection = false;
       boolean error = true;
       long timeRemainingMillis = _timeoutMS - (System.currentTimeMillis() - _startTime);
@@ -505,8 +505,8 @@ public class ScatterGatherImpl implements ScatterGather {
             _request.getRequestId(), gotConnection, e1.getMessage(), BrokerMeter.REQUEST_DROPPED_DUE_TO_CONNECTION_ERROR.toString());
         _responseFuture = new ResponseFuture(_server, e1, "Error Future for request " + _request.getRequestId());
       } catch (ConnectionLimitReachedException e) {
-        LOGGER.warn("Request {} not sent (gotConnection={}):{}. See metric {}", _request.getRequestId(),
-            gotConnection, e.getMessage(), BrokerMeter.REQUEST_DROPPED_DUE_TO_CONNECTION_ERROR);
+        LOGGER.warn("Request {} not sent (gotConnection={}):{}. See metric {}", _request.getRequestId(), gotConnection,
+            e.getMessage(), BrokerMeter.REQUEST_DROPPED_DUE_TO_CONNECTION_ERROR);
         _responseFuture = new ResponseFuture(_server, e, "Error Future for request " + _request.getRequestId());
       } catch (Exception e) {
         LOGGER.error("Got exception sending request ({})(gotConnection={}). Setting error future",
