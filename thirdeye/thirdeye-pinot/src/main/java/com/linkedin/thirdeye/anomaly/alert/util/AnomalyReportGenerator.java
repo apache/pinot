@@ -1,31 +1,11 @@
 package com.linkedin.thirdeye.anomaly.alert.util;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.google.common.base.Joiner;
-import com.google.common.base.Strings;
-import com.google.common.base.Throwables;
-import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
-import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import com.linkedin.thirdeye.anomaly.alert.AlertTaskRunner;
-import com.linkedin.thirdeye.anomaly.alert.v2.AlertTaskRunnerV2;
-import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
-import com.linkedin.thirdeye.api.DimensionMap;
-import com.linkedin.thirdeye.client.DAORegistry;
-import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
-import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-
-import freemarker.template.Configuration;
-import freemarker.template.Template;
-import freemarker.template.TemplateExceptionHandler;
-
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
+import java.nio.file.Files;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -43,9 +23,27 @@ import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.google.common.base.Joiner;
+import com.google.common.base.Strings;
+import com.google.common.base.Throwables;
+import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
+import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
+import com.linkedin.thirdeye.anomaly.alert.AlertTaskRunner;
+import com.linkedin.thirdeye.anomaly.alert.v2.AlertTaskRunnerV2;
+import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
+import com.linkedin.thirdeye.api.DimensionMap;
+import com.linkedin.thirdeye.client.DAORegistry;
+import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
+import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+
+import freemarker.template.Configuration;
+import freemarker.template.Template;
+import freemarker.template.TemplateExceptionHandler;
 
 public class AnomalyReportGenerator {
 
@@ -145,8 +143,7 @@ public class AnomalyReportGenerator {
           }
         }
 
-        String feedbackVal = getFeedback(
-            feedback == null ? "Not Resolved" : "Resolved(" + feedback.getFeedbackType().name() + ")");
+        String feedbackVal = getFeedbackValue(feedback);
 
         AnomalyReportDTO anomalyReportDTO = new AnomalyReportDTO(String.valueOf(anomaly.getId()),
             getAnomalyURL(anomaly, configuration.getDashboardHost()),
@@ -291,16 +288,25 @@ public class AnomalyReportGenerator {
     return tz.getDisplayName(true, 0);
   }
 
-  private String getFeedback(String feedbackType) {
-    switch (feedbackType) {
-    case "ANOMALY":
-      return "Resolved (Confirmed Anomaly)";
-    case "NOT_ANOMALY":
-      return "Resolved (False Alarm)";
-    case "ANOMALY_NO_ACTION":
-      return "Not Actionable";
+  private String getFeedbackValue(AnomalyFeedback feedback) {
+    String feedbackVal = "Not Resolved";
+    if (feedback != null && feedback.getFeedbackType() != null) {
+      switch (feedback.getFeedbackType()) {
+        case ANOMALY:
+          feedbackVal = "Resolved (Confirmed Anomaly)";
+          break;
+        case NOT_ANOMALY:
+          feedbackVal = "Resolved (False Alarm)";
+          break;
+        case ANOMALY_NO_ACTION:
+          feedbackVal = "Not Actionable";
+          break;
+      case NO_FEEDBACK:
+      default:
+        break;
+      }
     }
-    return "Not Resolved";
+    return feedbackVal;
   }
 
   private String getAnomalyURL(MergedAnomalyResultDTO anomalyResultDTO, String dashboardUrl) {
