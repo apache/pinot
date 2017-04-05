@@ -264,6 +264,8 @@ DimensionTreeMapView.prototype = {
       });
 
     }
+    // anchor page to dimension tree map if exists
+    $("#dimension-tree-map-placeholder").get(0).scrollIntoView()
   },
 
   calculateBaselineDate(dateType, offset) {

@@ -915,7 +915,7 @@ text {
 .analysis-chart {
   display: flex;
   flex-direction: row-reverse;
-  height: 448px;
+  height: 348px;
 }
 
 .analysis-chart__graph {
@@ -976,7 +976,8 @@ text {
 }
 
 .contribution-analysis__daterangepicker {
-  flex-grow: 1;
+    flex: 1 1 0%;
+    min-width: 0%;
 }
 
 .contribution-analysis__daterangepicker + .contribution-analysis__daterangepicker {

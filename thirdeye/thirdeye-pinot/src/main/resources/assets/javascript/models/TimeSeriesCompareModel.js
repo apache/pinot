@@ -19,6 +19,12 @@ function TimeSeriesCompareModel() {
   this.subDimensionsIndex = {};
   this.subDimensionContributionDetails;
   this.timeBucketDiff;
+
+  this.showTime = () => {
+    return this.granularity !== 'DAYS';
+  };
+
+  // this.showTime = true;
 }
 
 TimeSeriesCompareModel.prototype = {
@@ -52,6 +58,10 @@ TimeSeriesCompareModel.prototype = {
       if (params.filters) {
         this.filters = params.filters;
       }
+
+      this.heatMapCurrentStart = params.heatMapCurrentStart || this.heatMapCurrentStart;
+      this.heatMapCurrentEnd = params.heatMapCurrentEnd || this.heatMapCurrentEnd;
+
     }
   },
 

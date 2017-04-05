@@ -54,6 +54,11 @@ Handlebars.registerHelper('displayMonthDayHour', function (date) {
   return moment(date).tz(tz).format('M-D H');
 });
 
+Handlebars.registerHelper('displayMonthDay', function (date) {
+  var tz = getTimeZone();
+  return moment(date).tz(tz).format('M-D');
+});
+
 Handlebars.registerHelper('if_eq', function(a, b, opts) {
   if (a == b) {
       return opts.fn(this);

@@ -5,7 +5,13 @@
       <tr>
         <th class="analysis-table__anchor"></th>
         {{#each this.subDimensionContributionDetails.timeBucketsCurrent as |timestamp timeIndex|}}
-        <th class="analysis-table__header">{{displayMonthDayHour timestamp}}</th>
+        <th class="analysis-table__header">
+          {{#if ../showTime}}
+            {{displayMonthDayHour timestamp}}
+          {{else}}
+            {{displayMonthDay timestamp}}
+          {{/if}}
+        </th>
         {{/each}}
       </tr>
       </thead>
