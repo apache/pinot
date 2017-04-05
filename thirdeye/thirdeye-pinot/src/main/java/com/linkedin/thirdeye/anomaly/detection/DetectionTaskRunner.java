@@ -25,6 +25,7 @@ import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 import com.linkedin.thirdeye.detector.metric.transfer.MetricTransfer;
 import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
+import com.linkedin.thirdeye.anomaly.detection.DetectionJobContext.DetectionJobType;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -54,7 +55,7 @@ public class DetectionTaskRunner implements TaskRunner {
   private List<DateTime> windowEnds;
   private AnomalyFunctionDTO anomalyFunctionSpec;
   private long jobExecutionId;
-  private DetectionJobContext.DetectionJobType detectionJobType;
+  private DetectionJobType detectionJobType;
 
   private List<String> collectionDimensions;
   private AnomalyFunctionFactory anomalyFunctionFactory;
@@ -83,7 +84,7 @@ public class DetectionTaskRunner implements TaskRunner {
     jobExecutionId = detectionTaskInfo.getJobExecutionId();
     anomalyFunctionFactory = taskContext.getAnomalyFunctionFactory();
     anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
-    detectionJobType = ((DetectionTaskInfo) taskInfo).getDetectionJobType();
+    detectionJobType = detectionTaskInfo.getDetectionJobType();
 
     String dataset = anomalyFunctionSpec.getCollection();
     DatasetConfigDTO datasetConfig = DAO_REGISTRY.getDatasetConfigDAO().findByDataset(dataset);
@@ -117,8 +118,8 @@ public class DetectionTaskRunner implements TaskRunner {
     boolean isBackfill = false;
     // If the current job is a backfill (adhoc) detection job, set notified flag to true so the merged anomalies do not
     // induce alerts and emails.
-    if (detectionJobType != null && (detectionJobType.equals(DetectionJobContext.DetectionJobType.BACKFILL) ||
-        detectionJobType.equals(DetectionJobContext.DetectionJobType.OFFLINE))) {
+    if (detectionJobType != null && (detectionJobType.equals(DetectionJobType.BACKFILL) ||
+        detectionJobType.equals(DetectionJobType.OFFLINE))) {
       LOG.info("BACKFILL is triggered for Detection Job {}. Notified flag is set to be true", jobExecutionId);
       isBackfill = true;
     }
@@ -252,7 +253,7 @@ public class DetectionTaskRunner implements TaskRunner {
     Check if current task is running offline analysis
      */
     boolean isOffline = false;
-    if (detectionJobType != null && detectionJobType.equals(DetectionJobContext.DetectionJobType.OFFLINE)) {
+    if (detectionJobType != null && detectionJobType.equals(DetectionJobType.OFFLINE)) {
       LOG.info("Detection Job {} is running under OFFLINE mode", jobExecutionId);
       isOffline = true;
     }

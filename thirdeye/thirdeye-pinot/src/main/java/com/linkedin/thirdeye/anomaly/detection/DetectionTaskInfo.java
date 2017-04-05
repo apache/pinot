@@ -12,6 +12,7 @@ import com.linkedin.thirdeye.anomaly.task.TaskInfo;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.util.CustomListDateDeserializer;
 import com.linkedin.thirdeye.util.CustomListDateSerializer;
+import com.linkedin.thirdeye.anomaly.detection.DetectionJobContext.DetectionJobType;
 
 public class DetectionTaskInfo implements TaskInfo {
 
@@ -26,11 +27,11 @@ public class DetectionTaskInfo implements TaskInfo {
   private List<DateTime> windowEndTime;
   private AnomalyFunctionDTO anomalyFunctionSpec;
   private String groupByDimension;
-  private DetectionJobContext.DetectionJobType detectionJobType;
+  private DetectionJobType detectionJobType;
 
   public DetectionTaskInfo(long jobExecutionId, List<DateTime> windowStartTime,
       List<DateTime> windowEndTime, AnomalyFunctionDTO anomalyFunctionSpec, String groupByDimension,
-      DetectionJobContext.DetectionJobType detectionJobType) {
+      DetectionJobType detectionJobType) {
     this.jobExecutionId = jobExecutionId;
     this.windowStartTime = windowStartTime;
     this.windowEndTime = windowEndTime;
@@ -83,11 +84,11 @@ public class DetectionTaskInfo implements TaskInfo {
     this.groupByDimension = groupByDimension;
   }
 
-  public DetectionJobContext.DetectionJobType getDetectionJobType() {
+  public DetectionJobType getDetectionJobType() {
     return detectionJobType;
   }
 
-  public void setDetectionJobType(DetectionJobContext.DetectionJobType detectionJobType) {
+  public void setDetectionJobType(DetectionJobType detectionJobType) {
     this.detectionJobType = detectionJobType;
   }
 

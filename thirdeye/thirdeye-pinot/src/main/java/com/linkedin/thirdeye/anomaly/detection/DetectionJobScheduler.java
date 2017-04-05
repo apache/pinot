@@ -7,6 +7,7 @@ import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
+import com.linkedin.thirdeye.anomaly.detection.DetectionJobContext.DetectionJobType;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionStatusDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
@@ -169,9 +170,9 @@ public class DetectionJobScheduler implements Runnable {
       AnomalyFunctionDTO anomalyFunction, List<DetectionStatusDTO> detectionStatusToUpdate, boolean isBackfill) {
     Long jobExecutionId = null;
     if (!startTimes.isEmpty() && !endTimes.isEmpty() && startTimes.size() == endTimes.size()) {
-      DetectionJobContext.DetectionJobType detectionJobType = null;
+      DetectionJobType detectionJobType = null;
       if(isBackfill) {
-        detectionJobType = DetectionJobContext.DetectionJobType.BACKFILL;
+        detectionJobType = DetectionJobType.BACKFILL;
       }
       jobExecutionId = runAnomalyFunctionOnRanges(anomalyFunction, startTimes, endTimes, detectionJobType);
       LOG.info("Function: {} Dataset: {} Created job {} for running anomaly function {} on ranges {} to {}",
@@ -276,7 +277,7 @@ public class DetectionJobScheduler implements Runnable {
    * @return
    */
   private Long runAnomalyFunctionOnRanges(AnomalyFunctionDTO anomalyFunction, List<Long> startTimes, List<Long> endTimes,
-      DetectionJobContext.DetectionJobType detectionJobType) {
+      DetectionJobType detectionJobType) {
     DetectionJobContext detectionJobContext = new DetectionJobContext();
     detectionJobContext.setAnomalyFunctionId(anomalyFunction.getId());
     detectionJobContext.setAnomalyFunctionSpec(anomalyFunction);
@@ -320,7 +321,7 @@ public class DetectionJobScheduler implements Runnable {
     List<Long> analysisTimeList = new ArrayList<>();
     analysisTimeList.add(analysisTime.getMillis());
     List<DetectionStatusDTO> findAllInTimeRange = new ArrayList<>();
-    jobId = runAnomalyFunctionOnRanges(anomalyFunction, analysisTimeList, analysisTimeList, DetectionJobContext.DetectionJobType.OFFLINE);
+    jobId = runAnomalyFunctionOnRanges(anomalyFunction, analysisTimeList, analysisTimeList, DetectionJobType.OFFLINE);
     LOG.info("Function: {} Dataset: {} Generated offline analysis job for detecting anomalies for data points "
         + "whose ends before {}", functionId, dataset, analysisTime);
 
