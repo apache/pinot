@@ -45,7 +45,7 @@ public class DashboardConfigManagerImpl extends AbstractManagerImpl<DashboardCon
     return findByPredicate(Predicate.AND(datasetPredicate, activePredicate));
   }
 
-  public List<DashboardConfigDTO> findWhereNameLike(String name) {
+  public List<DashboardConfigDTO> findWhereNameLikeAndActive(String name) {
     Map<String, Object> parameterMap = new HashMap<>();
     parameterMap.put("name", name);
     parameterMap.put("active", true);

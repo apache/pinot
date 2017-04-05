@@ -176,7 +176,7 @@ public class DataResource {
   public List<DashboardConfigDTO> getDashboardsWhereNameLike(@QueryParam("name") String name) {
     List<DashboardConfigDTO> dashboardConfigs = Collections.emptyList();
     if (StringUtils.isNotBlank(name)) {
-      dashboardConfigs = dashboardConfigDAO.findWhereNameLike("%" + name + "%");
+      dashboardConfigs = dashboardConfigDAO.findWhereNameLikeAndActive("%" + name + "%");
     }
     return dashboardConfigs;
   }
@@ -186,7 +186,7 @@ public class DataResource {
   public List<MetricConfigDTO> getMetricsWhereNameLike(@QueryParam("name") String name) {
     List<MetricConfigDTO> metricConfigs = Collections.emptyList();
     if (StringUtils.isNotBlank(name)) {
-      metricConfigs = metricConfigDAO.findWhereNameLike("%" + name + "%");
+      metricConfigs = metricConfigDAO.findWhereNameLikeAndActive("%" + name + "%");
     }
     return metricConfigs;
   }
