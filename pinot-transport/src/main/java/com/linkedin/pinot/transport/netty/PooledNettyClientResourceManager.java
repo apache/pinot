@@ -59,13 +59,14 @@ public class PooledNettyClientResourceManager implements PooledResourceManager<S
     return conn;
   }
 
+  // This destroy method is called ONLY when asyncpoolimpl wants to destroy the connection object.
   @Override
   public boolean destroy(ServerInstance key, boolean isBad, NettyClientConnection resource) {
-
     LOGGER.info("Destroying client connection {}, isBad: {}", resource, isBad);
     boolean closed = false;
     try {
       resource.close();
+      ((PooledClientConnection)resource).setDestroyed(true);  // TODO define a new interface called PooledResourcet checko
       closed = true;
     } catch (InterruptedException e) {
       LOGGER.error("Got interrupted exception when closing resource {}", resource, e);
@@ -96,6 +97,10 @@ public class PooledNettyClientResourceManager implements PooledResourceManager<S
       init();
     }
 
+    public void setDestroyed(boolean isDestroyed) {
+      _destroyed = isDestroyed;
+    }
+
     public void init() {
       setRequestCallback(this);
     }
@@ -117,7 +122,7 @@ public class PooledNettyClientResourceManager implements PooledResourceManager<S
        * We got error. Time to discard this connection.
        */
       if (!_destroyed) {
-        LOGGER.error("Destroying connection {} due to error connId {}", _server, getConnId(), arg0);
+        LOGGER.info("Destroying connection (onError) {} due to error connId {}", _server, getConnId(), arg0.getMessage());
         _pool.destroyObject(getServer(), this);
         _destroyed = true;
       }
@@ -127,7 +132,7 @@ public class PooledNettyClientResourceManager implements PooledResourceManager<S
     protected void releaseResources() {
       // _pool is null in tests only.
       if (_pool != null && !_destroyed) {
-        LOGGER.error("Destroying connection {} due to error connId {}", _server, getConnId());
+        LOGGER.info("Destroying connection (releaseResources) {} due to error connId {}", _server, getConnId());
         _pool.destroyObject(getServer(), this);
         _destroyed = true;
       }

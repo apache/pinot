@@ -145,7 +145,7 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
     } catch (Exception ie) {
       if (ie instanceof ConnectException && ie.getMessage() != null && ie.getMessage().startsWith("Connection refused")) {
         // Most common case when a server is down. Don't print the entire stack and fill the logs.
-        LOGGER.error("Could not connect to server {}:{} connId:{}", _server, ie.getMessage(), getConnId());
+        LOGGER.info("Could not connect to server {}:{} connId:{}", _server, ie.getMessage(), getConnId());
       } else {
         LOGGER.error("Got exception when connecting to server {} connId {}", _server, ie, getConnId());
       }
@@ -258,6 +258,9 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
   public class NettyClientConnectionHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+      // called when:
+      // 1. idle server restart
+      // 2. Also when an idle connection is closed by broker. In that case, self-close is set to true.
       LOGGER.info("Client Channel to server ({}) (id = {}) in inactive state (closed).  !!", _server, _connId);
       Exception ex = new Exception("Client Channel to server (" + _server + ") is in inactive state (closed) !!");
       closeOnError(ctx, ex);
@@ -307,7 +310,10 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-      LOGGER.error("Got exception in the channel to {}, connId {}", _server, getConnId(), cause);
+      // Called from netty when we get an exception in the channel. Typically this is when the server restarts
+      // and we have connections that may or may not have outstanding requests. Connections could also be in the
+      // process of being set up when we get this exception.
+      LOGGER.info("Got exception in the channel to {}, connId {}, cause:{}", _server, getConnId(), cause.getMessage());
       closeOnError(ctx, cause);
       releaseResources();
     }
@@ -406,7 +412,7 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
       String message =
           "Request (" + _lastRequestId + ") to server " + _server + " connId " + getConnId()
               + " timed-out waiting for response. Closing the channel !!";
-      LOGGER.error(message);
+      LOGGER.info(message);
       Exception e = new Exception(message);
       _outstandingFuture.get().onError(e);
       close();

@@ -15,6 +15,19 @@
  */
 package com.linkedin.pinot.transport.scattergather;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.metrics.BrokerMeter;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.metrics.BrokerQueryPhase;
@@ -36,21 +49,8 @@ import com.yammer.metrics.core.Histogram;
 import com.yammer.metrics.core.MetricName;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -59,6 +59,12 @@ import org.slf4j.LoggerFactory;
  *
  */
 public class ScatterGatherImpl implements ScatterGather {
+
+  private static class RequestNotSentException extends RuntimeException {
+    RequestNotSentException(String msg) {
+      super(msg);
+    }
+  }
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ScatterGatherImpl.class);
 
@@ -479,12 +485,12 @@ public class ScatterGatherImpl implements ScatterGather {
           if (errorMap != null && errorMap.containsKey(_server)) {
             errStr = errorMap.get(_server).getMessage();
           }
-          LOGGER.warn("Destroying invalid conn {}:{}", conn, errStr);
+          LOGGER.info("Destroying invalid conn {}:{}", conn, errStr);
           if (conn != null) {
             _connPool.destroyObject(_server, conn);
           }
           if (++ntries == MAX_CONN_RETRIES-1) {
-            throw new RuntimeException("Could not connect to " + _server + " after " + ntries + "attempts(timeRemaining=" + timeRemainingMillis + "ms)");
+            throw new RequestNotSentException("Could not connect to " + _server + " after " + ntries + " attempts(timeRemaining=" + timeRemainingMillis + "ms)");
           }
           keyedFuture = _connPool.checkoutObject(_server);
           timeRemainingMillis = _timeoutMS - (System.currentTimeMillis() - _startTime);
@@ -495,9 +501,14 @@ public class ScatterGatherImpl implements ScatterGather {
         LOGGER.debug("Response Future is : {}", _responseFuture);
         error = false;
       } catch (TimeoutException e1) {
-        LOGGER.error("Timed out waiting for connection for server ({})({})(gotConnection={}). Setting error future",
-            _server, _request.getRequestId(), gotConnection, e1);
+        LOGGER.info("Timed out waiting for connection for server ({})({})(gotConnection={}). Setting error future",
+            _server, _request.getRequestId(), gotConnection, e1.getMessage());
         _responseFuture = new ResponseFuture(_server, e1, "Error Future for request " + _request.getRequestId());
+      } catch (RequestNotSentException e) {
+        LOGGER.info("Request {} not sent (gotConnection={}):{}. Setting error future",
+            _request.getRequestId(), gotConnection, e.getMessage());
+        _responseFuture = new ResponseFuture(_server, e, "Error Future for request " + _request.getRequestId());
+
       } catch (Exception e) {
         LOGGER.error("Got exception sending request ({})(gotConnection={}). Setting error future",
             _request.getRequestId(), gotConnection, e);

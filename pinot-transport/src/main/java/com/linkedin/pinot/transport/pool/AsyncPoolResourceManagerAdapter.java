@@ -30,6 +30,8 @@ import com.yammer.metrics.core.MetricName;
 import com.yammer.metrics.core.MetricsRegistry;
 
 
+// The create() and destoy() methods in this class are ONLY called from
+// AsyncPoolImpl when a connection needs to be created or destroyed.
 public class AsyncPoolResourceManagerAdapter<K, T> implements Lifecycle<T> {
   private static final Logger LOGGER = LoggerFactory.getLogger(AsyncPoolResourceManagerAdapter.class);
 
@@ -87,7 +89,6 @@ public class AsyncPoolResourceManagerAdapter<K, T> implements Lifecycle<T> {
 
       @Override
       public void run() {
-
         LOGGER.info("Running teardown for the client connection " + obj + " Error is : " + error);
         boolean success = _resourceManager.destroy(_key, error, obj);
         if (success) {

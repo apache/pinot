@@ -15,6 +15,16 @@
  */
 package com.linkedin.pinot.transport.pool;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.transport.common.AsyncResponseFuture;
 import com.linkedin.pinot.transport.common.Callback;
 import com.linkedin.pinot.transport.common.Cancellable;
@@ -27,16 +37,6 @@ import com.linkedin.pinot.transport.metrics.PoolStats;
 import com.linkedin.pinot.transport.pool.AsyncPoolImpl.Strategy;
 import com.yammer.metrics.core.Histogram;
 import com.yammer.metrics.core.MetricsRegistry;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map.Entry;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ScheduledExecutorService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class KeyedPoolImpl<K, T> implements KeyedPool<K, T> {
@@ -156,7 +156,7 @@ public class KeyedPoolImpl<K, T> implements KeyedPool<K, T> {
   @Override
   public void destroyObject(K key, T object) {
     AsyncPool<T> pool = _keyedPool.get(key);
-    LOGGER.error("Destroying object for the key (" + key + ") object :" + object);
+    LOGGER.info("Destroying object for the key (" + key + ") object :" + object);
     if (null != pool) {
       pool.dispose(object);
     } else {
