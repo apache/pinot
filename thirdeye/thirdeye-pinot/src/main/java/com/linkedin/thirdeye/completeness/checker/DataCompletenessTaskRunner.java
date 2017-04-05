@@ -137,7 +137,7 @@ public class DataCompletenessTaskRunner implements TaskRunner {
                 DAO_REGISTRY.getDataCompletenessConfigDAO().findAllByDatasetAndInTimeRangeAndStatus(dataset, adjustedStart, expectedDelayStart, false);
             for (DataCompletenessConfigDTO entry : olderThanExpectedDelayAndNotComplete) {
               if (!entry.isDelayNotified()) {
-                incompleteEntriesToNotify.putAll(dataset, olderThanExpectedDelayAndNotComplete);
+                incompleteEntriesToNotify.put(dataset, entry);
                 entry.setDelayNotified(true);
                 DAO_REGISTRY.getDataCompletenessConfigDAO().update(entry);
               }
