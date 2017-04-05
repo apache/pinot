@@ -8,7 +8,7 @@ import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 public class DetectionJobContext extends JobContext {
 
   public enum DetectionJobType {
-    BACKFILL, OFFLINE
+    DEFAULT, BACKFILL, OFFLINE
   }
 
 

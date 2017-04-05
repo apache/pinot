@@ -27,7 +27,7 @@ public class DetectionTaskInfo implements TaskInfo {
   private List<DateTime> windowEndTime;
   private AnomalyFunctionDTO anomalyFunctionSpec;
   private String groupByDimension;
-  private DetectionJobType detectionJobType;
+  private DetectionJobType detectionJobType = DetectionJobType.DEFAULT;
 
   public DetectionTaskInfo(long jobExecutionId, List<DateTime> windowStartTime,
       List<DateTime> windowEndTime, AnomalyFunctionDTO anomalyFunctionSpec, String groupByDimension,
@@ -41,7 +41,7 @@ public class DetectionTaskInfo implements TaskInfo {
   }
 
   public DetectionTaskInfo() {
-
+    this.detectionJobType = DetectionJobType.DEFAULT;
   }
 
   public long getJobExecutionId() {

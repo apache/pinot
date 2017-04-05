@@ -170,7 +170,7 @@ public class DetectionJobScheduler implements Runnable {
       AnomalyFunctionDTO anomalyFunction, List<DetectionStatusDTO> detectionStatusToUpdate, boolean isBackfill) {
     Long jobExecutionId = null;
     if (!startTimes.isEmpty() && !endTimes.isEmpty() && startTimes.size() == endTimes.size()) {
-      DetectionJobType detectionJobType = null;
+      DetectionJobType detectionJobType = DetectionJobType.DEFAULT;
       if(isBackfill) {
         detectionJobType = DetectionJobType.BACKFILL;
       }
@@ -212,7 +212,8 @@ public class DetectionJobScheduler implements Runnable {
 
     boolean pass = checkIfDetectionRunCriteriaMet(startTime, endTime, datasetConfig, anomalyFunction);
     if (pass) {
-      jobExecutionId = runAnomalyFunctionOnRanges(anomalyFunction, Lists.newArrayList(startTime), Lists.newArrayList(endTime), null);
+      jobExecutionId = runAnomalyFunctionOnRanges(anomalyFunction, Lists.newArrayList(startTime), Lists.newArrayList(endTime),
+          DetectionJobType.DEFAULT);
     } else {
       LOG.warn("Function: {} Dataset: {} Data incomplete for monitoring window {} ({}) to {} ({}), skipping anomaly detection",
           functionId, dataset, startTime, new DateTime(startTime), endTime, new DateTime(endTime));
