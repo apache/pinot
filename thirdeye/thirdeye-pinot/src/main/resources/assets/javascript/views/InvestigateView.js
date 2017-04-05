@@ -46,20 +46,28 @@ InvestigateView.prototype = {
   },
 
   formatWowResults( wowResults, args = {}){
-    const { anomalyStart, anomalyEnd, dataset, metricId, timeUnit } = args;
+    const { anomalyStart, anomalyEnd, dataset, metricId, timeUnit, currentStart, currentEnd} = args;
     const filters = {}
-    const start = moment(anomalyStart); //.tz(constants.TIME_ZONE);
-    const end = moment(anomalyEnd); //.tz(constants.TIME_ZONE);
-
+    const start = moment(currentStart); //.tz(constants.TIME_ZONE);
+    const end = moment(currentEnd); //.tz(constants.TIME_ZONE);
+    const heatMapCurrentStart = moment(anomalyStart);
+    const heatMapCurrentEnd = moment(anomalyEnd);
     return wowResults
       .filter(wow => wow.compareMode !== 'Wo4W')
       .map((wow) => {
         const offset = constants.WOW_MAPPING[wow.compareMode];
         const baselineStart = start.clone().subtract(offset, 'days');
         const baselineEnd = end.clone().subtract(offset, 'days');
+        const heatMapBaselineStart = heatMapCurrentStart.clone().subtract(offset, 'days');
+        const heatMapBaselineEnd = heatMapCurrentEnd.clone().subtract(offset, 'days');
         wow.change *= 100;
         // wow.url = `dashboard#view=compare&dataset=${dataset}&compareMode=WoW&aggTimeGranularity=aggregateAll&currentStart=${start.valueOf()}&currentEnd=${end.valueOf()}&baselineStart=${baselineStart.valueOf()}&baselineEnd=${baselineEnd.valueOf()}&metrics=${metric}`;
-        wow.url = `thirdeye#analysis?currentStart=${start.valueOf()}&currentEnd=${end.valueOf()}&baselineStart=${baselineStart.valueOf()}&baselineEnd=${baselineEnd.valueOf()}&compareMode=${wow.compareMode}&metricId=${metricId}&filters={}&granularity=${timeUnit}&dimension=All`;
+        wow.url = `thirdeye#analysis?currentStart=${start.valueOf()}&currentEnd=${end.valueOf()}&` +
+            `baselineStart=${baselineStart.valueOf()}&baselineEnd=${baselineEnd.valueOf()}&` +
+            `compareMode=${wow.compareMode}&metricId=${metricId}&filters={}&granularity=${timeUnit}&` +
+            `dimension=All&heatMapCurrentStart=${heatMapCurrentStart.valueOf()}&` +
+            `heatMapCurrentEnd=${heatMapCurrentEnd.valueOf()}&heatMapBaselineStart=${heatMapBaselineStart.valueOf()}&` +
+            `heatMapBaselineEnd=${heatMapBaselineEnd.valueOf()}`;
         return wow;
       });
   },

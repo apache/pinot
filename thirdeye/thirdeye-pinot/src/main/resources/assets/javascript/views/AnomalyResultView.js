@@ -145,8 +145,8 @@ AnomalyResultView.prototype = {
     const $anomalyTimeRangeEnd = $('#anomalies-time-range-end span');
 
     function cb(start, end, rangeType = constants.DATE_RANGE_CUSTOM) {
-      $anomalyTimeRangeStart.addClass('time-range').html(start.format(constants.DATE_RANGE_FORMAT));
-      $anomalyTimeRangeEnd.addClass('time-range').html(end.format(constants.DATE_RANGE_FORMAT));
+      $anomalyTimeRangeStart.addClass('time-range').html(start.format(constants.DATE_TIME_RANGE_FORMAT));
+      $anomalyTimeRangeEnd.addClass('time-range').html(end.format(constants.DATE_TIME_RANGE_FORMAT));
     }
     $('#anomalies-time-range-start').daterangepicker(this.timeRangeConfig, cb);
 

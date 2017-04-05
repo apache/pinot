@@ -17,26 +17,32 @@ var contributor_table_template = $("#contributor-table-details-template").html()
   this.contributor_table_placeHolderId = "#contributor-table-placeholder";
   this.heatmapRenderEvent = new Event(this);
 
-  this.viewParams;
+  this.viewParams = {};
   this.chart;
 }
 
 TimeSeriesCompareView.prototype = {
   render: function () {
-    var self = this;
     if (this.timeSeriesCompareModel.subDimensionContributionDetails) {
+      const heatmapCurrentStart = this.timeSeriesCompareModel.heatMapCurrentStart;
+      const heatmapCurrentEnd = this.timeSeriesCompareModel.heatMapCurrentEnd;
+
       this.renderChartSection();
+      if (heatmapCurrentStart && heatmapCurrentEnd) {
+        this.loadAnomalyRegion(heatmapCurrentStart, heatmapCurrentEnd);
+      }
       this.renderPercentageChangeSection();
+
       this.setupListenersForDetailsAndCumulativeCheckBoxes();
 
       // set initial view params for rendering heatmap
       this.viewParams = {
-        metricId: self.timeSeriesCompareModel.metricId,
-        heatmapCurrentStart: self.timeSeriesCompareModel.currentStart,
-        heatmapCurrentEnd: self.timeSeriesCompareModel.currentEnd,
-        heatmapBaselineStart: self.timeSeriesCompareModel.baselineStart,
-        heatmapBaselineEnd: self.timeSeriesCompareModel.baselineEnd,
-        heatmapFilters: self.timeSeriesCompareModel.filters
+        metricId: this.timeSeriesCompareModel.metricId,
+        heatmapCurrentStart: this.timeSeriesCompareModel.heatmapCurrentStart || this.timeSeriesCompareModel.currentStart,
+        heatmapCurrentEnd: this.timeSeriesCompareModel.heatMapCurrentEnd || this.timeSeriesCompareModel.currentEnd,
+        heatmapBaselineStart: this.timeSeriesCompareModel.baselineStart,
+        heatmapBaselineEnd: this.timeSeriesCompareModel.baselineEnd,
+        heatmapFilters: this.timeSeriesCompareModel.filters
       };
     }
   },
@@ -63,6 +69,7 @@ TimeSeriesCompareView.prototype = {
     // otherwise, we run into overflow issues
     this.loadChart(
         this.timeSeriesCompareModel.subDimensionContributionDetails.contributionMap['All']);
+    this.loadAnomalyRegion();
     this.setupListenerForChartSubDimension();
   },
 
@@ -112,8 +119,8 @@ TimeSeriesCompareView.prototype = {
     });
   },
 
-  loadAnomalyRegion() {
-    const { heatMapCurrentStart, heatMapCurrentEnd } = this.viewParams;
+  loadAnomalyRegion(heatMapCurrentStart, heatMapCurrentEnd) {
+    if (!(heatMapCurrentStart && heatMapCurrentEnd)) return;
     const regions = {
         axis: 'x',
         start: heatMapCurrentStart.format(constants.TIMESERIES_DATE_FORMAT),
@@ -152,7 +159,8 @@ TimeSeriesCompareView.prototype = {
           var subDimension = this.timeSeriesCompareModel.subDimensions[subDimensionBucketIndexArr[0]];
           var bucketIndex = subDimensionBucketIndexArr[1];
           this.collectAndUpdateViewParamsForHeatMapRendering(subDimension, bucketIndex);
-          this.loadAnomalyRegion();
+          const { heatMapCurrentStart, heatMapCurrentEnd } = this.viewParams;
+          this.loadAnomalyRegion(heatMapCurrentStart, heatMapCurrentEnd);
           this.heatmapRenderEvent.notify();
         });
       }
