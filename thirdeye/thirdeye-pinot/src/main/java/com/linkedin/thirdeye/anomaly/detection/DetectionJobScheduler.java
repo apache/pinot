@@ -150,7 +150,7 @@ public class DetectionJobScheduler implements Runnable {
         }
 
         // If any time periods found, for which detection needs to be run
-        runAnomalyFunctionAndUpdateDetectionStatus(startTimes, endTimes, anomalyFunction, detectionStatusToUpdate);
+        runAnomalyFunctionAndUpdateDetectionStatus(startTimes, endTimes, anomalyFunction, detectionStatusToUpdate, false);
 
       } catch (Exception e) {
         LOG.error("Function: {} Dataset: {} Exception in running anomaly function {}", anomalyFunction.getId(), anomalyFunction.getCollection(), anomalyFunction, e);
@@ -166,10 +166,14 @@ public class DetectionJobScheduler implements Runnable {
    * @param detectionStatusToUpdate
    */
   private Long runAnomalyFunctionAndUpdateDetectionStatus(List<Long> startTimes, List<Long> endTimes,
-      AnomalyFunctionDTO anomalyFunction, List<DetectionStatusDTO> detectionStatusToUpdate) {
+      AnomalyFunctionDTO anomalyFunction, List<DetectionStatusDTO> detectionStatusToUpdate, boolean isBackfill) {
     Long jobExecutionId = null;
     if (!startTimes.isEmpty() && !endTimes.isEmpty() && startTimes.size() == endTimes.size()) {
-      jobExecutionId = runAnomalyFunctionOnRanges(anomalyFunction, startTimes, endTimes);
+      DetectionJobContext.DetectionJobType detectionJobType = null;
+      if(isBackfill) {
+        detectionJobType = DetectionJobContext.DetectionJobType.BACKFILL;
+      }
+      jobExecutionId = runAnomalyFunctionOnRanges(anomalyFunction, startTimes, endTimes, detectionJobType);
       LOG.info("Function: {} Dataset: {} Created job {} for running anomaly function {} on ranges {} to {}",
           anomalyFunction.getId(), anomalyFunction.getCollection(), jobExecutionId, anomalyFunction, startTimes, endTimes);
 
@@ -207,7 +211,7 @@ public class DetectionJobScheduler implements Runnable {
 
     boolean pass = checkIfDetectionRunCriteriaMet(startTime, endTime, datasetConfig, anomalyFunction);
     if (pass) {
-      jobExecutionId = runAnomalyFunctionOnRanges(anomalyFunction, Lists.newArrayList(startTime), Lists.newArrayList(endTime));
+      jobExecutionId = runAnomalyFunctionOnRanges(anomalyFunction, Lists.newArrayList(startTime), Lists.newArrayList(endTime), null);
     } else {
       LOG.warn("Function: {} Dataset: {} Data incomplete for monitoring window {} ({}) to {} ({}), skipping anomaly detection",
           functionId, dataset, startTime, new DateTime(startTime), endTime, new DateTime(endTime));
@@ -271,32 +275,15 @@ public class DetectionJobScheduler implements Runnable {
    * @param endTimes
    * @return
    */
-  private Long runAnomalyFunctionOnRanges(AnomalyFunctionDTO anomalyFunction, List<Long> startTimes, List<Long> endTimes) {
+  private Long runAnomalyFunctionOnRanges(AnomalyFunctionDTO anomalyFunction, List<Long> startTimes, List<Long> endTimes,
+      DetectionJobContext.DetectionJobType detectionJobType) {
     DetectionJobContext detectionJobContext = new DetectionJobContext();
     detectionJobContext.setAnomalyFunctionId(anomalyFunction.getId());
     detectionJobContext.setAnomalyFunctionSpec(anomalyFunction);
     detectionJobContext.setJobName(DetectionJobSchedulerUtils.createJobName(anomalyFunction, startTimes, endTimes));
     detectionJobContext.setStartTimes(startTimes);
     detectionJobContext.setEndTimes(endTimes);
-    Long jobExecutionId = detectionJobRunner.run(detectionJobContext);
-    LOG.info("Function: {} Dataset: {} Created job {}", anomalyFunction.getId(), anomalyFunction.getCollection(), jobExecutionId);
-    return jobExecutionId;
-  }
-
-  /**
-   * Creates detection context for offline analysis and runs anomaly job, returns jobExecutionId
-   * @param anomalyFunction
-   * @param startTimes
-   * @param endTimes
-   * @return
-   */
-  private Long runOfflineAnomalyFunctionOnRanges(AnomalyFunctionDTO anomalyFunction, List<Long> startTimes, List<Long> endTimes) {
-    DetectionJobContext detectionJobContext = new DetectionJobContext();
-    detectionJobContext.setAnomalyFunctionId(anomalyFunction.getId());
-    detectionJobContext.setAnomalyFunctionSpec(anomalyFunction);
-    detectionJobContext.setJobName("offline_" + DetectionJobSchedulerUtils.createJobName(anomalyFunction, startTimes, endTimes));
-    detectionJobContext.setStartTimes(startTimes);
-    detectionJobContext.setEndTimes(endTimes);
+    detectionJobContext.setDetectionJobType(detectionJobType);
     Long jobExecutionId = detectionJobRunner.run(detectionJobContext);
     LOG.info("Function: {} Dataset: {} Created job {}", anomalyFunction.getId(), anomalyFunction.getCollection(), jobExecutionId);
     return jobExecutionId;
@@ -324,14 +311,6 @@ public class DetectionJobScheduler implements Runnable {
 
     String dataset = anomalyFunction.getCollection();
 
-    BackfillKey backfillKey = new BackfillKey(functionId, analysisTime, analysisTime);
-    Thread returnedThread = existingBackfillJobs.putIfAbsent(backfillKey, Thread.currentThread());
-    // If returned thread is not current thread, then a backfill job is already running
-    if (returnedThread != null) {
-      LOG.info("Function: {} Dataset: {} Aborting... An existing back-fill job is running...", functionId, dataset);
-      return null;
-    }
-
     if (Thread.currentThread().isInterrupted()) {
       LOG.info("Function: {} Dataset: {} Terminating adhoc function.", functionId, dataset);
       return null;
@@ -341,7 +320,7 @@ public class DetectionJobScheduler implements Runnable {
     List<Long> analysisTimeList = new ArrayList<>();
     analysisTimeList.add(analysisTime.getMillis());
     List<DetectionStatusDTO> findAllInTimeRange = new ArrayList<>();
-    jobId = runOfflineAnomalyFunctionOnRanges(anomalyFunction, analysisTimeList, analysisTimeList);
+    jobId = runAnomalyFunctionOnRanges(anomalyFunction, analysisTimeList, analysisTimeList, DetectionJobContext.DetectionJobType.OFFLINE);
     LOG.info("Function: {} Dataset: {} Generated offline analysis job for detecting anomalies for data points "
         + "whose ends before {}", functionId, dataset, analysisTime);
 
@@ -426,7 +405,7 @@ public class DetectionJobScheduler implements Runnable {
       // If any time periods found, for which detection needs to be run, run anomaly function update detection status
       List<DetectionStatusDTO> findAllInTimeRange = DAO_REGISTRY.getDetectionStatusDAO()
           .findAllInTimeRangeForFunctionAndDetectionRun(backfillStartTime.getMillis(), currentStart.getMillis(), functionId, false);
-      jobId = runAnomalyFunctionAndUpdateDetectionStatus(startTimes, endTimes, anomalyFunction, findAllInTimeRange);
+      jobId = runAnomalyFunctionAndUpdateDetectionStatus(startTimes, endTimes, anomalyFunction, findAllInTimeRange, force);
       LOG.info("Function: {} Dataset: {} Generated job for detecting anomalies for each monitoring window "
           + "whose start is located in range {} -- {}", functionId, dataset, backfillStartTime, currentStart);
     } finally {

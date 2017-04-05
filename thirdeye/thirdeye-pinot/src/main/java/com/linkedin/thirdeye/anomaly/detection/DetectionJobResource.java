@@ -297,7 +297,7 @@ public class DetectionJobResource {
     }
 
     DateTime analysisTime = DateTime.now();
-    if (analysisTimeIso != null && !analysisTimeIso.isEmpty()) {
+    if (StringUtils.isNotEmpty(analysisTimeIso)) {
       analysisTime = ISODateTimeFormat.dateTimeParser().parseDateTime(analysisTimeIso);
     }
 

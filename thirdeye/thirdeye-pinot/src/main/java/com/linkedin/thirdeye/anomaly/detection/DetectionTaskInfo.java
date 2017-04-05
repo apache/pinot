@@ -26,14 +26,17 @@ public class DetectionTaskInfo implements TaskInfo {
   private List<DateTime> windowEndTime;
   private AnomalyFunctionDTO anomalyFunctionSpec;
   private String groupByDimension;
+  private DetectionJobContext.DetectionJobType detectionJobType;
 
   public DetectionTaskInfo(long jobExecutionId, List<DateTime> windowStartTime,
-      List<DateTime> windowEndTime, AnomalyFunctionDTO anomalyFunctionSpec, String groupByDimension) {
+      List<DateTime> windowEndTime, AnomalyFunctionDTO anomalyFunctionSpec, String groupByDimension,
+      DetectionJobContext.DetectionJobType detectionJobType) {
     this.jobExecutionId = jobExecutionId;
     this.windowStartTime = windowStartTime;
     this.windowEndTime = windowEndTime;
     this.anomalyFunctionSpec = anomalyFunctionSpec;
     this.groupByDimension = groupByDimension;
+    this.detectionJobType = detectionJobType;
   }
 
   public DetectionTaskInfo() {
@@ -78,6 +81,14 @@ public class DetectionTaskInfo implements TaskInfo {
 
   public void setGroupByDimension(String groupByDimension) {
     this.groupByDimension = groupByDimension;
+  }
+
+  public DetectionJobContext.DetectionJobType getDetectionJobType() {
+    return detectionJobType;
+  }
+
+  public void setDetectionJobType(DetectionJobContext.DetectionJobType detectionJobType) {
+    this.detectionJobType = detectionJobType;
   }
 
   @Override

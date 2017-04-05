@@ -7,10 +7,16 @@ import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 
 public class DetectionJobContext extends JobContext {
 
+  public enum DetectionJobType {
+    BACKFILL, OFFLINE
+  }
+
+
   private Long anomalyFunctionId;
   private AnomalyFunctionDTO anomalyFunctionSpec;
   private List<Long> startTimes;
   private List<Long> endTimes;
+  private DetectionJobType detectionJobType;
 
 
   public List<Long> getStartTimes() {
@@ -45,4 +51,11 @@ public class DetectionJobContext extends JobContext {
     this.anomalyFunctionSpec = anomalyFunctionSpec;
   }
 
+  public DetectionJobType getDetectionJobType() {
+    return detectionJobType;
+  }
+
+  public void setDetectionJobType(DetectionJobType detectionJobType) {
+    this.detectionJobType = detectionJobType;
+  }
 }

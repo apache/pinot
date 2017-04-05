@@ -36,12 +36,13 @@ public class TaskGenerator {
     String exploreDimensionsString = anomalyFunctionSpec.getExploreDimensions();
     if (StringUtils.isBlank(exploreDimensionsString)) {
       DetectionTaskInfo taskInfo = new DetectionTaskInfo(jobExecutionId,
-          monitoringWindowStartTimes, monitoringWindowEndTimes, anomalyFunctionSpec, null);
+          monitoringWindowStartTimes, monitoringWindowEndTimes, anomalyFunctionSpec, null,
+          detectionJobContext.getDetectionJobType());
       tasks.add(taskInfo);
     } else {
       DetectionTaskInfo taskInfo =
           new DetectionTaskInfo(jobExecutionId, monitoringWindowStartTimes, monitoringWindowEndTimes, anomalyFunctionSpec,
-              exploreDimensionsString);
+              exploreDimensionsString, detectionJobContext.getDetectionJobType());
         tasks.add(taskInfo);
     }
 
