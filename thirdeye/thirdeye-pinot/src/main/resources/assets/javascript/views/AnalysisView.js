@@ -12,7 +12,6 @@ function AnalysisView(analysisModel) {
     filters: {},
   };
   this.compareMode = 'WoW';
-  this.compareModeOptions = ['WoW', 'Wo2W', 'Wo3W'];
 
   this.currentRange = () => {
     return {
@@ -28,7 +27,7 @@ function AnalysisView(analysisModel) {
 
   this.baselineRange = () => {
     const range = {};
-    this.compareModeOptions.forEach((options) => {
+    constants.COMPARE_MODE_OPTIONS.forEach((options) => {
       const offset = constants.WOW_MAPPING[options];
       range[options] = [this.calculateBaselineDate('currentStart', offset),this.calculateBaselineDate('currentEnd', offset)];
     });
@@ -126,13 +125,13 @@ AnalysisView.prototype = {
   renderAnalysisOptions(metricId) {
     metricId = metricId || Object.assign(this.viewParams, this.searchParams).metricId;
     // Now render the dimensions and filters for selected metric
-
+    const showTime = this.viewParams.granularity !== 'DAYS';
     const analysis_options_template = $('#analysis-options-template').html();
     const compiled_analysis_options_template = Handlebars.compile(analysis_options_template);
     $('#analysis-options-placeholder').html(compiled_analysis_options_template);
 
     this.renderGranularity(metricId);
-    this.renderDateRangePickers();
+    this.renderDateRangePickers(showTime);
     this.renderDimensions(metricId);
     this.renderFilters(metricId);
     this.setupApplyListener(metricId);
@@ -315,14 +314,16 @@ AnalysisView.prototype = {
   },
 
   clearHeatMapViewParams() {
-    const resetHeatMap = {
-      heatMapCurrentStart: null,
-      heatMapCurrentEnd: null,
-      heatMapBaselineStart: null,
-      heatMapBaselineEnd: null,
-      heatmapFilters: null
-    }
-    Object.assign(resetHeatMap, this.viewParams);
+    const heatMapProperties = [
+      'heatMapCurrentStart',
+      'heatMapCurrentEnd',
+      'heatMapBaselineStart',
+      'heatMapBaselineEnd',
+      'heatmapFilters'
+      ]
+    heatMapProperties.forEach((prop) => {
+      this.viewParams[prop] = null
+    })
   },
 
   setupSearchListeners() {

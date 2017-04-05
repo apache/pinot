@@ -25,7 +25,8 @@ function Constants() {
   this.DETAILS_DATE_DAYS_FORMAT = 'MMM D, HH:mm z';
   this.DETAILS_DATE_HOURS_FORMAT = 'HH:mm z';
   this.DATE_RANGE_CUSTOM = 'Custom Range';
-  this.DATE_RANGE_FORMAT = 'MMM D, YYYY hh:mm a';
+  this.DATE_RANGE_FORMAT = 'MMM D, YYYY';
+  this.DATE_TIME_RANGE_FORMAT = 'MMM D, YYYY hh:mm a';
   this.TIME_ZONE = 'America/Los_Angeles';
 
   // modes
@@ -53,7 +54,8 @@ function Constants() {
   this.FEEDBACK_TYPE_NOT_ANOMALY = 'NOT_ANOMALY';
   this.FEEDBACK_TYPE_ANOMALY_NO_ACTION = 'ANOMALY_NO_ACTION';
 
-  this.DEFAULT_COMPARE_MODE = 'wow';
+  this.DEFAULT_COMPARE_MODE = 'WoW';
+  this.COMPARE_MODE_OPTIONS = ['WoW', 'Wo2W', 'Wo3W'];
   this.WOW_MAPPING = {
     WoW: 7,
     Wo2W: 14,

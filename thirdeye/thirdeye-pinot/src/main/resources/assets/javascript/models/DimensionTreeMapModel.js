@@ -9,7 +9,8 @@ function DimensionTreeMapModel() {
 
   this.heatmapData;
 
-  this.heatmapMode = "percentChange";
+  this.heatmapMode = 'percentChange';
+  this.compareMode = 'WoW';
 
   this.currentTotal = 0;
   this.baselineTotal = 0;
