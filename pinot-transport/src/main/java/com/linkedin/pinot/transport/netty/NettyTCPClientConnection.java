@@ -412,7 +412,7 @@ public class NettyTCPClientConnection extends NettyClientConnection  {
       String message =
           "Request (" + _lastRequestId + ") to server " + _server + " connId " + getConnId()
               + " timed-out waiting for response. Closing the channel !!";
-      LOGGER.info(message);
+      LOGGER.warn(message);
       Exception e = new Exception(message);
       _outstandingFuture.get().onError(e);
       close();

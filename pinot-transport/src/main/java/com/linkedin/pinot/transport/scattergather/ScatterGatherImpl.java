@@ -60,8 +60,8 @@ import javax.annotation.Nullable;
  */
 public class ScatterGatherImpl implements ScatterGather {
 
-  private static class RequestNotSentException extends RuntimeException {
-    RequestNotSentException(String msg) {
+  private static class ConnectionLimitReachedException extends RuntimeException {
+    ConnectionLimitReachedException(String msg) {
       super(msg);
     }
   }
@@ -490,7 +490,7 @@ public class ScatterGatherImpl implements ScatterGather {
             _connPool.destroyObject(_server, conn);
           }
           if (++ntries == MAX_CONN_RETRIES-1) {
-            throw new RequestNotSentException("Could not connect to " + _server + " after " + ntries + " attempts(timeRemaining=" + timeRemainingMillis + "ms)");
+            throw new ConnectionLimitReachedException("Could not connect to " + _server + " after " + ntries + " attempts(timeRemaining=" + timeRemainingMillis + "ms)");
           }
           keyedFuture = _connPool.checkoutObject(_server);
           timeRemainingMillis = _timeoutMS - (System.currentTimeMillis() - _startTime);
@@ -501,14 +501,13 @@ public class ScatterGatherImpl implements ScatterGather {
         LOGGER.debug("Response Future is : {}", _responseFuture);
         error = false;
       } catch (TimeoutException e1) {
-        LOGGER.info("Timed out waiting for connection for server ({})({})(gotConnection={}). Setting error future",
-            _server, _request.getRequestId(), gotConnection, e1.getMessage());
+        LOGGER.warn("Timed out waiting for connection for server ({})({})(gotConnection={}). See metric {}", _server,
+            _request.getRequestId(), gotConnection, e1.getMessage(), BrokerMeter.REQUEST_DROPPED_DUE_TO_CONNECTION_ERROR.toString());
         _responseFuture = new ResponseFuture(_server, e1, "Error Future for request " + _request.getRequestId());
-      } catch (RequestNotSentException e) {
-        LOGGER.info("Request {} not sent (gotConnection={}):{}. Setting error future",
-            _request.getRequestId(), gotConnection, e.getMessage());
+      } catch (ConnectionLimitReachedException e) {
+        LOGGER.warn("Request {} not sent (gotConnection={}):{}. See metric {}", _request.getRequestId(),
+            gotConnection, e.getMessage(), BrokerMeter.REQUEST_DROPPED_DUE_TO_CONNECTION_ERROR);
         _responseFuture = new ResponseFuture(_server, e, "Error Future for request " + _request.getRequestId());
-
       } catch (Exception e) {
         LOGGER.error("Got exception sending request ({})(gotConnection={}). Setting error future",
             _request.getRequestId(), gotConnection, e);
