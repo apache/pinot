@@ -71,6 +71,7 @@ public class TestMergedAnomalyResultManager extends AbstractManagerTestBase {
     MergedAnomalyResultDTO mergedResultById = mergedAnomalyResultDAO.findById(mergedResult.getId());
     Assert.assertEquals(mergedResultById.getAnomalyResults(), rawResults);
     Assert.assertEquals(mergedResultById.getAnomalyResults().get(0).getId(), anomalyResultId);
+    Assert.assertEquals(mergedResultById.getDimensions(), result.getDimensions());
 
     List<MergedAnomalyResultDTO> mergedResultsByMetricDimensionsTime = mergedAnomalyResultDAO
         .findByCollectionMetricDimensionsTime(mergedResult.getCollection(), mergedResult.getMetric(),

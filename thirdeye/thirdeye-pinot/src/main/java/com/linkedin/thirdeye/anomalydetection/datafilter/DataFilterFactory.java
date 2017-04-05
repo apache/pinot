@@ -6,9 +6,9 @@ import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 
 public class DataFilterFactory {
-  private static final String FILTER_TYPE_KEY = "type";
+  public static final String FILTER_TYPE_KEY = "type";
 
-  public DataFilter fromSpec(Map<String, String> spec) {
+  public static DataFilter fromSpec(Map<String, String> spec) {
     if (MapUtils.isEmpty(spec)) {
       spec = Collections.emptyMap();
     }
@@ -18,7 +18,7 @@ public class DataFilterFactory {
     return dataFilter;
   }
 
-  private DataFilter fromStringType(String type) {
+  private static DataFilter fromStringType(String type) {
     String upperCaseType = "";
     if (StringUtils.isNotBlank(type)) {
       upperCaseType = type.toUpperCase();

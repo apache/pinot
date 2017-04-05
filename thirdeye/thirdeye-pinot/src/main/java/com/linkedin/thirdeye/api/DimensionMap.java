@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.api;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.Comparator;
@@ -13,7 +14,8 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.ObjectUtils;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Stores key-value pairs of dimension name and value. The paris are sorted by their dimension names in ascending order.
@@ -23,12 +25,40 @@ import org.apache.commons.lang.ObjectUtils;
  * "page_name":"front_page"}}, we only need to store {"country":"US","page_name":"front_page"}.
  */
 public class DimensionMap implements SortedMap<String, String>, Comparable<DimensionMap>, Serializable {
+  private static final Logger LOG = LoggerFactory.getLogger(DimensionMap.class);
   private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   // Dimension name to dimension value pairs, which are sorted by dimension names
   private SortedMap<String, String> sortedDimensionMap = new TreeMap<>();
 
+
+  /**
+   * Constructs an empty dimension map.
+   */
   public DimensionMap() {
+  }
+
+  /**
+   * Constructs a dimension map from a json string; if the given string is not in Json format, then this method
+   * falls back to parse Java's map string format, which is {key1=value1,key2=value2}.
+   *
+   * @param value the json string that represents this dimension map.
+   */
+  public DimensionMap(String value) {
+    try {
+      sortedDimensionMap = OBJECT_MAPPER.readValue(value, TreeMap.class);
+    } catch (IOException e) {
+      try { // Fall back to Java's map string, which is {key=value}.
+        value = value.substring(1, value.length() - 1); // Remove curly brackets
+        String[] keyValuePairs = value.split(",");
+        for (String pair : keyValuePairs) {
+          String[] entry = pair.split("=");
+          sortedDimensionMap.put(entry[0].trim(), entry[1].trim());
+        }
+      } catch (Exception finalE) {
+        LOG.error("Failed to initialize dimension map from this string: {}", value);
+      }
+    }
   }
 
   /**
@@ -83,8 +113,20 @@ public class DimensionMap implements SortedMap<String, String>, Comparable<Dimen
     }
   }
 
-  public String toJson()
-      throws JsonProcessingException {
+  /**
+   * Returns Java's string representation for Map class, which is in the form of {key1=value1,key2=value2}.
+   * @return Java's string representation for Map class.
+   */
+  public String toJavaString() {
+    return sortedDimensionMap.toString();
+  }
+
+  /**
+   * Returns Json string representation for Map class, which is in the form of {"key1":"value1","key2"="value2"}.
+   * @return Json string representation for Map class.
+   * @throws JsonProcessingException
+   */
+  public String toJson() throws JsonProcessingException {
     return OBJECT_MAPPER.writeValueAsString(this);
   }
 

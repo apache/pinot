@@ -1,16 +1,17 @@
 package com.linkedin.thirdeye.anomalydetection.datafilter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.anomalydetection.context.AnomalyDetectionContext;
-import com.linkedin.thirdeye.anomalydetection.context.TimeSeries;
 import com.linkedin.thirdeye.api.DimensionMap;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
 import java.io.IOException;
-import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.TreeMap;
+import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The data filter determines whether the average value of a time series passes the threshold.
@@ -24,16 +25,17 @@ import org.apache.commons.lang3.StringUtils;
  * belong to this dimension {country=US}, e.g., {country=US, pageName=homePage} is a sub-dimension of {country=US}.
  */
 public class AverageThresholdDataFilter extends BaseDataFilter {
+  private static final Logger LOG = LoggerFactory.getLogger(AverageThresholdDataFilter.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-  private static final String METRIC_NAME_KEY = "metricName";
-  private static final String THRESHOLD_KEY = "threshold";
+  public static final String METRIC_NAME_KEY = "metricName";
+  public static final String THRESHOLD_KEY = "threshold";
   // If the value of a bucket is smaller than MIN_LIVE_ZONE_KEY, then that bucket is omitted
-  private static final String MIN_LIVE_ZONE_KEY = "minLiveZone";
+  public static final String MIN_LIVE_ZONE_KEY = "minLiveZone";
   // If the value of a bucket is larger than MAX_LIVE_ZONE_KEY, then that bucket is omitted
-  private static final String MAX_LIVE_ZONE_KEY = "maxLiveZone";
+  public static final String MAX_LIVE_ZONE_KEY = "maxLiveZone";
   // Override threshold to different dimension map
-  private static final String OVERRIDE_THRESHOLD_KEY = "overrideThreshold";
+  public static final String OVERRIDE_THRESHOLD_KEY = "overrideThreshold";
 
   private static final double DEFAULT_THRESHOLD = Double.NEGATIVE_INFINITY;
   private static final double DEFAULT_MIN_LIVE_ZONE = Double.NEGATIVE_INFINITY;
@@ -42,6 +44,9 @@ public class AverageThresholdDataFilter extends BaseDataFilter {
   // The override threshold for different dimension maps, which could form a hierarchy.
   private NavigableMap<DimensionMap, Double> overrideThreshold = new TreeMap<>();
 
+  public NavigableMap<DimensionMap, Double> getOverrideThreshold() {
+    return overrideThreshold;
+  }
 
   @Override
   public void setParameters(Map<String, String> props) {
@@ -49,15 +54,20 @@ public class AverageThresholdDataFilter extends BaseDataFilter {
     if (props.containsKey(OVERRIDE_THRESHOLD_KEY)) {
       String overrideJsonPayLoad = props.get(OVERRIDE_THRESHOLD_KEY);
       try {
-        overrideThreshold = OBJECT_MAPPER.readValue(overrideJsonPayLoad, NavigableMap.class);
+        Map<String, Double> rawOverrideThresholdMap = OBJECT_MAPPER.readValue(overrideJsonPayLoad, HashMap.class);
+        for (Map.Entry<String, Double> overrideThresholdEntry : rawOverrideThresholdMap.entrySet()) {
+          DimensionMap dimensionMap = new DimensionMap(overrideThresholdEntry.getKey());
+          Double threshold = overrideThresholdEntry.getValue();
+          overrideThreshold.put(dimensionMap, threshold);
+        }
       } catch (IOException e) {
-        e.printStackTrace();
+        LOG.error("Failed to reconstruct override threshold mappings from this json string: {}", overrideJsonPayLoad);
       }
     }
   }
 
   @Override
-  public boolean isQualified(AnomalyDetectionContext context, DimensionMap dimensionMap) {
+  public boolean isQualified(MetricTimeSeries metricTimeSeries, DimensionMap dimensionMap) {
     // Initialize threshold from users' setting
     double threshold = DEFAULT_THRESHOLD;
     if (props.containsKey(THRESHOLD_KEY)) {
@@ -67,7 +77,9 @@ public class AverageThresholdDataFilter extends BaseDataFilter {
       throw new IllegalStateException("Threshold cannot be NaN.");
     }
     // Read the override threshold for the dimension of this time series
-    threshold = overrideThresholdForDimensions(dimensionMap, threshold);
+    if (MapUtils.isNotEmpty(overrideThreshold)) {
+      threshold = overrideThresholdForDimensions(dimensionMap, threshold);
+    }
     if (threshold == Double.NEGATIVE_INFINITY) {
       return true;
     } else if (threshold == Double.POSITIVE_INFINITY) {
@@ -77,7 +89,7 @@ public class AverageThresholdDataFilter extends BaseDataFilter {
     // Initialize metricName from users' setting
     String metricName = props.get(METRIC_NAME_KEY);
     if (StringUtils.isBlank(metricName)) {
-      throw new IllegalArgumentException("metric name cannot be a blank String.");
+      throw new IllegalArgumentException("metric name for average threshold data filter cannot be a blank String.");
     }
 
     // Initialize minLiveZone from users' setting
@@ -98,17 +110,17 @@ public class AverageThresholdDataFilter extends BaseDataFilter {
     }
 
     // Compute average values among all buckets and check if it passes the threshold
-    // TODO: improve anomaly detection context to get all time series from metric name
-    List<TimeSeries> timeSeries = context.getBaselines(metricName);
     double sum = 0d;
     int count = 0;
-    for (TimeSeries series : timeSeries) {
-      for (long timestamp : series.timestampSet()) {
-        double value = series.get(timestamp);
-        if (isLiveBucket(value, minLiveZone, maxLiveZone)) {
-          sum += value;
-          ++count;
-        }
+    for (long timestamp : metricTimeSeries.getTimeWindowSet()) {
+      double value = metricTimeSeries.get(timestamp, metricName).doubleValue();
+      // TODO: Distinguish 0 and empty value
+      if (Double.compare(0d, value) == 0) {
+        continue;
+      }
+      if (isLiveBucket(value, minLiveZone, maxLiveZone)) {
+        sum += value;
+        ++count;
       }
     }
     return count > 0 && (sum / count) > threshold;
@@ -124,7 +136,7 @@ public class AverageThresholdDataFilter extends BaseDataFilter {
    * @return true is the value should be considered when calculating the average of bucket values.
    */
   private boolean isLiveBucket(double value, double minLiveZone, double maxLiveZone) {
-    if (!Double.isNaN(value)) {
+    if (Double.isNaN(value)) {
       return false;
     } else if (Double.compare(minLiveZone, value) > 0) {
       return false;

@@ -86,7 +86,7 @@ public abstract class TimeSeriesUtil {
 
     DatasetConfigDTO dataset = DAORegistry.getInstance().getDatasetConfigDAO().findByDataset(anomalyFunctionSpec.getCollection());
     boolean doRollUp = true;
-    if (!dataset.isActive()) {
+    if (!dataset.isAdditive()) {
       doRollUp = false;
     }
 
