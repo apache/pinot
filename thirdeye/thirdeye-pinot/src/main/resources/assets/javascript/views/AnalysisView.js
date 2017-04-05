@@ -91,12 +91,15 @@ AnalysisView.prototype = {
       this.searchParams['metric'] = {id: metricId, alias: metricAlias, allowClear:true, name:metricName} || this.searchParams['metric'];
       this.searchParams['metricId'] = metricId || this.searchParams['metricId'];
       this.searchParams['metricName'] = metricName || this.searchParams['metricName'];
-
+      if (metricId) {
+        this.searchEvent.notify();
+      }
     }).trigger('change');
+
     if (metricId) {
       this.analysisModel.fetchAnalysisOptionsData(metricId, 'analysis-spin-area').then(() => {
         return this.renderAnalysisOptions(metricId);
-      }).then(callback)
+      }).then(callback);
     }
     this.setupSearchListeners();
   },
@@ -329,9 +332,14 @@ AnalysisView.prototype = {
   },
 
   setupSearchListeners() {
+
+    // $("#analysis-granularity-input").on("select2:selecting", () =>  {
+    //   this.searchEvent.notify();
+    // });
+
     $("#analysis-search-button").click(() => {
       if (!this.searchParams.metricId) return;
-      this.searchEvent.notify()
+      this.searchEvent.notify();
     });
   },
 

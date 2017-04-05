@@ -920,7 +920,7 @@ text {
 
 .analysis-chart__graph {
   flex-grow: 1;
-  height: 400px;
+  height: 300px;
   margin: 24px;
 }
 
