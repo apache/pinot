@@ -43,10 +43,12 @@ import com.linkedin.thirdeye.datalayer.dto.DetectionStatusDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.EmailConfig;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
+
 import java.io.File;
 import java.sql.Timestamp;
 import java.util.ArrayList;
@@ -54,6 +56,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -321,6 +324,22 @@ public class RunAdhocDatabaseQueriesTool {
     }
   }
 
+  private void cleanupDataset(String dataset) {
+    List<DashboardConfigDTO> dashboardConfigs = dashboardConfigDAO.findByDataset(dataset);
+    for (DashboardConfigDTO dashboardConfig : dashboardConfigs) {
+      dashboardConfig.setActive(false);
+      dashboardConfigDAO.update(dashboardConfig);
+    }
+    List<MetricConfigDTO> metricConfigs = metricConfigDAO.findByDataset(dataset);
+    for (MetricConfigDTO metricConfig : metricConfigs) {
+      metricConfig.setActive(false);
+      metricConfigDAO.update(metricConfig);
+    }
+    DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(dataset);
+    datasetConfig.setActive(false);
+    datasetConfigDAO.update(datasetConfig);
+  }
+
 
   public static void main(String[] args) throws Exception {
 
@@ -330,11 +349,6 @@ public class RunAdhocDatabaseQueriesTool {
       System.exit(1);
     }
     RunAdhocDatabaseQueriesTool dq = new RunAdhocDatabaseQueriesTool(persistenceFile);
-    List<Long> functionIds = new ArrayList<>();
-    functionIds.add(90794L);
-    functionIds.add(90795L);
-    dq.createClassificationConfig("testClassificationConfig", 90794, functionIds, true);
-//    dq.updateJobIndex();
   }
 
 }

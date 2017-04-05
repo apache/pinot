@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.dashboard.resources.v2;
 
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
+
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -173,13 +174,21 @@ public class DataResource {
   @GET
   @Path("autocomplete/dashboard")
   public List<DashboardConfigDTO> getDashboardsWhereNameLike(@QueryParam("name") String name) {
-    return dashboardConfigDAO.findWhereNameLike("%" + name + "%");
+    List<DashboardConfigDTO> dashboardConfigs = Collections.emptyList();
+    if (StringUtils.isNotBlank(name)) {
+      dashboardConfigs = dashboardConfigDAO.findWhereNameLike("%" + name + "%");
+    }
+    return dashboardConfigs;
   }
 
   @GET
   @Path("autocomplete/metric")
   public List<MetricConfigDTO> getMetricsWhereNameLike(@QueryParam("name") String name) {
-    return metricConfigDAO.findWhereNameLike("%" + name + "%");
+    List<MetricConfigDTO> metricConfigs = Collections.emptyList();
+    if (StringUtils.isNotBlank(name)) {
+      metricConfigs = metricConfigDAO.findWhereNameLike("%" + name + "%");
+    }
+    return metricConfigs;
   }
 
   @GET
@@ -216,28 +225,37 @@ public class DataResource {
     return filterMap;
   }
 
+  /**
+   * Returns a list of all possible aggregations that we will support on the front end
+   * For minute level datasets, we will also support HOURS and DAYS
+   * For hour level datasets, we will also support DAYS
+   * For day level datasets, we will only support DAYS
+   * @param metricId
+   * @return list of allowed data aggregations
+   */
   @GET
   @Path("agg/granularity/metric/{metricId}")
-  public List<String> getDataAggregationGranularity(@PathParam("metricId") Long metricId) {
-    List<String> list = new ArrayList<>();
-    list.add("DAYS");
-    MetricConfigDTO metricConfigDTO = metricConfigDAO.findById(metricId);
-    DatasetConfigDTO datasetConfigDTO = datasetConfigDAO.findByDataset(metricConfigDTO.getDataset());
-    int dataAggSize = datasetConfigDTO.getTimeDuration();
-    String dataGranularity = datasetConfigDTO.getTimeUnit().name();
-    if (dataGranularity.equals("DAYS")) {
-      // do nothing
-    } else {
-      list.add("HOURS");
-      if (dataGranularity.equals("MINUTES")) {
-        if (dataAggSize == 1) {
-          list.add("MINUTES");
-        } else {
-          list.add(dataAggSize+ "_MINUTES");
-        }
-      }
+  public List<String> getDataAggregationGranularities(@PathParam("metricId") Long metricId) {
+
+    MetricConfigDTO metricConfig = metricConfigDAO.findById(metricId);
+    DatasetConfigDTO datasetConfig = ThirdEyeUtils.getDatasetConfigFromName(metricConfig.getDataset());
+    int dataTimeSize = datasetConfig.getTimeDuration();
+    TimeUnit dataTimeUnit = datasetConfig.getTimeUnit();
+
+    List<String> dataGranularities = new ArrayList<>();
+    switch (dataTimeUnit) {
+      case MILLISECONDS:
+      case SECONDS:
+      case MINUTES:
+        dataGranularities.add(getDataGranularityString(dataTimeSize, TimeUnit.MINUTES));
+      case HOURS:
+        dataGranularities.add(getDataGranularityString(1, TimeUnit.HOURS));
+      case DAYS:
+      default:
+        dataGranularities.add(getDataGranularityString(1, TimeUnit.DAYS));
+        break;
     }
-    return list;
+    return dataGranularities;
   }
 
   //------------- HeatMap -----------------
@@ -548,6 +566,22 @@ public class DataResource {
     }
     TimeRange timeRange = new TimeRange(start, end);
     return timeRange;
+  }
+
+  /**
+   * Generates data granularity string for dropdown in the root cause page
+   * @param dataTimeSize
+   * @param dataTimeUnit
+   * @return data granularity string
+   */
+  private String getDataGranularityString(int dataTimeSize, TimeUnit dataTimeUnit) {
+    String dataGranularity = null;
+    if (dataTimeSize == 1) {
+      dataGranularity = dataTimeUnit.toString();
+    } else {
+      dataGranularity = String.format("%d_%s", dataTimeSize, dataTimeUnit);
+    }
+    return dataGranularity;
   }
 
 

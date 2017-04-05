@@ -15,7 +15,7 @@ import com.linkedin.thirdeye.datalayer.util.Predicate;
 public class DashboardConfigManagerImpl extends AbstractManagerImpl<DashboardConfigDTO>
     implements DashboardConfigManager {
 
-  private static final String FIND_BY_NAME_LIKE = " WHERE name like :name";
+  private static final String FIND_BY_NAME_LIKE = " WHERE active = :active and name like :name";
 
   public DashboardConfigManagerImpl() {
     super(DashboardConfigDTO.class, DashboardConfigBean.class);
@@ -48,6 +48,7 @@ public class DashboardConfigManagerImpl extends AbstractManagerImpl<DashboardCon
   public List<DashboardConfigDTO> findWhereNameLike(String name) {
     Map<String, Object> parameterMap = new HashMap<>();
     parameterMap.put("name", name);
+    parameterMap.put("active", true);
     List<DashboardConfigBean> list =
         genericPojoDao.executeParameterizedSQL(FIND_BY_NAME_LIKE, parameterMap, DashboardConfigBean.class);
     return convertBeanListToDTOList(list);

@@ -15,7 +15,7 @@ import com.linkedin.thirdeye.datalayer.util.Predicate;
 public class MetricConfigManagerImpl extends AbstractManagerImpl<MetricConfigDTO>
     implements MetricConfigManager {
 
-  private static final String FIND_BY_NAME_LIKE = " WHERE name like :name";
+  private static final String FIND_BY_NAME_LIKE = " WHERE active = :active and name like :name";
 
   public MetricConfigManagerImpl() {
     super(MetricConfigDTO.class, MetricConfigBean.class);
@@ -70,6 +70,7 @@ public class MetricConfigManagerImpl extends AbstractManagerImpl<MetricConfigDTO
   public List<MetricConfigDTO> findWhereNameLike(String name) {
     Map<String, Object> parameterMap = new HashMap<>();
     parameterMap.put("name", name);
+    parameterMap.put("active", true);
     List<MetricConfigBean> list =
         genericPojoDao.executeParameterizedSQL(FIND_BY_NAME_LIKE, parameterMap, MetricConfigBean.class);
     List<MetricConfigDTO> result = new ArrayList<>();
