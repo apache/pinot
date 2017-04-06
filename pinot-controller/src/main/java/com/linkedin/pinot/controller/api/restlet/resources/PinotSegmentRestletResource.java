@@ -73,10 +73,12 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
    * URI Mappings:
    * <ul>
    *   <li>
+   *     "/tables/{tableName}/segments/{segmentName}":
    *     "/tables/{tableName}/segments/{segmentName}/metadata":
    *     Get segment metadata for a given segment
    *   </li>
    *   <li>
+   *     "/tables/{tableName}/segments":
    *     "/tables/{tableName}/segments/metadata":
    *     List segment metadata for a given table
    *   </li>
@@ -139,17 +141,9 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
       }
 
       String lastPart = reference.getLastSegment();
-      if (lastPart.equals("metadata")) {
-        if (segmentName != null) {
-          // '/tables/{tableName}/segments/{segmentName}/metadata'
-          return getSegmentMetadataForTable(tableName, segmentName, tableType);
-        } else {
-          // '/tables/{tableName}/segments/metadata'
-          return getAllSegmentsMetadataForTable(tableName, tableType);
-        }
-      }
-
       if (lastPart.equals("reload")) {
+        // RELOAD
+
         if (segmentName != null) {
           // '/tables/{tableName}/segments/{segmentName}/reload'
           return reloadSegmentForTable(tableName, segmentName, tableType);
@@ -157,14 +151,24 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
           // '/tables/{tableName}/segments/reload'
           return reloadAllSegmentsForTable(tableName, tableType);
         }
-      }
+      } else {
+        // METADATA
 
-      setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
-      return new StringRepresentation("Invalid request.");
+        if (segmentName != null) {
+          // '/tables/{tableName}/segments/{segmentName}'
+          // '/tables/{tableName}/segments/{segmentName}/metadata'
+          return getSegmentMetadataForTable(tableName, segmentName, tableType);
+        } else {
+          // '/tables/{tableName}/segments'
+          // '/tables/{tableName}/segments/metadata'
+          return getAllSegmentsMetadataForTable(tableName, tableType);
+        }
+      }
     } catch (final Exception e) {
       representation = new StringRepresentation(e.getMessage() + "\n" + ExceptionUtils.getStackTrace(e));
       LOGGER.error("Caught exception while processing get request", e);
-      ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_GET_ERROR, 1L);
+      ControllerRestApplication.getControllerMetrics()
+          .addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_GET_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
       return representation;
     }
