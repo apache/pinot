@@ -19,6 +19,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.avro.file.DataFileStream;
@@ -62,6 +63,7 @@ public abstract class ClusterTest extends ControllerTest {
   private static final String _success = "success";
   protected List<HelixBrokerStarter> _brokerStarters = new ArrayList<HelixBrokerStarter>();
   protected List<HelixServerStarter> _serverStarters = new ArrayList<HelixServerStarter>();
+  protected static String partitioningKey = null;
 
   protected int getRealtimeSegmentFlushSize(boolean useLlc) {
     if (useLlc) {
@@ -263,13 +265,14 @@ public abstract class ClusterTest extends ControllerTest {
     addLLCRealtimeTable(tableName, timeColumnName, timeColumnType, retentionDays,
     retentionTimeUnit, kafkaBrokerList, kafkaTopic, schemaName, serverTenant,
         brokerTenant, avroFile, realtimeSegmentFlushSize, sortedColumn,
-        invertedIndexColumns, loadMode, null);
+        invertedIndexColumns, loadMode, null, new HashMap<String,String>());
   }
 
   protected void addLLCRealtimeTable(String tableName, String timeColumnName, String timeColumnType, int retentionDays,
       String retentionTimeUnit, String kafkaBrokerList, String kafkaTopic, String schemaName, String serverTenant,
       String brokerTenant, File avroFile, int realtimeSegmentFlushSize, String sortedColumn,
-      List<String> invertedIndexColumns, String loadMode, List<String> noDictionaryColumns)
+      List<String> invertedIndexColumns, String loadMode, List<String> noDictionaryColumns,
+      Map<String, String> partitioner)
           throws Exception {
     JSONObject metadata = new JSONObject();
     metadata.put("streamType", "kafka");
@@ -287,7 +290,7 @@ public abstract class ClusterTest extends ControllerTest {
     JSONObject request = ControllerRequestBuilder.buildCreateRealtimeTableJSON(tableName, serverTenant, brokerTenant,
         timeColumnName, timeColumnType, retentionTimeUnit, Integer.toString(retentionDays), 1,
         "BalanceNumSegmentAssignmentStrategy", metadata, schemaName, sortedColumn, invertedIndexColumns, null, false,
-        noDictionaryColumns);
+        noDictionaryColumns, partitioner);
     sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), request.toString());
   }
 

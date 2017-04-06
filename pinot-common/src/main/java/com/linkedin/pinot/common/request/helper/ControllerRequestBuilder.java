@@ -16,8 +16,10 @@
 package com.linkedin.pinot.common.request.helper;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 
+import java.util.Map;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -122,7 +124,18 @@ public class ControllerRequestBuilder {
         String timeColumnName, String timeType, String retentionTimeUnit, String retentionTimeValue, int numReplicas,
     String segmentAssignmentStrategy, JSONObject streamConfigs, String schemaName, String sortedColumn,
         List<String> invertedIndexColumns, String loadMode, boolean isHighLevel, List<String> noDictionaryColumns)
-    throws JSONException {
+      throws JSONException {
+    return buildCreateRealtimeTableJSON(tableName, serverTenant, brokerTenant, timeColumnName, timeType,
+        retentionTimeUnit, retentionTimeValue, numReplicas, segmentAssignmentStrategy, streamConfigs, schemaName,
+        sortedColumn, invertedIndexColumns, loadMode, isHighLevel, null, null);
+  }
+
+  public static JSONObject buildCreateRealtimeTableJSON(String tableName, String serverTenant, String brokerTenant,
+      String timeColumnName, String timeType, String retentionTimeUnit, String retentionTimeValue, int numReplicas,
+      String segmentAssignmentStrategy, JSONObject streamConfigs, String schemaName, String sortedColumn,
+      List<String> invertedIndexColumns, String loadMode, boolean isHighLevel, List<String> noDictionaryColumns,
+      Map<String, String> partitioners)
+      throws JSONException {
     JSONObject creationRequest = new JSONObject();
     creationRequest.put("tableName", tableName);
 
@@ -156,6 +169,9 @@ public class ControllerRequestBuilder {
     tableIndexConfig.put("sortedColumn", sortedColumns);
     if (noDictionaryColumns != null) {
       tableIndexConfig.put("noDictionaryColumns", noDictionaryColumns);
+    }
+    if (partitioners != null) {
+      tableIndexConfig.put("partitioners", partitioners);
     }
     creationRequest.put("tableIndexConfig", tableIndexConfig);
     JSONObject tenants = new JSONObject();

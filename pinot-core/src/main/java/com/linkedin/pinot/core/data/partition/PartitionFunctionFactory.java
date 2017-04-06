@@ -30,7 +30,8 @@ public class PartitionFunctionFactory {
   // Enum for various partition functions to be added.
   public enum PartitionFunctionType {
     Modulo,
-    DefaultKafkaPartitioner;
+    Murmur,
+    ByteArray;
     // Add more functions here.
 
     private static final Map<String, PartitionFunctionType> VALUE_MAP = new HashMap<>();
@@ -73,8 +74,11 @@ public class PartitionFunctionFactory {
       case Modulo:
         return new ModuloPartitionFunction(args);
 
-      case DefaultKafkaPartitioner:
-        return new DefaultKafkaPartitionFunction(args);
+      case Murmur:
+        return new MurmurPartitionFunction(args);
+
+      case ByteArray:
+        return new ByteArrayPartitionFunction(args);
 
       default:
         throw new IllegalArgumentException("Illegal partition function name: " + functionName);

@@ -30,6 +30,7 @@ import org.codehaus.jackson.annotate.JsonProperty;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ColumnPartitionConfig {
   public static final String PARTITION_VALUE_DELIMITER = ",";
+  public static final String PARTITIONER_DELIMITER = "\t\t";
 
   private final String _functionName;
   private final String _partitionValues;

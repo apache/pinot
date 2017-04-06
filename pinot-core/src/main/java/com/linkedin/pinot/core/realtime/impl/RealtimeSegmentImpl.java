@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.core.realtime.impl;
 
+import com.linkedin.pinot.core.indexsegment.generator.ColumnPartitionConfig;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentPartitionConfig;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -92,6 +94,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
 
   private final ServerMetrics serverMetrics;
   private final String tableAndStreamName;
+  private SegmentPartitionConfig segmentPartitionConfig = null;
 
   public RealtimeSegmentImpl(Schema schema, int capacity, String tableName, String segmentName, String streamName,
       ServerMetrics serverMetrics, List<String> invertedIndexColumns, int avgMultiValueCount) throws IOException {
@@ -685,5 +688,13 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   public long getDiskSizeBytes() {
     // all the data is in memory..disk size is 0
     return 0;
+  }
+
+  public void setSegmentPartitionConfig(SegmentPartitionConfig segmentPartitionConfig) {
+    this.segmentPartitionConfig = segmentPartitionConfig;
+  }
+
+  public SegmentPartitionConfig getSegmentPartitionConfig() {
+    return segmentPartitionConfig;
   }
 }
