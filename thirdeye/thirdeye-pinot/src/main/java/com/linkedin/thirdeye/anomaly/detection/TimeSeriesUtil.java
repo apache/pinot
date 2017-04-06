@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 
+import java.util.concurrent.Future;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
@@ -213,19 +214,19 @@ public abstract class TimeSeriesUtil {
         new TimeSeriesHandler(ThirdEyeCacheRegistry.getInstance().getQueryCache());
 
     // Seed request with top-level...
-    TimeSeriesRequest request = new TimeSeriesRequest();
-    request.setCollectionName(anomalyFunctionSpec.getCollection());
+    TimeSeriesRequest seedRequest = new TimeSeriesRequest();
+    seedRequest.setCollectionName(anomalyFunctionSpec.getCollection());
     // TODO: Check low level support for multiple metrics retrieval
     String metricsToRetrieve = StringUtils.join(anomalyFunctionSpec.getMetrics(), ",");
     List<MetricExpression> metricExpressions = Utils
         .convertToMetricExpressions(metricsToRetrieve,
             anomalyFunctionSpec.getMetricFunction(), anomalyFunctionSpec.getCollection());
-    request.setMetricExpressions(metricExpressions);
-    request.setAggregationTimeGranularity(timeGranularity);
-    request.setEndDateInclusive(false);
-    request.setFilterSet(filters);
-    request.setGroupByDimensions(groupByDimensions);
-    request.setEndDateInclusive(endTimeInclusive);
+    seedRequest.setMetricExpressions(metricExpressions);
+    seedRequest.setAggregationTimeGranularity(timeGranularity);
+    seedRequest.setEndDateInclusive(false);
+    seedRequest.setFilterSet(filters);
+    seedRequest.setGroupByDimensions(groupByDimensions);
+    seedRequest.setEndDateInclusive(endTimeInclusive);
 
     LOG.info("Found [{}] time ranges to fetch data", startEndTimeRanges.size());
     for (Pair<Long, Long> timeRange : startEndTimeRanges) {
@@ -233,26 +234,39 @@ public abstract class TimeSeriesUtil {
           new DateTime(timeRange.getSecond()));
     }
 
+    // MultiQuery request
+    List<Future<TimeSeriesResponse>> futureResponses = new ArrayList<>();
+    List<TimeSeriesRequest> requests = new ArrayList<>();
     Set<TimeSeriesRow> timeSeriesRowSet = new HashSet<>();
-    // TODO : replace this with Pinot MultiQuery Request
     for (Pair<Long, Long> startEndInterval : startEndTimeRanges) {
+      TimeSeriesRequest request = new TimeSeriesRequest(seedRequest);
       DateTime startTime = new DateTime(startEndInterval.getFirst());
       DateTime endTime = new DateTime(startEndInterval.getSecond());
       request.setStart(startTime);
       request.setEnd(endTime);
 
-      LOG.info(
-          "Fetching data with startTime: [{}], endTime: [{}], metricExpressions: [{}], timeGranularity: [{}]",
-          startTime, endTime, metricExpressions, timeGranularity);
-
-      try {
-        LOG.debug("Executing {}", request);
-        TimeSeriesResponse response = timeSeriesHandler.handle(request);
-        timeSeriesRowSet.addAll(response.getRows());
-      } catch (Exception e) {
-        throw new JobExecutionException(e);
+      Future<TimeSeriesResponse> response = timeSeriesHandler.asyncHandle(request);
+      if (response != null) {
+        futureResponses.add(response);
+        requests.add(request);
+        LOG.info("Fetching data with startTime: [{}], endTime: [{}], metricExpressions: [{}], timeGranularity: [{}]",
+            startTime, endTime, metricExpressions, timeGranularity);
       }
     }
+
+    for (int i = 0; i < futureResponses.size(); i++) {
+      Future<TimeSeriesResponse> futureResponse = futureResponses.get(i);
+      TimeSeriesRequest request = requests.get(i);
+      try {
+        TimeSeriesResponse response = futureResponse.get();
+        timeSeriesRowSet.addAll(response.getRows());
+      } catch (InterruptedException e) {
+        LOG.warn("Failed to fetch data with request: [{}]", request);
+      }
+    }
+
+    timeSeriesHandler.shutdownAsyncHandler();
+
     List<TimeSeriesRow> timeSeriesRows = new ArrayList<>();
     timeSeriesRows.addAll(timeSeriesRowSet);
 
