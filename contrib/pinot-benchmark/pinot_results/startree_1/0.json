@@ -1,1 +1,0 @@
-{"traceInfo":{},"numDocsScanned":3,"aggregationResults":[{"function":"sum_l_extendedprice","value":"229577338880.00000"},{"function":"sum_l_discount","value":"300057.51563"}],"timeUsedMs":1,"segmentStatistics":[],"exceptions":[],"totalDocs":6001215}
