@@ -98,21 +98,27 @@ public class AnomalyUtils {
       Thread.currentThread().interrupt();
     }
   }
-  public static class metaDataNode{
+
+  /**
+   * This is a subclass describing anomalies features as training data for alert filter
+   */
+  public static class MetaDataNode {
     public double windowSize;
     public double severity;
     public String startTimeISO;
     public String endTimeISO;
     public String functionName;
     public AnomalyFeedback feedback;
+    public long anomalyId;
 
-    public metaDataNode(MergedAnomalyResultDTO anomaly){
+    public MetaDataNode(MergedAnomalyResultDTO anomaly){
       this.windowSize = 1. * (anomaly.getEndTime() - anomaly.getStartTime()) / 3600000L;
       this.severity = Math.abs(anomaly.getWeight());
       this.startTimeISO = new Timestamp(anomaly.getStartTime()).toString();
       this.endTimeISO = new Timestamp(anomaly.getEndTime()).toString();
       this.functionName = anomaly.getFunction().getFunctionName();
       this.feedback = anomaly.getFeedback();
+      this.anomalyId = anomaly.getId();
     }
   }
 }
