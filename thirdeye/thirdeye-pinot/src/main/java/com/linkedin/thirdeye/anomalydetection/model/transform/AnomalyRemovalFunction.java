@@ -35,8 +35,9 @@ public class AnomalyRemovalFunction extends AbstractTransformationFunction {
   public static final String ANOMALY_REMOVAL_WEIGHT_THRESHOLD = "anomalyRemovalWeighThreshold";
   public static final String DEFAULT_ANOMALY_REMOVAL_WEIGHT_THRESHOLD = "0";
 
-  public static final String ANOMALY_REMOVAL_TOLERANCE_SIZE = "anomalyRemovalToleranceOffset";
-  public static final String DEFAULT_ANOMALY_REMOVAL_TOLERANCE_SIZE = "0";
+  // tolerance window, right before the current monitoring window, where we do not remove anomalies
+  public static final String ANOMALY_REMOVAL_TOLERANCE_WINDOW_SIZE = "anomalyRemovalToleranceWindowSize";
+  public static final String DEFAULT_ANOMALY_REMOVAL_TOLERANCE_WINDOW_SIZE = "0";
 
 
   /**
@@ -68,7 +69,7 @@ public class AnomalyRemovalFunction extends AbstractTransformationFunction {
     double weightThreshold =
         Double.valueOf(getProperties().getProperty(ANOMALY_REMOVAL_WEIGHT_THRESHOLD, DEFAULT_ANOMALY_REMOVAL_WEIGHT_THRESHOLD));
     int toleranceSize =
-        Integer.valueOf(getProperties().getProperty(ANOMALY_REMOVAL_TOLERANCE_SIZE, DEFAULT_ANOMALY_REMOVAL_TOLERANCE_SIZE));
+        Integer.valueOf(getProperties().getProperty(ANOMALY_REMOVAL_TOLERANCE_WINDOW_SIZE, DEFAULT_ANOMALY_REMOVAL_TOLERANCE_WINDOW_SIZE));
 
     TimeSeries transformedTimeSeries = new TimeSeries();
     Interval transformedInterval = new Interval(startTime, endTime);
@@ -108,13 +109,15 @@ public class AnomalyRemovalFunction extends AbstractTransformationFunction {
       List<MergedAnomalyResultDTO> historicalAnomalies, long bucketMillis, double weightThreshold) {
 
     Map<Long, Boolean> anomalousTimestamps = new HashMap<>();
-    if (!historicalAnomalies.isEmpty()) {
-      for (MergedAnomalyResultDTO ar : historicalAnomalies) {
-        if (isRemovable(isUserLabeledAnomaly(ar), ar.getWeight(), weightThreshold)) {
-          int tsLength = (int) (1 + ((ar.getEndTime() - ar.getStartTime()) / bucketMillis));
-          for (int i = 0; i < tsLength; i++) {
-            anomalousTimestamps.put(ar.getStartTime() + i * bucketMillis, isUserLabeledAnomaly(ar));
-          }
+    if (historicalAnomalies == null) {
+      return anomalousTimestamps;  //empty map
+    }
+    for (MergedAnomalyResultDTO anomaly : historicalAnomalies) {
+      boolean isRemovable = isRemovable(getUserLabel(anomaly), anomaly.getWeight(), weightThreshold);
+      if (isRemovable) {
+        int tsLength = (int) (1 + ((anomaly.getEndTime() - anomaly.getStartTime()) / bucketMillis));  // both ends included
+        for (int i = 0; i < tsLength; i++) {
+          anomalousTimestamps.put(anomaly.getStartTime() + i * bucketMillis, getUserLabel(anomaly));
         }
       }
     }
@@ -133,10 +136,10 @@ public class AnomalyRemovalFunction extends AbstractTransformationFunction {
   }
 
   /**
-   * translate user feedback type of a given anomaly to 'null, true or false'
+   * translate user feedback type of a given anomaly to user label: 'null, true or false'
    *
    */
-  public static Boolean isUserLabeledAnomaly(MergedAnomalyResultDTO anomalyResultDTO) {
+  public static Boolean getUserLabel(MergedAnomalyResultDTO anomalyResultDTO) {
     if (anomalyResultDTO == null) {
       return null;  // if input is null, return null
     }
@@ -157,8 +160,14 @@ public class AnomalyRemovalFunction extends AbstractTransformationFunction {
   }
 
   /**
-   * get offset timestamp considering timezone information, solve daylight saving issue
+   * get offset timestamp given current timestamp
    *
+   * considering timezone information, solve daylight saving issue
+   * @param currentTS current timestamp
+   * @param offsetSize number of offset time unit
+   * @param offsetUnit offset time unit offsetSize * offsetUnit = number of milliseconds to offset
+   * @param timezone time zone we operated in
+   * @return long
    */
   public static long getOffsetTimestamp(long currentTS, int offsetSize, long offsetUnit, String timezone) {
     // if no daylight saving issues in this timezone, should get direct offset
