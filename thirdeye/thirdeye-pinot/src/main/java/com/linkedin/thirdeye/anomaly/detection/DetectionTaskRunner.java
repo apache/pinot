@@ -10,6 +10,8 @@ import com.linkedin.thirdeye.anomaly.task.TaskInfo;
 import com.linkedin.thirdeye.anomaly.task.TaskResult;
 import com.linkedin.thirdeye.anomaly.task.TaskRunner;
 import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
+import com.linkedin.thirdeye.anomalydetection.datafilter.DataFilter;
+import com.linkedin.thirdeye.anomalydetection.datafilter.DataFilterFactory;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
@@ -104,8 +106,7 @@ public class DetectionTaskRunner implements TaskRunner {
   }
 
 
-  private void runTask(DateTime windowStart, DateTime windowEnd)
-      throws JobExecutionException, ExecutionException {
+  private void runTask(DateTime windowStart, DateTime windowEnd) throws JobExecutionException, ExecutionException {
 
     LOG.info("Running anomaly detection for time range {} to  {}", windowStart, windowEnd);
 
@@ -229,6 +230,15 @@ public class DetectionTaskRunner implements TaskRunner {
     ListMultimap<DimensionMap, RawAnomalyResultDTO> resultRawAnomalies = ArrayListMultimap.create();
 
     for (DimensionMap dimensionMap : anomalyDetectionInputContext.getDimensionKeyMetricTimeSeriesMap().keySet()) {
+      // Skip anomaly detection if the current time series does not pass data filter, which may check if the traffic
+      // or total count of the data has enough volume for produce sufficient confidence anomaly results
+      MetricTimeSeries metricTimeSeries =
+          anomalyDetectionInputContext.getDimensionKeyMetricTimeSeriesMap().get(dimensionMap);
+      DataFilter dataFilter = DataFilterFactory.fromSpec(anomalyFunctionSpec.getDataFilter());
+      if (!dataFilter.isQualified(metricTimeSeries, dimensionMap)) {
+        continue;
+      }
+
       List<RawAnomalyResultDTO> resultsOfAnEntry = runAnalyze(windowStart, windowEnd, anomalyDetectionInputContext, dimensionMap);
 
       // Set raw anomalies' properties
@@ -246,6 +256,9 @@ public class DetectionTaskRunner implements TaskRunner {
 
   private List<RawAnomalyResultDTO> runAnalyze(DateTime windowStart, DateTime windowEnd,
       AnomalyDetectionInputContext anomalyDetectionInputContext, DimensionMap dimensionMap) {
+
+    List<RawAnomalyResultDTO> resultsOfAnEntry = Collections.emptyList();
+
     String metricName = anomalyFunction.getSpec().getTopicMetric();
     MetricTimeSeries metricTimeSeries = anomalyDetectionInputContext.getDimensionKeyMetricTimeSeriesMap().get(dimensionMap);
 
@@ -273,7 +286,6 @@ public class DetectionTaskRunner implements TaskRunner {
 
     AnomalyUtils.logAnomaliesOverlapWithWindow(windowStart, windowEnd, historyMergedAnomalies);
 
-    List<RawAnomalyResultDTO> resultsOfAnEntry = Collections.emptyList();
     try {
       // Run algorithm
       // Scaling time series according to the scaling factor
