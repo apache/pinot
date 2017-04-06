@@ -33,8 +33,9 @@ import org.slf4j.LoggerFactory;
 public class TimeSeriesHandler {
   private static final Logger LOG = LoggerFactory.getLogger(TimeSeriesHandler.class);
   private final QueryCache queryCache;
-  private ExecutorService executorService;
   private final boolean doRollUp; // roll up small metrics to OTHER dimension
+  private ExecutorService executorService;
+
 
   public TimeSeriesHandler(QueryCache queryCache) {
     this.queryCache = queryCache;
