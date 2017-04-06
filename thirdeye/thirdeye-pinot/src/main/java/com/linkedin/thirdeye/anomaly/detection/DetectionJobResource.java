@@ -342,11 +342,11 @@ public class DetectionJobResource {
   /**
    *
    * @param id anomaly function id
-   * @param startTimeIso start time of anomalies to tune alert filter
-   * @param endTimeIso end time of anomalies to tune alert filter
+   * @param startTimeIso start time of anomalies to tune alert filter in ISO format ex: 2016-5-23T00:00:00Z
+   * @param endTimeIso end time of anomalies to tune alert filter in ISO format ex: 2016-5-23T00:00:00Z
    * @param autoTuneType the type of auto tune to invoke (default is "AUTOTUNE")
-   * @param holidayStarts: holidayStarts in ISO Format, ex: start1,start2,...
-   * @param holidayEnds: holidayEnds in in ISO Format, ex: end1,end2,...,
+   * @param holidayStarts: holidayStarts in ISO Format, ex: 2016-5-23T00:00:00Z,2016-6-23T00:00:00Z,...
+   * @param holidayEnds: holidayEnds in in ISO Format, ex: 2016-5-23T00:00:00Z,2016-6-23T00:00:00Z,...
    * @return HTTP response of request: string of alert filter
    */
   @POST
@@ -411,10 +411,10 @@ public class DetectionJobResource {
   /**
    * Endpoint to check if merged anomalies given a time period have at least one positive label
    * @param id functionId to test anomalies
-   * @param startTimeIso
-   * @param endTimeIso
-   * @param holidayStarts optional: holidayStarts in ISO format as string, ex: start1,start2,...
-   * @param holidayEnds optional:holidayEnds in ISO format as string, ex: end1,end2,...
+   * @param startTimeIso start time to check anomaly history labels in ISO format ex: 2016-5-23T00:00:00Z
+   * @param endTimeIso end time to check anomaly history labels in ISO format ex: 2016-5-23T00:00:00Z
+   * @param holidayStarts optional: holidayStarts in ISO format as string, ex: 2016-5-23T00:00:00Z,2016-6-23T00:00:00Z,...
+   * @param holidayEnds optional:holidayEnds in ISO format as string, ex: 2016-5-23T00:00:00Z,2016-6-23T00:00:00Z,...
    * @return true if the list of merged anomalies has at least one positive label, false otherwise
    */
   @POST
@@ -433,8 +433,8 @@ public class DetectionJobResource {
   /**
    * End point to trigger initiate alert filter auto tune
    * @param id functionId to initiate alert filter auto tune
-   * @param startTimeIso: training data starts time
-   * @param endTimeIso: training data ends time
+   * @param startTimeIso: training data starts time ex: 2016-5-23T00:00:00Z
+   * @param endTimeIso: training data ends time ex: 2016-5-23T00:00:00Z
    * @param autoTuneType: By default is "AUTOTUNE"
    * @param nExpectedAnomalies: number of expected anomalies to recommend users to label
    * @param holidayStarts optional: holidayStarts in ISO format: start1,start2,...
@@ -484,8 +484,8 @@ public class DetectionJobResource {
   /**
    * The endpoint to evaluate alert filter
    * @param id: function ID
-   * @param startTimeIso: startTime of merged anomaly
-   * @param endTimeIso: endTime of merged anomaly
+   * @param startTimeIso: startTime of merged anomaly ex: 2016-5-23T00:00:00Z
+   * @param endTimeIso: endTime of merged anomaly ex: 2016-5-23T00:00:00Z
    * @return feedback summary, precision and recall as json object
    * @throws Exception when data has no positive label or model has no positive prediction
    */
@@ -527,10 +527,10 @@ public class DetectionJobResource {
    * To evaluate alert filte directly by autotune Id using autotune_config_index table
    * This is to leverage the intermediate step before updating tuned alert filter configurations
    * @param id: autotune Id
-   * @param startTimeIso: merged anomalies start time
-   * @param endTimeIso: merged anomalies end time
-   * @param holidayStarts: holiday starts time to remove merged anomalies
-   * @param holidayEnds: holiday ends time to remove merged anomlaies
+   * @param startTimeIso: merged anomalies start time. ex: 2016-5-23T00:00:00Z
+   * @param endTimeIso: merged anomalies end time  ex: 2016-5-23T00:00:00Z
+   * @param holidayStarts: holiday starts time to remove merged anomalies in ISO format. ex: 2016-5-23T00:00:00Z,2016-6-23T00:00:00Z,...
+   * @param holidayEnds: holiday ends time to remove merged anomlaies in ISO format. ex: 2016-5-23T00:00:00Z,2016-6-23T00:00:00Z,...
    * @return HTTP response of evaluation results
    */
   @POST
@@ -807,8 +807,8 @@ public class DetectionJobResource {
    * @param id alert filter autotune id
    * @param startTimeIso: alert filter trainig data start time in ISO format: e.g. 2017-02-27T00:00:00.000Z
    * @param endTimeIso: alert filter training data end time in ISO format
-   * @param holidayStarts holiday starts time in ISO format to remove merged anomalies: start1, start2,...
-   * @param holidayEnds holiday ends time in ISO format to remove merged anomalies: end1, ends2, ...
+   * @param holidayStarts holiday starts time in ISO format to remove merged anomalies: 2016-5-23T00:00:00Z,2016-6-23T00:00:00Z,...
+   * @param holidayEnds holiday ends time in ISO format to remove merged anomalies: 2016-5-23T00:00:00Z,2016-6-23T00:00:00Z,...
    * @return training data in json format
    */
   @POST
