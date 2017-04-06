@@ -255,54 +255,55 @@ public final class Schema {
     boolean isValid = true;
 
     // Log ALL the schema errors that may be present.
-      for (FieldSpec fieldSpec : fieldSpecMap.values()) {
-        FieldType fieldType = fieldSpec.getFieldType();
-        DataType dataType = fieldSpec.getDataType();
-        String fieldName = fieldSpec.getName();
-        try {
-          switch (fieldType) {
-            case DIMENSION:
-            case TIME:
-              switch (dataType) {
-                case INT:
-                case LONG:
-                case FLOAT:
-                case DOUBLE:
-                case STRING:
-                  // Check getDefaultNullValue() does not throw exception.
-                  fieldSpec.getDefaultNullValue();
-                  break;
-                default:
-                  ctxLogger.error("Unsupported data type: {} in dimension/time field: {}", dataType, fieldName);
-                  isValid = false;
-                  break;
-              }
-              break;
-            case METRIC:
-              switch (dataType) {
-                case INT:
-                case LONG:
-                case FLOAT:
-                case DOUBLE:
-                  // Check getDefaultNullValue() does not throw exception.
-                  fieldSpec.getDefaultNullValue();
-                  break;
-                default:
-                  ctxLogger.error("Unsupported data type: {} in metric field: {}", dataType, fieldName);
-                  isValid = false;
-                  break;
-              }
-              break;
-            default:
-              ctxLogger.error("Unsupported field type: {} for field: {}", dataType, fieldName);
-              isValid = false;
-              break;
-          }
-        } catch (Exception e) {
-          ctxLogger.error("Caught exception while validating {} field {} dataType {}", fieldType, fieldName, dataType, e);
-          isValid = false;
+    for (FieldSpec fieldSpec : fieldSpecMap.values()) {
+      FieldType fieldType = fieldSpec.getFieldType();
+      DataType dataType = fieldSpec.getDataType();
+      String fieldName = fieldSpec.getName();
+      try {
+        switch (fieldType) {
+          case DIMENSION:
+          case TIME:
+            switch (dataType) {
+              case INT:
+              case LONG:
+              case FLOAT:
+              case DOUBLE:
+              case STRING:
+                // Check getDefaultNullValue() does not throw exception.
+                fieldSpec.getDefaultNullValue();
+                break;
+              default:
+                ctxLogger.info("Unsupported data type: {} in DIMENSION/TIME field: {}", dataType, fieldName);
+                isValid = false;
+                break;
+            }
+            break;
+          case METRIC:
+            switch (dataType) {
+              case INT:
+              case LONG:
+              case FLOAT:
+              case DOUBLE:
+                // Check getDefaultNullValue() does not throw exception.
+                fieldSpec.getDefaultNullValue();
+                break;
+              default:
+                ctxLogger.info("Unsupported data type: {} in METRIC field: {}", dataType, fieldName);
+                isValid = false;
+                break;
+            }
+            break;
+          default:
+            ctxLogger.info("Unsupported field type: {} for field: {}", dataType, fieldName);
+            isValid = false;
+            break;
         }
+      } catch (Exception e) {
+        ctxLogger.info("Caught exception while validating field: {} with field type: {}, data type: {}, {}", fieldName,
+            fieldType, dataType, e.getMessage());
+        isValid = false;
       }
+    }
 
     return isValid;
   }
