@@ -1,0 +1,1 @@
+SELECT SUM(l_extendedprice), SUM(l_discount) FROM tpch_lineitem

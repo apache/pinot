@@ -1,0 +1,6 @@
+{
+  "maxLeafRecords": 100,
+  "dimensionsSplitOrder": ["l_receiptdate", "l_shipdate", "l_shipmode", "l_returnflag"],
+  "skipStarNodeCreationForDimensions": [],
+  "skipMaterializationForDimensions": ["l_partkey", "l_commitdate", "l_linestatus", "l_comment", "l_orderkey", "l_shipinstruct", "l_linenumber", "l_suppkey"]
+}
