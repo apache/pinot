@@ -91,7 +91,7 @@ public class AnomalyReportGenerator {
 
   public void buildReport(List<MergedAnomalyResultDTO> anomalies,
       ThirdEyeAnomalyConfiguration configuration, AlertConfigDTO alertConfig) {
-    String subject = "Thirdeye anomaly report : " + alertConfig.getName();
+    String subject = "Thirdeye Alert : " + alertConfig.getName();
     long startTime = System.currentTimeMillis();
     long endTime = 0;
     for (MergedAnomalyResultDTO anomaly : anomalies) {
