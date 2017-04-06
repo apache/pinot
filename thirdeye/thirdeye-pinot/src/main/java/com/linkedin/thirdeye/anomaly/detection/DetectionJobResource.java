@@ -313,8 +313,8 @@ public class DetectionJobResource {
    * @param functionId: the functionId to fetch merged anomalies with holidays removed
    * @param startTime: start time in milliseconds of merged anomalies
    * @param endTime: end time of in milliseconds merged anomalies
-   * @param holidayStarts: holidayStarts in ISO Format {start1,start2,...}, ex: 2016-5-23T00:00:00Z
-   * @param holidayEnds: holidayEnds in in ISO Format {end1,end2,...}, ex: 2016-5-23T00:00:00Z
+   * @param holidayStarts: holidayStarts in ISO Format ex: 2016-5-23T00:00:00Z, start1,start2,...
+   * @param holidayEnds: holidayEnds in in ISO Format ex: 2016-5-23T00:00:00Z, end1,end2,...
    * @return a list of merged anomalies with holidays removed
    */
   public static List<MergedAnomalyResultDTO> getMergedAnomaliesRemoveHolidays(long functionId, long startTime, long endTime, String holidayStarts, String holidayEnds){
@@ -345,8 +345,8 @@ public class DetectionJobResource {
    * @param startTimeIso start time of anomalies to tune alert filter
    * @param endTimeIso end time of anomalies to tune alert filter
    * @param autoTuneType the type of auto tune to invoke (default is "AUTOTUNE")
-   * @param holidayStarts: holidayStarts in ISO Format {start1,start2,...}, ex: 2016-5-23T00:00:00Z
-   * @param holidayEnds: holidayEnds in in ISO Format {end1,end2,...}, ex: 2016-5-23T00:00:00Z
+   * @param holidayStarts: holidayStarts in ISO Format, ex: start1,start2,...
+   * @param holidayEnds: holidayEnds in in ISO Format, ex: end1,end2,...,
    * @return HTTP response of request: string of alert filter
    */
   @POST
@@ -413,8 +413,8 @@ public class DetectionJobResource {
    * @param id functionId to test anomalies
    * @param startTimeIso
    * @param endTimeIso
-   * @param holidayStarts optional: holidayStarts in milliseconds as string, in format {start1,start2,...}
-   * @param holidayEnds optional:holidayEnds in milliseconds as string, in format {end1,end2,...}
+   * @param holidayStarts optional: holidayStarts in ISO format as string, ex: start1,start2,...
+   * @param holidayEnds optional:holidayEnds in ISO format as string, ex: end1,end2,...
    * @return true if the list of merged anomalies has at least one positive label, false otherwise
    */
   @POST
@@ -437,8 +437,8 @@ public class DetectionJobResource {
    * @param endTimeIso: training data ends time
    * @param autoTuneType: By default is "AUTOTUNE"
    * @param nExpectedAnomalies: number of expected anomalies to recommend users to label
-   * @param holidayStarts optional: holidayStarts in milliseconds as string, in format {start1,start2,...}
-   * @param holidayEnds optional:holidayEnds in milliseconds as string, in format {end1,end2,...}
+   * @param holidayStarts optional: holidayStarts in ISO format: start1,start2,...
+   * @param holidayEnds optional:holidayEnds in ISO format: end1,end2,...
    * @return true if alert filter has successfully being initiated, false otherwise
    */
   @POST
@@ -807,8 +807,8 @@ public class DetectionJobResource {
    * @param id alert filter autotune id
    * @param startTimeIso: alert filter trainig data start time in ISO format: e.g. 2017-02-27T00:00:00.000Z
    * @param endTimeIso: alert filter training data end time in ISO format
-   * @param holidayStarts holiday starts time in ISO format to remove merged anomalies: {start1, start2,...}
-   * @param holidayEnds holiday ends time in ISO format to remove merged anomalies: {end1, ends2, ...}
+   * @param holidayStarts holiday starts time in ISO format to remove merged anomalies: start1, start2,...
+   * @param holidayEnds holiday ends time in ISO format to remove merged anomalies: end1, ends2, ...
    * @return training data in json format
    */
   @POST
