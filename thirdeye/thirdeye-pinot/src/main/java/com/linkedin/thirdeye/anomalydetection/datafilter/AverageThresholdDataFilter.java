@@ -51,6 +51,7 @@ public class AverageThresholdDataFilter extends BaseDataFilter {
   @Override
   public void setParameters(Map<String, String> props) {
     super.setParameters(props);
+    // Initialize the lookup table for overriding thresholds
     if (props.containsKey(OVERRIDE_THRESHOLD_KEY)) {
       String overrideJsonPayLoad = props.get(OVERRIDE_THRESHOLD_KEY);
       try {
@@ -123,7 +124,12 @@ public class AverageThresholdDataFilter extends BaseDataFilter {
         ++count;
       }
     }
-    return count > 0 && (sum / count) > threshold;
+    if (count > 0) {
+      double average = sum / count;
+      return average > threshold;
+    } else {
+      return false;
+    }
   }
 
   /**

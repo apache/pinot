@@ -7,6 +7,11 @@ import org.apache.commons.lang3.StringUtils;
 
 public class DataFilterFactory {
   public static final String FILTER_TYPE_KEY = "type";
+  private static final DataFilter DUMMY_DATA_FILTER = new DummyDataFilter();
+
+  public enum FilterType {
+    DUMMY, AVERAGE_THRESHOLD
+  }
 
   public static DataFilter fromSpec(Map<String, String> spec) {
     if (MapUtils.isEmpty(spec)) {
@@ -19,17 +24,25 @@ public class DataFilterFactory {
   }
 
   private static DataFilter fromStringType(String type) {
-    String upperCaseType = "";
-    if (StringUtils.isNotBlank(type)) {
-      upperCaseType = type.toUpperCase();
+    if (StringUtils.isBlank(type)) { // backward compatibility
+      return DUMMY_DATA_FILTER;
     }
-    switch (upperCaseType) {
-    case "": // speed optimization for most use cases
-      return new DummyDataFilter();
-    case "AVERAGETHRESHOLDDATAFILTER":
-      return new AverageThresholdDataFilter();
-    default:
-      return new DummyDataFilter();
+
+    FilterType filterType = FilterType.DUMMY;
+    for (FilterType enumFilterType : FilterType.class.getEnumConstants()) {
+      if (enumFilterType.name().compareToIgnoreCase(type) == 0) {
+        filterType = enumFilterType;
+        break;
+      }
+    }
+
+    switch (filterType) {
+      case DUMMY: // speed optimization for most use cases
+        return DUMMY_DATA_FILTER;
+      case AVERAGE_THRESHOLD:
+        return new AverageThresholdDataFilter();
+      default:
+        return DUMMY_DATA_FILTER;
     }
   }
 }

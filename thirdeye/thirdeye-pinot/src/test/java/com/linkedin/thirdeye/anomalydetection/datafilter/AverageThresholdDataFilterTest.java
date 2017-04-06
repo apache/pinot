@@ -14,7 +14,7 @@ public class AverageThresholdDataFilterTest {
   @Test
   public void testCreate() {
     Map<String, String> dataFilter = new HashMap<>();
-    dataFilter.put(DataFilterFactory.FILTER_TYPE_KEY, "AVERAGETHRESHOLDDATAFILTER");
+    dataFilter.put(DataFilterFactory.FILTER_TYPE_KEY, "aVerAge_THrEShOLd");
     dataFilter.put(AverageThresholdDataFilter.METRIC_NAME_KEY, "metricName");
     dataFilter.put(AverageThresholdDataFilter.THRESHOLD_KEY, "1000");
     dataFilter.put(AverageThresholdDataFilter.MIN_LIVE_ZONE_KEY, "100");

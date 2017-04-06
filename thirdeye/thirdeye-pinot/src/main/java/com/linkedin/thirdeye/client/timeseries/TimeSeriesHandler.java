@@ -34,10 +34,11 @@ public class TimeSeriesHandler {
   private static final Logger LOG = LoggerFactory.getLogger(TimeSeriesHandler.class);
   private final QueryCache queryCache;
   private ExecutorService executorService;
-  private boolean doRollUp = true; // roll up small metrics to OTHER dimension
+  private final boolean doRollUp; // roll up small metrics to OTHER dimension
 
   public TimeSeriesHandler(QueryCache queryCache) {
     this.queryCache = queryCache;
+    this.doRollUp = true;
   }
 
   public TimeSeriesHandler(QueryCache queryCache, boolean doRollUp) {
