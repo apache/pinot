@@ -13,4 +13,10 @@ public class DummyDataFilter extends BaseDataFilter {
   public boolean isQualified(MetricTimeSeries metricTimeSeries, DimensionMap dimensionMap) {
     return true;
   }
+
+  @Override
+  public boolean isQualified(MetricTimeSeries metricTimeSeries, DimensionMap dimensionMap, long windowStart,
+      long windowEnd) {
+    return true;
+  }
 }
