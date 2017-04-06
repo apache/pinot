@@ -485,8 +485,8 @@ public class ScatterGatherImpl implements ScatterGather {
           if (errorMap != null && errorMap.containsKey(_server)) {
             errStr = errorMap.get(_server).getMessage();
           }
-          LOGGER.info("Destroying invalid conn {}:{}", conn, errStr);
           if (conn != null) {
+            LOGGER.warn("Destroying invalid conn {}:{}", conn, errStr);
             _connPool.destroyObject(_server, conn);
           }
           if (++ntries == MAX_CONN_RETRIES-1) {
@@ -501,7 +501,7 @@ public class ScatterGatherImpl implements ScatterGather {
         LOGGER.debug("Response Future is : {}", _responseFuture);
         error = false;
       } catch (TimeoutException e1) {
-        LOGGER.warn("Timed out waiting for connection for server ({})({})(gotConnection={}). See metric {}", _server,
+        LOGGER.warn("Timed out waiting for connection for server ({})({})(gotConnection={}):{}. See metric {}", _server,
             _request.getRequestId(), gotConnection, e1.getMessage(), BrokerMeter.REQUEST_DROPPED_DUE_TO_CONNECTION_ERROR.toString());
         _responseFuture = new ResponseFuture(_server, e1, "Error Future for request " + _request.getRequestId());
       } catch (ConnectionLimitReachedException e) {
