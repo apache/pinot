@@ -50,6 +50,25 @@ public interface AnomalyFunction {
   List<RawAnomalyResultDTO> analyze(DimensionMap exploredDimensions, MetricTimeSeries timeSeries,
       DateTime windowStart, DateTime windowEnd, List<MergedAnomalyResultDTO> knownAnomalies)
       throws Exception;
+  /**
+   * Analyzes a metric time series before windowStart and returns any anomalous points / intervals.
+   * @param exploredDimensions
+   *          Pairs of dimension value and name corresponding to timeSeries.
+   * @param timeSeries
+   *          The metric time series data.
+   * @param windowStart
+   *          The beginning of the range corresponding to timeSeries.
+   * @param windowEnd
+   *          The end of the range corresponding to timeSeries.
+   * @param knownAnomalies
+   *          Any known anomalies in the time range.
+   * @return
+   *         A list of anomalies that were not previously known.
+   */
+
+  List<RawAnomalyResultDTO> offlineAnalyze(DimensionMap exploredDimensions, MetricTimeSeries timeSeries,
+      DateTime windowStart, DateTime windowEnd, List<MergedAnomalyResultDTO> knownAnomalies)
+      throws Exception;
 
   /**
    * Computes the score and severity according to the current and baseline of the given timeSeries and stores the

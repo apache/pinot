@@ -12,6 +12,7 @@ import com.linkedin.thirdeye.anomaly.task.TaskInfo;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.util.CustomListDateDeserializer;
 import com.linkedin.thirdeye.util.CustomListDateSerializer;
+import com.linkedin.thirdeye.anomaly.detection.DetectionJobContext.DetectionJobType;
 
 public class DetectionTaskInfo implements TaskInfo {
 
@@ -26,18 +27,21 @@ public class DetectionTaskInfo implements TaskInfo {
   private List<DateTime> windowEndTime;
   private AnomalyFunctionDTO anomalyFunctionSpec;
   private String groupByDimension;
+  private DetectionJobType detectionJobType = DetectionJobType.DEFAULT;
 
   public DetectionTaskInfo(long jobExecutionId, List<DateTime> windowStartTime,
-      List<DateTime> windowEndTime, AnomalyFunctionDTO anomalyFunctionSpec, String groupByDimension) {
+      List<DateTime> windowEndTime, AnomalyFunctionDTO anomalyFunctionSpec, String groupByDimension,
+      DetectionJobType detectionJobType) {
     this.jobExecutionId = jobExecutionId;
     this.windowStartTime = windowStartTime;
     this.windowEndTime = windowEndTime;
     this.anomalyFunctionSpec = anomalyFunctionSpec;
     this.groupByDimension = groupByDimension;
+    this.detectionJobType = detectionJobType;
   }
 
   public DetectionTaskInfo() {
-
+    this.detectionJobType = DetectionJobType.DEFAULT;
   }
 
   public long getJobExecutionId() {
@@ -78,6 +82,14 @@ public class DetectionTaskInfo implements TaskInfo {
 
   public void setGroupByDimension(String groupByDimension) {
     this.groupByDimension = groupByDimension;
+  }
+
+  public DetectionJobType getDetectionJobType() {
+    return detectionJobType;
+  }
+
+  public void setDetectionJobType(DetectionJobType detectionJobType) {
+    this.detectionJobType = detectionJobType;
   }
 
   @Override

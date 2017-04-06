@@ -2,15 +2,18 @@ package com.linkedin.thirdeye.detector.function;
 
 import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
+import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.dashboard.views.TimeBucket;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 
+import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 
@@ -19,6 +22,7 @@ import com.linkedin.thirdeye.util.AnomalyOffset;
 
 import java.util.concurrent.TimeUnit;
 
+import org.joda.time.DateTime;
 import org.joda.time.Period;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,6 +64,13 @@ public abstract class BaseAnomalyFunction implements AnomalyFunction {
     startEndTimeIntervals.add(new Pair<>(monitoringWindowStartTime, monitoringWindowEndTime));
     return startEndTimeIntervals;
   }
+
+  @Override
+  public List<RawAnomalyResultDTO> offlineAnalyze(DimensionMap exploredDimensions, MetricTimeSeries timeSeries,
+      DateTime windowStart, DateTime windowEnd, List<MergedAnomalyResultDTO> knownAnomalies) throws Exception {
+    return Collections.emptyList();
+  }
+
 
   /**
    * This method provides a view of current time series, i.e., no baseline time series.

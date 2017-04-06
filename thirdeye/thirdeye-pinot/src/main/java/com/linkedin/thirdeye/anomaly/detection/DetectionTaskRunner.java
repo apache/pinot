@@ -25,6 +25,7 @@ import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 import com.linkedin.thirdeye.detector.metric.transfer.MetricTransfer;
 import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
+import com.linkedin.thirdeye.anomaly.detection.DetectionJobContext.DetectionJobType;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -45,14 +46,16 @@ import static com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil.*;
 public class DetectionTaskRunner implements TaskRunner {
 
   private static final Logger LOG = LoggerFactory.getLogger(DetectionTaskRunner.class);
-  public static final String BACKFILL_PREFIX = "adhoc_";
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
+
+  public static final String BACKFILL_PREFIX = "adhoc_";
 
   private List<DateTime> windowStarts;
   private List<DateTime> windowEnds;
   private AnomalyFunctionDTO anomalyFunctionSpec;
   private long jobExecutionId;
+  private DetectionJobType detectionJobType;
 
   private List<String> collectionDimensions;
   private AnomalyFunctionFactory anomalyFunctionFactory;
@@ -81,6 +84,7 @@ public class DetectionTaskRunner implements TaskRunner {
     jobExecutionId = detectionTaskInfo.getJobExecutionId();
     anomalyFunctionFactory = taskContext.getAnomalyFunctionFactory();
     anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
+    detectionJobType = detectionTaskInfo.getDetectionJobType();
 
     String dataset = anomalyFunctionSpec.getCollection();
     DatasetConfigDTO datasetConfig = DAO_REGISTRY.getDatasetConfigDAO().findByDataset(dataset);
@@ -114,8 +118,9 @@ public class DetectionTaskRunner implements TaskRunner {
     boolean isBackfill = false;
     // If the current job is a backfill (adhoc) detection job, set notified flag to true so the merged anomalies do not
     // induce alerts and emails.
-    String jobName = DAO_REGISTRY.getJobDAO().getJobNameByJobId(jobExecutionId);
-    if (jobName != null && jobName.toLowerCase().startsWith(BACKFILL_PREFIX)) {
+    if (detectionJobType != null && (detectionJobType.equals(DetectionJobType.BACKFILL) ||
+        detectionJobType.equals(DetectionJobType.OFFLINE))) {
+      LOG.info("BACKFILL is triggered for Detection Job {}. Notified flag is set to be true", jobExecutionId);
       isBackfill = true;
     }
 
@@ -244,6 +249,15 @@ public class DetectionTaskRunner implements TaskRunner {
     String metricName = anomalyFunction.getSpec().getTopicMetric();
     MetricTimeSeries metricTimeSeries = anomalyDetectionInputContext.getDimensionKeyMetricTimeSeriesMap().get(dimensionMap);
 
+    /*
+    Check if current task is running offline analysis
+     */
+    boolean isOffline = false;
+    if (detectionJobType != null && detectionJobType.equals(DetectionJobType.OFFLINE)) {
+      LOG.info("Detection Job {} is running under OFFLINE mode", jobExecutionId);
+      isOffline = true;
+    }
+
     // Get current entry's knownMergedAnomalies, which should have the same explored dimensions
     List<MergedAnomalyResultDTO> knownMergedAnomaliesOfAnEntry =
         anomalyDetectionInputContext.getKnownMergedAnomalies().get(dimensionMap);
@@ -270,8 +284,13 @@ public class DetectionTaskRunner implements TaskRunner {
             metricName, properties);
       }
 
-      resultsOfAnEntry = anomalyFunction
-          .analyze(dimensionMap, metricTimeSeries, windowStart, windowEnd, historyMergedAnomalies);
+      if(isOffline) {
+        resultsOfAnEntry = anomalyFunction
+            .offlineAnalyze(dimensionMap, metricTimeSeries, windowStart, windowEnd, historyMergedAnomalies);
+      } else {
+        resultsOfAnEntry =
+            anomalyFunction.analyze(dimensionMap, metricTimeSeries, windowStart, windowEnd, historyMergedAnomalies);
+      }
     } catch (Exception e) {
       LOG.error("Could not compute for {}", dimensionMap, e);
     }
