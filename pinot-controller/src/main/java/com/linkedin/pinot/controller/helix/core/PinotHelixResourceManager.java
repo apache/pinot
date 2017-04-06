@@ -963,31 +963,36 @@ public class PinotHelixResourceManager {
   /**
    * Table APIs
    */
+  public void addTable(AbstractTableConfig config)
+      throws IOException {
+    TableType type;
+    try {
+      type = TableType.valueOf(config.getTableType().toUpperCase());
+    } catch (Exception e) {
+      throw new InvalidTableConfigException(e);
+    }
 
-  public void addTable(AbstractTableConfig config) throws JsonGenerationException, JsonMappingException, IOException {
-    TenantConfig tenantConfig = null;
-    TableType type = TableType.valueOf(config.getTableType().toUpperCase());
     if (isSingleTenantCluster()) {
-      tenantConfig = new TenantConfig();
-      tenantConfig.setBroker(ControllerTenantNameBuilder
-          .getBrokerTenantNameForTenant(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
+      TenantConfig tenantConfig = new TenantConfig();
+      tenantConfig.setBroker(
+          ControllerTenantNameBuilder.getBrokerTenantNameForTenant(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
       switch (type) {
         case OFFLINE:
-          tenantConfig.setServer(ControllerTenantNameBuilder
-              .getOfflineTenantNameForTenant(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
+          tenantConfig.setServer(ControllerTenantNameBuilder.getOfflineTenantNameForTenant(
+              ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
           break;
         case REALTIME:
-          tenantConfig.setServer(ControllerTenantNameBuilder
-              .getRealtimeTenantNameForTenant(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
+          tenantConfig.setServer(ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(
+              ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
           break;
         default:
-          throw new RuntimeException("UnSupported table type");
+          throw new InvalidTableConfigException("UnSupported table type: " + type);
       }
       config.setTenantConfig(tenantConfig);
     } else {
-      tenantConfig = config.getTenantConfig();
+      TenantConfig tenantConfig = config.getTenantConfig();
       if (tenantConfig.getBroker() == null || tenantConfig.getServer() == null) {
-        throw new RuntimeException("missing tenant configs");
+        throw new InvalidTableConfigException("Missing tenant configs");
       }
     }
 
@@ -1035,9 +1040,23 @@ public class PinotHelixResourceManager {
         LOGGER.info("Successfully added or updated the table {} ", realtimeTableName);
         break;
       default:
-        throw new RuntimeException("UnSupported table type");
+        throw new InvalidTableConfigException("UnSupported table type: " + type);
     }
     handleBrokerResource(config);
+  }
+
+  public static class InvalidTableConfigException extends RuntimeException {
+    public InvalidTableConfigException(String message) {
+      super(message);
+    }
+
+    public InvalidTableConfigException(String message, Throwable cause) {
+      super(message, cause);
+    }
+
+    public InvalidTableConfigException(Throwable cause) {
+      super(cause);
+    }
   }
 
   private void ensureRealtimeClusterIsSetUp(AbstractTableConfig config, String realtimeTableName,
