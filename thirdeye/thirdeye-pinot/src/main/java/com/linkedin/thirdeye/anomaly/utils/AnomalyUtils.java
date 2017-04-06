@@ -75,6 +75,9 @@ public class AnomalyUtils {
    * @param ownerClass the class that owns the executor service.
    */
   public static void safelyShutdownExecutionService(ExecutorService executorService, Class ownerClass) {
+    if (executorService == null) {
+      return;
+    }
     executorService.shutdown(); // Prevent new tasks from being submitted
     try {
       // Wait a while for existing tasks to terminate
@@ -82,7 +85,11 @@ public class AnomalyUtils {
         executorService.shutdownNow(); // Force terminate all currently executing tasks
         // Wait for tasks to be cancelled
         if (!executorService.awaitTermination(30, TimeUnit.SECONDS)) {
-          LOG.error("Failed to terminate thread pool for class {}", ownerClass.getSimpleName());
+          if (ownerClass != null) {
+            LOG.error("Failed to terminate thread pool for class {}", ownerClass.getSimpleName());
+          } else {
+            LOG.error("Failed to terminate thread pool: {}", executorService);
+          }
         }
       }
     } catch (InterruptedException e) { // If current thread is interrupted

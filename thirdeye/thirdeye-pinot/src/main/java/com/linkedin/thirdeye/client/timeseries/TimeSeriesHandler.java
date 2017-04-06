@@ -1,11 +1,15 @@
 package com.linkedin.thirdeye.client.timeseries;
 
+import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
@@ -23,9 +27,13 @@ import com.linkedin.thirdeye.client.TimeRangeUtils;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow.TimeSeriesMetric;
 import com.linkedin.thirdeye.dashboard.Utils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class TimeSeriesHandler {
+  private static final Logger LOG = LoggerFactory.getLogger(TimeSeriesHandler.class);
   private final QueryCache queryCache;
+  private ExecutorService executorService;
 
   public TimeSeriesHandler(QueryCache queryCache) {
     this.queryCache = queryCache;
@@ -98,6 +106,51 @@ public class TimeSeriesHandler {
         }
       }
     }
+  }
+
+  /**
+   * An asynchrous method for handling the time series request. This method initializes executor service (if necessary)
+   * and invokes the synchronous method -- handle() -- in the backend. After invoking this method, users could invoke
+   * shutdownAsyncHandler() to shutdown the executor service if it is no longer needed.
+   *
+   * @param timeSeriesRequest the request to retrieve time series.
+   * @return a future object of time series response for the give request. Returns null if it fails to handle the
+   * request.
+   */
+  public Future<TimeSeriesResponse> asyncHandle(final TimeSeriesRequest timeSeriesRequest) {
+    // For optimizing concurrency performance by reducing the access to the synchronized method
+    if (executorService == null) {
+      startAsyncHandler();
+    }
+
+    Future<TimeSeriesResponse> responseFuture = executorService.submit(new Callable<TimeSeriesResponse>() {
+      public TimeSeriesResponse call () {
+        try {
+          return TimeSeriesHandler.this.handle(timeSeriesRequest);
+        } catch (Exception e) {
+          LOG.warn("Failed to retrieve time series of the request: {}", timeSeriesRequest);
+        }
+        return null;
+      }
+    });
+
+    return responseFuture;
+  }
+
+  /**
+   * Initializes executor service if it is null. This method is thread-safe.
+   */
+  private synchronized void startAsyncHandler() {
+    if (executorService == null) {
+      executorService = Executors.newFixedThreadPool(10);
+    }
+  }
+
+  /**
+   * Shutdown the executor service of this TimeSeriesHandler safely.
+   */
+  public void shutdownAsyncHandler() {
+    AnomalyUtils.safelyShutdownExecutionService(executorService, this.getClass());
   }
 
   private static ThirdEyeRequest createThirdEyeRequest(String requestReference,
