@@ -11,12 +11,14 @@ import com.linkedin.pinot.common.restlet.swagger.Summary;
 import com.linkedin.pinot.common.restlet.swagger.Tags;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.controller.api.ControllerRestApplication;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 import java.io.File;
 import java.io.IOException;
 import java.util.Set;
 import java.util.TreeSet;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.codehaus.jackson.JsonParseException;
 import org.codehaus.jackson.JsonProcessingException;
 import org.codehaus.jackson.map.JsonMappingException;
@@ -53,23 +55,28 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
   @Override
   @Post("json")
   public Representation post(Representation entity) {
-    AbstractTableConfig config = null;
     try {
       String jsonRequest = entity.getText();
-      config = AbstractTableConfig.init(jsonRequest);
+      AbstractTableConfig config = AbstractTableConfig.init(jsonRequest);
       try {
         addTable(config);
       } catch (Exception e) {
-        LOGGER.error("Caught exception while adding table", e);
-        ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_ADD_ERROR, 1L);
-        setStatus(Status.SERVER_ERROR_INTERNAL);
-        return new StringRepresentation("Failed: " + e.getMessage());
+        if (e instanceof PinotHelixResourceManager.InvalidTableConfigException) {
+          LOGGER.info("Invalid table config for table: {}, {}", config.getTableName(), e.getMessage());
+          setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+        } else {
+          LOGGER.error("Caught exception while adding table: {}", config.getTableName(), e);
+          setStatus(Status.SERVER_ERROR_INTERNAL);
+        }
+        ControllerRestApplication.getControllerMetrics()
+            .addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_ADD_ERROR, 1L);
+        return new StringRepresentation("Failed: " + e.getMessage() + "\n" + ExceptionUtils.getStackTrace(e));
       }
       return new StringRepresentation("Success");
     } catch (Exception e) {
-      LOGGER.error("error reading/serializing requestJSON", e);
+      LOGGER.info("Caught exception while deserializing table config", e);
       setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
-      return new StringRepresentation("Failed: " + e.getMessage());
+      return new StringRepresentation("Failed: " + e.getMessage() + "\n" + ExceptionUtils.getStackTrace(e));
     }
   }
 
@@ -82,7 +89,12 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
     // For self-serviced cluster, ensure that the tables are created with atleast
     // min replication factor irrespective of table configuratio value.
     SegmentsValidationAndRetentionConfig segmentsConfig = config.getValidationConfig();
-    int requestReplication = segmentsConfig.getReplicationNumber();
+    int requestReplication;
+    try {
+      requestReplication = segmentsConfig.getReplicationNumber();
+    } catch (NumberFormatException e) {
+      throw new PinotHelixResourceManager.InvalidTableConfigException("Invalid replication number", e);
+    }
     int configMinReplication = _controllerConf.getDefaultTableMinReplicas();
     if (requestReplication < configMinReplication) {
       LOGGER.info("Creating table with minimum replication factor of: {} instead of requested replication: {}",
@@ -90,12 +102,19 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
       segmentsConfig.setReplication(String.valueOf(configMinReplication));
     }
 
-    if (segmentsConfig.getReplicasPerPartition() != null) {
-      int replicasPerPartition = Integer.valueOf(segmentsConfig.getReplicasPerPartition());
-      if (replicasPerPartition < configMinReplication) {
-        LOGGER.info("Creating table with minimum replicasPerPartition of: {} instead of requested replicasPerPartition: {}",
-          configMinReplication, requestReplication);
-        segmentsConfig.setReplicasPerPartition(String.valueOf(configMinReplication));
+    String replicasPerPartitionStr = segmentsConfig.getReplicasPerPartition();
+    if (replicasPerPartitionStr != null) {
+      try {
+        int replicasPerPartition = Integer.valueOf(replicasPerPartitionStr);
+        if (replicasPerPartition < configMinReplication) {
+          LOGGER.info(
+              "Creating table with minimum replicasPerPartition of: {} instead of requested replicasPerPartition: {}",
+              configMinReplication, replicasPerPartition);
+          segmentsConfig.setReplicasPerPartition(String.valueOf(configMinReplication));
+        }
+      } catch (NumberFormatException e) {
+        throw new PinotHelixResourceManager.InvalidTableConfigException(
+            "Invalid replicas per partition: " + replicasPerPartitionStr, e);
       }
     }
 
