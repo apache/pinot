@@ -17,8 +17,8 @@ import org.slf4j.LoggerFactory;
  * The data filter determines whether the average value of a time series passes the threshold.
  *
  * Advance Usage 1: A bucket of the time series is taken into consider only if its value is located inside the live
- * zone, which is specified by minLiveZone and maxLveZone. In other words, if a bucket's value is smaller than
- * minLiveZone or is larger than maxLveZone, then this bucket is ignored when calculating the average value.
+ * zone, which is specified by minLiveZone and maxLiveZone. In other words, if a bucket's value is smaller than
+ * minLiveZone or is larger than maxLiveZone, then this bucket is ignored when calculating the average value.
  *
  * Advance Usage 2: The threshold could be overridden for different dimensions. For instance, the default threshold
  * for any combination of dimensions could be 1000. However, we could override the threshold for any sub-dimensions that
