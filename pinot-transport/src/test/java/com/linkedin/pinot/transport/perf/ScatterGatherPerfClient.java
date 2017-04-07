@@ -55,7 +55,6 @@ import com.linkedin.pinot.transport.common.SegmentIdSet;
 import com.linkedin.pinot.transport.config.PerTableRoutingConfig;
 import com.linkedin.pinot.transport.config.RoutingTableConfig;
 import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
-import com.linkedin.pinot.transport.netty.NettyClientConnection;
 import com.linkedin.pinot.transport.netty.PooledNettyClientResourceManager;
 import com.linkedin.pinot.transport.pool.KeyedPool;
 import com.linkedin.pinot.transport.pool.KeyedPoolImpl;
@@ -86,7 +85,7 @@ public class ScatterGatherPerfClient implements Runnable {
   //Routing Config and Pool
   private final RoutingTableConfig _routingConfig;
   private ScatterGatherImpl _scatterGather;
-  private KeyedPool<ServerInstance, NettyClientConnection> _pool;
+  private KeyedPool<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection> _pool;
   private ExecutorService _service;
   private EventLoopGroup _eventLoopGroup;
   private Timer _timer;
@@ -163,7 +162,7 @@ public class ScatterGatherPerfClient implements Runnable {
     NettyClientMetrics clientMetrics = new NettyClientMetrics(registry, "client_");
     PooledNettyClientResourceManager rm = new PooledNettyClientResourceManager(_eventLoopGroup, _timer, clientMetrics);
     _pool =
-        new KeyedPoolImpl<ServerInstance, NettyClientConnection>(1, _maxActiveConnections, 300000, 10, rm,
+        new KeyedPoolImpl<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection>(1, _maxActiveConnections, 300000, 10, rm,
             _timedExecutor, MoreExecutors.sameThreadExecutor(), registry);
     rm.setPool(_pool);
     _scatterGather = new ScatterGatherImpl(_pool, _service);

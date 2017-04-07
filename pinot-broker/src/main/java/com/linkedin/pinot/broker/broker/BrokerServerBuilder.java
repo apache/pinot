@@ -69,7 +69,7 @@ public class BrokerServerBuilder {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerServerBuilder.class);
   // Connection Pool Related
-  private KeyedPool<ServerInstance, NettyClientConnection> _connPool;
+  private KeyedPool<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection> _connPool;
   private ScheduledThreadPoolExecutor _poolTimeoutExecutor;
   private ExecutorService _requestSenderPool;
 
@@ -146,7 +146,7 @@ public class BrokerServerBuilder {
 
     final ConnectionPoolConfig connPoolCfg = conf.getConnPool();
 
-    _connPool = new KeyedPoolImpl<ServerInstance, NettyClientConnection>(connPoolCfg.getMinConnectionsPerServer(),
+    _connPool = new KeyedPoolImpl<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection>(connPoolCfg.getMinConnectionsPerServer(),
         connPoolCfg.getMaxConnectionsPerServer(), connPoolCfg.getIdleTimeoutMs(), connPoolCfg.getMaxBacklogPerServer(),
         _resourceManager, _poolTimeoutExecutor, _requestSenderPool, _registry);
     // MoreExecutors.sameThreadExecutor(), _registry);

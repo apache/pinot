@@ -25,7 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.transport.netty.NettyClientConnection;
+import com.linkedin.pinot.transport.netty.PooledNettyClientResourceManager;
 import com.linkedin.pinot.transport.pool.KeyedPool;
 
 
@@ -37,13 +37,13 @@ public class LiveInstancesChangeListenerImpl implements LiveInstanceChangeListen
 
   private long timeout;
   private final Map<String, String> liveInstanceToSessionIdMap;
-  private KeyedPool<ServerInstance, NettyClientConnection> connectionPool;
+  private KeyedPool<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection> connectionPool;
 
   public LiveInstancesChangeListenerImpl(String clusterName) {
     this.liveInstanceToSessionIdMap = new HashMap<String, String>();
   }
 
-  public void init(final KeyedPool<ServerInstance, NettyClientConnection> connectionPool, final long timeout) {
+  public void init(final KeyedPool<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection> connectionPool, final long timeout) {
     this.connectionPool = connectionPool;
     this.timeout = timeout;
   }

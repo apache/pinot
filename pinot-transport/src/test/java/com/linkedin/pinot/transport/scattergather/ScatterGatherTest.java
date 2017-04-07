@@ -15,9 +15,6 @@
  */
 package com.linkedin.pinot.transport.scattergather;
 
-import com.google.common.util.concurrent.Futures;
-import com.google.common.util.concurrent.ListenableFuture;
-import io.netty.channel.ChannelHandlerContext;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -33,6 +30,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.linkedin.pinot.common.metrics.BrokerMetrics;
 import com.linkedin.pinot.common.request.BrokerRequest;
@@ -45,7 +44,6 @@ import com.linkedin.pinot.transport.common.RoundRobinReplicaSelection;
 import com.linkedin.pinot.transport.common.SegmentId;
 import com.linkedin.pinot.transport.common.SegmentIdSet;
 import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
-import com.linkedin.pinot.transport.netty.NettyClientConnection;
 import com.linkedin.pinot.transport.netty.NettyServer.RequestHandler;
 import com.linkedin.pinot.transport.netty.NettyServer.RequestHandlerFactory;
 import com.linkedin.pinot.transport.netty.NettyTCPServer;
@@ -54,6 +52,7 @@ import com.linkedin.pinot.transport.pool.KeyedPoolImpl;
 import com.linkedin.pinot.transport.scattergather.ScatterGatherImpl.ScatterGatherRequestContext;
 import com.yammer.metrics.core.MetricsRegistry;
 import io.netty.buffer.ByteBuf;
+import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.HashedWheelTimer;
@@ -233,8 +232,8 @@ public class ScatterGatherTest {
     NettyClientMetrics clientMetrics = new NettyClientMetrics(registry, "client_");
     PooledNettyClientResourceManager rm =
         new PooledNettyClientResourceManager(eventLoopGroup, new HashedWheelTimer(), clientMetrics);
-    KeyedPoolImpl<ServerInstance, NettyClientConnection> pool =
-        new KeyedPoolImpl<ServerInstance, NettyClientConnection>(1, 1, 300000, 1, rm, timedExecutor, poolExecutor,
+    KeyedPoolImpl<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection> pool =
+        new KeyedPoolImpl<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection>(1, 1, 300000, 1, rm, timedExecutor, poolExecutor,
             registry);
     rm.setPool(pool);
 
@@ -301,8 +300,8 @@ public class ScatterGatherTest {
     NettyClientMetrics clientMetrics = new NettyClientMetrics(registry, "client_");
     PooledNettyClientResourceManager rm =
         new PooledNettyClientResourceManager(eventLoopGroup, new HashedWheelTimer(), clientMetrics);
-    KeyedPoolImpl<ServerInstance, NettyClientConnection> pool =
-        new KeyedPoolImpl<ServerInstance, NettyClientConnection>(1, 1, 300000, 1, rm, timedExecutor, poolExecutor,
+    KeyedPoolImpl<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection> pool =
+        new KeyedPoolImpl<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection>(1, 1, 300000, 1, rm, timedExecutor, poolExecutor,
             registry);
     rm.setPool(pool);
 
@@ -406,8 +405,8 @@ public class ScatterGatherTest {
     NettyClientMetrics clientMetrics = new NettyClientMetrics(registry, "client_");
     PooledNettyClientResourceManager rm =
         new PooledNettyClientResourceManager(eventLoopGroup, new HashedWheelTimer(), clientMetrics);
-    KeyedPoolImpl<ServerInstance, NettyClientConnection> pool =
-        new KeyedPoolImpl<ServerInstance, NettyClientConnection>(1, 1, 300000, 1, rm, timedExecutor, service, registry);
+    KeyedPoolImpl<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection> pool =
+        new KeyedPoolImpl<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection>(1, 1, 300000, 1, rm, timedExecutor, service, registry);
     rm.setPool(pool);
 
     SegmentIdSet pg1 = new SegmentIdSet();
@@ -521,8 +520,8 @@ public class ScatterGatherTest {
     NettyClientMetrics clientMetrics = new NettyClientMetrics(registry, "client_");
     PooledNettyClientResourceManager rm =
         new PooledNettyClientResourceManager(eventLoopGroup, new HashedWheelTimer(), clientMetrics);
-    KeyedPoolImpl<ServerInstance, NettyClientConnection> pool =
-        new KeyedPoolImpl<ServerInstance, NettyClientConnection>(1, 1, 300000, 1, rm, timedExecutor, poolExecutor,
+    KeyedPoolImpl<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection> pool =
+        new KeyedPoolImpl<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection>(1, 1, 300000, 1, rm, timedExecutor, poolExecutor,
             registry);
     rm.setPool(pool);
 
