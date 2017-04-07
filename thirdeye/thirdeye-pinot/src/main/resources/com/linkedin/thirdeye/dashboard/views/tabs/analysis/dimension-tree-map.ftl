@@ -1,5 +1,11 @@
 <div class="analysis-card padding-all top-buffer">
-	<div class="analysis-title bottom-buffer">Contribution Analysis {{!--  (for {{metricName}} with filters: {{#each heatmapFilters}}{{@key}}: {{this}}{{/each}})--}}</div>
+	<div class="analysis-title bottom-buffer">Contribution Analysis
+		<span class="analysis-details"> (for <strong>Metric </strong>{{metricName}} and <strong>Dimensions </strong>{{#each heatmapFilters}}
+			{{@key}}: {{this}}
+		{{else}}
+			ALL
+		{{/each}}) <span>
+	</div>
 	<div class="contribution-analysis">
 		<div class="contribution-analysis__daterangepicker">
 			<label class="label-medium-semibold">Comparing:</label>

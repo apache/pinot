@@ -855,6 +855,12 @@ text {
   color: rgba(0,0,0,.70);
 }
 
+.analysis-details {
+  font-size: initial;
+  color: initial;
+  font-weight: 300;
+}
+
 .analysis-summary__data.positive {
   color: #398b18;
 }

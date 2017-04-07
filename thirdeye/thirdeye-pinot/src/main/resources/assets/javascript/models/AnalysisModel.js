@@ -6,13 +6,23 @@ function AnalysisModel() {
   this.dimension;
   this.filters;
   this.currentStart;
-  this.currentEndl;
+  this.currentEnd;
   this.baselineStart;
   this.baselineEnd;
 }
 
 AnalysisModel.prototype = {
-  init: function (params) {
+  init: function () {
+    this.metric = null;
+    this.metricId = null;
+    this.timeRange = null;
+    this.granularity = null;
+    this.dimension = null;
+    this.filters = null;
+    this.currentStart = moment().subtract(1, 'days');
+    this.currentEnd = moment();
+    this.baselineStart = null;
+    this.baselineEnd = null;
   },
 
   update: function (params) {
@@ -73,6 +83,8 @@ AnalysisModel.prototype = {
     spinner.spin(target);
     return this.fetchGranularityForMetric(metricId).then((granularity) => {
       this.granularityOptions = granularity;
+      this.granularity = granularity[0] || constants.DEFAULT_ANALYSIS_GRANULARITY;
+      this.setDefaultCurrentDateRange(this.granularity);
       return this.fetchDimensionsForMetric(metricId);
     }).then((dimensions) => {
       this.dimensionOptions = dimensions;
@@ -84,5 +96,14 @@ AnalysisModel.prototype = {
       spinner.stop();
       return this;
     });
+  },
+
+  setDefaultCurrentDateRange(granularity) {
+    if (granularity === constants.GRANULARITY_DAY) {
+      this.currenStart = moment().subtract(30, 'days').startOf('day');
+    }
+    this.granularity = granularity;
+    this.baselineStart = this.currentStart.clone().subtract(7, 'days');
+    this.baselineEnd = this.currentEnd.clone().subtract(7, 'days');
   }
 };

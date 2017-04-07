@@ -24,7 +24,7 @@ function TimeSeriesCompareModel() {
   this.heatMapCurrentEnd;
 
   this.showTime = () => {
-    return this.granularity !== 'DAYS';
+    return this.granularity !== constants.GRANULARITY_DAY;
   };
 }
 

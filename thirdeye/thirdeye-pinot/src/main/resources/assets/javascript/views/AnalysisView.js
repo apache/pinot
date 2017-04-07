@@ -16,9 +16,9 @@ function AnalysisView(analysisModel) {
   this.currentRange = () => {
     return {
       'Last 24 Hours': [moment().subtract(1, 'days'), moment()],
-      'Yesterday': [moment().subtract(2, 'days'), moment().subtract(1, 'days')],
-      'Last 7 Days': [moment().subtract(6, 'days'), moment()],
-      'Last 30 Days': [moment().subtract(29, 'days'), moment()],
+      'Yesterday': [moment().subtract(1, 'days').startOf('day'), moment().subtract(1, 'days').endOf('day')],
+      'Last 7 Days': [moment().subtract(6, 'days').startOf('day'), moment().endOf('day')],
+      'Last 30 Days': [moment().subtract(29, 'days').startOf('day'), moment().endOf('day')],
       'This Month': [moment().startOf('month'), moment().endOf('month')],
       'Last Month': [moment().subtract(1, 'month').startOf('month'),
         moment().subtract(1, 'month').endOf('month')]
@@ -29,10 +29,7 @@ function AnalysisView(analysisModel) {
     const range = {};
     constants.COMPARE_MODE_OPTIONS.forEach((options) => {
       const offset = constants.WOW_MAPPING[options];
-      range[options] = [
-        this.calculateBaselineDate('currentStart', offset),
-        this.calculateBaselineDate('currentEnd', offset)
-      ];
+      range[options] = [this.calculateBaselineDate('currentStart', offset),this.calculateBaselineDate('currentEnd', offset)];
     });
    return range;
   };
@@ -50,7 +47,7 @@ AnalysisView.prototype = {
     return baseDate.clone().subtract(offset, 'days');
   },
 
-  render(metricId, callback) {
+  render: function (metricId, callback) {
     $("#analysis-place-holder").html(this.analysis_template_compiled);
     // METRIC SELECTION
     var analysisMetricSelect = $('#analysis-metric-input').select2({
@@ -113,7 +110,8 @@ AnalysisView.prototype = {
 
   destroyAnalysisOptions() {
     this.destroyDatePickers();
-    $('#analysis-options-placeholder').children().remove();
+    const $analysisPlaceholder = $('#analysis-options-placeholder');
+    $analysisPlaceholder.children().remove();
   },
 
   destroyDatePickers() {
@@ -130,7 +128,7 @@ AnalysisView.prototype = {
   renderAnalysisOptions(metricId) {
     metricId = metricId || Object.assign(this.viewParams, this.searchParams).metricId;
     // Now render the dimensions and filters for selected metric
-    const showTime = this.viewParams.granularity !== 'DAYS';
+    const showTime = this.viewParams.granularity !== constants.GRANULARITY_DAY;
     const analysis_options_template = $('#analysis-options-template').html();
     const compiled_analysis_options_template = Handlebars.compile(analysis_options_template);
     $('#analysis-options-placeholder').html(compiled_analysis_options_template);
@@ -154,9 +152,9 @@ AnalysisView.prototype = {
       this.viewParams['compareMode'] = compareMode;
 
       $baselineRangeText.addClass("time-range").html(
-        `<span>${compareMode}</span> ${start.format(constants.DATE_RANGE_FORMAT)} &mdash; ${end.format(constants.DATE_RANGE_FORMAT)}`);
+        `<span>${compareMode}</span> ${start.format(constants.DATE_TIME_RANGE_FORMAT )} &mdash; ${end.format(constants.DATE_TIME_RANGE_FORMAT )}`);
     };
-    const setCurrentRange = (start, end, rangeType = constants.DATE_RANGE_CUSTOM) => {
+    const setCurrentRange = (start, end, rangeType = '') => {
       const $baselineRangePicker = $('#baseline-range');
 
       this.viewParams['currentStart'] = start;
@@ -174,7 +172,7 @@ AnalysisView.prototype = {
       }
 
       $currentRangeText.addClass("time-range").html(
-          `<span>${rangeType}</span> ${start.format(constants.DATE_RANGE_FORMAT)} &mdash; ${end.format(constants.DATE_RANGE_FORMAT)}`)
+          `<span>${rangeType}</span> ${start.format(constants.DATE_TIME_RANGE_FORMAT )} &mdash; ${end.format(constants.DATE_TIME_RANGE_FORMAT )}`)
     };
 
     // TIME RANGE SELECTION
@@ -190,7 +188,7 @@ AnalysisView.prototype = {
     setBaselineRange(baselineStart, baselineEnd, this.viewParams.compareMode);
   },
 
-  renderDatePicker($selector, callbackFun, initialStart, initialEnd, showTime, rangeGenerator){
+  renderDatePicker: function ($selector, callbackFun, initialStart, initialEnd, showTime, rangeGenerator){
     const ranges = rangeGenerator();
     $selector.daterangepicker({
       startDate: initialStart,
@@ -200,7 +198,7 @@ AnalysisView.prototype = {
       },
       showDropdowns: true,
       showWeekNumbers: true,
-      timePicker: showTime,
+      timePicker: true,
       timePickerIncrement: 5,
       timePicker12Hour: true,
       ranges,
@@ -210,7 +208,7 @@ AnalysisView.prototype = {
     }, callbackFun);
   },
 
-  renderGranularity(metricId) {
+  renderGranularity: function (metricId) {
     if(!metricId) return;
     const $granularitySelector = $("#analysis-granularity-input");
     const paramGranularity = this.viewParams.granularity;
@@ -229,7 +227,7 @@ AnalysisView.prototype = {
     }
   },
 
-  renderDimensions(metricId) {
+  renderDimensions: function (metricId) {
     if(!metricId) return;
     const $dimensionSelector = $("#analysis-metric-dimension-input");
     const paramDimension = this.viewParams.dimension;
@@ -248,11 +246,11 @@ AnalysisView.prototype = {
     }
   },
 
-  renderFilters(metricId) {
+  renderFilters: function (metricId) {
     if(!metricId) return;
     const $filterSelector = $("#analysis-metric-filter-input");
     const filtersParam = this.viewParams.filters;
-    const filters = this.analysisModel.filtersOptions;
+    var filters = this.analysisModel.filtersOptions;
     var filterData = [];
     for (var key in filters) {
       // TODO: introduce category
@@ -289,7 +287,7 @@ AnalysisView.prototype = {
     }
   },
 
-  collectViewParams() {
+  collectViewParams : function () {
     // Collect filters
     this.clearHeatMapViewParams();
     var selectedFilters = $("#analysis-metric-filter-input").val();
@@ -324,7 +322,7 @@ AnalysisView.prototype = {
       'heatmapFilters'
       ]
     heatMapProperties.forEach((prop) => {
-      this.viewParams[prop] = null;
+      this.viewParams[prop] = null
     })
   },
 

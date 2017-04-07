@@ -56,6 +56,8 @@ function Constants() {
 
   this.DEFAULT_COMPARE_MODE = 'WoW';
   this.COMPARE_MODE_OPTIONS = ['WoW', 'Wo2W', 'Wo3W'];
+
+  this.GRANULARITY_DAY = 'DAYS';
   this.WOW_MAPPING = {
     WoW: 7,
     Wo2W: 14,

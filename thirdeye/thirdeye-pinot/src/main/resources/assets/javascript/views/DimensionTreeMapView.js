@@ -54,7 +54,7 @@ DimensionTreeMapView.prototype = {
     const $baselineRangeText = $('#heatmap-baseline-range span');
     const $currentRange = $('#heatmap-current-range');
     const $baselineRange = $('#heatmap-baseline-range');
-    const showTime = this.dimensionTreeMapModel.granularity !== 'DAYS';
+    const showTime = this.dimensionTreeMapModel.granularity !== constants.GRANULARITY_DAY;
     const dateFormat = showTime ? constants.DATE_TIME_RANGE_FORMAT : constants.DATE_RANGE_FORMAT;
 
     const setRangeText = (selector, start, end, dateFormat, compareMode) => {
@@ -63,7 +63,8 @@ DimensionTreeMapView.prototype = {
     };
 
     const baselineCallBack = (start, end, compareMode = constants.DATE_RANGE_CUSTOM) => {
-      const showTime = this.dimensionTreeMapModel.granularity !== 'DAYS';
+      // show time needs to be after
+      const showTime = this.dimensionTreeMapModel.granularity !== constants.GRANULARITY_DAY;
       const dateFormat = showTime ? constants.DATE_TIME_RANGE_FORMAT : constants.DATE_RANGE_FORMAT;
       this.dimensionTreeMapModel['baselineStart'] = start;
       this.dimensionTreeMapModel['baselineEnd'] = end;
@@ -76,7 +77,7 @@ DimensionTreeMapView.prototype = {
     };
 
     const currentCallBack = (start, end, rangeType = constants.DATE_RANGE_CUSTOM) => {
-      const showTime = this.dimensionTreeMapModel.granularity !== 'DAYS';
+      const showTime = this.dimensionTreeMapModel.granularity !== constants.GRANULARITY_DAY;
       const dateFormat = showTime ? constants.DATE_TIME_RANGE_FORMAT : constants.DATE_RANGE_FORMAT;
       const $baselineRangePicker = $('#heatmap-baseline-range');
       const baselineCompareMode = this.dimensionTreeMapModel['compareMode'];
