@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.indexsegment.generator;
 
 import com.google.common.base.Preconditions;
 import com.linkedin.pinot.core.data.partition.PartitionFunction;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nonnull;
@@ -24,11 +25,13 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang.math.IntRange;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.codehaus.jackson.annotate.JsonProperty;
+import org.codehaus.jackson.map.ObjectMapper;
 
 
 @SuppressWarnings("unused") // Suppress incorrect warning, as methods are used for json ser/de.
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class SegmentPartitionConfig {
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private final Map<String, ColumnPartitionConfig> _columnPartitionMap;
 
   public SegmentPartitionConfig(
@@ -66,5 +69,28 @@ public class SegmentPartitionConfig {
       return columnPartitionConfig.getPartitionRanges();
     }
     return null;
+  }
+
+  /**
+   * Given a JSON string, de-serialize and return an instance of {@link SegmentPartitionConfig}
+   *
+   * @param jsonString Input JSON string
+   * @return Instance of {@link SegmentPartitionConfig} built from the input string.
+   * @throws IOException
+   */
+  public static SegmentPartitionConfig fromJsonString(String jsonString)
+      throws IOException {
+    return OBJECT_MAPPER.readValue(jsonString, SegmentPartitionConfig.class);
+  }
+
+  /**
+   * Returns the JSON equivalent of the object.
+   *
+   * @return JSON string equivalent of the object.
+   * @throws IOException
+   */
+  public String toJsonString()
+      throws IOException {
+    return OBJECT_MAPPER.writeValueAsString(this);
   }
 }
