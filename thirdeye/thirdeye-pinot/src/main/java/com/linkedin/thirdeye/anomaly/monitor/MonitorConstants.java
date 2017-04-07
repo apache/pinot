@@ -11,6 +11,6 @@ public class MonitorConstants {
   }
 
   public static int DEFAULT_EXPIRE_DAYS_AGO = 3;
-  public static TimeGranularity DEFAULT_MONITOR_FREQUENCY = new TimeGranularity(4, TimeUnit.HOURS);
+  public static TimeGranularity DEFAULT_MONITOR_FREQUENCY = new TimeGranularity(1, TimeUnit.HOURS);
 
 }
