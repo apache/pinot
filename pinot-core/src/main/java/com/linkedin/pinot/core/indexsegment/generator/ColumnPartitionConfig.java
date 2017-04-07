@@ -19,6 +19,7 @@ import com.linkedin.pinot.core.data.partition.PartitionFunction;
 import com.linkedin.pinot.core.data.partition.PartitionFunctionFactory;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nonnull;
 import org.apache.commons.lang.math.IntRange;
 import org.codehaus.jackson.annotate.JsonIgnore;
@@ -46,6 +47,13 @@ public class ColumnPartitionConfig {
       @Nonnull @JsonProperty("partitionValues") String partitionValues) {
     _functionName = functionName;
     _partitionValues = partitionValues;
+  }
+
+  public ColumnPartitionConfig(Map<String, String> map, String column, int partitionId, int nPartitions) {
+    _functionName = map.get(column) + PARTITIONER_DELIMITER + nPartitions;
+    List<IntRange> range = new ArrayList<>(1);
+    range.add(new IntRange(partitionId, partitionId));
+    _partitionValues = rangesToString(range);
   }
 
   public String getFunctionName() {

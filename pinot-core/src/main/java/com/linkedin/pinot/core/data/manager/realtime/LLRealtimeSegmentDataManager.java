@@ -173,8 +173,6 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   private final List<String> _invertedIndexColumns;
   private final List<String> _noDictionaryColumns;
   private final Map<String, String> _column2PartitionersMap;
-  private int _nPartitions;
-  private SegmentPartitionConfig _segmentPartitionConfig = null;
   private final String _sortedColumn;
   private Logger segmentLogger = LOGGER;
   private final String _tableStreamName;
@@ -849,12 +847,12 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     _column2PartitionersMap = indexingConfig.getPartitioners();
     if (_column2PartitionersMap != null && !_column2PartitionersMap.isEmpty()) {
       try {
-        _nPartitions = _consumerWrapper.getPartitionCount(_kafkaTopic, /*maxWaitTimeMs=*/5000L);
-        _segmentPartitionConfig = createPartitionConfig();
-        _realtimeSegment.setSegmentPartitionConfig(_segmentPartitionConfig);
+        int nPartitions = _consumerWrapper.getPartitionCount(_kafkaTopic, /*maxWaitTimeMs=*/5000L);
+        _realtimeSegment.setSegmentPartitionConfig(createPartitionConfig(nPartitions));
       } catch (Exception e) {
         segmentLogger.warn("Couldn't get number of partitions in 5s, not using partition config");
         _realtimeSegment.setSegmentPartitionConfig(null);
+        makeConsumerWrapper();
       }
     }
 
@@ -947,12 +945,10 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     return _maxTimeForConsumingToOnlineSec;
   }
 
-  private SegmentPartitionConfig createPartitionConfig() {
+  private SegmentPartitionConfig createPartitionConfig(int nPartitions) {
     Map<String, ColumnPartitionConfig> map = new HashedMap();
     for (String column : _column2PartitionersMap.keySet()) {
-      map.put(column, new ColumnPartitionConfig(
-          _column2PartitionersMap.get(column) + ColumnPartitionConfig.PARTITIONER_DELIMITER + _nPartitions,
-          "[" + _kafkaPartitionId + " " + _kafkaPartitionId + "]"));
+      map.put(column, new ColumnPartitionConfig(_column2PartitionersMap, column, _kafkaPartitionId, nPartitions));
     }
     return new SegmentPartitionConfig(map);
   }
