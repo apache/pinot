@@ -30,13 +30,18 @@ Handlebars.registerHelper('formatDelta', function (a, b) {
   }
 });
 
+/**
+ * Displays human readable number 
+ * @param {number} num A number
+ * @return {string} human readable number
+ */
 Handlebars.registerHelper('formatNumber', function(num) {
   return num.toString().replace(/(\d)(?=(\d\d\d)+(?!\d))/g, "$1,");
 });
 
 /**
  * Template helper that assigns the correct css class based on the delta
- * @param  {string} value: string value of delta ('2.4%')
+ * @param  {string} value string value of delta ('2.4%')
  * @return [string] css class positive/negative
  */
 Handlebars.registerHelper('colorDelta', function(value) {
@@ -54,6 +59,11 @@ Handlebars.registerHelper('displayMonthDayHour', function (date) {
   return moment(date).tz(tz).format('M-D H');
 });
 
+/**
+ * Displays human readable date  
+ * @param {string} date A date
+ * @return {string} human readable date
+ */
 Handlebars.registerHelper('displayMonthDay', function (date) {
   var tz = getTimeZone();
   return moment(date).tz(tz).format('M-D');

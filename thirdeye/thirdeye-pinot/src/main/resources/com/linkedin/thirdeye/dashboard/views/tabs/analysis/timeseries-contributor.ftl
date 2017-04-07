@@ -1,7 +1,7 @@
 <div class="row bottom-buffer">
   <div class="col-xs-12">
       <label class="label-medium-semibold">Metric: </label>
-      <div><label>{{this.metricName}}<label></div>
+      <div><label>{{metricName}}<label></div>
   </div>
 </div>
 <!-- Chart section -->

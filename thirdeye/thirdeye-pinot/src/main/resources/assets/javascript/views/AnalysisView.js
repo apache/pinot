@@ -29,7 +29,10 @@ function AnalysisView(analysisModel) {
     const range = {};
     constants.COMPARE_MODE_OPTIONS.forEach((options) => {
       const offset = constants.WOW_MAPPING[options];
-      range[options] = [this.calculateBaselineDate('currentStart', offset),this.calculateBaselineDate('currentEnd', offset)];
+      range[options] = [
+        this.calculateBaselineDate('currentStart', offset),
+        this.calculateBaselineDate('currentEnd', offset)
+      ];
     });
    return range;
   };
@@ -47,7 +50,7 @@ AnalysisView.prototype = {
     return baseDate.clone().subtract(offset, 'days');
   },
 
-  render: function (metricId, callback) {
+  render(metricId, callback) {
     $("#analysis-place-holder").html(this.analysis_template_compiled);
     // METRIC SELECTION
     var analysisMetricSelect = $('#analysis-metric-input').select2({
@@ -110,8 +113,7 @@ AnalysisView.prototype = {
 
   destroyAnalysisOptions() {
     this.destroyDatePickers();
-    const $analysisPlaceholder = $('#analysis-options-placeholder');
-    $analysisPlaceholder.children().remove();
+    $('#analysis-options-placeholder').children().remove();
   },
 
   destroyDatePickers() {
@@ -188,7 +190,7 @@ AnalysisView.prototype = {
     setBaselineRange(baselineStart, baselineEnd, this.viewParams.compareMode);
   },
 
-  renderDatePicker: function ($selector, callbackFun, initialStart, initialEnd, showTime, rangeGenerator){
+  renderDatePicker($selector, callbackFun, initialStart, initialEnd, showTime, rangeGenerator){
     const ranges = rangeGenerator();
     $selector.daterangepicker({
       startDate: initialStart,
@@ -208,7 +210,7 @@ AnalysisView.prototype = {
     }, callbackFun);
   },
 
-  renderGranularity: function (metricId) {
+  renderGranularity(metricId) {
     if(!metricId) return;
     const $granularitySelector = $("#analysis-granularity-input");
     const paramGranularity = this.viewParams.granularity;
@@ -221,18 +223,13 @@ AnalysisView.prototype = {
     if (granularities) {
       $granularitySelector.select2().empty();
       $granularitySelector.select2(config);
-      // $granularitySelector.on('change', (event) => {
-      //   const showTime = event.currentTarget.value !== 'DAYS';
-      //   onChangeCallback.call(this, showTime);
-      // });
     }
     if (paramGranularity && granularities.includes(paramGranularity)) {
       $granularitySelector.val(paramGranularity).trigger('change');
     }
-
   },
 
-  renderDimensions: function (metricId) {
+  renderDimensions(metricId) {
     if(!metricId) return;
     const $dimensionSelector = $("#analysis-metric-dimension-input");
     const paramDimension = this.viewParams.dimension;
@@ -251,11 +248,11 @@ AnalysisView.prototype = {
     }
   },
 
-  renderFilters: function (metricId) {
+  renderFilters(metricId) {
     if(!metricId) return;
     const $filterSelector = $("#analysis-metric-filter-input");
     const filtersParam = this.viewParams.filters;
-    var filters = this.analysisModel.filtersOptions;
+    const filters = this.analysisModel.filtersOptions;
     var filterData = [];
     for (var key in filters) {
       // TODO: introduce category
@@ -292,7 +289,7 @@ AnalysisView.prototype = {
     }
   },
 
-  collectViewParams : function () {
+  collectViewParams() {
     // Collect filters
     this.clearHeatMapViewParams();
     var selectedFilters = $("#analysis-metric-filter-input").val();
@@ -327,16 +324,11 @@ AnalysisView.prototype = {
       'heatmapFilters'
       ]
     heatMapProperties.forEach((prop) => {
-      this.viewParams[prop] = null
+      this.viewParams[prop] = null;
     })
   },
 
   setupSearchListeners() {
-
-    // $("#analysis-granularity-input").on("select2:selecting", () =>  {
-    //   this.searchEvent.notify();
-    // });
-
     $("#analysis-search-button").click(() => {
       if (!this.searchParams.metricId) return;
       this.searchEvent.notify();

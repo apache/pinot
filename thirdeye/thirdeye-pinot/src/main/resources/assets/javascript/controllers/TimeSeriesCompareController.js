@@ -21,7 +21,7 @@ TimeSeriesCompareController.prototype = {
     }
   },
 
-  handleHeatMapRenderEvent: function (viewObject) {
+  handleHeatMapRenderEvent(viewObject) {
     this.dimensionTreeMapController.destroy();
     HASH_SERVICE.update(viewObject.viewParams);
     HASH_SERVICE.refreshWindowHashForRouting('analysis');

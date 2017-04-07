@@ -1,6 +1,7 @@
 function TimeSeriesCompareModel() {
   this.metricId;
   this.metricName;
+  this.dataset;
 
   this.dimension;
   this.filters;
@@ -25,8 +26,6 @@ function TimeSeriesCompareModel() {
   this.showTime = () => {
     return this.granularity !== 'DAYS';
   };
-
-  // this.showTime = true;
 }
 
 TimeSeriesCompareModel.prototype = {
@@ -39,18 +38,14 @@ TimeSeriesCompareModel.prototype = {
       if (params.metricName) {
         this.metricName = params.metricName;
       }
-      if (params.currentStart) {
-        this.currentStart = moment(params.currentStart);
-      }
-      if (params.currentEnd) {
-        this.currentEnd = moment(params.currentEnd);
-      }
-      if (params.baselineStart) {
-        this.baselineStart = moment(params.baselineStart);
-      }
-      if (params.baselineEnd) {
-        this.baselineEnd = moment(params.baselineEnd);
-      }
+
+      this.currentStart = params.currentStart ? moment(params.currentStart) : this.currentStart;
+      this.currentEnd = params.currentEnd ? moment(params.currentEnd) : this.currentEnd;
+      this.baselineStart = params.baselineStart ? moment(params.baselineStart) : this.baselineStart;
+      this.baselineEnd = params.baselineEnd ? moment(params.baselineEnd) : this.baselineEnd;
+      this.heatMapCurrentStart = params.heatMapCurrentStart ? moment(params.heatMapCurrentStart) : this.heatMapCurrentStart;
+      this.heatMapCurrentEnd = params.heatMapCurrentEnd ? moment(params.heatMapCurrentEnd) : this.heatMapCurrentEnd;
+      this.dataset = params.dataset ||this.dataset;
       if (params.granularity) {
         this.granularity = params.granularity;
       }
@@ -61,17 +56,10 @@ TimeSeriesCompareModel.prototype = {
         this.filters = params.filters;
       }
 
-      if (params.heatMapCurrentStart) {
-        this.heatMapCurrentStart = moment(params.heatMapCurrentStart);
-      }
-
-      if (params.heatMapCurrentEnd) {
-        this.heatMapCurrentEnd = moment(params.heatMapCurrentEnd);
-      }
     }
   },
 
-  update: function () {
+  update() {
     if (this.metricId) {
       // update the timeseries data
       return dataService.fetchTimeseriesCompare(

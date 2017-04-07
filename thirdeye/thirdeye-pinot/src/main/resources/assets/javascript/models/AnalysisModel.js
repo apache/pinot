@@ -62,20 +62,25 @@ AnalysisModel.prototype = {
     return dataService.fetchFiltersForMetric(metricId);
   },
 
+  /**
+   * Fetches the data for the analysis options template
+   * @param {number} metricId The metric's id
+   * @param {string} spinArea The id of the spinner element
+   */
   fetchAnalysisOptionsData(metricId, spinArea) {
     const target = document.getElementById(spinArea);
     const spinner = new Spinner();
     spinner.spin(target);
-    return this.fetchGranularityForMetric(metricId).then((result) => {
-      this.granularityOptions = result;
+    return this.fetchGranularityForMetric(metricId).then((granularity) => {
+      this.granularityOptions = granularity;
       return this.fetchDimensionsForMetric(metricId);
-    }).then((result) => {
-      this.dimensionOptions = result;
+    }).then((dimensions) => {
+      this.dimensionOptions = dimensions;
       return this.fetchFiltersForMetric(metricId);
-    }).then((result) => {
-      this.filtersOptions = result;
-      return result;
-    }).then(() => {
+    }).then((filter) => {
+      this.filtersOptions = filter;
+      return filter;
+    }).done(() => {
       spinner.stop();
       return this;
     });

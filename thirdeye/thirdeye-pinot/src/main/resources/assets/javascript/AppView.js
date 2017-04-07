@@ -4,9 +4,7 @@ function AppView(appModel) {
   this.currentActiveTab = undefined;
 }
 AppView.prototype = {
-
-  init : function() {
-    var self = this;
+  init() {
     var tabSelectionEventHandler = (e) => {
       e.preventDefault();
       var targetTab = $(e.target).attr('href');
@@ -24,11 +22,10 @@ AppView.prototype = {
 
     $('#main-tabs').click(tabSelectionEventHandler);
     $('#admin-tabs').click(tabSelectionEventHandler);
-    // $('#thirdeye-home').click(goHome)
     // compile thirdeye.ftl
   },
 
-  render : function() {
+  render() {
     switch (this.appModel.tabSelected) {
     case "dashboard":
     case "analysis":

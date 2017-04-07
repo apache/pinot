@@ -63,7 +63,6 @@ DimensionTreeMapView.prototype = {
     };
 
     const baselineCallBack = (start, end, compareMode = constants.DATE_RANGE_CUSTOM) => {
-      // show time needs to be after
       const showTime = this.dimensionTreeMapModel.granularity !== 'DAYS';
       const dateFormat = showTime ? constants.DATE_TIME_RANGE_FORMAT : constants.DATE_RANGE_FORMAT;
       this.dimensionTreeMapModel['baselineStart'] = start;
@@ -97,12 +96,10 @@ DimensionTreeMapView.prototype = {
       setRangeText($currentRangeText, start, end, dateFormat, rangeType);
     };
 
-        // TIME RANGE SELECTION
     const currentStart = this.dimensionTreeMapModel.currentStart;
     const currentEnd = this.dimensionTreeMapModel.currentEnd;
     const baselineStart = this.dimensionTreeMapModel.baselineStart;
     const baselineEnd = this.dimensionTreeMapModel.baselineEnd;
-
 
     this.renderDatePicker($currentRange, currentCallBack, currentStart, currentEnd, showTime, this.currentRange);
     this.renderDatePicker($baselineRange, baselineCallBack, baselineStart, baselineEnd, showTime, this.baselineRange, 'left');
@@ -111,7 +108,7 @@ DimensionTreeMapView.prototype = {
     setRangeText($baselineRangeText, baselineStart, baselineEnd, dateFormat, this.dimensionTreeMapModel['compareMode']);
   },
 
-  renderDatePicker: function (domId, callbackFun, initialStart, initialEnd, showTime, rangeGenerator, opens = 'right'){
+  renderDatePicker(domId, callbackFun, initialStart, initialEnd, showTime, rangeGenerator, opens = 'right'){
     const ranges = rangeGenerator();
     $(domId).daterangepicker({
       startDate: initialStart,

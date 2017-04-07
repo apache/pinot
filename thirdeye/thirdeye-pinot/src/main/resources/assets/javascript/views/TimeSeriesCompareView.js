@@ -12,7 +12,7 @@ function TimeSeriesCompareView(timeSeriesCompareModel) {
       timeseries_subdimension_legend_template);
   this.timeseries_subdimension_legend_placeHolderId = "#analysis-chart-legend";
 
-var contributor_table_template = $("#contributor-table-details-template").html();
+  var contributor_table_template = $("#contributor-table-details-template").html();
   this.contributor_table_template_compiled = Handlebars.compile(contributor_table_template);
   this.contributor_table_placeHolderId = "#contributor-table-placeholder";
   this.heatmapRenderEvent = new Event(this);
@@ -22,7 +22,7 @@ var contributor_table_template = $("#contributor-table-details-template").html()
 }
 
 TimeSeriesCompareView.prototype = {
-  render: function () {
+  render() {
     if (this.timeSeriesCompareModel.subDimensionContributionDetails) {
       const heatmapCurrentStart = this.timeSeriesCompareModel.heatMapCurrentStart;
       const heatmapCurrentEnd = this.timeSeriesCompareModel.heatMapCurrentEnd;
@@ -32,7 +32,6 @@ TimeSeriesCompareView.prototype = {
         this.loadAnomalyRegion(heatmapCurrentStart, heatmapCurrentEnd);
       }
       this.renderPercentageChangeSection();
-
       this.setupListenersForDetailsAndCumulativeCheckBoxes();
 
       // set initial view params for rendering heatmap
@@ -51,7 +50,6 @@ TimeSeriesCompareView.prototype = {
     $('#timeseries-contributor-placeholder').children().remove();
     $('#contributor-table-placeholder').children().remove();
     $('#contributor-table-placeholder').children().remove();
-    // this.clearHeatMapViewParams();
   },
 
   renderChartSection: function () {
@@ -181,7 +179,7 @@ TimeSeriesCompareView.prototype = {
     const [ _, current, baseline ] = columns;
     if (checked) {
       this.chart.load({
-        columns: [current, baseline],
+        columns: [current, baseline]
       });
     } else {
       this.chart.load({

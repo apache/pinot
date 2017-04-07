@@ -37,7 +37,7 @@
       </div>
     </div>
     <div class="top-buffer" id="timeseries-contributor-placeholder"></div>
-    <div class="spinner-wrapper">
-      <div id="analysis-graph-spin-area"></div>
-    </div>
+  </div>
+  <div class="spinner-wrapper">
+    <div id="analysis-graph-spin-area"></div>
   </div>

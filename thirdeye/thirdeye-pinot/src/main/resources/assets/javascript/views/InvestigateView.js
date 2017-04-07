@@ -4,7 +4,6 @@ function InvestigateView(investigateModel) {
   this.investigate_template_compiled = Handlebars.compile(investigate);
   this.investigateModel = investigateModel;
 
-
   this.anomalyID;
   this.anomaly;
   this.wowData;
@@ -48,8 +47,8 @@ InvestigateView.prototype = {
   formatWowResults( wowResults, args = {}){
     const { anomalyStart, anomalyEnd, dataset, metricId, timeUnit, currentStart, currentEnd} = args;
     const filters = {}
-    const start = moment(currentStart); //.tz(constants.TIME_ZONE);
-    const end = moment(currentEnd); //.tz(constants.TIME_ZONE);
+    const start = moment(currentStart);
+    const end = moment(currentEnd);
     const heatMapCurrentStart = moment(anomalyStart);
     const heatMapCurrentEnd = moment(anomalyEnd);
     return wowResults
@@ -61,7 +60,6 @@ InvestigateView.prototype = {
         const heatMapBaselineStart = heatMapCurrentStart.clone().subtract(offset, 'days');
         const heatMapBaselineEnd = heatMapCurrentEnd.clone().subtract(offset, 'days');
         wow.change *= 100;
-        // wow.url = `dashboard#view=compare&dataset=${dataset}&compareMode=WoW&aggTimeGranularity=aggregateAll&currentStart=${start.valueOf()}&currentEnd=${end.valueOf()}&baselineStart=${baselineStart.valueOf()}&baselineEnd=${baselineEnd.valueOf()}&metrics=${metric}`;
         wow.url = `thirdeye#analysis?currentStart=${start.valueOf()}&currentEnd=${end.valueOf()}&` +
             `baselineStart=${baselineStart.valueOf()}&baselineEnd=${baselineEnd.valueOf()}&` +
             `compareMode=${wow.compareMode}&metricId=${metricId}&filters={}&granularity=${timeUnit}&` +
