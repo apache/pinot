@@ -36,6 +36,7 @@ import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.Loaders;
 import com.linkedin.pinot.pql.parsers.Pql2Compiler;
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -220,7 +221,58 @@ public class SegmentPartitionTest {
     }
   }
 
+  /**
+   * Unit test for {@link SegmentPartitionConfig} that tests the following:
+   * <ul>
+   *   <li> Conversion from/to JSON string. </li>
+   *   <li> Function names, values and ranges are as expected. </li>
+   * </ul>
+   * @throws IOException
+   */
+  @Test
+  public void testSegmentPartitionConfig()
+      throws IOException {
+    Map<String, ColumnPartitionConfig> expectedMap = new HashMap<>();
 
+    for (int i = 0; i < 10; i++) {
+      String partitionColumn = "column_" + i;
+      String partitionFunction = "function_" + i;
+
+      int numValues = 5;
+      StringBuilder builder = new StringBuilder();
+      for (int j = 0; j < numValues; j++) {
+        builder.append("[").append(j).append(" ").append(j + 1).append("]");
+        if (j < numValues - 1) {
+          builder.append(ColumnPartitionConfig.PARTITION_VALUE_DELIMITER);
+        }
+      }
+      expectedMap.put(partitionColumn, new ColumnPartitionConfig(partitionFunction, builder.toString()));
+    }
+
+    SegmentPartitionConfig expectedConfig = new SegmentPartitionConfig(expectedMap);
+    SegmentPartitionConfig actualConfig = SegmentPartitionConfig.fromJsonString(expectedConfig.toJsonString());
+
+    for (Map.Entry<String, ColumnPartitionConfig> entry : actualConfig.getColumnPartitionMap().entrySet()) {
+      String partitionColumn = entry.getKey();
+
+      ColumnPartitionConfig expectedColumnConfig = expectedMap.get(partitionColumn);
+      Assert.assertNotNull(expectedColumnConfig);
+      ColumnPartitionConfig actualColumnConfig = entry.getValue();
+
+      Assert.assertEquals(actualColumnConfig.getFunctionName(), expectedColumnConfig.getFunctionName());
+      Assert.assertEquals(actualColumnConfig.getPartitionValues(), expectedColumnConfig.getPartitionValues());
+      Assert.assertEquals(actualColumnConfig.getPartitionRanges(), expectedColumnConfig.getPartitionRanges());
+    }
+
+    // Test that adding new fields does not break json de-serialization.
+    String jsonStringWithNewField =
+        "{\"columnPartitionMap\":{\"column_0\":{\"functionName\":\"function_0\",\"partitionValues\":\"[0 1],[1 2]\"}}}, \"newField\":\"newValue\"";
+    String jsonStringWithoutNewField =
+        "{\"columnPartitionMap\":{\"column_0\":{\"functionName\":\"function_0\",\"partitionValues\":\"[0 1],[1 2]\"}}}";
+
+    Assert.assertEquals(jsonStringWithoutNewField,
+        SegmentPartitionConfig.fromJsonString(jsonStringWithNewField).toJsonString());
+  }
 
   private String buildQuery(String tableName, String columnName, int predicateValue) {
     return "select count(*) from " + tableName + " where " + columnName + " = " + predicateValue;
@@ -228,8 +280,8 @@ public class SegmentPartitionTest {
 
   private String buildAndQuery(String tableName, String partitionColumn, int partitionedColumnValue,
       String nonPartitionColumn, int nonPartitionedColumnValue, FilterOperator operator) {
-    return "select count(*) from " + tableName + " where " + partitionColumn + " = " + partitionedColumnValue
-        + " " + operator + " " + nonPartitionColumn + " = " + nonPartitionedColumnValue;
+    return "select count(*) from " + tableName + " where " + partitionColumn + " = " + partitionedColumnValue + " "
+        + operator + " " + nonPartitionColumn + " = " + nonPartitionedColumnValue;
   }
 
   private String buildRangeString(int start, int end) {
