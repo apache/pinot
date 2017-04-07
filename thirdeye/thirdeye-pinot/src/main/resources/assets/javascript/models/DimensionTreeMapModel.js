@@ -9,8 +9,8 @@ function DimensionTreeMapModel() {
 
   this.heatmapData;
 
-  this.heatmapMode = constants.DEFAULT_HEATMAP_MODE;
-  this.compareMode = constants.DEFAULT_COMPARE_MODE;
+  this.heatmapMode = 'percentChange';
+  this.compareMode = 'WoW';
 
   this.currentTotal = 0;
   this.baselineTotal = 0;
@@ -21,23 +21,33 @@ function DimensionTreeMapModel() {
 }
 
 DimensionTreeMapModel.prototype = {
-  init(params) {
+  init: function (params) {
     if (params) {
       this.metricId = params.metricId;
       this.metricName = params.metricName;
-      this.currentStart = params.heatMapCurrentStart || this.currentStart;
-      this.currentEnd = params.heatMapCurrentEnd || this.currentEnd;
-      this.baselineStart = params.heatMapBaselineStart || this.baselineStart;
-      this.baselineEnd = params.heatMapBaselineEnd || this.baselineEnd;
-      this.granularity = params.granularity || this.granularity;
-      this.compareMode = params.compareMode || this.compareMode;
-      this.heatmapMode = params.heatmapMode || this.heatmapMode;
 
-      if (params.heatmapFilters) {
-        this.heatmapFilters = params.heatmapFilters;
-      } else if (params.filters) {
-        this.heatmapFilters = params.filters;
+      if (params.heatMapCurrentStart) {
+        this.currentStart = params.heatMapCurrentStart;
       }
+      if (params.heatMapCurrentEnd) {
+        this.currentEnd = params.heatMapCurrentEnd;
+      }
+      if (params.heatMapBaselineStart) {
+        this.baselineStart = params.heatMapBaselineStart;
+      }
+      if (params.heatMapBaselineEnd) {
+        this.baselineEnd = params.heatMapBaselineEnd;
+      }
+      if (params.granularity) {
+        this.granularity = params.granularity;
+      }
+
+      if (params.heatmapMode) {
+        this.heatmapMode = params.heatmapMode;
+      }
+
+      this.heatmapFilters = Object.assign({}, params.heatmapFilters);
+      this.compareMode = params.compareMode || this.compareMode;
     }
   },
 
@@ -96,3 +106,4 @@ DimensionTreeMapModel.prototype = {
     }
   }
 }
+

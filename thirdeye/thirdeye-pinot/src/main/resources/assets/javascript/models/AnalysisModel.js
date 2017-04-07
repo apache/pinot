@@ -9,6 +9,7 @@ function AnalysisModel() {
   this.currentEnd;
   this.baselineStart;
   this.baselineEnd;
+  this.compareMode;
 }
 
 AnalysisModel.prototype = {
@@ -19,10 +20,11 @@ AnalysisModel.prototype = {
     this.granularity = null;
     this.dimension = null;
     this.filters = null;
-    this.currentStart = moment().subtract(1, 'days');
-    this.currentEnd = moment();
+    this.currentEnd = moment().subtract(3, 'hours').endOf('hour');
+    this.currentStart = moment().subtract(2, 'hours').subtract(24, 'hours').startOf('hour');
     this.baselineStart = null;
     this.baselineEnd = null;
+    this.compareMode = constants.DEFAULT_COMPARE_MODE ;
   },
 
   update: function (params) {
@@ -40,7 +42,7 @@ AnalysisModel.prototype = {
       this.dimension = params.dimension;
     }
     if (params.filters) {
-      this.filters = params.filters;
+      this.filters = Object.assign({}, params.filters);
     }
     if (params.currentStart) {
       this.currentStart = params.currentStart;
@@ -72,27 +74,22 @@ AnalysisModel.prototype = {
     return dataService.fetchFiltersForMetric(metricId);
   },
 
-  /**
-   * Fetches the data for the analysis options template
-   * @param {number} metricId The metric's id
-   * @param {string} spinArea The id of the spinner element
-   */
   fetchAnalysisOptionsData(metricId, spinArea) {
     const target = document.getElementById(spinArea);
     const spinner = new Spinner();
     spinner.spin(target);
-    return this.fetchGranularityForMetric(metricId).then((granularity) => {
-      this.granularityOptions = granularity;
-      this.granularity = granularity[0] || constants.DEFAULT_ANALYSIS_GRANULARITY;
+    return this.fetchGranularityForMetric(metricId).then((result) => {
+      this.granularityOptions = result;
+      this.granularity = result[0] || constants.DEFAULT_ANALYSIS_GRANULARITY;
       this.setDefaultCurrentDateRange(this.granularity);
       return this.fetchDimensionsForMetric(metricId);
-    }).then((dimensions) => {
-      this.dimensionOptions = dimensions;
+    }).then((result) => {
+      this.dimensionOptions = result;
       return this.fetchFiltersForMetric(metricId);
-    }).then((filter) => {
-      this.filtersOptions = filter;
-      return filter;
-    }).done(() => {
+    }).then((result) => {
+      this.filtersOptions = result;
+      return result;
+    }).then(() => {
       spinner.stop();
       return this;
     });
@@ -100,7 +97,8 @@ AnalysisModel.prototype = {
 
   setDefaultCurrentDateRange(granularity) {
     if (granularity === constants.GRANULARITY_DAY) {
-      this.currenStart = moment().subtract(30, 'days').startOf('day');
+      this.currentStart = moment().subtract(29, 'days').startOf('day');
+      this.currentEnd =  moment().endOf('day');
     }
     this.granularity = granularity;
     this.baselineStart = this.currentStart.clone().subtract(7, 'days');

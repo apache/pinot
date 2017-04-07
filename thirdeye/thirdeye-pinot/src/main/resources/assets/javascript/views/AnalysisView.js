@@ -6,16 +6,14 @@ function AnalysisView(analysisModel) {
   this.analysisModel = analysisModel;
   this.applyDataChangeEvent = new Event(this);
   this.searchEvent = new Event(this);
-  this.viewParams = {
-    granularity: "DAYS",
-    dimension: "All",
-    filters: {},
-  };
+  this.viewParams = {};
+  this.searchParams = {}
   this.compareMode = 'WoW';
 
   this.currentRange = () => {
     return {
-      'Last 24 Hours': [moment().subtract(1, 'days'), moment()],
+      'Last 24 Hours': [moment().subtract(2, 'hours').subtract(24, 'hours').startOf('hour'), 
+        moment().subtract(3, 'hours').endOf('hour')],
       'Yesterday': [moment().subtract(1, 'days').startOf('day'), moment().subtract(1, 'days').endOf('day')],
       'Last 7 Days': [moment().subtract(6, 'days').startOf('day'), moment().endOf('day')],
       'Last 30 Days': [moment().subtract(29, 'days').startOf('day'), moment().endOf('day')],
@@ -40,6 +38,10 @@ AnalysisView.prototype = {
     this.viewParams = params;
     this.searchParams = {};
     this.viewParams.metricName = this.analysisModel.metricName;
+  },
+
+  resetViewParams() {
+    this.viewParams = {};
   },
 
   calculateBaselineDate(dateType, offset) {
@@ -110,6 +112,7 @@ AnalysisView.prototype = {
 
   destroyAnalysisOptions() {
     this.destroyDatePickers();
+    this.resetViewParams();
     const $analysisPlaceholder = $('#analysis-options-placeholder');
     $analysisPlaceholder.children().remove();
   },
@@ -146,7 +149,7 @@ AnalysisView.prototype = {
     const $currentRange = $('#current-range');
     const $baselineRange = $('#baseline-range');
 
-    const setBaselineRange = (start, end, compareMode = constants.DATE_RANGE_CUSTOM) => {
+    const setBaselineRange = (start, end, compareMode = constants.DEFAULT_COMPARE_MODE) => {
       this.viewParams['baselineStart'] = start;
       this.viewParams['baselineEnd'] = end;
       this.viewParams['compareMode'] = compareMode;

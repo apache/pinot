@@ -49,7 +49,7 @@ AnalysisController.prototype = {
       const hashParams = HASH_SERVICE.getParams();
       this.analysisModel.update(hashParams);
       this.analysisView.renderAnalysisOptions();
-      this.initTimeSeriesController(this.analysisView.viewParams);
+      this.initTimeSeriesController(HASH_SERVICE.getParams());
     });
   },
 

@@ -41,7 +41,7 @@ TimeSeriesCompareView.prototype = {
         heatmapCurrentEnd: this.timeSeriesCompareModel.heatMapCurrentEnd || this.timeSeriesCompareModel.currentEnd,
         heatmapBaselineStart: this.timeSeriesCompareModel.baselineStart,
         heatmapBaselineEnd: this.timeSeriesCompareModel.baselineEnd,
-        heatmapFilters: this.timeSeriesCompareModel.filters
+        heatmapFilters: Object.assign({}, this.timeSeriesCompareModel.filters)
       };
     }
   },
@@ -208,6 +208,8 @@ TimeSeriesCompareView.prototype = {
     var heatmapFilters = self.timeSeriesCompareModel.filters;
     if (!(subDimension.toUpperCase() === 'ALL')) {
       heatmapFilters[self.timeSeriesCompareModel.dimension] = [subDimension];
+    } else {
+      heatmapFilters = {};
     }
 
     this.viewParams = {

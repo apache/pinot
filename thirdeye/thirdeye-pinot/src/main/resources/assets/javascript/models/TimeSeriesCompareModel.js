@@ -43,19 +43,12 @@ TimeSeriesCompareModel.prototype = {
       this.currentEnd = params.currentEnd ? moment(params.currentEnd) : this.currentEnd;
       this.baselineStart = params.baselineStart ? moment(params.baselineStart) : this.baselineStart;
       this.baselineEnd = params.baselineEnd ? moment(params.baselineEnd) : this.baselineEnd;
-      this.heatMapCurrentStart = params.heatMapCurrentStart ? moment(params.heatMapCurrentStart) : this.heatMapCurrentStart;
-      this.heatMapCurrentEnd = params.heatMapCurrentEnd ? moment(params.heatMapCurrentEnd) : this.heatMapCurrentEnd;
-      this.dataset = params.dataset ||this.dataset;
-      if (params.granularity) {
-        this.granularity = params.granularity;
-      }
-      if (params.dimension) {
-        this.dimension = params.dimension;
-      }
-      if (params.filters) {
-        this.filters = params.filters;
-      }
-
+      this.heatMapCurrentStart = params.heatMapCurrentStart ? moment(params.heatMapCurrentStart) : null;
+      this.heatMapCurrentEnd = params.heatMapCurrentEnd ? moment(params.heatMapCurrentEnd) : null;
+      this.dataset = params.dataset || this.dataset;
+      this.filters = Object.assign({}, params.filters);
+      this.dimension = params.dimension || 'ALL';
+      this.granularity = params.granularity;
     }
   },
 

@@ -1,6 +1,12 @@
 <ul class="analysis-chart__dimensions" id="chart-dimensions">
   {{#if subDimensions}}
-    <label class="label-medium-semibold">{{dimension}}:</label>
+    <label class="label-medium-semibold">
+      {{#if dimension}}
+        {{dimension}}:
+      {{else}}
+        Dimension:
+      {{/if}}
+    </label>
 
     {{#each subDimensions as |subDimension subDimensionIndex|}}
       <li class="analysis-chart__dimension">

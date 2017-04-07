@@ -30,6 +30,7 @@ function HashParams() {
   this.HEATMAP_BASELINE_START = 'heatMapBaselineStart';
   this.HEATMAP_BASELINE_END = 'heatMapBaselineEnd';
   this.HEATMAP_MODE = 'heatmapMode';
+  this.HEATMAP_FILTERS = 'heatmapFilters';
 
   this.RAND = 'rand';
 
@@ -103,8 +104,8 @@ HashParams.prototype = {
       // analysis
       paramNamesToDefaultValuesMap = {};
       paramNamesToDefaultValuesMap[this.TAB] = constants.TAB_ANALYSIS;
-      paramNamesToDefaultValuesMap[this.ANALYSIS_CURRENT_START] = currentTime.clone().subtract(24, 'hours');
-      paramNamesToDefaultValuesMap[this.ANALYSIS_CURRENT_END]= currentTime.clone();
+      paramNamesToDefaultValuesMap[this.ANALYSIS_CURRENT_START] = currentTime.clone().subtract(24, 'hours').startOf('hour');
+      paramNamesToDefaultValuesMap[this.ANALYSIS_CURRENT_END]= currentTime.clone().subtract(1, 'hours').endOf('hour');
       paramNamesToDefaultValuesMap[this.ANALYSIS_METRIC_ID]= null;
       paramNamesToDefaultValuesMap[this.ANALYSIS_BASELINE_START] = null;
       paramNamesToDefaultValuesMap[this.ANALYSIS_BASELINE_END] = null;
@@ -118,6 +119,8 @@ HashParams.prototype = {
       paramNamesToDefaultValuesMap[this.HEATMAP_BASELINE_START] = null;
       paramNamesToDefaultValuesMap[this.HEATMAP_BASELINE_END] = null;
       paramNamesToDefaultValuesMap[this.HEATMAP_MODE] = null;
+      paramNamesToDefaultValuesMap[this.HEATMAP_FILTERS] = null;
+
 
       this.controllerNameToParamNamesMap[this.ANALYSIS_CONTROLLER] = paramNamesToDefaultValuesMap;
 
@@ -144,6 +147,7 @@ HashParams.prototype = {
           return currentValue.isSame(newValue, 'day');
 
         case this.ANALYSIS_FILTERS:
+        case this.HEATMAP_FILTERS:
           return JSON.stringify(currentValue) === newValue;
 
         default:
