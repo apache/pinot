@@ -41,16 +41,55 @@ public class AverageThresholdDataFilter extends BaseDataFilter {
   private static final double DEFAULT_MIN_LIVE_ZONE = Double.NEGATIVE_INFINITY;
   private static final double DEFAULT_MAX_LIVE_ZONE = Double.POSITIVE_INFINITY;
 
+  private String metricName;
+  private double threshold;
+  private double minLiveZone;
+  private double maxLiveZone;
+
   // The override threshold for different dimension maps, which could form a hierarchy.
   private NavigableMap<DimensionMap, Double> overrideThreshold = new TreeMap<>();
 
-  public NavigableMap<DimensionMap, Double> getOverrideThreshold() {
+  // For testing purpose
+  NavigableMap<DimensionMap, Double> getOverrideThreshold() {
     return overrideThreshold;
   }
 
   @Override
   public void setParameters(Map<String, String> props) {
     super.setParameters(props);
+
+    // Initialize threshold from users' setting
+    threshold = DEFAULT_THRESHOLD;
+    if (props.containsKey(THRESHOLD_KEY)) {
+      threshold = Double.parseDouble(props.get(THRESHOLD_KEY));
+    }
+    if (Double.isNaN(threshold)) {
+      throw new IllegalStateException("Threshold cannot be NaN.");
+    }
+
+    // Initialize metricName from users' setting
+    metricName = props.get(METRIC_NAME_KEY);
+    if (StringUtils.isBlank(metricName)) {
+      throw new IllegalArgumentException("metric name for average threshold data filter cannot be a blank String.");
+    }
+
+    // Initialize minLiveZone from users' setting
+    minLiveZone = DEFAULT_MIN_LIVE_ZONE;
+    if (props.containsKey(MIN_LIVE_ZONE_KEY)) {
+      minLiveZone = Double.parseDouble(props.get(MIN_LIVE_ZONE_KEY));
+      if (Double.isNaN(minLiveZone)) {
+        minLiveZone = Double.NEGATIVE_INFINITY;
+      }
+    }
+    // Initialize maxLiveZone from users' setting
+    maxLiveZone = DEFAULT_MAX_LIVE_ZONE;
+    if (props.containsKey(MAX_LIVE_ZONE_KEY)) {
+      maxLiveZone = Double.parseDouble(props.get(MAX_LIVE_ZONE_KEY));
+      if (Double.isNaN(maxLiveZone)) {
+        maxLiveZone = Double.POSITIVE_INFINITY;
+      }
+    }
+
     // Initialize the lookup table for overriding thresholds
     if (props.containsKey(OVERRIDE_THRESHOLD_KEY)) {
       String overrideJsonPayLoad = props.get(OVERRIDE_THRESHOLD_KEY);
@@ -69,51 +108,31 @@ public class AverageThresholdDataFilter extends BaseDataFilter {
 
   @Override
   public boolean isQualified(MetricTimeSeries metricTimeSeries, DimensionMap dimensionMap) {
-    // Initialize threshold from users' setting
-    double threshold = DEFAULT_THRESHOLD;
-    if (props.containsKey(THRESHOLD_KEY)) {
-      threshold = Double.parseDouble(props.get(THRESHOLD_KEY));
-    }
-    if (Double.isNaN(threshold)) {
-      throw new IllegalStateException("Threshold cannot be NaN.");
-    }
+    return isQualified(metricTimeSeries, dimensionMap, Long.MIN_VALUE, Long.MAX_VALUE);
+  }
+
+  @Override
+  public boolean isQualified(MetricTimeSeries metricTimeSeries, DimensionMap dimensionMap, long windowStart,
+      long windowEnd) {
+    double threshold = this.threshold;
     // Read the override threshold for the dimension of this time series
     if (MapUtils.isNotEmpty(overrideThreshold)) {
       threshold = overrideThresholdForDimensions(dimensionMap, threshold);
     }
+
     if (threshold == Double.NEGATIVE_INFINITY) {
       return true;
     } else if (threshold == Double.POSITIVE_INFINITY) {
       return false;
     }
 
-    // Initialize metricName from users' setting
-    String metricName = props.get(METRIC_NAME_KEY);
-    if (StringUtils.isBlank(metricName)) {
-      throw new IllegalArgumentException("metric name for average threshold data filter cannot be a blank String.");
-    }
-
-    // Initialize minLiveZone from users' setting
-    double minLiveZone = DEFAULT_MIN_LIVE_ZONE;
-    if (props.containsKey(MIN_LIVE_ZONE_KEY)) {
-      minLiveZone = Double.parseDouble(props.get(MIN_LIVE_ZONE_KEY));
-      if (Double.isNaN(minLiveZone)) {
-        minLiveZone = Double.NEGATIVE_INFINITY;
-      }
-    }
-    // Initialize maxLiveZone from users' setting
-    double maxLiveZone = DEFAULT_MAX_LIVE_ZONE;
-    if (props.containsKey(MAX_LIVE_ZONE_KEY)) {
-      maxLiveZone = Double.parseDouble(props.get(MAX_LIVE_ZONE_KEY));
-      if (Double.isNaN(maxLiveZone)) {
-        maxLiveZone = Double.POSITIVE_INFINITY;
-      }
-    }
-
     // Compute average values among all buckets and check if it passes the threshold
     double sum = 0d;
     int count = 0;
     for (long timestamp : metricTimeSeries.getTimeWindowSet()) {
+      if (timestamp < windowStart || timestamp >= windowEnd) {
+        continue;
+      }
       double value = metricTimeSeries.get(timestamp, metricName).doubleValue();
       // TODO: Distinguish 0 and empty value
       if (Double.compare(0d, value) == 0) {

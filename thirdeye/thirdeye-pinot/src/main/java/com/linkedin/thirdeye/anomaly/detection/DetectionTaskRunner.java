@@ -229,13 +229,13 @@ public class DetectionTaskRunner implements TaskRunner {
     int anomalyCounter = 0;
     ListMultimap<DimensionMap, RawAnomalyResultDTO> resultRawAnomalies = ArrayListMultimap.create();
 
+    DataFilter dataFilter = DataFilterFactory.fromSpec(anomalyFunctionSpec.getDataFilter());
     for (DimensionMap dimensionMap : anomalyDetectionInputContext.getDimensionKeyMetricTimeSeriesMap().keySet()) {
       // Skip anomaly detection if the current time series does not pass data filter, which may check if the traffic
       // or total count of the data has enough volume for produce sufficient confidence anomaly results
       MetricTimeSeries metricTimeSeries =
           anomalyDetectionInputContext.getDimensionKeyMetricTimeSeriesMap().get(dimensionMap);
-      DataFilter dataFilter = DataFilterFactory.fromSpec(anomalyFunctionSpec.getDataFilter());
-      if (!dataFilter.isQualified(metricTimeSeries, dimensionMap)) {
+      if (!dataFilter.isQualified(metricTimeSeries, dimensionMap, windowStart.getMillis(), windowEnd.getMillis())) {
         continue;
       }
 
