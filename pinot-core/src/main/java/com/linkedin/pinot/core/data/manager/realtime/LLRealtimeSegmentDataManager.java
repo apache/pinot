@@ -37,6 +37,7 @@ import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
 import com.linkedin.pinot.core.data.extractors.PlainFieldExtractor;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
+import com.linkedin.pinot.core.data.partition.PartitionFunctionFactory;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.generator.ColumnPartitionConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentPartitionConfig;
@@ -948,7 +949,9 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   private SegmentPartitionConfig createPartitionConfig(int nPartitions) {
     Map<String, ColumnPartitionConfig> map = new HashedMap();
     for (String column : _column2PartitionersMap.keySet()) {
-      map.put(column, new ColumnPartitionConfig(_column2PartitionersMap, column, _kafkaPartitionId, nPartitions));
+      String partitionFunctionString =
+          PartitionFunctionFactory.buildPartitionFunctionString(_column2PartitionersMap.get(column), nPartitions);
+      map.put(column, new ColumnPartitionConfig(partitionFunctionString));
     }
     return new SegmentPartitionConfig(map);
   }

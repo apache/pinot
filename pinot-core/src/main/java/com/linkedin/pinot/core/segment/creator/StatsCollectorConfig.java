@@ -56,11 +56,6 @@ public class StatsCollectorConfig {
     return (_segmentPartitionConfig != null) ? _segmentPartitionConfig.getPartitionFunction(column) : null;
   }
 
-  @Nullable
-  public List<IntRange> getPartitionValue(String column) {
-    return (_segmentPartitionConfig != null) ? _segmentPartitionConfig.getPartitionRanges(column) : null;
-  }
-
   @Nonnull
   public Schema getSchema() {
     return _schema;

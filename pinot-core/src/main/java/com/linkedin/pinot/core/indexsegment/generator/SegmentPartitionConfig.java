@@ -57,21 +57,6 @@ public class SegmentPartitionConfig {
   }
 
   /**
-   * Returns the list of valid ranges for the given columns, null if ranges not defined for the column.
-   *
-   * @param column Column for which to return the ranges.
-   * @return List of ranges for the column.
-   */
-  @Nullable
-  public List<IntRange> getPartitionRanges(@Nonnull String column) {
-    ColumnPartitionConfig columnPartitionConfig = _columnPartitionMap.get(column);
-    if (columnPartitionConfig != null) {
-      return columnPartitionConfig.getPartitionRanges();
-    }
-    return null;
-  }
-
-  /**
    * Given a JSON string, de-serialize and return an instance of {@link SegmentPartitionConfig}
    *
    * @param jsonString Input JSON string

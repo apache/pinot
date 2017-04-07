@@ -66,13 +66,13 @@ public class SegmentPartitionTest {
 
   private static final int NUM_ROWS = 1001;
   private static final String PARTITIONED_COLUMN_NAME = "partitionedColumn";
-  private static final String FAILED_PARTITIONED_COLUMN_NAME = "failedPartitionedColumn";
 
   private static final String NON_PARTITIONED_COLUMN_NAME = "nonPartitionedColumn";
   private static final int MODULO_DIVISOR = 20; // For modulo function
   private static final int PARTITION_DIVISOR = 5; // Allowed partition values
-  private static final String expectedPartitionValueString = "[0 " + PARTITION_DIVISOR + "]";
-  private static final String expectedPartitionFunction =
+  private static final int MAX_PARTITION_VALUE = (PARTITION_DIVISOR - 1);
+  private static final String EXPECTED_PARTITION_VALUE_STRING = "[0 " + MAX_PARTITION_VALUE + "]";
+  private static final String EXPECTED_PARTITION_FUNCTION =
       "MoDuLO" + PartitionFunctionFactory.PARTITION_FUNCTION_DELIMITER + MODULO_DIVISOR;
   private IndexSegment _segment;
 
@@ -106,21 +106,17 @@ public class SegmentPartitionTest {
     ColumnMetadata columnMetadata = metadata.getColumnMetadataFor(PARTITIONED_COLUMN_NAME);
 
     Assert.assertEquals(columnMetadata.getPartitionFunction().toString().toLowerCase(),
-        expectedPartitionFunction.toLowerCase());
+        EXPECTED_PARTITION_FUNCTION.toLowerCase());
 
     List<IntRange> partitionValues = columnMetadata.getPartitionRanges();
     Assert.assertEquals(partitionValues.size(), 1);
     List<IntRange> expectedPartitionValues = ColumnPartitionConfig.rangesFromString(
-        expectedPartitionValueString.split(ColumnPartitionConfig.PARTITION_VALUE_DELIMITER));
+        EXPECTED_PARTITION_VALUE_STRING.split(ColumnPartitionConfig.PARTITION_VALUE_DELIMITER));
 
     IntRange actualValue = partitionValues.get(0);
     IntRange expectedPartitionValue = expectedPartitionValues.get(0);
     Assert.assertEquals(actualValue.getMinimumInteger(), expectedPartitionValue.getMinimumInteger());
     Assert.assertEquals(actualValue.getMaximumInteger(), expectedPartitionValue.getMaximumInteger());
-
-    columnMetadata = metadata.getColumnMetadataFor(FAILED_PARTITIONED_COLUMN_NAME);
-    Assert.assertNull(columnMetadata.getPartitionFunction());
-    Assert.assertNull(columnMetadata.getPartitionRanges());
 
     columnMetadata = metadata.getColumnMetadataFor(NON_PARTITIONED_COLUMN_NAME);
     Assert.assertNull(columnMetadata.getPartitionFunction());
@@ -148,7 +144,8 @@ public class SegmentPartitionTest {
       // Test for partitioned column.
       String query = buildQuery(TABLE_NAME, PARTITIONED_COLUMN_NAME, columnValue);
       BrokerRequest brokerRequest = compiler.compileToBrokerRequest(query);
-      Assert.assertEquals(pruner.prune(_segment, brokerRequest), (columnValue % MODULO_DIVISOR > PARTITION_DIVISOR),
+
+      Assert.assertEquals(pruner.prune(_segment, brokerRequest), (columnValue % MODULO_DIVISOR > MAX_PARTITION_VALUE),
           "Failed for column value: " + columnValue);
 
       // Test for non partitioned column.
@@ -164,7 +161,7 @@ public class SegmentPartitionTest {
 
       brokerRequest = compiler.compileToBrokerRequest(query);
       Assert.assertEquals(pruner.prune(_segment, brokerRequest),
-          (partitionColumnValue % MODULO_DIVISOR) > PARTITION_DIVISOR);
+          (partitionColumnValue % MODULO_DIVISOR) > MAX_PARTITION_VALUE);
 
       // Test for OR query: Segment should never be pruned as there's an OR with non partitioned column.
       query = buildAndQuery(TABLE_NAME, PARTITIONED_COLUMN_NAME, partitionColumnValue, NON_PARTITIONED_COLUMN_NAME,
@@ -237,16 +234,7 @@ public class SegmentPartitionTest {
     for (int i = 0; i < 10; i++) {
       String partitionColumn = "column_" + i;
       String partitionFunction = "function_" + i;
-
-      int numValues = 5;
-      StringBuilder builder = new StringBuilder();
-      for (int j = 0; j < numValues; j++) {
-        builder.append("[").append(j).append(" ").append(j + 1).append("]");
-        if (j < numValues - 1) {
-          builder.append(ColumnPartitionConfig.PARTITION_VALUE_DELIMITER);
-        }
-      }
-      expectedMap.put(partitionColumn, new ColumnPartitionConfig(partitionFunction, builder.toString()));
+      expectedMap.put(partitionColumn, new ColumnPartitionConfig(partitionFunction));
     }
 
     SegmentPartitionConfig expectedConfig = new SegmentPartitionConfig(expectedMap);
@@ -260,15 +248,13 @@ public class SegmentPartitionTest {
       ColumnPartitionConfig actualColumnConfig = entry.getValue();
 
       Assert.assertEquals(actualColumnConfig.getFunctionName(), expectedColumnConfig.getFunctionName());
-      Assert.assertEquals(actualColumnConfig.getPartitionValues(), expectedColumnConfig.getPartitionValues());
-      Assert.assertEquals(actualColumnConfig.getPartitionRanges(), expectedColumnConfig.getPartitionRanges());
     }
 
     // Test that adding new fields does not break json de-serialization.
     String jsonStringWithNewField =
-        "{\"columnPartitionMap\":{\"column_0\":{\"functionName\":\"function_0\",\"partitionValues\":\"[0 1],[1 2]\"}}}, \"newField\":\"newValue\"";
+        "{\"columnPartitionMap\":{\"column_0\":{\"functionName\":\"function_0\", \"newField\":\"newValue\"}}}";
     String jsonStringWithoutNewField =
-        "{\"columnPartitionMap\":{\"column_0\":{\"functionName\":\"function_0\",\"partitionValues\":\"[0 1],[1 2]\"}}}";
+        "{\"columnPartitionMap\":{\"column_0\":{\"functionName\":\"function_0\"}}}";
 
     Assert.assertEquals(jsonStringWithoutNewField,
         SegmentPartitionConfig.fromJsonString(jsonStringWithNewField).toJsonString());
@@ -301,14 +287,13 @@ public class SegmentPartitionTest {
       throws Exception {
     Schema schema = new Schema();
     schema.addField(new DimensionFieldSpec(PARTITIONED_COLUMN_NAME, FieldSpec.DataType.INT, true));
-    schema.addField(new DimensionFieldSpec(FAILED_PARTITIONED_COLUMN_NAME, FieldSpec.DataType.INT, true));
     schema.addField(new DimensionFieldSpec(NON_PARTITIONED_COLUMN_NAME, FieldSpec.DataType.INT, true));
 
     Random random = new Random();
     Map<String, ColumnPartitionConfig> partitionFunctionMap = new HashMap<>();
 
     partitionFunctionMap.put(PARTITIONED_COLUMN_NAME,
-        new ColumnPartitionConfig(expectedPartitionFunction, expectedPartitionValueString));
+        new ColumnPartitionConfig(EXPECTED_PARTITION_FUNCTION));
 
     SegmentPartitionConfig segmentPartitionConfig = new SegmentPartitionConfig(partitionFunctionMap);
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);
@@ -326,9 +311,6 @@ public class SegmentPartitionTest {
       int validPartitionedValue = random.nextInt(100) * 20 + random.nextInt(PARTITION_DIVISOR);
       map.put(PARTITIONED_COLUMN_NAME, validPartitionedValue);
       map.put(NON_PARTITIONED_COLUMN_NAME, validPartitionedValue);
-
-      int invalidPartitionedValue = random.nextInt();
-      map.put(FAILED_PARTITIONED_COLUMN_NAME, invalidPartitionedValue);
 
       GenericRow genericRow = new GenericRow();
       genericRow.init(map);
