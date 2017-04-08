@@ -42,17 +42,36 @@ public class DatasetConfigBean extends AbstractBean {
 
   private boolean active = true;
 
+  /** Configuration for non-additive dataset **/
+  // By default, every dataset is additive and this section of configurations should be ignored.
   private boolean additive = true;
+
+  // We assume that non-additive dataset has a default TOP dimension value, which is specified via preAggregatedKeyword,
+  // for each dimension. When ThirdEye constructs query string to backend database, it automatically appends the keyword
+  // for ALL dimensions except the dimension that has been specified by filter the one specified in
+  // dimensionsHaveNoPreAggregation (because some dimension may not have such pre-aggregated dimension value).
+  // For example, assume that we have three dimensions: D1, D2, D3. The preAggregatedKeyword is "all" and D2 does not
+  // has any pre-aggregated dimension value, i.e., dimensionsHaveNoPreAggregation=[D2]. The filter given by user is
+  // {D3=V3}. Then the query should append the WHERE condition {D1=all, D2=V3} in order to get the correct results from
+  // this non-additive dataset.
   private List<String> dimensionsHaveNoPreAggregation = Collections.emptyList();
+
+  // The pre-aggregated keyword
   private String preAggregatedKeyword = DEFAULT_PREAGGREGATED_DIMENSION_VALUE;
+
+  // the actual time duration for non-additive dataset
   private Integer nonAdditiveBucketSize;
-  private String nonAdditiveBucketUnit;
+
+  // the actual time unit for non-additive dataset
+  private TimeUnit nonAdditiveBucketUnit;
+  /** End of Configuration for non-additive dataset **/
 
   private boolean realtime = false;
 
   private boolean requiresCompletenessCheck = false;
 
   private TimeGranularity expectedDelay = DEFAULT_DAILY_EXPECTED_DELAY;
+
 
   public String getDataset() {
     return dataset;
@@ -78,6 +97,14 @@ public class DatasetConfigBean extends AbstractBean {
     this.timeColumn = timeColumn;
   }
 
+  /**
+   * Use DatasetConfigDTO.bucketTimeGranularity instead of this method for considering the additives of the dataset.
+   *
+   * This method is preserved for reading object from database via object mapping (i.e., Java reflection)
+   *
+   * @return the time unit of the granularity of the timestamp of each data point.
+   */
+  @Deprecated
   public TimeUnit getTimeUnit() {
     return timeUnit;
   }
@@ -86,6 +113,14 @@ public class DatasetConfigBean extends AbstractBean {
     this.timeUnit = timeUnit;
   }
 
+  /**
+   * Use DatasetConfigDTO.bucketTimeGranularity instead of this method for considering the additives of the dataset.
+   *
+   * This method is preserved for reading object from database via object mapping (i.e., Java reflection)
+   *
+   * @return the duration of the granularity of the timestamp of each data point.
+   */
+  @Deprecated
   public Integer getTimeDuration() {
     return timeDuration;
   }
@@ -183,11 +218,11 @@ public class DatasetConfigBean extends AbstractBean {
     this.nonAdditiveBucketSize = nonAdditiveBucketSize;
   }
 
-  public String getNonAdditiveBucketUnit() {
+  public TimeUnit getNonAdditiveBucketUnit() {
     return nonAdditiveBucketUnit;
   }
 
-  public void setNonAdditiveBucketUnit(String nonAdditiveBucketUnit) {
+  public void setNonAdditiveBucketUnit(TimeUnit nonAdditiveBucketUnit) {
     this.nonAdditiveBucketUnit = nonAdditiveBucketUnit;
   }
 

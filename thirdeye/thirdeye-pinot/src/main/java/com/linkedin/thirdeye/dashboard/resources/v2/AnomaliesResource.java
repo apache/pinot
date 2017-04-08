@@ -143,8 +143,7 @@ public class AnomaliesResource {
     try {
       DatasetConfigDTO dataset = datasetConfigDAO.findByDataset(anomaly.getCollection());
       DateTimeZone dateTimeZone = Utils.getDataTimeZone(anomaly.getCollection());
-      TimeGranularity granularity =
-          new TimeGranularity(dataset.getTimeDuration(), dataset.getTimeUnit());
+      TimeGranularity granularity = dataset.bucketTimeGranularity();
 
       // Lets compute currentTimeRange
       Pair<Long, Long> currentTimeRange = new Pair<>(anomaly.getStartTime(), anomaly.getEndTime());
@@ -457,16 +456,13 @@ public class AnomaliesResource {
    * @return
    */
   private String constructAggGranularity(DatasetConfigDTO datasetConfig) {
-    String aggGranularity = datasetConfig.getTimeDuration() + "_" + datasetConfig.getTimeUnit();
-    return aggGranularity;
+    return datasetConfig.bucketTimeGranularity().toAggregationGranularityString();
   }
 
   /**
    * Get formatted date time for anomaly chart
    * @param timestamp
    * @param datasetConfig
-   * @param startEndDateFormatterHours
-   * @param startEndDateFormatterDays
    * @return
    */
   private String getFormattedDateTime(long timestamp, DatasetConfigDTO datasetConfig) {
@@ -509,7 +505,7 @@ public class AnomaliesResource {
   /**
    * We want the anomaly point to be in between the shaded anomaly region.
    * Hence we will append some buffer to the start and end of the anomaly point
-   * @param startTime
+   * @param endTime
    * @param dateTimeZone
    * @param dataUnit
    * @return new anomaly start time
@@ -640,9 +636,6 @@ public class AnomaliesResource {
    * Generates Anomaly Details for each merged anomaly
    * @param mergedAnomaly
    * @param datasetConfig
-   * @param timeSeriesDateFormatter
-   * @param startEndDateFormatterHours
-   * @param startEndDateFormatterDays
    * @param externalUrl
    * @return
    */
@@ -655,7 +648,7 @@ public class AnomaliesResource {
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(mergedAnomaly.getFunctionId());
     BaseAnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
 
-    String aggGranularity = constructAggGranularity(datasetConfig);
+    String aggGranularity = datasetConfig.bucketTimeGranularity().toAggregationGranularityString();
 
     // get anomaly window range - this is the data to fetch (anomaly region + some offset if required)
     // the function will tell us this range, as how much data we fetch can change depending on which function is being executed
@@ -713,9 +706,6 @@ public class AnomaliesResource {
    * @param currentStartTime inclusive
    * @param currentEndTime inclusive
    * @param anomalyTimelinesView
-   * @param timeSeriesDateFormatter
-   * @param startEndDateFormatterHours
-   * @param startEndDateFormatterDays
    * @return
    * @throws JSONException
    */
@@ -726,7 +716,7 @@ public class AnomaliesResource {
 
     MetricConfigDTO metricConfigDTO = metricConfigDAO.findByMetricAndDataset(metricName, dataset);
     DateTimeZone dateTimeZone = Utils.getDataTimeZone(dataset);
-    TimeUnit dataUnit = datasetConfig.getTimeUnit();
+    TimeUnit dataUnit = datasetConfig.bucketTimeGranularity().getUnit();
 
     AnomalyDetails anomalyDetails = new AnomalyDetails();
     anomalyDetails.setMetric(metricName);
@@ -735,7 +725,7 @@ public class AnomaliesResource {
     if (metricConfigDTO != null) {
       anomalyDetails.setMetricId(metricConfigDTO.getId());
     }
-    anomalyDetails.setTimeUnit(datasetConfig.getTimeUnit().toString());
+    anomalyDetails.setTimeUnit(dataUnit.toString());
 
     // The filter ensures that the returned time series from anomalies function only includes the values that are
     // located inside the request windows (i.e., between currentStartTime and currentEndTime, inclusive).

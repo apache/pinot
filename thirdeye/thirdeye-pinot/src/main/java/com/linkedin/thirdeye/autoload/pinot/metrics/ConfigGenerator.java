@@ -33,7 +33,7 @@ public class ConfigGenerator {
     datasetConfigDTO.setTimeDuration(timeSpec.getTimeUnitSize());
     datasetConfigDTO.setTimeUnit(timeSpec.getTimeType());
     datasetConfigDTO.setTimeFormat(timeSpec.getTimeFormat());
-    datasetConfigDTO.setExpectedDelay(getExpectedDelayFromTimeunit(datasetConfigDTO.getTimeUnit()));
+    datasetConfigDTO.setExpectedDelay(getExpectedDelayFromTimeunit(timeSpec.getTimeType()));
     if (timeSpec.getTimeFormat().startsWith(TimeFormat.SIMPLE_DATE_FORMAT.toString())) {
       datasetConfigDTO.setTimezone(PDT_TIMEZONE);
     }

@@ -55,8 +55,9 @@ public interface DataCompletenessAlgorithm {
    * and if not available, computes and stores them, for the rest of the computation to use
    * @param dataset
    * @param bucketNameToBucketValueMS
-   * @param bucketNameToTimeValues
+   * @param dateTimeFormatter
    * @param timeSpec
+   * @param zone
    */
   public void computeBaselineCountsIfNotPresent(String dataset, Map<String, Long> bucketNameToBucketValueMS,
       DateTimeFormatter dateTimeFormatter, TimeSpec timeSpec, DateTimeZone zone);
