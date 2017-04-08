@@ -71,7 +71,7 @@ public class StringColumnPreIndexStatsCollector extends AbstractColumnStatistics
         value = fieldSpec.getDefaultNullValue().toString();
       }
       addressSorted(value);
-      checkPartition(value);
+      updatePartition(value);
       set.add(value);
       longestStringLength = Math.max(longestStringLength, value.getBytes(UTF_8).length);
       totalNumberOfEntries++;

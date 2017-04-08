@@ -567,10 +567,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
               segmentStats.getColumnProfileFor(column).getPartitionFunction(),
               segmentStats.getColumnProfileFor(column).getPartitionRanges(),
               dataSchema.getFieldSpecFor(column).getDefaultNullValue()));
-      if (segmentStats.getColumnProfileFor(column).getPartitionMismatch()) {
-        LOGGER.warn("Column '{}' not partitioned as specified for segment: '{}', dropping partition metadata.", column,
-            segmentName);
-      }
     }
     segmentIndexCreationInfo.setTotalDocs(totalDocs);
     segmentIndexCreationInfo.setTotalRawDocs(totalRawDocs);

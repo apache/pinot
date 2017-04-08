@@ -19,7 +19,6 @@ import com.linkedin.pinot.core.data.partition.PartitionFunction;
 import com.linkedin.pinot.core.data.partition.PartitionFunctionFactory;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import javax.annotation.Nonnull;
 import org.apache.commons.lang.math.IntRange;
 import org.codehaus.jackson.annotate.JsonIgnore;
@@ -34,44 +33,24 @@ public class ColumnPartitionConfig {
   public static final String PARTITIONER_DELIMITER = "\t\t";
 
   private final String _functionName;
-  private final String _partitionValues;
 
   /**
    * Constructor for the class.
    *
    * @param functionName Name of the partition function, includes delimiter separated arguments. For example:
    *                     "module\t\t20": Function name is module, with argument 20 (divisor).
-   * @param partitionValues Comma separated ranges expected for column values (e.g. [1 2], [3 5], [7 9]).
    */
-  public ColumnPartitionConfig(@Nonnull @JsonProperty("functionName") String functionName,
-      @Nonnull @JsonProperty("partitionValues") String partitionValues) {
+  public ColumnPartitionConfig(@Nonnull @JsonProperty("functionName") String functionName) {
     _functionName = functionName;
-    _partitionValues = partitionValues;
-  }
-
-  public ColumnPartitionConfig(Map<String, String> map, String column, int partitionId, int nPartitions) {
-    _functionName = map.get(column) + PARTITIONER_DELIMITER + nPartitions;
-    List<IntRange> range = new ArrayList<>(1);
-    range.add(new IntRange(partitionId, partitionId));
-    _partitionValues = rangesToString(range);
   }
 
   public String getFunctionName() {
     return _functionName;
   }
 
-  public String getPartitionValues() {
-    return _partitionValues;
-  }
-
   @JsonIgnore
   public PartitionFunction getPartitionFunction() {
     return PartitionFunctionFactory.getPartitionFunction(_functionName);
-  }
-
-  @JsonIgnore
-  public List<IntRange> getPartitionRanges() {
-    return rangesFromString(_partitionValues.split(PARTITION_VALUE_DELIMITER));
   }
 
   /**

@@ -26,6 +26,7 @@ import com.linkedin.pinot.core.operator.blocks.RealtimeSingleValueBlock;
 import com.linkedin.pinot.core.realtime.impl.datasource.RealtimeColumnDataSource;
 import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionaryReader;
 import com.linkedin.pinot.core.segment.creator.ColumnStatistics;
+import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.lang.math.IntRange;
 import org.slf4j.Logger;
@@ -43,7 +44,8 @@ public class RealtimeColumnStatistics implements ColumnStatistics {
   private final MutableDictionaryReader _dictionaryReader;
   private final Block _block;
   private PartitionFunction partitionFunction;
-  private List<IntRange> partitionRanges;
+  private int partitionRangeStart = Integer.MAX_VALUE;
+  private int partitionRangeEnd = Integer.MIN_VALUE;
   private boolean partitionMismatch = false;
 
   public RealtimeColumnStatistics(RealtimeColumnDataSource dataSource, int[] sortedDocIdIterationOrder, ColumnPartitionConfig columnPartitionConfig) {
@@ -53,9 +55,8 @@ public class RealtimeColumnStatistics implements ColumnStatistics {
     _block = dataSource.getNextBlock();
     if (columnPartitionConfig != null) {
       partitionFunction = columnPartitionConfig.getPartitionFunction();
-      partitionRanges = columnPartitionConfig.getPartitionRanges();
       if (partitionFunction != null) {
-        checkPartition();
+        updatePartition();
       }
     }
   }
@@ -166,37 +167,30 @@ public class RealtimeColumnStatistics implements ColumnStatistics {
 
   @Override
   public List<IntRange> getPartitionRanges() {
-    return partitionRanges;
-  }
-
-  /**
-   * For each element in the dictionary for a column
-   * Checks if the given value lies within one of the partition ranges. If the value is not within
-   * any of the partition ranges, partitioning is dropped. The effect of that is:
-   * <ul>
-   *   <li> Subsequent values will not be checked against partition ranges. </li>
-   *   <li> Partition information will not be written out to the metadata for this column. </li>
-   * </ul>
-   *
-   */
-  void checkPartition() {
-    // Iterate over the dictionary to check the partitioning
-    final int length = _dictionaryReader.length();
-    for (int i = 0; ((i < length) && (partitionFunction != null)); i++) {
-      int partition = partitionFunction.getPartition(_dictionaryReader.get(i));
-      for (IntRange partitionRange : partitionRanges) {
-        if (!partitionRange.containsNumber(partition)) {
-          partitionFunction = null;
-          partitionRanges = null;
-          partitionMismatch = true;
-        }
-      }
+    if (partitionRangeStart <= partitionRangeEnd) {
+      return Arrays.asList(new IntRange(partitionRangeStart, partitionRangeEnd));
+    } else {
+      return null;
     }
   }
 
-  @Override
-  public boolean getPartitionMismatch() {
-    return partitionMismatch;
-  }
+  /**
+   * Update partition ranges based on column values.
+   *
+   */
+  void updatePartition() {
+    // Iterate over the dictionary to check the partitioning
+    final int length = _dictionaryReader.length();
+    for (int i = 0; i < length; i++) {
+      int partition = partitionFunction.getPartition(_dictionaryReader.get(i));
 
+      if (partition < partitionRangeStart) {
+        partitionRangeStart = partition;
+      }
+
+      if (partition > partitionRangeEnd) {
+        partitionRangeEnd = partition;
+      }
+    }
+  }
 }

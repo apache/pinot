@@ -56,7 +56,7 @@ public class FloatColumnPreIndexStatsCollector extends AbstractColumnStatisticsC
     } else {
       float value = ((Number) entry).floatValue();
       addressSorted(value);
-      checkPartition(value);
+      updatePartition(value);
       set.add(value);
       totalNumberOfEntries++;
     }

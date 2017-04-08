@@ -21,10 +21,10 @@ import com.linkedin.pinot.core.data.partition.PartitionFunction;
 import com.linkedin.pinot.core.segment.creator.ColumnStatistics;
 import com.linkedin.pinot.core.segment.creator.StatsCollectorConfig;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
+import java.util.Arrays;
 import java.util.List;
+import org.apache.avro.reflect.Nullable;
 import org.apache.commons.lang.math.IntRange;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -39,8 +39,6 @@ import org.slf4j.LoggerFactory;
  */
 
 public abstract class AbstractColumnStatisticsCollector implements ColumnStatistics {
-  private static final Logger LOGGER = LoggerFactory.getLogger(AbstractColumnStatisticsCollector.class);
-
   protected static final int INITIAL_HASH_SET_SIZE = 1000;
   private Object previousValue = null;
   protected final FieldSpec fieldSpec;
@@ -51,9 +49,8 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
   protected int maxNumberOfMultiValues = 0;
   private int numInputNullValues = 0;  // Number of rows in which this column was null in the input.
   private PartitionFunction partitionFunction;
-  private List<IntRange> partitionValues;
-  private boolean columnPartitioned;
-  private boolean partitionMismatch = false;
+  private int partitionRangeStart = Integer.MAX_VALUE;
+  private int partitionRangeEnd = Integer.MIN_VALUE;
 
   void updateTotalNumberOfEntries(Object[] entries) {
     totalNumberOfEntries += entries.length;
@@ -67,8 +64,6 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
     this.column = column;
     fieldSpec = statsCollectorConfig.getFieldSpecForColumn(column);
     partitionFunction = statsCollectorConfig.getPartitionFunction(column);
-    partitionValues = statsCollectorConfig.getPartitionValue(column);
-    columnPartitioned = (partitionFunction != null);
     addressNull(previousValue, fieldSpec.getDataType());
     previousValue = null;
   }
@@ -154,58 +149,34 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
   }
 
   /**
-   * Returns the partition ranges within which the column values exist.
+   * Returns the partition range within which the column values exist.
    *
    * @return List of ranges for the column values.
    */
+  @Nullable
   public List<IntRange> getPartitionRanges() {
-    return partitionValues;
-  }
-
-  /**
-   * Checks if the given value lies within one of the partition ranges. If the value is not within
-   * any of the partition ranges, partitioning is dropped. The effect of that is:
-   * <ul>
-   *   <li> Subsequent values will not be checked against partition ranges. </li>
-   *   <li> Partition information will not be written out to the metadata for this column. </li>
-   * </ul>
-   *
-   * @param value Column value to check.
-   */
-  protected void checkPartition(Object value) {
-    if (partitionFunction != null) {
-      int partition = partitionFunction.getPartition(value);
-
-      for (IntRange partitionValue : partitionValues) {
-        if (partition >= partitionValue.getMinimumInteger() && partition <= partitionValue.getMaximumInteger()) {
-          return;
-        }
-      }
-
-      LOGGER.warn("Column '{}' not partitioned as specified for value: '{}', dropping partition metadata.", column,
-          value);
-      partitionFunction = null;
-      partitionValues = null;
-      columnPartitioned = false;
-      partitionMismatch = true;
+    if (partitionRangeStart <= partitionRangeEnd) {
+      return Arrays.asList(new IntRange(partitionRangeStart, partitionRangeEnd));
+    } else {
+      return null;
     }
   }
 
   /**
-   * Returns true if column was detected to be partitioned as per the specified partitioning scheme,
-   * false otherwise.
+   * Updates the partition range based on the partition of the given value.
    *
-   * @return True if partitioning failed, false otherwise.
+   * @param value Column value.
    */
-  public boolean isColumnPartitioned() {
-    return columnPartitioned;
-  }
+  protected void updatePartition(Object value) {
+    if (partitionFunction != null) {
+      int partition = partitionFunction.getPartition(value);
 
-  public void setColumnPartitioned(boolean columnPartitioned) {
-    this.columnPartitioned = columnPartitioned;
-  }
-
-  public boolean getPartitionMismatch() {
-    return partitionMismatch;
+      if (partition < partitionRangeStart) {
+        partitionRangeStart = partition;
+      }
+      if (partition > partitionRangeEnd) {
+        partitionRangeEnd = partition;
+      }
+    }
   }
 }

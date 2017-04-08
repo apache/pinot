@@ -84,4 +84,24 @@ public class PartitionFunctionFactory {
         throw new IllegalArgumentException("Illegal partition function name: " + functionName);
     }
   }
+
+  /**
+   * Utility function that takes a function name and its arguments in string form and returns
+   * a partition function string that can be passed into the factory to generate an instance of
+   * a partition function.
+   *
+   * @param functionName Name of partition function
+   * @param arguments Arguments for partition function
+   * @return Partition function string.
+   */
+  public static String buildPartitionFunctionString(String functionName, Object... arguments) {
+    StringBuilder builder = new StringBuilder(functionName);
+
+    for (int i = 0; i < arguments.length; i++) {
+      builder.append(PARTITION_FUNCTION_DELIMITER);
+      builder.append(arguments[i].toString());
+    }
+
+    return builder.toString();
+  }
 }
