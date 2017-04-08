@@ -651,6 +651,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     }
 
     long statFetchStart = System.currentTimeMillis();
+    Map<String, Stat> instanceConfigStatMap = new HashMap<>();
     Stat[] instanceConfigStats =
         helixDataAccessor.getBaseDataAccessor().getStats(instancePaths, AccessOption.PERSISTENT);
     long statFetchEnd = System.currentTimeMillis();
@@ -669,6 +670,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
         if (currentInstanceConfigVersion != lastKnownInstanceConfigVersion) {
           instancesThatChanged.add(instanceName);
         }
+        instanceConfigStatMap.put(instanceName, instanceConfigStat);
       }
     }
 
@@ -688,6 +690,13 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
     if (!affectedTables.isEmpty()) {
       long icFetchStart = System.currentTimeMillis();
       List<InstanceConfig> instanceConfigs = helixDataAccessor.getChildValues(propertyKeyBuilder.instanceConfigs());
+      // Helix does not set the version field, we need to set it explicitly
+      for (InstanceConfig instanceConfig : instanceConfigs) {
+        Stat stat = instanceConfigStatMap.get(instanceConfig.getInstanceName());
+        if (stat != null) {
+          instanceConfig.getRecord().setVersion(stat.getVersion());
+        }
+      }
       long icFetchEnd = System.currentTimeMillis();
       icFetchTime = icFetchEnd - icFetchStart;
 
