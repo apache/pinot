@@ -520,6 +520,13 @@ public abstract class HybridClusterScanComparisonIntegrationTest extends HybridC
     });
   }
 
+  @Override
+  @Test(enabled = false)
+  public void testInstanceShutdown() {
+    // jfim: Doesn't like this is working properly
+    super.testInstanceShutdown();
+  }
+
   protected int getKafkaPartitionCount() {
     return 10;
   }

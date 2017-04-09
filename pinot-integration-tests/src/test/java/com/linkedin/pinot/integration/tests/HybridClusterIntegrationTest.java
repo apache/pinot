@@ -342,6 +342,11 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     if (_zkHelixManager == null) {
       _zkHelixManager = HelixManagerFactory.getZKHelixManager(getHelixClusterName(), "test_instance", InstanceType.SPECTATOR,
           ZkStarter.DEFAULT_ZK_STR);
+      try {
+        _zkHelixManager.connect();
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
     }
   }
 
