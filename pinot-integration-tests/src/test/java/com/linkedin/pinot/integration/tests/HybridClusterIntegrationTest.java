@@ -42,6 +42,7 @@ import org.apache.helix.NotificationContext;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -337,8 +338,17 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     }
   }
 
+  protected void ensureZkHelixManagerIsInitialized() {
+    if (_zkHelixManager == null) {
+      _zkHelixManager = HelixManagerFactory.getZKHelixManager(getHelixClusterName(), "test_instance", InstanceType.SPECTATOR,
+          ZkStarter.DEFAULT_ZK_STR);
+    }
+  }
+
   @Test
   public void testInstanceShutdown() {
+    ensureZkHelixManagerIsInitialized();
+
     HelixAdmin clusterManagmentTool = _zkHelixManager.getClusterManagmentTool();
     String clusterName = _zkHelixManager.getClusterName();
     List<String> instances = clusterManagmentTool.getInstancesInCluster(clusterName);
@@ -352,12 +362,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     }
 
     // Check that the routing table is empty
-    waitForRoutingTablePredicate(new Function<JSONArray, Boolean>() {
-      @Override
-      public Boolean apply(JSONArray input) {
-        return input.length() == 0;
-      }
-    }, 15000, "Routing table is not empty after marking all instances as shutting down");
+    checkForEmptyRoutingTable(true, "Routing table is not empty after marking all instances as shutting down");
 
     // Mark all instances as not shutting down
     for (String instance : instances) {
@@ -367,12 +372,52 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     }
 
     // Check that the routing table is not empty
+    checkForEmptyRoutingTable(false, "Routing table is empty after marking all instances as not shutting down");
+  }
+
+  protected void checkForEmptyRoutingTable(final boolean checkForEmpty, String message) {
     waitForRoutingTablePredicate(new Function<JSONArray, Boolean>() {
       @Override
       public Boolean apply(JSONArray input) {
-        return input.length() != 0;
+        try {
+          int tableCount = input.length();
+
+          // Routing table should have an entry for this table
+          if (tableCount == 0) {
+            return false;
+          }
+
+          // Each routing table entry for this table should have not have any server to segment mapping
+          for (int i = 0; i < tableCount; i++) {
+            JSONObject tableRouting = input.getJSONObject(i);
+            String tableName = tableRouting.getString("tableName");
+            if (tableName.startsWith(getTableName())) {
+              JSONArray routingTableEntries = tableRouting.getJSONArray("routingTableEntries");
+              int routingTableEntryCount = routingTableEntries.length();
+              for (int j = 0; j < routingTableEntryCount; j++) {
+                JSONObject routingTableEntry = routingTableEntries.getJSONObject(j);
+
+                boolean hasServerToSegmentMappings = routingTableEntry.keys().hasNext();
+
+                if (hasServerToSegmentMappings && checkForEmpty) {
+                  return false;
+                }
+
+                if (!hasServerToSegmentMappings && !checkForEmpty) {
+                  return false;
+                }
+              }
+            }
+          }
+
+          return true;
+        } catch (JSONException e) {
+          LOGGER.warn("Caught exception while reading the routing table, will retry", e);
+          return false;
+        }
       }
-    }, 15000, "Routing table is empty after marking all instances as not shutting down");
+    }, 15000, message);
+
   }
 
   /**
@@ -381,7 +426,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
    * @param timeout Timeout for the predicate to become true
    * @param message Message to display if the predicate does not become true after the timeout expires
    */
-  public void waitForRoutingTablePredicate(Function<JSONArray, Boolean> predicate, long timeout, String message) {
+  protected void waitForRoutingTablePredicate(Function<JSONArray, Boolean> predicate, long timeout, String message) {
     long endTime = System.currentTimeMillis() + timeout;
     boolean isPredicateMet = false;
     JSONObject routingTableSnapshot = null;
