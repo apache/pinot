@@ -239,8 +239,8 @@ public class DataResource {
 
     MetricConfigDTO metricConfig = metricConfigDAO.findById(metricId);
     DatasetConfigDTO datasetConfig = ThirdEyeUtils.getDatasetConfigFromName(metricConfig.getDataset());
-    int dataTimeSize = datasetConfig.getTimeDuration();
-    TimeUnit dataTimeUnit = datasetConfig.getTimeUnit();
+    int dataTimeSize = datasetConfig.bucketTimeGranularity().getSize();
+    TimeUnit dataTimeUnit = datasetConfig.bucketTimeGranularity().getUnit();
 
     List<String> dataGranularities = new ArrayList<>();
     switch (dataTimeUnit) {

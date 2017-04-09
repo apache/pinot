@@ -31,7 +31,7 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
 public class DetectionJobRunner {
 
   private static final Logger LOG = LoggerFactory.getLogger(DetectionJobRunner.class);
-  private final static DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
+  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private TaskGenerator taskGenerator;
@@ -86,7 +86,7 @@ public class DetectionJobRunner {
     try {
       DatasetConfigDTO datasetConfig = DAO_REGISTRY.getDatasetConfigDAO().findByDataset(collection);
       TimeSpec timespec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
-      TimeGranularity dataGranularity = timespec.getDataGranularity();
+      TimeGranularity dataGranularity = datasetConfig.bucketTimeGranularity();
       String timeFormat = timespec.getFormat();
       if (dataGranularity.getUnit().equals(TimeUnit.DAYS)) {
         DateTimeZone dataTimeZone = Utils.getDataTimeZone(collection);

@@ -178,42 +178,30 @@ public class Utils {
     return Lists.newArrayList(metricFunctions);
   }
 
-  public static TimeGranularity getTimeGranularityFromString(String aggTimeGranularity) {
-    TimeGranularity timeGranularity = null;
-    if (aggTimeGranularity.indexOf("_") > -1) {
-      String[] split = aggTimeGranularity.split("_");
-      timeGranularity = new TimeGranularity(Integer.parseInt(split[0]), TimeUnit.valueOf(split[1]));
-    } else {
-      timeGranularity = new TimeGranularity(1, TimeUnit.valueOf(aggTimeGranularity));
-    }
-    return timeGranularity;
-  }
-
-  public static TimeGranularity getAggregationTimeGranularity(String aggTimeGranularity, String collection) {
-    TimeGranularity timeGranularity = getNonAdditiveTimeGranularity(collection);
-
-    if (timeGranularity == null) { // Data is additive and hence use the given time granularity -- aggTimeGranularity
-      timeGranularity = getTimeGranularityFromString(aggTimeGranularity);
-    }
-
-    return timeGranularity;
-  }
-
-  public static TimeGranularity getNonAdditiveTimeGranularity(String collection) {
+  /**
+   * If the dataset is non-additive, then the bucket granularity is return. Otherwise, a TimeGranularity that is
+   * constructed from the given string of aggregation granularity is returned.
+   *
+   * @param aggTimeGranularity the string of aggregation granularity.
+   * @param dataset            the name of the dataset.
+   *
+   * @return the available aggregation granularity for the given dataset.
+   */
+  public static TimeGranularity getAggregationTimeGranularity(String aggTimeGranularity, String dataset) {
     DatasetConfigDTO datasetConfig;
     try {
-      datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(collection);
-      Integer nonAdditiveBucketSize = datasetConfig.getNonAdditiveBucketSize();
-      String nonAdditiveBucketUnit = datasetConfig.getNonAdditiveBucketUnit();
-      if (nonAdditiveBucketSize != null && nonAdditiveBucketUnit != null) {
-        TimeGranularity timeGranularity = new TimeGranularity(datasetConfig.getNonAdditiveBucketSize(),
-            TimeUnit.valueOf(datasetConfig.getNonAdditiveBucketUnit()));
-        return timeGranularity;
-      }
+      datasetConfig = CACHE_REGISTRY.getDatasetConfigCache().get(dataset);
     } catch (ExecutionException e) {
-      LOG.info("Exception in fetching non additive time granularity");
+      LOG.info("Unable to determine whether dataset: {} is additive, the given aggregation granularity: {} is used.",
+          dataset, aggTimeGranularity);
+      return TimeGranularity.fromString(aggTimeGranularity);
     }
-    return null;
+
+    if (datasetConfig.isAdditive()) {
+      return TimeGranularity.fromString(aggTimeGranularity);
+    } else {
+      return datasetConfig.bucketTimeGranularity();
+    }
   }
 
   /**
@@ -230,9 +218,8 @@ public class Utils {
    * @return the resized time granularity in order to divide the duration to the number of chunks
    * that is smaller than or equals to the target chunk number.
    */
-  public static String resizeTimeGranularity(long duration, String timeGranularityString,
-      int targetChunkNum) {
-    TimeGranularity timeGranularity = Utils.getTimeGranularityFromString(timeGranularityString);
+  public static String resizeTimeGranularity(long duration, String timeGranularityString, int targetChunkNum) {
+    TimeGranularity timeGranularity = TimeGranularity.fromString(timeGranularityString);
 
     long timeGranularityMillis = timeGranularity.toMillis();
     long chunkNum = duration / timeGranularityMillis;

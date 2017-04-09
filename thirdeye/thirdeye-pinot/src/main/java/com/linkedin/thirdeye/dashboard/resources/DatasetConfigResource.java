@@ -61,7 +61,7 @@ public class DatasetConfigResource {
       datasetConfigDTO.setMetricNamesColumn(metricNamesColumn);
       datasetConfigDTO.setMetricValuesColumn(metricValuesColumn);
       datasetConfigDTO.setNonAdditiveBucketSize(nonAdditiveBucketSize);
-      datasetConfigDTO.setNonAdditiveBucketUnit(nonAdditiveBucketUnit);
+      datasetConfigDTO.setNonAdditiveBucketUnit(TimeUnit.valueOf(nonAdditiveBucketUnit));
       datasetConfigDTO.setPreAggregatedKeyword(preAggregatedKeyword);
       datasetConfigDTO.setTimeColumn(timeColumn);
       datasetConfigDTO.setTimeDuration(timeDuration);
@@ -105,7 +105,7 @@ public class DatasetConfigResource {
       datasetConfigDTO.setMetricAsDimension(metricAsDimension);
       datasetConfigDTO.setMetricValuesColumn(metricValuesColumn);
       datasetConfigDTO.setNonAdditiveBucketSize(nonAdditiveBucketSize);
-      datasetConfigDTO.setNonAdditiveBucketUnit(nonAdditiveBucketUnit);
+      datasetConfigDTO.setNonAdditiveBucketUnit(TimeUnit.valueOf(nonAdditiveBucketUnit));
       datasetConfigDTO.setPreAggregatedKeyword(preAggregatedKeyword);
       datasetConfigDTO.setTimeColumn(timeColumn);
       datasetConfigDTO.setTimeDuration(timeDuration);

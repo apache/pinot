@@ -32,7 +32,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.comparison.TimeOnTimeComparisonHandler;
@@ -44,7 +43,6 @@ import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.detector.email.AnomalyGraphGenerator;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 /**
  * Stateless class to provide util methods to help build anomaly report
@@ -87,10 +85,8 @@ public abstract class EmailHelper {
       long windowMillis = windowUnit.toMillis(windowSize);
 
       // TODO provide a way for email reports to specify desired graph granularity.
-      DatasetConfigManager datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
-      DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(collection);
-      TimeSpec timespec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
-      TimeGranularity dataGranularity = timespec.getDataGranularity();
+      DatasetConfigDTO datasetConfig = CACHE_REGISTRY_INSTANCE.getDatasetConfigCache().get(collection);
+      TimeGranularity dataGranularity = datasetConfig.bucketTimeGranularity();
 
       TimeOnTimeComparisonResponse chartData =
           getData(timeOnTimeComparisonHandler, config, then, now, WEEK_MILLIS, dataGranularity);
@@ -236,8 +232,8 @@ public abstract class EmailHelper {
     }
 
     DatasetConfigDTO datasetConfigDTO = datasetConfigManager.findByDataset(collection);
-    if (datasetConfigDTO != null && TimeUnit.DAYS.equals(datasetConfigDTO.getTimeUnit())) {
-      aggTimeGranularity = datasetConfigDTO.getTimeUnit().name();
+    if (datasetConfigDTO != null && TimeUnit.DAYS.equals(datasetConfigDTO.bucketTimeGranularity().getUnit())) {
+      aggTimeGranularity = datasetConfigDTO.bucketTimeGranularity().getUnit().name();
       currentEnd = currentEnd - (currentEnd % DAY_MILLIS);
       currentStart = currentEnd - WEEK_MILLIS;
     }

@@ -117,7 +117,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     for (MetricFunction metricFunction : request.getMetricFunctions()) {
       String dataset = metricFunction.getDataset();
       DatasetConfigDTO datasetConfig = ThirdEyeUtils.getDatasetConfigFromName(dataset);
-      TimeSpec dataTimeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
+      TimeSpec dataTimeSpec = ThirdEyeUtils.getTimestampTimeSpecFromDatasetConfig(datasetConfig);
       if (timeSpec == null) {
         timeSpec = dataTimeSpec;
       }
@@ -178,7 +178,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
 
       String dataset = metricFunction.getDataset();
       DatasetConfigDTO datasetConfig = ThirdEyeUtils.getDatasetConfigFromName(dataset);
-      TimeSpec dataTimeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
+      TimeSpec dataTimeSpec = ThirdEyeUtils.getTimestampTimeSpecFromDatasetConfig(datasetConfig);
 
       TimeGranularity dataGranularity = null;
       long startTime = request.getStartTimeInclusive().getMillis();

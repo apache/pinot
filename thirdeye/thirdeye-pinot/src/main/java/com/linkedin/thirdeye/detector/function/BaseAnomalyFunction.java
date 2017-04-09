@@ -140,7 +140,7 @@ public abstract class BaseAnomalyFunction implements AnomalyFunction {
   }
 
   private AnomalyOffset getDefaultOffsets(DatasetConfigDTO datasetConfig) {
-    TimeUnit dataTimeUnit = datasetConfig.getTimeUnit();
+    TimeUnit dataTimeUnit = datasetConfig.bucketTimeGranularity().getUnit();
     Period preOffsetPeriod = null;
     Period postOffsetPeriod = null;
     switch (dataTimeUnit) {
