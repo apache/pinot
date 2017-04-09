@@ -15,7 +15,9 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.google.common.base.Function;
 import com.google.common.util.concurrent.Uninterruptibles;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.ControllerTestUtils;
 import java.io.File;
@@ -32,11 +34,14 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.ExternalViewChangeListener;
+import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.InstanceConfig;
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,6 +82,7 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
   private String tableName;
 
   private KafkaServerStartable kafkaStarter;
+  private HelixManager _zkHelixManager;
 
   protected void setSegmentCount(int segmentCount) {
     this.segmentCount = segmentCount;
@@ -151,11 +157,10 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
 
     // Set up a Helix spectator to count the number of segments that are uploaded and unlock the latch once 12 segments are online
     final CountDownLatch latch = new CountDownLatch(1);
-    HelixManager manager =
-        HelixManagerFactory.getZKHelixManager(getHelixClusterName(), "test_instance", InstanceType.SPECTATOR,
-            ZkStarter.DEFAULT_ZK_STR);
-    manager.connect();
-    manager.addExternalViewChangeListener(new ExternalViewChangeListener() {
+    _zkHelixManager = HelixManagerFactory.getZKHelixManager(getHelixClusterName(), "test_instance", InstanceType.SPECTATOR,
+        ZkStarter.DEFAULT_ZK_STR);
+    _zkHelixManager.connect();
+    _zkHelixManager.addExternalViewChangeListener(new ExternalViewChangeListener() {
       @Override
       public void onExternalViewChange(List<ExternalView> externalViewList, NotificationContext changeContext) {
         for (ExternalView externalView : externalViewList) {
@@ -332,23 +337,65 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
     }
   }
 
+  @Test
+  public void testInstanceShutdown() {
+    HelixAdmin clusterManagmentTool = _zkHelixManager.getClusterManagmentTool();
+    String clusterName = _zkHelixManager.getClusterName();
+    List<String> instances = clusterManagmentTool.getInstancesInCluster(clusterName);
+    Assert.assertFalse(instances.isEmpty(), "List of instances should not be empty");
 
-  @AfterClass
-  public void tearDown() throws Exception {
-    // Try deleting the tables and check that they have no routing table
-    dropOfflineTable(getTableName());
-    dropRealtimeTable(getTableName());
+    // Mark all instances in the cluster as shutting down
+    for (String instance : instances) {
+      InstanceConfig instanceConfig = clusterManagmentTool.getInstanceConfig(clusterName, instance);
+      instanceConfig.getRecord().setBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, true);
+      clusterManagmentTool.setInstanceConfig(clusterName, instance, instanceConfig);
+    }
 
-    long endTime = System.currentTimeMillis() + 15000;
-    boolean isRoutingTableEmpty = false;
+    // Check that the routing table is empty
+    waitForRoutingTablePredicate(new Function<JSONArray, Boolean>() {
+      @Override
+      public Boolean apply(JSONArray input) {
+        return input.length() == 0;
+      }
+    }, 15000, "Routing table is not empty after marking all instances as shutting down");
+
+    // Mark all instances as not shutting down
+    for (String instance : instances) {
+      InstanceConfig instanceConfig = clusterManagmentTool.getInstanceConfig(clusterName, instance);
+      instanceConfig.getRecord().setBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, false);
+      clusterManagmentTool.setInstanceConfig(clusterName, instance, instanceConfig);
+    }
+
+    // Check that the routing table is not empty
+    waitForRoutingTablePredicate(new Function<JSONArray, Boolean>() {
+      @Override
+      public Boolean apply(JSONArray input) {
+        return input.length() != 0;
+      }
+    }, 15000, "Routing table is empty after marking all instances as not shutting down");
+  }
+
+  /**
+   * Wait for a predicate on the routing table to become true.
+   * @param predicate true when the routing table condition is met
+   * @param timeout Timeout for the predicate to become true
+   * @param message Message to display if the predicate does not become true after the timeout expires
+   */
+  public void waitForRoutingTablePredicate(Function<JSONArray, Boolean> predicate, long timeout, String message) {
+    long endTime = System.currentTimeMillis() + timeout;
+    boolean isPredicateMet = false;
     JSONObject routingTableSnapshot = null;
-    while (System.currentTimeMillis() < endTime) {
+    while (System.currentTimeMillis() < endTime && !isPredicateMet) {
       try {
         routingTableSnapshot = getDebugInfo("debug/routingTable/" + getTableName());
 
-        if (routingTableSnapshot.getJSONArray("routingTableSnapshot").length() == 0) {
-          isRoutingTableEmpty = true;
-          break;
+        if (routingTableSnapshot != null) {
+          JSONArray routingTableSnapshotJson = routingTableSnapshot.getJSONArray("routingTableSnapshot");
+          if (routingTableSnapshotJson != null) {
+            isPredicateMet = predicate.apply(routingTableSnapshotJson);
+          }
+        } else {
+          LOGGER.warn("Got null routing table snapshot, retrying");
         }
       } catch (Exception e) {
         // Will retry in a bit
@@ -357,8 +404,22 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
       Uninterruptibles.sleepUninterruptibly(500, TimeUnit.MILLISECONDS);
     }
 
-    Assert.assertTrue(isRoutingTableEmpty,
-        "Routing table is not empty, last snapshot is " + routingTableSnapshot.toString());
+    Assert.assertTrue(isPredicateMet, message + ", last routing table snapshot is " + routingTableSnapshot.toString());
+  }
+
+  @AfterClass
+  public void tearDown() throws Exception {
+    // Try deleting the tables and check that they have no routing table
+    dropOfflineTable(getTableName());
+    dropRealtimeTable(getTableName());
+
+    // Routing table should not have any entries (length = 0) after deleting all tables
+    waitForRoutingTablePredicate(new Function<JSONArray, Boolean>() {
+      @Override
+      public Boolean apply(JSONArray input) {
+        return input.length() == 0;
+      }
+    }, 15000, "Routing table is not empty after dropping all tables");
 
     stopBroker();
     stopController();
