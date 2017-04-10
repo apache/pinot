@@ -40,6 +40,7 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
   private final QueryCache queryCache;
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY = ThirdEyeCacheRegistry.getInstance();
   private static final String RATIO_SEPARATOR = "/";
+  private static final String TOPK = "_topk";
 
   public HeatMapViewHandler(QueryCache queryCache) {
     this.queryCache = queryCache;
@@ -98,6 +99,13 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
 
     TimeOnTimeComparisonRequest comparisonRequest = generateTimeOnTimeComparisonRequest(request);
     List<String> groupByDimensions = comparisonRequest.getGroupByDimensions();
+    List<String> groupByDimensionsFiltered = new ArrayList<>();
+    // remove group by dimensions which have topk as well
+    for (String groupByDimension : groupByDimensions) {
+      if (!groupByDimensions.contains(groupByDimension + TOPK)) {
+        groupByDimensionsFiltered.add(groupByDimension);
+      }
+    }
     final TimeOnTimeComparisonHandler handler = new TimeOnTimeComparisonHandler(queryCache);
 
     // we are tracking per dimension, to validate that its the same for each dimension
@@ -109,17 +117,17 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
       Map<String, Double> currentTotalMap = new HashMap<>();
       baselineTotalPerMetricAndDimension.put(metricOrExpressionName, baselineTotalMap);
       currentTotalPerMetricAndDimension.put(metricOrExpressionName, currentTotalMap);
-      for (String dimension : groupByDimensions) {
+      for (String dimension : groupByDimensionsFiltered) {
         baselineTotalMap.put(dimension, 0d);
         currentTotalMap.put(dimension, 0d);
       }
     }
 
     List<Future<TimeOnTimeComparisonResponse>> timeOnTimeComparisonResponsesFutures =
-        getTimeOnTimeComparisonResponses(groupByDimensions, comparisonRequest, handler);
+        getTimeOnTimeComparisonResponses(groupByDimensionsFiltered, comparisonRequest, handler);
 
-    for (int groupByDimensionId = 0; groupByDimensionId < groupByDimensions.size(); groupByDimensionId++) {
-      String groupByDimension = groupByDimensions.get(groupByDimensionId);
+    for (int groupByDimensionId = 0; groupByDimensionId < groupByDimensionsFiltered.size(); groupByDimensionId++) {
+      String groupByDimension = groupByDimensionsFiltered.get(groupByDimensionId);
 
       TimeOnTimeComparisonResponse response =
           timeOnTimeComparisonResponsesFutures.get(groupByDimensionId).get();
@@ -261,7 +269,7 @@ public class HeatMapViewHandler implements ViewHandler<HeatMapViewRequest, HeatM
 
     HeatMapViewResponse heatMapViewResponse = new HeatMapViewResponse();
     heatMapViewResponse.setMetrics(expressionNames);
-    heatMapViewResponse.setDimensions(groupByDimensions);
+    heatMapViewResponse.setDimensions(groupByDimensionsFiltered);
     heatMapViewResponse.setData(heatMapViewResponseData);
     heatMapViewResponse.setMetricExpression(metricExpressions);
     heatMapViewResponse.setSummary(summary);

@@ -98,4 +98,32 @@ public class ThirdEyeUtilsTest {
     };
   }
 
+  @Test
+  public void testGetRoundedValue() throws Exception {
+    double value = 123;
+    Assert.assertEquals(ThirdEyeUtils.getRoundedValue(value), "123");
+    value = 123.24;
+    Assert.assertEquals(ThirdEyeUtils.getRoundedValue(value), "123.24");
+    value = 123.246;
+    Assert.assertEquals(ThirdEyeUtils.getRoundedValue(value), "123.25");
+    value = 123.241;
+    Assert.assertEquals(ThirdEyeUtils.getRoundedValue(value), "123.24");
+    value = 0.23;
+    Assert.assertEquals(ThirdEyeUtils.getRoundedValue(value), "0.23");
+    value = 0.236;
+    Assert.assertEquals(ThirdEyeUtils.getRoundedValue(value), "0.24");
+    value = 0.01;
+    Assert.assertEquals(ThirdEyeUtils.getRoundedValue(value), "0.01");
+    value = 0.016;
+    Assert.assertEquals(ThirdEyeUtils.getRoundedValue(value), "0.016");
+    value = 0.0167;
+    Assert.assertEquals(ThirdEyeUtils.getRoundedValue(value), "0.017");
+    value = 0.001;
+    Assert.assertEquals(ThirdEyeUtils.getRoundedValue(value), "0.001");
+    value = 0.0013;
+    Assert.assertEquals(ThirdEyeUtils.getRoundedValue(value), "0.0013");
+    value = 0.00135;
+    Assert.assertEquals(ThirdEyeUtils.getRoundedValue(value), "0.0014");
+  }
+
 }

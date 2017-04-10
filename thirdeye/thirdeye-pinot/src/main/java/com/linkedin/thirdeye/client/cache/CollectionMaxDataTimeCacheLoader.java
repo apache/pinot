@@ -24,7 +24,6 @@ import com.linkedin.thirdeye.client.pinot.PinotQuery;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.pojo.DatasetConfigBean;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 public class CollectionMaxDataTimeCacheLoader extends CacheLoader<String, Long> {

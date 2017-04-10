@@ -1,3 +1,5 @@
+
+
 package com.linkedin.thirdeye.util;
 
 import com.google.common.collect.HashMultimap;
@@ -12,6 +14,7 @@ import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.thirdeye.api.DimensionMap;
 
 import java.io.IOException;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -57,6 +60,7 @@ public abstract class ThirdEyeUtils {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY = ThirdEyeCacheRegistry.getInstance();
+  private static final String TWO_DECIMALS_FORMAT = "##.##";
 
   private ThirdEyeUtils () {
 
@@ -388,6 +392,27 @@ public abstract class ThirdEyeUtils {
       LOG.error("Exception while fetching metric by name {} and dataset {}", metricName, dataset, e);
     }
     return metricConfig;
+  }
+
+
+  /**
+   * Get rounded double value, according to the value of the double.
+   * For values gte 0.1, use ##.## (eg. 123, 2.5, 1.26, 0.5, 0.162)
+   * For values lt 0.1 and gte 0.01, use ##.### (eg. 0.08, 0.071, 0.0123)
+   * For values lt 0.01 and gte 0.001, use ##.#### (eg. 0.001, 0.00367)
+   * This function ensures we don't prematurely round off double values to a fixed format, and make it 0.00 or lose out information
+   * @param value
+   * @return
+   */
+  public static String getRoundedValue(double value) {
+    StringBuffer decimalFormatBuffer = new StringBuffer(TWO_DECIMALS_FORMAT);
+    double compareValue = 0.1;
+    while (value < compareValue) {
+      decimalFormatBuffer.append("#");
+      compareValue = compareValue * 0.1;
+    }
+    DecimalFormat decimalFormat = new DecimalFormat(decimalFormatBuffer.toString());
+    return decimalFormat.format(value);
   }
 
 }
