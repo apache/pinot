@@ -55,7 +55,9 @@ AnalysisController.prototype = {
 
   initTimeSeriesController(params) {
     if (params.metricId) {
-      this.timeSeriesCompareController.handleAppEvent(params);
+      const dataset = this.analysisModel.dataset;
+      const timeSeriesParams = Object.assign(params, {dataset});
+      this.timeSeriesCompareController.handleAppEvent(timeSeriesParams);
     }
 
   }

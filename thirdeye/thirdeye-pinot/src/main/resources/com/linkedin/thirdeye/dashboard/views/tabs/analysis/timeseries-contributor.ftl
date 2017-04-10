@@ -1,7 +1,9 @@
 <div class="row bottom-buffer">
   <div class="col-xs-12">
-      <label class="label-medium-semibold">Metric: </label>
-      <div><label>{{metricName}}<label></div>
+      <label class="label-medium-semibold">Metric </label>
+      <label>{{metricName}}&nbsp;<label>
+      <label class="label-medium-semibold">from DataSet </label>
+      <label>{{dataset}}<label>
   </div>
 </div>
 <!-- Chart section -->

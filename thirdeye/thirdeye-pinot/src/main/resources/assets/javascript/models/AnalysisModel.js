@@ -1,7 +1,9 @@
 function AnalysisModel() {
   this.metric;
+  this.metricName;
   this.metricId;
   this.timeRange;
+  this.dateRange;
   this.granularity;
   this.dimension;
   this.filters;
@@ -10,6 +12,7 @@ function AnalysisModel() {
   this.baselineStart;
   this.baselineEnd;
   this.compareMode;
+
 }
 
 AnalysisModel.prototype = {
@@ -24,13 +27,17 @@ AnalysisModel.prototype = {
     this.currentStart = moment().subtract(2, 'hours').subtract(24, 'hours').startOf('hour');
     this.baselineStart = null;
     this.baselineEnd = null;
+    this.metricName = null;
+    this.dataset = null;
     this.compareMode = constants.DEFAULT_COMPARE_MODE ;
   },
 
   update: function (params) {
     if (params.metricId) {
+      const {name, dataset} = this.fetchMetricData(params.metricId);
+      this.metricName = name;
+      this.dataset = dataset;
       this.metricId = params.metricId;
-      this.metricName = this.fetchMetricName(params.metricId).name;
     }
     if (params.timeRange) {
       this.timeRange = params.timeRange;
@@ -58,7 +65,7 @@ AnalysisModel.prototype = {
     }
   },
 
-  fetchMetricName(metricId) {
+  fetchMetricData(metricId) {
     return dataService.fetchMetricByMetricId(metricId);
   },
 
