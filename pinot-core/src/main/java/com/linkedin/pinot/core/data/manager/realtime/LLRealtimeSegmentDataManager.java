@@ -61,6 +61,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
+import javax.annotation.Nonnull;
 import kafka.message.MessageAndOffset;
 import org.apache.commons.collections.map.HashedMap;
 import org.apache.commons.io.FileUtils;
@@ -249,13 +250,13 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  private void handleTransientKafkaErrors(Exception e) throws  Exception {
+  private void handleTransientKafkaErrors(@Nonnull Exception e) throws Exception {
     consecutiveErrorCount++;
     if (consecutiveErrorCount > MAX_CONSECUTIVE_ERROR_COUNT) {
       segmentLogger.warn("Kafka transient exception when fetching messages, stopping consumption after {} attempts", consecutiveErrorCount, e);
       throw e;
     } else {
-      segmentLogger.warn("Kafka transient exception when fetching messages, retrying (count={})", consecutiveErrorCount, e);
+      segmentLogger.info("Kafka transient exception when fetching messages, retrying (count = {}, cause = {})", consecutiveErrorCount, e.toString());
       Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
       makeConsumerWrapper();
     }
