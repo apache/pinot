@@ -29,8 +29,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import org.apache.commons.io.FileUtils;
@@ -64,6 +64,7 @@ import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
+import com.linkedin.pinot.common.utils.retry.RetryPolicy;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
@@ -731,19 +732,15 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   private long getPartitionOffset(final String topicName, final String bootstrapHosts, final String offsetCriteria, int partitionId) {
-    SimpleConsumerWrapper kafkaConsumer = SimpleConsumerWrapper.forPartitionConsumption(
-        new KafkaSimpleConsumerFactoryImpl(), bootstrapHosts, "dummyClientId", topicName, partitionId,
-        KAFKA_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
-    final long startOffset;
-    try {
-      startOffset = kafkaConsumer.fetchPartitionOffset(offsetCriteria, KAFKA_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
-    } catch (TimeoutException e) {
-      LOGGER.warn("Timed out when fetching partition offsets for topic {} partition {}", topicName, partitionId);
-      throw new RuntimeException(e);
-    } finally {
-      IOUtils.closeQuietly(kafkaConsumer);
+    KafkaOffsetFetcher kafkaOffsetFetcher = new KafkaOffsetFetcher(topicName, bootstrapHosts, offsetCriteria, partitionId);
+    RetryPolicy policy = RetryPolicies.fixedDelayRetryPolicy(3, 1000);
+    boolean success = policy.attempt(kafkaOffsetFetcher);
+    if (success) {
+      return kafkaOffsetFetcher.getOffset();
     }
-    return startOffset;
+    Exception e = kafkaOffsetFetcher.getException();
+    LOGGER.error("Could not get offset for topic {} partition {}, criteria {}", topicName, partitionId, offsetCriteria, e);
+    throw new RuntimeException(e);
   }
 
   /**
@@ -1040,5 +1037,53 @@ public class PinotLLCRealtimeSegmentManager {
 
   protected List<String> getInstances(String tenantName) {
     return _helixAdmin.getInstancesInClusterWithTag(_clusterName, tenantName);
+  }
+
+  private static class KafkaOffsetFetcher implements Callable<Boolean> {
+    private final String _topicName;
+    private final String _bootstrapHosts;
+    private final String _offsetCriteria;
+    private final int _partitionId;
+
+    private Exception _exception = null;
+    private long _offset = -1;
+
+    private KafkaOffsetFetcher(final String topicName, final String bootstrapHosts, final String offsetCriteria, int partitionId) {
+      _topicName = topicName;
+      _bootstrapHosts = bootstrapHosts;
+      _offsetCriteria = offsetCriteria;
+      _partitionId = partitionId;
+    }
+
+    private long getOffset() {
+      return _offset;
+    }
+
+    private Exception getException() {
+      return _exception;
+    }
+
+    @Override
+    public Boolean call() throws Exception {
+      SimpleConsumerWrapper kafkaConsumer = SimpleConsumerWrapper.forPartitionConsumption(
+          new KafkaSimpleConsumerFactoryImpl(), _bootstrapHosts, "dummyClientId", _topicName, _partitionId,
+          KAFKA_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
+      try {
+        _offset = kafkaConsumer.fetchPartitionOffset(_offsetCriteria, KAFKA_PARTITION_OFFSET_FETCH_TIMEOUT_MILLIS);
+        if (_exception != null) {
+          LOGGER.info("Successfully retrieved offset({}) for kafka topic {} partition {}", _offset, _topicName, _partitionId);
+        }
+        return Boolean.TRUE;
+      } catch (SimpleConsumerWrapper.TransientConsumerException e) {
+        LOGGER.warn("Temporary exception when fetching offset for topic {} partition {}:{}", _topicName, _partitionId, e.getMessage());
+        _exception = e;
+        return Boolean.FALSE;
+      } catch (Exception e) {
+        _exception = e;
+        throw e;
+      } finally {
+        IOUtils.closeQuietly(kafkaConsumer);
+      }
+    }
   }
 }
