@@ -55,16 +55,11 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
   }
 
   public SegmentZKMetadata(ZNRecord znRecord) {
-    if (getSegmentType().equals(SegmentType.OFFLINE)) {
-      // Throw an exception for offline segment push/get race condition
+    // Log a warning message for realtime use cases
+    try {
       _segmentName = znRecord.getSimpleField(CommonConstants.Segment.SEGMENT_NAME);
-    } else {
-      // Log a warning message for realtime use cases
-      try {
-        _segmentName = znRecord.getSimpleField(CommonConstants.Segment.SEGMENT_NAME);
-      } catch (NullPointerException e) {
-        _logger.info("Race condition between realtime segment push and get");
-      }
+    } catch (NullPointerException e) {
+      _logger.info("Race condition between segment push and get");
     }
     _tableName = znRecord.getSimpleField(CommonConstants.Segment.TABLE_NAME);
     _segmentType = znRecord.getEnumField(CommonConstants.Segment.SEGMENT_TYPE, SegmentType.class, SegmentType.OFFLINE);
