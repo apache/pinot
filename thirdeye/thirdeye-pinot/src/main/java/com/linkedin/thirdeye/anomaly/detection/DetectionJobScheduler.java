@@ -62,7 +62,7 @@ public class DetectionJobScheduler implements Runnable {
   private final long SYNC_SLEEP_SECONDS = 5;
 
   public void start() throws SchedulerException {
-    scheduledExecutorService.scheduleAtFixedRate(this, 0, 15, TimeUnit.MINUTES);
+    scheduledExecutorService.scheduleWithFixedDelay(this, 0, 5, TimeUnit.MINUTES);
   }
 
   public void shutdown() {
