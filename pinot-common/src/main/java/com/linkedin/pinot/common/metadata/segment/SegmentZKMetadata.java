@@ -24,6 +24,9 @@ import org.apache.helix.ZNRecord;
 import com.linkedin.pinot.common.metadata.ZKMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import static com.linkedin.pinot.common.utils.EqualityUtils.isEqual;
 import static com.linkedin.pinot.common.utils.EqualityUtils.hashCodeOf;
 import static com.linkedin.pinot.common.utils.EqualityUtils.isEqualIgnoreOrder;
@@ -32,6 +35,8 @@ import static com.linkedin.pinot.common.utils.EqualityUtils.isNullOrNotSameClass
 
 
 public abstract class SegmentZKMetadata implements ZKMetadata {
+
+  private static final Logger _logger = LoggerFactory.getLogger(SegmentZKMetadata.class);
 
   private static final String NULL = "null";
 
@@ -50,7 +55,17 @@ public abstract class SegmentZKMetadata implements ZKMetadata {
   }
 
   public SegmentZKMetadata(ZNRecord znRecord) {
-    _segmentName = znRecord.getSimpleField(CommonConstants.Segment.SEGMENT_NAME);
+    if (getSegmentType().equals(SegmentType.OFFLINE)) {
+      // Throw an exception for offline segment push/get race condition
+      _segmentName = znRecord.getSimpleField(CommonConstants.Segment.SEGMENT_NAME);
+    } else {
+      // Log a warning message for realtime use cases
+      try {
+        _segmentName = znRecord.getSimpleField(CommonConstants.Segment.SEGMENT_NAME);
+      } catch (NullPointerException e) {
+        _logger.info("Race condition between realtime segment push and get");
+      }
+    }
     _tableName = znRecord.getSimpleField(CommonConstants.Segment.TABLE_NAME);
     _segmentType = znRecord.getEnumField(CommonConstants.Segment.SEGMENT_TYPE, SegmentType.class, SegmentType.OFFLINE);
     _startTime = znRecord.getLongField(CommonConstants.Segment.START_TIME, -1);
