@@ -17,7 +17,9 @@ package com.linkedin.pinot.common.config;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.codehaus.jackson.JsonNode;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.json.JSONException;
@@ -36,7 +38,7 @@ public class IndexingConfigTest {
     json.put("sortedColumn", Arrays.asList("d", "e", "f"));
     json.put("loadMode", "MMAP");
     json.put("keyThatIsUnknown", "randomValue");
-    
+
     ObjectMapper mapper = new ObjectMapper();
     JsonNode jsonNode = mapper.readTree(json.toString());
     IndexingConfig indexingConfig = mapper.readValue(jsonNode, IndexingConfig.class);
@@ -53,8 +55,34 @@ public class IndexingConfigTest {
     Assert.assertEquals("d", sortedIndexColumns.get(0));
     Assert.assertEquals("e", sortedIndexColumns.get(1));
     Assert.assertEquals("f", sortedIndexColumns.get(2));
-
-
   }
 
+  @Test
+  public void testSegmentPartitionConfig()
+      throws IOException {
+    int numColumns = 5;
+    Map<String, ColumnPartitionConfig> expectedColumnPartitionMap = new HashMap<>(5);
+    for (int i = 0; i < numColumns; i++) {
+      expectedColumnPartitionMap.put("column_" + i, new ColumnPartitionConfig("function_" + i, i + 1));
+    }
+
+    SegmentPartitionConfig expectedPartitionConfig = new SegmentPartitionConfig(expectedColumnPartitionMap);
+    IndexingConfig expectedIndexingConfig = new IndexingConfig();
+    expectedIndexingConfig.setSegmentPartitionConfig(expectedPartitionConfig);
+
+    ObjectMapper mapper = new ObjectMapper();
+    String indexingConfigString = mapper.writeValueAsString(expectedIndexingConfig);
+    IndexingConfig actualIndexingConfig = mapper.readValue(indexingConfigString, IndexingConfig.class);
+
+    SegmentPartitionConfig actualPartitionConfig = actualIndexingConfig.getSegmentPartitionConfig();
+    Map<String, ColumnPartitionConfig> actualColumnPartitionMap = actualPartitionConfig.getColumnPartitionMap();
+    Assert.assertEquals(actualColumnPartitionMap.size(), expectedColumnPartitionMap.size());
+
+    for (String column : expectedColumnPartitionMap.keySet()) {
+      Assert.assertEquals(actualPartitionConfig.getFunctionName(column),
+          expectedPartitionConfig.getFunctionName(column));
+      Assert.assertEquals(actualPartitionConfig.getNumPartitions(column),
+          expectedPartitionConfig.getNumPartitions(column));
+    }
+  }
 }

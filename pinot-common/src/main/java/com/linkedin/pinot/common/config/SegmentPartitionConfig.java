@@ -13,16 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.indexsegment.generator;
+package com.linkedin.pinot.common.config;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.core.data.partition.PartitionFunction;
 import java.io.IOException;
-import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.apache.commons.lang.math.IntRange;
+import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.codehaus.jackson.annotate.JsonProperty;
 import org.codehaus.jackson.map.ObjectMapper;
@@ -32,6 +31,8 @@ import org.codehaus.jackson.map.ObjectMapper;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class SegmentPartitionConfig {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  public static final int INVALID_NUM_PARTITIONS = -1;
+
   private final Map<String, ColumnPartitionConfig> _columnPartitionMap;
 
   public SegmentPartitionConfig(
@@ -51,9 +52,32 @@ public class SegmentPartitionConfig {
    * @return Partition function for the column.
    */
   @Nullable
-  public PartitionFunction getPartitionFunction(@Nonnull String column) {
+  public String getFunctionName(@Nonnull String column) {
     ColumnPartitionConfig columnPartitionConfig = _columnPartitionMap.get(column);
-    return (columnPartitionConfig != null) ? columnPartitionConfig.getPartitionFunction() : null;
+    return (columnPartitionConfig != null) ? columnPartitionConfig.getFunctionName() : null;
+  }
+
+  /**
+   * Set the number of partitions for the specified column.
+   *
+   * @param column Column for which to set the number of partitions.
+   * @param numPartitions Number of partitions to set.
+   */
+  @JsonIgnore
+  public void setNumPartitions(String column, int numPartitions) {
+    ColumnPartitionConfig columnPartitionConfig = _columnPartitionMap.get(column);
+  }
+
+  /**
+   * Set the number of partitions for all columns.
+   *
+   * @param numPartitions Number of partitions.
+   */
+  @JsonIgnore
+  public void setNumPartitions(int numPartitions) {
+    for (ColumnPartitionConfig columnPartitionConfig : _columnPartitionMap.values()) {
+      columnPartitionConfig.setNumPartitions(numPartitions);
+    }
   }
 
   /**
@@ -77,5 +101,17 @@ public class SegmentPartitionConfig {
   public String toJsonString()
       throws IOException {
     return OBJECT_MAPPER.writeValueAsString(this);
+  }
+
+  /**
+   * Returns the number of partitions for the specified column.
+   * Returns {@link #INVALID_NUM_PARTITIONS} if it does not exist for the column.
+   *
+   * @param column Column for which to get number of partitions.
+   * @return Number of partitions of the column.
+   */
+  public int getNumPartitions(String column) {
+    ColumnPartitionConfig config = _columnPartitionMap.get(column);
+    return (config != null) ? config.getNumPartitions() : INVALID_NUM_PARTITIONS;
   }
 }

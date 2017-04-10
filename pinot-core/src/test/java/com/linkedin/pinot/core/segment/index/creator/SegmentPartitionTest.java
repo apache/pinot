@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.core.segment.index.creator;
 
+import com.linkedin.pinot.common.config.ColumnPartitionConfig;
+import com.linkedin.pinot.common.config.SegmentPartitionConfig;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
@@ -22,13 +24,10 @@ import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.data.partition.PartitionFunctionFactory;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.data.readers.TestRecordReader;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.generator.ColumnPartitionConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentPartitionConfig;
 import com.linkedin.pinot.core.query.pruner.PartitionSegmentPruner;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
@@ -68,12 +67,11 @@ public class SegmentPartitionTest {
   private static final String PARTITIONED_COLUMN_NAME = "partitionedColumn";
 
   private static final String NON_PARTITIONED_COLUMN_NAME = "nonPartitionedColumn";
-  private static final int MODULO_DIVISOR = 20; // For modulo function
+  private static final int NUM_PARTITIONS = 20; // For modulo function
   private static final int PARTITION_DIVISOR = 5; // Allowed partition values
   private static final int MAX_PARTITION_VALUE = (PARTITION_DIVISOR - 1);
   private static final String EXPECTED_PARTITION_VALUE_STRING = "[0 " + MAX_PARTITION_VALUE + "]";
-  private static final String EXPECTED_PARTITION_FUNCTION =
-      "MoDuLO" + PartitionFunctionFactory.PARTITION_FUNCTION_DELIMITER + MODULO_DIVISOR;
+  private static final String EXPECTED_PARTITION_FUNCTION = "MoDuLo";
   private IndexSegment _segment;
 
   @BeforeClass
@@ -145,7 +143,7 @@ public class SegmentPartitionTest {
       String query = buildQuery(TABLE_NAME, PARTITIONED_COLUMN_NAME, columnValue);
       BrokerRequest brokerRequest = compiler.compileToBrokerRequest(query);
 
-      Assert.assertEquals(pruner.prune(_segment, brokerRequest), (columnValue % MODULO_DIVISOR > MAX_PARTITION_VALUE),
+      Assert.assertEquals(pruner.prune(_segment, brokerRequest), (columnValue % NUM_PARTITIONS > MAX_PARTITION_VALUE),
           "Failed for column value: " + columnValue);
 
       // Test for non partitioned column.
@@ -161,7 +159,7 @@ public class SegmentPartitionTest {
 
       brokerRequest = compiler.compileToBrokerRequest(query);
       Assert.assertEquals(pruner.prune(_segment, brokerRequest),
-          (partitionColumnValue % MODULO_DIVISOR) > MAX_PARTITION_VALUE);
+          (partitionColumnValue % NUM_PARTITIONS) > MAX_PARTITION_VALUE);
 
       // Test for OR query: Segment should never be pruned as there's an OR with non partitioned column.
       query = buildAndQuery(TABLE_NAME, PARTITIONED_COLUMN_NAME, partitionColumnValue, NON_PARTITIONED_COLUMN_NAME,
@@ -234,7 +232,7 @@ public class SegmentPartitionTest {
     for (int i = 0; i < 10; i++) {
       String partitionColumn = "column_" + i;
       String partitionFunction = "function_" + i;
-      expectedMap.put(partitionColumn, new ColumnPartitionConfig(partitionFunction));
+      expectedMap.put(partitionColumn, new ColumnPartitionConfig(partitionFunction, i + 1));
     }
 
     SegmentPartitionConfig expectedConfig = new SegmentPartitionConfig(expectedMap);
@@ -252,9 +250,9 @@ public class SegmentPartitionTest {
 
     // Test that adding new fields does not break json de-serialization.
     String jsonStringWithNewField =
-        "{\"columnPartitionMap\":{\"column_0\":{\"functionName\":\"function_0\", \"newField\":\"newValue\"}}}";
+        "{\"columnPartitionMap\":{\"column_0\":{\"functionName\":\"function\",\"numPartitions\":10,\"newField\":\"newValue\"}}}";
     String jsonStringWithoutNewField =
-        "{\"columnPartitionMap\":{\"column_0\":{\"functionName\":\"function_0\"}}}";
+        "{\"columnPartitionMap\":{\"column_0\":{\"functionName\":\"function\",\"numPartitions\":10}}}";
 
     Assert.assertEquals(jsonStringWithoutNewField,
         SegmentPartitionConfig.fromJsonString(jsonStringWithNewField).toJsonString());
@@ -292,8 +290,8 @@ public class SegmentPartitionTest {
     Random random = new Random();
     Map<String, ColumnPartitionConfig> partitionFunctionMap = new HashMap<>();
 
-    partitionFunctionMap.put(PARTITIONED_COLUMN_NAME,
-        new ColumnPartitionConfig(EXPECTED_PARTITION_FUNCTION));
+    partitionFunctionMap.put(PARTITIONED_COLUMN_NAME, new ColumnPartitionConfig(EXPECTED_PARTITION_FUNCTION,
+        NUM_PARTITIONS));
 
     SegmentPartitionConfig segmentPartitionConfig = new SegmentPartitionConfig(partitionFunctionMap);
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(schema);

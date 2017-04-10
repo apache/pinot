@@ -75,5 +75,7 @@ public interface ColumnStatistics {
 
     PartitionFunction getPartitionFunction();
 
+    int getNumPartitions();
+
     List<IntRange> getPartitionRanges();
 }

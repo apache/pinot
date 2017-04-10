@@ -43,12 +43,13 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
   private Object previousValue = null;
   protected final FieldSpec fieldSpec;
   private boolean isSorted = true;
-
   private final String column;
+
   protected int totalNumberOfEntries = 0;
   protected int maxNumberOfMultiValues = 0;
   private int numInputNullValues = 0;  // Number of rows in which this column was null in the input.
   private PartitionFunction partitionFunction;
+  private final int numPartitions;
   private int partitionRangeStart = Integer.MAX_VALUE;
   private int partitionRangeEnd = Integer.MIN_VALUE;
 
@@ -64,6 +65,7 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
     this.column = column;
     fieldSpec = statsCollectorConfig.getFieldSpecForColumn(column);
     partitionFunction = statsCollectorConfig.getPartitionFunction(column);
+    numPartitions = statsCollectorConfig.getNumPartitions(column);
     addressNull(previousValue, fieldSpec.getDataType());
     previousValue = null;
   }
@@ -146,6 +148,15 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
    */
   public PartitionFunction getPartitionFunction() {
     return partitionFunction;
+  }
+
+  /**
+   * Returns the number of partitions for this column.
+   *
+   * @return Number of partitions.
+   */
+  public int getNumPartitions() {
+    return numPartitions;
   }
 
   /**

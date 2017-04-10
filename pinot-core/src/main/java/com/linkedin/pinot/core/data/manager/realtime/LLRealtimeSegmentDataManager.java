@@ -39,8 +39,8 @@ import com.linkedin.pinot.core.data.extractors.PlainFieldExtractor;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.data.partition.PartitionFunctionFactory;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.core.indexsegment.generator.ColumnPartitionConfig;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentPartitionConfig;
+import com.linkedin.pinot.common.config.ColumnPartitionConfig;
+import com.linkedin.pinot.common.config.SegmentPartitionConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.realtime.converter.RealtimeSegmentConverter;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
@@ -173,7 +173,6 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   private final String _tableName;
   private final List<String> _invertedIndexColumns;
   private final List<String> _noDictionaryColumns;
-  private final Map<String, String> _column2PartitionersMap;
   private final String _sortedColumn;
   private Logger segmentLogger = LOGGER;
   private final String _tableStreamName;
@@ -844,14 +843,14 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     _fieldExtractor = FieldExtractorFactory.getPlainFieldExtractor(schema);
     makeConsumerWrapper();
 
-    // Partitioners
-    _column2PartitionersMap = indexingConfig.getPartitioners();
-    if (_column2PartitionersMap != null && !_column2PartitionersMap.isEmpty()) {
+    SegmentPartitionConfig segmentPartitionConfig = indexingConfig.getSegmentPartitionConfig();
+    if (segmentPartitionConfig != null) {
       try {
         int nPartitions = _consumerWrapper.getPartitionCount(_kafkaTopic, /*maxWaitTimeMs=*/5000L);
-        _realtimeSegment.setSegmentPartitionConfig(createPartitionConfig(nPartitions));
+        segmentPartitionConfig.setNumPartitions(nPartitions);
+        _realtimeSegment.setSegmentPartitionConfig(segmentPartitionConfig);
       } catch (Exception e) {
-        segmentLogger.warn("Couldn't get number of partitions in 5s, not using partition config");
+        segmentLogger.warn("Couldn't get number of partitions in 5s, not using partition config {}", e.getMessage());
         _realtimeSegment.setSegmentPartitionConfig(null);
         makeConsumerWrapper();
       }
@@ -944,15 +943,5 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
 
   public int getMaxTimeForConsumingToOnlineSec() {
     return _maxTimeForConsumingToOnlineSec;
-  }
-
-  private SegmentPartitionConfig createPartitionConfig(int nPartitions) {
-    Map<String, ColumnPartitionConfig> map = new HashedMap();
-    for (String column : _column2PartitionersMap.keySet()) {
-      String partitionFunctionString =
-          PartitionFunctionFactory.buildPartitionFunctionString(_column2PartitionersMap.get(column), nPartitions);
-      map.put(column, new ColumnPartitionConfig(partitionFunctionString));
-    }
-    return new SegmentPartitionConfig(map);
   }
 }

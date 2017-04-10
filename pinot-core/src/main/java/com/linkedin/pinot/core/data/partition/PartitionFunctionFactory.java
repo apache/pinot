@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.core.data.partition;
 
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nonnull;
@@ -62,46 +61,26 @@ public class PartitionFunctionFactory {
    * This method generates and returns a partition function based on the provided string.
    *
    * @param partitionFunctionString String containing function name and its arguments.
+   * @param numPartitions Number of partitions.
    * @return Partition function
    */
-  public static PartitionFunction getPartitionFunction(@Nonnull String partitionFunctionString) {
+  public static PartitionFunction getPartitionFunction(@Nonnull String partitionFunctionString, int numPartitions) {
     String[] tokens = partitionFunctionString.split(PARTITION_FUNCTION_DELIMITER);
     String functionName = tokens[0];
-    String[] args = Arrays.copyOfRange(tokens, 1, tokens.length);
 
     PartitionFunctionType function = PartitionFunctionType.fromString(functionName);
     switch (function) {
       case Modulo:
-        return new ModuloPartitionFunction(args);
+        return new ModuloPartitionFunction(numPartitions);
 
       case Murmur:
-        return new MurmurPartitionFunction(args);
+        return new MurmurPartitionFunction(numPartitions);
 
       case ByteArray:
-        return new ByteArrayPartitionFunction(args);
+        return new ByteArrayPartitionFunction(numPartitions);
 
       default:
         throw new IllegalArgumentException("Illegal partition function name: " + functionName);
     }
-  }
-
-  /**
-   * Utility function that takes a function name and its arguments in string form and returns
-   * a partition function string that can be passed into the factory to generate an instance of
-   * a partition function.
-   *
-   * @param functionName Name of partition function
-   * @param arguments Arguments for partition function
-   * @return Partition function string.
-   */
-  public static String buildPartitionFunctionString(String functionName, Object... arguments) {
-    StringBuilder builder = new StringBuilder(functionName);
-
-    for (int i = 0; i < arguments.length; i++) {
-      builder.append(PARTITION_FUNCTION_DELIMITER);
-      builder.append(arguments[i].toString());
-    }
-
-    return builder.toString();
   }
 }
