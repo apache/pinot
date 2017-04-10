@@ -61,6 +61,8 @@ public abstract class ThirdEyeUtils {
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY = ThirdEyeCacheRegistry.getInstance();
   private static final String TWO_DECIMALS_FORMAT = "##.##";
+  private static final String MAX_DECIMALS_FORMAT = "##.#####";
+  private static final String DECIMALS_FORMAT_TOKEN = "#";
 
   private ThirdEyeUtils () {
 
@@ -397,6 +399,7 @@ public abstract class ThirdEyeUtils {
 
   /**
    * Get rounded double value, according to the value of the double.
+   * Max rounding will be upto 4 decimals
    * For values gte 0.1, use ##.## (eg. 123, 2.5, 1.26, 0.5, 0.162)
    * For values lt 0.1 and gte 0.01, use ##.### (eg. 0.08, 0.071, 0.0123)
    * For values lt 0.01 and gte 0.001, use ##.#### (eg. 0.001, 0.00367)
@@ -407,8 +410,8 @@ public abstract class ThirdEyeUtils {
   public static String getRoundedValue(double value) {
     StringBuffer decimalFormatBuffer = new StringBuffer(TWO_DECIMALS_FORMAT);
     double compareValue = 0.1;
-    while (value < compareValue) {
-      decimalFormatBuffer.append("#");
+    while (value > 0 && value < compareValue && !decimalFormatBuffer.toString().equals(MAX_DECIMALS_FORMAT)) {
+      decimalFormatBuffer.append(DECIMALS_FORMAT_TOKEN);
       compareValue = compareValue * 0.1;
     }
     DecimalFormat decimalFormat = new DecimalFormat(decimalFormatBuffer.toString());

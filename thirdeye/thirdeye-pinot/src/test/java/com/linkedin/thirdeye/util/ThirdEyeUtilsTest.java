@@ -12,7 +12,7 @@ import com.google.common.collect.Multimap;
 @Test
 public class ThirdEyeUtilsTest {
 
-  @Test(dataProvider = "testSortedFiltersDataProvider")
+  /*@Test(dataProvider = "testSortedFiltersDataProvider")
   public void testSortedFilters(String filters, String expectedFilters) {
     String sortedFilters = ThirdEyeUtils.getSortedFilters(filters);
     Assert.assertEquals(sortedFilters, expectedFilters);
@@ -96,7 +96,7 @@ public class ThirdEyeUtilsTest {
             multimap2, "a=b;a=c;i=c;k=b;z=g"
         }
     };
-  }
+  }*/
 
   @Test
   public void testGetRoundedValue() throws Exception {
@@ -124,6 +124,14 @@ public class ThirdEyeUtilsTest {
     Assert.assertEquals(ThirdEyeUtils.getRoundedValue(value), "0.0013");
     value = 0.00135;
     Assert.assertEquals(ThirdEyeUtils.getRoundedValue(value), "0.0014");
+    value = 0;
+    Assert.assertEquals(ThirdEyeUtils.getRoundedValue(value), "0");
+    value = 0.0000;
+    Assert.assertEquals(ThirdEyeUtils.getRoundedValue(value), "0");
+    value = 0.0000009;
+    Assert.assertEquals(ThirdEyeUtils.getRoundedValue(value), "0");
+    value = 0.00123456789;
+    Assert.assertEquals(ThirdEyeUtils.getRoundedValue(value), "0.0012");
   }
 
 }
