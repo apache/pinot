@@ -97,10 +97,12 @@ DimensionTreeMapView.prototype = {
       setRangeText($currentRangeText, start, end, dateFormat, rangeType);
     };
 
+        // TIME RANGE SELECTION
     const currentStart = this.dimensionTreeMapModel.currentStart;
     const currentEnd = this.dimensionTreeMapModel.currentEnd;
     const baselineStart = this.dimensionTreeMapModel.baselineStart;
     const baselineEnd = this.dimensionTreeMapModel.baselineEnd;
+
 
     this.renderDatePicker($currentRange, currentCallBack, currentStart, currentEnd, showTime, this.currentRange);
     this.renderDatePicker($baselineRange, baselineCallBack, baselineStart, baselineEnd, showTime, this.baselineRange, 'left');
@@ -109,11 +111,12 @@ DimensionTreeMapView.prototype = {
     setRangeText($baselineRangeText, baselineStart, baselineEnd, dateFormat, this.dimensionTreeMapModel['compareMode']);
   },
 
-  renderDatePicker(domId, callbackFun, initialStart, initialEnd, showTime, rangeGenerator, opens = 'right'){
+  renderDatePicker: function (domId, callbackFun, initialStart, initialEnd, showTime, rangeGenerator, opens = 'right'){
     const ranges = rangeGenerator();
     $(domId).daterangepicker({
       startDate: initialStart,
       endDate: initialEnd,
+      maxDate: moment(),
       dateLimit: {
         days: 60
       },

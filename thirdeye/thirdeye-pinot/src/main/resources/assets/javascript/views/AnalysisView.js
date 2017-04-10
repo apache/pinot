@@ -144,21 +144,31 @@ AnalysisView.prototype = {
   },
 
   renderDateRangePickers(showTime) {
+    showTime = showTime || this.viewParams.granularity;
     const $currentRangeText = $('#current-range span');
     const $baselineRangeText = $('#baseline-range span');
     const $currentRange = $('#current-range');
     const $baselineRange = $('#baseline-range');
+    // TIME RANGE SELECTION
+    const currentStart = this.viewParams.currentStart || this.analysisModel.currentStart;
+    const currentEnd = this.viewParams.currentEnd || this.analysisModel.currentEnd;
+    const baselineStart = this.viewParams.baselineStart || this.analysisModel.baselineStart;
+    const baselineEnd = this.viewParams.baselineEnd || this.analysisModel.baselineEnd;
 
     const setBaselineRange = (start, end, compareMode = constants.DEFAULT_COMPARE_MODE) => {
+      const showTime = this.viewParams.granularity !== constants.GRANULARITY_DAY;
+      const dateFormat = showTime ? constants.DATE_TIME_RANGE_FORMAT : constants.DATE_RANGE_FORMAT;
       this.viewParams['baselineStart'] = start;
       this.viewParams['baselineEnd'] = end;
       this.viewParams['compareMode'] = compareMode;
 
       $baselineRangeText.addClass("time-range").html(
-        `<span>${compareMode}</span> ${start.format(constants.DATE_TIME_RANGE_FORMAT )} &mdash; ${end.format(constants.DATE_TIME_RANGE_FORMAT )}`);
+        `<span>${compareMode}</span> ${start.format(dateFormat)} &mdash; ${end.format(dateFormat)}`);
     };
-    const setCurrentRange = (start, end, rangeType = '') => {
+    const setCurrentRange = (start, end, rangeType = constants.DATE_RANGE_CUSTOM) => {
       const $baselineRangePicker = $('#baseline-range');
+      const showTime = this.viewParams.granularity !== constants.GRANULARITY_DAY;
+      const dateFormat = showTime ? constants.DATE_TIME_RANGE_FORMAT : constants.DATE_RANGE_FORMAT;
 
       this.viewParams['currentStart'] = start;
       this.viewParams['currentEnd'] = end;
@@ -175,19 +185,20 @@ AnalysisView.prototype = {
       }
 
       $currentRangeText.addClass("time-range").html(
-          `<span>${rangeType}</span> ${start.format(constants.DATE_TIME_RANGE_FORMAT )} &mdash; ${end.format(constants.DATE_TIME_RANGE_FORMAT )}`)
+          `<span>${rangeType}</span> ${start.format(dateFormat)} &mdash; ${end.format(dateFormat)}`)
     };
 
-    // TIME RANGE SELECTION
-    var currentStart = this.analysisModel.currentStart;
-    var currentEnd = this.analysisModel.currentEnd;
-    var baselineStart = this.analysisModel.baselineStart;
-    var baselineEnd = this.analysisModel.baselineEnd;
 
 
     this.renderDatePicker($currentRange, setCurrentRange, currentStart, currentEnd, showTime, this.currentRange);
     this.renderDatePicker($baselineRange, setBaselineRange, baselineStart, baselineEnd, showTime, this.baselineRange);
-    setCurrentRange(currentStart, currentEnd);
+
+
+    const currentDatePicker = $currentRange.data('daterangepicker')
+    currentDatePicker.updateView();
+    const currentRangeType = currentDatePicker.chosenLabel;
+
+    setCurrentRange(currentStart, currentEnd, currentRangeType);
     setBaselineRange(baselineStart, baselineEnd, this.viewParams.compareMode);
   },
 
@@ -196,12 +207,13 @@ AnalysisView.prototype = {
     $selector.daterangepicker({
       startDate: initialStart,
       endDate: initialEnd,
+      maxDate: moment(),
       dateLimit: {
         days: 60
       },
       showDropdowns: true,
       showWeekNumbers: true,
-      timePicker: true,
+      timePicker: showTime,
       timePickerIncrement: 5,
       timePicker12Hour: true,
       ranges,
@@ -228,6 +240,14 @@ AnalysisView.prototype = {
     if (paramGranularity && granularities.includes(paramGranularity)) {
       $granularitySelector.val(paramGranularity).trigger('change');
     }
+
+    $granularitySelector.on('change', (event) => {
+      const granularity = $(event.currentTarget).select2('data')[0].id;
+      const showTime = granularity !== constants.GRANULARITY_DAY;
+      this.viewParams['granularity'] = granularity;
+      this.destroyDatePickers();
+      this.renderDateRangePickers(showTime);
+    })
   },
 
   renderDimensions: function (metricId) {
