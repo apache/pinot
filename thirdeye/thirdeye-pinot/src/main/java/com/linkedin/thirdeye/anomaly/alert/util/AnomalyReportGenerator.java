@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.nio.file.Files;
-import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -40,6 +39,7 @@ import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 import freemarker.template.Configuration;
 import freemarker.template.Template;
@@ -52,7 +52,6 @@ public class AnomalyReportGenerator {
   private static final AnomalyReportGenerator INSTANCE = new AnomalyReportGenerator();
   private static final String DATE_PATTERN = "MMM dd, HH:mm";
   private static final String MULTIPLE_ANOMALIES_EMAIL_TEMPLATE = "multiple-anomalies-email-template.ftl";
-  private static final DecimalFormat TWO_DECIMALS_FORMAT = new DecimalFormat("##.##");
 
   public static AnomalyReportGenerator getInstance() {
     return INSTANCE;
@@ -147,13 +146,13 @@ public class AnomalyReportGenerator {
 
         AnomalyReportDTO anomalyReportDTO = new AnomalyReportDTO(String.valueOf(anomaly.getId()),
             getAnomalyURL(anomaly, configuration.getDashboardHost()),
-            TWO_DECIMALS_FORMAT.format(anomaly.getAvgBaselineVal()),
-            TWO_DECIMALS_FORMAT.format(anomaly.getAvgCurrentVal()),
+            ThirdEyeUtils.getRoundedValue(anomaly.getAvgBaselineVal()),
+            ThirdEyeUtils.getRoundedValue(anomaly.getAvgCurrentVal()),
             getDimensionsList(anomaly.getDimensions()),
             getTimeDiffInHours(anomaly.getStartTime(), anomaly.getEndTime()), // duration
             feedbackVal,
             anomaly.getFunction().getFunctionName(),
-            TWO_DECIMALS_FORMAT.format(anomaly.getWeight() * 100) + "%",
+            ThirdEyeUtils.getRoundedValue(anomaly.getWeight() * 100) + "%",
             getLiftDirection(anomaly.getWeight()),
             anomaly.getMetric(),
             getDateString(anomaly.getStartTime(), timeZone),
@@ -265,7 +264,7 @@ public class AnomalyReportGenerator {
 
   private String getTimeDiffInHours(long start, long end) {
     double duration = Double.valueOf((end - start) / 1000) / 3600;
-    String durationString = TWO_DECIMALS_FORMAT.format(duration) + ((duration == 1) ? (" hour") : (" hours"));
+    String durationString = ThirdEyeUtils.getRoundedValue(duration) + ((duration == 1) ? (" hour") : (" hours"));
     return durationString;
   }
 

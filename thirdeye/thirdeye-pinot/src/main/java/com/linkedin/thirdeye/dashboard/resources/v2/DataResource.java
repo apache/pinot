@@ -75,7 +75,7 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
 @Produces(MediaType.APPLICATION_JSON)
 public class DataResource {
   private static final Logger LOG = LoggerFactory.getLogger(DataResource.class);
-  private static final DAORegistry daoRegistry = DAORegistry.getInstance();
+  private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
 
@@ -90,9 +90,9 @@ public class DataResource {
   private AnomaliesResource anomaliesResoure;
 
   public DataResource(AnomalyFunctionFactory anomalyFunctionFactory, AlertFilterFactory alertFilterFactory) {
-    metricConfigDAO = daoRegistry.getMetricConfigDAO();
-    datasetConfigDAO = daoRegistry.getDatasetConfigDAO();
-    dashboardConfigDAO = daoRegistry.getDashboardConfigDAO();
+    metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
+    datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
+    dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
 
     this.queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
     this.collectionMaxDataTimeCache = CACHE_REGISTRY_INSTANCE.getCollectionMaxDataTimeCache();
@@ -154,9 +154,13 @@ public class DataResource {
   }
 
   @GET
-  @Path("maxtime/{dataset}")
-  public Map<String, Long> getMetricMaxDataTime(@PathParam("dataset") String dataset) {
-    return null;
+  @Path("maxDataTime/metricId/{metricId}")
+  public Long getMetricMaxDataTime(@PathParam("metricId") Long metricId) {
+    MetricConfigDTO metricConfig = DAO_REGISTRY.getMetricConfigDAO().findById(metricId);
+    String dataset = metricConfig.getDataset();
+
+    long maxDataTime = Utils.getMaxDataTimeForDataset(dataset);
+    return maxDataTime;
   }
 
   //------------- endpoint for autocomplete ----------
@@ -276,6 +280,7 @@ public class DataResource {
     HeatMapViewRequest request = new HeatMapViewRequest();
     request.setCollection(collection);
     List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metric, MetricAggFunction.SUM, collection);
+
     request.setMetricExpressions(metricExpressions);
     long maxDataTime = collectionMaxDataTimeCache.get(collection);
     if (currentEnd > maxDataTime) {

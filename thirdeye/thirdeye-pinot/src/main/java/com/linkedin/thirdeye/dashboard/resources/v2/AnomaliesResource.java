@@ -26,7 +26,6 @@ import com.linkedin.thirdeye.detector.metric.transfer.MetricTransfer;
 import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
 
 import java.io.IOException;
-import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -100,8 +99,6 @@ public class AnomaliesResource {
   private static final DateTimeFormatter  timeSeriesDateFormatter = DateTimeFormat.forPattern(TIME_SERIES_DATE_FORMAT).withZone(DEFAULT_DASHBOARD_TIMEZONE);
   private static final DateTimeFormatter startEndDateFormatterDays = DateTimeFormat.forPattern(START_END_DATE_FORMAT_DAYS).withZone(DEFAULT_DASHBOARD_TIMEZONE);
   private static final DateTimeFormatter startEndDateFormatterHours = DateTimeFormat.forPattern(START_END_DATE_FORMAT_HOURS).withZone(DEFAULT_DASHBOARD_TIMEZONE);
-  private static final DecimalFormat TWO_DECIMALS_FORMAT = new DecimalFormat("##.##");
-
 
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY = ThirdEyeCacheRegistry.getInstance();
@@ -451,15 +448,6 @@ public class AnomaliesResource {
   }
 
   /**
-   * Construct agg granularity for using in timeseries
-   * @param datasetConfig
-   * @return
-   */
-  private String constructAggGranularity(DatasetConfigDTO datasetConfig) {
-    return datasetConfig.bucketTimeGranularity().toAggregationGranularityString();
-  }
-
-  /**
    * Get formatted date time for anomaly chart
    * @param timestamp
    * @param datasetConfig
@@ -766,8 +754,8 @@ public class AnomaliesResource {
     long newAnomalyRegionEnd = subtractRegionFromAnomalyEnd(mergedAnomaly.getEndTime(), dateTimeZone, dataUnit);
     anomalyDetails.setAnomalyRegionStart(timeSeriesDateFormatter.print(newAnomalyRegionStart));
     anomalyDetails.setAnomalyRegionEnd(timeSeriesDateFormatter.print(newAnomalyRegionEnd));
-    anomalyDetails.setCurrent(TWO_DECIMALS_FORMAT.format(mergedAnomaly.getAvgCurrentVal()));
-    anomalyDetails.setBaseline(TWO_DECIMALS_FORMAT.format(mergedAnomaly.getAvgBaselineVal()));
+    anomalyDetails.setCurrent(ThirdEyeUtils.getRoundedValue(mergedAnomaly.getAvgCurrentVal()));
+    anomalyDetails.setBaseline(ThirdEyeUtils.getRoundedValue(mergedAnomaly.getAvgBaselineVal()));
     anomalyDetails.setAnomalyFunctionId(anomalyFunction.getId());
     anomalyDetails.setAnomalyFunctionName(anomalyFunction.getFunctionName());
     anomalyDetails.setAnomalyFunctionType(anomalyFunction.getType());
