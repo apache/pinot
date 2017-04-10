@@ -220,8 +220,6 @@ public class AsyncPoolImpl<T> implements AsyncPool<T> {
       _state = State.RUNNING;
 
       if (_idleTimeout > 0) {
-        System.out.println(_poolName + " :Setting up timeout job to run every "+ _idleTimeout);
-
         LOGGER.info("{} Setting up timeout job to run every {} ms", _poolName, _idleTimeout);
         long freq = Math.min(_idleTimeout / 10, 1000);
         _objectTimeoutFuture = _timeoutExecutor.scheduleAtFixedRate(new Runnable() {
