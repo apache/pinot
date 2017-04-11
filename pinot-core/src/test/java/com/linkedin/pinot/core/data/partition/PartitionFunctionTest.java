@@ -39,20 +39,22 @@ public class PartitionFunctionTest {
     Random random = new Random(seed);
 
     for (int i = 0; i < 1000; i++) {
-      int divisor = random.nextInt();
+      int expectedNumPartitions = Math.abs(random.nextInt());
 
       // Avoid divide-by-zero.
-      if (divisor == 0) {
-        divisor = 1;
+      if (expectedNumPartitions == 0) {
+        expectedNumPartitions = 1;
       }
 
-      String partitionFunctionString = "MoDuLo" + PartitionFunctionFactory.PARTITION_FUNCTION_DELIMITER + divisor;
-      PartitionFunction partitionFunction = PartitionFunctionFactory.getPartitionFunction(partitionFunctionString);
-      Assert.assertEquals(partitionFunction.toString().toLowerCase(), partitionFunctionString.toLowerCase());
+      String functionName = "MoDuLo";
+      PartitionFunction partitionFunction =
+          PartitionFunctionFactory.getPartitionFunction(functionName, expectedNumPartitions);
+      Assert.assertEquals(partitionFunction.toString().toLowerCase(), functionName.toLowerCase());
+      Assert.assertEquals(partitionFunction.getNumPartitions(), expectedNumPartitions);
 
       for (int j = 0; j < 1000; j++) {
         int value = random.nextInt();
-        Assert.assertEquals(partitionFunction.getPartition(value), (value % divisor));
+        Assert.assertEquals(partitionFunction.getPartition(value), (value % expectedNumPartitions));
       }
     }
   }
@@ -70,22 +72,24 @@ public class PartitionFunctionTest {
     Random random = new Random(seed);
 
     for (int i = 0; i < 1000; i++) {
-      int divisor = Math.abs(random.nextInt());
+      int expectedNumPartitions = Math.abs(random.nextInt());
 
       // Avoid divide-by-zero.
-      if (divisor == 0) {
-        divisor = 1;
+      if (expectedNumPartitions == 0) {
+        expectedNumPartitions = 1;
       }
 
-      String partitionFunctionString =
-          "mUrmur" + PartitionFunctionFactory.PARTITION_FUNCTION_DELIMITER + divisor;
-      PartitionFunction partitionFunction = PartitionFunctionFactory.getPartitionFunction(partitionFunctionString);
-      Assert.assertEquals(partitionFunction.toString().toLowerCase(), partitionFunctionString.toLowerCase());
+      String functionName = "mUrmur";
+
+      PartitionFunction partitionFunction =
+          PartitionFunctionFactory.getPartitionFunction(functionName, expectedNumPartitions);
+      Assert.assertEquals(partitionFunction.toString().toLowerCase(), functionName.toLowerCase());
+      Assert.assertEquals(partitionFunction.getNumPartitions(), expectedNumPartitions);
 
       for (int j = 0; j < 1000; j++) {
         Integer value = random.nextInt();
-        Assert.assertTrue(partitionFunction.getPartition(value.toString()) < divisor,
-            "Illegal: " + partitionFunction.getPartition(value.toString()) + " " + divisor);
+        Assert.assertTrue(partitionFunction.getPartition(value.toString()) < expectedNumPartitions,
+            "Illegal: " + partitionFunction.getPartition(value.toString()) + " " + expectedNumPartitions);
       }
     }
   }
@@ -103,22 +107,23 @@ public class PartitionFunctionTest {
     Random random = new Random(seed);
 
     for (int i = 0; i < 1000; i++) {
-      int divisor = Math.abs(random.nextInt());
+      int expectedNumPartitions = Math.abs(random.nextInt());
 
       // Avoid divide-by-zero.
-      if (divisor == 0) {
-        divisor = 1;
+      if (expectedNumPartitions == 0) {
+        expectedNumPartitions = 1;
       }
 
-      String partitionFunctionString =
-          "bYteArray" + PartitionFunctionFactory.PARTITION_FUNCTION_DELIMITER + divisor;
-      PartitionFunction partitionFunction = PartitionFunctionFactory.getPartitionFunction(partitionFunctionString);
-      Assert.assertEquals(partitionFunction.toString().toLowerCase(), partitionFunctionString.toLowerCase());
+      String functionName = "bYteArray";
+      PartitionFunction partitionFunction =
+          PartitionFunctionFactory.getPartitionFunction(functionName, expectedNumPartitions);
+      Assert.assertEquals(partitionFunction.toString().toLowerCase(), functionName.toLowerCase());
+      Assert.assertEquals(partitionFunction.getNumPartitions(), expectedNumPartitions);
 
       for (int j = 0; j < 1000; j++) {
         Integer value = random.nextInt();
-        Assert.assertTrue(partitionFunction.getPartition(value) < divisor,
-            "Illegal: " + partitionFunction.getPartition(value) + " " + divisor);
+        Assert.assertTrue(partitionFunction.getPartition(value) < expectedNumPartitions,
+            "Illegal: " + partitionFunction.getPartition(value) + " " + expectedNumPartitions);
       }
     }
   }

@@ -162,6 +162,7 @@ public class V1Constants {
       public static final String MIN_VALUE = "minValue";
       public static final String MAX_VALUE = "maxValue";
       public static final String PARTITION_FUNCTION = "partitionFunction";
+      public static final String NUM_PARTITIONS = "numPartitions";
       public static final String PARTITION_VALUES = "partitionValues";
 
 

@@ -16,11 +16,12 @@
 
 package com.linkedin.pinot.core.realtime.converter.stats;
 
+import com.linkedin.pinot.common.config.ColumnPartitionConfig;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.Block;
 import com.linkedin.pinot.core.common.BlockMultiValIterator;
 import com.linkedin.pinot.core.data.partition.PartitionFunction;
-import com.linkedin.pinot.core.indexsegment.generator.ColumnPartitionConfig;
+import com.linkedin.pinot.core.data.partition.PartitionFunctionFactory;
 import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
 import com.linkedin.pinot.core.operator.blocks.RealtimeSingleValueBlock;
 import com.linkedin.pinot.core.realtime.impl.datasource.RealtimeColumnDataSource;
@@ -44,9 +45,9 @@ public class RealtimeColumnStatistics implements ColumnStatistics {
   private final MutableDictionaryReader _dictionaryReader;
   private final Block _block;
   private PartitionFunction partitionFunction;
+  private int numPartitions;
   private int partitionRangeStart = Integer.MAX_VALUE;
   private int partitionRangeEnd = Integer.MIN_VALUE;
-  private boolean partitionMismatch = false;
 
   public RealtimeColumnStatistics(RealtimeColumnDataSource dataSource, int[] sortedDocIdIterationOrder, ColumnPartitionConfig columnPartitionConfig) {
     _dataSource = dataSource;
@@ -54,7 +55,10 @@ public class RealtimeColumnStatistics implements ColumnStatistics {
     _dictionaryReader = dataSource.getDictionary();
     _block = dataSource.getNextBlock();
     if (columnPartitionConfig != null) {
-      partitionFunction = columnPartitionConfig.getPartitionFunction();
+      String functionName = columnPartitionConfig.getFunctionName();
+      numPartitions = columnPartitionConfig.getNumPartitions();
+      partitionFunction =
+          (functionName != null) ? PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions) : null;
       if (partitionFunction != null) {
         updatePartition();
       }
@@ -163,6 +167,11 @@ public class RealtimeColumnStatistics implements ColumnStatistics {
   @Override
   public PartitionFunction getPartitionFunction() {
     return partitionFunction;
+  }
+
+  @Override
+  public int getNumPartitions() {
+    return numPartitions;
   }
 
   @Override

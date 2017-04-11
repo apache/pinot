@@ -15,21 +15,7 @@
  */
 package com.linkedin.pinot.core.realtime.impl;
 
-import com.linkedin.pinot.core.indexsegment.generator.ColumnPartitionConfig;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentPartitionConfig;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
-import org.joda.time.DateTime;
-import org.joda.time.Interval;
-import org.roaringbitmap.IntIterator;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.linkedin.pinot.common.config.SegmentPartitionConfig;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.data.Schema;
@@ -59,6 +45,19 @@ import com.linkedin.pinot.core.realtime.impl.invertedIndex.TimeInvertedIndex;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.startree.StarTree;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.joda.time.DateTime;
+import org.joda.time.Interval;
+import org.roaringbitmap.IntIterator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class RealtimeSegmentImpl implements RealtimeSegment {
   private final Logger LOGGER;

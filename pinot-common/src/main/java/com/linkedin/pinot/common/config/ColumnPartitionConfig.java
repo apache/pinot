@@ -13,15 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.linkedin.pinot.core.indexsegment.generator;
+package com.linkedin.pinot.common.config;
 
-import com.linkedin.pinot.core.data.partition.PartitionFunction;
-import com.linkedin.pinot.core.data.partition.PartitionFunctionFactory;
+import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nonnull;
 import org.apache.commons.lang.math.IntRange;
-import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.codehaus.jackson.annotate.JsonProperty;
 
@@ -33,24 +31,43 @@ public class ColumnPartitionConfig {
   public static final String PARTITIONER_DELIMITER = "\t\t";
 
   private final String _functionName;
+  private int _numPartitions;
 
   /**
    * Constructor for the class.
    *
-   * @param functionName Name of the partition function, includes delimiter separated arguments. For example:
-   *                     "module\t\t20": Function name is module, with argument 20 (divisor).
+   * @param functionName Name of the partition function.
+   * @param numPartitions Number of partitions for this column.
    */
-  public ColumnPartitionConfig(@Nonnull @JsonProperty("functionName") String functionName) {
+  public ColumnPartitionConfig(@Nonnull @JsonProperty("functionName") String functionName,
+      @JsonProperty("numPartitions") int numPartitions) {
     _functionName = functionName;
+
+    Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > zero, specified: " + numPartitions);
+    _numPartitions = numPartitions;
   }
 
+  /**
+   * Returns the partition function name for the column.
+   *
+   * @return Partition function name.
+   */
   public String getFunctionName() {
     return _functionName;
   }
 
-  @JsonIgnore
-  public PartitionFunction getPartitionFunction() {
-    return PartitionFunctionFactory.getPartitionFunction(_functionName);
+  /**
+   * Returns the number of partitions for this column.
+   *
+   * @return Number of partitions.
+   */
+  public int getNumPartitions() {
+    return _numPartitions;
+  }
+
+  public void setNumPartitions(int numPartitions) {
+    Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > zero, specified: " + numPartitions);
+    _numPartitions = numPartitions;
   }
 
   /**

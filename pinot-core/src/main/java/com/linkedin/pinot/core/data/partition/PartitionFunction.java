@@ -27,4 +27,10 @@ public interface PartitionFunction {
    * @return partition id for the value.
    */
   int getPartition(Object value);
+
+  /**
+   * Returns the total number of possible partitions.
+   * @return Number of possible partitions.
+   */
+  int getNumPartitions();
 }

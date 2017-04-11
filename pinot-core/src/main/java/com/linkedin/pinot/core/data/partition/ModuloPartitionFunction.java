@@ -21,32 +21,27 @@ import com.google.common.base.Preconditions;
 /**
  * Modulo operation based partition function, where:
  * <ul>
- *   <li> partitionId = value % {@link #_divisor}</li>
+ *   <li> partitionId = value % {@link #_numPartitions}</li>
  * </ul>
  *
  */
 public class ModuloPartitionFunction implements PartitionFunction {
   private static final String NAME = "Modulo";
-  private final int _divisor;
+  private final int _numPartitions;
 
   /**
    * Constructor for the class.
-   * <ul>
-   *   <li> Requires the divisor to be passed in via args. </li>
-   * </ul>
-   *
-   * @param args Arguments for the function
+   * @param numPartitions Number of partitions.
    */
-  public ModuloPartitionFunction(String[] args) {
-    Preconditions.checkArgument(args.length == 1);
-    _divisor = Integer.parseInt(args[0]);
-    Preconditions.checkState(_divisor != 0, "Divisor for ModuloPartitionFunction cannot be zero.");
+  public ModuloPartitionFunction(int numPartitions) {
+    Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0, specified", numPartitions);
+    _numPartitions = numPartitions;
   }
 
   @Override
   public int getPartition(Object value) {
     if (value instanceof Integer) {
-      return ((Integer) value) % _divisor;
+      return ((Integer) value) % _numPartitions;
     } else {
       throw new IllegalArgumentException(
           "Illegal argument for partitioning, expected Integer, got: " + value.getClass().getName());
@@ -54,7 +49,12 @@ public class ModuloPartitionFunction implements PartitionFunction {
   }
 
   @Override
+  public int getNumPartitions() {
+    return _numPartitions;
+  }
+
+  @Override
   public String toString() {
-    return NAME + PartitionFunctionFactory.PARTITION_FUNCTION_DELIMITER + _divisor;
+    return NAME;
   }
 }

@@ -21,33 +21,36 @@ import kafka.producer.ByteArrayPartitioner;
 
 /**
  * Implementation of {@link Byte array partitioner}
- * {@link org.apache.kafka.producer.ByteArrayPartitioner}.
  *
  */
 public class ByteArrayPartitionFunction implements PartitionFunction {
   private static final String NAME = "ByteArray";
-  private final int _divisor;
+  private final int _numPartitions;
   public ByteArrayPartitioner _byteArrayPartitioner;
 
   /**
    * Constructor for the class.
-   * @param args Arguments for the partition function.
+   * @param numPartitions Number of partitions
    */
-  public ByteArrayPartitionFunction(String[] args) {
-    Preconditions.checkArgument(args.length == 1);
-    _divisor = Integer.parseInt(args[0]);
-    Preconditions.checkState(_divisor > 0, "Divisor for ByteArrayPartitionFunction cannot be <= zero.");
+  public ByteArrayPartitionFunction(int numPartitions) {
+    Preconditions.checkArgument(numPartitions > 0, "Number of partitions must be > 0, specified", numPartitions);
+    _numPartitions = numPartitions;
     _byteArrayPartitioner = new ByteArrayPartitioner(null);
   }
 
   @Override
   public int getPartition(Object valueIn) {
-    return _byteArrayPartitioner.partition(valueIn.toString().getBytes(), _divisor);
+    return _byteArrayPartitioner.partition(valueIn.toString().getBytes(), _numPartitions);
+  }
+
+  @Override
+  public int getNumPartitions() {
+    return _numPartitions;
   }
 
   @Override
   public String toString() {
-    return NAME + PartitionFunctionFactory.PARTITION_FUNCTION_DELIMITER + _divisor;
+    return NAME;
   }
 }
 

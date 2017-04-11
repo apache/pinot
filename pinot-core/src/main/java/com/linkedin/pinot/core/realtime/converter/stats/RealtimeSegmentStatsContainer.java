@@ -16,7 +16,7 @@
 
 package com.linkedin.pinot.core.realtime.converter.stats;
 
-import com.linkedin.pinot.core.indexsegment.generator.SegmentPartitionConfig;
+import com.linkedin.pinot.common.config.SegmentPartitionConfig;
 import com.linkedin.pinot.core.realtime.converter.RealtimeSegmentRecordReader;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
 import com.linkedin.pinot.core.segment.creator.ColumnStatistics;

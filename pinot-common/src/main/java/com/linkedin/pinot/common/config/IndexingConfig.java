@@ -40,10 +40,8 @@ public class IndexingConfig {
   private String _starTreeFormat;
   private String _columnMinMaxValueGeneratorMode;
   private List<String> _noDictionaryColumns;
+  private SegmentPartitionConfig _segmentPartitionConfig;
 
-  // Map with key as column name  value as  partition function
-  @Nullable
-  private Map<String, String> _partitioners;
 
   public List<String> getInvertedIndexColumns() {
     return _invertedIndexColumns;
@@ -125,13 +123,12 @@ public class IndexingConfig {
     _noDictionaryColumns = noDictionaryColumns;
   }
 
-  @Nullable
-  public Map<String, String> getPartitioners() {
-    return _partitioners;
+  public void setSegmentPartitionConfig(SegmentPartitionConfig config) {
+    _segmentPartitionConfig = config;
   }
 
-  public void setPartitioners(@Nullable Map<String, String> partitioners) {
-    _partitioners = partitioners;
+  public SegmentPartitionConfig getSegmentPartitionConfig() {
+    return _segmentPartitionConfig;
   }
 
   @Override

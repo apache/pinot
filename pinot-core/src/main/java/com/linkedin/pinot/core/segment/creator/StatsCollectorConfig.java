@@ -16,14 +16,13 @@
 package com.linkedin.pinot.core.segment.creator;
 
 import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.config.SegmentPartitionConfig;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.core.data.partition.PartitionFunction;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentPartitionConfig;
-import java.util.List;
+import com.linkedin.pinot.core.data.partition.PartitionFunctionFactory;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.apache.commons.lang.math.IntRange;
 
 
 /**
@@ -53,7 +52,25 @@ public class StatsCollectorConfig {
 
   @Nullable
   public PartitionFunction getPartitionFunction(String column) {
-    return (_segmentPartitionConfig != null) ? _segmentPartitionConfig.getPartitionFunction(column) : null;
+    if (_segmentPartitionConfig == null) {
+      return null;
+    }
+
+    String functionName = _segmentPartitionConfig.getFunctionName(column);
+    int numPartitions = _segmentPartitionConfig.getNumPartitions(column);
+    return (functionName != null) ? PartitionFunctionFactory.getPartitionFunction(functionName, numPartitions) : null;
+  }
+
+  /**
+   * Returns the number of partitions for the specified column.
+   * If segment partition config does not exist, returns {@link SegmentPartitionConfig#INVALID_NUM_PARTITIONS}.
+   *
+   * @param column Column for which to to return the number of partitions.
+   * @return Number of partitions for the column.
+   */
+  public int getNumPartitions(String column) {
+    return (_segmentPartitionConfig != null) ? _segmentPartitionConfig.getNumPartitions(column)
+        : SegmentPartitionConfig.INVALID_NUM_PARTITIONS;
   }
 
   @Nonnull
