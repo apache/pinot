@@ -391,10 +391,18 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
 
       _pinotHelixResourceManager.setExistingTableConfig(config, tableNameWithType, tableType);
       return responseRepresentation(Status.SUCCESS_OK, "{\"status\" : \"Success\"}");
-    } catch (IOException e) {
+    } catch(PinotHelixResourceManager.InvalidTableConfigException e) {
+      LOGGER.info("Failed to update configuration for table {}, message: {}", tableName, e.getMessage());
+      ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(
+          ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
+      return errorResponseRepresentation(Status.CLIENT_ERROR_BAD_REQUEST, e.getMessage());
+    } catch (Exception e) {
       LOGGER.error("Failed to update table configuration for table: {}", tableName, e);
+      ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(
+          ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
       return errorResponseRepresentation(Status.SERVER_ERROR_INTERNAL,
           "Internal error while updating table configuration");
+
     }
   }
 }

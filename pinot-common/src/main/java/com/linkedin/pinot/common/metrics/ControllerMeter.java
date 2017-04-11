@@ -36,6 +36,7 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   CONTROLLER_TABLE_INSTANCES_GET_ERROR("TableInstancesGetError", true),
   CONTROLLER_TABLE_ADD_ERROR("TableAddError", true),
   CONTROLLER_TABLE_GET_ERROR("TableGetError", true),
+  CONTROLLER_TABLE_UPDATE_ERROR("TableUpdateError", true),
   CONTROLLER_TABLE_SCHEMA_GET_ERROR("TableSchemaGetError", true),
   CONTROLLER_TABLE_SCHEMA_UPDATE_ERROR("TableSchemaUpdateError", true),
   CONTROLLER_TABLE_TENANT_UPDATE_ERROR("TableTenantUpdateError", true),
