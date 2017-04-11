@@ -59,7 +59,7 @@ DimensionTreeMapView.prototype = {
 
     const setRangeText = (selector, start, end, dateFormat, compareMode) => {
        selector.addClass("time-range").html(
-        `<span>${compareMode}</span> ${start.format(dateFormat)} &mdash; ${end.format(dateFormat)}`);
+        `<span class="time-range__type">${compareMode}</span> ${start.format(dateFormat)} &mdash; ${end.format(dateFormat)}`);
     };
 
     const baselineCallBack = (start, end, compareMode = constants.DATE_RANGE_CUSTOM) => {

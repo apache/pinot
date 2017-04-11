@@ -134,7 +134,8 @@ AnalysisView.prototype = {
     const showTime = this.viewParams.granularity !== constants.GRANULARITY_DAY;
     const analysis_options_template = $('#analysis-options-template').html();
     const compiled_analysis_options_template = Handlebars.compile(analysis_options_template);
-    $('#analysis-options-placeholder').html(compiled_analysis_options_template);
+    const analysisOptionsHTML = compiled_analysis_options_template(this.analysisModel);
+    $('#analysis-options-placeholder').html(analysisOptionsHTML);
 
     this.renderGranularity(metricId);
     this.renderDateRangePickers(showTime);
@@ -163,7 +164,7 @@ AnalysisView.prototype = {
       this.viewParams['compareMode'] = compareMode;
 
       $baselineRangeText.addClass("time-range").html(
-        `<span>${compareMode}</span> ${start.format(dateFormat)} &mdash; ${end.format(dateFormat)}`);
+        `<span class="time-range__type">${compareMode}</span> ${start.format(dateFormat)} &mdash; ${end.format(dateFormat)}`);
     };
     const setCurrentRange = (start, end, rangeType = constants.DATE_RANGE_CUSTOM) => {
       const $baselineRangePicker = $('#baseline-range');
@@ -185,7 +186,7 @@ AnalysisView.prototype = {
       }
 
       $currentRangeText.addClass("time-range").html(
-          `<span>${rangeType}</span> ${start.format(dateFormat)} &mdash; ${end.format(dateFormat)}`)
+          `<span class="time-range__type">${rangeType}</span> ${start.format(dateFormat)} &mdash; ${end.format(dateFormat)}`)
     };
 
     this.renderDatePicker($currentRange, setCurrentRange, currentStart, currentEnd, showTime, this.currentRange);

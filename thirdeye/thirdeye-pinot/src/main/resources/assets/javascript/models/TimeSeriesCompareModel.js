@@ -1,7 +1,6 @@
 function TimeSeriesCompareModel() {
   this.metricId;
   this.metricName;
-  this.dataset;
 
   this.dimension;
   this.filters;
@@ -45,7 +44,6 @@ TimeSeriesCompareModel.prototype = {
       this.baselineEnd = params.baselineEnd ? moment(params.baselineEnd) : this.baselineEnd;
       this.heatMapCurrentStart = params.heatMapCurrentStart ? moment(params.heatMapCurrentStart) : null;
       this.heatMapCurrentEnd = params.heatMapCurrentEnd ? moment(params.heatMapCurrentEnd) : null;
-      this.dataset = params.dataset || this.dataset;
       this.filters = Object.assign({}, params.filters);
       this.dimension = params.dimension || 'ALL';
       this.granularity = params.granularity;

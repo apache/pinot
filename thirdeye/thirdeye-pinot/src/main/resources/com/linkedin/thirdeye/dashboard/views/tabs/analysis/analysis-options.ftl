@@ -1,5 +1,9 @@
 <div class="analysis-card padding-all">
-    <div class="analysis-title bottom-buffer">Trend Analysis  (<label>metric: </label> {{netricName}} for <label> dataset: </label>{{dataset}}</div>
+    <div class="analysis-title bottom-buffer">Trend Analysis
+      <span class="analysis-details">
+        (for <label class="label-medium-semibold">Metric</label> {{metricName}} from <label class="label-medium-semibold">Dataset</label> {{dataset}})
+      </span>
+    </div>
     <div class="analysis-options">
       <div class="analysis-options__datepicker">
       <div class="datepicker-field">

@@ -1,6 +1,6 @@
 <div class="analysis-card padding-all top-buffer">
 	<div class="analysis-title bottom-buffer">Contribution Analysis
-		<span class="analysis-details"> (for <strong>Metric </strong>{{metricName}} and <strong>Dimensions </strong>{{#each heatmapFilters}}
+		<span class="analysis-details"> (for <label class="label-medium-semibold">Metric</label> {{metricName}} and <label class="label-medium-semibold">Dimensions</label>{{#each heatmapFilters}}
 			{{@key}}: {{this}}
 		{{else}}
 			ALL

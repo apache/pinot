@@ -330,6 +330,10 @@ hr {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+.time-range__type {
+  font-weight: normal;
+}
 .selectAutoWidth {
     width: auto
 }
@@ -857,7 +861,6 @@ text {
 
 .analysis-details {
   font-size: initial;
-  color: initial;
   font-weight: 300;
 }
 

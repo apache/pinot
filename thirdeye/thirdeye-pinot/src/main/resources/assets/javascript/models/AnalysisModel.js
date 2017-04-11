@@ -1,6 +1,7 @@
 function AnalysisModel() {
   this.metric;
   this.metricName;
+  this.dataset;
   this.metricId;
   this.timeRange;
   this.dateRange;
