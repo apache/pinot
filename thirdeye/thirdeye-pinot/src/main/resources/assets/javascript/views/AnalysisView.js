@@ -11,19 +11,21 @@ function AnalysisView(analysisModel) {
   this.compareMode = 'WoW';
 
   this.currentRange = () => {
+    const maxTime = this.analysisModel.maxTime;
     return {
-      'Last 24 Hours': [moment().subtract(2, 'hours').subtract(24, 'hours').startOf('hour'), 
-        moment().subtract(3, 'hours').endOf('hour')],
+      'Last 24 Hours': [moment().subtract(24, 'hours').startOf('hour'),
+        maxTime.clone()],
       'Yesterday': [moment().subtract(1, 'days').startOf('day'), moment().subtract(1, 'days').endOf('day')],
-      'Last 7 Days': [moment().subtract(6, 'days').startOf('day'), moment().endOf('day')],
-      'Last 30 Days': [moment().subtract(29, 'days').startOf('day'), moment().endOf('day')],
-      'This Month': [moment().startOf('month'), moment().endOf('month')],
+      'Last 7 Days': [moment().subtract(6, 'days').startOf('day'), maxTime.clone()],
+      'Last 30 Days': [moment().subtract(29, 'days').startOf('day'), maxTime.clone()],
+      'This Month': [moment().startOf('month'), maxTime.clone()],
       'Last Month': [moment().subtract(1, 'month').startOf('month'),
         moment().subtract(1, 'month').endOf('month')]
     };
   };
 
   this.baselineRange = () => {
+    const maxTime = this.analysisModel.maxTime;
     const range = {};
     constants.COMPARE_MODE_OPTIONS.forEach((options) => {
       const offset = constants.WOW_MAPPING[options];
@@ -145,7 +147,7 @@ AnalysisView.prototype = {
   },
 
   renderDateRangePickers(showTime) {
-    showTime = showTime || this.viewParams.granularity;
+    showTime = showTime || this.viewParams.granularity == constants.DATE_RANGE_CUSTOM;
     const $currentRangeText = $('#current-range span');
     const $baselineRangeText = $('#baseline-range span');
     const $currentRange = $('#current-range');
@@ -159,6 +161,8 @@ AnalysisView.prototype = {
     const setBaselineRange = (start, end, compareMode = constants.DEFAULT_COMPARE_MODE) => {
       const showTime = this.viewParams.granularity !== constants.GRANULARITY_DAY;
       const dateFormat = showTime ? constants.DATE_TIME_RANGE_FORMAT : constants.DATE_RANGE_FORMAT;
+      end = end.isBefore(this.analysisModel.maxTime) ? end : this.analysisModel.maxTime.clone();
+
       this.viewParams['baselineStart'] = start;
       this.viewParams['baselineEnd'] = end;
       this.viewParams['compareMode'] = compareMode;
@@ -170,6 +174,7 @@ AnalysisView.prototype = {
       const $baselineRangePicker = $('#baseline-range');
       const showTime = this.viewParams.granularity !== constants.GRANULARITY_DAY;
       const dateFormat = showTime ? constants.DATE_TIME_RANGE_FORMAT : constants.DATE_RANGE_FORMAT;
+      end = end.isBefore(this.analysisModel.maxTime) ? end : this.analysisModel.maxTime.clone();
 
       this.viewParams['currentStart'] = start;
       this.viewParams['currentEnd'] = end;
@@ -200,12 +205,12 @@ AnalysisView.prototype = {
     setBaselineRange(baselineStart, baselineEnd, this.viewParams.compareMode);
   },
 
-  renderDatePicker: function ($selector, callbackFun, initialStart, initialEnd, showTime, rangeGenerator){
+  renderDatePicker($selector, callbackFun, initialStart, initialEnd, showTime, rangeGenerator) {
     const ranges = rangeGenerator();
     $selector.daterangepicker({
       startDate: initialStart,
       endDate: initialEnd,
-      maxDate: moment(),
+      maxDate: this.maxTime,
       dateLimit: {
         days: 60
       },
@@ -245,7 +250,7 @@ AnalysisView.prototype = {
       this.viewParams['granularity'] = granularity;
       this.destroyDatePickers();
       this.renderDateRangePickers(showTime);
-    })
+    });
   },
 
   renderDimensions: function (metricId) {

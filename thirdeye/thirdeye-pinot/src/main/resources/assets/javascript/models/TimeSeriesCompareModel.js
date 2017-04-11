@@ -50,15 +50,46 @@ TimeSeriesCompareModel.prototype = {
     }
   },
 
+  formatDatesForTimeSeries() {
+    const granularity = this.granularity;
+    const granularityOffset = {
+        'DAYS': 'day',
+        'HOURS': 'hour',
+        '5_MINUTES': 'minute',
+      }[granularity];
+
+    return [
+      this.currentStart,
+      this.currentEnd,
+      this.baselineStart,
+      this.baselineEnd
+    ].map((date) => {
+      // if date.isAfter()
+      return date.clone().startOf(granularityOffset);
+    });
+  },
+
+      // granularity = {
+      //   'DAYS': ,
+      //   'HOURS':,
+      //   '5_MINUTES':,
+      // }
+      // ['currentStart', 'currentEnd', 'baselineStart', 'baselineEnd']
   update() {
     if (this.metricId) {
+      const [
+        currentStart,
+        currentEnd,
+        baselineStart,
+        baselineEnd
+      ] = this.formatDatesForTimeSeries();
       // update the timeseries data
       return dataService.fetchTimeseriesCompare(
         this.metricId,
-        this.currentStart,
-        this.currentEnd,
-        this.baselineStart,
-        this.baselineEnd,
+        currentStart,
+        currentEnd,
+        baselineStart,
+        baselineEnd,
         this.dimension,
         this.filters,
         this.granularity

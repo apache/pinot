@@ -131,18 +131,23 @@ DataService.prototype = {
       var response = this.postData(url, data);
     },
 
-    fetchGranularityForMetric: function (metricId) {
-      var url = "/data/agg/granularity/metric/"+metricId;
+    fetchGranularityForMetric(metricId) {
+      const url = `/data/agg/granularity/metric/${metricId}`;
       return this.getDataAsynchronous(url);
     },
 
-    fetchDimensionsForMetric : function(metricId) {
-      var url = "/data/autocomplete/dimensions/metric/"+metricId;
+    fetchDimensionsForMetric(metricId) {
+      const url = `/data/autocomplete/dimensions/metric/${metricId}`;
       return this.getDataAsynchronous(url);
     },
 
-    fetchFiltersForMetric : function(metricId) {
-      var url = "/data/autocomplete/filters/metric/" + metricId;
+    fetchFiltersForMetric(metricId) {
+      const url = `/data/autocomplete/filters/metric/${metricId}`;
+      return this.getDataAsynchronous(url);
+    },
+
+    fetchMaxTimeForMetric(metricId) {
+      const url = `/data/maxDataTime/metricId/${metricId}`;
       return this.getDataAsynchronous(url);
     },
 

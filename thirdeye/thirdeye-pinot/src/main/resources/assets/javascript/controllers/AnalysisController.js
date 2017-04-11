@@ -26,8 +26,7 @@ AnalysisController.prototype = {
   handleApplyAnalysisEvent(viewObject) {
     const params = viewObject.viewParams;
     this.timeSeriesCompareController.destroy();
-    // HASH_SERVICE.clear();
-    // params.tab = 'analysis';
+
     HASH_SERVICE.update(params);
     HASH_SERVICE.refreshWindowHashForRouting('analysis');
     this.initTimeSeriesController(HASH_SERVICE.getParams());

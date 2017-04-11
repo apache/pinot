@@ -333,6 +333,7 @@ hr {
 
 .time-range__type {
   font-weight: normal;
+  color: rgba(0,0,0,0.7);
 }
 .selectAutoWidth {
     width: auto
