@@ -1,8 +1,8 @@
 package com.linkedin.thirdeye.anomalydetection.model.data;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import org.joda.time.DateTimeZone;
 import org.joda.time.Duration;
 import org.joda.time.Interval;
 
@@ -10,6 +10,8 @@ public class SeasonalDataModel extends AbstractDataModel {
   public static final String SEASONAL_PERIOD = "seasonalPeriod";
   public static final String SEASONAL_SIZE = "seasonalSize";
   public static final String SEASONAL_UNIT = "seasonalUnit";
+  public static final String TIMEZONE = "timezone";
+  public static final String DEFAULT_TIMEZONE = "America/Los_Angeles";
 
   @Override
   public List<Interval> getAllDataIntervals(long monitoringWindowStartTime,
@@ -24,40 +26,14 @@ public class SeasonalDataModel extends AbstractDataModel {
   @Override
   public List<Interval> getTrainingDataIntervals(long monitoringWindowStartTime,
       long monitoringWindowEndTime) {
-    Interval currentInterval = new Interval(monitoringWindowStartTime, monitoringWindowEndTime);
+    DateTimeZone timezone = DateTimeZone.forID(getProperties().getProperty(TIMEZONE, DEFAULT_TIMEZONE));
+    Interval currentInterval = new Interval(monitoringWindowStartTime, monitoringWindowEndTime, timezone);
     int baselineCount = Integer.valueOf(getProperties().getProperty("seasonalPeriod"));
     // Gap between each season
     int seasonalSize = Integer.valueOf(getProperties().getProperty("seasonalSize"));
     TimeUnit seasonalUnit = TimeUnit.valueOf(getProperties().getProperty("seasonalUnit"));
     Duration gap = new Duration(seasonalUnit.toMillis(seasonalSize));
     // Compute the baseline intervals
-    return getBaselineIntervals(currentInterval, baselineCount, gap);
-  }
-
-  /**
-   * Given the interval of current time series, returns a list of baseline time series based on the
-   * specified baseline count and the gap between each time series.
-   *
-   * Examples:
-   * 1. Week-Over-Week: baselineCount = 1, gap = 7-DAYS
-   * 2. Week-Over-2Week: baselineCount = 1, gap = 14-DAYS
-   * 3. Week-Over-2Weeks: baselineCount = 2, gap = 7-DAYS
-   *
-   * @param currentInterval the interval of the current time series
-   * @param baselineCount the desired number of baselines
-   * @param gap the gap between the end of a time series to the begin of the subsequent time series
-   * @return a list of baseline time series
-   */
-  private List<Interval> getBaselineIntervals(Interval currentInterval, int baselineCount, Duration gap) {
-    List<Interval> baselineIntervals = new ArrayList<>();
-    long currentStart = currentInterval.getStartMillis();
-    long currentEnd = currentInterval.getEndMillis();
-    for (int i = 0; i < baselineCount; ++i) {
-      long baselineStart = currentStart - gap.getMillis() * (i + 1);
-      long baselineEnd = currentEnd - gap.getMillis() * (i + 1);
-      Interval baselineInterval = new Interval(baselineStart, baselineEnd);
-      baselineIntervals.add(baselineInterval);
-    }
-    return baselineIntervals;
+    return DataModelUtils.getBaselineIntervals(currentInterval, baselineCount, gap);
   }
 }
