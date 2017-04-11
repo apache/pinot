@@ -54,6 +54,7 @@ public interface TableDataManager {
   /**
    * Adds a segment from local disk into the OFFLINE table.
    */
+  // TODO: here maybe better to pass in indexDir instead of metadata
   void addSegment(@Nonnull SegmentMetadata segmentMetadata, @Nonnull IndexLoadingConfig indexLoadingConfig,
       @Nullable Schema schema)
       throws Exception;

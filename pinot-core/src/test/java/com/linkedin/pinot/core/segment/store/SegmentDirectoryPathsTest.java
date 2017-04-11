@@ -51,7 +51,7 @@ public class SegmentDirectoryPathsTest {
       File v3Dir = new File(tempDirectory, "v3");
       FileUtils.forceMkdir(v3Dir);
       File metaFile = new File(tempDirectory, V1Constants.MetadataKeys.METADATA_FILE_NAME);
-      try(FileOutputStream outputStream = new FileOutputStream(metaFile)) {
+      try (FileOutputStream outputStream = new FileOutputStream(metaFile)) {
         outputStream.write(10);
       }
       File v3MetaFile = new File(v3Dir, V1Constants.MetadataKeys.METADATA_FILE_NAME);
@@ -61,21 +61,39 @@ public class SegmentDirectoryPathsTest {
         File testMetaFile = SegmentDirectoryPaths.findMetadataFile(tempDirectory);
         Assert.assertNotNull(testMetaFile);
         Assert.assertEquals(testMetaFile.toString(), metaFile.toString());
-      }
-      {
-        // pass metadata file path directly
-        File testMetaFile = SegmentDirectoryPaths.findMetadataFile(metaFile);
+
+        testMetaFile = SegmentDirectoryPaths.findMetadataFile(tempDirectory, SegmentVersion.v1);
+        Assert.assertNotNull(testMetaFile);
         Assert.assertEquals(testMetaFile.toString(), metaFile.toString());
+
+        testMetaFile = SegmentDirectoryPaths.findMetadataFile(tempDirectory, SegmentVersion.v3);
+        Assert.assertNotNull(testMetaFile);
+        Assert.assertEquals(testMetaFile.toString(), v3MetaFile.toString());
       }
       {
         // drop v1 metadata file
         FileUtils.forceDelete(metaFile);
         File testMetaFile = SegmentDirectoryPaths.findMetadataFile(tempDirectory);
+        Assert.assertNotNull(testMetaFile);
+        Assert.assertEquals(testMetaFile.toString(), v3MetaFile.toString());
+
+        testMetaFile = SegmentDirectoryPaths.findMetadataFile(tempDirectory, SegmentVersion.v1);
+        Assert.assertNull(testMetaFile);
+
+        testMetaFile = SegmentDirectoryPaths.findMetadataFile(tempDirectory, SegmentVersion.v3);
+        Assert.assertNotNull(testMetaFile);
         Assert.assertEquals(testMetaFile.toString(), v3MetaFile.toString());
       }
       {
+        // drop v3 metadata file
         FileUtils.forceDelete(v3MetaFile);
         File testMetaFile = SegmentDirectoryPaths.findMetadataFile(tempDirectory);
+        Assert.assertNull(testMetaFile);
+
+        testMetaFile = SegmentDirectoryPaths.findMetadataFile(tempDirectory, SegmentVersion.v1);
+        Assert.assertNull(testMetaFile);
+
+        testMetaFile = SegmentDirectoryPaths.findMetadataFile(tempDirectory, SegmentVersion.v3);
         Assert.assertNull(testMetaFile);
       }
     } finally {
@@ -84,5 +102,4 @@ public class SegmentDirectoryPathsTest {
       }
     }
   }
-
 }
