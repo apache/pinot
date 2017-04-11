@@ -51,7 +51,6 @@ function HashParams() {
 HashParams.prototype = {
     init : function() {
       // appController
-      const currentTime = moment().subtract(2, 'hours');
       var paramNamesToDefaultValuesMap = {};
       paramNamesToDefaultValuesMap[this.TAB] = constants.TAB_ANOMALIES;
       this.controllerNameToParamNamesMap[this.APP_CONTROLLER] = paramNamesToDefaultValuesMap;
@@ -104,8 +103,8 @@ HashParams.prototype = {
       // analysis
       paramNamesToDefaultValuesMap = {};
       paramNamesToDefaultValuesMap[this.TAB] = constants.TAB_ANALYSIS;
-      paramNamesToDefaultValuesMap[this.ANALYSIS_CURRENT_START] = currentTime.clone().subtract(24, 'hours').startOf('hour');
-      paramNamesToDefaultValuesMap[this.ANALYSIS_CURRENT_END]= currentTime.clone().subtract(1, 'hours').endOf('hour');
+      paramNamesToDefaultValuesMap[this.ANALYSIS_CURRENT_START] = null;
+      paramNamesToDefaultValuesMap[this.ANALYSIS_CURRENT_END]= null;
       paramNamesToDefaultValuesMap[this.ANALYSIS_METRIC_ID]= null;
       paramNamesToDefaultValuesMap[this.ANALYSIS_BASELINE_START] = null;
       paramNamesToDefaultValuesMap[this.ANALYSIS_BASELINE_END] = null;

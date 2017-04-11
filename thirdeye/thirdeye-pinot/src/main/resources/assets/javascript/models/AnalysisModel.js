@@ -23,8 +23,8 @@ AnalysisModel.prototype = {
     this.granularity = null;
     this.dimension = null;
     this.filters = null;
-    this.currentEnd = moment().subtract(3, 'hours').endOf('hour');
-    this.currentStart = moment().subtract(2, 'hours').subtract(24, 'hours').startOf('hour');
+    this.currentEnd;
+    this.currentStart;
     this.baselineStart = null;
     this.baselineEnd = null;
     this.metricName = null;
@@ -103,9 +103,14 @@ AnalysisModel.prototype = {
   },
 
   setDefaultCurrentDateRange(granularity) {
+    if (this.currentEnd && this.currentStart && this.baselineStart && this.baselineEnd) return;
     if (granularity === constants.GRANULARITY_DAY) {
       this.currentStart = moment().subtract(29, 'days').startOf('day');
       this.currentEnd =  moment().endOf('day');
+    } else {
+      const currentTime = moment().subtract(2, 'hours');
+      this.currentStart = currentTime.clone().subtract(24, 'hours').startOf('hour')
+      this.currentEnd = currentTime.clone().subtract(1, 'hours').endOf('hour')
     }
     this.granularity = granularity;
     this.baselineStart = this.currentStart.clone().subtract(7, 'days');

@@ -31,7 +31,7 @@ Handlebars.registerHelper('formatDelta', function (a, b) {
 });
 
 /**
- * Displays human readable number 
+ * Displays human readable number
  * @param {number} num A number
  * @return {string} human readable number
  */
@@ -56,17 +56,17 @@ Handlebars.registerHelper('displayHour', function (date) {
 
 Handlebars.registerHelper('displayMonthDayHour', function (date) {
   var tz = getTimeZone();
-  return moment(date).tz(tz).format('M-D H');
+  return moment(date).tz(tz).format('M/D hA');
 });
 
 /**
- * Displays human readable date  
+ * Displays human readable date
  * @param {string} date A date
  * @return {string} human readable date
  */
 Handlebars.registerHelper('displayMonthDay', function (date) {
   var tz = getTimeZone();
-  return moment(date).tz(tz).format('M-D');
+  return moment(date).tz(tz).format('M/D');
 });
 
 Handlebars.registerHelper('if_eq', function(a, b, opts) {

@@ -188,11 +188,8 @@ AnalysisView.prototype = {
           `<span>${rangeType}</span> ${start.format(dateFormat)} &mdash; ${end.format(dateFormat)}`)
     };
 
-
-
     this.renderDatePicker($currentRange, setCurrentRange, currentStart, currentEnd, showTime, this.currentRange);
     this.renderDatePicker($baselineRange, setBaselineRange, baselineStart, baselineEnd, showTime, this.baselineRange);
-
 
     const currentDatePicker = $currentRange.data('daterangepicker')
     currentDatePicker.updateView();
