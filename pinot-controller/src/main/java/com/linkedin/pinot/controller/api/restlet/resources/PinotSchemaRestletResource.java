@@ -18,6 +18,7 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
 import org.apache.commons.fileupload.FileItem;
+import org.apache.commons.fileupload.FileUploadBase;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.io.FileUtils;
 import org.json.JSONArray;
@@ -145,7 +146,18 @@ public class PinotSchemaRestletResource extends BasePinotControllerRestletResour
   })
   private Representation uploadNewSchema()
       throws Exception {
-    File dataFile = getUploadContents();
+    File dataFile;
+    try {
+      dataFile = getUploadContents();
+    } catch (FileUploadBase.InvalidContentTypeException e) {
+      LOGGER.info("Invalid content type while adding new schema");
+      return errorResponseRepresentation(Status.CLIENT_ERROR_BAD_REQUEST,
+          e.getMessage());
+    } catch (Exception e) {
+      LOGGER.error("Error reading request body while adding new schema", e);
+      return errorResponseRepresentation(Status.SERVER_ERROR_INTERNAL,
+          "Error reading schema request body, error: " + e.getMessage());
+    }
 
     if (dataFile != null) {
       Schema schema = Schema.fromFile(dataFile);
@@ -207,7 +219,18 @@ public class PinotSchemaRestletResource extends BasePinotControllerRestletResour
   private Representation uploadSchema(
       @Parameter(name = "schemaName", in = "path", description = "The name of the schema to get")
       String schemaName) throws Exception {
-    File dataFile = getUploadContents();
+    File dataFile;
+    try {
+      dataFile = getUploadContents();
+    } catch (FileUploadBase.InvalidContentTypeException e) {
+      LOGGER.info("Invalid content type while updating schema {}", schemaName);
+      return errorResponseRepresentation(Status.CLIENT_ERROR_BAD_REQUEST,
+          e.getMessage());
+    } catch (Exception e) {
+      LOGGER.error("Error reading request body while updating new schema: {}", schemaName, e);
+      return errorResponseRepresentation(Status.SERVER_ERROR_INTERNAL,
+          "Error reading schema request body, error: " + e.getMessage());
+    }
 
     if (dataFile != null) {
       Schema schema = Schema.fromFile(dataFile);
@@ -251,11 +274,10 @@ public class PinotSchemaRestletResource extends BasePinotControllerRestletResour
     // FileUpload extension that will parse Restlet requests and
     // generates FileItems.
     final RestletFileUpload upload = new RestletFileUpload(factory);
-    final List<FileItem> items;
 
     // 3/ Request is parsed by the handler which generates a
     // list of FileItems
-    items = upload.parseRequest(getRequest());
+    final List<FileItem> items = upload.parseRequest(getRequest());
 
     for (FileItem fileItem : items) {
       String fieldName = fileItem.getFieldName();
