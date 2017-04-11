@@ -51,11 +51,11 @@ public class DetectionResourceHttpUtils extends AbstractResourceHttpUtils {
     return callJobEndpoint(req);
   }
 
-  public String runAutoTune(Long functionId, Long startTime, Long endTime, String autoTuneType, String holidayStarts, String holidayEnds) throws Exception {
+  public String runAutoTune(Long functionId, String startTimeIso, String endTimeIso, String autoTuneType, String holidayStarts, String holidayEnds) throws Exception {
     HttpPost req = new HttpPost(
         DETECTION_JOB_ENDPOINT + AUTOTUNE_FILTER + functionId
-            + "?startTime=" + startTime
-        + "&endTime=" + endTime
+            + "?start=" + startTimeIso
+        + "&end=" + endTimeIso
         + "&autoTuneType=" + autoTuneType
         + "&holidayStarts=" + holidayStarts
         + "&holidayEnds=" + holidayEnds
@@ -63,45 +63,45 @@ public class DetectionResourceHttpUtils extends AbstractResourceHttpUtils {
     return callJobEndpoint(req);
   }
 
-  public String getEvalStatsAlertFilter(Long functionId, Long startTime, Long endTime, String holidayStarts, String holidayEnds) throws Exception{
+  public String getEvalStatsAlertFilter(Long functionId, String startTimeIso, String endTimeIso, String holidayStarts, String holidayEnds) throws Exception{
     HttpPost req = new HttpPost(
         DETECTION_JOB_ENDPOINT + EVAL_FILTER + functionId
-            + "?startTime=" + startTime
-            + "&endTime=" + endTime
+            + "?start=" + startTimeIso
+            + "&end=" + endTimeIso
             + "&holidayStarts=" + holidayStarts
             + "&holidayEnds=" + holidayEnds
     );
     return callJobEndpoint(req);
   }
 
-  public String evalAutoTune(long autotuneId, long startTime, long endTime, String holidayStarts, String holidayEnds) throws Exception{
+  public String evalAutoTune(long autotuneId, String startTimeIso, String endTimeIso, String holidayStarts, String holidayEnds) throws Exception{
     HttpPost req = new HttpPost(
         DETECTION_JOB_ENDPOINT + EVAL_AUTOTUNE + autotuneId
-        + "?startTime=" + startTime
-        + "&endTime=" + endTime
+        + "?start=" + startTimeIso
+        + "&end=" + endTimeIso
         + "&holidayStarts=" + holidayStarts
         + "&holidayEnds=" + holidayEnds
     );
     return callJobEndpoint(req);
   }
 
-  public String checkHasLabels(long functionId, long startTime, long endTime, String holidayStarts, String holidayEnds) throws IOException {
+  public String checkHasLabels(long functionId, String startTimeIso, String endTimeIso, String holidayStarts, String holidayEnds) throws IOException {
     HttpPost req = new HttpPost(
         DETECTION_JOB_ENDPOINT + CHECK_HAS_LABELS + functionId
-        + "?startTime=" + startTime
-        + "&endTime=" + endTime
+        + "?start=" + startTimeIso
+        + "&end=" + endTimeIso
         + "&holidayStarts=" + holidayStarts
         + "&holidayEnds=" + holidayEnds
     );
     return callJobEndpoint(req);
   }
 
-  public String initAutoTune(Long functionId, Long startTime, Long endTime, String autoTuneType, int nExpected, String holidayStarts, String holidayEnds)
+  public String initAutoTune(Long functionId, String startTimeIso, String endTimeIso, String autoTuneType, int nExpected, String holidayStarts, String holidayEnds)
       throws IOException {
     HttpPost req = new HttpPost(
         DETECTION_JOB_ENDPOINT + INIT_AUTOTUNE + functionId
-            + "?startTime=" + startTime
-            + "&endTime=" + endTime
+            + "?start=" + startTimeIso
+            + "&end=" + endTimeIso
             + "&autoTuneType=" + autoTuneType
             + "&nExpected=" + nExpected
             + "&holidayStarts=" + holidayStarts

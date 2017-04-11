@@ -18,20 +18,20 @@ public class TestAlertFilterUtil {
     AlertFilterEvaluationUtil evaluator = new AlertFilterEvaluationUtil(dummyAlertFilter);
     // test data with 1 positive feedback, 1 negative feedback, other NA feedbacks
     List<MergedAnomalyResultDTO> anomalies = getMockMergedAnomalies(7,8);
-    evaluator.updatePrecisionAndRecall(anomalies);
-    assertEquals(evaluator.getPrecision(), 0.1111, 0.0001);
+    evaluator.updateWeighedPrecisionAndRecall(anomalies);
+    assertEquals(evaluator.getPrecision(), 0.1818, 0.0001);
     assertEquals(evaluator.getRecall(), 1, 0.0001);
 
     // test data with 1 positive feedback and others are NA feedbacks
     anomalies = getMockMergedAnomalies(6,-1);
-    evaluator.updatePrecisionAndRecall(anomalies);
-    assertEquals(evaluator.getPrecision(), 0.1111, 0.0001);
+    evaluator.updateWeighedPrecisionAndRecall(anomalies);
+    assertEquals(evaluator.getPrecision(), 0.2, 0.0001);
     assertEquals(evaluator.getRecall(), 1, 0.0001);
 
     // test data with 0 positive feedback, 1 negative feedback and others are NA feedbacks
     anomalies = getMockMergedAnomalies(-1,6);
     try{
-      evaluator.updatePrecisionAndRecall(anomalies);
+      evaluator.updateWeighedPrecisionAndRecall(anomalies);
       fail("Should throw exception");
     } catch (Exception e) {
       assertEquals("No true labels in dataset. Check data", e.getMessage());

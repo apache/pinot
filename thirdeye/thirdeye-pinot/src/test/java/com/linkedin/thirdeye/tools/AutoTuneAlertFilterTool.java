@@ -91,7 +91,7 @@ public class AutoTuneAlertFilterTool {
   }
 
 
-  public String getTunedAlertFilterByFunctionId(Long functionId, Long startTimeISO, Long endTimeISO, String AUTOTUNE_TYPE, String holidayStarts, String holidayEnds) throws Exception{
+  public String getTunedAlertFilterByFunctionId(Long functionId, String startTimeISO, String endTimeISO, String AUTOTUNE_TYPE, String holidayStarts, String holidayEnds) throws Exception{
     DetectionResourceHttpUtils httpUtils = new DetectionResourceHttpUtils(LOCALHOST, APPLICATION_PORT);
     try {
       return httpUtils.runAutoTune(functionId, startTimeISO, endTimeISO, AUTOTUNE_TYPE, holidayStarts, holidayEnds);
@@ -102,20 +102,20 @@ public class AutoTuneAlertFilterTool {
   }
 
 
-  public String evaluateAlertFilterByFunctionId(Long functionId, Long startTime, Long endTime, String holidayStarts, String holidayEnds){
+  public String evaluateAlertFilterByFunctionId(Long functionId, String startTimeISO, String endTimeISO, String holidayStarts, String holidayEnds){
     DetectionResourceHttpUtils httpUtils = new DetectionResourceHttpUtils(LOCALHOST, APPLICATION_PORT);
     try{
-      return httpUtils.getEvalStatsAlertFilter(functionId, startTime, endTime, holidayStarts, holidayEnds);
+      return httpUtils.getEvalStatsAlertFilter(functionId, startTimeISO, endTimeISO, holidayStarts, holidayEnds);
     } catch (Exception e) {
       LOG.warn(e.getMessage());
     }
     return null;
   }
 
-  public String evaluateAlertFilterByAutoTuneId(Long autotuneId, Long startTime, Long endTime, String holidayStarts, String holidayEnds){
+  public String evaluateAlertFilterByAutoTuneId(Long autotuneId, String startTimeISO, String endTimeISO, String holidayStarts, String holidayEnds){
     DetectionResourceHttpUtils httpUtils = new DetectionResourceHttpUtils(LOCALHOST, APPLICATION_PORT);
     try{
-      return httpUtils.evalAutoTune(autotuneId, startTime, endTime, holidayStarts, holidayEnds);
+      return httpUtils.evalAutoTune(autotuneId, startTimeISO, endTimeISO, holidayStarts, holidayEnds);
     } catch (Exception e){
       LOG.warn(e.getMessage());
     }
@@ -136,19 +136,19 @@ public class AutoTuneAlertFilterTool {
   }
 
 
-  public EvaluationNode evalAnomalyFunctionAlertFilterToEvalNode(Long functionID, Long startTime, Long endTime, String holidayStarts, String holidayEnds)
+  public EvaluationNode evalAnomalyFunctionAlertFilterToEvalNode(Long functionID, String startTimeISO, String endTimeISO, String holidayStarts, String holidayEnds)
       throws IOException, JSONException {
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(functionID);
     String metricName = anomalyFunctionSpec.getFunctionName();
     String collection = anomalyFunctionSpec.getCollection();
     String metricAlertFilter = (anomalyFunctionSpec.getAlertFilter() == null)? "null": anomalyFunctionSpec.getAlertFilter().toString().replaceAll(CSVSEPERATOR, CSVESCAPE);
 
-    String evals = evaluateAlertFilterByFunctionId(functionID, startTime, endTime, holidayStarts, holidayEnds);
+    String evals = evaluateAlertFilterByFunctionId(functionID, startTimeISO, endTimeISO, holidayStarts, holidayEnds);
     Properties alertFilterEvaluations = jsonStringToProperties(evals);
     return new EvaluationNode(functionID, metricName, collection, metricAlertFilter, alertFilterEvaluations);
   }
 
-  public EvaluationNode evalAutoTunedAlertFilterToEvalNode(Long autotuneId, Long startTime, Long endTime, String holidayStarts, String holidayEnds) throws IOException, JSONException{
+  public EvaluationNode evalAutoTunedAlertFilterToEvalNode(Long autotuneId, String startTimeISO, String endTimeISO, String holidayStarts, String holidayEnds) throws IOException, JSONException{
     AutotuneConfigDTO autotuneConfigDTO = autotuneConfigDAO.findById(autotuneId);
     long functionId = autotuneConfigDTO.getFunctionId();
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(functionId);
@@ -156,7 +156,7 @@ public class AutoTuneAlertFilterTool {
     String collection = anomalyFunctionSpec.getCollection();
     String metricAlertFilter = autotuneConfigDTO.getConfiguration().toString().replaceAll(CSVSEPERATOR, CSVESCAPE);
 
-    String evals = evaluateAlertFilterByAutoTuneId(autotuneId, startTime, endTime, holidayStarts, holidayEnds);
+    String evals = evaluateAlertFilterByAutoTuneId(autotuneId, startTimeISO, endTimeISO, holidayStarts, holidayEnds);
     Properties alertFilterEvaluations = jsonStringToProperties(evals);
     return new EvaluationNode(autotuneId, metricName, collection, metricAlertFilter, alertFilterEvaluations);
   }
@@ -184,17 +184,17 @@ public class AutoTuneAlertFilterTool {
     return functionIds;
   }
 
-  public Boolean checkAnomaliesHasLabels(Long functionId, Long startTime, Long endTime, String holidayStarts, String holidayEnds){
+  public Boolean checkAnomaliesHasLabels(Long functionId, String startTimeISO, String endTimeISO, String holidayStarts, String holidayEnds){
     DetectionResourceHttpUtils httpUtils = new DetectionResourceHttpUtils(LOCALHOST, APPLICATION_PORT);
     try{
-      return Boolean.valueOf(httpUtils.checkHasLabels(functionId, startTime, endTime, holidayStarts, holidayEnds));
+      return Boolean.valueOf(httpUtils.checkHasLabels(functionId, startTimeISO, endTimeISO, holidayStarts, holidayEnds));
     } catch (Exception e) {
       LOG.warn(e.getMessage());
     }
     return null;
   }
 
-  public String getInitAutoTuneByFunctionId(Long functionId, Long startTimeISO, Long endTimeISO, String AUTOTUNE_TYPE, int nExpected,String holidayStarts, String holidayEnds) throws Exception{
+  public String getInitAutoTuneByFunctionId(Long functionId, String startTimeISO, String endTimeISO, String AUTOTUNE_TYPE, int nExpected,String holidayStarts, String holidayEnds) throws Exception{
     DetectionResourceHttpUtils httpUtils = new DetectionResourceHttpUtils(LOCALHOST, APPLICATION_PORT);
     try {
       return httpUtils.initAutoTune(functionId, startTimeISO, endTimeISO, AUTOTUNE_TYPE, nExpected, holidayStarts, holidayEnds);
