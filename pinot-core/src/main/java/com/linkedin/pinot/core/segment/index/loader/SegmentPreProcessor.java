@@ -17,6 +17,7 @@ package com.linkedin.pinot.core.segment.index.loader;
 
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGenerator;
 import com.linkedin.pinot.core.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
@@ -37,7 +38,9 @@ import javax.annotation.Nullable;
  * <p>- Use {@link DefaultColumnHandler} to update auto-generated default columns.
  */
 public class SegmentPreProcessor implements AutoCloseable {
+  private final SegmentVersion _segmentVersion;
   private final File _segmentDirectoryPath;
+  private final File _indexDir;
   private final IndexLoadingConfig _indexLoadingConfig;
   private final Schema _schema;
   private final SegmentDirectory _segmentDirectory;
@@ -46,12 +49,15 @@ public class SegmentPreProcessor implements AutoCloseable {
   public SegmentPreProcessor(@Nonnull File indexDir, @Nonnull IndexLoadingConfig indexLoadingConfig,
       @Nullable Schema schema)
       throws Exception {
-    // Note: here we should already converted the segment into desired version, use the version in segment metadata
+    // Note: here we should already converted the segment into desired version, use the version in index loading config
+    _segmentVersion = indexLoadingConfig.getSegmentVersion();
 
-    _segmentMetadata = new SegmentMetadataImpl(indexDir);
-    _segmentDirectoryPath = SegmentDirectoryPaths.segmentDirectoryFor(indexDir, _segmentMetadata.getSegmentVersion());
+    _segmentDirectoryPath = SegmentDirectoryPaths.segmentDirectoryFor(indexDir, _segmentVersion);
+    _segmentMetadata = new SegmentMetadataImpl(indexDir, _segmentVersion);
+    _indexDir = indexDir;
     _indexLoadingConfig = indexLoadingConfig;
     _schema = schema;
+
     // Always use mmap to load the segment because it is safest and performs well without impact from -Xmx params.
     // This is not the final load of the segment.
     _segmentDirectory = SegmentDirectory.createFromLocalFS(_segmentDirectoryPath, _segmentMetadata, ReadMode.mmap);
@@ -86,7 +92,7 @@ public class SegmentPreProcessor implements AutoCloseable {
           // NOTE: This step may modify the segment metadata. When adding new steps after this, reload the metadata.
 
           // Reload the metadata.
-          _segmentMetadata = new SegmentMetadataImpl(_segmentDirectoryPath);
+          _segmentMetadata = new SegmentMetadataImpl(_indexDir, _segmentVersion);
           ColumnMinMaxValueGenerator columnMinMaxValueGenerator =
               new ColumnMinMaxValueGenerator(_segmentDirectoryPath, _segmentMetadata, segmentWriter,
                   columnMinMaxValueGeneratorMode);

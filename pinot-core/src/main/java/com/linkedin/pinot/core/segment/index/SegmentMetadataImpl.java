@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.segment.index;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.data.MetricFieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
@@ -44,6 +45,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
@@ -94,18 +96,56 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private long _segmentStartTime;
   private long _segmentEndTime;
 
+  /**
+   * Load segment metadata based on the segment version passed in.
+   * <p>Index directory passed in should be top level segment directory.
+   */
+  public SegmentMetadataImpl(@Nonnull File indexDir, @Nonnull SegmentVersion segmentVersion)
+      throws ConfigurationException, IOException {
+    _metadataFile = SegmentDirectoryPaths.findMetadataFile(indexDir, segmentVersion);
+    Preconditions.checkNotNull(_metadataFile, "Cannot find segment metadata file under directory: %s", indexDir);
+
+    _segmentMetadataPropertiesConfiguration = new PropertiesConfiguration(_metadataFile);
+    _columnMetadataMap = new HashMap<>();
+    _allColumns = new HashSet<>();
+    _schema = new Schema();
+
+    // For segment reload, we will load segment from the temporary index directory, but we need to set indexDir to the
+    // original index directory
+    String indexDirToLoad = indexDir.getPath();
+    if (indexDirToLoad.endsWith(RELOAD_TEMP_DIR_SUFFIX)) {
+      _indexDir = indexDirToLoad.substring(0, indexDirToLoad.length() - RELOAD_TEMP_DIR_SUFFIX.length());
+    } else {
+      _indexDir = indexDirToLoad;
+    }
+
+    init();
+    File creationMetaFile = SegmentDirectoryPaths.findCreationMetaFile(indexDir, segmentVersion);
+    if (creationMetaFile != null) {
+      loadCreationMeta(creationMetaFile);
+    }
+
+    setTimeInfo();
+    _totalDocs = _segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS);
+    _totalRawDocs =
+        _segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_RAW_DOCS,
+            _totalDocs);
+  }
+
+  /**
+   * Load segment metadata in any segment version.
+   * <p>Index directory passed in should be top level segment directory.
+   * <p>If segment metadata file exists in multiple segment version, load the one in lowest segment version.
+   */
+  // TODO: check if loading file in highest segment version is better
   public SegmentMetadataImpl(File indexDir)
       throws ConfigurationException, IOException {
-    LOGGER.debug("SegmentMetadata location: {}", indexDir);
-    File tmpMetadataFile = SegmentDirectoryPaths.findMetadataFile(indexDir);
-    if (tmpMetadataFile == null) {
-      LOGGER.warn("Metadata file: {} does not exist in directory: {}", tmpMetadataFile, indexDir);
-      tmpMetadataFile = new File(indexDir, MetadataKeys.METADATA_FILE_NAME);
-    }
-    _metadataFile = tmpMetadataFile;
+    _metadataFile = SegmentDirectoryPaths.findMetadataFile(indexDir);
+    Preconditions.checkNotNull(_metadataFile, "Cannot find segment metadata file under directory: %s", indexDir);
+
     _segmentMetadataPropertiesConfiguration = new PropertiesConfiguration(_metadataFile);
-    _columnMetadataMap = new HashMap<String, ColumnMetadata>();
-    _allColumns = new HashSet<String>();
+    _columnMetadataMap = new HashMap<>();
+    _allColumns = new HashSet<>();
     _schema = new Schema();
 
     // For segment reload, we will load segment from the temporary index directory, but we need to set indexDir to the
@@ -124,10 +164,10 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     }
 
     setTimeInfo();
-    LOGGER.debug("loaded metadata for {}", indexDir.getName());
     _totalDocs = _segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_DOCS);
-    _totalRawDocs = _segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_RAW_DOCS,
-        _totalDocs);
+    _totalRawDocs =
+        _segmentMetadataPropertiesConfiguration.getInt(V1Constants.MetadataKeys.Segment.SEGMENT_TOTAL_RAW_DOCS,
+            _totalDocs);
   }
 
   public SegmentMetadataImpl(OfflineSegmentZKMetadata offlineSegmentZKMetadata) {

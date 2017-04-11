@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.core.startree;
 
-import com.linkedin.pinot.core.indexsegment.IndexSegment;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.store.SegmentDirectoryPaths;
 import java.io.File;
 import java.io.IOException;
@@ -34,7 +34,6 @@ public class TestStarTreeConverter {
   private static final String SEGMENT_DIR_NAME = TMP_DIR + File.separator + "StarTreeFormatConverter";
   private static final String SEGMENT_NAME = "starTreeSegment";
 
-  private IndexSegment _segment;
   private File _indexDir;
 
   /**
@@ -45,8 +44,6 @@ public class TestStarTreeConverter {
   public void setup()
       throws Exception {
     StarTreeIndexTestSegmentHelper.buildSegment(SEGMENT_DIR_NAME, SEGMENT_NAME, false);
-    _segment = StarTreeIndexTestSegmentHelper.loadSegment(SEGMENT_DIR_NAME, SEGMENT_NAME);
-    // we've v3 segment but giving parent segment name as indexDir. Code should handle this
     _indexDir = new File(SEGMENT_DIR_NAME, SEGMENT_NAME);
   }
 
@@ -63,24 +60,24 @@ public class TestStarTreeConverter {
 
     // Convert from ON_HEAP to ON_HEAP, this should be no-op.
     StarTreeSerDe.convertStarTreeFormatIfNeeded(_indexDir, StarTreeFormatVersion.ON_HEAP);
-    assertStarTreeVersion(_indexDir, StarTreeFormatVersion.ON_HEAP);
+    assertStarTreeVersion(StarTreeFormatVersion.ON_HEAP);
 
     // Convert from ON_HEAP to OFF_HEAP.
     StarTreeSerDe.convertStarTreeFormatIfNeeded(_indexDir, StarTreeFormatVersion.OFF_HEAP);
-    assertStarTreeVersion(_indexDir, StarTreeFormatVersion.OFF_HEAP);
+    assertStarTreeVersion(StarTreeFormatVersion.OFF_HEAP);
 
     // Convert from OFF_HEAP to OFF_HEAP, this should be no-op
     StarTreeSerDe.convertStarTreeFormatIfNeeded(_indexDir, StarTreeFormatVersion.OFF_HEAP);
-    assertStarTreeVersion(_indexDir, StarTreeFormatVersion.OFF_HEAP);
+    assertStarTreeVersion(StarTreeFormatVersion.OFF_HEAP);
 
     // Convert from OFF_HEAP to ON_HEAP.
     StarTreeSerDe.convertStarTreeFormatIfNeeded(_indexDir, StarTreeFormatVersion.ON_HEAP);
-    assertStarTreeVersion(_indexDir, StarTreeFormatVersion.ON_HEAP);
+    assertStarTreeVersion(StarTreeFormatVersion.ON_HEAP);
   }
 
-  private void assertStarTreeVersion(File indexDir, StarTreeFormatVersion expectedVersion)
+  private void assertStarTreeVersion(StarTreeFormatVersion expectedVersion)
       throws IOException {
-    File starTreeFile = SegmentDirectoryPaths.findStarTreeFile(_indexDir);
+    File starTreeFile = SegmentDirectoryPaths.findStarTreeFile(_indexDir, SegmentVersion.v3);
     Assert.assertEquals(StarTreeSerDe.getStarTreeVersion(starTreeFile), expectedVersion);
   }
 
