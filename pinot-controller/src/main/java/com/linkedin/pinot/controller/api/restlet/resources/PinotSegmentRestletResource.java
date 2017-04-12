@@ -119,14 +119,14 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
       String tableType = reference.getQueryAsForm().getValues(TABLE_TYPE);
 
       if (tableType != null && !isValidTableType(tableType)) {
-        LOGGER.error(INVALID_TABLE_TYPE_ERROR);
+        LOGGER.info(INVALID_TABLE_TYPE_ERROR);
         setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
         return new StringRepresentation(INVALID_TABLE_TYPE_ERROR);
       }
 
       if (state != null) {
         if (!isValidState(state)) {
-          LOGGER.error(INVALID_STATE_ERROR);
+          LOGGER.info(INVALID_STATE_ERROR);
           setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
           return new StringRepresentation(INVALID_STATE_ERROR);
         } else {
