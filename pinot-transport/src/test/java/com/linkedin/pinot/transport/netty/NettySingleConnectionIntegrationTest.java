@@ -312,14 +312,11 @@ public class NettySingleConnectionIntegrationTest {
   private void closeClientConnection()
       throws Exception {
     _nettyTCPClientConnection.close();
-    // Sleep to ensure that server detects the connection has been closed
-    Uninterruptibles.sleepUninterruptibly(100L, TimeUnit.MILLISECONDS);
   }
 
   private void closeServerConnection()
       throws Exception {
-    _nettyTCPServer.shutdownGracefully();
-    // Sleep to ensure that server is fully shut down
-    Uninterruptibles.sleepUninterruptibly(1L, TimeUnit.SECONDS);
+    // Wait for at most 1 minute to shutdown the server completely
+    _nettyTCPServer.waitForShutdown(60 * 1000L);
   }
 }
