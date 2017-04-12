@@ -12,11 +12,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class AnomalyTimelinesView {
   private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-  public static String TIME_BUCKETS = "timeBuckets";
-  public static String SUMMARY = "summary";
-  public static String CURRENT_VALUES = "currentValues";
-  public static String BASELINE_VALUES = "baselineValues";
-
 
   List<TimeBucket> timeBuckets = new ArrayList<>();
   Map<String, String> summary = new HashMap<>();
