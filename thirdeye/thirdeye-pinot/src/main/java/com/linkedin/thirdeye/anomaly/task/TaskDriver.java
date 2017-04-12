@@ -116,13 +116,16 @@ public class TaskDriver {
             .findByStatusOrderByCreateTime(TaskStatus.WAITING, driverConfiguration.getTaskFetchSizeCap(),
                 orderAscending);
       } catch (Exception e) {
-        LOG.error("Exception found in fetching new tasks, sleeping for few seconds", e);
+        LOG.warn("Exception found in fetching new tasks, sleeping for few seconds", e);
         try {
           // TODO : Add better wait / clear call
           Thread.sleep(driverConfiguration.getTaskFailureDelayInMillis());
         } catch (InterruptedException e1) {
-          LOG.error(e1.getMessage(), e1);
-          return acquiredTask;
+          if (shutdown) {
+            return null;
+          } else {
+            LOG.error(e1.getMessage(), e1);
+          }
         }
       }
       if (anomalyTasks.size() > 0) {
@@ -138,8 +141,11 @@ public class TaskDriver {
         try {
           Thread.sleep(delay);
         } catch (InterruptedException e) {
-          LOG.error(e.getMessage(), e);
-          return acquiredTask;
+          if (shutdown) {
+            return null;
+          } else {
+            LOG.error(e.getMessage(), e);
+          }
         }
       }
 
