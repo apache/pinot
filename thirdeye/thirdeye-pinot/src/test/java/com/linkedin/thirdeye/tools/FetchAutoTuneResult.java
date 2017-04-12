@@ -23,13 +23,13 @@ public class FetchAutoTuneResult {
    * evaluate alert filter using evaluation endpoint
    * @param args
    * args[0]: Mode of AutoTune, default value is: AUTOTUNE, (If initiate auto tuning, use INITTUNE)
-   * args[1]: Start time of merged anomaly in milliseconds
-   * args[2]: End time of merged anomaly in milliseconds
+   * args[1]: Start time of merged anomaly in ISO time format
+   * args[2]: End time of merged anomaly in ISO time format
    * args[3]: Path to Persistence File
    * args[4]: Collection Name
    * args[6]: File directory (read and write file)
-   * args[7]: Holiday periods to remove from dataset. Holiday starts in format: milliseconds1,milliseconds2
-   * args[8]: Holiday periods to remove from dataset. Holiday ends in format: milliseconds1,milliseconds2
+   * args[7]: Holiday periods to remove from dataset. Holiday starts in ISO time format: start1,start2,...
+   * args[8]: Holiday periods to remove from dataset. Holiday ends in format: end1,end2,...
    * @throws Exception
    */
   public static void main(String[] args) throws Exception{
@@ -50,7 +50,6 @@ public class FetchAutoTuneResult {
     AutoTuneAlertFilterTool executor = new AutoTuneAlertFilterTool(new File(path2PersistenceFile));
     List<Long> functionIds = executor.getAllFunctionIdsByCollection(Collection);
 
-
     if(AUTOTUNE_MODE.equals(AUTOTUNE)){
       reTuneAndEvalToCSVByCollection(executor, functionIds, STARTTIME, ENDTIME, holidayStarts, holidayEnds, DIR_TO_FILE + Collection + CSVSUFFIX);
     } else if (AUTOTUNE_MODE.equals(INITTUNE)){
@@ -61,6 +60,17 @@ public class FetchAutoTuneResult {
 
   }
 
+  /**
+   * Tool to retune alert filter
+   * @param executor AutoTuneAlertFilterTool class
+   * @param functionIds a list of functionIds to retune
+   * @param STARTTIME start time to tune in ISO format
+   * @param ENDTIME end time to tune in ISO format
+   * @param holidayStarts holidays anomalies can be removed: the list of holiday starts
+   * @param holidayEnds holidays anomalies can be removed: the list of holiday starts
+   * @param fileName the file name to write to
+   * @throws Exception
+   */
   public static void reTuneAndEvalToCSVByCollection(AutoTuneAlertFilterTool executor, List<Long> functionIds,
       String STARTTIME, String ENDTIME, String holidayStarts, String holidayEnds, String fileName)
       throws Exception {
@@ -71,8 +81,7 @@ public class FetchAutoTuneResult {
       // evaluate current alert filter
       String origEvals = executor.evalAnomalyFunctionAlertFilterToEvalNode(functionId, STARTTIME, ENDTIME, holidayStarts, holidayEnds).toCSVString();
 
-      Long autotuneId;
-      autotuneId = Long.valueOf(executor.getTunedAlertFilterByFunctionId(functionId, STARTTIME, ENDTIME, AUTOTUNE, holidayStarts, holidayEnds));
+      Long autotuneId = Long.valueOf(executor.getTunedAlertFilterByFunctionId(functionId, STARTTIME, ENDTIME, AUTOTUNE, holidayStarts, holidayEnds));
 
       boolean isUpdated = autotuneId != -1;
       String tunedEvals = "";
@@ -95,7 +104,17 @@ public class FetchAutoTuneResult {
     LOG.info("Write evaluations to file: {}", fileName);
   }
 
-
+  /**
+   * Tool to initiate alert filter
+   * @param executor AutoTuneAlertFilterTool class
+   * @param functionIds a list of functionIds to retune
+   * @param STARTTIME start time to tune in ISO format
+   * @param ENDTIME end time to tune in ISO format
+   * @param holidayStarts holidays anomalies can be removed: the list of holiday starts
+   * @param holidayEnds holidays anomalies can be removed: the list of holiday starts
+   * @param fileName the file name to write to
+   * @throws Exception
+   */
   public static void initFilterAndEvalToCSVByCollection(AutoTuneAlertFilterTool executor, List<Long> functionIds,
       String STARTTIME, String ENDTIME, String holidayStarts, String holidayEnds, String fileName) throws Exception {
     Map<String, String> outputMap = new HashMap<>();

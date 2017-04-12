@@ -33,7 +33,7 @@ public class AlertFilterEvaluationUtil {
   public static final String TRUEANOMALIES = "trueAnomalies";
   public static final String FALSEALARM = "falseAlarm";
   public static final String NONACTIONABLE = "nonActionable";
-  public static final Double WEIGHT_OF_NULL_LABEL = 0.5;
+  public static final Double WEIGHT_OF_NULL_LABEL = 0.5; // the weight used for NA labeled data point when calculating precision
 
   public double getPrecision(){return this.precision;}
   public double getRecall(){return this.recall;}
