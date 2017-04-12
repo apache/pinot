@@ -139,8 +139,8 @@ public class SegmentCompletionManager {
         _fsmMap.put(segmentNameStr, fsm);
       } catch (Exception e) {
         // Server gone wonky. Segment does not exist in propstore
-        LOGGER.error("Exception reading segment read from propertystore {}", segmentNameStr, e);
-        throw new RuntimeException("Segment read from propertystore " + segmentNameStr, e);
+        LOGGER.error("Exception creating FSM for segment {}", segmentNameStr, e);
+        throw new RuntimeException("Exception creating FSM for segment " + segmentNameStr, e);
       }
     }
     return fsm;
