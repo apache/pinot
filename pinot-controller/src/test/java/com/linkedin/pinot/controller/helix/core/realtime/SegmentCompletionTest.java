@@ -249,6 +249,18 @@ public class SegmentCompletionTest {
     testHappyPath(5L);
   }
 
+  @Test
+  public void testExceptionInConsumedMessage() throws Exception {
+    segmentManager._segmentMetadata = null;
+
+    SegmentCompletionProtocol.Response response;
+    Request.Params params;
+    segmentCompletionMgr._secconds = 10;
+    params = new Request.Params().withInstanceId(s1).withOffset(s1Offset).withSegmentName(segmentNameStr);
+    response = segmentCompletionMgr.segmentConsumed(params);
+    Assert.assertEquals(response.getStatus(), ControllerResponseStatus.FAILED);
+  }
+
   public void testHappyPath(long startTime) throws  Exception {
     SegmentCompletionProtocol.Response response;
     Request.Params params;
