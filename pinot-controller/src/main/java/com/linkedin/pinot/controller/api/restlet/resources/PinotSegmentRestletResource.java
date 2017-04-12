@@ -119,14 +119,14 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
       String tableType = reference.getQueryAsForm().getValues(TABLE_TYPE);
 
       if (tableType != null && !isValidTableType(tableType)) {
-        LOGGER.error(INVALID_TABLE_TYPE_ERROR);
+        LOGGER.info(INVALID_TABLE_TYPE_ERROR);
         setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
         return new StringRepresentation(INVALID_TABLE_TYPE_ERROR);
       }
 
       if (state != null) {
         if (!isValidState(state)) {
-          LOGGER.error(INVALID_STATE_ERROR);
+          LOGGER.info(INVALID_STATE_ERROR);
           setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
           return new StringRepresentation(INVALID_STATE_ERROR);
         } else {
@@ -253,7 +253,8 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
       } else if (realtimeSegments.contains(segmentName)) {
         tableType = "REALTIME";
       } else {
-        throw new UnsupportedOperationException(segmentName + " does not exist");
+        LOGGER.info("This segment does not exist: " + segmentName);
+        return new StringRepresentation("This segment does not exist: " + segmentName);
       }
     }
 
@@ -333,8 +334,8 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
           segmentsToToggle.addAll(offlineSegments);
         }
       } else {
-        throw new UnsupportedOperationException("There is no offline table for " + tableName);
-      }
+        LOGGER.info("There is no offline table for: " + tableName);
+        return new StringRepresentation("There is no offline table for: " + tableName);      }
     }
 
     PinotResourceManagerResponse resourceManagerResponse = toggleSegmentsForTable(segmentsToToggle, tableNameWithType, segmentName, state);
@@ -420,7 +421,7 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
       throws JSONException {
     if (!ZKMetadataProvider.isSegmentExisted(_pinotHelixResourceManager.getPropertyStore(), tableName, segmentName)) {
       String error = new String("Error: segment " + segmentName + " not found.");
-      LOGGER.error(error);
+      LOGGER.info(error);
       setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
       return new StringRepresentation(error);
     }
