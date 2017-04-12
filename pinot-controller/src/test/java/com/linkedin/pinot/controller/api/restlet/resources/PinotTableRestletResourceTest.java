@@ -71,6 +71,14 @@ public class PinotTableRestletResourceTest extends ControllerTest {
         "MMAP", "v1");
 
     sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), request.toString());
+    boolean tableExistsError = false;
+    try {
+      sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), request.toString());
+    } catch (IOException e) {
+      Assert.assertTrue(e.getMessage().startsWith("Server returned HTTP response code: 409"), e.getMessage());
+      tableExistsError = true;
+    }
+    Assert.assertTrue(tableExistsError);
 
     // Create a table with an invalid name
     JSONObject metadata = new JSONObject();
@@ -103,6 +111,8 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), request.toString());
 
+    // try again...should work because POST on existing RT table is allowed
+    sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), request.toString());
   }
 
   @Test
