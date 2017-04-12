@@ -56,6 +56,7 @@ import java.util.Map;
 import javax.annotation.Nonnull;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.fileupload.FileItem;
+import org.apache.commons.fileupload.FileUploadBase;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.StringUtils;
@@ -350,7 +351,12 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
 
           // 3/ Request is parsed by the handler which generates a
           // list of FileItems
-          items = upload.parseRequest(getRequest());
+          try {
+            items = upload.parseRequest(getRequest());
+          } catch (FileUploadBase.IOFileUploadException e) {
+            LOGGER.info("Exception uploading segment: " + e);
+            return new StringRepresentation("Exception uploading segment: " + e);
+          }
 
           for (FileItem fileItem : items) {
             String fieldName = fileItem.getFieldName();
