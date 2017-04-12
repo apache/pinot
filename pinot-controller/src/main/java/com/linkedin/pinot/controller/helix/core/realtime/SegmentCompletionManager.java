@@ -117,11 +117,6 @@ public class SegmentCompletionManager {
         final String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(segmentName.getTableName());
         LLCRealtimeSegmentZKMetadata segmentMetadata = _segmentManager.getRealtimeSegmentZKMetadata(
             realtimeTableName, segmentName.getSegmentName());
-        if (segmentMetadata == null) {
-          // It is possible that we are in the process of reverting configuration back to high-level consumers.
-          LOGGER.warn("Segment metadata not found for {}", segmentNameStr);
-          throw new RuntimeException("Segment metadata not found for " + segmentNameStr);
-        }
         if (segmentMetadata.getStatus().equals(CommonConstants.Segment.Realtime.Status.DONE)) {
           // Best to go through the state machine for this case as well, so that all code regarding state handling is in one place
           // Also good for synchronization, because it is possible that multiple threads take this path, and we don't want
@@ -139,8 +134,8 @@ public class SegmentCompletionManager {
         _fsmMap.put(segmentNameStr, fsm);
       } catch (Exception e) {
         // Server gone wonky. Segment does not exist in propstore
-        LOGGER.error("Exception reading segment read from propertystore {}", segmentNameStr, e);
-        throw new RuntimeException("Segment read from propertystore " + segmentNameStr, e);
+        LOGGER.error("Exception creating FSM for segment {}", segmentNameStr, e);
+        throw new RuntimeException("Exception creating FSM for segment " + segmentNameStr, e);
       }
     }
     return fsm;
@@ -159,9 +154,15 @@ public class SegmentCompletionManager {
     final long offset = reqParams.getOffset();
 
     LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
-    SegmentCompletionFSM fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_CONSUMED);
-    SegmentCompletionProtocol.Response response = fsm.segmentConsumed(instanceId, offset);
-    if (fsm.isDone()) {
+    SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
+    SegmentCompletionFSM fsm = null;
+    try {
+      fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_CONSUMED);
+      response = fsm.segmentConsumed(instanceId, offset);
+    } catch (Exception e) {
+      // Return failed response
+    }
+    if (fsm != null && fsm.isDone()) {
       LOGGER.info("Removing FSM (if present):{}", fsm.toString());
       _fsmMap.remove(segmentNameStr);
     }
@@ -187,9 +188,15 @@ public class SegmentCompletionManager {
     final String instanceId = reqParams.getInstanceId();
     final long offset = reqParams.getOffset();
     LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
-    SegmentCompletionFSM fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMIT);
-    SegmentCompletionProtocol.Response response = fsm.segmentCommitStart(instanceId, offset);
-    if (fsm.isDone()) {
+    SegmentCompletionFSM fsm = null;
+    SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
+    try {
+      fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMIT);
+      response = fsm.segmentCommitStart(instanceId, offset);
+    } catch (Exception e) {
+      // Return failed response
+    }
+    if (fsm != null && fsm.isDone()) {
       LOGGER.info("Removing FSM (if present):{}", fsm.toString());
       _fsmMap.remove(segmentNameStr);
     }
@@ -205,9 +212,15 @@ public class SegmentCompletionManager {
     final long offset = reqParams.getOffset();
     final int extTimeSec = reqParams.getExtraTimeSec();
     LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
-    SegmentCompletionFSM fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMIT);
-    SegmentCompletionProtocol.Response response = fsm.extendBuildTime(instanceId, offset, extTimeSec);
-    if (fsm.isDone()) {
+    SegmentCompletionFSM fsm = null;
+    SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
+    try {
+      fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMIT);
+      response = fsm.extendBuildTime(instanceId, offset, extTimeSec);
+    } catch (Exception e) {
+      // Return failed response
+    }
+    if (fsm != null && fsm.isDone()) {
       LOGGER.info("Removing FSM (if present):{}", fsm.toString());
       _fsmMap.remove(segmentNameStr);
     }
@@ -229,9 +242,15 @@ public class SegmentCompletionManager {
     final long offset = reqParams.getOffset();
     final String reason = reqParams.getReason();
     LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
-    SegmentCompletionFSM fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_STOPPED_CONSUMING);
-    SegmentCompletionProtocol.Response response = fsm.stoppedConsuming(instanceId, offset, reason);
-    if (fsm.isDone()) {
+    SegmentCompletionFSM fsm = null;
+    SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
+    try {
+      fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_STOPPED_CONSUMING);
+      response = fsm.stoppedConsuming(instanceId, offset, reason);
+    } catch (Exception e) {
+      // Return failed response
+    }
+    if (fsm != null && fsm.isDone()) {
       LOGGER.info("Removing FSM (if present):{}", fsm.toString());
       _fsmMap.remove(segmentNameStr);
     }
@@ -256,9 +275,15 @@ public class SegmentCompletionManager {
     final String instanceId = reqParams.getInstanceId();
     final long offset = reqParams.getOffset();
     LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
-    SegmentCompletionFSM fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMIT);
-    SegmentCompletionProtocol.Response response = fsm.segmentCommitEnd(instanceId, offset, success);
-    if (fsm.isDone()) {
+    SegmentCompletionFSM fsm = null;
+    SegmentCompletionProtocol.Response response = SegmentCompletionProtocol.RESP_FAILED;
+    try {
+      fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_COMMIT);
+      response = fsm.segmentCommitEnd(instanceId, offset, success);
+    } catch (Exception e) {
+      // Return failed response
+    }
+    if (fsm != null && fsm.isDone()) {
       LOGGER.info("Removing FSM (if present):{}", fsm.toString());
       _fsmMap.remove(segmentNameStr);
     }

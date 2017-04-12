@@ -660,8 +660,12 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   public LLCRealtimeSegmentZKMetadata getRealtimeSegmentZKMetadata(String realtimeTableName, String segmentName) {
-    return new LLCRealtimeSegmentZKMetadata(_propertyStore.get(
-          ZKMetadataProvider.constructPropertyStorePathForSegment(realtimeTableName, segmentName), null, AccessOption.PERSISTENT));
+    ZNRecord znRecord = _propertyStore.get(ZKMetadataProvider.constructPropertyStorePathForSegment(realtimeTableName, segmentName), null, AccessOption.PERSISTENT);
+    if (znRecord == null) {
+      LOGGER.error("Segment metadata not found for table {}, segment {}. (can happen during table drop)");
+      throw new RuntimeException("Segment metadata not found for table " + realtimeTableName + " segment " + segmentName);
+    }
+    return new LLCRealtimeSegmentZKMetadata(znRecord);
   }
 
   private void completeCommittingSegments() {
