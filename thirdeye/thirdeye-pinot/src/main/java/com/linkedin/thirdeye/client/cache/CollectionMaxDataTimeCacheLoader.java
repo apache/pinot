@@ -54,7 +54,7 @@ public class CollectionMaxDataTimeCacheLoader extends CacheLoader<String, Long> 
       DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(collection);
       // By default, query only offline, unless dataset has been marked as realtime
       String tableName = ThirdEyeUtils.computeTableName(collection);
-      TimeSpec timeSpec = ThirdEyeUtils.getTimeSpecFromDatasetConfig(datasetConfig);
+      TimeSpec timeSpec = ThirdEyeUtils.getTimestampTimeSpecFromDatasetConfig(datasetConfig);
       long prevMaxDataTime = getPrevMaxDataTime(collection, timeSpec);
       String maxTimePql = String.format(COLLECTION_MAX_TIME_QUERY_TEMPLATE, timeSpec.getColumnName(), tableName,
           timeSpec.getColumnName(), prevMaxDataTime);
