@@ -197,6 +197,18 @@ public abstract class ThirdEyeUtils {
     return timeFormat;
   }
 
+  /**
+   * Returns the time spec of the buckets (data points) in the specified dataset config. For additive dataset, this
+   * method returns the same time spec as getTimestampTimeSpecFromDatasetConfig; however, for non-additive dataset,
+   * this method return the time spec for buckets (data points) instead of the one for the timestamp in the backend
+   * database. For example, the data points of a non-additive dataset could be 5-MINUTES granularity, but timestamp's
+   * granularity could be 1-Milliseconds. For additive dataset, the discrepancy is not an issue, but it could be
+   * a problem for non-additive dataset.
+   *
+   * @param datasetConfig the given dataset config
+   *
+   * @return the time spec of the buckets (data points) in the specified dataset config.
+   */
   public static TimeSpec getTimeSpecFromDatasetConfig(DatasetConfigDTO datasetConfig) {
     String timeFormat = getTimeFormatString(datasetConfig);
     TimeSpec timespec = new TimeSpec(datasetConfig.getTimeColumn(),
@@ -204,6 +216,16 @@ public abstract class ThirdEyeUtils {
     return timespec;
   }
 
+  /**
+   * Returns the time spec of the timestamp in the specified dataset config. The timestamp time spec is mainly used
+   * for constructing the queries to backend database. For most use case, this method returns the same time spec as
+   * getTimeSpecFromDatasetConfig(); however, if the dataset is non-additive, then getTimeSpecFromDatasetConfig
+   * should be used unless the application is related to database queries.
+   *
+   * @param datasetConfig the given dataset config
+   *
+   * @return the time spec of the timestamp in the specified dataset config.
+   */
   public static TimeSpec getTimestampTimeSpecFromDatasetConfig(DatasetConfigDTO datasetConfig) {
     String timeFormat = getTimeFormatString(datasetConfig);
     TimeSpec timespec = new TimeSpec(datasetConfig.getTimeColumn(),
