@@ -421,7 +421,7 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
       throws JSONException {
     if (!ZKMetadataProvider.isSegmentExisted(_pinotHelixResourceManager.getPropertyStore(), tableName, segmentName)) {
       String error = new String("Error: segment " + segmentName + " not found.");
-      LOGGER.error(error);
+      LOGGER.info(error);
       setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
       return new StringRepresentation(error);
     }
