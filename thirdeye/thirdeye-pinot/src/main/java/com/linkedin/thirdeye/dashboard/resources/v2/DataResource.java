@@ -246,18 +246,23 @@ public class DataResource {
     int dataTimeSize = datasetConfig.bucketTimeGranularity().getSize();
     TimeUnit dataTimeUnit = datasetConfig.bucketTimeGranularity().getUnit();
 
+
     List<String> dataGranularities = new ArrayList<>();
-    switch (dataTimeUnit) {
-      case MILLISECONDS:
-      case SECONDS:
-      case MINUTES:
-        dataGranularities.add(getDataGranularityString(dataTimeSize, TimeUnit.MINUTES));
-      case HOURS:
-        dataGranularities.add(getDataGranularityString(1, TimeUnit.HOURS));
-      case DAYS:
-      default:
-        dataGranularities.add(getDataGranularityString(1, TimeUnit.DAYS));
-        break;
+    if (datasetConfig.isAdditive()) { // Add additional aggregation granularities only for additive datasets
+      switch (dataTimeUnit) {
+        case MILLISECONDS:
+        case SECONDS:
+        case MINUTES:
+          dataGranularities.add(getDataGranularityString(dataTimeSize, TimeUnit.MINUTES));
+        case HOURS:
+          dataGranularities.add(getDataGranularityString(1, TimeUnit.HOURS));
+        case DAYS:
+        default:
+          dataGranularities.add(getDataGranularityString(1, TimeUnit.DAYS));
+          break;
+      }
+    } else { // for non additive, keep only original granularity
+      dataGranularities.add(getDataGranularityString(dataTimeSize, dataTimeUnit));
     }
     return dataGranularities;
   }
