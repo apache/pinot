@@ -28,9 +28,6 @@ public class AnomalyRemovalFunction extends AbstractTransformationFunction {
   public static final String METRIC_TIMEZONE = "metricTimezone";
   public static final String DEFAULT_METRIC_TIMEZONE = "America/Los_Angeles";
 
-  public static final String TARGET_METRIC_NAME = "targetMetricName";
-  public static final String DEFAULT_TARGET_METRIC_NAME = "NULL";
-
   // if threshold is 0, then threshold is not used at all
   public static final String ANOMALY_REMOVAL_WEIGHT_THRESHOLD = "anomalyRemovalWeighThreshold";
   public static final String DEFAULT_ANOMALY_REMOVAL_WEIGHT_THRESHOLD = "0";
@@ -48,7 +45,7 @@ public class AnomalyRemovalFunction extends AbstractTransformationFunction {
    * @param timeSeries the time series that provides the data points to be transformed.
    * @param anomalyDetectionContext the anomaly detection context that could provide additional
    *                                information for the transformation.
-   * @return a time series that is smoothed using moving average.
+   * @return a time series with anomalies removed.
    */
   @Override
   public TimeSeries transform(TimeSeries timeSeries, AnomalyDetectionContext anomalyDetectionContext) {
@@ -59,8 +56,7 @@ public class AnomalyRemovalFunction extends AbstractTransformationFunction {
     long bucketSizeInMillis = anomalyDetectionContext.getBucketSizeInMS();
 
     // get monitoring window
-    String metricName = getProperties().getProperty(TARGET_METRIC_NAME, DEFAULT_TARGET_METRIC_NAME);
-    String metricTimezone = getProperties().getProperty(METRIC_TIMEZONE, DEFAULT_METRIC_TIMEZONE);
+    String metricName = anomalyDetectionContext.getAnomalyDetectionFunction().getSpec().getTopicMetric();
     Interval currentWindow = anomalyDetectionContext.getCurrent(metricName).getTimeSeriesInterval();
 
     // get historical anomalies
@@ -78,6 +74,8 @@ public class AnomalyRemovalFunction extends AbstractTransformationFunction {
     Map<Long, Boolean> anomalousTimestamps =
         getAnomalousTimeStampAndLabel(anomalyHistory, bucketSizeInMillis, weightThreshold);
 
+    // get timestamp offset
+    String metricTimezone = getProperties().getProperty(METRIC_TIMEZONE, DEFAULT_METRIC_TIMEZONE);
     long windowStartOffset =
         getOffsetTimestamp(currentWindow.getStartMillis(), toleranceSize, bucketSizeInMillis, metricTimezone);
 
