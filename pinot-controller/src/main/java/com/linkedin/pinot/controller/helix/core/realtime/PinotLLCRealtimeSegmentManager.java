@@ -16,6 +16,7 @@
 
 package com.linkedin.pinot.controller.helix.core.realtime;
 
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
@@ -84,6 +85,8 @@ public class PinotLLCRealtimeSegmentManager {
   protected static final int STARTING_SEQUENCE_NUMBER = 0; // Initial sequence number for new table segments
   protected static final long END_OFFSET_FOR_CONSUMING_SEGMENTS = Long.MAX_VALUE;
   private static final int NUM_LOCKS = 4;
+
+  private static final String METADATA_TEMP_DIR_SUFFIX = ".metadata.tmp";
 
   private static PinotLLCRealtimeSegmentManager INSTANCE = null;
 
@@ -610,34 +613,50 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   /**
-   * Extract the segment metadata file from the tar-zipped segment file that is expected to be in the
-   * directory for the table.
-   * Segment tar-zipped file path: DATADIR/rawTableName/segmentName
-   * We extract the metadata into a file into a file in the same level,as in: DATADIR/rawTableName/segmentName.metadata
+   * Extract the segment metadata files from the tar-zipped segment file that is expected to be in the directory for the
+   * table.
+   * <p>Segment tar-zipped file path: DATADIR/rawTableName/segmentName.
+   * <p>We extract the metadata.properties and creation.meta into a temporary metadata directory:
+   * DATADIR/rawTableName/segmentName.metadata.tmp, and load metadata from there.
+   *
    * @param rawTableName Name of the table (not including the REALTIME extension)
    * @param segmentNameStr Name of the segment
    * @return SegmentMetadataImpl if it is able to extract the metadata file from the tar-zipped segment file.
    */
   protected SegmentMetadataImpl extractSegmentMetadata(final String rawTableName, final String segmentNameStr) {
-    final String baseDir = StringUtil.join("/", _controllerConf.getDataDir(), rawTableName);
-    final String segFileName = StringUtil.join("/", baseDir, segmentNameStr);
-    final File segFile = new File(segFileName);
-    SegmentMetadataImpl segmentMetadata;
-    Path metadataPath = null;
+    String baseDirStr = StringUtil.join("/", _controllerConf.getDataDir(), rawTableName);
+    String segFileStr = StringUtil.join("/", baseDirStr, segmentNameStr);
+    String tempMetadataDirStr = StringUtil.join("/", baseDirStr, segmentNameStr + METADATA_TEMP_DIR_SUFFIX);
+    File tempMetadataDir = new File(tempMetadataDirStr);
+
     try {
-      InputStream is = TarGzCompressionUtils
-          .unTarOneFile(new FileInputStream(segFile), V1Constants.MetadataKeys.METADATA_FILE_NAME);
-      metadataPath = FileSystems.getDefault().getPath(baseDir, segmentNameStr + ".metadata");
-      Files.copy(is, metadataPath);
-      segmentMetadata = new SegmentMetadataImpl(new File(metadataPath.toString()));
+      Preconditions.checkState(tempMetadataDir.mkdirs(), "Failed to create directory: %s", tempMetadataDirStr);
+
+      // Extract metadata.properties
+      InputStream metadataPropertiesInputStream =
+          TarGzCompressionUtils.unTarOneFile(new FileInputStream(new File(segFileStr)),
+              V1Constants.MetadataKeys.METADATA_FILE_NAME);
+      Preconditions.checkNotNull(metadataPropertiesInputStream, "%s does not exist",
+          V1Constants.MetadataKeys.METADATA_FILE_NAME);
+      Path metadataPropertiesPath =
+          FileSystems.getDefault().getPath(tempMetadataDirStr, V1Constants.MetadataKeys.METADATA_FILE_NAME);
+      Files.copy(metadataPropertiesInputStream, metadataPropertiesPath);
+
+      // Extract creation.meta
+      InputStream creationMetaInputStream =
+          TarGzCompressionUtils.unTarOneFile(new FileInputStream(new File(segFileStr)),
+              V1Constants.SEGMENT_CREATION_META);
+      Preconditions.checkNotNull(creationMetaInputStream, "%s does not exist", V1Constants.SEGMENT_CREATION_META);
+      Path creationMetaPath = FileSystems.getDefault().getPath(tempMetadataDirStr, V1Constants.SEGMENT_CREATION_META);
+      Files.copy(creationMetaInputStream, creationMetaPath);
+
+      // Load segment metadata
+      return new SegmentMetadataImpl(tempMetadataDir);
     } catch (Exception e) {
-      throw new RuntimeException("Exception extacting and reading segment metadata for " + segmentNameStr, e);
+      throw new RuntimeException("Exception extracting and reading segment metadata for " + segmentNameStr, e);
     } finally {
-      if (metadataPath != null) {
-        FileUtils.deleteQuietly(new File(metadataPath.toString()));
-      }
+      FileUtils.deleteQuietly(tempMetadataDir);
     }
-    return segmentMetadata;
   }
 
   public LLCRealtimeSegmentZKMetadata getRealtimeSegmentZKMetadata(String realtimeTableName, String segmentName) {
