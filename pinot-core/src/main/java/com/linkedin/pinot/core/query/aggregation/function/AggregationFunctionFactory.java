@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.query.aggregation.function;
 
+import com.linkedin.pinot.core.query.exception.BadQueryRequestException;
 import javax.annotation.Nonnull;
 
 
@@ -80,7 +81,13 @@ public class AggregationFunctionFactory {
    */
   @Nonnull
   public static AggregationFunction getAggregationFunction(@Nonnull String functionName) {
-    switch (AggregationFunctionType.valueOf(functionName.toUpperCase())) {
+    AggregationFunctionType aggregationFunctionType;
+    try {
+      aggregationFunctionType = AggregationFunctionType.valueOf(functionName.toUpperCase());
+    } catch (Exception e) {
+      throw new BadQueryRequestException("Invalid aggregation function name: " + functionName);
+    }
+    switch (aggregationFunctionType) {
       case COUNT:
         return new CountAggregationFunction();
       case MIN:
