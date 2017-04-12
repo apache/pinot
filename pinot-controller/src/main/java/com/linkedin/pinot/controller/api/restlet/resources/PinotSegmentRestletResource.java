@@ -253,7 +253,8 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
       } else if (realtimeSegments.contains(segmentName)) {
         tableType = "REALTIME";
       } else {
-        throw new UnsupportedOperationException(segmentName + " does not exist");
+        LOGGER.info("This segment does not exist: " + segmentName);
+        return new StringRepresentation("This segment does not exist: " + segmentName);
       }
     }
 
@@ -333,8 +334,8 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
           segmentsToToggle.addAll(offlineSegments);
         }
       } else {
-        throw new UnsupportedOperationException("There is no offline table for " + tableName);
-      }
+        LOGGER.info("There is no offline table for: " + tableName);
+        return new StringRepresentation("There is no offline table for: " + tableName);      }
     }
 
     PinotResourceManagerResponse resourceManagerResponse = toggleSegmentsForTable(segmentsToToggle, tableNameWithType, segmentName, state);
