@@ -45,13 +45,23 @@ InvestigateView.prototype = {
   },
 
   formatWowResults( wowResults, args = {}){
-    const { anomalyStart, anomalyEnd, dataset, metricId, timeUnit, currentStart, currentEnd} = args;
+    const {
+      anomalyStart,
+      anomalyEnd,
+      dataset,
+      metricId,
+      timeUnit,
+      currentStart,
+      currentEnd,
+      anomalyFunctionDimension
+      } = args;
     const granularity = timeUnit === 'MINUTES' ? '5_MINUTES' : timeUnit;
     const filters = {}
     const start = moment(currentStart);
     const end = moment(currentEnd);
     const heatMapCurrentStart = moment(anomalyStart);
     const heatMapCurrentEnd = moment(anomalyEnd);
+    const dimension = anomalyFunctionDimension ? Object.keys(JSON.parse(anomalyFunctionDimension))[0] : 'ALL';
 
     return wowResults
       .filter(wow => wow.compareMode !== 'Wo4W')
@@ -62,10 +72,10 @@ InvestigateView.prototype = {
         const heatMapBaselineStart = heatMapCurrentStart.clone().subtract(offset, 'days');
         const heatMapBaselineEnd = heatMapCurrentEnd.clone().subtract(offset, 'days');
         wow.change *= 100;
-        wow.url = `thirdeye#analysis?currentStart=${start.valueOf()}&currentEnd=${end.valueOf()}&` +
+        wow.url = `thirdeye#analysis?metricId=${metricId}&dimension=${dimension}&currentStart=${start.valueOf()}&currentEnd=${end.valueOf()}&` +
             `baselineStart=${baselineStart.valueOf()}&baselineEnd=${baselineEnd.valueOf()}&` +
-            `compareMode=${wow.compareMode}&metricId=${metricId}&filters={}&granularity=${granularity}&` +
-            `dimension=All&heatMapCurrentStart=${heatMapCurrentStart.valueOf()}&` +
+            `compareMode=${wow.compareMode}&filters={}&granularity=${granularity}&` +
+            `heatMapCurrentStart=${heatMapCurrentStart.valueOf()}&` +
             `heatMapCurrentEnd=${heatMapCurrentEnd.valueOf()}&heatMapBaselineStart=${heatMapBaselineStart.valueOf()}&` +
             `heatMapBaselineEnd=${heatMapBaselineEnd.valueOf()}`;
         return wow;
