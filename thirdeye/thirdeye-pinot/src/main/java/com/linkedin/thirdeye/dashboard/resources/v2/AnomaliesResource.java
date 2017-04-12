@@ -665,11 +665,19 @@ public class AnomaliesResource {
       }
 
       List<MergedAnomalyResultDTO> knownAnomalies = adInputContext.getKnownMergedAnomalies().get(dimensions);
-      // Known anomalies are ignored (the null parameter) because 1. we can reduce users' waiting time and 2. presentation
-      // data does not need to be as accurate as the one used for detecting anomalies
-      AnomalyTimelinesView anomalyTimelinesView =
-          anomalyFunction.getTimeSeriesView(metricTimeSeries, bucketMillis, anomalyFunctionSpec.getTopicMetric(),
-              anomalyWindowStart, anomalyWindowEnd, knownAnomalies);
+
+      AnomalyTimelinesView anomalyTimelinesView = null;
+      Map<String, String> anomalyProps = mergedAnomaly.getProperties();
+      // check if there is AnomalyTimelinesView in the Properties. If yes, use the AnomalyTimelinesView
+      if(anomalyProps.containsKey("anomalyTimelinesView")) {
+        anomalyTimelinesView = AnomalyTimelinesView.fromJsonString(
+            anomalyProps.get("anomalyTimelinesView"));
+      } else {
+        // Known anomalies are ignored (the null parameter) because 1. we can reduce users' waiting time and 2. presentation
+        // data does not need to be as accurate as the one used for detecting anomalies
+        anomalyTimelinesView = anomalyFunction.getTimeSeriesView(metricTimeSeries, bucketMillis, anomalyFunctionSpec.getTopicMetric(),
+            anomalyWindowStart, anomalyWindowEnd, knownAnomalies);
+      }
 
       // get viewing window range - this is the region to display along with anomaly, from all the fetched data.
       // the function will tell us this range, as how much data we display can change depending on which function is being executed
