@@ -157,8 +157,9 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
   }
 
   @Override
-  public List<MergedAnomalyResultDTO> findByFunctionIdAndIdGreaterThan(Long functionId, Long anomalyId) {
-    Predicate predicate = Predicate.AND(Predicate.EQ("functionId", functionId), Predicate.GT("baseId", anomalyId));
+  public List<MergedAnomalyResultDTO> findUnNotifiedByFunctionIdAndIdGreaterThan(Long functionId, Long anomalyId) {
+    Predicate predicate = Predicate.AND(Predicate.EQ("functionId", functionId), Predicate.GT("baseId", anomalyId),
+        Predicate.EQ("notified", false));
     List<MergedAnomalyResultBean> list = genericPojoDao.get(predicate, MergedAnomalyResultBean.class);
     return batchConvertMergedAnomalyBean2DTO(list, true);
   }

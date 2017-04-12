@@ -35,6 +35,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.commons.mail.EmailException;
 import org.apache.commons.mail.HtmlEmail;
@@ -101,8 +102,8 @@ public class AlertTaskRunnerV2 implements TaskRunner {
       long lastNotifiedAnomaly = emailConfig.getAnomalyWatermark();
       for (Long functionId : functionIds) {
         List<MergedAnomalyResultDTO> resultsForFunction = anomalyMergedResultDAO
-            .findByFunctionIdAndIdGreaterThan(functionId, lastNotifiedAnomaly);
-        if (resultsForFunction != null && resultsForFunction.size() > 0) {
+            .findUnNotifiedByFunctionIdAndIdGreaterThan(functionId, lastNotifiedAnomaly);
+        if (CollectionUtils.isNotEmpty(resultsForFunction)) {
           mergedAnomaliesAllResults.addAll(resultsForFunction);
         }
         // fetch anomalies having id lesser than the watermark for the same function with notified = false & endTime > last one day
@@ -111,7 +112,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
         List<MergedAnomalyResultDTO> filteredAnomalies = anomalyMergedResultDAO
             .findUnNotifiedByFunctionIdAndIdLesserThanAndEndTimeGreaterThanLastOneDay(functionId,
                 lastNotifiedAnomaly);
-        if (filteredAnomalies != null && filteredAnomalies.size() > 0) {
+        if (CollectionUtils.isNotEmpty(filteredAnomalies)) {
           mergedAnomaliesAllResults.addAll(filteredAnomalies);
         }
       }
