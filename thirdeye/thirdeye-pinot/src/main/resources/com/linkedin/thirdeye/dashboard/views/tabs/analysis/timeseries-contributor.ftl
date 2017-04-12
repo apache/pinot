@@ -5,7 +5,7 @@
 </div>
 
 <!-- Percentage change table -->
-<div class="analysis-title">Change Over Time</div>
+<h4 class="analysis-title">Change Over Time</h4>
 <div class="analysis-change bottom-buffer">
   <span class="analysis-change__description label-small-semibold">Click on a cell to drill down into its contribution breakdown.</span>
   <input class="analysis-change__checkbox" type="checkbox" id="show-details" {{#if this.showDetailsChecked}}checked{{/if}}>

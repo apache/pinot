@@ -1,20 +1,20 @@
 <div class="analysis-card padding-all">
-    <div class="analysis-title bottom-buffer">Trend Analysis
+    <h4 class="analysis-title bottom-buffer">Trend Analysis
       <span class="analysis-details">
         (for <label class="label-medium-semibold">Metric</label> {{metricName}} from <label class="label-medium-semibold">Dataset</label> {{dataset}})
       </span>
-    </div>
+    </h4>
     <div class="analysis-options">
       <div class="analysis-options__datepicker">
       <div class="datepicker-field">
-        <label class="label-medium-semibold">Date Range (Current) </label>
+        <h5 class="label-medium-semibold">Date Range (Current) </h5>
         <div id="current-range" class="datepicker-range">
           <span></span><b class="caret"></b>
         </div>
       </div>
 
       <div class="datepicker-field">
-        <label class="label-medium-semibold">Compare To (Baseline)</label>
+        <h5 class="label-medium-semibold">Compare To (Baseline)</h5>
         <div id="baseline-range" class="datepicker-range">
           <span></span> <b class="caret"></b>
         </div>
@@ -23,15 +23,15 @@
       </div>
       <div class="analysis-options__dropdown">
         <div class="analysis-options__granularity">
-          <label for="granularity">Granularity </label>
+          <label for="analysis-granularity-input">Granularity </label>
           <select id="analysis-granularity-input" style="width: 100%;" class="label-large-light"></select>
         </div>
         <div class="analysis-options__dimensions">
-          <label for="add-dimension-button">Dimensions</label>
+          <label for="analysis-metric-dimension-input">Dimensions</label>
           <select id="analysis-metric-dimension-input" style="width: 100%;" class="label-large-light filter-select-field"></select>
         </div>
         <div class="analysis-options__filters">
-          <label for="add-filter-button">Filters </label>
+          <label for="analysis-metric-filter-input">Filters </label>
           <select id="analysis-metric-filter-input" style="width: 100%;" class="label-large-light"></select>
         </div>
       </div>

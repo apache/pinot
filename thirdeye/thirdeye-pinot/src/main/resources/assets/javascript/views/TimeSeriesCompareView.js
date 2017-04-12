@@ -47,9 +47,7 @@ TimeSeriesCompareView.prototype = {
   },
 
   destroy() {
-    $('#timeseries-contributor-placeholder').children().remove();
-    $('#contributor-table-placeholder').children().remove();
-    $('#contributor-table-placeholder').children().remove();
+    $('#timeseries-contributor-placeholder, #contributor-table-placeholder').children().remove();
   },
 
   renderChartSection: function () {

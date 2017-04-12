@@ -17,7 +17,7 @@ function AnalysisModel() {
 }
 
 AnalysisModel.prototype = {
-  init: function () {
+  init() {
     this.metric = null;
     this.metricId = null;
     this.timeRange = null;
@@ -124,9 +124,11 @@ AnalysisModel.prototype = {
    * beyond the metric's max time
    */
   setEndDateMaxTime() {
-    const maxTime = this.maxTime;
-    const currentEnd = this.currentEnd;
-    const baselineEnd = this.baselineEnd;
+    const {
+      maxTime,
+      currentEnd,
+      baselineEnd
+    } = this;
 
     if (currentEnd) {
       this.currentEnd = moment.min(currentEnd, maxTime).clone();

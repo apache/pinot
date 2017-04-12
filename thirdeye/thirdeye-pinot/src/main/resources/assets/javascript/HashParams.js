@@ -49,7 +49,7 @@ function HashParams() {
 
 
 HashParams.prototype = {
-    init : function() {
+    init() {
       // appController
       var paramNamesToDefaultValuesMap = {};
       paramNamesToDefaultValuesMap[this.TAB] = constants.TAB_ANOMALIES;

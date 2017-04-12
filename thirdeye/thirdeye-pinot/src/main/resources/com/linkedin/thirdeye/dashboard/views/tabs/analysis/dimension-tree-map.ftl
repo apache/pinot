@@ -1,21 +1,21 @@
 <div class="analysis-card padding-all top-buffer">
-  <div class="analysis-title bottom-buffer">Contribution Analysis
+  <h4 class="analysis-title bottom-buffer">Contribution Analysis
     <span class="analysis-details"> (for <label class="label-medium-semibold">Metric</label> {{metricName}} and <label class="label-medium-semibold">Dimensions</label>{{#each heatmapFilters}}
       {{@key}}: {{this}}
     {{else}}
       ALL
     {{/each}}) <span>
-  </div>
+  </h4>
   <div class="contribution-analysis">
     <div class="contribution-analysis__daterangepicker">
-      <label class="label-medium-semibold">Comparing:</label>
+      <h5 class="label-medium-semibold">Comparing:</h5>
       <div class="datepicker-range" id="heatmap-current-range">
         <span></span>
         <b class="caret"></b>
       </div>
     </div>
     <div class="contribution-analysis__daterangepicker">
-      <label class="label-medium-semibold">To:</label>
+      <h5 class="label-medium-semibold">To:</h5>
       <div class="datepicker-range" id="heatmap-baseline-range">
         <span></span>
         <b class="caret"></b>

@@ -26,6 +26,7 @@ label {
 .label-medium-semibold {
     font-weight: 600;
     font-size: 15px;
+    margin-top: 0;
 }
 .label-small-semibold {
     font-weight: 600;
@@ -858,6 +859,7 @@ text {
 .analysis-title {
   font-size: 18px;
   color: rgba(0,0,0,.70);
+  margin-top: 0;
 }
 
 .analysis-details {
@@ -1058,4 +1060,9 @@ text {
   background-color: white;
   border: 1px solid #CCC;
   border-radius: 2px;
+}
+
+/* Accessibility */
+.a11y-text {
+   display: none;
 }
