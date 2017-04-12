@@ -1,5 +1,7 @@
 package com.linkedin.pinot.controller.api.restlet.resources;
 
+import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import java.io.File;
 import java.io.IOException;
 import org.apache.commons.io.FileUtils;
@@ -55,41 +57,44 @@ public class PinotTableSchema extends BasePinotControllerRestletResource {
       "/tables/{tableName}/schema/"
   })
   private Representation getTableSchema(
-      @Parameter(name = "tableName", in = "path", description = "Table name for which to get the schema", required = true)
-      String tableName) {
+      @Parameter(name = "tableName", in = "path", description = "Table name for which to get the schema",
+          required = true) String tableName) {
     if (_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
       try {
         AbstractTableConfig config = _pinotHelixResourceManager.getTableConfig(tableName, TableType.REALTIME);
-        return new StringRepresentation(_pinotHelixResourceManager.getSchema(config.getValidationConfig().getSchemaName()).getJSONSchema()
-            .toString());
-      } catch (Exception e) {
-        LOGGER.error("Caught exception while fetching schema for a realtime table : {} ", tableName, e);
-        ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_SCHEMA_GET_ERROR, 1L);
-        setStatus(Status.SERVER_ERROR_INTERNAL);
-        return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
-      }
-    } else {
-      AbstractTableConfig config;
-      try {
-        config = _pinotHelixResourceManager.getTableConfig(tableName, TableType.OFFLINE);
         String schemaName = config.getValidationConfig().getSchemaName();
-        Schema schema = null;
-        if (schemaName != null && !schemaName.isEmpty()) {
-          schema = _pinotHelixResourceManager.getSchema(schemaName);
-        }
-        if (schema == null) {
-          setStatus(Status.CLIENT_ERROR_NOT_FOUND);
-          StringRepresentation repr = new StringRepresentation("{\"error\": \"Schema " + schemaName + " not found\"");
-          repr.setMediaType(MediaType.APPLICATION_JSON);
-          return repr;
-        }
-        return new StringRepresentation(schema.getJSONSchema().toString());
+        Schema schema = _pinotHelixResourceManager.getSchema(schemaName);
+        Preconditions.checkNotNull(schema, "Failed to fetch schema: %s for REALTIME table: %s", schemaName, tableName);
+        return new StringRepresentation(schema.getJSONSchema());
       } catch (Exception e) {
-        LOGGER.error("Caught exception while fetching schema for a offline table : {} ", tableName, e);
-        ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_SCHEMA_GET_ERROR, 1L);
+        LOGGER.error("Caught exception while fetching schema for REALTIME table: {} ", tableName, e);
+        ControllerRestApplication.getControllerMetrics()
+            .addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_SCHEMA_GET_ERROR, 1L);
         setStatus(Status.SERVER_ERROR_INTERNAL);
         return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
       }
     }
+
+    if (_pinotHelixResourceManager.hasOfflineTable(tableName)) {
+      // For OFFLINE table, schema name is the same as table name
+      String schemaName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
+      try {
+        Schema schema = _pinotHelixResourceManager.getSchema(schemaName);
+        if (schema == null) {
+          setStatus(Status.CLIENT_ERROR_NOT_FOUND);
+          return new StringRepresentation("Error: schema " + schemaName + " not found");
+        }
+        return new StringRepresentation(schema.getJSONSchema());
+      } catch (Exception e) {
+        LOGGER.error("Caught exception while fetching schema for OFFLINE table :{} ", tableName, e);
+        ControllerRestApplication.getControllerMetrics()
+            .addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_SCHEMA_GET_ERROR, 1L);
+        setStatus(Status.SERVER_ERROR_INTERNAL);
+        return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
+      }
+    }
+
+    setStatus(Status.CLIENT_ERROR_NOT_FOUND);
+    return new StringRepresentation("Error: table " + tableName + " not found");
   }
 }

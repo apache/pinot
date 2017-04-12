@@ -936,15 +936,10 @@ public class PinotHelixResourceManager {
     }
     return false;
   }
-  /**
-   *
-   * @param schemaName
-   * @return
-   * @throws JsonParseException
-   * @throws JsonMappingException
-   * @throws IOException
-   */
-  public @Nullable Schema getSchema(String schemaName) throws JsonParseException, JsonMappingException, IOException {
+
+  @Nullable
+  public Schema getSchema(String schemaName)
+      throws IOException {
     PinotHelixPropertyStoreZnRecordProvider propertyStoreHelper =
         PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore);
     ZNRecord record = propertyStoreHelper.get(schemaName);
