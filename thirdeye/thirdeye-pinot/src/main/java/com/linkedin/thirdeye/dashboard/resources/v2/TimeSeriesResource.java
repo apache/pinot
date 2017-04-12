@@ -17,9 +17,10 @@ import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewResponse
 import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewHandler;
 import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewRequest;
 import com.linkedin.thirdeye.dashboard.views.tabular.TabularViewResponse;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
+
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -27,6 +28,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -35,8 +37,8 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
+
 import org.apache.commons.lang3.StringUtils;
-import org.apache.kafka.common.utils.Time;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
@@ -55,7 +57,7 @@ public class TimeSeriesResource {
   private LoadingCache<String, Long> datasetMaxDataTimeCache = CACHE_REGISTRY_INSTANCE
       .getCollectionMaxDataTimeCache();
   private QueryCache queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
-  private MetricConfigManager metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
+
 
   @GET
   @Path("/compare/{metricId}/{currentStart}/{currentEnd}/{baselineStart}/{baselineEnd}")
@@ -73,10 +75,13 @@ public class TimeSeriesResource {
         dimension = ALL;
       }
 
-      MetricConfigDTO metricConfigDTO = metricConfigDAO.findById(metricId);
+      MetricConfigDTO metricConfigDTO = DAO_REGISTRY.getMetricConfigDAO().findById(metricId);
       String dataset = metricConfigDTO.getDataset();
+      DatasetConfigDTO datasetConfig = DAO_REGISTRY.getDatasetConfigDAO().findByDataset(dataset);
       long maxDataTime = datasetMaxDataTimeCache.get(dataset);
 
+      currentEnd = roundEndTimeByGranularity(currentEnd, datasetConfig);
+      baselineEnd = roundEndTimeByGranularity(baselineEnd, datasetConfig);
       if (currentEnd > maxDataTime) {
         long delta = currentEnd - maxDataTime;
         currentEnd = currentEnd - delta;
@@ -115,11 +120,33 @@ public class TimeSeriesResource {
     }
   }
 
+  private long roundEndTimeByGranularity(long endTime, DatasetConfigDTO datasetConfig) {
+    TimeGranularity bucketTimeGranularity = datasetConfig.bucketTimeGranularity();
+    TimeUnit timeUnit = bucketTimeGranularity.getUnit();
+    int timeSize = bucketTimeGranularity.getSize();
+    DateTimeZone dateTimeZone = Utils.getDataTimeZone(datasetConfig.getDataset());
+    DateTime adjustedDateTime = new DateTime(endTime, dateTimeZone);
+    switch (timeUnit) {
+      case DAYS:
+        adjustedDateTime = adjustedDateTime.withTimeAtStartOfDay();
+        break;
+      case MINUTES:
+        int roundedMinutes = (adjustedDateTime.getMinuteOfHour()/timeSize) * timeSize;
+        adjustedDateTime = adjustedDateTime.withTime(adjustedDateTime.getHourOfDay(), roundedMinutes, 0, 0);
+        break;
+      case HOURS:
+      default:
+        adjustedDateTime = adjustedDateTime.withTime(adjustedDateTime.getHourOfDay(), 0, 0, 0);
+        break;
+    }
+    return adjustedDateTime.getMillis();
+  }
+
   private TimeSeriesCompareMetricView getContributorDataForDimension(long metricId,
       long currentStart, long currentEnd, long baselineStart, long baselineEnd, String dimension,
       String filters, String granularity) {
 
-    MetricConfigDTO metricConfigDTO = metricConfigDAO.findById(metricId);
+    MetricConfigDTO metricConfigDTO = DAO_REGISTRY.getMetricConfigDAO().findById(metricId);
     TimeSeriesCompareMetricView timeSeriesCompareMetricView =
         new TimeSeriesCompareMetricView(metricConfigDTO.getName(), metricId, currentStart,
             currentEnd);
@@ -273,7 +300,7 @@ public class TimeSeriesResource {
       long baselineStart, long baselineEnd, String filters, String granularity) {
     TimeSeriesCompareMetricView timeSeriesCompareView = new TimeSeriesCompareMetricView();
     try {
-      MetricConfigDTO metricConfigDTO = metricConfigDAO.findById(metricId);
+      MetricConfigDTO metricConfigDTO = DAO_REGISTRY.getMetricConfigDAO().findById(metricId);
       if (metricConfigDTO != null) {
         String dataset = metricConfigDTO.getDataset();
 
