@@ -378,7 +378,7 @@ public class DetectionJobResource {
     double currRecall = 0;
     try {
       //evaluate current alert filter (calculate current precision and recall)
-      evaluator.updatePrecisionAndRecall(anomalyResultDTOS);
+      evaluator.updateWeighedPrecisionAndRecall(anomalyResultDTOS);
       LOG.info("AlertFilter of Type {}, has been evaluated with precision: {}, recall: {}", alertFilter.getClass().toString(), evaluator.getPrecision(), evaluator.getRecall());
     } catch (Exception e){
       LOG.info(e.getMessage());
@@ -511,7 +511,7 @@ public class DetectionJobResource {
 
     try{
       //evaluate current alert filter (calculate current precision and recall)
-      evaluator.updatePrecisionAndRecall(anomalyResultDTOS);
+      evaluator.updateWeighedPrecisionAndRecall(anomalyResultDTOS);
       LOG.info("AlertFilter of Type {}, has been evaluated with precision: {}, recall:{}", alertFilter.getClass().toString(),
           evaluator.getPrecision(), evaluator.getRecall());
     } catch (Exception e) {
@@ -554,7 +554,7 @@ public class DetectionJobResource {
     AlertFilterEvaluationUtil evaluator = new AlertFilterEvaluationUtil(alertFilter);
 
     try{
-      evaluator.updatePrecisionAndRecall(anomalyResultDTOS);
+      evaluator.updateWeighedPrecisionAndRecall(anomalyResultDTOS);
     } catch (Exception e){
       LOG.warn("Updating precision and recall failed");
     }

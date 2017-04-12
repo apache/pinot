@@ -33,6 +33,7 @@ public class AlertFilterEvaluationUtil {
   public static final String TRUEANOMALIES = "trueAnomalies";
   public static final String FALSEALARM = "falseAlarm";
   public static final String NONACTIONABLE = "nonActionable";
+  public static final Double WEIGHT_OF_NULL_LABEL = 0.5; // the weight used for NA labeled data point when calculating precision
 
   public double getPrecision(){return this.precision;}
   public double getRecall(){return this.recall;}
@@ -53,26 +54,29 @@ public class AlertFilterEvaluationUtil {
   }
 
   /**
-   * Evaluate alert filter given merged anomalies and output precision and recall
+   * Evaluate alert filter given merged anomalies and output weigheted precision and recall
    * @param mergedAnomalyResultDTOS
    * @throws Exception
    */
-  public void updatePrecisionAndRecall(List<MergedAnomalyResultDTO> mergedAnomalyResultDTOS) throws Exception {
+  public void updateWeighedPrecisionAndRecall(List<MergedAnomalyResultDTO> mergedAnomalyResultDTOS) throws Exception {
     int TP = 0;
     int FP = 0;
     int FN = 0;
+    int naFP = 0;
     for (MergedAnomalyResultDTO anomaly: mergedAnomalyResultDTOS) {
       boolean predLabel = alertFilter.isQualified(anomaly);
       AnomalyFeedback feedback = anomaly.getFeedback();
-      boolean label = !(feedback == null || feedback.getFeedbackType() == AnomalyFeedbackType.NOT_ANOMALY);
+      Boolean label = (feedback == null)? null: feedback.getFeedbackType() != AnomalyFeedbackType.NOT_ANOMALY;
       //predicted true
       if (predLabel) {
-        if (label) {
+        if(label == null){
+          naFP++;
+        } else if (label) {
           TP++;
         } else {
           FP++;
         }
-      } else if (label) {
+      } else if (label != null && label) {
         // else if predicted false but label is true
         FN++;
       }
@@ -80,13 +84,8 @@ public class AlertFilterEvaluationUtil {
     if (TP + FN == 0) {
       throw new Exception("No true labels in dataset. Check data");
     }
-    if (TP + FP == 0) {
-      this.precision = -1;
-      LOG.info("No predicted true labels. Check model input");
-    } else{
-      this.precision = 1.000 * TP / (TP + FP);
-    }
-    this.recall = 1.000 * TP / (TP + FN);
+    this.precision = (TP + FP + naFP * WEIGHT_OF_NULL_LABEL == 0)? -1 : 1.000 * TP / (TP + FP + naFP * WEIGHT_OF_NULL_LABEL);
+    this.recall = (TP + FN == 0)? -1 : 1.000 * TP / (TP + FN);
   }
 
 
