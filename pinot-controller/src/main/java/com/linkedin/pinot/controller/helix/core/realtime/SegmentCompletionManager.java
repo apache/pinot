@@ -117,11 +117,6 @@ public class SegmentCompletionManager {
         final String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(segmentName.getTableName());
         LLCRealtimeSegmentZKMetadata segmentMetadata = _segmentManager.getRealtimeSegmentZKMetadata(
             realtimeTableName, segmentName.getSegmentName());
-        if (segmentMetadata == null) {
-          // It is possible that we are in the process of reverting configuration back to high-level consumers.
-          LOGGER.warn("Segment metadata not found for {}", segmentNameStr);
-          throw new RuntimeException("Segment metadata not found for " + segmentNameStr);
-        }
         if (segmentMetadata.getStatus().equals(CommonConstants.Segment.Realtime.Status.DONE)) {
           // Best to go through the state machine for this case as well, so that all code regarding state handling is in one place
           // Also good for synchronization, because it is possible that multiple threads take this path, and we don't want
