@@ -10,7 +10,7 @@ function DimensionTreeMapModel() {
   this.heatmapData;
 
   this.heatmapMode = 'percentChange';
-  this.compareMode = 'WoW';
+  this.compareMode = constants.DEFAULT_COMPARE_MODE;
 
   this.currentTotal = 0;
   this.baselineTotal = 0;
@@ -25,27 +25,12 @@ DimensionTreeMapModel.prototype = {
     if (params) {
       this.metricId = params.metricId;
       this.metricName = params.metricName;
-
-      if (params.heatMapCurrentStart) {
-        this.currentStart = params.heatMapCurrentStart;
-      }
-      if (params.heatMapCurrentEnd) {
-        this.currentEnd = params.heatMapCurrentEnd;
-      }
-      if (params.heatMapBaselineStart) {
-        this.baselineStart = params.heatMapBaselineStart;
-      }
-      if (params.heatMapBaselineEnd) {
-        this.baselineEnd = params.heatMapBaselineEnd;
-      }
-      if (params.granularity) {
-        this.granularity = params.granularity;
-      }
-
-      if (params.heatmapMode) {
-        this.heatmapMode = params.heatmapMode;
-      }
-
+      this.currentStart = params.heatMapCurrentStart || this.currentStart;
+      this.currentEnd = params.heatMapCurrentEnd || this.currentEnd;
+      this.baselineStart = params.heatMapBaselineStart || this.baselineStart;
+      this.baselineEnd = params.heatMapBaselineEnd || this.baselineEnd;
+      this.granularity = params.granularity || this.granularity;
+      this.heatmapMode = params.heatmapMode || this.heatmapMode;
       this.heatmapFilters = Object.assign({}, params.heatmapFilters);
       this.compareMode = params.compareMode || this.compareMode;
     }

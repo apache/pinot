@@ -35,7 +35,7 @@ AnalysisModel.prototype = {
 
   update: function (params) {
     if (params.metricId) {
-      const {name, dataset} = this.fetchMetricData(params.metricId);
+      const { name, dataset } = this.fetchMetricData(params.metricId);
       this.metricName = name;
       this.dataset = dataset;
       this.metricId = params.metricId;
@@ -86,10 +86,16 @@ AnalysisModel.prototype = {
     return dataService.fetchMaxTimeForMetric(metricId);
   },
 
+  /**
+   * fetch the analysis form options for a metric
+   * @param  {number} metricId the ID of the searched Metric
+   * @param  {string} spinArea id selector of the spinner
+   */
   fetchAnalysisOptionsData(metricId, spinArea) {
     const target = document.getElementById(spinArea);
     const spinner = new Spinner();
     spinner.spin(target);
+
     return this.fetchMaxTimeForMetric(metricId).then((maxTime)=> {
       const maxTimeMoment = moment(maxTime);
       this.maxTime = maxTimeMoment.isValid() ? maxTimeMoment : moment();
@@ -112,6 +118,11 @@ AnalysisModel.prototype = {
     });
   },
 
+
+  /**
+   * Makes sure that the time inputted by the user are not
+   * beyond the metric's max time
+   */
   setEndDateMaxTime() {
     const maxTime = this.maxTime;
     const currentEnd = this.currentEnd;
@@ -126,6 +137,10 @@ AnalysisModel.prototype = {
     }
   },
 
+  /**
+   * Initialize the date range based on the metric's granularity
+   * @param {string} granularity granularity of the searched metric
+   */
   setDefaultDateRange(granularity) {
     if (this.currentEnd && this.currentStart && this.baselineStart && this.baselineEnd) return;
     const maxTime = this.maxTime;

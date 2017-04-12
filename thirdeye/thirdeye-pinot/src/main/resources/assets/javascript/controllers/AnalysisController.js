@@ -13,7 +13,6 @@ AnalysisController.prototype = {
   handleAppEvent() {
     this.timeSeriesCompareController.destroy();
     this.analysisView.destroyAnalysisOptions();
-    // HASH_SERVICE.refreshWindowHashForRouting('analysis');
     const hashParams = HASH_SERVICE.getParams();
     this.analysisModel.init(hashParams);
     this.analysisModel.update(hashParams);
@@ -41,7 +40,7 @@ AnalysisController.prototype = {
     this.analysisModel.fetchAnalysisOptionsData(searchParams.metricId, 'analysis-spin-area').then((res) => {
       HASH_SERVICE.clear();
       searchParams.tab = 'analysis';
-      const {currentStart, currentEnd, baselineStart, baselineEnd, granularity} = this.analysisModel;
+      const { currentStart, currentEnd, baselineStart, baselineEnd, granularity } = this.analysisModel;
       Object.assign(searchParams, {currentStart, currentEnd, baselineStart, baselineEnd, granularity});
       HASH_SERVICE.update(searchParams);
       HASH_SERVICE.refreshWindowHashForRouting('analysis');
