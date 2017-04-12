@@ -26,6 +26,7 @@ function Constants() {
   this.DETAILS_DATE_HOURS_FORMAT = 'HH:mm z';
   this.DATE_RANGE_CUSTOM = 'Custom Range';
   this.DATE_RANGE_FORMAT = 'MMM D, YYYY';
+  this.DATE_HOUR_RANGE_FORMAT = 'MMM D, YYYY h a';
   this.DATE_TIME_RANGE_FORMAT = 'MMM D, YYYY hh:mm a';
   this.TIME_ZONE = 'America/Los_Angeles';
 

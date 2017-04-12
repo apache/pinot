@@ -51,6 +51,17 @@ AnalysisView.prototype = {
     return baseDate.clone().subtract(offset, 'days');
   },
 
+  getDateRangeFormat(granularity) {
+    switch(granularity) {
+      case 'DAYS':
+        return constants.DATE_RANGE_FORMAT;
+      case 'HOURS':
+        return constants.DATE_HOUR_RANGE_FORMAT;
+      case '5_MINUTES':
+        return  constants.DATE_TIME_RANGE_FORMAT;
+    }
+  },
+
   render: function (metricId, callback) {
     $("#analysis-place-holder").html(this.analysis_template_compiled);
     // METRIC SELECTION
@@ -147,7 +158,7 @@ AnalysisView.prototype = {
   },
 
   renderDateRangePickers(showTime) {
-    showTime = showTime || this.viewParams.granularity == constants.DATE_RANGE_CUSTOM;
+    showTime = showTime || this.viewParams.granularity === constants.DATE_RANGE_CUSTOM;
     const $currentRangeText = $('#current-range span');
     const $baselineRangeText = $('#baseline-range span');
     const $currentRange = $('#current-range');
@@ -159,8 +170,7 @@ AnalysisView.prototype = {
     const baselineEnd = this.viewParams.baselineEnd || this.analysisModel.baselineEnd;
 
     const setBaselineRange = (start, end, compareMode = constants.DEFAULT_COMPARE_MODE) => {
-      const showTime = this.viewParams.granularity !== constants.GRANULARITY_DAY;
-      const dateFormat = showTime ? constants.DATE_TIME_RANGE_FORMAT : constants.DATE_RANGE_FORMAT;
+      const dateFormat = this.getDateRangeFormat(this.viewParams.granularity);
       end = end.isBefore(this.analysisModel.maxTime) ? end : this.analysisModel.maxTime.clone();
 
       this.viewParams['baselineStart'] = start;
@@ -172,8 +182,7 @@ AnalysisView.prototype = {
     };
     const setCurrentRange = (start, end, rangeType = constants.DATE_RANGE_CUSTOM) => {
       const $baselineRangePicker = $('#baseline-range');
-      const showTime = this.viewParams.granularity !== constants.GRANULARITY_DAY;
-      const dateFormat = showTime ? constants.DATE_TIME_RANGE_FORMAT : constants.DATE_RANGE_FORMAT;
+      const dateFormat = this.getDateRangeFormat(this.viewParams.granularity);
       end = end.isBefore(this.analysisModel.maxTime) ? end : this.analysisModel.maxTime.clone();
 
       this.viewParams['currentStart'] = start;
@@ -186,7 +195,7 @@ AnalysisView.prototype = {
         const offset = constants.WOW_MAPPING[compareMode];
         const baselineStart = start.clone().subtract(offset, 'days');
         const baselineEnd = end.clone().subtract(offset, 'days');
-        this.renderDatePicker($baselineRange, setBaselineRange, baselineStart, baselineEnd, showTime, this.baselineRange);
+        this.renderDatePicker($baselineRange, setBaselineRange, baselineStart, baselineEnd, showTime, this.baselineRange, this.analysisModel.maxTime);
         setBaselineRange(baselineStart, baselineEnd, compareMode);
       }
 
@@ -194,8 +203,8 @@ AnalysisView.prototype = {
           `<span class="time-range__type">${rangeType}</span> ${start.format(dateFormat)} &mdash; ${end.format(dateFormat)}`)
     };
 
-    this.renderDatePicker($currentRange, setCurrentRange, currentStart, currentEnd, showTime, this.currentRange);
-    this.renderDatePicker($baselineRange, setBaselineRange, baselineStart, baselineEnd, showTime, this.baselineRange);
+    this.renderDatePicker($currentRange, setCurrentRange, currentStart, currentEnd, showTime, this.currentRange, this.analysisModel.maxTime);
+    this.renderDatePicker($baselineRange, setBaselineRange, baselineStart, baselineEnd, showTime, this.baselineRange, this.analysisModel.maxTime);
 
     const currentDatePicker = $currentRange.data('daterangepicker')
     currentDatePicker.updateView();
@@ -205,12 +214,12 @@ AnalysisView.prototype = {
     setBaselineRange(baselineStart, baselineEnd, this.viewParams.compareMode);
   },
 
-  renderDatePicker($selector, callbackFun, initialStart, initialEnd, showTime, rangeGenerator) {
+  renderDatePicker($selector, callbackFun, initialStart, initialEnd, showTime, rangeGenerator, maxTime) {
     const ranges = rangeGenerator();
     $selector.daterangepicker({
       startDate: initialStart,
       endDate: initialEnd,
-      maxDate: this.maxTime,
+      maxDate: maxTime,
       dateLimit: {
         days: 60
       },

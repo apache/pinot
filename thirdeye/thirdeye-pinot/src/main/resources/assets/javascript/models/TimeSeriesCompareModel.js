@@ -53,42 +53,35 @@ TimeSeriesCompareModel.prototype = {
   formatDatesForTimeSeries() {
     const granularity = this.granularity;
     const granularityOffset = {
-        'DAYS': 'day',
-        'HOURS': 'hour',
-        '5_MINUTES': 'minute',
+        'DAYS': (date) => {
+          return date.clone().startOf('day');
+        },
+        'HOURS': (date) => {
+          return date.clone().startOf('hour');
+        },
+        '5_MINUTES': (date) => {
+          return date.clone().subtract(4, 'minutes').startOf('minute');
+        },
       }[granularity];
 
     return [
-      this.currentStart,
       this.currentEnd,
-      this.baselineStart,
       this.baselineEnd
-    ].map((date) => {
-      // if date.isAfter()
-      return date.clone().startOf(granularityOffset);
-    });
+    ].map(granularityOffset);
   },
 
-      // granularity = {
-      //   'DAYS': ,
-      //   'HOURS':,
-      //   '5_MINUTES':,
-      // }
-      // ['currentStart', 'currentEnd', 'baselineStart', 'baselineEnd']
   update() {
     if (this.metricId) {
       const [
-        currentStart,
         currentEnd,
-        baselineStart,
         baselineEnd
       ] = this.formatDatesForTimeSeries();
       // update the timeseries data
       return dataService.fetchTimeseriesCompare(
         this.metricId,
-        currentStart,
+        this.currentStart,
         currentEnd,
-        baselineStart,
+        this.baselineStart,
         baselineEnd,
         this.dimension,
         this.filters,

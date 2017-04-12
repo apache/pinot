@@ -6,11 +6,7 @@
         <th class="analysis-table__anchor"></th>
         {{#each this.subDimensionContributionDetails.timeBucketsCurrent as |timestamp timeIndex|}}
         <th class="analysis-table__header">
-          {{#if ../showTime}}
-            {{displayMonthDayHour timestamp}}
-          {{else}}
-            {{displayMonthDay timestamp}}
-          {{/if}}
+          {{formatDate ../granularity timestamp}}
         </th>
         {{/each}}
       </tr>

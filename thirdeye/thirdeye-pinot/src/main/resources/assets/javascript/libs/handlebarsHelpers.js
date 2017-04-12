@@ -61,12 +61,19 @@ Handlebars.registerHelper('displayMonthDayHour', function (date) {
 
 /**
  * Displays human readable date
+ * @param {string} granularity granularity of the metric
  * @param {string} date A date
  * @return {string} human readable date
  */
-Handlebars.registerHelper('displayMonthDay', function (date) {
+Handlebars.registerHelper('formatDate', function (granularity, date) {
   var tz = getTimeZone();
-  return moment(date).tz(tz).format('M/D');
+  const dateFormat = {
+    'DAYS': 'M/D',
+    'HOURS': 'M/D ha',
+    '5_MINUTES': 'M/D hh:mm a'
+  }[granularity];
+
+  return moment(date).tz(tz).format(dateFormat);
 });
 
 Handlebars.registerHelper('if_eq', function(a, b, opts) {

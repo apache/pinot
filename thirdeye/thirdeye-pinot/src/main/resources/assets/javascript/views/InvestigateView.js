@@ -46,11 +46,13 @@ InvestigateView.prototype = {
 
   formatWowResults( wowResults, args = {}){
     const { anomalyStart, anomalyEnd, dataset, metricId, timeUnit, currentStart, currentEnd} = args;
+    const granularity = timeUnit === 'MINUTES' ? '5_MINUTES' : timeUnit;
     const filters = {}
     const start = moment(currentStart);
     const end = moment(currentEnd);
     const heatMapCurrentStart = moment(anomalyStart);
     const heatMapCurrentEnd = moment(anomalyEnd);
+
     return wowResults
       .filter(wow => wow.compareMode !== 'Wo4W')
       .map((wow) => {
@@ -62,7 +64,7 @@ InvestigateView.prototype = {
         wow.change *= 100;
         wow.url = `thirdeye#analysis?currentStart=${start.valueOf()}&currentEnd=${end.valueOf()}&` +
             `baselineStart=${baselineStart.valueOf()}&baselineEnd=${baselineEnd.valueOf()}&` +
-            `compareMode=${wow.compareMode}&metricId=${metricId}&filters={}&granularity=${timeUnit}&` +
+            `compareMode=${wow.compareMode}&metricId=${metricId}&filters={}&granularity=${granularity}&` +
             `dimension=All&heatMapCurrentStart=${heatMapCurrentStart.valueOf()}&` +
             `heatMapCurrentEnd=${heatMapCurrentEnd.valueOf()}&heatMapBaselineStart=${heatMapBaselineStart.valueOf()}&` +
             `heatMapBaselineEnd=${heatMapBaselineEnd.valueOf()}`;
@@ -97,32 +99,6 @@ InvestigateView.prototype = {
     }
   },
 
-  setupListenerOnViewContributionLink() {
-    const anomaly = this.investigateModel.getAnomaly();
-    $('.thirdeye-link').click((e) => {
-      const wowType = e.target.id;
-      const offset = constants.WOW_MAPPING[wowType] || 7;
-      const currentStart = moment(anomaly.currentStart);
-      const currentEnd = moment(anomaly.currentEnd);
-      const granularity = this.getGranularity(currentStart, currentEnd);
-
-      const analysisParams = {
-        metricId: anomaly.metricId,
-        currentStart,
-        currentEnd,
-        granularity,
-        baselineStart: currentStart.clone().subtract(offset, 'days'),
-        baselineEnd: currentEnd.clone().subtract(offset, 'days')
-      };
-
-      // if (anomaly.anomalyFunctionDimension.length) {
-      //   const dimension = JSON.parse(anomaly.anomalyFunctionDimension);
-      //   analysisParams.dimension = Object.keys(dimension)[0];
-      // }
-      this.viewContributionClickEvent.notify(analysisParams);
-    });
-  },
-
   setupListenerOnUserFeedback() {
     $("input[name=feedback-radio]").change((event) => {
       const userFeedback = event.target.value;
@@ -131,17 +107,6 @@ InvestigateView.prototype = {
 
       $('#anomaly-feedback').html(`Resolved (${feedbackString})`);
     });
-  },
-
-  getGranularity(start, end) {
-    const hoursDiff = end.diff(start, 'hours');
-    if (hoursDiff < 3) {
-      return '5_MINUTES';
-    } else if (hoursDiff < 120) {
-      return 'HOURS';
-    } else {
-      return 'DAYS';
-    }
   },
 
   renderAnomalyChart(anomaly){
