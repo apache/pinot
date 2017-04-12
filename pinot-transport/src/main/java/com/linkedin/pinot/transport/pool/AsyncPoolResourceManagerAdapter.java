@@ -39,6 +39,7 @@ public class AsyncPoolResourceManagerAdapter<K, T> implements Lifecycle<T> {
   private final ExecutorService _executor;
   private final K _key;
   private final Histogram _histogram;
+  private boolean _isShuttingDown = false;
 
   public AsyncPoolResourceManagerAdapter(K key, PooledResourceManager<K, T> resourceManager,
       ExecutorService executorService, MetricsRegistry registry) {
@@ -48,6 +49,11 @@ public class AsyncPoolResourceManagerAdapter<K, T> implements Lifecycle<T> {
     _histogram =
         MetricsHelper.newHistogram(registry, new MetricName(AsyncPoolResourceManagerAdapter.class, key.toString()),
             false);
+  }
+
+  @Override
+  public void shutdown() {
+    _isShuttingDown = true;
   }
 
   @Override
@@ -85,19 +91,30 @@ public class AsyncPoolResourceManagerAdapter<K, T> implements Lifecycle<T> {
 
   @Override
   public void destroy(final T obj, final boolean error, final Callback<T> callback) {
-    _executor.submit(new Runnable() {
+    try {
+      _executor.submit(new Runnable() {
 
-      @Override
-      public void run() {
-        LOGGER.info("Running teardown for the client connection " + obj + " Error is : " + error);
-        boolean success = _resourceManager.destroy(_key, error, obj);
-        if (success) {
-          callback.onSuccess(obj);
-        } else {
-          callback.onError(new Exception("Unable to destroy resource for key " + _key));
+        @Override
+        public void run() {
+          LOGGER.info("Running teardown for the client connection " + obj + " Error is : " + error);
+          boolean success = _resourceManager.destroy(_key, error, obj);
+          if (success) {
+            callback.onSuccess(obj);
+          } else {
+            callback.onError(new Exception("Unable to destroy resource for key " + _key));
+          }
         }
+      });
+    } catch (Exception e) {
+      // During a broker shutdown, it is possible that we get RejectedExecutionException since we are tyring to
+      // destroy all resources. Ignore it (only during shutdown).
+      if (_isShuttingDown) {
+        LOGGER.info("Could not destroy resource for key {}: {}", _key.toString(), e.getMessage());
+      } else {
+        LOGGER.error("Could not destroy resource for key {}: {}", _key.toString(), e.getMessage());
+        throw new RuntimeException(e);
       }
-    });
+    }
 
   }
 
