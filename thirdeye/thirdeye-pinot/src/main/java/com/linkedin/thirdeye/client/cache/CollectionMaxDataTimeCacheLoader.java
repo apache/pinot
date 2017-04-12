@@ -8,9 +8,11 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
+import org.joda.time.Period;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
@@ -19,6 +21,7 @@ import org.slf4j.LoggerFactory;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.linkedin.pinot.client.ResultSetGroup;
+import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.pinot.PinotQuery;
 import com.linkedin.thirdeye.dashboard.Utils;
@@ -71,7 +74,9 @@ public class CollectionMaxDataTimeCacheLoader extends CacheLoader<String, Long> 
         } else {
           DateTimeFormatter inputDataDateTimeFormatter =
               DateTimeFormat.forPattern(timeFormat).withZone(Utils.getDataTimeZone(collection));
-          maxTime = DateTime.parse(String.valueOf(endTime), inputDataDateTimeFormatter).getMillis();
+          DateTime endDateTime = DateTime.parse(String.valueOf(endTime), inputDataDateTimeFormatter);
+          Period oneBucket = datasetConfig.bucketTimeGranularity().toPeriod();
+          maxTime = endDateTime.plus(oneBucket).getMillis() - 1;
         }
       }
     } catch (Exception e) {
