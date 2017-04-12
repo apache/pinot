@@ -91,7 +91,8 @@ AnalysisModel.prototype = {
     const spinner = new Spinner();
     spinner.spin(target);
     return this.fetchMaxTimeForMetric(metricId).then((maxTime)=> {
-      this.maxTime = moment(maxTime);
+      const maxTimeMoment = moment(maxTime);
+      this.maxTime = maxTimeMoment.isValid() ? maxTimeMoment : moment();
       this.setEndDateMaxTime();
       return this.fetchGranularityForMetric(metricId);
     }).then((result) => {
