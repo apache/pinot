@@ -17,6 +17,10 @@ function Constants() {
   this.SEARCH_ANOMALIES_ANOMALYIDS = '/anomalies/search/anomalyIds/';
   this.SEARCH_ANOMALIES_TIME = '/anomalies/search/time/';
   this.UPDATE_ANOMALY_FEEDBACK = '/anomalies/updateFeedback/';
+  this.METRIC_GRANULARITY = '/data/agg/granularity/metric/';
+  this.METRIC_DIMENSION = '/data/autocomplete/dimensions/metric/';
+  this.METRIC_FILTERS = '/data/autocomplete/filters/metric/';
+  this.METRIC_MAX_TIME = '/data/maxDataTime/metricId/';
   this.MAX_POINT_NUM = 150;
 
   //

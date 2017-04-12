@@ -132,22 +132,22 @@ DataService.prototype = {
     },
 
     fetchGranularityForMetric(metricId) {
-      const url = `/data/agg/granularity/metric/${metricId}`;
+      const url = constants.METRIC_GRANULARITY + metricId;
       return this.getDataAsynchronous(url);
     },
 
     fetchDimensionsForMetric(metricId) {
-      const url = `/data/autocomplete/dimensions/metric/${metricId}`;
+      const url = constants.METRIC_DIMENSION + metricId;
       return this.getDataAsynchronous(url);
     },
 
     fetchFiltersForMetric(metricId) {
-      const url = `/data/autocomplete/filters/metric/${metricId}`;
+      const url = constants.METRIC_FILTERS + metricId;
       return this.getDataAsynchronous(url);
     },
 
     fetchMaxTimeForMetric(metricId) {
-      const url = `/data/maxDataTime/metricId/${metricId}`;
+      const url = constants.METRIC_MAX_TIME + metricId;
       return this.getDataAsynchronous(url);
     },
 
