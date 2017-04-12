@@ -26,8 +26,9 @@ import org.apache.commons.csv.CSVRecord;
 public class DataFrame {
   public static Pattern SERIES_NAME_PATTERN = Pattern.compile("([A-Za-z_]\\w*)");
 
-  public static final String COLUMN_INDEX = "index";
+  public static final String COLUMN_INDEX_DEFAULT = "index";
   public static final String COLUMN_JOIN_POSTFIX = "_right";
+  public static final int DEFAULT_MAX_COLUMN_WIDTH = 30;
 
   /**
    * Strategy interface for resampling series with different native types with a common
@@ -45,13 +46,13 @@ public class DataFrame {
     public DataFrame apply(Series.SeriesGrouping grouping, Series s) {
       switch(s.type()) {
         case DOUBLE:
-          return grouping.applyTo(s).aggregate(new DoubleSeries.DoubleBatchLast());
+          return grouping.applyTo(s).aggregate(new DoubleSeries.DoubleLast());
         case LONG:
-          return grouping.applyTo(s).aggregate(new LongSeries.LongBatchLast());
+          return grouping.applyTo(s).aggregate(new LongSeries.LongLast());
         case STRING:
-          return grouping.applyTo(s).aggregate(new StringSeries.StringBatchLast());
+          return grouping.applyTo(s).aggregate(new StringSeries.StringLast());
         case BOOLEAN:
-          return grouping.applyTo(s).aggregate(new BooleanSeries.BooleanBatchLast());
+          return grouping.applyTo(s).aggregate(new BooleanSeries.BooleanLast());
         default:
           throw new IllegalArgumentException(String.format("Cannot resample series type '%s'", s.type()));
       }
@@ -63,14 +64,20 @@ public class DataFrame {
    * based on a common key.
    */
   public static final class DataFrameGrouping {
+    final String keyName;
     final Series keys;
     final List<Series.Bucket> buckets;
     final DataFrame source;
 
-    DataFrameGrouping(Series keys, DataFrame source, List<Series.Bucket> buckets) {
+    DataFrameGrouping(String keyName, Series keys, DataFrame source, List<Series.Bucket> buckets) {
+      this.keyName = keyName;
       this.keys = keys;
       this.buckets = buckets;
       this.source = source;
+    }
+
+    DataFrameGrouping(Series keys, DataFrame source, List<Series.Bucket> buckets) {
+      this(Series.GROUP_KEY, keys, source, buckets);
     }
 
     public int size() {
@@ -86,28 +93,17 @@ public class DataFrame {
     }
 
     public Series.SeriesGrouping get(String seriesName) {
-      return new Series.SeriesGrouping(keys, this.source.get(seriesName), this.buckets);
+      return new Series.SeriesGrouping(this.keys, this.source.get(seriesName), this.buckets);
     }
 
-    public DataFrame aggregate(String seriesName, Series.DoubleFunction function) {
-      return this.get(seriesName).aggregate(function);
-    }
-
-    public DataFrame aggregate(String seriesName, Series.LongFunction function) {
-      return this.get(seriesName).aggregate(function);
-    }
-
-    public DataFrame aggregate(String seriesName, Series.StringFunction function) {
-      return this.get(seriesName).aggregate(function);
-    }
-
-    public DataFrame aggregate(String seriesName, Series.BooleanFunction function) {
-      return this.get(seriesName).aggregate(function);
+    public DataFrame aggregate(String seriesName, Series.Function function) {
+      return this.get(seriesName).aggregate(function)
+          .renameSeries(Series.GROUP_KEY, this.keyName)
+          .renameSeries(Series.GROUP_VALUE, seriesName);
     }
   }
 
-
-
+  String indexName = null;
   Map<String, Series> series = new HashMap<>();
 
   /**
@@ -197,7 +193,7 @@ public class DataFrame {
   }
 
   /**
-   * Creates a new DataFrame with a column "INDEX" (as determined by {@code COLUMN_INDEX}) with
+   * Creates a new DataFrame with a column "index" (as determined by {@code COLUMN_INDEX_DEFAULT}) with
    * length {@code defaultIndexSize}, ranging from 0 to {@code defaultIndexSize - 1}.
    *
    * @param defaultIndexSize index column size
@@ -207,27 +203,42 @@ public class DataFrame {
     for(int i=0; i<defaultIndexSize; i++) {
       indexValues[i] = i;
     }
-    this.addSeries(COLUMN_INDEX, LongSeries.buildFrom(indexValues));
+    this.addSeries(COLUMN_INDEX_DEFAULT, LongSeries.buildFrom(indexValues));
+    this.indexName = COLUMN_INDEX_DEFAULT;
   }
 
   /**
-   * Creates a new DataFrame with a column "INDEX" (as determined by {@code COLUMN_INDEX}) that
+   * Creates a new DataFrame with a column "index" (as determined by {@code COLUMN_INDEX_DEFAULT}) that
    * wraps the array {@code indexValues}.
    *
    * @param indexValues index values
    */
   public DataFrame(long... indexValues) {
-    this.addSeries(COLUMN_INDEX, LongSeries.buildFrom(indexValues));
+    this.addSeries(COLUMN_INDEX_DEFAULT, LongSeries.buildFrom(indexValues));
+    this.indexName = COLUMN_INDEX_DEFAULT;
   }
 
   /**
-   * Creates a new DataFrame with a column "INDEX" (as determined by {@code COLUMN_INDEX}) referencing
+   * Creates a new DataFrame with a column "index" (as determined by {@code COLUMN_INDEX_DEFAULT}) referencing
    * the Series {@code index}.
    *
    * @param index index series
    */
-  public DataFrame(LongSeries index) {
-    this.addSeries(COLUMN_INDEX, index);
+  public DataFrame(Series index) {
+    this.addSeries(COLUMN_INDEX_DEFAULT, index);
+    this.indexName = COLUMN_INDEX_DEFAULT;
+  }
+
+  /**
+   * Creates a new DataFrame that copies the properties of {@code df}.
+   *
+   * <br/><b>NOTE:</b> the copy is shallow, i.e. the contained series are not copied but referenced.
+   *
+   * @param df DataFrame to copy properties from
+   */
+  public DataFrame(DataFrame df) {
+    this.indexName = df.indexName;
+    this.series = new HashMap<>(df.series);
   }
 
   /**
@@ -236,6 +247,57 @@ public class DataFrame {
    */
   public DataFrame() {
     // left blank
+  }
+
+  /**
+   * Sets the index name to the specified series name in-place.
+   *
+   * @param seriesName index series name
+   * @throws IllegalArgumentException if the series does not exist
+   * @return reference to the modified DataFrame (this)
+   */
+  public DataFrame setIndex(String seriesName) {
+    assertSeriesExists(seriesName);
+    this.indexName = seriesName;
+    return this;
+  }
+
+  /**
+   * Resets the index name to {@code null} in-place.
+   *
+   * @return reference to the modified DataFrame (this)
+   */
+  public DataFrame resetIndex() {
+    this.indexName = null;
+    return this;
+  }
+
+  /**
+   * Returns the series referenced by indexName.
+   *
+   * @throws IllegalArgumentException if the series does not exist
+   * @return index series
+   */
+  public Series getIndex() {
+    return assertSeriesExists(this.indexName);
+  }
+
+  /**
+   * Returns {@code true} if a valid index name is set. Otherwise, returns {@code false}.
+   *
+   * @return {@code true} if a valid index name is set, {@code false} otherwise
+   */
+  public boolean hasIndex() {
+    return this.indexName != null;
+  }
+
+  /**
+   * Returns the series name of the index, or {@code null} if no index name is set.
+   *
+   * @return index series name
+   */
+  public String getIndexName() {
+    return this.indexName;
   }
 
   /**
@@ -258,7 +320,7 @@ public class DataFrame {
    * @return sliced DataFrame copy
    */
   public DataFrame slice(int from, int to) {
-    DataFrame df = new DataFrame();
+    DataFrame df = new DataFrame(this);
     for(Map.Entry<String, Series> e : this.series.entrySet()) {
       df.addSeries(e.getKey(), e.getValue().slice(from, to));
     }
@@ -305,7 +367,7 @@ public class DataFrame {
    * @return deep copy of DataFrame
    */
   public DataFrame copy() {
-    DataFrame df = new DataFrame();
+    DataFrame df = new DataFrame(this);
     for(Map.Entry<String, Series> e : this.series.entrySet()) {
       df.addSeries(e.getKey(), e.getValue().copy());
     }
@@ -403,6 +465,8 @@ public class DataFrame {
   public DataFrame dropSeries(String seriesName) {
     assertSeriesExists(seriesName);
     this.series.remove(seriesName);
+    if(seriesName.equals(this.indexName))
+      this.indexName = null;
     return this;
   }
 
@@ -417,7 +481,13 @@ public class DataFrame {
    */
   public DataFrame renameSeries(String oldName, String newName) {
     Series s = assertSeriesExists(oldName);
-    return this.dropSeries(oldName).addSeries(newName, s);
+    String indexName = this.indexName;
+
+    this.dropSeries(oldName).addSeries(newName, s);
+
+    if(oldName.equals(indexName))
+      this.indexName = newName;
+    return this;
   }
 
   /**
@@ -538,6 +608,22 @@ public class DataFrame {
    return assertSeriesExists(seriesName).getBooleans();
   }
 
+  public double getDouble(String seriesName, int index) {
+    return assertSeriesExists(seriesName).getDouble(index);
+  }
+
+  public long getLong(String seriesName, int index) {
+    return assertSeriesExists(seriesName).getLong(index);
+  }
+
+  public String getString(String seriesName, int index) {
+    return assertSeriesExists(seriesName).getString(index);
+  }
+
+  public byte getBoolean(String seriesName, int index) {
+    return assertSeriesExists(seriesName).getBoolean(index);
+  }
+
   /**
    * Applies {@code function} to the series referenced by {@code seriesNames} row by row
    * and returns the results as a new series. The series' values are mapped to arguments
@@ -547,6 +633,7 @@ public class DataFrame {
    * determined by {@code function}'s output type.
    *
    * @param function function to apply to each row
+   * @param seriesNames names of input series
    * @throws IllegalArgumentException if the series does not exist
    * @return series with evaluation results
    */
@@ -558,63 +645,98 @@ public class DataFrame {
    * @see DataFrame#map(Series.Function, Series...)
    */
   public DoubleSeries map(Series.DoubleFunction function, String... seriesNames) {
-    return (DoubleSeries)map((Series.Function)function, seriesNames);
+    return map(function, names2series(seriesNames));
   }
 
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */
   public LongSeries map(Series.LongFunction function, String... seriesNames) {
-    return (LongSeries)map((Series.Function)function, seriesNames);
+    return map(function, names2series(seriesNames));
   }
 
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */
   public StringSeries map(Series.StringFunction function, String... seriesNames) {
-    return (StringSeries)map((Series.Function)function, seriesNames);
+    return map(function, names2series(seriesNames));
   }
 
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */
   public BooleanSeries map(Series.BooleanFunction function, String... seriesNames) {
-    return (BooleanSeries)map((Series.Function)function, seriesNames);
+    return map(function, names2series(seriesNames));
   }
 
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */
   public BooleanSeries map(Series.BooleanFunctionEx function, String... seriesNames) {
-    return (BooleanSeries)map((Series.Function)function, seriesNames);
+    return map(function, names2series(seriesNames));
   }
 
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */
   public BooleanSeries map(Series.DoubleConditional function, String... seriesNames) {
-    return (BooleanSeries)map((Series.Function)function, seriesNames);
+    return map(function, names2series(seriesNames));
   }
 
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */
   public BooleanSeries map(Series.LongConditional function, String... seriesNames) {
-    return (BooleanSeries)map((Series.Function)function, seriesNames);
+    return map(function, names2series(seriesNames));
   }
 
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */
   public BooleanSeries map(Series.StringConditional function, String... seriesNames) {
-    return (BooleanSeries)map((Series.Function)function, seriesNames);
+    return map(function, names2series(seriesNames));
   }
 
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */
   public BooleanSeries map(Series.BooleanConditional function, String... seriesNames) {
-    return (BooleanSeries)map((Series.Function)function, seriesNames);
+    return map(function, names2series(seriesNames));
+  }
+
+  /**
+   * Applies {@code function} to the series referenced by {@code seriesNames} row by row
+   * and adds the result to the DataFrame as a new series with name {@code outputName}.
+   * The series' values are mapped to arguments of {@code function} in the same order
+   * as they appear in {@code seriesNames}.
+   * If the series' native types do not match the required input types of {@code function},
+   * the series are converted transparently. The native type of the returned series is
+   * determined by {@code function}'s output type.
+   *
+   * @param function function to apply to each row
+   * @param outputName name of output series
+   * @param inputNames names of input series, or none to use output series name as only input
+   * @throws IllegalArgumentException if the series does not exist
+   * @return series with evaluation results
+   */
+  public DataFrame mapInPlace(Series.Function function, String outputName, String... inputNames) {
+    return this.addSeries(outputName, map(function, names2series(inputNames)));
+  }
+
+  /**
+   * Applies {@code function} to the series referenced by {@code seriesName} row by row
+   * and adds the result to the DataFrame as a new series with the same name.
+   * If the series' native types do not match the required input types of {@code function},
+   * the series are converted transparently. The native type of the returned series is
+   * determined by {@code function}'s output type.
+   *
+   * @param function function to apply to each row
+   * @param seriesName name of series
+   * @throws IllegalArgumentException if the series does not exist
+   * @return series with evaluation results
+   */
+  public DataFrame mapInPlace(Series.Function function, String seriesName) {
+    return this.addSeries(seriesName, map(function, this.get(seriesName)));
   }
 
   /**
@@ -626,6 +748,7 @@ public class DataFrame {
    * determined by {@code function}'s output type.
    *
    * @param function function to apply to each row
+   * @param series input series for function
    * @throws IllegalArgumentException if the series does not exist
    * @return series with evaluation results
    */
@@ -636,63 +759,63 @@ public class DataFrame {
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */
-  public DoubleSeries map(Series.DoubleFunction function, Series... series) {
+  public static DoubleSeries map(Series.DoubleFunction function, Series... series) {
     return (DoubleSeries)map((Series.Function)function, series);
   }
 
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */
-  public LongSeries map(Series.LongFunction function, Series... series) {
+  public static LongSeries map(Series.LongFunction function, Series... series) {
     return (LongSeries)map((Series.Function)function, series);
   }
 
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */
-  public StringSeries map(Series.StringFunction function, Series... series) {
+  public static StringSeries map(Series.StringFunction function, Series... series) {
     return (StringSeries)map((Series.Function)function, series);
   }
 
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */
-  public BooleanSeries map(Series.BooleanFunction function, Series... series) {
+  public static BooleanSeries map(Series.BooleanFunction function, Series... series) {
     return (BooleanSeries)map((Series.Function)function, series);
   }
 
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */
-  public BooleanSeries map(Series.BooleanFunctionEx function, Series... series) {
+  public static BooleanSeries map(Series.BooleanFunctionEx function, Series... series) {
     return (BooleanSeries)map((Series.Function)function, series);
   }
 
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */
-  public BooleanSeries map(Series.DoubleConditional function, Series... series) {
+  public static BooleanSeries map(Series.DoubleConditional function, Series... series) {
     return (BooleanSeries)map((Series.Function)function, series);
   }
 
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */
-  public BooleanSeries map(Series.LongConditional function, Series... series) {
+  public static BooleanSeries map(Series.LongConditional function, Series... series) {
     return (BooleanSeries)map((Series.Function)function, series);
   }
 
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */
-  public BooleanSeries map(Series.StringConditional function, Series... series) {
+  public static BooleanSeries map(Series.StringConditional function, Series... series) {
     return (BooleanSeries)map((Series.Function)function, series);
   }
 
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */
-  public BooleanSeries map(Series.BooleanConditional function, Series... series) {
+  public static BooleanSeries map(Series.BooleanConditional function, Series... series) {
     return (BooleanSeries)map((Series.Function)function, series);
   }
 
@@ -753,7 +876,8 @@ public class DataFrame {
    * @return DataFrame projection
    */
   public DataFrame project(int[] fromIndex) {
-    DataFrame newDataFrame = new DataFrame();
+    DataFrame newDataFrame = new DataFrame(this);
+    newDataFrame.series.clear();
     for(Map.Entry<String, Series> e : this.series.entrySet()) {
       newDataFrame.addSeries(e.getKey(), e.getValue().project(fromIndex));
     }
@@ -783,7 +907,7 @@ public class DataFrame {
    * @return reversed DataFrame copy
    */
   public DataFrame reverse() {
-    DataFrame newDataFrame = new DataFrame();
+    DataFrame newDataFrame = new DataFrame(this);
     for(Map.Entry<String, Series> e : this.series.entrySet()) {
       newDataFrame.addSeries(e.getKey(), e.getValue().reverse());
     }
@@ -809,12 +933,13 @@ public class DataFrame {
     Series.SeriesGrouping grouping = baseDataFrame.getLongs(seriesName).groupByInterval(interval);
 
     // resample series
-    DataFrame newDataFrame = new DataFrame();
+    DataFrame newDataFrame = new DataFrame(this);
+    newDataFrame.series.clear();
 
     for(Map.Entry<String, Series> e : baseDataFrame.getSeries().entrySet()) {
       if(e.getKey().equals(seriesName))
         continue;
-      newDataFrame.addSeries(e.getKey(), strategy.apply(grouping, e.getValue()).get(Series.COLUMN_VALUE));
+      newDataFrame.addSeries(e.getKey(), strategy.apply(grouping, e.getValue()).get(Series.GROUP_VALUE));
     }
 
     // new series
@@ -915,7 +1040,8 @@ public class DataFrame {
    * @return DataFrameGrouping
    */
   public DataFrameGrouping groupBy(String seriesName) {
-    return this.groupBy(this.get(seriesName));
+    Series.SeriesGrouping grouping = this.get(seriesName).groupByValue();
+    return new DataFrameGrouping(seriesName, grouping.keys(), this, grouping.buckets);
   }
 
   /**
@@ -955,7 +1081,8 @@ public class DataFrame {
    * @return DataFrame copy without null series
    */
   public DataFrame dropNullColumns() {
-    DataFrame df = new DataFrame();
+    DataFrame df = new DataFrame(this);
+    df.series.clear();
     for(Map.Entry<String, Series> e : this.getSeries().entrySet()) {
       if(!e.getValue().hasNull())
         df.addSeries(e.getKey(), e.getValue());
@@ -963,9 +1090,31 @@ public class DataFrame {
     return df;
   }
 
+  /* **************************************************************************
+   * Joins across data frames
+   ***************************************************************************/
+
+  public DataFrame joinInner(DataFrame other) {
+    assertIndex(this, other);
+    return this.joinInner(other, this.getIndexName(), other.getIndexName());
+  }
+
+  public DataFrame joinInner(DataFrame other, String onSeries) {
+    return this.joinInner(other, onSeries, onSeries);
+  }
+
   public DataFrame joinInner(DataFrame other, String onSeriesLeft, String onSeriesRight) {
     List<Series.JoinPair> pairs = this.get(onSeriesLeft).join(other.get(onSeriesRight), Series.JoinType.INNER);
     return DataFrame.join(this, other, pairs);
+  }
+
+  public DataFrame joinLeft(DataFrame other) {
+    assertIndex(this, other);
+    return this.joinLeft(other, this.getIndexName(), other.getIndexName());
+  }
+
+  public DataFrame joinLeft(DataFrame other, String onSeries) {
+    return this.joinLeft(other, onSeries, onSeries);
   }
 
   public DataFrame joinLeft(DataFrame other, String onSeriesLeft, String onSeriesRight) {
@@ -973,9 +1122,27 @@ public class DataFrame {
     return DataFrame.join(this, other, pairs);
   }
 
+  public DataFrame joinRight(DataFrame other) {
+    assertIndex(this, other);
+    return this.joinRight(other, this.getIndexName(), other.getIndexName());
+  }
+
+  public DataFrame joinRight(DataFrame other, String onSeries) {
+    return this.joinRight(other, onSeries, onSeries);
+  }
+
   public DataFrame joinRight(DataFrame other, String onSeriesLeft, String onSeriesRight) {
     List<Series.JoinPair> pairs = this.get(onSeriesLeft).join(other.get(onSeriesRight), Series.JoinType.RIGHT);
     return DataFrame.join(this, other, pairs);
+  }
+
+  public DataFrame joinOuter(DataFrame other) {
+    assertIndex(this, other);
+    return this.joinOuter(other, this.getIndexName(), other.getIndexName());
+  }
+
+  public DataFrame joinOuter(DataFrame other, String onSeries) {
+    return this.joinOuter(other, onSeries, onSeries);
   }
 
   public DataFrame joinOuter(DataFrame other, String onSeriesLeft, String onSeriesRight) {
@@ -1017,14 +1184,63 @@ public class DataFrame {
   public String toString() {
     StringBuilder builder = new StringBuilder();
     builder.append("DataFrame{\n");
-    for(Map.Entry<String, Series> e : this.series.entrySet()) {
-      builder.append(e.getKey());
-      builder.append(": ");
-      builder.append(e.getValue());
-      builder.append("\n");
-    }
+    builder.append(this.toString(DEFAULT_MAX_COLUMN_WIDTH, this.getSeriesNames().toArray(new String[0])));
     builder.append("}");
     return builder.toString();
+  }
+
+  public String toString(int maxColumnWidth, String... seriesNames) {
+    String[][] values = new String[this.size()][seriesNames.length];
+    int[] width = new int[seriesNames.length];
+    for(int i=0; i<seriesNames.length; i++) {
+      Series s = assertSeriesExists(seriesNames[i]);
+
+      width[i] = truncateToString(seriesNames[i], maxColumnWidth).length();
+      for(int j=0; j<this.size(); j++) {
+        String itemValue = truncateToString(s.toString(j), maxColumnWidth);
+        values[j][i] = itemValue;
+        width[i] = Math.max(itemValue.length(), width[i]);
+      }
+    }
+
+    StringBuilder sb = new StringBuilder();
+    // header
+    for(int i=0; i<seriesNames.length; i++) {
+      sb.append(String.format("%" + width[i] + "s", truncateToString(seriesNames[i], maxColumnWidth)));
+      sb.append("  ");
+    }
+    sb.append("\n");
+
+    // values
+    for(int j=0; j<this.size(); j++) {
+      for(int i=0; i<seriesNames.length; i++) {
+        Series s = this.get(seriesNames[i]);
+        String item;
+        switch(s.type()) {
+          case DOUBLE:
+          case LONG:
+          case BOOLEAN:
+            item = String.format("%" + width[i] + "s", values[j][i]);
+            break;
+          case STRING:
+            item = String.format("%-" + width[i] + "s", values[j][i]);
+            break;
+          default:
+            throw new IllegalArgumentException(String.format("Unknown series type '%s'", s.type()));
+        }
+        sb.append(item);
+        sb.append("  ");
+      }
+      sb.append("\n");
+    }
+
+    return sb.toString();
+  }
+
+  static String truncateToString(String value, int maxWidth) {
+    if(value.length() > maxWidth)
+      value = value.substring(0, maxWidth - 3) + "...";
+    return value;
   }
 
   @Override
@@ -1070,6 +1286,12 @@ public class DataFrame {
       if (series[i].size() != series[i+1].size())
         throw new IllegalArgumentException("Series size must be equals to DataFrame size");
     }
+  }
+
+  static void assertIndex(DataFrame... dataframes) {
+    for(DataFrame d : dataframes)
+      if(!d.hasIndex())
+        throw new IllegalArgumentException("DataFrames must have a valid index");
   }
 
   Set<String> extractSeriesNames(String doubleExpression) {

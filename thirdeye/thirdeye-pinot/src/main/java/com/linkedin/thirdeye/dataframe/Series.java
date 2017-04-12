@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import org.apache.commons.lang.ArrayUtils;
 
@@ -19,8 +18,9 @@ import org.apache.commons.lang.ArrayUtils;
  * the underlying data structures.
  */
 public abstract class Series {
-  public static final String COLUMN_KEY = "key";
-  public static final String COLUMN_VALUE = "value";
+  public static final String GROUP_KEY = "key";
+  public static final String GROUP_VALUE = "value";
+  public static final String TOSTRING_NULL = "null";
 
   public enum SeriesType {
     DOUBLE,
@@ -36,59 +36,71 @@ public abstract class Series {
     RIGHT
   }
 
-  interface Function {
+  /**
+   * Top-level interface to denote a function that may be applied to one (or multiple) series.
+   * Functions may be applied either row-by-row across multiple series or to all values within
+   * a single series.
+   * <br/><b>NOTE:</b> Functions MAY NOT receive a {@code null} value as an input. Rather, if
+   * any one of the input values is {@code null}, the result is set to {@code null} by the
+   * Series framework.
+   * <br/><b>NOTE:</b> Function MAY return {@code null} as a result, however.
+   */
+  public interface Function {
     // left blank
   }
 
-  interface Conditional extends Function {
+  public interface Conditional extends Function {
     // left blank
   }
 
   //  @FunctionalInterface
-  interface DoubleConditional extends Conditional {
+  public interface DoubleConditional extends Conditional {
     boolean apply(double... values);
   }
 
   //  @FunctionalInterface
-  interface LongConditional extends Conditional {
+  public interface LongConditional extends Conditional {
     boolean apply(long... values);
   }
 
   //  @FunctionalInterface
-  interface StringConditional extends Conditional {
+  public interface StringConditional extends Conditional {
     boolean apply(String... values);
   }
 
   //  @FunctionalInterface
-  interface BooleanConditional extends Conditional {
+  public interface BooleanConditional extends Conditional {
     boolean apply(boolean... values);
   }
 
   //  @FunctionalInterface
-  interface DoubleFunction extends Function {
+  public interface DoubleFunction extends Function {
+    double NULL = DoubleSeries.NULL;
     double apply(double... values);
   }
 
   //  @FunctionalInterface
-  interface LongFunction extends Function {
+  public interface LongFunction extends Function {
+    long NULL = LongSeries.NULL;
     long apply(long... values);
   }
 
   //  @FunctionalInterface
-  interface StringFunction extends Function {
+  public interface StringFunction extends Function {
+    String NULL = StringSeries.NULL;
     String apply(String... values);
   }
 
   //  @FunctionalInterface
-  interface BooleanFunction extends Function {
+  public interface BooleanFunction extends Function {
     boolean apply(boolean... values);
   }
 
   //  @FunctionalInterface
-  interface BooleanFunctionEx extends Function {
-    byte TRUE = BooleanSeries.TRUE_VALUE;
-    byte FALSE = BooleanSeries.FALSE_VALUE;
-    byte NULL = BooleanSeries.NULL_VALUE;
+  public interface BooleanFunctionEx extends Function {
+    byte TRUE = BooleanSeries.TRUE;
+    byte FALSE = BooleanSeries.FALSE;
+    byte NULL = BooleanSeries.NULL;
 
     byte apply(boolean... values);
   }
@@ -226,8 +238,8 @@ public abstract class Series {
 
     static DataFrame makeAggregate(Series keys, Series values) {
       DataFrame df = new DataFrame();
-      df.addSeries(COLUMN_KEY, keys);
-      df.addSeries(COLUMN_VALUE, values);
+      df.addSeries(GROUP_KEY, keys);
+      df.addSeries(GROUP_VALUE, values);
       return df;
     }
   }
@@ -352,6 +364,15 @@ public abstract class Series {
   public abstract boolean isNull(int index);
 
   /**
+   * Returns a human-readable String representation of the value referenced by {@code index}.
+   *
+   * @param index index of value
+   * @throws IndexOutOfBoundsException if index is outside the series bounds
+   * @return human-readable string representation
+   */
+  public abstract String toString(int index);
+
+  /**
    * Returns a copy of the series with values ordered in ascending order.
    *
    * <br/><b>NOTE:</b> BooleanSeries interprets {@code false} as smaller than {@code true}.
@@ -359,6 +380,14 @@ public abstract class Series {
    * @return sorted series copy
    */
   public abstract Series sorted();
+
+  /**
+   * Returns a copy of the series with {@code null} values replaced by the series' default
+   * value.
+   *
+   * @return series copy with filled nulls
+   */
+  public abstract Series fillNull();
 
   /* *************************************************************************
    * Internal abstract interface
@@ -690,7 +719,7 @@ public abstract class Series {
       if(!isNull(i))
         fromIndex[count++] = i;
     }
-    return this.project(fromIndex);
+    return this.project(Arrays.copyOf(fromIndex, count));
   }
 
   //
@@ -933,7 +962,14 @@ public abstract class Series {
     int[] fromIndex = Arrays.copyOfRange(sref, bucketOffset, sref.length);
     buckets.add(new Bucket(fromIndex));
 
-    return new SeriesGrouping(this.unique(), this, buckets);
+    // keys from buckets
+    int[] keyIndex = new int[buckets.size()];
+    int i = 0;
+    for(Bucket b : buckets) {
+      keyIndex[i++] = b.fromIndex[0];
+    }
+
+    return new SeriesGrouping(this.project(keyIndex), this, buckets);
   }
 
   /**
