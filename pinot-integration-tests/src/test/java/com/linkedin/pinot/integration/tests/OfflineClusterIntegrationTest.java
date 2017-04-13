@@ -319,4 +319,9 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     }
     FileUtils.deleteDirectory(_tmpDir);
   }
+
+  @Override
+  protected String getTableName() {
+    return "mytable";
+  }
 }

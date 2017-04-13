@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.google.common.base.Function;
 import com.google.common.primitives.Longs;
 import com.google.common.util.concurrent.AsyncFunction;
 import com.google.common.util.concurrent.Futures;
@@ -23,6 +24,7 @@ import com.google.common.util.concurrent.ListenableFutureTask;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.client.ConnectionFactory;
 import com.linkedin.pinot.common.data.StarTreeIndexSpec;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import com.linkedin.pinot.common.utils.StringUtil;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
@@ -53,6 +55,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -86,11 +89,13 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.ExternalViewChangeListener;
+import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.InstanceConfig;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -120,6 +125,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   private static final boolean GATHER_FAILED_QUERIES = false;
 
   private final File _failedQueriesFile = new File(getClass().getSimpleName() + "-failed.txt");
+  protected HelixManager _zkHelixManager;
   private int _failedQueryCount = 0;
   private int _queryCount = 0;
 
@@ -911,7 +917,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         inputPinotSchema);
   }
   /**
-   * 
+   *
    * @param avroFiles
    * @param executor
    * @param baseSegmentIndex
@@ -949,13 +955,13 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
             if (inputPinotSchema != null) {
               genConfig.setSchema(inputPinotSchema);
             }
-            
+
             // jfim: We add a space and a special character to do a regression test for PINOT-3296 Segments with spaces
             // in their filename don't work properly
             genConfig.setSegmentNamePostfix(Integer.toString(segmentNumber) + " %");
             genConfig.setEnableStarTreeIndex(createStarTreeIndex);
             genConfig.setRawIndexCreationColumns(rawIndexColumns);
-            
+
             // Enable off heap star tree format in the integration test.
             StarTreeIndexSpec starTreeIndexSpec = null;
             if (createStarTreeIndex) {
@@ -1281,5 +1287,234 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     } else {
       return GENERATED_QUERY_COUNT;
     }
+  }
+
+  /**
+   * Wait for a predicate on the routing table to become true.
+   * @param predicate true when the routing table condition is met
+   * @param timeout Timeout for the predicate to become true
+   * @param message Message to display if the predicate does not become true after the timeout expires
+   */
+  protected void waitForRoutingTablePredicate(Function<JSONArray, Boolean> predicate, long timeout, String message) {
+    long endTime = System.currentTimeMillis() + timeout;
+    boolean isPredicateMet = false;
+    JSONObject routingTableSnapshot = null;
+    while (System.currentTimeMillis() < endTime && !isPredicateMet) {
+      try {
+        routingTableSnapshot = getDebugInfo("debug/routingTable/" + getTableName());
+
+        if (routingTableSnapshot != null) {
+          JSONArray routingTableSnapshotJson = routingTableSnapshot.getJSONArray("routingTableSnapshot");
+          if (routingTableSnapshotJson != null) {
+            isPredicateMet = predicate.apply(routingTableSnapshotJson);
+          }
+        } else {
+          LOGGER.warn("Got null routing table snapshot, retrying");
+        }
+      } catch (Exception e) {
+        // Will retry in a bit
+      }
+
+      Uninterruptibles.sleepUninterruptibly(500, TimeUnit.MILLISECONDS);
+    }
+
+    Assert.assertTrue(isPredicateMet, message + ", last routing table snapshot is " + routingTableSnapshot.toString());
+  }
+
+  // In case inherited tests set up a different table name they can override this method.
+  protected abstract String getTableName();
+
+  protected void ensureZkHelixManagerIsInitialized() {
+    if (_zkHelixManager == null) {
+      _zkHelixManager = HelixManagerFactory.getZKHelixManager(getHelixClusterName(), "test_instance", InstanceType.SPECTATOR,
+          ZkStarter.DEFAULT_ZK_STR);
+      try {
+        _zkHelixManager.connect();
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }
+  }
+
+  // jfim: This is not marked as a test as we don't want to run it for every integration test
+  protected void testInstanceShutdown() {
+    ensureZkHelixManagerIsInitialized();
+
+    HelixAdmin clusterManagmentTool = _zkHelixManager.getClusterManagmentTool();
+    String clusterName = _zkHelixManager.getClusterName();
+    List<String> instances = clusterManagmentTool.getInstancesInCluster(clusterName);
+    Assert.assertFalse(instances.isEmpty(), "List of instances should not be empty");
+
+    // Mark all instances in the cluster as shutting down
+    for (String instance : instances) {
+      InstanceConfig instanceConfig = clusterManagmentTool.getInstanceConfig(clusterName, instance);
+      instanceConfig.getRecord().setBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, true);
+      clusterManagmentTool.setInstanceConfig(clusterName, instance, instanceConfig);
+    }
+
+    // Check that the routing table is empty
+    checkForEmptyRoutingTable(true, "Routing table is not empty after marking all instances as shutting down");
+
+    // Mark all instances as not shutting down
+    for (String instance : instances) {
+      InstanceConfig instanceConfig = clusterManagmentTool.getInstanceConfig(clusterName, instance);
+      instanceConfig.getRecord().setBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, false);
+      clusterManagmentTool.setInstanceConfig(clusterName, instance, instanceConfig);
+    }
+
+    // Check that the routing table is not empty
+    checkForEmptyRoutingTable(false, "Routing table is empty after marking all instances as not shutting down");
+
+    String[] instanceArray = instances.toArray(new String[instances.size()]);
+    for(int i = 0; i < 10; ++i) {
+      // Pick a random server instance to mark as shutting down
+      int randomInstanceIndex = new Random().nextInt(instanceArray.length);
+
+      while (!instanceArray[randomInstanceIndex].startsWith("Server_")) {
+        randomInstanceIndex = new Random().nextInt(instanceArray.length);
+      }
+
+      final String randomInstanceId = instanceArray[randomInstanceIndex]; // Server_1.2.3.4_1234
+      final String randomInstanceAddress = randomInstanceId.substring("Server_".length()); // 1.2.3.4_1234
+
+      // Ensure that the random instance is in the routing table
+      checkForInstanceInRoutingTable(randomInstanceAddress);
+
+      // Mark the instance as shutting down
+      InstanceConfig instanceConfig = clusterManagmentTool.getInstanceConfig(clusterName, randomInstanceId);
+      instanceConfig.getRecord().setBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, true);
+      clusterManagmentTool.setInstanceConfig(clusterName, randomInstanceId, instanceConfig);
+
+      // Check that it is not in the routing table
+      checkForInstanceAbsenceFromRoutingTable(randomInstanceAddress);
+
+      // Re-enable the instance
+      instanceConfig.getRecord().setBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, false);
+      clusterManagmentTool.setInstanceConfig(clusterName, randomInstanceId, instanceConfig);
+
+      // Check that it is in the routing table
+      checkForInstanceInRoutingTable(randomInstanceAddress);
+    }
+  }
+
+  private void checkForInstanceAbsenceFromRoutingTable(final String instanceAddress) {
+    waitForRoutingTablePredicate(new Function<JSONArray, Boolean>() {
+      @Nullable
+      @Override
+      public Boolean apply(@Nullable JSONArray input) {
+        try {
+          int tableCount = input.length();
+
+          for (int i = 0; i < tableCount; i++) {
+            JSONObject tableRouting = input.getJSONObject(i);
+            String tableName = tableRouting.getString("tableName");
+            if (tableName.startsWith(getTableName())) {
+              JSONArray routingTableEntries = tableRouting.getJSONArray("routingTableEntries");
+              int routingTableEntryCount = routingTableEntries.length();
+              for (int j = 0; j < routingTableEntryCount; j++) {
+                JSONObject routingTableEntry = routingTableEntries.getJSONObject(j);
+                Iterator<String> routingTableEntryInstances = routingTableEntry.keys();
+
+                // The randomly selected instance should not be in the routing table
+                while (routingTableEntryInstances.hasNext()) {
+                  String instance = routingTableEntryInstances.next();
+                  if (instance.equals(instanceAddress)) {
+                    return false;
+                  }
+                }
+              }
+            }
+          }
+
+          return true;
+        } catch (JSONException e) {
+          LOGGER.warn("Caught exception while reading the routing table, will retry", e);
+          return false;
+        }
+      }
+    }, 15000, "Routing table contains unexpected instance " + instanceAddress + " from the routing table");
+  }
+
+  private void checkForInstanceInRoutingTable(final String instanceAddress) {
+    waitForRoutingTablePredicate(new Function<JSONArray, Boolean>() {
+      @Nullable
+      @Override
+      public Boolean apply(@Nullable JSONArray input) {
+        try {
+          int tableCount = input.length();
+
+          for (int i = 0; i < tableCount; i++) {
+            JSONObject tableRouting = input.getJSONObject(i);
+            String tableName = tableRouting.getString("tableName");
+            if (tableName.startsWith(getTableName())) {
+              JSONArray routingTableEntries = tableRouting.getJSONArray("routingTableEntries");
+              int routingTableEntryCount = routingTableEntries.length();
+              for (int j = 0; j < routingTableEntryCount; j++) {
+                JSONObject routingTableEntry = routingTableEntries.getJSONObject(j);
+                Iterator<String> routingTableEntryInstances = routingTableEntry.keys();
+
+                // The randomly selected instance should be in at least one routing table
+                while (routingTableEntryInstances.hasNext()) {
+                  String instance = routingTableEntryInstances.next();
+                  if (instance.equals(instanceAddress)) {
+                    return true;
+                  }
+                }
+              }
+            }
+          }
+
+          return false;
+        } catch (JSONException e) {
+          LOGGER.warn("Caught exception while reading the routing table, will retry", e);
+          return false;
+        }
+      }
+    }, 15000, "Routing table does not contain expected instance " + instanceAddress + " in the routing table");
+  }
+
+  protected void checkForEmptyRoutingTable(final boolean checkForEmpty, String message) {
+    waitForRoutingTablePredicate(new Function<JSONArray, Boolean>() {
+      @Override
+      public Boolean apply(JSONArray input) {
+        try {
+          int tableCount = input.length();
+
+          // Routing table should have an entry for this table
+          if (tableCount == 0) {
+            return false;
+          }
+
+          // Each routing table entry for this table should have not have any server to segment mapping
+          for (int i = 0; i < tableCount; i++) {
+            JSONObject tableRouting = input.getJSONObject(i);
+            String tableName = tableRouting.getString("tableName");
+            if (tableName.startsWith(getTableName())) {
+              JSONArray routingTableEntries = tableRouting.getJSONArray("routingTableEntries");
+              int routingTableEntryCount = routingTableEntries.length();
+              for (int j = 0; j < routingTableEntryCount; j++) {
+                JSONObject routingTableEntry = routingTableEntries.getJSONObject(j);
+
+                boolean hasServerToSegmentMappings = routingTableEntry.keys().hasNext();
+
+                if (hasServerToSegmentMappings && checkForEmpty) {
+                  return false;
+                }
+
+                if (!hasServerToSegmentMappings && !checkForEmpty) {
+                  return false;
+                }
+              }
+            }
+          }
+
+          return true;
+        } catch (JSONException e) {
+          LOGGER.warn("Caught exception while reading the routing table, will retry", e);
+          return false;
+        }
+      }
+    }, 15000, message);
+
   }
 }

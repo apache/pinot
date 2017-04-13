@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.linkedin.pinot.common.utils.NetUtil;
 import java.io.File;
 import java.io.FileInputStream;
 import java.util.ArrayList;
@@ -108,6 +109,7 @@ public abstract class ClusterTest extends ControllerTest {
             Integer.toString(Integer.valueOf(Server.DEFAULT_ADMIN_API_PORT) - i));
         configuration.setProperty(Server.CONFIG_OF_NETTY_PORT,
             Integer.toString(Integer.valueOf(Helix.DEFAULT_SERVER_NETTY_PORT) + i));
+        configuration.setProperty(Helix.KEY_OF_SERVER_NETTY_HOST, NetUtil.getHostnameOrAddress());
         configuration.setProperty(Server.CONFIG_OF_SEGMENT_FORMAT_VERSION, "v3");
         overrideOfflineServerConf(configuration);
         _serverStarters.add(new HelixServerStarter(getHelixClusterName(), ZkStarter.DEFAULT_ZK_STR, configuration));

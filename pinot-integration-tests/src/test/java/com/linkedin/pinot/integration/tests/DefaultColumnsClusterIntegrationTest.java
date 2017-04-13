@@ -163,6 +163,11 @@ public class DefaultColumnsClusterIntegrationTest extends BaseClusterIntegration
     }
   }
 
+  @Override
+  protected String getTableName() {
+    return "mytable";
+  }
+
   @Test
   public void testNewAddedColumns()
       throws Exception {

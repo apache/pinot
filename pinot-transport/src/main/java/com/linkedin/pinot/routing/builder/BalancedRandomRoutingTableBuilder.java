@@ -66,7 +66,7 @@ public class BalancedRandomRoutingTableBuilder implements RoutingTableBuilder {
 
     String[] segmentSet = externalView.getPartitionSet().toArray(new String[0]);
     for (String segment : segmentSet) {
-      Map<String, String> instanceToStateMap = externalView.getStateMap(segment);
+      Map<String, String> instanceToStateMap = new HashMap<>(externalView.getStateMap(segment));
       for (String instance : instanceToStateMap.keySet().toArray(new String[0])) {
         if (!instanceToStateMap.get(instance).equals("ONLINE") || pruner.isInactive(instance)) {
           LOGGER.info("Removing offline/inactive instance '{}' from routing table computation", instance);

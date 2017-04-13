@@ -372,6 +372,11 @@ public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTe
     // Ignored.
   }
 
+  @Override
+  protected String getTableName() {
+    return tableName;
+  }
+
   @AfterClass
   public void tearDown() {
     stopServer();

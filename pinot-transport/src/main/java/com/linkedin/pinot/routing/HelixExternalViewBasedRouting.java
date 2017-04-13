@@ -377,7 +377,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
           routingTableBuilder.computeRoutingTableFromExternalView(tableName, externalView, instanceConfigs);
 
       // Keep track of the instance configs that are used in that routing table
-      updateInstanceConfigsMapFromRoutingTables(relevantInstanceConfigs, instanceConfigs, serverToSegmentSetMap);
+      updateInstanceConfigsMapFromExternalView(relevantInstanceConfigs, instanceConfigs, externalView);
 
       _brokerRoutingTable.put(tableName, serverToSegmentSetMap);
 
@@ -391,7 +391,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
               .computeRoutingTableFromExternalView(tableName, externalView, instanceConfigs);
 
           // Keep track of the instance configs that are used in that routing table
-          updateInstanceConfigsMapFromRoutingTables(relevantInstanceConfigs, instanceConfigs, llcserverToSegmentSetMap);
+          updateInstanceConfigsMapFromExternalView(relevantInstanceConfigs, instanceConfigs, externalView);
 
           _llcBrokerRoutingTable.put(tableName, llcserverToSegmentSetMap);
         } catch (Exception e) {
@@ -522,13 +522,13 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
         _helixManager.getClusterName(), table);
   }
 
-  private void updateInstanceConfigsMapFromRoutingTables(Map<String, InstanceConfig> relevantInstanceConfigs,
-      List<InstanceConfig> instanceConfigs, List<ServerToSegmentSetMap> serverToSegmentSetMaps) {
+  private void updateInstanceConfigsMapFromExternalView(Map<String, InstanceConfig> relevantInstanceConfigs,
+      List<InstanceConfig> instanceConfigs, ExternalView externalView) {
     Set<String> relevantInstanceNames = new HashSet<>();
 
-    // Gather all the instance names contained in the routing table
-    for (ServerToSegmentSetMap serverToSegmentSetMap : serverToSegmentSetMaps) {
-      relevantInstanceNames.addAll(serverToSegmentSetMap.getServerSet());
+    // Gather all the instance names contained in the external view
+    for (String partitionName : externalView.getPartitionSet()) {
+      relevantInstanceNames.addAll(externalView.getStateMap(partitionName).keySet());
     }
 
     // Update the relevant instance config map with the instance configs given

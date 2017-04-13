@@ -15,6 +15,9 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import org.testng.annotations.Test;
+
+
 public class MultipleNodeOfflineClusterIntegrationTest extends OfflineClusterIntegrationTest {
   private static final int BROKER_COUNT = 3;
   private static final int SERVER_COUNT = 5;
@@ -25,5 +28,11 @@ public class MultipleNodeOfflineClusterIntegrationTest extends OfflineClusterInt
     startController();
     startServers(SERVER_COUNT);
     startBrokers(BROKER_COUNT);
+  }
+
+  @Override
+  @Test
+  public void testInstanceShutdown() {
+    super.testInstanceShutdown();
   }
 }

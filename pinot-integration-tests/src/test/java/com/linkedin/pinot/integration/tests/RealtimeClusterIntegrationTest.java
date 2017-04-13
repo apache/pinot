@@ -131,4 +131,9 @@ public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
     }
     FileUtils.deleteDirectory(_tmpDir);
   }
+
+  @Override
+  protected String getTableName() {
+    return "mytable";
+  }
 }
