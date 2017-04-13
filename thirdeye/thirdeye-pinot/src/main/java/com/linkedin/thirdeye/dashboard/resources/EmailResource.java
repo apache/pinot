@@ -3,11 +3,13 @@ package com.linkedin.thirdeye.dashboard.resources;
 import com.google.common.base.Strings;
 import com.linkedin.thirdeye.anomaly.SmtpConfiguration;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
+import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import com.linkedin.thirdeye.anomaly.alert.util.AnomalyReportGenerator;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 
+import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import java.util.Arrays;
 import java.util.List;
 
@@ -40,12 +42,14 @@ public class EmailResource {
   private final AlertConfigManager alertDAO;
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
   private ThirdEyeConfiguration thirdeyeConfiguration = null;
+  private AlertFilterFactory alertFilterFactory;
 
   public EmailResource(ThirdEyeConfiguration thirdeyeConfiguration) {
     this.functionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     this.emailDAO = DAO_REGISTRY.getEmailConfigurationDAO();
     this.alertDAO = DAO_REGISTRY.getAlertConfigDAO();
     this.thirdeyeConfiguration = thirdeyeConfiguration;
+    this.alertFilterFactory = new AlertFilterFactory(this.thirdeyeConfiguration.getAlertFilterConfigPath());
   }
 
   @POST
@@ -153,7 +157,21 @@ public class EmailResource {
 
   // TODO : add end points for AlertConfig
 
-
+  /**
+   * End point to send anomalies by datasets
+   * @param startTime start time to generate anomalies
+   * @param endTime end time of generate anomalies
+   * @param datasets from which datasets anomalies are from. Multiple datasets can be processed. The input should follow format dataset1,dataset2,...
+   * @param fromAddr from which email address. Multiple email addresses can be processed. The input should follow format address1,address2,...
+   * @param toAddr to which email address. Multiple email addresses can be processed. The input should follow format address1,address2,...
+   * @param subject Title of the report
+   * @param includeSentAnomaliesOnly is only include sent anomalies (which notified flag = 1)
+   * @param isApplyFilter is apply alert filter or not
+   * @param teHost
+   * @param smtpHost
+   * @param smtpPort
+   * @return
+   */
   @GET
   @Path("generate/datasets/{startTime}/{endTime}")
   public Response generateAndSendAlertForDatasets(@PathParam("startTime") Long startTime,
@@ -161,6 +179,7 @@ public class EmailResource {
       @QueryParam("from") String fromAddr, @QueryParam("to") String toAddr,
       @QueryParam("subject") String subject,
       @QueryParam("includeSentAnomaliesOnly") boolean includeSentAnomaliesOnly,
+      @QueryParam("isApplyFilter") boolean isApplyFilter,
       @QueryParam("teHost") String teHost, @QueryParam("smtpHost") String smtpHost,
       @QueryParam("smtpPort") int smtpPort) {
     if (Strings.isNullOrEmpty(datasets)) {
@@ -182,6 +201,9 @@ public class EmailResource {
     AnomalyReportGenerator anomalyReportGenerator = AnomalyReportGenerator.getInstance();
     List<MergedAnomalyResultDTO> anomalies = anomalyReportGenerator
         .getAnomaliesForDatasets(Arrays.asList(dataSetArr), startTime, endTime);
+    if (isApplyFilter){
+      anomalies = AlertFilterHelper.applyFiltrationRule(anomalies, alertFilterFactory);
+    }
     ThirdEyeAnomalyConfiguration configuration = new ThirdEyeAnomalyConfiguration();
     SmtpConfiguration smtpConfiguration = new SmtpConfiguration();
     smtpConfiguration.setSmtpHost(smtpHost);
@@ -199,6 +221,24 @@ public class EmailResource {
     return Response.ok().build();
   }
 
+
+  /**
+   * End point to send anomalies by metrics
+   * @param startTime start time to generate anomalies
+   * @param endTime end time of generate anomalies
+   * @param metrics from which datasets anomalies are from. Multiple datasets can be processed. The input should follow format dataset1,dataset2,...
+   * @param fromAddr from which email address. Multiple email addresses can be processed. The input should follow format address1,address2,...
+   * @param toAddr to which email address. Multiple email addresses can be processed. The input should follow format address1,address2,...
+   * @param subject Title of the report
+   * @param includeSentAnomaliesOnly is only include sent anomalies (which notified flag = 1)
+   * @param isApplyFilter is apply alert filter or not
+   * @param teHost
+   * @param smtpHost
+   * @param smtpPort
+   * @return
+   */
+
+
   @GET
   @Path("generate/metrics/{startTime}/{endTime}")
   public Response generateAndSendAlertForMetrics(
@@ -206,6 +246,7 @@ public class EmailResource {
       @QueryParam("metrics") String metrics, @QueryParam("from") String fromAddr,
       @QueryParam("to") String toAddr,@QueryParam("subject") String subject,
       @QueryParam("includeSentAnomaliesOnly") boolean includeSentAnomaliesOnly,
+      @QueryParam("isApplyFilter") boolean isApplyFilter,
       @QueryParam("teHost") String teHost, @QueryParam("smtpHost") String smtpHost,
       @QueryParam("smtpPort") int smtpPort,
       @QueryParam("phantomJsPath") String phantomJsPath) {
@@ -228,6 +269,9 @@ public class EmailResource {
     AnomalyReportGenerator anomalyReportGenerator = AnomalyReportGenerator.getInstance();
     List<MergedAnomalyResultDTO> anomalies = anomalyReportGenerator
         .getAnomaliesForMetrics(Arrays.asList(metricsArr), startTime, endTime);
+    if(isApplyFilter){
+      anomalies = AlertFilterHelper.applyFiltrationRule(anomalies, alertFilterFactory);
+    }
     ThirdEyeAnomalyConfiguration configuration = new ThirdEyeAnomalyConfiguration();
     SmtpConfiguration smtpConfiguration = new SmtpConfiguration();
     smtpConfiguration.setSmtpHost(smtpHost);
