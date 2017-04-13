@@ -39,19 +39,21 @@ public class MetricDimensionPipeline implements Pipeline {
 
   @Override
   public PipelineResult run(ExecutionContext context) {
-    Set<String> metrics = new HashSet<>();
+    Set<MetricEntity> metrics = new HashSet<>();
     Set<String> datasets = new HashSet<>();
     for(Entity e : context.getSearchContext().getEntities()) {
       if(URNUtils.isMetricURN(e.getUrn())) {
-        metrics.add(URNUtils.getMetricName(e.getUrn()));
-        datasets.add(URNUtils.getMetricDataset(e.getUrn()));
+        String m = URNUtils.getMetricName(e.getUrn());
+        String d = URNUtils.getMetricDataset(e.getUrn());
+
+        MetricConfigDTO dto = metricDAO.findByMetricAndDataset(m, d);
+        metrics.add(MetricEntity.fromDTO(dto));
+
+        datasets.add(d);
       }
     }
 
-    // TODO confirm usage of MetricDTO in ThirdEye
-    // is it metric-dimension already?
-
-    LOG.info("Found {} metrics across {} datasets for dimension analysis", metrics.size(), datasets.size());
+    LOG.info("Found {} metrics for dimension analysis", metrics.size());
 
     Map<String, DatasetConfigDTO> datasetMap = new HashMap<>();
     for(String d : datasets) {
@@ -60,19 +62,17 @@ public class MetricDimensionPipeline implements Pipeline {
     }
 
     Map<MetricDimensionEntity, Double> scores = new HashMap<>();
-    for(String m : metrics) {
-      List<MetricConfigDTO> dtos = metricDAO.findByMetricName(m);
-      for(MetricConfigDTO mdto : dtos) {
-        DatasetConfigDTO ddto = datasetMap.get(mdto.getDataset());
+    for(MetricEntity m : metrics) {
+        DatasetConfigDTO ddto = datasetMap.get(m.getDto().getDataset());
 
         if(ddto == null) {
-          LOG.warn("Skipping metric '{}'. Could not resolve associated dataset '{}'", m, mdto.getName());
+          LOG.warn("Skipping metric '{}'. Could not resolve associated dataset '{}'", m.getDto().getName(), m.getDto().getDataset());
           continue;
         }
 
         List<MetricDimensionEntity> entities = new ArrayList<>();
         for(String dim : ddto.getDimensions()) {
-          entities.add(MetricDimensionEntity.fromDTO(mdto, ddto, dim));
+          entities.add(MetricDimensionEntity.fromDTO(m.getDto(), ddto, dim));
         }
 
         try {
@@ -81,7 +81,6 @@ public class MetricDimensionPipeline implements Pipeline {
           // TODO internal exception handling?
           throw new RuntimeException(e);
         }
-      }
     }
 
     return new PipelineResult(scores);
