@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.transport.netty;
 
-import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
 import com.linkedin.pinot.transport.netty.NettyClientConnection.ResponseFuture;
@@ -24,7 +23,6 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.HashedWheelTimer;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -104,14 +102,11 @@ public class NettyCloseChannelTest {
   private void closeClientConnection()
       throws Exception {
     _nettyTCPClientConnection.close();
-    // Sleep to ensure that server detects the connection has been closed
-    Uninterruptibles.sleepUninterruptibly(100L, TimeUnit.MILLISECONDS);
   }
 
   private void closeServerConnection()
       throws Exception {
-    _nettyTCPServer.shutdownGracefully();
-    // Sleep to ensure that server is fully shut down
-    Uninterruptibles.sleepUninterruptibly(1L, TimeUnit.SECONDS);
+    // Wait for at most 1 minute to shutdown the server completely
+    _nettyTCPServer.waitForShutdown(60 * 1000L);
   }
 }
