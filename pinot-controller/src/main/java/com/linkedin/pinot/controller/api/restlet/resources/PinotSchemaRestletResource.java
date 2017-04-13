@@ -15,12 +15,13 @@ import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import java.io.File;
 import java.io.IOException;
-import java.util.Iterator;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.FileUploadBase;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
 import org.apache.commons.io.FileUtils;
+import org.codehaus.jackson.map.JsonMappingException;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.restlet.data.MediaType;
@@ -146,41 +147,7 @@ public class PinotSchemaRestletResource extends BasePinotControllerRestletResour
   })
   private Representation uploadNewSchema()
       throws Exception {
-    File dataFile;
-    try {
-      dataFile = getUploadContents();
-    } catch (FileUploadBase.InvalidContentTypeException e) {
-      LOGGER.info("Invalid content type while adding new schema");
-      return errorResponseRepresentation(Status.CLIENT_ERROR_BAD_REQUEST,
-          e.getMessage());
-    } catch (Exception e) {
-      LOGGER.error("Error reading request body while adding new schema", e);
-      return errorResponseRepresentation(Status.SERVER_ERROR_INTERNAL,
-          "Error reading schema request body, error: " + e.getMessage());
-    }
-
-    if (dataFile != null) {
-      Schema schema = Schema.fromFile(dataFile);
-      try {
-        if (!schema.validate(LOGGER)) {
-          throw new RuntimeException("Schema validation failed");
-        }
-        _pinotHelixResourceManager.addOrUpdateSchema(schema);
-        return new StringRepresentation(dataFile + " sucessfully added", MediaType.TEXT_PLAIN);
-      } catch (Exception e) {
-        LOGGER.error("error adding schema ", e);
-        LOGGER.error("Caught exception in file upload", e);
-        setStatus(Status.SERVER_ERROR_INTERNAL);
-        ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
-        return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
-      }
-    } else {
-      // Some problem occurs, send back a simple line of text.
-      LOGGER.warn("No file was uploaded");
-      ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
-      setStatus(Status.SERVER_ERROR_INTERNAL);
-      return new StringRepresentation("schema not added", MediaType.TEXT_PLAIN);
-    }
+    return addOrUpdateSchema(null);
   }
 
   @Override
@@ -219,47 +186,76 @@ public class PinotSchemaRestletResource extends BasePinotControllerRestletResour
   private Representation uploadSchema(
       @Parameter(name = "schemaName", in = "path", description = "The name of the schema to get")
       String schemaName) throws Exception {
+    return addOrUpdateSchema(schemaName);
+  }
+
+  /**
+   * Internal method to add or update schema
+   * @param schemaName null value indicates new schema (POST request) where schemaName is
+   *                   not part of URI
+   * @return
+   */
+  private Representation addOrUpdateSchema(@Nullable String schemaName) {
     File dataFile;
+    final String schemaNameForLogging = (schemaName == null) ? "new schema" : schemaName + " schema";
     try {
       dataFile = getUploadContents();
     } catch (FileUploadBase.InvalidContentTypeException e) {
-      LOGGER.info("Invalid content type while updating schema {}", schemaName);
-      return errorResponseRepresentation(Status.CLIENT_ERROR_BAD_REQUEST,
+      LOGGER.info("Invalid content type while adding {}", schemaNameForLogging);
+      return errorResponseRepresentation(Status.CLIENT_ERROR_UNSUPPORTED_MEDIA_TYPE,
           e.getMessage());
     } catch (Exception e) {
-      LOGGER.error("Error reading request body while updating new schema: {}", schemaName, e);
+      LOGGER.error("Error reading request body while adding {}", schemaNameForLogging, e);
       return errorResponseRepresentation(Status.SERVER_ERROR_INTERNAL,
           "Error reading schema request body, error: " + e.getMessage());
     }
 
-    if (dataFile != null) {
-      Schema schema = Schema.fromFile(dataFile);
-      try {
-        if (schema.getSchemaName().equals(schemaName)) {
-          _pinotHelixResourceManager.addOrUpdateSchema(schema);
-          return new StringRepresentation(dataFile + " sucessfully added", MediaType.TEXT_PLAIN);
-        } else {
-          final String message =
-              "Schema name mismatch for uploaded schema, tried to add schema with name " + schema.getSchemaName()
-                  + " as " + schemaName;
-          LOGGER.warn(message);
-          ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
-          setStatus(Status.SERVER_ERROR_INTERNAL);
-          return new StringRepresentation(message, MediaType.TEXT_PLAIN);
-        }
-      } catch (Exception e) {
-        LOGGER.error("error adding schema ", e);
-        LOGGER.error("Caught exception in file upload", e);
-        ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
-        setStatus(Status.SERVER_ERROR_INTERNAL);
-        return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
-      }
-    } else {
-      // Some problem occurs, send back a simple line of text.
-      LOGGER.warn("No file was uploaded");
+    Schema schema = null;
+    if (dataFile == null) {
+      // This should not happen since we handle all possible exceptions above
+      // Safe to check though
+      LOGGER.error("No file was uploaded to add or update {}" , schemaNameForLogging);
+      ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(
+          ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
+      return errorResponseRepresentation(Status.SERVER_ERROR_INTERNAL,
+          "File not received while adding " + schemaNameForLogging);
+    }
+
+    try {
+      schema = Schema.fromFile(dataFile);
+    } catch (org.codehaus.jackson.JsonParseException | JsonMappingException e) {
+      LOGGER.info("Invalid json while adding {}", schemaNameForLogging, e);
+      return errorResponseRepresentation(Status.CLIENT_ERROR_BAD_REQUEST,
+          "Invalid json in input schema");
+    } catch (IOException e) {
+      // this can be due to failure to read from dataFile which is stored locally
+      // and hence, server responsibility. return 500 for this error
+      LOGGER.error("Failed to read input json while adding {}", schemaNameForLogging, e);
+      return errorResponseRepresentation(Status.SERVER_ERROR_INTERNAL, "Failed to read input json schema");
+    }
+
+
+    if (!schema.validate(LOGGER)) {
+      LOGGER.info("Invalid schema during create/update of {}", schemaNameForLogging);
+      return errorResponseRepresentation(Status.CLIENT_ERROR_BAD_REQUEST, "Invalid schema");
+    }
+
+    if (schemaName != null && ! schema.getSchemaName().equals(schemaName)) {
+      final String message =
+          "Schema name mismatch for uploaded schema, tried to add schema with name " + schema.getSchemaName()
+              + " as " + schemaName;
+      LOGGER.info(message);
       ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
-      setStatus(Status.SERVER_ERROR_INTERNAL);
-      return new StringRepresentation("schema not added", MediaType.TEXT_PLAIN);
+      return errorResponseRepresentation(Status.CLIENT_ERROR_BAD_REQUEST, message);
+    }
+
+    try {
+      _pinotHelixResourceManager.addOrUpdateSchema(schema);
+      return new StringRepresentation(dataFile + " successfully added", MediaType.TEXT_PLAIN);
+    } catch (Exception e) {
+      LOGGER.error("Error updating schema {} ", schemaNameForLogging, e);
+      ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(ControllerMeter.CONTROLLER_SCHEMA_UPLOAD_ERROR, 1L);
+      return errorResponseRepresentation(Status.SERVER_ERROR_INTERNAL, "Failed to update schema");
     }
   }
 

@@ -157,6 +157,19 @@ public class ControllerRequestURLBuilder {
     }
     return url;
   }
+
+  public String forSchemaCreate() {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "schemas");
+  }
+
+  public String forSchemaUpdate(String schemaName) {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "schemas", schemaName);
+  }
+
+  public String forSchemaGet(String schemaName) {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "schemas", schemaName);
+  }
+
   public static void main(String[] args) {
     System.out.println(ControllerRequestURLBuilder.baseUrl("localhost:8089").forResourceCreate());
     System.out.println(ControllerRequestURLBuilder.baseUrl("localhost:8089").forInstanceCreate());
