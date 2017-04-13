@@ -64,6 +64,9 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
         if (e instanceof PinotHelixResourceManager.InvalidTableConfigException) {
           LOGGER.info("Invalid table config for table: {}, {}", config.getTableName(), e.getMessage());
           setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
+        } else if (e instanceof PinotHelixResourceManager.TableAlreadyExistsException) {
+          LOGGER.info("Table: {} already exists", config.getTableName());
+          setStatus(Status.CLIENT_ERROR_CONFLICT);
         } else {
           LOGGER.error("Caught exception while adding table: {}", config.getTableName(), e);
           setStatus(Status.SERVER_ERROR_INTERNAL);
