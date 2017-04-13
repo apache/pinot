@@ -10,6 +10,7 @@
 
 # misc
 /.sass-cache
+/.vscode
 /connect.lock
 /coverage/*
 /libpeerconnection.log

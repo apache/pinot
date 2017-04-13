@@ -4,6 +4,7 @@ module.exports = function(environment) {
   var ENV = {
     modulePrefix: 'thirdeye-frontend',
     environment: environment,
+    podModulePrefix: 'thirdeye-frontend/pods',
     rootURL: '/',
     locationType: 'auto',
     EmberENV: {
