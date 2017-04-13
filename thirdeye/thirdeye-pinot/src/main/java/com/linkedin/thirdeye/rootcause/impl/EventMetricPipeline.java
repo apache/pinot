@@ -37,6 +37,10 @@ public class EventMetricPipeline implements Pipeline {
     Set<EventDTO> eventSet = new HashSet<>();
     for(Entity e : metrics) {
       EventFilter filter = new EventFilter();
+      filter.setStartTime(0);
+      if(context.getSearchContext().getTimestampEnd() >= 0)
+        filter.setEndTime(context.getSearchContext().getTimestampEnd());
+      filter.setEventType(EventType.HISTORICAL_ANOMALY);
       filter.setMetricName(URNUtils.getMetricName(e.getUrn()));
 
       eventSet.addAll(manager.getEvents(filter));

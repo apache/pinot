@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import org.omg.CORBA.UNKNOWN;
 
 
 public class URNUtils {
@@ -20,7 +21,8 @@ public class URNUtils {
   public enum EntityType {
     EVENT("thirdeye:event:"),
     METRIC("thirdeye:metric:"),
-    METRIC_DIMENSION("thirdeye:metricdimension:");
+    METRIC_DIMENSION("thirdeye:metricdimension:"),
+    UNKNOWN("");
 
     private final String prefix;
 
@@ -31,6 +33,14 @@ public class URNUtils {
     public String getPrefix() {
       return prefix;
     }
+  }
+
+  public static EntityType getType(String urn) {
+    for(EntityType t : EntityType.values()) {
+      if(isType(urn, t))
+        return t;
+    }
+    return EntityType.UNKNOWN;
   }
 
   public static boolean isType(String urn, EntityType type) {

@@ -2,7 +2,6 @@ package com.linkedin.thirdeye.rootcause.impl;
 
 import com.linkedin.thirdeye.anomaly.events.EventDataProviderManager;
 import com.linkedin.thirdeye.anomaly.events.EventFilter;
-import com.linkedin.thirdeye.anomaly.events.EventType;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 import com.linkedin.thirdeye.rootcause.ExecutionContext;
 import com.linkedin.thirdeye.rootcause.Pipeline;
@@ -29,10 +28,8 @@ public class EventTimePipeline implements Pipeline {
   @Override
   public PipelineResult run(ExecutionContext context) {
     EventFilter filter = new EventFilter();
-
     if(context.getSearchContext().getTimestampStart() >= 0)
       filter.setStartTime(context.getSearchContext().getTimestampStart());
-
     if(context.getSearchContext().getTimestampEnd() >= 0)
       filter.setEndTime(context.getSearchContext().getTimestampEnd());
 

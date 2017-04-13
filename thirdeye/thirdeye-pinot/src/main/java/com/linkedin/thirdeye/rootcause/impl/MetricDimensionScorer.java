@@ -7,6 +7,8 @@ import com.linkedin.thirdeye.client.diffsummary.DimNameValueCostEntry;
 import com.linkedin.thirdeye.client.diffsummary.Dimensions;
 import com.linkedin.thirdeye.client.diffsummary.OLAPDataBaseClient;
 import com.linkedin.thirdeye.client.diffsummary.PinotThirdEyeSummaryClient;
+import com.linkedin.thirdeye.constant.MetricAggFunction;
+import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.DoubleSeries;
 import com.linkedin.thirdeye.dataframe.Series;
@@ -66,7 +68,7 @@ public class MetricDimensionScorer {
     cube.buildWithAutoDimensionOrder(olapClient, dimensions, topDimensions, Collections.<List<String>>emptyList());
 
     // group by dimension
-    DataFrame df = makeContibutionFrame(cube.getCostSet());
+    DataFrame df = makeContributionFrame(cube.getCostSet());
 
     // map dimension to MetricDimension
     Map<String, MetricDimensionEntity> mdMap = new HashMap<>();
@@ -84,10 +86,9 @@ public class MetricDimensionScorer {
   }
 
   private OLAPDataBaseClient getOlapDataBaseClient(SearchContext context, DatasetConfigDTO dataset,
-      MetricConfigDTO metric) {
+      MetricConfigDTO metric) throws Exception {
     String timezone = "UTC";
-    List<MetricExpression> metricExpressions = new ArrayList<>();
-    metricExpressions.add(new MetricExpression(MetricConfigBean.DERIVED_METRIC_ID_PREFIX + metric.getId(), dataset.getDataset()));
+    List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metric.getName(), MetricAggFunction.SUM, dataset.getDataset());
 
     OLAPDataBaseClient olapClient = new PinotThirdEyeSummaryClient(cache);
     olapClient.setCollection(dataset.getDataset());
@@ -99,7 +100,7 @@ public class MetricDimensionScorer {
     return olapClient;
   }
 
-  private static DataFrame makeContibutionFrame(Collection<DimNameValueCostEntry> costs) {
+  private static DataFrame makeContributionFrame(Collection<DimNameValueCostEntry> costs) {
     String[] dim = new String[costs.size()];
     double[] contrib = new double[costs.size()];
     int i = 0;

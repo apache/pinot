@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.apache.commons.cli.BasicParser;
 import org.apache.commons.cli.CommandLine;
@@ -103,7 +104,9 @@ public class FrameworkRunner {
     long baselineOffset = Long.parseLong(cmd.getOptionValue(CLI_BASELINE_OFFSET, "7")) * DAY_IN_MS;
 
     // search loop
+    System.out.println("Enter search context entities' URNs (separated by comma \",\"):");
     BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+
     String line = null;
     while((line = br.readLine()) != null) {
       String[] urns = line.split(",");
@@ -121,12 +124,39 @@ public class FrameworkRunner {
 
       SearchContext context = new SearchContext(entities, windowStart, windowEnd, baselineStart, baselineEnd);
 
-      FrameworkResult result = framework.run(context);
+      System.out.println("*** Search context:");
+      for(Entity e : context.getEntities()) {
+        System.out.println(e.getUrn());
+      }
+      System.out.println("timestampStart: " + context.getTimestampStart());
+      System.out.println("timestampEnd:   " + context.getTimestampEnd());
+      System.out.println("baselineStart:  " + context.getBaselineStart());
+      System.out.println("baselineEnd:    " + context.getBaselineEnd());
 
-      System.out.println("Results:");
+      FrameworkResult result = null;
+      try {
+        result = framework.run(context);
+      } catch (Exception e) {
+        System.out.println("*** Exception while running framework:");
+        e.printStackTrace();
+        continue;
+      }
+
+      System.out.println("*** Linear results:");
       for(Entity e : result.getEntities()) {
         System.out.println(e.getUrn());
       }
+
+      System.out.println("*** Grouped results:");
+      Map<URNUtils.EntityType, Collection<Entity>> grouped = FrameworkResultUtils.topKPerType(result.getEntities(), 3);
+      for(Map.Entry<URNUtils.EntityType, Collection<Entity>> entry : grouped.entrySet()) {
+        System.out.println(entry.getKey().getPrefix());
+        for(Entity e : entry.getValue()) {
+          System.out.println(e.getUrn());
+        }
+      }
+
+      System.out.println("Enter search context entities' URNs (separated by comma \",\"):");
     }
 
     System.out.println("done.");

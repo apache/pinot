@@ -1,5 +1,8 @@
 package com.linkedin.thirdeye.rootcause;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +37,10 @@ public class Framework {
       ExecutionContext context = new ExecutionContext(searchContext);
       PipelineResult result = e.getValue().run(context);
       results.put(e.getKey(), result);
+
       LOG.info("Got {} results", result.getScores().size());
+      if(LOG.isDebugEnabled())
+        logResultDetails(result);
     }
 
     LOG.info("Aggregating results from {} pipelines", results.size());
@@ -45,5 +51,20 @@ public class Framework {
     FrameworkResult result = new FrameworkResult(aggregated, context);
 
     return result;
+  }
+
+  private static void logResultDetails(PipelineResult result) {
+    List<Map.Entry<Entity, Double>> entries = new ArrayList<>(result.getScores().entrySet());
+    Collections.sort(entries, new Comparator<Map.Entry<Entity, Double>>() {
+      @Override
+      public int compare(Map.Entry<Entity, Double> o1, Map.Entry<Entity, Double> o2) {
+        return Double.compare(o1.getValue(), o2.getValue());
+      }
+    });
+
+    for(Map.Entry<Entity, Double> entry : entries) {
+      Entity e = entry.getKey();
+      LOG.debug("{} [{}] {}", Math.round(entry.getValue() * 1000) / 1000.0, e.getClass().getSimpleName(), e.getUrn());
+    }
   }
 }
