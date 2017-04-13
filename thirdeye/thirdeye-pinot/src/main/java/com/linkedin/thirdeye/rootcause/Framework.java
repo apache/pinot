@@ -3,9 +3,13 @@ package com.linkedin.thirdeye.rootcause;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class Framework {
+  private static final Logger LOG = LoggerFactory.getLogger(Framework.class);
+
   final Map<String, Pipeline> pipelines;
   final Aggregator aggregator;
 
@@ -19,17 +23,24 @@ public class Framework {
     this.aggregator = aggregator;
   }
 
-  FrameworkResult run(SearchContext searchContext) {
+  public FrameworkResult run(SearchContext searchContext) {
     Map<String, PipelineResult> results = new HashMap<>();
+
+    LOG.info("Using search context '{}'", searchContext.entities);
 
     // independent execution
     for(Map.Entry<String, Pipeline> e : this.pipelines.entrySet()) {
+      LOG.info("Running pipeline '{}'", e.getKey());
       ExecutionContext context = new ExecutionContext(searchContext);
-      results.put(e.getKey(), e.getValue().run(context));
+      PipelineResult result = e.getValue().run(context);
+      results.put(e.getKey(), result);
+      LOG.info("Got {} results", result.getScores().size());
     }
 
+    LOG.info("Aggregating results from {} pipelines", results.size());
     List<Entity> aggregated = this.aggregator.aggregate(results);
     ExecutionContext context = new ExecutionContext(searchContext, results);
+    LOG.info("Aggregated scores for {} entities", aggregated.size());
 
     FrameworkResult result = new FrameworkResult(aggregated, context);
 

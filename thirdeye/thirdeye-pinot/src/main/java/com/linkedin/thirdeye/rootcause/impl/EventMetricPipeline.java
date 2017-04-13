@@ -2,10 +2,10 @@ package com.linkedin.thirdeye.rootcause.impl;
 
 import com.linkedin.thirdeye.anomaly.events.EventDataProviderManager;
 import com.linkedin.thirdeye.anomaly.events.EventFilter;
+import com.linkedin.thirdeye.anomaly.events.EventType;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.ExecutionContext;
-import com.linkedin.thirdeye.rootcause.Metadata;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
 import java.util.ArrayList;
@@ -19,7 +19,11 @@ import java.util.Set;
 
 
 public class EventMetricPipeline implements Pipeline {
-  EventDataProviderManager manager;
+  final EventDataProviderManager manager;
+
+  public EventMetricPipeline(EventDataProviderManager manager) {
+    this.manager = manager;
+  }
 
   @Override
   public String getName() {
@@ -28,16 +32,17 @@ public class EventMetricPipeline implements Pipeline {
 
   @Override
   public PipelineResult run(ExecutionContext context) {
-    List<Entity> metrics = new ArrayList<>();
+    Set<Entity> metrics = new HashSet<>();
     for(Entity e : context.getSearchContext().getEntities()) {
-      if(EntityUtils.isMetricEntity(e))
+      if(URNUtils.isMetricURN(e.getUrn()))
         metrics.add(e);
     }
 
     Set<EventDTO> eventSet = new HashSet<>();
     for(Entity e : metrics) {
       EventFilter filter = new EventFilter();
-      filter.setMetricName(EntityUtils.getMetricEntityName(e));
+      filter.setEventType(EventType.HOLIDAY); // TODO remove after provider fix
+      filter.setMetricName(URNUtils.getMetricName(e.getUrn()));
 
       eventSet.addAll(manager.getEvents(filter));
     }
@@ -50,19 +55,16 @@ public class EventMetricPipeline implements Pipeline {
       }
     });
 
-    Map<Entity, Double> scores = new HashMap<>();
-    Map<Entity, Metadata> metadata = new HashMap<>();
+    Map<EventEntity, Double> scores = new HashMap<>();
 
-    // Event URN: thirdeye:event:type:name:start
+    int i = 0;
     for(EventDTO dto : events) {
-      Entity e = EventEntityUtils.entityFromDTO(dto);
+      EventEntity e = EventEntity.fromDTO(dto);
 
-      scores.put(e, 1.0d);
-
-      EventMetadata meta = new EventMetadata(dto);
-      metadata.put(e, meta);
+      double score = i++ / (double)events.size();
+      scores.put(e, score);
     }
 
-    return new PipelineResult(scores, metadata);
+    return new PipelineResult(scores);
   }
 }

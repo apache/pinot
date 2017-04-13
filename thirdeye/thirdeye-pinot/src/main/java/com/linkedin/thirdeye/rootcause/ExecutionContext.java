@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.rootcause;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -23,6 +24,6 @@ public class ExecutionContext {
   }
 
   public Map<String, PipelineResult> getResults() {
-    return results;
+    return Collections.unmodifiableMap(results);
   }
 }
