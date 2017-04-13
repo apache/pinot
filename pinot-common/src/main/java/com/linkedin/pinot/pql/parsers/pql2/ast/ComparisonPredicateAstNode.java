@@ -74,7 +74,7 @@ public class ComparisonPredicateAstNode extends PredicateAstNode {
       } else {
         throw new Pql2CompilationException("Comparison is not between a column and a constant");
       }
-    } else if ("<>".equals(_operand)) {
+    } else if ("<>".equals(_operand) || "!=".equals(_operand)) {
       if (_identifier != null && _literal != null) {
         return new FilterQueryTree(_identifier.getName(), Collections.singletonList(_literal.getValueAsString()),
             FilterOperator.NOT, null);

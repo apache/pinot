@@ -21,11 +21,16 @@ import com.linkedin.pinot.pql.parsers.pql2.ast.AstNode;
 
 import org.antlr.v4.runtime.ANTLRInputStream;
 import org.antlr.v4.runtime.BailErrorStrategy;
+import org.antlr.v4.runtime.BaseErrorListener;
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CommonToken;
 import org.antlr.v4.runtime.CommonTokenFactory;
+import org.antlr.v4.runtime.RecognitionException;
+import org.antlr.v4.runtime.Recognizer;
 import org.antlr.v4.runtime.TokenStream;
 import org.antlr.v4.runtime.UnbufferedTokenStream;
+import org.antlr.v4.runtime.misc.NotNull;
+import org.antlr.v4.runtime.misc.Nullable;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.ParseTreeWalker;
 import org.apache.commons.lang3.exception.ExceptionUtils;
@@ -35,6 +40,16 @@ import org.apache.commons.lang3.exception.ExceptionUtils;
  * PQL 2 compiler.
  */
 public class Pql2Compiler implements AbstractCompiler {
+  private static class ErrorListener extends BaseErrorListener {
+    @Override
+    public void syntaxError(@NotNull Recognizer<?, ?> recognizer, @Nullable Object offendingSymbol, int line,
+        int charPositionInLine, @NotNull String msg, @Nullable RecognitionException e) {
+      throw new Pql2CompilationException(msg, offendingSymbol, line, charPositionInLine, e);
+    }
+  }
+
+  private static final ErrorListener ERROR_LISTENER = new ErrorListener();
+
   @Override
   public BrokerRequest compileToBrokerRequest(String expression) throws Pql2CompilationException {
     try {
@@ -42,9 +57,13 @@ public class Pql2Compiler implements AbstractCompiler {
       CharStream charStream = new ANTLRInputStream(expression);
       PQL2Lexer lexer = new PQL2Lexer(charStream);
       lexer.setTokenFactory(new CommonTokenFactory(true));
+      lexer.removeErrorListeners();
+      lexer.addErrorListener(ERROR_LISTENER);
       TokenStream tokenStream = new UnbufferedTokenStream<CommonToken>(lexer);
       PQL2Parser parser = new PQL2Parser(tokenStream);
       parser.setErrorHandler(new BailErrorStrategy());
+      parser.removeErrorListeners();
+      parser.addErrorListener(ERROR_LISTENER);
 
       // Parse
       ParseTree parseTree = parser.root();

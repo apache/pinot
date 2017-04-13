@@ -83,7 +83,7 @@ isClause:
 
 comparisonClause:
   expression comparisonOperator expression;
-comparisonOperator: '<' | '>' | '<>' | '<=' | '>=' | '=';
+comparisonOperator: '<' | '>' | '<>' | '<=' | '>=' | '=' | '!=';
 
 betweenClause:
   expression BETWEEN expression AND expression;

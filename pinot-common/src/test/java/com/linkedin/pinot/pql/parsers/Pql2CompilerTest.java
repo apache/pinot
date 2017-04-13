@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.pql.parsers;
 
+import com.linkedin.pinot.common.request.FilterOperator;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 import com.linkedin.pinot.common.request.BrokerRequest;
@@ -92,5 +93,42 @@ public class Pql2CompilerTest {
     GroupBy groupBy = req.getGroupBy();
     Assert.assertTrue(groupBy.isSetTopN());
     Assert.assertEquals(expectedTopN, groupBy.getTopN());
+  }
+
+  @Test
+  public void testRejectInvalidLexerToken() {
+    assertCompilationFails(new Pql2Compiler(), "select foo from bar where baz ?= 2");
+    assertCompilationFails(new Pql2Compiler(), "select foo from bar where baz =! 2");
+  }
+
+  @Test
+  public void testRejectInvalidParses() {
+    assertCompilationFails(new Pql2Compiler(), "select foo from bar where baz < > 2");
+    assertCompilationFails(new Pql2Compiler(), "select foo from bar where baz ! = 2");
+  }
+
+  @Test
+  public void testParseExceptionHasCharacterPosition() {
+    Pql2Compiler compiler  = new Pql2Compiler();
+    final String query = "select foo from bar where baz ? 2";
+
+    try {
+      compiler.compileToBrokerRequest(query);
+    } catch (Pql2CompilationException e) {
+      // Expected
+      Assert.assertTrue(e.getMessage().startsWith("1:30: "), "Compilation exception should contain line and character for error message. Error message is " + e.getMessage());
+      return;
+    }
+
+    Assert.fail("Query " + query + " compiled successfully but was expected to fail compilation");
+  }
+
+  @Test
+  public void testCStyleInequalityOperator() {
+    Pql2Compiler compiler = new Pql2Compiler();
+
+    BrokerRequest brokerRequest = compiler.compileToBrokerRequest(
+        "select * from vegetables where name != 'Brussels sprouts'");
+    Assert.assertEquals(brokerRequest.getFilterQuery().getOperator(), FilterOperator.NOT);
   }
 }
