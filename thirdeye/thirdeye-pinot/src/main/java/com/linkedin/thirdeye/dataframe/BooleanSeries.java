@@ -125,6 +125,25 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
       return this;
     }
 
+    public Builder fillValues(int count, byte value) {
+      byte[] values = new byte[count];
+      Arrays.fill(values, value);
+      return this.addValues(values);
+    }
+
+    public Builder fillValues(int count, Byte value) {
+      return this.fillValues(count, valueOf(value));
+    }
+
+    public Builder fillValues(int count, boolean value) {
+      return this.fillValues(count, valueOf(value));
+    }
+
+    public Builder fillValues(int count, Boolean value) {
+      return this.fillValues(count, valueOf(value));
+    }
+
+
     @Override
     public BooleanSeries build() {
       int totalSize = 0;

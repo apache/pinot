@@ -130,6 +130,16 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
       return this.addValues(new double[] { valueOf(value) });
     }
 
+    public Builder fillValues(int count, double value) {
+      double[] values = new double[count];
+      Arrays.fill(values, value);
+      return this.addValues(values);
+    }
+
+    public Builder fillValues(int count, Double value) {
+      return this.fillValues(count, valueOf(value));
+    }
+
     @Override
     public Builder addSeries(Collection<Series> series) {
       for(Series s : series)

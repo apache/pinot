@@ -78,6 +78,10 @@ public final class StringSeries extends TypedSeries<StringSeries> {
       return this;
     }
 
+    public Builder fillValues(int count, String value) {
+      return this.fillValues(count, value);
+    }
+
     @Override
     public StringSeries build() {
       return StringSeries.buildFrom(this.values.toArray(new String[this.values.size()]));

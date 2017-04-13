@@ -75,6 +75,16 @@ public final class LongSeries extends TypedSeries<LongSeries> {
       return this;
     }
 
+    public Builder fillValues(int count, long value) {
+      long[] values = new long[count];
+      Arrays.fill(values, value);
+      return this.addValues(values);
+    }
+
+    public Builder fillValues(int count, Long value) {
+      return this.fillValues(count, valueOf(value));
+    }
+
     @Override
     public LongSeries build() {
       int totalSize = 0;
