@@ -1,63 +1,146 @@
 function DimensionTreeMapView(dimensionTreeMapModel) {
-  var template = $("#dimension-tree-map-template").html();
-  this.template_compiled = Handlebars.compile(template);
+  const template = $("#dimension-tree-map-template").html();
+  const graphTemplate = $("#dimension-tree-map-graph-template").html();
+  this.compiledTemplate = Handlebars.compile(template);
+  this.compiledGraph = Handlebars.compile(graphTemplate);
   this.placeHolderId = "#dimension-tree-map-placeholder";
+  this.graphPlaceholderId = "#dimension-tree-map-graph-placeholder";
+
   this.dimensionTreeMapModel = dimensionTreeMapModel;
+  this.currentRange = () => {
+    return {
+      'Last 24 Hours': [moment().subtract(1, 'days'), moment()],
+      'Yesterday': [moment().subtract(2, 'days'), moment().subtract(1, 'days')],
+      'Last 7 Days': [moment().subtract(6, 'days'), moment()],
+      'Last 30 Days': [moment().subtract(29, 'days'), moment()],
+      'This Month': [moment().startOf('month'), moment().endOf('month')],
+      'Last Month': [moment().subtract(1, 'month').startOf('month'),
+        moment().subtract(1, 'month').endOf('month')]
+    };
+  };
+
+  this.baselineRange = () => {
+    const range = {};
+    constants.COMPARE_MODE_OPTIONS.forEach((options) => {
+      const offset = constants.WOW_MAPPING[options];
+      range[options] = [this.calculateBaselineDate('currentStart', offset),this.calculateBaselineDate('currentEnd', offset)];
+    });
+   return range;
+  };
 }
 
 DimensionTreeMapView.prototype = {
-  render: function () {
+  render() {
     if (this.dimensionTreeMapModel.heatmapData) {
-      var result = this.template_compiled(this.dimensionTreeMapModel);
-      $(this.placeHolderId).html(result);
+      var compiledTemplate = this.compiledTemplate(this.dimensionTreeMapModel);
+      $(this.placeHolderId).html(compiledTemplate);
       this.renderTreemapHeaderSection();
       this.renderTreemapSection();
       this.setupListenersForMode();
     }
   },
 
-  renderTreemapHeaderSection : function() {
-    var self = this;
-    function current_range_cb(start, end) {
-      $('#heatmap-current-range span').addClass("time-range").html(start.format('MMM D, ') + start.format('hh:mm a') + '  &mdash;  ' + end.format('MMM D, ') + end.format('hh:mm a'));
-    }
-    function baseline_range_cb(start, end) {
-      $('#heatmap-baseline-range span').addClass("time-range").html(start.format('MMM D, ') + start.format('hh:mm a') + '  &mdash;  ' + end.format('MMM D, ') + end.format('hh:mm a'));
-    }
-    this.renderDatePicker('#heatmap-current-range', current_range_cb, self.dimensionTreeMapModel.currentStart, self.dimensionTreeMapModel.currentEnd);
-    this.renderDatePicker('#heatmap-baseline-range', baseline_range_cb, self.dimensionTreeMapModel.baselineStart, self.dimensionTreeMapModel.baselineEnd);
-    current_range_cb(self.dimensionTreeMapModel.currentStart, self.dimensionTreeMapModel.currentEnd);
-    baseline_range_cb(self.dimensionTreeMapModel.baselineStart, self.dimensionTreeMapModel.baselineEnd);
+  destroy() {
+    const $heatMapCurrent = $('#heatmap-current-range');
+    const $heatMapBaseline = $('#heatmap-baseline-range');
+
+    $heatMapCurrent.length && $heatMapCurrent.data('daterangepicker').remove();
+    $heatMapBaseline.length && $heatMapBaseline.data('daterangepicker').remove();
+    $("#dimension-tree-map-placeholder").children().remove();
   },
 
-  renderDatePicker: function (domId, callbackFun, initialStart, initialEnd){
+  renderTreemapHeaderSection : function() {
+    const $currentRangeText = $('#heatmap-current-range span');
+    const $baselineRangeText = $('#heatmap-baseline-range span');
+    const $currentRange = $('#heatmap-current-range');
+    const $baselineRange = $('#heatmap-baseline-range');
+    const showTime = this.dimensionTreeMapModel.granularity !== constants.GRANULARITY_DAY;
+    const dateFormat = showTime ? constants.DATE_TIME_RANGE_FORMAT : constants.DATE_RANGE_FORMAT;
+
+    const setRangeText = (selector, start, end, dateFormat, compareMode) => {
+       selector.addClass("time-range").html(
+        `<span class="time-range__type">${compareMode}</span> ${start.format(dateFormat)} &mdash; ${end.format(dateFormat)}`);
+    };
+
+    const baselineCallBack = (start, end, compareMode = constants.DATE_RANGE_CUSTOM) => {
+      // show time needs to be after
+      const showTime = this.dimensionTreeMapModel.granularity !== constants.GRANULARITY_DAY;
+      const dateFormat = showTime ? constants.DATE_TIME_RANGE_FORMAT : constants.DATE_RANGE_FORMAT;
+      this.dimensionTreeMapModel['baselineStart'] = start;
+      this.dimensionTreeMapModel['baselineEnd'] = end;
+      this.dimensionTreeMapModel['compareMode'] = compareMode;
+      setRangeText($baselineRangeText, start, end, dateFormat, compareMode);
+      this.destroyTreemapSection();
+      this.dimensionTreeMapModel.update().then(() => {
+        this.renderTreemapSection();
+      });
+    };
+
+    const currentCallBack = (start, end, rangeType = constants.DATE_RANGE_CUSTOM) => {
+      const showTime = this.dimensionTreeMapModel.granularity !== constants.GRANULARITY_DAY;
+      const dateFormat = showTime ? constants.DATE_TIME_RANGE_FORMAT : constants.DATE_RANGE_FORMAT;
+      const $baselineRangePicker = $('#heatmap-baseline-range');
+      const baselineCompareMode = this.dimensionTreeMapModel['compareMode'];
+      const compareMode = this.dimensionTreeMapModel['compareMode'];
+
+      this.dimensionTreeMapModel['currentStart'] = start;
+      this.dimensionTreeMapModel['currentEnd'] = end;
+
+      if (baselineCompareMode !== constants.DATE_RANGE_CUSTOM) {
+        const offset = constants.WOW_MAPPING[compareMode];
+        const baselineStart = start.clone().subtract(offset, 'days');
+        const baselineEnd = end.clone().subtract(offset, 'days');
+        $baselineRangePicker.length && $baselineRangePicker.data('daterangepicker').remove();
+        this.renderDatePicker($baselineRange, baselineCallBack, baselineStart, baselineEnd, showTime, this.baselineRange, 'left');
+        baselineCallBack(baselineStart, baselineEnd, baselineCompareMode);
+      }
+      setRangeText($currentRangeText, start, end, dateFormat, rangeType);
+    };
+
+        // TIME RANGE SELECTION
+    const currentStart = this.dimensionTreeMapModel.currentStart;
+    const currentEnd = this.dimensionTreeMapModel.currentEnd;
+    const baselineStart = this.dimensionTreeMapModel.baselineStart;
+    const baselineEnd = this.dimensionTreeMapModel.baselineEnd;
+
+
+    this.renderDatePicker($currentRange, currentCallBack, currentStart, currentEnd, showTime, this.currentRange);
+    this.renderDatePicker($baselineRange, baselineCallBack, baselineStart, baselineEnd, showTime, this.baselineRange, 'left');
+
+    setRangeText($currentRangeText, currentStart, currentEnd, dateFormat, constants.DATE_RANGE_CUSTOM);
+    setRangeText($baselineRangeText, baselineStart, baselineEnd, dateFormat, this.dimensionTreeMapModel['compareMode']);
+  },
+
+  renderDatePicker: function (domId, callbackFun, initialStart, initialEnd, showTime, rangeGenerator, opens = 'right'){
+    const ranges = rangeGenerator();
     $(domId).daterangepicker({
       startDate: initialStart,
       endDate: initialEnd,
+      maxDate: moment(),
       dateLimit: {
         days: 60
       },
+      opens,
       showDropdowns: true,
       showWeekNumbers: true,
-      timePicker: true,
+      timePicker: showTime,
       timePickerIncrement: 5,
       timePicker12Hour: true,
-      ranges: {
-        'Last 24 Hours': [moment(), moment()],
-        'Yesterday': [moment().subtract(1, 'days'), moment().subtract(1, 'days')],
-        'Last 7 Days': [moment().subtract(6, 'days'), moment()],
-        'Last 30 Days': [moment().subtract(29, 'days'), moment()],
-        'This Month': [moment().startOf('month'), moment().endOf('month')],
-        'Last Month': [moment().subtract(1, 'month').startOf('month'),
-          moment().subtract(1, 'month').endOf('month')]
-      },
+      ranges,
       buttonClasses: ['btn', 'btn-sm'],
       applyClass: 'btn-primary',
       cancelClass: 'btn-default'
     }, callbackFun);
   },
 
-  renderTreemapSection : function() {
+  destroyTreemapSection() {
+    $(this.graphPlaceholderId).children().remove();
+  },
+
+  renderTreemapSection() {
+    this.destroyTreemapSection();
+    const compiledGraph = this.compiledGraph(this.dimensionTreeMapModel);
+    $(this.graphPlaceholderId).html(compiledGraph);
     // DRAW THE AXIS
     // Create the SVG Viewport
     var height = $('#axis-placeholder').height();
@@ -182,21 +265,27 @@ DimensionTreeMapView.prototype = {
       });
 
     }
+    // anchor page to dimension tree map if exists
+    $("#dimension-tree-map-placeholder").get(0).scrollIntoView()
+  },
+
+  calculateBaselineDate(dateType, offset) {
+    const baseDate = this.dimensionTreeMapModel[dateType] || moment();
+    return baseDate.clone().subtract(offset, 'days');
   },
 
   setupListenersForMode : function () {
-    var self = this;
-    $("#percent_change a").click(self, function() {
-      self.dimensionTreeMapModel.heatmapMode = "percentChange";
-      self.render();
+    $("#percent_change a").click(() => {
+      this.dimensionTreeMapModel.heatmapMode = "percentChange";
+      this.renderTreemapSection();
     });
-    $("#change_in_contribution").click(self, function() {
-      self.dimensionTreeMapModel.heatmapMode = "contributionChange";
-      self.render();
+    $("#change_in_contribution").click(() => {
+      this.dimensionTreeMapModel.heatmapMode = "contributionChange";
+      this.renderTreemapSection();
     });
-    $("#contribution_to_overall_change").click(self, function() {
-      self.dimensionTreeMapModel.heatmapMode = "contributionToOverallChange";
-      self.render();
+    $("#contribution_to_overall_change").click(() => {
+      this.dimensionTreeMapModel.heatmapMode = "contributionToOverallChange";
+      this.renderTreemapSection();
     });
   },
 }

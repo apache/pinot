@@ -131,19 +131,24 @@ DataService.prototype = {
       var response = this.postData(url, data);
     },
 
-    fetchGranularityForMetric: function (metricId) {
-      var url = "/data/agg/granularity/metric/"+metricId;
-      return this.getDataSynchronous(url);
+    fetchGranularityForMetric(metricId) {
+      const url = constants.METRIC_GRANULARITY + metricId;
+      return this.getDataAsynchronous(url);
     },
 
-    fetchDimensionsForMetric : function(metricId) {
-      var url = "/data/autocomplete/dimensions/metric/"+metricId;
-      return this.getDataSynchronous(url);
+    fetchDimensionsForMetric(metricId) {
+      const url = constants.METRIC_DIMENSION + metricId;
+      return this.getDataAsynchronous(url);
     },
 
-    fetchFiltersForMetric : function(metricId) {
-      var url = "/data/autocomplete/filters/metric/" + metricId;
-      return this.getDataSynchronous(url);
+    fetchFiltersForMetric(metricId) {
+      const url = constants.METRIC_FILTERS + metricId;
+      return this.getDataAsynchronous(url);
+    },
+
+    fetchMaxTimeForMetric(metricId) {
+      const url = constants.METRIC_MAX_TIME + metricId;
+      return this.getDataAsynchronous(url);
     },
 
     fetchTimeseriesCompare: function (metricId, currentStart, currentEnd, baselineStart, baselineEnd,
@@ -151,14 +156,14 @@ DataService.prototype = {
       var url = "/timeseries/compare/" + metricId + "/" + currentStart + "/" + currentEnd + "/"
           + baselineStart + "/" + baselineEnd + "?dimension=" + dimension + "&filters="
           + JSON.stringify(filters) + "&granularity=" + granularity;
-      return this.getDataSynchronous(url);
+      return this.getDataAsynchronous(url, {}, null, 'analysis-graph-spin-area');
     },
 
   fetchHeatmapData: function (metricId, currentStart, currentEnd, baselineStart, baselineEnd,
       filters = {}) {
     var url = "/data/heatmap/" + metricId + "/" + currentStart + "/" + currentEnd + "/"
         + baselineStart + "/" + baselineEnd + "?filters=" + JSON.stringify(filters);
-    return this.getDataSynchronous(url);
+    return this.getDataAsynchronous(url, {}, null, 'dimension-tree-spin-area');
   },
 
   fetchAnomalyWowData(anomalyId){

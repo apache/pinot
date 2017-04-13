@@ -93,13 +93,14 @@ function AnomalyResultView(anomalyResultModel) {
     timePicker : true,
     timePickerIncrement : 60,
     timePicker12Hour : true,
-    ranges : {
-      'Last 24 Hours' : [ moment(), moment() ],
-      'Yesterday' : [ moment().subtract(1, 'days'), moment().subtract(1, 'days') ],
-      'Last 7 Days' : [ moment().subtract(6, 'days'), moment() ],
-      'Last 30 Days' : [ moment().subtract(29, 'days'), moment() ],
-      'This Month' : [ moment().startOf('month'), moment().endOf('month') ],
-      'Last Month' : [ moment().subtract(1, 'month').startOf('month'), moment().subtract(1, 'month').endOf('month') ]
+    ranges: {
+      'Last 24 Hours': [moment().subtract(1, 'days'), moment()],
+      'Yesterday': [moment().subtract(1, 'days').startOf('day'), moment().subtract(1, 'days').endOf('day')],
+      'Last 7 Days': [moment().subtract(6, 'days').startOf('day'), moment().endOf('day')],
+      'Last 30 Days': [moment().subtract(29, 'days').startOf('day'), moment().endOf('day')],
+      'This Month': [moment().startOf('month'), moment().endOf('month')],
+      'Last Month': [moment().subtract(1, 'month').startOf('month'),
+        moment().subtract(1, 'month').endOf('month')]
     },
     buttonClasses : [ 'btn', 'btn-sm' ],
     applyClass : 'btn-primary',
@@ -145,8 +146,8 @@ AnomalyResultView.prototype = {
     const $anomalyTimeRangeEnd = $('#anomalies-time-range-end span');
 
     function cb(start, end, rangeType = constants.DATE_RANGE_CUSTOM) {
-      $anomalyTimeRangeStart.addClass('time-range').html(start.format(constants.DATE_RANGE_FORMAT));
-      $anomalyTimeRangeEnd.addClass('time-range').html(end.format(constants.DATE_RANGE_FORMAT));
+      $anomalyTimeRangeStart.addClass('time-range').html(start.format(constants.DATE_TIME_RANGE_FORMAT));
+      $anomalyTimeRangeEnd.addClass('time-range').html(end.format(constants.DATE_TIME_RANGE_FORMAT));
     }
     $('#anomalies-time-range-start').daterangepicker(this.timeRangeConfig, cb);
 
@@ -280,7 +281,7 @@ AnomalyResultView.prototype = {
           y : {
             show : true,
             tick: {
-              format: d3.format(".2f")
+              format: d3.format('.2s')
             }
           },
           x : {

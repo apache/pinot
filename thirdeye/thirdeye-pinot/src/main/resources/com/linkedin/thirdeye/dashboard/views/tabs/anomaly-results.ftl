@@ -62,13 +62,13 @@
             <div class="anomaly-details-row">
               <div class="anomaly-details-items">
                 <label class="label-medium-semibold">Current Avg</label>
-                <span>{{current}}</span>
+                <span>{{formatNumber current}}</span>
               </div>
               <div class="anomaly-details-items">
                 <label class="label-medium-semibold">Baseline Avg</label>
                 <span>
                   {{#if baseline}}
-                    {{baseline}}
+                    {{formatNumber baseline}}
                   {{else}}
                     N/A
                   {{/if}}

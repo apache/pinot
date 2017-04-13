@@ -13,17 +13,24 @@ TimeSeriesCompareController.prototype = {
   handleAppEvent: function (params) {
     params = params || HASH_SERVICE.getParams();
     this.timeSeriesCompareModel.init(params);
-    this.timeSeriesCompareModel.update();
-    this.timeSeriesCompareView.render();
-
-    // render heatmap if view params are set in hashParams
-    this.dimensionTreeMapController.handleAppEvent(params);
+    this.timeSeriesCompareModel.update().then(() => {
+      this.timeSeriesCompareView.render();
+    });
+    if (params.heatMapCurrentStart && params.heatMapCurrentEnd && params.heatMapBaselineStart && params.heatMapBaselineEnd) {
+      this.dimensionTreeMapController.handleAppEvent(params);
+    }
   },
 
-  handleHeatMapRenderEvent: function (viewObject) {
-
-    // TODO: separate refreshWindowHash within update
+  handleHeatMapRenderEvent(viewObject) {
+    this.dimensionTreeMapController.destroy();
     HASH_SERVICE.update(viewObject.viewParams);
+    HASH_SERVICE.refreshWindowHashForRouting('analysis');
     this.dimensionTreeMapController.handleAppEvent(HASH_SERVICE.getParams());
+  },
+
+  destroy() {
+    this.timeSeriesCompareView.destroy();
+    this.dimensionTreeMapController.destroy();
   }
 };
+

@@ -17,27 +17,37 @@ function TimeSeriesCompareView(timeSeriesCompareModel) {
   this.contributor_table_placeHolderId = "#contributor-table-placeholder";
   this.heatmapRenderEvent = new Event(this);
 
-  this.viewParams;
+  this.viewParams = {};
+  this.chart;
 }
 
 TimeSeriesCompareView.prototype = {
-  render: function () {
-    var self = this;
+  render() {
     if (this.timeSeriesCompareModel.subDimensionContributionDetails) {
+      const heatmapCurrentStart = this.timeSeriesCompareModel.heatMapCurrentStart;
+      const heatmapCurrentEnd = this.timeSeriesCompareModel.heatMapCurrentEnd;
+
       this.renderChartSection();
+      if (heatmapCurrentStart && heatmapCurrentEnd) {
+        this.loadAnomalyRegion(heatmapCurrentStart, heatmapCurrentEnd);
+      }
       this.renderPercentageChangeSection();
       this.setupListenersForDetailsAndCumulativeCheckBoxes();
 
       // set initial view params for rendering heatmap
       this.viewParams = {
-        metricId: self.timeSeriesCompareModel.metricId,
-        currentStart: self.timeSeriesCompareModel.currentStart,
-        currentEnd: self.timeSeriesCompareModel.currentEnd,
-        baselineStart: self.timeSeriesCompareModel.baselineStart,
-        baselineEnd: self.timeSeriesCompareModel.baselineEnd,
-        heatmapFilters: self.timeSeriesCompareModel.filters
+        metricId: this.timeSeriesCompareModel.metricId,
+        heatmapCurrentStart: this.timeSeriesCompareModel.heatmapCurrentStart || this.timeSeriesCompareModel.currentStart,
+        heatmapCurrentEnd: this.timeSeriesCompareModel.heatMapCurrentEnd || this.timeSeriesCompareModel.currentEnd,
+        heatmapBaselineStart: this.timeSeriesCompareModel.baselineStart,
+        heatmapBaselineEnd: this.timeSeriesCompareModel.baselineEnd,
+        heatmapFilters: Object.assign({}, this.timeSeriesCompareModel.filters)
       };
     }
+  },
+
+  destroy() {
+    $('#timeseries-contributor-placeholder, #contributor-table-placeholder').children().remove();
   },
 
   renderChartSection: function () {
@@ -45,13 +55,17 @@ TimeSeriesCompareView.prototype = {
     var timeseriesContributorViewResult = this.timeseries_contributor_template_compiled(
         this.timeSeriesCompareModel);
     $(this.timeseries_contributor_placeHolderId).html(timeseriesContributorViewResult);
-    this.loadChart(
-        this.timeSeriesCompareModel.subDimensionContributionDetails.contributionMap['All']);
 
     // render chart legend
     var timeseriesSubDimensionsHtml = this.timeseries_subdimension_legend_template_compiled(
         this.timeSeriesCompareModel);
     $(this.timeseries_subdimension_legend_placeHolderId).html(timeseriesSubDimensionsHtml);
+
+    // this needs to be called last so that the chart is rendered after the legend
+    // otherwise, we run into overflow issues
+    this.loadChart(
+        this.timeSeriesCompareModel.subDimensionContributionDetails.contributionMap['All']);
+    this.loadAnomalyRegion();
     this.setupListenerForChartSubDimension();
   },
 
@@ -64,12 +78,16 @@ TimeSeriesCompareView.prototype = {
     this.setupListenersForPercentageChangeCells();
   },
 
-  loadChart: function (timeSeriesObject) {
+  loadChart: function (timeSeriesObject, regions = []) {
     // CHART GENERATION
-    var chart = c3.generate({
+    this.timeSeriesObject = timeSeriesObject;
+    this.chart = c3.generate({
       bindto: '#analysis-chart',
       data: {
-        x: 'date', columns: timeSeriesObject.columns, type: 'line'
+        x: 'date',
+        xFormat : '%Y-%m-%d %H:%M',
+        columns: timeSeriesObject.columns,
+        type: 'line'
       },
       legend : {
         position : 'inset',
@@ -79,18 +97,38 @@ TimeSeriesCompareView.prototype = {
       },
       axis: {
         y: {
-          show: true
+          show: true,
+          tick: {
+            format: d3.format('.2s')
+          }
         },
         x: {
-          type: 'timeseries', show: true, tick: {
-            "culling": {"max": 100},
-            "count": 10, // "rotate":30,   // this will rotate the x axis display values
-            "fit": true,
-            "format": "%m-%d %H:%M"
+          type: 'timeseries', show: true, tick: { // "rotate":30,   // this will rotate the x axis display values
+            fit: false
           }
         }
-      }
+      },
+      zoom: {
+        enabled: true
+      },
+      regions
     });
+  },
+
+  loadAnomalyRegion(heatMapCurrentStart, heatMapCurrentEnd) {
+    if (!(heatMapCurrentStart && heatMapCurrentEnd)) return;
+    const regions = {
+        axis: 'x',
+        start: heatMapCurrentStart.format(constants.TIMESERIES_DATE_FORMAT),
+        end: heatMapCurrentEnd.format(constants.TIMESERIES_DATE_FORMAT),
+        class: 'anomaly-region',
+        tick: {
+          format: '%m %d %Y'
+        }
+      };
+
+    this.chart.regions([regions]);
+    this.chart.load({});
   },
 
   setupListenersForDetailsAndCumulativeCheckBoxes: function () {
@@ -112,25 +150,38 @@ TimeSeriesCompareView.prototype = {
       for (var j in
           self.timeSeriesCompareModel.subDimensionContributionDetails.timeBucketsCurrent) {
         var tableCellId = i + "-" + j;
-        $("#" + tableCellId).click(function (e) {
+        $("#" + tableCellId).click((e) => {
           var subDimensionBucketIndexArr = e.target.attributes[0].value.split("-");
-          var subDimension = self.timeSeriesCompareModel.subDimensions[subDimensionBucketIndexArr[0]];
+          var subDimension = this.timeSeriesCompareModel.subDimensions[subDimensionBucketIndexArr[0]];
           var bucketIndex = subDimensionBucketIndexArr[1];
-          self.collectAndUpdateViewParamsForHeatMapRendering(subDimension, bucketIndex);
-          self.heatmapRenderEvent.notify();
+          this.collectAndUpdateViewParamsForHeatMapRendering(subDimension, bucketIndex);
+          const { heatMapCurrentStart, heatMapCurrentEnd } = this.viewParams;
+          this.loadAnomalyRegion(heatMapCurrentStart, heatMapCurrentEnd);
+          this.heatmapRenderEvent.notify();
         });
       }
     }
   },
 
   setupListenerForChartSubDimension: function () {
-    var self = this;
-    for (var i in self.timeSeriesCompareModel.subDimensions) {
-      $('#a-sub-dimension-' + i + ' a').click(self, function (e) {
-        var index = e.currentTarget.getAttribute('id');
-        var subDimension = self.timeSeriesCompareModel.subDimensions[index];
-        self.loadChart(
-            self.timeSeriesCompareModel.subDimensionContributionDetails.contributionMap[subDimension]);
+    $('#chart-dimensions :checkbox').change((event) => {
+      const subDimensionIndex =  event.currentTarget.getAttribute('id');
+      const subDimension = this.timeSeriesCompareModel.subDimensions[subDimensionIndex];
+      const checked = event.currentTarget.checked;
+      this.updateSubDimension(subDimension, checked);
+    });
+  },
+
+  updateSubDimension(subDimension, checked) {
+    const { columns } = this.timeSeriesCompareModel.subDimensionContributionDetails.contributionMap[subDimension];
+    const [ _, current, baseline ] = columns;
+    if (checked) {
+      this.chart.load({
+        columns: [current, baseline]
+      });
+    } else {
+      this.chart.load({
+        unload: [current[0], baseline[0]]
       });
     }
   },
@@ -142,7 +193,7 @@ TimeSeriesCompareView.prototype = {
     var baselineStart = self.timeSeriesCompareModel.subDimensionContributionDetails.timeBucketsBaseline[bucketIndex];
 
     var delta = 5 * 60 * 60 * 1000; // 1 hour
-    if (this.timeSeriesCompareModel.granularity == 'DAYS') {
+    if (this.timeSeriesCompareModel.granularity === 'DAYS') {
       delta = 86400 * 1000;
     }
     if (self.timeSeriesCompareModel.subDimensionContributionDetails.timeBucketsCurrent.length > 1) {
@@ -155,15 +206,27 @@ TimeSeriesCompareView.prototype = {
     var heatmapFilters = self.timeSeriesCompareModel.filters;
     if (!(subDimension.toUpperCase() === 'ALL')) {
       heatmapFilters[self.timeSeriesCompareModel.dimension] = [subDimension];
+    } else {
+      heatmapFilters = {};
     }
 
     this.viewParams = {
       metricId: self.timeSeriesCompareModel.metricId,
-      currentStart: moment(currentStart),
-      currentEnd: moment(currentEnd),
-      baselineStart: moment(baselineStart),
-      baselineEnd: moment(baselineEnd),
+      heatMapCurrentStart: moment(currentStart),
+      heatMapCurrentEnd: moment(currentEnd),
+      heatMapBaselineStart: moment(baselineStart),
+      heatMapBaselineEnd: moment(baselineEnd),
       heatmapFilters: heatmapFilters
+    };
+  },
+
+  clearHeatMapViewParams() {
+    this.viewParams = {
+      heatMapCurrentStart: null,
+      heatMapCurrentEnd: null,
+      heatMapBaselineStart: null,
+      heatMapBaselineEnd: null,
+      heatmapFilters: null
     };
   }
 }

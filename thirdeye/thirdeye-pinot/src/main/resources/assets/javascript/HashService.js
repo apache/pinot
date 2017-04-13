@@ -39,12 +39,21 @@ HashService.prototype = {
       case HASH_PARAMS.ANALYSIS_CURRENT_END:
       case HASH_PARAMS.ANALYSIS_BASELINE_START:
       case HASH_PARAMS.ANALYSIS_BASELINE_END:
+      case HASH_PARAMS.HEATMAP_CURRENT_START:
+      case HASH_PARAMS.HEATMAP_CURRENT_END:
+      case HASH_PARAMS.HEATMAP_BASELINE_START:
+      case HASH_PARAMS.HEATMAP_BASELINE_END:
+        const isNum = /^\d+$/.test(value);
+        if (isNum) {
+          value = Number(value);
+        }
         value = value && moment(value);
         break;
       case HASH_PARAMS.ANOMALIES_PAGE_NUMBER:
         value = Number(value);
         break;
       case HASH_PARAMS.ANALYSIS_FILTERS:
+      case HASH_PARAMS.HEATMAP_FILTERS:
         try {
           value = JSON.parse(value);
         } catch (e) {

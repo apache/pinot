@@ -4,11 +4,10 @@ function InvestigateView(investigateModel) {
   this.investigate_template_compiled = Handlebars.compile(investigate);
   this.investigateModel = investigateModel;
 
-
   this.anomalyID;
   this.anomaly;
   this.wowData;
-  this.inves
+  this.investigateData;
   this.viewContributionClickEvent = new Event(this);
 
   this.investigateModel.renderViewEvent.attach(this.renderViewEventHandler.bind(this));
@@ -46,27 +45,44 @@ InvestigateView.prototype = {
   },
 
   formatWowResults( wowResults, args = {}){
-    const { anomalyRegionStart, anomalyRegionEnd, dataset, metric } = args;
-    const start = moment(anomalyRegionStart);
-    const end = moment(anomalyRegionEnd);
-    const wowMapping = {
-      WoW: 7,
-      Wo2W: 14,
-      Wo3W: 21,
-      Wo4W: 28
-    };
+    const {
+      anomalyStart,
+      anomalyEnd,
+      dataset,
+      metricId,
+      timeUnit,
+      currentStart,
+      currentEnd,
+      anomalyFunctionDimension
+      } = args;
+    const granularity = timeUnit === 'MINUTES' ? '5_MINUTES' : timeUnit;
+    const filters = {}
+    const start = moment(currentStart);
+    const end = moment(currentEnd);
+    const heatMapCurrentStart = moment(anomalyStart);
+    const heatMapCurrentEnd = moment(anomalyEnd);
+    const dimension = anomalyFunctionDimension ? Object.keys(JSON.parse(anomalyFunctionDimension))[0] : 'ALL';
 
     return wowResults
       .filter(wow => wow.compareMode !== 'Wo4W')
       .map((wow) => {
-        const offset = wowMapping[wow.compareMode];
+        const offset = constants.WOW_MAPPING[wow.compareMode];
         const baselineStart = start.clone().subtract(offset, 'days');
         const baselineEnd = end.clone().subtract(offset, 'days');
+        const heatMapBaselineStart = heatMapCurrentStart.clone().subtract(offset, 'days');
+        const heatMapBaselineEnd = heatMapCurrentEnd.clone().subtract(offset, 'days');
         wow.change *= 100;
-        wow.url = `dashboard#view=compare&dataset=${dataset}&compareMode=WoW&aggTimeGranularity=aggregateAll&currentStart=${start.valueOf()}&currentEnd=${end.valueOf()}&baselineStart=${baselineStart.valueOf()}&baselineEnd=${baselineEnd.valueOf()}&metrics=${metric}`;
+        wow.url = `thirdeye#analysis?metricId=${metricId}&dimension=${dimension}&currentStart=${start.valueOf()}&currentEnd=${end.valueOf()}&` +
+            `baselineStart=${baselineStart.valueOf()}&baselineEnd=${baselineEnd.valueOf()}&` +
+            `compareMode=${wow.compareMode}&filters={}&granularity=${granularity}&` +
+            `heatMapCurrentStart=${heatMapCurrentStart.valueOf()}&` +
+            `heatMapCurrentEnd=${heatMapCurrentEnd.valueOf()}&heatMapBaselineStart=${heatMapBaselineStart.valueOf()}&` +
+            `heatMapBaselineEnd=${heatMapBaselineEnd.valueOf()}`;
         return wow;
       });
   },
+
+
 
   render() {
     const template_with_anomaly = this.investigate_template_compiled(this.investigateData);
@@ -93,37 +109,6 @@ InvestigateView.prototype = {
     }
   },
 
-  setupListenerOnViewContributionLink() {
-    const anomaly = this.investigateModel.getAnomaly();
-    $('.thirdeye-link').click((e) => {
-      const wowType = e.target.id;
-      const wowMapping = {
-        wow1: 7,
-        wow2: 14,
-        wow3: 21
-      };
-      const offset = wowMapping[wowType] || 7;
-      const currentStart = moment(anomaly.currentStart);
-      const currentEnd = moment(anomaly.currentEnd);
-      const granularity = this.getGranularity(currentStart, currentEnd);
-
-      const analysisParams = {
-        metricId: anomaly.metricId,
-        currentStart,
-        currentEnd,
-        granularity,
-        baselineStart: currentStart.clone().subtract(offset, 'days'),
-        baselineEnd: currentEnd.clone().subtract(offset, 'days')
-      };
-
-      // if (anomaly.anomalyFunctionDimension.length) {
-      //   const dimension = JSON.parse(anomaly.anomalyFunctionDimension);
-      //   analysisParams.dimension = Object.keys(dimension)[0];
-      // }
-      this.viewContributionClickEvent.notify(analysisParams);
-    });
-  },
-
   setupListenerOnUserFeedback() {
     $("input[name=feedback-radio]").change((event) => {
       const userFeedback = event.target.value;
@@ -132,17 +117,6 @@ InvestigateView.prototype = {
 
       $('#anomaly-feedback').html(`Resolved (${feedbackString})`);
     });
-  },
-
-  getGranularity(start, end) {
-    const hoursDiff = end.diff(start, 'hours');
-    if (hoursDiff < 3) {
-      return '5_MINUTES';
-    } else if (hoursDiff < 120) {
-      return 'HOURS';
-    } else {
-      return 'DAYS';
-    }
   },
 
   renderAnomalyChart(anomaly){
@@ -179,7 +153,7 @@ InvestigateView.prototype = {
           y : {
             show : true,
             tick: {
-              format: d3.format(".2f")
+              format: d3.format('.2s')
             }
           },
           x : {

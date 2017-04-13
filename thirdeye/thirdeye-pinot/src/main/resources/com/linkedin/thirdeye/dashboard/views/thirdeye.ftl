@@ -69,16 +69,19 @@
   <#include "tabs/analysis.ftl"/>
 </script>
 <script id="metric-summary-template" type="text/x-handlebars-template">
-	<#include "tabs/dashboard/metric-summary-dashboard.ftl">
+  <#include "tabs/dashboard/metric-summary-dashboard.ftl">
 </script>
 <script id="anomaly-summary-template" type="text/x-handlebars-template">
-	<#include "tabs/dashboard/anomaly-summary-dashboard.ftl">
+  <#include "tabs/dashboard/anomaly-summary-dashboard.ftl">
 </script>
 <script id="wow-summary-template" type="text/x-handlebars-template">
-	<#include "tabs/dashboard/wow-summary-dashboard.ftl">
+  <#include "tabs/dashboard/wow-summary-dashboard.ftl">
+</script>
+<script id="analysis-options-template" type="text/x-handlebars-template">
+  <#include "tabs/analysis/analysis-options.ftl"/>
 </script>
 <script id="timeseries-contributor-template" type="text/x-handlebars-template">
-	<#include "tabs/analysis/timeseries-contributor.ftl"/>
+  <#include "tabs/analysis/timeseries-contributor.ftl"/>
 </script>
 <script id="timeseries-subdimension-legend-template" type="text/x-handlebars-template">
   <#include "tabs/analysis/timeseries-subdimension-legend.ftl"/>
@@ -88,6 +91,9 @@
 </script>
 <script id="dimension-tree-map-template" type="text/x-handlebars-template">
   <#include "tabs/analysis/dimension-tree-map.ftl"/>
+</script>
+<script id="dimension-tree-map-graph-template" type="text/x-handlebars-template">
+  <#include "tabs/analysis/dimension-tree-map-graph.ftl"/>
 </script>
 <#include "admin/job-info.ftl"/>
 <#include "admin/ingraph-metric-config.ftl"/>
@@ -149,80 +155,80 @@
 </head>
 <body>
 
-	<div class="container-fullwidth bg-black">
-		<div class="">
-			<div class="">
-				<nav class="navbar navbar-inverse" role="navigation">
+  <div class="container-fullwidth bg-black">
+    <div class="">
+      <div class="">
+        <nav class="navbar navbar-inverse" role="navigation">
           <div class="container thirdeye-nav">
-						<div id="global-navbar" class="navbar-header">
-							<a class="navbar-brand logo" href="#anomalies" id="thirdeye-home">ThirdEye</a>
-						</div>
+            <div id="global-navbar" class="navbar-header">
+              <a class="navbar-brand logo" href="#anomalies" id="thirdeye-home">ThirdEye</a>
+            </div>
 
-						<ul class="nav navbar-nav thirdeye-nav__tabs" id="main-tabs">
-							<li><a href="#anomalies">Anomalies</a></li>
-							<li class="hidden"><a href="#investigate">Investigate</a></li>
-							<li class="hidden"><a href="#analysis">Root Cause Analysis</a></li>
-						</ul>
-						<div class="thirdeye-nav__oldui">
-							<div class="thirdeye-nav__divider"></div>
-							<a class="btn thirdeye-btn thirdeye-btn--secondary" href="dashboard">Old UI</a>
-						</div>
+            <ul class="nav navbar-nav thirdeye-nav__tabs" id="main-tabs">
+              <li><a href="#anomalies">Anomalies</a></li>
+              <li class="hidden"><a href="#investigate">Investigate</a></li>
+              <li><a href="#analysis">Root Cause Analysis</a></li>
+            </ul>
+            <div class="thirdeye-nav__oldui">
+              <div class="thirdeye-nav__divider"></div>
+              <a class="btn thirdeye-btn thirdeye-btn--secondary" href="dashboard">Old UI</a>
+            </div>
 
             <!-- Hidding this until it's fully fleshed out -->
             <!-- Jira: https://jira01.corp.linkedin.com:8443/browse/THIRDEYE-1042 -->
-						<!-- 	<ul class="nav navbar-nav navbar-right">
-								<li><a href="#">Manage Anomalies</a></li>
-								<li class="dropdown"><a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Admin <span class="caret"></span></a>
-									<ul class="dropdown-menu">
-										<li class=""><a href="#ingraph-metric-config" data-toggle="tab">Ingraph Metric</a></li>
-										<li class=""><a href="#ingraph-dashboard-config" data-toggle="tab">Ingraph Dashboard</a></li>
-										<li class=""><a href="#dataset-config" data-toggle="tab">Dataset </a></li>
-										<li class=""><a href="#metric-config" data-toggle="tab">Metric</a></li>
-										<li class=""><a href="#job-info" data-toggle="tab">JobInfo</a></li>
-										<li class=""><a href="#entity-editor" data-toggle="tab">Entity Editor</a></li>
-									</ul></li>
-								<li><a href="#">Sign In</a></li>
-							</ul> -->
-					</nav>
-				</div>
-			</div>
-		</div>
-	</div>
+            <!--  <ul class="nav navbar-nav navbar-right">
+                <li><a href="#">Manage Anomalies</a></li>
+                <li class="dropdown"><a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">Admin <span class="caret"></span></a>
+                  <ul class="dropdown-menu">
+                    <li class=""><a href="#ingraph-metric-config" data-toggle="tab">Ingraph Metric</a></li>
+                    <li class=""><a href="#ingraph-dashboard-config" data-toggle="tab">Ingraph Dashboard</a></li>
+                    <li class=""><a href="#dataset-config" data-toggle="tab">Dataset </a></li>
+                    <li class=""><a href="#metric-config" data-toggle="tab">Metric</a></li>
+                    <li class=""><a href="#job-info" data-toggle="tab">JobInfo</a></li>
+                    <li class=""><a href="#entity-editor" data-toggle="tab">Entity Editor</a></li>
+                  </ul></li>
+                <li><a href="#">Sign In</a></li>
+              </ul> -->
+          </nav>
+        </div>
+      </div>
+    </div>
+  </div>
 
-	<div class="tab-content">
-		<div class="tab-pane" id="dashboard">
-			<div id="dashboard-place-holder"></div>
-		</div>
-		<div class="tab-pane" id="anomalies">
-			<div id="anomalies-place-holder"></div>
-		</div>
+  <div class="tab-content">
+    <div class="tab-pane" id="dashboard">
+      <div id="dashboard-place-holder"></div>
+    </div>
+    <div class="tab-pane" id="anomalies">
+      <div id="anomalies-place-holder"></div>
+    </div>
 
-		<div class="tab-pane" id="investigate">
-			<div id='investigate-spin-area'></div>
-			<div id="investigate-place-holder""></div>
-		</div>
+    <div class="tab-pane" id="investigate">
+      <div id='investigate-spin-area'></div>
+      <div id="investigate-place-holder""></div>
+    </div>
 
-		<div class="tab-pane" id="analysis">
-			<div id="analysis-place-holder"></div>
-		</div>
-		<div class="tab-pane" id="ingraph-metric-config">
-			<div id="ingraph-metric-config-place-holder"></div>
-		</div>
-		<div class="tab-pane" id="ingraph-dashboard-config">
-			<div id="ingraph-dashboard-config-place-holder"></div>
-		</div>
-		<div class="tab-pane" id="dataset-config">
-			<div id="dataset-config-place-holder"></div>
-		</div>
-		<div class="tab-pane" id="metric-config">
-			<div id="metric-config-place-holder"></div>
-		</div>
-		<div class="tab-pane" id="job-info">
-			<div id="job-info-place-holder"></div>
-		</div>
-		<div class="tab-pane" id="entity-editor">
-			<div id="entity-editor-place-holder"></div>
-		</div>
-	</div>
+    <div class="tab-pane" id="analysis">
+      <div id="analysis-place-holder"></div>
+    </div>
+    <div class="tab-pane" id="ingraph-metric-config">
+      <div id="ingraph-metric-config-place-holder"></div>
+    </div>
+    <div class="tab-pane" id="ingraph-dashboard-config">
+      <div id="ingraph-dashboard-config-place-holder"></div>
+    </div>
+    <div class="tab-pane" id="dataset-config">
+      <div id="dataset-config-place-holder"></div>
+    </div>
+    <div class="tab-pane" id="metric-config">
+      <div id="metric-config-place-holder"></div>
+    </div>
+    <div class="tab-pane" id="job-info">
+      <div id="job-info-place-holder"></div>
+    </div>
+    <div class="tab-pane" id="entity-editor">
+      <div id="entity-editor-place-holder"></div>
+    </div>
+  </div>
 </body>
 </html>

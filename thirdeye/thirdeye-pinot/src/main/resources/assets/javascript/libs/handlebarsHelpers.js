@@ -31,8 +31,17 @@ Handlebars.registerHelper('formatDelta', function (a, b) {
 });
 
 /**
+ * Displays human readable number
+ * @param {number} num A number
+ * @return {string} human readable number
+ */
+Handlebars.registerHelper('formatNumber', function(num) {
+  return num.toString().replace(/(\d)(?=(\d\d\d)+(?!\d))/g, "$1,");
+});
+
+/**
  * Template helper that assigns the correct css class based on the delta
- * @param  {string} value: string value of delta ('2.4%')
+ * @param  {string} value string value of delta ('2.4%')
  * @return [string] css class positive/negative
  */
 Handlebars.registerHelper('colorDelta', function(value) {
@@ -47,7 +56,24 @@ Handlebars.registerHelper('displayHour', function (date) {
 
 Handlebars.registerHelper('displayMonthDayHour', function (date) {
   var tz = getTimeZone();
-  return moment(date).tz(tz).format('M-D H');
+  return moment(date).tz(tz).format('M/D hA');
+});
+
+/**
+ * Displays human readable date
+ * @param {string} granularity granularity of the metric
+ * @param {string} date A date
+ * @return {string} human readable date
+ */
+Handlebars.registerHelper('formatDate', function (granularity, date) {
+  var tz = getTimeZone();
+  const dateFormat = {
+    'DAYS': 'M/D',
+    'HOURS': 'M/D ha',
+    '5_MINUTES': 'M/D hh:mm a'
+  }[granularity];
+
+  return moment(date).tz(tz).format(dateFormat);
 });
 
 Handlebars.registerHelper('if_eq', function(a, b, opts) {

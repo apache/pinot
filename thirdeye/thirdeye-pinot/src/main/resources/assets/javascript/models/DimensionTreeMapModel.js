@@ -9,7 +9,8 @@ function DimensionTreeMapModel() {
 
   this.heatmapData;
 
-  this.heatmapMode = "percentChange";
+  this.heatmapMode = 'percentChange';
+  this.compareMode = constants.DEFAULT_COMPARE_MODE;
 
   this.currentTotal = 0;
   this.baselineTotal = 0;
@@ -24,41 +25,31 @@ DimensionTreeMapModel.prototype = {
     if (params) {
       this.metricId = params.metricId;
       this.metricName = params.metricName;
-
-      if (params.currentStart) {
-        this.currentStart = params.currentStart;
-      }
-      if (params.currentEnd) {
-        this.currentEnd = params.currentEnd;
-      }
-      if (params.baselineStart) {
-        this.baselineStart = params.baselineStart;
-      }
-      if (params.baselineEnd) {
-        this.baselineEnd = params.baselineEnd;
-      }
-      if (params.granularity) {
-        this.granularity = params.granularity;
-      }
-
-      if (params.heatmapFilters) {
-        this.heatmapFilters = params.heatmapFilters;
-      } else if (params.filters) {
-        this.heatmapFilters = params.filters;
-      }
-
-      if (params.heatmapMode) {
-        this.heatmapMode = params.heatmapMode;
-      }
+      this.currentStart = params.heatMapCurrentStart || this.currentStart;
+      this.currentEnd = params.heatMapCurrentEnd || this.currentEnd;
+      this.baselineStart = params.heatMapBaselineStart || this.baselineStart;
+      this.baselineEnd = params.heatMapBaselineEnd || this.baselineEnd;
+      this.granularity = params.granularity || this.granularity;
+      this.heatmapMode = params.heatmapMode || this.heatmapMode;
+      this.heatmapFilters = Object.assign({}, params.heatmapFilters);
+      this.compareMode = params.compareMode || this.compareMode;
     }
   },
 
-  update: function () {
+  update() {
     if (this.metricId) {
-      var heatMapData = dataService.fetchHeatmapData(this.metricId, this.currentStart,
-          this.currentEnd, this.baselineStart, this.baselineEnd, this.heatmapFilters);
-      this.heatmapData = heatMapData;
-      this.transformResponseData(heatMapData);
+      return dataService.fetchHeatmapData(
+        this.metricId,
+        this.currentStart,
+        this.currentEnd,
+        this.baselineStart,
+        this.baselineEnd,
+        this.heatmapFilters
+      ).then((heatMapData) => {
+        this.heatmapData = heatMapData;
+        this.transformResponseData(heatMapData);
+        return heatMapData;
+      });
     }
   },
 
@@ -100,3 +91,4 @@ DimensionTreeMapModel.prototype = {
     }
   }
 }
+

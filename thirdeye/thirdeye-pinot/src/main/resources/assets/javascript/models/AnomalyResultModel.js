@@ -125,7 +125,7 @@ AnomalyResultModel.prototype = {
     const isSameDay = regionStart.isSame(regionEnd, 'day');
     const timeDelta = regionEnd.diff(regionStart);
     const regionDuration = moment.duration(timeDelta);
-    const showTime = granularity !== 'DAYS';
+    const showTime = granularity !== constants.GRANULARITY_DAY;
     let range = '';
     let regionStartFormat = constants.DETAILS_DATE_FORMAT;
     let regionEndFormat = constants.DETAILS_DATE_FORMAT;

@@ -76,13 +76,13 @@
         <div class="anomaly-details-row">
           <div class="anomaly-details-items">
             <label class="label-medium-semibold">Current Avg</label>
-            <span>{{current}}</span>
+            <span>{{formatNumber current}}</span>
           </div>
           <div class="anomaly-details-items">
             <label class="label-medium-semibold">Baseline Avg</label>
             <span>
               {{#if baseline}}
-                {{baseline}}
+                {{formatNumber baseline}}
               {{else}}
                 N/A
               {{/if}}
@@ -102,7 +102,7 @@
           <label class="label-medium-semibold">Current Total</label>
         </div>
         <div class="wow-card-body">
-          {{formatDouble currentValue}}
+          {{formatNumber (formatDouble currentValue)}}
         </div>
         {{#unless externalUrls.INGRAPH}}
           <div class="wow-card-footer">
@@ -116,7 +116,7 @@
             <label class="label-medium-semibold">{{wow.compareMode}}</label>
           </div>
           <div class="wow-card-body">
-            {{formatDouble wow.baselineValue}}
+            {{formatNumber (formatDouble wow.baselineValue)}}
             <span class="anomaly-change-delta {{colorDelta wow.change}}">({{formatPercent wow.change}})</span>
           </div>
           {{#unless ../externalUrls.INGRAPH}}

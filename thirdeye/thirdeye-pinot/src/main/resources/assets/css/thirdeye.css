@@ -17,6 +17,7 @@ label {
     font-weight: 100;
     font-size: 23px;
     padding-right: 10px;
+    margin-bottom: 0;
 }
 .label-medium-light {
     font-weight: 100;
@@ -25,7 +26,7 @@ label {
 .label-medium-semibold {
     font-weight: 600;
     font-size: 15px;
-    margin-bottom: 0;
+    margin-top: 0;
 }
 .label-small-semibold {
     font-weight: 600;
@@ -150,10 +151,10 @@ hr {
     margin-top: 5px
 }
 .top-buffer {
-    margin-top: 10px;
+    margin-top: 24px;
 }
 .bottom-buffer {
-    margin-bottom: 10px;
+    margin-bottom: 24px;
 }
 .padding-all {
     padding: 24px;
@@ -281,8 +282,13 @@ hr {
 }
 /* analysis table css*/
 
+.analysis-table-wrapper {
+  max-height: 400px;
+  overflow-y: scroll;
+}
+
 .analysis-table {
-    table-layout: fixed;
+  table-layout: fixed;
 }
 
 .analysis-table>thead>tr>th,
@@ -297,23 +303,21 @@ hr {
     font-weight: 300;
     font-size: 11px;
     text-align: center;
+    white-space: nowrap;
     background-color: #E4E8EC;
 }
 .analysis-table>tbody>tr>td {
     font-weight: 300;
     font-size: 11px;
-    text-align: center;
+    white-space: nowrap;
     background-color: white;
-    width: 50px;
 }
 .analysis-table>thead>tr>th.dim-label {
-    width: 100px;
     background-color: #F3F6F8;
     border: none !important;
     font-weight: 400;
 }
 .analysis-table>tbody>tr>td.dim-label {
-    width: 100px;
     background-color: #F3F6F8;
     border: none !important;
 }
@@ -327,8 +331,67 @@ hr {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+.time-range__type {
+  font-weight: normal;
+  color: rgba(0,0,0,0.7);
+}
 .selectAutoWidth {
     width: auto
+}
+
+.analysis-table__anchor {
+  position: sticky;
+  z-index: 1;
+  left: -1px;
+  top: -1px;
+}
+
+.analysis-table__dimension {
+  position: sticky;
+  /* offset the table border*/
+  left: -1px;
+}
+
+
+.analysis-table__header {
+  position: sticky;
+  /* offset the table border*/
+  top: -1px;
+}
+
+.analysis-table__anchor--low,
+.analysis-table__subheader {
+  /* offset the table border*/
+  position: sticky;
+  top: 29px;
+}
+
+.analysis-table__cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  border: 0;
+}
+
+.analysis-table__item {
+  width: 35%;
+  flex: none;
+  padding: 0 12px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.analysis-table__item--small {
+  width: 30%;
+  justify-content: center;
+}
+
+.analysis-table__item--large {
+  width: 100%;
+  justify-content: center;
 }
 /** C3 related*/
 
@@ -350,6 +413,7 @@ hr {
 .heatmap {
     display: block;
     margin: auto;
+    background-color: #f5f5f5;
 }
 text {
     font-size: 11px;
@@ -417,6 +481,12 @@ text {
 }
 
 /* Common */
+
+/* Spinner*/
+
+.spinner-wrapper {
+  position: relative;
+}
 
 /* Navbar*/
 
@@ -500,14 +570,19 @@ text {
 }
 
 /* anomalies page Search Bar*/
+.search-title {
+  flex-shrink: 0;
+}
 
 .search-bar {
   display: flex;
+  margin: 10px 0;
 }
 
 .search-field {
   flex-grow: 1;
   margin-left: 24px;
+  overflow: hidden;
 }
 
 .search-select {
@@ -580,6 +655,10 @@ text {
 }
 
 /* root cause analysis date range picker*/
+.datepicker-field + .datepicker-field {
+  padding-top: 12px;
+}
+
 .datepicker-range {
   display: flex;
   justify-content: space-between;
@@ -597,7 +676,6 @@ text {
 
 /* Anomaly Results*/
 .anomalies-panel {
-  margin: 24px 0;
   background-color: white;
   border-radius: 2px;
   border: 1px solid #CCC;
@@ -682,11 +760,11 @@ text {
 }
 
 .anomaly-change-delta.negative {
-  color: #ee1620
+  color: #ee1620;
 }
 
 .anomaly-change-delta.positive {
-  color: #398b18
+  color: #398b18;
 }
 
 /* Pagination */
@@ -775,6 +853,201 @@ text {
   padding: 8px 0;
 }
 
+/* Analysis */
+
+.analysis-summary__data,
+.analysis-title {
+  font-size: 18px;
+  color: rgba(0,0,0,.70);
+  margin-top: 0;
+}
+
+.analysis-details {
+  font-size: initial;
+  font-weight: 300;
+}
+
+.analysis-summary__data.positive {
+  color: #398b18;
+}
+
+.analysis-summary__data.negative{
+  color: #ee1620;
+}
+
+.analysis-options {
+  display: flex;
+}
+
+.analysis-options__dropdown {
+  padding: 0 12px;
+  flex-grow: 1;
+  flex-shrink: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.analysis-options__datepicker {
+  width: 50%;
+  min-width: 50%;
+  flex-shrink: 0;
+  margin-right: 24px;
+}
+
+.analysis-options__granularity {
+  margin-right: 24px;
+}
+
+.analysis-options__granularity,
+.analysis-options__dimensions {
+  flex-grow: 1;
+  margin: 0 12px;
+}
+
+.analysis-options__filters {
+  flex-basis: 100%;
+  width: 100%;
+  margin: 0 12px;
+}
+
+.analysis-options__apply {
+  position: relative;
+  top: 26px;
+}
+
+.analysis-options__apply > .thirdeye-btn {
+  font-weight: normal;
+}
+
+.analysis-options .datepicker-range {
+  height: 32px;
+}
+
+.analysis-chart {
+  display: flex;
+  flex-direction: row-reverse;
+  height: 348px;
+}
+
+.analysis-chart__graph {
+  flex-grow: 1;
+  height: 300px;
+  margin: 24px;
+}
+
+.analysis-chart__graph > svg {
+  width: 100%;
+}
+
+.analysis-chart__legend {
+  border-left: 1px solid #CCC;
+  max-width: 250px;
+  height: 100%;
+}
+
+.analysis-chart__checkbox[type=checkbox]  {
+  margin: 0 8px;
+  transform: scale(1.2);
+}
+
+.analysis-chart__dimensions {
+  list-style: none;
+  padding: 0;
+  overflow-x: hidden;
+  overflow-y: scroll;
+  height: 100%;
+}
+
+.analysis-chart__dimension {
+  white-space: nowrap;
+}
+
+.analysis-change {
+  display: flex;
+  align-items: center;
+}
+
+.analysis-change__description {
+  flex-grow: 1;
+}
+
+.analysis-change__checkbox[type=checkbox] {
+  margin: 0 8px 0 24px;
+  transform: scale(1.2);
+}
+
+.analysis-change__label {
+  user-select: none;
+  white-space: nowrap;
+}
+
+.contribution-analysis {
+  display: flex;
+  justify-content: space-between;
+}
+
+.contribution-analysis__daterangepicker {
+    flex: 1 1 0%;
+    min-width: 0%;
+}
+
+.contribution-analysis__daterangepicker + .contribution-analysis__daterangepicker {
+  margin-left: 48px;
+}
+
+.tree-map__nav {
+  padding: 0;
+}
+
+.tree-map__tab {
+  margin-right: 24px;
+}
+
+.tree-map__tab: + .tree-map__tab {
+  margin-left: 24px;
+}
+
+.tree-map__tab:hover,
+.tree-map__tab.active {
+  border-bottom: 2px solid #0073b1;
+}
+
+.tree-map__link {
+  padding-right: 0!important;
+  padding-left: 0!important;
+  background-color: transparent!important;
+  color: rgba(0,0,0,0.70)!important;
+}
+.tree-map__tab.active .tree-map__link,
+.tree-map__link:hover {
+  color: #0073b1!important;
+  padding-bottom: 13px;
+}
+
+.analysis-summary {
+  display: flex;
+  justify-content: space-between;
+}
+.analysis-summary__label {
+  text-transform: uppercase;
+  font-size: 12px;
+  color: rgba(0,0,0,.55);
+  font-weight: normal;
+}
+
+.analysis-summary__item {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.tree-map__table {
+  width: auto;
+  min-width: 100%;
+  table-layout: fixed;
+}
+
 /* Radio*/
 
 .anomaly-feedback-radio {
@@ -782,8 +1055,14 @@ text {
   user-select: none;
 }
 
-.anomaly-details-wrapper {
+.anomaly-details-wrapper,
+.analysis-card {
   background-color: white;
-  padding: 24px;
   border: 1px solid #CCC;
+  border-radius: 2px;
+}
+
+/* Accessibility */
+.a11y-text {
+   display: none;
 }
