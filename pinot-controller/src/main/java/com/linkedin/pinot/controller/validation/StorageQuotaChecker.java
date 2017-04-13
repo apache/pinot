@@ -63,14 +63,9 @@ public class StorageQuotaChecker {
   public QuotaCheckerResponse isSegmentStorageWithinQuota(@Nonnull File segmentFile, @Nonnull String tableNameWithType,
       @Nonnull String segmentName,
       @Nonnegative int timeoutMsec) {
-    try {
-      Preconditions.checkNotNull(segmentFile);
-      Preconditions.checkNotNull(tableNameWithType);
-      Preconditions.checkNotNull(segmentName);
-    } catch(NullPointerException e) {
-      LOGGER.info("NullPointerException: " + e);
-      return new QuotaCheckerResponse(false, "Invalid API call: " + e);
-    }
+    Preconditions.checkNotNull(segmentFile);
+    Preconditions.checkNotNull(tableNameWithType);
+    Preconditions.checkNotNull(segmentName);
     try {
       Preconditions.checkArgument(timeoutMsec > 0, "Timeout value must be > 0, input: %s", timeoutMsec);
       Preconditions.checkArgument(segmentFile.exists(), "Segment file: %s does not exist", segmentFile);
