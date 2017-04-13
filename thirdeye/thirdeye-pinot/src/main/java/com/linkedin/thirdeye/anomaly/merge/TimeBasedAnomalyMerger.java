@@ -20,6 +20,7 @@ import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 import com.linkedin.thirdeye.detector.metric.transfer.MetricTransfer;
 import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -162,6 +163,20 @@ public class TimeBasedAnomalyMerger {
       mergedResult.setAvgCurrentVal(rawAnomaly.getAvgCurrentVal());
       mergedResult.setAvgBaselineVal(rawAnomaly.getAvgBaselineVal());
       mergedResult.setMessage(rawAnomaly.getMessage());
+
+      // Decode Properties String to HashMap
+      HashMap<String, String> props = new HashMap<>();
+      String[] tokens = rawAnomaly.getProperties().split(";");
+      for(String token : tokens) {
+        String[] keyValues = token.split("=");
+        String values = keyValues[1];
+        for(int i = 2; i < keyValues.length; i++) {
+          values = values + "=" + keyValues[i];
+        }
+        props.put(keyValues[0], values);
+      }
+
+      mergedResult.setProperties(props);
     } else {
       // Calculate default score and weight in case of any failure (e.g., DB exception) during the update
       double weightedScoreSum = 0.0;

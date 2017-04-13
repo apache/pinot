@@ -558,6 +558,7 @@ public class AnomalyResource {
     }
   }
 
+
   /**
    * Returns the time series for the given anomaly.
    *
@@ -580,69 +581,77 @@ public class AnomalyResource {
 
     boolean loadRawAnomalies = false;
     MergedAnomalyResultDTO anomalyResult = anomalyMergedResultDAO.findById(anomalyResultId, loadRawAnomalies);
-    DimensionMap dimensions = anomalyResult.getDimensions();
-    AnomalyFunctionDTO anomalyFunctionSpec = anomalyResult.getFunction();
-    BaseAnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
+    Map<String, String> anomalyProps = anomalyResult.getProperties();
 
-    // Calculate view window start and end if they are not given by the user, which should be 0 if it is not given.
-    // By default, the padding window size is half of the anomaly window.
-    if (viewWindowStartTime == 0 || viewWindowEndTime == 0) {
-      long anomalyWindowStartTime = anomalyResult.getStartTime();
-      long anomalyWindowEndTime = anomalyResult.getEndTime();
+    AnomalyTimelinesView anomalyTimelinesView = null;
 
-      long bucketMillis = TimeUnit.MILLISECONDS.convert(anomalyFunctionSpec.getBucketSize(), anomalyFunctionSpec.getBucketUnit());
-      long bucketCount = (anomalyWindowEndTime - anomalyWindowStartTime) / bucketMillis;
-      long paddingMillis = Math.max(1, (bucketCount / 2)) * bucketMillis;
-      if (paddingMillis > TimeUnit.DAYS.toMillis(1)) {
-        paddingMillis = TimeUnit.DAYS.toMillis(1);
+    // check if there is AnomalyTimelinesView in the Properties. If yes, use the AnomalyTimelinesView
+    if(anomalyProps.containsKey("anomalyTimelinesView")) {
+      anomalyTimelinesView = AnomalyTimelinesView.fromJsonString(
+          anomalyProps.get("anomalyTimelinesView"));
+    } else {
+
+      DimensionMap dimensions = anomalyResult.getDimensions();
+      AnomalyFunctionDTO anomalyFunctionSpec = anomalyResult.getFunction();
+      BaseAnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
+
+      // Calculate view window start and end if they are not given by the user, which should be 0 if it is not given.
+      // By default, the padding window size is half of the anomaly window.
+      if (viewWindowStartTime == 0 || viewWindowEndTime == 0) {
+        long anomalyWindowStartTime = anomalyResult.getStartTime();
+        long anomalyWindowEndTime = anomalyResult.getEndTime();
+
+        long bucketMillis = TimeUnit.MILLISECONDS.convert(anomalyFunctionSpec.getBucketSize(), anomalyFunctionSpec.getBucketUnit());
+        long bucketCount = (anomalyWindowEndTime - anomalyWindowStartTime) / bucketMillis;
+        long paddingMillis = Math.max(1, (bucketCount / 2)) * bucketMillis;
+        if (paddingMillis > TimeUnit.DAYS.toMillis(1)) {
+          paddingMillis = TimeUnit.DAYS.toMillis(1);
+        }
+
+        if (viewWindowStartTime == 0) {
+          viewWindowStartTime = anomalyWindowStartTime - paddingMillis;
+        }
+        if (viewWindowEndTime == 0) {
+          viewWindowEndTime = anomalyWindowEndTime + paddingMillis;
+        }
       }
 
-      if (viewWindowStartTime == 0) {
-        viewWindowStartTime = anomalyWindowStartTime - paddingMillis;
+      TimeGranularity timeGranularity = Utils.getAggregationTimeGranularity(aggTimeGranularity, anomalyFunctionSpec.getCollection());
+      long bucketMillis = timeGranularity.toMillis();
+      // ThirdEye backend is end time exclusive, so one more bucket is appended to make end time inclusive for frontend.
+      viewWindowEndTime += bucketMillis;
+
+      long maxDataTime = collectionMaxDataTimeCache.get(anomalyResult.getCollection());
+      if (viewWindowEndTime > maxDataTime) {
+        viewWindowEndTime = (anomalyResult.getEndTime() > maxDataTime) ? anomalyResult.getEndTime() : maxDataTime;
       }
-      if (viewWindowEndTime == 0) {
-        viewWindowEndTime = anomalyWindowEndTime + paddingMillis;
+
+      AnomalyDetectionInputContext adInputContext =
+          TimeBasedAnomalyMerger.fetchDataByDimension(viewWindowStartTime, viewWindowEndTime, dimensions,
+              anomalyFunction, anomalyMergedResultDAO, overrideConfigDAO, false);
+
+      MetricTimeSeries metricTimeSeries = adInputContext.getDimensionKeyMetricTimeSeriesMap().get(dimensions);
+
+      if (metricTimeSeries == null) {
+        // If this case happened, there was something wrong with anomaly detection because we are not able to retrieve
+        // the timeseries for the given anomaly
+        return new AnomalyTimelinesView();
       }
+
+      // Transform time series with scaling factor
+      List<ScalingFactor> scalingFactors = adInputContext.getScalingFactors();
+      if (CollectionUtils.isNotEmpty(scalingFactors)) {
+        Properties properties = anomalyFunction.getProperties();
+        MetricTransfer.rescaleMetric(metricTimeSeries, viewWindowStartTime, scalingFactors, anomalyFunctionSpec.getTopicMetric(), properties);
+      }
+
+      List<MergedAnomalyResultDTO> knownAnomalies = adInputContext.getKnownMergedAnomalies().get(dimensions);
+      // Known anomalies are ignored (the null parameter) because 1. we can reduce users' waiting time and 2. presentation
+      // data does not need to be as accurate as the one used for detecting anomalies
+      anomalyTimelinesView =
+          anomalyFunction.getTimeSeriesView(metricTimeSeries, bucketMillis, anomalyFunctionSpec.getTopicMetric(),
+              viewWindowStartTime, viewWindowEndTime, knownAnomalies);
     }
-
-    TimeGranularity timeGranularity =
-        Utils.getAggregationTimeGranularity(aggTimeGranularity, anomalyFunctionSpec.getCollection());
-    long bucketMillis = timeGranularity.toMillis();
-    // ThirdEye backend is end time exclusive, so one more bucket is appended to make end time inclusive for frontend.
-    viewWindowEndTime += bucketMillis;
-
-    long maxDataTime = collectionMaxDataTimeCache.get(anomalyResult.getCollection());
-    if (viewWindowEndTime > maxDataTime) {
-      viewWindowEndTime =
-          (anomalyResult.getEndTime() > maxDataTime) ? anomalyResult.getEndTime() : maxDataTime;
-    }
-
-    AnomalyDetectionInputContext adInputContext = TimeBasedAnomalyMerger
-        .fetchDataByDimension(viewWindowStartTime, viewWindowEndTime, dimensions, anomalyFunction,
-            anomalyMergedResultDAO, overrideConfigDAO, false);
-
-    MetricTimeSeries metricTimeSeries = adInputContext.getDimensionKeyMetricTimeSeriesMap().get(dimensions);
-
-    if (metricTimeSeries == null) {
-      // If this case happened, there was something wrong with anomaly detection because we are not able to retrieve
-      // the timeseries for the given anomaly
-      return new AnomalyTimelinesView();
-    }
-
-    // Transform time series with scaling factor
-    List<ScalingFactor> scalingFactors = adInputContext.getScalingFactors();
-    if (CollectionUtils.isNotEmpty(scalingFactors)) {
-      Properties properties = anomalyFunction.getProperties();
-      MetricTransfer.rescaleMetric(metricTimeSeries, viewWindowStartTime, scalingFactors,
-          anomalyFunctionSpec.getTopicMetric(), properties);
-    }
-
-    List<MergedAnomalyResultDTO> knownAnomalies = adInputContext.getKnownMergedAnomalies().get(dimensions);
-    // Known anomalies are ignored (the null parameter) because 1. we can reduce users' waiting time and 2. presentation
-    // data does not need to be as accurate as the one used for detecting anomalies
-    AnomalyTimelinesView anomalyTimelinesView =
-        anomalyFunction.getTimeSeriesView(metricTimeSeries, bucketMillis, anomalyFunctionSpec.getTopicMetric(),
-            viewWindowStartTime, viewWindowEndTime, knownAnomalies);
 
     // Generate summary for frontend
     List<TimeBucket> timeBuckets = anomalyTimelinesView.getTimeBuckets();

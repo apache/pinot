@@ -650,26 +650,35 @@ public class AnomaliesResource {
     long bucketMillis = timeGranularity.toMillis();
     AnomalyDetails anomalyDetails = null;
     try {
-      AnomalyDetectionInputContext adInputContext = TimeBasedAnomalyMerger
-          .fetchDataByDimension(anomalyWindowStart, anomalyWindowEnd, dimensions, anomalyFunction,
-              mergedAnomalyResultDAO, overrideConfigDAO, true);
+      AnomalyTimelinesView anomalyTimelinesView = null;
+      Map<String, String> anomalyProps = mergedAnomaly.getProperties();
+      if(anomalyProps.containsKey("anomalyTimelinesView")) {
+        anomalyTimelinesView = AnomalyTimelinesView.fromJsonString(anomalyProps.get("anomalyTimelinesView"));
+      } else {
+        AnomalyDetectionInputContext adInputContext =
+            TimeBasedAnomalyMerger.fetchDataByDimension(anomalyWindowStart, anomalyWindowEnd, dimensions,
+                anomalyFunction, mergedAnomalyResultDAO, overrideConfigDAO, true);
 
-      MetricTimeSeries metricTimeSeries = adInputContext.getDimensionKeyMetricTimeSeriesMap().get(dimensions);
+        MetricTimeSeries metricTimeSeries = adInputContext.getDimensionKeyMetricTimeSeriesMap().get(dimensions);
 
-      // Transform time series with scaling factor
-      List<ScalingFactor> scalingFactors = adInputContext.getScalingFactors();
-      if (CollectionUtils.isNotEmpty(scalingFactors)) {
-        Properties properties = anomalyFunction.getProperties();
-        MetricTransfer.rescaleMetric(metricTimeSeries, anomalyWindowStart, scalingFactors,
-            anomalyFunctionSpec.getTopicMetric(), properties);
-      }
+        // Transform time series with scaling factor
+        List<ScalingFactor> scalingFactors = adInputContext.getScalingFactors();
+        if (CollectionUtils.isNotEmpty(scalingFactors)) {
+          Properties properties = anomalyFunction.getProperties();
+          MetricTransfer.rescaleMetric(metricTimeSeries, anomalyWindowStart, scalingFactors, anomalyFunctionSpec.getTopicMetric(), properties);
+        }
 
-      List<MergedAnomalyResultDTO> knownAnomalies = adInputContext.getKnownMergedAnomalies().get(dimensions);
-      // Known anomalies are ignored (the null parameter) because 1. we can reduce users' waiting time and 2. presentation
-      // data does not need to be as accurate as the one used for detecting anomalies
-      AnomalyTimelinesView anomalyTimelinesView =
-          anomalyFunction.getTimeSeriesView(metricTimeSeries, bucketMillis, anomalyFunctionSpec.getTopicMetric(),
+        List<MergedAnomalyResultDTO> knownAnomalies = adInputContext.getKnownMergedAnomalies().get(dimensions);
+        // check if there is AnomalyTimelinesView in the Properties. If yes, use the AnomalyTimelinesView
+        if (anomalyProps.containsKey("anomalyTimelinesView")) {
+          anomalyTimelinesView = AnomalyTimelinesView.fromJsonString(anomalyProps.get("anomalyTimelinesView"));
+        } else {
+          // Known anomalies are ignored (the null parameter) because 1. we can reduce users' waiting time and 2. presentation
+          // data does not need to be as accurate as the one used for detecting anomalies
+          anomalyTimelinesView = anomalyFunction.getTimeSeriesView(metricTimeSeries, bucketMillis, anomalyFunctionSpec.getTopicMetric(),
               anomalyWindowStart, anomalyWindowEnd, knownAnomalies);
+        }
+      }
 
       // get viewing window range - this is the region to display along with anomaly, from all the fetched data.
       // the function will tell us this range, as how much data we display can change depending on which function is being executed
