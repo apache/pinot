@@ -45,13 +45,13 @@ public class DataFrame {
     public DataFrame apply(Series.SeriesGrouping grouping, Series s) {
       switch(s.type()) {
         case DOUBLE:
-          return grouping.applyTo(s).aggregate(new DoubleSeries.DoubleBatchLast());
+          return grouping.applyTo(s).aggregate(new DoubleSeries.DoubleLast());
         case LONG:
-          return grouping.applyTo(s).aggregate(new LongSeries.LongBatchLast());
+          return grouping.applyTo(s).aggregate(new LongSeries.LongLast());
         case STRING:
-          return grouping.applyTo(s).aggregate(new StringSeries.StringBatchLast());
+          return grouping.applyTo(s).aggregate(new StringSeries.StringLast());
         case BOOLEAN:
-          return grouping.applyTo(s).aggregate(new BooleanSeries.BooleanBatchLast());
+          return grouping.applyTo(s).aggregate(new BooleanSeries.BooleanLast());
         default:
           throw new IllegalArgumentException(String.format("Cannot resample series type '%s'", s.type()));
       }
@@ -89,19 +89,7 @@ public class DataFrame {
       return new Series.SeriesGrouping(keys, this.source.get(seriesName), this.buckets);
     }
 
-    public DataFrame aggregate(String seriesName, Series.DoubleFunction function) {
-      return this.get(seriesName).aggregate(function);
-    }
-
-    public DataFrame aggregate(String seriesName, Series.LongFunction function) {
-      return this.get(seriesName).aggregate(function);
-    }
-
-    public DataFrame aggregate(String seriesName, Series.StringFunction function) {
-      return this.get(seriesName).aggregate(function);
-    }
-
-    public DataFrame aggregate(String seriesName, Series.BooleanFunction function) {
+    public DataFrame aggregate(String seriesName, Series.Function function) {
       return this.get(seriesName).aggregate(function);
     }
   }
@@ -538,6 +526,22 @@ public class DataFrame {
    return assertSeriesExists(seriesName).getBooleans();
   }
 
+  public double getDouble(String seriesName, int index) {
+    return assertSeriesExists(seriesName).getDouble(index);
+  }
+
+  public long getLong(String seriesName, int index) {
+    return assertSeriesExists(seriesName).getLong(index);
+  }
+
+  public String getString(String seriesName, int index) {
+    return assertSeriesExists(seriesName).getString(index);
+  }
+
+  public byte getBoolean(String seriesName, int index) {
+    return assertSeriesExists(seriesName).getBoolean(index);
+  }
+
   /**
    * Applies {@code function} to the series referenced by {@code seriesNames} row by row
    * and returns the results as a new series. The series' values are mapped to arguments
@@ -547,6 +551,7 @@ public class DataFrame {
    * determined by {@code function}'s output type.
    *
    * @param function function to apply to each row
+   * @param seriesNames names of input series
    * @throws IllegalArgumentException if the series does not exist
    * @return series with evaluation results
    */
@@ -558,63 +563,82 @@ public class DataFrame {
    * @see DataFrame#map(Series.Function, Series...)
    */
   public DoubleSeries map(Series.DoubleFunction function, String... seriesNames) {
-    return (DoubleSeries)map((Series.Function)function, seriesNames);
+    return map(function, names2series(seriesNames));
   }
 
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */
   public LongSeries map(Series.LongFunction function, String... seriesNames) {
-    return (LongSeries)map((Series.Function)function, seriesNames);
+    return map(function, names2series(seriesNames));
   }
 
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */
   public StringSeries map(Series.StringFunction function, String... seriesNames) {
-    return (StringSeries)map((Series.Function)function, seriesNames);
+    return map(function, names2series(seriesNames));
   }
 
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */
   public BooleanSeries map(Series.BooleanFunction function, String... seriesNames) {
-    return (BooleanSeries)map((Series.Function)function, seriesNames);
+    return map(function, names2series(seriesNames));
   }
 
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */
   public BooleanSeries map(Series.BooleanFunctionEx function, String... seriesNames) {
-    return (BooleanSeries)map((Series.Function)function, seriesNames);
+    return map(function, names2series(seriesNames));
   }
 
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */
   public BooleanSeries map(Series.DoubleConditional function, String... seriesNames) {
-    return (BooleanSeries)map((Series.Function)function, seriesNames);
+    return map(function, names2series(seriesNames));
   }
 
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */
   public BooleanSeries map(Series.LongConditional function, String... seriesNames) {
-    return (BooleanSeries)map((Series.Function)function, seriesNames);
+    return map(function, names2series(seriesNames));
   }
 
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */
   public BooleanSeries map(Series.StringConditional function, String... seriesNames) {
-    return (BooleanSeries)map((Series.Function)function, seriesNames);
+    return map(function, names2series(seriesNames));
   }
 
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */
   public BooleanSeries map(Series.BooleanConditional function, String... seriesNames) {
-    return (BooleanSeries)map((Series.Function)function, seriesNames);
+    return map(function, names2series(seriesNames));
+  }
+
+  /**
+   * Applies {@code function} to the series referenced by {@code seriesNames} row by row
+   * and adds the result to the DataFrame as a new series with name {@code outputName}.
+   * The series' values are mapped to arguments of {@code function} in the same order
+   * as they appear in {@code seriesNames}.
+   * If the series' native types do not match the required input types of {@code function},
+   * the series are converted transparently. The native type of the returned series is
+   * determined by {@code function}'s output type.
+   *
+   * @param function function to apply to each row
+   * @param outputName name of output series
+   * @param inputNames names of input series
+   * @throws IllegalArgumentException if the series does not exist
+   * @return series with evaluation results
+   */
+  public DataFrame mapInPlace(Series.Function function, String outputName, String... inputNames) {
+    return this.addSeries(outputName, map(function, names2series(inputNames)));
   }
 
   /**
@@ -626,6 +650,7 @@ public class DataFrame {
    * determined by {@code function}'s output type.
    *
    * @param function function to apply to each row
+   * @param series input series for function
    * @throws IllegalArgumentException if the series does not exist
    * @return series with evaluation results
    */
@@ -636,63 +661,63 @@ public class DataFrame {
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */
-  public DoubleSeries map(Series.DoubleFunction function, Series... series) {
+  public static DoubleSeries map(Series.DoubleFunction function, Series... series) {
     return (DoubleSeries)map((Series.Function)function, series);
   }
 
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */
-  public LongSeries map(Series.LongFunction function, Series... series) {
+  public static LongSeries map(Series.LongFunction function, Series... series) {
     return (LongSeries)map((Series.Function)function, series);
   }
 
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */
-  public StringSeries map(Series.StringFunction function, Series... series) {
+  public static StringSeries map(Series.StringFunction function, Series... series) {
     return (StringSeries)map((Series.Function)function, series);
   }
 
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */
-  public BooleanSeries map(Series.BooleanFunction function, Series... series) {
+  public static BooleanSeries map(Series.BooleanFunction function, Series... series) {
     return (BooleanSeries)map((Series.Function)function, series);
   }
 
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */
-  public BooleanSeries map(Series.BooleanFunctionEx function, Series... series) {
+  public static BooleanSeries map(Series.BooleanFunctionEx function, Series... series) {
     return (BooleanSeries)map((Series.Function)function, series);
   }
 
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */
-  public BooleanSeries map(Series.DoubleConditional function, Series... series) {
+  public static BooleanSeries map(Series.DoubleConditional function, Series... series) {
     return (BooleanSeries)map((Series.Function)function, series);
   }
 
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */
-  public BooleanSeries map(Series.LongConditional function, Series... series) {
+  public static BooleanSeries map(Series.LongConditional function, Series... series) {
     return (BooleanSeries)map((Series.Function)function, series);
   }
 
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */
-  public BooleanSeries map(Series.StringConditional function, Series... series) {
+  public static BooleanSeries map(Series.StringConditional function, Series... series) {
     return (BooleanSeries)map((Series.Function)function, series);
   }
 
   /**
    * @see DataFrame#map(Series.Function, Series...)
    */
-  public BooleanSeries map(Series.BooleanConditional function, Series... series) {
+  public static BooleanSeries map(Series.BooleanConditional function, Series... series) {
     return (BooleanSeries)map((Series.Function)function, series);
   }
 
@@ -814,7 +839,7 @@ public class DataFrame {
     for(Map.Entry<String, Series> e : baseDataFrame.getSeries().entrySet()) {
       if(e.getKey().equals(seriesName))
         continue;
-      newDataFrame.addSeries(e.getKey(), strategy.apply(grouping, e.getValue()).get(Series.COLUMN_VALUE));
+      newDataFrame.addSeries(e.getKey(), strategy.apply(grouping, e.getValue()).get(Series.GROUP_VALUE));
     }
 
     // new series

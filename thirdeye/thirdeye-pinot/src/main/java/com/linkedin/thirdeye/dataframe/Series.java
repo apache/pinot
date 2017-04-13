@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import org.apache.commons.lang.ArrayUtils;
 
@@ -19,8 +18,8 @@ import org.apache.commons.lang.ArrayUtils;
  * the underlying data structures.
  */
 public abstract class Series {
-  public static final String COLUMN_KEY = "key";
-  public static final String COLUMN_VALUE = "value";
+  public static final String GROUP_KEY = "key";
+  public static final String GROUP_VALUE = "value";
 
   public enum SeriesType {
     DOUBLE,
@@ -226,8 +225,8 @@ public abstract class Series {
 
     static DataFrame makeAggregate(Series keys, Series values) {
       DataFrame df = new DataFrame();
-      df.addSeries(COLUMN_KEY, keys);
-      df.addSeries(COLUMN_VALUE, values);
+      df.addSeries(GROUP_KEY, keys);
+      df.addSeries(GROUP_VALUE, values);
       return df;
     }
   }

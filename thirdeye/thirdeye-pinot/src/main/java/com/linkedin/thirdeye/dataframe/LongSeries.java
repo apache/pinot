@@ -13,8 +13,10 @@ import java.util.List;
  */
 public final class LongSeries extends TypedSeries<LongSeries> {
   public static final long NULL_VALUE = Long.MIN_VALUE;
+  public static final LongFunction SUM = new LongSum();
+  public static final LongFunction LAST = new LongLast();
 
-  public static class LongBatchSum implements Series.LongFunction {
+  public static final class LongSum implements LongFunction {
     @Override
     public long apply(long[] values) {
       long sum = 0;
@@ -25,7 +27,7 @@ public final class LongSeries extends TypedSeries<LongSeries> {
     }
   }
 
-  public static class LongBatchLast implements Series.LongFunction {
+  public static final class LongLast implements LongFunction {
     @Override
     public long apply(long[] values) {
       if(values.length <= 0)
@@ -34,7 +36,7 @@ public final class LongSeries extends TypedSeries<LongSeries> {
     }
   }
 
-  public static class Builder extends Series.Builder {
+  public static final class Builder extends Series.Builder {
     final List<long[]> arrays = new ArrayList<>();
 
     private Builder() {
@@ -175,6 +177,12 @@ public final class LongSeries extends TypedSeries<LongSeries> {
     return this.values;
   }
 
+  public long value() {
+    if(this.size() != 1)
+      throw new IllegalStateException("Series must contain exactly one element");
+    return this.values[0];
+  }
+
   /**
    * Returns the value of the first element in the series
    *
@@ -264,8 +272,6 @@ public final class LongSeries extends TypedSeries<LongSeries> {
       if(!isNull(n) && (isNull(m) || n < m))
         m = n;
     }
-    if(isNull(m))
-      throw new IllegalStateException("No valid minimum value");
     return m;
   }
 
@@ -275,26 +281,19 @@ public final class LongSeries extends TypedSeries<LongSeries> {
       if(!isNull(n) && (isNull(m) || n > m))
         m = n;
     }
-    if(isNull(m))
-      throw new IllegalStateException("No valid maximum value");
     return m;
   }
 
   public double mean() {
-    assertNotEmpty(this.values);
-    long sum = 0;
-    int count = 0;
-    for(long v : this.values) {
-      if(!isNull(v)) {
-        sum += v;
-        count++;
-      }
-    }
-    return sum / (double) count;
+    return this.aggregate(DoubleSeries.MEAN).value();
+  }
+
+  public double std() {
+    return this.aggregate(DoubleSeries.STD).value();
   }
 
   public long sum() {
-    return new LongBatchSum().apply(this.values);
+    return new LongSum().apply(this.values);
   }
 
   @Override

@@ -593,7 +593,7 @@ public class DataFrameTest {
 
     Series.SeriesGrouping grouping = new Series.SeriesGrouping(keys, in, buckets);
 
-    DataFrame out = grouping.aggregate(new LongSeries.LongBatchSum());
+    DataFrame out = grouping.aggregate(new LongSeries.LongSum());
     Assert.assertEquals(out.getLongs("key").values(), new long[] { 3, 5, 7 });
     Assert.assertEquals(out.getLongs("value").values(), new long[] { 39, 0, 16 });
   }
@@ -609,7 +609,7 @@ public class DataFrameTest {
 
     Series.SeriesGrouping grouping = new Series.SeriesGrouping(keys, in, buckets);
 
-    DataFrame out = grouping.aggregate(new LongSeries.LongBatchLast());
+    DataFrame out = grouping.aggregate(new LongSeries.LongLast());
     Assert.assertEquals(out.getLongs("key").values(), new long[] { 3, 5, 7 });
     Assert.assertEquals(out.getLongs("value").values(), new long[] { 19, LongSeries.NULL_VALUE, 13 });
   }
@@ -620,7 +620,7 @@ public class DataFrameTest {
     Series.SeriesGrouping grouping = in.groupByInterval(4);
     Assert.assertEquals(grouping.size(), 4);
 
-    DataFrame out = grouping.aggregate(new LongSeries.LongBatchSum());
+    DataFrame out = grouping.aggregate(new LongSeries.LongSum());
     Assert.assertEquals(out.getLongs("key").values(), new long[] { 0, 4, 8, 12 });
     Assert.assertEquals(out.getLongs("value").values(), new long[] { 6, 22, 38, 12 });
   }
@@ -628,13 +628,13 @@ public class DataFrameTest {
   @Test
   public void testDataFrameGroupBy() {
     DataFrame.DataFrameGrouping grouping = df.groupBy("boolean");
-    DoubleSeries ds = grouping.aggregate("double", new DoubleSeries.DoubleBatchSum()).get(Series.COLUMN_VALUE).getDoubles();
+    DoubleSeries ds = grouping.aggregate("double", new DoubleSeries.DoubleSum()).getDoubles(Series.GROUP_VALUE);
     assertEqualsDoubles(ds.values(), new double[] { 0.0, -0.4 });
 
-    LongSeries ls = grouping.aggregate("long", new LongSeries.LongBatchSum()).get(Series.COLUMN_VALUE).getLongs();
+    LongSeries ls = grouping.aggregate("long", new LongSeries.LongSum()).get(Series.GROUP_VALUE).getLongs();
     Assert.assertEquals(ls.values(), new long[] { 0, 2 });
 
-    StringSeries ss = grouping.aggregate("string", new StringSeries.StringBatchConcat("|")).get(Series.COLUMN_VALUE).getStrings();
+    StringSeries ss = grouping.aggregate("string", new StringSeries.StringConcat("|")).get(Series.GROUP_VALUE).getStrings();
     Assert.assertEquals(ss.values(), new String[] { "0.0", "-2.3|-1|0.5|0.13e1" });
   }
 
@@ -776,6 +776,10 @@ public class DataFrameTest {
   public void testDoubleAccessorsEmpty() {
     DoubleSeries s = DoubleSeries.empty();
     Assert.assertEquals(s.sum(), 0.0d);
+    Assert.assertTrue(DoubleSeries.isNull(s.min()));
+    Assert.assertTrue(DoubleSeries.isNull(s.max()));
+    Assert.assertTrue(DoubleSeries.isNull(s.mean()));
+    Assert.assertTrue(DoubleSeries.isNull(s.std()));
 
     try {
       s.first();
@@ -792,21 +796,7 @@ public class DataFrameTest {
     }
 
     try {
-      s.min();
-      Assert.fail();
-    } catch(IllegalStateException ignore) {
-      // left blank
-    }
-
-    try {
-      s.max();
-      Assert.fail();
-    } catch(IllegalStateException ignore) {
-      // left blank
-    }
-
-    try {
-      s.mean();
+      s.value();
       Assert.fail();
     } catch(IllegalStateException ignore) {
       // left blank
@@ -833,6 +823,10 @@ public class DataFrameTest {
   public void testLongAccessorsEmpty() {
     LongSeries s = LongSeries.empty();
     Assert.assertEquals(s.sum(), 0);
+    Assert.assertTrue(LongSeries.isNull(s.min()));
+    Assert.assertTrue(LongSeries.isNull(s.max()));
+    Assert.assertTrue(DoubleSeries.isNull(s.mean()));
+    Assert.assertTrue(DoubleSeries.isNull(s.std()));
 
     try {
       s.first();
@@ -849,21 +843,7 @@ public class DataFrameTest {
     }
 
     try {
-      s.min();
-      Assert.fail();
-    } catch(IllegalStateException ignore) {
-      // left blank
-    }
-
-    try {
-      s.max();
-      Assert.fail();
-    } catch(IllegalStateException ignore) {
-      // left blank
-    }
-
-    try {
-      s.mean();
+      s.value();
       Assert.fail();
     } catch(IllegalStateException ignore) {
       // left blank
@@ -1076,7 +1056,7 @@ public class DataFrameTest {
   @Test
   public void testDoubleMovingWindow() {
     DoubleSeries s = DataFrame.toSeries(1.0, 2.0, 3.0, 4.0, 5.0, 6.0);
-    DoubleSeries out = s.applyMovingWindow(2, 1, new DoubleSeries.DoubleBatchSum());
+    DoubleSeries out = s.applyMovingWindow(2, 1, new DoubleSeries.DoubleSum());
     Assert.assertEquals(out.values(), new double[] { 1.0, 3.0, 5.0, 7.0, 9.0, 11.0 });
   }
 

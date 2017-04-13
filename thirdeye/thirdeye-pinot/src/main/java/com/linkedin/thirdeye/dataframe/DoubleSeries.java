@@ -6,6 +6,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import org.apache.commons.math.stat.descriptive.SummaryStatistics;
 
 
 /**
@@ -13,8 +14,13 @@ import java.util.List;
  */
 public final class DoubleSeries extends TypedSeries<DoubleSeries> {
   public static final double NULL_VALUE = Double.NaN;
+  public static final DoubleFunction SUM = new DoubleSum();
+  public static final DoubleFunction MEAN = new DoubleMean();
+  public static final DoubleFunction STD = new DoubleStandardDeviation();
+  public static final DoubleFunction LAST = new DoubleLast();
+  public static final DoubleFunction NEGATIVE = new DoubleNegative();
 
-  public static class DoubleBatchSum implements Series.DoubleFunction {
+  public static final class DoubleSum implements DoubleFunction {
     @Override
     public double apply(double[] values) {
       // TODO sorted, add low to high for accuracy
@@ -26,11 +32,11 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     }
   }
 
-  public static class DoubleBatchMean implements Series.DoubleFunction {
+  public static final class DoubleMean implements DoubleFunction {
     @Override
     public double apply(double[] values) {
       if(values.length <= 0)
-        return DoubleSeries.NULL_VALUE;
+        return NULL_VALUE;
 
       // TODO sorted, add low to high for accuracy
       double sum = 0.0d;
@@ -45,14 +51,52 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     }
   }
 
-  public static class DoubleBatchLast implements Series.DoubleFunction {
+  public static final class DoubleLast implements DoubleFunction {
     @Override
     public double apply(double[] values) {
       if(values.length <= 0)
-        return DoubleSeries.NULL_VALUE;
+        return NULL_VALUE;
       return values[values.length - 1];
     }
   }
+
+  public static final class DoubleNegative implements DoubleFunction {
+    @Override
+    public double apply(double... values) {
+      if(values.length <= 0)
+        return NULL_VALUE;
+      return -values[0];
+    }
+  }
+
+  public static final class DoubleStandardDeviation implements DoubleFunction {
+    @Override
+    public double apply(double... values) {
+      if(values.length <= 1)
+        return NULL_VALUE;
+      double mean = MEAN.apply(values);
+      double var = 0.0;
+      for(double v : values)
+        var += (v - mean) * (v - mean);
+      return Math.sqrt(var);
+    }
+  }
+
+  public static final class DoubleZScore implements DoubleFunction {
+    final double mean;
+    final double std;
+
+    public DoubleZScore(double mean, double std) {
+      this.mean = mean;
+      this.std = std;
+    }
+
+    @Override
+    public double apply(double... values) {
+      return (values[0] - this.mean) / this.std;
+    }
+  }
+
 
   public static class Builder extends Series.Builder {
     final List<double[]> arrays = new ArrayList<>();
@@ -195,6 +239,12 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     return this.values;
   }
 
+  public double value() {
+    if(this.size() != 1)
+      throw new IllegalStateException("Series must contain exactly one element");
+    return this.values[0];
+  }
+
   /**
    * Returns the value of the first element in the series
    *
@@ -259,8 +309,6 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
       if(!isNull(n) && (isNull(m) || n < m))
         m = n;
     }
-    if(isNull(m))
-      throw new IllegalStateException("No valid minimum value");
     return m;
   }
 
@@ -270,18 +318,19 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
       if(!isNull(n) && (isNull(m) || n > m))
         m = n;
     }
-    if(isNull(m))
-      throw new IllegalStateException("No valid maximum value");
     return m;
   }
 
   public double mean() {
-    assertNotEmpty(this.values);
-    return new DoubleBatchMean().apply(this.values);
+    return MEAN.apply(this.values);
+  }
+
+  public double std() {
+    return STD.apply(this.values);
   }
 
   public double sum() {
-    return new DoubleBatchSum().apply(this.values);
+    return new DoubleSum().apply(this.values);
   }
 
   /**

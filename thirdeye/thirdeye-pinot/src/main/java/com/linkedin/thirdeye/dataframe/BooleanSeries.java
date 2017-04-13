@@ -14,8 +14,11 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
   public static final byte NULL_VALUE = Byte.MIN_VALUE;
   public static final byte TRUE_VALUE = 1;
   public static final byte FALSE_VALUE = 0;
+  public static final BooleanFunctionEx AND = new BooleanAnd();
+  public static final BooleanFunctionEx OR = new BooleanOr();
+  public static final BooleanFunctionEx LAST = new BooleanLast();
 
-  public static class BooleanBatchAnd implements Series.BooleanFunctionEx {
+  public static final class BooleanAnd implements BooleanFunctionEx {
     @Override
     public byte apply(boolean... values) {
       if(values.length <= 0)
@@ -28,7 +31,7 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
     }
   }
 
-  public static class BooleanBatchOr implements Series.BooleanFunctionEx {
+  public static final class BooleanOr implements BooleanFunctionEx {
     @Override
     public byte apply(boolean... values) {
       if(values.length <= 0)
@@ -41,7 +44,7 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
     }
   }
 
-  public static class BooleanBatchLast implements Series.BooleanFunctionEx {
+  public static final class BooleanLast implements BooleanFunctionEx {
     @Override
     public byte apply(boolean... values) {
       if(values.length <= 0)
@@ -232,6 +235,18 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
         values[i++] = isTrue(v);
     }
     return Arrays.copyOf(values, i);
+  }
+
+  public byte value() {
+    if(this.size() != 1)
+      throw new IllegalStateException("Series must contain exactly one element");
+    return this.values[0];
+  }
+
+  public boolean valueBoolean() {
+    if(this.size() != 1)
+      throw new IllegalStateException("Series must contain exactly one element");
+    return isTrue(this.values[0]);
   }
 
   /**

@@ -17,11 +17,17 @@ import org.apache.commons.lang.math.NumberUtils;
  */
 public final class StringSeries extends TypedSeries<StringSeries> {
   public static final String NULL_VALUE = null;
+  public static final StringFunction CONCAT = new StringConcat();
+  public static final StringFunction LAST = new StringLast();
 
-  public static class StringBatchConcat implements Series.StringFunction {
+  public static final class StringConcat implements StringFunction {
     final String delimiter;
 
-    public StringBatchConcat(String delimiter) {
+    public StringConcat() {
+      this.delimiter = "";
+    }
+
+    public StringConcat(String delimiter) {
       this.delimiter = delimiter;
     }
 
@@ -40,7 +46,7 @@ public final class StringSeries extends TypedSeries<StringSeries> {
     }
   }
 
-  public static class StringBatchLast implements Series.StringFunction {
+  public static final class StringLast implements StringFunction {
     @Override
     public String apply(String[] values) {
       if(values.length <= 0)
@@ -167,6 +173,12 @@ public final class StringSeries extends TypedSeries<StringSeries> {
 
   public String[] values() {
     return this.values;
+  }
+
+  public String value() {
+    if(this.size() != 1)
+      throw new IllegalStateException("Series must contain exactly one element");
+    return this.values[0];
   }
 
   @Override
