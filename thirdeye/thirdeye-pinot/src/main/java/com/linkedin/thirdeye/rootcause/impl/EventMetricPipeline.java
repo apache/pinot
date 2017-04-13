@@ -32,16 +32,11 @@ public class EventMetricPipeline implements Pipeline {
 
   @Override
   public PipelineResult run(ExecutionContext context) {
-    Set<Entity> metrics = new HashSet<>();
-    for(Entity e : context.getSearchContext().getEntities()) {
-      if(URNUtils.isMetricURN(e.getUrn()))
-        metrics.add(e);
-    }
+    Set<Entity> metrics = URNUtils.filterContext(context, URNUtils.EntityType.METRIC);
 
     Set<EventDTO> eventSet = new HashSet<>();
     for(Entity e : metrics) {
       EventFilter filter = new EventFilter();
-      filter.setEventType(EventType.HOLIDAY); // TODO remove after provider fix
       filter.setMetricName(URNUtils.getMetricName(e.getUrn()));
 
       eventSet.addAll(manager.getEvents(filter));

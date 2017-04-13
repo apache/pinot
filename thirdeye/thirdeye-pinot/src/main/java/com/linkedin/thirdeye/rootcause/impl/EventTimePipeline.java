@@ -29,7 +29,6 @@ public class EventTimePipeline implements Pipeline {
   @Override
   public PipelineResult run(ExecutionContext context) {
     EventFilter filter = new EventFilter();
-    filter.setEventType(EventType.HOLIDAY); // TODO remove after provider fix
 
     if(context.getSearchContext().getTimestampStart() >= 0)
       filter.setStartTime(context.getSearchContext().getTimestampStart());

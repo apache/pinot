@@ -43,8 +43,7 @@ public class LinearAggregator implements Aggregator {
     return entities;
   }
 
-  private static void appendScores(StringSeries.Builder globalUrns, DoubleSeries.Builder globalZScores,
-      PipelineResult r) {
+  private static void appendScores(StringSeries.Builder globalUrns, DoubleSeries.Builder globalZScores, PipelineResult r) {
     String[] urns = new String[r.getScores().size()];
     double[] scores = new double[r.getScores().size()];
 

@@ -1,9 +1,11 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
+import com.linkedin.thirdeye.anomaly.events.DefaultDeploymentEventProvider;
 import com.linkedin.thirdeye.anomaly.events.DefaultHolidayEventProvider;
 import com.linkedin.thirdeye.anomaly.events.EventDataProviderManager;
 import com.linkedin.thirdeye.anomaly.events.EventType;
+import com.linkedin.thirdeye.anomaly.events.HistoricalAnomalyEventProvider;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.cache.QueryCache;
@@ -76,6 +78,7 @@ public class FrameworkRunner {
     // EventTime pipeline
     EventDataProviderManager eventProvider = EventDataProviderManager.getInstance();
     eventProvider.registerEventDataProvider(EventType.HOLIDAY, new DefaultHolidayEventProvider());
+    eventProvider.registerEventDataProvider(EventType.HISTORICAL_ANOMALY, new HistoricalAnomalyEventProvider());
     pipelines.add(new EventTimePipeline(eventProvider));
 
     // EventMetric pipeline
@@ -87,6 +90,9 @@ public class FrameworkRunner {
     MetricConfigManager metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
     DatasetConfigManager datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
     pipelines.add(new MetricDimensionPipeline(metricDAO, datasetDAO, scorer));
+
+    // MetricDataset pipeline
+    pipelines.add(new MetricDatsetPipeline(metricDAO));
 
     Aggregator aggregator = new LinearAggregator();
 

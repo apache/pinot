@@ -39,18 +39,18 @@ public class MetricDimensionPipeline implements Pipeline {
 
   @Override
   public PipelineResult run(ExecutionContext context) {
-    Set<MetricEntity> metrics = new HashSet<>();
+    Set<Entity> metrics = URNUtils.filterContext(context, URNUtils.EntityType.METRIC);
+
+    Set<MetricEntity> metricEntities = new HashSet<>();
     Set<String> datasets = new HashSet<>();
-    for(Entity e : context.getSearchContext().getEntities()) {
-      if(URNUtils.isMetricURN(e.getUrn())) {
-        String m = URNUtils.getMetricName(e.getUrn());
-        String d = URNUtils.getMetricDataset(e.getUrn());
+    for(Entity e : metrics) {
+      String m = URNUtils.getMetricName(e.getUrn());
+      String d = URNUtils.getMetricDataset(e.getUrn());
 
-        MetricConfigDTO dto = metricDAO.findByMetricAndDataset(m, d);
-        metrics.add(MetricEntity.fromDTO(dto));
+      MetricConfigDTO dto = metricDAO.findByMetricAndDataset(m, d);
+      metricEntities.add(MetricEntity.fromDTO(dto));
 
-        datasets.add(d);
-      }
+      datasets.add(d);
     }
 
     LOG.info("Found {} metrics for dimension analysis", metrics.size());
@@ -62,25 +62,26 @@ public class MetricDimensionPipeline implements Pipeline {
     }
 
     Map<MetricDimensionEntity, Double> scores = new HashMap<>();
-    for(MetricEntity m : metrics) {
-        DatasetConfigDTO ddto = datasetMap.get(m.getDto().getDataset());
+    for(MetricEntity m : metricEntities) {
+      MetricConfigDTO mdto = m.getDto();
+      DatasetConfigDTO ddto = datasetMap.get(mdto.getDataset());
 
-        if(ddto == null) {
-          LOG.warn("Skipping metric '{}'. Could not resolve associated dataset '{}'", m.getDto().getName(), m.getDto().getDataset());
-          continue;
-        }
+      if(ddto == null) {
+        LOG.warn("Skipping metric '{}'. Could not resolve associated dataset '{}'", mdto.getName(), mdto.getDataset());
+        continue;
+      }
 
-        List<MetricDimensionEntity> entities = new ArrayList<>();
-        for(String dim : ddto.getDimensions()) {
-          entities.add(MetricDimensionEntity.fromDTO(m.getDto(), ddto, dim));
-        }
+      List<MetricDimensionEntity> entities = new ArrayList<>();
+      for(String dim : ddto.getDimensions()) {
+        entities.add(MetricDimensionEntity.fromDTO(mdto, ddto, dim));
+      }
 
-        try {
-          scores.putAll(scorer.score(entities, context.getSearchContext()));
-        } catch (Exception e) {
-          // TODO internal exception handling?
-          throw new RuntimeException(e);
-        }
+      try {
+        scores.putAll(scorer.score(entities, context.getSearchContext()));
+      } catch (Exception e) {
+        // TODO internal exception handling?
+        throw new RuntimeException(e);
+      }
     }
 
     return new PipelineResult(scores);
