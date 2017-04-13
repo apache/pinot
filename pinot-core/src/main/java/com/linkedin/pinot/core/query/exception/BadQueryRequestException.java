@@ -16,6 +16,10 @@
 package com.linkedin.pinot.core.query.exception;
 
 public class BadQueryRequestException extends RuntimeException {
+  public BadQueryRequestException(String message) {
+    super(message);
+  }
+
   public BadQueryRequestException(Throwable cause) {
     super(cause);
   }
