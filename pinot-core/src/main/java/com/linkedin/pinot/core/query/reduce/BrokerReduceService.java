@@ -15,6 +15,14 @@
  */
 package com.linkedin.pinot.core.query.reduce;
 
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.metrics.BrokerMeter;
@@ -36,17 +44,9 @@ import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionUti
 import com.linkedin.pinot.core.query.aggregation.groupby.AggregationGroupByTrimmingService;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorService;
 import com.linkedin.pinot.core.query.selection.SelectionOperatorUtils;
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -180,7 +180,7 @@ public class BrokerReduceService implements ReduceService<BrokerResponseNative> 
             String errorMessage =
                 QueryException.MERGE_RESPONSE_ERROR.getMessage() + ": responses for table: " + tableName
                     + " from servers: " + droppedServers + " got dropped due to data schema inconsistency.";
-            LOGGER.error(errorMessage);
+            LOGGER.info(errorMessage);
             if (brokerMetrics != null) {
               brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.RESPONSE_MERGE_EXCEPTIONS, 1);
             }
