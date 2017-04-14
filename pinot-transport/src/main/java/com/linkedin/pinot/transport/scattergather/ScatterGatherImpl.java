@@ -166,7 +166,7 @@ public class ScatterGatherImpl implements ScatterGather {
           new ArrayList<KeyedFuture<ServerInstance, ByteBuf>>();
       for (SingleRequestHandler h : handlers) {
         responseFutures.add(h.getResponseFuture());
-        String shortServerName = h.getServer().getShortHostName();t commit
+        String shortServerName = h.getServer().getShortHostName();
         if (isOfflineTable != null) {
           if (isOfflineTable) {
             shortServerName += ScatterGatherStats.OFFLINE_TABLE_SUFFIX;
