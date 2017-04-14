@@ -51,6 +51,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.text.StrSubstitutor;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -603,9 +604,18 @@ public class AnomaliesResource {
     Long startTime = mergedAnomaly.getStartTime();
     Long endTime = mergedAnomaly.getEndTime();
     MetricConfigDTO metricConfigDTO = metricConfigDAO.findByMetricAndDataset(metric, dataset);
+    // Construct context for substituting the keywords in URL template
     Map<String, String> context = new HashMap<>();
+    // context for startTime and endTime
     context.put(MetricConfigBean.URL_TEMPLATE_START_TIME, String.valueOf(startTime));
     context.put(MetricConfigBean.URL_TEMPLATE_END_TIME, String.valueOf(endTime));
+    // context for each pair of dimension name and value
+    if (MapUtils.isNotEmpty(mergedAnomaly.getDimensions())) {
+      for (Map.Entry<String, String> entry : mergedAnomaly.getDimensions().entrySet()) {
+        // TODO: Change to case sensitive?
+        context.put(entry.getKey().toLowerCase(), entry.getValue().toLowerCase());
+      }
+    }
     StrSubstitutor strSubstitutor = new StrSubstitutor(context);
     Map<String, String> urlTemplates = metricConfigDTO.getExtSourceLinkInfo();
     if (urlTemplates == null) {
