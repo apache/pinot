@@ -19,6 +19,7 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.google.common.net.InternetDomainName;
 
 
 /**
@@ -49,6 +50,8 @@ public class ServerInstance implements Comparable<ServerInstance> {
 
   private final int _seq;
 
+  private final String _shortHostName;
+
   /**
    * Use this constructor if the name and port are embedded as string with ":" as delimiter
    *
@@ -76,6 +79,39 @@ public class ServerInstance implements Comparable<ServerInstance> {
     _hostname = _ipAddress != null ? _ipAddress.getHostName() : name;
     _port = port;
     _seq = seq;
+    _shortHostName = makeShortHostName(_hostname);
+  }
+
+  /**
+   * As per <a href="https://tools.ietf.org/html/rfc952">RFC-952</a> domain names should begin with a letter.
+   * That said, <a href="https://tools.ietf.org/html/rfc1123#page-13">RFC-1123</a> updated it say that it may also begin
+   * with a digit. Indeed, <a href="http://9292.nl/">this</a> is a valid domain name. Only the top-level domain (i.e. the
+   * last portion) has to be non-numeric. More clarification on this matter is in
+   * <a href="https://tools.ietf.org/html/rfc3696#section-2">RFC-3696</a>
+   *
+   * A potentially faster solution is
+   *
+   * if (first char is a digit) {
+   *   it is probably ipv4;
+   *   return name;
+   * } else {
+   *   it could be ipv6 (in which case no dots), or a hostname
+   *   return substring before the first dot.
+   * }
+   *
+   * It will fail if there are host names starting with a digit, but will work right otherwise.
+   */
+  private String makeShortHostName(final String name) {
+    try {
+      InternetDomainName domainName = InternetDomainName.from(name);
+      return domainName.parts().get(0);
+    } catch (Exception e) {
+      return name;
+    }
+  }
+
+  public String getShortHostName() {
+    return _shortHostName;
   }
 
   public String getHostname() {

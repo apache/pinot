@@ -110,14 +110,6 @@ public class ScatterGatherImpl implements ScatterGather {
     return scatterGather(scatterGatherRequest, scatterGatherStats, null, brokerMetrics);
   }
 
-  private String shortenHostName(String fqdn) {
-    int firstDot = fqdn.indexOf('.');
-    if (firstDot <= 0) {
-      return fqdn;
-    }
-    return fqdn.substring(0, firstDot);
-  }
-
   /**
    *
    * Helper Function to send scatter-request. This method should be called after the servers are selected
@@ -144,7 +136,7 @@ public class ScatterGatherImpl implements ScatterGather {
 
     for (Entry<ServerInstance, SegmentIdSet> e : mp.entrySet()) {
       ServerInstance server = e.getKey();
-      String shortServerName = shortenHostName(server.toString());
+      String shortServerName = server.getShortHostName();
       if (isOfflineTable != null) {
         if (isOfflineTable) {
           shortServerName += ScatterGatherStats.OFFLINE_TABLE_SUFFIX;
@@ -174,7 +166,7 @@ public class ScatterGatherImpl implements ScatterGather {
           new ArrayList<KeyedFuture<ServerInstance, ByteBuf>>();
       for (SingleRequestHandler h : handlers) {
         responseFutures.add(h.getResponseFuture());
-        String shortServerName = shortenHostName(h.getServer().toString());
+        String shortServerName = h.getServer().getShortHostName();t commit
         if (isOfflineTable != null) {
           if (isOfflineTable) {
             shortServerName += ScatterGatherStats.OFFLINE_TABLE_SUFFIX;
