@@ -36,6 +36,8 @@ public class MetricConfigBean extends AbstractBean {
 
   private Map<String, String> extSourceLinkInfo;
 
+  private Map<String, String> extSourceLinkTimeGranularity;
+
 
   public String getName() {
     return name;
@@ -123,6 +125,14 @@ public class MetricConfigBean extends AbstractBean {
 
   public void setExtSourceLinkInfo(Map<String, String> extSourceLinkInfo) {
     this.extSourceLinkInfo = extSourceLinkInfo;
+  }
+
+  public Map<String, String> getExtSourceLinkTimeGranularity() {
+    return extSourceLinkTimeGranularity;
+  }
+
+  public void setExtSourceLinkTimeGranularity(Map<String, String> extSourceLinkTimeGranularity) {
+    this.extSourceLinkTimeGranularity = extSourceLinkTimeGranularity;
   }
 
   @Override
