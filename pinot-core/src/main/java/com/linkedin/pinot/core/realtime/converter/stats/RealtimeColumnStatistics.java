@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.core.realtime.converter.stats;
 
 import com.linkedin.pinot.common.config.ColumnPartitionConfig;
@@ -25,7 +24,7 @@ import com.linkedin.pinot.core.data.partition.PartitionFunctionFactory;
 import com.linkedin.pinot.core.io.reader.SingleColumnSingleValueReader;
 import com.linkedin.pinot.core.operator.blocks.RealtimeSingleValueBlock;
 import com.linkedin.pinot.core.realtime.impl.datasource.RealtimeColumnDataSource;
-import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionaryReader;
+import com.linkedin.pinot.core.realtime.impl.dictionary.BaseOnHeapMutableDictionary;
 import com.linkedin.pinot.core.segment.creator.ColumnStatistics;
 import java.util.Arrays;
 import java.util.List;
@@ -42,14 +41,15 @@ public class RealtimeColumnStatistics implements ColumnStatistics {
 
   private final RealtimeColumnDataSource _dataSource;
   private final int[] _sortedDocIdIterationOrder;
-  private final MutableDictionaryReader _dictionaryReader;
+  private final BaseOnHeapMutableDictionary _dictionaryReader;
   private final Block _block;
   private PartitionFunction partitionFunction;
   private int numPartitions;
   private int partitionRangeStart = Integer.MAX_VALUE;
   private int partitionRangeEnd = Integer.MIN_VALUE;
 
-  public RealtimeColumnStatistics(RealtimeColumnDataSource dataSource, int[] sortedDocIdIterationOrder, ColumnPartitionConfig columnPartitionConfig) {
+  public RealtimeColumnStatistics(RealtimeColumnDataSource dataSource, int[] sortedDocIdIterationOrder,
+      ColumnPartitionConfig columnPartitionConfig) {
     _dataSource = dataSource;
     _sortedDocIdIterationOrder = sortedDocIdIterationOrder;
     _dictionaryReader = dataSource.getDictionary();
@@ -146,7 +146,7 @@ public class RealtimeColumnStatistics implements ColumnStatistics {
       int[] dictionaryIds = new int[getMaxNumberOfMultiValues()];
 
       BlockMultiValIterator valIterator = (BlockMultiValIterator) _block.getBlockValueSet().iterator();
-      while(valIterator.hasNext()) {
+      while (valIterator.hasNext()) {
         multivalueEntryCount += valIterator.nextIntVal(dictionaryIds);
       }
     }

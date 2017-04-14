@@ -52,11 +52,6 @@ public class FloatDictionary extends ImmutableDictionaryReader {
   }
 
   @Override
-  public String toString(int dictionaryId) {
-    return Float.toString(getFloat(dictionaryId));
-  }
-
-  @Override
   public String getStringValue(int dictionaryId) {
     return Float.toString(getFloat(dictionaryId));
   }

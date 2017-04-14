@@ -172,9 +172,6 @@ public abstract class MutableDictionaryReader implements Dictionary {
   @Override
   public abstract float getFloatValue(int dictionaryId);
 
-  @Override
-  public abstract String toString(int dictionaryId);
-
   public void print() {
     System.out.println("************* printing dictionary for column : " + column + " ***************");
     for (Integer key : dictionaryIdBiMap.keySet()) {

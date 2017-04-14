@@ -15,16 +15,13 @@
  */
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
+import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnMultiValueReaderWriter;
 import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-import com.linkedin.pinot.common.data.DimensionFieldSpec;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnMultiValueReaderWriter;
 
 
 public class MultiValueDictionaryTest {
-  private static final String COL_NAME = "greek";
   private static final int NROWS = 1000;
   private static final int MAX_N_VALUES = FixedByteSingleColumnMultiValueReaderWriter.DEFAULT_MAX_NUMBER_OF_MULTIVALUES;
 
@@ -38,10 +35,9 @@ public class MultiValueDictionaryTest {
     }
   }
 
-  public void testMultiValueIndexing(final long seed)
+  private void testMultiValueIndexing(final long seed)
       throws Exception {
-    final FieldSpec mvIntFs = new DimensionFieldSpec(COL_NAME, FieldSpec.DataType.LONG, false);
-    final LongMutableDictionary dict = new LongMutableDictionary(COL_NAME);
+    final LongOnHeapMutableDictionary dict = new LongOnHeapMutableDictionary();
     final FixedByteSingleColumnMultiValueReaderWriter indexer =
         new FixedByteSingleColumnMultiValueReaderWriter(NROWS, Integer.SIZE / 8, MAX_N_VALUES, 2);
 

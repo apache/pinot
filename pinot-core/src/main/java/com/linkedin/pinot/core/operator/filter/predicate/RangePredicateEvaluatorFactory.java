@@ -17,7 +17,7 @@ package com.linkedin.pinot.core.operator.filter.predicate;
 
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.core.common.predicate.RangePredicate;
-import com.linkedin.pinot.core.realtime.impl.dictionary.MutableDictionaryReader;
+import com.linkedin.pinot.core.realtime.impl.dictionary.BaseOnHeapMutableDictionary;
 import com.linkedin.pinot.core.segment.index.readers.ImmutableDictionaryReader;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
@@ -53,7 +53,7 @@ public class RangePredicateEvaluatorFactory {
    * @return Dictionary based equality _predicate evaluator
    */
   public static PredicateEvaluator newRealtimeDictionaryBasedEvaluator(RangePredicate predicate,
-      MutableDictionaryReader dictionary) {
+      BaseOnHeapMutableDictionary dictionary) {
     return new RealtimeDictionaryBasedPredicateEvaluator(predicate, dictionary);
   }
 
@@ -94,8 +94,7 @@ public class RangePredicateEvaluatorFactory {
     private int _rangeEndIndex = 0;
     int _matchingSize;
 
-    public OfflineDictionaryBasedPredicateEvaluator(RangePredicate predicate,
-        ImmutableDictionaryReader dictionary) {
+    public OfflineDictionaryBasedPredicateEvaluator(RangePredicate predicate, ImmutableDictionaryReader dictionary) {
       this._predicate = predicate;
 
       final boolean incLower = predicate.includeLowerBoundary();
@@ -188,8 +187,7 @@ public class RangePredicateEvaluatorFactory {
     private IntSet _dictIdSet;
     private RangePredicate _predicate;
 
-    public RealtimeDictionaryBasedPredicateEvaluator(RangePredicate predicate,
-        MutableDictionaryReader dictionary) {
+    public RealtimeDictionaryBasedPredicateEvaluator(RangePredicate predicate, BaseOnHeapMutableDictionary dictionary) {
       this._predicate = predicate;
       List<Integer> ids = new ArrayList<>();
       String rangeStart;

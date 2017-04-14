@@ -90,11 +90,6 @@ public class StringDictionary extends ImmutableDictionaryReader {
   }
 
   @Override
-  public String toString(int dictionaryId) {
-    return get(dictionaryId);
-  }
-
-  @Override
   public void readIntValues(int[] dictionaryIds, int startPos, int limit, int[] outValues, int outStartPos) {
     throw new RuntimeException("Can not convert string to int");
   }

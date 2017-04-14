@@ -18,12 +18,12 @@ package com.linkedin.pinot.core.realtime.impl.dictionary;
 import java.util.Arrays;
 
 
-public class StringMutableDictionary extends MutableDictionaryReader {
+public class StringBiMapDictionary extends MutableDictionaryReader {
 
   private String min = null;
   private String max = null;
 
-  public StringMutableDictionary(String column) {
+  public StringBiMapDictionary(String column) {
     super(column);
   }
 
@@ -93,11 +93,6 @@ public class StringMutableDictionary extends MutableDictionaryReader {
   @Override
   public float getFloatValue(int dictionaryId) {
     return -1;
-  }
-
-  @Override
-  public String toString(int dictionaryId) {
-    return (String) getRawValueFromBiMap(dictionaryId);
   }
 
   @Override

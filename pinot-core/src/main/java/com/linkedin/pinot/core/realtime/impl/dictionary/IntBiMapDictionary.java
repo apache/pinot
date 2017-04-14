@@ -18,12 +18,12 @@ package com.linkedin.pinot.core.realtime.impl.dictionary;
 import java.util.Arrays;
 
 
-public class DoubleMutableDictionary extends MutableDictionaryReader {
+public class IntBiMapDictionary extends MutableDictionaryReader {
 
-  private Double min = Double.MAX_VALUE;
-  private Double max = Double.MIN_VALUE;
+  private Integer min = Integer.MAX_VALUE;
+  private Integer max = Integer.MIN_VALUE;
 
-  public DoubleMutableDictionary(String column) {
+  public IntBiMapDictionary(String column) {
     super(column);
   }
 
@@ -35,36 +35,39 @@ public class DoubleMutableDictionary extends MutableDictionaryReader {
     }
 
     if (rawValue instanceof String) {
-      Double entry = Double.parseDouble((String) rawValue);
+      Integer entry = Integer.parseInt(rawValue.toString());
       addToDictionaryBiMap(entry);
       updateMinMax(entry);
       return;
     }
 
-    if (rawValue instanceof Double) {
+    if (rawValue instanceof Integer) {
       addToDictionaryBiMap(rawValue);
-      updateMinMax((Double) rawValue);
+      updateMinMax((Integer) rawValue);
       return;
     }
 
     if (rawValue instanceof Object[]) {
-      for (Object o : (Object[]) rawValue) {
-        if (o instanceof String) {
-          final Double doubleValue = Double.parseDouble(o.toString());
-          addToDictionaryBiMap(doubleValue);
-          updateMinMax(doubleValue);
+      Object[] multivalues = (Object[]) rawValue;
+
+      for (int i = 0; i < multivalues.length; i++) {
+
+        if (multivalues[i] instanceof String) {
+          addToDictionaryBiMap(Integer.parseInt(multivalues[i].toString()));
+          updateMinMax(Integer.parseInt(multivalues[i].toString()));
           continue;
         }
 
-        if (o instanceof Double) {
-          addToDictionaryBiMap(o);
-          updateMinMax((Double) o);
+        if (multivalues[i] instanceof Integer) {
+          addToDictionaryBiMap(multivalues[i]);
+          updateMinMax((Integer) multivalues[i]);
+          continue;
         }
       }
     }
   }
 
-  private void updateMinMax(Double entry) {
+  private void updateMinMax(Integer entry) {
     if (entry < min) {
       min = entry;
     }
@@ -79,7 +82,7 @@ public class DoubleMutableDictionary extends MutableDictionaryReader {
       return hasNull;
     }
     if (rawValue instanceof String) {
-      return dictionaryIdBiMap.inverse().containsKey(Double.parseDouble(rawValue.toString()));
+      return dictionaryIdBiMap.inverse().containsKey(Integer.parseInt(rawValue.toString()));
     }
     return dictionaryIdBiMap.inverse().containsKey(rawValue);
   }
@@ -87,7 +90,7 @@ public class DoubleMutableDictionary extends MutableDictionaryReader {
   @Override
   public int indexOf(Object rawValue) {
     if (rawValue instanceof String) {
-      return getIndexOfFromBiMap(Double.parseDouble(rawValue.toString()));
+      return getIndexOfFromBiMap(Integer.parseInt(rawValue.toString()));
     }
     return getIndexOfFromBiMap(rawValue);
   }
@@ -99,70 +102,40 @@ public class DoubleMutableDictionary extends MutableDictionaryReader {
 
   @Override
   public long getLongValue(int dictionaryId) {
-    return ((Double) getRawValueFromBiMap(dictionaryId)).longValue();
+    return ((Integer) getRawValueFromBiMap(dictionaryId)).longValue();
   }
 
   @Override
   public double getDoubleValue(int dictionaryId) {
-    return (Double) getRawValueFromBiMap(dictionaryId);
+    return ((Integer) getRawValueFromBiMap(dictionaryId)).doubleValue();
   }
 
   @Override
   public int getIntValue(int dictionaryId) {
-    return (int) getDouble(dictionaryId);
+    return getInt(dictionaryId);
   }
 
   @Override
   public float getFloatValue(int dictionaryId) {
-    return (float) getDouble(dictionaryId);
+    return (float) getInt(dictionaryId);
   }
 
   @Override
-  public String toString(int dictionaryId) {
-    return (getRawValueFromBiMap(dictionaryId)).toString();
-  }
-
-  @Override
-  public boolean inRange(String lower, String upper, int indexOfValueToCompare, boolean includeLower,
-      boolean includeUpper) {
-
-    double lowerInDouble = Double.parseDouble(lower);
-    double upperInDouble = Double.parseDouble(upper);
-
-    double valueToCompare = getDouble(indexOfValueToCompare);
-
-    boolean ret = true;
-
-    if (includeLower) {
-      if (valueToCompare < lowerInDouble) {
-        ret = false;
-      }
-    } else {
-      if (valueToCompare <= lowerInDouble) {
-        ret = false;
-      }
+  public void readIntValues(int[] dictionaryIds, int startPos, int limit, int[] outValues, int outStartPos) {
+    int endPos = startPos + limit;
+    for (int iter = startPos; iter < endPos; ++iter) {
+      int dictId = dictionaryIds[iter];
+      outValues[outStartPos++] = getInt(dictId);
     }
-
-    if (includeUpper) {
-      if (valueToCompare > upperInDouble) {
-        ret = false;
-      }
-    } else {
-      if (valueToCompare >= upperInDouble) {
-        ret = false;
-      }
-    }
-
-    return ret;
   }
 
   @Override
   public Object getSortedValues() {
     int valueCount = length();
-    double[] values = new double[valueCount];
+    int[] values = new int[valueCount];
 
     for (int i = 0; i < valueCount; i++) {
-      values[i] = getDoubleValue(i);
+      values[i] = getIntValue(i);
     }
 
     Arrays.sort(values);
@@ -172,11 +145,45 @@ public class DoubleMutableDictionary extends MutableDictionaryReader {
 
   @Override
   public String getStringValue(int dictionaryId) {
-    return ((Double) getRawValueFromBiMap(dictionaryId)).toString();
+    return ((Integer) getRawValueFromBiMap(dictionaryId)).toString();
   }
 
-  private double getDouble(int dictionaryId) {
-    return (Double) dictionaryIdBiMap.get(dictionaryId);
+  @Override
+  public boolean inRange(String lower, String upper, int indexOfValueToCompare, boolean includeLower,
+      boolean includeUpper) {
+
+    int lowerInInt = Integer.parseInt(lower);
+    int upperInInt = Integer.parseInt(upper);
+
+    int valueToCompare = getInt(indexOfValueToCompare);
+
+    boolean ret = true;
+
+    if (includeLower) {
+      if (valueToCompare < lowerInInt) {
+        ret = false;
+      }
+    } else {
+      if (valueToCompare <= lowerInInt) {
+        ret = false;
+      }
+    }
+
+    if (includeUpper) {
+      if (valueToCompare > upperInInt) {
+        ret = false;
+      }
+    } else {
+      if (valueToCompare >= upperInInt) {
+        ret = false;
+      }
+    }
+
+    return ret;
+  }
+
+  public int getInt(int dictionaryId) {
+    return (Integer) dictionaryIdBiMap.get(dictionaryId);
   }
 
   @Override
@@ -188,4 +195,5 @@ public class DoubleMutableDictionary extends MutableDictionaryReader {
   public Object getMaxVal() {
     return max;
   }
+
 }

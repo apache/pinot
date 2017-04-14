@@ -15,29 +15,36 @@
  */
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
+import java.util.Random;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
 /**
  * Tests for concurrent read and write against REALTIME dictionary.
- * <p>For now just test against {@link IntMutableDictionary}. Index contiguous integers from 0 so that the index for
- * each value is deterministic.
+ * <p>For now just test against {@link IntOnHeapMutableDictionary}. Index contiguous integers from 1 so that the index
+ * for each value is deterministic.
  */
 public class ConcurrentReadWriteDictionaryTest {
   private static final int NUM_ENTRIES = 1_000_000;
   private static final int NUM_READERS = 5;
   private static final ExecutorService EXECUTOR_SERVICE = Executors.newFixedThreadPool(NUM_READERS + 1);
+  private static final Random RANDOM = new Random();
 
-  private final IntMutableDictionary _intMutableDictionary = new IntMutableDictionary("DummyColumn");
+  private IntOnHeapMutableDictionary _intOnHeapMutableDictionary;
 
-  // TODO: fix the concurrency issue then turn on the test
-  @Test(enabled = false)
+  @BeforeMethod
+  public void setUp() {
+    _intOnHeapMutableDictionary = new IntOnHeapMutableDictionary();
+  }
+
+  @Test
   public void testSingleReaderSingleWriter()
       throws Exception {
     Future<Void> readerFuture = EXECUTOR_SERVICE.submit(new Reader());
@@ -47,8 +54,7 @@ public class ConcurrentReadWriteDictionaryTest {
     writerFuture.get();
   }
 
-  // TODO: fix the concurrency issue then turn on the test
-  @Test(enabled = false)
+  @Test
   public void testMultiReadersSingleWriter()
       throws Exception {
     Future[] readerFutures = new Future[NUM_READERS];
@@ -78,12 +84,16 @@ public class ConcurrentReadWriteDictionaryTest {
     public Void call()
         throws Exception {
       for (int i = 0; i < NUM_ENTRIES; i++) {
-        int index;
+        int dictId;
         do {
-          index = _intMutableDictionary.indexOf(i);
-        } while (index < 0);
-        Assert.assertEquals(index, i);
-        Assert.assertEquals(_intMutableDictionary.getInt(index), i);
+          dictId = _intOnHeapMutableDictionary.indexOf(i + 1);
+        } while (dictId < 0);
+        Assert.assertEquals(dictId, i);
+        Assert.assertEquals(_intOnHeapMutableDictionary.getIntValue(dictId), i + 1);
+
+        // Fetch value by a random existing dictId
+        int randomDictId = RANDOM.nextInt(i + 1);
+        Assert.assertEquals(_intOnHeapMutableDictionary.getIntValue(randomDictId), randomDictId + 1);
       }
       return null;
     }
@@ -98,8 +108,13 @@ public class ConcurrentReadWriteDictionaryTest {
     public Void call()
         throws Exception {
       for (int i = 0; i < NUM_ENTRIES; i++) {
-        _intMutableDictionary.index(i);
-        Assert.assertEquals(_intMutableDictionary.indexOf(i), i);
+        _intOnHeapMutableDictionary.index(i + 1);
+        Assert.assertEquals(_intOnHeapMutableDictionary.indexOf(i + 1), i);
+
+        // Index a random existing value
+        int randomValue = RANDOM.nextInt(i + 1) + 1;
+        _intOnHeapMutableDictionary.index(randomValue);
+        Assert.assertEquals(_intOnHeapMutableDictionary.indexOf(randomValue), randomValue - 1);
       }
       return null;
     }

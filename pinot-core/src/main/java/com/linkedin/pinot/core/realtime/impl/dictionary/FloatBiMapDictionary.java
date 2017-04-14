@@ -18,12 +18,12 @@ package com.linkedin.pinot.core.realtime.impl.dictionary;
 import java.util.Arrays;
 
 
-public class LongMutableDictionary extends MutableDictionaryReader {
+public class FloatBiMapDictionary extends MutableDictionaryReader {
 
-  private Long min = Long.MAX_VALUE;
-  private Long max = Long.MIN_VALUE;
+  private Float min = Float.MAX_VALUE;
+  private Float max = Float.MIN_VALUE;
 
-  public LongMutableDictionary(String column) {
+  public FloatBiMapDictionary(String column) {
     super(column);
   }
 
@@ -33,38 +33,38 @@ public class LongMutableDictionary extends MutableDictionaryReader {
       hasNull = true;
       return;
     }
-
     if (rawValue instanceof String) {
-      Long e = Long.parseLong(rawValue.toString());
+      Float e = Float.parseFloat(rawValue.toString());
       addToDictionaryBiMap(e);
       updateMinMax(e);
       return;
     }
 
-    if (rawValue instanceof Long) {
+    if (rawValue instanceof Float) {
       addToDictionaryBiMap(rawValue);
-      updateMinMax((Long) rawValue);
+      updateMinMax((Float) rawValue);
       return;
     }
 
     if (rawValue instanceof Object[]) {
+
       for (Object o : (Object[]) rawValue) {
         if (o instanceof String) {
-          final Long longValue = Long.parseLong(o.toString());
-          addToDictionaryBiMap(longValue);
-          updateMinMax(longValue);
+          final Float floatValue = Float.parseFloat(o.toString());
+          addToDictionaryBiMap(floatValue);
+          updateMinMax(floatValue);
           continue;
         }
 
-        if (o instanceof Long) {
+        if (o instanceof Float) {
           addToDictionaryBiMap(o);
-          updateMinMax((Long) o);
+          updateMinMax((Float) o);
         }
       }
     }
   }
 
-  private void updateMinMax(Long entry) {
+  private void updateMinMax(Float entry) {
     if (entry < min) {
       min = entry;
     }
@@ -79,7 +79,7 @@ public class LongMutableDictionary extends MutableDictionaryReader {
       return hasNull;
     }
     if (rawValue instanceof String) {
-      return dictionaryIdBiMap.inverse().containsKey(Long.parseLong((String) rawValue));
+      return dictionaryIdBiMap.inverse().containsKey(Float.parseFloat(rawValue.toString()));
     }
     return dictionaryIdBiMap.inverse().containsKey(rawValue);
   }
@@ -87,7 +87,7 @@ public class LongMutableDictionary extends MutableDictionaryReader {
   @Override
   public int indexOf(Object rawValue) {
     if (rawValue instanceof String) {
-      return getIndexOfFromBiMap(Long.parseLong(rawValue.toString()));
+      return getIndexOfFromBiMap(Float.parseFloat(rawValue.toString()));
     }
     return getIndexOfFromBiMap(rawValue);
   }
@@ -99,57 +99,51 @@ public class LongMutableDictionary extends MutableDictionaryReader {
 
   @Override
   public long getLongValue(int dictionaryId) {
-    return (Long) getRawValueFromBiMap(dictionaryId);
+    return ((Float) getRawValueFromBiMap(dictionaryId)).longValue();
   }
 
   @Override
   public double getDoubleValue(int dictionaryId) {
-    return ((Long) getRawValueFromBiMap(dictionaryId)).doubleValue();
+    return ((Float) getRawValueFromBiMap(dictionaryId)).doubleValue();
   }
 
   @Override
   public int getIntValue(int dictionaryId) {
-    return ((Long) getRawValueFromBiMap(dictionaryId)).intValue();
+    return ((Float) getRawValueFromBiMap(dictionaryId)).intValue();
   }
 
   @Override
   public float getFloatValue(int dictionaryId) {
-    return ((Long) getRawValueFromBiMap(dictionaryId)).floatValue();
+    return ((Float) getRawValueFromBiMap(dictionaryId));
   }
-
-  @Override
-  public String toString(int dictionaryId) {
-    return ((Long) getRawValueFromBiMap(dictionaryId)).toString();
-  }
-
 
   @Override
   public boolean inRange(String lower, String upper, int indexOfValueToCompare, boolean includeLower,
       boolean includeUpper) {
 
-    long lowerInLong = Long.parseLong(lower);
-    long upperInLong = Long.parseLong(upper);
+    float lowerInFloat = Float.parseFloat(lower);
+    float upperInFloat = Float.parseFloat(upper);
 
-    long valueToCompare = getLong(indexOfValueToCompare);
+    float valueToCompare = getFloat(indexOfValueToCompare);
 
     boolean ret = true;
 
     if (includeLower) {
-      if (valueToCompare < lowerInLong) {
+      if (valueToCompare < lowerInFloat) {
         ret = false;
       }
     } else {
-      if (valueToCompare <= lowerInLong) {
+      if (valueToCompare <= lowerInFloat) {
         ret = false;
       }
     }
 
     if (includeUpper) {
-      if (valueToCompare > upperInLong) {
+      if (valueToCompare > upperInFloat) {
         ret = false;
       }
     } else {
-      if (valueToCompare >= upperInLong) {
+      if (valueToCompare >= upperInFloat) {
         ret = false;
       }
     }
@@ -160,10 +154,10 @@ public class LongMutableDictionary extends MutableDictionaryReader {
   @Override
   public Object getSortedValues() {
     int valueCount = length();
-    long[] values = new long[valueCount];
+    float[] values = new float[valueCount];
 
     for (int i = 0; i < valueCount; i++) {
-      values[i] = getLongValue(i);
+      values[i] = getFloatValue(i);
     }
 
     Arrays.sort(values);
@@ -173,11 +167,11 @@ public class LongMutableDictionary extends MutableDictionaryReader {
 
   @Override
   public String getStringValue(int dictionaryId) {
-    return getRawValueFromBiMap(dictionaryId).toString();
+    return (getRawValueFromBiMap(dictionaryId)).toString();
   }
 
-  private long getLong(int dictionaryId) {
-    return (Long) dictionaryIdBiMap.get(dictionaryId);
+  private float getFloat(int dictionaryId) {
+    return (Float) dictionaryIdBiMap.get(dictionaryId);
   }
 
   @Override

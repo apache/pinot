@@ -65,11 +65,6 @@ public class LongDictionary extends ImmutableDictionaryReader {
     return (int) getLong(dictionaryId);
   }
 
-  @Override
-  public String toString(int dictionaryId) {
-    return Long.toString(getLong(dictionaryId));
-  }
-
   private long getLong(int dictionaryId) {
     return dataFileReader.getLong(dictionaryId, 0);
   }
