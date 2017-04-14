@@ -51,6 +51,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.text.StrSubstitutor;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -600,24 +601,60 @@ public class AnomaliesResource {
 
     String metric = mergedAnomaly.getMetric();
     String dataset = mergedAnomaly.getCollection();
-    Long startTime = mergedAnomaly.getStartTime();
-    Long endTime = mergedAnomaly.getEndTime();
     MetricConfigDTO metricConfigDTO = metricConfigDAO.findByMetricAndDataset(metric, dataset);
-    Map<String, String> context = new HashMap<>();
-    context.put(MetricConfigBean.URL_TEMPLATE_START_TIME, String.valueOf(startTime));
-    context.put(MetricConfigBean.URL_TEMPLATE_END_TIME, String.valueOf(endTime));
-    StrSubstitutor strSubstitutor = new StrSubstitutor(context);
     Map<String, String> urlTemplates = metricConfigDTO.getExtSourceLinkInfo();
-    if (urlTemplates == null) {
+    if (MapUtils.isEmpty(urlTemplates)) {
       return "";
     }
-    for (Map.Entry<String, String> entry : urlTemplates.entrySet()) {
-      String sourceName = entry.getKey();
-      String urlTemplate = entry.getValue();
+
+    // Construct context for substituting the keywords in URL template
+    Map<String, String> context = new HashMap<>();
+    // context for each pair of dimension name and value
+    if (MapUtils.isNotEmpty(mergedAnomaly.getDimensions())) {
+      for (Map.Entry<String, String> entry : mergedAnomaly.getDimensions().entrySet()) {
+        // TODO: Change to case sensitive?
+        context.put(entry.getKey().toLowerCase(), entry.getValue().toLowerCase());
+      }
+    }
+
+    Long startTime = mergedAnomaly.getStartTime();
+    Long endTime = mergedAnomaly.getEndTime();
+    Map<String, String> externalLinkTimeGranularity = metricConfigDTO.getExtSourceLinkTimeGranularity();
+    for (Map.Entry<String, String> externalLinkEntry : urlTemplates.entrySet()) {
+      String sourceName = externalLinkEntry.getKey();
+      String urlTemplate = externalLinkEntry.getValue();
+      // context for startTime and endTime
+      putExternalLinkTimeContext(startTime, endTime, sourceName, context, externalLinkTimeGranularity);
+
+      StrSubstitutor strSubstitutor = new StrSubstitutor(context);
       String extSourceUrl = strSubstitutor.replace(urlTemplate);
       urlTemplates.put(sourceName, extSourceUrl);
     }
     return new JSONObject(urlTemplates).toString();
+  }
+
+  /**
+   * The default time granularity of ThirdEye is MILLISECONDS; however, it could be different for external links. This
+   * method updates the start and end time according to external link's time granularity. If a link's granularity is
+   * not given, then the default granularity (MILLISECONDS) is used.
+   *
+   * @param startTime the start time in milliseconds/
+   * @param endTime the end time in milliseconds.
+   * @param linkName the name of the external link.
+   * @param context the context to be updated, which is used by StrSubstitutor.
+   * @param externalLinkTimeGranularity the granularity of the external link.
+   */
+  private void putExternalLinkTimeContext(long startTime, long endTime, String linkName,
+      Map<String, String> context, Map<String, String> externalLinkTimeGranularity) {
+    if (MapUtils.isNotEmpty(externalLinkTimeGranularity) && externalLinkTimeGranularity.containsKey(linkName)) {
+      String timeGranularityString = externalLinkTimeGranularity.get(linkName);
+      TimeGranularity timeGranularity = TimeGranularity.fromString(timeGranularityString);
+      context.put(MetricConfigBean.URL_TEMPLATE_START_TIME, String.valueOf(timeGranularity.convertToUnit(startTime)));
+      context.put(MetricConfigBean.URL_TEMPLATE_END_TIME, String.valueOf(timeGranularity.convertToUnit(endTime)));
+    } else { // put start and end time as is
+      context.put(MetricConfigBean.URL_TEMPLATE_START_TIME, String.valueOf(startTime));
+      context.put(MetricConfigBean.URL_TEMPLATE_END_TIME, String.valueOf(endTime));
+    }
   }
 
   /**

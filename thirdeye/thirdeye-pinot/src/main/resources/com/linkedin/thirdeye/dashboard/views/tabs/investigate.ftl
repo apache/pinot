@@ -30,6 +30,9 @@
         {{#if ../externalUrls.INGRAPH}}
           <a href={{../externalUrls.INGRAPH}} target="_blank" class="thirdeye-link">InGraphs</a>
         {{/if}}
+       {{#if ../externalUrls.HARRIER}}
+          <a href={{../externalUrls.HARRIER}} target="_blank" class="thirdeye-link">Harrier</a>
+        {{/if}}
       </div>
     </div>
 
