@@ -755,7 +755,9 @@ public class DetectionJobResource {
   }
 
   /**
-   *
+   * Single function Reply to generate unnotified anomalies for user to label.
+   * Given anomaly function Id, start time, end time, it clones a function with same configurations and replays from start time to end time
+   * The replayed anomalies are being kept, with notified label = false
    * @param id FunctionId
    * @param replayStartTimeIso replay start time in ISO format, e.g. 2017-02-27T00:00:00.000Z
    * @param replayEndTimeIso replay end time
@@ -768,6 +770,7 @@ public class DetectionJobResource {
     DateTime replayStart = ISODateTimeFormat.dateTimeParser().parseDateTime(replayStartTimeIso);
     DateTime replayEnd = ISODateTimeFormat.dateTimeParser().parseDateTime(replayEndTimeIso);
     FunctionReplayRunnable functionReplayRunnable = new FunctionReplayRunnable(detectionJobScheduler, anomalyFunctionDAO, mergedAnomalyResultDAO, rawAnomalyResultDAO, new HashMap<String, String>(), id, replayStart, replayEnd, false);
+    functionReplayRunnable.setForceBackfill(false);
     functionReplayRunnable.run();
     return Response.ok(functionReplayRunnable.getLastClonedFunctionId()).build();
   }
