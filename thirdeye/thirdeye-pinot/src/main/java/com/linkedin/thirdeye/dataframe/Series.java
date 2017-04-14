@@ -35,59 +35,71 @@ public abstract class Series {
     RIGHT
   }
 
-  interface Function {
+  /**
+   * Top-level interface to denote a function that may be applied to one (or multiple) series.
+   * Functions may be applied either row-by-row across multiple series or to all values within
+   * a single series.
+   * <br/><b>NOTE:</b> Functions MAY NOT receive a {@code null} value as an input. Rather, if
+   * any one of the input values is {@code null}, the result is set to {@code null} by the
+   * Series framework.
+   * <br/><b>NOTE:</b> Function MAY return {@code null} as a result, however.
+   */
+  public interface Function {
     // left blank
   }
 
-  interface Conditional extends Function {
+  public interface Conditional extends Function {
     // left blank
   }
 
   //  @FunctionalInterface
-  interface DoubleConditional extends Conditional {
+  public interface DoubleConditional extends Conditional {
     boolean apply(double... values);
   }
 
   //  @FunctionalInterface
-  interface LongConditional extends Conditional {
+  public interface LongConditional extends Conditional {
     boolean apply(long... values);
   }
 
   //  @FunctionalInterface
-  interface StringConditional extends Conditional {
+  public interface StringConditional extends Conditional {
     boolean apply(String... values);
   }
 
   //  @FunctionalInterface
-  interface BooleanConditional extends Conditional {
+  public interface BooleanConditional extends Conditional {
     boolean apply(boolean... values);
   }
 
   //  @FunctionalInterface
-  interface DoubleFunction extends Function {
+  public interface DoubleFunction extends Function {
+    double NULL = DoubleSeries.NULL;
     double apply(double... values);
   }
 
   //  @FunctionalInterface
-  interface LongFunction extends Function {
+  public interface LongFunction extends Function {
+    long NULL = LongSeries.NULL;
     long apply(long... values);
   }
 
   //  @FunctionalInterface
-  interface StringFunction extends Function {
+  public interface StringFunction extends Function {
+    String NULL = StringSeries.NULL;
     String apply(String... values);
   }
 
   //  @FunctionalInterface
-  interface BooleanFunction extends Function {
+  public interface BooleanFunction extends Function {
     boolean apply(boolean... values);
   }
 
   //  @FunctionalInterface
-  interface BooleanFunctionEx extends Function {
-    byte TRUE = BooleanSeries.TRUE_VALUE;
-    byte FALSE = BooleanSeries.FALSE_VALUE;
-    byte NULL = BooleanSeries.NULL_VALUE;
+  public interface BooleanFunctionEx extends Function {
+    byte TRUE = BooleanSeries.TRUE;
+    byte FALSE = BooleanSeries.FALSE;
+    byte NULL = BooleanSeries.NULL;
 
     byte apply(boolean... values);
   }
@@ -358,6 +370,14 @@ public abstract class Series {
    * @return sorted series copy
    */
   public abstract Series sorted();
+
+  /**
+   * Returns a copy of the series with {@code null} values replaced by the series' default
+   * value.
+   *
+   * @return series copy with filled nulls
+   */
+  public abstract Series fillNull();
 
   /* *************************************************************************
    * Internal abstract interface
@@ -689,7 +709,7 @@ public abstract class Series {
       if(!isNull(i))
         fromIndex[count++] = i;
     }
-    return this.project(fromIndex);
+    return this.project(Arrays.copyOf(fromIndex, count));
   }
 
   //

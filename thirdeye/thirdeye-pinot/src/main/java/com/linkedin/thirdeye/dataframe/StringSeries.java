@@ -16,8 +16,11 @@ import org.apache.commons.lang.math.NumberUtils;
  * Series container for String objects.
  */
 public final class StringSeries extends TypedSeries<StringSeries> {
-  public static final String NULL_VALUE = null;
+  public static final String NULL = null;
+  public static final String DEFAULT = "";
+
   public static final StringFunction CONCAT = new StringConcat();
+  public static final StringFunction FIRST = new StringFirst();
   public static final StringFunction LAST = new StringLast();
 
   public static final class StringConcat implements StringFunction {
@@ -46,11 +49,20 @@ public final class StringSeries extends TypedSeries<StringSeries> {
     }
   }
 
+  public static final class StringFirst implements StringFunction {
+    @Override
+    public String apply(String[] values) {
+      if(values.length <= 0)
+        return NULL;
+      return values[0];
+    }
+  }
+
   public static final class StringLast implements StringFunction {
     @Override
     public String apply(String[] values) {
       if(values.length <= 0)
-        return StringSeries.NULL_VALUE;
+        return NULL;
       return values[values.length-1];
     }
   }
@@ -119,7 +131,7 @@ public final class StringSeries extends TypedSeries<StringSeries> {
 
   public static double getDouble(String value) {
     if(StringSeries.isNull(value) || value.length() <= 0)
-      return DoubleSeries.NULL_VALUE;
+      return DoubleSeries.NULL;
     return Double.parseDouble(value);
   }
 
@@ -130,7 +142,7 @@ public final class StringSeries extends TypedSeries<StringSeries> {
 
   public static long getLong(String value) {
     if(StringSeries.isNull(value) || value.length() <= 0)
-      return LongSeries.NULL_VALUE;
+      return LongSeries.NULL;
     try {
       return Long.parseLong(value);
     } catch (NumberFormatException e) {
@@ -145,7 +157,7 @@ public final class StringSeries extends TypedSeries<StringSeries> {
 
   public static byte getBoolean(String value) {
     if(StringSeries.isNull(value) || value.length() <= 0)
-      return BooleanSeries.NULL_VALUE;
+      return BooleanSeries.NULL;
     if(NumberUtils.isNumber(value))
       return BooleanSeries.valueOf(Double.parseDouble(value) != 0.0d);
     return BooleanSeries.valueOf(Boolean.parseBoolean(value));
@@ -257,6 +269,14 @@ public final class StringSeries extends TypedSeries<StringSeries> {
     return StringSeries.buildFrom(Arrays.copyOfRange(this.values, from, to));
   }
 
+  public String concat() {
+    return this.aggregate(CONCAT).value();
+  }
+
+  public String concat(String delimiter) {
+    return this.aggregate(new StringConcat(delimiter)).value();
+  }
+
   @Override
   public String toString() {
     StringBuilder builder = new StringBuilder();
@@ -272,6 +292,11 @@ public final class StringSeries extends TypedSeries<StringSeries> {
     }
     builder.append("}");
     return builder.toString();
+  }
+
+  @Override
+  public StringSeries fillNull() {
+    return this.fillNull(DEFAULT);
   }
 
   /**
@@ -296,7 +321,7 @@ public final class StringSeries extends TypedSeries<StringSeries> {
     String[] values = new String[fromIndex.length];
     for(int i=0; i<fromIndex.length; i++) {
       if(fromIndex[i] == -1) {
-        values[i] = NULL_VALUE;
+        values[i] = NULL;
       } else {
         values[i] = this.values[fromIndex[i]];
       }
@@ -358,7 +383,7 @@ public final class StringSeries extends TypedSeries<StringSeries> {
     for(int j=0; j<series.length; j++) {
       String value = series[j].getString(row);
       if(isNull(value))
-        return NULL_VALUE;
+        return NULL;
       input[j] = value;
     }
     return function.apply(input);
@@ -368,7 +393,7 @@ public final class StringSeries extends TypedSeries<StringSeries> {
     String[] output = new String[a.size()];
     for(int i=0; i<a.size(); i++) {
       if(a.isNull(i)) {
-        output[i] = NULL_VALUE;
+        output[i] = NULL;
       } else {
         output[i] = function.apply(a.getString(i));
       }
@@ -380,7 +405,7 @@ public final class StringSeries extends TypedSeries<StringSeries> {
     String[] output = new String[a.size()];
     for(int i=0; i<a.size(); i++) {
       if(a.isNull(i) || b.isNull(i)) {
-        output[i] = NULL_VALUE;
+        output[i] = NULL;
       } else {
         output[i] = function.apply(a.getString(i), b.getString(i));
       }
@@ -392,7 +417,7 @@ public final class StringSeries extends TypedSeries<StringSeries> {
     String[] output = new String[a.size()];
     for(int i=0; i<a.size(); i++) {
       if(a.isNull(i) || b.isNull(i) || c.isNull(i)) {
-        output[i] = NULL_VALUE;
+        output[i] = NULL;
       } else {
         output[i] = function.apply(a.getString(i), b.getString(i), c.getString(i));
       }
@@ -422,7 +447,7 @@ public final class StringSeries extends TypedSeries<StringSeries> {
     for(int j=0; j<series.length; j++) {
       String value = series[j].getString(row);
       if(isNull(value))
-        return BooleanSeries.NULL_VALUE;
+        return BooleanSeries.NULL;
       input[j] = value;
     }
     return BooleanSeries.valueOf(function.apply(input));
@@ -432,18 +457,22 @@ public final class StringSeries extends TypedSeries<StringSeries> {
    * @see Series#aggregate(Function)
    */
   public static StringSeries aggregate(StringFunction function, Series series) {
-    return buildFrom(function.apply(series.dropNull().getStrings().values));
+    if(series.hasNull())
+      return buildFrom(NULL);
+    return buildFrom(function.apply(series.getStrings().values));
   }
 
   /**
    * @see Series#aggregate(Function)
    */
   public static BooleanSeries aggregate(StringConditional function, Series series) {
-    return BooleanSeries.builder().addBooleanValues(function.apply(series.dropNull().getStrings().values)).build();
+    if(series.hasNull())
+      return BooleanSeries.buildFrom(BooleanSeries.NULL);
+    return BooleanSeries.builder().addBooleanValues(function.apply(series.getStrings().values)).build();
   }
 
   public static boolean isNull(String value) {
-    return Objects.equals(value, NULL_VALUE);
+    return Objects.equals(value, NULL);
   }
 
   private static int nullSafeStringComparator(String a, String b) {
@@ -467,11 +496,11 @@ public final class StringSeries extends TypedSeries<StringSeries> {
   public StringSeries shift(int offset) {
     String[] values = new String[this.values.length];
     if(offset >= 0) {
-      Arrays.fill(values, 0, Math.min(offset, values.length), NULL_VALUE);
+      Arrays.fill(values, 0, Math.min(offset, values.length), NULL);
       System.arraycopy(this.values, 0, values, Math.min(offset, values.length), Math.max(values.length - offset, 0));
     } else {
       System.arraycopy(this.values, Math.min(-offset, values.length), values, 0, Math.max(values.length + offset, 0));
-      Arrays.fill(values, Math.max(values.length + offset, 0), values.length, NULL_VALUE);
+      Arrays.fill(values, Math.max(values.length + offset, 0), values.length, NULL);
     }
     return buildFrom(values);
   }

@@ -6,29 +6,47 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import org.apache.commons.math.stat.descriptive.SummaryStatistics;
 
 
 /**
  * Series container for primitive double.
  */
 public final class DoubleSeries extends TypedSeries<DoubleSeries> {
-  public static final double NULL_VALUE = Double.NaN;
+  public static final double NULL = Double.NaN;
+  public static final double DEFAULT = 0.0d;
+
   public static final DoubleFunction SUM = new DoubleSum();
+  public static final DoubleFunction PRODUCT = new DoubleProduct();
+  public static final DoubleFunction LAST = new DoubleLast();
+  public static final DoubleFunction MIN = new DoubleMin();
+  public static final DoubleFunction MAX = new DoubleMax();
   public static final DoubleFunction MEAN = new DoubleMean();
   public static final DoubleFunction STD = new DoubleStandardDeviation();
-  public static final DoubleFunction LAST = new DoubleLast();
   public static final DoubleFunction NEGATIVE = new DoubleNegative();
 
   public static final class DoubleSum implements DoubleFunction {
     @Override
     public double apply(double[] values) {
-      // TODO sorted, add low to high for accuracy
-      double sum = 0.0d;
+      if(values.length <= 0)
+        return NULL;
+      // TODO sort, add low to high for accuracy?
+      double result = 0.0d;
       for(double v : values)
-        if(!DoubleSeries.isNull(v))
-          sum += v;
-      return sum;
+        result += v;
+      return result;
+    }
+  }
+
+  public static final class DoubleProduct implements DoubleFunction {
+    @Override
+    public double apply(double[] values) {
+      if(values.length <= 0)
+        return NULL;
+      // TODO sort for accuracy?
+      double result = 1.0d;
+      for(double v : values)
+        result *= v;
+      return result;
     }
   }
 
@@ -36,18 +54,25 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     @Override
     public double apply(double[] values) {
       if(values.length <= 0)
-        return NULL_VALUE;
+        return NULL;
 
-      // TODO sorted, add low to high for accuracy
+      // TODO sort, add low to high for accuracy?
       double sum = 0.0d;
       int count = 0;
       for(double v : values) {
-        if (!DoubleSeries.isNull(v)) {
-          sum += v;
-          count++;
-        }
+        sum += v;
+        count++;
       }
       return sum / count;
+    }
+  }
+
+  public static final class DoubleFirst implements DoubleFunction {
+    @Override
+    public double apply(double[] values) {
+      if(values.length <= 0)
+        return NULL;
+      return values[0];
     }
   }
 
@@ -55,8 +80,32 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     @Override
     public double apply(double[] values) {
       if(values.length <= 0)
-        return NULL_VALUE;
+        return NULL;
       return values[values.length - 1];
+    }
+  }
+
+  public static final class DoubleMin implements DoubleFunction {
+    @Override
+    public double apply(double[] values) {
+      if(values.length <= 0)
+        return NULL;
+      double min = values[0];
+      for(double v : values)
+        min = Math.min(min, v);
+      return min;
+    }
+  }
+
+  public static final class DoubleMax implements DoubleFunction {
+    @Override
+    public double apply(double[] values) {
+      if (values.length <= 0)
+        return NULL;
+      double max = values[0];
+      for (double v : values)
+        max = Math.max(max, v);
+      return max;
     }
   }
 
@@ -64,7 +113,7 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     @Override
     public double apply(double... values) {
       if(values.length <= 0)
-        return NULL_VALUE;
+        return NULL;
       return -values[0];
     }
   }
@@ -73,7 +122,7 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     @Override
     public double apply(double... values) {
       if(values.length <= 1)
-        return NULL_VALUE;
+        return NULL;
       double mean = MEAN.apply(values);
       double var = 0.0;
       for(double v : values)
@@ -82,11 +131,11 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     }
   }
 
-  public static final class DoubleZScore implements DoubleFunction {
+  public static final class DoubleMapZScore implements DoubleFunction {
     final double mean;
     final double std;
 
-    public DoubleZScore(double mean, double std) {
+    public DoubleMapZScore(double mean, double std) {
       this.mean = mean;
       this.std = std;
     }
@@ -97,6 +146,20 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     }
   }
 
+  public static final class DoubleMapNormalize implements DoubleFunction {
+    final double min;
+    final double max;
+
+    public DoubleMapNormalize(double min, double max) {
+      this.min = min;
+      this.max = max;
+    }
+
+    @Override
+    public double apply(double... values) {
+      return (values[0] - this.min) / (this.max - this.min);
+    }
+  }
 
   public static class Builder extends Series.Builder {
     final List<double[]> arrays = new ArrayList<>();
@@ -204,7 +267,7 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
 
   public static long getLong(double value) {
     if(DoubleSeries.isNull(value))
-      return LongSeries.NULL_VALUE;
+      return LongSeries.NULL;
     return (long) value;
   }
 
@@ -215,7 +278,7 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
 
   public static byte getBoolean(double value) {
     if(DoubleSeries.isNull(value))
-      return BooleanSeries.NULL_VALUE;
+      return BooleanSeries.NULL;
     return BooleanSeries.valueOf(value != 0.0d);
   }
 
@@ -226,7 +289,7 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
 
   public static String getString(double value) {
     if(DoubleSeries.isNull(value))
-      return StringSeries.NULL_VALUE;
+      return StringSeries.NULL;
     return String.valueOf(value);
   }
 
@@ -286,7 +349,7 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     double[] values = new double[this.values.length];
 
     // fill minSize - 1 with null values
-    Arrays.fill(values, 0, Math.min(values.length, Math.max(0, minSize)), NULL_VALUE);
+    Arrays.fill(values, 0, Math.min(values.length, Math.max(0, minSize)), NULL);
 
     for(int to=Math.max(1, minSize); to<=values.length; to++) {
       int from = Math.max(0, to - size);
@@ -314,33 +377,76 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
   }
 
   public double min() {
-    double m = NULL_VALUE;
-    for(double n : this.values) {
-      if(!isNull(n) && (isNull(m) || n < m))
-        m = n;
-    }
-    return m;
+    return this.aggregate(MIN).value();
   }
 
   public double max() {
-    double m = NULL_VALUE;
-    for(double n : this.values) {
-      if(!isNull(n) && (isNull(m) || n > m))
-        m = n;
-    }
-    return m;
-  }
-
-  public double mean() {
-    return MEAN.apply(this.values);
-  }
-
-  public double std() {
-    return STD.apply(this.values);
+    return this.aggregate(MAX).value();
   }
 
   public double sum() {
-    return new DoubleSum().apply(this.values);
+    return this.aggregate(SUM).value();
+  }
+
+  public double product() {
+    return this.aggregate(PRODUCT).value();
+  }
+
+  public double mean() {
+    return this.aggregate(MEAN).value();
+  }
+
+  public double std() {
+    return this.aggregate(STD).value();
+  }
+
+  public DoubleSeries normalize() {
+    return this.map(new DoubleMapNormalize(this.min(), this.max()));
+  }
+
+  public DoubleSeries zscore() {
+    return this.map(new DoubleMapZScore(this.mean(), this.std()));
+  }
+
+  public DoubleSeries add(Series other) {
+    return map(new DoubleFunction() {
+      @Override
+      public double apply(double... values) {
+        return values[0] + values[1];
+      }
+    }, this, other);
+  }
+
+  public DoubleSeries subtract(Series other) {
+    return map(new DoubleFunction() {
+      @Override
+      public double apply(double... values) {
+        return values[0] - values[1];
+      }
+    }, this, other);
+  }
+
+  public DoubleSeries multiply(Series other) {
+    return map(new DoubleFunction() {
+      @Override
+      public double apply(double... values) {
+        return values[0] * values[1];
+      }
+    }, this, other);
+  }
+
+  public DoubleSeries divide(Series other) {
+    return map(new DoubleFunction() {
+      @Override
+      public double apply(double... values) {
+        return values[0] / values[1];
+      }
+    }, this, other);
+  }
+
+  @Override
+  public DoubleSeries fillNull() {
+    return this.fillNull(DEFAULT);
   }
 
   /**
@@ -365,7 +471,7 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     double[] values = new double[fromIndex.length];
     for(int i=0; i<fromIndex.length; i++) {
       if(fromIndex[i] == -1) {
-        values[i] = NULL_VALUE;
+        values[i] = NULL;
       } else {
         values[i] = this.values[fromIndex[i]];
       }
@@ -422,7 +528,7 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     for(int j=0; j<series.length; j++) {
       double value = series[j].getDouble(row);
       if(isNull(value))
-        return NULL_VALUE;
+        return NULL;
       input[j] = value;
     }
     return function.apply(input);
@@ -432,7 +538,7 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     double[] output = new double[a.size()];
     for(int i=0; i<a.size(); i++) {
       if(a.isNull(i)) {
-        output[i] = NULL_VALUE;
+        output[i] = NULL;
       } else {
         output[i] = function.apply(a.getDouble(i));
       }
@@ -444,7 +550,7 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     double[] output = new double[a.size()];
     for(int i=0; i<a.size(); i++) {
       if(a.isNull(i) || b.isNull(i)) {
-        output[i] = NULL_VALUE;
+        output[i] = NULL;
       } else {
         output[i] = function.apply(a.getDouble(i), b.getDouble(i));
       }
@@ -456,7 +562,7 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     double[] output = new double[a.size()];
     for(int i=0; i<a.size(); i++) {
       if(a.isNull(i) || b.isNull(i) || c.isNull(i)) {
-        output[i] = NULL_VALUE;
+        output[i] = NULL;
       } else {
         output[i] = function.apply(a.getDouble(i), b.getDouble(i), c.getDouble(i));
       }
@@ -486,7 +592,7 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     for(int j=0; j<series.length; j++) {
       double value = series[j].getDouble(row);
       if(isNull(value))
-        return BooleanSeries.NULL_VALUE;
+        return BooleanSeries.NULL;
       input[j] = value;
     }
     return BooleanSeries.valueOf(function.apply(input));
@@ -496,14 +602,18 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
    * @see Series#aggregate(Function)
    */
   public static DoubleSeries aggregate(DoubleFunction function, Series series) {
-    return buildFrom(function.apply(series.dropNull().getDoubles().values));
+    if(series.hasNull())
+      return buildFrom(NULL);
+    return buildFrom(function.apply(series.getDoubles().values));
   }
 
   /**
    * @see Series#aggregate(Function)
    */
   public static BooleanSeries aggregate(DoubleConditional function, Series series) {
-    return BooleanSeries.builder().addBooleanValues(function.apply(series.dropNull().getDoubles().values)).build();
+    if(series.hasNull())
+      return BooleanSeries.buildFrom(BooleanSeries.NULL);
+    return BooleanSeries.builder().addBooleanValues(function.apply(series.getDoubles().values)).build();
   }
 
   private static int nullSafeDoubleComparator(double a, double b) {
@@ -523,7 +633,7 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
 
   public static double valueOf(Double value) {
     if(value == null)
-      return NULL_VALUE;
+      return NULL;
     return value;
   }
 
@@ -541,11 +651,11 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
   public DoubleSeries shift(int offset) {
     double[] values = new double[this.values.length];
     if(offset >= 0) {
-      Arrays.fill(values, 0, Math.min(offset, values.length), NULL_VALUE);
+      Arrays.fill(values, 0, Math.min(offset, values.length), NULL);
       System.arraycopy(this.values, 0, values, Math.min(offset, values.length), Math.max(values.length - offset, 0));
     } else {
       System.arraycopy(this.values, Math.min(-offset, values.length), values, 0, Math.max(values.length + offset, 0));
-      Arrays.fill(values, Math.max(values.length + offset, 0), values.length, NULL_VALUE);
+      Arrays.fill(values, Math.max(values.length + offset, 0), values.length, NULL);
     }
     return buildFrom(values);
   }
