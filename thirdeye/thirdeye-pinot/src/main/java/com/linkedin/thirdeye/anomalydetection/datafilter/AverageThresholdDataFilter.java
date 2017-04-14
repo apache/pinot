@@ -34,17 +34,21 @@ public class AverageThresholdDataFilter extends BaseDataFilter {
   public static final String MIN_LIVE_ZONE_KEY = "minLiveZone";
   // If the value of a bucket is larger than MAX_LIVE_ZONE_KEY, then that bucket is omitted
   public static final String MAX_LIVE_ZONE_KEY = "maxLiveZone";
+  // Threshold to the percentage of live buckets among all buckets
+  public static final String LIVE_BUCKETS_PERCENTAGE_KEY = "liveBucketsPctThreshold";
   // Override threshold to different dimension map
   public static final String OVERRIDE_THRESHOLD_KEY = "overrideThreshold";
 
   private static final double DEFAULT_THRESHOLD = Double.NEGATIVE_INFINITY;
   private static final double DEFAULT_MIN_LIVE_ZONE = Double.NEGATIVE_INFINITY;
   private static final double DEFAULT_MAX_LIVE_ZONE = Double.POSITIVE_INFINITY;
+  private static final double DEFAULT_LIVE_BUCKETS_PERCENTAGE = 0.5d;
 
   private String metricName;
   private double threshold;
   private double minLiveZone;
   private double maxLiveZone;
+  private double liveBucketPercentageThreshold;
 
   // The override threshold for different dimension maps, which could form a hierarchy.
   private NavigableMap<DimensionMap, Double> overrideThreshold = new TreeMap<>();
@@ -74,21 +78,11 @@ public class AverageThresholdDataFilter extends BaseDataFilter {
     }
 
     // Initialize minLiveZone from users' setting
-    minLiveZone = DEFAULT_MIN_LIVE_ZONE;
-    if (props.containsKey(MIN_LIVE_ZONE_KEY)) {
-      minLiveZone = Double.parseDouble(props.get(MIN_LIVE_ZONE_KEY));
-      if (Double.isNaN(minLiveZone)) {
-        minLiveZone = Double.NEGATIVE_INFINITY;
-      }
-    }
+    minLiveZone = parseDoubleFromUserInput(MIN_LIVE_ZONE_KEY, DEFAULT_MIN_LIVE_ZONE);
     // Initialize maxLiveZone from users' setting
-    maxLiveZone = DEFAULT_MAX_LIVE_ZONE;
-    if (props.containsKey(MAX_LIVE_ZONE_KEY)) {
-      maxLiveZone = Double.parseDouble(props.get(MAX_LIVE_ZONE_KEY));
-      if (Double.isNaN(maxLiveZone)) {
-        maxLiveZone = Double.POSITIVE_INFINITY;
-      }
-    }
+    maxLiveZone = parseDoubleFromUserInput(MAX_LIVE_ZONE_KEY, DEFAULT_MAX_LIVE_ZONE);
+    // Initialize liveBucketPercentageThreshold from users' setting
+    liveBucketPercentageThreshold = parseDoubleFromUserInput(LIVE_BUCKETS_PERCENTAGE_KEY, DEFAULT_LIVE_BUCKETS_PERCENTAGE);
 
     // Initialize the lookup table for overriding thresholds
     if (props.containsKey(OVERRIDE_THRESHOLD_KEY)) {
@@ -129,6 +123,7 @@ public class AverageThresholdDataFilter extends BaseDataFilter {
     // Compute average values among all buckets and check if it passes the threshold
     double sum = 0d;
     int count = 0;
+    int totalCount = 0;
     for (long timestamp : metricTimeSeries.getTimeWindowSet()) {
       if (timestamp < windowStart || timestamp >= windowEnd) {
         continue;
@@ -138,17 +133,51 @@ public class AverageThresholdDataFilter extends BaseDataFilter {
       if (Double.compare(0d, value) == 0) {
         continue;
       }
+      ++totalCount;
       if (isLiveBucket(value, minLiveZone, maxLiveZone)) {
         sum += value;
         ++count;
       }
     }
+
     if (count > 0) {
-      double average = sum / count;
-      return average > threshold;
-    } else {
-      return false;
+      double liveBucketPercentage = count / totalCount;
+      if (liveBucketPercentage > liveBucketPercentageThreshold) {
+        double average = sum / count;
+        return average > threshold;
+      }
     }
+
+    return false;
+  }
+
+  /**
+   * Returns the parsed double value from users' given value that is stored in the properties.
+   *
+   * @param propKey the key to retrieve users' value from the properties.
+   * @param defaultValue the default value if users' value is unreadable (e.g., NaN, NumberFormatException)
+   *
+   * @return the parsed double value that is stored in the properties.
+   */
+  private double parseDoubleFromUserInput(String propKey, double defaultValue) {
+    double value = defaultValue;
+
+    if (props.containsKey(propKey)) {
+      try {
+        value = Double.parseDouble(props.get(propKey));
+        if (Double.isNaN(value)) {
+          LOG.warn("This value {} for the property key {} is unreadable; default value {} is used.", value, propKey,
+              defaultValue);
+          value = defaultValue;
+        }
+      } catch (NumberFormatException e) {
+        LOG.warn("Failed to parse this value {} for the property key {}; default value {} is used.", props.get(propKey),
+            propKey, defaultValue);
+        value = defaultValue;
+      }
+    }
+
+    return value;
   }
 
   /**
