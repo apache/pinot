@@ -755,7 +755,8 @@ public class DetectionJobResource {
   }
 
   /**
-   *
+   * Single function Reply to generate unnotified anomalies for user to label.
+   * Given anomaly function Id, start time, end time, it clones a function with same configurations and replays from start time to end time
    * @param id FunctionId
    * @param replayStartTimeIso replay start time in ISO format, e.g. 2017-02-27T00:00:00.000Z
    * @param replayEndTimeIso replay end time
