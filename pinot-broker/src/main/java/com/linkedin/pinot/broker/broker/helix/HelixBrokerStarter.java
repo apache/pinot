@@ -126,7 +126,7 @@ public class HelixBrokerStarter {
 
     // Register the service status handler
     ServiceStatus.setServiceStatusCallback(
-        new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixAdmin, helixClusterName, brokerId));
+        new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager, helixClusterName, brokerId));
 
     _brokerServerBuilder.getBrokerMetrics().addCallbackGauge(
         "helix.connected", new Callable<Long>() {
