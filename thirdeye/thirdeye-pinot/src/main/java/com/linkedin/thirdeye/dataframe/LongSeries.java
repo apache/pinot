@@ -166,6 +166,18 @@ public final class LongSeries extends TypedSeries<LongSeries> {
     return new LongSeries();
   }
 
+  public static LongSeries nulls(int size) {
+    return builder().fillValues(size, NULL).build();
+  }
+
+  public static LongSeries zeros(int size) {
+    return builder().fillValues(size, 0L).build();
+  }
+
+  public static LongSeries ones(int size) {
+    return builder().fillValues(size, 1L).build();
+  }
+
   // CAUTION: The array is final, but values are inherently modifiable
   final long[] values;
 
@@ -286,6 +298,13 @@ public final class LongSeries extends TypedSeries<LongSeries> {
     }
     builder.append("}");
     return builder.toString();
+  }
+
+  @Override
+  public String toString(int index) {
+    if(this.isNull(index))
+      return TOSTRING_NULL;
+    return String.valueOf(this.values[index]);
   }
 
   public SeriesGrouping groupByInterval(long interval) {

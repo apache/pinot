@@ -20,6 +20,7 @@ import org.apache.commons.lang.ArrayUtils;
 public abstract class Series {
   public static final String GROUP_KEY = "key";
   public static final String GROUP_VALUE = "value";
+  public static final String TOSTRING_NULL = "null";
 
   public enum SeriesType {
     DOUBLE,
@@ -361,6 +362,15 @@ public abstract class Series {
    * @return {@code true} if value is null, otherwise {@code false}
    */
   public abstract boolean isNull(int index);
+
+  /**
+   * Returns a human-readable String representation of the value referenced by {@code index}.
+   *
+   * @param index index of value
+   * @throws IndexOutOfBoundsException if index is outside the series bounds
+   * @return human-readable string representation
+   */
+  public abstract String toString(int index);
 
   /**
    * Returns a copy of the series with values ordered in ascending order.
@@ -952,7 +962,14 @@ public abstract class Series {
     int[] fromIndex = Arrays.copyOfRange(sref, bucketOffset, sref.length);
     buckets.add(new Bucket(fromIndex));
 
-    return new SeriesGrouping(this.unique(), this, buckets);
+    // keys from buckets
+    int[] keyIndex = new int[buckets.size()];
+    int i = 0;
+    for(Bucket b : buckets) {
+      keyIndex[i++] = b.fromIndex[0];
+    }
+
+    return new SeriesGrouping(this.project(keyIndex), this, buckets);
   }
 
   /**

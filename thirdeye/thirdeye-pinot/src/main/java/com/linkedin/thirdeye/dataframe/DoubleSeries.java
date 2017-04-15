@@ -136,6 +136,8 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     final double std;
 
     public DoubleMapZScore(double mean, double std) {
+      if(std <= 0.0d)
+        throw new IllegalArgumentException("std must be greater than 0");
       this.mean = mean;
       this.std = std;
     }
@@ -151,6 +153,8 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     final double max;
 
     public DoubleMapNormalize(double min, double max) {
+      if(min == max)
+        throw new IllegalArgumentException("min and max must be different");
       this.min = min;
       this.max = max;
     }
@@ -237,6 +241,18 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
 
   public static DoubleSeries empty() {
     return new DoubleSeries();
+  }
+
+  public static DoubleSeries nulls(int size) {
+    return builder().fillValues(size, NULL).build();
+  }
+
+  public static DoubleSeries zeros(int size) {
+    return builder().fillValues(size, 0.0d).build();
+  }
+
+  public static DoubleSeries ones(int size) {
+    return builder().fillValues(size, 1.0d).build();
   }
 
   // CAUTION: The array is final, but values are inherently modifiable
@@ -376,6 +392,13 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     return builder.toString();
   }
 
+  @Override
+  public String toString(int index) {
+    if(this.isNull(index))
+      return TOSTRING_NULL;
+    return String.valueOf(this.values[index]);
+  }
+
   public double min() {
     return this.aggregate(MIN).value();
   }
@@ -401,11 +424,19 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
   }
 
   public DoubleSeries normalize() {
-    return this.map(new DoubleMapNormalize(this.min(), this.max()));
+    try {
+      return this.map(new DoubleMapNormalize(this.min(), this.max()));
+    } catch (Exception e) {
+      return DoubleSeries.builder().fillValues(this.size(), NULL).build();
+    }
   }
 
   public DoubleSeries zscore() {
-    return this.map(new DoubleMapZScore(this.mean(), this.std()));
+    try {
+      return this.map(new DoubleMapZScore(this.mean(), this.std()));
+    } catch (Exception e) {
+      return DoubleSeries.builder().fillValues(this.size(), NULL).build();
+    }
   }
 
   public DoubleSeries add(Series other) {

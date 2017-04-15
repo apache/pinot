@@ -173,7 +173,6 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
       return this.fillValues(count, valueOf(value));
     }
 
-
     @Override
     public BooleanSeries build() {
       int totalSize = 0;
@@ -201,6 +200,10 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
 
   public static BooleanSeries empty() {
     return new BooleanSeries();
+  }
+
+  public static BooleanSeries nulls(int size) {
+    return builder().fillValues(size, NULL).build();
   }
 
   // CAUTION: The array is final, but values are inherently modifiable
@@ -423,6 +426,15 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
     }
     builder.append("}");
     return builder.toString();
+  }
+
+  @Override
+  public String toString(int index) {
+    if(isNull(this.values[index]))
+      return TOSTRING_NULL;
+    if(isFalse(this.values[index]))
+      return "false";
+    return "true";
   }
 
   @Override

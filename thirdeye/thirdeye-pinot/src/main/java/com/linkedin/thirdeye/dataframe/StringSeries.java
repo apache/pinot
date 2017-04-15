@@ -112,6 +112,10 @@ public final class StringSeries extends TypedSeries<StringSeries> {
     return new StringSeries();
   }
 
+  public static StringSeries nulls(int size) {
+    return builder().fillValues(size, NULL).build();
+  }
+
   // CAUTION: The array is final, but values are inherently modifiable
   final String[] values;
 
@@ -292,6 +296,13 @@ public final class StringSeries extends TypedSeries<StringSeries> {
     }
     builder.append("}");
     return builder.toString();
+  }
+
+  @Override
+  public String toString(int index) {
+    if(this.isNull(index))
+      return TOSTRING_NULL;
+    return this.values[index];
   }
 
   @Override

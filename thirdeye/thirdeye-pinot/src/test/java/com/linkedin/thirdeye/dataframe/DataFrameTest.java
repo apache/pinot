@@ -1606,6 +1606,37 @@ public class DataFrameTest {
     Assert.assertEquals(df.getIndex(), index);
   }
 
+  @Test
+  public void testDoubleNormalize() {
+    DoubleSeries s = DataFrame.toSeries(1.5, 2.0, 3.5).normalize();
+    Assert.assertEquals(s.values(), new double[] { 0, 0.25, 1.0 });
+  }
+
+  @Test
+  public void testDoubleNormalizeFailInvalid() {
+    DoubleSeries s = DataFrame.toSeries(1.5, 1.5, 1.5).normalize();
+    Assert.assertEquals(s, DoubleSeries.nulls(3));
+  }
+
+  @Test
+  public void testDoubleZScore() {
+    DoubleSeries s = DataFrame.toSeries(0.0, 1.0, 2.0).zscore();
+    assertEqualsDoubles(s.values(), new double[] { -0.707, 0.0, 0.707 });
+  }
+
+  @Test
+  public void testDoubleZScoreFailInvalid() {
+    DoubleSeries s = DataFrame.toSeries(1.5, 1.5, 1.5).zscore();
+    Assert.assertEquals(s, DoubleSeries.nulls(3));
+  }
+
+  @Test
+  public void testToString() {
+    Assert.assertTrue(df.toString(4, "index", "double", "long", "string", "boolean").contains("..."));
+    Assert.assertTrue(df.toString(6, "index", "double", "long", "string", "boolean").contains("..."));
+    Assert.assertFalse(df.toString(8, "index", "double", "long", "string", "boolean").contains("..."));
+  }
+
   static void assertEqualsDoubles(double[] actual, double[] expected) {
     if(actual.length != expected.length)
       Assert.fail(String.format("expected array length [%d] but found [%d]", actual.length, expected.length));

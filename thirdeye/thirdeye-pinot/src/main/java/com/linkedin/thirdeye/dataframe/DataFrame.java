@@ -28,6 +28,7 @@ public class DataFrame {
 
   public static final String COLUMN_INDEX_DEFAULT = "index";
   public static final String COLUMN_JOIN_POSTFIX = "_right";
+  public static final int DEFAULT_MAX_COLUMN_WIDTH = 30;
 
   /**
    * Strategy interface for resampling series with different native types with a common
@@ -86,7 +87,7 @@ public class DataFrame {
     }
 
     public Series.SeriesGrouping get(String seriesName) {
-      return new Series.SeriesGrouping(keys, this.source.get(seriesName), this.buckets);
+      return new Series.SeriesGrouping(this.keys, this.source.get(seriesName), this.buckets);
     }
 
     public DataFrame aggregate(String seriesName, Series.Function function) {
@@ -1174,14 +1175,63 @@ public class DataFrame {
   public String toString() {
     StringBuilder builder = new StringBuilder();
     builder.append("DataFrame{\n");
-    for(Map.Entry<String, Series> e : this.series.entrySet()) {
-      builder.append(e.getKey());
-      builder.append(": ");
-      builder.append(e.getValue());
-      builder.append("\n");
-    }
+    builder.append(this.toString(DEFAULT_MAX_COLUMN_WIDTH, this.getSeriesNames().toArray(new String[0])));
     builder.append("}");
     return builder.toString();
+  }
+
+  public String toString(int maxColumnWidth, String... seriesNames) {
+    String[][] values = new String[this.size()][seriesNames.length];
+    int[] width = new int[seriesNames.length];
+    for(int i=0; i<seriesNames.length; i++) {
+      Series s = assertSeriesExists(seriesNames[i]);
+
+      width[i] = truncateToString(seriesNames[i], maxColumnWidth).length();
+      for(int j=0; j<this.size(); j++) {
+        String itemValue = truncateToString(s.toString(j), maxColumnWidth);
+        values[j][i] = itemValue;
+        width[i] = Math.max(itemValue.length(), width[i]);
+      }
+    }
+
+    StringBuilder sb = new StringBuilder();
+    // header
+    for(int i=0; i<seriesNames.length; i++) {
+      sb.append(String.format("%" + width[i] + "s", truncateToString(seriesNames[i], maxColumnWidth)));
+      sb.append("  ");
+    }
+    sb.append("\n");
+
+    // values
+    for(int j=0; j<this.size(); j++) {
+      for(int i=0; i<seriesNames.length; i++) {
+        Series s = this.get(seriesNames[i]);
+        String item;
+        switch(s.type()) {
+          case DOUBLE:
+          case LONG:
+          case BOOLEAN:
+            item = String.format("%" + width[i] + "s", values[j][i]);
+            break;
+          case STRING:
+            item = String.format("%-" + width[i] + "s", values[j][i]);
+            break;
+          default:
+            throw new IllegalArgumentException(String.format("Unknown series type '%s'", s.type()));
+        }
+        sb.append(item);
+        sb.append("  ");
+      }
+      sb.append("\n");
+    }
+
+    return sb.toString();
+  }
+
+  static String truncateToString(String value, int maxWidth) {
+    if(value.length() > maxWidth)
+      value = value.substring(0, maxWidth - 3) + "...";
+    return value;
   }
 
   @Override
