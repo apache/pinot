@@ -14,8 +14,7 @@ import com.linkedin.thirdeye.dataframe.DoubleSeries;
 import com.linkedin.thirdeye.dataframe.Series;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
-import com.linkedin.thirdeye.rootcause.SearchContext;
+import com.linkedin.thirdeye.rootcause.ExecutionContext;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -41,26 +40,26 @@ public class MetricDimensionScorer {
     this.cache = cache;
   }
 
-  Map<MetricDimensionEntity, Double> score(Collection<MetricDimensionEntity> entities, SearchContext context) throws Exception {
+  Collection<MetricDimensionEntity> score(Collection<MetricDimensionEntity> entities, TimeRangeEntity current, BaselineEntity baseline) throws Exception {
     if(entities.isEmpty())
-      return Collections.emptyMap();
+      return Collections.emptyList();
 
     // ensure same base dataset and metric
     Iterator<MetricDimensionEntity> it = entities.iterator();
     MetricDimensionEntity first = it.next();
-    DatasetConfigDTO dataset = first.getDataset();
     MetricConfigDTO metric = first.getMetric();
+    DatasetConfigDTO dataset = first.getDataset();
 
     while(it.hasNext()) {
       MetricDimensionEntity e = it.next();
-      if(!dataset.equals(e.getDataset()))
-        throw new IllegalArgumentException("entities must derive from same dataset");
       if(!metric.equals(e.getMetric()))
         throw new IllegalArgumentException("entities must derive from same metric");
+      if(!dataset.equals(e.getDataset()))
+        throw new IllegalArgumentException("entities must derive from same dataset");
     }
 
     // build data cube
-    OLAPDataBaseClient olapClient = getOlapDataBaseClient(context, dataset, metric);
+    OLAPDataBaseClient olapClient = getOlapDataBaseClient(current, baseline, metric, dataset);
     Dimensions dimensions = new Dimensions(dataset.getDimensions());
     int topDimensions = dataset.getDimensions().size();
 
@@ -68,7 +67,7 @@ public class MetricDimensionScorer {
     cube.buildWithAutoDimensionOrder(olapClient, dimensions, topDimensions, Collections.<List<String>>emptyList());
 
     // group by dimension
-    DataFrame df = makeContributionFrame(cube.getCostSet());
+    DataFrame df = makeContribution(cube.getCostSet());
 
     // map dimension to MetricDimension
     Map<String, MetricDimensionEntity> mdMap = new HashMap<>();
@@ -76,31 +75,31 @@ public class MetricDimensionScorer {
       mdMap.put(e.getDimension(), e);
     }
 
-    Map<MetricDimensionEntity, Double> scores = new HashMap<>();
+    List<MetricDimensionEntity> scores = new ArrayList<>();
     for(int i=0; i<df.size(); i++) {
       MetricDimensionEntity e = mdMap.get(df.getString(Series.GROUP_KEY, i));
-      scores.put(e, df.getDouble(Series.GROUP_VALUE, i));
+      MetricDimensionEntity n = e.withScore(df.getDouble(Series.GROUP_VALUE, i));
+      scores.add(n);
     }
 
     return scores;
   }
 
-  private OLAPDataBaseClient getOlapDataBaseClient(SearchContext context, DatasetConfigDTO dataset,
-      MetricConfigDTO metric) throws Exception {
-    String timezone = "UTC";
+  private OLAPDataBaseClient getOlapDataBaseClient(TimeRangeEntity current, BaselineEntity baseline, MetricConfigDTO metric, DatasetConfigDTO dataset) throws Exception {
+    final String timezone = "UTC";
     List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metric.getName(), MetricAggFunction.SUM, dataset.getDataset());
 
     OLAPDataBaseClient olapClient = new PinotThirdEyeSummaryClient(cache);
     olapClient.setCollection(dataset.getDataset());
     olapClient.setMetricExpression(metricExpressions.get(0));
-    olapClient.setCurrentStartInclusive(new DateTime(context.getTimestampStart(), DateTimeZone.forID(timezone)));
-    olapClient.setCurrentEndExclusive(new DateTime(context.getTimestampEnd(), DateTimeZone.forID(timezone)));
-    olapClient.setBaselineStartInclusive(new DateTime(context.getBaselineStart(), DateTimeZone.forID(timezone)));
-    olapClient.setBaselineEndExclusive(new DateTime(context.getTimestampEnd(), DateTimeZone.forID(timezone)));
+    olapClient.setCurrentStartInclusive(new DateTime(current.getStart(), DateTimeZone.forID(timezone)));
+    olapClient.setCurrentEndExclusive(new DateTime(current.getEnd(), DateTimeZone.forID(timezone)));
+    olapClient.setBaselineStartInclusive(new DateTime(baseline.getEnd(), DateTimeZone.forID(timezone)));
+    olapClient.setBaselineEndExclusive(new DateTime(baseline.getEnd(), DateTimeZone.forID(timezone)));
     return olapClient;
   }
 
-  private static DataFrame makeContributionFrame(Collection<DimNameValueCostEntry> costs) {
+  private static DataFrame makeContribution(Collection<DimNameValueCostEntry> costs) {
     String[] dim = new String[costs.size()];
     double[] contrib = new double[costs.size()];
     int i = 0;
@@ -113,7 +112,30 @@ public class MetricDimensionScorer {
     DataFrame df = new DataFrame();
     df.addSeries(DIMENSION, dim);
     df.addSeries(CONTRIBUTION, contrib);
+    df.setIndex(DIMENSION);
 
     return df.groupBy(DIMENSION).aggregate(CONTRIBUTION, DoubleSeries.SUM);
   }
+
+//  private static DataFrame aggregateContribution(DataFrame aggregate, DataFrame df, final BaselineEntity baseline) {
+//    DoubleSeries s = df.getDoubles(CONTRIBUTION).normalize();
+//    s = s.map(new DoubleSeries.DoubleFunction() {
+//      @Override
+//      public double apply(double... values) {
+//        return values[0] * baseline.getScore();
+//      }
+//    });
+//
+//    DataFrame normalized = new DataFrame(df);
+//    normalized.addSeries(CONTRIBUTION, s);
+//
+//    DataFrame joined = aggregate.joinOuter(normalized);
+//    DoubleSeries left = joined.getDoubles(CONTRIBUTION).fillNull();
+//    DoubleSeries right = joined.getDoubles(CONTRIBUTION + DataFrame.COLUMN_JOIN_POSTFIX).fillNull();
+//
+//    DataFrame out = new DataFrame(aggregate);
+//    out.addSeries(DIMENSION, left.add(right));
+//
+//    return out;
+//  }
 }

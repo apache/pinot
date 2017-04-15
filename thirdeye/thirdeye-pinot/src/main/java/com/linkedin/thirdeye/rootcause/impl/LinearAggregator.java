@@ -8,58 +8,67 @@ import com.linkedin.thirdeye.rootcause.Aggregator;
 import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class LinearAggregator implements Aggregator {
+  private static Logger LOG = LoggerFactory.getLogger(LinearAggregator.class);
+
   private static final String URN = "urn";
-  private static final String ZSCORE = "zscore";
+  private static final String SCORE = "score";
+  private static final String NORMALIZED = "normalized";
 
   @Override
   public List<Entity> aggregate(Map<String, PipelineResult> results) {
     StringSeries.Builder urns = StringSeries.builder();
-    DoubleSeries.Builder zscores = DoubleSeries.builder();
+    DoubleSeries.Builder normalized = DoubleSeries.builder();
 
-    Map<String, Entity> urn2entity = new HashMap<>();
     for(PipelineResult r : results.values()) {
-      urn2entity.putAll(URNUtils.mapEntityURNs(r.getScores().keySet()));
-      appendScores(urns, zscores, r);
+      DataFrame df = toDataFrame(r.getEntities());
+      urns.addSeries(df.get(URN));
+      if(allEqual(df.get(SCORE))) {
+        normalized.fillValues(df.size(), 1.0d);
+      } else {
+        normalized.addSeries(df.getDoubles(SCORE).normalize());
+      }
     }
 
     DataFrame df = new DataFrame();
     df.addSeries(URN, urns.build());
-    df.addSeries(ZSCORE, zscores.build());
+    df.addSeries(NORMALIZED, normalized.build());
 
-    DataFrame grp = df.groupBy(URN).aggregate(ZSCORE, DoubleSeries.SUM);
+    DataFrame grp = df.groupBy(URN).aggregate(NORMALIZED, DoubleSeries.SUM);
     grp = grp.sortedBy(Series.GROUP_VALUE).reverse();
 
-    List<Entity> entities = new ArrayList<>();
-    for(String urn : grp.getStrings(Series.GROUP_KEY).values()) {
-      entities.add(urn2entity.get(urn));
-    }
+    return toEntities(grp, Series.GROUP_KEY, Series.GROUP_VALUE);
+  }
 
+  private static DataFrame toDataFrame(Collection<Entity> entities) {
+    String[] urns = new String[entities.size()];
+    double[] scores = new double[entities.size()];
+    int i = 0;
+    for(Entity e : entities) {
+      urns[i] = e.getUrn();
+      scores[i] = e.getScore();
+      i++;
+    }
+    return new DataFrame().addSeries(URN, urns).addSeries(SCORE, scores);
+  }
+
+  private static boolean allEqual(Series score) {
+    return score.unique().size() <= 1;
+  }
+
+  private static List<Entity> toEntities(DataFrame df, String colUrn, String colScore) {
+    List<Entity> entities = new ArrayList<>(df.size());
+    for(int i=0; i<df.size(); i++) {
+      entities.add(new Entity(df.getString(colUrn, i), df.getDouble(colScore, i)));
+    }
     return entities;
   }
 
-  private static void appendScores(StringSeries.Builder globalUrns, DoubleSeries.Builder globalZScores, PipelineResult r) {
-    String[] urns = new String[r.getScores().size()];
-    double[] scores = new double[r.getScores().size()];
-
-    int i = 0;
-    for(Map.Entry<Entity, Double> entry : r.getScores().entrySet()) {
-      urns[i] = entry.getKey().getUrn();
-      scores[i] = entry.getValue();
-      i++;
-    }
-
-    // standardize
-    StringSeries urn = StringSeries.buildFrom(urns);
-    DoubleSeries score = DoubleSeries.buildFrom(scores);
-    DoubleSeries zscore = score.map(new DoubleSeries.DoubleZScore(score.mean(), score.std()));
-
-    globalUrns.addSeries(urn);
-    globalZScores.addSeries(zscore);
-  }
 }

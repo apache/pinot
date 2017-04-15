@@ -9,8 +9,13 @@
 		</encoder>
 	</appender>
 
+	<logger name="org.apache" level="WARN" />
+	<logger name="com.linkedin.thirdeye.client" level="WARN" />
+	<logger name="com.linkedin.thirdeye.rootcause" level="DEBUG" />
+
 	<!-- By default, the level of the root level is set to INFO -->
 	<root level="INFO">
 		<appender-ref ref="STDOUT" />
 	</root>
+
 </configuration>

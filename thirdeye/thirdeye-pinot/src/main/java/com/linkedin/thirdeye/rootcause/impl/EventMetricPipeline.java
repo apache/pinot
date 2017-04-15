@@ -10,15 +10,16 @@ import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class EventMetricPipeline implements Pipeline {
+  private static final Logger LOG = LoggerFactory.getLogger(EventMetricPipeline.class);
+
   final EventDataProviderManager manager;
 
   public EventMetricPipeline(EventDataProviderManager manager) {
@@ -32,38 +33,30 @@ public class EventMetricPipeline implements Pipeline {
 
   @Override
   public PipelineResult run(ExecutionContext context) {
-    Set<Entity> metrics = URNUtils.filterContext(context, URNUtils.EntityType.METRIC);
+    Set<Entity> metrics = EntityUtils.filterContext(context, EntityUtils.EntityType.METRIC);
 
-    Set<EventDTO> eventSet = new HashSet<>();
+    TimeRangeEntity current = EntityUtils.getContextTimeRange(context);
+    if(current == null) {
+      LOG.warn("Pipeline '{}' requires TimeRangeEntity. Skipping.", this.getName());
+      return new PipelineResult(Collections.<Entity>emptyList());
+    }
+
+    Set<EventDTO> events = new HashSet<>();
     for(Entity e : metrics) {
       EventFilter filter = new EventFilter();
-      filter.setStartTime(0);
-      if(context.getSearchContext().getTimestampEnd() >= 0)
-        filter.setEndTime(context.getSearchContext().getTimestampEnd());
       filter.setEventType(EventType.HISTORICAL_ANOMALY);
-      filter.setMetricName(URNUtils.getMetricName(e.getUrn()));
+      filter.setMetricName(EntityUtils.getMetricName(e.getUrn()));
 
-      eventSet.addAll(manager.getEvents(filter));
+      events.addAll(manager.getEvents(filter));
     }
 
-    List<EventDTO> events = new ArrayList<>(eventSet);
-    Collections.sort(events, new Comparator<EventDTO>() {
-      @Override
-      public int compare(EventDTO o1, EventDTO o2) {
-        return Long.compare(o1.getStartTime(), o2.getStartTime());
-      }
-    });
-
-    Map<EventEntity, Double> scores = new HashMap<>();
-
-    int i = 0;
-    for(EventDTO dto : events) {
-      EventEntity e = EventEntity.fromDTO(dto);
-
-      double score = i++ / (double)events.size();
-      scores.put(e, score);
+    List<EventEntity> entities = new ArrayList<>();
+    for(EventDTO e : events) {
+      long distance = current.getEnd() - e.getStartTime();
+      double score = -distance;
+      entities.add(EventEntity.fromDTO(score, e));
     }
 
-    return new PipelineResult(scores);
+    return new PipelineResult(entities);
   }
 }

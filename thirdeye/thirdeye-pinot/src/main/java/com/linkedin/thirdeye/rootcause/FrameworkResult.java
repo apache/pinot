@@ -1,21 +1,27 @@
 package com.linkedin.thirdeye.rootcause;
 
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 
 public final class FrameworkResult {
-  final List<Entity> entities;
+  final List<Entity> aggregatedResults;
+  final Map<String, PipelineResult> pipelineResults;
   final ExecutionContext context;
 
-  public FrameworkResult(List<? extends Entity> entities, ExecutionContext context) {
-    this.entities = new ArrayList<>(entities);
+  public FrameworkResult(List<Entity> aggregatedResults, Map<String, PipelineResult> pipelineResults,
+      ExecutionContext context) {
+    this.aggregatedResults = aggregatedResults;
+    this.pipelineResults = pipelineResults;
     this.context = context;
   }
 
-  public List<Entity> getEntities() {
-    return Collections.unmodifiableList(entities);
+  public List<Entity> getAggregatedResults() {
+    return aggregatedResults;
+  }
+
+  public Map<String, PipelineResult> getPipelineResults() {
+    return pipelineResults;
   }
 
   public ExecutionContext getContext() {

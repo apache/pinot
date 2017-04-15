@@ -3,17 +3,20 @@ package com.linkedin.thirdeye.rootcause.impl;
 import com.linkedin.thirdeye.anomaly.events.EventDataProviderManager;
 import com.linkedin.thirdeye.anomaly.events.EventFilter;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
+import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.ExecutionContext;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
+import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class EventTimePipeline implements Pipeline {
+  private static Logger LOG = LoggerFactory.getLogger(EventTimePipeline.class);
+
   final EventDataProviderManager provider;
 
   public EventTimePipeline(EventDataProviderManager manager) {
@@ -27,31 +30,25 @@ public class EventTimePipeline implements Pipeline {
 
   @Override
   public PipelineResult run(ExecutionContext context) {
+    TimeRangeEntity current = EntityUtils.getContextTimeRange(context);
+    if(current == null) {
+      LOG.warn("Pipeline '{}' requires TimeRangeEntity. Skipping.", this.getName());
+      return new PipelineResult(Collections.<Entity>emptyList());
+    }
+
     EventFilter filter = new EventFilter();
-    if(context.getSearchContext().getTimestampStart() >= 0)
-      filter.setStartTime(context.getSearchContext().getTimestampStart());
-    if(context.getSearchContext().getTimestampEnd() >= 0)
-      filter.setEndTime(context.getSearchContext().getTimestampEnd());
+    filter.setStartTime(current.getStart());
+    filter.setEndTime(current.getEnd());
 
     List<EventDTO> events = provider.getEvents(filter);
 
-    Collections.sort(events, new Comparator<EventDTO>() {
-      @Override
-      public int compare(EventDTO o1, EventDTO o2) {
-        return Long.compare(o1.getStartTime(), o2.getStartTime());
-      }
-    });
-
-    Map<EventEntity, Double> scores = new HashMap<>();
-
-    int i = 0;
-    for(EventDTO dto : events) {
-      EventEntity e = EventEntity.fromDTO(dto);
-
-      double score = i++ / (double)events.size();
-      scores.put(e, score);
+    List<EventEntity> entities = new ArrayList<>();
+    for(EventDTO e : events) {
+      long distance = current.getEnd() - e.getStartTime();
+      double score = -distance;
+      entities.add(EventEntity.fromDTO(score, e));
     }
 
-    return new PipelineResult(scores);
+    return new PipelineResult(entities);
   }
 }

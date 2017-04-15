@@ -5,15 +5,15 @@ import com.linkedin.thirdeye.rootcause.Entity;
 
 
 public class EventEntity extends Entity {
-  public static EventEntity fromDTO(EventDTO dto) {
-    String urn = String.format("thirdeye:event:%s:%s:%d", dto.getEventType(), dto.getName(), dto.getStartTime());
-    return new EventEntity(urn, dto);
+  public static EventEntity fromDTO(double score, EventDTO dto) {
+    String urn = EntityUtils.EntityType.EVENT.formatUrn("%s:%s:%d", dto.getEventType(), dto.getName(), dto.getStartTime());
+    return new EventEntity(urn, score, dto);
   }
 
   final EventDTO dto;
 
-  public EventEntity(String urn, EventDTO dto) {
-    super(urn);
+  public EventEntity(String urn, double score, EventDTO dto) {
+    super(urn, score);
     this.dto = dto;
   }
 

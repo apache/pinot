@@ -1,18 +1,17 @@
 package com.linkedin.thirdeye.rootcause;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.Collection;
 
 
 public class PipelineResult {
-  final Map<Entity, Double> scores;
+  final Collection<Entity> entities;
 
-  public PipelineResult(Map<? extends Entity, Double> scores) {
-    this.scores = new HashMap<>(scores);
+  public PipelineResult(Collection<? extends Entity> entities) {
+    this.entities = new ArrayList<>(entities);
   }
 
-  public Map<Entity, Double> getScores() {
-    return Collections.unmodifiableMap(scores);
+  public Collection<Entity> getEntities() {
+    return entities;
   }
 }

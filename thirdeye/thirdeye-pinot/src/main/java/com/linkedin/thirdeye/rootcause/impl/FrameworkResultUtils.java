@@ -8,10 +8,10 @@ import java.util.Map;
 
 
 public class FrameworkResultUtils {
-  public static Map<URNUtils.EntityType, Collection<Entity>> topKPerType(Collection<Entity> entities, int k) {
-    Map<URNUtils.EntityType, Collection<Entity>> map = new HashMap<>();
+  public static Map<EntityUtils.EntityType, Collection<Entity>> topKPerType(Collection<Entity> entities, int k) {
+    Map<EntityUtils.EntityType, Collection<Entity>> map = new HashMap<>();
     for(Entity e : entities) {
-      URNUtils.EntityType t = URNUtils.getType(e.getUrn());
+      EntityUtils.EntityType t = EntityUtils.getType(e.getUrn());
 
       if(!map.containsKey(t))
         map.put(t, new ArrayList<Entity>());

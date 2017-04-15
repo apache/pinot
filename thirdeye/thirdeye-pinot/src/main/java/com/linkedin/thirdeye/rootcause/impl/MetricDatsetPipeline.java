@@ -1,23 +1,30 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
+import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.ExecutionContext;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class MetricDatsetPipeline implements Pipeline {
-  final MetricConfigManager metricDAO;
+  private static final Logger LOG = LoggerFactory.getLogger(MetricDatsetPipeline.class);
 
-  public MetricDatsetPipeline(MetricConfigManager metricDAO) {
+  final MetricConfigManager metricDAO;
+  final DatasetConfigManager datasetDAO;
+
+  public MetricDatsetPipeline(MetricConfigManager metricDAO, DatasetConfigManager datasetDAO) {
     this.metricDAO = metricDAO;
+    this.datasetDAO = datasetDAO;
   }
 
   @Override
@@ -27,21 +34,27 @@ public class MetricDatsetPipeline implements Pipeline {
 
   @Override
   public PipelineResult run(ExecutionContext context) {
-    Set<Entity> metrics = URNUtils.filterContext(context, URNUtils.EntityType.METRIC);
+    Set<Entity> metrics = EntityUtils.filterContext(context, EntityUtils.EntityType.METRIC);
 
     Set<String> datasets = new HashSet<>();
     for(Entity m : metrics) {
-      datasets.add(URNUtils.getMetricDataset(m.getUrn()));
+      datasets.add(EntityUtils.getMetricDataset(m.getUrn()));
     }
 
-    Map<MetricEntity, Double> scores = new HashMap<>();
+    Collection<Entity> entities = new ArrayList<>();
     for(String d : datasets) {
+      DatasetConfigDTO dataset = datasetDAO.findByDataset(d);
+      if(dataset == null) {
+        LOG.warn("Could not find dataset '{}'", d);
+        continue;
+      }
+
       Collection<MetricConfigDTO> dtos = metricDAO.findByDataset(d);
       for(MetricConfigDTO dto : dtos) {
-        scores.put(MetricEntity.fromDTO(dto), 1.0);
+        entities.add(MetricEntity.fromDTO(1.0, dto, dataset));
       }
     }
 
-    return new PipelineResult(scores);
+    return new PipelineResult(entities);
   }
 }

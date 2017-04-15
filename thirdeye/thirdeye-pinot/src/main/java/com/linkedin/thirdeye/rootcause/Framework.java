@@ -38,7 +38,7 @@ public class Framework {
       PipelineResult result = e.getValue().run(context);
       results.put(e.getKey(), result);
 
-      LOG.info("Got {} results", result.getScores().size());
+      LOG.info("Got {} results", result.getEntities().size());
       if(LOG.isDebugEnabled())
         logResultDetails(result);
     }
@@ -48,23 +48,22 @@ public class Framework {
     ExecutionContext context = new ExecutionContext(searchContext, results);
     LOG.info("Aggregated scores for {} entities", aggregated.size());
 
-    FrameworkResult result = new FrameworkResult(aggregated, context);
+    FrameworkResult result = new FrameworkResult(aggregated, results, context);
 
     return result;
   }
 
   private static void logResultDetails(PipelineResult result) {
-    List<Map.Entry<Entity, Double>> entries = new ArrayList<>(result.getScores().entrySet());
-    Collections.sort(entries, new Comparator<Map.Entry<Entity, Double>>() {
+    List<Entity> entities = new ArrayList<>(result.getEntities());
+    Collections.sort(entities, new Comparator<Entity>() {
       @Override
-      public int compare(Map.Entry<Entity, Double> o1, Map.Entry<Entity, Double> o2) {
-        return Double.compare(o1.getValue(), o2.getValue());
+      public int compare(Entity o1, Entity o2) {
+        return -Double.compare(o1.getScore(), o2.getScore());
       }
     });
 
-    for(Map.Entry<Entity, Double> entry : entries) {
-      Entity e = entry.getKey();
-      LOG.debug("{} [{}] {}", Math.round(entry.getValue() * 1000) / 1000.0, e.getClass().getSimpleName(), e.getUrn());
+    for(Entity e : entities) {
+      LOG.debug("{} [{}] {}", Math.round(e.getScore() * 1000) / 1000.0, e.getClass().getSimpleName(), e.getUrn());
     }
   }
 }

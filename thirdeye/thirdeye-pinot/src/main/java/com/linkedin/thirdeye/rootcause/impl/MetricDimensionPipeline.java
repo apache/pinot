@@ -9,8 +9,8 @@ import com.linkedin.thirdeye.rootcause.ExecutionContext;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -39,51 +39,64 @@ public class MetricDimensionPipeline implements Pipeline {
 
   @Override
   public PipelineResult run(ExecutionContext context) {
-    Set<Entity> metrics = URNUtils.filterContext(context, URNUtils.EntityType.METRIC);
+    Set<Entity> contextEntities = EntityUtils.filterContext(context, EntityUtils.EntityType.METRIC);
 
-    Set<MetricEntity> metricEntities = new HashSet<>();
-    Set<String> datasets = new HashSet<>();
-    for(Entity e : metrics) {
-      String m = URNUtils.getMetricName(e.getUrn());
-      String d = URNUtils.getMetricDataset(e.getUrn());
+    TimeRangeEntity current = EntityUtils.getContextTimeRange(context);
+    if(current == null) {
+      LOG.warn("Pipeline '{}' requires TimeRangeEntity. Skipping.", this.getName());
+      return new PipelineResult(Collections.<Entity>emptyList());
+    }
 
-      MetricConfigDTO dto = metricDAO.findByMetricAndDataset(m, d);
-      metricEntities.add(MetricEntity.fromDTO(dto));
+    BaselineEntity baseline = EntityUtils.getContextBaseline(context);
+    if(baseline == null) {
+      LOG.warn("Pipeline '{}' requires BaselineEntity. Skipping.", this.getName());
+      return new PipelineResult(Collections.<Entity>emptyList());
+    }
 
-      datasets.add(d);
+    Map<String, MetricConfigDTO> metrics = new HashMap<>();
+    Map<String, DatasetConfigDTO> datasets = new HashMap<>();
+    for(Entity e : contextEntities) {
+      String m = EntityUtils.getMetricName(e.getUrn());
+      String d = EntityUtils.getMetricDataset(e.getUrn());
+
+      MetricConfigDTO mdto = metricDAO.findByMetricAndDataset(m, d);
+      DatasetConfigDTO ddto = datasetDAO.findByDataset(d);
+
+      if(mdto == null) {
+        LOG.warn("Could not resolve metric '{}'. Skipping.", m);
+        continue;
+      }
+
+      if(ddto == null) {
+        LOG.warn("Could not resolve dataset '{}'. Skipping metric '{}'", d, m);
+        continue;
+      }
+
+      metrics.put(e.getUrn(), mdto);
+      datasets.put(e.getUrn(), ddto);
     }
 
     LOG.info("Found {} metrics for dimension analysis", metrics.size());
 
-    Map<String, DatasetConfigDTO> datasetMap = new HashMap<>();
-    for(String d : datasets) {
-      DatasetConfigDTO dto = datasetDAO.findByDataset(d);
-      datasetMap.put(dto.getDataset(), dto);
-    }
+    List<MetricDimensionEntity> entities = new ArrayList<>();
+    for(Map.Entry<String, MetricConfigDTO> entry : metrics.entrySet()) {
+      MetricConfigDTO mdto = entry.getValue();
+      DatasetConfigDTO ddto = datasets.get(entry.getKey());
 
-    Map<MetricDimensionEntity, Double> scores = new HashMap<>();
-    for(MetricEntity m : metricEntities) {
-      MetricConfigDTO mdto = m.getDto();
-      DatasetConfigDTO ddto = datasetMap.get(mdto.getDataset());
-
-      if(ddto == null) {
-        LOG.warn("Skipping metric '{}'. Could not resolve associated dataset '{}'", mdto.getName(), mdto.getDataset());
-        continue;
-      }
-
-      List<MetricDimensionEntity> entities = new ArrayList<>();
       for(String dim : ddto.getDimensions()) {
-        entities.add(MetricDimensionEntity.fromDTO(mdto, ddto, dim));
+        entities.add(MetricDimensionEntity.fromDTO(1.0, mdto, ddto, dim));
       }
 
       try {
-        scores.putAll(scorer.score(entities, context.getSearchContext()));
+        entities.addAll(scorer.score(entities, current, baseline));
       } catch (Exception e) {
-        // TODO internal exception handling?
-        throw new RuntimeException(e);
+        // TODO external exception handling?
+        LOG.warn("Could not score entity '{}'", entry.getKey());
+        e.printStackTrace();
+        continue;
       }
     }
 
-    return new PipelineResult(scores);
+    return new PipelineResult(entities);
   }
 }
