@@ -1,4 +1,5 @@
 /.apt_generated/
+/src/main/resources/app/
 /node/
 /node_modules/
 /etc/

@@ -5,8 +5,8 @@ module.exports = function(environment) {
     modulePrefix: 'thirdeye-frontend',
     environment: environment,
     podModulePrefix: 'thirdeye-frontend/pods',
-    rootURL: '/',
-    locationType: 'auto',
+    rootURL: '/app',
+    locationType: 'hash',
     EmberENV: {
       FEATURES: {
         // Here you can enable experimental features on an ember canary build
@@ -44,7 +44,7 @@ module.exports = function(environment) {
   }
 
   if (environment === 'production') {
-
+    ENV.locationType = 'hash'
   }
 
   return ENV;

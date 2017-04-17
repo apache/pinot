@@ -9,9 +9,9 @@ import com.linkedin.thirdeye.dashboard.views.ThirdEyeView;
 
 import io.dropwizard.views.View;
 
-@Path(value = "/thirdeye")
+@Path(value = "/app")
 @Produces(MediaType.APPLICATION_JSON)
-public class ThirdEyeResource {
+public class ThirdEyeEmberResource {
 
   @GET
   @Path(value = "/")
@@ -20,4 +20,3 @@ public class ThirdEyeResource {
     return new ThirdEyeView();
   }
 }
-
