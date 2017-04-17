@@ -19,6 +19,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import com.google.common.util.concurrent.MoreExecutors;
+import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.common.Callback;
 
 
@@ -29,11 +30,11 @@ public class AsyncPoolResourceManagerAdapterTest {
 
     // Success
     {
-      String key = "localhost:8080";
+      ServerInstance key = new ServerInstance("localhost:8080");
       String value = "dummy";
       MyPooledResourceManager rm = new MyPooledResourceManager(true, value);
-      AsyncPoolResourceManagerAdapter<String, String> adapter =
-          new AsyncPoolResourceManagerAdapter<String, String>(key, rm, MoreExecutors.sameThreadExecutor(), null);
+      AsyncPoolResourceManagerAdapter<String> adapter =
+          new AsyncPoolResourceManagerAdapter<>(key, rm, MoreExecutors.sameThreadExecutor(), null);
       MyCallback callback = new MyCallback();
 
       adapter.create(callback);
@@ -46,10 +47,10 @@ public class AsyncPoolResourceManagerAdapterTest {
 
     //Error
     {
-      String key = "localhost:8080";
+      ServerInstance key = new ServerInstance("localhost:8080");
       MyPooledResourceManager rm = new MyPooledResourceManager(true, null);
-      AsyncPoolResourceManagerAdapter<String, String> adapter =
-          new AsyncPoolResourceManagerAdapter<String, String>(key, rm, MoreExecutors.sameThreadExecutor(), null);
+      AsyncPoolResourceManagerAdapter<String> adapter =
+          new AsyncPoolResourceManagerAdapter<String>(key, rm, MoreExecutors.sameThreadExecutor(), null);
       MyCallback callback = new MyCallback();
 
       adapter.create(callback);
@@ -65,11 +66,11 @@ public class AsyncPoolResourceManagerAdapterTest {
   public void testValidate() {
     //Success
     {
-      String key = "localhost:8080";
+      ServerInstance key = new ServerInstance("localhost:8080");
       String value = "dummy";
       MyPooledResourceManager rm = new MyPooledResourceManager(true, null);
-      AsyncPoolResourceManagerAdapter<String, String> adapter =
-          new AsyncPoolResourceManagerAdapter<String, String>(key, rm, MoreExecutors.sameThreadExecutor(), null);
+      AsyncPoolResourceManagerAdapter<String> adapter =
+          new AsyncPoolResourceManagerAdapter<>(key, rm, MoreExecutors.sameThreadExecutor(), null);
 
       boolean ret = adapter.validateGet(value);
       Assert.assertTrue(ret, "Validate Return");
@@ -86,11 +87,11 @@ public class AsyncPoolResourceManagerAdapterTest {
 
     //Error
     {
-      String key = "localhost:8080";
+      ServerInstance key = new ServerInstance("localhost:8080");
       String value = "dummy";
       MyPooledResourceManager rm = new MyPooledResourceManager(false, null);
-      AsyncPoolResourceManagerAdapter<String, String> adapter =
-          new AsyncPoolResourceManagerAdapter<String, String>(key, rm, MoreExecutors.sameThreadExecutor(), null);
+      AsyncPoolResourceManagerAdapter<String> adapter =
+          new AsyncPoolResourceManagerAdapter<>(key, rm, MoreExecutors.sameThreadExecutor(), null);
 
       boolean ret = adapter.validateGet(value);
       Assert.assertFalse(ret, "Validate Return");
@@ -112,11 +113,11 @@ public class AsyncPoolResourceManagerAdapterTest {
 
     // Success
     {
-      String key = "localhost:8080";
+      ServerInstance key = new ServerInstance("localhost:8080");
       String value = "dummy";
       MyPooledResourceManager rm = new MyPooledResourceManager(true, null);
-      AsyncPoolResourceManagerAdapter<String, String> adapter =
-          new AsyncPoolResourceManagerAdapter<String, String>(key, rm, MoreExecutors.sameThreadExecutor(), null);
+      AsyncPoolResourceManagerAdapter<String> adapter =
+          new AsyncPoolResourceManagerAdapter<>(key, rm, MoreExecutors.sameThreadExecutor(), null);
       MyCallback callback = new MyCallback();
 
       adapter.destroy(value, true, callback);
@@ -130,11 +131,11 @@ public class AsyncPoolResourceManagerAdapterTest {
 
     // Error
     {
-      String key = "localhost:8080";
+      ServerInstance key = new ServerInstance("localhost:8080");
       String value = "dummy";
       MyPooledResourceManager rm = new MyPooledResourceManager(false, null);
-      AsyncPoolResourceManagerAdapter<String, String> adapter =
-          new AsyncPoolResourceManagerAdapter<String, String>(key, rm, MoreExecutors.sameThreadExecutor(), null);
+      AsyncPoolResourceManagerAdapter<String> adapter =
+          new AsyncPoolResourceManagerAdapter<>(key, rm, MoreExecutors.sameThreadExecutor(), null);
       MyCallback callback = new MyCallback();
 
       adapter.destroy(value, true, callback);
@@ -147,13 +148,13 @@ public class AsyncPoolResourceManagerAdapterTest {
     }
   }
 
-  public static class MyPooledResourceManager implements PooledResourceManager<String, String> {
-    private String _createKey;
+  public static class MyPooledResourceManager implements PooledResourceManager<String> {
+    private ServerInstance _createKey;
     private final String _createReturnValue;
     private String _resourceForDestroy;
     private String _resourceForValidate;
-    private String _keyForDestroy;
-    private String _keyForValidate;
+    private ServerInstance _keyForDestroy;
+    private ServerInstance _keyForValidate;
     private final boolean _boolReturnVal;
 
     public MyPooledResourceManager(boolean returnVal, String createReturnValue) {
@@ -162,26 +163,26 @@ public class AsyncPoolResourceManagerAdapterTest {
     }
 
     @Override
-    public String create(String key) {
+    public String create(ServerInstance key) {
       _createKey = key;
       return _createReturnValue;
     }
 
     @Override
-    public boolean destroy(String key, boolean isBad, String resource) {
+    public boolean destroy(ServerInstance key, boolean isBad, String resource) {
       _keyForDestroy = key;
       _resourceForDestroy = resource;
       return _boolReturnVal;
     }
 
     @Override
-    public boolean validate(String key, String resource) {
+    public boolean validate(ServerInstance key, String resource) {
       _keyForValidate = key;
       _resourceForValidate = resource;
       return _boolReturnVal;
     }
 
-    public String getCreateKey() {
+    public ServerInstance getCreateKey() {
       return _createKey;
     }
 
@@ -193,11 +194,11 @@ public class AsyncPoolResourceManagerAdapterTest {
       return _resourceForValidate;
     }
 
-    public String getKeyForDestroy() {
+    public ServerInstance getKeyForDestroy() {
       return _keyForDestroy;
     }
 
-    public String getKeyForValidate() {
+    public ServerInstance getKeyForValidate() {
       return _keyForValidate;
     }
   }

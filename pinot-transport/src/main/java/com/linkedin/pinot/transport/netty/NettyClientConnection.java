@@ -121,7 +121,7 @@ public abstract class NettyClientConnection {
    * Future Handle provided to the request sender to asynchronously wait for response.
    * We use guava API for implementing Futures.
    */
-  public static class ResponseFuture extends AsyncResponseFuture<ServerInstance, ByteBuf> {
+  public static class ResponseFuture extends AsyncResponseFuture<ByteBuf> {
 
     public ResponseFuture(ServerInstance key, String ctxt) {
       super(key, ctxt);

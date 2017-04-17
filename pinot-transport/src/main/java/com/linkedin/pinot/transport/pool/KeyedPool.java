@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.transport.pool;
 
+import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.common.AsyncResponseFuture;
 import com.linkedin.pinot.transport.common.KeyedFuture;
 import com.linkedin.pinot.transport.common.NoneType;
@@ -32,7 +33,7 @@ import com.yammer.metrics.core.Histogram;
  *
  * @param <T>
  */
-public interface KeyedPool<K, T> extends PoolStatsProvider<Histogram> {
+public interface KeyedPool<T> extends PoolStatsProvider<Histogram> {
 
   /**
    * Start the pool.
@@ -60,7 +61,7 @@ public interface KeyedPool<K, T> extends PoolStatsProvider<Histogram> {
    * @param key the key identifying the inner pool which manages the resources.
    * @return A {@link AsyncResponseFuture} whose get() method will return the actual resource
    */
-  public KeyedFuture<K, T> checkoutObject(K key);
+  public KeyedFuture<T> checkoutObject(ServerInstance key);
 
   /**
    * Validates all object in the pool with key.
@@ -70,7 +71,7 @@ public interface KeyedPool<K, T> extends PoolStatsProvider<Histogram> {
    * @param recreate recreates invalid objects
    * @return
    */
-  public boolean validatePool(K key, boolean recreate);
+  public boolean validatePool(ServerInstance key, boolean recreate);
 
   /**
    * Return a previously checked out object to the pool.  It is an error to return an object to
@@ -78,7 +79,7 @@ public interface KeyedPool<K, T> extends PoolStatsProvider<Histogram> {
    *
    * @param object the object to be returned
    */
-  public void checkinObject(K key, T object);
+  public void checkinObject(ServerInstance key, T object);
 
   /**
    * Dispose of a checked out object which is not operating correctly.  It is an error to
@@ -87,7 +88,7 @@ public interface KeyedPool<K, T> extends PoolStatsProvider<Histogram> {
    * @param key the key identifying the inner pool
    * @param object the object to be disposed
    */
-  public void destroyObject(K key, T object);
+  public void destroyObject(ServerInstance key, T object);
 
   /**
    * Initiate an orderly shutdown of the pool.  The pool will immediately stop accepting
@@ -99,5 +100,5 @@ public interface KeyedPool<K, T> extends PoolStatsProvider<Histogram> {
    *
    * @return composite Future which you can call get() to wait for shutdown.
    */
-  public KeyedFuture<K, NoneType> shutdown();
+  public KeyedFuture<NoneType> shutdown();
 }

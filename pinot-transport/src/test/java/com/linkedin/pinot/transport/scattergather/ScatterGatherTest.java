@@ -232,8 +232,8 @@ public class ScatterGatherTest {
     NettyClientMetrics clientMetrics = new NettyClientMetrics(registry, "client_");
     PooledNettyClientResourceManager rm =
         new PooledNettyClientResourceManager(eventLoopGroup, new HashedWheelTimer(), clientMetrics);
-    KeyedPoolImpl<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection> pool =
-        new KeyedPoolImpl<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection>(1, 1, 300000, 1, rm, timedExecutor, poolExecutor,
+    KeyedPoolImpl<PooledNettyClientResourceManager.PooledClientConnection> pool =
+        new KeyedPoolImpl<PooledNettyClientResourceManager.PooledClientConnection>(1, 1, 300000, 1, rm, timedExecutor, poolExecutor,
             registry);
     rm.setPool(pool);
 
@@ -254,7 +254,7 @@ public class ScatterGatherTest {
 
     final ScatterGatherStats scatterGatherStats = new ScatterGatherStats();
     BrokerMetrics brokerMetrics = new BrokerMetrics(new MetricsRegistry());
-    CompositeFuture<ServerInstance, ByteBuf> fut = scImpl.scatterGather(req, scatterGatherStats, brokerMetrics);
+    CompositeFuture<ByteBuf> fut = scImpl.scatterGather(req, scatterGatherStats, brokerMetrics);
     Map<ServerInstance, ByteBuf> v = fut.get();
     ByteBuf b = v.get(serverInstance1);
     byte[] b2 = new byte[b.readableBytes()];
@@ -300,8 +300,8 @@ public class ScatterGatherTest {
     NettyClientMetrics clientMetrics = new NettyClientMetrics(registry, "client_");
     PooledNettyClientResourceManager rm =
         new PooledNettyClientResourceManager(eventLoopGroup, new HashedWheelTimer(), clientMetrics);
-    KeyedPoolImpl<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection> pool =
-        new KeyedPoolImpl<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection>(1, 1, 300000, 1, rm, timedExecutor, poolExecutor,
+    KeyedPoolImpl<PooledNettyClientResourceManager.PooledClientConnection> pool =
+        new KeyedPoolImpl<PooledNettyClientResourceManager.PooledClientConnection>(1, 1, 300000, 1, rm, timedExecutor, poolExecutor,
             registry);
     rm.setPool(pool);
 
@@ -340,7 +340,7 @@ public class ScatterGatherTest {
     ScatterGatherImpl scImpl = new ScatterGatherImpl(pool, service);
     final ScatterGatherStats scatterGatherStats = new ScatterGatherStats();
     BrokerMetrics brokerMetrics = new BrokerMetrics(new MetricsRegistry());
-    CompositeFuture<ServerInstance, ByteBuf> fut = scImpl.scatterGather(req, scatterGatherStats, brokerMetrics);
+    CompositeFuture<ByteBuf> fut = scImpl.scatterGather(req, scatterGatherStats, brokerMetrics);
     Map<ServerInstance, ByteBuf> v = fut.get();
     Assert.assertEquals(v.size(), 4);
 
@@ -405,8 +405,8 @@ public class ScatterGatherTest {
     NettyClientMetrics clientMetrics = new NettyClientMetrics(registry, "client_");
     PooledNettyClientResourceManager rm =
         new PooledNettyClientResourceManager(eventLoopGroup, new HashedWheelTimer(), clientMetrics);
-    KeyedPoolImpl<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection> pool =
-        new KeyedPoolImpl<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection>(1, 1, 300000, 1, rm, timedExecutor, service, registry);
+    KeyedPoolImpl<PooledNettyClientResourceManager.PooledClientConnection> pool =
+        new KeyedPoolImpl<>(1, 1, 300000, 1, rm, timedExecutor, service, registry);
     rm.setPool(pool);
 
     SegmentIdSet pg1 = new SegmentIdSet();
@@ -446,7 +446,7 @@ public class ScatterGatherTest {
     ScatterGatherImpl scImpl = new ScatterGatherImpl(pool, service);
     final ScatterGatherStats scatterGatherStats = new ScatterGatherStats();
     BrokerMetrics brokerMetrics = new BrokerMetrics(new MetricsRegistry());
-    CompositeFuture<ServerInstance, ByteBuf> fut = scImpl.scatterGather(req, scatterGatherStats, brokerMetrics);
+    CompositeFuture<ByteBuf> fut = scImpl.scatterGather(req, scatterGatherStats, brokerMetrics);
     Map<ServerInstance, ByteBuf> v = fut.get();
 
     //Only 3 servers return value.
@@ -520,8 +520,8 @@ public class ScatterGatherTest {
     NettyClientMetrics clientMetrics = new NettyClientMetrics(registry, "client_");
     PooledNettyClientResourceManager rm =
         new PooledNettyClientResourceManager(eventLoopGroup, new HashedWheelTimer(), clientMetrics);
-    KeyedPoolImpl<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection> pool =
-        new KeyedPoolImpl<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection>(1, 1, 300000, 1, rm, timedExecutor, poolExecutor,
+    KeyedPoolImpl<PooledNettyClientResourceManager.PooledClientConnection> pool =
+        new KeyedPoolImpl<>(1, 1, 300000, 1, rm, timedExecutor, poolExecutor,
             registry);
     rm.setPool(pool);
 
@@ -562,7 +562,7 @@ public class ScatterGatherTest {
     ScatterGatherImpl scImpl = new ScatterGatherImpl(pool, service);
     final ScatterGatherStats scatterGatherStats = new ScatterGatherStats();
     final BrokerMetrics brokerMetrics = new BrokerMetrics(new MetricsRegistry());
-    CompositeFuture<ServerInstance, ByteBuf> fut = scImpl.scatterGather(req, scatterGatherStats, brokerMetrics);
+    CompositeFuture<ByteBuf> fut = scImpl.scatterGather(req, scatterGatherStats, brokerMetrics);
     Map<ServerInstance, ByteBuf> v = fut.get();
 
     //Only 3 servers return value.
