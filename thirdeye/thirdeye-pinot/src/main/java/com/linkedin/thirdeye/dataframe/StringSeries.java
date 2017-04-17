@@ -91,7 +91,9 @@ public final class StringSeries extends TypedSeries<StringSeries> {
     }
 
     public Builder fillValues(int count, String value) {
-      return this.fillValues(count, value);
+      String[] values = new String[count];
+      Arrays.fill(values, value);
+      return this.addValues(values);
     }
 
     @Override
@@ -273,12 +275,32 @@ public final class StringSeries extends TypedSeries<StringSeries> {
     return StringSeries.buildFrom(Arrays.copyOfRange(this.values, from, to));
   }
 
-  public String concat() {
+  public String join() {
     return this.aggregate(CONCAT).value();
   }
 
-  public String concat(String delimiter) {
+  public String join(String delimiter) {
     return this.aggregate(new StringConcat(delimiter)).value();
+  }
+
+  public StringSeries concat(final String constant) {
+    if(isNull(constant))
+      return nulls(this.size());
+    return this.map(new StringFunction() {
+      @Override
+      public String apply(String... values) {
+        return values[0] + constant;
+      }
+    });
+  }
+
+  public StringSeries concat(Series other) {
+    return map(new StringFunction() {
+      @Override
+      public String apply(String... values) {
+        return values[0] + values[1];
+      }
+    }, this, other);
   }
 
   @Override
@@ -303,6 +325,25 @@ public final class StringSeries extends TypedSeries<StringSeries> {
     if(this.isNull(index))
       return TOSTRING_NULL;
     return this.values[index];
+  }
+
+  public boolean hasValue(String value) {
+    for(String v : this.values)
+      if(nullSafeStringComparator(v, value) == 0)
+        return true;
+    return false;
+  }
+
+  public StringSeries replace(String find, String by) {
+    String[] values = new String[this.values.length];
+    for(int i=0; i<values.length; i++) {
+      if(nullSafeStringComparator(this.values[i], find) == 0) {
+        values[i] = by;
+      } else {
+        values[i] = this.values[i];
+      }
+    }
+    return buildFrom(values);
   }
 
   @Override

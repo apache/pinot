@@ -13,7 +13,12 @@ import java.util.List;
  */
 public final class DoubleSeries extends TypedSeries<DoubleSeries> {
   public static final double NULL = Double.NaN;
+  public static final double INFINITY = Double.POSITIVE_INFINITY;
+  public static final double POSITIVE_INFINITY = Double.POSITIVE_INFINITY;
+  public static final double NEGATIVE_INFINITY = Double.NEGATIVE_INFINITY;
   public static final double DEFAULT = 0.0d;
+  public static final double MIN_VALUE = Double.MIN_VALUE;
+  public static final double MAX_VALUE = Double.MAX_VALUE;
 
   public static final DoubleFunction SUM = new DoubleSum();
   public static final DoubleFunction PRODUCT = new DoubleProduct();
@@ -284,6 +289,8 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
   public static long getLong(double value) {
     if(DoubleSeries.isNull(value))
       return LongSeries.NULL;
+    if(value == NEGATIVE_INFINITY)
+      return LongSeries.MIN_VALUE;
     return (long) value;
   }
 
@@ -449,6 +456,8 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
   }
 
   public DoubleSeries add(final double constant) {
+    if(isNull(constant))
+      return nulls(this.size());
     return this.map(new DoubleFunction() {
       @Override
       public double apply(double... values) {
@@ -467,6 +476,8 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
   }
 
   public DoubleSeries subtract(final double constant) {
+    if(isNull(constant))
+      return nulls(this.size());
     return this.map(new DoubleFunction() {
       @Override
       public double apply(double... values) {
@@ -485,6 +496,8 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
   }
 
   public DoubleSeries multiply(final double constant) {
+    if(isNull(constant))
+      return nulls(this.size());
     return this.map(new DoubleFunction() {
       @Override
       public double apply(double... values) {
@@ -494,21 +507,47 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
   }
 
   public DoubleSeries divide(Series other) {
+    DoubleSeries o = other.getDoubles();
+    if(o.hasValue(0))
+      throw new ArithmeticException("/ by zero");
     return map(new DoubleFunction() {
       @Override
       public double apply(double... values) {
         return values[0] / values[1];
       }
-    }, this, other);
+    }, this, o);
   }
 
   public DoubleSeries divide(final double constant) {
+    if(isNull(constant))
+      return nulls(this.size());
+    if(constant == 0.0d)
+      throw new ArithmeticException("/ by zero");
     return this.map(new DoubleFunction() {
       @Override
       public double apply(double... values) {
         return values[0] / constant;
       }
     });
+  }
+
+  public boolean hasValue(double value) {
+    for(double v : this.values)
+      if(nullSafeDoubleComparator(v, value) == 0)
+        return true;
+    return false;
+  }
+
+  public DoubleSeries replace(double find, double by) {
+    double[] values = new double[this.values.length];
+    for(int i=0; i<values.length; i++) {
+      if(nullSafeDoubleComparator(this.values[i], find) == 0) {
+        values[i] = by;
+      } else {
+        values[i] = this.values[i];
+      }
+    }
+    return buildFrom(values);
   }
 
   @Override
@@ -527,6 +566,16 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     double[] values = Arrays.copyOf(this.values, this.values.length);
     for(int i=0; i<values.length; i++) {
       if(isNull(values[i])) {
+        values[i] = value;
+      }
+    }
+    return buildFrom(values);
+  }
+
+  public DoubleSeries fillInfinite(double value) {
+    double[] values = Arrays.copyOf(this.values, this.values.length);
+    for(int i=0; i<values.length; i++) {
+      if(Double.isInfinite(values[i])) {
         values[i] = value;
       }
     }

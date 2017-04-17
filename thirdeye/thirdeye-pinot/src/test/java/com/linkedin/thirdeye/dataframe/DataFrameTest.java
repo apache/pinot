@@ -286,6 +286,17 @@ public class DataFrameTest {
   }
 
   @Test
+  public void testDoubleInfinity() {
+    Series s = DataFrame.toSeries(DoubleSeries.POSITIVE_INFINITY, DoubleSeries.NEGATIVE_INFINITY);
+    Assert.assertEquals(s.getDoubles().values(), new double[] { Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY });
+    Assert.assertEquals(s.getLongs().values(), new long[] { LongSeries.MAX_VALUE, LongSeries.MIN_VALUE });
+    Assert.assertEquals(s.getBooleans().values(), new byte[] { BooleanSeries.TRUE, BooleanSeries.TRUE });
+    Assert.assertEquals(s.getStrings().values(), new String[] { "Infinity", "-Infinity" });
+
+    Assert.assertEquals(DataFrame.toSeries("Infinity", "-Infinity").getDoubles().values(), new double[] { Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY });
+  }
+
+  @Test
   public void testMapDoubleToDouble() {
     DoubleSeries in = DataFrame.toSeries(VALUES_DOUBLE);
     DoubleSeries out = in.map(new DoubleSeries.DoubleFunction() {
@@ -661,9 +672,9 @@ public class DataFrameTest {
   @Test
   public void testStringAggregateWithNull() {
     StringSeries s = DataFrame.toSeries("a", "b", StringSeries.NULL, "d");
-    Assert.assertEquals(s.concat(), StringSeries.NULL);
-    Assert.assertEquals(s.fillNull().concat(), "abd");
-    Assert.assertEquals(s.dropNull().concat(), "abd");
+    Assert.assertEquals(s.join(), StringSeries.NULL);
+    Assert.assertEquals(s.fillNull().join(), "abd");
+    Assert.assertEquals(s.dropNull().join(), "abd");
   }
 
   @Test
@@ -678,7 +689,7 @@ public class DataFrameTest {
   public void testDataFrameGroupBy() {
     DataFrame.DataFrameGrouping grouping = df.groupBy("boolean");
     DoubleSeries ds = grouping.aggregate("double", new DoubleSeries.DoubleSum()).getDoubles("double");
-    assertEqualsDoubles(ds.values(), new double[] { 0.0, -0.4 });
+    assertEquals(ds, 0.0, -0.4);
 
     LongSeries ls = grouping.aggregate("long", new LongSeries.LongSum()).get("long").getLongs();
     Assert.assertEquals(ls.values(), new long[] { 0, 2 });
@@ -1621,7 +1632,7 @@ public class DataFrameTest {
   @Test
   public void testDoubleZScore() {
     DoubleSeries s = DataFrame.toSeries(0.0, 1.0, 2.0).zscore();
-    assertEqualsDoubles(s.values(), new double[] { -0.707, 0.0, 0.707 });
+    assertEquals(s.values(), -0.707, 0.0, 0.707);
   }
 
   @Test
@@ -1631,17 +1642,222 @@ public class DataFrameTest {
   }
 
   @Test
-  public void testToString() {
-    Assert.assertTrue(df.toString(4, "index", "double", "long", "string", "boolean").contains("..."));
-    Assert.assertTrue(df.toString(6, "index", "double", "long", "string", "boolean").contains("..."));
-    Assert.assertFalse(df.toString(8, "index", "double", "long", "string", "boolean").contains("..."));
+  public void testDoubleOperationsSeries() {
+    DoubleSeries base = DataFrame.toSeries(DoubleSeries.NULL, 0, 1, 1.5, 0.003);
+    DoubleSeries mod = DataFrame.toSeries(1, 1, 1, 0, DoubleSeries.NULL);
+
+    assertEquals(base.add(mod), DoubleSeries.NULL, 1, 2, 1.5, DoubleSeries.NULL);
+    assertEquals(base.subtract(mod), DoubleSeries.NULL, -1, 0, 1.5, DoubleSeries.NULL);
+    assertEquals(base.multiply(mod), DoubleSeries.NULL, 0, 1, 0, DoubleSeries.NULL);
+    assertEquals(base.divide(mod.replace(0, 1)), DoubleSeries.NULL, 0, 1, 1.5, DoubleSeries.NULL);
+
+    try {
+      base.divide(mod);
+      Assert.fail();
+    } catch(ArithmeticException ignore) {
+      // left blank
+    }
   }
 
-  static void assertEqualsDoubles(double[] actual, double[] expected) {
+  @Test
+  public void testDoubleOperationsConstant() {
+    DoubleSeries base = DataFrame.toSeries(DoubleSeries.NULL, 0, 1, 1.5, 0.003);
+
+    assertEquals(base.add(1), DoubleSeries.NULL, 1, 2, 2.5, 1.003);
+    assertEquals(base.add(0), DoubleSeries.NULL, 0, 1, 1.5, 0.003);
+    assertEquals(base.add(-1), DoubleSeries.NULL, -1, 0, 0.5, -0.997);
+    assertEquals(base.add(DoubleSeries.NULL), DoubleSeries.nulls(5));
+
+    assertEquals(base.subtract(1), DoubleSeries.NULL, -1, 0, 0.5, -0.997);
+    assertEquals(base.subtract(0), DoubleSeries.NULL, 0, 1, 1.5, 0.003);
+    assertEquals(base.subtract(-1), DoubleSeries.NULL, 1, 2, 2.5, 1.003);
+    assertEquals(base.subtract(DoubleSeries.NULL), DoubleSeries.nulls(5));
+
+    assertEquals(base.multiply(1), DoubleSeries.NULL, 0, 1, 1.5, 0.003);
+    assertEquals(base.multiply(0), DoubleSeries.NULL, 0, 0, 0, 0);
+    assertEquals(base.multiply(-1), DoubleSeries.NULL, 0, -1, -1.5, -0.003);
+    assertEquals(base.multiply(DoubleSeries.NULL), DoubleSeries.nulls(5));
+
+    assertEquals(base.divide(1), DoubleSeries.NULL, 0, 1, 1.5, 0.003);
+    assertEquals(base.divide(-1), DoubleSeries.NULL, 0, -1, -1.5, -0.003);
+    assertEquals(base.divide(DoubleSeries.NULL), DoubleSeries.nulls(5));
+
+    try {
+      base.divide(0);
+      Assert.fail();
+    } catch(ArithmeticException ignore) {
+      // left blank
+    }
+  }
+
+  @Test
+  public void testLongOperationsSeries() {
+    LongSeries base = DataFrame.toSeries(LongSeries.NULL, 0, 1, 5, 10);
+    LongSeries mod = DataFrame.toSeries(1, 1, 1, 0, LongSeries.NULL);
+
+    assertEquals(base.add(mod), LongSeries.NULL, 1, 2, 5, LongSeries.NULL);
+    assertEquals(base.subtract(mod), LongSeries.NULL, -1, 0, 5, LongSeries.NULL);
+    assertEquals(base.multiply(mod), LongSeries.NULL, 0, 1, 0, LongSeries.NULL);
+    assertEquals(base.divide(mod.replace(0, 1)), LongSeries.NULL, 0, 1, 5, LongSeries.NULL);
+
+    try {
+      base.divide(mod);
+      Assert.fail();
+    } catch(ArithmeticException ignore) {
+      // left blank
+    }
+  }
+
+  @Test
+  public void testLongOperationsConstant() {
+    LongSeries base = DataFrame.toSeries(LongSeries.NULL, 0, 1, 5, 10);
+
+    assertEquals(base.add(1), LongSeries.NULL, 1, 2, 6, 11);
+    assertEquals(base.add(0), LongSeries.NULL, 0, 1, 5, 10);
+    assertEquals(base.add(-1), LongSeries.NULL, -1, 0, 4, 9);
+    assertEquals(base.add(LongSeries.NULL), LongSeries.nulls(5));
+
+    assertEquals(base.subtract(1), LongSeries.NULL, -1, 0, 4, 9);
+    assertEquals(base.subtract(0), LongSeries.NULL, 0, 1, 5, 10);
+    assertEquals(base.subtract(-1), LongSeries.NULL, 1, 2, 6, 11);
+    assertEquals(base.subtract(LongSeries.NULL), LongSeries.nulls(5));
+
+    assertEquals(base.multiply(1), LongSeries.NULL, 0, 1, 5, 10);
+    assertEquals(base.multiply(0), LongSeries.NULL, 0, 0, 0, 0);
+    assertEquals(base.multiply(-1), LongSeries.NULL, 0, -1, -5, -10);
+    assertEquals(base.multiply(LongSeries.NULL), LongSeries.nulls(5));
+
+    assertEquals(base.divide(1), LongSeries.NULL, 0, 1, 5, 10);
+    assertEquals(base.divide(-1), LongSeries.NULL, 0, -1, -5, -10);
+    assertEquals(base.divide(LongSeries.NULL), LongSeries.nulls(5));
+
+    try {
+      base.divide(0);
+      Assert.fail();
+    } catch(ArithmeticException ignore) {
+      // left blank
+    }
+  }
+
+  @Test
+  public void testStringOperationsSeries() {
+    StringSeries base = DataFrame.toSeries(StringSeries.NULL, "a", "b", "c", "d");
+    StringSeries mod = DataFrame.toSeries("A", "A", "A", "B", StringSeries.NULL);
+
+    assertEquals(base.concat(mod), StringSeries.NULL, "aA", "bA", "cB", StringSeries.NULL);
+  }
+
+  @Test
+  public void testStringOperationsConstant() {
+    StringSeries base = DataFrame.toSeries(StringSeries.NULL, "a", "b", "c", "d");
+
+    assertEquals(base.concat("X"), StringSeries.NULL, "aX", "bX", "cX", "dX");
+    assertEquals(base.concat(""), StringSeries.NULL, "a", "b", "c", "d");
+    assertEquals(base.concat(StringSeries.NULL), StringSeries.nulls(5));
+  }
+
+  @Test
+  public void testBooleanOperationsSeries() {
+    BooleanSeries base = DataFrame.toSeries(new byte[] { BooleanSeries.NULL, 1, 0, 1, 0 });
+    BooleanSeries mod = DataFrame.toSeries(new byte[] { 1, 1, 1, 0, BooleanSeries.NULL });
+
+    assertEquals(base.and(mod), new byte[] { BooleanSeries.NULL, 1, 0, 0, BooleanSeries.NULL });
+    assertEquals(base.or(mod), new byte[] { BooleanSeries.NULL, 1, 1, 1, BooleanSeries.NULL });
+    assertEquals(base.xor(mod), new byte[] { BooleanSeries.NULL, 0, 1, 1, BooleanSeries.NULL });
+    assertEquals(base.implies(mod), new byte[] { BooleanSeries.NULL, 1, 1, 0, BooleanSeries.NULL });
+  }
+
+  @Test
+  public void testBooleanOperationsConstant() {
+    BooleanSeries base = DataFrame.toSeries(new byte[] { BooleanSeries.NULL, 1, 0, 1, 0 });
+
+    assertEquals(base.and(true), new byte[] { BooleanSeries.NULL, 1, 0, 1, 0 });
+    assertEquals(base.and(false), new byte[] { BooleanSeries.NULL, 0, 0, 0, 0 });
+    assertEquals(base.and(BooleanSeries.NULL), BooleanSeries.nulls(5));
+
+    assertEquals(base.or(true), new byte[] { BooleanSeries.NULL, 1, 1, 1, 1 });
+    assertEquals(base.or(false), new byte[] { BooleanSeries.NULL, 1, 0, 1, 0 });
+    assertEquals(base.or(BooleanSeries.NULL), BooleanSeries.nulls(5));
+
+    assertEquals(base.xor(true), new byte[] { BooleanSeries.NULL, 0, 1, 0, 1 });
+    assertEquals(base.xor(false), new byte[] { BooleanSeries.NULL, 1, 0, 1, 0 });
+    assertEquals(base.xor(BooleanSeries.NULL), BooleanSeries.nulls(5));
+
+    assertEquals(base.implies(true), new byte[] { BooleanSeries.NULL, 1, 1, 1, 1 });
+    assertEquals(base.implies(false), new byte[] { BooleanSeries.NULL, 0, 1, 0, 1 });
+    assertEquals(base.implies(BooleanSeries.NULL), BooleanSeries.nulls(5));
+  }
+
+  /* **************************************************************************
+   * Helpers
+   ***************************************************************************/
+
+  static void assertEquals(Series actual, Series expected) {
+    Assert.assertEquals(actual, expected);
+  }
+
+  static void assertEquals(Series actual, double... expected) {
+    assertEquals(actual.getDoubles().values(), expected);
+  }
+
+  static void assertEquals(double[] actual, double... expected) {
     if(actual.length != expected.length)
       Assert.fail(String.format("expected array length [%d] but found [%d]", actual.length, expected.length));
     for(int i=0; i<actual.length; i++) {
-      Assert.assertEquals(actual[i], expected[i], COMPARE_DOUBLE_DELTA);
+      if(Double.isNaN(actual[i]) && Double.isNaN(expected[i]))
+        continue;
+      Assert.assertEquals(actual[i], expected[i], COMPARE_DOUBLE_DELTA, "index=" + i);
+    }
+  }
+
+  static void assertEquals(Series actual, long... expected) {
+    assertEquals(actual.getLongs().values(), expected);
+  }
+
+  static void assertEquals(long[] actual, long... expected) {
+    if(actual.length != expected.length)
+      Assert.fail(String.format("expected array length [%d] but found [%d]", actual.length, expected.length));
+    for(int i=0; i<actual.length; i++) {
+      Assert.assertEquals(actual[i], expected[i], "index=" + i);
+    }
+  }
+
+  static void assertEquals(Series actual, String... expected) {
+    assertEquals(actual.getStrings().values(), expected);
+  }
+
+  static void assertEquals(String[] actual, String... expected) {
+    if(actual.length != expected.length)
+      Assert.fail(String.format("expected array length [%d] but found [%d]", actual.length, expected.length));
+    for(int i=0; i<actual.length; i++) {
+      Assert.assertEquals(actual[i], expected[i], "index=" + i);
+    }
+  }
+
+  static void assertEquals(Series actual, byte... expected) {
+    assertEquals(actual.getBooleans().values(), expected);
+  }
+
+  static void assertEquals(Series actual, boolean... expected) {
+    BooleanSeries s = actual.getBooleans();
+    if(s.hasNull())
+      Assert.fail("Encountered NULL when comparing against booleans");
+    assertEquals(s.valuesBoolean(), expected);
+  }
+
+  static void assertEquals(byte[] actual, byte... expected) {
+    if(actual.length != expected.length)
+      Assert.fail(String.format("expected array length [%d] but found [%d]", actual.length, expected.length));
+    for(int i=0; i<actual.length; i++) {
+      Assert.assertEquals(actual[i], expected[i], "index=" + i);
+    }
+  }
+
+  static void assertEquals(boolean[] actual, boolean... expected) {
+    if(actual.length != expected.length)
+      Assert.fail(String.format("expected array length [%d] but found [%d]", actual.length, expected.length));
+    for(int i=0; i<actual.length; i++) {
+      Assert.assertEquals(actual[i], expected[i], "index=" + i);
     }
   }
 }
