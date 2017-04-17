@@ -37,13 +37,13 @@ public class LiveInstancesChangeListenerImpl implements LiveInstanceChangeListen
 
   private long timeout;
   private final Map<String, String> liveInstanceToSessionIdMap;
-  private KeyedPool<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection> connectionPool;
+  private KeyedPool<PooledNettyClientResourceManager.PooledClientConnection> connectionPool;
 
   public LiveInstancesChangeListenerImpl(String clusterName) {
     this.liveInstanceToSessionIdMap = new HashMap<String, String>();
   }
 
-  public void init(final KeyedPool<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection> connectionPool, final long timeout) {
+  public void init(final KeyedPool<PooledNettyClientResourceManager.PooledClientConnection> connectionPool, final long timeout) {
     this.connectionPool = connectionPool;
     this.timeout = timeout;
   }

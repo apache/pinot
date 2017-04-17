@@ -27,6 +27,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.linkedin.pinot.common.response.ServerInstance;
 
 
 /**
@@ -43,10 +44,9 @@ import org.slf4j.LoggerFactory;
  *
  * This future's value will be a map of each future's key and the corresponding underlying future's value.
  *
- * @param <K> Key to locate the specific future's value
  * @param <V> Value type of the underlying future
  */
-public class CompositeFuture<K, V> extends AbstractCompositeListenableFuture<K, V> {
+public class CompositeFuture<V> extends AbstractCompositeListenableFuture<V> {
   protected static Logger LOGGER = LoggerFactory.getLogger(CompositeFuture.class);
 
   public static enum GatherModeOnError {
@@ -56,15 +56,15 @@ public class CompositeFuture<K, V> extends AbstractCompositeListenableFuture<K, 
     AND,
   };
 
-  private final Collection<KeyedFuture<K, V>> _futures;
+  private final Collection<ServerResponseFuture<V>> _futures;
 
   // Composite Response
-  private final ConcurrentMap<K, V> _delayedResponseMap;
+  private final ConcurrentMap<ServerInstance, V> _delayedResponseMap;
 
   private final ConcurrentMap<String, Long> _responseTimeMap = new ConcurrentHashMap<>(10);
 
   // Exception in case of error
-  private final ConcurrentMap<K, Throwable> _errorMap;
+  private final ConcurrentMap<ServerInstance, Throwable> _errorMap;
 
   private final GatherModeOnError _gatherMode;
 
@@ -73,9 +73,9 @@ public class CompositeFuture<K, V> extends AbstractCompositeListenableFuture<K, 
 
   public CompositeFuture(String name, GatherModeOnError mode) {
     _name = name;
-    _futures = new ArrayList<KeyedFuture<K, V>>();
-    _delayedResponseMap = new ConcurrentHashMap<K, V>();
-    _errorMap = new ConcurrentHashMap<K, Throwable>();
+    _futures = new ArrayList<ServerResponseFuture<V>>();
+    _delayedResponseMap = new ConcurrentHashMap<ServerInstance, V>();
+    _errorMap = new ConcurrentHashMap<ServerInstance, Throwable>();
     _gatherMode = mode;
   }
 
@@ -83,7 +83,7 @@ public class CompositeFuture<K, V> extends AbstractCompositeListenableFuture<K, 
    * Start the future. This will add listener to the underlying futures. This method needs to be called
    * as soon the composite future is constructed and before any other method is invoked.
    */
-  public void start(Collection<KeyedFuture<K, V>> futureList) {
+  public void start(Collection<ServerResponseFuture<V>> futureList) {
     boolean started = super.start();
 
     if (!started) {
@@ -99,7 +99,7 @@ public class CompositeFuture<K, V> extends AbstractCompositeListenableFuture<K, 
     } else {
       _latch = new CountDownLatch(0);
     }
-    for (KeyedFuture<K, V> entry : _futures) {
+    for (ServerResponseFuture<V> entry : _futures) {
       if (null != entry) {
         addResponseFutureListener(entry);
       }
@@ -112,7 +112,7 @@ public class CompositeFuture<K, V> extends AbstractCompositeListenableFuture<K, 
    */
   @Override
   protected void cancelUnderlyingFutures() {
-    for (KeyedFuture<K, V> entry : _futures) {
+    for (ServerResponseFuture<V> entry : _futures) {
       entry.cancel(true);
     }
   }
@@ -121,7 +121,7 @@ public class CompositeFuture<K, V> extends AbstractCompositeListenableFuture<K, 
   /**
    *
    */
-  public Map<K, V> get() throws InterruptedException, ExecutionException {
+  public Map<ServerInstance, V> get() throws InterruptedException, ExecutionException {
     _latch.await();
     return _delayedResponseMap;
   }
@@ -150,7 +150,7 @@ public class CompositeFuture<K, V> extends AbstractCompositeListenableFuture<K, 
   }
 
   @Override
-  public Map<K, Throwable> getError() {
+  public Map<ServerInstance, Throwable> getError() {
     return _errorMap;
   }
 
@@ -169,7 +169,7 @@ public class CompositeFuture<K, V> extends AbstractCompositeListenableFuture<K, 
   }
 
   @Override
-  public Map<K, V> get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
+  public Map<ServerInstance, V> get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
     _latch.await(timeout, unit);
     return _delayedResponseMap;
   }
@@ -183,7 +183,7 @@ public class CompositeFuture<K, V> extends AbstractCompositeListenableFuture<K, 
     return Collections.unmodifiableMap(_responseTimeMap);
   }
   @Override
-  protected boolean processFutureResult(String name, Map<K, V> response, Map<K, Throwable> error, long durationMillis) {
+  protected boolean processFutureResult(String name, Map<ServerInstance, V> response, Map<ServerInstance, Throwable> error, long durationMillis) {
     // Get the response time and create another map that can be invoked to get the end time when responses were received for each server.
     boolean ret = false;
     if (null != response) {

@@ -29,15 +29,16 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.linkedin.pinot.common.response.ServerInstance;
 
 
-public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T> {
+public class AsyncResponseFuture<T> implements Callback<T>, ServerResponseFuture<T> {
   protected static Logger LOGGER = LoggerFactory.getLogger(AsyncResponseFuture.class);
 
   private Cancellable _cancellable;
 
   // Id for this future
-  private final K _key;
+  private final ServerInstance _key;
 
   // Lock for mutex
   private final Lock _futureLock = new ReentrantLock();
@@ -59,8 +60,8 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
   private final List<Executor> _pendingRunnableExecutors = new ArrayList<Executor>();
 
   // Cached response/errors
-  private volatile Map<K, T> _responseMap;
-  private volatile Map<K, Throwable> _errorMap;
+  private volatile Map<ServerInstance, T> _responseMap;
+  private volatile Map<ServerInstance, Throwable> _errorMap;
 
   // For  debug
   private final String _ctxt;
@@ -83,7 +84,7 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
   // State of the future
   private State _state;
 
-  public AsyncResponseFuture(K key, String ctxt) {
+  public AsyncResponseFuture(ServerInstance key, String ctxt) {
     _key = key;
     _state = State.PENDING;
     _cancellable = new NoopCancellable();
@@ -91,7 +92,7 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
     _startTime = System.currentTimeMillis();
   }
 
-  public AsyncResponseFuture(K key, Throwable t, String ctxt) {
+  public AsyncResponseFuture(ServerInstance key, Throwable t, String ctxt) {
     _key = key;
     _state = State.DONE;
     _error = t;
@@ -167,7 +168,7 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
   }
 
   @Override
-  public Map<K, T> get() throws InterruptedException, ExecutionException {
+  public Map<ServerInstance, T> get() throws InterruptedException, ExecutionException {
     try {
       _futureLock.lock();
       while (!_state.isCompleted()) {
@@ -224,12 +225,12 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
   }
 
   @Override
-  public Map<K, Throwable> getError() {
+  public Map<ServerInstance, Throwable> getError() {
     if ((null == _errorMap) && (null != _error)) {
       try {
         _futureLock.lock();
         if ((null == _errorMap) && (null != _error)) {
-          _errorMap = new HashMap<K, Throwable>();
+          _errorMap = new HashMap<ServerInstance, Throwable>();
           _errorMap.put(_key, _error);
         }
       } finally {
@@ -241,13 +242,13 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
 
   private void setResponseMap() {
     if (null != _delayedResponse) {
-      _responseMap = new HashMap<K, T>();
+      _responseMap = new HashMap<ServerInstance, T>();
       _responseMap.put(_key, _delayedResponse);
     }
   }
 
   @Override
-  public Map<K, T> get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
+  public Map<ServerInstance, T> get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
     try {
       _futureLock.lock();
       while (!_state.isCompleted()) {

@@ -15,11 +15,24 @@
  */
 package com.linkedin.pinot.transport.netty;
 
+import java.lang.reflect.Field;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import org.apache.commons.lang.RandomStringUtils;
+import org.testng.Assert;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.Test;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.common.AsyncResponseFuture;
 import com.linkedin.pinot.transport.common.Callback;
-import com.linkedin.pinot.transport.common.KeyedFuture;
+import com.linkedin.pinot.transport.common.ServerResponseFuture;
 import com.linkedin.pinot.transport.common.LinkedDequeue;
 import com.linkedin.pinot.transport.common.NoneType;
 import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
@@ -35,19 +48,6 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.HashedWheelTimer;
-import java.lang.reflect.Field;
-import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import org.apache.commons.lang.RandomStringUtils;
-import org.testng.Assert;
-import org.testng.annotations.AfterMethod;
-import org.testng.annotations.BeforeMethod;
-import org.testng.annotations.Test;
 
 
 public class NettySingleConnectionIntegrationTest {
@@ -161,7 +161,7 @@ public class NettySingleConnectionIntegrationTest {
 
     String serverName = "server";
     MetricsRegistry metricsRegistry = new MetricsRegistry();
-    AsyncPoolResourceManagerAdapter<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection> rmAdapter =
+    AsyncPoolResourceManagerAdapter<PooledNettyClientResourceManager.PooledClientConnection> rmAdapter =
         new AsyncPoolResourceManagerAdapter<>(_clientServer, resourceManager, executorService, metricsRegistry);
     AsyncPool<PooledNettyClientResourceManager.PooledClientConnection> pool = new AsyncPoolImpl<>(serverName, rmAdapter,
      /*maxSize=*/5, /*idleTimeoutMs=*/100000L, timeoutExecutor, executorService, /*maxWaiters=*/10,
@@ -179,7 +179,7 @@ public class NettySingleConnectionIntegrationTest {
       Assert.assertEquals(stats.getCheckedOut(), 0);
 
       // Test one connection, it should not destroy anything
-      AsyncResponseFuture<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection> responseFuture =
+      AsyncResponseFuture<PooledNettyClientResourceManager.PooledClientConnection> responseFuture =
           new AsyncResponseFuture<>(_clientServer, null);
       pool.get(responseFuture);
       Assert.assertNotNull(responseFuture.getOne());
@@ -225,7 +225,7 @@ public class NettySingleConnectionIntegrationTest {
     ExecutorService executorService = Executors.newCachedThreadPool();
     ScheduledExecutorService timeoutExecutor = new ScheduledThreadPoolExecutor(5);
 
-    KeyedPool<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection> keyedPool =
+    KeyedPool<PooledNettyClientResourceManager.PooledClientConnection> keyedPool =
         new KeyedPoolImpl<>(/*minSize=*/2, /*maxSize=*/3, /*idleTimeoutMs=*/100000L, /*maxPending=*/1, resourceManager,
             timeoutExecutor, executorService, new MetricsRegistry());
     resourceManager.setPool(keyedPool);
@@ -268,10 +268,10 @@ public class NettySingleConnectionIntegrationTest {
 
       // Try to get one more connection
       // We should get an exception because we don't have a free connection to the server
-      KeyedFuture<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection> keyedFuture =
+      ServerResponseFuture<PooledNettyClientResourceManager.PooledClientConnection> serverResponseFuture =
           keyedPool.checkoutObject(_clientServer);
       try {
-        keyedFuture.getOne(1, TimeUnit.SECONDS);
+        serverResponseFuture.getOne(1, TimeUnit.SECONDS);
         Assert.fail("Get connection even no connections available");
       } catch (TimeoutException e) {
         // PASS
@@ -281,7 +281,7 @@ public class NettySingleConnectionIntegrationTest {
       Assert.assertEquals(stats.getIdleCount(), 0);
       Assert.assertEquals(stats.getCheckedOut(), 3);
       Assert.assertEquals(waitersQueue.size(), 1);
-      keyedFuture.cancel(true);
+      serverResponseFuture.cancel(true);
       Assert.assertEquals(waitersQueue.size(), 0);
 
       // If the server goes down, we should release all 3 connections and be able to get new connections

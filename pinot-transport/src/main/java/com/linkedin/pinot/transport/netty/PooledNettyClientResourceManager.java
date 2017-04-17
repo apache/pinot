@@ -27,11 +27,11 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.util.Timer;
 
 
-public class PooledNettyClientResourceManager implements PooledResourceManager<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection> {
+public class PooledNettyClientResourceManager implements PooledResourceManager<PooledNettyClientResourceManager.PooledClientConnection> {
 
   protected static Logger LOGGER = LoggerFactory.getLogger(PooledNettyClientResourceManager.class);
 
-  private KeyedPool<ServerInstance, PooledClientConnection> _pool;
+  private KeyedPool<PooledClientConnection> _pool;
   private final EventLoopGroup _eventLoop;
   private final NettyClientMetrics _metrics;
   private final Timer _timer;
@@ -42,7 +42,7 @@ public class PooledNettyClientResourceManager implements PooledResourceManager<S
     _timer = timer;
   }
 
-  public void setPool(KeyedPool<ServerInstance, PooledClientConnection> pool) {
+  public void setPool(KeyedPool<PooledClientConnection> pool) {
     _pool = pool;
   }
 
@@ -87,10 +87,10 @@ public class PooledNettyClientResourceManager implements PooledResourceManager<S
    *
    */
   public class PooledClientConnection extends NettyTCPClientConnection implements Callback<NoneType> {
-    private final KeyedPool<ServerInstance, PooledNettyClientResourceManager.PooledClientConnection> _pool;
+    private final KeyedPool<PooledNettyClientResourceManager.PooledClientConnection> _pool;
     private boolean _destroyed = false;
 
-    public PooledClientConnection(KeyedPool<ServerInstance, PooledClientConnection> pool, ServerInstance server,
+    public PooledClientConnection(KeyedPool<PooledClientConnection> pool, ServerInstance server,
         EventLoopGroup eventGroup, Timer timer, NettyClientMetrics metric) {
       super(server, eventGroup, timer, metric);
       _pool = pool;

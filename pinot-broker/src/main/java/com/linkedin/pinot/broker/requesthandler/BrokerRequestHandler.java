@@ -15,6 +15,21 @@
  */
 package com.linkedin.pinot.broker.requesthandler;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import org.apache.commons.configuration.Configuration;
+import org.apache.thrift.protocol.TCompactProtocol;
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.google.common.base.Splitter;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.exception.QueryException;
@@ -51,24 +66,9 @@ import com.linkedin.pinot.transport.scattergather.ScatterGather;
 import com.linkedin.pinot.transport.scattergather.ScatterGatherRequest;
 import com.linkedin.pinot.transport.scattergather.ScatterGatherStats;
 import io.netty.buffer.ByteBuf;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
-import org.apache.commons.configuration.Configuration;
-import org.apache.thrift.protocol.TCompactProtocol;
-import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -434,7 +434,7 @@ public class BrokerRequestHandler {
     // Step 1: find the candidate servers to be queried for each set of segments from the routing table.
     // Step 2: select servers for each segment set and scatter request to the servers.
     String offlineTableName = null;
-    CompositeFuture<ServerInstance, ByteBuf> offlineCompositeFuture = null;
+    CompositeFuture<ByteBuf> offlineCompositeFuture = null;
     if (offlineBrokerRequest != null) {
       offlineTableName = offlineBrokerRequest.getQuerySource().getTableName();
       offlineCompositeFuture =
@@ -442,7 +442,7 @@ public class BrokerRequestHandler {
               requestId);
     }
     String realtimeTableName = null;
-    CompositeFuture<ServerInstance, ByteBuf> realtimeCompositeFuture = null;
+    CompositeFuture<ByteBuf> realtimeCompositeFuture = null;
     if (realtimeBrokerRequest != null) {
       realtimeTableName = realtimeBrokerRequest.getQuerySource().getTableName();
       realtimeCompositeFuture =
@@ -524,7 +524,7 @@ public class BrokerRequestHandler {
    * @return composite future used to gather responses.
    */
   @Nullable
-  private CompositeFuture<ServerInstance, ByteBuf> routeAndScatterBrokerRequest(@Nonnull BrokerRequest brokerRequest,
+  private CompositeFuture<ByteBuf> routeAndScatterBrokerRequest(@Nonnull BrokerRequest brokerRequest,
       @Nonnull PhaseTimes phaseTimes, @Nonnull ScatterGatherStats scatterGatherStats, boolean isOfflineTable,
       @Nullable BucketingSelection bucketingSelection, long requestId)
       throws InterruptedException {
@@ -546,7 +546,7 @@ public class BrokerRequestHandler {
         new ScatterGatherRequestImpl(brokerRequest, segmentServices, _replicaSelection,
             ReplicaSelectionGranularity.SEGMENT_ID_SET, brokerRequest.getBucketHashKey(), 0, bucketingSelection,
             requestId, _brokerTimeOutMs, _brokerId);
-    CompositeFuture<ServerInstance, ByteBuf> compositeFuture =
+    CompositeFuture<ByteBuf> compositeFuture =
         _scatterGatherer.scatterGather(scatterRequest, scatterGatherStats, isOfflineTable, _brokerMetrics);
     phaseTimes.addToScatterTime(System.nanoTime() - scatterStartTime);
     return compositeFuture;
@@ -585,7 +585,7 @@ public class BrokerRequestHandler {
    */
   @Nullable
   private Map<ServerInstance, ByteBuf> gatherServerResponses(
-      @Nonnull CompositeFuture<ServerInstance, ByteBuf> compositeFuture, @Nonnull ScatterGatherStats scatterGatherStats,
+      @Nonnull CompositeFuture<ByteBuf> compositeFuture, @Nonnull ScatterGatherStats scatterGatherStats,
       boolean isOfflineTable, @Nonnull String tableName, @Nonnull List<ProcessingException> processingExceptions) {
     try {
       Map<ServerInstance, ByteBuf> serverResponseMap = compositeFuture.get();

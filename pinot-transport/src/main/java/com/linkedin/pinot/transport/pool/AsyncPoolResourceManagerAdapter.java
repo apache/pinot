@@ -22,6 +22,7 @@ import org.slf4j.LoggerFactory;
 
 import com.linkedin.pinot.common.metrics.LatencyMetric;
 import com.linkedin.pinot.common.metrics.MetricsHelper;
+import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.common.Callback;
 import com.linkedin.pinot.transport.metrics.PoolStats.LifecycleStats;
 import com.linkedin.pinot.transport.pool.AsyncPool.Lifecycle;
@@ -32,16 +33,16 @@ import com.yammer.metrics.core.MetricsRegistry;
 
 // The create() and destoy() methods in this class are ONLY called from
 // AsyncPoolImpl when a connection needs to be created or destroyed.
-public class AsyncPoolResourceManagerAdapter<K, T> implements Lifecycle<T> {
+public class AsyncPoolResourceManagerAdapter<T> implements Lifecycle<T> {
   private static final Logger LOGGER = LoggerFactory.getLogger(AsyncPoolResourceManagerAdapter.class);
 
-  private final PooledResourceManager<K, T> _resourceManager;
+  private final PooledResourceManager<T> _resourceManager;
   private final ExecutorService _executor;
-  private final K _key;
+  private final ServerInstance _key;
   private final Histogram _histogram;
   private boolean _isShuttingDown = false;
 
-  public AsyncPoolResourceManagerAdapter(K key, PooledResourceManager<K, T> resourceManager,
+  public AsyncPoolResourceManagerAdapter(ServerInstance key, PooledResourceManager<T> resourceManager,
       ExecutorService executorService, MetricsRegistry registry) {
     _resourceManager = resourceManager;
     _executor = executorService;

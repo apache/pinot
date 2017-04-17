@@ -22,6 +22,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import com.google.common.util.concurrent.ListenableFuture;
+import com.linkedin.pinot.common.response.ServerInstance;
 
 
 /**
@@ -39,10 +40,9 @@ import com.google.common.util.concurrent.ListenableFuture;
  * request dispatch with speculative (duplicate) request dispatching.
  *
  *
- * @param <K> Key type to identify a result/error
  * @param <V> Response Type
  */
-public interface KeyedFuture<K, V> extends ListenableFuture<Map<K, V>> {
+public interface ServerResponseFuture<V> extends ListenableFuture<Map<ServerInstance, V>> {
 
   /**
    * Returns a name of the future. The name of the future is not expected
@@ -87,5 +87,5 @@ public interface KeyedFuture<K, V> extends ListenableFuture<Map<K, V>> {
    * for the future to complete. It will just return the current error results
    * @return
    */
-  public Map<K, Throwable> getError();
+  public Map<ServerInstance, Throwable> getError();
 }

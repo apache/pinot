@@ -24,12 +24,11 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-
+import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.common.CompositeFuture.GatherModeOnError;
 
 
@@ -42,18 +41,18 @@ public class CompositeFutureTest {
    * @throws Exception
    */
   public void testMultiFutureComposite1() throws Exception {
-    List<String> keys = new ArrayList<String>();
+    List<ServerInstance> keys = new ArrayList<>();
     int numFutures = 100;
-    Map<String, KeyedFuture<String, String>> futureMap = new HashMap<String, KeyedFuture<String, String>>();
-    Map<String, String> expectedMessages = new HashMap<String, String>();
+    Map<ServerInstance, ServerResponseFuture<String>> futureMap = new HashMap<>();
+    Map<ServerInstance, String> expectedMessages = new HashMap<>();
     for (int i = 0; i < numFutures; i++) {
-      String key = "key_" + i;
+      ServerInstance key = new ServerInstance("localhost:" + i);
       keys.add(key);
-      AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key, "");
+      AsyncResponseFuture<String> future = new AsyncResponseFuture<>(key, "");
       futureMap.put(key, future);
     }
-    CompositeFuture<String, String> compositeFuture =
-        new CompositeFuture<String, String>("test", GatherModeOnError.AND);
+    CompositeFuture<String> compositeFuture =
+        new CompositeFuture<String>("test", GatherModeOnError.AND);
     compositeFuture.start(futureMap.values());
     ResponseCompositeFutureClientRunnerListener runner =
         new ResponseCompositeFutureClientRunnerListener(compositeFuture);
@@ -69,8 +68,8 @@ public class CompositeFutureTest {
     // Send response for underlying futures
     for (int i = 0; i < numFutures; i++) {
       String message = "dummy Message_" + i;
-      String k = "key_" + i;
-      AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>) futureMap.get(k);
+      ServerInstance k = new ServerInstance("localhost:" + i);
+      AsyncResponseFuture<String> future = (AsyncResponseFuture<String>) futureMap.get(k);
       future.onSuccess(message);
       expectedMessages.put(k, message);
     }
@@ -80,12 +79,12 @@ public class CompositeFutureTest {
     Assert.assertTrue(runner.isDone(), "Composite Is Done ? ");
     Assert.assertTrue(runner.getError().isEmpty(), "Composite No Error :");
 
-    Map<String, String> runnerResponse = runner.getMessage();
-    Map<String, String> listenerResponse = listener.getMessage();
+    Map<ServerInstance, String> runnerResponse = runner.getMessage();
+    Map<ServerInstance, String> listenerResponse = listener.getMessage();
 
     for (int i = 0; i < numFutures; i++) {
-      String k = "key_" + i;
-      AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>) futureMap.get(k);
+      ServerInstance k = new ServerInstance("localhost:" + i);
+      AsyncResponseFuture<String> future = (AsyncResponseFuture<String>) futureMap.get(k);
       Assert.assertFalse(future.isCancelled(), "Cancelled ?");
       Assert.assertTrue(future.isDone(), "Is Done ? ");
       Assert.assertEquals(future.getOne(), expectedMessages.get(k), "Reponse :");
@@ -106,17 +105,17 @@ public class CompositeFutureTest {
    * @throws Exception
    */
   public void testMultiFutureComposite2() throws Exception {
-    List<String> keys = new ArrayList<String>();
+    List<ServerInstance> keys = new ArrayList<>();
     int numFutures = 100;
-    Map<String, KeyedFuture<String, String>> futureMap = new HashMap<String, KeyedFuture<String, String>>();
-    Map<String, Exception> expectedErrors = new HashMap<String, Exception>();
+    Map<ServerInstance, ServerResponseFuture<String>> futureMap = new HashMap<>();
+    Map<ServerInstance, Exception> expectedErrors = new HashMap<>();
     for (int i = 0; i < numFutures; i++) {
-      String key = "key_" + i;
+      ServerInstance key = new ServerInstance("localhost:" + i);
       keys.add(key);
-      AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key, "");
+      AsyncResponseFuture<String> future = new AsyncResponseFuture<>(key, "");
       futureMap.put(key, future);
     }
-    CompositeFuture<String, String> compositeFuture = new CompositeFuture<String, String>("a", GatherModeOnError.AND);
+    CompositeFuture<String> compositeFuture = new CompositeFuture<>("a", GatherModeOnError.AND);
     compositeFuture.start(futureMap.values());
     ResponseCompositeFutureClientRunnerListener runner =
         new ResponseCompositeFutureClientRunnerListener(compositeFuture);
@@ -132,9 +131,9 @@ public class CompositeFutureTest {
     // Send response for underlying futures
     for (int i = 0; i < numFutures; i++) {
       Exception expectedError = new Exception("error processing_" + i);
-      String k = "key_" + i;
-      KeyedFuture<String, String> future = futureMap.get(k);
-      ((AsyncResponseFuture<String, String>) future).onError(expectedError);
+      ServerInstance k = new ServerInstance("localhost:" + i);
+      ServerResponseFuture<String> future = futureMap.get(k);
+      ((AsyncResponseFuture<String>) future).onError(expectedError);
       expectedErrors.put(k, expectedError);
     }
 
@@ -143,12 +142,12 @@ public class CompositeFutureTest {
     Assert.assertTrue(runner.isDone(), "Composite Is Done ? ");
     Assert.assertTrue(runner.getMessage().isEmpty(), "Composite No Response :");
 
-    Map<String, Throwable> runnerException = runner.getError();
-    Map<String, Throwable> listenerException = listener.getError();
+    Map<ServerInstance, Throwable> runnerException = runner.getError();
+    Map<ServerInstance, Throwable> listenerException = listener.getError();
 
     for (int i = 0; i < numFutures; i++) {
-      String k = "key_" + i;
-      AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>) futureMap.get(k);
+      ServerInstance k = new ServerInstance("localhost:" + i);
+      AsyncResponseFuture<String> future = (AsyncResponseFuture<String>) futureMap.get(k);
       Assert.assertFalse(future.isCancelled(), "Cancelled ?");
       Assert.assertTrue(future.isDone(), "Is Done ? ");
       Assert.assertEquals(future.getError().values().iterator().next(), expectedErrors.get(k), "Error :");
@@ -170,17 +169,17 @@ public class CompositeFutureTest {
    */
   public void testMultiFutureComposite3() throws Exception {
 
-    List<String> keys = new ArrayList<String>();
+    List<ServerInstance> keys = new ArrayList<>();
     int numFutures = 100;
     int numSuccessFutures = 50;
-    Map<String, KeyedFuture<String, String>> futureMap = new HashMap<String, KeyedFuture<String, String>>();
+    Map<ServerInstance, ServerResponseFuture<String>> futureMap = new HashMap<>();
     for (int i = 0; i < numFutures; i++) {
-      String key = "key_" + i;
+      ServerInstance key = new ServerInstance("localhost:" + i);
       keys.add(key);
-      AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key, "");
+      AsyncResponseFuture<String> future = new AsyncResponseFuture<String>(key, "");
       futureMap.put(key, future);
     }
-    CompositeFuture<String, String> compositeFuture = new CompositeFuture<String, String>("a", GatherModeOnError.AND);
+    CompositeFuture<String> compositeFuture = new CompositeFuture<>("a", GatherModeOnError.AND);
     compositeFuture.start(futureMap.values());
     ResponseCompositeFutureClientRunnerListener runner =
         new ResponseCompositeFutureClientRunnerListener(compositeFuture);
@@ -198,16 +197,16 @@ public class CompositeFutureTest {
     // Send response for some of the underlying futures
     for (int i = 0; i < numSuccessFutures; i++) {
       String message = "dummy Message_" + i;
-      String k = "key_" + i;
-      AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>) futureMap.get(k);
+      ServerInstance k = new ServerInstance("localhost:" + i);
+      AsyncResponseFuture<String> future = (AsyncResponseFuture<String>) futureMap.get(k);
       future.onSuccess(message);
     }
 
     // Send exception for some of the underlying futures
     for (int i = numSuccessFutures; i < numFutures; i++) {
       Exception expectedError = new Exception("error processing_" + i);
-      String k = "key_" + i;
-      AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>) futureMap.get(k);
+      ServerInstance k = new ServerInstance("localhost:" + i);
+      AsyncResponseFuture<String> future = (AsyncResponseFuture<String>) futureMap.get(k);
       future.onError(expectedError);
     }
 
@@ -218,8 +217,8 @@ public class CompositeFutureTest {
     Assert.assertTrue(runner.getError().isEmpty(), "Composite No Error :");
 
     for (int i = 0; i < numFutures; i++) {
-      String k = "key_" + i;
-      AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>) futureMap.get(k);
+      ServerInstance k = new ServerInstance("localhost:" + i);
+      AsyncResponseFuture<String> future = (AsyncResponseFuture<String>) futureMap.get(k);
       Assert.assertTrue(future.isCancelled(), "Cancelled ?");
       Assert.assertTrue(future.isDone(), "Is Done ? ");
       Assert.assertNull(future.get(), "No Reponse :");
@@ -240,20 +239,20 @@ public class CompositeFutureTest {
    * @throws Exception
    */
   public void testMultiFutureComposite4() throws Exception {
-    List<String> keys = new ArrayList<String>();
+    List<ServerInstance> keys = new ArrayList<>();
     int numFutures = 100;
     int numSuccessFutures = 5;
-    Map<String, KeyedFuture<String, String>> futureMap = new HashMap<String, KeyedFuture<String, String>>();
-    Map<String, String> expectedMessages = new HashMap<String, String>();
+    Map<ServerInstance, ServerResponseFuture<String>> futureMap = new HashMap<>();
+    Map<ServerInstance, String> expectedMessages = new HashMap<>();
 
     for (int i = 0; i < numFutures; i++) {
-      String key = "key_" + i;
+      ServerInstance key = new ServerInstance("localhost:" + i);
       keys.add(key);
-      AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key, "");
+      AsyncResponseFuture<String> future = new AsyncResponseFuture<>(key, "");
       futureMap.put(key, future);
     }
-    CompositeFuture<String, String> compositeFuture =
-        new CompositeFuture<String, String>("a", GatherModeOnError.SHORTCIRCUIT_AND); //stopOnError = true
+    CompositeFuture<String> compositeFuture =
+        new CompositeFuture<>("a", GatherModeOnError.SHORTCIRCUIT_AND); //stopOnError = true
     compositeFuture.start(futureMap.values());
     ResponseCompositeFutureClientRunnerListener runner =
         new ResponseCompositeFutureClientRunnerListener(compositeFuture);
@@ -269,16 +268,16 @@ public class CompositeFutureTest {
     // Send response for underlying futures
     for (int i = 0; i < numSuccessFutures; i++) {
       String message = "dummy Message_" + i;
-      String k = "key_" + i;
-      AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>) futureMap.get(k);
+      ServerInstance k = new ServerInstance("localhost:" + i);
+      AsyncResponseFuture<String> future = (AsyncResponseFuture<String>) futureMap.get(k);
       future.onSuccess(message);
       expectedMessages.put(k, message);
     }
 
     // Send error. This should complete the future/.
-    String errorKey = "key_" + numSuccessFutures;
+    ServerInstance errorKey = new ServerInstance("localhost:" + numSuccessFutures);
     Exception expectedException = new Exception("Exception");
-    AsyncResponseFuture<String, String> f = (AsyncResponseFuture<String, String>) futureMap.get(errorKey);
+    AsyncResponseFuture<String> f = (AsyncResponseFuture<String>) futureMap.get(errorKey);
     f.onError(expectedException);
     runner.waitForDone();
 
@@ -287,14 +286,14 @@ public class CompositeFutureTest {
     Assert.assertFalse(listener.isCancelled(), "listener Cancelled ?");
     Assert.assertTrue(listener.isDone(), "listener Is Done ? ");
 
-    Map<String, Throwable> runnerException = runner.getError();
-    Map<String, String> runnerMessages = runner.getMessage();
-    Map<String, String> listenerMessages = listener.getMessage();
-    Map<String, Throwable> listenerException = listener.getError();
+    Map<ServerInstance, Throwable> runnerException = runner.getError();
+    Map<ServerInstance, String> runnerMessages = runner.getMessage();
+    Map<ServerInstance, String> listenerMessages = listener.getMessage();
+    Map<ServerInstance, Throwable> listenerException = listener.getError();
 
     for (int i = 0; i < numSuccessFutures; i++) {
-      String k = "key_" + i;
-      AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>) futureMap.get(k);
+      ServerInstance k = new ServerInstance("localhost:" + i);
+      AsyncResponseFuture<String> future = (AsyncResponseFuture<String>) futureMap.get(k);
       Assert.assertFalse(future.isCancelled(), "Cancelled ?");
       Assert.assertTrue(future.isDone(), "Is Done ? ");
       Assert.assertEquals(future.getOne(), expectedMessages.get(k), "Reponse :");
@@ -303,8 +302,8 @@ public class CompositeFutureTest {
       Assert.assertEquals(listenerMessages.get(k), expectedMessages.get(k), "Message_" + i);
     }
 
-    String key1 = "key_" + numSuccessFutures;
-    f = (AsyncResponseFuture<String, String>) futureMap.get(key1);
+    ServerInstance key1 = new ServerInstance("localhost:" + numSuccessFutures);
+    f = (AsyncResponseFuture<String>) futureMap.get(key1);
     Assert.assertFalse(f.isCancelled(), "Cancelled ?");
     Assert.assertTrue(f.isDone(), "Is Done ? ");
     Assert.assertEquals(f.getError().values().iterator().next(), expectedException, "Exception :");
@@ -313,8 +312,8 @@ public class CompositeFutureTest {
     Assert.assertEquals(listenerException.get(key1), expectedException, "Exception_" + numSuccessFutures);
 
     for (int i = numSuccessFutures + 1; i < numFutures; i++) {
-      String k = "key_" + i;
-      AsyncResponseFuture<String, String> future = (AsyncResponseFuture<String, String>) futureMap.get(k);
+      ServerInstance k = new ServerInstance("localhost:" + i);
+      AsyncResponseFuture<String> future = (AsyncResponseFuture<String>) futureMap.get(k);
       Assert.assertTrue(future.isCancelled(), "Cancelled ?");
       Assert.assertTrue(future.isDone(), "Is Done ? ");
       Assert.assertNull(future.get(), "No Reponse :");
@@ -335,15 +334,15 @@ public class CompositeFutureTest {
    */
   public void testSingleFutureComposite() throws Exception {
 
-    String key1 = "localhost:8080";
+    ServerInstance key1 = new ServerInstance("localhost:8080");
 
     //Cancelled Future. Future Client calls get() and another listens before cancel().
     // A response and exception arrives after cancel but they should be discarded.
     {
-      AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key1, "");
-      Map<String, KeyedFuture<String, String>> futureMap = new HashMap<String, KeyedFuture<String, String>>();
+      AsyncResponseFuture<String> future = new AsyncResponseFuture<>(key1, "");
+      Map<ServerInstance, ServerResponseFuture<String>> futureMap = new HashMap<>();
       futureMap.put(key1, future);
-      CompositeFuture<String, String> compositeFuture = new CompositeFuture<String, String>("a", GatherModeOnError.AND);
+      CompositeFuture<String> compositeFuture = new CompositeFuture<>("a", GatherModeOnError.AND);
       compositeFuture.start(futureMap.values());
       ResponseCompositeFutureClientRunnerListener runner =
           new ResponseCompositeFutureClientRunnerListener(compositeFuture);
@@ -381,10 +380,10 @@ public class CompositeFutureTest {
     //Cancelled Future. Future Client calls get() and another listens after cancel()
     // A response and exception arrives after cancel but they should be discarded.
     {
-      AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key1, "");
-      Map<String, KeyedFuture<String, String>> futureMap = new HashMap<String, KeyedFuture<String, String>>();
+      AsyncResponseFuture<String> future = new AsyncResponseFuture<>(key1, "");
+      Map<ServerInstance, ServerResponseFuture<String>> futureMap = new HashMap<>();
       futureMap.put(key1, future);
-      CompositeFuture<String, String> compositeFuture = new CompositeFuture<String, String>("a", GatherModeOnError.AND);
+      CompositeFuture<String> compositeFuture = new CompositeFuture<>("a", GatherModeOnError.AND);
       compositeFuture.start(futureMap.values());
       ResponseCompositeFutureClientRunnerListener runner =
           new ResponseCompositeFutureClientRunnerListener(compositeFuture);
@@ -422,10 +421,10 @@ public class CompositeFutureTest {
     // Throw Exception. Future Client calls get() and another listens before exception
     // A response and cancellation arrives after exception but they should be discarded.
     {
-      AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key1, "");
-      Map<String, KeyedFuture<String, String>> futureMap = new HashMap<String, KeyedFuture<String, String>>();
+      AsyncResponseFuture<String> future = new AsyncResponseFuture<>(key1, "");
+      Map<ServerInstance, ServerResponseFuture<String>> futureMap = new HashMap<>();
       futureMap.put(key1, future);
-      CompositeFuture<String, String> compositeFuture = new CompositeFuture<String, String>("a", GatherModeOnError.AND);
+      CompositeFuture<String> compositeFuture = new CompositeFuture<>("a", GatherModeOnError.AND);
       compositeFuture.start(futureMap.values());
       ResponseCompositeFutureClientRunnerListener runner =
           new ResponseCompositeFutureClientRunnerListener(compositeFuture);
@@ -463,10 +462,10 @@ public class CompositeFutureTest {
     // Throw Exception. Future Client calls get() and another listens after exception
     // A response and cancellation arrives after exception but they should be discarded.
     {
-      AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key1, "");
-      Map<String, KeyedFuture<String, String>> futureMap = new HashMap<String, KeyedFuture<String, String>>();
+      AsyncResponseFuture<String> future = new AsyncResponseFuture<>(key1, "");
+      Map<ServerInstance, ServerResponseFuture<String>> futureMap = new HashMap<>();
       futureMap.put(key1, future);
-      CompositeFuture<String, String> compositeFuture = new CompositeFuture<String, String>("a", GatherModeOnError.AND);
+      CompositeFuture<String> compositeFuture = new CompositeFuture<>("a", GatherModeOnError.AND);
       compositeFuture.start(futureMap.values());
       ResponseCompositeFutureClientRunnerListener runner =
           new ResponseCompositeFutureClientRunnerListener(compositeFuture);
@@ -504,10 +503,10 @@ public class CompositeFutureTest {
     // Get Response. Future Client calls get() and another listens before response
     // An exception and cancellation arrives after exception but they should be discarded.
     {
-      AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key1, "");
-      Map<String, KeyedFuture<String, String>> futureMap = new HashMap<String, KeyedFuture<String, String>>();
+      AsyncResponseFuture<String> future = new AsyncResponseFuture<>(key1, "");
+      Map<ServerInstance, ServerResponseFuture<String>> futureMap = new HashMap<>();
       futureMap.put(key1, future);
-      CompositeFuture<String, String> compositeFuture = new CompositeFuture<String, String>("a", GatherModeOnError.AND);
+      CompositeFuture<String> compositeFuture = new CompositeFuture<>("a", GatherModeOnError.AND);
       compositeFuture.start(futureMap.values());
       ResponseCompositeFutureClientRunnerListener runner =
           new ResponseCompositeFutureClientRunnerListener(compositeFuture);
@@ -545,10 +544,10 @@ public class CompositeFutureTest {
     // Get Response. Future Client calls get() and another listens after response
     // An exception and cancellation arrives after exception but they should be discarded.
     {
-      AsyncResponseFuture<String, String> future = new AsyncResponseFuture<String, String>(key1, "");
-      Map<String, KeyedFuture<String, String>> futureMap = new HashMap<String, KeyedFuture<String, String>>();
+      AsyncResponseFuture<String> future = new AsyncResponseFuture<>(key1, "");
+      Map<ServerInstance, ServerResponseFuture<String>> futureMap = new HashMap<>();
       futureMap.put(key1, future);
-      CompositeFuture<String, String> compositeFuture = new CompositeFuture<String, String>("a", GatherModeOnError.AND);
+      CompositeFuture<String> compositeFuture = new CompositeFuture<>("a", GatherModeOnError.AND);
       compositeFuture.start(futureMap.values());
       ResponseCompositeFutureClientRunnerListener runner =
           new ResponseCompositeFutureClientRunnerListener(compositeFuture);
@@ -590,13 +589,13 @@ public class CompositeFutureTest {
   private static class ResponseCompositeFutureClientRunnerListener implements Runnable {
     private boolean _isDone;
     private boolean _isCancelled;
-    private Map<String, String> _message;
-    private Map<String, Throwable> _errorMap;
-    private final CompositeFuture<String, String> _future;
+    private Map<ServerInstance, String> _message;
+    private Map<ServerInstance, Throwable> _errorMap;
+    private final CompositeFuture<String> _future;
     private final CountDownLatch _latch = new CountDownLatch(1);
     private final CountDownLatch _endLatch = new CountDownLatch(1);
 
-    public ResponseCompositeFutureClientRunnerListener(CompositeFuture<String, String> f) {
+    public ResponseCompositeFutureClientRunnerListener(CompositeFuture<String> f) {
       _future = f;
     }
 
@@ -612,7 +611,7 @@ public class CompositeFutureTest {
     public synchronized void run() {
       LOGGER.info("Running Future runner !!");
 
-      Map<String, String> message = null;
+      Map<ServerInstance, String> message = null;
 
       try {
         _latch.countDown();
@@ -644,15 +643,15 @@ public class CompositeFutureTest {
       return _isCancelled;
     }
 
-    public Map<String, String> getMessage() {
+    public Map<ServerInstance, String> getMessage() {
       return _message;
     }
 
-    public Map<String, Throwable> getError() {
+    public Map<ServerInstance, Throwable> getError() {
       return _errorMap;
     }
 
-    public CompositeFuture<String, String> getFuture() {
+    public CompositeFuture<String> getFuture() {
       return _future;
     }
   }
