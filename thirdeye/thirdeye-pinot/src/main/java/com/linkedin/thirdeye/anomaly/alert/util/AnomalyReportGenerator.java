@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomaly.alert.util;
 
+import com.linkedin.thirdeye.detector.email.filter.PerformanceEvaluationUtil;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -116,11 +117,6 @@ public class AnomalyReportGenerator {
     } else {
       DateTimeZone timeZone = DateTimeZone.forTimeZone(AlertTaskRunnerV2.DEFAULT_TIME_ZONE);
       Set<String> metrics = new HashSet<>();
-      int alertedAnomalies = 0;
-      int feedbackCollected = 0;
-      int trueAlert = 0;
-      int falseAlert = 0;
-      int nonActionable = 0;
 
       List<AnomalyReportDTO> anomalyReportDTOList = new ArrayList<>();
       List<String> anomalyIds = new ArrayList<>();
@@ -130,17 +126,6 @@ public class AnomalyReportGenerator {
         datasets.add(anomaly.getCollection());
 
         AnomalyFeedback feedback = anomaly.getFeedback();
-        if (feedback != null) {
-          feedbackCollected++;
-          if (feedback.getFeedbackType().equals(AnomalyFeedbackType.ANOMALY)) {
-            trueAlert++;
-          } else if (feedback.getFeedbackType()
-              .equals(AnomalyFeedbackType.NOT_ANOMALY)) {
-            falseAlert++;
-          } else {
-            nonActionable++;
-          }
-        }
 
         String feedbackVal = getFeedbackValue(feedback);
 
@@ -160,10 +145,6 @@ public class AnomalyReportGenerator {
             getTimezoneString(timeZone)
         );
 
-
-        if (anomaly.isNotified()) {
-          alertedAnomalies++;
-        }
         // include notified alerts only in the email
         if (includeSentAnomaliesOnly) {
           if (anomaly.isNotified()) {
@@ -176,6 +157,8 @@ public class AnomalyReportGenerator {
         }
       }
 
+      PerformanceEvaluationUtil performanceEvaluationUtil = new PerformanceEvaluationUtil(null, anomalies);
+
       HtmlEmail email = new HtmlEmail();
 
       DataReportHelper.DateFormatMethod dateFormatMethod = new DataReportHelper.DateFormatMethod(timeZone);
@@ -187,20 +170,21 @@ public class AnomalyReportGenerator {
       templateData.put("endTime", getDateString(endTime, timeZone));
       templateData.put("anomalyCount", anomalies.size());
       templateData.put("metricsCount", metrics.size());
-      templateData.put("notifiedCount", alertedAnomalies);
-      templateData.put("feedbackCount", feedbackCollected);
-      templateData.put("trueAlertCount", trueAlert);
-      templateData.put("falseAlertCount", falseAlert);
-      templateData.put("nonActionableCount", nonActionable);
+      templateData.put("notifiedCount", performanceEvaluationUtil.getTotalReports());
+      templateData.put("feedbackCount", performanceEvaluationUtil.getTotalResponses());
+      templateData.put("trueAlertCount", performanceEvaluationUtil.getQualifiedTrueAnomaly());
+      templateData.put("falseAlertCount", performanceEvaluationUtil.getFalseAlarm());
+      templateData.put("nonActionableCount", performanceEvaluationUtil.getQualifiedTrueAnomalyNotActionable());
       templateData.put("anomalyDetails", anomalyReportDTOList);
       templateData.put("alertConfigName", alertConfigName);
       templateData.put("includeSummary", includeSummary);
       templateData.put("reportGenerationTimeMillis", System.currentTimeMillis());
       templateData.put("dashboardHost", configuration.getDashboardHost());
       templateData.put("anomalyIds", Joiner.on(",").join(anomalyIds));
-      if(trueAlert + falseAlert > 0 && trueAlert > 0) {
-        templateData.put("precision", trueAlert / (double) (trueAlert + falseAlert));
-        templateData.put("recall", trueAlert / (double) (trueAlert + 0)); // TODO falseNegatives
+      if(performanceEvaluationUtil.getTotalResponses() > 0) {
+        templateData.put("precision", performanceEvaluationUtil.getPrecisionInResponse());
+        templateData.put("recall", performanceEvaluationUtil.getRecall());
+        templateData.put("falseNegative", performanceEvaluationUtil.getFalseNegativeRate());
       }
 
       String imgPath = null;

@@ -17,7 +17,7 @@ import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
-import com.linkedin.thirdeye.detector.email.filter.AlertFilterEvaluationUtil;
+import com.linkedin.thirdeye.detector.email.filter.PerformanceEvaluationUtil;
 import com.linkedin.thirdeye.util.SeverityComputationUtil;
 
 import java.util.ArrayList;
@@ -368,7 +368,7 @@ public class DetectionJobResource {
 
     // create alert filter and evaluator
     AlertFilter alertFilter = alertFilterFactory.fromSpec(anomalyFunctionSpec.getAlertFilter());
-    AlertFilterEvaluationUtil evaluator = new AlertFilterEvaluationUtil(alertFilter);
+    PerformanceEvaluationUtil evaluator = new PerformanceEvaluationUtil(alertFilter, null);
 
     // create alert filter auto tune
     AlertFilterAutoTune alertFilterAutotune = alertFilterAutotuneFactory.fromSpec(autoTuneType);
@@ -378,12 +378,12 @@ public class DetectionJobResource {
     double currRecall = 0;
     try {
       //evaluate current alert filter (calculate current precision and recall)
-      evaluator.updateWeighedPrecisionAndRecall(anomalyResultDTOS);
+      evaluator.init(anomalyResultDTOS);
       LOG.info("AlertFilter of Type {}, has been evaluated with precision: {}, recall: {}", alertFilter.getClass().toString(), evaluator.getPrecision(), evaluator.getRecall());
     } catch (Exception e){
       LOG.info(e.getMessage());
     }
-    currPrecision = evaluator.getPrecision();
+    currPrecision = evaluator.getWeightedPrecision();
     currRecall = evaluator.getRecall();
     try{
       // get tuned alert filter
@@ -507,19 +507,12 @@ public class DetectionJobResource {
 
     // create alert filter and evaluator
     AlertFilter alertFilter = alertFilterFactory.fromSpec(anomalyFunctionSpec.getAlertFilter());
-    AlertFilterEvaluationUtil evaluator = new AlertFilterEvaluationUtil(alertFilter);
+    //evaluate current alert filter (calculate current precision and recall)
+    PerformanceEvaluationUtil evaluator = new PerformanceEvaluationUtil(alertFilter, anomalyResultDTOS);
 
-    try{
-      //evaluate current alert filter (calculate current precision and recall)
-      evaluator.updateWeighedPrecisionAndRecall(anomalyResultDTOS);
-      LOG.info("AlertFilter of Type {}, has been evaluated with precision: {}, recall:{}", alertFilter.getClass().toString(),
-          evaluator.getPrecision(), evaluator.getRecall());
-    } catch (Exception e) {
-      LOG.warn("Updating precision and recall failed because: {}", e.getMessage());
-    }
+    LOG.info("AlertFilter of Type {}, has been evaluated with precision: {}, recall:{}", alertFilter.getClass().toString(),
+        evaluator.getWeightedPrecision(), evaluator.getRecall());
 
-    // get anomaly summary from merged anomaly results
-    evaluator.updateFeedbackSummary(anomalyResultDTOS);
     return Response.ok(evaluator.toProperties().toString()).build();
   }
 
@@ -551,14 +544,8 @@ public class DetectionJobResource {
 
     Map<String, String> alertFilterParams = target.getConfiguration();
     AlertFilter alertFilter = alertFilterFactory.fromSpec(alertFilterParams);
-    AlertFilterEvaluationUtil evaluator = new AlertFilterEvaluationUtil(alertFilter);
+    PerformanceEvaluationUtil evaluator = new PerformanceEvaluationUtil(alertFilter, anomalyResultDTOS);
 
-    try{
-      evaluator.updateWeighedPrecisionAndRecall(anomalyResultDTOS);
-    } catch (Exception e){
-      LOG.warn("Updating precision and recall failed");
-    }
-    evaluator.updateFeedbackSummary(anomalyResultDTOS);
     return Response.ok(evaluator.toProperties().toString()).build();
   }
 
