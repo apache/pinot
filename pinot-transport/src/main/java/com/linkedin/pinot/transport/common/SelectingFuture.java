@@ -142,7 +142,7 @@ public class SelectingFuture<K, T> extends AbstractCompositeListenableFuture<K, 
   }
 
   @Override
-  protected boolean processFutureResult(String name, Map<K, T> response, Map<K, Throwable> error, long durationMillis) {
+  protected boolean processFutureResult(K name, Map<K, T> response, Map<K, Throwable> error, long durationMillis) {
     // Add an argument here to get the time of completion of the future.
     boolean done = false;
     if ((null != response)) {
@@ -162,5 +162,10 @@ public class SelectingFuture<K, T> extends AbstractCompositeListenableFuture<K, 
   @Override
   public String getName() {
     return _name;
+  }
+
+  @Override
+  public K getKey() {
+    return null;
   }
 }

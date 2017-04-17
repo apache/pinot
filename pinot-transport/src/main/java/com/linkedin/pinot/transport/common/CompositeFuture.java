@@ -27,6 +27,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.linkedin.pinot.common.response.ServerInstance;
 
 
 /**
@@ -183,7 +184,7 @@ public class CompositeFuture<K, V> extends AbstractCompositeListenableFuture<K, 
     return Collections.unmodifiableMap(_responseTimeMap);
   }
   @Override
-  protected boolean processFutureResult(String name, Map<K, V> response, Map<K, Throwable> error, long durationMillis) {
+  protected boolean processFutureResult(K name, Map<K, V> response, Map<K, Throwable> error, long durationMillis) {
     // Get the response time and create another map that can be invoked to get the end time when responses were received for each server.
     boolean ret = false;
     if (null != response) {
@@ -198,13 +199,18 @@ public class CompositeFuture<K, V> extends AbstractCompositeListenableFuture<K, 
       }
     }
     // TODO May be limit the number of entries here to 10? We don't want to create too much garbage on the broker.
-    _responseTimeMap.put(name, durationMillis);
+    _responseTimeMap.put(((ServerInstance)(name)).getShortHostName(), durationMillis);
     return ret;
   }
 
   @Override
   public String getName() {
     return _name;
+  }
+
+  @Override
+  public K getKey() {
+    return null;
   }
 
   public int getNumFutures() {

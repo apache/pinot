@@ -136,15 +136,15 @@ public class ScatterGatherImpl implements ScatterGather {
 
     for (Entry<ServerInstance, SegmentIdSet> e : mp.entrySet()) {
       ServerInstance server = e.getKey();
-      String serverName = server.toString();
+      String shortServerName = server.getShortHostName();
       if (isOfflineTable != null) {
         if (isOfflineTable) {
-          serverName += ScatterGatherStats.OFFLINE_TABLE_SUFFIX;
+          shortServerName += ScatterGatherStats.OFFLINE_TABLE_SUFFIX;
         } else {
-          serverName += ScatterGatherStats.REALTIME_TABLE_SUFFIX;
+          shortServerName += ScatterGatherStats.REALTIME_TABLE_SUFFIX;
         }
       }
-      scatterGatherStats.initServer(serverName);
+      scatterGatherStats.initServer(shortServerName);
       SingleRequestHandler handler =
           new SingleRequestHandler(_connPool, server, ctxt.getRequest(), e.getValue(), ctxt.getTimeRemaining(),
               requestDispatchLatch, brokerMetrics);
@@ -166,17 +166,17 @@ public class ScatterGatherImpl implements ScatterGather {
           new ArrayList<KeyedFuture<ServerInstance, ByteBuf>>();
       for (SingleRequestHandler h : handlers) {
         responseFutures.add(h.getResponseFuture());
-        String serverName = h.getServer().toString();
+        String shortServerName = h.getServer().getShortHostName();
         if (isOfflineTable != null) {
           if (isOfflineTable) {
-            serverName += ScatterGatherStats.OFFLINE_TABLE_SUFFIX;
+            shortServerName += ScatterGatherStats.OFFLINE_TABLE_SUFFIX;
           } else {
-            serverName += ScatterGatherStats.REALTIME_TABLE_SUFFIX;
+            shortServerName += ScatterGatherStats.REALTIME_TABLE_SUFFIX;
           }
         }
-        scatterGatherStats.setSendStartTimeMillis(serverName, h.getConnStartTimeMillis());
-        scatterGatherStats.setConnStartTimeMillis(serverName, h.getStartDelayMillis());
-        scatterGatherStats.setSendCompletionTimeMillis(serverName, h.getSendCompletionTimeMillis());
+        scatterGatherStats.setSendStartTimeMillis(shortServerName, h.getConnStartTimeMillis());
+        scatterGatherStats.setConnStartTimeMillis(shortServerName, h.getStartDelayMillis());
+        scatterGatherStats.setSendCompletionTimeMillis(shortServerName, h.getSendCompletionTimeMillis());
       }
       response.start(responseFutures);
     } else {

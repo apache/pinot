@@ -177,7 +177,7 @@ public abstract class AbstractCompositeListenableFuture<K, T> implements KeyedFu
    * @param durationMillis
    * @return true if processing done
    */
-  protected abstract boolean processFutureResult(String name, Map<K, T> responses, Map<K, Throwable> error,
+  protected abstract boolean processFutureResult(K name, Map<K, T> responses, Map<K, Throwable> error,
       long durationMillis);
 
   protected void addResponseFutureListener(KeyedFuture<K, T> future) {
@@ -217,7 +217,7 @@ public abstract class AbstractCompositeListenableFuture<K, T> implements KeyedFu
 
       // Since the future is done, it is safe to look at error results
       Map<K, Throwable> error = _future.getError();
-      boolean done = processFutureResult(_future.getName(), response, error, _future.getDurationMillis());
+      boolean done = processFutureResult(_future.getKey(), response, error, _future.getDurationMillis());
 
       if (done) {
         setDone(State.DONE);

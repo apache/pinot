@@ -327,6 +327,10 @@ public class AsyncResponseFuture<K, T> implements Callback<T>, KeyedFuture<K, T>
     return _key.toString();
   }
 
+  public K getKey() {
+    return _key;
+  }
+
   public State getState() {
     return _state;
   }

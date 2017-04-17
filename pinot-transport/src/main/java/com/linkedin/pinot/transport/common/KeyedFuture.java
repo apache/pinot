@@ -51,6 +51,8 @@ public interface KeyedFuture<K, V> extends ListenableFuture<Map<K, V>> {
    */
   public String getName();
 
+  public K getKey();
+
   /**
    * Returns the duration between when the future was created and when its result was available.
    * @return
