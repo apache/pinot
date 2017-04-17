@@ -114,7 +114,9 @@ public class MetricDimensionScorer {
     df.addSeries(CONTRIBUTION, contrib);
     df.setIndex(DIMENSION);
 
-    return df.groupBy(DIMENSION).aggregate(CONTRIBUTION, DoubleSeries.SUM);
+    DataFrame agg = df.groupBy(DIMENSION).aggregate(CONTRIBUTION, DoubleSeries.SUM);
+    agg.addSeries(Series.GROUP_KEY, agg.getDoubles(Series.GROUP_VALUE).normalize());
+    return agg;
   }
 
 //  private static DataFrame aggregateContribution(DataFrame aggregate, DataFrame df, final BaselineEntity baseline) {

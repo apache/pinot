@@ -80,15 +80,16 @@ public class MetricDimensionPipeline implements Pipeline {
 
     List<MetricDimensionEntity> entities = new ArrayList<>();
     for(Map.Entry<String, MetricConfigDTO> entry : metrics.entrySet()) {
+      List<MetricDimensionEntity> local = new ArrayList<>();
       MetricConfigDTO mdto = entry.getValue();
       DatasetConfigDTO ddto = datasets.get(entry.getKey());
 
       for(String dim : ddto.getDimensions()) {
-        entities.add(MetricDimensionEntity.fromDTO(1.0, mdto, ddto, dim));
+        local.add(MetricDimensionEntity.fromDTO(1.0, mdto, ddto, dim));
       }
 
       try {
-        entities.addAll(scorer.score(entities, current, baseline));
+        entities.addAll(scorer.score(local, current, baseline));
       } catch (Exception e) {
         // TODO external exception handling?
         LOG.warn("Could not score entity '{}'", entry.getKey());
