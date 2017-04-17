@@ -476,7 +476,14 @@ public class AnomalyResource {
 
     // Update function configuration
     targetFunction.updateProperties(autotuneConfigDTO.getConfiguration());
+    targetFunction.setActive(true);
     anomalyFunctionDAO.update(targetFunction);
+
+    // Dis-activate original function
+    if(isCloneFunction) {
+      originalFunction.setActive(false);
+      anomalyFunctionDAO.update(originalFunction);
+    }
 
     return Response.ok(targetFunction).build();
   }
