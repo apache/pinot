@@ -77,8 +77,14 @@ public class MetricDimensionScorer {
 
     List<MetricDimensionEntity> scores = new ArrayList<>();
     for(int i=0; i<df.size(); i++) {
-      MetricDimensionEntity e = mdMap.get(df.getString(Series.GROUP_KEY, i));
-      MetricDimensionEntity n = e.withScore(df.getDouble(Series.GROUP_VALUE, i));
+      String urn = df.getString(DIMENSION, i);
+      MetricDimensionEntity e = mdMap.get(urn);
+      if(e == null) {
+        LOG.warn("Could not resolve MetricDimensionEntity '{}'. Skipping.", urn);
+        continue;
+      }
+
+      MetricDimensionEntity n = e.withScore(df.getDouble(CONTRIBUTION, i));
       scores.add(n);
     }
 
@@ -94,7 +100,7 @@ public class MetricDimensionScorer {
     olapClient.setMetricExpression(metricExpressions.get(0));
     olapClient.setCurrentStartInclusive(new DateTime(current.getStart(), DateTimeZone.forID(timezone)));
     olapClient.setCurrentEndExclusive(new DateTime(current.getEnd(), DateTimeZone.forID(timezone)));
-    olapClient.setBaselineStartInclusive(new DateTime(baseline.getEnd(), DateTimeZone.forID(timezone)));
+    olapClient.setBaselineStartInclusive(new DateTime(baseline.getStart(), DateTimeZone.forID(timezone)));
     olapClient.setBaselineEndExclusive(new DateTime(baseline.getEnd(), DateTimeZone.forID(timezone)));
     return olapClient;
   }
@@ -112,10 +118,10 @@ public class MetricDimensionScorer {
     DataFrame df = new DataFrame();
     df.addSeries(DIMENSION, dim);
     df.addSeries(CONTRIBUTION, contrib);
-    df.setIndex(DIMENSION);
 
     DataFrame agg = df.groupBy(DIMENSION).aggregate(CONTRIBUTION, DoubleSeries.SUM);
-    agg.addSeries(Series.GROUP_KEY, agg.getDoubles(Series.GROUP_VALUE).normalize());
+    DoubleSeries s = agg.getDoubles(CONTRIBUTION);
+    agg.addSeries(CONTRIBUTION, s.divide(s.sum()));
     return agg;
   }
 

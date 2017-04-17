@@ -20,31 +20,31 @@ public class LinearAggregator implements Aggregator {
 
   private static final String URN = "urn";
   private static final String SCORE = "score";
-  private static final String NORMALIZED = "normalized";
 
   @Override
   public List<Entity> aggregate(Map<String, PipelineResult> results) {
-    StringSeries.Builder urns = StringSeries.builder();
-    DoubleSeries.Builder normalized = DoubleSeries.builder();
+    StringSeries.Builder urnBuilder = StringSeries.builder();
+    DoubleSeries.Builder scoreBuilder = DoubleSeries.builder();
 
     for(PipelineResult r : results.values()) {
       DataFrame df = toDataFrame(r.getEntities());
-      urns.addSeries(df.get(URN));
-      if(allEqual(df.get(SCORE))) {
-        normalized.fillValues(df.size(), 1.0d);
-      } else {
-        normalized.addSeries(df.getDoubles(SCORE).normalize());
-      }
+      urnBuilder.addSeries(df.get(URN));
+
+      DoubleSeries s = df.getDoubles(SCORE);
+      scoreBuilder.addSeries(s.divide(s.sum()));
     }
 
+    StringSeries urns = urnBuilder.build();
+    DoubleSeries scores = scoreBuilder.build();
+
     DataFrame df = new DataFrame();
-    df.addSeries(URN, urns.build());
-    df.addSeries(NORMALIZED, normalized.build());
+    df.addSeries(URN, urns);
+    df.addSeries(SCORE, scores.divide(scores.sum()));
 
-    DataFrame grp = df.groupBy(URN).aggregate(NORMALIZED, DoubleSeries.SUM);
-    grp = grp.sortedBy(Series.GROUP_VALUE).reverse();
+    DataFrame grp = df.groupBy(URN).aggregate(SCORE, DoubleSeries.SUM);
+    grp = grp.sortedBy(SCORE).reverse();
 
-    return toEntities(grp, Series.GROUP_KEY, Series.GROUP_VALUE);
+    return toEntities(grp, URN, SCORE);
   }
 
   private static DataFrame toDataFrame(Collection<Entity> entities) {
@@ -57,10 +57,6 @@ public class LinearAggregator implements Aggregator {
       i++;
     }
     return new DataFrame().addSeries(URN, urns).addSeries(SCORE, scores);
-  }
-
-  private static boolean allEqual(Series score) {
-    return score.unique().size() <= 1;
   }
 
   private static List<Entity> toEntities(DataFrame df, String colUrn, String colScore) {
