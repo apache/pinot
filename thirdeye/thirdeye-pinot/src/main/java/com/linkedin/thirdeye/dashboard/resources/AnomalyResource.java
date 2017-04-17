@@ -316,11 +316,21 @@ public class AnomalyResource {
     TimeUnit dataGranularityUnit = dataGranularity.getUnit();
 
     // default window delay time = 10 hours
-    int windowDelayTime = 10;
-    TimeUnit windowDelayTimeUnit = TimeUnit.HOURS;
-
-    if(dataGranularityUnit.equals(TimeUnit.MINUTES) || dataGranularityUnit.equals(TimeUnit.HOURS)) {
-      windowDelayTime = 4;
+    int windowDelayTime;
+    TimeUnit windowDelayTimeUnit;
+    switch (dataGranularityUnit) {
+    case MINUTES:
+      windowDelayTime = 30;
+      windowDelayTimeUnit = TimeUnit.MINUTES;
+      break;
+    case DAYS:
+      windowDelayTime = 0;
+      windowDelayTimeUnit = TimeUnit.DAYS;
+      break;
+    case HOURS:
+    default:
+      windowDelayTime = 10;
+      windowDelayTimeUnit = TimeUnit.HOURS;
     }
     anomalyFunctionSpec.setWindowDelayUnit(windowDelayTimeUnit);
     anomalyFunctionSpec.setWindowDelay(windowDelayTime);
