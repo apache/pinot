@@ -12,29 +12,83 @@ import java.util.List;
  * Series container for primitive long.
  */
 public final class LongSeries extends TypedSeries<LongSeries> {
-  public static final long NULL_VALUE = Long.MIN_VALUE;
+  public static final long NULL = Long.MIN_VALUE;
+  public static final long DEFAULT = 0L;
 
-  public static class LongBatchSum implements Series.LongFunction {
-    @Override
-    public long apply(long[] values) {
-      long sum = 0;
-      for(long v : values)
-        if(!LongSeries.isNull(v))
-          sum += v;
-      return sum;
-    }
-  }
+  public static final LongFunction SUM = new LongSum();
+  public static final LongFunction PRODUCT = new LongProduct();
+  public static final LongFunction FIRST = new LongFirst();
+  public static final LongFunction LAST = new LongLast();
+  public static final LongFunction MIN = new LongMin();
+  public static final LongFunction MAX = new LongMax();
 
-  public static class LongBatchLast implements Series.LongFunction {
+  public static final class LongSum implements LongFunction {
     @Override
     public long apply(long[] values) {
       if(values.length <= 0)
-        return LongSeries.NULL_VALUE;
+        return NULL;
+      long result = 0;
+      for(long v : values)
+        result += v;
+      return result;
+    }
+  }
+
+  public static final class LongProduct implements LongFunction {
+    @Override
+    public long apply(long[] values) {
+      if(values.length <= 0)
+        return NULL;
+      long result = 1;
+      for(long v : values)
+        result *= v;
+      return result;
+    }
+  }
+
+  public static final class LongFirst implements LongFunction {
+    @Override
+    public long apply(long[] values) {
+      if(values.length <= 0)
+        return NULL;
+      return values[0];
+    }
+  }
+
+  public static final class LongLast implements LongFunction {
+    @Override
+    public long apply(long[] values) {
+      if(values.length <= 0)
+        return NULL;
       return values[values.length - 1];
     }
   }
 
-  public static class Builder extends Series.Builder {
+  public static final class LongMin implements LongFunction {
+    @Override
+    public long apply(long[] values) {
+      if(values.length <= 0)
+        return NULL;
+      long min = values[0];
+      for(long v : values)
+        min = Math.min(min, v);
+      return min;
+    }
+  }
+
+  public static final class LongMax implements LongFunction {
+    @Override
+    public long apply(long[] values) {
+      if (values.length <= 0)
+        return NULL;
+      long max = values[0];
+      for (long v : values)
+        max = Math.max(max, v);
+      return max;
+    }
+  }
+
+  public static final class Builder extends Series.Builder {
     final List<long[]> arrays = new ArrayList<>();
 
     private Builder() {
@@ -73,6 +127,16 @@ public final class LongSeries extends TypedSeries<LongSeries> {
       return this;
     }
 
+    public Builder fillValues(int count, long value) {
+      long[] values = new long[count];
+      Arrays.fill(values, value);
+      return this.addValues(values);
+    }
+
+    public Builder fillValues(int count, Long value) {
+      return this.fillValues(count, valueOf(value));
+    }
+
     @Override
     public LongSeries build() {
       int totalSize = 0;
@@ -102,6 +166,18 @@ public final class LongSeries extends TypedSeries<LongSeries> {
     return new LongSeries();
   }
 
+  public static LongSeries nulls(int size) {
+    return builder().fillValues(size, NULL).build();
+  }
+
+  public static LongSeries zeros(int size) {
+    return builder().fillValues(size, 0L).build();
+  }
+
+  public static LongSeries ones(int size) {
+    return builder().fillValues(size, 1L).build();
+  }
+
   // CAUTION: The array is final, but values are inherently modifiable
   final long[] values;
 
@@ -121,7 +197,7 @@ public final class LongSeries extends TypedSeries<LongSeries> {
 
   public static double getDouble(long value) {
     if(LongSeries.isNull(value))
-      return DoubleSeries.NULL_VALUE;
+      return DoubleSeries.NULL;
     return (double) value;
   }
 
@@ -141,7 +217,7 @@ public final class LongSeries extends TypedSeries<LongSeries> {
 
   public static byte getBoolean(long value) {
     if(LongSeries.isNull(value))
-      return BooleanSeries.NULL_VALUE;
+      return BooleanSeries.NULL;
     return BooleanSeries.valueOf(value != 0L);
   }
 
@@ -152,7 +228,7 @@ public final class LongSeries extends TypedSeries<LongSeries> {
 
   public static String getString(long value) {
     if(LongSeries.isNull(value))
-      return StringSeries.NULL_VALUE;
+      return StringSeries.NULL;
     return String.valueOf(value);
   }
 
@@ -173,6 +249,12 @@ public final class LongSeries extends TypedSeries<LongSeries> {
 
   public long[] values() {
     return this.values;
+  }
+
+  public long value() {
+    if(this.size() != 1)
+      throw new IllegalStateException("Series must contain exactly one element");
+    return this.values[0];
   }
 
   /**
@@ -218,6 +300,13 @@ public final class LongSeries extends TypedSeries<LongSeries> {
     return builder.toString();
   }
 
+  @Override
+  public String toString(int index) {
+    if(this.isNull(index))
+      return TOSTRING_NULL;
+    return String.valueOf(this.values[index]);
+  }
+
   public SeriesGrouping groupByInterval(long interval) {
     if(interval <= 0)
       throw new IllegalArgumentException("interval must be greater than 0");
@@ -259,42 +348,91 @@ public final class LongSeries extends TypedSeries<LongSeries> {
   }
 
   public long min() {
-    long m = NULL_VALUE;
-    for(long n : this.values) {
-      if(!isNull(n) && (isNull(m) || n < m))
-        m = n;
-    }
-    if(isNull(m))
-      throw new IllegalStateException("No valid minimum value");
-    return m;
+    return this.aggregate(MIN).value();
   }
 
   public long max() {
-    long m = NULL_VALUE;
-    for(long n : this.values) {
-      if(!isNull(n) && (isNull(m) || n > m))
-        m = n;
-    }
-    if(isNull(m))
-      throw new IllegalStateException("No valid maximum value");
-    return m;
-  }
-
-  public double mean() {
-    assertNotEmpty(this.values);
-    long sum = 0;
-    int count = 0;
-    for(long v : this.values) {
-      if(!isNull(v)) {
-        sum += v;
-        count++;
-      }
-    }
-    return sum / (double) count;
+    return this.aggregate(MAX).value();
   }
 
   public long sum() {
-    return new LongBatchSum().apply(this.values);
+    return this.aggregate(SUM).value();
+  }
+
+  public long product() {
+    return this.aggregate(PRODUCT).value();
+  }
+
+  public LongSeries add(Series other) {
+    return map(new LongFunction() {
+      @Override
+      public long apply(long... values) {
+        return values[0] + values[1];
+      }
+    }, this, other);
+  }
+
+  public LongSeries add(final long constant) {
+    return this.map(new LongFunction() {
+      @Override
+      public long apply(long... values) {
+        return values[0] + constant;
+      }
+    });
+  }
+
+  public LongSeries subtract(Series other) {
+    return map(new LongFunction() {
+      @Override
+      public long apply(long... values) {
+        return values[0] - values[1];
+      }
+    }, this, other);
+  }
+
+  public LongSeries subtract(final long constant) {
+    return this.map(new LongFunction() {
+      @Override
+      public long apply(long... values) {
+        return values[0] - constant;
+      }
+    });
+  }
+
+  public LongSeries multiply(Series other) {
+    return map(new LongFunction() {
+      @Override
+      public long apply(long... values) {
+        return values[0] * values[1];
+      }
+    }, this, other);
+  }
+
+  public LongSeries multiply(final long constant) {
+    return this.map(new LongFunction() {
+      @Override
+      public long apply(long... values) {
+        return values[0] * constant;
+      }
+    });
+  }
+
+  public LongSeries divide(Series other) {
+    return map(new LongFunction() {
+      @Override
+      public long apply(long... values) {
+        return values[0] / values[1];
+      }
+    }, this, other);
+  }
+
+  public LongSeries divide(final long constant) {
+    return this.map(new LongFunction() {
+      @Override
+      public long apply(long... values) {
+        return values[0] / constant;
+      }
+    });
   }
 
   @Override
@@ -302,12 +440,17 @@ public final class LongSeries extends TypedSeries<LongSeries> {
     long[] values = new long[fromIndex.length];
     for(int i=0; i<fromIndex.length; i++) {
       if(fromIndex[i] == -1) {
-        values[i] = NULL_VALUE;
+        values[i] = NULL;
       } else {
         values[i] = this.values[fromIndex[i]];
       }
     }
     return buildFrom(values);
+  }
+
+  @Override
+  public LongSeries fillNull() {
+    return this.fillNull(DEFAULT);
   }
 
   /**
@@ -381,7 +524,7 @@ public final class LongSeries extends TypedSeries<LongSeries> {
     for(int j=0; j<series.length; j++) {
       long value = series[j].getLong(row);
       if(isNull(value))
-        return NULL_VALUE;
+        return NULL;
       input[j] = value;
     }
     return function.apply(input);
@@ -391,7 +534,7 @@ public final class LongSeries extends TypedSeries<LongSeries> {
     long[] output = new long[a.size()];
     for(int i=0; i<a.size(); i++) {
       if(a.isNull(i)) {
-        output[i] = NULL_VALUE;
+        output[i] = NULL;
       } else {
         output[i] = function.apply(a.getLong(i));
       }
@@ -403,7 +546,7 @@ public final class LongSeries extends TypedSeries<LongSeries> {
     long[] output = new long[a.size()];
     for(int i=0; i<a.size(); i++) {
       if(a.isNull(i) || b.isNull(i)) {
-        output[i] = NULL_VALUE;
+        output[i] = NULL;
       } else {
         output[i] = function.apply(a.getLong(i), b.getLong(i));
       }
@@ -415,7 +558,7 @@ public final class LongSeries extends TypedSeries<LongSeries> {
     long[] output = new long[a.size()];
     for(int i=0; i<a.size(); i++) {
       if(a.isNull(i) || b.isNull(i) || c.isNull(i)) {
-        output[i] = NULL_VALUE;
+        output[i] = NULL;
       } else {
         output[i] = function.apply(a.getLong(i), b.getLong(i), c.getLong(i));
       }
@@ -445,7 +588,7 @@ public final class LongSeries extends TypedSeries<LongSeries> {
     for(int j=0; j<series.length; j++) {
       long value = series[j].getLong(row);
       if(isNull(value))
-        return BooleanSeries.NULL_VALUE;
+        return BooleanSeries.NULL;
       input[j] = value;
     }
     return BooleanSeries.valueOf(function.apply(input));
@@ -455,24 +598,28 @@ public final class LongSeries extends TypedSeries<LongSeries> {
    * @see Series#aggregate(Function)
    */
   public static LongSeries aggregate(LongFunction function, Series series) {
-    return buildFrom(function.apply(series.dropNull().getLongs().values));
+    if(series.hasNull())
+      return buildFrom(NULL);
+    return buildFrom(function.apply(series.getLongs().values));
   }
 
   /**
    * @see Series#aggregate(Function)
    */
   public static BooleanSeries aggregate(LongConditional function, Series series) {
-    return BooleanSeries.builder().addBooleanValues(function.apply(series.dropNull().getLongs().values)).build();
+    if(series.hasNull())
+      return BooleanSeries.buildFrom(BooleanSeries.NULL);
+    return BooleanSeries.builder().addBooleanValues(function.apply(series.getLongs().values)).build();
   }
 
   public static long valueOf(Long value) {
     if(value == null)
-      return NULL_VALUE;
+      return NULL;
     return value;
   }
 
   public static boolean isNull(long value) {
-    return value == NULL_VALUE;
+    return value == NULL;
   }
 
   private static long[] assertNotEmpty(long[] values) {
@@ -495,11 +642,11 @@ public final class LongSeries extends TypedSeries<LongSeries> {
   public LongSeries shift(int offset) {
     long[] values = new long[this.values.length];
     if(offset >= 0) {
-      Arrays.fill(values, 0, Math.min(offset, values.length), NULL_VALUE);
+      Arrays.fill(values, 0, Math.min(offset, values.length), NULL);
       System.arraycopy(this.values, 0, values, Math.min(offset, values.length), Math.max(values.length - offset, 0));
     } else {
       System.arraycopy(this.values, Math.min(-offset, values.length), values, 0, Math.max(values.length + offset, 0));
-      Arrays.fill(values, Math.max(values.length + offset, 0), values.length, NULL_VALUE);
+      Arrays.fill(values, Math.max(values.length + offset, 0), values.length, NULL);
     }
     return buildFrom(values);
   }
