@@ -17,7 +17,7 @@ import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
-import com.linkedin.thirdeye.detector.email.filter.PerformanceEvaluationUtil;
+import com.linkedin.thirdeye.detector.email.filter.PrecisionRecallEvaluator;
 import com.linkedin.thirdeye.util.SeverityComputationUtil;
 
 import java.util.ArrayList;
@@ -368,7 +368,7 @@ public class DetectionJobResource {
 
     // create alert filter and evaluator
     AlertFilter alertFilter = alertFilterFactory.fromSpec(anomalyFunctionSpec.getAlertFilter());
-    PerformanceEvaluationUtil evaluator = new PerformanceEvaluationUtil(alertFilter, null);
+    PrecisionRecallEvaluator evaluator = new PrecisionRecallEvaluator(alertFilter, null);
 
     // create alert filter auto tune
     AlertFilterAutoTune alertFilterAutotune = alertFilterAutotuneFactory.fromSpec(autoTuneType);
@@ -508,7 +508,7 @@ public class DetectionJobResource {
     // create alert filter and evaluator
     AlertFilter alertFilter = alertFilterFactory.fromSpec(anomalyFunctionSpec.getAlertFilter());
     //evaluate current alert filter (calculate current precision and recall)
-    PerformanceEvaluationUtil evaluator = new PerformanceEvaluationUtil(alertFilter, anomalyResultDTOS);
+    PrecisionRecallEvaluator evaluator = new PrecisionRecallEvaluator(alertFilter, anomalyResultDTOS);
 
     LOG.info("AlertFilter of Type {}, has been evaluated with precision: {}, recall:{}", alertFilter.getClass().toString(),
         evaluator.getWeightedPrecision(), evaluator.getRecall());
@@ -544,7 +544,7 @@ public class DetectionJobResource {
 
     Map<String, String> alertFilterParams = target.getConfiguration();
     AlertFilter alertFilter = alertFilterFactory.fromSpec(alertFilterParams);
-    PerformanceEvaluationUtil evaluator = new PerformanceEvaluationUtil(alertFilter, anomalyResultDTOS);
+    PrecisionRecallEvaluator evaluator = new PrecisionRecallEvaluator(alertFilter, anomalyResultDTOS);
 
     return Response.ok(evaluator.toProperties().toString()).build();
   }

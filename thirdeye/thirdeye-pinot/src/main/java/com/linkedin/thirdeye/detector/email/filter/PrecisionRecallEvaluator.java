@@ -15,9 +15,9 @@ import org.slf4j.LoggerFactory;
 /**
  * Utility class to evaluate the performance of a list of merged anomalies
  */
-public class PerformanceEvaluationUtil {
+public class PrecisionRecallEvaluator {
   private AlertFilter alertFilter;
-  private static final Logger LOG = LoggerFactory.getLogger(PerformanceEvaluationUtil.class);
+  private static final Logger LOG = LoggerFactory.getLogger(PrecisionRecallEvaluator.class);
 
   private int qualifiedTrueAnomaly; // Anomaly is labeled as true and is qualified
   private int qualifiedTrueAnomalyNotActionable; // Anomaly is labeled as TRUE_BUT_NOT_ACTIONABLE and is qualified
@@ -99,32 +99,26 @@ public class PerformanceEvaluationUtil {
   public int getTrueAlerts() {
     return qualifiedTrueAnomaly + qualifiedTrueAnomalyNotActionable;
   }
-
   public int getQualifiedTrueAnomaly() {
     return qualifiedTrueAnomaly;
   }
-
   public int getQualifiedTrueAnomalyNotActionable() {
     return qualifiedTrueAnomalyNotActionable;
   }
-
   public int getInvalidTrueAnomaly() {
     return invalidTrueAnomaly;
   }
-
   public int getInvalidTrueAnomalyNotActionable() {
     return invalidTrueAnomalyNotActionable;
   }
-
   public int getInvalidAnomaly() {
     return invalidAnomaly;
   }
-
   public int getQualifiedNotLabeled() {
     return qualifiedNotLabeled;
   }
 
-  public PerformanceEvaluationUtil(AlertFilter alertFilter, List<MergedAnomalyResultDTO> anomalies){
+  public PrecisionRecallEvaluator(AlertFilter alertFilter, List<MergedAnomalyResultDTO> anomalies){
     this.alertFilter = alertFilter;
     init(anomalies);
   }

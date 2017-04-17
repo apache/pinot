@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.anomaly.alert.util;
 
-import com.linkedin.thirdeye.detector.email.filter.PerformanceEvaluationUtil;
+import com.linkedin.thirdeye.detector.email.filter.PrecisionRecallEvaluator;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -34,7 +34,6 @@ import com.linkedin.thirdeye.anomaly.alert.v2.AlertTaskRunnerV2;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.client.DAORegistry;
-import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
@@ -157,7 +156,7 @@ public class AnomalyReportGenerator {
         }
       }
 
-      PerformanceEvaluationUtil performanceEvaluationUtil = new PerformanceEvaluationUtil(null, anomalies);
+      PrecisionRecallEvaluator precisionRecallEvaluator = new PrecisionRecallEvaluator(null, anomalies);
 
       HtmlEmail email = new HtmlEmail();
 
@@ -170,21 +169,21 @@ public class AnomalyReportGenerator {
       templateData.put("endTime", getDateString(endTime, timeZone));
       templateData.put("anomalyCount", anomalies.size());
       templateData.put("metricsCount", metrics.size());
-      templateData.put("notifiedCount", performanceEvaluationUtil.getTotalReports());
-      templateData.put("feedbackCount", performanceEvaluationUtil.getTotalResponses());
-      templateData.put("trueAlertCount", performanceEvaluationUtil.getQualifiedTrueAnomaly());
-      templateData.put("falseAlertCount", performanceEvaluationUtil.getFalseAlarm());
-      templateData.put("nonActionableCount", performanceEvaluationUtil.getQualifiedTrueAnomalyNotActionable());
+      templateData.put("notifiedCount", precisionRecallEvaluator.getTotalReports());
+      templateData.put("feedbackCount", precisionRecallEvaluator.getTotalResponses());
+      templateData.put("trueAlertCount", precisionRecallEvaluator.getQualifiedTrueAnomaly());
+      templateData.put("falseAlertCount", precisionRecallEvaluator.getFalseAlarm());
+      templateData.put("nonActionableCount", precisionRecallEvaluator.getQualifiedTrueAnomalyNotActionable());
       templateData.put("anomalyDetails", anomalyReportDTOList);
       templateData.put("alertConfigName", alertConfigName);
       templateData.put("includeSummary", includeSummary);
       templateData.put("reportGenerationTimeMillis", System.currentTimeMillis());
       templateData.put("dashboardHost", configuration.getDashboardHost());
       templateData.put("anomalyIds", Joiner.on(",").join(anomalyIds));
-      if(performanceEvaluationUtil.getTotalResponses() > 0) {
-        templateData.put("precision", performanceEvaluationUtil.getPrecisionInResponse());
-        templateData.put("recall", performanceEvaluationUtil.getRecall());
-        templateData.put("falseNegative", performanceEvaluationUtil.getFalseNegativeRate());
+      if(precisionRecallEvaluator.getTotalResponses() > 0) {
+        templateData.put("precision", precisionRecallEvaluator.getPrecisionInResponse());
+        templateData.put("recall", precisionRecallEvaluator.getRecall());
+        templateData.put("falseNegative", precisionRecallEvaluator.getFalseNegativeRate());
       }
 
       String imgPath = null;

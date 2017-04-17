@@ -10,14 +10,14 @@ import static com.linkedin.thirdeye.constant.AnomalyFeedbackType.*;
 import static org.junit.Assert.*;
 
 
-public class TestAlertFilterUtil {
+public class TestPrecisionRecallEvaluator {
 
   @Test
   public void testPrecisionAndRecall() throws Exception{
     AlertFilter dummyAlertFilter = new DummyAlertFilter();
     // test data with 1 positive feedback, 1 negative feedback, other NA feedbacks
     List<MergedAnomalyResultDTO> anomalies = getMockMergedAnomalies(7,8);
-    PerformanceEvaluationUtil evaluator = new PerformanceEvaluationUtil(dummyAlertFilter, anomalies);
+    PrecisionRecallEvaluator evaluator = new PrecisionRecallEvaluator(dummyAlertFilter, anomalies);
     assertEquals(evaluator.getWeightedPrecision(), 0.1818, 0.0001);
     assertEquals(evaluator.getRecall(), 1, 0.0001);
 
