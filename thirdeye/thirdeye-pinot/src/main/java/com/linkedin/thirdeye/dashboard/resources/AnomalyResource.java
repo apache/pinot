@@ -11,7 +11,9 @@ import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dashboard.views.TimeBucket;
 
+import com.linkedin.thirdeye.datalayer.bao.AutotuneConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.AutotuneConfigDTO;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
@@ -94,6 +96,7 @@ public class AnomalyResource {
   private MetricConfigManager metricConfigDAO;
   private MergedAnomalyResultManager mergedAnomalyResultDAO;
   private OverrideConfigManager overrideConfigDAO;
+  private AutotuneConfigManager autotuneConfigDAO;
   private AnomalyFunctionFactory anomalyFunctionFactory;
   private AlertFilterFactory alertFilterFactory;
   private LoadingCache<String, Long> collectionMaxDataTimeCache;
@@ -108,6 +111,7 @@ public class AnomalyResource {
     this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
     this.mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     this.overrideConfigDAO = DAO_REGISTRY.getOverrideConfigDAO();
+    this.autotuneConfigDAO = DAO_REGISTRY.getAutotuneConfigDAO();
     this.anomalyFunctionFactory = anomalyFunctionFactory;
     this.alertFilterFactory = alertFilterFactory;
     this.collectionMaxDataTimeCache = CACHE_REGISTRY_INSTANCE.getCollectionMaxDataTimeCache();
@@ -440,6 +444,43 @@ public class AnomalyResource {
     return Response.ok(id).build();
   }
 
+  @POST
+  @Path("/anomaly-function/apply/{autotune_config_id}")
+  public Response applyReplayConfig(@PathParam("autotune_config_id") @NotNull long id,
+      @QueryParam("cloneFunction") @DefaultValue("false") boolean isCloneFunction,
+      @QueryParam("cloneAnomalies") @DefaultValue("false") boolean isCloneAnomalies) {
+    AutotuneConfigDTO autotuneConfigDTO = autotuneConfigDAO.findById(id);
+    if(autotuneConfigDTO == null) {
+      return Response.status(Response.Status.BAD_REQUEST).build();
+    }
+    if(autotuneConfigDTO.getConfiguration() == null) {
+      return Response.ok().build();
+    }
+
+    AnomalyFunctionDTO originalFunction = anomalyFunctionDAO.findById(autotuneConfigDTO.getFunctionId());
+    AnomalyFunctionDTO targetFunction = originalFunction;
+
+    // clone anomaly function and its anomaly results if requested
+    if(isCloneFunction) {
+      OnboardResource onboardResource = new OnboardResource(anomalyFunctionDAO, mergedAnomalyResultDAO, rawAnomalyResultDAO);
+      long cloneId;
+      String tag = "clone";
+      try {
+        cloneId = onboardResource.cloneFunctionsGetIds(originalFunction.getId(), "clone", Boolean.toString(isCloneAnomalies));
+      } catch (Exception e) {
+        LOG.warn("Unable to clone function {} with clone tag \"{}\"", originalFunction.getId());
+        return Response.status(Response.Status.CONFLICT).build();
+      }
+      targetFunction = anomalyFunctionDAO.findById(cloneId);
+    }
+
+    // Update function configuration
+    targetFunction.updateProperties(autotuneConfigDTO.getConfiguration());
+    anomalyFunctionDAO.update(targetFunction);
+
+    return Response.ok(targetFunction).build();
+  }
+
   private String getDimensions(String dataset, String exploreDimensions) throws Exception {
     // Ensure that the explore dimension names are ordered as schema dimension names
     List<String> schemaDimensionNames = CACHE_REGISTRY_INSTANCE.getDatasetConfigCache().get(dataset).getDimensions();
@@ -567,7 +608,6 @@ public class AnomalyResource {
       throw new IllegalArgumentException("Invalid payload " + payload, e);
     }
   }
-
 
   /**
    * Returns the time series for the given anomaly.
