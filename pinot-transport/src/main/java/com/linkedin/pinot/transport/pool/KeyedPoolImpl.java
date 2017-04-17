@@ -31,7 +31,7 @@ import com.linkedin.pinot.transport.common.Callback;
 import com.linkedin.pinot.transport.common.Cancellable;
 import com.linkedin.pinot.transport.common.CompositeFuture;
 import com.linkedin.pinot.transport.common.CompositeFuture.GatherModeOnError;
-import com.linkedin.pinot.transport.common.KeyedFuture;
+import com.linkedin.pinot.transport.common.ServerResponseFuture;
 import com.linkedin.pinot.transport.common.NoneType;
 import com.linkedin.pinot.transport.metrics.AggregatedPoolStats;
 import com.linkedin.pinot.transport.metrics.PoolStats;
@@ -117,7 +117,7 @@ public class KeyedPoolImpl<T> implements KeyedPool<T> {
   }
 
   @Override
-  public KeyedFuture<T> checkoutObject(ServerInstance key) {
+  public ServerResponseFuture<T> checkoutObject(ServerInstance key) {
     AsyncPool<T> pool = _keyedPool.get(key);
 
     if (null == pool) {
@@ -167,7 +167,7 @@ public class KeyedPoolImpl<T> implements KeyedPool<T> {
   }
 
   @Override
-  public KeyedFuture<NoneType> shutdown() {
+  public ServerResponseFuture<NoneType> shutdown() {
     synchronized (_mutex) {
       if ((_state == State.SHUTTING_DOWN) || (_state == State.SHUTDOWN)) {
         return _shutdownFuture;
@@ -175,7 +175,7 @@ public class KeyedPoolImpl<T> implements KeyedPool<T> {
 
       _state = State.SHUTTING_DOWN;
 
-      List<KeyedFuture< NoneType>> futureList = new ArrayList<KeyedFuture<NoneType>>();
+      List<ServerResponseFuture< NoneType>> futureList = new ArrayList<ServerResponseFuture<NoneType>>();
       for (Entry<ServerInstance, AsyncPool<T>> poolEntry : _keyedPool.entrySet()) {
         AsyncResponseFuture<NoneType> shutdownFuture = new AsyncResponseFuture<NoneType>(poolEntry.getKey(),
             "Shutdown future for pool entry " + poolEntry.getKey());

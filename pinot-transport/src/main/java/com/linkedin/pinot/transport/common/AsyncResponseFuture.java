@@ -32,7 +32,7 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.response.ServerInstance;
 
 
-public class AsyncResponseFuture<T> implements Callback<T>, KeyedFuture<T> {
+public class AsyncResponseFuture<T> implements Callback<T>, ServerResponseFuture<T> {
   protected static Logger LOGGER = LoggerFactory.getLogger(AsyncResponseFuture.class);
 
   private Cancellable _cancellable;

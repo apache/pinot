@@ -38,7 +38,7 @@ import org.testng.annotations.Test;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.common.AsyncResponseFuture;
-import com.linkedin.pinot.transport.common.KeyedFuture;
+import com.linkedin.pinot.transport.common.ServerResponseFuture;
 import com.linkedin.pinot.transport.common.NoneType;
 import com.linkedin.pinot.transport.metrics.AggregatedPoolStats;
 
@@ -234,7 +234,7 @@ public class KeyedPoolImplTest {
     // checkout and checkin back all
     for (int j = 0; j < numResourcesPerKey; j++) {
       for (int i = 0; i < numKeys; i++) {
-        KeyedFuture<String> rFuture = kPool.checkoutObject(getKey(i));
+        ServerResponseFuture<String> rFuture = kPool.checkoutObject(getKey(i));
         String resource = rFuture.getOne();
       }
     }
@@ -292,7 +292,7 @@ public class KeyedPoolImplTest {
     int c = 1;
     for (int j = 0; j < numResourcesPerKey; j++) {
       for (int i = 0; i < numKeys; i++) {
-        KeyedFuture<String> rFuture = kPool.checkoutObject(getKey(i));
+        ServerResponseFuture<String> rFuture = kPool.checkoutObject(getKey(i));
         String resource = rFuture.getOne();
         Assert.assertEquals(resource, getResource(i, j));
         s.refresh();
@@ -317,7 +317,7 @@ public class KeyedPoolImplTest {
     c = 1;
     int d = 1;
     for (int i = 0; i < numKeys; i++) {
-      KeyedFuture<String> rFuture = kPool.checkoutObject(getKey(i));
+      ServerResponseFuture<String> rFuture = kPool.checkoutObject(getKey(i));
       String resource = rFuture.getOne();
       Assert.assertEquals(resource, getResource(i, 0));
       CountDownLatch latch = new CountDownLatch(1);
@@ -368,7 +368,7 @@ public class KeyedPoolImplTest {
     int c = 1;
     for (int j = 0; j < numResourcesPerKey; j++) {
       for (int i = 0; i < numKeys; i++) {
-        KeyedFuture<String> rFuture = kPool.checkoutObject(getKey(i));
+        ServerResponseFuture<String> rFuture = kPool.checkoutObject(getKey(i));
         String resource = rFuture.getOne();
         Assert.assertEquals(resource, getResource(i, j));
         s.refresh();
@@ -391,7 +391,7 @@ public class KeyedPoolImplTest {
     // Check out 1 object for each key
     c = 1;
     for (int i = 0; i < numKeys; i++) {
-      KeyedFuture<String> rFuture = kPool.checkoutObject(getKey(i));
+      ServerResponseFuture<String> rFuture = kPool.checkoutObject(getKey(i));
       String resource = rFuture.getOne();
       Assert.assertEquals(resource, getResource(i, 0));
       s.refresh();

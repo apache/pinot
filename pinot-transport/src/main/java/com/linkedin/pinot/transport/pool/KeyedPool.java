@@ -17,7 +17,7 @@ package com.linkedin.pinot.transport.pool;
 
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.common.AsyncResponseFuture;
-import com.linkedin.pinot.transport.common.KeyedFuture;
+import com.linkedin.pinot.transport.common.ServerResponseFuture;
 import com.linkedin.pinot.transport.common.NoneType;
 import com.linkedin.pinot.transport.metrics.PoolStatsProvider;
 import com.yammer.metrics.core.Histogram;
@@ -61,7 +61,7 @@ public interface KeyedPool<T> extends PoolStatsProvider<Histogram> {
    * @param key the key identifying the inner pool which manages the resources.
    * @return A {@link AsyncResponseFuture} whose get() method will return the actual resource
    */
-  public KeyedFuture<T> checkoutObject(ServerInstance key);
+  public ServerResponseFuture<T> checkoutObject(ServerInstance key);
 
   /**
    * Validates all object in the pool with key.
@@ -100,5 +100,5 @@ public interface KeyedPool<T> extends PoolStatsProvider<Histogram> {
    *
    * @return composite Future which you can call get() to wait for shutdown.
    */
-  public KeyedFuture<NoneType> shutdown();
+  public ServerResponseFuture<NoneType> shutdown();
 }

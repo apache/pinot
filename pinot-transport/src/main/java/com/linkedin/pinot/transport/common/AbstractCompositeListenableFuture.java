@@ -29,7 +29,7 @@ import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.response.ServerInstance;
 
 
-public abstract class AbstractCompositeListenableFuture<T> implements KeyedFuture<T> {
+public abstract class AbstractCompositeListenableFuture<T> implements ServerResponseFuture<T> {
   protected static Logger LOGGER = LoggerFactory.getLogger(CompositeFuture.class);
 
   /**
@@ -181,7 +181,7 @@ public abstract class AbstractCompositeListenableFuture<T> implements KeyedFutur
   protected abstract boolean processFutureResult(String name, Map<ServerInstance, T> responses, Map<ServerInstance, Throwable> error,
       long durationMillis);
 
-  protected void addResponseFutureListener(KeyedFuture<T> future) {
+  protected void addResponseFutureListener(ServerResponseFuture<T> future) {
     future.addListener(new ResponseFutureListener(future), null); // no need for separate Executors
   }
 
@@ -189,9 +189,9 @@ public abstract class AbstractCompositeListenableFuture<T> implements KeyedFutur
    * Underlying Response future listener. This will count down the latch.
    */
   private class ResponseFutureListener implements Runnable {
-    private final KeyedFuture<T> _future;
+    private final ServerResponseFuture<T> _future;
 
-    public ResponseFutureListener(KeyedFuture<T> future) {
+    public ResponseFutureListener(ServerResponseFuture<T> future) {
       _future = future;
     }
 

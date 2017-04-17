@@ -43,7 +43,7 @@ public class CompositeFutureTest {
   public void testMultiFutureComposite1() throws Exception {
     List<ServerInstance> keys = new ArrayList<>();
     int numFutures = 100;
-    Map<ServerInstance, KeyedFuture<String>> futureMap = new HashMap<>();
+    Map<ServerInstance, ServerResponseFuture<String>> futureMap = new HashMap<>();
     Map<ServerInstance, String> expectedMessages = new HashMap<>();
     for (int i = 0; i < numFutures; i++) {
       ServerInstance key = new ServerInstance("localhost:" + i);
@@ -107,7 +107,7 @@ public class CompositeFutureTest {
   public void testMultiFutureComposite2() throws Exception {
     List<ServerInstance> keys = new ArrayList<>();
     int numFutures = 100;
-    Map<ServerInstance, KeyedFuture<String>> futureMap = new HashMap<>();
+    Map<ServerInstance, ServerResponseFuture<String>> futureMap = new HashMap<>();
     Map<ServerInstance, Exception> expectedErrors = new HashMap<>();
     for (int i = 0; i < numFutures; i++) {
       ServerInstance key = new ServerInstance("localhost:" + i);
@@ -132,7 +132,7 @@ public class CompositeFutureTest {
     for (int i = 0; i < numFutures; i++) {
       Exception expectedError = new Exception("error processing_" + i);
       ServerInstance k = new ServerInstance("localhost:" + i);
-      KeyedFuture<String> future = futureMap.get(k);
+      ServerResponseFuture<String> future = futureMap.get(k);
       ((AsyncResponseFuture<String>) future).onError(expectedError);
       expectedErrors.put(k, expectedError);
     }
@@ -172,7 +172,7 @@ public class CompositeFutureTest {
     List<ServerInstance> keys = new ArrayList<>();
     int numFutures = 100;
     int numSuccessFutures = 50;
-    Map<ServerInstance, KeyedFuture<String>> futureMap = new HashMap<>();
+    Map<ServerInstance, ServerResponseFuture<String>> futureMap = new HashMap<>();
     for (int i = 0; i < numFutures; i++) {
       ServerInstance key = new ServerInstance("localhost:" + i);
       keys.add(key);
@@ -242,7 +242,7 @@ public class CompositeFutureTest {
     List<ServerInstance> keys = new ArrayList<>();
     int numFutures = 100;
     int numSuccessFutures = 5;
-    Map<ServerInstance, KeyedFuture<String>> futureMap = new HashMap<>();
+    Map<ServerInstance, ServerResponseFuture<String>> futureMap = new HashMap<>();
     Map<ServerInstance, String> expectedMessages = new HashMap<>();
 
     for (int i = 0; i < numFutures; i++) {
@@ -340,7 +340,7 @@ public class CompositeFutureTest {
     // A response and exception arrives after cancel but they should be discarded.
     {
       AsyncResponseFuture<String> future = new AsyncResponseFuture<>(key1, "");
-      Map<ServerInstance, KeyedFuture<String>> futureMap = new HashMap<>();
+      Map<ServerInstance, ServerResponseFuture<String>> futureMap = new HashMap<>();
       futureMap.put(key1, future);
       CompositeFuture<String> compositeFuture = new CompositeFuture<>("a", GatherModeOnError.AND);
       compositeFuture.start(futureMap.values());
@@ -381,7 +381,7 @@ public class CompositeFutureTest {
     // A response and exception arrives after cancel but they should be discarded.
     {
       AsyncResponseFuture<String> future = new AsyncResponseFuture<>(key1, "");
-      Map<ServerInstance, KeyedFuture<String>> futureMap = new HashMap<>();
+      Map<ServerInstance, ServerResponseFuture<String>> futureMap = new HashMap<>();
       futureMap.put(key1, future);
       CompositeFuture<String> compositeFuture = new CompositeFuture<>("a", GatherModeOnError.AND);
       compositeFuture.start(futureMap.values());
@@ -422,7 +422,7 @@ public class CompositeFutureTest {
     // A response and cancellation arrives after exception but they should be discarded.
     {
       AsyncResponseFuture<String> future = new AsyncResponseFuture<>(key1, "");
-      Map<ServerInstance, KeyedFuture<String>> futureMap = new HashMap<>();
+      Map<ServerInstance, ServerResponseFuture<String>> futureMap = new HashMap<>();
       futureMap.put(key1, future);
       CompositeFuture<String> compositeFuture = new CompositeFuture<>("a", GatherModeOnError.AND);
       compositeFuture.start(futureMap.values());
@@ -463,7 +463,7 @@ public class CompositeFutureTest {
     // A response and cancellation arrives after exception but they should be discarded.
     {
       AsyncResponseFuture<String> future = new AsyncResponseFuture<>(key1, "");
-      Map<ServerInstance, KeyedFuture<String>> futureMap = new HashMap<>();
+      Map<ServerInstance, ServerResponseFuture<String>> futureMap = new HashMap<>();
       futureMap.put(key1, future);
       CompositeFuture<String> compositeFuture = new CompositeFuture<>("a", GatherModeOnError.AND);
       compositeFuture.start(futureMap.values());
@@ -504,7 +504,7 @@ public class CompositeFutureTest {
     // An exception and cancellation arrives after exception but they should be discarded.
     {
       AsyncResponseFuture<String> future = new AsyncResponseFuture<>(key1, "");
-      Map<ServerInstance, KeyedFuture<String>> futureMap = new HashMap<>();
+      Map<ServerInstance, ServerResponseFuture<String>> futureMap = new HashMap<>();
       futureMap.put(key1, future);
       CompositeFuture<String> compositeFuture = new CompositeFuture<>("a", GatherModeOnError.AND);
       compositeFuture.start(futureMap.values());
@@ -545,7 +545,7 @@ public class CompositeFutureTest {
     // An exception and cancellation arrives after exception but they should be discarded.
     {
       AsyncResponseFuture<String> future = new AsyncResponseFuture<>(key1, "");
-      Map<ServerInstance, KeyedFuture<String>> futureMap = new HashMap<>();
+      Map<ServerInstance, ServerResponseFuture<String>> futureMap = new HashMap<>();
       futureMap.put(key1, future);
       CompositeFuture<String> compositeFuture = new CompositeFuture<>("a", GatherModeOnError.AND);
       compositeFuture.start(futureMap.values());

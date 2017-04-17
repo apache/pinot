@@ -41,7 +41,7 @@ public class SelectingFutureTest {
   public void testMultiFutureComposite1() throws Exception {
     List<ServerInstance> keys = new ArrayList<>();
     int numFutures = 3;
-    List<KeyedFuture<String>> futureList = new ArrayList<>();
+    List<ServerResponseFuture<String>> futureList = new ArrayList<>();
     String expectedMessage = null;
     for (int i = 0; i < numFutures; i++) {
       ServerInstance key = new ServerInstance("localhost:" + i);
@@ -94,7 +94,7 @@ public class SelectingFutureTest {
   public void testMultiFutureComposite2() throws Exception {
     List<ServerInstance> keys = new ArrayList<>();
     int numFutures = 3;
-    List<KeyedFuture<String>> futureList = new ArrayList<>();
+    List<ServerResponseFuture<String>> futureList = new ArrayList<>();
     for (int i = 0; i < numFutures; i++) {
       ServerInstance key = new ServerInstance("localhost:" + i);
       keys.add(key);
@@ -150,7 +150,7 @@ public class SelectingFutureTest {
   public void testMultiFutureComposite3() throws Exception {
     List<ServerInstance> keys = new ArrayList<>();
     int numFutures = 3;
-    List<KeyedFuture<String>> futureList = new ArrayList<>();
+    List<ServerResponseFuture<String>> futureList = new ArrayList<>();
     for (int i = 0; i < numFutures; i++) {
       ServerInstance key = new ServerInstance("localhost:" + i);
       keys.add(key);

@@ -42,7 +42,7 @@ import com.linkedin.pinot.common.response.ServerInstance;
  *
  * @param <V> Response Type
  */
-public interface KeyedFuture<V> extends ListenableFuture<Map<ServerInstance, V>> {
+public interface ServerResponseFuture<V> extends ListenableFuture<Map<ServerInstance, V>> {
 
   /**
    * Returns a name of the future. The name of the future is not expected

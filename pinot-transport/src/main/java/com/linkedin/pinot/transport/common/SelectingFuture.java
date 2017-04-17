@@ -44,7 +44,7 @@ import com.linkedin.pinot.common.response.ServerInstance;
 public class SelectingFuture<T> extends AbstractCompositeListenableFuture<T> {
   protected static Logger LOGGER = LoggerFactory.getLogger(SelectingFuture.class);
 
-  private final List<KeyedFuture<T>> _futuresList;
+  private final List<ServerResponseFuture<T>> _futuresList;
 
   // First successful Response
   private volatile Map<ServerInstance, T> _delayedResponse;
@@ -58,7 +58,7 @@ public class SelectingFuture<T> extends AbstractCompositeListenableFuture<T> {
 
   public SelectingFuture(String name) {
     _name = name;
-    _futuresList = new ArrayList<KeyedFuture<T>>();
+    _futuresList = new ArrayList<ServerResponseFuture<T>>();
     _delayedResponse = null;
     _error = null;
   }
@@ -67,7 +67,7 @@ public class SelectingFuture<T> extends AbstractCompositeListenableFuture<T> {
    * Start the future. This will add listener to the underlying futures. This method needs to be called
    * as soon the composite future is constructed and before any other method is invoked.
    */
-  public void start(Collection<KeyedFuture<T>> futuresList) {
+  public void start(Collection<ServerResponseFuture<T>> futuresList) {
     boolean started = super.start();
 
     if (!started) {
@@ -78,7 +78,7 @@ public class SelectingFuture<T> extends AbstractCompositeListenableFuture<T> {
 
     _futuresList.addAll(futuresList);
     _latch = new CountDownLatch(futuresList.size());
-    for (KeyedFuture<T> entry : _futuresList) {
+    for (ServerResponseFuture<T> entry : _futuresList) {
       if (null != entry) {
         addResponseFutureListener(entry);
       }
@@ -91,7 +91,7 @@ public class SelectingFuture<T> extends AbstractCompositeListenableFuture<T> {
    */
   @Override
   protected void cancelUnderlyingFutures() {
-    for (KeyedFuture<T> entry : _futuresList) {
+    for (ServerResponseFuture<T> entry : _futuresList) {
       entry.cancel(true);
     }
   }

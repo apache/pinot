@@ -32,7 +32,7 @@ import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.common.AsyncResponseFuture;
 import com.linkedin.pinot.transport.common.Callback;
-import com.linkedin.pinot.transport.common.KeyedFuture;
+import com.linkedin.pinot.transport.common.ServerResponseFuture;
 import com.linkedin.pinot.transport.common.LinkedDequeue;
 import com.linkedin.pinot.transport.common.NoneType;
 import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
@@ -268,10 +268,10 @@ public class NettySingleConnectionIntegrationTest {
 
       // Try to get one more connection
       // We should get an exception because we don't have a free connection to the server
-      KeyedFuture<PooledNettyClientResourceManager.PooledClientConnection> keyedFuture =
+      ServerResponseFuture<PooledNettyClientResourceManager.PooledClientConnection> serverResponseFuture =
           keyedPool.checkoutObject(_clientServer);
       try {
-        keyedFuture.getOne(1, TimeUnit.SECONDS);
+        serverResponseFuture.getOne(1, TimeUnit.SECONDS);
         Assert.fail("Get connection even no connections available");
       } catch (TimeoutException e) {
         // PASS
@@ -281,7 +281,7 @@ public class NettySingleConnectionIntegrationTest {
       Assert.assertEquals(stats.getIdleCount(), 0);
       Assert.assertEquals(stats.getCheckedOut(), 3);
       Assert.assertEquals(waitersQueue.size(), 1);
-      keyedFuture.cancel(true);
+      serverResponseFuture.cancel(true);
       Assert.assertEquals(waitersQueue.size(), 0);
 
       // If the server goes down, we should release all 3 connections and be able to get new connections

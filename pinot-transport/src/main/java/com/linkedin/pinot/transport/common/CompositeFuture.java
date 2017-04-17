@@ -56,7 +56,7 @@ public class CompositeFuture<V> extends AbstractCompositeListenableFuture<V> {
     AND,
   };
 
-  private final Collection<KeyedFuture<V>> _futures;
+  private final Collection<ServerResponseFuture<V>> _futures;
 
   // Composite Response
   private final ConcurrentMap<ServerInstance, V> _delayedResponseMap;
@@ -73,7 +73,7 @@ public class CompositeFuture<V> extends AbstractCompositeListenableFuture<V> {
 
   public CompositeFuture(String name, GatherModeOnError mode) {
     _name = name;
-    _futures = new ArrayList<KeyedFuture<V>>();
+    _futures = new ArrayList<ServerResponseFuture<V>>();
     _delayedResponseMap = new ConcurrentHashMap<ServerInstance, V>();
     _errorMap = new ConcurrentHashMap<ServerInstance, Throwable>();
     _gatherMode = mode;
@@ -83,7 +83,7 @@ public class CompositeFuture<V> extends AbstractCompositeListenableFuture<V> {
    * Start the future. This will add listener to the underlying futures. This method needs to be called
    * as soon the composite future is constructed and before any other method is invoked.
    */
-  public void start(Collection<KeyedFuture<V>> futureList) {
+  public void start(Collection<ServerResponseFuture<V>> futureList) {
     boolean started = super.start();
 
     if (!started) {
@@ -99,7 +99,7 @@ public class CompositeFuture<V> extends AbstractCompositeListenableFuture<V> {
     } else {
       _latch = new CountDownLatch(0);
     }
-    for (KeyedFuture<V> entry : _futures) {
+    for (ServerResponseFuture<V> entry : _futures) {
       if (null != entry) {
         addResponseFutureListener(entry);
       }
@@ -112,7 +112,7 @@ public class CompositeFuture<V> extends AbstractCompositeListenableFuture<V> {
    */
   @Override
   protected void cancelUnderlyingFutures() {
-    for (KeyedFuture<V> entry : _futures) {
+    for (ServerResponseFuture<V> entry : _futures) {
       entry.cancel(true);
     }
   }

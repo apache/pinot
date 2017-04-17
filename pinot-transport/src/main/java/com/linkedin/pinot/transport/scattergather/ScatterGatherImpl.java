@@ -37,7 +37,7 @@ import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.common.CompositeFuture;
 import com.linkedin.pinot.transport.common.CompositeFuture.GatherModeOnError;
-import com.linkedin.pinot.transport.common.KeyedFuture;
+import com.linkedin.pinot.transport.common.ServerResponseFuture;
 import com.linkedin.pinot.transport.common.ReplicaSelection;
 import com.linkedin.pinot.transport.common.ReplicaSelectionGranularity;
 import com.linkedin.pinot.transport.common.SegmentId;
@@ -162,8 +162,8 @@ public class ScatterGatherImpl implements ScatterGather {
     boolean sentSuccessfully = requestDispatchLatch.await(timeRemaining, TimeUnit.MILLISECONDS);
 
     if (sentSuccessfully) {
-      List<KeyedFuture<ByteBuf>> responseFutures =
-          new ArrayList<KeyedFuture<ByteBuf>>();
+      List<ServerResponseFuture<ByteBuf>> responseFutures =
+          new ArrayList<ServerResponseFuture<ByteBuf>>();
       for (SingleRequestHandler h : handlers) {
         responseFutures.add(h.getResponseFuture());
         String serverName = h.getServer().toString();
@@ -451,14 +451,14 @@ public class ScatterGatherImpl implements ScatterGather {
       }
 
       PooledNettyClientResourceManager.PooledClientConnection conn = null;
-      KeyedFuture<PooledNettyClientResourceManager.PooledClientConnection> keyedFuture = null;
+      ServerResponseFuture<PooledNettyClientResourceManager.PooledClientConnection> serverResponseFuture = null;
       boolean gotConnection = false;
       boolean error = true;
       long timeRemainingMillis = _timeoutMS - (System.currentTimeMillis() - _startTime);
       final long _startTimeNs = System.nanoTime();
       long timeWaitedNs = 0;
       try {
-        keyedFuture = _connPool.checkoutObject(_server);
+        serverResponseFuture = _connPool.checkoutObject(_server);
 
         byte[] serializedRequest = _request.getRequestForService(_server, _segmentIds);
         int ntries = 0;
@@ -467,7 +467,7 @@ public class ScatterGatherImpl implements ScatterGather {
           if (timeRemainingMillis <= 0) {
             throw new TimeoutException("Timed out trying to connect to " + _server + "(timeout=" + _timeoutMS + "ms,ntries=" + ntries + ")");
           }
-          conn = keyedFuture.getOne(timeRemainingMillis, TimeUnit.MILLISECONDS);
+          conn = serverResponseFuture.getOne(timeRemainingMillis, TimeUnit.MILLISECONDS);
           if (conn != null && conn.validate()) {
             timeWaitedNs = System.nanoTime() - _startTimeNs;
             gotConnection = true;
@@ -480,7 +480,7 @@ public class ScatterGatherImpl implements ScatterGather {
           // The connect errors are obtained from two different objects -- 'conn' and 'keyedFuture'.
           // We pick the error from 'keyedFuture' here, if we find it. Unfortunately there is not a way (now) to pass the
           // error from 'keyedFuture' to 'conn' (need to do it via AsyncPoolImpl)
-          Map<ServerInstance, Throwable> errorMap = keyedFuture.getError();
+          Map<ServerInstance, Throwable> errorMap = serverResponseFuture.getError();
           String errStr = "";
           if (errorMap != null && errorMap.containsKey(_server)) {
             errStr = errorMap.get(_server).getMessage();
@@ -492,7 +492,7 @@ public class ScatterGatherImpl implements ScatterGather {
           if (++ntries == MAX_CONN_RETRIES-1) {
             throw new ConnectionLimitReachedException("Could not connect to " + _server + " after " + ntries + " attempts(timeRemaining=" + timeRemainingMillis + "ms)");
           }
-          keyedFuture = _connPool.checkoutObject(_server);
+          serverResponseFuture = _connPool.checkoutObject(_server);
           timeRemainingMillis = _timeoutMS - (System.currentTimeMillis() - _startTime);
         }
         ByteBuf req = Unpooled.wrappedBuffer(serializedRequest);
@@ -525,8 +525,8 @@ public class ScatterGatherImpl implements ScatterGather {
             _brokerMetrics.addMeteredQueryValue(brokerRequest, BrokerMeter.REQUEST_DROPPED_DUE_TO_SEND_ERROR, 1);
           } else {
             // If we got a keyed future, but we did not get to send a request, then cancel the future.
-            if (keyedFuture!= null) {
-              keyedFuture.cancel(true);
+            if (serverResponseFuture != null) {
+              serverResponseFuture.cancel(true);
             }
             _brokerMetrics.addMeteredQueryValue(brokerRequest, BrokerMeter.REQUEST_DROPPED_DUE_TO_CONNECTION_ERROR, 1);
           }
