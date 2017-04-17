@@ -71,6 +71,11 @@ public class OffHeapBitmapInvertedIndexCreator implements InvertedIndexCreator {
   private static final Logger LOGGER =
       LoggerFactory.getLogger(OffHeapBitmapInvertedIndexCreator.class);
 
+  // Number of bytes required to store an integer
+  private static final int INT_SIZE = Integer.SIZE / Byte.SIZE;
+  // Maximum number of entries for each buffer
+  public static final int MAX_NUM_ENTRIES = Integer.MAX_VALUE / INT_SIZE;
+
   private final File invertedIndexFile;
   private final FieldSpec spec;
   long start = 0;
@@ -90,51 +95,52 @@ public class OffHeapBitmapInvertedIndexCreator implements InvertedIndexCreator {
   IntBuffer postingListStartOffsets; // start offset in posting List Buffer
   IntBuffer postingListCurrentOffsets; // start offset in posting List Buffer
   private int numDocs;
-  /**
-   * Num of bytes required to store an INT
-   */
-  private static int INT_SIZE = Integer.SIZE / Byte.SIZE;
 
-  public OffHeapBitmapInvertedIndexCreator(File indexDir, int cardinality, int numDocs,
-      int totalNumberOfEntries, FieldSpec spec) {
-    Preconditions.checkArgument(cardinality > 0, "Cardinality:%s must > 0", cardinality);
-    Preconditions.checkArgument(numDocs > 0, "numDocs:%s must > 0", numDocs);
-    Preconditions.checkArgument(spec.isSingleValueField() || totalNumberOfEntries > 0,
-        "totalNumberOfEntries:%s must > 0 for multi value", totalNumberOfEntries);
-    assert cardinality > 0 && numDocs > 0;
+  public OffHeapBitmapInvertedIndexCreator(File indexDir, int cardinality, int numDocs, int totalNumberOfEntries,
+      FieldSpec spec) {
+    String columnName = spec.getName();
+    Preconditions.checkArgument((cardinality > 0) && (cardinality <= MAX_NUM_ENTRIES),
+        "For column: %s, cardinality: %s must > 0 and <= %s", columnName, cardinality, MAX_NUM_ENTRIES);
+    Preconditions.checkArgument((numDocs > 0) && (numDocs <= MAX_NUM_ENTRIES),
+        "For column: %s, numDocs: %s must > 0 and <= %s", columnName, numDocs, MAX_NUM_ENTRIES);
+    if (!spec.isSingleValueField()) {
+      Preconditions.checkArgument((totalNumberOfEntries > 0) && (totalNumberOfEntries <= MAX_NUM_ENTRIES),
+          "For column: %s, totalNumberOfEntries: %s must > 0 and <= %s for multi-value column", columnName,
+          totalNumberOfEntries, MAX_NUM_ENTRIES);
+    }
+
     this.cardinality = cardinality;
     this.numDocs = numDocs;
     this.capacity = spec.isSingleValueField() ? numDocs : totalNumberOfEntries;
     this.spec = spec;
-    invertedIndexFile = new File(indexDir,
-        spec.getName() + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
+    invertedIndexFile = new File(indexDir, columnName + V1Constants.Indexes.BITMAP_INVERTED_INDEX_FILE_EXTENSION);
 
     start = System.currentTimeMillis();
 
     // create buffers to store raw values
     origValueBuffer = MmapUtils.allocateDirectByteBuffer(this.capacity * INT_SIZE, null,
-        "value buffer create bitmap index for " + spec.getName());
+        "value buffer create bitmap index for " + columnName);
     valueBuffer = origValueBuffer.asIntBuffer();
     if (!spec.isSingleValueField()) {
       origLengths = MmapUtils.allocateDirectByteBuffer(numDocs * INT_SIZE, null,
-          "lengths buffer to create bitmap index for " + spec.getName());
+          "lengths buffer to create bitmap index for " + columnName);
       lengths = origLengths.asIntBuffer();
     } else {
       origLengths = null;
     }
 
     // create buffer to store posting lists
-    origPostingListBuffer = MmapUtils.allocateDirectByteBuffer(this.capacity * INT_SIZE,
-        null, "posting list buffer to bitmap index for " + spec.getName());
+    origPostingListBuffer = MmapUtils.allocateDirectByteBuffer(this.capacity * INT_SIZE, null,
+        "posting list buffer to bitmap index for " + columnName);
     postingListBuffer = origPostingListBuffer.asIntBuffer();
     origPostingListLengths = MmapUtils.allocateDirectByteBuffer(cardinality * INT_SIZE, null,
-        "posting list lengths buffer to bitmap index for " + spec.getName());
+        "posting list lengths buffer to bitmap index for " + columnName);
     postingListLengths = origPostingListLengths.asIntBuffer();
     origPostingListStartOffsets = MmapUtils.allocateDirectByteBuffer(cardinality * INT_SIZE, null,
-        "posting list start offsets buffer to bitmap index for " + spec.getName());
+        "posting list start offsets buffer to bitmap index for " + columnName);
     postingListStartOffsets = origPostingListStartOffsets.asIntBuffer();
     origPostingListCurrentOffsets = MmapUtils.allocateDirectByteBuffer(cardinality * INT_SIZE, null,
-        "posting list current offsets buffer to bitmap index for " + spec.getName());
+        "posting list current offsets buffer to bitmap index for " + columnName);
     postingListCurrentOffsets = origPostingListCurrentOffsets.asIntBuffer();
   }
 
