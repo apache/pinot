@@ -589,7 +589,7 @@ public class BrokerRequestHandler {
       boolean isOfflineTable, @Nonnull String tableName, @Nonnull List<ProcessingException> processingExceptions) {
     try {
       Map<ServerInstance, ByteBuf> serverResponseMap = compositeFuture.get();
-      Map<String, Long> responseTimes = compositeFuture.getResponseTimes();
+      Map<ServerInstance, Long> responseTimes = compositeFuture.getResponseTimes();
       scatterGatherStats.setResponseTimeMillis(responseTimes, isOfflineTable);
       return serverResponseMap;
     } catch (Exception e) {

@@ -142,21 +142,26 @@ public class SelectingFuture<T> extends AbstractCompositeListenableFuture<T> {
   }
 
   @Override
-  protected boolean processFutureResult(String name, Map<ServerInstance, T> response, Map<ServerInstance, Throwable> error, long durationMillis) {
+  protected boolean processFutureResult(ServerInstance server, Map<ServerInstance, T> response, Map<ServerInstance, Throwable> error, long durationMillis) {
     // Add an argument here to get the time of completion of the future.
     boolean done = false;
     if ((null != response)) {
-      LOGGER.debug("Error got from {} is : {}", name, response);
+      LOGGER.debug("Error got from {} is : {}", server, response);
 
       _delayedResponse = response;
       _error = null;
       done = true;
     } else if (null != error) {
-      LOGGER.debug("Error got from {} is : {}", name, error);
+      LOGGER.debug("Error got from {} is : {}", server, error);
       _error = error;
     }
     _durationMillis = durationMillis;
     return done;
+  }
+
+  @Override
+  public ServerInstance getServerInstance() {
+    throw new RuntimeException("Invalid API call on selecting future");
   }
 
   @Override

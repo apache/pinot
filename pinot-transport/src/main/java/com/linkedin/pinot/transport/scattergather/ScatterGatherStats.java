@@ -17,6 +17,7 @@ package com.linkedin.pinot.transport.scattergather;
 
 import java.util.HashMap;
 import java.util.Map;
+import com.linkedin.pinot.common.response.ServerInstance;
 import javax.annotation.concurrent.NotThreadSafe;
 
 
@@ -50,15 +51,15 @@ public class ScatterGatherStats {
     _perServerStatsMap.get(server).setSendCompletionTimeMillis(millis);
   }
 
-  public void setResponseTimeMillis(Map<String, Long> responseTimeMap, boolean isOfflineTable) {
-    for (Map.Entry<String, Long> entry : responseTimeMap.entrySet()) {
-      String serverName = entry.getKey();
+  public void setResponseTimeMillis(Map<ServerInstance, Long> responseTimeMap, boolean isOfflineTable) {
+    for (Map.Entry<ServerInstance, Long> entry : responseTimeMap.entrySet()) {
+      String shortServerName = entry.getKey().getShortHostName();
       if (isOfflineTable) {
-        serverName += OFFLINE_TABLE_SUFFIX;
+        shortServerName += OFFLINE_TABLE_SUFFIX;
       } else {
-        serverName += REALTIME_TABLE_SUFFIX;
+        shortServerName += REALTIME_TABLE_SUFFIX;
       }
-      _perServerStatsMap.get(serverName).setResponseTimeMillis(entry.getValue());
+      _perServerStatsMap.get(shortServerName).setResponseTimeMillis(entry.getValue());
     }
   }
 
