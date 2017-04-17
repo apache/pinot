@@ -1,3 +1,5 @@
+<!-- Front end -->
+
 <?xml version="1.0" encoding="UTF-8"?>
 <project
   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
@@ -8,7 +10,7 @@
     <artifactId>thirdeye</artifactId>
     <version>1.0-SNAPSHOT</version>
   </parent>
-  <artifactId>thirdeye-webapp</artifactId>
+  <artifactId>thirdeye-frontend</artifactId>
   <name>thirdeye-webpapp</name>
   <url>http://maven.apache.org</url>
   <properties>

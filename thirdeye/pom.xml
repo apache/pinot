@@ -11,6 +11,7 @@
 
   <modules>
     <module>thirdeye-hadoop</module>
+    <module>thirdeye-frontend</module>
     <module>thirdeye-pinot</module>
   </modules>
 
@@ -343,4 +344,3 @@
     </plugins>
   </reporting>
 </project>
-
