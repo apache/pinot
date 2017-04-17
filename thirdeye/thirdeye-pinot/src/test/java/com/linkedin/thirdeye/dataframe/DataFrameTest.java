@@ -677,13 +677,13 @@ public class DataFrameTest {
   @Test
   public void testDataFrameGroupBy() {
     DataFrame.DataFrameGrouping grouping = df.groupBy("boolean");
-    DoubleSeries ds = grouping.aggregate("double", new DoubleSeries.DoubleSum()).getDoubles(Series.GROUP_VALUE);
+    DoubleSeries ds = grouping.aggregate("double", new DoubleSeries.DoubleSum()).getDoubles("double");
     assertEqualsDoubles(ds.values(), new double[] { 0.0, -0.4 });
 
-    LongSeries ls = grouping.aggregate("long", new LongSeries.LongSum()).get(Series.GROUP_VALUE).getLongs();
+    LongSeries ls = grouping.aggregate("long", new LongSeries.LongSum()).get("long").getLongs();
     Assert.assertEquals(ls.values(), new long[] { 0, 2 });
 
-    StringSeries ss = grouping.aggregate("string", new StringSeries.StringConcat("|")).get(Series.GROUP_VALUE).getStrings();
+    StringSeries ss = grouping.aggregate("string", new StringSeries.StringConcat("|")).get("string").getStrings();
     Assert.assertEquals(ss.values(), new String[] { "0.0", "-2.3|-1|0.5|0.13e1" });
   }
 

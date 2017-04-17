@@ -448,6 +448,15 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     }, this, other);
   }
 
+  public DoubleSeries add(final double constant) {
+    return this.map(new DoubleFunction() {
+      @Override
+      public double apply(double... values) {
+        return values[0] + constant;
+      }
+    });
+  }
+
   public DoubleSeries subtract(Series other) {
     return map(new DoubleFunction() {
       @Override
@@ -455,6 +464,15 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
         return values[0] - values[1];
       }
     }, this, other);
+  }
+
+  public DoubleSeries subtract(final double constant) {
+    return this.map(new DoubleFunction() {
+      @Override
+      public double apply(double... values) {
+        return values[0] - constant;
+      }
+    });
   }
 
   public DoubleSeries multiply(Series other) {
@@ -466,6 +484,15 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     }, this, other);
   }
 
+  public DoubleSeries multiply(final double constant) {
+    return this.map(new DoubleFunction() {
+      @Override
+      public double apply(double... values) {
+        return values[0] * constant;
+      }
+    });
+  }
+
   public DoubleSeries divide(Series other) {
     return map(new DoubleFunction() {
       @Override
@@ -473,6 +500,15 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
         return values[0] / values[1];
       }
     }, this, other);
+  }
+
+  public DoubleSeries divide(final double constant) {
+    return this.map(new DoubleFunction() {
+      @Override
+      public double apply(double... values) {
+        return values[0] / constant;
+      }
+    });
   }
 
   @Override

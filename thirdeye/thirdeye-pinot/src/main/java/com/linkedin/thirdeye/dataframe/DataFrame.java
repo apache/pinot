@@ -64,14 +64,20 @@ public class DataFrame {
    * based on a common key.
    */
   public static final class DataFrameGrouping {
+    final String keyName;
     final Series keys;
     final List<Series.Bucket> buckets;
     final DataFrame source;
 
-    DataFrameGrouping(Series keys, DataFrame source, List<Series.Bucket> buckets) {
+    DataFrameGrouping(String keyName, Series keys, DataFrame source, List<Series.Bucket> buckets) {
+      this.keyName = keyName;
       this.keys = keys;
       this.buckets = buckets;
       this.source = source;
+    }
+
+    DataFrameGrouping(Series keys, DataFrame source, List<Series.Bucket> buckets) {
+      this(Series.GROUP_KEY, keys, source, buckets);
     }
 
     public int size() {
@@ -91,7 +97,9 @@ public class DataFrame {
     }
 
     public DataFrame aggregate(String seriesName, Series.Function function) {
-      return this.get(seriesName).aggregate(function);
+      return this.get(seriesName).aggregate(function)
+          .renameSeries(Series.GROUP_KEY, this.keyName)
+          .renameSeries(Series.GROUP_VALUE, seriesName);
     }
   }
 
@@ -1032,7 +1040,8 @@ public class DataFrame {
    * @return DataFrameGrouping
    */
   public DataFrameGrouping groupBy(String seriesName) {
-    return this.groupBy(this.get(seriesName));
+    Series.SeriesGrouping grouping = this.get(seriesName).groupByValue();
+    return new DataFrameGrouping(seriesName, grouping.keys(), this, grouping.buckets);
   }
 
   /**

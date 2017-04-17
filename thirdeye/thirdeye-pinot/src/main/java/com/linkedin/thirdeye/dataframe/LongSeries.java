@@ -372,6 +372,15 @@ public final class LongSeries extends TypedSeries<LongSeries> {
     }, this, other);
   }
 
+  public LongSeries add(final long constant) {
+    return this.map(new LongFunction() {
+      @Override
+      public long apply(long... values) {
+        return values[0] + constant;
+      }
+    });
+  }
+
   public LongSeries subtract(Series other) {
     return map(new LongFunction() {
       @Override
@@ -379,6 +388,15 @@ public final class LongSeries extends TypedSeries<LongSeries> {
         return values[0] - values[1];
       }
     }, this, other);
+  }
+
+  public LongSeries subtract(final long constant) {
+    return this.map(new LongFunction() {
+      @Override
+      public long apply(long... values) {
+        return values[0] - constant;
+      }
+    });
   }
 
   public LongSeries multiply(Series other) {
@@ -390,6 +408,15 @@ public final class LongSeries extends TypedSeries<LongSeries> {
     }, this, other);
   }
 
+  public LongSeries multiply(final long constant) {
+    return this.map(new LongFunction() {
+      @Override
+      public long apply(long... values) {
+        return values[0] * constant;
+      }
+    });
+  }
+
   public LongSeries divide(Series other) {
     return map(new LongFunction() {
       @Override
@@ -397,6 +424,15 @@ public final class LongSeries extends TypedSeries<LongSeries> {
         return values[0] / values[1];
       }
     }, this, other);
+  }
+
+  public LongSeries divide(final long constant) {
+    return this.map(new LongFunction() {
+      @Override
+      public long apply(long... values) {
+        return values[0] / constant;
+      }
+    });
   }
 
   @Override
