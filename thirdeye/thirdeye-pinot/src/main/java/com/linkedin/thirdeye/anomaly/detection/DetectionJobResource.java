@@ -722,53 +722,38 @@ public class DetectionJobResource {
     return tuningParameters;
   }
 
+
   /**
+   * Single function Reply to generate anomalies given a time range
+   * Given anomaly function Id, or auto tuned Id, start time, end time, it clones a function with same configurations and replays from start time to end time
    * Replay function with input auto tuned configurations and save the cloned function
-   * @param id: function auto tune id
-   * @param replayStartTimeIso: the start time of the anomaly function replay in ISO format, e.g. 2017-02-27T00:00:00.000Z
-   * @param replayEndTimeIso: the end time of the anomaly function replay in ISO format
-   * @return cloned function Id
-   * @throws Exception: throw exception when input time string cannot be parsed
-   */
-  @POST
-  @Path("/replay/functionconfig/{autotuneId}")
-  public Response replayAnomalyFunctionByAutoTuneId(@PathParam("autotuneId") long id,
-      @QueryParam("start") @NotNull String replayStartTimeIso, @QueryParam("end") @NotNull String replayEndTimeIso)
-      throws Exception {
-    DateTime replayStart = null;
-    DateTime replayEnd = null;
-    try {
-      replayStart = ISODateTimeFormat.dateTimeParser().parseDateTime(replayStartTimeIso);
-      replayEnd = ISODateTimeFormat.dateTimeParser().parseDateTime(replayEndTimeIso);
-    } catch (Exception e) {
-      throw new WebApplicationException("Unable to parse strings, " + replayStartTimeIso + " and " + replayEndTimeIso +
-          ", in ISO DateTime format", e);
-    }
-
-    // clone function to update function configs
-    AutotuneConfigDTO target = DAO_REGISTRY.getAutotuneConfigDAO().findById(id);
-    long functionId = target.getFunctionId();
-
-    FunctionReplayRunnable functionReplayRunnable = new FunctionReplayRunnable(detectionJobScheduler, anomalyFunctionDAO, mergedAnomalyResultDAO, rawAnomalyResultDAO, target.getConfiguration(), functionId, replayStart, replayEnd, false);
-    functionReplayRunnable.run();
-    return Response.ok(functionReplayRunnable.getLastClonedFunctionId()).build();
-  }
-
-  /**
-   * Single function Reply to generate unnotified anomalies for user to label.
-   * Given anomaly function Id, start time, end time, it clones a function with same configurations and replays from start time to end time
-   * @param id FunctionId
+   * @param functionId FunctionId
+   * @param autotuneId autotuneId
+   * Either functionId or autotuneId should be not null to provide function information, if functionId is not aligned with autotuneId's function, use all function information from autotuneId
    * @param replayStartTimeIso replay start time in ISO format, e.g. 2017-02-27T00:00:00.000Z
-   * @param replayEndTimeIso replay end time
+   * @param replayEndTimeIso replay end time, e.g. 2017-02-27T00:00:00.000Z
    * @return cloned function Id
    */
   @POST
-  @Path("/replay/singlefunction/{functionId}")
-  public Response replayAnomalyFunctionByFunctionId(@PathParam("functionId") long id,
-      @QueryParam("start") @NotNull String replayStartTimeIso, @QueryParam("end") @NotNull String replayEndTimeIso){
+  @Path("/replay/singlefunction/")
+  public Response replayAnomalyFunctionByFunctionId(@QueryParam("functionId") @DefaultValue("") Long functionId,
+      @QueryParam("autotuneId") @DefaultValue("") Long autotuneId,
+      @QueryParam("start") @NotNull String replayStartTimeIso, @QueryParam("end") @NotNull String replayEndTimeIso) throws IllegalArgumentException{
+    if(functionId == null && autotuneId == null) {
+      throw new IllegalArgumentException("Both function Id and autotune Id are null!");
+    }
     DateTime replayStart = ISODateTimeFormat.dateTimeParser().parseDateTime(replayStartTimeIso);
     DateTime replayEnd = ISODateTimeFormat.dateTimeParser().parseDateTime(replayEndTimeIso);
-    FunctionReplayRunnable functionReplayRunnable = new FunctionReplayRunnable(detectionJobScheduler, anomalyFunctionDAO, mergedAnomalyResultDAO, rawAnomalyResultDAO, new HashMap<String, String>(), id, replayStart, replayEnd, false);
+    FunctionReplayRunnable functionReplayRunnable;
+    if(autotuneId != null){
+      AutotuneConfigDTO target = DAO_REGISTRY.getAutotuneConfigDAO().findById(autotuneId);
+      if(functionId == null || target.getFunctionId() != functionId){
+        functionId = target.getFunctionId();
+      }
+      functionReplayRunnable = new FunctionReplayRunnable(detectionJobScheduler, anomalyFunctionDAO, mergedAnomalyResultDAO, rawAnomalyResultDAO, target.getConfiguration(), functionId, replayStart, replayEnd, false);
+    } else {
+      functionReplayRunnable = new FunctionReplayRunnable(detectionJobScheduler, anomalyFunctionDAO, mergedAnomalyResultDAO, rawAnomalyResultDAO, new HashMap<String, String>(), functionId, replayStart, replayEnd, false);
+    }
     functionReplayRunnable.run();
     return Response.ok(functionReplayRunnable.getLastClonedFunctionId()).build();
   }
