@@ -91,6 +91,11 @@ public abstract class ThirdEyeConfiguration extends Configuration {
     return getRootDir() + "/detector-config/anomaly-functions/alertFilterAutotune.properties";
   }
 
+  //pipelines.properties format: {pipeline name} = {path to pipeline implementation}
+  public String getRCAPipelinesConfigPath() {
+    return getRootDir() + "/rca-config/pipelines.properties";
+  }
+
   public String getSmtpHost() {
     return smtpHost;
   }

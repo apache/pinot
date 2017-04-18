@@ -11,6 +11,7 @@ import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import com.linkedin.thirdeye.rootcause.Aggregator;
 import com.linkedin.thirdeye.rootcause.Entity;
@@ -18,6 +19,7 @@ import com.linkedin.thirdeye.rootcause.RCAFramework;
 import com.linkedin.thirdeye.rootcause.RCAFrameworkResult;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.SearchContext;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -29,6 +31,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
 import org.apache.commons.cli.BasicParser;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.HelpFormatter;
@@ -36,7 +39,10 @@ import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.commons.cli.Parser;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.LoggerFactory;
+
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 
@@ -113,6 +119,10 @@ public class RCAFrameworkRunner {
 
     // MetricDataset pipeline
     pipelines.add(new MetricDatasetPipeline(metricDAO, datasetDAO));
+
+    // External pipelines
+    List<Pipeline> externalPipelines = PipelineUtils.getPipelinesFromConfig(thirdEyeConfig);
+    pipelines.addAll(externalPipelines);
 
     Aggregator aggregator = new LinearAggregator();
 
@@ -237,4 +247,8 @@ public class RCAFrameworkRunner {
   static String formatEntity(Entity e) {
     return String.format("%.3f [%s] %s", e.getScore(), e.getClass().getSimpleName(), e.getUrn());
   }
+
+
+
+
 }
