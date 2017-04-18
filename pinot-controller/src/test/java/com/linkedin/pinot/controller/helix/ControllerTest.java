@@ -16,6 +16,10 @@
 package com.linkedin.pinot.controller.helix;
 
 import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.utils.ZkStarter;
+import com.linkedin.pinot.controller.ControllerConf;
+import com.linkedin.pinot.controller.ControllerStarter;
+import com.linkedin.pinot.controller.validation.ValidationManager;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -25,6 +29,12 @@ import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.methods.PostMethod;
+import org.apache.commons.httpclient.methods.PutMethod;
+import org.apache.commons.httpclient.methods.multipart.MultipartRequestEntity;
+import org.apache.commons.httpclient.methods.multipart.Part;
+import org.apache.commons.httpclient.methods.multipart.StringPart;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.ZNRecord;
@@ -34,10 +44,6 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.common.utils.ZkStarter;
-import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.ControllerStarter;
-import com.linkedin.pinot.controller.validation.ValidationManager;
 
 
 /**
@@ -240,6 +246,29 @@ public abstract class ControllerTest {
       queryResp.append(respLine);
     }
     return queryResp.toString();
+  }
+
+  public static PostMethod sendMultipartPostRequest(String url, String body)
+      throws IOException {
+    HttpClient httpClient = new HttpClient();
+    PostMethod postMethod = new PostMethod(url);
+    // our handlers ignore key...so we can put anything here
+    Part[] parts = { new StringPart("body", body)};
+    postMethod.setRequestEntity(new MultipartRequestEntity(parts, postMethod.getParams()));
+    httpClient.executeMethod(postMethod);
+    return postMethod;
+  }
+
+  public static PutMethod sendMultipartPutRequest(String url, String body)
+      throws IOException {
+    HttpClient httpClient = new HttpClient();
+    PutMethod putMethod = new PutMethod(url);
+    // our handlers ignore key...so we can put anything here
+    Part[] parts = { new StringPart("body", body)};
+    putMethod.setRequestEntity(new MultipartRequestEntity(parts, putMethod.getParams()));
+    httpClient.executeMethod(putMethod);
+    return putMethod;
+
   }
 
   protected String getHelixClusterName() {
