@@ -10,14 +10,11 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 public class DummyAlertGrouperTest {
-  private final static String GROUP_BY_DIMENSION_NAME = "K1";
-
-  private DummyAlertGrouper alertGrouper;
 
   @Test(dataProvider="prepareAnomalyGroups", dataProviderClass=DimensionalAlertGrouperTest.class)
   public void testGroup(List<MergedAnomalyResultDTO> anomalies, Set<MergedAnomalyResultDTO> expectedGroup1,
       Set<MergedAnomalyResultDTO> expectedGroup2, Set<MergedAnomalyResultDTO> expectedRollUpGroup) {
-    alertGrouper = new DummyAlertGrouper();
+    DummyAlertGrouper alertGrouper = new DummyAlertGrouper();
 
     Map<GroupKey<DimensionMap>, GroupedAnomalyResults> groupedAnomalies = alertGrouper.group(anomalies);
     Assert.assertEquals(groupedAnomalies.size(), 1);
@@ -33,4 +30,5 @@ public class DummyAlertGrouperTest {
     actualAnomalySet.addAll(actualAnomalies);
     Assert.assertEquals(actualAnomalySet, expectedAnomalySet);
   }
+
 }
