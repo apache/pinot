@@ -26,15 +26,6 @@ public class TestPrecisionRecallEvaluator {
     evaluator.init(anomalies);
     assertEquals(evaluator.getWeightedPrecision(), 0.2, 0.0001);
     assertEquals(evaluator.getRecall(), 1, 0.0001);
-
-    // test data with 0 positive feedback, 1 negative feedback and others are NA feedbacks
-//    anomalies = getMockMergedAnomalies(-1,6);
-//    try{
-//      evaluator.updateWeighedPrecisionAndRecall(anomalies);
-//      fail("Should throw exception");
-//    } catch (Exception e) {
-//      assertEquals("No true labels in dataset. Check data", e.getMessage());
-//    }
   }
 
 
