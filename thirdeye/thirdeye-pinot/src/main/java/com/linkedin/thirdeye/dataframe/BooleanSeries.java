@@ -206,6 +206,10 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
     return builder().fillValues(size, NULL).build();
   }
 
+  public static BooleanSeries fillTrue(int size) { return builder().fillValues(size, TRUE).build(); }
+
+  public static BooleanSeries fillFalse(int size) { return builder().fillValues(size, FALSE).build(); }
+
   // CAUTION: The array is final, but values are inherently modifiable
   final byte[] values;
 
@@ -445,13 +449,28 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
     return this.implies(isTrue(constant));
   }
 
-  public  BooleanSeries implies(Series other) {
+  public BooleanSeries implies(Series other) {
     return map(new BooleanFunction() {
       @Override
       public boolean apply(boolean... values) {
         return !values[0] | values[1];
       }
     }, this, other);
+  }
+
+  public BooleanSeries eq(byte constant) {
+    if(isNull(constant))
+      return this.isNull();
+    return this.eq(valueOf(constant));
+  }
+
+  public BooleanSeries eq(final boolean constant) {
+    return this.map(new BooleanFunction() {
+      @Override
+      public boolean apply(boolean... values) {
+        return values[0] == constant;
+      }
+    });
   }
 
   @Override

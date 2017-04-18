@@ -969,9 +969,7 @@ public class DataFrame {
       }
     }
 
-    int[] fromIndexCompressed = Arrays.copyOf(fromIndex, fromIndexCount);
-
-    return this.project(fromIndexCompressed);
+    return this.project(Arrays.copyOf(fromIndex, fromIndexCount));
   }
 
   public DataFrame filter(String seriesName) {
@@ -1052,29 +1050,22 @@ public class DataFrame {
    * @return DataFrame copy without null rows
    */
   public DataFrame dropNull() {
-    int[] fromIndex = new int[this.size()];
-    for(int i=0; i<fromIndex.length; i++) {
-      fromIndex[i] = i;
-    }
-
+    BooleanSeries nulls = BooleanSeries.fillFalse(this.size());
     for(Series s : this.series.values()) {
-      int[] nulls = s.nullIndex();
-      for(int n : nulls) {
-        fromIndex[n] = -1;
-      }
+      nulls = nulls.or(s.isNull());
     }
+    boolean[] isNull = nulls.valuesBoolean();
 
+    int[] fromIndex = new int[this.size()];
     int countNotNull = 0;
     for(int i=0; i<fromIndex.length; i++) {
-      if(fromIndex[i] >= 0) {
-        fromIndex[countNotNull] = fromIndex[i];
+      if(!isNull[i]) {
+        fromIndex[countNotNull] = i;
         countNotNull++;
       }
     }
 
-    int[] fromIndexCompressed = Arrays.copyOf(fromIndex, countNotNull);
-
-    return this.project(fromIndexCompressed);
+    return this.project(Arrays.copyOf(fromIndex, countNotNull));
   }
 
   /**

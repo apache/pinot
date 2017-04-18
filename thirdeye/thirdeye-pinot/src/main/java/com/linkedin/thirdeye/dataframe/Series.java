@@ -1059,26 +1059,23 @@ public abstract class Series {
     return first.append(rest);
   }
 
+  /**
+   * Returns a BooleanSeries which contains a value indicating the null-equivalence for each
+   * value in the original series (this).
+   *
+   * @return boolean series indicating null-equivalence of each value
+   */
+  public BooleanSeries isNull() {
+    byte[] values = new byte[this.size()];
+    for(int i=0; i<this.size(); i++) {
+      values[i] = BooleanSeries.valueOf(this.isNull(i));
+    }
+    return BooleanSeries.buildFrom(values);
+  }
+
   /* *************************************************************************
    * Internal interface
    * *************************************************************************/
-
-  /**
-   * Returns an array of indices with size less than or equal to the series size, such that
-   * each index references a null value in the original series.
-   *
-   * @return indices of null values
-   */
-  int[] nullIndex() {
-    int[] nulls = new int[this.size()];
-    int count = 0;
-    for(int i=0; i<this.size(); i++) {
-      if(isNull(i)) {
-        nulls[count++] = i;
-      }
-    }
-    return Arrays.copyOf(nulls, count);
-  }
 
   /**
    * Returns index tuples (pairs) for a join performed based on value.
