@@ -11,7 +11,7 @@ import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
  */
 public class MetricDimensionEntity extends MetricEntity {
   public static MetricDimensionEntity fromDTO(double score, MetricConfigDTO dto, DatasetConfigDTO dataset, String dimension) {
-    String urn = EntityUtils.EntityType.METRIC.formatUrn("%s:%s:%s", dto.getDataset(), dto.getName(), dimension);
+    String urn = EntityType.METRIC.formatUrn("%s:%s:%s", dto.getDataset(), dto.getName(), dimension);
     return new MetricDimensionEntity(urn, score, dto, dataset, dimension);
   }
 

@@ -39,7 +39,7 @@ public class EventMetricPipeline implements Pipeline {
 
   @Override
   public PipelineResult run(ExecutionContext context) {
-    Set<Entity> metrics = EntityUtils.filterContext(context, EntityUtils.EntityType.METRIC);
+    Set<Entity> metrics = EntityUtils.filterContext(context, EntityType.METRIC);
 
     TimeRangeEntity current = EntityUtils.getContextTimeRange(context);
     if(current == null) {

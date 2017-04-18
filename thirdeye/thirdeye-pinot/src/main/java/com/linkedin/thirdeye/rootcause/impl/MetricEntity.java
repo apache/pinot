@@ -11,7 +11,7 @@ import com.linkedin.thirdeye.rootcause.Entity;
  */
 public class MetricEntity extends Entity {
   public static MetricEntity fromDTO(double score, MetricConfigDTO metric, DatasetConfigDTO dataset) {
-    String urn = EntityUtils.EntityType.METRIC.formatUrn("%s:%s", metric.getDataset(), metric.getName());
+    String urn = EntityType.METRIC.formatUrn("%s:%s", metric.getDataset(), metric.getName());
     return new MetricEntity(urn, score, metric, dataset);
   }
 

@@ -105,7 +105,7 @@ public class RCAFrameworkRunner {
     pipelines.add(new MetricDimensionPipeline(metricDAO, datasetDAO, scorer));
 
     // MetricDataset pipeline
-    pipelines.add(new MetricDatsetPipeline(metricDAO, datasetDAO));
+    pipelines.add(new MetricDatasetPipeline(metricDAO, datasetDAO));
 
     Aggregator aggregator = new LinearAggregator();
 
@@ -194,9 +194,9 @@ public class RCAFrameworkRunner {
     }
 
     System.out.println("*** Grouped results:");
-    Map<EntityUtils.EntityType, Collection<Entity>>
+    Map<EntityType, Collection<Entity>>
         grouped = topKPerType(result.getAggregatedResults(), 3);
-    for(Map.Entry<EntityUtils.EntityType, Collection<Entity>> entry : grouped.entrySet()) {
+    for(Map.Entry<EntityType, Collection<Entity>> entry : grouped.entrySet()) {
       System.out.println(entry.getKey().getPrefix());
       for(Entity e : entry.getValue()) {
         System.out.println(formatEntity(e));
@@ -211,10 +211,10 @@ public class RCAFrameworkRunner {
    * @param k maximum number of entities per entity type
    * @return mapping of entity types to list of entities
    */
-  static Map<EntityUtils.EntityType, Collection<Entity>> topKPerType(Collection<Entity> entities, int k) {
-    Map<EntityUtils.EntityType, Collection<Entity>> map = new HashMap<>();
+  static Map<EntityType, Collection<Entity>> topKPerType(Collection<Entity> entities, int k) {
+    Map<EntityType, Collection<Entity>> map = new HashMap<>();
     for(Entity e : entities) {
-      EntityUtils.EntityType type = EntityUtils.getType(e.getUrn());
+      EntityType type = EntityUtils.getType(e.getUrn());
 
       if(!map.containsKey(type))
         map.put(type, new ArrayList<Entity>());

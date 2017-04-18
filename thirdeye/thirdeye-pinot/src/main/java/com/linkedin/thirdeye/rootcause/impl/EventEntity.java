@@ -10,7 +10,7 @@ import com.linkedin.thirdeye.rootcause.Entity;
  */
 public class EventEntity extends Entity {
   public static EventEntity fromDTO(double score, EventDTO dto) {
-    String urn = EntityUtils.EntityType.EVENT.formatUrn("%s:%s:%d", dto.getEventType(), dto.getName(), dto.getStartTime());
+    String urn = EntityType.EVENT.formatUrn("%s:%s:%d", dto.getEventType(), dto.getName(), dto.getStartTime());
     return new EventEntity(urn, score, dto);
   }
 

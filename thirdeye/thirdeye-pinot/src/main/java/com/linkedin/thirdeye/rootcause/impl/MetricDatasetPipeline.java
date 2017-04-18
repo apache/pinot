@@ -24,13 +24,13 @@ import org.slf4j.LoggerFactory;
  * searches Thirdeye's internal database for metrics contained in the same datasets as
  * any metric entities in the search context. All found metrics are scored equally.
  */
-public class MetricDatsetPipeline implements Pipeline {
-  private static final Logger LOG = LoggerFactory.getLogger(MetricDatsetPipeline.class);
+public class MetricDatasetPipeline implements Pipeline {
+  private static final Logger LOG = LoggerFactory.getLogger(MetricDatasetPipeline.class);
 
   final MetricConfigManager metricDAO;
   final DatasetConfigManager datasetDAO;
 
-  public MetricDatsetPipeline(MetricConfigManager metricDAO, DatasetConfigManager datasetDAO) {
+  public MetricDatasetPipeline(MetricConfigManager metricDAO, DatasetConfigManager datasetDAO) {
     this.metricDAO = metricDAO;
     this.datasetDAO = datasetDAO;
   }
@@ -42,7 +42,7 @@ public class MetricDatsetPipeline implements Pipeline {
 
   @Override
   public PipelineResult run(ExecutionContext context) {
-    Set<Entity> metrics = EntityUtils.filterContext(context, EntityUtils.EntityType.METRIC);
+    Set<Entity> metrics = EntityUtils.filterContext(context, EntityType.METRIC);
 
     Set<String> datasets = new HashSet<>();
     Map<String, Double> datasetScores = new HashMap<>();

@@ -9,13 +9,13 @@ import com.linkedin.thirdeye.rootcause.Entity;
  */
 public class BaselineEntity extends Entity {
   public static BaselineEntity fromURN(String urn, double score) {
-    EntityUtils.assertType(urn, EntityUtils.EntityType.BASELINE);
+    EntityUtils.assertType(urn, EntityType.BASELINE);
     String[] parts = urn.split(":");
     return new BaselineEntity(urn, score, Long.parseLong(parts[2]), Long.parseLong(parts[3]));
   }
 
   public static BaselineEntity fromRange(double score, long start, long end) {
-    String urn = EntityUtils.EntityType.BASELINE.formatUrn("%d:%d", start, end);
+    String urn = EntityType.BASELINE.formatUrn("%d:%d", start, end);
     return new BaselineEntity(urn, score, start, end);
   }
 
