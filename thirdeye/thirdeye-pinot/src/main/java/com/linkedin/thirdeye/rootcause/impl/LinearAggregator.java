@@ -15,6 +15,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * Sample implementation of an aggregator that normalizes weights across pipelines and handles
+ * the same entity being returned from multiple pipelines by summing the entity's weights. Each
+ * pipeline is weighted equally.
+ */
 public class LinearAggregator implements Aggregator {
   private static Logger LOG = LoggerFactory.getLogger(LinearAggregator.class);
 

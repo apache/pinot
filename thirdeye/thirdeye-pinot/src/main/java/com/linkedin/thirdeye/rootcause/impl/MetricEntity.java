@@ -5,6 +5,10 @@ import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.rootcause.Entity;
 
 
+/**
+ * MetricEntity represents an individual metric. It holds meta-data referencing ThirdEye's internal
+ * database. The URN namespace is defined as 'thirdeye:metric:{dataset}:{name}'.
+ */
 public class MetricEntity extends Entity {
   public static MetricEntity fromDTO(double score, MetricConfigDTO metric, DatasetConfigDTO dataset) {
     String urn = EntityUtils.EntityType.METRIC.formatUrn("%s:%s", metric.getDataset(), metric.getName());

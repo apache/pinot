@@ -28,6 +28,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * The MetricDimensionScorer performs contribution analysis for sets of associated metric
+ * dimensions given a time range and a baseline range. It relies on ThirdEye's internal QueryCache
+ * to obtain the necessary data for constructing a data cube.
+ */
 public class MetricDimensionScorer {
   private static final Logger LOG = LoggerFactory.getLogger(MetricDimensionScorer.class);
 
@@ -40,6 +45,16 @@ public class MetricDimensionScorer {
     this.cache = cache;
   }
 
+  /**
+   * Perform contribution analysis on associated MetricDimension entities given a time range
+   * and baseline range.
+   *
+   * @param entities MetricDimensionEntities of same metric and dataset
+   * @param current current time range
+   * @param baseline baseline time range
+   * @return MetricDimensionEntities with score updated according to contribution
+   * @throws Exception if data cannot be fetched or data is invalid
+   */
   Collection<MetricDimensionEntity> score(Collection<MetricDimensionEntity> entities, TimeRangeEntity current, BaselineEntity baseline) throws Exception {
     if(entities.isEmpty())
       return Collections.emptyList();
@@ -67,7 +82,7 @@ public class MetricDimensionScorer {
     cube.buildWithAutoDimensionOrder(olapClient, dimensions, topDimensions, Collections.<List<String>>emptyList());
 
     // group by dimension
-    DataFrame df = makeContribution(cube.getCostSet());
+    DataFrame df = toDataFrame(cube.getCostSet());
 
     // map dimension to MetricDimension
     Map<String, MetricDimensionEntity> mdMap = new HashMap<>();
@@ -105,7 +120,7 @@ public class MetricDimensionScorer {
     return olapClient;
   }
 
-  private static DataFrame makeContribution(Collection<DimNameValueCostEntry> costs) {
+  private static DataFrame toDataFrame(Collection<DimNameValueCostEntry> costs) {
     String[] dim = new String[costs.size()];
     double[] contrib = new double[costs.size()];
     int i = 0;

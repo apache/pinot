@@ -14,6 +14,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * Sample implementation of a pipeline for identifying events based on their start and end times.
+ * The pipeline identifies the TimeRangeEntity in the search context and then invokes the
+ * event provider manager to fetch any matching events. It then scores events based on their
+ * time distance from the end of the search time window (closer is better).
+ */
 public class EventTimePipeline implements Pipeline {
   private static Logger LOG = LoggerFactory.getLogger(EventTimePipeline.class);
 

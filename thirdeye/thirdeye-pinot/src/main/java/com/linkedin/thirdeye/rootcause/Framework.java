@@ -10,6 +10,20 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * Container class for configuring and executing a rootcause search with multiple pipelines.
+ * The framework is instantiated with multiple (named) pipelines and a result aggregator. The run()
+ * method then executes the configured pipelines and aggregation for arbitrary search contexts without
+ * storing any additional state within the Framework.
+ */
+
+/*
+ *                          /-> pipeline.run() \
+ *                         /                    \
+ * SearchContext --> run() ---> pipeline.run() ---> aggregator.aggregate() --> FrameworkResult
+ *                         \                    /
+ *                          \-> pipeline.run() /
+ */
 public class Framework {
   private static final Logger LOG = LoggerFactory.getLogger(Framework.class);
 
@@ -26,6 +40,13 @@ public class Framework {
     this.aggregator = aggregator;
   }
 
+  /**
+   * Performs rootcause search for a user-specified search context. Fans out entities to individual
+   * pipelines, collects results, and aggregates them.
+   *
+   * @param searchContext user-specified search entities
+   * @return aggregated result
+   */
   public FrameworkResult run(SearchContext searchContext) {
     Map<String, PipelineResult> results = new HashMap<>();
 

@@ -17,6 +17,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * Sample implementation of a pipeline for identifying events based on their associated metric
+ * names. The pipeline identifies metric entities in the search context and then invokes the
+ * event provider manager to fetch any matching events. It then scores events based on their
+ * time distance from the end of the search time window (closer is better).
+ */
 public class EventMetricPipeline implements Pipeline {
   private static final Logger LOG = LoggerFactory.getLogger(EventMetricPipeline.class);
 

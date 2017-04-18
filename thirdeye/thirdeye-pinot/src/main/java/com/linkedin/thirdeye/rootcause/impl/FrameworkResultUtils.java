@@ -7,7 +7,18 @@ import java.util.HashMap;
 import java.util.Map;
 
 
+/**
+ * Utility class for grouping linearized framework results
+ */
 public class FrameworkResultUtils {
+
+  /**
+   * Returns the top K (first K) results per entity type from a collection of entities.
+   *
+   * @param entities aggregated entities
+   * @param k maximum number of entities per entity type
+   * @return mapping of entity types to list of entities
+   */
   public static Map<EntityUtils.EntityType, Collection<Entity>> topKPerType(Collection<Entity> entities, int k) {
     Map<EntityUtils.EntityType, Collection<Entity>> map = new HashMap<>();
     for(Entity e : entities) {

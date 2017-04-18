@@ -37,6 +37,14 @@ import org.apache.commons.cli.ParseException;
 import org.apache.commons.cli.Parser;
 
 
+/**
+ * Console interface for performing root cause search using a sample pipeline configuration.
+ * The user can specify the TimeRange and Baseline entities, as well as arbitrary URNs to
+ * populate the search context with. The console interface allows one-off or interactive REPL execution modes.
+ * <br/><b>Example:</b> {@code java -cp target/thirdeye-pinot-1.0-SNAPSHOT.jar com.linkedin.thirdeye.rootcause.impl.FrameworkRunner
+ * --config-dir local-configs/ --window-size 28 --baseline-offset 28 --entities thirdeye:metric:pageViews,thirdeye:metric:logins}
+ *
+ */
 public class FrameworkRunner {
   private static final String CLI_CONFIG_DIR = "config-dir";
   private static final String CLI_WINDOW_SIZE = "window-size";
@@ -54,7 +62,7 @@ public class FrameworkRunner {
 
     options.addOption(null, CLI_WINDOW_SIZE, true, "window size for search window (in days)");
     options.addOption(null, CLI_BASELINE_OFFSET, true, "baseline offset (in days)");
-    options.addOption(null, CLI_ENTITIES, true, "search context entities");
+    options.addOption(null, CLI_ENTITIES, true, "search context entities (not specifying this will activate interactive REPL mode)");
 
     Parser parser = new BasicParser();
     CommandLine cmd = null;

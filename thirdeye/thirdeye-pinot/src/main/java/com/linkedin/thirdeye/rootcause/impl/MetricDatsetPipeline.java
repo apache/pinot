@@ -16,6 +16,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * Sample implementation of a pipeline for identifying relevant metrics based on dataset
+ * association. The pipeline first fetches metric entities from the context and then
+ * searches Thirdeye's internal database for metrics contained in the same datasets as
+ * any metric entities in the search context. All found metrics are scored equally.
+ */
 public class MetricDatsetPipeline implements Pipeline {
   private static final Logger LOG = LoggerFactory.getLogger(MetricDatsetPipeline.class);
 

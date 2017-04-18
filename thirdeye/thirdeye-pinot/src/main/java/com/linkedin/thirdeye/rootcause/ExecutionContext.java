@@ -5,6 +5,11 @@ import java.util.HashMap;
 import java.util.Map;
 
 
+/**
+ * Container object for the execution context (the state) of {@code Framework.run()}. Holds the search context
+ * with user-specified entities as well as the (incremental) results from executing individual
+ * pipelines.
+ */
 public class ExecutionContext {
   final SearchContext searchContext;
   final Map<String, PipelineResult> results;

@@ -3,6 +3,10 @@ package com.linkedin.thirdeye.rootcause.impl;
 import com.linkedin.thirdeye.rootcause.Entity;
 
 
+/**
+ * TimeRangeEntity represents a time-range as investigated by the user for purposes of
+ * root cause search. The URN namespace is defined as 'thirdeye:timerange:{start}:{end}'.
+ */
 public class TimeRangeEntity extends Entity {
   public static TimeRangeEntity fromURN(String urn, double score) {
     EntityUtils.assertType(urn, EntityUtils.EntityType.TIMERANGE);

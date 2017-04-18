@@ -18,6 +18,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * Sample implementation of a pipeline for identifying relevant metric dimensions by performing
+ * contribution analysis. The pipeline first fetches the TimeRange and Baseline entities and
+ * MetricEntities in the search context. It then maps metric URNs to ThirdEye's internal database
+ * and performs contribution analysis using a {@code MetricDimensionScorer).
+ *
+ * @see MetricDimensionScorer
+ */
 public class MetricDimensionPipeline implements Pipeline {
   private static final Logger LOG = LoggerFactory.getLogger(MetricDimensionPipeline.class);
 
