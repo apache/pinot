@@ -400,10 +400,10 @@ public abstract class Series {
    * Returns a copy of the series with values replaced by {@code null} for every row in
    * {@code filter} that is not {@code true}.
    *
-   * @param filter series to filter by
+   * @param mask series to filter by
    * @return filtered series copy
    */
-  public abstract Series filter(BooleanSeries filter);
+  public abstract Series filter(BooleanSeries mask);
 
   /* *************************************************************************
    * Internal abstract interface
@@ -631,11 +631,20 @@ public abstract class Series {
    * @return {@code true} if empty, {@code false} otherwise
    */
   public final boolean hasNull() {
-    for(int i=0; i<this.size(); i++) {
-      if(isNull(i))
-        return true;
-    }
-    return false;
+    return this.count() < this.size();
+  }
+
+  /**
+   * Returns the number of non-null values in the series.
+   *
+   * @return count of non-null values
+   */
+  public final int count() {
+    int countNotNull = 0;
+    for(int i=0; i<this.size(); i++)
+      if(!this.isNull(i))
+        countNotNull++;
+    return countNotNull;
   }
 
   /**
@@ -738,6 +747,31 @@ public abstract class Series {
     return this.project(Arrays.copyOf(fromIndex, count));
   }
 
+  /**
+   * Returns a BooleanSeries which contains a value indicating the null-equivalence for each
+   * value in the original series (this).
+   *
+   * @return boolean series indicating null-equivalence of each value
+   */
+  public BooleanSeries isNull() {
+    byte[] values = new byte[this.size()];
+    for(int i=0; i<this.size(); i++) {
+      values[i] = BooleanSeries.valueOf(this.isNull(i));
+    }
+    return BooleanSeries.buildFrom(values);
+  }
+
+  /**
+   * Returns a copy of the series with values replaced by {@code null} for every row in
+   * the result of applying {@code conditional} to the series that is not {@code true}.
+   *
+   * @param conditional conditional to apply and filter by
+   * @return filtered series copy
+   */
+  public Series filter(Conditional conditional) {
+    return this.filter(this.map(conditional));
+  }
+
   //
   // NOTE: co-variant method messiness
   //
@@ -826,29 +860,8 @@ public abstract class Series {
   /**
    * @see Series#map(Function)
    */
-  public final BooleanSeries map(DoubleConditional function) {
-    return (BooleanSeries)map(function, this);
-  }
-
-  /**
-   * @see Series#map(Function)
-   */
-  public final BooleanSeries map(LongConditional function) {
-    return (BooleanSeries)map(function, this);
-  }
-
-  /**
-   * @see Series#map(Function)
-   */
-  public final BooleanSeries map(StringConditional function) {
-    return (BooleanSeries)map(function, this);
-  }
-
-  /**
-   * @see Series#map(Function)
-   */
-  public final BooleanSeries map(BooleanConditional function) {
-    return (BooleanSeries)map(function, this);
+  public final BooleanSeries map(Conditional conditional) {
+    return (BooleanSeries)map(conditional, this);
   }
 
   //
@@ -926,29 +939,8 @@ public abstract class Series {
   /**
    * @see Series#aggregate(Function)
    */
-  public final BooleanSeries aggregate(DoubleConditional function) {
-    return (BooleanSeries)this.aggregate((Function)function);
-  }
-
-  /**
-   * @see Series#aggregate(Function)
-   */
-  public final BooleanSeries aggregate(LongConditional function) {
-    return (BooleanSeries)this.aggregate((Function)function);
-  }
-
-  /**
-   * @see Series#aggregate(Function)
-   */
-  public final BooleanSeries aggregate(StringConditional function) {
-    return (BooleanSeries)this.aggregate((Function)function);
-  }
-
-  /**
-   * @see Series#aggregate(Function)
-   */
-  public final BooleanSeries aggregate(BooleanConditional function) {
-    return (BooleanSeries)this.aggregate((Function)function);
+  public final BooleanSeries aggregate(Conditional conditional) {
+    return (BooleanSeries)this.aggregate((Function)conditional);
   }
 
   /**
@@ -1071,20 +1063,6 @@ public abstract class Series {
     Series[] rest = Arrays.copyOfRange(series, 1, series.length);
 
     return first.append(rest);
-  }
-
-  /**
-   * Returns a BooleanSeries which contains a value indicating the null-equivalence for each
-   * value in the original series (this).
-   *
-   * @return boolean series indicating null-equivalence of each value
-   */
-  public BooleanSeries isNull() {
-    byte[] values = new byte[this.size()];
-    for(int i=0; i<this.size(); i++) {
-      values[i] = BooleanSeries.valueOf(this.isNull(i));
-    }
-    return BooleanSeries.buildFrom(values);
   }
 
   /* *************************************************************************

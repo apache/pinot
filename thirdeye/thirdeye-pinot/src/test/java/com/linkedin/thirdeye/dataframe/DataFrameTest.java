@@ -671,7 +671,7 @@ public class DataFrameTest {
 
   @Test
   public void testBooleanAggregateWithNull() {
-    BooleanSeries s = DataFrame.toSeries(new byte[] { 1, 0, BNULL, 1 });
+    BooleanSeries s = DataFrame.toSeries(TRUE, FALSE, BNULL, TRUE);
     Assert.assertEquals(s.aggregate(BooleanSeries.HAS_TRUE).value(), BNULL);
     Assert.assertEquals(s.fillNull().aggregate(BooleanSeries.HAS_TRUE).value(), 1);
     Assert.assertEquals(s.dropNull().aggregate(BooleanSeries.HAS_TRUE).value(), 1);
@@ -739,6 +739,9 @@ public class DataFrameTest {
   public void testFilter() {
     df = df.filter(DataFrame.toSeries(true, false, true, true, false));
 
+    Assert.assertEquals(df.size(), 5);
+    df = df.dropNull();
+
     Assert.assertEquals(df.size(), 3);
     assertEquals(df.getLongs("index"),-1, -2, 4);
     assertEquals(df.getDoubles("double"), -2.1, 0.0, 0.5);
@@ -751,18 +754,21 @@ public class DataFrameTest {
   public void testFilterAll() {
     df = df.filter(DataFrame.toSeries(true, true, true, true, true));
     Assert.assertEquals(df.size(), 5);
+    Assert.assertEquals(df.dropNull().size(), 5);
   }
 
   @Test
   public void testFilterNone() {
     df = df.filter(DataFrame.toSeries(false, false, false, false, false));
-    Assert.assertEquals(df.size(), 0);
+    Assert.assertEquals(df.size(), 5);
+    Assert.assertEquals(df.dropNull().size(), 0);
   }
 
   @Test
   public void testFilterNull() {
-    df = df.filter(DataFrame.toSeries(new byte[] { BNULL, 0, 1, BNULL, 0 }));
-    Assert.assertEquals(df.size(), 1);
+    df = df.filter(DataFrame.toSeries(BNULL, FALSE, TRUE, BNULL, FALSE));
+    Assert.assertEquals(df.size(), 5);
+    Assert.assertEquals(df.dropNull().size(), 1);
   }
 
   @Test
@@ -1728,10 +1734,22 @@ public class DataFrameTest {
   }
 
   @Test
-  public void testDoubleFilter() {
+  public void testDoubleFilterSeries() {
     DoubleSeries base = DataFrame.toSeries(DNULL, 1, 1, 1.5, 0.003);
     BooleanSeries mod = DataFrame.toSeries(TRUE, TRUE, TRUE, FALSE, BNULL);
     assertEquals(base.filter(mod), DNULL, 1, 1, DNULL, DNULL);
+  }
+
+  @Test
+  public void testDoubleFilterConditional() {
+    DoubleSeries base = DataFrame.toSeries(DNULL, 1, 1, 1.5, 0.003);
+    BooleanSeries mod = DataFrame.toSeries(TRUE, TRUE, TRUE, FALSE, BNULL);
+    assertEquals(base.filter(new Series.DoubleConditional() {
+      @Override
+      public boolean apply(double... values) {
+        return (values[0] >= 1 && values[0] < 1.5) || values[0] == 0.003;
+      }
+    }), DNULL, 1, 1, DNULL, 0.003);
   }
 
   @Test
@@ -1831,10 +1849,22 @@ public class DataFrameTest {
   }
 
   @Test
-  public void testLongFilter() {
+  public void testLongFilterSeries() {
     LongSeries base = DataFrame.toSeries(LNULL, 0, 0, 5, 10);
     BooleanSeries mod = DataFrame.toSeries(TRUE, TRUE, TRUE, FALSE, BNULL);
     assertEquals(base.filter(mod), LNULL, 0, 0, LNULL, LNULL);
+  }
+
+  @Test
+  public void testLongFilterConditional() {
+    LongSeries base = DataFrame.toSeries(LNULL, 0, 0, 5, 10);
+    BooleanSeries mod = DataFrame.toSeries(TRUE, TRUE, TRUE, FALSE, BNULL);
+    assertEquals(base.filter(new Series.LongConditional() {
+      @Override
+      public boolean apply(long... values) {
+        return values[0] >= 0 && values[0] <= 5;
+      }
+    }), LNULL, 0, 0, 5, LNULL);
   }
 
   @Test
@@ -1891,10 +1921,22 @@ public class DataFrameTest {
   }
 
   @Test
-  public void testStringFilter() {
+  public void testStringFilterSeries() {
     StringSeries base = DataFrame.toSeries(SNULL, "a", "a", "b", "A");
     BooleanSeries mod = DataFrame.toSeries(TRUE, TRUE, TRUE, FALSE, BNULL);
     assertEquals(base.filter(mod), SNULL, "a", "a", SNULL, SNULL);
+  }
+
+  @Test
+  public void testStringFilterConditional() {
+    StringSeries base = DataFrame.toSeries(SNULL, "a", "a", "b", "A");
+    BooleanSeries mod = DataFrame.toSeries(TRUE, TRUE, TRUE, FALSE, BNULL);
+    assertEquals(base.filter(new Series.StringConditional() {
+      @Override
+      public boolean apply(String... values) {
+        return values[0].equals("a") || values[0].equals("A");
+      }
+    }), SNULL, "a", "a", SNULL, "A");
   }
 
   @Test
@@ -1976,10 +2018,20 @@ public class DataFrameTest {
   }
 
   @Test
-  public void testBooleanFilter() {
+  public void testBooleanFilterSeries() {
     BooleanSeries base = DataFrame.toSeries(BNULL, TRUE, FALSE, TRUE, FALSE);
     BooleanSeries mod = DataFrame.toSeries(TRUE, TRUE, TRUE, FALSE, BNULL);
     assertEquals(base.filter(mod), BNULL, TRUE, FALSE, BNULL, BNULL);
+  }
+
+  public void testBooleanFilterConditional() {
+    BooleanSeries base = DataFrame.toSeries(BNULL, TRUE, FALSE, TRUE, FALSE);
+    assertEquals(base.filter(new Series.BooleanConditional() {
+      @Override
+      public boolean apply(boolean... values) {
+        return values[0];
+      }
+    }), BNULL, TRUE, BNULL, TRUE, BNULL);
   }
 
   @Test

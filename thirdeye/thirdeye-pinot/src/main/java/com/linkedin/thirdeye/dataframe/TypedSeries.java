@@ -60,4 +60,9 @@ public abstract class TypedSeries<T extends Series> extends Series {
   public T dropNull() {
     return (T)super.dropNull();
   }
+
+  @Override
+  public T filter(Conditional conditional) {
+    return (T)super.filter(conditional);
+  }
 }

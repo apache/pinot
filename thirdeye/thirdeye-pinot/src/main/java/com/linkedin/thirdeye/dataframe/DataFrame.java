@@ -951,7 +951,7 @@ public class DataFrame {
 
   /**
    * Returns a copy of the DataFrame with rows filtered by {@code series}. If the value of {@code series}
-   * Associated with a row is {@code true} the row is included, otherwise it is omitted.
+   * associated with a row is {@code true} the row is copied, otherwise it is set to {@code null}.
    *
    * @param series filter series
    * @return filtered DataFrame copy
@@ -961,15 +961,15 @@ public class DataFrame {
       throw new IllegalArgumentException("Series size must be equal to index size");
 
     int[] fromIndex = new int[series.size()];
-    int fromIndexCount = 0;
     for(int i=0; i<series.size(); i++) {
       if(BooleanSeries.isTrue(series.values[i])) {
-        fromIndex[fromIndexCount] = i;
-        fromIndexCount++;
+        fromIndex[i] = i;
+      } else {
+        fromIndex[i] = -1;
       }
     }
 
-    return this.project(Arrays.copyOf(fromIndex, fromIndexCount));
+    return this.project(fromIndex);
   }
 
   public DataFrame filter(String seriesName) {

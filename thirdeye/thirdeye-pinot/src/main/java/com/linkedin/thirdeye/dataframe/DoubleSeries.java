@@ -521,6 +521,19 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     return this.eq(fillValues(this.size(), constant));
   }
 
+  public BooleanSeries eq(final double constant, final double epsilon) {
+    return this.eq(fillValues(this.size(), constant), epsilon);
+  }
+
+  public BooleanSeries eq(Series other, final double epsilon) {
+    return map(new DoubleConditional() {
+      @Override
+      public boolean apply(double... values) {
+        return values[0] - epsilon <= values[1] && values[0] + epsilon >= values[1];
+      }
+    }, this, other);
+  }
+
   public DoubleSeries set(BooleanSeries where, double value) {
     double[] values = new double[this.values.length];
     for(int i=0; i<where.size(); i++) {
