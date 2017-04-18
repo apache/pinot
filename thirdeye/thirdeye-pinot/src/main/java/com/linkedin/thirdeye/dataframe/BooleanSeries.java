@@ -451,6 +451,32 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
     return this.eq(fillValues(this.size(), constant));
   }
 
+  public BooleanSeries set(BooleanSeries where, byte value) {
+    byte[] values = new byte[this.values.length];
+    for(int i=0; i<where.size(); i++) {
+      if(BooleanSeries.isTrue(where.getBoolean(i))) {
+        values[i] = valueOf(value);
+      } else {
+        values[i] = this.values[i];
+      }
+    }
+    return buildFrom(values);
+  }
+
+  public BooleanSeries set(BooleanSeries where, boolean value) {
+    return this.set(where, valueOf(value));
+  }
+
+  public BooleanSeries set(int index, byte value) {
+    byte[] values = Arrays.copyOf(this.values, this.values.length);
+    values[index] = valueOf(value);
+    return buildFrom(values);
+  }
+
+  public BooleanSeries set(int index, boolean value) {
+    return this.set(index, valueOf(value));
+  }
+
   public int count(boolean value) {
     return this.count(valueOf(value));
   }
@@ -458,9 +484,32 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
   public int count(byte value) {
     int count = 0;
     for(byte v : this.values)
-      if(v == value)
+      if(v == valueOf(value))
         count++;
     return count;
+  }
+
+  public boolean contains(boolean value) {
+    return this.contains(valueOf(value));
+  }
+
+  public boolean contains(byte value) {
+    return this.count(value) > 0;
+  }
+
+  public BooleanSeries replace(boolean find, boolean by) {
+    return this.replace(valueOf(find), valueOf(by));
+  }
+
+  public BooleanSeries replace(byte find, byte by) {
+    if(isNull(find))
+      return this.fillNull(by);
+    return this.set(this.eq(find), by);
+  }
+
+  @Override
+  public BooleanSeries filter(BooleanSeries filter) {
+    return this.set(filter.fillNull().not(), NULL);
   }
 
   @Override
@@ -508,33 +557,6 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
     if(isFalse(this.values[index]))
       return "false";
     return "true";
-  }
-
-  public boolean hasValue(boolean value) {
-    return this.hasValue(valueOf(value));
-  }
-
-  public boolean hasValue(byte value) {
-    for(byte v : this.values)
-      if(v == value)
-        return true;
-    return false;
-  }
-
-  public BooleanSeries replace(boolean find, boolean by) {
-    return this.replace(valueOf(find), valueOf(by));
-  }
-
-  public BooleanSeries replace(byte find, byte by) {
-    byte[] values = new byte[this.values.length];
-    for(int i=0; i<values.length; i++) {
-      if(this.values[i] == find) {
-        values[i] = by;
-      } else {
-        values[i] = this.values[i];
-      }
-    }
-    return buildFrom(values);
   }
 
   @Override

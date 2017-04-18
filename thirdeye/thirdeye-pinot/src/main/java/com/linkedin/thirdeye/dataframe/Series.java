@@ -389,7 +389,21 @@ public abstract class Series {
    */
   public abstract Series fillNull();
 
+  /**
+   * Returns a new builder instance for the native type encapsulated by this series.
+   *
+   * @return series builder
+   */
   public abstract Builder getBuilder();
+
+  /**
+   * Returns a copy of the series with values replaced by {@code null} for every row in
+   * {@code filter} that is not {@code true}.
+   *
+   * @param filter series to filter by
+   * @return filtered series copy
+   */
+  public abstract Series filter(BooleanSeries filter);
 
   /* *************************************************************************
    * Internal abstract interface

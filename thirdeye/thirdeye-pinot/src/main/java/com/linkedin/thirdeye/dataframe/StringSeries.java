@@ -343,20 +343,14 @@ public final class StringSeries extends TypedSeries<StringSeries> {
   }
 
   public StringSeries replace(String find, String by) {
+    if(isNull(find))
+      return this.fillNull(by);
     return this.set(this.eq(find), by);
   }
 
-  public LongSeries compare(Series other) {
-    DataFrame.assertSameLength(this, other);
-    long[] values = new long[this.size()];
-    for (int i = 0; i < this.size(); i++) {
-      if (this.isNull(i) || other.isNull(i)) {
-        values[i] = LongSeries.NULL;
-      } else {
-        values[i] = this.values[i].compareTo(other.getString(i));
-      }
-    }
-    return LongSeries.buildFrom(values);
+  @Override
+  public StringSeries filter(BooleanSeries filter) {
+    return this.set(filter.fillNull().not(), NULL);
   }
 
   @Override

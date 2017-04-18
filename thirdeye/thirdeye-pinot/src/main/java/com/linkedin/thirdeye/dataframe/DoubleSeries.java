@@ -546,7 +546,14 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
   }
 
   public DoubleSeries replace(double find, double by) {
+    if(isNull(find))
+      return this.fillNull(by);
     return this.set(this.eq(find), by);
+  }
+
+  @Override
+  public DoubleSeries filter(BooleanSeries filter) {
+    return this.set(filter.fillNull().not(), NULL);
   }
 
   @Override

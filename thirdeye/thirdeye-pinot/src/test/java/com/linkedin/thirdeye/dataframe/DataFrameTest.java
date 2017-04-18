@@ -1702,6 +1702,39 @@ public class DataFrameTest {
   }
 
   @Test
+  public void testDoubleCount() {
+    DoubleSeries base = DataFrame.toSeries(DNULL, 1, 1, 1.5, 0.003);
+    Assert.assertEquals(base.count(1), 2);
+    Assert.assertEquals(base.count(2), 0);
+    Assert.assertEquals(base.count(DNULL), 1);
+  }
+
+  @Test
+  public void testDoubleContains() {
+    DoubleSeries base = DataFrame.toSeries(DNULL, 1, 1, 1.5, 0.003);
+    Assert.assertTrue(base.contains(1));
+    Assert.assertFalse(base.contains(2));
+    Assert.assertTrue(base.contains(DNULL));
+  }
+
+  @Test
+  public void testDoubleReplace() {
+    DoubleSeries base = DataFrame.toSeries(DNULL, 1, 1, 1.5, 0.003);
+    assertEquals(base.replace(1, 2), DNULL, 2, 2, 1.5, 0.003);
+    assertEquals(base.replace(1, DNULL), DNULL, DNULL, DNULL, 1.5, 0.003);
+    assertEquals(base.replace(2, 1), DNULL, 1, 1, 1.5, 0.003);
+    assertEquals(base.replace(1.5, DNULL), DNULL, 1, 1, DNULL, 0.003);
+    assertEquals(base.replace(DNULL, 1), 1, 1, 1, 1.5, 0.003);
+  }
+
+  @Test
+  public void testDoubleFilter() {
+    DoubleSeries base = DataFrame.toSeries(DNULL, 1, 1, 1.5, 0.003);
+    BooleanSeries mod = DataFrame.toSeries(TRUE, TRUE, TRUE, FALSE, BNULL);
+    assertEquals(base.filter(mod), DNULL, 1, 1, DNULL, DNULL);
+  }
+
+  @Test
   public void testLongOperationsSeries() {
     LongSeries base = DataFrame.toSeries(LNULL, 0, 1, 5, 10);
     LongSeries mod = DataFrame.toSeries(1, 1, 1, 0, LNULL);
@@ -1772,6 +1805,39 @@ public class DataFrameTest {
 
 
   @Test
+  public void testLongCount() {
+    LongSeries base = DataFrame.toSeries(LNULL, 0, 0, 5, 10);
+    Assert.assertEquals(base.count(0), 2);
+    Assert.assertEquals(base.count(2), 0);
+    Assert.assertEquals(base.count(LNULL), 1);
+  }
+
+  @Test
+  public void testLongContains() {
+    LongSeries base = DataFrame.toSeries(LNULL, 0, 0, 5, 10);
+    Assert.assertTrue(base.contains(0));
+    Assert.assertFalse(base.contains(2));
+    Assert.assertTrue(base.contains(LNULL));
+  }
+
+  @Test
+  public void testLongReplace() {
+    LongSeries base = DataFrame.toSeries(LNULL, 0, 0, 5, 10);
+    assertEquals(base.replace(0, 1), LNULL, 1, 1, 5, 10);
+    assertEquals(base.replace(0, LNULL), LNULL, LNULL, LNULL, 5, 10);
+    assertEquals(base.replace(2, 1), LNULL, 0, 0, 5, 10);
+    assertEquals(base.replace(5, LNULL), LNULL, 0, 0, LNULL, 10);
+    assertEquals(base.replace(LNULL, 1), 1, 0, 0, 5, 10);
+  }
+
+  @Test
+  public void testLongFilter() {
+    LongSeries base = DataFrame.toSeries(LNULL, 0, 0, 5, 10);
+    BooleanSeries mod = DataFrame.toSeries(TRUE, TRUE, TRUE, FALSE, BNULL);
+    assertEquals(base.filter(mod), LNULL, 0, 0, LNULL, LNULL);
+  }
+
+  @Test
   public void testStringOperationsSeries() {
     StringSeries base = DataFrame.toSeries(SNULL, "a", "b", "c", "d");
     StringSeries mod = DataFrame.toSeries("A", "A", "b", "B", SNULL);
@@ -1795,6 +1861,40 @@ public class DataFrameTest {
     assertEquals(base.eq("b"), BNULL, FALSE, TRUE, FALSE, FALSE);
     assertEquals(base.eq(""), BNULL, FALSE, FALSE, FALSE, FALSE);
     assertEquals(base.eq(SNULL), BooleanSeries.nulls(5));
+  }
+
+
+  @Test
+  public void testStringCount() {
+    StringSeries base = DataFrame.toSeries(SNULL, "a", "a", "b", "A");
+    Assert.assertEquals(base.count("a"), 2);
+    Assert.assertEquals(base.count("d"), 0);
+    Assert.assertEquals(base.count(SNULL), 1);
+  }
+
+  @Test
+  public void testStringContains() {
+    StringSeries base = DataFrame.toSeries(SNULL, "a", "a", "b", "A");
+    Assert.assertTrue(base.contains("a"));
+    Assert.assertFalse(base.contains(""));
+    Assert.assertTrue(base.contains(SNULL));
+  }
+
+  @Test
+  public void testStringReplace() {
+    StringSeries base = DataFrame.toSeries(SNULL, "a", "a", "b", "A");
+    assertEquals(base.replace("a", "AA"), SNULL, "AA", "AA", "b", "A");
+    assertEquals(base.replace("a", SNULL), SNULL, SNULL, SNULL, "b", "A");
+    assertEquals(base.replace("b", "B"), SNULL, "a", "a", "B", "A");
+    assertEquals(base.replace("", "X"), SNULL, "a", "a", "b", "A");
+    assertEquals(base.replace(SNULL, "N"), "N", "a", "a", "b", "A");
+  }
+
+  @Test
+  public void testStringFilter() {
+    StringSeries base = DataFrame.toSeries(SNULL, "a", "a", "b", "A");
+    BooleanSeries mod = DataFrame.toSeries(TRUE, TRUE, TRUE, FALSE, BNULL);
+    assertEquals(base.filter(mod), SNULL, "a", "a", SNULL, SNULL);
   }
 
   @Test
@@ -1847,6 +1947,39 @@ public class DataFrameTest {
     assertEquals(base.eq(true), BNULL, TRUE, FALSE, TRUE, FALSE);
     assertEquals(base.eq(false), BNULL, FALSE, TRUE, FALSE, TRUE);
     assertEquals(base.eq(BNULL), BooleanSeries.nulls(5));
+  }
+
+  @Test
+  public void testBooleanCount() {
+    BooleanSeries base = DataFrame.toSeries(BNULL, TRUE, FALSE, TRUE, FALSE);
+    Assert.assertEquals(base.count(TRUE), 2);
+    Assert.assertEquals(base.count(FALSE), 2);
+    Assert.assertEquals(base.count(BNULL), 1);
+  }
+
+  @Test
+  public void testBooleanContains() {
+    BooleanSeries base = DataFrame.toSeries(BNULL, TRUE, FALSE, TRUE, FALSE);
+    Assert.assertTrue(base.contains(TRUE));
+    Assert.assertTrue(base.contains(FALSE));
+    Assert.assertTrue(base.contains(BNULL));
+  }
+
+  @Test
+  public void testBooleanReplace() {
+    BooleanSeries base = DataFrame.toSeries(BNULL, TRUE, FALSE, TRUE, FALSE);
+    assertEquals(base.replace(TRUE, FALSE), BNULL, FALSE, FALSE, FALSE, FALSE);
+    assertEquals(base.replace(TRUE, BNULL), BNULL, BNULL, FALSE, BNULL, FALSE);
+    assertEquals(base.replace(FALSE, TRUE), BNULL, TRUE, TRUE, TRUE, TRUE);
+    assertEquals(base.replace(FALSE, BNULL), BNULL, TRUE, BNULL, TRUE, BNULL);
+    assertEquals(base.replace(BNULL, TRUE), TRUE, TRUE, FALSE, TRUE, FALSE);
+  }
+
+  @Test
+  public void testBooleanFilter() {
+    BooleanSeries base = DataFrame.toSeries(BNULL, TRUE, FALSE, TRUE, FALSE);
+    BooleanSeries mod = DataFrame.toSeries(TRUE, TRUE, TRUE, FALSE, BNULL);
+    assertEquals(base.filter(mod), BNULL, TRUE, FALSE, BNULL, BNULL);
   }
 
   @Test

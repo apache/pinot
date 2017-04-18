@@ -464,7 +464,14 @@ public final class LongSeries extends TypedSeries<LongSeries> {
   }
 
   public LongSeries replace(long find, long by) {
+    if(isNull(find))
+      return this.fillNull(by);
     return this.set(this.eq(find), by);
+  }
+
+  @Override
+  public LongSeries filter(BooleanSeries filter) {
+    return this.set(filter.fillNull().not(), NULL);
   }
 
   @Override
