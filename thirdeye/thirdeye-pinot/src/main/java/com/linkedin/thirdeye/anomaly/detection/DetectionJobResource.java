@@ -569,6 +569,10 @@ public class DetectionJobResource {
    * ex: {"baselineLift": [0.9, 0.95, 1, 1.05, 1.1], "baselineSeasonalPeriod": [2, 3, 4]}
    * @param goal
    * the expected performance assigned by user
+   * @param includeOrigin
+   * to include the performance of original setup into comparison
+   * If we perform offline analysis before hand, we don't get the correct performance about the current configuration
+   * setup. Therefore, we need to exclude the performance from the comparison.
    * @return
    * A response containing all satisfied properties with their evaluation result
    */

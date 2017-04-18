@@ -444,17 +444,30 @@ public class AnomalyResource {
     return Response.ok(id).build();
   }
 
+  /**
+   * Apply an autotune configuration to an existing function
+   * @param id
+   * The id of an autotune configuration
+   * @param isCloneFunction
+   * Should we clone the function or simply apply the autotune configuration to the existing function
+   * @return
+   * an activated anomaly detection function
+   */
   @POST
   @Path("/anomaly-function/apply/{autotune_config_id}")
   public Response applyReplayConfig(@PathParam("autotune_config_id") @NotNull long id,
       @QueryParam("cloneFunction") @DefaultValue("false") boolean isCloneFunction,
-      @QueryParam("cloneAnomalies") @DefaultValue("false") boolean isCloneAnomalies) {
+      @QueryParam("cloneAnomalies") Boolean isCloneAnomalies) {
     AutotuneConfigDTO autotuneConfigDTO = autotuneConfigDAO.findById(id);
-    if(autotuneConfigDTO == null) {
+    if (autotuneConfigDTO == null) {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
-    if(autotuneConfigDTO.getConfiguration() == null) {
+    if (autotuneConfigDTO.getConfiguration() == null) {
       return Response.ok().build();
+    }
+
+    if (isCloneAnomalies == null) { // if isCloneAnomalies is not given, assign a default value
+      isCloneAnomalies = containsLabeledAnomalies(autotuneConfigDTO.getFunctionId());
     }
 
     AnomalyFunctionDTO originalFunction = anomalyFunctionDAO.findById(autotuneConfigDTO.getFunctionId());
@@ -486,6 +499,29 @@ public class AnomalyResource {
     }
 
     return Response.ok(targetFunction).build();
+  }
+
+  /**
+   * Check if the given function contains labeled anomalies
+   * @param functionId
+   * an id of an anomaly detection function
+   * @return
+   * true if there are labeled anomalies detected by the function
+   */
+  private boolean containsLabeledAnomalies(long functionId) {
+    List<MergedAnomalyResultDTO> mergedAnomalies = mergedAnomalyResultDAO.findByFunctionId(functionId);
+
+    for(MergedAnomalyResultDTO mergedAnomaly : mergedAnomalies) {
+      AnomalyFeedback feedback = mergedAnomaly.getFeedback();
+      if(feedback == null) {
+        continue;
+      }
+      if(feedback.getFeedbackType().equals(AnomalyFeedbackType.ANOMALY) ||
+          feedback.getFeedbackType().equals(AnomalyFeedbackType.ANOMALY_NO_ACTION)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private String getDimensions(String dataset, String exploreDimensions) throws Exception {
