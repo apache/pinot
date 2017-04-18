@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.broker.broker.helix;
 
+import com.google.common.collect.ImmutableList;
 import com.linkedin.pinot.broker.broker.BrokerServerBuilder;
 import com.linkedin.pinot.broker.requesthandler.BrokerRequestHandler;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
@@ -126,7 +127,10 @@ public class HelixBrokerStarter {
 
     // Register the service status handler
     ServiceStatus.setServiceStatusCallback(
-        new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager, helixClusterName, brokerId));
+        new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList.of(
+            new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_helixManager, helixClusterName, brokerId),
+            new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_helixManager, helixClusterName, brokerId)
+        )));
 
     _brokerServerBuilder.getBrokerMetrics().addCallbackGauge(
         "helix.connected", new Callable<Long>() {

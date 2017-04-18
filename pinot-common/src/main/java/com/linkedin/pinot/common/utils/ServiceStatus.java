@@ -17,13 +17,15 @@
 package com.linkedin.pinot.common.utils;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
+import java.util.Set;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixDataAccessor;
 import org.apache.helix.HelixManager;
-import org.apache.helix.HelixProperty;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.PropertyKey.Builder;
 import org.apache.helix.model.CurrentState;
@@ -71,29 +73,59 @@ public class ServiceStatus {
     }
   }
 
-  public static class IdealStateAndCurrentStateMatchServiceStatusCallback implements ServiceStatusCallback {
+  public static class MultipleCallbackServiceStatusCallback implements ServiceStatusCallback {
+    private final List<? extends ServiceStatusCallback> _statusCallbacks;
 
-    private String _clusterName;
-    private String _instanceName;
-    private List<String> _resourcesToMonitor;
-    private boolean _finishedStartingUp = false;
-    private HelixManager _helixManager;
-    private HelixAdmin _helixAdmin;
-    private HelixDataAccessor _helixDataAccessor;
-    private Builder _keyBuilder;
+    public MultipleCallbackServiceStatusCallback(List<? extends ServiceStatusCallback> statusCallbacks) {
+      _statusCallbacks = statusCallbacks;
+    }
 
-    public IdealStateAndCurrentStateMatchServiceStatusCallback(HelixManager helixManager, String clusterName, String instanceName) {
+    @Override
+    public Status getServiceStatus() {
+      // Iterate through all callbacks, returning the first non GOOD one as the service status
+      for (ServiceStatusCallback statusCallback : _statusCallbacks) {
+        final Status serviceStatus = statusCallback.getServiceStatus();
+        if (serviceStatus != Status.GOOD) {
+          return serviceStatus;
+        }
+      }
+
+      // All callbacks report good, therefore we're good too
+      return Status.GOOD;
+    }
+  }
+
+  /**
+   * Service status callback that compares ideal state with another Helix state. Used to share most of the logic between
+   * the ideal state/external view comparison and ideal state/current state comparison.
+   */
+  private static abstract class IdealStateMatchServiceStatusCallback<T> implements ServiceStatusCallback {
+    protected String _clusterName;
+    protected String _instanceName;
+    protected List<String> _resourcesToMonitor;
+    protected boolean _finishedStartingUp = false;
+    protected HelixManager _helixManager;
+    protected HelixAdmin _helixAdmin;
+    protected HelixDataAccessor _helixDataAccessor;
+    protected Builder _keyBuilder;
+    protected Set<String> _resourcesDoneStartingUp = new HashSet<>();
+
+    public IdealStateMatchServiceStatusCallback(HelixManager helixManager, String clusterName, String instanceName) {
       _helixManager = helixManager;
       _clusterName = clusterName;
       _instanceName = instanceName;
-      _helixAdmin = _helixManager.getClusterManagmentTool();
-      _helixDataAccessor = _helixManager.getHelixDataAccessor();
-      _keyBuilder = _helixDataAccessor.keyBuilder();
+
+      if (_helixManager != null) {
+        _helixAdmin = _helixManager.getClusterManagmentTool();
+        _helixDataAccessor = _helixManager.getHelixDataAccessor();
+        _keyBuilder = _helixDataAccessor.keyBuilder();
+      }
+
       // Make a list of the resources to monitor
       _resourcesToMonitor = new ArrayList<>();
 
       for (String resource : _helixAdmin.getResourcesInCluster(_clusterName)) {
-        final IdealState idealState = _helixAdmin.getResourceIdealState(_clusterName, resource);
+        final IdealState idealState = getResourceIdealState(resource);
         for (String partitionInResource : idealState.getPartitionSet()) {
           if (idealState.getInstanceSet(partitionInResource).contains(_instanceName)) {
             _resourcesToMonitor.add(resource);
@@ -101,33 +133,47 @@ public class ServiceStatus {
           }
         }
       }
+
       LOGGER.info("Monitoring resources {} for start up of instance {}", _resourcesToMonitor, _instanceName);
     }
 
-    public IdealStateAndCurrentStateMatchServiceStatusCallback(HelixManager helixManager, String clusterName, String instanceName,
+    public IdealStateMatchServiceStatusCallback(HelixManager helixManager, String clusterName, String instanceName,
         List<String> resourcesToMonitor) {
       _helixManager = helixManager;
       _clusterName = clusterName;
       _instanceName = instanceName;
-      _helixAdmin = _helixManager.getClusterManagmentTool();
+
+      if (_helixManager != null) {
+        _helixAdmin = _helixManager.getClusterManagmentTool();
+        _helixDataAccessor = _helixManager.getHelixDataAccessor();
+        _keyBuilder = _helixDataAccessor.keyBuilder();
+      }
+
       _resourcesToMonitor = resourcesToMonitor;
 
       LOGGER.info("Monitoring resources {} for start up of instance {}", _resourcesToMonitor, _instanceName);
     }
+
+    protected abstract T getState(String resourceName);
+
+    protected abstract Map<String, String> getPartitionStateMap(T state);
 
     @Override
     public Status getServiceStatus() {
       if (_finishedStartingUp) {
         return Status.GOOD;
       }
-      LiveInstance liveInstance = _helixDataAccessor.getProperty(_keyBuilder.liveInstance(_instanceName));
-      
+
       for (String resourceToMonitor : _resourcesToMonitor) {
-        IdealState idealState = _helixAdmin.getResourceIdealState(_clusterName, resourceToMonitor);
-        String sessionId = liveInstance.getSessionId();
-        PropertyKey currentStateKey = _keyBuilder.currentState(_instanceName, sessionId, resourceToMonitor);
-        CurrentState currentState = _helixDataAccessor.getProperty(currentStateKey);
-        if (idealState == null || currentState == null) {
+        // If the instance is already done starting up, skip checking its state
+        if (_resourcesDoneStartingUp.contains(resourceToMonitor)) {
+          continue;
+        }
+
+        IdealState idealState = getResourceIdealState(resourceToMonitor);
+        T helixState = getState(resourceToMonitor);
+
+        if (idealState == null || helixState == null) {
           return Status.STARTING;
         }
 
@@ -135,8 +181,9 @@ public class ServiceStatus {
         if (!idealState.isEnabled()) {
           continue;
         }
-        Map<String, String> currentStatePartitionStateMap = currentState.getPartitionStateMap();
-        if(currentStatePartitionStateMap.isEmpty()){
+
+        Map<String, String> statePartitionStateMap = getPartitionStateMap(helixState);
+        if(statePartitionStateMap.isEmpty() && !idealState.getPartitionSet().isEmpty()) {
           return Status.STARTING;
         }
 
@@ -150,12 +197,13 @@ public class ServiceStatus {
           if (idealStateStatus == null || "OFFLINE".equals(idealStateStatus)) {
             continue;
           }
+
           // If this instance state is not in the current state, then it hasn't finished starting up
-          if (!currentStatePartitionStateMap.containsKey(partition)) {
+          if (!statePartitionStateMap.containsKey(partition)) {
             return Status.STARTING;
           }
 
-          String currentStateStatus = currentStatePartitionStateMap.get(partition);
+          String currentStateStatus = statePartitionStateMap.get(partition);
 
           // If the instance state is not ERROR and is not the same as what's expected from the ideal state, then it
           // hasn't finished starting up
@@ -163,11 +211,50 @@ public class ServiceStatus {
             return Status.STARTING;
           }
         }
+
+        // Resource is done starting up, add it to the list of resources that are done starting up
+        _resourcesDoneStartingUp.add(resourceToMonitor);
       }
 
       LOGGER.info("Instance {} has finished starting up", _instanceName);
       _finishedStartingUp = true;
       return Status.GOOD;
+    }
+
+    protected IdealState getResourceIdealState(String resourceName) {
+      return _helixAdmin.getResourceIdealState(_clusterName, resourceName);
+    }
+  }
+
+  /**
+   * Service status callback that reports starting until all resources relevant to this instance have a matching
+   * external view and current state. This callback considers the ERROR state in the current view to be equivalent to
+   * the ideal state value.
+   */
+  public static class IdealStateAndCurrentStateMatchServiceStatusCallback extends IdealStateMatchServiceStatusCallback<CurrentState> {
+    public IdealStateAndCurrentStateMatchServiceStatusCallback(HelixManager helixManager, String clusterName, String instanceName) {
+      super(helixManager, clusterName, instanceName);
+    }
+
+    public IdealStateAndCurrentStateMatchServiceStatusCallback(HelixManager helixManager, String clusterName, String instanceName,
+        List<String> resourcesToMonitor) {
+      super(helixManager, clusterName, instanceName, resourcesToMonitor);
+    }
+
+    @Override
+    protected CurrentState getState(String resourceName) {
+      LiveInstance liveInstance = _helixDataAccessor.getProperty(_keyBuilder.liveInstance(_instanceName));
+
+      String sessionId = liveInstance.getSessionId();
+      PropertyKey currentStateKey = _keyBuilder.currentState(_instanceName, sessionId, resourceName);
+      CurrentState currentState = _helixDataAccessor.getProperty(currentStateKey);
+
+      return currentState;
+    }
+
+    @Override
+    protected Map<String, String> getPartitionStateMap(CurrentState state) {
+      return state.getPartitionStateMap();
     }
   }
 
@@ -176,92 +263,33 @@ public class ServiceStatus {
    * external view and ideal state. This callback considers the ERROR state in the external view to be equivalent to the
    * ideal state value.
    */
-  public static class IdealStateAndExternalViewMatchServiceStatusCallback implements ServiceStatusCallback {
-    private HelixAdmin _helixAdmin;
-    private String _clusterName;
-    private String _instanceName;
-    private List<String> _resourcesToMonitor;
-    private boolean _finishedStartingUp = false;
-
-    public IdealStateAndExternalViewMatchServiceStatusCallback(HelixAdmin helixAdmin, String clusterName, String instanceName) {
-      _helixAdmin = helixAdmin;
-      _clusterName = clusterName;
-      _instanceName = instanceName;
-
-      // Make a list of the resources to monitor
-      _resourcesToMonitor = new ArrayList<>();
-
-      for (String resource : _helixAdmin.getResourcesInCluster(_clusterName)) {
-        final IdealState idealState = _helixAdmin.getResourceIdealState(_clusterName, resource);
-        for (String partitionInResource : idealState.getPartitionSet()) {
-          if (idealState.getInstanceSet(partitionInResource).contains(_instanceName)) {
-            _resourcesToMonitor.add(resource);
-            break;
-          }
-        }
-      }
-
-      LOGGER.info("Monitoring resources {} for start up of instance {}", _resourcesToMonitor, _instanceName);
+  public static class IdealStateAndExternalViewMatchServiceStatusCallback extends IdealStateMatchServiceStatusCallback<ExternalView> {
+    public IdealStateAndExternalViewMatchServiceStatusCallback(HelixManager helixManager, String clusterName, String instanceName) {
+      super(helixManager, clusterName, instanceName);
     }
 
-    public IdealStateAndExternalViewMatchServiceStatusCallback(HelixAdmin helixAdmin, String clusterName, String instanceName,
+    public IdealStateAndExternalViewMatchServiceStatusCallback(HelixManager helixManager, String clusterName, String instanceName,
         List<String> resourcesToMonitor) {
-      _helixAdmin = helixAdmin;
-      _clusterName = clusterName;
-      _instanceName = instanceName;
-      _resourcesToMonitor = resourcesToMonitor;
-
-      LOGGER.info("Monitoring resources {} for start up of instance {}", _resourcesToMonitor, _instanceName);
+      super(helixManager, clusterName, instanceName, resourcesToMonitor);
     }
 
     @Override
-    public Status getServiceStatus() {
-      if (_finishedStartingUp) {
-        return Status.GOOD;
-      }
+    protected ExternalView getState(String resourceName) {
+      return _helixAdmin.getResourceExternalView(_clusterName, resourceName);
+    }
 
-      for (String resourceToMonitor : _resourcesToMonitor) {
-        IdealState idealState = _helixAdmin.getResourceIdealState(_clusterName, resourceToMonitor);
-        ExternalView externalView = _helixAdmin.getResourceExternalView(_clusterName, resourceToMonitor);
+    @Override
+    protected Map<String, String> getPartitionStateMap(ExternalView state) {
+      Map<String, String> partitionState = new HashMap<>();
 
-        if (idealState == null || externalView == null) {
-          return Status.STARTING;
-        }
-
-        // If the resource is disabled, ignore it
-        if (!idealState.isEnabled()) {
-          continue;
-        }
-
-        // Check that all partitions that are supposed to be in any state other than OFFLINE have the same status in the
-        // external view or went to ERROR state (which means that we tried to load the segments/resources but failed for
-        // some reason)
-        for (String partition : idealState.getPartitionSet()) {
-          final String idealStateStatus = idealState.getInstanceStateMap(partition).get(_instanceName);
-
-          // Skip this partition if it is not assigned to this instance or if the instance should be offline
-          if (idealStateStatus == null || "OFFLINE".equals(idealStateStatus)) {
-            continue;
-          }
-
-          // If this instance state is not in the external view, then it hasn't finished starting up
-          if (!externalView.getPartitionSet().contains(partition)) {
-            return Status.STARTING;
-          }
-
-          final String externalViewStatus = externalView.getStateMap(partition).get(_instanceName);
-
-          // If the instance state is not ERROR and is not the same as what's expected from the ideal state, then it
-          // hasn't finished starting up
-          if (!"ERROR".equals(externalViewStatus) && !idealStateStatus.equals(externalViewStatus)) {
-            return Status.STARTING;
-          }
+      for (String partition : state.getPartitionSet()) {
+        Map<String, String> instanceStateMap = state.getStateMap(partition);
+        if (instanceStateMap.containsKey(_instanceName)) {
+          partitionState.put(partition, instanceStateMap.get(_instanceName));
         }
       }
 
-      LOGGER.info("Instance {} has finished starting up", _instanceName);
-      _finishedStartingUp = true;
-      return Status.GOOD;
+      return partitionState;
     }
   }
 }

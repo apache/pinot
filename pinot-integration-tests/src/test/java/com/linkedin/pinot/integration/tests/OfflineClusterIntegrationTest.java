@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.google.common.collect.ImmutableList;
 import com.linkedin.pinot.common.utils.FileUploadUtils;
 import com.linkedin.pinot.common.utils.ServiceStatus;
 import com.linkedin.pinot.common.utils.ZkStarter;
@@ -94,8 +95,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     createTable();
 
     // Get the list of instances through the REST API
-    URL url = new URL("http://" + ControllerTestUtils.DEFAULT_CONTROLLER_HOST + ":"
-        + ControllerTestUtils.DEFAULT_CONTROLLER_API_PORT + "/instances");
+    URL url = new URL("http://" + ControllerTestUtils.DEFAULT_CONTROLLER_HOST + ":" + ControllerTestUtils.DEFAULT_CONTROLLER_API_PORT
+        + "/instances");
     InputStream inputStream = url.openConnection().getInputStream();
     String instanceApiResponseString = IOUtils.toString(inputStream);
     IOUtils.closeQuietly(inputStream);
@@ -104,17 +105,20 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
 
     HelixAdmin helixAdmin = new ZKHelixAdmin(new ZkClient(ZkStarter.DEFAULT_ZK_STR, 10000, 10000, new ZNRecordSerializer()));
     for (int i = 0; i < instanceArray.length(); i++) {
+      ensureZkHelixManagerIsInitialized();
       String instance = instanceArray.getString(i);
 
       if (instance.startsWith("Server_")) {
-        _serverServiceStatusCallback =
-            new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(helixAdmin, getHelixClusterName(),
-                instance);
+        _serverServiceStatusCallback = new ServiceStatus.MultipleCallbackServiceStatusCallback(ImmutableList.of(
+            new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_zkHelixManager, getHelixClusterName(),
+                instance),
+            new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_zkHelixManager, getHelixClusterName(),
+                instance)));
       }
 
       if (instance.startsWith("Broker_")) {
         _brokerServiceStatusCallback =
-            new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(helixAdmin, getHelixClusterName(),
+            new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_zkHelixManager, getHelixClusterName(),
                 instance, Collections.singletonList("brokerResource"));
       }
     }
