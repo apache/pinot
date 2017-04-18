@@ -201,11 +201,10 @@ public class SegmentFetcherAndLoader {
             }
           }
         }
-        if (_segmentLoadMaxRetryCount <= retryCount) {
-          String msg =
-              "Failed to download segment " + segmentId + " (table " + tableName + " after " + retryCount + " retries";
-          LOGGER.error(msg);
-          throw new RuntimeException(msg);
+        if (retryCount == maxRetryCount) {
+          throw new RuntimeException(
+              "Failed to download and load segment " + segmentId + " (table " + tableName + " after " + retryCount
+                  + " retries");
         }
       } else {
         LOGGER.info("Got already loaded segment {} of table {} crc {} again, will do nothing.", segmentId, tableName, localSegmentMetadata.getCrc());
