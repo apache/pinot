@@ -749,6 +749,9 @@ public class DetectionJobResource {
       AutotuneConfigDTO target = DAO_REGISTRY.getAutotuneConfigDAO().findById(autotuneId);
       if(functionId == null || target.getFunctionId() != functionId){
         functionId = target.getFunctionId();
+        if (target.getFunctionId() != functionId){
+          LOG.warn("input function Id does not consistent with autotune Id's function");
+        }
       }
       functionReplayRunnable = new FunctionReplayRunnable(detectionJobScheduler, anomalyFunctionDAO, mergedAnomalyResultDAO, rawAnomalyResultDAO, target.getConfiguration(), functionId, replayStart, replayEnd, false);
     } else {
