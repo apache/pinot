@@ -35,7 +35,8 @@ public class MetricDimensionScorer {
   private static final Logger LOG = LoggerFactory.getLogger(MetricDimensionScorer.class);
 
   private static final String DIMENSION = "dimension";
-  private static final String CONTRIBUTION = "contribution";
+  private static final String COST = "cost";
+  private static final String VALUE = "value";
 
   final QueryCache cache;
 
@@ -98,7 +99,7 @@ public class MetricDimensionScorer {
       }
 
       // final score is dimension_contribution * base_metric_score
-      MetricDimensionEntity n = e.withScore(df.getDouble(CONTRIBUTION, i) * e.getScore());
+      MetricDimensionEntity n = e.withScore(df.getDouble(COST, i) * e.getScore());
       scores.add(n);
     }
 
@@ -121,43 +122,25 @@ public class MetricDimensionScorer {
 
   private static DataFrame toNormalizedDataFrame(Collection<DimNameValueCostEntry> costs) {
     String[] dim = new String[costs.size()];
-    double[] contrib = new double[costs.size()];
+    String[] value = new String[costs.size()];
+    double[] cost = new double[costs.size()];
     int i = 0;
     for(DimNameValueCostEntry e : costs) {
       dim[i] = e.getDimName();
-      contrib[i] = e.getContributionFactor();
+      value[i] = e.getDimValue();
+      cost[i] = e.getCost();
       i++;
     }
 
     DataFrame df = new DataFrame();
     df.addSeries(DIMENSION, dim);
-    df.addSeries(CONTRIBUTION, contrib);
+    df.addSeries(COST, cost);
+    df.addSeries(VALUE, value);
 
-    DataFrame agg = df.groupBy(DIMENSION).aggregate(CONTRIBUTION, DoubleSeries.SUM);
-    DoubleSeries s = agg.getDoubles(CONTRIBUTION);
-    agg.addSeries(CONTRIBUTION, s.divide(s.sum()));
+    DataFrame agg = df.groupBy(DIMENSION).aggregate(COST, DoubleSeries.SUM);
+    DoubleSeries s = agg.getDoubles(COST);
+    agg.addSeries(COST, s.divide(s.sum()));
+
     return agg;
   }
-
-//  private static DataFrame aggregateContribution(DataFrame aggregate, DataFrame df, final BaselineEntity baseline) {
-//    DoubleSeries s = df.getDoubles(CONTRIBUTION).normalize();
-//    s = s.map(new DoubleSeries.DoubleFunction() {
-//      @Override
-//      public double apply(double... values) {
-//        return values[0] * baseline.getScore();
-//      }
-//    });
-//
-//    DataFrame normalized = new DataFrame(df);
-//    normalized.addSeries(CONTRIBUTION, s);
-//
-//    DataFrame joined = aggregate.joinOuter(normalized);
-//    DoubleSeries left = joined.getDoubles(CONTRIBUTION).fillNull();
-//    DoubleSeries right = joined.getDoubles(CONTRIBUTION + DataFrame.COLUMN_JOIN_POSTFIX).fillNull();
-//
-//    DataFrame out = new DataFrame(aggregate);
-//    out.addSeries(DIMENSION, left.add(right));
-//
-//    return out;
-//  }
 }

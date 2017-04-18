@@ -36,6 +36,9 @@ import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.commons.cli.Parser;
+import org.slf4j.LoggerFactory;
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
 
 
 /**
@@ -75,6 +78,10 @@ public class RCAFrameworkRunner {
       formatter.printHelp(RCAFrameworkRunner.class.getSimpleName(), options);
       System.exit(1);
     }
+
+    // logger config
+    Logger root = (Logger)LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
+    root.setLevel(Level.WARN);
 
     // config
     File config = new File(cmd.getOptionValue(CLI_CONFIG_DIR));
