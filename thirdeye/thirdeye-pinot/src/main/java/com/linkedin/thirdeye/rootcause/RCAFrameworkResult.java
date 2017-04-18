@@ -10,12 +10,12 @@ import java.util.Map;
  * context.
  *
  */
-public final class FrameworkResult {
+public final class RCAFrameworkResult {
   final List<Entity> aggregatedResults;
   final Map<String, PipelineResult> pipelineResults;
   final ExecutionContext context;
 
-  public FrameworkResult(List<Entity> aggregatedResults, Map<String, PipelineResult> pipelineResults,
+  public RCAFrameworkResult(List<Entity> aggregatedResults, Map<String, PipelineResult> pipelineResults,
       ExecutionContext context) {
     this.aggregatedResults = aggregatedResults;
     this.pipelineResults = pipelineResults;

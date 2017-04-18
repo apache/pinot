@@ -5,7 +5,7 @@ import java.util.Map;
 
 
 /**
- * Interface for the stateless result aggregator as used by {@code Framework.run()} to linearize results
+ * Interface for the stateless result aggregator as used by {@code RCAFramework.run()} to linearize results
  * across multiple pipelines. An aggregator should normalize scores across different pipelines
  * and handle cases where the same entity is returned multiple times by different pipelines.
  */

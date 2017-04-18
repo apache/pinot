@@ -14,8 +14,8 @@ import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import com.linkedin.thirdeye.rootcause.Aggregator;
 import com.linkedin.thirdeye.rootcause.Entity;
-import com.linkedin.thirdeye.rootcause.Framework;
-import com.linkedin.thirdeye.rootcause.FrameworkResult;
+import com.linkedin.thirdeye.rootcause.RCAFramework;
+import com.linkedin.thirdeye.rootcause.RCAFrameworkResult;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.SearchContext;
 import java.io.BufferedReader;
@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -41,11 +42,12 @@ import org.apache.commons.cli.Parser;
  * Console interface for performing root cause search using a sample pipeline configuration.
  * The user can specify the TimeRange and Baseline entities, as well as arbitrary URNs to
  * populate the search context with. The console interface allows one-off or interactive REPL execution modes.
- * <br/><b>Example:</b> {@code java -cp target/thirdeye-pinot-1.0-SNAPSHOT.jar com.linkedin.thirdeye.rootcause.impl.FrameworkRunner
+ *
+ * <br/><b>Example:</b> {@code java -cp target/thirdeye-pinot-1.0-SNAPSHOT.jar com.linkedin.thirdeye.rootcause.impl.RCAFrameworkRunner
  * --config-dir local-configs/ --window-size 28 --baseline-offset 28 --entities thirdeye:metric:pageViews,thirdeye:metric:logins}
  *
  */
-public class FrameworkRunner {
+public class RCAFrameworkRunner {
   private static final String CLI_CONFIG_DIR = "config-dir";
   private static final String CLI_WINDOW_SIZE = "window-size";
   private static final String CLI_BASELINE_OFFSET = "baseline-offset";
@@ -70,7 +72,7 @@ public class FrameworkRunner {
       cmd = parser.parse(options, args);
     } catch (ParseException e) {
       HelpFormatter formatter = new HelpFormatter();
-      formatter.printHelp(FrameworkRunner.class.getSimpleName(), options);
+      formatter.printHelp(RCAFrameworkRunner.class.getSimpleName(), options);
       System.exit(1);
     }
 
@@ -107,7 +109,7 @@ public class FrameworkRunner {
 
     Aggregator aggregator = new LinearAggregator();
 
-    Framework framework = new Framework(pipelines, aggregator);
+    RCAFramework framework = new RCAFramework(pipelines, aggregator);
 
     // time range and baseline
     long windowSize = Long.parseLong(cmd.getOptionValue(CLI_WINDOW_SIZE, "1")) * DAY_IN_MS;
@@ -146,7 +148,7 @@ public class FrameworkRunner {
     System.exit(0);
   }
 
-  private static void readExecutePrintLoop(Framework framework, TimeRangeEntity timeRange, BaselineEntity baseline)
+  private static void readExecutePrintLoop(RCAFramework framework, TimeRangeEntity timeRange, BaselineEntity baseline)
       throws IOException {
     // search loop
     System.out.println("Enter search context entities' URNs (separated by comma \",\"):");
@@ -169,7 +171,7 @@ public class FrameworkRunner {
     }
   }
 
-  private static void runFramework(Framework framework, Set<Entity> entities) {
+  private static void runFramework(RCAFramework framework, Set<Entity> entities) {
     SearchContext context = new SearchContext(entities);
 
     System.out.println("*** Search context:");
@@ -177,7 +179,7 @@ public class FrameworkRunner {
       System.out.println(formatEntity(e));
     }
 
-    FrameworkResult result = null;
+    RCAFrameworkResult result = null;
     try {
       result = framework.run(context);
     } catch (Exception e) {
@@ -193,13 +195,36 @@ public class FrameworkRunner {
 
     System.out.println("*** Grouped results:");
     Map<EntityUtils.EntityType, Collection<Entity>>
-        grouped = FrameworkResultUtils.topKPerType(result.getAggregatedResults(), 3);
+        grouped = topKPerType(result.getAggregatedResults(), 3);
     for(Map.Entry<EntityUtils.EntityType, Collection<Entity>> entry : grouped.entrySet()) {
       System.out.println(entry.getKey().getPrefix());
       for(Entity e : entry.getValue()) {
         System.out.println(formatEntity(e));
       }
     }
+  }
+
+  /**
+   * Returns the top K (first K) results per entity type from a collection of entities.
+   *
+   * @param entities aggregated entities
+   * @param k maximum number of entities per entity type
+   * @return mapping of entity types to list of entities
+   */
+  static Map<EntityUtils.EntityType, Collection<Entity>> topKPerType(Collection<Entity> entities, int k) {
+    Map<EntityUtils.EntityType, Collection<Entity>> map = new HashMap<>();
+    for(Entity e : entities) {
+      EntityUtils.EntityType type = EntityUtils.getType(e.getUrn());
+
+      if(!map.containsKey(type))
+        map.put(type, new ArrayList<Entity>());
+
+      Collection<Entity> current = map.get(type);
+      if(current.size() < k)
+        current.add(e);
+    }
+
+    return map;
   }
 
   static String formatEntity(Entity e) {

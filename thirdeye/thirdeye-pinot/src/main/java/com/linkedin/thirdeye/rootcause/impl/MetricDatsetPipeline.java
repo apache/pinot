@@ -10,7 +10,9 @@ import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,8 +45,15 @@ public class MetricDatsetPipeline implements Pipeline {
     Set<Entity> metrics = EntityUtils.filterContext(context, EntityUtils.EntityType.METRIC);
 
     Set<String> datasets = new HashSet<>();
+    Map<String, Double> datasetScores = new HashMap<>();
     for(Entity m : metrics) {
-      datasets.add(EntityUtils.getMetricDataset(m.getUrn()));
+      String d = EntityUtils.getMetricDataset(m.getUrn());
+      datasets.add(d);
+
+      double metricScore = m.getScore();
+      if(!datasetScores.containsKey(d))
+        datasetScores.put(d, 0.0d);
+      datasetScores.put(d, datasetScores.get(d) + metricScore);
     }
 
     Collection<Entity> entities = new ArrayList<>();
@@ -55,9 +64,11 @@ public class MetricDatsetPipeline implements Pipeline {
         continue;
       }
 
+      double datasetScore = datasetScores.get(d);
+
       Collection<MetricConfigDTO> dtos = metricDAO.findByDataset(d);
       for(MetricConfigDTO dto : dtos) {
-        entities.add(MetricEntity.fromDTO(1.0, dto, dataset));
+        entities.add(MetricEntity.fromDTO(datasetScore, dto, dataset));
       }
     }
 

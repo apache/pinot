@@ -61,6 +61,8 @@ public class MetricDimensionPipeline implements Pipeline {
       return new PipelineResult(Collections.<Entity>emptyList());
     }
 
+    Map<String, Entity> contextEntityMap = EntityUtils.mapEntityURNs(contextEntities);
+
     Map<String, MetricConfigDTO> metrics = new HashMap<>();
     Map<String, DatasetConfigDTO> datasets = new HashMap<>();
     for(Entity e : contextEntities) {
@@ -93,7 +95,8 @@ public class MetricDimensionPipeline implements Pipeline {
       DatasetConfigDTO ddto = datasets.get(entry.getKey());
 
       for(String dim : ddto.getDimensions()) {
-        local.add(MetricDimensionEntity.fromDTO(1.0, mdto, ddto, dim));
+        double metricScore = contextEntityMap.get(entry.getKey()).getScore();
+        local.add(MetricDimensionEntity.fromDTO(metricScore, mdto, ddto, dim));
       }
 
       try {

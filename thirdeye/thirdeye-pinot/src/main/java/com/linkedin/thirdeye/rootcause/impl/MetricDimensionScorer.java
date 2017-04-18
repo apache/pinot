@@ -11,10 +11,8 @@ import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.DoubleSeries;
-import com.linkedin.thirdeye.dataframe.Series;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.rootcause.ExecutionContext;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -82,7 +80,7 @@ public class MetricDimensionScorer {
     cube.buildWithAutoDimensionOrder(olapClient, dimensions, topDimensions, Collections.<List<String>>emptyList());
 
     // group by dimension
-    DataFrame df = toDataFrame(cube.getCostSet());
+    DataFrame df = toNormalizedDataFrame(cube.getCostSet());
 
     // map dimension to MetricDimension
     Map<String, MetricDimensionEntity> mdMap = new HashMap<>();
@@ -99,7 +97,8 @@ public class MetricDimensionScorer {
         continue;
       }
 
-      MetricDimensionEntity n = e.withScore(df.getDouble(CONTRIBUTION, i));
+      // final score is dimension_contribution * base_metric_score
+      MetricDimensionEntity n = e.withScore(df.getDouble(CONTRIBUTION, i) * e.getScore());
       scores.add(n);
     }
 
@@ -120,7 +119,7 @@ public class MetricDimensionScorer {
     return olapClient;
   }
 
-  private static DataFrame toDataFrame(Collection<DimNameValueCostEntry> costs) {
+  private static DataFrame toNormalizedDataFrame(Collection<DimNameValueCostEntry> costs) {
     String[] dim = new String[costs.size()];
     double[] contrib = new double[costs.size()];
     int i = 0;

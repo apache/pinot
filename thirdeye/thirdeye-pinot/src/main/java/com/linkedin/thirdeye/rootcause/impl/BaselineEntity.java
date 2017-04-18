@@ -5,7 +5,7 @@ import com.linkedin.thirdeye.rootcause.Entity;
 
 /**
  * BaselineEntity represents a time-range used for comparison to a {@code TimeRange} entity.
- * The URN namespace is defined as 'thirdeye:timerange:{start}:{end}'.
+ * The URN namespace is defined as 'thirdeye:baseline:{start}:{end}'.
  */
 public class BaselineEntity extends Entity {
   public static BaselineEntity fromURN(String urn, double score) {

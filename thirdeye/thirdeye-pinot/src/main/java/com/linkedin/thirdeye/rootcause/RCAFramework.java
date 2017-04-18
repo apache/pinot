@@ -11,26 +11,26 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Container class for configuring and executing a rootcause search with multiple pipelines.
+ * Container class for configuring and executing a root cause search with multiple pipelines.
  * The framework is instantiated with multiple (named) pipelines and a result aggregator. The run()
  * method then executes the configured pipelines and aggregation for arbitrary search contexts without
- * storing any additional state within the Framework.
+ * storing any additional state within the RCAFramework.
  */
 
 /*
  *                          /-> pipeline.run() \
  *                         /                    \
- * SearchContext --> run() ---> pipeline.run() ---> aggregator.aggregate() --> FrameworkResult
+ * SearchContext --> run() ---> pipeline.run() ---> aggregator.aggregate() --> RCAFrameworkResult
  *                         \                    /
  *                          \-> pipeline.run() /
  */
-public class Framework {
-  private static final Logger LOG = LoggerFactory.getLogger(Framework.class);
+public class RCAFramework {
+  private static final Logger LOG = LoggerFactory.getLogger(RCAFramework.class);
 
   final Map<String, Pipeline> pipelines;
   final Aggregator aggregator;
 
-  public Framework(Iterable<Pipeline> pipelines, Aggregator aggregator) {
+  public RCAFramework(Iterable<Pipeline> pipelines, Aggregator aggregator) {
     this.pipelines = new HashMap<>();
     for(Pipeline p : pipelines) {
       if(this.pipelines.containsKey(p.getName()))
@@ -47,7 +47,7 @@ public class Framework {
    * @param searchContext user-specified search entities
    * @return aggregated result
    */
-  public FrameworkResult run(SearchContext searchContext) {
+  public RCAFrameworkResult run(SearchContext searchContext) {
     Map<String, PipelineResult> results = new HashMap<>();
 
     LOG.info("Using search context '{}'", searchContext.entities);
@@ -69,7 +69,7 @@ public class Framework {
     ExecutionContext context = new ExecutionContext(searchContext, results);
     LOG.info("Aggregated scores for {} entities", aggregated.size());
 
-    FrameworkResult result = new FrameworkResult(aggregated, results, context);
+    RCAFrameworkResult result = new RCAFrameworkResult(aggregated, results, context);
 
     return result;
   }
