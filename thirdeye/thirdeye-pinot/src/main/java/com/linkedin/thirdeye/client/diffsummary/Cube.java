@@ -239,8 +239,8 @@ public class Cube { // the cube (Ca|Cb)
       baselineTotal += wowValues.baselineValue;
       currentTotal += wowValues.currentValue;
     }
-    System.out.println("baselineTotal:" + baselineTotal);
-    System.out.println("currentTotal:" + currentTotal);
+    LOG.info("baselineTotal: {}", baselineTotal);
+    LOG.info("currentTotal: {}", currentTotal);
 
     for (int i = 0; i < dimensions.size(); ++i) {
       String dimension = dimensions.get(i);
@@ -261,9 +261,9 @@ public class Cube { // the cube (Ca|Cb)
     }
 
     Collections.sort(costSet, Collections.reverseOrder());
-    System.out.println("Cost set");
+    LOG.info("Cost set");
     for (DimNameValueCostEntry entry : costSet.subList(0, Math.min(costSet.size(), 20))) {
-      System.out.println(entry);
+      LOG.info("{}", entry);
     }
 
     return costSet;
