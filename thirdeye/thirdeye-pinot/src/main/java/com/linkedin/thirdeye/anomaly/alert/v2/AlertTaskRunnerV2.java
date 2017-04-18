@@ -136,8 +136,8 @@ public class AlertTaskRunnerV2 implements TaskRunner {
         // 1. Anomaly results from detection --> Grouped anomalies from grouper --> Alerter sends emails on grouped anomalies
         // 2. Anomaly results from detection --> Alerter performs simple grouping and sends alerts in one go
 
-        // Current implementation uses the second approach for experimental purpose. We might need to change to
-        //     approach 1 in order to increase the flexibility of the grouping logic.
+        // Current implementation uses the second approach for experimental purpose. We might need to move to
+        //     approach 1 in order to consider multi-metric grouping.
         // Input: a list of anomalies.
         // Output: lists of anomalies; each list contains the anomalies of the same group.
         AlertGrouper alertGrouper = AlertGrouperFactory.fromSpec(alertConfig.getGroupByConfig());
@@ -164,9 +164,6 @@ public class AlertTaskRunnerV2 implements TaskRunner {
                   emailName);
           updateNotifiedStatus(resultsForThisGroup);
         }
-
-//        AnomalyReportGenerator.getInstance().buildReport(results, thirdeyeConfig, alertConfig);
-//        updateNotifiedStatus(results);
 
         // update anomaly watermark in alertConfig
         long lastNotifiedAlertId = emailConfig.getAnomalyWatermark();

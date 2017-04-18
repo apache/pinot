@@ -88,6 +88,10 @@ public class DimensionalAlertGrouper extends BaseAlertGrouper<DimensionMap> {
         if (groupedAnomaliesMap.containsKey(groupKey)) {
           GroupedAnomalyResults groupedAnomalyResults = groupedAnomaliesMap.get(groupKey);
           groupedAnomalyResults.getAnomalyResults().add(anomalyResult);
+        } else {
+          GroupedAnomalyResults groupedAnomalyResults = new GroupedAnomalyResults();
+          groupedAnomalyResults.getAnomalyResults().add(anomalyResult);
+          groupedAnomaliesMap.put(groupKey, groupedAnomalyResults);
         }
       }
 
