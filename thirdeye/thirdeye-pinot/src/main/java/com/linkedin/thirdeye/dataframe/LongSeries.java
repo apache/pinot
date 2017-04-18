@@ -14,6 +14,8 @@ import java.util.List;
 public final class LongSeries extends TypedSeries<LongSeries> {
   public static final long NULL = Long.MIN_VALUE;
   public static final long DEFAULT = 0L;
+  public static final long MIN_VALUE = Long.MIN_VALUE + 1;
+  public static final long MAX_VALUE = Long.MAX_VALUE;
 
   public static final LongFunction SUM = new LongSum();
   public static final LongFunction PRODUCT = new LongProduct();
@@ -373,6 +375,8 @@ public final class LongSeries extends TypedSeries<LongSeries> {
   }
 
   public LongSeries add(final long constant) {
+    if(isNull(constant))
+      return nulls(this.size());
     return this.map(new LongFunction() {
       @Override
       public long apply(long... values) {
@@ -391,6 +395,8 @@ public final class LongSeries extends TypedSeries<LongSeries> {
   }
 
   public LongSeries subtract(final long constant) {
+    if(isNull(constant))
+      return nulls(this.size());
     return this.map(new LongFunction() {
       @Override
       public long apply(long... values) {
@@ -409,6 +415,8 @@ public final class LongSeries extends TypedSeries<LongSeries> {
   }
 
   public LongSeries multiply(final long constant) {
+    if(isNull(constant))
+      return nulls(this.size());
     return this.map(new LongFunction() {
       @Override
       public long apply(long... values) {
@@ -427,6 +435,8 @@ public final class LongSeries extends TypedSeries<LongSeries> {
   }
 
   public LongSeries divide(final long constant) {
+    if(isNull(constant))
+      return nulls(this.size());
     return this.map(new LongFunction() {
       @Override
       public long apply(long... values) {
@@ -443,6 +453,25 @@ public final class LongSeries extends TypedSeries<LongSeries> {
         values[i] = NULL;
       } else {
         values[i] = this.values[fromIndex[i]];
+      }
+    }
+    return buildFrom(values);
+  }
+
+  public boolean hasValue(long value) {
+    for(long v : this.values)
+      if(v == value)
+        return true;
+    return false;
+  }
+
+  public LongSeries replace(long find, long by) {
+    long[] values = new long[this.values.length];
+    for(int i=0; i<values.length; i++) {
+      if(this.values[i] == find) {
+        values[i] = by;
+      } else {
+        values[i] = this.values[i];
       }
     }
     return buildFrom(values);
