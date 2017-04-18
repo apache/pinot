@@ -167,14 +167,38 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     }
 
     for (String column : config.getInvertedIndexCreationColumns()) {
-      if (!schema.hasColumn(column)) {
-        LOGGER.warn("Skipping enabling index on column:{} since its missing in schema", column);
+      // Validation check
+      FieldSpec fieldSpec = schema.getFieldSpecFor(column);
+      if (fieldSpec == null) {
+        LOGGER.warn("Skip creating inverted index for segment: {}, column: {} because column does not exist in schema",
+            segmentName, column);
+        continue;
+      }
+      if (totalDocs > OffHeapBitmapInvertedIndexCreator.MAX_NUM_ENTRIES) {
+        LOGGER.warn(
+            "Skip creating inverted index for segment: {}, column: {} because totalDocs: {} exceeds the limit: {}",
+            segmentName, column, totalDocs, OffHeapBitmapInvertedIndexCreator.MAX_NUM_ENTRIES);
         continue;
       }
       ColumnIndexCreationInfo indexCreationInfo = indexCreationInfoMap.get(column);
-      int uniqueValueCount = indexCreationInfo.getDistinctValueCount();
-      OffHeapBitmapInvertedIndexCreator invertedIndexCreator = new OffHeapBitmapInvertedIndexCreator(file,
-          uniqueValueCount, totalDocs, indexCreationInfo.getTotalNumberOfEntries(), schema.getFieldSpecFor(column));
+      int cardinality = indexCreationInfo.getDistinctValueCount();
+      if (cardinality > OffHeapBitmapInvertedIndexCreator.MAX_NUM_ENTRIES) {
+        LOGGER.warn(
+            "Skip creating inverted index for segment: {}, column: {} because cardinality: {} exceeds the limit: {}",
+            segmentName, column, cardinality, OffHeapBitmapInvertedIndexCreator.MAX_NUM_ENTRIES);
+        continue;
+      }
+      int totalNumberOfEntries = indexCreationInfo.getTotalNumberOfEntries();
+      if ((!fieldSpec.isSingleValueField())
+          && (totalNumberOfEntries > OffHeapBitmapInvertedIndexCreator.MAX_NUM_ENTRIES)) {
+        LOGGER.warn(
+            "Skip creating inverted index for segment: {}, multi-value column: {} because totalNumberOfEntries: {} exceeds the limit: {}",
+            segmentName, column, totalNumberOfEntries, OffHeapBitmapInvertedIndexCreator.MAX_NUM_ENTRIES);
+        continue;
+      }
+
+      OffHeapBitmapInvertedIndexCreator invertedIndexCreator =
+          new OffHeapBitmapInvertedIndexCreator(file, cardinality, totalDocs, totalNumberOfEntries, fieldSpec);
       invertedIndexCreatorMap.put(column, invertedIndexCreator);
     }
   }
