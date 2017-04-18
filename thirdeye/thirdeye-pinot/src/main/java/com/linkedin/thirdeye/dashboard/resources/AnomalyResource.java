@@ -479,7 +479,7 @@ public class AnomalyResource {
     targetFunction.setActive(true);
     anomalyFunctionDAO.update(targetFunction);
 
-    // Dis-activate original function
+    // Deactivate original function
     if(isCloneFunction) {
       originalFunction.setActive(false);
       anomalyFunctionDAO.update(originalFunction);
