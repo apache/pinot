@@ -10,7 +10,7 @@
   </parent>
   <groupId>com.linkedin.thirdeye</groupId>
   <artifactId>thirdeye-frontend</artifactId>
-  <name>thirdeye-webpapp</name>
+  <name>thirdeye-frontend</name>
   <url>http://maven.apache.org</url>
 
   <build>
