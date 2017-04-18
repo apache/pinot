@@ -19,17 +19,14 @@ module.exports = function(environment) {
     },
 
     APP: {
-      // Here you can pass flags/options to your application instance
+      // you can pass flags/options to your application instance
       // when it is created
     }
   };
 
   if (environment === 'development') {
     ENV.rootURL = '/';
-    ENV.contentSecurityPolicy = {
-      'connect-src': "'self' http://localhost:1426"
-    };
-    // ENV.APP.LOG_RESOLVER = true;
+    // necessary for local development
     // ENV.APP.LOG_ACTIVE_GENERATION = true;
     // ENV.APP.LOG_TRANSITIONS = true;
     // ENV.APP.LOG_TRANSITIONS_INTERNAL = true;
@@ -48,8 +45,6 @@ module.exports = function(environment) {
   }
 
   if (environment === 'production') {
-    ENV.locationType = 'hash'
   }
-
   return ENV;
 };

@@ -19,7 +19,6 @@ import com.linkedin.thirdeye.dashboard.resources.OnboardResource;
 import com.linkedin.thirdeye.dashboard.resources.OverrideConfigResource;
 import com.linkedin.thirdeye.dashboard.resources.SummaryResource;
 import com.linkedin.thirdeye.dashboard.resources.ThirdEyeResource;
-// import com.linkedin.thirdeye.dashboard.resources.ThirdEyeEmberResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.AnomaliesResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.DataResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.EventResource;
@@ -49,7 +48,6 @@ public class ThirdEyeDashboardApplication
     bootstrap.addBundle(new ViewBundle());
     bootstrap.addBundle(new HelperBundle());
     bootstrap.addBundle(new AssetsBundle("/app/", "/app", "index.html", "app"));
-    // bootstrap.addBundle(new AssetsBundle("/app/assets", "/assets"));
     bootstrap.addBundle(new AssetsBundle("/assets", "/assets", null, "assets"));
     bootstrap.addBundle(new AssetsBundle("/assets/css", "/assets/css", null, "css"));
     bootstrap.addBundle(new AssetsBundle("/assets/js", "/assets/js", null, "js"));
@@ -94,7 +92,6 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new AdminResource());
     env.jersey().register(new SummaryResource());
     env.jersey().register(new ThirdEyeResource());
-    // env.jersey().register(new ThirdEyeEmberResource());
     env.jersey().register(new OverrideConfigResource());
     env.jersey().register(new DataResource(anomalyFunctionFactory, alertFilterFactory));
     env.jersey().register(new AnomaliesResource(anomalyFunctionFactory, alertFilterFactory));
