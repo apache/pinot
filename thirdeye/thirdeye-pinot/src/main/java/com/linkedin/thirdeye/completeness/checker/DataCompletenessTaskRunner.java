@@ -80,12 +80,8 @@ public class DataCompletenessTaskRunner implements TaskRunner {
           DatasetConfigDTO datasetConfig = DAO_REGISTRY.getDatasetConfigDAO().findByDataset(dataset);
           LOG.info("Dataset {} {}", dataset, datasetConfig);
 
-          // TODO: get this from datasetConfig
-          //DataCompletenessAlgorithmName algorithmName = datasetConfig.getDataCompletenessAlgorithmName();
-          DataCompletenessAlgorithmName algorithmName = DataCompletenessAlgorithmName.WO4W_AVERAGE;
-          // TODO: get this from datasetConfig
-          // Double expectedCompleteness = datasetConfig.getExpectedCompleteness();
-          Double expectedCompleteness = null;
+          DataCompletenessAlgorithmName algorithmName = datasetConfig.getDataCompletenessAlgorithmName();
+          Double expectedCompleteness = datasetConfig.getExpectedCompleteness();
           DataCompletenessAlgorithm dataCompletenessAlgorithm = DataCompletenessAlgorithmFactory.getDataCompletenessAlgorithmFromName(algorithmName);
           LOG.info("DataCompletenessAlgorithmClass: {}", algorithmName);
 
