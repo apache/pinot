@@ -10,32 +10,27 @@ import static com.linkedin.thirdeye.constant.AnomalyFeedbackType.*;
 import static org.junit.Assert.*;
 
 
-public class TestAlertFilterUtil {
+public class TestPrecisionRecallEvaluator {
 
   @Test
   public void testPrecisionAndRecall() throws Exception{
     AlertFilter dummyAlertFilter = new DummyAlertFilter();
-    AlertFilterEvaluationUtil evaluator = new AlertFilterEvaluationUtil(dummyAlertFilter);
     // test data with 1 positive feedback, 1 negative feedback, other NA feedbacks
     List<MergedAnomalyResultDTO> anomalies = getMockMergedAnomalies(7,8);
-    evaluator.updateWeighedPrecisionAndRecall(anomalies);
-    assertEquals(evaluator.getPrecision(), 0.1818, 0.0001);
+    PrecisionRecallEvaluator evaluator = new PrecisionRecallEvaluator(dummyAlertFilter, anomalies);
+    assertEquals(evaluator.getWeightedPrecision(), 0.1818, 0.0001);
     assertEquals(evaluator.getRecall(), 1, 0.0001);
 
     // test data with 1 positive feedback and others are NA feedbacks
     anomalies = getMockMergedAnomalies(6,-1);
-    evaluator.updateWeighedPrecisionAndRecall(anomalies);
-    assertEquals(evaluator.getPrecision(), 0.2, 0.0001);
+    evaluator.init(anomalies);
+    assertEquals(evaluator.getWeightedPrecision(), 0.2, 0.0001);
     assertEquals(evaluator.getRecall(), 1, 0.0001);
 
     // test data with 0 positive feedback, 1 negative feedback and others are NA feedbacks
     anomalies = getMockMergedAnomalies(-1,6);
-    try{
-      evaluator.updateWeighedPrecisionAndRecall(anomalies);
-      fail("Should throw exception");
-    } catch (Exception e) {
-      assertEquals("No true labels in dataset. Check data", e.getMessage());
-    }
+    evaluator.init(anomalies);
+    assertTrue(Double.isNaN(evaluator.getRecall()));
   }
 
 

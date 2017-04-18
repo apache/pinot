@@ -7,7 +7,7 @@ import com.linkedin.thirdeye.datalayer.bao.AutotuneConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.AutotuneConfigDTO;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
-import com.linkedin.thirdeye.detector.email.filter.AlertFilterEvaluationUtil;
+import com.linkedin.thirdeye.detector.email.filter.PrecisionRecallEvaluator;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
@@ -62,7 +62,7 @@ public class AutoTuneAlertFilterTool {
     private static List<String> getHeaders(){
       List<String> headers = new ArrayList<>();
       headers.addAll(Arrays.asList(COLLECTION, METRICNAME, ID, ALERTFILTERSTR));
-      headers.addAll(AlertFilterEvaluationUtil.getPropertyNames());
+      headers.addAll(PrecisionRecallEvaluator.getPropertyNames());
       return headers;
     }
 
