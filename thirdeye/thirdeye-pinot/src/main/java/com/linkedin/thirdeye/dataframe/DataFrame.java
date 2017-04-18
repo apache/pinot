@@ -1050,18 +1050,16 @@ public class DataFrame {
    * @return DataFrame copy without null rows
    */
   public DataFrame dropNull() {
-    BooleanSeries nulls = BooleanSeries.fillFalse(this.size());
+    BooleanSeries isNull = BooleanSeries.fillValues(this.size(), false);
     for(Series s : this.series.values()) {
-      nulls = nulls.or(s.isNull());
+      isNull = isNull.or(s.isNull());
     }
-    boolean[] isNull = nulls.valuesBoolean();
 
-    int[] fromIndex = new int[this.size()];
+    int[] fromIndex = new int[isNull.count(false)];
     int countNotNull = 0;
-    for(int i=0; i<fromIndex.length; i++) {
-      if(!isNull[i]) {
-        fromIndex[countNotNull] = i;
-        countNotNull++;
+    for(int i=0; i<this.size(); i++) {
+      if(BooleanSeries.isFalse(isNull.getBoolean(i))) {
+        fromIndex[countNotNull++] = i;
       }
     }
 

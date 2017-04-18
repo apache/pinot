@@ -206,9 +206,13 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
     return builder().fillValues(size, NULL).build();
   }
 
-  public static BooleanSeries fillTrue(int size) { return builder().fillValues(size, TRUE).build(); }
+  public static BooleanSeries fillValues(int size, byte value) {
+    return builder().fillValues(size, value).build();
+  }
 
-  public static BooleanSeries fillFalse(int size) { return builder().fillValues(size, FALSE).build(); }
+  public static BooleanSeries fillValues(int size, boolean value) {
+    return builder().fillValues(size, value).build();
+  }
 
   // CAUTION: The array is final, but values are inherently modifiable
   final byte[] values;
@@ -362,21 +366,6 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
     });
   }
 
-  public BooleanSeries or(final boolean constant) {
-    return this.map(new BooleanFunction() {
-      @Override
-      public boolean apply(boolean... values) {
-        return values[0] | constant;
-      }
-    });
-  }
-
-  public BooleanSeries or(byte constant) {
-    if(isNull(constant))
-      return nulls(this.size());
-    return this.or(isTrue(constant));
-  }
-
   public BooleanSeries or(Series other) {
     return map(new BooleanFunction() {
       @Override
@@ -386,19 +375,12 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
     }, this, other);
   }
 
-  public BooleanSeries and(final boolean constant) {
-    return this.map(new BooleanFunction() {
-      @Override
-      public boolean apply(boolean... values) {
-        return values[0] & constant;
-      }
-    });
+  public BooleanSeries or(final boolean constant) {
+    return this.or(fillValues(this.size(), constant));
   }
 
-  public BooleanSeries and(byte constant) {
-    if(isNull(constant))
-      return nulls(this.size());
-    return this.and(isTrue(constant));
+  public BooleanSeries or(byte constant) {
+    return this.or(fillValues(this.size(), constant));
   }
 
   public BooleanSeries and(Series other) {
@@ -410,19 +392,12 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
     }, this, other);
   }
 
-  public BooleanSeries xor(final boolean constant) {
-    return this.map(new BooleanFunction() {
-      @Override
-      public boolean apply(boolean... values) {
-        return values[0] ^ constant;
-      }
-    });
+  public BooleanSeries and(final boolean constant) {
+    return this.and(fillValues(this.size(), constant));
   }
 
-  public BooleanSeries xor(byte constant) {
-    if(isNull(constant))
-      return nulls(this.size());
-    return this.xor(isTrue(constant));
+  public BooleanSeries and(byte constant) {
+    return this.and(fillValues(this.size(), constant));
   }
 
   public BooleanSeries xor(Series other) {
@@ -434,19 +409,12 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
     }, this, other);
   }
 
-  public BooleanSeries implies(final boolean constant) {
-    return this.map(new BooleanFunction() {
-      @Override
-      public boolean apply(boolean... values) {
-        return !values[0] | constant;
-      }
-    });
+  public BooleanSeries xor(final boolean constant) {
+    return this.xor(fillValues(this.size(), constant));
   }
 
-  public BooleanSeries implies(byte constant) {
-    if(isNull(constant))
-      return nulls(this.size());
-    return this.implies(isTrue(constant));
+  public BooleanSeries xor(byte constant) {
+    return this.xor(fillValues(this.size(), constant));
   }
 
   public BooleanSeries implies(Series other) {
@@ -458,19 +426,41 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
     }, this, other);
   }
 
+  public BooleanSeries implies(final boolean constant) {
+    return this.implies(fillValues(this.size(), constant));
+  }
+
+  public BooleanSeries implies(byte constant) {
+    return this.implies(fillValues(this.size(), constant));
+  }
+
+  public BooleanSeries eq(Series other) {
+    return map(new BooleanFunction() {
+      @Override
+      public boolean apply(boolean... values) {
+        return values[0] == values[1];
+      }
+    }, this, other);
+  }
+
   public BooleanSeries eq(byte constant) {
-    if(isNull(constant))
-      return this.isNull();
-    return this.eq(valueOf(constant));
+    return this.eq(fillValues(this.size(), constant));
   }
 
   public BooleanSeries eq(final boolean constant) {
-    return this.map(new BooleanFunction() {
-      @Override
-      public boolean apply(boolean... values) {
-        return values[0] == constant;
-      }
-    });
+    return this.eq(fillValues(this.size(), constant));
+  }
+
+  public int count(boolean value) {
+    return this.count(valueOf(value));
+  }
+
+  public int count(byte value) {
+    int count = 0;
+    for(byte v : this.values)
+      if(v == value)
+        count++;
+    return count;
   }
 
   @Override
@@ -502,11 +492,10 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
     builder.append("BooleanSeries{");
     for(byte b : this.values) {
       if(isNull(b)) {
-        builder.append("null");
+        builder.append("null" );
       } else {
-        builder.append(isTrue(b) ? "true" : "false");
+        builder.append(isTrue(b) ? "true " : "false ");
       }
-      builder.append(" ");
     }
     builder.append("}");
     return builder.toString();

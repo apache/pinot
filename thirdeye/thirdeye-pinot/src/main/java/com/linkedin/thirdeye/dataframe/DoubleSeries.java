@@ -260,6 +260,8 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     return builder().fillValues(size, 1.0d).build();
   }
 
+  public static DoubleSeries fillValues(int size, double value) { return builder().fillValues(size, value).build(); }
+
   // CAUTION: The array is final, but values are inherently modifiable
   final double[] values;
 
@@ -461,14 +463,7 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
   }
 
   public DoubleSeries add(final double constant) {
-    if(isNull(constant))
-      return nulls(this.size());
-    return this.map(new DoubleFunction() {
-      @Override
-      public double apply(double... values) {
-        return values[0] + constant;
-      }
-    });
+    return this.add(fillValues(this.size(), constant));
   }
 
   public DoubleSeries subtract(Series other) {
@@ -481,14 +476,7 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
   }
 
   public DoubleSeries subtract(final double constant) {
-    if(isNull(constant))
-      return nulls(this.size());
-    return this.map(new DoubleFunction() {
-      @Override
-      public double apply(double... values) {
-        return values[0] - constant;
-      }
-    });
+    return this.subtract(fillValues(this.size(), constant));
   }
 
   public DoubleSeries multiply(Series other) {
@@ -501,19 +489,12 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
   }
 
   public DoubleSeries multiply(final double constant) {
-    if(isNull(constant))
-      return nulls(this.size());
-    return this.map(new DoubleFunction() {
-      @Override
-      public double apply(double... values) {
-        return values[0] * constant;
-      }
-    });
+    return this.multiply(fillValues(this.size(), constant));
   }
 
   public DoubleSeries divide(Series other) {
     DoubleSeries o = other.getDoubles();
-    if(o.hasValue(0))
+    if(o.contains(0.0d))
       throw new ArithmeticException("/ by zero");
     return map(new DoubleFunction() {
       @Override
@@ -524,35 +505,48 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
   }
 
   public DoubleSeries divide(final double constant) {
-    if(isNull(constant))
-      return nulls(this.size());
-    if(constant == 0.0d)
-      throw new ArithmeticException("/ by zero");
-    return this.map(new DoubleFunction() {
+    return this.divide(fillValues(this.size(), constant));
+  }
+
+  public BooleanSeries eq(Series other) {
+    return map(new DoubleConditional() {
       @Override
-      public double apply(double... values) {
-        return values[0] / constant;
+      public boolean apply(double... values) {
+        return values[0] == values[1];
       }
-    });
+    }, this, other);
   }
 
-  public boolean hasValue(double value) {
-    for(double v : this.values)
-      if(nullSafeDoubleComparator(v, value) == 0)
-        return true;
-    return false;
+  public BooleanSeries eq(final double constant) {
+    return this.eq(fillValues(this.size(), constant));
   }
 
-  public DoubleSeries replace(double find, double by) {
+  public DoubleSeries set(BooleanSeries where, double value) {
     double[] values = new double[this.values.length];
-    for(int i=0; i<values.length; i++) {
-      if(nullSafeDoubleComparator(this.values[i], find) == 0) {
-        values[i] = by;
+    for(int i=0; i<where.size(); i++) {
+      if(BooleanSeries.isTrue(where.getBoolean(i))) {
+        values[i] = value;
       } else {
         values[i] = this.values[i];
       }
     }
     return buildFrom(values);
+  }
+
+  public int count(double value) {
+    int count = 0;
+    for(double v : this.values)
+      if(nullSafeDoubleComparator(v, value) == 0)
+        count++;
+    return count;
+  }
+
+  public boolean contains(double value) {
+    return this.count(value) > 0;
+  }
+
+  public DoubleSeries replace(double find, double by) {
+    return this.set(this.eq(find), by);
   }
 
   @Override
