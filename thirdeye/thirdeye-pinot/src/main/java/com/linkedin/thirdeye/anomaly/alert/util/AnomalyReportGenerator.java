@@ -90,7 +90,13 @@ public class AnomalyReportGenerator {
 
   public void buildReport(List<MergedAnomalyResultDTO> anomalies,
       ThirdEyeAnomalyConfiguration configuration, AlertConfigDTO alertConfig) {
-    String subject = "Thirdeye Alert : " + alertConfig.getName();
+    buildReport(anomalies, configuration, alertConfig.getRecipients(), alertConfig.getFromAddress(),
+        alertConfig.getName());
+  }
+
+  public void buildReport(List<MergedAnomalyResultDTO> anomalies,
+      ThirdEyeAnomalyConfiguration configuration, String recipients, String fromAddress, String alertConfigName) {
+    String subject = "Thirdeye Alert : " + alertConfigName;
     long startTime = System.currentTimeMillis();
     long endTime = 0;
     for (MergedAnomalyResultDTO anomaly : anomalies) {
@@ -102,7 +108,7 @@ public class AnomalyReportGenerator {
       }
     }
     buildReport(startTime, endTime, anomalies, subject, configuration, false,
-        alertConfig.getRecipients(), alertConfig.getFromAddress(), alertConfig.getName(), false);
+        recipients, fromAddress, alertConfigName, false);
   }
 
 

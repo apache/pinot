@@ -9,6 +9,7 @@ import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -152,17 +153,19 @@ public class DimensionMap implements SortedMap<String, String>, Comparable<Dimen
 
   @Override
   public boolean equals(Object o) {
-    if (o instanceof DimensionMap) {
-      DimensionMap otherDimensionMap = (DimensionMap) o;
-      return ObjectUtils.equals(sortedDimensionMap, otherDimensionMap.sortedDimensionMap);
-    } else {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
       return false;
     }
+    DimensionMap that = (DimensionMap) o;
+    return Objects.equals(sortedDimensionMap, that.sortedDimensionMap);
   }
 
   @Override
   public int hashCode() {
-    return sortedDimensionMap.hashCode();
+    return Objects.hash(sortedDimensionMap);
   }
 
   /**
@@ -179,7 +182,7 @@ public class DimensionMap implements SortedMap<String, String>, Comparable<Dimen
   public int compareTo(DimensionMap o) {
     Iterator<Map.Entry<String, String>> thisIte = sortedDimensionMap.entrySet().iterator();
     Iterator<Map.Entry<String, String>> thatIte = o.sortedDimensionMap.entrySet().iterator();
-    if (thisIte.hasNext()) {
+    while (thisIte.hasNext()) {
       // o is a smaller map
       if (!thatIte.hasNext()) {
         return 1;

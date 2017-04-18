@@ -2,7 +2,9 @@ package com.linkedin.thirdeye.datalayer.pojo;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class AlertConfigBean extends AbstractBean {
@@ -11,6 +13,7 @@ public class AlertConfigBean extends AbstractBean {
   boolean active;
   EmailConfig emailConfig;
   ReportConfigCollection reportConfigCollection;
+  Map<String, String> groupByConfig = new HashMap<>();
   String recipients;
   String fromAddress;
 
@@ -68,6 +71,14 @@ public class AlertConfigBean extends AbstractBean {
 
   public void setReportConfigCollection(ReportConfigCollection reportConfigCollection) {
     this.reportConfigCollection = reportConfigCollection;
+  }
+
+  public Map<String, String> getGroupByConfig() {
+    return groupByConfig;
+  }
+
+  public void setGroupByConfig(Map<String, String> groupByConfig) {
+    this.groupByConfig = groupByConfig;
   }
 
   @JsonIgnoreProperties(ignoreUnknown = true)
