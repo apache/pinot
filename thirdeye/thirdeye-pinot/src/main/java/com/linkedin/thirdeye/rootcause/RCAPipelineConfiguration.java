@@ -2,6 +2,12 @@ package com.linkedin.thirdeye.rootcause;
 
 import java.util.Map;
 
+/**
+ * Class to keep configs of each individual external rca pipeline
+ * name: name for pipeline
+ * className: class name containing implementation for this pipeline
+ * properties: map of property name and value, which are required by this pipeline for instantiation
+ */
 public class RCAPipelineConfiguration {
   private String name;
   private String className;

@@ -1,0 +1,12 @@
+rcaPipelinesConfiguration:
+    - name: DUMMY_RCA_PIPELINE1
+      className: com.linkedin.thirdeye.dummy.pipeline.DummyRCAPipeline1
+      properties:
+          DB_URL: value1
+          EXTERNAL_ENDPOINT: value2
+    - name: DUMMY_RCA_PIPELINE2
+      className: com.linkedin.thirdeye.dummy.pipeline.DummyRCAPipeline2
+      properties:
+          PROP1: value1
+          PROP2: value2
+          PROP3: value3
