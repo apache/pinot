@@ -25,11 +25,11 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
 
   public static final class BooleanAllTrue implements BooleanFunctionEx {
     @Override
-    public byte apply(boolean... values) {
+    public byte apply(byte... values) {
       if(values.length <= 0)
         return NULL;
-      for(boolean b : values) {
-        if(!b) return FALSE;
+      for(byte b : values) {
+        if(isFalse(b)) return FALSE;
       }
       return TRUE;
     }
@@ -37,11 +37,11 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
 
   public static final class BooleanHasTrue implements BooleanFunctionEx {
     @Override
-    public byte apply(boolean... values) {
+    public byte apply(byte... values) {
       if(values.length <= 0)
         return NULL;
-      for(boolean b : values) {
-        if(b) return TRUE;
+      for(byte b : values) {
+        if(isTrue(b)) return TRUE;
       }
       return FALSE;
     }
@@ -49,7 +49,7 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
 
   public static final class BooleanAllFalse implements BooleanFunctionEx {
     @Override
-    public byte apply(boolean... values) {
+    public byte apply(byte... values) {
       if(values.length <= 0)
         return NULL;
       return valueOf(!isTrue(HAS_TRUE.apply(values)));
@@ -58,7 +58,7 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
 
   public static final class BooleanHasFalse implements BooleanFunctionEx {
     @Override
-    public byte apply(boolean... values) {
+    public byte apply(byte... values) {
       if(values.length <= 0)
         return NULL;
       return valueOf(!isTrue(ALL_TRUE.apply(values)));
@@ -67,19 +67,19 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
 
   public static final class BooleanFirst implements BooleanFunctionEx {
     @Override
-    public byte apply(boolean... values) {
+    public byte apply(byte... values) {
       if(values.length <= 0)
         return NULL;
-      return values[0] ? TRUE : FALSE;
+      return values[0];
     }
   }
 
   public static final class BooleanLast implements BooleanFunctionEx {
     @Override
-    public byte apply(boolean... values) {
+    public byte apply(byte... values) {
       if(values.length <= 0)
         return NULL;
-      return values[values.length-1] ? TRUE : FALSE;
+      return values[values.length-1];
     }
   }
 
@@ -358,19 +358,19 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
   }
 
   public BooleanSeries not() {
-    return this.map(new BooleanFunction() {
+    return this.map(new BooleanFunctionEx() {
       @Override
-      public boolean apply(boolean... values) {
-        return !values[0];
+      public byte apply(byte... values) {
+        return (byte)(0b1 ^ values[0]);
       }
     });
   }
 
   public BooleanSeries or(Series other) {
-    return map(new BooleanFunction() {
+    return map(new BooleanFunctionEx() {
       @Override
-      public boolean apply(boolean... values) {
-        return values[0] | values[1];
+      public byte apply(byte... values) {
+        return (byte)(values[0] | values[1]);
       }
     }, this, other);
   }
@@ -384,10 +384,10 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
   }
 
   public BooleanSeries and(Series other) {
-    return map(new BooleanFunction() {
+    return map(new BooleanFunctionEx() {
       @Override
-      public boolean apply(boolean... values) {
-        return values[0] & values[1];
+      public byte apply(byte... values) {
+        return (byte)(values[0] & values[1]);
       }
     }, this, other);
   }
@@ -401,10 +401,10 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
   }
 
   public BooleanSeries xor(Series other) {
-    return map(new BooleanFunction() {
+    return map(new BooleanFunctionEx() {
       @Override
-      public boolean apply(boolean... values) {
-        return values[0] ^ values[1];
+      public byte apply(byte... values) {
+        return (byte)(values[0] ^ values[1]);
       }
     }, this, other);
   }
@@ -418,10 +418,10 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
   }
 
   public BooleanSeries implies(Series other) {
-    return map(new BooleanFunction() {
+    return map(new BooleanFunctionEx() {
       @Override
-      public boolean apply(boolean... values) {
-        return !values[0] | values[1];
+      public byte apply(byte... values) {
+        return (byte)((0b1 ^ values[0]) | values[1]);
       }
     }, this, other);
   }
@@ -435,10 +435,10 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
   }
 
   public BooleanSeries eq(Series other) {
-    return map(new BooleanFunction() {
+    return map(new BooleanFunctionEx() {
       @Override
-      public boolean apply(boolean... values) {
-        return values[0] == values[1];
+      public byte apply(byte... values) {
+        return (byte)((values[0] ^ values[1]) ^ 0b1);
       }
     }, this, other);
   }
@@ -683,11 +683,11 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
     final boolean[] input = new boolean[series.length];
     return map(new BooleanFunctionEx() {
       @Override
-      public byte apply(boolean... values) {
+      public byte apply(byte... values) {
         for(int i=0; i<input.length; i++) {
-          input[i] = values[i];
+          input[i] = booleanValueOf(values[i]);
         }
-        return function.apply(input) ? BooleanSeries.TRUE : BooleanSeries.FALSE;
+        return function.apply(input) ? TRUE : FALSE;
       }
     }, series);
   }
@@ -703,13 +703,13 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
 
     // Note: code-specialization to help hot-spot vm
     if(series.length == 1)
-      return map(function, series[0]);
+      return mapUnrolled(function, series[0]);
     if(series.length == 2)
-      return map(function, series[0], series[1]);
+      return mapUnrolled(function, series[0], series[1]);
     if(series.length == 3)
-      return map(function, series[0], series[1], series[2]);
+      return mapUnrolled(function, series[0], series[1], series[2]);
 
-    boolean[] input = new boolean[series.length];
+    byte[] input = new byte[series.length];
     byte[] output = new byte[series[0].size()];
     for(int i=0; i<series[0].size(); i++) {
       output[i] = mapRow(function, series, input, i);
@@ -718,47 +718,47 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
     return buildFrom(output);
   }
 
-  private static byte mapRow(BooleanFunctionEx function, Series[] series, boolean[] input, int row) {
+  private static byte mapRow(BooleanFunctionEx function, Series[] series, byte[] input, int row) {
     for(int j=0; j<series.length; j++) {
       byte value = series[j].getBoolean(row);
       if(isNull(value))
         return NULL;
-      input[j] = booleanValueOf(value);
+      input[j] = value;
     }
     return function.apply(input);
   }
 
-  private static BooleanSeries map(BooleanFunctionEx function, Series a) {
+  private static BooleanSeries mapUnrolled(BooleanFunctionEx function, Series a) {
     byte[] output = new byte[a.size()];
     for(int i=0; i<a.size(); i++) {
       if(a.isNull(i)) {
         output[i] = NULL;
       } else {
-        output[i] = function.apply(booleanValueOf(a.getBoolean(i)));
+        output[i] = function.apply(a.getBoolean(i));
       }
     }
     return buildFrom(output);
   }
 
-  private static BooleanSeries map(BooleanFunctionEx function, Series a, Series b) {
+  private static BooleanSeries mapUnrolled(BooleanFunctionEx function, Series a, Series b) {
     byte[] output = new byte[a.size()];
     for(int i=0; i<a.size(); i++) {
       if(a.isNull(i) || b.isNull(i)) {
         output[i] = NULL;
       } else {
-        output[i] = function.apply(booleanValueOf(a.getBoolean(i)), booleanValueOf(b.getBoolean(i)));
+        output[i] = function.apply(a.getBoolean(i), b.getBoolean(i));
       }
     }
     return buildFrom(output);
   }
 
-  private static BooleanSeries map(BooleanFunctionEx function, Series a, Series b, Series c) {
+  private static BooleanSeries mapUnrolled(BooleanFunctionEx function, Series a, Series b, Series c) {
     byte[] output = new byte[a.size()];
     for(int i=0; i<a.size(); i++) {
       if(a.isNull(i) || b.isNull(i) || c.isNull(i)) {
         output[i] = NULL;
       } else {
-        output[i] = function.apply(booleanValueOf(a.getBoolean(i)), booleanValueOf(b.getBoolean(i)), booleanValueOf(c.getBoolean(i)));
+        output[i] = function.apply(a.getBoolean(i), b.getBoolean(i), c.getBoolean(i));
       }
     }
     return buildFrom(output);
@@ -791,7 +791,7 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
   public static BooleanSeries aggregate(BooleanFunctionEx function, Series series) {
     if(series.hasNull())
       return buildFrom(NULL);
-    return builder().addValues(function.apply(series.getBooleans().valuesBoolean())).build();
+    return builder().addValues(function.apply(series.getBooleans().values())).build();
   }
 
   /**

@@ -258,6 +258,16 @@ public final class StringSeries extends TypedSeries<StringSeries> {
   }
 
   /**
+   * Attempts to infer a tighter native series type based on pattern matching against individual
+   * values in the series. Returns a copy of the series with the inferred type.
+   *
+   * @return series copy of inferred type
+   */
+  public Series toInferredType() {
+    return this.get(this.inferType());
+  }
+
+  /**
    * Returns the value of the first element in the series
    *
    * @throws IllegalStateException if the series is empty
@@ -447,11 +457,11 @@ public final class StringSeries extends TypedSeries<StringSeries> {
 
     // Note: code-specialization to help hot-spot vm
     if(series.length == 1)
-      return map(function, series[0]);
+      return mapUnrolled(function, series[0]);
     if(series.length == 2)
-      return map(function, series[0], series[1]);
+      return mapUnrolled(function, series[0], series[1]);
     if(series.length == 3)
-      return map(function, series[0], series[1], series[2]);
+      return mapUnrolled(function, series[0], series[1], series[2]);
 
     String[] input = new String[series.length];
     String[] output = new String[series[0].size()];
@@ -472,7 +482,7 @@ public final class StringSeries extends TypedSeries<StringSeries> {
     return function.apply(input);
   }
 
-  private static StringSeries map(StringFunction function, Series a) {
+  private static StringSeries mapUnrolled(StringFunction function, Series a) {
     String[] output = new String[a.size()];
     for(int i=0; i<a.size(); i++) {
       if(a.isNull(i)) {
@@ -484,7 +494,7 @@ public final class StringSeries extends TypedSeries<StringSeries> {
     return buildFrom(output);
   }
 
-  private static StringSeries map(StringFunction function, Series a, Series b) {
+  private static StringSeries mapUnrolled(StringFunction function, Series a, Series b) {
     String[] output = new String[a.size()];
     for(int i=0; i<a.size(); i++) {
       if(a.isNull(i) || b.isNull(i)) {
@@ -496,7 +506,7 @@ public final class StringSeries extends TypedSeries<StringSeries> {
     return buildFrom(output);
   }
 
-  private static StringSeries map(StringFunction function, Series a, Series b, Series c) {
+  private static StringSeries mapUnrolled(StringFunction function, Series a, Series b, Series c) {
     String[] output = new String[a.size()];
     for(int i=0; i<a.size(); i++) {
       if(a.isNull(i) || b.isNull(i) || c.isNull(i)) {

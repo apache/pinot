@@ -102,7 +102,7 @@ public abstract class Series {
     byte FALSE = BooleanSeries.FALSE;
     byte NULL = BooleanSeries.NULL;
 
-    byte apply(boolean... values);
+    byte apply(byte... values);
   }
 
   /**

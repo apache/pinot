@@ -629,11 +629,11 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
 
     // Note: code-specialization to help hot-spot vm
     if(series.length == 1)
-      return map(function, series[0]);
+      return mapUnrolled(function, series[0]);
     if(series.length == 2)
-      return map(function, series[0], series[1]);
+      return mapUnrolled(function, series[0], series[1]);
     if(series.length == 3)
-      return map(function, series[0], series[1], series[2]);
+      return mapUnrolled(function, series[0], series[1], series[2]);
 
     double[] input = new double[series.length];
     double[] output = new double[series[0].size()];
@@ -654,7 +654,7 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     return function.apply(input);
   }
 
-  private static DoubleSeries map(DoubleFunction function, Series a) {
+  private static DoubleSeries mapUnrolled(DoubleFunction function, Series a) {
     double[] output = new double[a.size()];
     for(int i=0; i<a.size(); i++) {
       if(a.isNull(i)) {
@@ -666,7 +666,7 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     return buildFrom(output);
   }
 
-  private static DoubleSeries map(DoubleFunction function, Series a, Series b) {
+  private static DoubleSeries mapUnrolled(DoubleFunction function, Series a, Series b) {
     double[] output = new double[a.size()];
     for(int i=0; i<a.size(); i++) {
       if(a.isNull(i) || b.isNull(i)) {
@@ -678,7 +678,7 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     return buildFrom(output);
   }
 
-  private static DoubleSeries map(DoubleFunction function, Series a, Series b, Series c) {
+  private static DoubleSeries mapUnrolled(DoubleFunction function, Series a, Series b, Series c) {
     double[] output = new double[a.size()];
     for(int i=0; i<a.size(); i++) {
       if(a.isNull(i) || b.isNull(i) || c.isNull(i)) {

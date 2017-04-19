@@ -241,6 +241,27 @@ public class DataFrameTest {
   }
 
   @Test
+  public void testDataFrameBuilder() {
+    DataFrame.Builder builder = DataFrame.builder("double", "long", "string", "boolean");
+
+    builder.append(4.0d, 1, null, "true");
+    builder.append(null, 2, "2", "true");
+    builder.append(2.3d, "", "hi", "false");
+    builder.append(1.0d, 4, "4", "");
+
+    DataFrame df = builder.build();
+    Assert.assertEquals(df.get("double").type(), Series.SeriesType.DOUBLE);
+    Assert.assertEquals(df.get("long").type(), Series.SeriesType.LONG);
+    Assert.assertEquals(df.get("string").type(), Series.SeriesType.STRING);
+    Assert.assertEquals(df.get("boolean").type(), Series.SeriesType.BOOLEAN);
+
+    assertEquals(df.getDoubles("double"), 4, DNULL, 2.3, 1);
+    assertEquals(df.getLongs("long"), 1, 2, LNULL, 4);
+    assertEquals(df.getStrings("string"), SNULL, "2", "hi", "4");
+    assertEquals(df.getBooleans("boolean"),TRUE, TRUE, FALSE, BNULL);
+  }
+
+  @Test
   public void testDoubleNull() {
     Series s = DataFrame.toSeries(1.0, DNULL, 2.0);
     assertEquals(s.getDoubles(), 1.0, DNULL, 2.0);
@@ -873,21 +894,21 @@ public class DataFrameTest {
     try {
       s.first();
       Assert.fail();
-    } catch(IllegalStateException ignore) {
+    } catch(IllegalStateException expected) {
       // left blank
     }
 
     try {
       s.last();
       Assert.fail();
-    } catch(IllegalStateException ignore) {
+    } catch(IllegalStateException expected) {
       // left blank
     }
 
     try {
       s.value();
       Assert.fail();
-    } catch(IllegalStateException ignore) {
+    } catch(IllegalStateException expected) {
       // left blank
     }
   }
@@ -918,21 +939,21 @@ public class DataFrameTest {
     try {
       s.first();
       Assert.fail();
-    } catch(IllegalStateException ignore) {
+    } catch(IllegalStateException expected) {
       // left blank
     }
 
     try {
       s.last();
       Assert.fail();
-    } catch(IllegalStateException ignore) {
+    } catch(IllegalStateException expected) {
       // left blank
     }
 
     try {
       s.value();
       Assert.fail();
-    } catch(IllegalStateException ignore) {
+    } catch(IllegalStateException expected) {
       // left blank
     }
   }
@@ -1524,7 +1545,7 @@ public class DataFrameTest {
   public void testBooleanFunctionExConversion() {
     Series out = df.map(new Series.BooleanFunctionEx() {
       @Override
-      public byte apply(boolean... values) {
+      public byte apply(byte... values) {
         return TRUE;
       }
     }, "long");
@@ -1675,9 +1696,51 @@ public class DataFrameTest {
     try {
       base.divide(mod);
       Assert.fail();
-    } catch(ArithmeticException ignore) {
+    } catch(ArithmeticException expected) {
       // left blank
     }
+  }
+
+  @Test
+  public void testDoubleOperationsSeriesMisaligned() {
+    DoubleSeries base = DataFrame.toSeries(DNULL, 0, 1, 1.5, 0.003);
+    DoubleSeries mod = DataFrame.toSeries(1, 1, 1, DNULL);
+
+    try {
+      base.add(mod);
+      Assert.fail();
+    } catch(IllegalArgumentException expected) {
+      // left blank
+    }
+
+    try {
+      base.subtract(mod);
+      Assert.fail();
+    } catch(IllegalArgumentException expected) {
+      // left blank
+    }
+
+    try {
+      base.multiply(mod);
+      Assert.fail();
+    } catch(IllegalArgumentException expected) {
+      // left blank
+    }
+
+    try {
+      base.divide(mod);
+      Assert.fail();
+    } catch(IllegalArgumentException expected) {
+      // left blank
+    }
+
+    try {
+      base.eq(mod);
+      Assert.fail();
+    } catch(IllegalArgumentException expected) {
+      // left blank
+    }
+
   }
 
   @Test
@@ -1717,7 +1780,7 @@ public class DataFrameTest {
     try {
       base.divide(0);
       Assert.fail();
-    } catch(ArithmeticException ignore) {
+    } catch(ArithmeticException expected) {
       // left blank
     }
   }
@@ -1790,7 +1853,48 @@ public class DataFrameTest {
     try {
       base.divide(mod);
       Assert.fail();
-    } catch(ArithmeticException ignore) {
+    } catch(ArithmeticException expected) {
+      // left blank
+    }
+  }
+
+  @Test
+  public void testLongOperationsSeriesMisaligned() {
+    LongSeries base = DataFrame.toSeries(LNULL, 0, 1, 5, 10);
+    LongSeries mod = DataFrame.toSeries(1, 1, 1, LNULL);
+
+    try {
+      base.add(mod);
+      Assert.fail();
+    } catch(IllegalArgumentException expected) {
+      // left blank
+    }
+
+    try {
+      base.subtract(mod);
+      Assert.fail();
+    } catch(IllegalArgumentException expected) {
+      // left blank
+    }
+
+    try {
+      base.multiply(mod);
+      Assert.fail();
+    } catch(IllegalArgumentException expected) {
+      // left blank
+    }
+
+    try {
+      base.divide(mod);
+      Assert.fail();
+    } catch(IllegalArgumentException expected) {
+      // left blank
+    }
+
+    try {
+      base.eq(mod);
+      Assert.fail();
+    } catch(IllegalArgumentException expected) {
       // left blank
     }
   }
@@ -1831,7 +1935,7 @@ public class DataFrameTest {
     try {
       base.divide(0);
       Assert.fail();
-    } catch(ArithmeticException ignore) {
+    } catch(ArithmeticException expected) {
       // left blank
     }
   }
@@ -1898,6 +2002,26 @@ public class DataFrameTest {
 
     assertEquals(base.concat(mod), SNULL, "aA", "bb", "cB", SNULL);
     assertEquals(base.eq(mod), BNULL, FALSE, TRUE, FALSE, BNULL);
+  }
+
+  @Test
+  public void testStringOperationsSeriesMisaligned() {
+    StringSeries base = DataFrame.toSeries(SNULL, "a", "b", "c", "d");
+    StringSeries mod = DataFrame.toSeries("A", "A", "b", SNULL);
+
+    try {
+      base.concat(mod);
+      Assert.fail();
+    } catch(IllegalArgumentException expected) {
+      // left blank
+    }
+
+    try {
+      base.eq(mod);
+      Assert.fail();
+    } catch(IllegalArgumentException expected) {
+      // left blank
+    }
   }
 
   @Test
@@ -1973,6 +2097,47 @@ public class DataFrameTest {
     assertEquals(base.xor(mod), BNULL, FALSE, TRUE, TRUE, BNULL);
     assertEquals(base.implies(mod), BNULL, TRUE, TRUE, FALSE, BNULL);
     assertEquals(base.eq(mod), BNULL, TRUE, FALSE, FALSE, BNULL);
+  }
+
+  @Test
+  public void testBooleanOperationsSeriesMisaligned() {
+    BooleanSeries base = DataFrame.toSeries(BNULL, TRUE, FALSE, TRUE, FALSE);
+    BooleanSeries mod = DataFrame.toSeries(BNULL, TRUE, FALSE, BNULL);
+
+    try {
+      base.and(mod);
+      Assert.fail();
+    } catch(IllegalArgumentException expected) {
+      // left blank
+    }
+
+    try {
+      base.or(mod);
+      Assert.fail();
+    } catch(IllegalArgumentException expected) {
+      // left blank
+    }
+
+    try {
+      base.xor(mod);
+      Assert.fail();
+    } catch(IllegalArgumentException expected) {
+      // left blank
+    }
+
+    try {
+      base.implies(mod);
+      Assert.fail();
+    } catch(IllegalArgumentException expected) {
+      // left blank
+    }
+
+    try {
+      base.eq(mod);
+      Assert.fail();
+    } catch(IllegalArgumentException expected) {
+      // left blank
+    }
   }
 
   @Test

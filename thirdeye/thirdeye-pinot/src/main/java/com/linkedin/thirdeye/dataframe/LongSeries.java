@@ -544,11 +544,11 @@ public final class LongSeries extends TypedSeries<LongSeries> {
 
     // Note: code-specialization to help hot-spot vm
     if(series.length == 1)
-      return map(function, series[0]);
+      return mapUnrolled(function, series[0]);
     if(series.length == 2)
-      return map(function, series[0], series[1]);
+      return mapUnrolled(function, series[0], series[1]);
     if(series.length == 3)
-      return map(function, series[0], series[1], series[2]);
+      return mapUnrolled(function, series[0], series[1], series[2]);
 
     long[] input = new long[series.length];
     long[] output = new long[series[0].size()];
@@ -569,7 +569,7 @@ public final class LongSeries extends TypedSeries<LongSeries> {
     return function.apply(input);
   }
 
-  private static LongSeries map(LongFunction function, Series a) {
+  private static LongSeries mapUnrolled(LongFunction function, Series a) {
     long[] output = new long[a.size()];
     for(int i=0; i<a.size(); i++) {
       if(a.isNull(i)) {
@@ -581,7 +581,7 @@ public final class LongSeries extends TypedSeries<LongSeries> {
     return buildFrom(output);
   }
 
-  private static LongSeries map(LongFunction function, Series a, Series b) {
+  private static LongSeries mapUnrolled(LongFunction function, Series a, Series b) {
     long[] output = new long[a.size()];
     for(int i=0; i<a.size(); i++) {
       if(a.isNull(i) || b.isNull(i)) {
@@ -593,7 +593,7 @@ public final class LongSeries extends TypedSeries<LongSeries> {
     return buildFrom(output);
   }
 
-  private static LongSeries map(LongFunction function, Series a, Series b, Series c) {
+  private static LongSeries mapUnrolled(LongFunction function, Series a, Series b, Series c) {
     long[] output = new long[a.size()];
     for(int i=0; i<a.size(); i++) {
       if(a.isNull(i) || b.isNull(i) || c.isNull(i)) {

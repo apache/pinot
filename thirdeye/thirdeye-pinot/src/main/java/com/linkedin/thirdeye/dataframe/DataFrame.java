@@ -6,13 +6,16 @@ import com.udojava.evalex.Expression;
 import java.io.IOException;
 import java.io.Reader;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -104,6 +107,58 @@ public class DataFrame {
     }
   }
 
+  /**
+   * Builder for DataFrame in row-by-row sequence. Constructs each column as a StringSeries
+   * and attempts to infer a tighter native type on completion.
+   */
+  public static final class Builder {
+    final List<String> seriesNames;
+    final List<String[]> rows = new ArrayList<>();
+
+    Builder(List<String> seriesNames) {
+      this.seriesNames = seriesNames;
+    }
+
+    public Builder append(Collection<Object[]> rows) {
+      for(Object[] r : rows) {
+        if (r.length != this.seriesNames.size())
+          throw new IllegalArgumentException(String.format("Expected %d values, but got %d", seriesNames.size(), r.length));
+        String[] row = new String[this.seriesNames.size()];
+        for (int i = 0; i < row.length; i++) {
+          if(r[i] != null) {
+            row[i] = r[i].toString();
+          }
+        }
+        this.rows.add(row);
+      }
+      return this;
+    }
+
+    public Builder append(Object[]... rows) {
+      return this.append(Arrays.asList(rows));
+    }
+
+    public Builder append(Object... row) {
+      return this.append(Collections.singleton(row));
+    }
+
+    public DataFrame build() {
+      DataFrame df = new DataFrame();
+
+      // transpose rows to columns
+      for(int i=0; i<this.seriesNames.size(); i++) {
+        String[] column = new String[this.rows.size()];
+        for(int j=0; j<this.rows.size(); j++) {
+          column[j] = this.rows.get(j)[i];
+        }
+
+        df.addSeries(this.seriesNames.get(i), StringSeries.buildFrom(column).toInferredType());
+      }
+
+      return df;
+    }
+  }
+
   String indexName = null;
   Map<String, Series> series = new HashMap<>();
 
@@ -155,6 +210,26 @@ public class DataFrame {
    */
   public static BooleanSeries toSeries(boolean... values) {
     return BooleanSeries.builder().addBooleanValues(values).build();
+  }
+
+  /**
+   * Returns a builder instance for DataFrame
+   *
+   * @param seriesNames series names of the DataFrame
+   * @return FDataFrame builder
+   */
+  public static Builder builder(String... seriesNames) {
+    return new Builder(Arrays.asList(seriesNames));
+  }
+
+  /**
+   * Returns a builder instance for DataFrame
+   *
+   * @param seriesNames series names of the DataFrame
+   * @return FDataFrame builder
+   */
+  public static Builder builder(List<String> seriesNames) {
+    return new Builder(seriesNames);
   }
 
   /**

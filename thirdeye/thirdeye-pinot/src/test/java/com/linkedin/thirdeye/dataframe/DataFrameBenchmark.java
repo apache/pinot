@@ -23,6 +23,7 @@ public class DataFrameBenchmark {
 
   long tStart;
   List<Long> times = new ArrayList<>();
+  DataFrame.Builder results = DataFrame.builder("task", "min", "mid", "max", "checksum");
 
   void benchmarkMapDoubleSeries() {
     long checksum = 0;
@@ -45,6 +46,24 @@ public class DataFrameBenchmark {
     }
 
     logResults("benchmarkMapDoubleSeries", checksum);
+  }
+
+  void benchmarkMapDoubleSeriesOperation() {
+    long checksum = 0;
+
+    for (int r = 0; r < N_ROUNDS; r++) {
+      double[] doubleValues = generateDoubleData(N_ELEMENTS);
+      final double delta = r;
+
+      startTimer();
+      DoubleSeries s = DoubleSeries.buildFrom(doubleValues);
+      DoubleSeries sResult = s.add(delta);
+      stopTimer();
+
+      checksum ^= checksum(sResult.values());
+    }
+
+    logResults("benchmarkMapDoubleSeriesOperation", checksum);
   }
 
   void benchmarkMapDoubleArray() {
@@ -88,6 +107,24 @@ public class DataFrameBenchmark {
     }
 
     logResults("benchmarkMapLongSeries", checksum);
+  }
+
+  void benchmarkMapLongSeriesOperation() {
+    long checksum = 0;
+
+    for (int r = 0; r < N_ROUNDS; r++) {
+      long[] longValues = generateLongData(N_ELEMENTS);
+      final long delta = r;
+
+      startTimer();
+      LongSeries s = LongSeries.buildFrom(longValues);
+      LongSeries sResult = s.add(delta);
+      stopTimer();
+
+      checksum ^= checksum(sResult.values());
+    }
+
+    logResults("benchmarkMapLongSeriesOperation", checksum);
   }
 
   void benchmarkMapLongArray() {
@@ -157,6 +194,29 @@ public class DataFrameBenchmark {
     logResults("benchmarkMapTwoSeries", checksum);
   }
 
+  void benchmarkMapTwoSeriesOperation() {
+    long checksum = 0;
+
+    for(int r=0; r<N_ROUNDS; r++) {
+      long[] longValues = generateLongData(N_ELEMENTS);
+      double[] doubleValues = generateDoubleData(N_ELEMENTS);
+
+      DataFrame df = new DataFrame();
+      df.addSeries("long", longValues);
+      df.addSeries("double", doubleValues);
+
+      startTimer();
+      LongSeries l = df.getLongs("long");
+      DoubleSeries d = df.getDoubles("double");
+      DoubleSeries res = d.multiply(l);
+      stopTimer();
+
+      checksum ^= checksum(res.values());
+    }
+
+    logResults("benchmarkMapTwoSeriesOperation", checksum);
+  }
+
   void benchmarkMapTwoArrays() {
     long checksum = 0;
 
@@ -196,7 +256,7 @@ public class DataFrameBenchmark {
         public double apply(double... values) {
           return values[0] * values[1] + values[2];
         }
-      }, "long", "double", "other").getDoubles();
+      }, "long", "double", "other");
       stopTimer();
 
       checksum ^= checksum(res.values());
@@ -224,6 +284,58 @@ public class DataFrameBenchmark {
     }
 
     logResults("benchmarkMapThreeArrays", checksum);
+  }
+
+  void benchmarkMapFourSeriesGeneric() {
+    long checksum = 0;
+
+    for(int r=0; r<N_ROUNDS; r++) {
+      long[] longValues = generateLongData(N_ELEMENTS);
+      double[] doubleValues = generateDoubleData(N_ELEMENTS);
+      long[] otherValues = generateLongData(N_ELEMENTS);
+      double[] anotherValues = generateDoubleData(N_ELEMENTS);
+
+      DataFrame df = new DataFrame();
+      df.addSeries("long", longValues);
+      df.addSeries("double", doubleValues);
+      df.addSeries("other", otherValues);
+      df.addSeries("another", anotherValues);
+
+      startTimer();
+      DoubleSeries res = df.map(new Series.DoubleFunction() {
+        @Override
+        public double apply(double... values) {
+          return values[0] * values[1] + values[2] / values[3];
+        }
+      }, "long", "double", "other", "another");
+      stopTimer();
+
+      checksum ^= checksum(res.values());
+    }
+
+    logResults("benchmarkMapFourSeriesGeneric", checksum);
+  }
+
+  void benchmarkMapFourArrays() {
+    long checksum = 0;
+
+    for(int r=0; r<N_ROUNDS; r++) {
+      long[] longValues = generateLongData(N_ELEMENTS);
+      double[] doubleValues = generateDoubleData(N_ELEMENTS);
+      long[] otherValues = generateLongData(N_ELEMENTS);
+      double[] anotherValues = generateDoubleData(N_ELEMENTS);
+
+      startTimer();
+      double[] results = new double[N_ELEMENTS];
+      for(int i=0; i<N_ELEMENTS; i++) {
+        results[i] = longValues[i] * doubleValues[i] + otherValues[i] / anotherValues[i];
+      }
+      stopTimer();
+
+      checksum ^= checksum(results);
+    }
+
+    logResults("benchmarkMapFourArrays", checksum);
   }
 
   void benchmarkMinMaxLongSeries() {
@@ -304,6 +416,29 @@ public class DataFrameBenchmark {
     }
 
     logResults("benchmarkEqualsLongSeries", checksum);
+  }
+
+  void benchmarkEqualsLongSeriesOperation() {
+    long checksum = 0;
+
+    for(int r=0; r<N_ROUNDS; r++) {
+      long[] longValues = generateLongData(N_ELEMENTS);
+      long[] otherValues = Arrays.copyOf(longValues, longValues.length);
+      LongSeries series = LongSeries.buildFrom(longValues);
+      LongSeries other = LongSeries.buildFrom(otherValues);
+
+      startTimer();
+      BooleanSeries res = series.eq(other);
+      stopTimer();
+
+      if(res.hasFalse())
+        throw new IllegalStateException("Series must be equal");
+
+      checksum ^= checksum(series.values());
+      checksum ^= checksum(other.values());
+    }
+
+    logResults("benchmarkEqualsLongSeriesOperation", checksum);
   }
 
   void benchmarkSortLongArray() {
@@ -414,6 +549,7 @@ public class DataFrameBenchmark {
     benchmarkMinMaxLongSeries();
     benchmarkMinMaxLongArray();
     benchmarkEqualsLongSeries();
+    benchmarkEqualsLongSeriesOperation();
     benchmarkEqualsLongArray();
     benchmarkShiftLongSeries();
     benchmarkShiftLongArray();
@@ -422,13 +558,18 @@ public class DataFrameBenchmark {
     benchmarkUniqueLongSeries();
     benchmarkUniqueLongArrayWithObjects();
     benchmarkMapDoubleSeries();
+    benchmarkMapDoubleSeriesOperation();
     benchmarkMapDoubleArray();
     benchmarkMapLongSeries();
+    benchmarkMapLongSeriesOperation();
     benchmarkMapLongArray();
     benchmarkMapTwoSeries();
+    benchmarkMapTwoSeriesOperation();
     benchmarkMapTwoArrays();
     benchmarkMapThreeSeries();
     benchmarkMapThreeArrays();
+    benchmarkMapFourSeriesGeneric();
+    benchmarkMapFourArrays();
     benchmarkMapTwoSeriesExpression();
   }
 
@@ -447,6 +588,9 @@ public class DataFrameBenchmark {
     long tMin = Collections.min(this.times);
     long tMax = Collections.max(this.times);
     LOG.info("{}: min/mid/max = {}ms {}ms {}ms [xor {}]", name, tMin / 1000000, tMid / 1000000, tMax / 1000000, (checksum >= 0 ? checksum : -checksum) % 1000);
+    this.results.append(name, tMin, tMid, tMax, checksum);
+
+    // reset timer stats
     this.times = new ArrayList<>();
   }
 
@@ -457,6 +601,8 @@ public class DataFrameBenchmark {
     LOG.info("Running DataFrame benchmark ...");
     DataFrameBenchmark b = new DataFrameBenchmark();
     b.benchmarkAll();
+
+    LOG.info("Summary:\n{}", b.results.build());
     LOG.info("done.");
   }
 
