@@ -539,6 +539,22 @@ public class AnomalyResource {
     return reorderedExploreDimensions.toString();
   }
 
+  // Activate anomaly function
+  @POST
+  @Path("/anomaly-function/activate")
+  public Response activateAnomalyFunction(@NotNull @QueryParam("functionId") Long id, @QueryParam("modifiedFunctionName") String functionName){
+    if (id == null) {
+      throw new IllegalArgumentException("id is a required query param");
+    }
+    AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
+    anomalyFunctionSpec.setActive(true);
+    if (functionName != null){
+      anomalyFunctionSpec.setFunctionName(functionName);
+    }
+    anomalyFunctionDAO.update(anomalyFunctionSpec);
+    return Response.ok(id).build();
+  }
+
   // Delete anomaly function
   @DELETE
   @Path("/anomaly-function/delete")
