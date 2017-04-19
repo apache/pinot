@@ -42,12 +42,12 @@ public class MetricDatasetPipeline implements Pipeline {
 
   @Override
   public PipelineResult run(ExecutionContext context) {
-    Set<Entity> metrics = EntityUtils.filterContext(context, EntityType.METRIC);
+    Set<MetricEntity> metrics = EntityUtils.filterContext(context, MetricEntity.class);
 
     Set<String> datasets = new HashSet<>();
     Map<String, Double> datasetScores = new HashMap<>();
-    for(Entity m : metrics) {
-      String d = EntityUtils.getMetricDataset(m.getUrn());
+    for(MetricEntity m : metrics) {
+      String d = m.getDataset();
       datasets.add(d);
 
       double metricScore = m.getScore();
@@ -68,7 +68,7 @@ public class MetricDatasetPipeline implements Pipeline {
 
       Collection<MetricConfigDTO> dtos = metricDAO.findByDataset(d);
       for(MetricConfigDTO dto : dtos) {
-        entities.add(MetricEntity.fromDTO(datasetScore, dto, dataset));
+        entities.add(MetricEntity.fromMetric(datasetScore, d, dto.getName()));
       }
     }
 

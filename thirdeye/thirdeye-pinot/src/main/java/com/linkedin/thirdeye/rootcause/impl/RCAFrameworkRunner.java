@@ -64,7 +64,7 @@ public class RCAFrameworkRunner {
   private static final String CLI_CONFIG_DIR = "config-dir";
   private static final String CLI_WINDOW_SIZE = "window-size";
   private static final String CLI_BASELINE_OFFSET = "baseline-offset";
-  private static final String CLI_ENTITIES = "entities";
+  private static final String CLI_METRIC_ENTITIES = "metric-entities";
 
   private static final long DAY_IN_MS = 24 * 3600 * 1000;
 
@@ -77,7 +77,7 @@ public class RCAFrameworkRunner {
 
     options.addOption(null, CLI_WINDOW_SIZE, true, "window size for search window (in days)");
     options.addOption(null, CLI_BASELINE_OFFSET, true, "baseline offset (in days)");
-    options.addOption(null, CLI_ENTITIES, true, "search context entities (not specifying this will activate interactive REPL mode)");
+    options.addOption(null, CLI_METRIC_ENTITIES, true, "search context metric entities (not specifying this will activate interactive REPL mode)");
 
     Parser parser = new BasicParser();
     CommandLine cmd = null;
@@ -145,25 +145,25 @@ public class RCAFrameworkRunner {
     long baselineEnd = windowEnd - baselineOffset;
     long baselineStart = windowStart - baselineOffset;
 
-    TimeRangeEntity timeRange = TimeRangeEntity.fromRange(windowStart, windowEnd);
-    BaselineEntity baseline = BaselineEntity.fromRange(1.0, baselineStart, baselineEnd);
+    TimeRangeEntity current = TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_CURRENT, windowStart, windowEnd);
+    TimeRangeEntity baseline = TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_BASELINE, baselineStart, baselineEnd);
 
-    if(cmd.hasOption(CLI_ENTITIES)) {
+    if(cmd.hasOption(CLI_METRIC_ENTITIES)) {
       // one-off execution
-      String[] urns = cmd.getOptionValue(CLI_ENTITIES).split(",");
+      String[] urns = cmd.getOptionValue(CLI_METRIC_ENTITIES).split(",");
 
       Set<Entity> entities = new HashSet<>();
       for (String urn : urns) {
-        entities.add(new Entity(urn, 1.0));
+        entities.add(MetricEntity.fromURN(urn, 1.0));
       }
-      entities.add(timeRange);
+      entities.add(current);
       entities.add(baseline);
 
       runFramework(framework, entities);
 
     } else {
       // interactive REPL
-      readExecutePrintLoop(framework, timeRange, baseline);
+      readExecutePrintLoop(framework, current, baseline);
     }
 
     System.out.println("done.");
@@ -172,10 +172,10 @@ public class RCAFrameworkRunner {
     System.exit(0);
   }
 
-  private static void readExecutePrintLoop(RCAFramework framework, TimeRangeEntity timeRange, BaselineEntity baseline)
+  private static void readExecutePrintLoop(RCAFramework framework, TimeRangeEntity current, TimeRangeEntity baseline)
       throws IOException {
     // search loop
-    System.out.println("Enter search context entities' URNs (separated by comma \",\"):");
+    System.out.println("Enter search context metric entities' URNs (separated by comma \",\"):");
     BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
 
     String line = null;
@@ -184,14 +184,14 @@ public class RCAFrameworkRunner {
 
       Set<Entity> entities = new HashSet<>();
       for(String urn : urns) {
-        entities.add(new Entity(urn, 1.0));
+        entities.add(MetricEntity.fromURN(urn, 1.0));
       }
-      entities.add(timeRange);
+      entities.add(current);
       entities.add(baseline);
 
       runFramework(framework, entities);
 
-      System.out.println("Enter search context entities' URNs (separated by comma \",\"):");
+      System.out.println("Enter search context metric entities' URNs (separated by comma \",\"):");
     }
   }
 
@@ -218,10 +218,10 @@ public class RCAFrameworkRunner {
     }
 
     System.out.println("*** Grouped results:");
-    Map<EntityType, Collection<Entity>>
+    Map<String, Collection<Entity>>
         grouped = topKPerType(result.getAggregatedResults(), 3);
-    for(Map.Entry<EntityType, Collection<Entity>> entry : grouped.entrySet()) {
-      System.out.println(entry.getKey().getPrefix());
+    for(Map.Entry<String, Collection<Entity>> entry : grouped.entrySet()) {
+      System.out.println(entry.getKey());
       for(Entity e : entry.getValue()) {
         System.out.println(formatEntity(e));
       }
@@ -235,15 +235,15 @@ public class RCAFrameworkRunner {
    * @param k maximum number of entities per entity type
    * @return mapping of entity types to list of entities
    */
-  static Map<EntityType, Collection<Entity>> topKPerType(Collection<Entity> entities, int k) {
-    Map<EntityType, Collection<Entity>> map = new HashMap<>();
+  static Map<String, Collection<Entity>> topKPerType(Collection<Entity> entities, int k) {
+    Map<String, Collection<Entity>> map = new HashMap<>();
     for(Entity e : entities) {
-      EntityType type = EntityUtils.getType(e.getUrn());
+      String prefix = EntityType.extractPrefix(e);
 
-      if(!map.containsKey(type))
-        map.put(type, new ArrayList<Entity>());
+      if(!map.containsKey(prefix))
+        map.put(prefix, new ArrayList<Entity>());
 
-      Collection<Entity> current = map.get(type);
+      Collection<Entity> current = map.get(prefix);
       if(current.size() < k)
         current.add(e);
     }

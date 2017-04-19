@@ -39,19 +39,15 @@ public class EventMetricPipeline implements Pipeline {
 
   @Override
   public PipelineResult run(ExecutionContext context) {
-    Set<Entity> metrics = EntityUtils.filterContext(context, EntityType.METRIC);
+    Set<MetricEntity> metrics = EntityUtils.filterContext(context, MetricEntity.class);
 
-    TimeRangeEntity current = EntityUtils.getContextTimeRange(context);
-    if(current == null) {
-      LOG.warn("Pipeline '{}' requires TimeRangeEntity. Skipping.", this.getName());
-      return new PipelineResult(Collections.<Entity>emptyList());
-    }
+    TimeRangeEntity current = TimeRangeEntity.getContextCurrent(context);
 
     Set<EventDTO> events = new HashSet<>();
-    for(Entity e : metrics) {
+    for(MetricEntity e : metrics) {
       EventFilter filter = new EventFilter();
       filter.setEventType(EventType.HISTORICAL_ANOMALY);
-      filter.setMetricName(EntityUtils.getMetricName(e.getUrn()));
+      filter.setMetricName(e.getMetric());
 
       events.addAll(manager.getEvents(filter));
     }

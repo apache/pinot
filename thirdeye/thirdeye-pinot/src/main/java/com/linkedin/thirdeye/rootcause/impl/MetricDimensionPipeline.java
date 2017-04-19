@@ -47,68 +47,69 @@ public class MetricDimensionPipeline implements Pipeline {
 
   @Override
   public PipelineResult run(ExecutionContext context) {
-    Set<Entity> contextEntities = EntityUtils.filterContext(context, EntityType.METRIC);
-
-    TimeRangeEntity current = EntityUtils.getContextTimeRange(context);
-    if(current == null) {
-      LOG.warn("Pipeline '{}' requires TimeRangeEntity. Skipping.", this.getName());
-      return new PipelineResult(Collections.<Entity>emptyList());
-    }
-
-    BaselineEntity baseline = EntityUtils.getContextBaseline(context);
-    if(baseline == null) {
-      LOG.warn("Pipeline '{}' requires BaselineEntity. Skipping.", this.getName());
-      return new PipelineResult(Collections.<Entity>emptyList());
-    }
-
-    Map<String, Entity> contextEntityMap = EntityUtils.mapEntityURNs(contextEntities);
-
-    Map<String, MetricConfigDTO> metrics = new HashMap<>();
-    Map<String, DatasetConfigDTO> datasets = new HashMap<>();
-    for(Entity e : contextEntities) {
-      String m = EntityUtils.getMetricName(e.getUrn());
-      String d = EntityUtils.getMetricDataset(e.getUrn());
-
-      MetricConfigDTO mdto = metricDAO.findByMetricAndDataset(m, d);
-      DatasetConfigDTO ddto = datasetDAO.findByDataset(d);
-
-      if(mdto == null) {
-        LOG.warn("Could not resolve metric '{}'. Skipping.", m);
-        continue;
-      }
-
-      if(ddto == null) {
-        LOG.warn("Could not resolve dataset '{}'. Skipping metric '{}'", d, m);
-        continue;
-      }
-
-      metrics.put(e.getUrn(), mdto);
-      datasets.put(e.getUrn(), ddto);
-    }
-
-    LOG.info("Found {} metrics for dimension analysis", metrics.size());
-
-    List<MetricDimensionEntity> entities = new ArrayList<>();
-    for(Map.Entry<String, MetricConfigDTO> entry : metrics.entrySet()) {
-      List<MetricDimensionEntity> local = new ArrayList<>();
-      MetricConfigDTO mdto = entry.getValue();
-      DatasetConfigDTO ddto = datasets.get(entry.getKey());
-
-      for(String dim : ddto.getDimensions()) {
-        double metricScore = contextEntityMap.get(entry.getKey()).getScore();
-        local.add(MetricDimensionEntity.fromDTO(metricScore, mdto, ddto, dim));
-      }
-
-      try {
-        entities.addAll(scorer.score(local, current, baseline));
-      } catch (Exception e) {
-        // TODO external exception handling?
-        LOG.warn("Could not score entity '{}'", entry.getKey());
-        e.printStackTrace();
-        continue;
-      }
-    }
-
-    return new PipelineResult(entities);
+//    Set<Entity> contextEntities = EntityUtils.filterContext(context, EntityType.METRIC);
+//
+//    TimeRangeEntity current = EntityUtils.getContextTimeRange(context);
+//    if(current == null) {
+//      LOG.warn("Pipeline '{}' requires TimeRangeEntity. Skipping.", this.getName());
+//      return new PipelineResult(Collections.<Entity>emptyList());
+//    }
+//
+//    BaselineEntity baseline = EntityUtils.getContextBaseline(context);
+//    if(baseline == null) {
+//      LOG.warn("Pipeline '{}' requires BaselineEntity. Skipping.", this.getName());
+//      return new PipelineResult(Collections.<Entity>emptyList());
+//    }
+//
+//    Map<String, Entity> contextEntityMap = EntityUtils.mapEntityURNs(contextEntities);
+//
+//    Map<String, MetricConfigDTO> metrics = new HashMap<>();
+//    Map<String, DatasetConfigDTO> datasets = new HashMap<>();
+//    for(Entity e : contextEntities) {
+//      String m = EntityUtils.getMetricName(e.getUrn());
+//      String d = EntityUtils.getMetricDataset(e.getUrn());
+//
+//      MetricConfigDTO mdto = metricDAO.findByMetricAndDataset(m, d);
+//      DatasetConfigDTO ddto = datasetDAO.findByDataset(d);
+//
+//      if(mdto == null) {
+//        LOG.warn("Could not resolve metric '{}'. Skipping.", m);
+//        continue;
+//      }
+//
+//      if(ddto == null) {
+//        LOG.warn("Could not resolve dataset '{}'. Skipping metric '{}'", d, m);
+//        continue;
+//      }
+//
+//      metrics.put(e.getUrn(), mdto);
+//      datasets.put(e.getUrn(), ddto);
+//    }
+//
+//    LOG.info("Found {} metrics for dimension analysis", metrics.size());
+//
+//    List<MetricDimensionEntity> entities = new ArrayList<>();
+//    for(Map.Entry<String, MetricConfigDTO> entry : metrics.entrySet()) {
+//      List<MetricDimensionEntity> local = new ArrayList<>();
+//      MetricConfigDTO mdto = entry.getValue();
+//      DatasetConfigDTO ddto = datasets.get(entry.getKey());
+//
+//      for(String dim : ddto.getDimensions()) {
+//        double metricScore = contextEntityMap.get(entry.getKey()).getScore();
+//        local.add(MetricDimensionEntity.fromDTO(metricScore, mdto, ddto, dim));
+//      }
+//
+//      try {
+//        entities.addAll(scorer.score(local, current, baseline));
+//      } catch (Exception e) {
+//        // TODO external exception handling?
+//        LOG.warn("Could not score entity '{}'", entry.getKey());
+//        e.printStackTrace();
+//        continue;
+//      }
+//    }
+//
+//    return new PipelineResult(entities);
+    return new PipelineResult(Collections.<Entity>emptyList());
   }
 }
