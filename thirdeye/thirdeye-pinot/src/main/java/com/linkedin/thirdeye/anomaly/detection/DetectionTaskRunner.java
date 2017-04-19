@@ -152,7 +152,7 @@ public class DetectionTaskRunner implements TaskRunner {
     adOutputContext.setMergedAnomalies(resultMergedAnomalies);
     storeData(adOutputContext);
   }
-
+  
   private void storeData(AnomalyDetectionOutputContext anomalyDetectionOutputContext) {
     RawAnomalyResultManager rawAnomalyDAO = DAO_REGISTRY.getRawAnomalyResultDAO();
     MergedAnomalyResultManager mergedAmomalyDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
