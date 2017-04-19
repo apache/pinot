@@ -67,11 +67,6 @@ public class IntDictionary extends ImmutableDictionaryReader {
   }
 
   @Override
-  public String toString(int dictionaryId) {
-    return Integer.toString(getInt(dictionaryId));
-  }
-
-  @Override
   public void readIntValues(int[] dictionaryIds, int startPos, int limit, int[] outValues, int outStartPos) {
     dataFileReader.readIntValues(dictionaryIds, 0 /*column*/, startPos, limit, outValues, outStartPos);
   }

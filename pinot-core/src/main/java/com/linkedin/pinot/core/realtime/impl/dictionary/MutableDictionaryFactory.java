@@ -18,23 +18,24 @@ package com.linkedin.pinot.core.realtime.impl.dictionary;
 import com.linkedin.pinot.common.data.FieldSpec;
 
 
-public class RealtimeDictionaryProvider {
+public class MutableDictionaryFactory {
+  private MutableDictionaryFactory() {
+  }
 
-  public static MutableDictionaryReader getDictionaryFor(FieldSpec spec) {
-    String column = spec.getName();
-    switch (spec.getDataType()) {
+  public static BaseOnHeapMutableDictionary getMutableDictionary(FieldSpec.DataType dataType) {
+    switch (dataType) {
       case INT:
-        return new IntBiMapDictionary(column);
+        return new IntOnHeapMutableDictionary();
       case LONG:
-        return new LongBiMapDictionary(column);
+        return new LongOnHeapMutableDictionary();
       case FLOAT:
-        return new FloatBiMapDictionary(column);
+        return new FloatOnHeapMutableDictionary();
       case DOUBLE:
-        return new DoubleBiMapDictionary(column);
-      case BOOLEAN:
+        return new DoubleOnHeapMutableDictionary();
       case STRING:
-        return new StringBiMapDictionary(column);
+        return new StringOnHeapMutableDictionary();
+      default:
+        throw new UnsupportedOperationException();
     }
-    throw new UnsupportedOperationException();
   }
 }

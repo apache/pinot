@@ -52,11 +52,6 @@ public class DoubleDictionary extends ImmutableDictionaryReader  {
   }
 
   @Override
-  public String toString(int dictionaryId) {
-    return Double.toString(getDoubleValue(dictionaryId));
-  }
-
-  @Override
   public String getStringValue(int dictionaryId) {
     return Double.toString(getDoubleValue(dictionaryId));
   }

@@ -39,8 +39,6 @@ public interface Dictionary {
 
   int getIntValue(int dictionaryId);
 
-  String toString(int dictionaryId);
-
   int length();
 
   /**
