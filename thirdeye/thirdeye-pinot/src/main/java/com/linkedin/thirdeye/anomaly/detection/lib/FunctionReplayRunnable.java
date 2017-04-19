@@ -155,8 +155,11 @@ public class FunctionReplayRunnable implements Runnable {
 
       AutotuneConfigDTO targetAutotuneDTO = autotuneConfigDAO.findById(functionAutotuneConfigId);
 
-      double prevPerformance = targetAutotuneDTO.getPerformance().get(performanceEvaluationMethod.name());
-      if (Math.abs(prevPerformance - goal) > Math.abs(performance - goal)) {
+      Map<String, Double> prevPerformance = targetAutotuneDTO.getPerformance();
+      // if there is no previous performance, update performance directly
+      // Otherwise, compare the performance, and update if betterW
+      if (prevPerformance == null || prevPerformance.isEmpty() ||
+          Math.abs(prevPerformance.get(performanceEvaluationMethod.name()) - goal) > Math.abs(performance - goal)) {
         targetAutotuneDTO.setConfiguration(tuningParameter);
         Map<String, Double> newPerformance = targetAutotuneDTO.getPerformance();
         newPerformance.put(performanceEvaluationMethod.name(), performance);

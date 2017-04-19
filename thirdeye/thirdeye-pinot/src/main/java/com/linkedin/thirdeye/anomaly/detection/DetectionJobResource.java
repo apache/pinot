@@ -21,6 +21,7 @@ import com.linkedin.thirdeye.detector.email.filter.PrecisionRecallEvaluator;
 import com.linkedin.thirdeye.util.SeverityComputationUtil;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -568,6 +569,10 @@ public class DetectionJobResource {
    * ex: {"baselineLift": [0.9, 0.95, 1, 1.05, 1.1], "baselineSeasonalPeriod": [2, 3, 4]}
    * @param goal
    * the expected performance assigned by user
+   * @param includeOrigin
+   * to include the performance of original setup into comparison
+   * If we perform offline analysis before hand, we don't get the correct performance about the current configuration
+   * setup. Therefore, we need to exclude the performance from the comparison.
    * @return
    * A response containing all satisfied properties with their evaluation result
    */
@@ -578,6 +583,7 @@ public class DetectionJobResource {
       @QueryParam("speedup") @DefaultValue("true") boolean speedup,
       @QueryParam("tune") @DefaultValue("{\"pValueThreshold\":[0.05, 0.01]}") String tuningJSON,
       @QueryParam("goal") @DefaultValue("0.05") double goal,
+      @QueryParam("includeOriginal") @DefaultValue("true") boolean includeOrigin,
       @QueryParam("evalMethod") @DefaultValue("ANOMALY_PERCENTAGE") String performanceEvaluationMethod){
     DateTime replayStart = null;
     DateTime replayEnd = null;
@@ -606,9 +612,14 @@ public class DetectionJobResource {
     AutotuneMethodType autotuneMethodType = AutotuneMethodType.EXHAUSTIVE;
     PerformanceEvaluationMethod performanceEvalMethod = PerformanceEvaluationMethod.valueOf(performanceEvaluationMethod.toUpperCase());
 
+    Map<String, Double> originalPerformance = new HashMap<>();
+    originalPerformance.put(performanceEvalMethod.name(),
+        PerformanceEvaluateHelper.getPerformanceEvaluator(performanceEvalMethod, functionId, functionId,
+            new Interval(replayStart.getMillis(), replayEnd.getMillis()), mergedAnomalyResultDAO).evaluate());
+
     // select the functionAutotuneConfigDTO in DB
     //TODO: override existing autotune results by a method "autotuneConfigDAO.udpate()"
-    Long targetId = null;
+    AutotuneConfigDTO targetDTO = null;
     List<AutotuneConfigDTO> functionAutoTuneConfigDTOList =
         autotuneConfigDAO.findAllByFuctionIdAndWindow(functionId,replayStart.getMillis(), replayEnd.getMillis());
     for(AutotuneConfigDTO configDTO : functionAutoTuneConfigDTOList) {
@@ -616,28 +627,30 @@ public class DetectionJobResource {
           configDTO.getPerformanceEvaluationMethod().equals(performanceEvalMethod) &&
           configDTO.getStartTime() == replayStart.getMillis() && configDTO.getEndTime() == replayEnd.getMillis() &&
           configDTO.getGoal() == goal) {
-        // clear message;
-        configDTO.setMessage("");
-        targetId = autotuneConfigDAO.save(configDTO);
+        targetDTO = configDTO;
         break;
       }
     }
 
-    if(targetId == null) {  // Cannot find existing dto
-      AutotuneConfigDTO target = new AutotuneConfigDTO();
-      target.setFunctionId(functionId);
-      target.setAutotuneMethod(autotuneMethodType);
-      target.setPerformanceEvaluationMethod(performanceEvalMethod);
-      target.setStartTime(replayStart.getMillis());
-      target.setEndTime(replayEnd.getMillis());
-      target.setGoal(goal);
-      target.setMessage("");
-      Map<String, Double> performance = new HashMap<>();
-      performance.put(performanceEvalMethod.name(), PerformanceEvaluateHelper.getPerformanceEvaluator(performanceEvalMethod, functionId,
-          functionId, new Interval(replayStart.getMillis(), replayEnd.getMillis()), mergedAnomalyResultDAO).evaluate());
-      target.setPerformance(performance);
-      targetId = autotuneConfigDAO.save(target);
+    if(targetDTO == null) {  // Cannot find existing dto
+      targetDTO = new AutotuneConfigDTO();
+      targetDTO.setFunctionId(functionId);
+      targetDTO.setAutotuneMethod(autotuneMethodType);
+      targetDTO.setPerformanceEvaluationMethod(performanceEvalMethod);
+      targetDTO.setStartTime(replayStart.getMillis());
+      targetDTO.setEndTime(replayEnd.getMillis());
+      targetDTO.setGoal(goal);
+      autotuneConfigDAO.save(targetDTO);
     }
+
+    // clear message;
+    targetDTO.setMessage("");
+    if(includeOrigin) {
+      targetDTO.setPerformance(originalPerformance);
+    } else {
+      targetDTO.setPerformance(Collections.EMPTY_MAP);
+    }
+    autotuneConfigDAO.update(targetDTO);
 
     // Setup threads and start to run
     for(Map<String, String> config : tuningParameters) {
@@ -645,7 +658,7 @@ public class DetectionJobResource {
       FunctionReplayRunnable backfillRunnable = new FunctionReplayRunnable(detectionJobScheduler, anomalyFunctionDAO,
           mergedAnomalyResultDAO, rawAnomalyResultDAO, autotuneConfigDAO);
       backfillRunnable.setTuningFunctionId(functionId);
-      backfillRunnable.setFunctionAutotuneConfigId(targetId);
+      backfillRunnable.setFunctionAutotuneConfigId(targetDTO.getId());
       backfillRunnable.setReplayStart(replayStart);
       backfillRunnable.setReplayEnd(replayEnd);
       backfillRunnable.setForceBackfill(true);
@@ -658,7 +671,7 @@ public class DetectionJobResource {
       new Thread(backfillRunnable).start();
     }
 
-    return Response.ok(targetId).build();
+    return Response.ok(targetDTO.getId()).build();
   }
 
   /**

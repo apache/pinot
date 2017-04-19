@@ -11,7 +11,9 @@ import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dashboard.views.TimeBucket;
 
+import com.linkedin.thirdeye.datalayer.bao.AutotuneConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.AutotuneConfigDTO;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
@@ -94,6 +96,7 @@ public class AnomalyResource {
   private MetricConfigManager metricConfigDAO;
   private MergedAnomalyResultManager mergedAnomalyResultDAO;
   private OverrideConfigManager overrideConfigDAO;
+  private AutotuneConfigManager autotuneConfigDAO;
   private AnomalyFunctionFactory anomalyFunctionFactory;
   private AlertFilterFactory alertFilterFactory;
   private LoadingCache<String, Long> collectionMaxDataTimeCache;
@@ -108,6 +111,7 @@ public class AnomalyResource {
     this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
     this.mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
     this.overrideConfigDAO = DAO_REGISTRY.getOverrideConfigDAO();
+    this.autotuneConfigDAO = DAO_REGISTRY.getAutotuneConfigDAO();
     this.anomalyFunctionFactory = anomalyFunctionFactory;
     this.alertFilterFactory = alertFilterFactory;
     this.collectionMaxDataTimeCache = CACHE_REGISTRY_INSTANCE.getCollectionMaxDataTimeCache();
@@ -440,6 +444,86 @@ public class AnomalyResource {
     return Response.ok(id).build();
   }
 
+  /**
+   * Apply an autotune configuration to an existing function
+   * @param id
+   * The id of an autotune configuration
+   * @param isCloneFunction
+   * Should we clone the function or simply apply the autotune configuration to the existing function
+   * @return
+   * an activated anomaly detection function
+   */
+  @POST
+  @Path("/anomaly-function/apply/{autotune_config_id}")
+  public Response applyReplayConfig(@PathParam("autotune_config_id") @NotNull long id,
+      @QueryParam("cloneFunction") @DefaultValue("false") boolean isCloneFunction,
+      @QueryParam("cloneAnomalies") Boolean isCloneAnomalies) {
+    AutotuneConfigDTO autotuneConfigDTO = autotuneConfigDAO.findById(id);
+    if (autotuneConfigDTO == null) {
+      return Response.status(Response.Status.BAD_REQUEST).build();
+    }
+    if (autotuneConfigDTO.getConfiguration() == null) {
+      return Response.ok().build();
+    }
+
+    if (isCloneAnomalies == null) { // if isCloneAnomalies is not given, assign a default value
+      isCloneAnomalies = containsLabeledAnomalies(autotuneConfigDTO.getFunctionId());
+    }
+
+    AnomalyFunctionDTO originalFunction = anomalyFunctionDAO.findById(autotuneConfigDTO.getFunctionId());
+    AnomalyFunctionDTO targetFunction = originalFunction;
+
+    // clone anomaly function and its anomaly results if requested
+    if(isCloneFunction) {
+      OnboardResource onboardResource = new OnboardResource(anomalyFunctionDAO, mergedAnomalyResultDAO, rawAnomalyResultDAO);
+      long cloneId;
+      String tag = "clone";
+      try {
+        cloneId = onboardResource.cloneFunctionsGetIds(originalFunction.getId(), "clone", Boolean.toString(isCloneAnomalies));
+      } catch (Exception e) {
+        LOG.warn("Unable to clone function {} with clone tag \"{}\"", originalFunction.getId());
+        return Response.status(Response.Status.CONFLICT).build();
+      }
+      targetFunction = anomalyFunctionDAO.findById(cloneId);
+    }
+
+    // Update function configuration
+    targetFunction.updateProperties(autotuneConfigDTO.getConfiguration());
+    targetFunction.setActive(true);
+    anomalyFunctionDAO.update(targetFunction);
+
+    // Deactivate original function
+    if(isCloneFunction) {
+      originalFunction.setActive(false);
+      anomalyFunctionDAO.update(originalFunction);
+    }
+
+    return Response.ok(targetFunction).build();
+  }
+
+  /**
+   * Check if the given function contains labeled anomalies
+   * @param functionId
+   * an id of an anomaly detection function
+   * @return
+   * true if there are labeled anomalies detected by the function
+   */
+  private boolean containsLabeledAnomalies(long functionId) {
+    List<MergedAnomalyResultDTO> mergedAnomalies = mergedAnomalyResultDAO.findByFunctionId(functionId);
+
+    for(MergedAnomalyResultDTO mergedAnomaly : mergedAnomalies) {
+      AnomalyFeedback feedback = mergedAnomaly.getFeedback();
+      if(feedback == null) {
+        continue;
+      }
+      if(feedback.getFeedbackType().equals(AnomalyFeedbackType.ANOMALY) ||
+          feedback.getFeedbackType().equals(AnomalyFeedbackType.ANOMALY_NO_ACTION)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   private String getDimensions(String dataset, String exploreDimensions) throws Exception {
     // Ensure that the explore dimension names are ordered as schema dimension names
     List<String> schemaDimensionNames = CACHE_REGISTRY_INSTANCE.getDatasetConfigCache().get(dataset).getDimensions();
@@ -567,7 +651,6 @@ public class AnomalyResource {
       throw new IllegalArgumentException("Invalid payload " + payload, e);
     }
   }
-
 
   /**
    * Returns the time series for the given anomaly.
