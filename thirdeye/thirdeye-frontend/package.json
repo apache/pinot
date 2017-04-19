@@ -31,10 +31,18 @@
     "ember-cli-uglify": "^1.2.0",
     "ember-export-application-global": "^1.0.5",
     "ember-load-initializers": "^0.6.0",
+    "ember-lodash-shim": "^2.0.2",
+    "ember-network": "^0.3.1",
+    "ember-redux": "^2.2.0",
+    "ember-redux-shim": "^1.1.1",
+    "ember-redux-thunk-shim": "^1.1.2",
     "ember-resolver": "^2.0.3",
     "ember-source": "~2.12.0",
+    "ember-symbol-observable": "^0.1.2",
     "ember-welcome-page": "^2.0.2",
-    "loader.js": "^4.2.3"
+    "loader.js": "^4.2.3",
+    "redux": "^3.6.0",
+    "redux-thunk": "^2.2.0"
   },
   "engines": {
     "node": ">= 4"
