@@ -16,10 +16,12 @@
 package com.linkedin.pinot.server.starter.helix;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.Uninterruptibles;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.helix.HelixAdmin;
@@ -65,6 +67,7 @@ import com.yammer.metrics.core.MetricsRegistry;
 public class HelixServerStarter {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixServerStarter.class);
+  private final long MAX_QUERY_TIME_MILLIS;
 
   protected final HelixManager _helixManager;
   private final Configuration _pinotHelixProperties;
@@ -82,6 +85,18 @@ public class HelixServerStarter {
     LOGGER.info("Starting Pinot server");
     _helixClusterName = helixClusterName;
     _pinotHelixProperties = pinotHelixProperties;
+
+    String maxQueryTime = pinotHelixProperties.getString(CommonConstants.Server.CONFIG_OF_QUERY_EXECUTOR_TIMEOUT);
+    long maxQueryTimeLong;
+    try {
+      maxQueryTimeLong = Long.parseLong(maxQueryTime);
+    } catch (Exception e) {
+      LOGGER.warn("Could not parse the query executor timeout " + maxQueryTime + ", defaulting to "
+          + CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT, e);
+      maxQueryTimeLong = Long.parseLong(CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT);
+    }
+    MAX_QUERY_TIME_MILLIS = maxQueryTimeLong;
+
     String hostname = pinotHelixProperties.getString(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST,
         NetUtil.getHostAddress());
     _instanceId =
@@ -261,11 +276,7 @@ public class HelixServerStarter {
   public void stop() {
     _adminApiApplication.stop();
     setShuttingDownStatus(true);
-    try {
-      Thread.sleep(5000);
-    } catch (Exception e) {
-      LOGGER.error("error trying to sleep waiting for external view to change : ", e);
-    }
+    Uninterruptibles.sleepUninterruptibly(MAX_QUERY_TIME_MILLIS, TimeUnit.MILLISECONDS);
     _helixManager.disconnect();
     _serverInstance.shutDown();
   }
