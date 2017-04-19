@@ -15,6 +15,21 @@ import org.apache.commons.collections.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * A grouper that groups anomalies by the specified dimensions. If "RollUp" option is enabled, then the groups that
+ * contains only one anomaly will be grouped together with an empty group key. Each group of anomalies could have
+ * a list of auxiliary email recipients, which will be append to the global email recipients.
+ *
+ * An usage example:
+ * Assume that we have four anomalies, whose dimensions are enclosed in brackets: a1={D1=G1, D2=V1}, a2={D1=G1, D2=V2},
+ * a3={D1=G2, D2=V3}, and a4={D1=G3, D2=V4}. We further assume that we want to group by dimension D1 with roll up
+ * enabled, then this grouper returns this grouped result:
+ * groupKey={D1=G1} : a1, a2
+ * groupKey={} : a3, a4
+ *
+ * User could assign the auxiliary email recipients as follows and retrieved through group keys:
+ *     {{D1=G1}:"group1AuxiliaryRecipents.com",{}:"rollUp.com"}
+ */
 public class DimensionalAlertGrouper extends BaseAlertGrouper<DimensionMap> {
   private static final Logger LOG = LoggerFactory.getLogger(DimensionalAlertGrouper.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();

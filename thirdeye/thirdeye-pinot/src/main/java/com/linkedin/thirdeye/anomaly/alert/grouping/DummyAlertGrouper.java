@@ -6,6 +6,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Returns a group that contains all input anomalies. Additionally, this class always returns empty auxiliary email
+ * recipients.
+ */
 public class DummyAlertGrouper extends BaseAlertGrouper<DimensionMap> {
 
   @Override

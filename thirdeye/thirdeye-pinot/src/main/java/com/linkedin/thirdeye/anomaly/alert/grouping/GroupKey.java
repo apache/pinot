@@ -1,9 +1,17 @@
 package com.linkedin.thirdeye.anomaly.alert.grouping;
 
 import java.util.Objects;
+import org.apache.commons.lang.builder.ToStringBuilder;
+import org.apache.commons.lang.builder.ToStringStyle;
 
+/**
+ * Group key is wrapper class that is used to retrieve the specified group of anomalies from AlertGrouper.
+ *
+ * @param <T> The class type of the actual entity to identify different groups. For instance, the actual key could be a
+ *            DimensionMap.
+ */
 public class GroupKey<T> {
-  protected T key;
+  private T key;
 
   public GroupKey() {
   }
@@ -39,6 +47,6 @@ public class GroupKey<T> {
 
   @Override
   public String toString() {
-    return key.toString();
+    return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
   }
 }
