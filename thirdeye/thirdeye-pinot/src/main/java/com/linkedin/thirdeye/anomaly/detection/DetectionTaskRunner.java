@@ -36,10 +36,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.NullArgumentException;
 import org.joda.time.DateTime;
+import org.mozilla.javascript.tools.debugger.Dim;
 import org.quartz.JobExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -129,6 +131,13 @@ public class DetectionTaskRunner implements TaskRunner {
     TimeBasedAnomalyMerger timeBasedAnomalyMerger = new TimeBasedAnomalyMerger(anomalyFunctionFactory);
     ListMultimap<DimensionMap, MergedAnomalyResultDTO> resultMergedAnomalies =
       timeBasedAnomalyMerger.mergeAnomalies(anomalyFunctionSpec, resultRawAnomalies, isBackfill);
+    MetricTimeSeries metricTraffic = adContext.getMetricTraffic();
+    // Calculate Traffic Contribution
+    for (DimensionMap dimension : resultMergedAnomalies.keys()) {
+      for (MergedAnomalyResultDTO mergedAnomaly : resultMergedAnomalies.get(dimension)) {
+        mergedAnomaly.setTrafficContribution(calculateTrafficImpact(metricTraffic, mergedAnomaly));
+      }
+    }
     detectionTaskSuccessCounter.inc();
 
     // TODO: Change to DataSink
@@ -138,6 +147,19 @@ public class DetectionTaskRunner implements TaskRunner {
     storeData(adOutputContext);
   }
 
+  private double calculateTrafficImpact (MetricTimeSeries metricTraffic, MergedAnomalyResultDTO mergedAnomaly) {
+    Set<Long> timestamps = metricTraffic.getTimeWindowSet();
+    double avgTraffic = 0.0;
+    int count = 0;
+    for (long timestamp : timestamps) {
+      if (timestamp >= mergedAnomaly.getStartTime() && timestamp <= mergedAnomaly.getEndTime()) {
+        avgTraffic += metricTraffic.get(timestamp, mergedAnomaly.getMetric()).doubleValue();
+        count++;
+      }
+    }
+    avgTraffic /= count;
+    return mergedAnomaly.getAvgCurrentVal() / avgTraffic;
+  }
 
   private AnomalyDetectionInputContext fetchData(DateTime windowStart, DateTime windowEnd)
       throws JobExecutionException, ExecutionException {
@@ -174,6 +196,24 @@ public class DetectionTaskRunner implements TaskRunner {
       }
     }
     adContext.setDimensionKeyMetricTimeSeriesMap(dimensionMapMetricTimeSeriesMap);
+
+    // Get traffic contribution ratio of each dimension
+    List<Pair<Long, Long>> monitoringTimeRange = new ArrayList<>();
+    monitoringTimeRange.add(new Pair(windowStart, windowEnd));
+    // Clone anomalyFunctionSpec and remove filter and dimension info
+    AnomalyFunctionDTO cloneAnomalyFunctionSpec = new AnomalyFunctionDTO();
+    cloneAnomalyFunctionSpec.setCollection(anomalyFunctionSpec.getCollection());
+    cloneAnomalyFunctionSpec.setMetrics(anomalyFunctionSpec.getMetrics());
+    cloneAnomalyFunctionSpec.setMetricFunction(anomalyFunctionSpec.getMetricFunction());
+    cloneAnomalyFunctionSpec.setBucketSize(anomalyFunctionSpec.getBucketSize());
+    cloneAnomalyFunctionSpec.setBucketUnit(anomalyFunctionSpec.getBucketUnit());
+    dimensionKeyMetricTimeSeriesMap = TimeSeriesUtil.getTimeSeriesForAnomalyDetection(cloneAnomalyFunctionSpec, monitoringTimeRange);
+    // Calculate traffic contribution ratio
+    if (dimensionKeyMetricTimeSeriesMap.size() > 1) {
+      LOG.warn("More than 1 dimensions when fetching traffic data for {}; take the 1st dimension", anomalyFunctionSpec);
+    }
+    DimensionKey dimensionKey = dimensionKeyMetricTimeSeriesMap.keySet().iterator().next();
+    adContext.setMetricTraffic(dimensionKeyMetricTimeSeriesMap.get(dimensionKey));
 
     // Get existing anomalies for this time range and this function id for all combinations of dimensions
     List<MergedAnomalyResultDTO> knownMergedAnomalies;
