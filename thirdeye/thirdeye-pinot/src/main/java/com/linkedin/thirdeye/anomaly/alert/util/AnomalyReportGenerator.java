@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomaly.alert.util;
 
+import com.linkedin.thirdeye.detector.email.filter.DummyAlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.PrecisionRecallEvaluator;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -156,7 +157,7 @@ public class AnomalyReportGenerator {
         }
       }
 
-      PrecisionRecallEvaluator precisionRecallEvaluator = new PrecisionRecallEvaluator(null, anomalies);
+      PrecisionRecallEvaluator precisionRecallEvaluator = new PrecisionRecallEvaluator(new DummyAlertFilter(), anomalies);
 
       HtmlEmail email = new HtmlEmail();
 
