@@ -186,7 +186,7 @@ public class EntityUtils {
    * @return the entity urn
    */
   public static String assertType(String urn, EntityType type) {
-    if(!isType(urn, EntityType.METRIC))
+    if(!isType(urn, type))
       throw new IllegalArgumentException(String.format("Entity '%s' is not a '%s'", urn, type.getPrefix()));
     return urn;
   }
