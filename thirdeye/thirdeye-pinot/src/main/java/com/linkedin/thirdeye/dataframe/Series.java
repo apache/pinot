@@ -985,8 +985,6 @@ public abstract class Series {
    * based on a greedy algorithm with fixed bucket size. The size of all buckets (except for the
    * last) is guaranteed to be equal to {@code bucketSize}.
    *
-   * <br/><b>NOTE:</b> the series is not sorted before grouping.
-   *
    * @param bucketSize maximum number of elements per bucket
    * @return grouping by element count
    */
@@ -1019,8 +1017,6 @@ public abstract class Series {
    * based on a greedy algorithm to approximately evenly fill buckets. The number of buckets
    * is guaranteed to be equal to {@code partitionCount} even if some remain empty.
    *
-   * <br/><b>NOTE:</b> the series is not sorted before grouping.
-   *
    * @param partitionCount number of buckets
    * @return grouping by bucket count
    */
@@ -1043,6 +1039,35 @@ public abstract class Series {
       }
       buckets.add(new Bucket(fromIndex));
       keys[i] = i;
+    }
+    return new SeriesGrouping(DataFrame.toSeries(keys), this, buckets);
+  }
+
+  /**
+   * Returns an (overlapping) SeriesGrouping base on a moving window size. Elements are grouped
+   * into overlapping buckets in sequences of {@code windowSize} consecutive items. The number
+   * of buckets is guaranteed to be equal to {@code series_size - moving_window_size + 1}, or
+   * 0 if the window size is greater than the series size.
+   *
+   * @param windowSize size of moving window
+   * @return grouping by moving window
+   */
+  public final SeriesGrouping groupByMovingWindow(int windowSize) {
+    if(windowSize <= 0)
+      throw new IllegalArgumentException("windowSize must be greater than 0");
+    if(this.size() < windowSize)
+      return new SeriesGrouping(this);
+
+    int windowCount = this.size() - windowSize + 1;
+    long[] keys = new long[windowCount];
+    List<Bucket> buckets = new ArrayList<>();
+    for(int i=0; i<windowCount; i++) {
+      keys[i] = i;
+      int[] fromIndex = new int[windowSize];
+      for(int j=0; j<windowSize; j++) {
+        fromIndex[j] = i + j;
+      }
+      buckets.add(new Bucket(fromIndex));
     }
     return new SeriesGrouping(DataFrame.toSeries(keys), this, buckets);
   }

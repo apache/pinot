@@ -375,21 +375,6 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     return buildFrom(Arrays.copyOfRange(this.values, from, to));
   }
 
-  public DoubleSeries applyMovingWindow(int size, int minSize, DoubleFunction function) {
-    double[] values = new double[this.values.length];
-
-    // fill minSize - 1 with null values
-    Arrays.fill(values, 0, Math.min(values.length, Math.max(0, minSize)), NULL);
-
-    for(int to=Math.max(1, minSize); to<=values.length; to++) {
-      int from = Math.max(0, to - size);
-      double[] input = Arrays.copyOfRange(this.values, from, to);
-      values[to-1] = function.apply(input);
-    }
-
-    return buildFrom(values);
-  }
-
   @Override
   public String toString() {
     StringBuilder builder = new StringBuilder();
