@@ -158,7 +158,7 @@ public class DetectionTaskRunner implements TaskRunner {
       }
     }
     avgTraffic /= count;
-    return mergedAnomaly.getAvgCurrentVal() / avgTraffic;
+    return (mergedAnomaly.getAvgCurrentVal() - mergedAnomaly.getAvgBaselineVal()) / avgTraffic;
   }
 
   private AnomalyDetectionInputContext fetchData(DateTime windowStart, DateTime windowEnd)
