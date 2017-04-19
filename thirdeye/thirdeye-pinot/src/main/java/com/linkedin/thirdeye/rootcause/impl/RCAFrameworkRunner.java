@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.events.DefaultHolidayEventProvider;
 import com.linkedin.thirdeye.anomaly.events.EventDataProviderManager;
@@ -15,6 +17,7 @@ import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import com.linkedin.thirdeye.rootcause.Aggregator;
 import com.linkedin.thirdeye.rootcause.Entity;
+import com.linkedin.thirdeye.rootcause.RCAConfiguration;
 import com.linkedin.thirdeye.rootcause.RCAFramework;
 import com.linkedin.thirdeye.rootcause.RCAFrameworkResult;
 import com.linkedin.thirdeye.rootcause.Pipeline;
@@ -57,6 +60,7 @@ import ch.qos.logback.classic.Logger;
  *
  */
 public class RCAFrameworkRunner {
+
   private static final String CLI_CONFIG_DIR = "config-dir";
   private static final String CLI_WINDOW_SIZE = "window-size";
   private static final String CLI_BASELINE_OFFSET = "baseline-offset";
@@ -99,6 +103,7 @@ public class RCAFrameworkRunner {
     thirdEyeConfig.setRootDir(config.getAbsolutePath());
     ThirdEyeCacheRegistry.initializeCaches(thirdEyeConfig);
 
+
     List<Pipeline> pipelines = new ArrayList<>();
 
     // EventTime pipeline
@@ -121,8 +126,10 @@ public class RCAFrameworkRunner {
     pipelines.add(new MetricDatasetPipeline(metricDAO, datasetDAO));
 
     // External pipelines
-    List<Pipeline> externalPipelines = PipelineUtils.getPipelinesFromConfig(thirdEyeConfig);
-    pipelines.addAll(externalPipelines);
+    File rcaConfig = new File(config.getAbsolutePath() + "/rca.yml");
+    if (rcaConfig.exists()) {
+      pipelines.addAll(PipelineLoader.getPipelinesFromConfig(rcaConfig));
+    }
 
     Aggregator aggregator = new LinearAggregator();
 
