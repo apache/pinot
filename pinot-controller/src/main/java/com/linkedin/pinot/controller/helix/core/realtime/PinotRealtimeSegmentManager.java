@@ -362,7 +362,7 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
         // errors with one table don't impact others
         if (tableConfigZnRecord == null) {
           // Can happen if the table config zn record failed to parse.
-          LOGGER.error("Got null ZN record for table config");
+          LOGGER.error("Got null ZN record for table config", e);
         } else {
           LOGGER.error("Caught exception while processing ZNRecord id: {}. Skipping node to continue setting watches",
               tableConfigZnRecord.getId(), e);
