@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.events.DefaultHolidayEventProvider;
 import com.linkedin.thirdeye.anomaly.events.EventDataProviderManager;
@@ -11,13 +13,16 @@ import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import com.linkedin.thirdeye.rootcause.Aggregator;
 import com.linkedin.thirdeye.rootcause.Entity;
+import com.linkedin.thirdeye.rootcause.RCAConfiguration;
 import com.linkedin.thirdeye.rootcause.RCAFramework;
 import com.linkedin.thirdeye.rootcause.RCAFrameworkResult;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.SearchContext;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -29,6 +34,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
 import org.apache.commons.cli.BasicParser;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.HelpFormatter;
@@ -36,7 +42,10 @@ import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.commons.cli.Parser;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.LoggerFactory;
+
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 
@@ -51,6 +60,7 @@ import ch.qos.logback.classic.Logger;
  *
  */
 public class RCAFrameworkRunner {
+
   private static final String CLI_CONFIG_DIR = "config-dir";
   private static final String CLI_WINDOW_SIZE = "window-size";
   private static final String CLI_BASELINE_OFFSET = "baseline-offset";
@@ -93,6 +103,7 @@ public class RCAFrameworkRunner {
     thirdEyeConfig.setRootDir(config.getAbsolutePath());
     ThirdEyeCacheRegistry.initializeCaches(thirdEyeConfig);
 
+
     List<Pipeline> pipelines = new ArrayList<>();
 
     // EventTime pipeline
@@ -113,6 +124,12 @@ public class RCAFrameworkRunner {
 
     // MetricDataset pipeline
     pipelines.add(new MetricDatasetPipeline(metricDAO, datasetDAO));
+
+    // External pipelines
+    File rcaConfig = new File(config.getAbsolutePath() + "/rca.yml");
+    if (rcaConfig.exists()) {
+      pipelines.addAll(PipelineLoader.getPipelinesFromConfig(rcaConfig));
+    }
 
     Aggregator aggregator = new LinearAggregator();
 
@@ -237,4 +254,8 @@ public class RCAFrameworkRunner {
   static String formatEntity(Entity e) {
     return String.format("%.3f [%s] %s", e.getScore(), e.getClass().getSimpleName(), e.getUrn());
   }
+
+
+
+
 }
