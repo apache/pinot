@@ -78,6 +78,9 @@ import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
+import static com.linkedin.thirdeye.anomaly.detection.lib.AutotuneMethodType.*;
+
+
 @Path(value = "/dashboard")
 @Produces(MediaType.APPLICATION_JSON)
 public class AnomalyResource {
@@ -455,7 +458,7 @@ public class AnomalyResource {
    */
   @POST
   @Path("/anomaly-function/apply/{autotune_config_id}")
-  public Response applyReplayConfig(@PathParam("autotune_config_id") @NotNull long id,
+  public Response applyAutotuneConfig(@PathParam("autotune_config_id") @NotNull long id,
       @QueryParam("cloneFunction") @DefaultValue("false") boolean isCloneFunction,
       @QueryParam("cloneAnomalies") Boolean isCloneAnomalies) {
     AutotuneConfigDTO autotuneConfigDTO = autotuneConfigDAO.findById(id);
@@ -487,8 +490,15 @@ public class AnomalyResource {
       targetFunction = anomalyFunctionDAO.findById(cloneId);
     }
 
-    // Update function configuration
-    targetFunction.updateProperties(autotuneConfigDTO.getConfiguration());
+    // Verify if to update alert filter or function configuraions
+    // if auto tune method is EXHAUSTIVE, which belongs to function auto tune, need to update function configurations
+    // if auto tune method is ALERT_FILTER_LOGISITC_AUTO_TUNE or INITIATE_ALERT_FILTER_LOGISTIC_AUTO_TUNE, alert filter is to be updated
+    if (autotuneConfigDTO.getAutotuneMethod() != EXHAUSTIVE) {
+      targetFunction.setAlertFilter(autotuneConfigDTO.getConfiguration());
+    } else{
+      // Update function configuration
+      targetFunction.updateProperties(autotuneConfigDTO.getConfiguration());
+    }
     targetFunction.setActive(true);
     anomalyFunctionDAO.update(targetFunction);
 
