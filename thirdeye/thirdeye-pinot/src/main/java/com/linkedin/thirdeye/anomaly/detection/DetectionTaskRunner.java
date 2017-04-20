@@ -12,6 +12,7 @@ import com.linkedin.thirdeye.anomaly.task.TaskRunner;
 import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
 import com.linkedin.thirdeye.anomalydetection.datafilter.DataFilter;
 import com.linkedin.thirdeye.anomalydetection.datafilter.DataFilterFactory;
+import com.linkedin.thirdeye.anomalydetection.model.operator.AnomalyContribution;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
@@ -36,12 +37,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
-import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang.NullArgumentException;
 import org.joda.time.DateTime;
-import org.mozilla.javascript.tools.debugger.Dim;
 import org.quartz.JobExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -152,7 +151,7 @@ public class DetectionTaskRunner implements TaskRunner {
     adOutputContext.setMergedAnomalies(resultMergedAnomalies);
     storeData(adOutputContext);
   }
-  
+
   private void storeData(AnomalyDetectionOutputContext anomalyDetectionOutputContext) {
     RawAnomalyResultManager rawAnomalyDAO = DAO_REGISTRY.getRawAnomalyResultDAO();
     MergedAnomalyResultManager mergedAmomalyDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();

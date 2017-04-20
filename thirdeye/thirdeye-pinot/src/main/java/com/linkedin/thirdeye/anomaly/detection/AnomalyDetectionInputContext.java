@@ -16,7 +16,6 @@ public class AnomalyDetectionInputContext {
   MetricTimeSeries MetricSumTimeSeries;
   ListMultimap<DimensionMap, RawAnomalyResultDTO> existingRawAnomalies = ArrayListMultimap.create();;
   ListMultimap<DimensionMap, MergedAnomalyResultDTO> knownMergedAnomalies = ArrayListMultimap.create();;
-  MetricTimeSeries metricTraffic = null;
   List<ScalingFactor> scalingFactors = Collections.emptyList();
 
   public Map<DimensionMap, MetricTimeSeries> getDimensionKeyMetricTimeSeriesMap() {
