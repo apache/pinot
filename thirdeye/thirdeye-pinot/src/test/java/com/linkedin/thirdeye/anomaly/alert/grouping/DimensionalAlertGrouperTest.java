@@ -106,8 +106,7 @@ public class DimensionalAlertGrouperTest {
     }
     // Test roll-up group
     {
-      DimensionMap dimensionRollUpGroup = new DimensionMap();
-      AlertGroupKey<DimensionMap> alertGroupKey = new AlertGroupKey<>(dimensionRollUpGroup);
+      AlertGroupKey<DimensionMap> alertGroupKey = AlertGroupKey.emptyKey();
       GroupedAnomalyResults groupedAnomaly = groupedAnomalies.get(alertGroupKey);
       List<MergedAnomalyResultDTO> anomalyRollUpGroup = groupedAnomaly.getAnomalyResults();
       Assert.assertEquals(anomalyRollUpGroup.size(), 2);
