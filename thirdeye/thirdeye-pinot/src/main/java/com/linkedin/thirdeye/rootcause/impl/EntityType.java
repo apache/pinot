@@ -1,23 +1,28 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
-public enum EntityType {
-  EVENT("thirdeye:event"),
-  METRIC("thirdeye:metric"),
-  TIMERANGE("thirdeye:timerange"),
-  BASELINE("thirdeye:baseline"),
-  UNKNOWN("");
+import com.linkedin.thirdeye.rootcause.Entity;
+import org.apache.commons.lang.StringUtils;
 
-  private final String prefix;
 
-  EntityType(String prefix) {
-    this.prefix = prefix;
-  }
+public final class EntityType {
+  final String prefix;
 
   public String getPrefix() {
     return prefix;
   }
 
-  public String formatUrn(String format, Object... values) {
-    return this.prefix + ":" + String.format(format, values);
+  public EntityType(String prefix) {
+    if(!prefix.endsWith(":"))
+      throw new IllegalArgumentException("Prefix must end with ':'");
+    this.prefix = prefix;
+  }
+
+  public String formatURN(Object... values) {
+    return this.prefix + StringUtils.join(values, ":");
+  }
+
+  public static String extractPrefix(Entity e) {
+    String[] parts = e.getUrn().split(":");
+    return parts[0] + ":" + parts[1];
   }
 }

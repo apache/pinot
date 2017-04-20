@@ -36,11 +36,7 @@ public class EventTimePipeline implements Pipeline {
 
   @Override
   public PipelineResult run(ExecutionContext context) {
-    TimeRangeEntity current = EntityUtils.getContextTimeRange(context);
-    if(current == null) {
-      LOG.warn("Pipeline '{}' requires TimeRangeEntity. Skipping.", this.getName());
-      return new PipelineResult(Collections.<Entity>emptyList());
-    }
+    TimeRangeEntity current = TimeRangeEntity.getContextCurrent(context);
 
     EventFilter filter = new EventFilter();
     filter.setStartTime(current.getStart());

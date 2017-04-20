@@ -44,81 +44,81 @@ public class MetricDimensionScorer {
     this.cache = cache;
   }
 
-  /**
-   * Perform contribution analysis on associated MetricDimension entities given a time range
-   * and baseline range.
-   *
-   * @param entities MetricDimensionEntities of same metric and dataset
-   * @param current current time range
-   * @param baseline baseline time range
-   * @return MetricDimensionEntities with score updated according to contribution
-   * @throws Exception if data cannot be fetched or data is invalid
-   */
-  Collection<MetricDimensionEntity> score(Collection<MetricDimensionEntity> entities, TimeRangeEntity current, BaselineEntity baseline) throws Exception {
-    if(entities.isEmpty())
-      return Collections.emptyList();
-
-    // ensure same base dataset and metric
-    Iterator<MetricDimensionEntity> it = entities.iterator();
-    MetricDimensionEntity first = it.next();
-    MetricConfigDTO metric = first.getMetric();
-    DatasetConfigDTO dataset = first.getDataset();
-
-    while(it.hasNext()) {
-      MetricDimensionEntity e = it.next();
-      if(!metric.equals(e.getMetric()))
-        throw new IllegalArgumentException("entities must derive from same metric");
-      if(!dataset.equals(e.getDataset()))
-        throw new IllegalArgumentException("entities must derive from same dataset");
-    }
-
-    // build data cube
-    OLAPDataBaseClient olapClient = getOlapDataBaseClient(current, baseline, metric, dataset);
-    Dimensions dimensions = new Dimensions(dataset.getDimensions());
-    int topDimensions = dataset.getDimensions().size();
-
-    Cube cube = new Cube();
-    cube.buildWithAutoDimensionOrder(olapClient, dimensions, topDimensions, Collections.<List<String>>emptyList());
-
-    // group by dimension
-    DataFrame df = toNormalizedDataFrame(cube.getCostSet());
-
-    // map dimension to MetricDimension
-    Map<String, MetricDimensionEntity> mdMap = new HashMap<>();
-    for(MetricDimensionEntity e : entities) {
-      mdMap.put(e.getDimension(), e);
-    }
-
-    List<MetricDimensionEntity> scores = new ArrayList<>();
-    for(int i=0; i<df.size(); i++) {
-      String urn = df.getString(DIMENSION, i);
-      MetricDimensionEntity e = mdMap.get(urn);
-      if(e == null) {
-        LOG.warn("Could not resolve MetricDimensionEntity '{}'. Skipping.", urn);
-        continue;
-      }
-
-      // final score is dimension_contribution * base_metric_score
-      MetricDimensionEntity n = e.withScore(df.getDouble(COST, i) * e.getScore());
-      scores.add(n);
-    }
-
-    return scores;
-  }
-
-  private OLAPDataBaseClient getOlapDataBaseClient(TimeRangeEntity current, BaselineEntity baseline, MetricConfigDTO metric, DatasetConfigDTO dataset) throws Exception {
-    final String timezone = "UTC";
-    List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metric.getName(), MetricAggFunction.SUM, dataset.getDataset());
-
-    OLAPDataBaseClient olapClient = new PinotThirdEyeSummaryClient(cache);
-    olapClient.setCollection(dataset.getDataset());
-    olapClient.setMetricExpression(metricExpressions.get(0));
-    olapClient.setCurrentStartInclusive(new DateTime(current.getStart(), DateTimeZone.forID(timezone)));
-    olapClient.setCurrentEndExclusive(new DateTime(current.getEnd(), DateTimeZone.forID(timezone)));
-    olapClient.setBaselineStartInclusive(new DateTime(baseline.getStart(), DateTimeZone.forID(timezone)));
-    olapClient.setBaselineEndExclusive(new DateTime(baseline.getEnd(), DateTimeZone.forID(timezone)));
-    return olapClient;
-  }
+//  /**
+//   * Perform contribution analysis on associated MetricDimension entities given a time range
+//   * and baseline range.
+//   *
+//   * @param entities MetricDimensionEntities of same metric and dataset
+//   * @param current current time range
+//   * @param baseline baseline time range
+//   * @return MetricDimensionEntities with score updated according to contribution
+//   * @throws Exception if data cannot be fetched or data is invalid
+//   */
+//  Collection<MetricDimensionEntity> score(Collection<MetricDimensionEntity> entities, TimeRangeEntity current, BaselineEntity baseline) throws Exception {
+//    if(entities.isEmpty())
+//      return Collections.emptyList();
+//
+//    // ensure same base dataset and metric
+//    Iterator<MetricDimensionEntity> it = entities.iterator();
+//    MetricDimensionEntity first = it.next();
+//    MetricConfigDTO metric = first.getMetric();
+//    DatasetConfigDTO dataset = first.getDataset();
+//
+//    while(it.hasNext()) {
+//      MetricDimensionEntity e = it.next();
+//      if(!metric.equals(e.getMetric()))
+//        throw new IllegalArgumentException("entities must derive from same metric");
+//      if(!dataset.equals(e.getDataset()))
+//        throw new IllegalArgumentException("entities must derive from same dataset");
+//    }
+//
+//    // build data cube
+//    OLAPDataBaseClient olapClient = getOlapDataBaseClient(current, baseline, metric, dataset);
+//    Dimensions dimensions = new Dimensions(dataset.getDimensions());
+//    int topDimensions = dataset.getDimensions().size();
+//
+//    Cube cube = new Cube();
+//    cube.buildWithAutoDimensionOrder(olapClient, dimensions, topDimensions, Collections.<List<String>>emptyList());
+//
+//    // group by dimension
+//    DataFrame df = toNormalizedDataFrame(cube.getCostSet());
+//
+//    // map dimension to MetricDimension
+//    Map<String, MetricDimensionEntity> mdMap = new HashMap<>();
+//    for(MetricDimensionEntity e : entities) {
+//      mdMap.put(e.getDimension(), e);
+//    }
+//
+//    List<MetricDimensionEntity> scores = new ArrayList<>();
+//    for(int i=0; i<df.size(); i++) {
+//      String urn = df.getString(DIMENSION, i);
+//      MetricDimensionEntity e = mdMap.get(urn);
+//      if(e == null) {
+//        LOG.warn("Could not resolve MetricDimensionEntity '{}'. Skipping.", urn);
+//        continue;
+//      }
+//
+//      // final score is dimension_contribution * base_metric_score
+//      MetricDimensionEntity n = e.withScore(df.getDouble(COST, i) * e.getScore());
+//      scores.add(n);
+//    }
+//
+//    return scores;
+//  }
+//
+//  private OLAPDataBaseClient getOlapDataBaseClient(TimeRangeEntity current, BaselineEntity baseline, MetricConfigDTO metric, DatasetConfigDTO dataset) throws Exception {
+//    final String timezone = "UTC";
+//    List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metric.getName(), MetricAggFunction.SUM, dataset.getDataset());
+//
+//    OLAPDataBaseClient olapClient = new PinotThirdEyeSummaryClient(cache);
+//    olapClient.setCollection(dataset.getDataset());
+//    olapClient.setMetricExpression(metricExpressions.get(0));
+//    olapClient.setCurrentStartInclusive(new DateTime(current.getStart(), DateTimeZone.forID(timezone)));
+//    olapClient.setCurrentEndExclusive(new DateTime(current.getEnd(), DateTimeZone.forID(timezone)));
+//    olapClient.setBaselineStartInclusive(new DateTime(baseline.getStart(), DateTimeZone.forID(timezone)));
+//    olapClient.setBaselineEndExclusive(new DateTime(baseline.getEnd(), DateTimeZone.forID(timezone)));
+//    return olapClient;
+//  }
 
   private static DataFrame toNormalizedDataFrame(Collection<DimNameValueCostEntry> costs) {
     String[] dim = new String[costs.size()];
