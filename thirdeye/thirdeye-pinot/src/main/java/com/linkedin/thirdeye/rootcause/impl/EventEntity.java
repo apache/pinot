@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
-import com.linkedin.thirdeye.anomaly.events.EventType;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 import com.linkedin.thirdeye.rootcause.Entity;
 

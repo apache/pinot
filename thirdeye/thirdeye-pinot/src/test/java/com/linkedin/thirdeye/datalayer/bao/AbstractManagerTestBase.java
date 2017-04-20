@@ -65,7 +65,7 @@ public abstract class AbstractManagerTestBase {
   protected OverrideConfigManager overrideConfigDAO;
   protected AlertConfigManager alertConfigDAO;
   protected DataCompletenessConfigManager dataCompletenessConfigDAO;
-  protected EventManager eventManager;
+  protected EventManager eventDAO;
   protected DetectionStatusManager detectionStatusDAO;
   protected AutotuneConfigManager autotuneConfigDAO;
   protected ClassificationConfigManager classificationConfigDAO;
@@ -99,7 +99,7 @@ public abstract class AbstractManagerTestBase {
       overrideConfigDAO = daoRegistry.getOverrideConfigDAO();
       alertConfigDAO = daoRegistry.getAlertConfigDAO();
       dataCompletenessConfigDAO = daoRegistry.getDataCompletenessConfigDAO();
-      eventManager = daoRegistry.getEventDAO();
+      eventDAO = daoRegistry.getEventDAO();
       anomalyFunctionDAO = daoRegistry.getAnomalyFunctionDAO();
       detectionStatusDAO = daoRegistry.getDetectionStatusDAO();
       autotuneConfigDAO = daoRegistry.getAutotuneConfigDAO();

@@ -35,29 +35,29 @@ public class TestEventManager extends AbstractManagerTestBase {
     Map<String, List<String>> targetDimensionsMap = new HashMap<>();
     eventDTO.setTargetDimensionMap(targetDimensionsMap);
 
-    testEventId = eventManager.save(eventDTO);
+    testEventId = eventDAO.save(eventDTO);
     Assert.assertTrue(testEventId > 0);
   }
 
   @Test(dependsOnMethods = { "testCreate" })
   public void testGetById() {
-    EventDTO testEventDTO = eventManager.findById(testEventId);
+    EventDTO testEventDTO = eventDAO.findById(testEventId);
     Assert.assertEquals(testEventDTO.getId().longValue(), testEventId);
     System.out.println(testEventDTO.getStartTime());
     System.out.println(testEventDTO.getEndTime());
     System.out.println(testEventDTO.getEventType());
-    List<EventDTO> results0 = eventManager.findByEventType(EventType.DEPLOYMENT.name());
+    List<EventDTO> results0 = eventDAO.findByEventType(EventType.DEPLOYMENT.name());
     Assert.assertEquals(results0.size(), 1);
 
-    List<EventDTO> results1 = eventManager
+    List<EventDTO> results1 = eventDAO
         .findEventsBetweenTimeRange(EventType.DEPLOYMENT.name(), 0, System.currentTimeMillis());
     Assert.assertEquals(results1.size(), 1);
   }
 
   @Test(dependsOnMethods = { "testGetById" })
   public void testDelete() {
-    eventManager.deleteById(testEventId);
-    EventDTO testEventDTO = eventManager.findById(testEventId);
+    eventDAO.deleteById(testEventId);
+    EventDTO testEventDTO = eventDAO.findById(testEventId);
     Assert.assertNull(testEventDTO);
   }
 }
