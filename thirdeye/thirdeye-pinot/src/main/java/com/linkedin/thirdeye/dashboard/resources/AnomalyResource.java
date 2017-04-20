@@ -78,6 +78,9 @@ import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
+import static com.linkedin.thirdeye.anomaly.detection.lib.AutotuneMethodType.*;
+
+
 @Path(value = "/dashboard")
 @Produces(MediaType.APPLICATION_JSON)
 public class AnomalyResource {
@@ -454,8 +457,8 @@ public class AnomalyResource {
    * an activated anomaly detection function
    */
   @POST
-  @Path("/anomaly-function/apply/{autotune_config_id}")
-  public Response applyReplayConfig(@PathParam("autotune_config_id") @NotNull long id,
+  @Path("/anomaly-function/apply/{autotuneConfigId}")
+  public Response applyAutotuneConfig(@PathParam("autotuneConfigId") @NotNull long id,
       @QueryParam("cloneFunction") @DefaultValue("false") boolean isCloneFunction,
       @QueryParam("cloneAnomalies") Boolean isCloneAnomalies) {
     AutotuneConfigDTO autotuneConfigDTO = autotuneConfigDAO.findById(id);
@@ -487,8 +490,15 @@ public class AnomalyResource {
       targetFunction = anomalyFunctionDAO.findById(cloneId);
     }
 
-    // Update function configuration
-    targetFunction.updateProperties(autotuneConfigDTO.getConfiguration());
+    // Verify if to update alert filter or function configuraions
+    // if auto tune method is EXHAUSTIVE, which belongs to function auto tune, need to update function configurations
+    // if auto tune method is ALERT_FILTER_LOGISITC_AUTO_TUNE or INITIATE_ALERT_FILTER_LOGISTIC_AUTO_TUNE, alert filter is to be updated
+    if (autotuneConfigDTO.getAutotuneMethod() != EXHAUSTIVE) {
+      targetFunction.setAlertFilter(autotuneConfigDTO.getConfiguration());
+    } else{
+      // Update function configuration
+      targetFunction.updateProperties(autotuneConfigDTO.getConfiguration());
+    }
     targetFunction.setActive(true);
     anomalyFunctionDAO.update(targetFunction);
 
@@ -537,6 +547,19 @@ public class AnomalyResource {
       }
     }
     return reorderedExploreDimensions.toString();
+  }
+
+  // Activate anomaly function
+  @POST
+  @Path("/anomaly-function/activate")
+  public Response activateAnomalyFunction(@NotNull @QueryParam("functionId") Long id){
+    if (id == null) {
+      return Response.status(Response.Status.BAD_REQUEST).build();
+    }
+    AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
+    anomalyFunctionSpec.setActive(true);
+    anomalyFunctionDAO.update(anomalyFunctionSpec);
+    return Response.ok(id).build();
   }
 
   // Delete anomaly function
