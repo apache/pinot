@@ -360,8 +360,13 @@ public class PinotRealtimeSegmentManager implements HelixPropertyListener, IZkCh
       } catch (Exception e) {
         // we want to continue setting watches for other tables for any kind of exception here so that
         // errors with one table don't impact others
-        LOGGER.error("Caught exception while processing ZNRecord id: {}. Skipping node to continue setting watches",
-            tableConfigZnRecord.getId(), e);
+        if (tableConfigZnRecord == null) {
+          // Can happen if the table config zn record failed to parse.
+          LOGGER.error("Got null ZN record for table config", e);
+        } else {
+          LOGGER.error("Caught exception while processing ZNRecord id: {}. Skipping node to continue setting watches",
+              tableConfigZnRecord.getId(), e);
+        }
       }
     }
   }
