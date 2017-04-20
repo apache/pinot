@@ -120,6 +120,7 @@ function AnomalyResultView(anomalyResultModel) {
   this.investigateButtonClickEvent = new Event(this);
   this.showDetailsLinkClickEvent = new Event(this);
   this.anomalyFeedbackSelectEvent = new Event(this);
+  this.pageClickEvent = new Event(this)
 
   this.anomalyResultModel.renderViewEvent.attach(this.renderViewEventHandler.bind(this));
 
@@ -187,18 +188,10 @@ AnomalyResultView.prototype = {
       visiblePages: 7,
       startPage: pageNumber,
       onPageClick: (event, page) => {
-          $('body').scrollTop(0);
-          if (page != pageNumber) {
-            var anomaliesParams = {
-                pageNumber : page,
-                metricIds : this.anomalyResultModel.metricIds,
-                dashboardId : this.anomalyResultModel.dashboardId,
-                anomalyIds : this.anomalyResultModel.anomalyIds,
-                startDate : this.anomalyResultModel.startDate,
-                endDate : this.anomalyResultModel.endDate,
-              };
-            this.applyButtonEvent.notify(anomaliesParams);
-          }
+        $('body').scrollTop(0);
+        if (page != pageNumber) {
+          this.pageClickEvent.notify(page);
+        }
       }
     });
 
