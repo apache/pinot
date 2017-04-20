@@ -188,6 +188,11 @@ public final class LongSeries extends TypedSeries<LongSeries> {
   }
 
   @Override
+  public Builder getBuilder() {
+    return new Builder();
+  }
+
+  @Override
   public LongSeries getLongs() {
     return this;
   }

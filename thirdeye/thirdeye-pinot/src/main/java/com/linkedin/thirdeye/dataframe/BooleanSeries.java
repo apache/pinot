@@ -214,6 +214,11 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
   }
 
   @Override
+  public Builder getBuilder() {
+    return new Builder();
+  }
+
+  @Override
   public BooleanSeries getBooleans() {
     return this;
   }

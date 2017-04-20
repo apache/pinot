@@ -268,6 +268,11 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
   }
 
   @Override
+  public Builder getBuilder() {
+    return new Builder();
+  }
+
+  @Override
   public DoubleSeries getDoubles() {
     return this;
   }

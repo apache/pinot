@@ -38,27 +38,6 @@ public class EntityUtils {
     return e.getUrn().startsWith(type.getPrefix());
   }
 
-//  public static Set<Entity> filterType(Collection<Entity> entities, EntityType type) {
-//    Set<Entity> filtered = new HashSet<>();
-//    for(Entity e : entities) {
-//      if(isType(e, type))
-//        filtered.add(e);
-//    }
-//    return filtered;
-//  }
-//
-//  /**
-//   * Returns all entities with a matching entity type contained in the search context of an
-//   * execution context.
-//   *
-//   * @param context execution context
-//   * @param type entity type
-//   * @return set of entities with specified type
-//   */
-//  public static Set<Entity> filterContext(ExecutionContext context, EntityType type) {
-//    return new HashSet<>(filterType(context.getSearchContext().getEntities(), type));
-//  }
-//
   public static <T extends Entity> Set<T> filterContext(ExecutionContext context, Class<? extends T> clazz) {
     HashSet<T> filtered = new HashSet<>();
     for(Entity e : context.getSearchContext().getEntities()) {
