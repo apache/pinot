@@ -15,11 +15,6 @@
  */
 package com.linkedin.pinot.core.plan;
 
-import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.core.common.Operator;
-import com.linkedin.pinot.core.operator.MCombineGroupByOperator;
-import com.linkedin.pinot.core.operator.MCombineOperator;
-import com.linkedin.pinot.core.util.trace.TraceCallable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -27,6 +22,12 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.core.common.Operator;
+import com.linkedin.pinot.core.operator.MCombineGroupByOperator;
+import com.linkedin.pinot.core.operator.MCombineOperator;
+import com.linkedin.pinot.core.query.exception.BadQueryRequestException;
+import com.linkedin.pinot.core.util.trace.TraceCallable;
 
 
 /**
@@ -96,6 +97,8 @@ public class CombinePlanNode implements PlanNode {
           Future<Operator> future = futures.get(index);
           try {
             operators.add(future.get(timeout - System.currentTimeMillis(), TimeUnit.MILLISECONDS));
+          } catch (BadQueryRequestException e) {
+            throw e;
           } catch (Exception e) {
             throw new RuntimeException("Caught exception while running CombinePlanNode.", e);
           }
