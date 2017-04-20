@@ -3,9 +3,9 @@ package com.linkedin.thirdeye.anomaly.alert.v2;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.alert.AlertTaskInfo;
 import com.linkedin.thirdeye.anomaly.alert.AlertTaskRunner;
+import com.linkedin.thirdeye.anomaly.alert.grouping.AlertGroupKey;
 import com.linkedin.thirdeye.anomaly.alert.grouping.AlertGrouper;
 import com.linkedin.thirdeye.anomaly.alert.grouping.AlertGrouperFactory;
-import com.linkedin.thirdeye.anomaly.alert.grouping.GroupKey;
 import com.linkedin.thirdeye.anomaly.alert.grouping.GroupedAnomalyResults;
 import com.linkedin.thirdeye.anomaly.alert.template.pojo.MetricDimensionReport;
 import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
@@ -17,8 +17,6 @@ import com.linkedin.thirdeye.anomaly.task.TaskInfo;
 import com.linkedin.thirdeye.anomaly.task.TaskResult;
 import com.linkedin.thirdeye.anomaly.task.TaskRunner;
 import com.linkedin.thirdeye.anomaly.utils.ThirdeyeMetricsUtil;
-import com.linkedin.thirdeye.api.DimensionKey;
-import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewResponse;
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
@@ -141,9 +139,9 @@ public class AlertTaskRunnerV2 implements TaskRunner {
         // Input: a list of anomalies.
         // Output: lists of anomalies; each list contains the anomalies of the same group.
         AlertGrouper alertGrouper = AlertGrouperFactory.fromSpec(alertConfig.getGroupByConfig());
-        Map<GroupKey, GroupedAnomalyResults> groupedAnomalyResultsMap = alertGrouper.group(results);
+        Map<AlertGroupKey, GroupedAnomalyResults> groupedAnomalyResultsMap = alertGrouper.group(results);
 
-        for (Map.Entry<GroupKey, GroupedAnomalyResults> entry : groupedAnomalyResultsMap.entrySet()) {
+        for (Map.Entry<AlertGroupKey, GroupedAnomalyResults> entry : groupedAnomalyResultsMap.entrySet()) {
           // Anomaly results for this group
           List<MergedAnomalyResultDTO> resultsForThisGroup = entry.getValue().getAnomalyResults();
           // Append auxiliary recipients for this group
@@ -154,7 +152,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
           }
           // Append group name after config name if the group name is not an empty string or group
           String emailName = alertConfig.getName();
-          if (!GroupKey.EMPTY_KEY.equals(entry.getKey())) {
+          if (!AlertGroupKey.emptyKey().equals(entry.getKey())) {
             String groupName = entry.getKey().toString();
             if (StringUtils.isNotBlank(groupName)) {
               emailName = emailName + " " + groupName;

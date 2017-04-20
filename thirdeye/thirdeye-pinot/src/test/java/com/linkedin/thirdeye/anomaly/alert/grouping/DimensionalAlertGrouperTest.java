@@ -66,26 +66,26 @@ public class DimensionalAlertGrouperTest {
     DimensionMap dimensionMap = new DimensionMap();
     dimensionMap.put(GROUP_BY_DIMENSION_NAME, "V1");
     dimensionMap.put("K2", "V3"); // K2 should not affect group key
-    GroupKey<DimensionMap> groupKey = alertGrouper.constructGroupKey(dimensionMap);
+    AlertGroupKey<DimensionMap> alertGroupKey = alertGrouper.constructGroupKey(dimensionMap);
 
     DimensionMap expectedDimensionMap = new DimensionMap();
     expectedDimensionMap.put(GROUP_BY_DIMENSION_NAME, "V1");
-    GroupKey<DimensionMap> expectedGroupKey = new GroupKey<>(expectedDimensionMap);
-    Assert.assertEquals(groupKey, expectedGroupKey);
+    AlertGroupKey<DimensionMap> expectedAlertGroupKey = new AlertGroupKey<>(expectedDimensionMap);
+    Assert.assertEquals(alertGroupKey, expectedAlertGroupKey);
   }
 
   @Test(dataProvider = "prepareAnomalyGroups", dependsOnMethods = { "testCreate", "testConstructGroupKey" })
   public void testGroup(List<MergedAnomalyResultDTO> anomalies, Set<MergedAnomalyResultDTO> expectedGroup1,
       Set<MergedAnomalyResultDTO> expectedGroup2, Set<MergedAnomalyResultDTO> expectedRollUpGroup) {
 
-    Map<GroupKey<DimensionMap>, GroupedAnomalyResults> groupedAnomalies = alertGrouper.group(anomalies);
+    Map<AlertGroupKey<DimensionMap>, GroupedAnomalyResults> groupedAnomalies = alertGrouper.group(anomalies);
     Assert.assertEquals(groupedAnomalies.size(), 3);
     // Test group 1
     {
       DimensionMap dimensionGroup1 = new DimensionMap();
       dimensionGroup1.put(GROUP_BY_DIMENSION_NAME, "G1");
-      GroupKey<DimensionMap> groupKey = new GroupKey<>(dimensionGroup1);
-      GroupedAnomalyResults groupedAnomaly1 = groupedAnomalies.get(groupKey);
+      AlertGroupKey<DimensionMap> alertGroupKey = new AlertGroupKey<>(dimensionGroup1);
+      GroupedAnomalyResults groupedAnomaly1 = groupedAnomalies.get(alertGroupKey);
       List<MergedAnomalyResultDTO> anomalyGroup1 = groupedAnomaly1.getAnomalyResults();
       Assert.assertEquals(anomalyGroup1.size(), 2);
       Set<MergedAnomalyResultDTO> group1 = new HashSet<>();
@@ -96,8 +96,8 @@ public class DimensionalAlertGrouperTest {
     {
       DimensionMap dimensionGroup2 = new DimensionMap();
       dimensionGroup2.put(GROUP_BY_DIMENSION_NAME, "G2");
-      GroupKey<DimensionMap> groupKey = new GroupKey<>(dimensionGroup2);
-      GroupedAnomalyResults groupedAnomaly2 = groupedAnomalies.get(groupKey);
+      AlertGroupKey<DimensionMap> alertGroupKey = new AlertGroupKey<>(dimensionGroup2);
+      GroupedAnomalyResults groupedAnomaly2 = groupedAnomalies.get(alertGroupKey);
       List<MergedAnomalyResultDTO> anomalyGroup2 = groupedAnomaly2.getAnomalyResults();
       Assert.assertEquals(anomalyGroup2.size(), 2);
       Set<MergedAnomalyResultDTO> group2 = new HashSet<>();
@@ -107,8 +107,8 @@ public class DimensionalAlertGrouperTest {
     // Test roll-up group
     {
       DimensionMap dimensionRollUpGroup = new DimensionMap();
-      GroupKey<DimensionMap> groupKey = new GroupKey<>(dimensionRollUpGroup);
-      GroupedAnomalyResults groupedAnomaly = groupedAnomalies.get(groupKey);
+      AlertGroupKey<DimensionMap> alertGroupKey = new AlertGroupKey<>(dimensionRollUpGroup);
+      GroupedAnomalyResults groupedAnomaly = groupedAnomalies.get(alertGroupKey);
       List<MergedAnomalyResultDTO> anomalyRollUpGroup = groupedAnomaly.getAnomalyResults();
       Assert.assertEquals(anomalyRollUpGroup.size(), 2);
       Set<MergedAnomalyResultDTO> rollUpGroup = new HashSet<>();
@@ -119,17 +119,17 @@ public class DimensionalAlertGrouperTest {
 
   @Test(dependsOnMethods = { "testCreate", "testConstructGroupKey" })
   public void testGroupEmailRecipients() {
-    // Test GroupKey to auxiliary recipients
+    // Test AlertGroupKey to auxiliary recipients
     DimensionMap dimensionMap1 = new DimensionMap();
     dimensionMap1.put(GROUP_BY_DIMENSION_NAME, "V1");
-    GroupKey<DimensionMap> groupKey1 = alertGrouper.constructGroupKey(dimensionMap1);
-    Assert.assertEquals(alertGrouper.groupEmailRecipients(groupKey1), EMAIL1);
+    AlertGroupKey<DimensionMap> alertGroupKey1 = alertGrouper.constructGroupKey(dimensionMap1);
+    Assert.assertEquals(alertGrouper.groupEmailRecipients(alertGroupKey1), EMAIL1);
 
     DimensionMap dimensionMap2 = new DimensionMap();
     dimensionMap2.put(GROUP_BY_DIMENSION_NAME, "V1");
     dimensionMap2.put("K2", "V3"); // K2 should not affect group key
-    GroupKey<DimensionMap> groupKey2 = alertGrouper.constructGroupKey(dimensionMap2);
-    Assert.assertEquals(alertGrouper.groupEmailRecipients(groupKey2), EMAIL1);
+    AlertGroupKey<DimensionMap> alertGroupKey2 = alertGrouper.constructGroupKey(dimensionMap2);
+    Assert.assertEquals(alertGrouper.groupEmailRecipients(alertGroupKey2), EMAIL1);
   }
 
   @DataProvider(name = "prepareAnomalyGroups")

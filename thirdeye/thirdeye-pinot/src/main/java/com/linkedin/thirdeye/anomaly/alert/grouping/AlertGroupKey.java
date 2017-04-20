@@ -10,10 +10,10 @@ import org.apache.commons.lang.builder.ToStringStyle;
  * @param <T> The class type of the actual entity to identify different groups. For instance, the actual key could be a
  *            DimensionMap.
  */
-public class GroupKey<T> {
+public class AlertGroupKey<T> {
    // The default empty group key that is used to represent the rolled up group, which collects the anomalies from
    // groups that contains only one anomaly.
-  public static final GroupKey EMPTY_KEY = new GroupKey();
+  public static final AlertGroupKey EMPTY_KEY = new AlertGroupKey<Objects>();
 
   // The actual object to distinguish group key from each other.
   private final T key;
@@ -21,7 +21,7 @@ public class GroupKey<T> {
   /**
    * Constructs an empty group key, i.e., the key is null.
    */
-  public GroupKey() {
+  public AlertGroupKey() {
     this.key = null;
   }
 
@@ -30,16 +30,22 @@ public class GroupKey<T> {
    *
    * @param key the actual object that is used to distinguish group key from each other.
    */
-  public GroupKey(T key) {
+  public AlertGroupKey(T key) {
     this.key = key;
   }
 
   /**
    * Returns the actual object that is used to distinguish group key from each other.
-   * @return
+   *
+   * @return the actual object that is used to distinguish group key from each other.
    */
   T getKey() {
     return key;
+  }
+
+  @SuppressWarnings("unchecked")
+  public static final <T> AlertGroupKey<T> emptyKey() {
+    return (AlertGroupKey<T>) EMPTY_KEY;
   }
 
   @Override
@@ -50,8 +56,8 @@ public class GroupKey<T> {
     if (o == null || getClass() != o.getClass()) {
       return false;
     }
-    GroupKey<?> groupKey = (GroupKey<?>) o;
-    return Objects.equals(getKey(), groupKey.getKey());
+    AlertGroupKey<?> alertGroupKey = (AlertGroupKey<?>) o;
+    return Objects.equals(getKey(), alertGroupKey.getKey());
   }
 
   @Override

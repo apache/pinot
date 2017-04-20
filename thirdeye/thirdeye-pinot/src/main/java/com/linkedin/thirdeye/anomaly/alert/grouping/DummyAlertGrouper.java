@@ -13,22 +13,22 @@ import java.util.Map;
 public class DummyAlertGrouper extends BaseAlertGrouper<DimensionMap> {
 
   @Override
-  public Map<GroupKey<DimensionMap>, GroupedAnomalyResults> group(List<MergedAnomalyResultDTO> anomalyResults) {
-    Map<GroupKey<DimensionMap>, GroupedAnomalyResults> groupMap = new HashMap<>();
-    GroupKey<DimensionMap> groupKey = this.constructGroupKey(null);
+  public Map<AlertGroupKey<DimensionMap>, GroupedAnomalyResults> group(List<MergedAnomalyResultDTO> anomalyResults) {
+    Map<AlertGroupKey<DimensionMap>, GroupedAnomalyResults> groupMap = new HashMap<>();
+    AlertGroupKey<DimensionMap> alertGroupKey = this.constructGroupKey(null);
     GroupedAnomalyResults groupedAnomalyResults = new GroupedAnomalyResults();
     groupedAnomalyResults.setAnomalyResults(anomalyResults);
-    groupMap.put(groupKey, groupedAnomalyResults);
+    groupMap.put(alertGroupKey, groupedAnomalyResults);
     return groupMap;
   }
 
   @Override
-  public GroupKey<DimensionMap> constructGroupKey(DimensionMap rawKey) {
-    return new GroupKey<>(new DimensionMap());
+  public AlertGroupKey<DimensionMap> constructGroupKey(DimensionMap rawKey) {
+    return AlertGroupKey.emptyKey();
   }
 
   @Override
-  public String groupEmailRecipients(GroupKey groupKey) {
+  public String groupEmailRecipients(AlertGroupKey alertGroupKey) {
     return "";
   }
 }

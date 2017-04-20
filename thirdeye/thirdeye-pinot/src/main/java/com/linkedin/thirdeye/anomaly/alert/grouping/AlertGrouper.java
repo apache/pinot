@@ -18,16 +18,16 @@ public interface AlertGrouper<T> {
    *
    * @return groups of anomaly results.
    */
-  Map<GroupKey<T>, GroupedAnomalyResults> group(List<MergedAnomalyResultDTO> anomalyResults);
+  Map<AlertGroupKey<T>, GroupedAnomalyResults> group(List<MergedAnomalyResultDTO> anomalyResults);
 
   /**
    * The additional recipients string for this group of anomalies.
    *
-   * @param groupKey the key of the group
+   * @param alertGroupKey the key of the group
    *
    * @return the additional recipients for the given group.
    */
-  String groupEmailRecipients(GroupKey<T> groupKey);
+  String groupEmailRecipients(AlertGroupKey<T> alertGroupKey);
 
   /**
    * Constructs group key from the given raw key and based on the setting of this grouper.
@@ -36,5 +36,5 @@ public interface AlertGrouper<T> {
    *
    * @return a group key.
    */
-  GroupKey<T> constructGroupKey(T rawKey);
+  AlertGroupKey<T> constructGroupKey(T rawKey);
 }

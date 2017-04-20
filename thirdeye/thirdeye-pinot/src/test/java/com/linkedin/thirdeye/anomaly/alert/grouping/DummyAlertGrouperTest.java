@@ -16,7 +16,7 @@ public class DummyAlertGrouperTest {
       Set<MergedAnomalyResultDTO> expectedGroup2, Set<MergedAnomalyResultDTO> expectedRollUpGroup) {
     DummyAlertGrouper alertGrouper = new DummyAlertGrouper();
 
-    Map<GroupKey<DimensionMap>, GroupedAnomalyResults> groupedAnomalies = alertGrouper.group(anomalies);
+    Map<AlertGroupKey<DimensionMap>, GroupedAnomalyResults> groupedAnomalies = alertGrouper.group(anomalies);
     Assert.assertEquals(groupedAnomalies.size(), 1);
 
     Set<MergedAnomalyResultDTO> expectedAnomalySet = new HashSet<>();

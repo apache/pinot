@@ -92,21 +92,21 @@ public class DimensionalAlertGrouper extends BaseAlertGrouper<DimensionMap> {
   }
 
   @Override
-  public Map<GroupKey<DimensionMap>, GroupedAnomalyResults> group(List<MergedAnomalyResultDTO> anomalyResults) {
+  public Map<AlertGroupKey<DimensionMap>, GroupedAnomalyResults> group(List<MergedAnomalyResultDTO> anomalyResults) {
     if (CollectionUtils.isEmpty(groupByDimensions)) {
       return DUMMY_ALERT_GROUPER.group(anomalyResults);
     } else {
-      Map<GroupKey<DimensionMap>, GroupedAnomalyResults> groupedAnomaliesMap = new HashMap<>();
+      Map<AlertGroupKey<DimensionMap>, GroupedAnomalyResults> groupedAnomaliesMap = new HashMap<>();
       for (MergedAnomalyResultDTO anomalyResult : anomalyResults) {
         DimensionMap anomalyDimensionMap = anomalyResult.getDimensions();
-        GroupKey<DimensionMap> groupKey = this.constructGroupKey(anomalyDimensionMap);
-        if (groupedAnomaliesMap.containsKey(groupKey)) {
-          GroupedAnomalyResults groupedAnomalyResults = groupedAnomaliesMap.get(groupKey);
+        AlertGroupKey<DimensionMap> alertGroupKey = this.constructGroupKey(anomalyDimensionMap);
+        if (groupedAnomaliesMap.containsKey(alertGroupKey)) {
+          GroupedAnomalyResults groupedAnomalyResults = groupedAnomaliesMap.get(alertGroupKey);
           groupedAnomalyResults.getAnomalyResults().add(anomalyResult);
         } else {
           GroupedAnomalyResults groupedAnomalyResults = new GroupedAnomalyResults();
           groupedAnomalyResults.getAnomalyResults().add(anomalyResult);
-          groupedAnomaliesMap.put(groupKey, groupedAnomalyResults);
+          groupedAnomaliesMap.put(alertGroupKey, groupedAnomalyResults);
         }
       }
 
@@ -114,10 +114,10 @@ public class DimensionalAlertGrouper extends BaseAlertGrouper<DimensionMap> {
       if (doRollUp) {
         GroupedAnomalyResults rolledUpGroupedAnomaly = new GroupedAnomalyResults();
         List<MergedAnomalyResultDTO> groupedAnomalyList = rolledUpGroupedAnomaly.getAnomalyResults();
-        Iterator<Map.Entry<GroupKey<DimensionMap>, GroupedAnomalyResults>> iterator =
+        Iterator<Map.Entry<AlertGroupKey<DimensionMap>, GroupedAnomalyResults>> iterator =
             groupedAnomaliesMap.entrySet().iterator();
         while (iterator.hasNext()) {
-          Map.Entry<GroupKey<DimensionMap>, GroupedAnomalyResults> entry = iterator.next();
+          Map.Entry<AlertGroupKey<DimensionMap>, GroupedAnomalyResults> entry = iterator.next();
           List<MergedAnomalyResultDTO> groupedAnomalyResults = entry.getValue().getAnomalyResults();
           if (CollectionUtils.isNotEmpty(groupedAnomalyResults) && groupedAnomalyResults.size() == 1) {
             groupedAnomalyList.add(groupedAnomalyResults.get(0));
@@ -125,8 +125,8 @@ public class DimensionalAlertGrouper extends BaseAlertGrouper<DimensionMap> {
           }
         }
         if (groupedAnomalyList.size() > 0) {
-          GroupKey<DimensionMap> groupKey = new GroupKey<>(new DimensionMap());
-          groupedAnomaliesMap.put(groupKey, rolledUpGroupedAnomaly);
+          AlertGroupKey<DimensionMap> alertGroupKey = AlertGroupKey.emptyKey();
+          groupedAnomaliesMap.put(alertGroupKey, rolledUpGroupedAnomaly);
         }
       }
 
@@ -135,8 +135,8 @@ public class DimensionalAlertGrouper extends BaseAlertGrouper<DimensionMap> {
   }
 
   @Override
-  public String groupEmailRecipients(GroupKey<DimensionMap> groupKey) {
-    DimensionMap dimensionMap = groupKey.getKey();
+  public String groupEmailRecipients(AlertGroupKey<DimensionMap> alertGroupKey) {
+    DimensionMap dimensionMap = alertGroupKey.getKey();
     if (auxiliaryEmailRecipients.containsKey(dimensionMap)) {
       return auxiliaryEmailRecipients.get(dimensionMap);
     } else {
@@ -145,14 +145,14 @@ public class DimensionalAlertGrouper extends BaseAlertGrouper<DimensionMap> {
   }
 
   @Override
-  public GroupKey<DimensionMap> constructGroupKey(DimensionMap rawKey) {
-    GroupKey<DimensionMap> groupKey = new GroupKey<>(new DimensionMap());
-    DimensionMap groupKeyDimensionMap = groupKey.getKey();
+  public AlertGroupKey<DimensionMap> constructGroupKey(DimensionMap rawKey) {
+    AlertGroupKey<DimensionMap> alertGroupKey = new AlertGroupKey<>(new DimensionMap());
+    DimensionMap groupKeyDimensionMap = alertGroupKey.getKey();
     for (String groupByDimensionName : groupByDimensions) {
       if (rawKey.containsKey(groupByDimensionName)) {
         groupKeyDimensionMap.put(groupByDimensionName, rawKey.get(groupByDimensionName));
       }
     }
-    return groupKey;
+    return alertGroupKey;
   }
 }
