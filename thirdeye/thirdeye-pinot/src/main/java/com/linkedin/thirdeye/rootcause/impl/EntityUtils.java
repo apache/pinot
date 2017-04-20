@@ -2,13 +2,9 @@ package com.linkedin.thirdeye.rootcause.impl;
 
 import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.ExecutionContext;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -37,6 +33,7 @@ public class EntityUtils {
    * @param type entity type
    * @return {@code true} if entity type matches, {@code false} otherwise.
    */
+
   public static boolean isType(Entity e, EntityType type) {
     return e.getUrn().startsWith(type.getPrefix());
   }
