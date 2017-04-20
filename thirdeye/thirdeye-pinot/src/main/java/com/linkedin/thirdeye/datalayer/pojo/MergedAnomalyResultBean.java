@@ -20,7 +20,7 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
   private double avgBaselineVal; // expected value
   private double score; // confidence level
   private double weight; // change percentage, whose absolute value is severity
-  private double trafficContribution; // the contribution of this anomaly to the global traffic
+  private double impactToTotal; // the impact of this anomaly to the total metric
   // Additional anomaly detection properties (e.g., patter=UP, etc.)
   private Map<String, String> properties = new HashMap<>();
 
@@ -160,17 +160,17 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
     this.rawAnomalyIdList = rawAnomalyIdList;
   }
 
-  public double getTrafficContribution() {
-    return trafficContribution;
+  public double getImpactToTotal() {
+    return impactToTotal;
   }
 
-  public void setTrafficContribution(double trafficContribution) {
-    this.trafficContribution = trafficContribution;
+  public void setImpactToTotal(double impactToTotal) {
+    this.impactToTotal = impactToTotal;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(getId(), startTime, endTime, collection, metric, dimensions, score, trafficContribution, avgBaselineVal, avgCurrentVal);
+    return Objects.hash(getId(), startTime, endTime, collection, metric, dimensions, score, impactToTotal, avgBaselineVal, avgCurrentVal);
   }
 
   @Override
@@ -183,7 +183,7 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
         .equals(endTime, m.getEndTime()) && Objects.equals(collection, m.getCollection()) && Objects
         .equals(metric, m.getMetric()) && Objects.equals(dimensions, m.getDimensions()) && Objects
         .equals(score, m.getScore()) && Objects.equals(avgBaselineVal, m.getAvgBaselineVal()) && Objects
-        .equals(avgCurrentVal, m.getAvgCurrentVal()) && Objects.equals(trafficContribution, m.getTrafficContribution());
+        .equals(avgCurrentVal, m.getAvgCurrentVal()) && Objects.equals(impactToTotal, m.getImpactToTotal());
   }
 
   @Override
