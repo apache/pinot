@@ -11,19 +11,33 @@ import org.apache.commons.lang.builder.ToStringStyle;
  *            DimensionMap.
  */
 public class GroupKey<T> {
-  private T key;
+   // The default empty group key that is used to represent the rolled up group, which collects the anomalies from
+   // groups that contains only one anomaly.
+  public static final GroupKey EMPTY_KEY = new GroupKey();
 
+  // The actual object to distinguish group key from each other.
+  private final T key;
+
+  /**
+   * Constructs an empty group key, i.e., the key is null.
+   */
   public GroupKey() {
+    this.key = null;
   }
 
+  /**
+   * Constructs a group key with the given key.
+   *
+   * @param key the actual object that is used to distinguish group key from each other.
+   */
   public GroupKey(T key) {
     this.key = key;
   }
 
-  public void setKey(T key) {
-    this.key = key;
-  }
-
+  /**
+   * Returns the actual object that is used to distinguish group key from each other.
+   * @return
+   */
   T getKey() {
     return key;
   }

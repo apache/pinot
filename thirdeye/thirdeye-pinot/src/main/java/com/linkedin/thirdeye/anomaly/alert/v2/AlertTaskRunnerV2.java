@@ -152,11 +152,13 @@ public class AlertTaskRunnerV2 implements TaskRunner {
           if (StringUtils.isNotBlank(auxiliaryRecipients)) {
             recipientsForThisGroup = recipientsForThisGroup + EmailHelper.EMAIL_ADDRESS_SEPARATOR + auxiliaryRecipients;
           }
-          // Append group name after config name
+          // Append group name after config name if the group name is not an empty string or group
           String emailName = alertConfig.getName();
-          String groupName = entry.getKey().toString();
-          if (StringUtils.isNotBlank(groupName)) {
-            emailName = emailName + " " + groupName;
+          if (!GroupKey.EMPTY_KEY.equals(entry.getKey())) {
+            String groupName = entry.getKey().toString();
+            if (StringUtils.isNotBlank(groupName)) {
+              emailName = emailName + " " + groupName;
+            }
           }
           // Generate and send out an anomaly report for this group
           AnomalyReportGenerator.getInstance()
