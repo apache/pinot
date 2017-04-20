@@ -1,9 +1,0 @@
-<h1> Screenshot </h1>
-<ul>
-{{#with model.anomalyDetailsList as |anomalies|}}
-  {{#each anomalies as |anomaly index|}}
-    <li>{{index}}. {{anomaly.anomalyFunctionName}}</li>
-  {{/each}}
-{{/with}}
-</ul>
-{{outlet}}

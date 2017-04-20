@@ -1,7 +1,7 @@
 {
   "name": "thirdeye-frontend",
   "version": "0.0.0",
-  "description": "Small description for thirdeye-frontend goes here",
+  "description": "Thirdeye Frontend WebApp",
   "license": "MIT",
   "author": "",
   "directories": {
@@ -11,7 +11,7 @@
   "repository": "",
   "scripts": {
     "build": "ember build",
-    "start": "ember server",
+    "start": "ember server --proxy http://localhost:1426",
     "test": "ember test"
   },
   "devDependencies": {
@@ -39,7 +39,6 @@
     "ember-resolver": "^2.0.3",
     "ember-source": "~2.12.0",
     "ember-symbol-observable": "^0.1.2",
-    "ember-welcome-page": "^2.0.2",
     "loader.js": "^4.2.3",
     "redux": "^3.6.0",
     "redux-thunk": "^2.2.0"

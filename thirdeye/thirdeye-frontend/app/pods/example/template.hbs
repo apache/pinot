@@ -1,0 +1,20 @@
+<h1>Example</h1>
+<p>This is a placeholder example page for the new ember app utilizing ember-redux</p>
+
+{{#containers/anomaly-container as |anomalyList actions|}}
+  {{#if anomalyList.loading}}
+    Loading...
+  {{/if}}
+
+  {{#if anomalyList.failed}}
+    Oops, something went wrong...
+  {{/if}}
+
+  {{#if anomalyList.loaded}}
+    {{#each anomalyList.anomalies as |anomaly|}}
+      {{anomaly-graph anomaly=anomaly}}
+    {{else}}
+      No anomalies found.
+    {{/each}}
+  {{/if}}
+{{/containers/anomaly-container}}
