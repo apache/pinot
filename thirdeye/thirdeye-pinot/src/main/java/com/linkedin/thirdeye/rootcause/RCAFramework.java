@@ -54,14 +54,17 @@ public class RCAFramework {
 
     // independent execution
     for(Map.Entry<String, Pipeline> e : this.pipelines.entrySet()) {
-      LOG.info("Running pipeline '{}'", e.getKey());
-      ExecutionContext context = new ExecutionContext(searchContext);
-      PipelineResult result = e.getValue().run(context);
-      results.put(e.getKey(), result);
+      try {
+        LOG.info("Running pipeline '{}'", e.getKey());
+        ExecutionContext context = new ExecutionContext(searchContext);
+        PipelineResult result = e.getValue().run(context);
+        results.put(e.getKey(), result);
 
-      LOG.info("Got {} results", result.getEntities().size());
-      if(LOG.isDebugEnabled())
-        logResultDetails(result);
+        LOG.info("Got {} results", result.getEntities().size());
+        if (LOG.isDebugEnabled()) logResultDetails(result);
+      } catch (Exception ex) {
+        LOG.error("Error while executing pipeline '{}'. Skipping. Error was:", e.getKey(), ex);
+      }
     }
 
     LOG.info("Aggregating results from {} pipelines", results.size());
