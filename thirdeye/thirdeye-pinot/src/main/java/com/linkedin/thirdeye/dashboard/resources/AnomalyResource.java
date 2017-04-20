@@ -552,15 +552,12 @@ public class AnomalyResource {
   // Activate anomaly function
   @POST
   @Path("/anomaly-function/activate")
-  public Response activateAnomalyFunction(@NotNull @QueryParam("functionId") Long id, @QueryParam("modifiedFunctionName") String functionName){
+  public Response activateAnomalyFunction(@NotNull @QueryParam("functionId") Long id){
     if (id == null) {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
     anomalyFunctionSpec.setActive(true);
-    if (functionName != null){
-      anomalyFunctionSpec.setFunctionName(functionName);
-    }
     anomalyFunctionDAO.update(anomalyFunctionSpec);
     return Response.ok(id).build();
   }
