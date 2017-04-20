@@ -50,7 +50,8 @@ export default function reducer(state = INITIAL_STATE, action = {}) {
     }
     case ActionTypes.LOADING:
       return Object.assign(state, {
-        loading: true
+        loading: true,
+        loaded: false
       });
 
     case ActionTypes.REQUEST_FAIL:

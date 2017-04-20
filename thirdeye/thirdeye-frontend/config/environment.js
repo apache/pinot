@@ -7,6 +7,9 @@ module.exports = function(environment) {
     podModulePrefix: 'thirdeye-frontend/pods',
     rootURL: '/app',
     locationType: 'hash',
+    'ember-cli-mirage': {
+      directory: 'app/mirage'
+    },
     EmberENV: {
       FEATURES: {
         // Here you can enable experimental features on an ember canary build

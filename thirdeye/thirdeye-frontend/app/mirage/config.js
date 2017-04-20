@@ -24,4 +24,14 @@ export default function() {
     http://www.ember-cli-mirage.com/docs/v0.3.x/shorthands/
   */
 
+  this.get('/anomalies/search/anomalyIds/1492498800000/1492585200000/:id', () => {
+    return {
+      anomalyDetailsList: [{
+        anomalyId: 1,
+        anomalyFunctionName: 'example_anomaly_name',
+        currentStart: '1/1/2017',
+        currentEnd: '12/1/2017'
+      }]
+    };
+  });
 }
