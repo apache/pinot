@@ -58,10 +58,7 @@ public class RCAFrameworkRunner {
   private static final String CLI_CONFIG_DIR = "config-dir";
   private static final String CLI_WINDOW_SIZE = "window-size";
   private static final String CLI_BASELINE_OFFSET = "baseline-offset";
-  private static final String CLI_METRIC_ENTITIES = "metric-entities";
-  private static final String CLI_DIMENSION_ENTITIES = "dimension-entities";
-  private static final String CLI_TIMERANGE_ENTITIES = "timerange-entities";
-  private static final String CLI_REPL = "repl";
+  private static final String CLI_ENTITIES = "entities";
   private static final String CLI_DIMENSION_CUTOFF = "dimension-cutoff";
 
   private static final long DAY_IN_MS = 24 * 3600 * 1000;
@@ -75,10 +72,7 @@ public class RCAFrameworkRunner {
 
     options.addOption(null, CLI_WINDOW_SIZE, true, "window size for search window (in days)");
     options.addOption(null, CLI_BASELINE_OFFSET, true, "baseline offset (in days)");
-    options.addOption(null, CLI_METRIC_ENTITIES, true, "search context metric entities (not specifying this will activate interactive REPL mode)");
-    options.addOption(null, CLI_DIMENSION_ENTITIES, true, "search context dimension entities");
-    options.addOption(null, CLI_TIMERANGE_ENTITIES, true, "search context timerange entities ");
-    options.addOption(null, CLI_REPL, true, "interactive repl mode ");
+    options.addOption(null, CLI_ENTITIES, true, "search context metric entities (not specifying this will activate interactive REPL mode)");
     options.addOption(null, CLI_DIMENSION_CUTOFF, true,
         String.format("cutoff number for top dimensions from contribution analysis (default = %d)", DimensionPipeline.DEFAULT_CUTOFF));
 
@@ -140,50 +134,28 @@ public class RCAFrameworkRunner {
 
     RCAFramework framework = new RCAFramework(pipelines, aggregator);
 
+    Set<Entity> entities = new HashSet<>();
 
     // time range and baseline
-    long windowSize = Long.parseLong(cmd.getOptionValue(CLI_WINDOW_SIZE, "1")) * DAY_IN_MS;
-    long baselineOffset = Long.parseLong(cmd.getOptionValue(CLI_BASELINE_OFFSET, "7")) * DAY_IN_MS;
+    if(cmd.hasOption(CLI_WINDOW_SIZE)) {
+      long windowSize = Long.parseLong(cmd.getOptionValue(CLI_WINDOW_SIZE, "1")) * DAY_IN_MS;
+      long baselineOffset = Long.parseLong(cmd.getOptionValue(CLI_BASELINE_OFFSET, "7")) * DAY_IN_MS;
 
-    long now = System.currentTimeMillis();
-    long windowEnd = now;
-    long windowStart = now - windowSize;
-    long baselineEnd = windowEnd - baselineOffset;
-    long baselineStart = windowStart - baselineOffset;
+      long now = System.currentTimeMillis();
+      long windowEnd = now;
+      long windowStart = now - windowSize;
+      long baselineEnd = windowEnd - baselineOffset;
+      long baselineStart = windowStart - baselineOffset;
 
-    TimeRangeEntity current = TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_CURRENT, windowStart, windowEnd);
-    TimeRangeEntity baseline = TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_BASELINE, baselineStart, baselineEnd);
-
-    Set<Entity> entities = new HashSet<>();
-    if (cmd.hasOption(CLI_TIMERANGE_ENTITIES)) {
-      String[] urns = cmd.getOptionValue(CLI_METRIC_ENTITIES).split(",");
-      for (String urn : urns) {
-        entities.add(TimeRangeEntity.fromURN(urn, 1.0));
-      }
-    } else {
-      entities.add(current);
-      entities.add(baseline);
+      entities.add(TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_CURRENT, windowStart, windowEnd));
+      entities.add(TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_BASELINE, baselineStart, baselineEnd));
     }
 
-    if(cmd.hasOption(CLI_METRIC_ENTITIES)) {
-      String[] urns = cmd.getOptionValue(CLI_METRIC_ENTITIES).split(",");
-      for (String urn : urns) {
-        entities.add(MetricEntity.fromURN(urn, 1.0));
-      }
-    }
-
-
-    if(cmd.hasOption(CLI_DIMENSION_ENTITIES)) {
-      String[] urns = cmd.getOptionValue(CLI_DIMENSION_ENTITIES).split(",");
-      for (String urn : urns) {
-        entities.add(DimensionEntity.fromURN(urn, 1.0));
-      }
-    }
-
-    if (!cmd.hasOption(CLI_REPL)) {
+    if (cmd.hasOption(CLI_ENTITIES)) {
+      entities.addAll(parseURNSequence(cmd.getOptionValue(CLI_ENTITIES), 1.0));
       runFramework(framework, entities);
     } else {
-      readExecutePrintLoop(framework, current, baseline);
+      readExecutePrintLoop(framework, entities);
     }
 
     System.out.println("done.");
@@ -192,22 +164,17 @@ public class RCAFrameworkRunner {
     System.exit(0);
   }
 
-  private static void readExecutePrintLoop(RCAFramework framework, TimeRangeEntity current, TimeRangeEntity baseline)
+  private static void readExecutePrintLoop(RCAFramework framework, Collection<Entity> baseEntities)
       throws IOException {
     // search loop
     System.out.println("Enter search context metric entities' URNs (separated by comma \",\"):");
     BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
 
-    String line = null;
+    String line;
     while((line = br.readLine()) != null) {
-      String[] urns = line.split(",");
-
       Set<Entity> entities = new HashSet<>();
-      for(String urn : urns) {
-        entities.add(MetricEntity.fromURN(urn, 1.0));
-      }
-      entities.add(current);
-      entities.add(baseline);
+      entities.addAll(baseEntities);
+      entities.addAll(parseURNSequence(line, 1.0));
 
       runFramework(framework, entities);
 
@@ -248,6 +215,27 @@ public class RCAFrameworkRunner {
     }
   }
 
+  private static Collection<Entity> parseURNSequence(String urns, double score) {
+    Set<Entity> entities = new HashSet<>();
+    String[] parts = urns.split(",");
+    for(String part : parts) {
+      entities.add(parseURN(part, score));
+    }
+    return entities;
+  }
+
+  private static Entity parseURN(String urn, double score) {
+    String prefix = EntityType.extractPrefix(urn);
+    if(DimensionEntity.TYPE.getPrefix().equals(prefix)) {
+      return DimensionEntity.fromURN(urn, score);
+    } else if(MetricEntity.TYPE.getPrefix().equals(prefix)) {
+      return MetricEntity.fromURN(urn, score);
+    } else if(TimeRangeEntity.TYPE.getPrefix().equals(prefix)){
+      return TimeRangeEntity.fromURN(urn, score);
+    }
+    throw new IllegalArgumentException(String.format("Could not parse URN '%s'", urn));
+  }
+
   /**
    * Returns the top K (first K) results per entity type from a collection of entities.
    *
@@ -255,7 +243,7 @@ public class RCAFrameworkRunner {
    * @param k maximum number of entities per entity type
    * @return mapping of entity types to list of entities
    */
-  static Map<String, Collection<Entity>> topKPerType(Collection<Entity> entities, int k) {
+  private static Map<String, Collection<Entity>> topKPerType(Collection<Entity> entities, int k) {
     Map<String, Collection<Entity>> map = new HashMap<>();
     for(Entity e : entities) {
       String prefix = EntityType.extractPrefix(e);

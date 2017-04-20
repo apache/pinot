@@ -9,7 +9,7 @@ import com.linkedin.thirdeye.rootcause.Entity;
  * database. The URN namespace is defined as 'thirdeye:event:{type}:{name}:{start}'.
  */
 public class EventEntity extends Entity {
-  private static final EntityType TYPE = new EntityType("thirdeye:event:");
+  public static final EntityType TYPE = new EntityType("thirdeye:event:");
 
   public static EventEntity fromDTO(double score, EventDTO dto) {
     String urn = TYPE.formatURN(dto.getEventType(), dto.getName(), dto.getStartTime());

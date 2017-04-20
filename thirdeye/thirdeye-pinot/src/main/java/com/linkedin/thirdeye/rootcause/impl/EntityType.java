@@ -21,8 +21,12 @@ public final class EntityType {
     return this.prefix + StringUtils.join(values, ":");
   }
 
+  public static String extractPrefix(String urn) {
+    String[] parts = urn.split(":");
+    return parts[0] + ":" + parts[1] + ":";
+  }
+
   public static String extractPrefix(Entity e) {
-    String[] parts = e.getUrn().split(":");
-    return parts[0] + ":" + parts[1];
+    return extractPrefix(e.getUrn());
   }
 }
