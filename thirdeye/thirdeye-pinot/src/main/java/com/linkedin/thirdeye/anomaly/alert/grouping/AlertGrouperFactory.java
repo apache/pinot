@@ -29,7 +29,7 @@ public class AlertGrouperFactory {
     }
 
     GrouperType filterType = GrouperType.DUMMY;
-    for (GrouperType enumFilterType : GrouperType.class.getEnumConstants()) {
+    for (GrouperType enumFilterType : GrouperType.values()) {
       if (enumFilterType.name().compareToIgnoreCase(type) == 0) {
         filterType = enumFilterType;
         break;
