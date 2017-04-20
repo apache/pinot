@@ -1788,6 +1788,30 @@ public class DataFrameTest {
     assertEquals(base.implies(BooleanSeries.NULL), BooleanSeries.nulls(5));
   }
 
+  @Test
+  public void testAppend() {
+    DataFrame base = new DataFrame();
+    base.addSeries("A", 1, 2, 3, 4);
+    base.addSeries("B", "a", "b", "c", "d");
+    base.setIndex("B");
+
+    DataFrame other = new DataFrame();
+    other.addSeries("A", 5.0d, 6.3d, 7.1d);
+    other.addSeries("C", true, true, false);
+
+    DataFrame another = new DataFrame();
+    another.addSeries("C", false, false);
+
+    DataFrame res = base.append(other, another);
+
+    Assert.assertEquals(res.getSeriesNames(), new HashSet<>(Arrays.asList("A", "B")));
+    Assert.assertEquals(res.get("A").type(), Series.SeriesType.LONG);
+    Assert.assertEquals(res.get("B").type(), Series.SeriesType.STRING);
+
+    assertEquals(res.getLongs("A"), 1, 2, 3, 4, 5, 6, 7, LongSeries.NULL, LongSeries.NULL);
+    assertEquals(res.getStrings("B"), "a", "b", "c", "d", null, null, null, null, null);
+  }
+
   /* **************************************************************************
    * Helpers
    ***************************************************************************/

@@ -126,6 +126,11 @@ public final class StringSeries extends TypedSeries<StringSeries> {
   }
 
   @Override
+  public Builder getBuilder() {
+    return new Builder();
+  }
+
+  @Override
   public StringSeries getStrings() {
     return this;
   }

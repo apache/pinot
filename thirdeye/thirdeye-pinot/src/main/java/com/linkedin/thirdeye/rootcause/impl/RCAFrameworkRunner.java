@@ -62,6 +62,7 @@ public class RCAFrameworkRunner {
   private static final String CLI_DIMENSION_ENTITIES = "dimension-entities";
   private static final String CLI_TIMERANGE_ENTITIES = "timerange-entities";
   private static final String CLI_REPL = "repl";
+  private static final String CLI_DIMENSION_CUTOFF = "dimension-cutoff";
 
   private static final long DAY_IN_MS = 24 * 3600 * 1000;
 
@@ -78,6 +79,8 @@ public class RCAFrameworkRunner {
     options.addOption(null, CLI_DIMENSION_ENTITIES, true, "search context dimension entities");
     options.addOption(null, CLI_TIMERANGE_ENTITIES, true, "search context timerange entities ");
     options.addOption(null, CLI_REPL, true, "interactive repl mode ");
+    options.addOption(null, CLI_DIMENSION_CUTOFF, true,
+        String.format("cutoff number for top dimensions from contribution analysis (default = %d)", DimensionPipeline.DEFAULT_CUTOFF));
 
     Parser parser = new BasicParser();
     CommandLine cmd = null;
@@ -89,9 +92,9 @@ public class RCAFrameworkRunner {
       System.exit(1);
     }
 
-    // logger config
-    Logger root = (Logger)LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
-    root.setLevel(Level.WARN);
+    // runtime logger config
+    ((Logger)LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME)).setLevel(Level.WARN);
+    ((Logger)LoggerFactory.getLogger("com.linkedin.thirdeye.rootcause")).setLevel(Level.INFO);
 
     // config
     File config = new File(cmd.getOptionValue(CLI_CONFIG_DIR));
@@ -115,13 +118,14 @@ public class RCAFrameworkRunner {
 
     // EventMetric pipeline
     QueryCache cache = ThirdEyeCacheRegistry.getInstance().getQueryCache();
-    MetricDimensionScorer scorer = new MetricDimensionScorer(cache);
+    DimensionScorer scorer = new DimensionScorer(cache);
     pipelines.add(new EventMetricPipeline(eventProvider));
 
-    // MetricDimension pipeline
+    // Dimension pipeline
+    int cutoff = Integer.parseInt(cmd.getOptionValue(CLI_DIMENSION_CUTOFF, String.valueOf(DimensionPipeline.DEFAULT_CUTOFF)));
     MetricConfigManager metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
     DatasetConfigManager datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
-    pipelines.add(new MetricDimensionPipeline(metricDAO, datasetDAO, scorer));
+    pipelines.add(new DimensionPipeline(metricDAO, datasetDAO, scorer, cutoff));
 
     // MetricDataset pipeline
     pipelines.add(new MetricDatasetPipeline(metricDAO, datasetDAO));

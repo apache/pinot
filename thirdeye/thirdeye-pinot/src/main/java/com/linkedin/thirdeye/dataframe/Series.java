@@ -215,7 +215,7 @@ public abstract class Series {
      * @return grouped aggregation series
      */
     public DataFrame aggregate(Function function) {
-      Builder builder = builderForFunction(function);
+      Builder builder = this.source.getBuilder();
       for(Bucket b : this.buckets) {
         builder.addSeries(this.source.project(b.fromIndex).aggregate(function));
       }
@@ -389,6 +389,8 @@ public abstract class Series {
    */
   public abstract Series fillNull();
 
+  public abstract Builder getBuilder();
+
   /* *************************************************************************
    * Internal abstract interface
    * *************************************************************************/
@@ -531,7 +533,7 @@ public abstract class Series {
    * @return concatenated series
    */
   public Series append(Series... other) {
-    return builderForType(this.type()).addSeries(this).addSeries(other).build();
+    return this.getBuilder().addSeries(this).addSeries(other).build();
   }
 
   /**
@@ -1144,44 +1146,6 @@ public abstract class Series {
     return pairs;
   }
 
-  static Builder builderForFunction(Function function) {
-    if(function instanceof DoubleFunction) {
-      return DoubleSeries.builder();
-    } else if(function instanceof LongFunction) {
-      return LongSeries.builder();
-    } else if(function instanceof StringFunction) {
-      return StringSeries.builder();
-    } else if(function instanceof BooleanFunction) {
-      return BooleanSeries.builder();
-    } else if(function instanceof BooleanFunctionEx) {
-      return BooleanSeries.builder();
-    } else if(function instanceof DoubleConditional) {
-      return BooleanSeries.builder();
-    } else if(function instanceof LongConditional) {
-      return BooleanSeries.builder();
-    } else if(function instanceof StringConditional) {
-      return BooleanSeries.builder();
-    } else if(function instanceof BooleanConditional) {
-      return BooleanSeries.builder();
-    }
-    throw new IllegalArgumentException(String.format("Unknown function type '%s'", function.getClass()));
-  }
-
-  static Builder builderForType(SeriesType type) {
-    switch(type) {
-      case DOUBLE:
-        return DoubleSeries.builder();
-      case LONG:
-        return LongSeries.builder();
-      case STRING:
-        return StringSeries.builder();
-      case BOOLEAN:
-        return BooleanSeries.builder();
-      default:
-        throw new IllegalArgumentException(String.format("Unknown series type '%s'", type));
-    }
-  }
-
   /* **************************************************************************
    * Code grave
    ***************************************************************************/
@@ -1207,5 +1171,4 @@ public abstract class Series {
 //
 //    return ArrayUtils.toPrimitive(fromIndex);
 //  }
-
 }

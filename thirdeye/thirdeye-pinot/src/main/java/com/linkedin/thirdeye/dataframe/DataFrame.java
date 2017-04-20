@@ -99,7 +99,8 @@ public class DataFrame {
     public DataFrame aggregate(String seriesName, Series.Function function) {
       return this.get(seriesName).aggregate(function)
           .renameSeries(Series.GROUP_KEY, this.keyName)
-          .renameSeries(Series.GROUP_VALUE, seriesName);
+          .renameSeries(Series.GROUP_VALUE, seriesName)
+          .setIndex(this.keyName);
     }
   }
 
@@ -321,6 +322,7 @@ public class DataFrame {
    */
   public DataFrame slice(int from, int to) {
     DataFrame df = new DataFrame(this);
+    df.series.clear();
     for(Map.Entry<String, Series> e : this.series.entrySet()) {
       df.addSeries(e.getKey(), e.getValue().slice(from, to));
     }
@@ -1178,6 +1180,37 @@ public class DataFrame {
     }
 
     return leftData;
+  }
+
+  /**
+   * Returns a copy of the DataFrame with data from {@code others} appended at the end. Matches
+   * series by names and uses the native type of the original (this) DataFrame. If {@code others}
+   * do not contain series with matching names, a sequence of {@code nulls} is appended. Any series
+   * in {@code other} that are not matched by name are discarded.
+   *
+   * @param others DataFrames to append in sequence
+   * @return copy of the DataFrame with appended data
+   */
+  public DataFrame append(DataFrame... others) {
+    DataFrame df = new DataFrame(this);
+    df.series.clear();
+
+    for(String name : this.getSeriesNames()) {
+      Series.Builder builder = this.get(name).getBuilder();
+      builder.addSeries(this.get(name));
+
+      for(DataFrame other : others) {
+        if (other.contains(name)) {
+          builder.addSeries(other.get(name));
+        } else {
+          builder.addSeries(BooleanSeries.nulls(other.size()));
+        }
+      }
+
+      df.addSeries(name, builder.build());
+    }
+
+    return df;
   }
 
   @Override
