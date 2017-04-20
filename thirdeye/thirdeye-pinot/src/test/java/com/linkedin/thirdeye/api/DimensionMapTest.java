@@ -48,6 +48,15 @@ public class DimensionMapTest {
     d2.put("K2", "V2");
     Assert.assertEquals(d1.compareTo(d2) > 0, "K2V1".compareTo("K1V1K2V2") > 0);
     Assert.assertEquals(d2.compareTo(d1) < 0, "K1V1K2V2".compareTo("K2V1") < 0);
+
+    // Case 4: a={"K1"="V1"}, b={"K1"="V1","K2"="V2"} --> a="K1V1", b="K1V1K2V2" --> a < b
+    d1 = new DimensionMap();
+    d2 = new DimensionMap();
+    d1.put("K1", "V1");
+    d2.put("K1", "V1");
+    d2.put("K2", "V2");
+    Assert.assertEquals(d1.compareTo(d2) < 0, "K1V1".compareTo("K1V1K2V2") < 0);
+    Assert.assertEquals(d2.compareTo(d1) > 0, "K1V1K2V2".compareTo("K1V1") > 0);
   }
 
   @Test

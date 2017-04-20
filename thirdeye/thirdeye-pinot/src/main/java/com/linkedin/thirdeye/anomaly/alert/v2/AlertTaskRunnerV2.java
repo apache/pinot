@@ -3,6 +3,10 @@ package com.linkedin.thirdeye.anomaly.alert.v2;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.alert.AlertTaskInfo;
 import com.linkedin.thirdeye.anomaly.alert.AlertTaskRunner;
+import com.linkedin.thirdeye.anomaly.alert.grouping.AlertGroupKey;
+import com.linkedin.thirdeye.anomaly.alert.grouping.AlertGrouper;
+import com.linkedin.thirdeye.anomaly.alert.grouping.AlertGrouperFactory;
+import com.linkedin.thirdeye.anomaly.alert.grouping.GroupedAnomalyResults;
 import com.linkedin.thirdeye.anomaly.alert.template.pojo.MetricDimensionReport;
 import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import com.linkedin.thirdeye.anomaly.alert.util.AnomalyReportGenerator;
@@ -36,6 +40,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.commons.mail.EmailException;
 import org.apache.commons.mail.HtmlEmail;
@@ -124,9 +129,41 @@ public class AlertTaskRunnerV2 implements TaskRunner {
       if (results.isEmpty()) {
         LOG.info("Zero anomalies found, skipping sending email");
       } else {
-        AnomalyReportGenerator.getInstance().buildReport(results, thirdeyeConfig, alertConfig);
+        // TODO: Add dimensional alert grouping before the stage of task runner?
+        // There are two approaches to solve the problem of alert grouping:
+        // 1. Anomaly results from detection --> Grouped anomalies from grouper --> Alerter sends emails on grouped anomalies
+        // 2. Anomaly results from detection --> Alerter performs simple grouping and sends alerts in one go
 
-        updateNotifiedStatus(results);
+        // Current implementation uses the second approach for experimental purpose. We might need to move to
+        //     approach 1 in order to consider multi-metric grouping.
+        // Input: a list of anomalies.
+        // Output: lists of anomalies; each list contains the anomalies of the same group.
+        AlertGrouper alertGrouper = AlertGrouperFactory.fromSpec(alertConfig.getGroupByConfig());
+        Map<AlertGroupKey, GroupedAnomalyResults> groupedAnomalyResultsMap = alertGrouper.group(results);
+
+        for (Map.Entry<AlertGroupKey, GroupedAnomalyResults> entry : groupedAnomalyResultsMap.entrySet()) {
+          // Anomaly results for this group
+          List<MergedAnomalyResultDTO> resultsForThisGroup = entry.getValue().getAnomalyResults();
+          // Append auxiliary recipients for this group
+          String recipientsForThisGroup = alertConfig.getRecipients();
+          String auxiliaryRecipients = alertGrouper.groupEmailRecipients(entry.getKey());
+          if (StringUtils.isNotBlank(auxiliaryRecipients)) {
+            recipientsForThisGroup = recipientsForThisGroup + EmailHelper.EMAIL_ADDRESS_SEPARATOR + auxiliaryRecipients;
+          }
+          // Append group name after config name if the group name is not an empty string or group
+          String emailName = alertConfig.getName();
+          if (!AlertGroupKey.emptyKey().equals(entry.getKey())) {
+            String groupName = entry.getKey().toString();
+            if (StringUtils.isNotBlank(groupName)) {
+              emailName = emailName + " " + groupName;
+            }
+          }
+          // Generate and send out an anomaly report for this group
+          AnomalyReportGenerator.getInstance()
+              .buildReport(resultsForThisGroup, thirdeyeConfig, recipientsForThisGroup, alertConfig.getFromAddress(),
+                  emailName);
+          updateNotifiedStatus(resultsForThisGroup);
+        }
 
         // update anomaly watermark in alertConfig
         long lastNotifiedAlertId = emailConfig.getAnomalyWatermark();

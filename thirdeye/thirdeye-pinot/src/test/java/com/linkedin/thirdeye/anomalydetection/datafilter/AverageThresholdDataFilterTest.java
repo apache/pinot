@@ -40,6 +40,7 @@ public class AverageThresholdDataFilterTest {
       Assert.assertEquals(overrideThresholdMap.get(dimensionMap), overrideThreshold.get(dimensionMap));
     } catch (JsonProcessingException e) {
       e.printStackTrace();
+      Assert.fail();
     }
   }
 
