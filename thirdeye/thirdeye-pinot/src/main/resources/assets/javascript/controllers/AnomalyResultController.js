@@ -5,6 +5,7 @@ function AnomalyResultController(parentController) {
 
   this.anomalyResultView.applyButtonEvent.attach(this.applyButtonEventHandler.bind(this));
   this.anomalyResultView.investigateButtonClickEvent.attach(this.investigateButtonClickEventHandler.bind(this));
+  this.anomalyResultView.pageClickEvent.attach(this.pageClickEventHandler.bind(this));
 
   this.anomalyResultView.init();
 }
@@ -37,4 +38,15 @@ AnomalyResultController.prototype = {
     HASH_SERVICE.routeTo('app');
     // Send this event and the args to parent controller, to route to AnalysisController
   },
+
+  /**
+   * Handles the pagination click by updating the hash params
+   * @param  {string} sender Name of the view sending the event
+   * @param  {number} pageNumber The page number the user clicked
+   */
+  pageClickEventHandler(sender, pageNumber) {
+    HASH_SERVICE.update({pageNumber});
+    HASH_SERVICE.refreshWindowHashForRouting('anomalies');
+    HASH_SERVICE.routeTo('anomalies');
+  }
 };
