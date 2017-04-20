@@ -26,6 +26,8 @@ import com.linkedin.thirdeye.detector.metric.transfer.MetricTransfer;
 import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -613,7 +615,13 @@ public class AnomaliesResource {
     if (MapUtils.isNotEmpty(mergedAnomaly.getDimensions())) {
       for (Map.Entry<String, String> entry : mergedAnomaly.getDimensions().entrySet()) {
         // TODO: Change to case sensitive?
-        context.put(entry.getKey().toLowerCase(), entry.getValue().toLowerCase());
+        try {
+          String URLEncodedDimensionName = URLEncoder.encode(entry.getKey().toLowerCase(), "UTF-8");
+          String URLEncodedDimensionValue = URLEncoder.encode(entry.getValue().toLowerCase(), "UTF-8");
+          context.put(URLEncodedDimensionName, URLEncodedDimensionValue);
+        } catch (UnsupportedEncodingException e) {
+          LOG.warn("Unable to encode this dimension pair {}:{} for external links.", entry.getKey(), entry.getValue());
+        }
       }
     }
 
