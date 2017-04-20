@@ -47,18 +47,18 @@ public class MCombineOperator extends BaseOperator {
   private final List<Operator> _operators;
   private final BrokerRequest _brokerRequest;
   private final ExecutorService _executorService;
-  private long _timeOutMs;
+  private final long _timeOutMs;
   //Make this configurable
   //These two control the parallelism on a per query basis, depending on the number of segments to process
-  private static int MIN_THREADS_PER_QUERY = 10;
-  private static int MAX_THREADS_PER_QUERY = 10;
-  private static int MIN_SEGMENTS_PER_THREAD = 10;
+  private static final int MIN_THREADS_PER_QUERY;
+  private static final int MAX_THREADS_PER_QUERY;
+  private static final int MIN_SEGMENTS_PER_THREAD = 10;
 
   static {
     int numCores = Runtime.getRuntime().availableProcessors();
     MIN_THREADS_PER_QUERY = Math.max(1, (int) (numCores * .5));
     //Dont have more than 10 threads per query
-    MAX_THREADS_PER_QUERY = Math.min(MAX_THREADS_PER_QUERY, (int) (numCores * .5));
+    MAX_THREADS_PER_QUERY = Math.min(10, (int) (numCores * .5));
   }
 
   public MCombineOperator(List<Operator> operators, ExecutorService executorService, long timeOutMs,
@@ -81,18 +81,20 @@ public class MCombineOperator extends BaseOperator {
   public Block getNextBlock() {
     final long startTime = System.currentTimeMillis();
     final long queryEndTime = System.currentTimeMillis() + _timeOutMs;
-    int numGroups = Math.max(MIN_THREADS_PER_QUERY,
-        Math.min(MAX_THREADS_PER_QUERY, (_operators.size() + MIN_SEGMENTS_PER_THREAD - 1) / MIN_SEGMENTS_PER_THREAD));
-    //ensure that the number of groups is not more than the number of segments
-    numGroups = Math.min(_operators.size(), numGroups);
-    final List<List<Operator>> operatorGroups = new ArrayList<List<Operator>>(numGroups);
+    final int numOperators = _operators.size();
+    // Ensure that the number of groups is not more than the number of segments
+    final int numGroups = Math.min(numOperators, Math.max(MIN_THREADS_PER_QUERY,
+        Math.min(MAX_THREADS_PER_QUERY, (numOperators + MIN_SEGMENTS_PER_THREAD - 1) / MIN_SEGMENTS_PER_THREAD)));
+
+    final List<List<Operator>> operatorGroups = new ArrayList<>(numGroups);
     for (int i = 0; i < numGroups; i++) {
       operatorGroups.add(new ArrayList<Operator>());
     }
-    for (int i = 0; i < _operators.size(); i++) {
+    for (int i = 0; i < numOperators; i++) {
       operatorGroups.get(i % numGroups).add(_operators.get(i));
     }
-    final BlockingQueue<Block> blockingQueue = new ArrayBlockingQueue<>(operatorGroups.size());
+
+    final BlockingQueue<Block> blockingQueue = new ArrayBlockingQueue<>(numGroups);
     // Submit operators.
     for (final List<Operator> operatorGroup : operatorGroups) {
       _executorService.submit(new TraceRunnable() {
@@ -118,6 +120,7 @@ public class MCombineOperator extends BaseOperator {
             LOGGER.error("Caught exception while executing query.", e);
             mergedBlock = new IntermediateResultsBlock(e);
           }
+          assert mergedBlock != null;
           blockingQueue.offer(mergedBlock);
         }
       });
@@ -132,7 +135,7 @@ public class MCombineOperator extends BaseOperator {
               throws Exception {
             int mergedBlocksNumber = 0;
             IntermediateResultsBlock mergedBlock = null;
-            while ((queryEndTime > System.currentTimeMillis()) && (mergedBlocksNumber < operatorGroups.size())) {
+            while (mergedBlocksNumber < numGroups) {
               if (mergedBlock == null) {
                 mergedBlock = (IntermediateResultsBlock) blockingQueue.poll(queryEndTime - System.currentTimeMillis(),
                     TimeUnit.MILLISECONDS);
@@ -176,6 +179,7 @@ public class MCombineOperator extends BaseOperator {
       mergedBlock = new IntermediateResultsBlock(QueryException.getException(QueryException.MERGE_RESPONSE_ERROR, e));
     } catch (TimeoutException e) {
       LOGGER.error("Caught TimeoutException", e);
+      mergedBlockFuture.cancel(true);
       mergedBlock =
           new IntermediateResultsBlock(QueryException.getException(QueryException.EXECUTION_TIMEOUT_ERROR, e));
     }
