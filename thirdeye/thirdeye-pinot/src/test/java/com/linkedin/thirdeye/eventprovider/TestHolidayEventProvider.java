@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.rootcause.impl;
+package com.linkedin.thirdeye.eventprovider;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -9,9 +9,12 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import com.google.common.collect.Lists;
+import com.linkedin.thirdeye.anomaly.events.DefaultHolidayEventProvider;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 
-public class TestEventEntity {
+public class TestHolidayEventProvider {
+
+  private DefaultHolidayEventProvider holidayEventDataProvider = new DefaultHolidayEventProvider();
 
   @Test
   public void testApplyEventDimensionFilter() throws Exception {
@@ -37,36 +40,36 @@ public class TestEventEntity {
     List<EventDTO> filteredEvents;
 
     // empty allEvents
-    filteredEvents = EventEntity.applyDimensionFilter(allEvents , eventFilterDimensionMap);
+    filteredEvents = holidayEventDataProvider.applyDimensionFilter(allEvents , eventFilterDimensionMap);
     Assert.assertEquals(filteredEvents.size(), 0);
 
     // empty filters map
     allEvents.add(event1);
-    filteredEvents = EventEntity.applyDimensionFilter(allEvents , eventFilterDimensionMap);
+    filteredEvents = holidayEventDataProvider.applyDimensionFilter(allEvents , eventFilterDimensionMap);
     Assert.assertEquals(filteredEvents.size(), 1);
 
     // non empty filters map, empty event dimensions map
     eventFilterDimensionMap.put("country", Lists.newArrayList("brazil"));
-    filteredEvents = EventEntity.applyDimensionFilter(allEvents , eventFilterDimensionMap);
+    filteredEvents = holidayEventDataProvider.applyDimensionFilter(allEvents , eventFilterDimensionMap);
     Assert.assertEquals(filteredEvents.size(), 0);
 
     // an event passes one filter
     allEvents.add(event2);
     allEvents.add(event3);
-    filteredEvents = EventEntity.applyDimensionFilter(allEvents , eventFilterDimensionMap);
+    filteredEvents = holidayEventDataProvider.applyDimensionFilter(allEvents , eventFilterDimensionMap);
     Assert.assertEquals(filteredEvents.size(), 1);
     Assert.assertEquals(filteredEvents.get(0).getName(), "event2");
 
     // an event passes multiple filters
     eventFilterDimensionMap.put("browser", Lists.newArrayList("chrome"));
-    filteredEvents = EventEntity.applyDimensionFilter(allEvents , eventFilterDimensionMap);
+    filteredEvents = holidayEventDataProvider.applyDimensionFilter(allEvents , eventFilterDimensionMap);
     Assert.assertEquals(filteredEvents.size(), 1);
     Assert.assertEquals(filteredEvents.get(0).getName(), "event2");
 
     // multiple events pass a filter
     eventFilterDimensionMap.remove("browser");
     eventFilterDimensionMap.put("country", Lists.newArrayList("brazil", "india"));
-    filteredEvents = EventEntity.applyDimensionFilter(allEvents , eventFilterDimensionMap);
+    filteredEvents = holidayEventDataProvider.applyDimensionFilter(allEvents , eventFilterDimensionMap);
     Assert.assertEquals(filteredEvents.size(), 2);
     Assert.assertEquals(filteredEvents.get(0).getName(), "event2");
     Assert.assertEquals(filteredEvents.get(1).getName(), "event3");
@@ -74,7 +77,7 @@ public class TestEventEntity {
     // an event passes a filter, another event passes another filter
     eventFilterDimensionMap.put("country", Lists.newArrayList("india"));
     eventFilterDimensionMap.put("browser", Lists.newArrayList("chrome"));
-    filteredEvents = EventEntity.applyDimensionFilter(allEvents , eventFilterDimensionMap);
+    filteredEvents = holidayEventDataProvider.applyDimensionFilter(allEvents , eventFilterDimensionMap);
     Assert.assertEquals(filteredEvents.size(), 2);
     Assert.assertEquals(filteredEvents.get(0).getName(), "event2");
     Assert.assertEquals(filteredEvents.get(1).getName(), "event3");
@@ -82,7 +85,7 @@ public class TestEventEntity {
     // no events pass filter
     eventFilterDimensionMap.put("country", Lists.newArrayList("france"));
     eventFilterDimensionMap.put("browser", Lists.newArrayList("mozilla"));
-    filteredEvents = EventEntity.applyDimensionFilter(allEvents , eventFilterDimensionMap);
+    filteredEvents = holidayEventDataProvider.applyDimensionFilter(allEvents , eventFilterDimensionMap);
     Assert.assertEquals(filteredEvents.size(), 0);
 
     // all events pass filter
@@ -91,7 +94,7 @@ public class TestEventEntity {
     event1.setTargetDimensionMap(eventDimensionMap1);
     eventFilterDimensionMap.remove("browser");
     eventFilterDimensionMap.put("country", Lists.newArrayList("brazil", "india"));
-    filteredEvents = EventEntity.applyDimensionFilter(allEvents , eventFilterDimensionMap);
+    filteredEvents = holidayEventDataProvider.applyDimensionFilter(allEvents , eventFilterDimensionMap);
     Assert.assertEquals(filteredEvents.size(), 3);
 
   }

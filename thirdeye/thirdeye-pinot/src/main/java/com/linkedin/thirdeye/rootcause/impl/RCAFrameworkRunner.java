@@ -65,6 +65,9 @@ public class RCAFrameworkRunner {
   private static final String CLI_WINDOW_SIZE = "window-size";
   private static final String CLI_BASELINE_OFFSET = "baseline-offset";
   private static final String CLI_METRIC_ENTITIES = "metric-entities";
+  private static final String CLI_DIMENSION_ENTITIES = "dimension-entities";
+  private static final String CLI_TIMERANGE_ENTITIES = "timerange-entities";
+  private static final String CLI_REPL = "repl";
 
   private static final long DAY_IN_MS = 24 * 3600 * 1000;
 
@@ -78,6 +81,9 @@ public class RCAFrameworkRunner {
     options.addOption(null, CLI_WINDOW_SIZE, true, "window size for search window (in days)");
     options.addOption(null, CLI_BASELINE_OFFSET, true, "baseline offset (in days)");
     options.addOption(null, CLI_METRIC_ENTITIES, true, "search context metric entities (not specifying this will activate interactive REPL mode)");
+    options.addOption(null, CLI_DIMENSION_ENTITIES, true, "search context dimension entities");
+    options.addOption(null, CLI_TIMERANGE_ENTITIES, true, "search context timerange entities ");
+    options.addOption(null, CLI_REPL, true, "interactive repl mode ");
 
     Parser parser = new BasicParser();
     CommandLine cmd = null;
@@ -106,34 +112,36 @@ public class RCAFrameworkRunner {
 
     List<Pipeline> pipelines = new ArrayList<>();
 
-    // EventTime pipeline
     EventDataProviderManager eventProvider = EventDataProviderManager.getInstance();
     eventProvider.registerEventDataProvider(EventType.HOLIDAY, new DefaultHolidayEventProvider());
     eventProvider.registerEventDataProvider(EventType.HISTORICAL_ANOMALY, new HistoricalAnomalyEventProvider());
-    pipelines.add(new EventTimePipeline(eventProvider));
+
+    // Holiday pipeline
+    pipelines.add(new HolidayEventsPipeline(eventProvider));
 
     // EventMetric pipeline
     QueryCache cache = ThirdEyeCacheRegistry.getInstance().getQueryCache();
     MetricDimensionScorer scorer = new MetricDimensionScorer(cache);
-    pipelines.add(new EventMetricPipeline(eventProvider));
+    //pipelines.add(new EventMetricPipeline(eventProvider));
 
     // MetricDimension pipeline
     MetricConfigManager metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
     DatasetConfigManager datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
-    pipelines.add(new MetricDimensionPipeline(metricDAO, datasetDAO, scorer));
+    //pipelines.add(new MetricDimensionPipeline(metricDAO, datasetDAO, scorer));
 
     // MetricDataset pipeline
-    pipelines.add(new MetricDatasetPipeline(metricDAO, datasetDAO));
+    //pipelines.add(new MetricDatasetPipeline(metricDAO, datasetDAO));
 
     // External pipelines
-    File rcaConfig = new File(config.getAbsolutePath() + "/rca.yml");
+    /*File rcaConfig = new File(config.getAbsolutePath() + "/rca.yml");
     if (rcaConfig.exists()) {
       pipelines.addAll(PipelineLoader.getPipelinesFromConfig(rcaConfig));
-    }
+    }*/
 
     Aggregator aggregator = new LinearAggregator();
 
     RCAFramework framework = new RCAFramework(pipelines, aggregator);
+
 
     // time range and baseline
     long windowSize = Long.parseLong(cmd.getOptionValue(CLI_WINDOW_SIZE, "1")) * DAY_IN_MS;
@@ -148,21 +156,35 @@ public class RCAFrameworkRunner {
     TimeRangeEntity current = TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_CURRENT, windowStart, windowEnd);
     TimeRangeEntity baseline = TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_BASELINE, baselineStart, baselineEnd);
 
-    if(cmd.hasOption(CLI_METRIC_ENTITIES)) {
-      // one-off execution
+    Set<Entity> entities = new HashSet<>();
+    if (cmd.hasOption(CLI_TIMERANGE_ENTITIES)) {
       String[] urns = cmd.getOptionValue(CLI_METRIC_ENTITIES).split(",");
+      for (String urn : urns) {
+        entities.add(TimeRangeEntity.fromURN(urn, 1.0));
+      }
+    } else {
+      entities.add(current);
+      entities.add(baseline);
+    }
 
-      Set<Entity> entities = new HashSet<>();
+    if(cmd.hasOption(CLI_METRIC_ENTITIES)) {
+      String[] urns = cmd.getOptionValue(CLI_METRIC_ENTITIES).split(",");
       for (String urn : urns) {
         entities.add(MetricEntity.fromURN(urn, 1.0));
       }
-      entities.add(current);
-      entities.add(baseline);
+    }
 
+
+    if(cmd.hasOption(CLI_DIMENSION_ENTITIES)) {
+      String[] urns = cmd.getOptionValue(CLI_DIMENSION_ENTITIES).split(",");
+      for (String urn : urns) {
+        entities.add(DimensionEntity.fromURN(urn, 1.0));
+      }
+    }
+
+    if (!cmd.hasOption(CLI_REPL)) {
       runFramework(framework, entities);
-
     } else {
-      // interactive REPL
       readExecutePrintLoop(framework, current, baseline);
     }
 

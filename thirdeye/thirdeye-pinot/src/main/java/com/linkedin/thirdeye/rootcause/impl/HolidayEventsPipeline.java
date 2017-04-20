@@ -1,17 +1,19 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+
+import org.apache.commons.collections.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.linkedin.thirdeye.anomaly.events.EventDataProviderManager;
 import com.linkedin.thirdeye.anomaly.events.EventFilter;
 import com.linkedin.thirdeye.anomaly.events.EventType;
-import com.linkedin.thirdeye.datalayer.bao.EventManager;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
-import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.ExecutionContext;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
@@ -19,10 +21,10 @@ import com.linkedin.thirdeye.rootcause.PipelineResult;
 public class HolidayEventsPipeline implements Pipeline {
 
   private static final Logger LOG = LoggerFactory.getLogger(HolidayEventsPipeline.class);
-  private EventManager eventDAO = null;
+  private EventDataProviderManager eventDataProvider = null;
 
-  public HolidayEventsPipeline(EventManager eventDAO) {
-    this.eventDAO = eventDAO;
+  public HolidayEventsPipeline(EventDataProviderManager eventDataProvider) {
+    this.eventDataProvider = eventDataProvider;
   }
 
   @Override
@@ -32,20 +34,28 @@ public class HolidayEventsPipeline implements Pipeline {
 
   @Override
   public PipelineResult run(ExecutionContext context) {
-    TimeRangeEntity timeRangeEntity = EntityUtils.getContextTimeRange(context);
-    if(timeRangeEntity == null) {
-      LOG.warn("Pipeline '{}' requires TimeRangeEntity. Skipping.", this.getName());
-      return new PipelineResult(Collections.<Entity>emptyList());
-    }
+    TimeRangeEntity timeRangeEntity = TimeRangeEntity.getContextCurrent(context);
 
     EventFilter filter = new EventFilter();
+    filter.setEventType(EventType.HOLIDAY);
     filter.setStartTime(timeRangeEntity.getStart());
     filter.setEndTime(timeRangeEntity.getEnd());
 
-    // get dimension entity
-    // if exists, create map of dimension name to values, and set it in filter
+    Set<DimensionEntity> dimensionEntities = EntityUtils.filterContext(context, DimensionEntity.class);
+    Map<String, List<String>> dimensionFilterMap = new HashMap<>();
+    if (CollectionUtils.isNotEmpty(dimensionEntities)) {
+      for (DimensionEntity dimensionEntity : dimensionEntities) {
+        String dimensionName = dimensionEntity.getName();
+        String dimensionValue = dimensionEntity.getValue();
+        if (!dimensionFilterMap.containsKey(dimensionName)) {
+          dimensionFilterMap.put(dimensionName, new ArrayList<String>());
+        }
+        dimensionFilterMap.get(dimensionName).add(dimensionValue);
+      }
+    }
+    filter.setTargetDimensionMap(dimensionFilterMap);
 
-    List<EventDTO> events = getHolidayEvents(filter);
+    List<EventDTO> events = eventDataProvider.getEvents(filter);
 
     List<EventEntity> entities = new ArrayList<>();
     for(EventDTO e : events) {
@@ -55,17 +65,6 @@ public class HolidayEventsPipeline implements Pipeline {
     }
 
     return new PipelineResult(entities);
-  }
-
-  private List<EventDTO> getHolidayEvents(EventFilter eventFilter) {
-
-    List<EventDTO> allHolidayEventsBetweenTimeRange =
-        eventDAO.findEventsBetweenTimeRange(EventType.HOLIDAY.name(), eventFilter.getStartTime(),
-            eventFilter.getEndTime());
-
-    Map<String, List<String>> eventFilterDimensionMap = eventFilter.getTargetDimensionMap();
-    List<EventDTO> holidayEvents = EventEntity.applyDimensionFilter(allHolidayEventsBetweenTimeRange, eventFilterDimensionMap);
-    return holidayEvents;
   }
 
 

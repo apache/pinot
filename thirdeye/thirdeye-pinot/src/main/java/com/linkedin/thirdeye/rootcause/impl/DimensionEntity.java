@@ -13,6 +13,13 @@ public class DimensionEntity extends Entity {
   final String name;
   final String value;
 
+  public static DimensionEntity fromURN(String urn, double score) {
+    String[] parts = urn.split(":");
+    if(parts.length != 4)
+      throw new IllegalArgumentException(String.format("Dimension URN must have 4 parts but has '%s'", parts.length));
+    return fromDimension(score, parts[2], parts[3]);
+  }
+
   protected DimensionEntity(String urn, double score, String name, String value) {
     super(urn, score);
     this.name = name;
