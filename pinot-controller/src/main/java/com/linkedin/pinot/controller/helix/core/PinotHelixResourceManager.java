@@ -1808,43 +1808,67 @@ public class PinotHelixResourceManager {
   }
 
   /**
-   * Drop the instance from helix cluster. Instance will not be dropped if:
+   * Check if an instance can safely dropped from helix cluster. Instance should not be dropped if:
    * - It is a live instance.
-   * - Has at least one ONLINE segment.
+   * - Any idealstate includes the instance.
    *
    * @param instanceName: Name of the instance to be dropped.
    * @return
    */
-  public PinotResourceManagerResponse dropInstance(String instanceName) {
-    if (!instanceExists(instanceName)) {
-      return new PinotResourceManagerResponse("Instance " + instanceName + " does not exist.", false);
-    }
-
+  public boolean isInstanceDroppable(String instanceName) {
+    // Check if this instance is live
     HelixDataAccessor helixDataAccessor = _helixZkManager.getHelixDataAccessor();
     LiveInstance liveInstance = helixDataAccessor.getProperty(_keyBuilder.liveInstance(instanceName));
-
     if (liveInstance != null) {
-      PropertyKey currentStatesKey =
-          _keyBuilder.currentStates(instanceName, liveInstance.getSessionId());
-      List<CurrentState> currentStates = _helixDataAccessor.getChildValues(currentStatesKey);
-
-      if (currentStates != null) {
-        for (CurrentState currentState : currentStates) {
-          for (String state : currentState.getPartitionStateMap().values()) {
-            if (state.equalsIgnoreCase(SegmentOnlineOfflineStateModel.ONLINE)) {
-              return new PinotResourceManagerResponse(("Instance " + instanceName + " has online partitions"), false);
-            }
-          }
-        }
-      } else {
-        return new PinotResourceManagerResponse("Cannot drop live instance " + instanceName
-            + " please stop the instance first.", false);
-      }
+      return false;
     }
 
-    // Disable the instance first.
-    toogleInstance(instanceName, false, 10);
-    _helixAdmin.dropInstance(_helixClusterName, getHelixInstanceConfig(instanceName));
+    // Check if any idealstate contains information on this instance
+    for (String tableName : getAllTableNames()) {
+      IdealState tableIdealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableName);
+      for (String partition : tableIdealState.getPartitionSet()) {
+        for (String instance : tableIdealState.getInstanceSet(partition)) {
+          if (instance.equals(instanceName)) {
+            return false;
+          }
+        }
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Drop the instance from helix cluster. Instance will not be dropped if:
+   *
+   * @param instanceName: Name of the instance to be dropped.
+   * @return
+   */
+  public PinotResourceManagerResponse dropInstance(final String instanceName) {
+    // Delete '/INSTANCES/<server_name>'
+    final String instancePath = "/" + _helixClusterName + "/INSTANCES/" + instanceName;
+    boolean successfulInstanceRemove = DEFAULT_RETRY_POLICY.attempt(new Callable<Boolean>() {
+      @Override
+      public Boolean call() throws Exception {
+        return _helixDataAccessor.getBaseDataAccessor().remove(instancePath, AccessOption.PERSISTENT);
+      }
+    });
+    if (!successfulInstanceRemove) {
+      return new PinotResourceManagerResponse("Failed to erase /INSTANCES/" + instanceName, false);
+    }
+
+    // Delete '/CONFIGS/PARTICIPANT/<server_name>'
+    boolean successfulConfigRemove = DEFAULT_RETRY_POLICY.attempt(new Callable<Boolean>() {
+      @Override
+      public Boolean call() throws Exception {
+        PropertyKey instanceKey = _keyBuilder.instanceConfig(instanceName);
+        return _helixDataAccessor.removeProperty(instanceKey);
+      }
+    });
+    if (!successfulConfigRemove) {
+      return new PinotResourceManagerResponse("Failed to erase /CONFIGS/PARTICIPANT/" + instanceName
+          + " Make sure to erase /CONFIGS/PARTICIPANT/" + instanceName  + " manually since /INSTANCES/" + instanceName
+          + " has already been removed.", false);
+    }
 
     return new PinotResourceManagerResponse("Instance " + instanceName + " dropped.", true);
   }

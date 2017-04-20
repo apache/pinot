@@ -26,6 +26,7 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   CONTROLLER_INTERNAL_ERROR("InternalError", true),
   CONTROLLER_INSTANCE_GET_ERROR("InstanceGetError", true),
   CONTROLLER_INSTANCE_POST_ERROR("InstancePostError", true),
+  CONTROLLER_INSTANCE_DELETE_ERROR("InstanceDeleteError", true),
   CONTROLLER_SEGMENT_GET_ERROR("SegmentGetError", true),
   CONTROLLER_SEGMENT_DELETE_ERROR("SegmentDeleteError", true),
   CONTROLLER_SEGMENT_UPLOAD_ERROR("SegmentUploadError", true),

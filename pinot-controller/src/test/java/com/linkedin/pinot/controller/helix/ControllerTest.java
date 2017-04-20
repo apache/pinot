@@ -61,7 +61,6 @@ public abstract class ControllerTest {
   protected ControllerStarter _controllerStarter;
   protected HelixAdmin _helixAdmin;
   protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
-  protected HelixManager _helixZkManager;
   private ZkStarter.ZookeeperInstance _zookeeperInstance;
 
   public JSONObject postQuery(String query, String brokerBaseApiUrl) throws Exception {

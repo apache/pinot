@@ -79,6 +79,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     dropOfflineTable("mytable");
   }
 
+  protected void deleteTempDirectory() throws Exception {
+    FileUtils.deleteDirectory(_tmpDir);
+  }
+
   @BeforeClass
   public void setUp() throws Exception {
     //Clean up
@@ -321,7 +325,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTest {
     } catch (Exception e) {
       // Swallow ZK Exceptions.
     }
-    FileUtils.deleteDirectory(_tmpDir);
+    deleteTempDirectory();
   }
 
   @Override
