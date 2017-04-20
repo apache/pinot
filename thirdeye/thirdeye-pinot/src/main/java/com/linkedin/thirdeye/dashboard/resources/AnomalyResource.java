@@ -457,8 +457,8 @@ public class AnomalyResource {
    * an activated anomaly detection function
    */
   @POST
-  @Path("/anomaly-function/apply/{autotune_config_id}")
-  public Response applyAutotuneConfig(@PathParam("autotune_config_id") @NotNull long id,
+  @Path("/anomaly-function/apply/{autotuneConfigId}")
+  public Response applyAutotuneConfig(@PathParam("autotuneConfigId") @NotNull long id,
       @QueryParam("cloneFunction") @DefaultValue("false") boolean isCloneFunction,
       @QueryParam("cloneAnomalies") Boolean isCloneAnomalies) {
     AutotuneConfigDTO autotuneConfigDTO = autotuneConfigDAO.findById(id);
@@ -554,7 +554,7 @@ public class AnomalyResource {
   @Path("/anomaly-function/activate")
   public Response activateAnomalyFunction(@NotNull @QueryParam("functionId") Long id, @QueryParam("modifiedFunctionName") String functionName){
     if (id == null) {
-      throw new IllegalArgumentException("id is a required query param");
+      return Response.status(Response.Status.BAD_REQUEST).build();
     }
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyFunctionDAO.findById(id);
     anomalyFunctionSpec.setActive(true);

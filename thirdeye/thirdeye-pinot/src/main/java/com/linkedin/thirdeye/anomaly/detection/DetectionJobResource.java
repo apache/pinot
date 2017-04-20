@@ -741,7 +741,7 @@ public class DetectionJobResource {
       @QueryParam("autotuneId") Long autotuneId,
       @QueryParam("start") @NotNull String replayStartTimeIso, @QueryParam("end") @NotNull String replayEndTimeIso) throws IllegalArgumentException{
     if (functionId == null && autotuneId == null) {
-      throw new IllegalArgumentException("Both function Id and autotune Id are null!");
+      return Response.status(Response.Status.BAD_REQUEST).build();
     }
     DateTime replayStart = ISODateTimeFormat.dateTimeParser().parseDateTime(replayStartTimeIso);
     DateTime replayEnd = ISODateTimeFormat.dateTimeParser().parseDateTime(replayEndTimeIso);
