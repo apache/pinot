@@ -1,7 +1,5 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.events.DefaultHolidayEventProvider;
 import com.linkedin.thirdeye.anomaly.events.EventDataProviderManager;
@@ -13,11 +11,9 @@ import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import com.linkedin.thirdeye.rootcause.Aggregator;
 import com.linkedin.thirdeye.rootcause.Entity;
-import com.linkedin.thirdeye.rootcause.RCAConfiguration;
 import com.linkedin.thirdeye.rootcause.RCAFramework;
 import com.linkedin.thirdeye.rootcause.RCAFrameworkResult;
 import com.linkedin.thirdeye.rootcause.Pipeline;
@@ -42,8 +38,6 @@ import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.commons.cli.Parser;
-import org.joda.time.format.DateTimeFormat;
-import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.LoggerFactory;
 
 import ch.qos.logback.classic.Level;
@@ -122,21 +116,21 @@ public class RCAFrameworkRunner {
     // EventMetric pipeline
     QueryCache cache = ThirdEyeCacheRegistry.getInstance().getQueryCache();
     MetricDimensionScorer scorer = new MetricDimensionScorer(cache);
-    //pipelines.add(new EventMetricPipeline(eventProvider));
+    pipelines.add(new EventMetricPipeline(eventProvider));
 
     // MetricDimension pipeline
     MetricConfigManager metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
     DatasetConfigManager datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
-    //pipelines.add(new MetricDimensionPipeline(metricDAO, datasetDAO, scorer));
+    pipelines.add(new MetricDimensionPipeline(metricDAO, datasetDAO, scorer));
 
     // MetricDataset pipeline
-    //pipelines.add(new MetricDatasetPipeline(metricDAO, datasetDAO));
+    pipelines.add(new MetricDatasetPipeline(metricDAO, datasetDAO));
 
     // External pipelines
-    /*File rcaConfig = new File(config.getAbsolutePath() + "/rca.yml");
+    File rcaConfig = new File(config.getAbsolutePath() + "/rca.yml");
     if (rcaConfig.exists()) {
       pipelines.addAll(PipelineLoader.getPipelinesFromConfig(rcaConfig));
-    }*/
+    }
 
     Aggregator aggregator = new LinearAggregator();
 
