@@ -21,9 +21,11 @@ public class DataFrameBenchmark {
   private static final int N_ROUNDS_SLOW = 3;
   private static final int N_ELEMENTS = 10_000_000;
 
+  private static final String[] SERIES_NAMES = new String[] { "task", "min", "mid", "max", "checksum", "samples" };
+
   long tStart;
   List<Long> times = new ArrayList<>();
-  DataFrame.Builder results = DataFrame.builder("task", "min", "mid", "max", "checksum");
+  DataFrame.Builder results = DataFrame.builder(SERIES_NAMES);
 
   void benchmarkMapDoubleSeries() {
     long checksum = 0;
@@ -588,7 +590,7 @@ public class DataFrameBenchmark {
     long tMin = Collections.min(this.times);
     long tMax = Collections.max(this.times);
     LOG.info("{}: min/mid/max = {}ms {}ms {}ms [xor {}]", name, tMin / 1000000, tMid / 1000000, tMax / 1000000, (checksum >= 0 ? checksum : -checksum) % 1000);
-    this.results.append(name, tMin, tMid, tMax, checksum);
+    this.results.append(name, tMin, tMid, tMax, checksum, this.times.size());
 
     // reset timer stats
     this.times = new ArrayList<>();
@@ -602,7 +604,33 @@ public class DataFrameBenchmark {
     DataFrameBenchmark b = new DataFrameBenchmark();
     b.benchmarkAll();
 
-    LOG.info("Summary:\n{}", b.results.build());
+    DataFrame df = b.results.build();
+    df.mapInPlace(new Series.LongFunction() {
+      @Override
+      public long apply(long... values) {
+        return values[0] / 1000000;
+      }
+    }, "min");
+    df.mapInPlace(new Series.LongFunction() {
+      @Override
+      public long apply(long... values) {
+        return values[0] / 1000000;
+      }
+    }, "mid");
+    df.mapInPlace(new Series.LongFunction() {
+      @Override
+      public long apply(long... values) {
+        return values[0] / 1000000;
+      }
+    }, "max");
+    df.mapInPlace(new Series.LongFunction() {
+      @Override
+      public long apply(long... values) {
+        return values[0] % 1000;
+      }
+    }, "checksum");
+
+    LOG.info("Summary:\n{}", df.toString(40, SERIES_NAMES));
     LOG.info("done.");
   }
 
