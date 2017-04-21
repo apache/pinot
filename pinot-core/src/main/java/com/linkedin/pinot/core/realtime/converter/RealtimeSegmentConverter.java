@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.realtime.converter;
 
+import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -39,10 +40,11 @@ public class RealtimeSegmentConverter {
   private String sortedColumn;
   private List<String> invertedIndexColumns;
   private List<String> noDictionaryColumns;
+  private StarTreeIndexSpec starTreeIndexSpec;
 
   public RealtimeSegmentConverter(RealtimeSegmentImpl realtimeSegment, String outputPath, Schema schema,
       String tableName, String segmentName, String sortedColumn, List<String> invertedIndexColumns,
-      List<String> noDictionaryColumns) {
+      List<String> noDictionaryColumns, StarTreeIndexSpec starTreeIndexSpec) {
     if (new File(outputPath).exists()) {
       throw new IllegalAccessError("path already exists:" + outputPath);
     }
@@ -72,12 +74,13 @@ public class RealtimeSegmentConverter {
     this.tableName = tableName;
     this.segmentName = segmentName;
     this.noDictionaryColumns = noDictionaryColumns;
+    this.starTreeIndexSpec = starTreeIndexSpec;
   }
 
   public RealtimeSegmentConverter(RealtimeSegmentImpl realtimeSegment, String outputPath, Schema schema,
       String tableName, String segmentName, String sortedColumn) {
     this(realtimeSegment, outputPath, schema, tableName, segmentName, sortedColumn, new ArrayList<String>(),
-        new ArrayList<String>());
+        new ArrayList<String>(), null/*StarTreeIndexSpec*/);
   }
 
   public void build(SegmentVersion segmentVersion) throws Exception {
@@ -97,6 +100,13 @@ public class RealtimeSegmentConverter {
     if (noDictionaryColumns != null) {
       genConfig.setRawIndexCreationColumns(noDictionaryColumns);
     }
+
+    // Presence of the spec enables star tree generation.
+    if (starTreeIndexSpec != null) {
+      genConfig.setEnableStarTreeIndex(true);
+      genConfig.setStarTreeIndexSpec(starTreeIndexSpec);
+    }
+
     genConfig.setTimeColumnName(dataSchema.getTimeFieldSpec().getOutgoingTimeColumnName());
     genConfig.setSegmentTimeUnit(dataSchema.getTimeFieldSpec().getOutgoingGranularitySpec().getTimeType());
     genConfig.setSegmentVersion(segmentVersion);

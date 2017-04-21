@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.common.config;
 
+import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -40,6 +41,7 @@ public class IndexingConfig {
   private String _starTreeFormat;
   private String _columnMinMaxValueGeneratorMode;
   private List<String> _noDictionaryColumns;
+  private StarTreeIndexSpec _starTreeIndexSpec;
   private SegmentPartitionConfig _segmentPartitionConfig;
 
 
@@ -121,6 +123,14 @@ public class IndexingConfig {
 
   public void setNoDictionaryColumns(List<String> noDictionaryColumns) {
     _noDictionaryColumns = noDictionaryColumns;
+  }
+
+  public void setStarTreeIndexSpec(StarTreeIndexSpec starTreeIndexSpec) {
+    _starTreeIndexSpec = starTreeIndexSpec;
+  }
+
+  public StarTreeIndexSpec getStarTreeIndexSpec() {
+    return _starTreeIndexSpec;
   }
 
   public void setSegmentPartitionConfig(SegmentPartitionConfig config) {
