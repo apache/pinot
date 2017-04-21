@@ -61,7 +61,7 @@ public class CompositeFuture<V> extends AbstractCompositeListenableFuture<V> {
   // Composite Response
   private final ConcurrentMap<ServerInstance, V> _delayedResponseMap;
 
-  private final ConcurrentMap<String, Long> _responseTimeMap = new ConcurrentHashMap<>(10);
+  private final ConcurrentMap<ServerInstance, Long> _responseTimeMap = new ConcurrentHashMap<>(10);
 
   // Exception in case of error
   private final ConcurrentMap<ServerInstance, Throwable> _errorMap;
@@ -160,7 +160,7 @@ public class CompositeFuture<V> extends AbstractCompositeListenableFuture<V> {
     // the individual futures that have completed. Typically, we are interested in getting the individual completion
     // times, however.
     long maxDuration = -1;
-    for (Map.Entry<String, Long> entry:_responseTimeMap.entrySet()) {
+    for (Map.Entry<ServerInstance, Long> entry:_responseTimeMap.entrySet()) {
       if (entry.getValue() > maxDuration) {
         maxDuration = entry.getValue();
       }
@@ -179,18 +179,24 @@ public class CompositeFuture<V> extends AbstractCompositeListenableFuture<V> {
    * For now, this method has not been added to the interface.
    * @return A map of response times of each response in _delayedResponseMap.
    */
-  public Map<String, Long> getResponseTimes() {
+  public Map<ServerInstance, Long> getResponseTimes() {
     return Collections.unmodifiableMap(_responseTimeMap);
   }
+
   @Override
-  protected boolean processFutureResult(String name, Map<ServerInstance, V> response, Map<ServerInstance, Throwable> error, long durationMillis) {
+  public ServerInstance getServerInstance() {
+    throw new RuntimeException("Invalid API call on a composite future");
+  }
+
+  @Override
+  protected boolean processFutureResult(ServerInstance server, Map<ServerInstance, V> response, Map<ServerInstance, Throwable> error, long durationMillis) {
     // Get the response time and create another map that can be invoked to get the end time when responses were received for each server.
     boolean ret = false;
     if (null != response) {
-      LOGGER.debug("Response from {} is {}", name, response);
+      LOGGER.debug("Response from {} is {}", server, response);
       _delayedResponseMap.putAll(response);
     } else if (null != error) {
-      LOGGER.debug("Error from {} is : {}", name, error);
+      LOGGER.debug("Error from {} is : {}", server, error);
       _errorMap.putAll(error);
 
       if (_gatherMode == GatherModeOnError.SHORTCIRCUIT_AND) {
@@ -198,7 +204,7 @@ public class CompositeFuture<V> extends AbstractCompositeListenableFuture<V> {
       }
     }
     // TODO May be limit the number of entries here to 10? We don't want to create too much garbage on the broker.
-    _responseTimeMap.put(name, durationMillis);
+    _responseTimeMap.put(server, durationMillis);
     return ret;
   }
 

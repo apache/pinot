@@ -88,4 +88,6 @@ public interface ServerResponseFuture<V> extends ListenableFuture<Map<ServerInst
    * @return
    */
   public Map<ServerInstance, Throwable> getError();
+
+  public ServerInstance getServerInstance();
 }

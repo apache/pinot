@@ -324,6 +324,11 @@ public class AsyncResponseFuture<T> implements Callback<T>, ServerResponseFuture
   }
 
   @Override
+  public ServerInstance getServerInstance() {
+    return _key;
+  }
+
+  @Override
   public String getName() {
     return _key.toString();
   }

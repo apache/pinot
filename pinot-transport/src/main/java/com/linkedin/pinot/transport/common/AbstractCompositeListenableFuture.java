@@ -172,13 +172,13 @@ public abstract class AbstractCompositeListenableFuture<T> implements ServerResp
    * Process underlying futures. Returns true if all the processing is done
    * The framework will go ahead and cancel any outstanding futures.
    *
-   * @param name Name of the future which got completed
+   * @param server ServerInstance that is responding
    * @param responses Response
    * @param error Error
    * @param durationMillis
    * @return true if processing done
    */
-  protected abstract boolean processFutureResult(String name, Map<ServerInstance, T> responses, Map<ServerInstance, Throwable> error,
+  protected abstract boolean processFutureResult(ServerInstance server, Map<ServerInstance, T> responses, Map<ServerInstance, Throwable> error,
       long durationMillis);
 
   protected void addResponseFutureListener(ServerResponseFuture<T> future) {
@@ -218,7 +218,7 @@ public abstract class AbstractCompositeListenableFuture<T> implements ServerResp
 
       // Since the future is done, it is safe to look at error results
       Map<ServerInstance, Throwable> error = _future.getError();
-      boolean done = processFutureResult(_future.getName(), response, error, _future.getDurationMillis());
+      boolean done = processFutureResult(_future.getServerInstance(), response, error, _future.getDurationMillis());
 
       if (done) {
         setDone(State.DONE);
