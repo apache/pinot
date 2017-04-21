@@ -376,11 +376,18 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
   }
 
   public BooleanSeries or(final boolean constant) {
-    return this.or(fillValues(this.size(), constant));
+    return this.or(valueOf(constant));
   }
 
-  public BooleanSeries or(byte constant) {
-    return this.or(fillValues(this.size(), constant));
+  public BooleanSeries or(final byte constant) {
+    if(isNull(constant))
+      return nulls(this.size());
+    return this.map(new BooleanFunctionEx() {
+      @Override
+      public byte apply(byte... values) {
+        return (byte)(values[0] | constant);
+      }
+    });
   }
 
   public BooleanSeries and(Series other) {
@@ -393,11 +400,18 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
   }
 
   public BooleanSeries and(final boolean constant) {
-    return this.and(fillValues(this.size(), constant));
+    return this.and(valueOf(constant));
   }
 
-  public BooleanSeries and(byte constant) {
-    return this.and(fillValues(this.size(), constant));
+  public BooleanSeries and(final byte constant) {
+    if(isNull(constant))
+      return nulls(this.size());
+    return this.map(new BooleanFunctionEx() {
+      @Override
+      public byte apply(byte... values) {
+        return (byte)(values[0] & constant);
+      }
+    });
   }
 
   public BooleanSeries xor(Series other) {
@@ -410,11 +424,18 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
   }
 
   public BooleanSeries xor(final boolean constant) {
-    return this.xor(fillValues(this.size(), constant));
+    return this.xor(valueOf(constant));
   }
 
-  public BooleanSeries xor(byte constant) {
-    return this.xor(fillValues(this.size(), constant));
+  public BooleanSeries xor(final byte constant) {
+    if(isNull(constant))
+      return nulls(this.size());
+    return this.map(new BooleanFunctionEx() {
+      @Override
+      public byte apply(byte... values) {
+        return (byte)(values[0] ^ constant);
+      }
+    });
   }
 
   public BooleanSeries implies(Series other) {
@@ -427,11 +448,18 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
   }
 
   public BooleanSeries implies(final boolean constant) {
-    return this.implies(fillValues(this.size(), constant));
+    return this.implies(valueOf(constant));
   }
 
-  public BooleanSeries implies(byte constant) {
-    return this.implies(fillValues(this.size(), constant));
+  public BooleanSeries implies(final byte constant) {
+    if(isNull(constant))
+      return nulls(this.size());
+    return this.map(new BooleanFunctionEx() {
+      @Override
+      public byte apply(byte... values) {
+        return (byte)((0b1 ^ values[0]) | constant);
+      }
+    });
   }
 
   public BooleanSeries eq(Series other) {
@@ -443,12 +471,19 @@ public final class BooleanSeries extends TypedSeries<BooleanSeries> {
     }, this, other);
   }
 
-  public BooleanSeries eq(byte constant) {
-    return this.eq(fillValues(this.size(), constant));
+  public BooleanSeries eq(final boolean constant) {
+    return this.eq(valueOf(constant));
   }
 
-  public BooleanSeries eq(final boolean constant) {
-    return this.eq(fillValues(this.size(), constant));
+  public BooleanSeries eq(final byte constant) {
+    if(isNull(constant))
+      return nulls(this.size());
+    return this.map(new BooleanFunctionEx() {
+      @Override
+      public byte apply(byte... values) {
+        return (byte)((values[0] ^ constant) ^ 0b1);
+      }
+    });
   }
 
   public BooleanSeries set(BooleanSeries where, byte value) {

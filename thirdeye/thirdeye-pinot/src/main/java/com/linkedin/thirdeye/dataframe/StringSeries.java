@@ -303,7 +303,14 @@ public final class StringSeries extends TypedSeries<StringSeries> {
   }
 
   public StringSeries concat(final String constant) {
-    return this.concat(fillValues(this.size(), constant));
+    if(isNull(constant))
+      return nulls(this.size());
+    return this.map(new StringFunction() {
+      @Override
+      public String apply(String... values) {
+        return values[0] + constant;
+      }
+    });
   }
 
   public StringSeries concat(Series other) {
@@ -316,7 +323,14 @@ public final class StringSeries extends TypedSeries<StringSeries> {
   }
 
   public BooleanSeries eq(final String constant) {
-    return this.eq(fillValues(this.size(), constant));
+    if(isNull(constant))
+      return BooleanSeries.nulls(this.size());
+    return this.map(new StringConditional() {
+      @Override
+      public boolean apply(String... values) {
+        return constant.equals(values[0]);
+      }
+    });
   }
 
   public BooleanSeries eq(Series other) {

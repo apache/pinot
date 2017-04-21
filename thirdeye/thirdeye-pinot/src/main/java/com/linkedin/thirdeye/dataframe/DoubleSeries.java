@@ -448,7 +448,14 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
   }
 
   public DoubleSeries add(final double constant) {
-    return this.add(fillValues(this.size(), constant));
+    if(isNull(constant))
+      return nulls(this.size());
+    return this.map(new DoubleFunction() {
+      @Override
+      public double apply(double... values) {
+        return values[0] + constant;
+      }
+    });
   }
 
   public DoubleSeries subtract(Series other) {
@@ -461,7 +468,14 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
   }
 
   public DoubleSeries subtract(final double constant) {
-    return this.subtract(fillValues(this.size(), constant));
+    if(isNull(constant))
+      return nulls(this.size());
+    return this.map(new DoubleFunction() {
+      @Override
+      public double apply(double... values) {
+        return values[0] - constant;
+      }
+    });
   }
 
   public DoubleSeries multiply(Series other) {
@@ -474,7 +488,14 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
   }
 
   public DoubleSeries multiply(final double constant) {
-    return this.multiply(fillValues(this.size(), constant));
+    if(isNull(constant))
+      return nulls(this.size());
+    return this.map(new DoubleFunction() {
+      @Override
+      public double apply(double... values) {
+        return values[0] * constant;
+      }
+    });
   }
 
   public DoubleSeries divide(Series other) {
@@ -490,7 +511,16 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
   }
 
   public DoubleSeries divide(final double constant) {
-    return this.divide(fillValues(this.size(), constant));
+    if(isNull(constant))
+      return nulls(this.size());
+    if(constant == 0.0d)
+      throw new ArithmeticException("/ by zero");
+    return this.map(new DoubleFunction() {
+      @Override
+      public double apply(double... values) {
+        return values[0] / constant;
+      }
+    });
   }
 
   public BooleanSeries eq(Series other) {
@@ -503,7 +533,14 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
   }
 
   public BooleanSeries eq(final double constant) {
-    return this.eq(fillValues(this.size(), constant));
+    if(isNull(constant))
+      return BooleanSeries.nulls(this.size());
+    return this.map(new DoubleConditional() {
+      @Override
+      public boolean apply(double... values) {
+        return values[0] == constant;
+      }
+    });
   }
 
   public BooleanSeries eq(final double constant, final double epsilon) {
