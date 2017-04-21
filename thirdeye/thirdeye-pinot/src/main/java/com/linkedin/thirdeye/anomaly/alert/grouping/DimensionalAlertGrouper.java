@@ -136,11 +136,11 @@ public class DimensionalAlertGrouper extends BaseAlertGrouper<DimensionMap> {
 
   @Override
   public String groupEmailRecipients(AlertGroupKey<DimensionMap> alertGroupKey) {
-    DimensionMap dimensionMap = alertGroupKey.getKey();
-    if (auxiliaryEmailRecipients.containsKey(dimensionMap)) {
-      return auxiliaryEmailRecipients.get(dimensionMap);
+    if (alertGroupKey == null || AlertGroupKey.emptyKey().equals(alertGroupKey) || !auxiliaryEmailRecipients
+        .containsKey(alertGroupKey.getKey())) {
+      return EMPTY_RECIPIENTS;
     } else {
-      return "";
+      return auxiliaryEmailRecipients.get(alertGroupKey.getKey());
     }
   }
 

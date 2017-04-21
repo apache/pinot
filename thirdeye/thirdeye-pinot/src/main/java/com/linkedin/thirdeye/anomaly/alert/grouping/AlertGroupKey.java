@@ -43,6 +43,24 @@ public class AlertGroupKey<T> {
     return key;
   }
 
+  /**
+   * Returns raw key's toString method if it is not null.
+   *
+   * @return an empty string if the raw key is null.
+   */
+  public String toGroupName() {
+    if (key != null) {
+      return key.toString();
+    } else {
+      return "";
+    }
+  }
+
+  /**
+   * Returns an empty group key, whose raw key is null.
+   *
+   * @return an empty group key.
+   */
   @SuppressWarnings("unchecked")
   public static final <T> AlertGroupKey<T> emptyKey() {
     return (AlertGroupKey<T>) EMPTY_KEY;

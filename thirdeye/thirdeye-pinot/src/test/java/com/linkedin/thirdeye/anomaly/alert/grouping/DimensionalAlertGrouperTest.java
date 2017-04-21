@@ -129,6 +129,15 @@ public class DimensionalAlertGrouperTest {
     dimensionMap2.put("K2", "V3"); // K2 should not affect group key
     AlertGroupKey<DimensionMap> alertGroupKey2 = alertGrouper.constructGroupKey(dimensionMap2);
     Assert.assertEquals(alertGrouper.groupEmailRecipients(alertGroupKey2), EMAIL1);
+
+    // Test empty recipients
+    Assert.assertEquals(alertGrouper.groupEmailRecipients(AlertGroupKey.<DimensionMap>emptyKey()),
+        BaseAlertGrouper.EMPTY_RECIPIENTS);
+    Assert.assertEquals(alertGrouper.groupEmailRecipients(null), BaseAlertGrouper.EMPTY_RECIPIENTS);
+    DimensionMap dimensionMapNonExist = new DimensionMap();
+    dimensionMapNonExist.put("K2", "V1");
+    AlertGroupKey<DimensionMap> alertGroupKey3 = alertGrouper.constructGroupKey(dimensionMapNonExist);
+    Assert.assertEquals(alertGrouper.groupEmailRecipients(alertGroupKey3), BaseAlertGrouper.EMPTY_RECIPIENTS);
   }
 
   @DataProvider(name = "prepareAnomalyGroups")
