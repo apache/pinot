@@ -262,7 +262,7 @@ public class HLRealtimeSegmentDataManager extends SegmentDataManager {
               new RealtimeSegmentConverter(realtimeSegment, tempSegmentFolder.getAbsolutePath(), schema,
                   segmentMetadata.getTableName(), segmentMetadata.getSegmentName(), sortedColumn,
                   HLRealtimeSegmentDataManager.this.invertedIndexColumns,
-                  noDictionaryColumns);
+                  noDictionaryColumns, null/*StarTreeIndexSpec*/); // Star tree not supported for HLC.
 
           segmentLogger.info("Trying to build segment");
           final long buildStartTime = System.nanoTime();

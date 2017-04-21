@@ -21,6 +21,7 @@ import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
@@ -173,6 +174,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   private final String _tableName;
   private final List<String> _invertedIndexColumns;
   private final List<String> _noDictionaryColumns;
+  private final StarTreeIndexSpec _starTreeIndexSpec;
   private final String _sortedColumn;
   private Logger segmentLogger = LOGGER;
   private final String _tableStreamName;
@@ -533,7 +535,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     RealtimeSegmentConverter converter =
         new RealtimeSegmentConverter(_realtimeSegment, tempSegmentFolder.getAbsolutePath(), _schema,
             _segmentZKMetadata.getTableName(), _segmentZKMetadata.getSegmentName(), _sortedColumn,
-            _invertedIndexColumns, _noDictionaryColumns);
+            _invertedIndexColumns, _noDictionaryColumns, _starTreeIndexSpec);
     logStatistics();
     segmentLogger.info("Trying to build segment");
     final long buildStartTime = now();
@@ -819,6 +821,9 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
 
     // No dictionary Columns
     _noDictionaryColumns = new ArrayList<>(indexLoadingConfig.getNoDictionaryColumns());
+
+    // Read the star tree config
+    _starTreeIndexSpec = indexingConfig.getStarTreeIndexSpec();
 
     // Read the max number of rows
     int segmentMaxRowCount = kafkaStreamProviderConfig.getSizeThresholdToFlushSegment();

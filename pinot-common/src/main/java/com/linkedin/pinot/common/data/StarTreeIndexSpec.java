@@ -20,7 +20,10 @@ import com.google.common.base.Objects;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
+import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 
+
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class StarTreeIndexSpec {
   public static final Integer DEFAULT_MAX_LEAF_RECORDS = 100000; // TODO: determine a good number via experiment
   public static final int DEFAULT_SKIP_MATERIALIZATION_CARDINALITY_THRESHOLD = 10000;
