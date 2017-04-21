@@ -118,6 +118,10 @@ public final class StringSeries extends TypedSeries<StringSeries> {
     return builder().fillValues(size, NULL).build();
   }
 
+  public static StringSeries fillValues(int size, String value) {
+    return builder().fillValues(size, value).build();
+  }
+
   // CAUTION: The array is final, but values are inherently modifiable
   final String[] values;
 
@@ -254,6 +258,16 @@ public final class StringSeries extends TypedSeries<StringSeries> {
   }
 
   /**
+   * Attempts to infer a tighter native series type based on pattern matching against individual
+   * values in the series. Returns a copy of the series with the inferred type.
+   *
+   * @return series copy of inferred type
+   */
+  public Series toInferredType() {
+    return this.get(this.inferType());
+  }
+
+  /**
    * Returns the value of the first element in the series
    *
    * @throws IllegalStateException if the series is empty
@@ -289,14 +303,7 @@ public final class StringSeries extends TypedSeries<StringSeries> {
   }
 
   public StringSeries concat(final String constant) {
-    if(isNull(constant))
-      return nulls(this.size());
-    return this.map(new StringFunction() {
-      @Override
-      public String apply(String... values) {
-        return values[0] + constant;
-      }
-    });
+    return this.concat(fillValues(this.size(), constant));
   }
 
   public StringSeries concat(Series other) {
@@ -308,13 +315,61 @@ public final class StringSeries extends TypedSeries<StringSeries> {
     }, this, other);
   }
 
+  public BooleanSeries eq(final String constant) {
+    return this.eq(fillValues(this.size(), constant));
+  }
+
+  public BooleanSeries eq(Series other) {
+    return map(new StringConditional() {
+      @Override
+      public boolean apply(String... values) {
+        return values[1].equals(values[0]);
+      }
+    }, this, other);
+  }
+
+  public StringSeries set(BooleanSeries where, String value) {
+    String[] values = new String[this.values.length];
+    for(int i=0; i<where.size(); i++) {
+      if(BooleanSeries.isTrue(where.getBoolean(i))) {
+        values[i] = value;
+      } else {
+        values[i] = this.values[i];
+      }
+    }
+    return buildFrom(values);
+  }
+
+  public int count(String value) {
+    int count = 0;
+    for(String v : this.values)
+      if(nullSafeStringComparator(v, value) == 0)
+        count++;
+    return count;
+  }
+
+  public boolean contains(String value) {
+    return this.count(value) > 0;
+  }
+
+  public StringSeries replace(String find, String by) {
+    if(isNull(find))
+      return this.fillNull(by);
+    return this.set(this.eq(find), by);
+  }
+
+  @Override
+  public StringSeries filter(BooleanSeries filter) {
+    return this.set(filter.fillNull().not(), NULL);
+  }
+
   @Override
   public String toString() {
     StringBuilder builder = new StringBuilder();
     builder.append("StringSeries{");
     for(String s : this.values) {
       if(isNull(s)) {
-        builder.append("null");
+        builder.append("null ");
       } else {
         builder.append("'");
         builder.append(s);
@@ -330,25 +385,6 @@ public final class StringSeries extends TypedSeries<StringSeries> {
     if(this.isNull(index))
       return TOSTRING_NULL;
     return this.values[index];
-  }
-
-  public boolean hasValue(String value) {
-    for(String v : this.values)
-      if(nullSafeStringComparator(v, value) == 0)
-        return true;
-    return false;
-  }
-
-  public StringSeries replace(String find, String by) {
-    String[] values = new String[this.values.length];
-    for(int i=0; i<values.length; i++) {
-      if(nullSafeStringComparator(this.values[i], find) == 0) {
-        values[i] = by;
-      } else {
-        values[i] = this.values[i];
-      }
-    }
-    return buildFrom(values);
   }
 
   @Override
@@ -421,11 +457,11 @@ public final class StringSeries extends TypedSeries<StringSeries> {
 
     // Note: code-specialization to help hot-spot vm
     if(series.length == 1)
-      return map(function, series[0]);
+      return mapUnrolled(function, series[0]);
     if(series.length == 2)
-      return map(function, series[0], series[1]);
+      return mapUnrolled(function, series[0], series[1]);
     if(series.length == 3)
-      return map(function, series[0], series[1], series[2]);
+      return mapUnrolled(function, series[0], series[1], series[2]);
 
     String[] input = new String[series.length];
     String[] output = new String[series[0].size()];
@@ -446,7 +482,7 @@ public final class StringSeries extends TypedSeries<StringSeries> {
     return function.apply(input);
   }
 
-  private static StringSeries map(StringFunction function, Series a) {
+  private static StringSeries mapUnrolled(StringFunction function, Series a) {
     String[] output = new String[a.size()];
     for(int i=0; i<a.size(); i++) {
       if(a.isNull(i)) {
@@ -458,7 +494,7 @@ public final class StringSeries extends TypedSeries<StringSeries> {
     return buildFrom(output);
   }
 
-  private static StringSeries map(StringFunction function, Series a, Series b) {
+  private static StringSeries mapUnrolled(StringFunction function, Series a, Series b) {
     String[] output = new String[a.size()];
     for(int i=0; i<a.size(); i++) {
       if(a.isNull(i) || b.isNull(i)) {
@@ -470,7 +506,7 @@ public final class StringSeries extends TypedSeries<StringSeries> {
     return buildFrom(output);
   }
 
-  private static StringSeries map(StringFunction function, Series a, Series b, Series c) {
+  private static StringSeries mapUnrolled(StringFunction function, Series a, Series b, Series c) {
     String[] output = new String[a.size()];
     for(int i=0; i<a.size(); i++) {
       if(a.isNull(i) || b.isNull(i) || c.isNull(i)) {

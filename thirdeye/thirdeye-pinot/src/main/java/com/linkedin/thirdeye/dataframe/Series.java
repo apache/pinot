@@ -102,7 +102,7 @@ public abstract class Series {
     byte FALSE = BooleanSeries.FALSE;
     byte NULL = BooleanSeries.NULL;
 
-    byte apply(boolean... values);
+    byte apply(byte... values);
   }
 
   /**
@@ -389,7 +389,21 @@ public abstract class Series {
    */
   public abstract Series fillNull();
 
+  /**
+   * Returns a new builder instance for the native type encapsulated by this series.
+   *
+   * @return series builder
+   */
   public abstract Builder getBuilder();
+
+  /**
+   * Returns a copy of the series with values replaced by {@code null} for every row in
+   * {@code filter} that is not {@code true}.
+   *
+   * @param mask series to filter by
+   * @return filtered series copy
+   */
+  public abstract Series filter(BooleanSeries mask);
 
   /* *************************************************************************
    * Internal abstract interface
@@ -617,11 +631,20 @@ public abstract class Series {
    * @return {@code true} if empty, {@code false} otherwise
    */
   public final boolean hasNull() {
-    for(int i=0; i<this.size(); i++) {
-      if(isNull(i))
-        return true;
-    }
-    return false;
+    return this.count() < this.size();
+  }
+
+  /**
+   * Returns the number of non-null values in the series.
+   *
+   * @return count of non-null values
+   */
+  public final int count() {
+    int countNotNull = 0;
+    for(int i=0; i<this.size(); i++)
+      if(!this.isNull(i))
+        countNotNull++;
+    return countNotNull;
   }
 
   /**
@@ -724,6 +747,31 @@ public abstract class Series {
     return this.project(Arrays.copyOf(fromIndex, count));
   }
 
+  /**
+   * Returns a BooleanSeries which contains a value indicating the null-equivalence for each
+   * value in the original series (this).
+   *
+   * @return boolean series indicating null-equivalence of each value
+   */
+  public BooleanSeries isNull() {
+    byte[] values = new byte[this.size()];
+    for(int i=0; i<this.size(); i++) {
+      values[i] = BooleanSeries.valueOf(this.isNull(i));
+    }
+    return BooleanSeries.buildFrom(values);
+  }
+
+  /**
+   * Returns a copy of the series with values replaced by {@code null} for every row in
+   * the result of applying {@code conditional} to the series that is not {@code true}.
+   *
+   * @param conditional conditional to apply and filter by
+   * @return filtered series copy
+   */
+  public Series filter(Conditional conditional) {
+    return this.filter(this.map(conditional));
+  }
+
   //
   // NOTE: co-variant method messiness
   //
@@ -812,29 +860,8 @@ public abstract class Series {
   /**
    * @see Series#map(Function)
    */
-  public final BooleanSeries map(DoubleConditional function) {
-    return (BooleanSeries)map(function, this);
-  }
-
-  /**
-   * @see Series#map(Function)
-   */
-  public final BooleanSeries map(LongConditional function) {
-    return (BooleanSeries)map(function, this);
-  }
-
-  /**
-   * @see Series#map(Function)
-   */
-  public final BooleanSeries map(StringConditional function) {
-    return (BooleanSeries)map(function, this);
-  }
-
-  /**
-   * @see Series#map(Function)
-   */
-  public final BooleanSeries map(BooleanConditional function) {
-    return (BooleanSeries)map(function, this);
+  public final BooleanSeries map(Conditional conditional) {
+    return (BooleanSeries)map(conditional, this);
   }
 
   //
@@ -912,29 +939,8 @@ public abstract class Series {
   /**
    * @see Series#aggregate(Function)
    */
-  public final BooleanSeries aggregate(DoubleConditional function) {
-    return (BooleanSeries)this.aggregate((Function)function);
-  }
-
-  /**
-   * @see Series#aggregate(Function)
-   */
-  public final BooleanSeries aggregate(LongConditional function) {
-    return (BooleanSeries)this.aggregate((Function)function);
-  }
-
-  /**
-   * @see Series#aggregate(Function)
-   */
-  public final BooleanSeries aggregate(StringConditional function) {
-    return (BooleanSeries)this.aggregate((Function)function);
-  }
-
-  /**
-   * @see Series#aggregate(Function)
-   */
-  public final BooleanSeries aggregate(BooleanConditional function) {
-    return (BooleanSeries)this.aggregate((Function)function);
+  public final BooleanSeries aggregate(Conditional conditional) {
+    return (BooleanSeries)this.aggregate((Function)conditional);
   }
 
   /**
@@ -979,8 +985,6 @@ public abstract class Series {
    * based on a greedy algorithm with fixed bucket size. The size of all buckets (except for the
    * last) is guaranteed to be equal to {@code bucketSize}.
    *
-   * <br/><b>NOTE:</b> the series is not sorted before grouping.
-   *
    * @param bucketSize maximum number of elements per bucket
    * @return grouping by element count
    */
@@ -1013,8 +1017,6 @@ public abstract class Series {
    * based on a greedy algorithm to approximately evenly fill buckets. The number of buckets
    * is guaranteed to be equal to {@code partitionCount} even if some remain empty.
    *
-   * <br/><b>NOTE:</b> the series is not sorted before grouping.
-   *
    * @param partitionCount number of buckets
    * @return grouping by bucket count
    */
@@ -1042,6 +1044,35 @@ public abstract class Series {
   }
 
   /**
+   * Returns an (overlapping) SeriesGrouping base on a moving window size. Elements are grouped
+   * into overlapping buckets in sequences of {@code windowSize} consecutive items. The number
+   * of buckets is guaranteed to be equal to {@code series_size - moving_window_size + 1}, or
+   * 0 if the window size is greater than the series size.
+   *
+   * @param windowSize size of moving window
+   * @return grouping by moving window
+   */
+  public final SeriesGrouping groupByMovingWindow(int windowSize) {
+    if(windowSize <= 0)
+      throw new IllegalArgumentException("windowSize must be greater than 0");
+    if(this.size() < windowSize)
+      return new SeriesGrouping(this);
+
+    int windowCount = this.size() - windowSize + 1;
+    long[] keys = new long[windowCount];
+    List<Bucket> buckets = new ArrayList<>();
+    for(int i=0; i<windowCount; i++) {
+      keys[i] = i;
+      int[] fromIndex = new int[windowSize];
+      for(int j=0; j<windowSize; j++) {
+        fromIndex[j] = i + j;
+      }
+      buckets.add(new Bucket(fromIndex));
+    }
+    return new SeriesGrouping(DataFrame.toSeries(keys), this, buckets);
+  }
+
+  /**
    * Returns a concatenation of {@code series} as a new series with a native type equal
    * to the first series. If subsequent series have different native types they are
    * converted transparently.
@@ -1062,23 +1093,6 @@ public abstract class Series {
   /* *************************************************************************
    * Internal interface
    * *************************************************************************/
-
-  /**
-   * Returns an array of indices with size less than or equal to the series size, such that
-   * each index references a null value in the original series.
-   *
-   * @return indices of null values
-   */
-  int[] nullIndex() {
-    int[] nulls = new int[this.size()];
-    int count = 0;
-    for(int i=0; i<this.size(); i++) {
-      if(isNull(i)) {
-        nulls[count++] = i;
-      }
-    }
-    return Arrays.copyOf(nulls, count);
-  }
 
   /**
    * Returns index tuples (pairs) for a join performed based on value.
