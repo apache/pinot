@@ -41,6 +41,7 @@ import com.linkedin.thirdeye.datalayer.entity.AbstractIndexEntity;
 import com.linkedin.thirdeye.datalayer.entity.AbstractJsonEntity;
 import com.linkedin.thirdeye.datalayer.entity.AnomalyFeedbackIndex;
 import com.linkedin.thirdeye.datalayer.entity.AnomalyFunctionIndex;
+import com.linkedin.thirdeye.datalayer.entity.AutometricsConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.DashboardConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.DataCompletenessConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.DatasetConfigIndex;
@@ -57,6 +58,7 @@ import com.linkedin.thirdeye.datalayer.entity.TaskIndex;
 import com.linkedin.thirdeye.datalayer.pojo.AbstractBean;
 import com.linkedin.thirdeye.datalayer.pojo.AnomalyFeedbackBean;
 import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
+import com.linkedin.thirdeye.datalayer.pojo.AutometricsConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.DashboardConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.DataCompletenessConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.DatasetConfigBean;
@@ -121,6 +123,8 @@ public class GenericPojoDao {
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, AutotuneConfigIndex.class));
     pojoInfoMap.put(ClassificationConfigBean.class,
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, ClassificationConfigIndex.class));
+    pojoInfoMap.put(AutometricsConfigBean.class,
+        newPojoInfo(DEFAULT_BASE_TABLE_NAME, AutometricsConfigIndex.class));
   }
 
   private static PojoInfo newPojoInfo(String baseTableName,
