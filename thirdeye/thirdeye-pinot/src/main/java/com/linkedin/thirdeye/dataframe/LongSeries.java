@@ -384,7 +384,14 @@ public final class LongSeries extends TypedSeries<LongSeries> {
   }
 
   public LongSeries add(final long constant) {
-    return this.add(fillValues(this.size(), constant));
+    if(isNull(constant))
+      return nulls(this.size());
+    return this.map(new LongFunction() {
+      @Override
+      public long apply(long... values) {
+        return values[0] + constant;
+      }
+    });
   }
 
   public LongSeries subtract(Series other) {
@@ -397,7 +404,14 @@ public final class LongSeries extends TypedSeries<LongSeries> {
   }
 
   public LongSeries subtract(final long constant) {
-    return this.subtract(fillValues(this.size(), constant));
+    if(isNull(constant))
+      return nulls(this.size());
+    return this.map(new LongFunction() {
+      @Override
+      public long apply(long... values) {
+        return values[0] - constant;
+      }
+    });
   }
 
   public LongSeries multiply(Series other) {
@@ -410,7 +424,14 @@ public final class LongSeries extends TypedSeries<LongSeries> {
   }
 
   public LongSeries multiply(final long constant) {
-    return this.multiply(fillValues(this.size(), constant));
+    if(isNull(constant))
+      return nulls(this.size());
+    return this.map(new LongFunction() {
+      @Override
+      public long apply(long... values) {
+        return values[0] * constant;
+      }
+    });
   }
 
   public LongSeries divide(Series other) {
@@ -423,7 +444,14 @@ public final class LongSeries extends TypedSeries<LongSeries> {
   }
 
   public LongSeries divide(final long constant) {
-    return this.divide(fillValues(this.size(), constant));
+    if(isNull(constant))
+      return nulls(this.size());
+    return this.map(new LongFunction() {
+      @Override
+      public long apply(long... values) {
+        return values[0] / constant;
+      }
+    });
   }
 
   public BooleanSeries eq(Series other) {
@@ -436,7 +464,14 @@ public final class LongSeries extends TypedSeries<LongSeries> {
   }
 
   public BooleanSeries eq(final long constant) {
-    return this.eq(fillValues(this.size(), constant));
+    if(isNull(constant))
+      return BooleanSeries.nulls(this.size());
+    return this.map(new LongConditional() {
+      @Override
+      public boolean apply(long... values) {
+        return values[0] == constant;
+      }
+    });
   }
 
   public LongSeries set(BooleanSeries where, long value) {
