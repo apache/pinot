@@ -1,5 +1,8 @@
 package com.linkedin.thirdeye.rootcause;
 
+import java.util.Set;
+
+
 /**
  * Interface for a named stateless pipeline as injected into {@code RCAFramework}. Holds the business logic for
  * associating search context entities with other relevant entities. Also performs relative ranking
@@ -7,23 +10,30 @@ package com.linkedin.thirdeye.rootcause;
  *
  * @see RCAFramework
  */
-public interface Pipeline {
+public abstract class Pipeline {
+  final String name;
+  final Set<String> inputs;
 
-  /**
-   * Returns the name of the pipeline which is both a unique identifier within a {@code RCAFramework}
-   * instance and a human-readable identifier.
-   *
-   * @return pipeline identifier
-   */
-  String getName();
+  public Pipeline(String name, Set<String> inputs) {
+    this.name = name;
+    this.inputs = inputs;
+  }
+
+  public final String getName() {
+    return name;
+  }
+
+  public final Set<String> getInputs() {
+    return inputs;
+  }
 
   /**
    * Executes the pipeline given the execution context set up by the RCAFramework. Returns entities
    * as determined relevant given the user-specified search context (contained in the execution
    * context).
    *
-   * @param context execution context
+   * @param context pipeline execution context
    * @return pipeline results
    */
-  PipelineResult run(ExecutionContext context);
+  public abstract PipelineResult run(PipelineContext context);
 }

@@ -1,5 +1,8 @@
 package com.linkedin.thirdeye.rootcause;
 
+import java.util.Comparator;
+
+
 /**
  * An entity represents a node in the knowledge graph traversed to identify potential root causes.
  * The URN represents a unique identifier (with a hierarchical namespace) and the score identifies
@@ -18,6 +21,13 @@ package com.linkedin.thirdeye.rootcause;
 public class Entity {
   final String urn;
   final double score;
+
+  public static final Comparator<Entity> HIGHEST_SCORE_FIRST = new Comparator<Entity>() {
+    @Override
+    public int compare(Entity o1, Entity o2) {
+      return -Double.compare(o1.score, o2.score);
+    }
+  };
 
   public Entity(String urn, double score) {
     this.urn = urn;
