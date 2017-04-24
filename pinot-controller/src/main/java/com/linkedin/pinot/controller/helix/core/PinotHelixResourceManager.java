@@ -177,6 +177,10 @@ public class PinotHelixResourceManager {
     _helixZkManager.disconnect();
   }
 
+  public SegmentDeletionManager getSegmentDeletionManager() {
+    return _segmentDeletionManager;
+  }
+
   public InstanceConfig getHelixInstanceConfig(String instanceId) {
     return _helixAdmin.getInstanceConfig(_helixClusterName, instanceId);
   }
@@ -1800,11 +1804,11 @@ public class PinotHelixResourceManager {
   }
 
   public PinotResourceManagerResponse enableInstance(String instanceName) {
-    return toogleInstance(instanceName, true, 10);
+    return toggleInstance(instanceName, true, 10);
   }
 
   public PinotResourceManagerResponse disableInstance(String instanceName) {
-    return toogleInstance(instanceName, false, 10);
+    return toggleInstance(instanceName, false, 10);
   }
 
   /**
@@ -1882,7 +1886,7 @@ public class PinotHelixResourceManager {
    * @param timeOutInSeconds: Time-out for setting ideal-state.
    * @return
    */
-  public PinotResourceManagerResponse toogleInstance(String instanceName, boolean toggle, int timeOutInSeconds) {
+  public PinotResourceManagerResponse toggleInstance(String instanceName, boolean toggle, int timeOutInSeconds) {
     if (!instanceExists(instanceName)) {
       return new PinotResourceManagerResponse("Instance " + instanceName + " does not exist.", false);
     }

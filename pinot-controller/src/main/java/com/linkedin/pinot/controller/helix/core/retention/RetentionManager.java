@@ -66,12 +66,16 @@ public class RetentionManager {
 
   private final ScheduledExecutorService _executorService;
   private final int _runFrequencyInSeconds;
+  private final int _deletedSegmentsRetentionInDays;
 
   private static final int RETENTION_TIME_FOR_OLD_LLC_SEGMENTS_DAYS = 5;
+  private static final int DEFAULT_RETENTION_FOR_DELETED_SEGMENTS_DAYS = 7;
 
-  public RetentionManager(PinotHelixResourceManager pinotHelixResourceManager, int runFrequencyInSeconds) {
+  public RetentionManager(PinotHelixResourceManager pinotHelixResourceManager, int runFrequencyInSeconds,
+      int deletedSegmentsRetentionInDays) {
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _runFrequencyInSeconds = runFrequencyInSeconds;
+    _deletedSegmentsRetentionInDays = deletedSegmentsRetentionInDays;
     _executorService = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
       @Override
       public Thread newThread(@Nonnull Runnable runnable) {
@@ -80,6 +84,10 @@ public class RetentionManager {
         return thread;
       }
     });
+  }
+
+  public RetentionManager(PinotHelixResourceManager pinotHelixResourceManager, int runFrequencyInSeconds) {
+    this(pinotHelixResourceManager, runFrequencyInSeconds, DEFAULT_RETENTION_FOR_DELETED_SEGMENTS_DAYS);
   }
 
   public static long getRetentionTimeForOldLLCSegmentsDays() {
@@ -169,6 +177,9 @@ public class RetentionManager {
         LOGGER.info("Trying to delete {} segments for table {}", segmentsToDelete.size(), tableName);
         _pinotHelixResourceManager.deleteSegments(tableName, segmentsToDelete);
       }
+
+      // Trigger clean-up for deleted segments from the deleted directory
+      _pinotHelixResourceManager.getSegmentDeletionManager().removeAgedDeletedSegments(_deletedSegmentsRetentionInDays);
     }
   }
 

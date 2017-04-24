@@ -44,6 +44,7 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String STATUS_CHECKER_WAIT_FOR_PUSH_TIME_IN_SECONDS = "controller.statuschecker.waitForPushTimeInSeconds";
   private static final String SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS = "server.request.timeoutSeconds";
   private static final String SEGMENT_COMMIT_TIMEOUT_SECONDS = "controller.realtime.segment.commit.timeoutSeconds";
+  private static final String DELETED_SEGMENTS_RETENTION_IN_DAYS = "controller.deleted.segments.retentionInDays";
   private static final String TABLE_MIN_REPLICAS = "table.minReplicas";
 
   private static final int DEFAULT_RETENTION_CONTROLLER_FREQUENCY_IN_SECONDS = 6 * 60 * 60; // 6 Hours.
@@ -52,6 +53,7 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final int DEFAULT_STATUS_CONTROLLER_WAIT_FOR_PUSH_TIME_IN_SECONDS = 10 * 60; // 10 minutes
   private static final long DEFAULT_EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT_MILLIS = 120_000L; // 2 minutes
   private static final int DEFAULT_SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS = 30;
+  private static final int DEFAULT_DELETED_SEGMENTS_RETENTION_IN_DAYS = 7;
   private static final int DEFAULT_TABLE_MIN_REPLICAS = 1;
 
   public ControllerConf(File file) throws ConfigurationException {
@@ -271,6 +273,14 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public int getServerAdminRequestTimeoutSeconds() {
     return getInt(SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS, DEFAULT_SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS);
+  }
+
+  public int getDeletedSegmentsRetentionInDays() {
+    return getInt(DELETED_SEGMENTS_RETENTION_IN_DAYS, DEFAULT_DELETED_SEGMENTS_RETENTION_IN_DAYS);
+  }
+
+  public void setDeletedSegmentsRetentionInDays(int retentionInDays) {
+    setProperty(DELETED_SEGMENTS_RETENTION_IN_DAYS, retentionInDays);
   }
 
   public int getDefaultTableMinReplicas() {
