@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.events.EventDataProvider;
 import com.linkedin.thirdeye.anomaly.events.EventDataProviderConfiguration;
@@ -16,25 +18,26 @@ import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
-import com.linkedin.thirdeye.rootcause.Aggregator;
 import com.linkedin.thirdeye.rootcause.Entity;
+import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.RCAFramework;
 import com.linkedin.thirdeye.rootcause.RCAFrameworkResult;
-import com.linkedin.thirdeye.rootcause.Pipeline;
-import com.linkedin.thirdeye.rootcause.SearchContext;
-
+import com.linkedin.thirdeye.rootcause.TopKPipeline;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.apache.commons.cli.BasicParser;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.HelpFormatter;
@@ -43,9 +46,6 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.commons.cli.Parser;
 import org.slf4j.LoggerFactory;
-
-import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.Logger;
 
 
 /**
@@ -63,7 +63,17 @@ public class RCAFrameworkRunner {
   private static final String CLI_WINDOW_SIZE = "window-size";
   private static final String CLI_BASELINE_OFFSET = "baseline-offset";
   private static final String CLI_ENTITIES = "entities";
-  private static final String CLI_DIMENSION_CUTOFF = "dimension-cutoff";
+
+  private static final String P_INPUT = RCAFramework.INPUT;
+  private static final String P_EVENT_HOLIDAY = "eventHoliday";
+  private static final String P_EVENT_ANOMALY = "eventAnomaly";
+  private static final String P_EVENT_TOPK = "eventTopK";
+  private static final String P_METRIC_DATASET_RAW = "metricDatasetRaw";
+  private static final String P_METRIC_TOPK = "metricTopK";
+  private static final String P_DIMENSION_METRIC_RAW = "dimensionMetricRaw";
+  private static final String P_DIMENSION_METRIC_REWRITE = "dimensionMetricRewrite";
+  private static final String P_DIMENSION_TOPK = "dimensionTopK";
+  private static final String P_OUTPUT = RCAFramework.OUTPUT;
 
   private static final long DAY_IN_MS = 24 * 3600 * 1000;
 
@@ -77,8 +87,6 @@ public class RCAFrameworkRunner {
     options.addOption(null, CLI_WINDOW_SIZE, true, "window size for search window (in days)");
     options.addOption(null, CLI_BASELINE_OFFSET, true, "baseline offset (in days)");
     options.addOption(null, CLI_ENTITIES, true, "search context metric entities (not specifying this will activate interactive REPL mode)");
-    options.addOption(null, CLI_DIMENSION_CUTOFF, true,
-        String.format("cutoff number for top dimensions from contribution analysis (default = %d)", DimensionPipeline.DEFAULT_CUTOFF));
 
     Parser parser = new BasicParser();
     CommandLine cmd = null;
@@ -104,44 +112,60 @@ public class RCAFrameworkRunner {
     thirdEyeConfig.setRootDir(config.getAbsolutePath());
     ThirdEyeCacheRegistry.initializeCaches(thirdEyeConfig);
 
-
-    List<Pipeline> pipelines = new ArrayList<>();
+    // ************************************************************************
+    // Framework setup
+    // ************************************************************************
+    Set<Pipeline> pipelines = new HashSet<>();
 
     EventDataProviderManager eventProvider = EventDataProviderManager.getInstance();
     eventProvider.registerEventDataProvider(EventType.HOLIDAY.toString(), new HolidayEventProvider());
     eventProvider.registerEventDataProvider(EventType.HISTORICAL_ANOMALY.toString(), new HistoricalAnomalyEventProvider());
-    // External event providers
+
     File rcaConfig = new File(config.getAbsolutePath() + "/rca.yml");
     if (rcaConfig.exists()) {
       EventDataProviderLoader.registerEventDataProvidersFromConfig(rcaConfig, eventProvider);
     }
 
-    // Holiday pipeline
-    pipelines.add(new HolidayEventsPipeline(eventProvider));
-
-    // EventMetric pipeline
-    QueryCache cache = ThirdEyeCacheRegistry.getInstance().getQueryCache();
-    DimensionScorer scorer = new DimensionScorer(cache);
-    pipelines.add(new EventMetricPipeline(eventProvider));
-
-    // Dimension pipeline
-    int cutoff = Integer.parseInt(cmd.getOptionValue(CLI_DIMENSION_CUTOFF, String.valueOf(DimensionPipeline.DEFAULT_CUTOFF)));
     MetricConfigManager metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
     DatasetConfigManager datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
-    pipelines.add(new DimensionPipeline(metricDAO, datasetDAO, scorer, cutoff));
 
-    // MetricDataset pipeline
-    pipelines.add(new MetricDatasetPipeline(metricDAO, datasetDAO));
+    // Metrics
+    pipelines.add(new MetricDatasetPipeline(P_METRIC_DATASET_RAW, asSet(P_INPUT), metricDAO, datasetDAO));
+    pipelines.add(new TopKPipeline(P_METRIC_TOPK, asSet(P_INPUT, P_METRIC_DATASET_RAW), MetricEntity.class, 5));
+
+    // Dimensions (from metrics)
+    QueryCache cache = ThirdEyeCacheRegistry.getInstance().getQueryCache();
+    DimensionScorer scorer = new DimensionScorer(cache);
+    ExecutorService executorScorer = Executors.newFixedThreadPool(3);
+    pipelines.add(new DimensionPipeline(P_DIMENSION_METRIC_RAW, asSet(P_INPUT, P_METRIC_TOPK), metricDAO, datasetDAO, scorer, executorScorer));
+
+    Map<String, String> nameMapping = new HashMap<>();
+    nameMapping.put("country", "countryCode");
+    pipelines.add(new DimensionRewriter(P_DIMENSION_METRIC_REWRITE, asSet(P_DIMENSION_METRIC_RAW), nameMapping));
+    pipelines.add(new TopKPipeline(P_DIMENSION_TOPK, asSet(P_INPUT, P_DIMENSION_METRIC_REWRITE), DimensionEntity.class, 20));
+
+    // Events (from metrics and dimensions)
+    pipelines.add(new AnomalyEventsPipeline(P_EVENT_ANOMALY, asSet(P_INPUT, P_METRIC_TOPK), eventProvider));
+    pipelines.add(new HolidayEventsPipeline(P_EVENT_HOLIDAY, asSet(P_INPUT, P_DIMENSION_TOPK), eventProvider));
+    pipelines.add(new TopKPipeline(P_EVENT_TOPK, asSet(P_EVENT_ANOMALY, P_EVENT_HOLIDAY), EventEntity.class, 20));
 
     // External pipelines
     if (rcaConfig.exists()) {
       pipelines.addAll(PipelineLoader.getPipelinesFromConfig(rcaConfig));
     }
 
-    Aggregator aggregator = new LinearAggregator();
+    // Aggregation
+    pipelines.add(new LinearAggregator(P_OUTPUT, asSet(P_EVENT_TOPK, P_METRIC_TOPK, P_DIMENSION_TOPK)));
 
-    RCAFramework framework = new RCAFramework(pipelines, aggregator);
+    // Executor
+    ExecutorService executor = Executors.newSingleThreadExecutor();
 
+    // Framework
+    RCAFramework framework = new RCAFramework(pipelines, executor);
+
+    // ************************************************************************
+    // Framework execution
+    // ************************************************************************
     Set<Entity> entities = new HashSet<>();
 
     // time range and baseline
@@ -191,16 +215,14 @@ public class RCAFrameworkRunner {
   }
 
   private static void runFramework(RCAFramework framework, Set<Entity> entities) {
-    SearchContext context = new SearchContext(entities);
-
     System.out.println("*** Search context:");
-    for(Entity e : context.getEntities()) {
+    for(Entity e : entities) {
       System.out.println(formatEntity(e));
     }
 
     RCAFrameworkResult result = null;
     try {
-      result = framework.run(context);
+      result = framework.run(entities);
     } catch (Exception e) {
       System.out.println("*** Exception while running framework:");
       e.printStackTrace();
@@ -208,13 +230,15 @@ public class RCAFrameworkRunner {
     }
 
     System.out.println("*** Linear results:");
-    for(Entity e : result.getAggregatedResults()) {
+    List<Entity> results = new ArrayList<>(result.getResults());
+    Collections.sort(results, Entity.HIGHEST_SCORE_FIRST);
+
+    for(Entity e : results) {
       System.out.println(formatEntity(e));
     }
 
     System.out.println("*** Grouped results:");
-    Map<String, Collection<Entity>>
-        grouped = topKPerType(result.getAggregatedResults(), 3);
+    Map<String, Collection<Entity>> grouped = topKPerType(results, 3);
     for(Map.Entry<String, Collection<Entity>> entry : grouped.entrySet()) {
       System.out.println(entry.getKey());
       for(Entity e : entry.getValue()) {
@@ -271,7 +295,9 @@ public class RCAFrameworkRunner {
     return String.format("%.3f [%s] %s", e.getScore(), e.getClass().getSimpleName(), e.getUrn());
   }
 
-
+  static Set<String> asSet(String... s) {
+    return new HashSet<>(Arrays.asList(s));
+  }
 
 
 }

@@ -26,4 +26,8 @@ public class EventEntity extends Entity {
   public EventDTO getDto() {
     return dto;
   }
+
+  public EventEntity withScore(double score) {
+    return new EventEntity(this.getUrn(), score, this.dto);
+  }
 }

@@ -1,7 +1,8 @@
 package com.linkedin.thirdeye.rootcause;
 
-import java.util.List;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 
 /**
@@ -11,26 +12,19 @@ import java.util.Map;
  *
  */
 public final class RCAFrameworkResult {
-  final List<Entity> aggregatedResults;
+  final Set<Entity> results;
   final Map<String, PipelineResult> pipelineResults;
-  final ExecutionContext context;
 
-  public RCAFrameworkResult(List<Entity> aggregatedResults, Map<String, PipelineResult> pipelineResults,
-      ExecutionContext context) {
-    this.aggregatedResults = aggregatedResults;
+  public RCAFrameworkResult(Set<? extends Entity> results, Map<String, PipelineResult> pipelineResults) {
+    this.results = new HashSet<>(results);
     this.pipelineResults = pipelineResults;
-    this.context = context;
   }
 
-  public List<Entity> getAggregatedResults() {
-    return aggregatedResults;
+  public Set<Entity> getResults() {
+    return results;
   }
 
   public Map<String, PipelineResult> getPipelineResults() {
     return pipelineResults;
-  }
-
-  public ExecutionContext getContext() {
-    return context;
   }
 }

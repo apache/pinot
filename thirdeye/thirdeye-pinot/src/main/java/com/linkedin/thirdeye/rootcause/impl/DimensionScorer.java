@@ -91,12 +91,17 @@ public class DimensionScorer {
       i++;
     }
 
-    DoubleSeries sCost = DataFrame.toSeries(cost);
+    DoubleSeries sCost = DataFrame.toSeries(cost).fillNull();
 
     DataFrame df = new DataFrame();
     df.addSeries(DIMENSION, dim);
     df.addSeries(VALUE, value);
-    df.addSeries(COST, sCost.divide(sCost.sum()));
+
+    if(sCost.sum() > 0.0) {
+      df.addSeries(COST, sCost.divide(sCost.sum()));
+    } else {
+      df.addSeries(COST, sCost);
+    }
 
     return df;
   }
