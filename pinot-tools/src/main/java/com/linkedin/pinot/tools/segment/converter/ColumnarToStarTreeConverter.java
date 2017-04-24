@@ -15,12 +15,16 @@
  */
 package com.linkedin.pinot.tools.segment.converter;
 
+import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.core.data.readers.FileFormat;
 import com.linkedin.pinot.core.data.readers.PinotSegmentRecordReader;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentGeneratorConfig;
+import com.linkedin.pinot.core.segment.DefaultSegmentNameGenerator;
+import com.linkedin.pinot.core.segment.SegmentNameGenerator;
 import com.linkedin.pinot.core.segment.creator.SegmentIndexCreationDriver;
 import com.linkedin.pinot.core.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import java.io.File;
 import java.lang.reflect.Field;
 import org.apache.commons.io.FileUtils;
@@ -113,7 +117,12 @@ public class ColumnarToStarTreeConverter {
     config.setOutDir(_outputDirName);
     config.setStarTreeIndexSpecFile(_starTreeConfigFileName);
     config.setOverwrite(_overwrite);
-    config.setSegmentName(columnarSegment.getName());
+
+    // Read the segment and table name from the segment's metadata.
+    SegmentMetadata metadata = new SegmentMetadataImpl(columnarSegment);
+    SegmentNameGenerator nameGenerator = new DefaultSegmentNameGenerator(metadata.getName());
+    config.setSegmentNameGenerator(nameGenerator);
+    config.setTableName(metadata.getTableName());
 
     SegmentIndexCreationDriver indexCreator = new SegmentIndexCreationDriverImpl();
     indexCreator.init(config);
