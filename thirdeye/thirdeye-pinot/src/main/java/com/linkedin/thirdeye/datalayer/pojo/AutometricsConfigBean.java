@@ -2,9 +2,6 @@ package com.linkedin.thirdeye.datalayer.pojo;
 
 import java.util.Objects;
 
-import org.apache.commons.lang3.builder.ToStringBuilder;
-import org.apache.commons.lang3.builder.ToStringStyle;
-
 
 /**
  * Class to represent the autometric definition in thirdeye database
@@ -111,11 +108,5 @@ public class AutometricsConfigBean extends AbstractBean {
         && Objects.equals(getFabricGroup(), ac.getFabricGroup())
         && Objects.equals(isActive(), ac.isActive());
   }
-
-  @Override
-  public String toString() {
-    return ToStringBuilder.reflectionToString(this, ToStringStyle.SHORT_PREFIX_STYLE);
-  }
-
 
 }
