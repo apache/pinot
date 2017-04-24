@@ -19,4 +19,5 @@ DROP TABLE IF EXISTS dashboard_config_index;
 DROP TABLE IF EXISTS event_index;
 DROP TABLE IF EXISTS detection_status_index;
 DROP TABLE IF EXISTS autotune_config_index;
+DROP TABLE IF EXISTS autometrics_config_index;
 SET FOREIGN_KEY_CHECKS = 1;

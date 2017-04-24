@@ -307,3 +307,19 @@ create table if not exists classification_config_index (
 ALTER TABLE `classification_config_index` ADD UNIQUE `classification_config_unique_index`(`name`);
 create index classification_config_name_index on classification_config_index(name);
 create index classification_config_function_index on classification_config_index(main_function_id);
+
+create table if not exists autometrics_config_index (
+    metric varchar(500) not null,
+    dashboard varchar(500) not null,
+    rrd varchar(2000) not null,
+    autometrics_type varchar(100) not null,
+    base_id bigint(20) not null,
+    create_time timestamp,
+    update_time timestamp default current_timestamp,
+    version int(10)
+) ENGINE=InnoDB;
+ALTER TABLE `autometrics_config_index` ADD UNIQUE `autometrics_config_unique_index`(`dashboard`, `metric`);
+create index autometrics_config_metric_idx on autometrics_config_index(metric);
+create index autometrics_config_dashboard_idx on autometrics_config_index(dashboard);
+create index autometrics_config_rrd_idx on autometrics_config_index(rrd);
+create index autometrics_config_autometrics_type_idx on autometrics_config_index(autometrics_type);
