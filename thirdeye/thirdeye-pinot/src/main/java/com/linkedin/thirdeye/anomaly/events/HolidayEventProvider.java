@@ -6,7 +6,7 @@ import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 
 import java.util.List;
 
-public class DefaultHolidayEventProvider implements EventDataProvider<EventDTO> {
+public class HolidayEventProvider implements EventDataProvider<EventDTO> {
   private EventManager eventDAO = DAORegistry.getInstance().getEventDAO();
 
   @Override
@@ -18,6 +18,11 @@ public class DefaultHolidayEventProvider implements EventDataProvider<EventDTO> 
 
     List<EventDTO> holidayEvents = EventFilter.applyDimensionFilter(allEventsBetweenTimeRange, eventFilter.getTargetDimensionMap());
     return holidayEvents;
+  }
+
+  @Override
+  public String getEventType() {
+    return EventType.HOLIDAY.toString();
   }
 
 }

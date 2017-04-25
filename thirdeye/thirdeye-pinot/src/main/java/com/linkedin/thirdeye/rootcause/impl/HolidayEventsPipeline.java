@@ -37,7 +37,7 @@ public class HolidayEventsPipeline implements Pipeline {
     TimeRangeEntity timeRangeEntity = TimeRangeEntity.getContextCurrent(context);
 
     EventFilter filter = new EventFilter();
-    filter.setEventType(EventType.HOLIDAY);
+    filter.setEventType(EventType.HOLIDAY.toString());
     filter.setStartTime(timeRangeEntity.getStart());
     filter.setEndTime(timeRangeEntity.getEnd());
 

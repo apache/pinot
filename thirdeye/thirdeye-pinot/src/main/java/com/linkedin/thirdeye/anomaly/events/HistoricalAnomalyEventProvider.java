@@ -4,6 +4,7 @@ import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -57,6 +58,11 @@ public class HistoricalAnomalyEventProvider implements EventDataProvider<EventDT
     }
     eventDTO.setTargetDimensionMap(dimensionValuesMap);
     return eventDTO;
+  }
+
+  @Override
+  public String getEventType() {
+    return EventType.HISTORICAL_ANOMALY.toString();
   }
 
 }

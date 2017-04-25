@@ -1,7 +1,7 @@
 package com.linkedin.thirdeye.eventprovider;
 
 import com.google.common.collect.Lists;
-import com.linkedin.thirdeye.anomaly.events.DefaultHolidayEventProvider;
+import com.linkedin.thirdeye.anomaly.events.HolidayEventProvider;
 import com.linkedin.thirdeye.anomaly.events.EventFilter;
 import com.linkedin.thirdeye.anomaly.events.EventType;
 import com.linkedin.thirdeye.datalayer.bao.AbstractManagerTestBase;
@@ -22,7 +22,7 @@ public class TestHolidayEventProvider {
 
   public class TestEventManager extends AbstractManagerTestBase {
     long testEventId;
-    DefaultHolidayEventProvider holidayEventProvider = null;
+    HolidayEventProvider holidayEventProvider = null;
     long hoursAgo5 = new DateTime().minusHours(5).getMillis();
     long hoursAgo4 = new DateTime().minusHours(4).getMillis();
     long hoursAgo3 = new DateTime().minusHours(3).getMillis();
@@ -31,7 +31,7 @@ public class TestHolidayEventProvider {
     @BeforeClass
     void beforeClass() {
       super.init();
-      holidayEventProvider = new DefaultHolidayEventProvider();
+      holidayEventProvider = new HolidayEventProvider();
     }
 
     @AfterClass(alwaysRun = true)
