@@ -15,6 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class PipelineLoader {
+  public static final String PROP_PATH = "path";
 
   private static final Logger LOG = LoggerFactory.getLogger(PipelineLoader.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper(new YAMLFactory());
@@ -31,6 +32,9 @@ public class PipelineLoader {
         String className = pipelineConfig.getClassName();
         Map<String, String> properties = pipelineConfig.getProperties();
 
+        if(properties != null)
+          properties = augmentPathProperty(properties, rcaConfig);
+
         LOG.info("Creating pipeline '{}' [{}] with inputs '{}'", name, className, inputs);
         Constructor<?> constructor = Class.forName(className).getConstructor(String.class, Set.class, Map.class);
         Pipeline pipeline = (Pipeline) constructor.newInstance(name, inputs, properties);
@@ -40,6 +44,15 @@ public class PipelineLoader {
     }
 
     return pipelines;
+  }
+
+  static Map<String, String> augmentPathProperty(Map<String, String> properties, File rcaConfig) {
+    if(properties.containsKey(PROP_PATH)) {
+      File path = new File(properties.get(PROP_PATH));
+      if(!path.isAbsolute())
+        properties.put(PROP_PATH, rcaConfig.getParent() + File.separator + path);
+    }
+    return properties;
   }
 
 }

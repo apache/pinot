@@ -16,7 +16,7 @@ import org.slf4j.LoggerFactory;
 public class DimensionRewriter extends Pipeline {
   private static final Logger LOG = LoggerFactory.getLogger(DimensionRewriter.class);
 
-  public static final String PROP_PATH = "path";
+  public static final String PROP_PATH = PipelineLoader.PROP_PATH;
 
   final Map<String, StringMapping> dimensionMappings;
 

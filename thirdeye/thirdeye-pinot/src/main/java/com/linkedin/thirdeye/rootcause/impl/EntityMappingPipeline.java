@@ -18,7 +18,7 @@ import org.slf4j.LoggerFactory;
 public class EntityMappingPipeline extends Pipeline {
   private static final Logger LOG = LoggerFactory.getLogger(EntityMappingPipeline.class);
 
-  public static final String PROP_PATH = "path";
+  public static final String PROP_PATH = PipelineLoader.PROP_PATH;
 
   final Map<String, StringMapping> urnMappings;
 
