@@ -736,7 +736,7 @@ public class DetectionJobResource {
    * @return cloned function Id
    */
   @POST
-  @Path("/replay/singlefunction/")
+  @Path("/replay/singlefunction")
   public Response replayAnomalyFunctionByFunctionId(@QueryParam("functionId") Long functionId,
       @QueryParam("autotuneId") Long autotuneId,
       @QueryParam("start") @NotNull String replayStartTimeIso, @QueryParam("end") @NotNull String replayEndTimeIso) throws IllegalArgumentException{
