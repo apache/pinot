@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
+import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
 import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
 import com.linkedin.thirdeye.anomaly.detection.lib.AutotuneMethodType;
 import com.linkedin.thirdeye.anomaly.detection.lib.FunctionReplayRunnable;
@@ -287,9 +288,10 @@ public class DetectionJobResource {
   }
 
   @POST
-  @Path("/{id}/offline_analysis")
+  @Path("/{id}/offlineAnalysis")
   public Response generateAnomaliesInTrainingData(@PathParam("id") @NotNull long id,
       @QueryParam("time") String analysisTimeIso) throws Exception {
+    long currentTime = System.currentTimeMillis();
 
     AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(id);
     if (anomalyFunction == null) {
@@ -301,12 +303,25 @@ public class DetectionJobResource {
       analysisTime = ISODateTimeFormat.dateTimeParser().parseDateTime(analysisTimeIso);
     }
 
-    final long functionId = id;
-    final DateTime innerTime = analysisTime;
+    Long jobId = detectionJobScheduler.runOfflineAnalysis(id, analysisTime);
+    List<Long> anomalyIds = new ArrayList<>();
+    if(jobId == null) {
+      return Response.status(Response.Status.BAD_REQUEST).entity("Anomaly function " + Long.toString(id)
+          + " is inactive. Or thread is interrupted.").build();
+    } else {
+      JobStatus jobStatus = detectionJobScheduler.waitForJobDone(jobId);
+      if(jobStatus.equals(JobStatus.FAILED)) {
+        return Response.status(Response.Status.NO_CONTENT).entity("Detection job failed").build();
+      } else {
+        List<MergedAnomalyResultDTO> mergedAnomalies = mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(
+            0, analysisTime.getMillis(), id);
+        for (MergedAnomalyResultDTO mergedAnomaly : mergedAnomalies) {
+          anomalyIds.add(mergedAnomaly.getId());
+        }
+      }
+    }
 
-    detectionJobScheduler.runOfflineAnalysis(functionId, innerTime);
-
-    return Response.ok().build();
+    return Response.ok(anomalyIds).build();
   }
 
   /**

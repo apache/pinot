@@ -495,9 +495,11 @@ public class AnomalyResource {
     // if auto tune method is ALERT_FILTER_LOGISITC_AUTO_TUNE or INITIATE_ALERT_FILTER_LOGISTIC_AUTO_TUNE, alert filter is to be updated
     if (autotuneConfigDTO.getAutotuneMethod() != EXHAUSTIVE) {
       targetFunction.setAlertFilter(autotuneConfigDTO.getConfiguration());
-    } else{
+    } else {
       // Update function configuration
-      targetFunction.updateProperties(autotuneConfigDTO.getConfiguration());
+      if (autotuneConfigDTO.getConfiguration()!= null && !autotuneConfigDTO.getConfiguration().isEmpty()) {
+        targetFunction.updateProperties(autotuneConfigDTO.getConfiguration());
+      }
     }
     targetFunction.setActive(true);
     anomalyFunctionDAO.update(targetFunction);
