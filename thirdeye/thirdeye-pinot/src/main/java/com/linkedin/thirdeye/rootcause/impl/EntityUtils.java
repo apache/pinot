@@ -91,4 +91,31 @@ public class EntityUtils {
     assertType(entity.getUrn(), type);
     return entity;
   }
+
+  /**
+   * Attemps to parse {@code urn} and return a specific Entity subtype with the given {@code score}
+   * Supports {@code MetricEntity}, {@code DimensionEntity}, {@code TimeRangeEntity}, and
+   * {@code ServiceEntity}.
+   *
+   * @param urn entity urn
+   * @param score entity score
+   * @throws IllegalArgumentException, if the urn cannot be parsed
+   * @return entity subtype instance
+   */
+  public static Entity parseURN(String urn, double score) {
+    if(DimensionEntity.TYPE.isType(urn)) {
+      return DimensionEntity.fromURN(urn, score);
+
+    } else if(MetricEntity.TYPE.isType(urn)) {
+      return MetricEntity.fromURN(urn, score);
+
+    } else if(TimeRangeEntity.TYPE.isType(urn)) {
+      return TimeRangeEntity.fromURN(urn, score);
+
+    } else if(ServiceEntity.TYPE.isType(urn)) {
+      return ServiceEntity.fromURN(urn, score);
+    }
+    throw new IllegalArgumentException(String.format("Could not parse URN '%s'", urn));
+  }
+
 }

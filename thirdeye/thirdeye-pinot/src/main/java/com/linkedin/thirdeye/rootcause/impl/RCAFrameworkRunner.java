@@ -3,8 +3,6 @@ package com.linkedin.thirdeye.rootcause.impl;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import com.linkedin.thirdeye.anomaly.events.EventDataProvider;
-import com.linkedin.thirdeye.anomaly.events.EventDataProviderConfiguration;
 import com.linkedin.thirdeye.anomaly.events.EventDataProviderLoader;
 import com.linkedin.thirdeye.anomaly.events.HolidayEventProvider;
 import com.linkedin.thirdeye.anomaly.events.EventDataProviderManager;
@@ -16,7 +14,6 @@ import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.Pipeline;
@@ -69,11 +66,19 @@ public class RCAFrameworkRunner {
   private static final String P_EVENT_ANOMALY = "eventAnomaly";
   private static final String P_EVENT_TOPK = "eventTopK";
   private static final String P_METRIC_DATASET_RAW = "metricDatasetRaw";
+  private static final String P_METRIC_METRIC_RAW = "metricMetricRaw";
   private static final String P_METRIC_TOPK = "metricTopK";
   private static final String P_DIMENSION_METRIC_RAW = "dimensionMetricRaw";
-  private static final String P_DIMENSION_METRIC_REWRITE = "dimensionMetricRewrite";
+  private static final String P_DIMENSION_REWRITE = "dimensionRewrite";
   private static final String P_DIMENSION_TOPK = "dimensionTopK";
+  private static final String P_SERVICE_METRIC_RAW = "serviceMetricRaw";
+  private static final String P_SERVICE_TOPK = "serviceTopK";
   private static final String P_OUTPUT = RCAFramework.OUTPUT;
+
+  private static final int TOPK_EVENT = 10;
+  private static final int TOPK_METRIC = 5;
+  private static final int TOPK_DIMENSION = 10;
+  private static final int TOPK_SERVICE = 5;
 
   private static final long DAY_IN_MS = 24 * 3600 * 1000;
 
@@ -130,8 +135,12 @@ public class RCAFrameworkRunner {
     DatasetConfigManager datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
 
     // Metrics
+    Map<String, String> metricToMetricMapping = new HashMap<>();
+    Collection<StringMapping> metricMapping = StringMappingParser.fromMap(metricToMetricMapping, 1.0);
+
     pipelines.add(new MetricDatasetPipeline(P_METRIC_DATASET_RAW, asSet(P_INPUT), metricDAO, datasetDAO));
-    pipelines.add(new TopKPipeline(P_METRIC_TOPK, asSet(P_INPUT, P_METRIC_DATASET_RAW), MetricEntity.class, 5));
+    pipelines.add(new EntityMappingPipeline(P_METRIC_METRIC_RAW, asSet(P_INPUT), metricMapping, MetricEntity.class));
+    pipelines.add(new TopKPipeline(P_METRIC_TOPK, asSet(P_INPUT, P_METRIC_DATASET_RAW, P_METRIC_METRIC_RAW), MetricEntity.class, TOPK_METRIC));
 
     // Dimensions (from metrics)
     QueryCache cache = ThirdEyeCacheRegistry.getInstance().getQueryCache();
@@ -139,16 +148,24 @@ public class RCAFrameworkRunner {
     ExecutorService executorScorer = Executors.newFixedThreadPool(3);
     pipelines.add(new DimensionPipeline(P_DIMENSION_METRIC_RAW, asSet(P_INPUT, P_METRIC_TOPK), metricDAO, datasetDAO, scorer, executorScorer));
 
-    Map<String, String> nameMapping = new HashMap<>();
-    nameMapping.put("country", "countryCode");
+    Map<String, String> dimNameToDimNameMapping = new HashMap<>();
+    dimNameToDimNameMapping.put("country", "countryCode");
+    Collection<StringMapping> dimensionMapping = StringMappingParser.fromMap(dimNameToDimNameMapping, 1.0);
 
-    pipelines.add(new DimensionRewriter(P_DIMENSION_METRIC_REWRITE, asSet(P_DIMENSION_METRIC_RAW), nameMapping));
-    pipelines.add(new TopKPipeline(P_DIMENSION_TOPK, asSet(P_INPUT, P_DIMENSION_METRIC_REWRITE), DimensionEntity.class, 20));
+    pipelines.add(new DimensionRewriter(P_DIMENSION_REWRITE, asSet(P_DIMENSION_METRIC_RAW), dimensionMapping));
+    pipelines.add(new TopKPipeline(P_DIMENSION_TOPK, asSet(P_INPUT, P_DIMENSION_REWRITE), DimensionEntity.class, TOPK_DIMENSION));
+
+    // Systems
+    Map<String, String> metricToServiceMapping = new HashMap<>();
+    Collection<StringMapping> serviceMapping = StringMappingParser.fromMap(metricToServiceMapping, 1.0);
+
+    pipelines.add(new EntityMappingPipeline(P_SERVICE_METRIC_RAW, asSet(P_METRIC_TOPK), serviceMapping, MetricEntity.class));
+    pipelines.add(new TopKPipeline(P_SERVICE_TOPK, asSet(P_INPUT, P_SERVICE_METRIC_RAW), ServiceEntity.class, TOPK_SERVICE));
 
     // Events (from metrics and dimensions)
     pipelines.add(new AnomalyEventsPipeline(P_EVENT_ANOMALY, asSet(P_INPUT, P_METRIC_TOPK), eventProvider));
     pipelines.add(new HolidayEventsPipeline(P_EVENT_HOLIDAY, asSet(P_INPUT, P_DIMENSION_TOPK), eventProvider));
-    pipelines.add(new TopKPipeline(P_EVENT_TOPK, asSet(P_EVENT_ANOMALY, P_EVENT_HOLIDAY), EventEntity.class, 20));
+    pipelines.add(new TopKPipeline(P_EVENT_TOPK, asSet(P_INPUT, P_EVENT_ANOMALY, P_EVENT_HOLIDAY), EventEntity.class, TOPK_EVENT));
 
     // External pipelines
     if (rcaConfig.exists()) {
@@ -156,7 +173,7 @@ public class RCAFrameworkRunner {
     }
 
     // Aggregation
-    pipelines.add(new LinearAggregator(P_OUTPUT, asSet(P_EVENT_TOPK, P_METRIC_TOPK, P_DIMENSION_TOPK)));
+    pipelines.add(new LinearAggregator(P_OUTPUT, asSet(P_EVENT_TOPK, P_METRIC_TOPK, P_DIMENSION_TOPK, P_SERVICE_TOPK)));
 
     // Executor
     ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -252,21 +269,9 @@ public class RCAFrameworkRunner {
     Set<Entity> entities = new HashSet<>();
     String[] parts = urns.split(",");
     for(String part : parts) {
-      entities.add(parseURN(part, score));
+      entities.add(EntityUtils.parseURN(part, score));
     }
     return entities;
-  }
-
-  private static Entity parseURN(String urn, double score) {
-    String prefix = EntityType.extractPrefix(urn);
-    if(DimensionEntity.TYPE.getPrefix().equals(prefix)) {
-      return DimensionEntity.fromURN(urn, score);
-    } else if(MetricEntity.TYPE.getPrefix().equals(prefix)) {
-      return MetricEntity.fromURN(urn, score);
-    } else if(TimeRangeEntity.TYPE.getPrefix().equals(prefix)){
-      return TimeRangeEntity.fromURN(urn, score);
-    }
-    throw new IllegalArgumentException(String.format("Could not parse URN '%s'", urn));
   }
 
   /**

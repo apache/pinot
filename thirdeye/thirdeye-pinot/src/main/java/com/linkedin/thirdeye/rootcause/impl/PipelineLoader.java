@@ -31,7 +31,7 @@ public class PipelineLoader {
         Map<String, String> properties = pipelineConfig.getProperties();
 
         LOG.info("Creating pipeline '{}' [{}] with inputs '{}'", name, className, inputs);
-        Constructor<?> constructor = Class.forName(className).getConstructor(Map.class);
+        Constructor<?> constructor = Class.forName(className).getConstructor(String.class, Collection.class, Map.class);
         Pipeline pipeline = (Pipeline) constructor.newInstance(name, inputs, properties);
         pipelines.add(pipeline);
       }
