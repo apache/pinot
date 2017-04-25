@@ -28,7 +28,7 @@
       "fieldName": "l_extendedprice"
     }
   ],
-  "dimension": "l_shipdate",
+  "dimension": "l_shipmode",
   "threshold": 10,
   "metric": "l_extendedprice_sum"
 }
