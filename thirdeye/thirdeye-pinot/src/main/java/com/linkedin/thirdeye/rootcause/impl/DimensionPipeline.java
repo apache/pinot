@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
+import com.linkedin.thirdeye.client.DAORegistry;
+import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.DoubleSeries;
 import com.linkedin.thirdeye.dataframe.Series;
@@ -17,6 +19,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
@@ -41,6 +44,8 @@ public class DimensionPipeline extends Pipeline {
   static final String VALUE = DimensionScorer.VALUE;
   static final String COST = DimensionScorer.COST;
 
+  static final String PROP_PARALLELISM = "parallelism";
+
   final MetricConfigManager metricDAO;
   final DatasetConfigManager datasetDAO;
   final DimensionScorer scorer;
@@ -53,6 +58,17 @@ public class DimensionPipeline extends Pipeline {
     this.datasetDAO = datasetDAO;
     this.scorer = scorer;
     this.executor = executor;
+  }
+
+  public DimensionPipeline(String name, Set<String> inputs, Map<String, String> properties) {
+    super(name, inputs);
+
+    this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
+    this.datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
+    this.scorer = new DimensionScorer(ThirdEyeCacheRegistry.getInstance().getQueryCache());
+
+    int parallelism = Integer.parseInt(properties.get(PROP_PARALLELISM));
+    this.executor = Executors.newFixedThreadPool(parallelism);
   }
 
   @Override

@@ -6,9 +6,10 @@ import com.linkedin.thirdeye.rootcause.Pipeline;
 import java.io.File;
 import java.lang.reflect.Constructor;
 import java.util.ArrayList;
-import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,13 +27,14 @@ public class PipelineLoader {
     if (CollectionUtils.isNotEmpty(rcaPipelinesConfiguration)) {
       for (PipelineConfiguration pipelineConfig : rcaPipelinesConfiguration) {
         String name = pipelineConfig.getName();
-        Collection<String> inputs = pipelineConfig.getInputs();
+        Set<String> inputs = new HashSet<>(pipelineConfig.getInputs());
         String className = pipelineConfig.getClassName();
         Map<String, String> properties = pipelineConfig.getProperties();
 
         LOG.info("Creating pipeline '{}' [{}] with inputs '{}'", name, className, inputs);
-        Constructor<?> constructor = Class.forName(className).getConstructor(String.class, Collection.class, Map.class);
+        Constructor<?> constructor = Class.forName(className).getConstructor(String.class, Set.class, Map.class);
         Pipeline pipeline = (Pipeline) constructor.newInstance(name, inputs, properties);
+
         pipelines.add(pipeline);
       }
     }

@@ -8,6 +8,7 @@ import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.PipelineContext;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +28,11 @@ public class AnomalyEventsPipeline extends Pipeline {
   public AnomalyEventsPipeline(String name, Set<String> inputs, EventDataProviderManager manager) {
     super(name, inputs);
     this.manager = manager;
+  }
+
+  public AnomalyEventsPipeline(String name, Set<String> inputs, Map<String, String> ignore) {
+    super(name, inputs);
+    this.manager = EventDataProviderManager.getInstance();
   }
 
   @Override

@@ -1,8 +1,7 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
-import java.util.List;
-
 import com.linkedin.thirdeye.anomaly.events.EventDataProviderConfiguration;
+import java.util.List;
 
 /**
  * Config class for RCA's yml config

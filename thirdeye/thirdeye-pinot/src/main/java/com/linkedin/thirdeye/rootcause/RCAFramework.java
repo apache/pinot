@@ -34,8 +34,8 @@ import org.slf4j.LoggerFactory;
 public class RCAFramework {
   private static final Logger LOG = LoggerFactory.getLogger(RCAFramework.class);
 
-  public static final String INPUT = "input";
-  public static final String OUTPUT = "output";
+  public static final String INPUT = "INPUT";
+  public static final String OUTPUT = "OUTPUT";
   public static final long TIMEOUT = 600000;
 
   final Map<String, Pipeline> pipelines;

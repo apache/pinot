@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
-import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -13,7 +13,7 @@ import java.util.Map;
 public class PipelineConfiguration {
   private String name;
   private String className;
-  private Collection<String> inputs;
+  private List<String> inputs;
   private Map<String, String> properties = null;
 
   public String getName() {
@@ -34,10 +34,10 @@ public class PipelineConfiguration {
   public void setProperties(Map<String, String> properties) {
     this.properties = properties;
   }
-  public Collection<String> getInputs() {
+  public List<String> getInputs() {
     return inputs;
   }
-  public void setInputs(Collection<String> inputs) {
+  public void setInputs(List<String> inputs) {
     this.inputs = inputs;
   }
 }

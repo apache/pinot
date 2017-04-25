@@ -37,6 +37,12 @@ public class MetricDatasetPipeline extends Pipeline {
     this.datasetDAO = datasetDAO;
   }
 
+  public MetricDatasetPipeline(String name, Set<String> inputs, Map<String, String> ignore) {
+    super(name, inputs);
+    this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
+    this.datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
+  }
+
   @Override
   public PipelineResult run(PipelineContext context) {
     Set<MetricEntity> metrics = EntityUtils.filterContext(context, MetricEntity.class);

@@ -4,10 +4,10 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
 import com.linkedin.thirdeye.anomaly.events.EventDataProviderLoader;
-import com.linkedin.thirdeye.anomaly.events.HolidayEventProvider;
 import com.linkedin.thirdeye.anomaly.events.EventDataProviderManager;
 import com.linkedin.thirdeye.anomaly.events.EventType;
 import com.linkedin.thirdeye.anomaly.events.HistoricalAnomalyEventProvider;
+import com.linkedin.thirdeye.anomaly.events.HolidayEventProvider;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.cache.QueryCache;
@@ -19,7 +19,6 @@ import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.RCAFramework;
 import com.linkedin.thirdeye.rootcause.RCAFrameworkResult;
-import com.linkedin.thirdeye.rootcause.TopKPipeline;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -60,6 +59,7 @@ public class RCAFrameworkRunner {
   private static final String CLI_WINDOW_SIZE = "window-size";
   private static final String CLI_BASELINE_OFFSET = "baseline-offset";
   private static final String CLI_ENTITIES = "entities";
+  private static final String CLI_PIPELINE = "pipeline";
 
   private static final String P_INPUT = RCAFramework.INPUT;
   private static final String P_EVENT_HOLIDAY = "eventHoliday";
@@ -92,6 +92,7 @@ public class RCAFrameworkRunner {
     options.addOption(null, CLI_WINDOW_SIZE, true, "window size for search window (in days)");
     options.addOption(null, CLI_BASELINE_OFFSET, true, "baseline offset (in days)");
     options.addOption(null, CLI_ENTITIES, true, "search context metric entities (not specifying this will activate interactive REPL mode)");
+    options.addOption(null, CLI_PIPELINE, true, "pipeline config YAML file (not specifying this will launch default pipeline)");
 
     Parser parser = new BasicParser();
     CommandLine cmd = null;
@@ -117,69 +118,27 @@ public class RCAFrameworkRunner {
     thirdEyeConfig.setRootDir(config.getAbsolutePath());
     ThirdEyeCacheRegistry.initializeCaches(thirdEyeConfig);
 
-    // ************************************************************************
-    // Framework setup
-    // ************************************************************************
-    Set<Pipeline> pipelines = new HashSet<>();
-
     EventDataProviderManager eventProvider = EventDataProviderManager.getInstance();
     eventProvider.registerEventDataProvider(EventType.HOLIDAY.toString(), new HolidayEventProvider());
     eventProvider.registerEventDataProvider(EventType.HISTORICAL_ANOMALY.toString(), new HistoricalAnomalyEventProvider());
 
-    File rcaConfig = new File(config.getAbsolutePath() + "/rca.yml");
-    if (rcaConfig.exists()) {
+    // ************************************************************************
+    // Framework setup
+    // ************************************************************************
+    RCAFramework framework;
+    if(cmd.hasOption(CLI_PIPELINE)) {
+      File rcaConfig = new File(cmd.getOptionValue(CLI_PIPELINE));
       EventDataProviderLoader.registerEventDataProvidersFromConfig(rcaConfig, eventProvider);
+      List<Pipeline> pipelines = PipelineLoader.getPipelinesFromConfig(rcaConfig);
+
+      // Executor
+      ExecutorService executor = Executors.newSingleThreadExecutor();
+
+      framework = new RCAFramework(pipelines, executor);
+
+    } else {
+      framework = makeStaticFramework(eventProvider);
     }
-
-    MetricConfigManager metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
-    DatasetConfigManager datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
-
-    // Metrics
-    Map<String, String> metricToMetricMapping = new HashMap<>();
-    Collection<StringMapping> metricMapping = StringMappingParser.fromMap(metricToMetricMapping, 1.0);
-
-    pipelines.add(new MetricDatasetPipeline(P_METRIC_DATASET_RAW, asSet(P_INPUT), metricDAO, datasetDAO));
-    pipelines.add(new EntityMappingPipeline(P_METRIC_METRIC_RAW, asSet(P_INPUT), metricMapping, MetricEntity.class));
-    pipelines.add(new TopKPipeline(P_METRIC_TOPK, asSet(P_INPUT, P_METRIC_DATASET_RAW, P_METRIC_METRIC_RAW), MetricEntity.class, TOPK_METRIC));
-
-    // Dimensions (from metrics)
-    QueryCache cache = ThirdEyeCacheRegistry.getInstance().getQueryCache();
-    DimensionScorer scorer = new DimensionScorer(cache);
-    ExecutorService executorScorer = Executors.newFixedThreadPool(3);
-    pipelines.add(new DimensionPipeline(P_DIMENSION_METRIC_RAW, asSet(P_INPUT, P_METRIC_TOPK), metricDAO, datasetDAO, scorer, executorScorer));
-
-    Map<String, String> dimNameToDimNameMapping = new HashMap<>();
-    dimNameToDimNameMapping.put("country", "countryCode");
-    Collection<StringMapping> dimensionMapping = StringMappingParser.fromMap(dimNameToDimNameMapping, 1.0);
-
-    pipelines.add(new DimensionRewriter(P_DIMENSION_REWRITE, asSet(P_DIMENSION_METRIC_RAW), dimensionMapping));
-    pipelines.add(new TopKPipeline(P_DIMENSION_TOPK, asSet(P_INPUT, P_DIMENSION_REWRITE), DimensionEntity.class, TOPK_DIMENSION));
-
-    // Systems
-    Map<String, String> metricToServiceMapping = new HashMap<>();
-    Collection<StringMapping> serviceMapping = StringMappingParser.fromMap(metricToServiceMapping, 1.0);
-
-    pipelines.add(new EntityMappingPipeline(P_SERVICE_METRIC_RAW, asSet(P_METRIC_TOPK), serviceMapping, MetricEntity.class));
-    pipelines.add(new TopKPipeline(P_SERVICE_TOPK, asSet(P_INPUT, P_SERVICE_METRIC_RAW), ServiceEntity.class, TOPK_SERVICE));
-
-    // Events (from metrics and dimensions)
-    pipelines.add(new AnomalyEventsPipeline(P_EVENT_ANOMALY, asSet(P_INPUT, P_METRIC_TOPK), eventProvider));
-    pipelines.add(new HolidayEventsPipeline(P_EVENT_HOLIDAY, asSet(P_INPUT, P_DIMENSION_TOPK), eventProvider));
-    pipelines.add(new TopKPipeline(P_EVENT_TOPK, asSet(P_INPUT, P_EVENT_ANOMALY, P_EVENT_HOLIDAY), EventEntity.class, TOPK_EVENT));
-
-    // External pipelines
-    if (rcaConfig.exists()) {
-      pipelines.addAll(PipelineLoader.getPipelinesFromConfig(rcaConfig));
-    }
-
-    // Aggregation
-    pipelines.add(new LinearAggregator(P_OUTPUT, asSet(P_EVENT_TOPK, P_METRIC_TOPK, P_DIMENSION_TOPK, P_SERVICE_TOPK)));
-
-    // Executor
-    ExecutorService executor = Executors.newSingleThreadExecutor();
-
-    // Framework
-    RCAFramework framework = new RCAFramework(pipelines, executor);
 
     // ************************************************************************
     // Framework execution
@@ -212,6 +171,55 @@ public class RCAFrameworkRunner {
 
     // Pinot connection workaround
     System.exit(0);
+  }
+
+  private static RCAFramework makeStaticFramework(EventDataProviderManager eventProvider) {
+    Set<Pipeline> pipelines = new HashSet<>();
+
+    MetricConfigManager metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
+    DatasetConfigManager datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
+
+    // Metrics
+    Map<String, String> metricToMetricMapping = new HashMap<>();
+    Collection<StringMapping> metricMapping = StringMappingParser.fromMap(metricToMetricMapping, 1.0);
+
+    pipelines.add(new MetricDatasetPipeline(P_METRIC_DATASET_RAW, asSet(P_INPUT), metricDAO, datasetDAO));
+    pipelines.add(new EntityMappingPipeline(P_METRIC_METRIC_RAW, asSet(P_INPUT), metricMapping));
+    pipelines.add(new TopKPipeline(P_METRIC_TOPK, asSet(P_INPUT, P_METRIC_DATASET_RAW, P_METRIC_METRIC_RAW), MetricEntity.class, TOPK_METRIC));
+
+    // Dimensions (from metrics)
+    QueryCache cache = ThirdEyeCacheRegistry.getInstance().getQueryCache();
+    DimensionScorer scorer = new DimensionScorer(cache);
+    ExecutorService executorScorer = Executors.newFixedThreadPool(3);
+    pipelines.add(new DimensionPipeline(P_DIMENSION_METRIC_RAW, asSet(P_INPUT, P_METRIC_TOPK), metricDAO, datasetDAO, scorer, executorScorer));
+
+    Map<String, String> dimNameToDimNameMapping = new HashMap<>();
+    dimNameToDimNameMapping.put("country", "countryCode");
+    Collection<StringMapping> dimensionMapping = StringMappingParser.fromMap(dimNameToDimNameMapping, 1.0);
+
+    pipelines.add(new DimensionRewriter(P_DIMENSION_REWRITE, asSet(P_DIMENSION_METRIC_RAW), dimensionMapping));
+    pipelines.add(new TopKPipeline(P_DIMENSION_TOPK, asSet(P_INPUT, P_DIMENSION_REWRITE), DimensionEntity.class, TOPK_DIMENSION));
+
+    // Systems
+    Map<String, String> metricToServiceMapping = new HashMap<>();
+    Collection<StringMapping> serviceMapping = StringMappingParser.fromMap(metricToServiceMapping, 1.0);
+
+    pipelines.add(new EntityMappingPipeline(P_SERVICE_METRIC_RAW, asSet(P_METRIC_TOPK), serviceMapping));
+    pipelines.add(new TopKPipeline(P_SERVICE_TOPK, asSet(P_INPUT, P_SERVICE_METRIC_RAW), ServiceEntity.class, TOPK_SERVICE));
+
+    // Events (from metrics and dimensions)
+    pipelines.add(new AnomalyEventsPipeline(P_EVENT_ANOMALY, asSet(P_INPUT, P_METRIC_TOPK), eventProvider));
+    pipelines.add(new HolidayEventsPipeline(P_EVENT_HOLIDAY, asSet(P_INPUT, P_DIMENSION_TOPK), eventProvider));
+    pipelines.add(new TopKPipeline(P_EVENT_TOPK, asSet(P_INPUT, P_EVENT_ANOMALY, P_EVENT_HOLIDAY), EventEntity.class, TOPK_EVENT));
+
+    // Aggregation
+    pipelines.add(new LinearAggregator(P_OUTPUT, asSet(P_EVENT_TOPK, P_METRIC_TOPK, P_DIMENSION_TOPK, P_SERVICE_TOPK)));
+
+    // Executor
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+
+    // Framework
+    return new RCAFramework(pipelines, executor);
   }
 
   private static void readExecutePrintLoop(RCAFramework framework, Collection<Entity> baseEntities)

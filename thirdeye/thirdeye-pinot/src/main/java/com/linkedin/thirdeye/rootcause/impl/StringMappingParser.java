@@ -12,17 +12,17 @@ import java.util.Map;
 public class StringMappingParser {
   private static final String S_FROM = "from";
   private static final String S_TO = "to";
-  private static final String S_WEIGHT = "weight";
+  private static final String S_WEIGHT = "score";
 
-  public static Collection<StringMapping> fromCsv(Reader in, double defaultWeight) throws IOException {
+  public static Collection<StringMapping> fromCsv(Reader in, double defaultScore) throws IOException {
     Collection<StringMapping> mappings = new ArrayList<>();
 
     DataFrame df = DataFrame.fromCsv(in);
 
     if(!df.contains(S_WEIGHT))
-      df.addSeries(S_WEIGHT, DoubleSeries.fillValues(df.size(), defaultWeight));
+      df.addSeries(S_WEIGHT, DoubleSeries.fillValues(df.size(), defaultScore));
 
-    df.addSeries(S_WEIGHT, df.getDoubles(S_WEIGHT).fillNull(defaultWeight));
+    df.addSeries(S_WEIGHT, df.getDoubles(S_WEIGHT).fillNull(defaultScore));
 
     for(int i=0; i<df.size(); i++) {
       String from = df.getString(S_FROM, i);
@@ -34,16 +34,16 @@ public class StringMappingParser {
     return mappings;
   }
 
-  public static Collection<StringMapping> fromMap(Map<String, String> map, double defaultWeight) {
+  public static Collection<StringMapping> fromMap(Map<String, String> map, double defaultScore) {
     Collection<StringMapping> mappings = new ArrayList<>();
 
     for(Map.Entry<String, String> e : map.entrySet()) {
       String[] parts = e.getValue().split(",");
       String to = parts[0];
-      double weight = defaultWeight;
+      double score = defaultScore;
       if(parts.length >= 2)
-        weight = Double.parseDouble(parts[1]);
-      mappings.add(new StringMapping(e.getKey(), to, weight));
+        score = Double.parseDouble(parts[1]);
+      mappings.add(new StringMapping(e.getKey(), to, score));
     }
 
     return mappings;

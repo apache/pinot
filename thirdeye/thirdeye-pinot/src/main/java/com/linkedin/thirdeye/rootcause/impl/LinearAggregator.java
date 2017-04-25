@@ -9,6 +9,7 @@ import com.linkedin.thirdeye.rootcause.PipelineContext;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,6 +27,10 @@ public class LinearAggregator extends Pipeline {
   private static final String SCORE = "score";
 
   public LinearAggregator(String name, Set<String> inputs) {
+    super(name, inputs);
+  }
+
+  public LinearAggregator(String name, Set<String> inputs, Map<String, String> ignore) {
     super(name, inputs);
   }
 

@@ -20,11 +20,17 @@ import org.slf4j.LoggerFactory;
 public class HolidayEventsPipeline extends Pipeline {
 
   private static final Logger LOG = LoggerFactory.getLogger(HolidayEventsPipeline.class);
+
   final EventDataProviderManager eventDataProvider;
 
   public HolidayEventsPipeline(String name, Set<String> inputs, EventDataProviderManager eventDataProvider) {
     super(name, inputs);
     this.eventDataProvider = eventDataProvider;
+  }
+
+  public HolidayEventsPipeline(String name, Set<String> inputs, Map<String, String> ignore) {
+    super(name, inputs);
+    this.eventDataProvider = EventDataProviderManager.getInstance();
   }
 
   @Override
