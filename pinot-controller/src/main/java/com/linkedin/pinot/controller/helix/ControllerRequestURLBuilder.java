@@ -57,6 +57,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "instances/");
   }
 
+  public String forInstanceDelete(String instanceName) {
+    return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "instances", instanceName);
+  }
+
   public String forInstanceState(String instanceName) {
     return StringUtil.join("/", StringUtils.chomp(_baseUrl, "/"), "instances", instanceName, "state");
   }
