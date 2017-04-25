@@ -2,7 +2,7 @@ package com.linkedin.thirdeye.anomaly.detection;
 
 import com.google.common.collect.Lists;
 import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
-import com.linkedin.thirdeye.anomaly.task.TaskConstants;
+import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
@@ -448,13 +448,13 @@ public class DetectionJobScheduler implements Runnable {
     TaskManager taskDAO = DAO_REGISTRY.getTaskDAO();
     JobManager jobDAO = DAO_REGISTRY.getJobDAO();
     JobDTO jobDTO;
-    List<TaskDTO> scheduledTaskDTO = taskDAO.findByJobIdStatusNotIn(jobExecutionId, TaskConstants.TaskStatus.COMPLETED);
+    List<TaskDTO> scheduledTaskDTO = taskDAO.findByJobIdStatusNotIn(jobExecutionId, TaskStatus.COMPLETED);
     long functionId = jobDAO.findById(jobExecutionId).getAnomalyFunctionId();
 
     while (scheduledTaskDTO.size() > 0) {
       List<Long> failedTaskIds = new ArrayList<>();
       for (TaskDTO taskDTO : scheduledTaskDTO) {
-        if (taskDTO.getStatus() == TaskConstants.TaskStatus.FAILED) {
+        if (taskDTO.getStatus() == TaskStatus.FAILED) {
           failedTaskIds.add(taskDTO.getId());
         }
       }
@@ -470,7 +470,7 @@ public class DetectionJobScheduler implements Runnable {
         LOG.warn("The monitoring thread for anomaly function {} (task id: {}) backfill is awakened.", functionId,
             jobExecutionId);
       }
-      scheduledTaskDTO = taskDAO.findByJobIdStatusNotIn(jobExecutionId, TaskConstants.TaskStatus.COMPLETED);
+      scheduledTaskDTO = taskDAO.findByJobIdStatusNotIn(jobExecutionId, TaskStatus.COMPLETED);
     }
     // Set job to be completed
     jobDTO = jobDAO.findById(jobExecutionId);
@@ -524,10 +524,10 @@ public class DetectionJobScheduler implements Runnable {
    */
   private void cleanUpJob(JobDTO job) {
     if (!job.getStatus().equals(JobStatus.COMPLETED)) {
-      List<TaskDTO> tasks = DAO_REGISTRY.getTaskDAO().findByJobIdStatusNotIn(job.getId(), TaskConstants.TaskStatus.COMPLETED);
+      List<TaskDTO> tasks = DAO_REGISTRY.getTaskDAO().findByJobIdStatusNotIn(job.getId(), TaskStatus.COMPLETED);
       if (CollectionUtils.isNotEmpty(tasks)) {
         for (TaskDTO task : tasks) {
-          task.setStatus(TaskConstants.TaskStatus.FAILED);
+          task.setStatus(TaskStatus.FAILED);
           DAO_REGISTRY.getTaskDAO().save(task);
         }
         job.setStatus(JobStatus.FAILED);

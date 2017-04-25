@@ -291,7 +291,6 @@ public class DetectionJobResource {
   @Path("/{id}/offlineAnalysis")
   public Response generateAnomaliesInTrainingData(@PathParam("id") @NotNull long id,
       @QueryParam("time") String analysisTimeIso) throws Exception {
-    long currentTime = System.currentTimeMillis();
 
     AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(id);
     if (anomalyFunction == null) {
