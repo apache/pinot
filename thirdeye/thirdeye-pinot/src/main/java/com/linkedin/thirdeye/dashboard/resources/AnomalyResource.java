@@ -461,12 +461,15 @@ public class AnomalyResource {
   public Response applyAutotuneConfig(@PathParam("autotuneConfigId") @NotNull long id,
       @QueryParam("cloneFunction") @DefaultValue("false") boolean isCloneFunction,
       @QueryParam("cloneAnomalies") Boolean isCloneAnomalies) {
+    Map<String, String> responseMessage = new HashMap<>();
     AutotuneConfigDTO autotuneConfigDTO = autotuneConfigDAO.findById(id);
     if (autotuneConfigDTO == null) {
-      return Response.status(Response.Status.BAD_REQUEST).build();
+      responseMessage.put("message", "Cannot find the autotune configuration entry " + id + ".");
+      return Response.status(Response.Status.BAD_REQUEST).entity(responseMessage).build();
     }
-    if (autotuneConfigDTO.getConfiguration() == null) {
-      return Response.ok().build();
+    if (autotuneConfigDTO.getConfiguration() == null || autotuneConfigDTO.getConfiguration().isEmpty()) {
+      responseMessage.put("message", "Autotune configuration is null or empty. The original function is optimal. Nothing to change");
+      return Response.ok(responseMessage).build();
     }
 
     if (isCloneAnomalies == null) { // if isCloneAnomalies is not given, assign a default value
@@ -484,8 +487,9 @@ public class AnomalyResource {
       try {
         cloneId = onboardResource.cloneFunctionsGetIds(originalFunction.getId(), "clone", Boolean.toString(isCloneAnomalies));
       } catch (Exception e) {
-        LOG.warn("Unable to clone function {} with clone tag \"{}\"", originalFunction.getId());
-        return Response.status(Response.Status.CONFLICT).build();
+        responseMessage.put("message", "Unable to clone function " + originalFunction.getId() + " with clone tag \"clone\"");
+        LOG.warn("Unable to clone function {} with clone tag \"{}\"", originalFunction.getId(), "clone");
+        return Response.status(Response.Status.CONFLICT).entity(responseMessage).build();
       }
       targetFunction = anomalyFunctionDAO.findById(cloneId);
     }
@@ -497,9 +501,7 @@ public class AnomalyResource {
       targetFunction.setAlertFilter(autotuneConfigDTO.getConfiguration());
     } else {
       // Update function configuration
-      if (autotuneConfigDTO.getConfiguration()!= null && !autotuneConfigDTO.getConfiguration().isEmpty()) {
-        targetFunction.updateProperties(autotuneConfigDTO.getConfiguration());
-      }
+      targetFunction.updateProperties(autotuneConfigDTO.getConfiguration());
     }
     targetFunction.setActive(true);
     anomalyFunctionDAO.update(targetFunction);
