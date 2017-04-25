@@ -7,6 +7,7 @@ import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAut
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluateHelper;
 import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceEvaluationMethod;
+import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.datalayer.bao.AutotuneConfigManager;
@@ -560,8 +561,10 @@ public class DetectionJobResource {
    * the id of the target anomaly function
    * @param replayStartTimeIso
    * the start time of the anomaly function replay in ISO format, e.g. 2017-02-27T00:00:00.000Z
-   * @param replayEndTimeIso
-   * the end time of the anomaly function replay in ISO format
+   * @param replayDuration
+   * the duration of the replay ahead of the replayStartTimeIso
+   * @param durationUnit
+   * the time unit of the duration, DAYS, HOURS, MINUTES and so on
    * @param speedup
    * whether we speedup the replay process
    * @param tuningJSON
@@ -579,20 +582,34 @@ public class DetectionJobResource {
   @POST
   @Path("replay/function/{id}")
   public Response anomalyFunctionReplay(@PathParam("id") @NotNull long functionId,
-      @QueryParam("start") @NotNull String replayStartTimeIso, @QueryParam("end") @NotNull String replayEndTimeIso,
+      @QueryParam("time") String replayTimeIso, @QueryParam("duration") @DefaultValue("30") int replayDuration,
+      @QueryParam("durationUnit") String durationUnit,
       @QueryParam("speedup") @DefaultValue("true") boolean speedup,
       @QueryParam("tune") @DefaultValue("{\"pValueThreshold\":[0.05, 0.01]}") String tuningJSON,
       @QueryParam("goal") @DefaultValue("0.05") double goal,
       @QueryParam("includeOriginal") @DefaultValue("true") boolean includeOrigin,
       @QueryParam("evalMethod") @DefaultValue("ANOMALY_PERCENTAGE") String performanceEvaluationMethod){
+    AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(functionId);
+    if (anomalyFunction == null) {
+      LOG.warn("Unable to find anomaly function {}", functionId);
+      return Response.status(Response.Status.BAD_REQUEST).entity("Cannot find function").build();
+    }
     DateTime replayStart = null;
     DateTime replayEnd = null;
     try {
-      replayStart = ISODateTimeFormat.dateTimeParser().parseDateTime(replayStartTimeIso);
-      replayEnd = ISODateTimeFormat.dateTimeParser().parseDateTime(replayEndTimeIso);
+      TimeUnit timeUnit = anomalyFunction.getBucketUnit();
+      if (StringUtils.isNotEmpty(durationUnit)) {
+        timeUnit = TimeUnit.valueOf(durationUnit);
+      }
+      TimeGranularity timeGranularity = new TimeGranularity(replayDuration, timeUnit);
+      replayStart = DateTime.now();
+      if (StringUtils.isNotEmpty(replayTimeIso)) {
+        replayStart = ISODateTimeFormat.dateTimeParser().parseDateTime(replayTimeIso);
+      }
+      replayEnd = replayStart.minus(timeGranularity.toPeriod());
     }
     catch (Exception e) {
-      throw new WebApplicationException("Unable to parse strings, "+ replayStartTimeIso + " and " + replayEndTimeIso +
+      throw new WebApplicationException("Unable to parse strings, "+ replayTimeIso +
           ", in ISO DateTime format", e);
     }
 
@@ -770,7 +787,7 @@ public class DetectionJobResource {
     }
 
     Map<String, String> responseMessages = new HashMap<>();
-    responseMessages.put("cloneFunctionId", String.valueOf(functionReplayRunnable.getLastClonedFunctionId()));
+    responseMessages.put("cloneFunctionId", String.valueOf(functionReplayRunnable.getClonedFunctionId()));
     if (target != null && functionId != null && functionId != target.getFunctionId()) {
       responseMessages.put("Warning", "Input function Id does not consistent with autotune Id's function, use auto tune Id's information instead.");
     }
