@@ -1,3 +1,8 @@
+eventDataProvidersConfiguration:
+    - name: DEPLOYMENT
+      className: com.linkedin.thirdeye.anomaly.events.MyDeploymentEventProvider
+      properties:
+          DEPLOYMENT_DATA_URL: http://myurl.com
 rcaPipelinesConfiguration:
     - name: DUMMY_RCA_PIPELINE1
       className: com.linkedin.thirdeye.dummy.pipeline.DummyRCAPipeline1
