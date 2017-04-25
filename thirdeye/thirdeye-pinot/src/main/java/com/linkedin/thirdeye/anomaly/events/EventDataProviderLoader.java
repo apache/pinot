@@ -2,7 +2,6 @@ package com.linkedin.thirdeye.anomaly.events;
 
 import java.io.File;
 import java.lang.reflect.Constructor;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -39,21 +38,6 @@ public class EventDataProviderLoader {
     } catch (Exception e) {
       LOG.error("Exception in loading rca configs", e);
     }
-  }
-
-  public static void main(String[] args) {
-    // External event providers
-    File rcaConfig = new File("/Users/npawar/pinotAbookInstance/dashboard-controller/rca.yml");
-    if (rcaConfig.exists()) {
-      EventDataProviderLoader.registerEventDataProvidersFromConfig(rcaConfig, EventDataProviderManager.getInstance());
-      EventFilter ef = new EventFilter();
-      ef.setEventType("INFORMED");
-      List<EventDTO> events = EventDataProviderManager.getInstance().getEvents(ef);
-      for (EventDTO event : events) {
-        System.out.println(event);
-      }
-    }
-
   }
 
 }
