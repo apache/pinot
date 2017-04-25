@@ -53,7 +53,7 @@ import org.testng.annotations.Test;
  *   <li>"newAddedStringDimension", DIMENSION, STRING, multi-value, "newAdded"</li>
  * </ul>
  */
-public class DefaultColumnsClusterIntegrationTest extends BaseClusterIntegrationTest {
+public class DefaultColumnsClusterIntegrationTest extends BaseClusterIntegrationTestWithQueryGenerator {
   protected static final String SCHEMA_WITH_EXTRA_COLUMNS =
       "On_Time_On_Time_Performance_2014_100k_subset_nonulls_default_column_test_extra_columns.schema";
   private static final File TMP_DIR = new File("/tmp/DefaultColumnsClusterIntegrationTest");

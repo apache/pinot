@@ -118,7 +118,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   private static final int MAX_MESSAGES_PER_BATCH = 10000;
 
   // Maximum number of queries skipped when random select queries from hard coded query set.
-  private static final int MAX_NUM_QUERIES_SKIPPED = 200;
+  protected static final int MAX_NUM_QUERIES_SKIPPED = 200;
   // Number of queries generated.
   private static final int GENERATED_QUERY_COUNT = 100;
   // Gather failed queries or failed immediately.
@@ -1144,109 +1144,6 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .getResource("On_Time_On_Time_Performance_2014_100k_subset_nonulls.schema").getFile());
   }
 
-  /**
-   * NOTE:
-   * <p>
-   * For queries with <code>LIMIT</code> or <code>TOP</code>, need to remove limit or add <code>LIMIT 10000</code> to
-   * the H2 SQL query because the comparison only works on exhausted result with at most 10000 rows.
-   * <ul>
-   *   <li>Eg. <code>SELECT a FROM table LIMIT 15 -> [SELECT a FROM table LIMIT 10000]</code></li>
-   * </ul>
-   * <p>
-   * For queries with multiple aggregation functions, need to split each of them into a separate H2 SQL query.
-   * <ul>
-   *   <li>Eg. <code>SELECT SUM(a), MAX(b) FROM table -> [SELECT SUM(a) FROM table, SELECT MAX(b) FROM table]</code></li>
-   * </ul>
-   * <p>
-   * For group-by queries, need to add group-by columns to the select clause for H2 SQL query.
-   * <ul>
-   *   <li>Eg. <code>SELECT SUM(a) FROM table GROUP BY b -> [SELECT b, SUM(a) FROM table GROUP BY b]</code></li>
-   * </ul>
-   *
-   * @throws Exception
-   */
-  @Test(enabled = false)
-  public void testHardcodedQueries()
-      throws Exception {
-    // Here are some sample queries.
-    String query;
-    query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch = 16312 AND Carrier = 'DL'";
-    runQuery(query, Collections.singletonList(query));
-    query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = 'DL'";
-    runQuery(query, Collections.singletonList(query));
-    query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch > 16312 AND Carrier = 'DL'";
-    runQuery(query, Collections.singletonList(query));
-    query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch >= 16312 AND Carrier = 'DL'";
-    runQuery(query, Collections.singletonList(query));
-    query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch < 16312 AND Carrier = 'DL'";
-    runQuery(query, Collections.singletonList(query));
-    query = "SELECT COUNT(*) FROM mytable WHERE DaysSinceEpoch <= 16312 AND Carrier = 'DL'";
-    runQuery(query, Collections.singletonList(query));
-    query = "SELECT MAX(ArrTime), MIN(ArrTime) FROM mytable WHERE DaysSinceEpoch >= 16312";
-    runQuery(query, Arrays.asList("SELECT MAX(ArrTime) FROM mytable WHERE DaysSinceEpoch >= 15312",
-        "SELECT MIN(ArrTime) FROM mytable WHERE DaysSinceEpoch >= 15312"));
-  }
-
-  @Test
-  public void testHardcodedQuerySet()
-      throws Exception {
-    URL resourceUrl = BaseClusterIntegrationTest.class.getClassLoader()
-        .getResource("On_Time_On_Time_Performance_2014_100k_subset.test_queries_10K");
-    Assert.assertNotNull(resourceUrl);
-    File queriesFile = new File(resourceUrl.getFile());
-    Random random = new Random();
-
-    try (BufferedReader reader = new BufferedReader(new FileReader(queriesFile))) {
-      while (true) {
-        // Skip up to MAX_NUM_QUERIES_SKIPPED queries.
-        int numQueriesSkipped = random.nextInt(MAX_NUM_QUERIES_SKIPPED);
-        for (int i = 0; i < numQueriesSkipped; i++) {
-          reader.readLine();
-        }
-
-        String queryString = reader.readLine();
-        // Reach end of file.
-        if (queryString == null) {
-          return;
-        }
-
-        JSONObject query = new JSONObject(queryString);
-        String pqlQuery = query.getString("pql");
-        JSONArray hsqls = query.getJSONArray("hsqls");
-        List<String> sqlQueries = new ArrayList<>();
-        int length = hsqls.length();
-        for (int i = 0; i < length; i++) {
-          sqlQueries.add(hsqls.getString(i));
-        }
-        runQuery(pqlQuery, sqlQueries);
-      }
-    }
-  }
-
-  // This is disabled because testGeneratedQueriesWithMultiValues covers the same thing.
-  @Test(enabled = false)
-  public void testGeneratedQueriesWithoutMultiValues()
-      throws Exception {
-    testGeneratedQueries(false);
-  }
-
-  @Test
-  public void testGeneratedQueriesWithMultiValues()
-      throws Exception {
-    testGeneratedQueries(true);
-  }
-
-  protected void testGeneratedQueries(boolean withMultiValues)
-      throws Exception {
-    _queryGenerator.setSkipMultiValuePredicates(!withMultiValues);
-    int generatedQueryCount = getGeneratedQueryCount();
-    for (int i = 0; i < generatedQueryCount; i++) {
-      QueryGenerator.Query query = _queryGenerator.generateQuery();
-      String pqlQuery = query.generatePql();
-      LOGGER.debug("Running query: {}", pqlQuery);
-      runQuery(pqlQuery, query.generateH2Sql());
-    }
-  }
 
   protected String getSingleStringValueFromJSONAggregationResults(JSONObject jsonObject) throws JSONException {
     return jsonObject.getJSONArray("aggregationResults").getJSONObject(0).getString("value");

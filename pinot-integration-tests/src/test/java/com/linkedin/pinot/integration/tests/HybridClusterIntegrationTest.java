@@ -66,7 +66,7 @@ import kafka.server.KafkaServerStartable;
  * two month overlap).
  *
  */
-public class HybridClusterIntegrationTest extends BaseClusterIntegrationTest {
+public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestWithQueryGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeClusterIntegrationTest.class);
   private static final String TENANT_NAME = "TestTenant";
   protected final File _tmpDir = new File("/tmp/HybridClusterIntegrationTest");
