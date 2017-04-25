@@ -83,7 +83,7 @@ public class HelixBrokerStarter {
     _pinotHelixProperties = DefaultHelixBrokerConfig.getDefaultBrokerConf(pinotHelixProperties);
     final String brokerId =
         _pinotHelixProperties.getString(
-                "instanceId",
+                CommonConstants.Helix.Instance.INSTANCE_ID_KEY,
                 CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE
                         + NetUtil.getHostAddress()
                         + "_"

@@ -15,7 +15,29 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.linkedin.pinot.broker.broker.BrokerTestUtils;
+import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.request.helper.ControllerRequestBuilder;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.Realtime.Kafka;
+import com.linkedin.pinot.common.utils.CommonConstants.Server;
+import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.common.utils.KafkaStarterUtils;
 import com.linkedin.pinot.common.utils.NetUtil;
+import com.linkedin.pinot.common.utils.ZkStarter;
+import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
+import com.linkedin.pinot.controller.helix.ControllerTest;
+import com.linkedin.pinot.controller.helix.ControllerTestUtils;
+import com.linkedin.pinot.core.data.GenericRow;
+import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
+import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
+import com.linkedin.pinot.core.realtime.impl.kafka.AvroRecordToPinotRowGenerator;
+import com.linkedin.pinot.core.realtime.impl.kafka.KafkaMessageDecoder;
+import com.linkedin.pinot.minion.MinionStarter;
+import com.linkedin.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
+import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.util.ArrayList;
@@ -30,30 +52,10 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.DatumReader;
 import org.apache.avro.io.DecoderFactory;
 import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.PropertiesConfiguration;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.broker.broker.BrokerTestUtils;
-import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.request.helper.ControllerRequestBuilder;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.DataSource.Realtime.Kafka;
-import com.linkedin.pinot.common.utils.CommonConstants.Server;
-import com.linkedin.pinot.common.utils.FileUploadUtils;
-import com.linkedin.pinot.common.utils.KafkaStarterUtils;
-import com.linkedin.pinot.common.utils.ZkStarter;
-import com.linkedin.pinot.controller.helix.ControllerRequestURLBuilder;
-import com.linkedin.pinot.controller.helix.ControllerTest;
-import com.linkedin.pinot.controller.helix.ControllerTestUtils;
-import com.linkedin.pinot.core.data.GenericRow;
-import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
-import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
-import com.linkedin.pinot.core.realtime.impl.kafka.AvroRecordToPinotRowGenerator;
-import com.linkedin.pinot.core.realtime.impl.kafka.KafkaMessageDecoder;
-import com.linkedin.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
-import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
 
 
 /**
@@ -61,10 +63,11 @@ import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
  *
  */
 public abstract class ClusterTest extends ControllerTest {
-  private static final String _success = "success";
-  protected List<HelixBrokerStarter> _brokerStarters = new ArrayList<HelixBrokerStarter>();
-  protected List<HelixServerStarter> _serverStarters = new ArrayList<HelixServerStarter>();
   protected static String partitioningKey = null;
+
+  private List<HelixBrokerStarter> _brokerStarters = new ArrayList<>();
+  private List<HelixServerStarter> _serverStarters = new ArrayList<>();
+  private List<MinionStarter> _minionStarters = new ArrayList<>();
 
   protected int getRealtimeSegmentFlushSize(boolean useLlc) {
     if (useLlc) {
@@ -120,6 +123,24 @@ public abstract class ClusterTest extends ControllerTest {
     }
   }
 
+  protected void startMinion() {
+    startMinions(1);
+  }
+
+  protected void startMinions(int minionCount) {
+    try {
+      for (int i = 0; i < minionCount; i++) {
+        Configuration config = new PropertiesConfiguration();
+        config.setProperty(Helix.Instance.INSTANCE_ID_KEY, "minion" + i);
+        MinionStarter minionStarter = new MinionStarter(ZkStarter.DEFAULT_ZK_STR, getHelixClusterName(), config);
+        minionStarter.start();
+        _minionStarters.add(minionStarter);
+      }
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   protected void overrideOfflineServerConf(Configuration configuration) {
     // Do nothing, to be overridden by tests if they need something specific
   }
@@ -136,9 +157,13 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected void stopServer() {
     for (HelixServerStarter helixServerStarter : _serverStarters) {
-      if (helixServerStarter != null) {
-        helixServerStarter.stop();
-      }
+      helixServerStarter.stop();
+    }
+  }
+
+  protected void stopMinion() {
+    for (MinionStarter minionStarter : _minionStarters) {
+      minionStarter.stop();
     }
   }
 

@@ -36,6 +36,7 @@
     <module>pinot-transport</module>
     <module>pinot-integration-tests</module>
     <module>pinot-distribution</module>
+    <module>pinot-minion</module>
   </modules>
   <licenses>
     <license>
@@ -222,6 +223,11 @@
       <dependency>
         <groupId>com.linkedin.pinot</groupId>
         <artifactId>pinot-broker</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.linkedin.pinot</groupId>
+        <artifactId>pinot-minion</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>

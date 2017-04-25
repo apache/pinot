@@ -1760,16 +1760,26 @@ public class PinotHelixResourceManager {
     return getAllPinotTableNames().contains(actualTableName);
   }
 
+  /**
+   * @param tableName table name with or without type suffix.
+   */
   @Nullable
   public AbstractTableConfig getOfflineTableConfig(@Nonnull String tableName) {
     return ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
   }
 
+  /**
+   * @param tableName table name with or without type suffix.
+   */
   @Nullable
   public AbstractTableConfig getRealtimeTableConfig(@Nonnull String tableName) {
     return ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, tableName);
   }
 
+  /**
+   * @param tableName table name with or without type suffix.
+   * @param tableType table type.
+   */
   @Nullable
   public AbstractTableConfig getTableConfig(@Nonnull String tableName, @Nonnull TableType tableType) {
     if (tableType == TableType.OFFLINE) {
@@ -1777,6 +1787,18 @@ public class PinotHelixResourceManager {
     } else {
       return getRealtimeTableConfig(tableName);
     }
+  }
+
+  /**
+   * @param tableNameWithSuffix table name with type suffix.
+   */
+  @Nullable
+  public AbstractTableConfig getTableConfig(@Nonnull String tableNameWithSuffix) {
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithSuffix);
+    if (tableType == null) {
+      return null;
+    }
+    return getTableConfig(tableNameWithSuffix, tableType);
   }
 
   public List<String> getServerInstancesForTable(String tableName, TableType tableType) {
