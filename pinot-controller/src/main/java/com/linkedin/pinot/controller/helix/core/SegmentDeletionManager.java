@@ -16,6 +16,7 @@
 package com.linkedin.pinot.controller.helix.core;
 
 import java.io.File;
+import java.io.FileFilter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -28,12 +29,16 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.filefilter.AgeFileFilter;
+import org.apache.commons.io.filefilter.DirectoryFileFilter;
+import org.apache.commons.io.filefilter.TrueFileFilter;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.config.TableNameBuilder;
@@ -191,6 +196,37 @@ public class SegmentDeletionManager {
       }
     } else {
       LOGGER.info("localDiskDir is not configured, won't delete segment {} from disk", segmentId);
+    }
+  }
+
+  /**
+   * Removes aged deleted segments from the deleted directory
+   * @param retentionInDays: retention for deleted segments in days
+   */
+  public void removeAgedDeletedSegments(int retentionInDays) {
+    if (_localDiskDir != null) {
+      File targetDir = new File(_localDiskDir, DELETED_SEGMENTS);
+      AgeFileFilter fileFilter = new AgeFileFilter(DateTime.now().minusDays(retentionInDays).toDate());
+      for (File currentDir : targetDir.listFiles((FileFilter) DirectoryFileFilter.DIRECTORY)) {
+        // Get files that are aged
+        Collection<File> targetFiles = FileUtils.listFiles(currentDir, fileFilter, null);
+
+        // Delete aged files
+        for (File f : targetFiles) {
+          if (!f.delete()) {
+            LOGGER.warn("Cannot remove file {} from deleted directory.", f.getAbsolutePath());
+          }
+        }
+
+        // Delete directory if it's empty
+        if (currentDir.list().length == 0) {
+          if (!currentDir.delete()) {
+            LOGGER.warn("The directory {} cannot be removed. The directory may not be empty.", currentDir.getAbsolutePath());
+          }
+        }
+      }
+    } else {
+      LOGGER.info("localDiskDir is not configured, won't delete any expired segments from deleted directory.");
     }
   }
 }

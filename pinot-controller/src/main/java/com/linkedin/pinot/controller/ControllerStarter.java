@@ -72,7 +72,8 @@ public class ControllerStarter {
     component = new Component();
     controllerRestApp = new ControllerRestApplication(config.getQueryConsole());
     helixResourceManager = new PinotHelixResourceManager(config);
-    retentionManager = new RetentionManager(helixResourceManager, config.getRetentionControllerFrequencyInSeconds());
+    retentionManager = new RetentionManager(helixResourceManager, config.getRetentionControllerFrequencyInSeconds(),
+        config.getDeletedSegmentsRetentionInDays());
     _metricsRegistry = new MetricsRegistry();
     realtimeSegmentsManager = new PinotRealtimeSegmentManager(helixResourceManager);
     segmentStatusChecker = new SegmentStatusChecker(helixResourceManager, config);
