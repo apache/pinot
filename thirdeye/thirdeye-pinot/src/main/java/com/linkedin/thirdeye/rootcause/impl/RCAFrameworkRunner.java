@@ -1,7 +1,10 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
 import com.linkedin.thirdeye.anomaly.ThirdEyeAnomalyConfiguration;
-import com.linkedin.thirdeye.anomaly.events.DefaultHolidayEventProvider;
+import com.linkedin.thirdeye.anomaly.events.EventDataProvider;
+import com.linkedin.thirdeye.anomaly.events.EventDataProviderConfiguration;
+import com.linkedin.thirdeye.anomaly.events.EventDataProviderLoader;
+import com.linkedin.thirdeye.anomaly.events.HolidayEventProvider;
 import com.linkedin.thirdeye.anomaly.events.EventDataProviderManager;
 import com.linkedin.thirdeye.anomaly.events.EventType;
 import com.linkedin.thirdeye.anomaly.events.HistoricalAnomalyEventProvider;
@@ -11,6 +14,7 @@ import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import com.linkedin.thirdeye.rootcause.Aggregator;
 import com.linkedin.thirdeye.rootcause.Entity;
@@ -104,8 +108,13 @@ public class RCAFrameworkRunner {
     List<Pipeline> pipelines = new ArrayList<>();
 
     EventDataProviderManager eventProvider = EventDataProviderManager.getInstance();
-    eventProvider.registerEventDataProvider(EventType.HOLIDAY, new DefaultHolidayEventProvider());
-    eventProvider.registerEventDataProvider(EventType.HISTORICAL_ANOMALY, new HistoricalAnomalyEventProvider());
+    eventProvider.registerEventDataProvider(EventType.HOLIDAY.toString(), new HolidayEventProvider());
+    eventProvider.registerEventDataProvider(EventType.HISTORICAL_ANOMALY.toString(), new HistoricalAnomalyEventProvider());
+    // External event providers
+    File rcaConfig = new File(config.getAbsolutePath() + "/rca.yml");
+    if (rcaConfig.exists()) {
+      EventDataProviderLoader.registerEventDataProvidersFromConfig(rcaConfig, eventProvider);
+    }
 
     // Holiday pipeline
     pipelines.add(new HolidayEventsPipeline(eventProvider));
@@ -125,7 +134,6 @@ public class RCAFrameworkRunner {
     pipelines.add(new MetricDatasetPipeline(metricDAO, datasetDAO));
 
     // External pipelines
-    File rcaConfig = new File(config.getAbsolutePath() + "/rca.yml");
     if (rcaConfig.exists()) {
       pipelines.addAll(PipelineLoader.getPipelinesFromConfig(rcaConfig));
     }

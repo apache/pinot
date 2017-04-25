@@ -13,7 +13,7 @@ import org.apache.commons.collections.MapUtils;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 
 public class EventFilter {
-  EventType eventType;
+  String eventType;
   String serviceName;
   String metricName;
   long startTime;
@@ -44,11 +44,11 @@ public class EventFilter {
     this.endTime = endTime;
   }
 
-  public EventType getEventType() {
+  public String getEventType() {
     return eventType;
   }
 
-  public void setEventType(EventType eventType) {
+  public void setEventType(String eventType) {
     this.eventType = eventType;
   }
 

@@ -82,7 +82,7 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new AnomaliesResource(anomalyFunctionFactory, alertFilterFactory));
     env.jersey().register(new TimeSeriesResource());
     env.jersey().register(new OnboardResource());
-    env.jersey().register(new EventResource(config.getInformedApiUrl()));
+    env.jersey().register(new EventResource(config));
     env.jersey().register(new DataCompletenessResource(DAO_REGISTRY.getDataCompletenessConfigDAO()));
   }
 

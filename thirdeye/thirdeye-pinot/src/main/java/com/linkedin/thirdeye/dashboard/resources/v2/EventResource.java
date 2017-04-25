@@ -1,15 +1,19 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
-import com.linkedin.thirdeye.anomaly.events.DefaultDeploymentEventProvider;
-import com.linkedin.thirdeye.anomaly.events.DefaultHolidayEventProvider;
+import com.linkedin.thirdeye.anomaly.events.EventDataProviderLoader;
+import com.linkedin.thirdeye.anomaly.events.HolidayEventProvider;
 import com.linkedin.thirdeye.anomaly.events.EventDataProviderManager;
 import com.linkedin.thirdeye.anomaly.events.EventFilter;
 import com.linkedin.thirdeye.anomaly.events.EventType;
 import com.linkedin.thirdeye.anomaly.events.HistoricalAnomalyEventProvider;
 import com.linkedin.thirdeye.client.DAORegistry;
+import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.datalayer.bao.EventManager;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
+
+import java.io.File;
 import java.util.List;
+
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -17,6 +21,7 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,13 +33,16 @@ public class EventResource {
   static final EventDataProviderManager EVENT_DATA_PROVIDER_MANAGER =  EventDataProviderManager.getInstance();
   static final EventManager eventDAO = DAORegistry.getInstance().getEventDAO();
 
-  public EventResource(String informedAPIUrl) {
+  public EventResource(ThirdEyeConfiguration thirdeyeConfig) {
     EVENT_DATA_PROVIDER_MANAGER
-        .registerEventDataProvider(EventType.HOLIDAY, new DefaultHolidayEventProvider());
-    EVENT_DATA_PROVIDER_MANAGER
-        .registerEventDataProvider(EventType.DEPLOYMENT, new DefaultDeploymentEventProvider(informedAPIUrl));
-    EVENT_DATA_PROVIDER_MANAGER.registerEventDataProvider(EventType.HISTORICAL_ANOMALY,
+        .registerEventDataProvider(EventType.HOLIDAY.toString(), new HolidayEventProvider());
+    EVENT_DATA_PROVIDER_MANAGER.registerEventDataProvider(EventType.HISTORICAL_ANOMALY.toString(),
         new HistoricalAnomalyEventProvider());
+    // External event providers
+    File rcaConfig = new File(thirdeyeConfig.getRootDir() + "/rca.yml");
+    if (rcaConfig.exists()) {
+      EventDataProviderLoader.registerEventDataProvidersFromConfig(rcaConfig, EVENT_DATA_PROVIDER_MANAGER);
+    }
   }
 
   @GET
@@ -44,7 +52,7 @@ public class EventResource {
     EventFilter eventFilter = new EventFilter();
     eventFilter.setStartTime(start);
     eventFilter.setEndTime(end);
-    eventFilter.setEventType(EventType.HOLIDAY);
+    eventFilter.setEventType(EventType.HOLIDAY.toString());
     return EVENT_DATA_PROVIDER_MANAGER.getEvents(eventFilter);
   }
 
