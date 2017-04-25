@@ -141,6 +141,7 @@ public class RCAFrameworkRunner {
 
     Map<String, String> nameMapping = new HashMap<>();
     nameMapping.put("country", "countryCode");
+
     pipelines.add(new DimensionRewriter(P_DIMENSION_METRIC_REWRITE, asSet(P_DIMENSION_METRIC_RAW), nameMapping));
     pipelines.add(new TopKPipeline(P_DIMENSION_TOPK, asSet(P_INPUT, P_DIMENSION_METRIC_REWRITE), DimensionEntity.class, 20));
 

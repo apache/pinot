@@ -1,4 +1,4 @@
-package com.linkedin.thirdeye.rootcause;
+package com.linkedin.thirdeye.rootcause.impl;
 
 import java.util.List;
 
@@ -12,7 +12,7 @@ import com.linkedin.thirdeye.anomaly.events.EventDataProviderConfiguration;
 public class RCAConfiguration {
 
   private List<EventDataProviderConfiguration> eventDataProvidersConfiguration;
-  private List<RCAPipelineConfiguration> rcaPipelinesConfiguration;
+  private List<PipelineConfiguration> rcaPipelinesConfiguration;
 
   public List<EventDataProviderConfiguration> getEventDataProvidersConfiguration() {
     return eventDataProvidersConfiguration;
@@ -23,11 +23,11 @@ public class RCAConfiguration {
     this.eventDataProvidersConfiguration = eventDataProvidersConfiguration;
   }
 
-  public List<RCAPipelineConfiguration> getRcaPipelinesConfiguration() {
+  public List<PipelineConfiguration> getRcaPipelinesConfiguration() {
     return rcaPipelinesConfiguration;
   }
 
-  public void setRcaPipelinesConfiguration(List<RCAPipelineConfiguration> rcaPipelinesConfiguration) {
+  public void setRcaPipelinesConfiguration(List<PipelineConfiguration> rcaPipelinesConfiguration) {
     this.rcaPipelinesConfiguration = rcaPipelinesConfiguration;
   }
 
