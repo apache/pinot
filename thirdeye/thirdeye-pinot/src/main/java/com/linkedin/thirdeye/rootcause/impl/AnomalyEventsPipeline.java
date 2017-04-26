@@ -15,7 +15,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Sample implementation of a pipeline for identifying anomaly events based on their associated metric
+ * Pipeline for identifying anomaly events based on their start amnd end times and associated metric
  * names. The pipeline identifies metric entities in the search context and then invokes the
  * event provider manager to fetch any matching events. It then scores events based on their
  * time distance from the end of the search time window (closer is better).
@@ -23,13 +23,27 @@ import org.slf4j.LoggerFactory;
 public class AnomalyEventsPipeline extends Pipeline {
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyEventsPipeline.class);
 
-  final EventDataProviderManager manager;
+  private final EventDataProviderManager manager;
 
+  /**
+   * Constructor for dependency injection
+   *
+   * @param name pipeline name
+   * @param inputs pipeline inputs
+   * @param manager event data provider manager
+   */
   public AnomalyEventsPipeline(String name, Set<String> inputs, EventDataProviderManager manager) {
     super(name, inputs);
     this.manager = manager;
   }
 
+  /**
+   * Alternate constructor for use by PipelineLoader
+   *
+   * @param name pipeline name
+   * @param inputs pipeline inputs
+   * @param ignore configuration properties (none)
+   */
   public AnomalyEventsPipeline(String name, Set<String> inputs, Map<String, String> ignore) {
     super(name, inputs);
     this.manager = EventDataProviderManager.getInstance();
@@ -43,10 +57,12 @@ public class AnomalyEventsPipeline extends Pipeline {
     long duration = current.getEnd() - current.getStart();
 
     Set<EventEntity> entities = new HashSet<>();
-    for(MetricEntity e : metrics) {
+    for(MetricEntity me : metrics) {
       EventFilter filter = new EventFilter();
+      filter.setStartTime(current.getStart());
+      filter.setEndTime(current.getEnd());
       filter.setEventType(EventType.HISTORICAL_ANOMALY.toString());
-      filter.setMetricName(e.getMetric());
+      filter.setMetricName(me.getMetric());
 
       for(EventDTO dto : manager.getEvents(filter)) {
         long distance = current.getEnd() - dto.getStartTime();

@@ -12,19 +12,40 @@ import java.util.Map;
 import java.util.Set;
 
 
+/**
+ * TopKPipeline is a generic pipeline implementation for ordering, filtering, and truncating incoming
+ * Entities. The pipeline first filters incoming Entities based on their {@code class} and then
+ * orders them based on score from highest to lowest. It finally truncates the result to at most
+ * {@code k} elements and emits the result.
+ */
 public class TopKPipeline extends Pipeline {
   public static final String PROP_K = "k";
   public static final String PROP_CLASS = "class";
 
-  final int k;
-  final Class<? extends Entity> clazz;
+  private final int k;
+  private final Class<? extends Entity> clazz;
 
+  /**
+   * Constructor for dependency injection
+   *
+   * @param name pipeline name
+   * @param inputs pipeline inputs
+   * @param clazz (super) class to filter by
+   * @param k maximum number of result elements
+   */
   public TopKPipeline(String name, Set<String> inputs, Class<? extends Entity> clazz, int k) {
     super(name, inputs);
     this.k = k;
     this.clazz = clazz;
   }
 
+  /**
+   * Alternate constructor for PipelineLoader
+   *
+   * @param name pipeline name
+   * @param inputs pipeline inputs
+   * @param properties configuration properties ({@code PROP_K}, {@code PROP_CLASS})
+   */
   public TopKPipeline(String name, Set<String> inputs, Map<String, String> properties) throws Exception {
     super(name, inputs);
     this.k = Integer.parseInt(properties.get(PROP_K));

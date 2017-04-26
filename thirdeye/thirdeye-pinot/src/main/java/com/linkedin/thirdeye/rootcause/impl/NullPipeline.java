@@ -9,10 +9,29 @@ import java.util.Map;
 import java.util.Set;
 
 
+/**
+ * NullPipeline serves as a dummy implementation or sink that may receive inputs, but does not
+ * emit any output. Can be used to construct an validate a DAG without a full implementation
+ * of component pipelines.
+ */
 public class NullPipeline extends Pipeline {
+  /**
+   * Constructor for dependency injection
+   *
+   * @param name pipeline name
+   * @param inputs pipeline inputs
+   */
   public NullPipeline(String name, Set<String> inputs) {
     super(name, inputs);
   }
+
+  /**
+   * Alternate constructor for PipelineLoader
+   *
+   * @param name pipeline name
+   * @param inputs pipeline inputs
+   * @param ignore configuration properties (none)
+   */
 
   public NullPipeline(String name, Set<String> inputs, Map<String, String> ignore) {
     super(name, inputs);

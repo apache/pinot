@@ -15,18 +15,37 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * The EntityMappingPipeline is a generic implementation for emitting Entities based on
+ * association with incoming Entities. For example, it may be used to generate "similar" metrics
+ * for each incoming MetricEntity based on a per-defined mapping of Entity URNs to other URNs.
+ */
 public class EntityMappingPipeline extends Pipeline {
   private static final Logger LOG = LoggerFactory.getLogger(EntityMappingPipeline.class);
 
   public static final String PROP_PATH = PipelineLoader.PROP_PATH;
 
-  final Map<String, StringMapping> urnMappings;
+  private final Map<String, StringMapping> urnMappings;
 
+  /**
+   * Constructor for dependency injection
+   *
+   * @param name pipeline name
+   * @param inputs pipeline inputs
+   * @param urnMappings string mappings from URNs to other URNs
+   */
   public EntityMappingPipeline(String name, Set<String> inputs, Collection<StringMapping> urnMappings) {
     super(name, inputs);
     this.urnMappings = StringMapping.toMap(urnMappings);
   }
 
+  /**
+   * Alternate constructor for use by PipelineLoader
+   *
+   * @param name pipeline name
+   * @param inputs pipeline inputs
+   * @param properties configuration properties ({@code PROP_PARALLELISM})
+   */
   public EntityMappingPipeline(String name, Set<String> inputs, Map<String, String> properties) throws IOException {
     super(name, inputs);
     File csv = new File(properties.get(PROP_PATH));

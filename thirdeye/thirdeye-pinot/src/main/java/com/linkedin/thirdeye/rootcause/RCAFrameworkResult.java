@@ -7,8 +7,7 @@ import java.util.Set;
 
 /**
  * Container object for framework execution results. Holds the results aggregated across all
- * pipeline executions, the results for each individual pipeline, as well as the execution
- * context.
+ * pipeline executions as well as the results for each individual pipeline.
  *
  */
 public final class RCAFrameworkResult {

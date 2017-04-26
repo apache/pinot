@@ -26,10 +26,23 @@ public class LinearAggregator extends Pipeline {
   private static final String URN = "urn";
   private static final String SCORE = "score";
 
+  /**
+   * Constructor for dependency injection
+   *
+   * @param name pipeline name
+   * @param inputs pipeline inputs
+   */
   public LinearAggregator(String name, Set<String> inputs) {
     super(name, inputs);
   }
 
+  /**
+   * Alternate constructor for use by PipelineLoader
+   *
+   * @param name pipeline name
+   * @param inputs pipeline inputs
+   * @param ignore configuration properties (none)
+   */
   public LinearAggregator(String name, Set<String> inputs, Map<String, String> ignore) {
     super(name, inputs);
   }
@@ -43,9 +56,6 @@ public class LinearAggregator extends Pipeline {
       DataFrame df = toDataFrame(res);
       urnBuilder.addSeries(df.get(URN));
       scoreBuilder.addSeries(df.getDoubles(SCORE));
-
-//      DoubleSeries s = df.getDoubles(SCORE);
-//      scoreBuilder.addSeries(s.divide(s.sum()));
     }
 
     StringSeries urns = urnBuilder.build();
@@ -53,7 +63,6 @@ public class LinearAggregator extends Pipeline {
 
     DataFrame df = new DataFrame();
     df.addSeries(URN, urns);
-//    df.addSeries(SCORE, scores.divide(scores.sum()));
     df.addSeries(SCORE, scores);
 
     DataFrame grp = df.groupBy(URN).aggregate(SCORE, DoubleSeries.SUM);

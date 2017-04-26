@@ -34,7 +34,7 @@ public class DimensionScorer {
   static final String COST = "cost";
   static final String VALUE = "value";
 
-  final QueryCache cache;
+  private final QueryCache cache;
 
   public DimensionScorer(QueryCache cache) {
     this.cache = cache;

@@ -17,17 +17,37 @@ import org.apache.commons.collections.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
+/**
+ * HolidayEventsPipeline produces EventEntities associated with holidays within the current
+ * TimeRange. It matches holidays based on incoming DimensionEntities (e.g. from contribution
+ * analysis) and scores them based on the number of matching DimensionEntities.
+ */
 public class HolidayEventsPipeline extends Pipeline {
 
   private static final Logger LOG = LoggerFactory.getLogger(HolidayEventsPipeline.class);
 
-  final EventDataProviderManager eventDataProvider;
+  private final EventDataProviderManager eventDataProvider;
 
+  /**
+   * Constructor for dependency injection
+   *
+   * @param name pipeline name
+   * @param inputs pipeline inputs
+   * @param eventDataProvider event data provider manager
+   */
   public HolidayEventsPipeline(String name, Set<String> inputs, EventDataProviderManager eventDataProvider) {
     super(name, inputs);
     this.eventDataProvider = eventDataProvider;
   }
 
+  /**
+   * Alternate constructor for PipelineLoader
+   *
+   * @param name pipeline name
+   * @param inputs pipeline inputs
+   * @param ignore configuration properties (none)
+   */
   public HolidayEventsPipeline(String name, Set<String> inputs, Map<String, String> ignore) {
     super(name, inputs);
     this.eventDataProvider = EventDataProviderManager.getInstance();
@@ -41,33 +61,31 @@ public class HolidayEventsPipeline extends Pipeline {
     filter.setEventType(EventType.HOLIDAY.toString());
     filter.setStartTime(current.getStart());
     filter.setEndTime(current.getEnd());
-    long duration = current.getEnd() - current.getStart();
 
     Set<DimensionEntity> dimensionEntities = EntityUtils.filterContext(context, DimensionEntity.class);
     Map<String, DimensionEntity> urn2entity = EntityUtils.mapEntityURNs(dimensionEntities);
 
-    Map<String, List<String>> dimensionFilterMap = new HashMap<>();
+    Map<String, List<String>> filterMap = new HashMap<>();
     if (CollectionUtils.isNotEmpty(dimensionEntities)) {
       for (DimensionEntity dimensionEntity : dimensionEntities) {
         String dimensionName = dimensionEntity.getName();
         String dimensionValue = dimensionEntity.getValue();
-        if (!dimensionFilterMap.containsKey(dimensionName)) {
-          dimensionFilterMap.put(dimensionName, new ArrayList<String>());
+        if (!filterMap.containsKey(dimensionName)) {
+          filterMap.put(dimensionName, new ArrayList<String>());
         }
-        dimensionFilterMap.get(dimensionName).add(dimensionValue);
+        filterMap.get(dimensionName).add(dimensionValue);
       }
     }
-    filter.setTargetDimensionMap(dimensionFilterMap);
+    filter.setTargetDimensionMap(filterMap);
 
     List<EventDTO> events = eventDataProvider.getEvents(filter);
 
     Set<EventEntity> entities = new HashSet<>();
-    for(EventDTO e : events) {
-      long distance = current.getEnd() - e.getStartTime();
-      double distanceScore = 1.0 - distance / (double)duration;
-      double dimensionScore = makeDimensionScore(urn2entity, e.getTargetDimensionMap());
-      EventEntity entity = EventEntity.fromDTO(distanceScore * dimensionScore, e);
-      LOG.debug("{}: distance={}, dimension={}, filter={}", entity.getUrn(), distanceScore, dimensionScore, e.getTargetDimensionMap());
+    for(EventDTO ev : events) {
+      long distance = current.getEnd() - ev.getStartTime();
+      double dimensionScore = makeDimensionScore(urn2entity, ev.getTargetDimensionMap());
+      EventEntity entity = EventEntity.fromDTO(dimensionScore, ev);
+      LOG.debug("{}: dimension={}, filter={}", entity.getUrn(), dimensionScore, ev.getTargetDimensionMap());
       entities.add(entity);
     }
 

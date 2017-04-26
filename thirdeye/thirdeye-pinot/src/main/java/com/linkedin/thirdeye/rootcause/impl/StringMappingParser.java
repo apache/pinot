@@ -9,6 +9,9 @@ import java.util.Collection;
 import java.util.Map;
 
 
+/**
+ * Helper class to obtain StringMappings from files or String-String maps.
+ */
 public class StringMappingParser {
   private static final String S_FROM = "from";
   private static final String S_TO = "to";

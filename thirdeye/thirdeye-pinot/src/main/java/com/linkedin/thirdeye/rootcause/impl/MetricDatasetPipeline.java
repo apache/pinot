@@ -19,7 +19,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Sample implementation of a pipeline for identifying relevant metrics based on dataset
+ * Pipeline for identifying relevant metrics based on dataset
  * association. The pipeline first fetches metric entities from the context and then
  * searches Thirdeye's internal database for metrics contained in the same datasets as
  * any metric entities in the search context. All found metrics are scored equally.
@@ -30,6 +30,14 @@ public class MetricDatasetPipeline extends Pipeline {
   final MetricConfigManager metricDAO;
   final DatasetConfigManager datasetDAO;
 
+  /**
+   * Constructor for dependency injection
+   *
+   * @param name pipeline name
+   * @param inputs pipeline inputs
+   * @param metricDAO metric config DAO
+   * @param datasetDAO dataset config DAO
+   */
   public MetricDatasetPipeline(String name, Set<String> inputs, MetricConfigManager metricDAO,
       DatasetConfigManager datasetDAO) {
     super(name, inputs);
@@ -37,6 +45,13 @@ public class MetricDatasetPipeline extends Pipeline {
     this.datasetDAO = datasetDAO;
   }
 
+  /**
+   * Alternate constructor for PipelineLoader
+   *
+   * @param name pipeline name
+   * @param inputs pipeline inputs
+   * @param ignore configuration properties (none)
+   */
   public MetricDatasetPipeline(String name, Set<String> inputs, Map<String, String> ignore) {
     super(name, inputs);
     this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
@@ -49,11 +64,11 @@ public class MetricDatasetPipeline extends Pipeline {
 
     Set<String> datasets = new HashSet<>();
     Map<String, Double> datasetScores = new HashMap<>();
-    for(MetricEntity m : metrics) {
-      String d = m.getDataset();
+    for(MetricEntity me : metrics) {
+      String d = me.getDataset();
       datasets.add(d);
 
-      double metricScore = m.getScore();
+      double metricScore = me.getScore();
       if(!datasetScores.containsKey(d))
         datasetScores.put(d, 0.0d);
       datasetScores.put(d, datasetScores.get(d) + metricScore);

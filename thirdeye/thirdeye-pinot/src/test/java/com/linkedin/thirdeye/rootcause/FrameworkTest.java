@@ -16,6 +16,9 @@ import org.testng.annotations.Test;
 
 
 public class FrameworkTest {
+  private static final String INPUT = RCAFramework.INPUT;
+  private static final String OUTPUT = RCAFramework.OUTPUT;
+
   static class DummyPipeline extends Pipeline {
     public DummyPipeline(String name, Set<String> inputs) {
       super(name, inputs);
@@ -69,32 +72,32 @@ public class FrameworkTest {
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testInvalidDAGInputPipeline() {
     Collection<Pipeline> pipelines = new ArrayList<>();
-    pipelines.add(makePipeline("input"));
-    pipelines.add(makePipeline("output", "input"));
+    pipelines.add(makePipeline(INPUT));
+    pipelines.add(makePipeline(OUTPUT, INPUT));
     RCAFramework f = new RCAFramework(pipelines, Executors.newSingleThreadExecutor());
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testInvalidDAGNoOutput() {
     Collection<Pipeline> pipelines = new ArrayList<>();
-    pipelines.add(makePipeline("a", "input"));
+    pipelines.add(makePipeline("a", INPUT));
     RCAFramework f = new RCAFramework(pipelines, Executors.newSingleThreadExecutor());
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void testInvalidDAGNoPath() {
     Collection<Pipeline> pipelines = new ArrayList<>();
-    pipelines.add(makePipeline("a", "input"));
-    pipelines.add(makePipeline("output", "a", "b"));
+    pipelines.add(makePipeline("a", INPUT));
+    pipelines.add(makePipeline(OUTPUT, "a", "b"));
     RCAFramework f = new RCAFramework(pipelines, Executors.newSingleThreadExecutor());
   }
 
   @Test
   public void testValidDAG() {
     Collection<Pipeline> pipelines = new ArrayList<>();
-    pipelines.add(makePipeline("a", "input"));
-    pipelines.add(makePipeline("b", "input", "a"));
-    pipelines.add(makePipeline("output", "a", "b", "input"));
+    pipelines.add(makePipeline("a", INPUT));
+    pipelines.add(makePipeline("b", INPUT, "a"));
+    pipelines.add(makePipeline(OUTPUT, "a", "b", INPUT));
     RCAFramework f = new RCAFramework(pipelines, Executors.newSingleThreadExecutor());
   }
 

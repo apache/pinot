@@ -27,7 +27,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Sample implementation of a pipeline for identifying relevant dimensions by performing
+ * Pipeline for identifying relevant dimensions by performing
  * contribution analysis. The pipeline first fetches the Current and Baseline entities and
  * MetricEntities in the search context. It then maps the metrics to ThirdEye's internal database
  * and performs contribution analysis using a {@code DimensionScorer).
@@ -37,20 +37,30 @@ import org.slf4j.LoggerFactory;
 public class DimensionPipeline extends Pipeline {
   private static final Logger LOG = LoggerFactory.getLogger(DimensionPipeline.class);
 
-  static final long TIMEOUT = 120000;
+  public static final String PROP_PARALLELISM = "parallelism";
 
-  static final String KEY = "key";
-  static final String DIMENSION = DimensionScorer.DIMENSION;
-  static final String VALUE = DimensionScorer.VALUE;
-  static final String COST = DimensionScorer.COST;
+  public static final long TIMEOUT = 120000;
 
-  static final String PROP_PARALLELISM = "parallelism";
+  private static final String KEY = "key";
+  private static final String DIMENSION = DimensionScorer.DIMENSION;
+  private static final String VALUE = DimensionScorer.VALUE;
+  private static final String COST = DimensionScorer.COST;
 
-  final MetricConfigManager metricDAO;
-  final DatasetConfigManager datasetDAO;
-  final DimensionScorer scorer;
-  final ExecutorService executor;
+  private final MetricConfigManager metricDAO;
+  private final DatasetConfigManager datasetDAO;
+  private final DimensionScorer scorer;
+  private final ExecutorService executor;
 
+  /**
+   * Constructor for dependency injection
+   *
+   * @param name pipeline name
+   * @param inputs pipeline inputs
+   * @param metricDAO metric config DAO
+   * @param datasetDAO dataset config DAO
+   * @param scorer dimension scorer for contribution analysis
+   * @param executor executor service for parallel task execution
+   */
   public DimensionPipeline(String name, Set<String> inputs, MetricConfigManager metricDAO,
       DatasetConfigManager datasetDAO, DimensionScorer scorer, ExecutorService executor) {
     super(name, inputs);
@@ -60,6 +70,13 @@ public class DimensionPipeline extends Pipeline {
     this.executor = executor;
   }
 
+  /**
+   * Alternate constructor for use by PipelineLoader
+   *
+   * @param name pipeline name
+   * @param inputs pipeline inputs
+   * @param properties configuration properties ({@code PROP_PARALLELISM})
+   */
   public DimensionPipeline(String name, Set<String> inputs, Map<String, String> properties) {
     super(name, inputs);
 
@@ -84,22 +101,22 @@ public class DimensionPipeline extends Pipeline {
     dfScore.addSeries(COST, DoubleSeries.empty());
 
     Map<String, Future<DataFrame>> scores = new HashMap<>();
-    for(MetricEntity e : metricsEntities) {
-      final MetricConfigDTO mdto = metricDAO.findByMetricAndDataset(e.getMetric(), e.getDataset());
-      final DatasetConfigDTO ddto = datasetDAO.findByDataset(e.getDataset());
+    for(MetricEntity me : metricsEntities) {
+      final MetricConfigDTO mdto = metricDAO.findByMetricAndDataset(me.getMetric(), me.getDataset());
+      final DatasetConfigDTO ddto = datasetDAO.findByDataset(me.getDataset());
 
       if(mdto == null) {
-        LOG.warn("Could not resolve metric '{}'. Skipping.", e.getMetric());
+        LOG.warn("Could not resolve metric '{}'. Skipping.", me.getMetric());
         continue;
       }
 
       if(ddto == null) {
-        LOG.warn("Could not resolve dataset '{}'. Skipping metric '{}'", e.getDataset(), e.getMetric());
+        LOG.warn("Could not resolve dataset '{}'. Skipping metric '{}'", me.getDataset(), me.getMetric());
         continue;
       }
 
       // Create asynchronous scoring task
-      final MetricEntity entity = e;
+      final MetricEntity entity = me;
       Callable<DataFrame> scoreTask = new Callable<DataFrame>() {
         @Override
         public DataFrame call() throws Exception {
@@ -120,7 +137,7 @@ public class DimensionPipeline extends Pipeline {
       };
 
       Future<DataFrame> fScore = this.executor.submit(scoreTask);
-      scores.put(e.getUrn(), fScore);
+      scores.put(me.getUrn(), fScore);
     }
 
     // Combine results

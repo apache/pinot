@@ -20,16 +20,20 @@ import org.slf4j.LoggerFactory;
 /**
  * Container class for configuring and executing a root cause search with multiple pipelines.
  * The framework is instantiated with multiple (named) pipelines and a result aggregator. The run()
- * method then executes the configured pipelines and aggregation for arbitrary search contexts without
- * storing any additional state within the RCAFramework.
+ * method then executes the configured pipelines for arbitrary inputs without
+ * maintaining any additional state within the RCAFramework.
+ *
+ * RCAFramework supports parallel DAG execution and requires pipelines to form a valid path
+ * from {@code INPUT} to {@code OUTPUT}. The execution order of pipelines is guaranteed to be
+ * compatible with serial execution in one single thread.
  */
 
 /*
- *                          /-> pipeline.run() \
- *                         /                    \
- * SearchContext --> run() ---> pipeline.run() ---> aggregator.aggregate() --> RCAFrameworkResult
- *                         \                    /
- *                          \-> pipeline.run() /
+ *                   /-> pipeline.run() --> pipeline.run() \
+ *                  /                                       \
+ * INPUT --> run() ---> pipeline.run() ---> pipeline.run() --> OUTPUT
+ *                  \                    /
+ *                   \-> pipeline.run() /
  */
 public class RCAFramework {
   private static final Logger LOG = LoggerFactory.getLogger(RCAFramework.class);
@@ -141,7 +145,7 @@ public class RCAFramework {
     return tasks;
   }
 
-  static class PipelineCallable implements Callable<PipelineResult> {
+  private static class PipelineCallable implements Callable<PipelineResult> {
     final Map<String, Future<PipelineResult>> dependencies;
     final Pipeline pipeline;
 

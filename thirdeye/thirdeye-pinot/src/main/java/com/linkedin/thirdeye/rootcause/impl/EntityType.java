@@ -4,6 +4,9 @@ import com.linkedin.thirdeye.rootcause.Entity;
 import org.apache.commons.lang.StringUtils;
 
 
+/**
+ * Wrapper class for URN prefix based typing of Entity.
+ */
 public final class EntityType {
   final String prefix;
 

@@ -41,31 +41,4 @@ public class Entity {
   public double getScore() {
     return score;
   }
-
-  @Override
-  public boolean equals(Object o) {
-    if (this == o) {
-      return true;
-    }
-    if (o == null || getClass() != o.getClass()) {
-      return false;
-    }
-
-    Entity entity = (Entity) o;
-
-    if (Double.compare(entity.score, score) != 0) {
-      return false;
-    }
-    return urn != null ? urn.equals(entity.urn) : entity.urn == null;
-  }
-
-  @Override
-  public int hashCode() {
-    int result;
-    long temp;
-    result = urn != null ? urn.hashCode() : 0;
-    temp = Double.doubleToLongBits(score);
-    result = 31 * result + (int) (temp ^ (temp >>> 32));
-    return result;
-  }
 }

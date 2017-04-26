@@ -14,6 +14,13 @@ import org.apache.commons.collections.CollectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
+/**
+ * PipelineLoader creates Pipeline instances based on a YAML config file. It expects the Pipeline
+ * implementation to support a constructor that takes (name, inputs, properties map) as arguments.
+ * It further augments certain properties with additional information, e.g. the {@code PROP_PATH}
+ * property with absolute path information.
+ */
 public class PipelineLoader {
   public static final String PROP_PATH = "path";
 
