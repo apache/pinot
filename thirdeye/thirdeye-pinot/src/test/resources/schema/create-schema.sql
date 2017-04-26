@@ -323,3 +323,17 @@ create index autometrics_config_metric_idx on autometrics_config_index(metric);
 create index autometrics_config_dashboard_idx on autometrics_config_index(dashboard);
 create index autometrics_config_rrd_idx on autometrics_config_index(rrd);
 create index autometrics_config_autometrics_type_idx on autometrics_config_index(autometrics_type);
+
+create table if not exists entity_to_entity_mapping_index (
+    from_urn varchar(500) not null,
+    to_urn varchar(500) not null,
+    mapping_type varchar(500) not null,
+    base_id bigint(20) not null,
+    create_time timestamp,
+    update_time timestamp default current_timestamp,
+    version int(10)
+) ENGINE=InnoDB;
+ALTER TABLE `entity_to_entity_mapping_index` ADD UNIQUE `entity_mapping_unique_index`(`from_urn`, `to_urn`);
+create index entity_mapping_from_urn_idx on entity_to_entity_mapping_index(from_urn);
+create index entity_mapping_to_urn_idx on entity_to_entity_mapping_index(to_urn);
+create index entity_mapping_type_idx on entity_to_entity_mapping_index(mapping_type);

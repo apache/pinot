@@ -20,6 +20,7 @@ import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DetectionStatusDTO;
 import com.linkedin.thirdeye.datalayer.dto.EmailConfigurationDTO;
 import com.linkedin.thirdeye.datalayer.dto.AutotuneConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.EntityToEntityMappingDTO;
 import com.linkedin.thirdeye.datalayer.dto.IngraphDashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.IngraphMetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
@@ -28,6 +29,7 @@ import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
+import com.linkedin.thirdeye.datalayer.pojo.EntityToEntityMappingBean.MappingType;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import com.linkedin.thirdeye.datalayer.util.PersistenceConfig;
 import com.linkedin.thirdeye.detector.email.filter.AlphaBetaAlertFilter;
@@ -71,6 +73,7 @@ public abstract class AbstractManagerTestBase {
   protected AutotuneConfigManager autotuneConfigDAO;
   protected ClassificationConfigManager classificationConfigDAO;
   protected AutometricsConfigManager autometricsConfigDAO;
+  protected EntityToEntityMappingManager entityToEntityMappingDAO;
 
   //  protected TestDBResources testDBResources;
   protected DAORegistry daoRegistry;
@@ -107,6 +110,7 @@ public abstract class AbstractManagerTestBase {
       autotuneConfigDAO = daoRegistry.getAutotuneConfigDAO();
       classificationConfigDAO = daoRegistry.getClassificationConfigDAO();
       autometricsConfigDAO = daoRegistry.getAutometricsConfigDAO();
+      entityToEntityMappingDAO = daoRegistry.getEntityToEntityMappingDAO();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -393,5 +397,14 @@ public abstract class AbstractManagerTestBase {
     classificationConfigDTO.setFunctionIdList(functionIds);
     classificationConfigDTO.setActive(true);
     return classificationConfigDTO;
+  }
+
+  protected EntityToEntityMappingDTO getTestEntityToEntityMapping(String fromURN, String toURN, MappingType mappingType) {
+    EntityToEntityMappingDTO dto = new EntityToEntityMappingDTO();
+    dto.setFromURN(fromURN);
+    dto.setToURN(toURN);
+    dto.setMappingType(mappingType);
+    dto.setScore(1);
+    return dto;
   }
 }
