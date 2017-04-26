@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.common;
 
 import io.dropwizard.Configuration;
+import java.util.ArrayList;
 import java.util.List;
 
 public abstract class ThirdEyeConfiguration extends Configuration {
@@ -22,8 +23,8 @@ public abstract class ThirdEyeConfiguration extends Configuration {
   private String configStoreType = "FILE";
   private String implMode = "hibernate";
 
-  private List<String> whitelistCollections;
-  private List<String> blacklistCollections;
+  private List<String> whitelistCollections = new ArrayList<>();
+  private List<String> blacklistCollections = new ArrayList<>();
 
   private String smtpHost = "";
   private int smtpPort = 0;
