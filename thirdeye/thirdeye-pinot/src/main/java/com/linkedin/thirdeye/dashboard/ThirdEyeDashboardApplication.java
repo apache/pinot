@@ -11,6 +11,7 @@ import com.linkedin.thirdeye.dashboard.resources.DataCompletenessResource;
 import com.linkedin.thirdeye.dashboard.resources.DatasetConfigResource;
 import com.linkedin.thirdeye.dashboard.resources.EmailResource;
 import com.linkedin.thirdeye.dashboard.resources.EntityManagerResource;
+import com.linkedin.thirdeye.dashboard.resources.EntityMappingResource;
 import com.linkedin.thirdeye.dashboard.resources.IngraphDashboardConfigResource;
 import com.linkedin.thirdeye.dashboard.resources.IngraphMetricConfigResource;
 import com.linkedin.thirdeye.dashboard.resources.JobResource;
@@ -25,6 +26,7 @@ import com.linkedin.thirdeye.dashboard.resources.v2.EventResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.TimeSeriesResource;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
+
 import io.dropwizard.assets.AssetsBundle;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
@@ -84,6 +86,7 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new OnboardResource());
     env.jersey().register(new EventResource(config));
     env.jersey().register(new DataCompletenessResource(DAO_REGISTRY.getDataCompletenessConfigDAO()));
+    env.jersey().register(new EntityMappingResource());
   }
 
   public static void main(String[] args) throws Exception {
