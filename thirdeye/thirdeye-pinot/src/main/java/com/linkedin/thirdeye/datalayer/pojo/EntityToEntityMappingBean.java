@@ -14,25 +14,26 @@ public class EntityToEntityMappingBean extends AbstractBean {
 
   public enum MappingType {
     METRIC_TO_SERVICE,
+    SERVICE_TO_METRIC,
     METRIC_TO_METRIC,
     DIMENSION_TO_DIMENSION
   }
-  String fromUrn;
-  String toUrn;
+  String fromURN;
+  String toURN;
   MappingType mappingType;
   double score;
 
-  public String getFromUrn() {
-    return fromUrn;
+  public String getFromURN() {
+    return fromURN;
   }
-  public void setFromUrn(String fromUrn) {
-    this.fromUrn = fromUrn;
+  public void setFromURN(String fromURN) {
+    this.fromURN = fromURN;
   }
-  public String getToUrn() {
-    return toUrn;
+  public String getToURN() {
+    return toURN;
   }
-  public void setToUrn(String toUrn) {
-    this.toUrn = toUrn;
+  public void setToURN(String toURN) {
+    this.toURN = toURN;
   }
   public MappingType getMappingType() {
     return mappingType;
@@ -53,15 +54,15 @@ public class EntityToEntityMappingBean extends AbstractBean {
       return false;
     }
     EntityToEntityMappingBean em = (EntityToEntityMappingBean) o;
-    return Objects.equals(fromUrn, em.getFromUrn())
-        && Objects.equals(toUrn, em.getToUrn())
+    return Objects.equals(fromURN, em.getFromURN())
+        && Objects.equals(toURN, em.getToURN())
         && Objects.equals(mappingType, em.getMappingType())
         && Objects.equals(score, em.getScore());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(fromUrn, toUrn, mappingType, score);
+    return Objects.hash(fromURN, toURN, mappingType, score);
   }
 
 }

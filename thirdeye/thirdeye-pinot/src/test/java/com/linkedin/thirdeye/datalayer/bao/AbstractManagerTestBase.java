@@ -399,10 +399,10 @@ public abstract class AbstractManagerTestBase {
     return classificationConfigDTO;
   }
 
-  protected EntityToEntityMappingDTO getTestEntityToEntityMapping(String fromUrn, String toUrn, MappingType mappingType) {
+  protected EntityToEntityMappingDTO getTestEntityToEntityMapping(String fromURN, String toURN, MappingType mappingType) {
     EntityToEntityMappingDTO dto = new EntityToEntityMappingDTO();
-    dto.setFromUrn(fromUrn);
-    dto.setToUrn(toUrn);
+    dto.setFromURN(fromURN);
+    dto.setToURN(toURN);
     dto.setMappingType(mappingType);
     dto.setScore(1);
     return dto;

@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -14,6 +13,8 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.Response.Status;
 
 import org.apache.commons.lang3.StringUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -28,7 +29,6 @@ public class EntityMappingResource {
 
   private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
-
   private static final EntityToEntityMappingManager entityMappingDAO = DAO_REGISTRY.getEntityToEntityMappingDAO();
 
 
@@ -39,22 +39,22 @@ public class EntityMappingResource {
   @Path("/view")
   @Produces(MediaType.APPLICATION_JSON)
   public List<EntityToEntityMappingDTO> viewEntityMappings(
-      @QueryParam("fromUrn") String fromUrn,
-      @QueryParam("toUrn") String toUrn,
-      @QueryParam("mappingType") String mappingType) {
+      @QueryParam("fromURN") String fromURN,
+      @QueryParam("toURN") String toURN,
+      @QueryParam("mappingType") MappingType mappingType) {
 
     List<EntityToEntityMappingDTO> mappings = new ArrayList<>();
-    if (StringUtils.isBlank(fromUrn) && StringUtils.isBlank(toUrn) && StringUtils.isBlank(mappingType)) {
+    if (StringUtils.isBlank(fromURN) && StringUtils.isBlank(toURN) && mappingType == null) {
       mappings = entityMappingDAO.findAll();
     } else {
       Map<String, Object> filters = new HashMap<>();
-      if (StringUtils.isNotBlank(fromUrn)) {
-        filters.put("fromUrn", fromUrn);
+      if (StringUtils.isNotBlank(fromURN)) {
+        filters.put("fromURN", fromURN);
       }
-      if (StringUtils.isNotBlank(toUrn)) {
-        filters.put("toUrn", toUrn);
+      if (StringUtils.isNotBlank(toURN)) {
+        filters.put("toURN", toURN);
       }
-      if (StringUtils.isNotBlank(mappingType)) {
+      if (mappingType != null) {
         filters.put("mappingType", mappingType);
       }
       mappings = entityMappingDAO.findByParams(filters);
@@ -62,55 +62,156 @@ public class EntityMappingResource {
     return mappings;
   }
 
-  @POST
-  @Path("/create")
-  public void createEntityMapping(String payload) {
-    EntityToEntityMappingDTO entityToEntityMapping = null;
-    try {
-      entityToEntityMapping = OBJECT_MAPPER.readValue(payload, EntityToEntityMappingDTO.class);
-      entityMappingDAO.save(entityToEntityMapping);
-    } catch (IOException e) {
-      throw new IllegalArgumentException("Invalid payload " + payload, e);
-    }
+
+  @GET
+  @Path("/view/all")
+  @Produces(MediaType.APPLICATION_JSON)
+  public List<EntityToEntityMappingDTO> viewAllEntityMappings() {
+    List<EntityToEntityMappingDTO> mappings = entityMappingDAO.findAll();
+    return mappings;
+  }
+
+  @GET
+  @Path("/view/fromURN/{fromURN}")
+  @Produces(MediaType.APPLICATION_JSON)
+  public List<EntityToEntityMappingDTO> viewEntityMappingsFromURN(@PathParam("fromURN") String fromURN) {
+
+    List<EntityToEntityMappingDTO> mappings = entityMappingDAO.findByFromURN(fromURN);
+    return mappings;
+  }
+
+  @GET
+  @Path("/view/toURN/{toURN}")
+  @Produces(MediaType.APPLICATION_JSON)
+  public List<EntityToEntityMappingDTO> viewEntityMappingsToURN(@PathParam("toURN") String toURN) {
+
+    List<EntityToEntityMappingDTO> mappings = entityMappingDAO.findByToURN(toURN);
+    return mappings;
+  }
+
+  @GET
+  @Path("/view/mappingType/{mappingType}")
+  @Produces(MediaType.APPLICATION_JSON)
+  public List<EntityToEntityMappingDTO> viewEntityMappingsForMappingType(
+      @PathParam("mappingType") MappingType mappingType) {
+
+    List<EntityToEntityMappingDTO> mappings = entityMappingDAO.findByMappingType(mappingType);
+    return mappings;
   }
 
 
+  @GET
+  @Path("/view/fromURN/{fromURN}/toURN/{toURN}")
+  @Produces(MediaType.APPLICATION_JSON)
+  public EntityToEntityMappingDTO viewEntityMappingsFromAndToURN(
+      @PathParam("fromURN") String fromURN,
+      @PathParam("toURN") String toURN) {
+
+    EntityToEntityMappingDTO mapping = entityMappingDAO.findByFromAndToURN(fromURN, toURN);
+    return mapping;
+  }
+
+
+  @GET
+  @Path("/view/fromURN/{fromURN}/mappingType/{mappingType}")
+  @Produces(MediaType.APPLICATION_JSON)
+  public List<EntityToEntityMappingDTO> viewEntityMappingsFromURNAndMappingType(
+      @PathParam("fromURN") String fromURN,
+      @PathParam("mappingType") MappingType mappingType) {
+
+    List<EntityToEntityMappingDTO> mappings = entityMappingDAO.findByFromURNAndMappingType(fromURN, mappingType);
+    return mappings;
+  }
+
+
+  @GET
+  @Path("/view/toURN/{toURN}/mappingType/{mappingType}")
+  @Produces(MediaType.APPLICATION_JSON)
+  public List<EntityToEntityMappingDTO> viewEntityMappingsToURNAndMappingType(
+      @PathParam("toURN") String toURN,
+      @PathParam("mappingType") MappingType mappingType) {
+
+    List<EntityToEntityMappingDTO> mappings = entityMappingDAO.findByToURNAndMappingType(toURN, mappingType);
+    return mappings;
+  }
+
+  /**
+   * Create this by providing json payload as follows:
+   *
+   *    curl -H "Content-Type: application/json" -X POST -d <payload> <url>
+   *    Eg: curl -H "Content-Type: application/json" -X POST -d
+   *            '{"fromURN":"xyz","toURN":"xyz", "mappingType":"METRIC_TO_METRIC", "score":1.0}'
+   *                http://localhost:8080/entityMapping/create
+   * @param payload
+   */
+  @POST
+  @Path("/create")
+  public Response createEntityMapping(String payload) {
+    EntityToEntityMappingDTO entityToEntityMapping = null;
+    Response response = null;
+    try {
+      entityToEntityMapping = OBJECT_MAPPER.readValue(payload, EntityToEntityMappingDTO.class);
+      Long id = entityMappingDAO.save(entityToEntityMapping);
+      response = Response.status(Status.OK).entity(String.format("Created mapping with id %d", id)).build();
+    } catch (Exception e) {
+      response = Response.status(Status.INTERNAL_SERVER_ERROR)
+          .entity(String.format("Invalid payload %s %s",  payload, e)).build();
+    }
+    return response;
+  }
+
+
+  /**
+   * Update the entity mapping by providing the changes in query params
+   * @param id
+   * @param fromURN
+   * @param toURN
+   * @param mappingType
+   * @param score
+   * @return
+   */
   @POST
   @Path("/update/{id}")
-  public void updateEntityMapping(
+  public Response updateEntityMapping(
       @PathParam("id") Long id,
-      @QueryParam("fromUrn") String fromUrn,
-      @QueryParam("toUrn") String toUrn,
-      @QueryParam("mappingType") String mappingType,
+      @QueryParam("fromURN") String fromURN,
+      @QueryParam("toURN") String toURN,
+      @QueryParam("mappingType") MappingType mappingType,
       @QueryParam("score") Double score) {
 
+    Response response = Response.status(Status.NOT_FOUND).build();
     EntityToEntityMappingDTO entityMappingDTO = entityMappingDAO.findById(id);
     if (entityMappingDTO != null) {
-      if (StringUtils.isNotBlank(fromUrn)) {
-        entityMappingDTO.setFromUrn(fromUrn);
+      if (StringUtils.isNotBlank(fromURN)) {
+        entityMappingDTO.setFromURN(fromURN);
       }
-      if (StringUtils.isNotBlank(toUrn)) {
-        entityMappingDTO.setToUrn(toUrn);
+      if (StringUtils.isNotBlank(toURN)) {
+        entityMappingDTO.setToURN(toURN);
       }
-      if (StringUtils.isNotBlank(mappingType)) {
-        entityMappingDTO.setMappingType(MappingType.valueOf(mappingType));
+      if (mappingType != null) {
+        entityMappingDTO.setMappingType(mappingType);
       }
       if (score != null) {
         entityMappingDTO.setScore(score);
       }
       entityMappingDAO.update(entityMappingDTO);
+      response = Response.ok().build();
     }
+    return response;
   }
 
 
   @DELETE
   @Path("/delete/{id}")
   @Produces(MediaType.APPLICATION_JSON)
-  public void deleteEntityMappings(@PathParam("id") Long id) {
+  public Response deleteEntityMappings(@PathParam("id") Long id) {
+    Response response = Response.status(Status.NOT_FOUND).build();
     EntityToEntityMappingDTO entityMappingDTO = entityMappingDAO.findById(id);
     if (entityMappingDTO != null) {
       entityMappingDAO.delete(entityMappingDTO);
+      response = Response.ok().build();
     }
+    return response;
   }
 
 }
