@@ -4,8 +4,20 @@ import com.linkedin.thirdeye.rootcause.Entity;
 import org.apache.commons.lang.StringUtils;
 
 
+/**
+ * Wrapper class for URN prefix based typing of Entity.
+ */
 public final class EntityType {
   final String prefix;
+
+  public static String extractPrefix(String urn) {
+    String[] parts = urn.split(":");
+    return parts[0] + ":" + parts[1] + ":";
+  }
+
+  public static String extractPrefix(Entity e) {
+    return extractPrefix(e.getUrn());
+  }
 
   public String getPrefix() {
     return prefix;
@@ -21,12 +33,7 @@ public final class EntityType {
     return this.prefix + StringUtils.join(values, ":");
   }
 
-  public static String extractPrefix(String urn) {
-    String[] parts = urn.split(":");
-    return parts[0] + ":" + parts[1] + ":";
-  }
-
-  public static String extractPrefix(Entity e) {
-    return extractPrefix(e.getUrn());
+  public boolean isType(String urn) {
+    return prefix.equals(extractPrefix(urn));
   }
 }
