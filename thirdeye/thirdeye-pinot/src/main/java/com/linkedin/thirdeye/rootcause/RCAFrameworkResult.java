@@ -1,36 +1,29 @@
 package com.linkedin.thirdeye.rootcause;
 
-import java.util.List;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 
 /**
  * Container object for framework execution results. Holds the results aggregated across all
- * pipeline executions, the results for each individual pipeline, as well as the execution
- * context.
+ * pipeline executions as well as the results for each individual pipeline.
  *
  */
 public final class RCAFrameworkResult {
-  final List<Entity> aggregatedResults;
+  final Set<Entity> results;
   final Map<String, PipelineResult> pipelineResults;
-  final ExecutionContext context;
 
-  public RCAFrameworkResult(List<Entity> aggregatedResults, Map<String, PipelineResult> pipelineResults,
-      ExecutionContext context) {
-    this.aggregatedResults = aggregatedResults;
+  public RCAFrameworkResult(Set<? extends Entity> results, Map<String, PipelineResult> pipelineResults) {
+    this.results = new HashSet<>(results);
     this.pipelineResults = pipelineResults;
-    this.context = context;
   }
 
-  public List<Entity> getAggregatedResults() {
-    return aggregatedResults;
+  public Set<Entity> getResults() {
+    return results;
   }
 
   public Map<String, PipelineResult> getPipelineResults() {
     return pipelineResults;
-  }
-
-  public ExecutionContext getContext() {
-    return context;
   }
 }

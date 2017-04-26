@@ -1,7 +1,7 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
 import com.linkedin.thirdeye.rootcause.Entity;
-import com.linkedin.thirdeye.rootcause.ExecutionContext;
+import com.linkedin.thirdeye.rootcause.PipelineContext;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -38,11 +38,13 @@ public class EntityUtils {
     return e.getUrn().startsWith(type.getPrefix());
   }
 
-  public static <T extends Entity> Set<T> filterContext(ExecutionContext context, Class<? extends T> clazz) {
-    HashSet<T> filtered = new HashSet<>();
-    for(Entity e : context.getSearchContext().getEntities()) {
-      if(clazz.isInstance(e))
-        filtered.add((T)e);
+  public static <T extends Entity> Set<T> filterContext(PipelineContext context, Class<? extends T> clazz) {
+    Set<T> filtered = new HashSet<>();
+    for(Set<Entity> entities : context.getInputs().values()) {
+      for (Entity e : entities) {
+        if (clazz.isInstance(e))
+          filtered.add((T) e);
+      }
     }
     return filtered;
   }
@@ -89,4 +91,31 @@ public class EntityUtils {
     assertType(entity.getUrn(), type);
     return entity;
   }
+
+  /**
+   * Attemps to parse {@code urn} and return a specific Entity subtype with the given {@code score}
+   * Supports {@code MetricEntity}, {@code DimensionEntity}, {@code TimeRangeEntity}, and
+   * {@code ServiceEntity}.
+   *
+   * @param urn entity urn
+   * @param score entity score
+   * @throws IllegalArgumentException, if the urn cannot be parsed
+   * @return entity subtype instance
+   */
+  public static Entity parseURN(String urn, double score) {
+    if(DimensionEntity.TYPE.isType(urn)) {
+      return DimensionEntity.fromURN(urn, score);
+
+    } else if(MetricEntity.TYPE.isType(urn)) {
+      return MetricEntity.fromURN(urn, score);
+
+    } else if(TimeRangeEntity.TYPE.isType(urn)) {
+      return TimeRangeEntity.fromURN(urn, score);
+
+    } else if(ServiceEntity.TYPE.isType(urn)) {
+      return ServiceEntity.fromURN(urn, score);
+    }
+    throw new IllegalArgumentException(String.format("Could not parse URN '%s'", urn));
+  }
+
 }

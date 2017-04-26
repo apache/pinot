@@ -12,7 +12,7 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
-import com.linkedin.thirdeye.rootcause.RCAConfiguration;
+import com.linkedin.thirdeye.rootcause.impl.RCAConfiguration;
 
 public class EventDataProviderLoader {
 

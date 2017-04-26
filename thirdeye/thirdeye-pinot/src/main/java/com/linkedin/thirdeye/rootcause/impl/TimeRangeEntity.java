@@ -1,7 +1,7 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
 import com.linkedin.thirdeye.rootcause.Entity;
-import com.linkedin.thirdeye.rootcause.ExecutionContext;
+import com.linkedin.thirdeye.rootcause.PipelineContext;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -61,7 +61,7 @@ public class TimeRangeEntity extends Entity {
    * @param context execution context
    * @return TimeRangeEntity
    */
-  public static TimeRangeEntity getContextTimeRange(ExecutionContext context, String type) {
+  public static TimeRangeEntity getContextTimeRange(PipelineContext context, String type) {
     Set<TimeRangeEntity> timeRanges = EntityUtils.filterContext(context, TimeRangeEntity.class);
     Set<TimeRangeEntity> matching = new HashSet<>();
     for(TimeRangeEntity e : timeRanges) {
@@ -73,11 +73,11 @@ public class TimeRangeEntity extends Entity {
     return matching.iterator().next();
   }
 
-  public static TimeRangeEntity getContextCurrent(ExecutionContext context) {
+  public static TimeRangeEntity getContextCurrent(PipelineContext context) {
     return getContextTimeRange(context, TYPE_CURRENT);
   }
 
-  public static TimeRangeEntity getContextBaseline(ExecutionContext context) {
+  public static TimeRangeEntity getContextBaseline(PipelineContext context) {
     return getContextTimeRange(context, TYPE_BASELINE);
   }
 }

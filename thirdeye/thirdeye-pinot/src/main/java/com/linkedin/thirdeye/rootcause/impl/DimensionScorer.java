@@ -34,7 +34,7 @@ public class DimensionScorer {
   static final String COST = "cost";
   static final String VALUE = "value";
 
-  final QueryCache cache;
+  private final QueryCache cache;
 
   public DimensionScorer(QueryCache cache) {
     this.cache = cache;
@@ -91,12 +91,17 @@ public class DimensionScorer {
       i++;
     }
 
-    DoubleSeries sCost = DataFrame.toSeries(cost);
+    DoubleSeries sCost = DataFrame.toSeries(cost).fillNull();
 
     DataFrame df = new DataFrame();
     df.addSeries(DIMENSION, dim);
     df.addSeries(VALUE, value);
-    df.addSeries(COST, sCost.divide(sCost.sum()));
+
+    if(sCost.sum() > 0.0) {
+      df.addSeries(COST, sCost.divide(sCost.sum()));
+    } else {
+      df.addSeries(COST, sCost);
+    }
 
     return df;
   }

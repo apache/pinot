@@ -3,6 +3,11 @@ package com.linkedin.thirdeye.rootcause.impl;
 import com.linkedin.thirdeye.rootcause.Entity;
 
 
+/**
+ * DimensionEntity represents a data dimension (a cut) across multiple metrics. It is identified
+ * by a key-value pair. Note, that dimension names may require standardization across different
+ * metrics.
+ */
 public class DimensionEntity extends Entity {
   public static final EntityType TYPE = new EntityType("thirdeye:dimension:");
 
@@ -10,8 +15,8 @@ public class DimensionEntity extends Entity {
     return new DimensionEntity(TYPE.formatURN(name, value), score, name, value);
   }
 
-  final String name;
-  final String value;
+  private final String name;
+  private final String value;
 
   public static DimensionEntity fromURN(String urn, double score) {
     String[] parts = urn.split(":");
