@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,7 +19,7 @@ public class CollectionsCache {
 
   private AtomicReference<List<String>> collectionsRef;
   private DatasetConfigManager datasetConfigDAO;
-  private String whitelistCollections;
+  private List<String> whitelistCollections;
   private static final Logger LOG = LoggerFactory.getLogger(CollectionsCache.class);
 
 
@@ -36,9 +37,8 @@ public class CollectionsCache {
   public void loadCollections() {
     List<String> collections = new ArrayList<>();
 
-    if (StringUtils.isNotBlank(whitelistCollections)) {
-      List<String> whitelist = Lists.newArrayList(whitelistCollections.split(","));
-      for (String collection : whitelist) {
+    if (CollectionUtils.isNotEmpty(whitelistCollections)) {
+      for (String collection : whitelistCollections) {
         DatasetConfigDTO datasetConfig = datasetConfigDAO.findByDataset(collection);
         if (datasetConfig == null || !datasetConfig.isActive()) {
           LOG.info("Skipping collection {} due to missing dataset config or status inactive", collection);
