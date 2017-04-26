@@ -240,7 +240,7 @@ public class CommonConstants {
 
   public static class Segment {
     public static class Realtime {
-      public static enum Status {
+      public enum Status {
         IN_PROGRESS,
         DONE
       }
@@ -250,7 +250,7 @@ public class CommonConstants {
     public static class Offline {
       public static final String DOWNLOAD_URL = "segment.offline.download.url";
       public static final String PUSH_TIME = "segment.offline.push.time";
-      public static final String REFRESH_TIME = "segment.offline.refresh.time";;
+      public static final String REFRESH_TIME = "segment.offline.refresh.time";
     }
 
     public static final String SEGMENT_NAME = "segment.name";
@@ -265,7 +265,10 @@ public class CommonConstants {
     public static final String CREATION_TIME = "segment.creation.time";
     public static final String FLUSH_THRESHOLD_SIZE = "segment.flush.threshold.size";
 
-    public static enum SegmentType {
+    public static final String SEGMENT_BACKUP_DIR_SUFFIX = ".segment.bak";
+    public static final String SEGMENT_TEMP_DIR_SUFFIX = ".segment.tmp";
+
+    public enum SegmentType {
       OFFLINE,
       REALTIME
     }

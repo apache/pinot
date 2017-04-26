@@ -33,8 +33,8 @@ import com.linkedin.pinot.core.data.manager.offline.TableDataManagerProvider;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
+import com.linkedin.pinot.core.segment.index.loader.LoaderUtils;
 import java.io.File;
-import java.io.FilenameFilter;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -57,8 +57,6 @@ import org.slf4j.LoggerFactory;
 // TODO: pass a reference to Helix property store during initialization. Both OFFLINE and REALTIME use case need it.
 public class HelixInstanceDataManager implements InstanceDataManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(HelixInstanceDataManager.class);
-
-  private static final String RELOAD_TEMP_DIR_SUFFIX = ".reload.tmp";
 
   private HelixInstanceDataManagerConfig _instanceDataManagerConfig;
   private Map<String, TableDataManager> _tableDataManagerMap = new HashMap<>();
@@ -243,45 +241,43 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     LOGGER.info("Reloading segment: {} in table: {}", segmentName, tableName);
 
     File indexDir = new File(segmentMetadata.getIndexDir());
-    Preconditions.checkState(indexDir.isDirectory());
-    File parentDir = indexDir.getParentFile();
+    Preconditions.checkState(indexDir.isDirectory(), "Index directory: %s is not a directory", indexDir);
 
-    // Clean up all temporary index directories
-    // This is for failure recovery
-    File[] files = parentDir.listFiles(new FilenameFilter() {
-      @Override
-      public boolean accept(File dir, String name) {
-        return name.endsWith(RELOAD_TEMP_DIR_SUFFIX);
-      }
-    });
-    Preconditions.checkNotNull(files);
-    for (File file : files) {
-      FileUtils.deleteQuietly(file);
-    }
-
-    // Copy the original segment to a temporary segment
-    File tempIndexDir = new File(parentDir, indexDir.getName() + RELOAD_TEMP_DIR_SUFFIX);
-    FileUtils.copyDirectory(indexDir, tempIndexDir);
-
-    // Try to load with the temporary segment
-    IndexSegment indexSegment;
+    File parentFile = indexDir.getParentFile();
+    File segmentBackupDir =
+        new File(parentFile, indexDir.getName() + CommonConstants.Segment.SEGMENT_BACKUP_DIR_SUFFIX);
     try {
-      indexSegment =
-          ColumnarSegmentLoader.load(tempIndexDir, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig),
-              schema);
-    } catch (Exception e) {
-      LOGGER.error("Caught exception while trying to reload the segment: {} in table: {}, abort the reloading",
-          segmentName, tableName, e);
-      FileUtils.deleteQuietly(tempIndexDir);
-      return;
+      // First rename index directory to segment backup directory so that original segment have all file descriptors
+      // point to the segment backup directory to ensure original segment serves queries properly
+
+      // Rename index directory to segment backup directory (atomic)
+      Preconditions.checkState(indexDir.renameTo(segmentBackupDir),
+          "Failed to rename index directory: %s to segment backup directory: %s", indexDir, segmentBackupDir);
+
+      // Copy from segment backup directory back to index directory
+      FileUtils.copyDirectory(segmentBackupDir, indexDir);
+
+      // Load from index directory
+      IndexSegment indexSegment =
+          ColumnarSegmentLoader.load(indexDir, new IndexLoadingConfig(_instanceDataManagerConfig, tableConfig), schema);
+
+      // Replace the old segment in memory
+      _tableDataManagerMap.get(tableName).addSegment(indexSegment);
+
+      // Rename segment backup directory to segment temporary directory (atomic)
+      // The reason to first rename then delete is that, renaming is an atomic operation, but deleting is not. When we
+      // rename the segment backup directory to segment temporary directory, we know the reload already succeeded, so
+      // that we can safely delete the segment temporary directory
+      File segmentTempDir = new File(parentFile, indexDir.getName() + CommonConstants.Segment.SEGMENT_TEMP_DIR_SUFFIX);
+      Preconditions.checkState(segmentBackupDir.renameTo(segmentTempDir),
+          "Failed to rename segment backup directory: %s to segment temporary directory: %s", segmentBackupDir,
+          segmentTempDir);
+
+      // Delete segment temporary directory
+      FileUtils.deleteDirectory(segmentTempDir);
+    } finally {
+      LoaderUtils.reloadFailureRecovery(indexDir);
     }
-
-    // Replace the old segment in memory
-    _tableDataManagerMap.get(tableName).addSegment(indexSegment);
-
-    // Replace the original index directory with the temporary one
-    FileUtils.deleteQuietly(indexDir);
-    FileUtils.moveDirectory(tempIndexDir, indexDir);
   }
 
   @Override
@@ -317,5 +313,4 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       }
     }
   }
-
 }
