@@ -6,20 +6,8 @@ moduleForComponent('anomaly-graph', 'Integration | Component | anomaly graph', {
 });
 
 test('it renders', function(assert) {
-
-  // Set any properties with this.set('myProperty', 'value');
-  // Handle any actions with this.on('myAction', function(val) { ... });
-
+  const selector = '.anomaly-graph';
   this.render(hbs`{{anomaly-graph}}`);
 
-  assert.equal(this.$().text().trim(), '');
-
-  // Template block usage:
-  this.render(hbs`
-    {{#anomaly-graph}}
-      template block text
-    {{/anomaly-graph}}
-  `);
-
-  assert.equal(this.$().text().trim(), 'template block text');
+  assert.ok(this.$(selector).length, 'anomaly graph renders correctly');
 });

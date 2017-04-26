@@ -33,7 +33,7 @@ const INITIAL_STATE = {
 
 export default function reducer(state = INITIAL_STATE, action = {}) {
   switch (action.type) {
-    case ActionTypes.LOAD:
+    case ActionTypes.LOAD: {
       const anomalyList = action.payload.anomalyDetailsList;
       const ids = anomalyList.map((anomaly) => anomaly.anomalyId);
       const entities = anomalyList.reduce((entities, anomaly) => {
@@ -47,7 +47,7 @@ export default function reducer(state = INITIAL_STATE, action = {}) {
         ids,
         entities,
       });
-
+    }
     case ActionTypes.LOADING:
       return Object.assign(state, {
         loading: true
