@@ -1,7 +1,16 @@
 package com.linkedin.thirdeye.rootcause.impl;
 
 import com.linkedin.thirdeye.client.DAORegistry;
+import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.client.cache.QueryCache;
+import com.linkedin.thirdeye.client.diffsummary.Cube;
+import com.linkedin.thirdeye.client.diffsummary.DimNameValueCostEntry;
+import com.linkedin.thirdeye.client.diffsummary.Dimensions;
+import com.linkedin.thirdeye.client.diffsummary.OLAPDataBaseClient;
+import com.linkedin.thirdeye.client.diffsummary.PinotThirdEyeSummaryClient;
+import com.linkedin.thirdeye.constant.MetricAggFunction;
+import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dataframe.DataFrame;
 import com.linkedin.thirdeye.dataframe.DoubleSeries;
 import com.linkedin.thirdeye.dataframe.Series;
@@ -13,8 +22,11 @@ import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.PipelineContext;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -22,6 +34,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,13 +56,13 @@ public class DimensionAnalysisPipeline extends Pipeline {
   public static final long TIMEOUT = 120000;
 
   private static final String KEY = "key";
-  private static final String DIMENSION = DimensionScorer.DIMENSION;
-  private static final String VALUE = DimensionScorer.VALUE;
-  private static final String COST = DimensionScorer.COST;
+  static final String DIMENSION = "dimension";
+  static final String COST = "cost";
+  static final String VALUE = "value";
 
+  private final QueryCache cache;
   private final MetricConfigManager metricDAO;
   private final DatasetConfigManager datasetDAO;
-  private final DimensionScorer scorer;
   private final ExecutorService executor;
 
   /**
@@ -58,15 +72,15 @@ public class DimensionAnalysisPipeline extends Pipeline {
    * @param inputNames input pipeline names
    * @param metricDAO metric config DAO
    * @param datasetDAO dataset config DAO
-   * @param scorer dimension scorer for contribution analysis
+   * @param cache query cache for running contribution analysis
    * @param executor executor service for parallel task execution
    */
   public DimensionAnalysisPipeline(String outputName, Set<String> inputNames, MetricConfigManager metricDAO,
-      DatasetConfigManager datasetDAO, DimensionScorer scorer, ExecutorService executor) {
+      DatasetConfigManager datasetDAO, QueryCache cache, ExecutorService executor) {
     super(outputName, inputNames);
     this.metricDAO = metricDAO;
     this.datasetDAO = datasetDAO;
-    this.scorer = scorer;
+    this.cache = cache;
     this.executor = executor;
   }
 
@@ -82,7 +96,7 @@ public class DimensionAnalysisPipeline extends Pipeline {
 
     this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
     this.datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
-    this.scorer = new DimensionScorer(ThirdEyeCacheRegistry.getInstance().getQueryCache());
+    this.cache = ThirdEyeCacheRegistry.getInstance().getQueryCache();
 
     int parallelism = Integer.parseInt(properties.get(PROP_PARALLELISM));
     this.executor = Executors.newFixedThreadPool(parallelism);
@@ -121,7 +135,7 @@ public class DimensionAnalysisPipeline extends Pipeline {
         @Override
         public DataFrame call() throws Exception {
           LOG.info("Scoring metric '{}' in dataset '{}' with weight {}", entity.getMetric(), entity.getDataset(), entity.getScore());
-          DataFrame dfMetric = scorer.score(datasetDTO, metricDTO, current, baseline);
+          DataFrame dfMetric = DimensionAnalysisPipeline.this.score(datasetDTO, metricDTO, current, baseline);
 
           // modify cost by metric score
           final double metricScore = entity.getScore();
@@ -191,5 +205,71 @@ public class DimensionAnalysisPipeline extends Pipeline {
       entities.add(DimensionEntity.fromDimension(score, dimension, value));
     }
     return entities;
+  }
+
+  /**
+   * Perform contribution analysis on a metric given a time range and baseline.
+   *
+   * @param dataset thirdeye dataset reference
+   * @param metric thirdeye metric reference
+   * @param current current time range
+   * @param baseline baseline time range
+   * @return DataFrame with normalized cost
+   * @throws Exception if data cannot be fetched or data is invalid
+   */
+  DataFrame score(DatasetConfigDTO dataset, MetricConfigDTO metric, TimeRangeEntity current, TimeRangeEntity baseline) throws Exception {
+    if(!metric.getDataset().equals(dataset.getDataset()))
+      throw new IllegalArgumentException("Dataset and metric must match");
+
+    // build data cube
+    OLAPDataBaseClient olapClient = getOlapDataBaseClient(current, baseline, metric, dataset);
+    Dimensions dimensions = new Dimensions(dataset.getDimensions());
+    int topDimensions = dataset.getDimensions().size();
+
+    Cube cube = new Cube();
+    cube.buildWithAutoDimensionOrder(olapClient, dimensions, topDimensions, Collections.<List<String>>emptyList());
+
+    return toNormalizedDataFrame(cube.getCostSet());
+  }
+
+  private OLAPDataBaseClient getOlapDataBaseClient(TimeRangeEntity current, TimeRangeEntity baseline, MetricConfigDTO metric, DatasetConfigDTO dataset) throws Exception {
+    final String timezone = "UTC";
+    List<MetricExpression> metricExpressions = Utils.convertToMetricExpressions(metric.getName(), MetricAggFunction.SUM, dataset.getDataset());
+
+    OLAPDataBaseClient olapClient = new PinotThirdEyeSummaryClient(cache);
+    olapClient.setCollection(dataset.getDataset());
+    olapClient.setMetricExpression(metricExpressions.get(0));
+    olapClient.setCurrentStartInclusive(new DateTime(current.getStart(), DateTimeZone.forID(timezone)));
+    olapClient.setCurrentEndExclusive(new DateTime(current.getEnd(), DateTimeZone.forID(timezone)));
+    olapClient.setBaselineStartInclusive(new DateTime(baseline.getStart(), DateTimeZone.forID(timezone)));
+    olapClient.setBaselineEndExclusive(new DateTime(baseline.getEnd(), DateTimeZone.forID(timezone)));
+    return olapClient;
+  }
+
+  private static DataFrame toNormalizedDataFrame(Collection<DimNameValueCostEntry> costs) {
+    String[] dim = new String[costs.size()];
+    String[] value = new String[costs.size()];
+    double[] cost = new double[costs.size()];
+    int i = 0;
+    for(DimNameValueCostEntry e : costs) {
+      dim[i] = e.getDimName();
+      value[i] = e.getDimValue();
+      cost[i] = e.getCost();
+      i++;
+    }
+
+    DoubleSeries sCost = DataFrame.toSeries(cost).fillNull();
+
+    DataFrame df = new DataFrame();
+    df.addSeries(DIMENSION, dim);
+    df.addSeries(VALUE, value);
+
+    if(sCost.sum() > 0.0) {
+      df.addSeries(COST, sCost.divide(sCost.sum()));
+    } else {
+      df.addSeries(COST, sCost);
+    }
+
+    return df;
   }
 }

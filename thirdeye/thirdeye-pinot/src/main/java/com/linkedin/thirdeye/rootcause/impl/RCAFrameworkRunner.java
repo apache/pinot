@@ -189,15 +189,14 @@ public class RCAFrameworkRunner {
 
     // Dimensions (from metrics)
     QueryCache cache = ThirdEyeCacheRegistry.getInstance().getQueryCache();
-    DimensionScorer scorer = new DimensionScorer(cache);
     ExecutorService executorScorer = Executors.newFixedThreadPool(3);
-    pipelines.add(new DimensionAnalysisPipeline(P_DIMENSION_METRIC_RAW, asSet(P_INPUT, P_METRIC_TOPK), metricDAO, datasetDAO, scorer, executorScorer));
+    pipelines.add(new DimensionAnalysisPipeline(P_DIMENSION_METRIC_RAW, asSet(P_INPUT, P_METRIC_TOPK), metricDAO, datasetDAO, cache, executorScorer));
 
     Map<String, String> dimNameToDimNameMapping = new HashMap<>();
     dimNameToDimNameMapping.put("country", "countryCode");
     Collection<StringMapping> dimensionMapping = StringMappingParser.fromMap(dimNameToDimNameMapping, 1.0);
 
-    pipelines.add(new DimensionRewriterPipeline(P_DIMENSION_REWRITE, asSet(P_DIMENSION_METRIC_RAW), dimensionMapping));
+    pipelines.add(new DimensionStandardizationPipeline(P_DIMENSION_REWRITE, asSet(P_DIMENSION_METRIC_RAW), dimensionMapping));
     pipelines.add(new TopKPipeline(P_DIMENSION_TOPK, asSet(P_INPUT, P_DIMENSION_REWRITE), DimensionEntity.class, TOPK_DIMENSION));
 
     // Systems

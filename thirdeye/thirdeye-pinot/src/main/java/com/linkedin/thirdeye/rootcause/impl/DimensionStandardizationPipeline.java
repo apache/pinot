@@ -19,8 +19,8 @@ import org.slf4j.LoggerFactory;
  * mappings. If there is a match, a new (modified) DimensionEntity is emitted, otherwise the
  * DimensionEntity passes through without modification.
  */
-public class DimensionRewriterPipeline extends Pipeline {
-  private static final Logger LOG = LoggerFactory.getLogger(DimensionRewriterPipeline.class);
+public class DimensionStandardizationPipeline extends Pipeline {
+  private static final Logger LOG = LoggerFactory.getLogger(DimensionStandardizationPipeline.class);
 
   public static final String PROP_PATH = PipelineLoader.PROP_PATH;
 
@@ -33,7 +33,7 @@ public class DimensionRewriterPipeline extends Pipeline {
    * @param inputNames input pipeline config
    * @param dimensionMappings string mappings for dimension names
    */
-  public DimensionRewriterPipeline(String outputName, Set<String> inputNames, Iterable<StringMapping> dimensionMappings) {
+  public DimensionStandardizationPipeline(String outputName, Set<String> inputNames, Iterable<StringMapping> dimensionMappings) {
     super(outputName, inputNames);
     this.dimensionMappings = StringMapping.toMap(dimensionMappings);
   }
@@ -45,7 +45,7 @@ public class DimensionRewriterPipeline extends Pipeline {
    * @param inputNames input pipeline names
    * @param properties configuration properties ({@code PROP_PATH})
    */
-  public DimensionRewriterPipeline(String outputName, Set<String> inputNames, Map<String, String> properties) throws IOException {
+  public DimensionStandardizationPipeline(String outputName, Set<String> inputNames, Map<String, String> properties) throws IOException {
     super(outputName, inputNames);
     File csv = new File(properties.get(PROP_PATH));
     this.dimensionMappings = StringMapping.toMap(StringMappingParser.fromCsv(new FileReader(csv), 1.0d));
