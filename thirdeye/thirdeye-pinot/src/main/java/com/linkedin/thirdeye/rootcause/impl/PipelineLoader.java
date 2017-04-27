@@ -34,17 +34,17 @@ public class PipelineLoader {
     List<PipelineConfiguration> rcaPipelinesConfiguration = rcaConfiguration.getRcaPipelinesConfiguration();
     if (CollectionUtils.isNotEmpty(rcaPipelinesConfiguration)) {
       for (PipelineConfiguration pipelineConfig : rcaPipelinesConfiguration) {
-        String name = pipelineConfig.getName();
-        Set<String> inputs = new HashSet<>(pipelineConfig.getInputs());
+        String outputName = pipelineConfig.getOutputName();
+        Set<String> inputNames = new HashSet<>(pipelineConfig.getInputNames());
         String className = pipelineConfig.getClassName();
         Map<String, String> properties = pipelineConfig.getProperties();
 
         if(properties != null)
           properties = augmentPathProperty(properties, rcaConfig);
 
-        LOG.info("Creating pipeline '{}' [{}] with inputs '{}'", name, className, inputs);
+        LOG.info("Creating pipeline '{}' [{}] with inputs '{}'", outputName, className, inputNames);
         Constructor<?> constructor = Class.forName(className).getConstructor(String.class, Set.class, Map.class);
-        Pipeline pipeline = (Pipeline) constructor.newInstance(name, inputs, properties);
+        Pipeline pipeline = (Pipeline) constructor.newInstance(outputName, inputNames, properties);
 
         pipelines.add(pipeline);
       }

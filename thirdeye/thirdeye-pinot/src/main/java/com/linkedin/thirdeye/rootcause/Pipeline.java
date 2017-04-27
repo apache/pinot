@@ -11,20 +11,20 @@ import java.util.Set;
  * @see RCAFramework
  */
 public abstract class Pipeline {
-  final String name;
-  final Set<String> inputs;
+  private final String outputName;
+  private final Set<String> inputNames;
 
-  public Pipeline(String name, Set<String> inputs) {
-    this.name = name;
-    this.inputs = inputs;
+  public Pipeline(String outputName, Set<String> inputNames) {
+    this.outputName = outputName;
+    this.inputNames = inputNames;
   }
 
-  public final String getName() {
-    return name;
+  public final String getOutputName() {
+    return outputName;
   }
 
-  public final Set<String> getInputs() {
-    return inputs;
+  public final Set<String> getInputNames() {
+    return inputNames;
   }
 
   /**

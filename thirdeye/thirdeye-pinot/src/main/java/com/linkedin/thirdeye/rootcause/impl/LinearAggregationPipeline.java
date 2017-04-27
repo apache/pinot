@@ -16,12 +16,11 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Sample implementation of an aggregator that normalizes weights across pipelines and handles
- * the same entity being returned from multiple pipelines by summing the entity's weights. Each
- * pipeline is weighted equally.
+ * Sample implementation of an aggregator that handles
+ * the same entity being returned from multiple pipelines by summing the entity's weights.
  */
-public class LinearAggregator extends Pipeline {
-  private static Logger LOG = LoggerFactory.getLogger(LinearAggregator.class);
+public class LinearAggregationPipeline extends Pipeline {
+  private static Logger LOG = LoggerFactory.getLogger(LinearAggregationPipeline.class);
 
   private static final String URN = "urn";
   private static final String SCORE = "score";
@@ -29,22 +28,22 @@ public class LinearAggregator extends Pipeline {
   /**
    * Constructor for dependency injection
    *
-   * @param name pipeline name
-   * @param inputs pipeline inputs
+   * @param outputName pipeline output name
+   * @param inputNames input pipeline names
    */
-  public LinearAggregator(String name, Set<String> inputs) {
-    super(name, inputs);
+  public LinearAggregationPipeline(String outputName, Set<String> inputNames) {
+    super(outputName, inputNames);
   }
 
   /**
    * Alternate constructor for use by PipelineLoader
    *
-   * @param name pipeline name
-   * @param inputs pipeline inputs
+   * @param outputName pipeline output name
+   * @param inputNames input pipeline names
    * @param ignore configuration properties (none)
    */
-  public LinearAggregator(String name, Set<String> inputs, Map<String, String> ignore) {
-    super(name, inputs);
+  public LinearAggregationPipeline(String outputName, Set<String> inputNames, Map<String, String> ignore) {
+    super(outputName, inputNames);
   }
 
   @Override

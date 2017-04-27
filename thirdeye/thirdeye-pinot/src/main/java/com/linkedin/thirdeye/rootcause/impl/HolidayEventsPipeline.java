@@ -24,7 +24,6 @@ import org.slf4j.LoggerFactory;
  * analysis) and scores them based on the number of matching DimensionEntities.
  */
 public class HolidayEventsPipeline extends Pipeline {
-
   private static final Logger LOG = LoggerFactory.getLogger(HolidayEventsPipeline.class);
 
   private final EventDataProviderManager eventDataProvider;
@@ -32,24 +31,24 @@ public class HolidayEventsPipeline extends Pipeline {
   /**
    * Constructor for dependency injection
    *
-   * @param name pipeline name
-   * @param inputs pipeline inputs
+   * @param outputName pipeline output name
+   * @param inputNames input pipeline names
    * @param eventDataProvider event data provider manager
    */
-  public HolidayEventsPipeline(String name, Set<String> inputs, EventDataProviderManager eventDataProvider) {
-    super(name, inputs);
+  public HolidayEventsPipeline(String outputName, Set<String> inputNames, EventDataProviderManager eventDataProvider) {
+    super(outputName, inputNames);
     this.eventDataProvider = eventDataProvider;
   }
 
   /**
    * Alternate constructor for PipelineLoader
    *
-   * @param name pipeline name
-   * @param inputs pipeline inputs
+   * @param outputName pipeline output name
+   * @param inputNames input pipeline names
    * @param ignore configuration properties (none)
    */
-  public HolidayEventsPipeline(String name, Set<String> inputs, Map<String, String> ignore) {
-    super(name, inputs);
+  public HolidayEventsPipeline(String outputName, Set<String> inputNames, Map<String, String> ignore) {
+    super(outputName, inputNames);
     this.eventDataProvider = EventDataProviderManager.getInstance();
   }
 

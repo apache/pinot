@@ -19,8 +19,8 @@ import org.slf4j.LoggerFactory;
  * mappings. If there is a match, a new (modified) DimensionEntity is emitted, otherwise the
  * DimensionEntity passes through without modification.
  */
-public class DimensionRewriter extends Pipeline {
-  private static final Logger LOG = LoggerFactory.getLogger(DimensionRewriter.class);
+public class DimensionRewriterPipeline extends Pipeline {
+  private static final Logger LOG = LoggerFactory.getLogger(DimensionRewriterPipeline.class);
 
   public static final String PROP_PATH = PipelineLoader.PROP_PATH;
 
@@ -29,24 +29,24 @@ public class DimensionRewriter extends Pipeline {
   /**
    * Constructor for dependency injection
    *
-   * @param name pipeline name
-   * @param inputs pipeline inputs
+   * @param outputName pipeline output name
+   * @param inputNames input pipeline config
    * @param dimensionMappings string mappings for dimension names
    */
-  public DimensionRewriter(String name, Set<String> inputs, Iterable<StringMapping> dimensionMappings) {
-    super(name, inputs);
+  public DimensionRewriterPipeline(String outputName, Set<String> inputNames, Iterable<StringMapping> dimensionMappings) {
+    super(outputName, inputNames);
     this.dimensionMappings = StringMapping.toMap(dimensionMappings);
   }
 
   /**
    * Alternate constructor for use by PipelineLoader
    *
-   * @param name pipeline name
-   * @param inputs pipeline inputs
+   * @param outputName pipeline output name
+   * @param inputNames input pipeline names
    * @param properties configuration properties ({@code PROP_PATH})
    */
-  public DimensionRewriter(String name, Set<String> inputs, Map<String, String> properties) throws IOException {
-    super(name, inputs);
+  public DimensionRewriterPipeline(String outputName, Set<String> inputNames, Map<String, String> properties) throws IOException {
+    super(outputName, inputNames);
     File csv = new File(properties.get(PROP_PATH));
     this.dimensionMappings = StringMapping.toMap(StringMappingParser.fromCsv(new FileReader(csv), 1.0d));
   }

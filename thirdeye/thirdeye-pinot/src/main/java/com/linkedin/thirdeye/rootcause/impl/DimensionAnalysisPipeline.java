@@ -54,16 +54,16 @@ public class DimensionAnalysisPipeline extends Pipeline {
   /**
    * Constructor for dependency injection
    *
-   * @param name pipeline name
-   * @param inputs pipeline inputs
+   * @param outputName pipeline output name
+   * @param inputNames input pipeline names
    * @param metricDAO metric config DAO
    * @param datasetDAO dataset config DAO
    * @param scorer dimension scorer for contribution analysis
    * @param executor executor service for parallel task execution
    */
-  public DimensionAnalysisPipeline(String name, Set<String> inputs, MetricConfigManager metricDAO,
+  public DimensionAnalysisPipeline(String outputName, Set<String> inputNames, MetricConfigManager metricDAO,
       DatasetConfigManager datasetDAO, DimensionScorer scorer, ExecutorService executor) {
-    super(name, inputs);
+    super(outputName, inputNames);
     this.metricDAO = metricDAO;
     this.datasetDAO = datasetDAO;
     this.scorer = scorer;
@@ -73,12 +73,12 @@ public class DimensionAnalysisPipeline extends Pipeline {
   /**
    * Alternate constructor for use by PipelineLoader
    *
-   * @param name pipeline name
-   * @param inputs pipeline inputs
+   * @param outputName pipeline output name
+   * @param inputNames input pipeline names
    * @param properties configuration properties ({@code PROP_PARALLELISM})
    */
-  public DimensionAnalysisPipeline(String name, Set<String> inputs, Map<String, String> properties) {
-    super(name, inputs);
+  public DimensionAnalysisPipeline(String outputName, Set<String> inputNames, Map<String, String> properties) {
+    super(outputName, inputNames);
 
     this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
     this.datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();

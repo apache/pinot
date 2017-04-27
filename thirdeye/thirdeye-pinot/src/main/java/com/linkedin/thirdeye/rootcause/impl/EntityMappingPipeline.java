@@ -30,24 +30,24 @@ public class EntityMappingPipeline extends Pipeline {
   /**
    * Constructor for dependency injection
    *
-   * @param name pipeline name
-   * @param inputs pipeline inputs
+   * @param outputName pipeline output name
+   * @param inputNames input pipeline names
    * @param urnMappings string mappings from URNs to other URNs
    */
-  public EntityMappingPipeline(String name, Set<String> inputs, Collection<StringMapping> urnMappings) {
-    super(name, inputs);
+  public EntityMappingPipeline(String outputName, Set<String> inputNames, Collection<StringMapping> urnMappings) {
+    super(outputName, inputNames);
     this.urnMappings = StringMapping.toMap(urnMappings);
   }
 
   /**
    * Alternate constructor for use by PipelineLoader
    *
-   * @param name pipeline name
-   * @param inputs pipeline inputs
+   * @param outputName pipeline output name
+   * @param inputNames input pipeline names
    * @param properties configuration properties ({@code PROP_PARALLELISM})
    */
-  public EntityMappingPipeline(String name, Set<String> inputs, Map<String, String> properties) throws IOException {
-    super(name, inputs);
+  public EntityMappingPipeline(String outputName, Set<String> inputNames, Map<String, String> properties) throws IOException {
+    super(outputName, inputNames);
     File csv = new File(properties.get(PROP_PATH));
     this.urnMappings = StringMapping.toMap(StringMappingParser.fromCsv(new FileReader(csv), 1.0d));
   }

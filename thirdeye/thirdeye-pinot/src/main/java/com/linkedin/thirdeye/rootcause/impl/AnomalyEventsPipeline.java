@@ -28,24 +28,24 @@ public class AnomalyEventsPipeline extends Pipeline {
   /**
    * Constructor for dependency injection
    *
-   * @param name pipeline name
-   * @param inputs pipeline inputs
+   * @param outputName pipeline output name
+   * @param inputNames input pipeline names
    * @param manager event data provider manager
    */
-  public AnomalyEventsPipeline(String name, Set<String> inputs, EventDataProviderManager manager) {
-    super(name, inputs);
+  public AnomalyEventsPipeline(String outputName, Set<String> inputNames, EventDataProviderManager manager) {
+    super(outputName, inputNames);
     this.manager = manager;
   }
 
   /**
    * Alternate constructor for use by PipelineLoader
    *
-   * @param name pipeline name
-   * @param inputs pipeline inputs
+   * @param outputName pipeline output name
+   * @param inputNames input pipeline names
    * @param ignore configuration properties (none)
    */
-  public AnomalyEventsPipeline(String name, Set<String> inputs, Map<String, String> ignore) {
-    super(name, inputs);
+  public AnomalyEventsPipeline(String outputName, Set<String> inputNames, Map<String, String> ignore) {
+    super(outputName, inputNames);
     this.manager = EventDataProviderManager.getInstance();
   }
 

@@ -28,13 +28,13 @@ public class TopKPipeline extends Pipeline {
   /**
    * Constructor for dependency injection
    *
-   * @param name pipeline name
-   * @param inputs pipeline inputs
+   * @param outputName pipeline output name
+   * @param inputNames input pipeline names
    * @param clazz (super) class to filter by
    * @param k maximum number of result elements
    */
-  public TopKPipeline(String name, Set<String> inputs, Class<? extends Entity> clazz, int k) {
-    super(name, inputs);
+  public TopKPipeline(String outputName, Set<String> inputNames, Class<? extends Entity> clazz, int k) {
+    super(outputName, inputNames);
     this.k = k;
     this.clazz = clazz;
   }
@@ -42,12 +42,12 @@ public class TopKPipeline extends Pipeline {
   /**
    * Alternate constructor for PipelineLoader
    *
-   * @param name pipeline name
-   * @param inputs pipeline inputs
+   * @param outputName pipeline output name
+   * @param inputNames input pipeline names
    * @param properties configuration properties ({@code PROP_K}, {@code PROP_CLASS})
    */
-  public TopKPipeline(String name, Set<String> inputs, Map<String, String> properties) throws Exception {
-    super(name, inputs);
+  public TopKPipeline(String outputName, Set<String> inputNames, Map<String, String> properties) throws Exception {
+    super(outputName, inputNames);
     this.k = Integer.parseInt(properties.get(PROP_K));
     this.clazz = (Class<? extends Entity>)Class.forName(properties.get(PROP_CLASS));
   }

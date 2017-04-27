@@ -8,8 +8,8 @@ import java.util.Set;
  * Container object for pipeline execution results. Holds entities with scores as set by the pipeline.
  */
 public class PipelineResult {
-  final PipelineContext context;
-  final Set<Entity> entities;
+  private final PipelineContext context;
+  private final Set<Entity> entities;
 
   public PipelineResult(PipelineContext context, Set<? extends Entity> entities) {
     this.context = context;

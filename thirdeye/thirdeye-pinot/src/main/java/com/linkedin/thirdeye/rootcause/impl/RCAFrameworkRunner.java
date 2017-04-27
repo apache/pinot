@@ -197,7 +197,7 @@ public class RCAFrameworkRunner {
     dimNameToDimNameMapping.put("country", "countryCode");
     Collection<StringMapping> dimensionMapping = StringMappingParser.fromMap(dimNameToDimNameMapping, 1.0);
 
-    pipelines.add(new DimensionRewriter(P_DIMENSION_REWRITE, asSet(P_DIMENSION_METRIC_RAW), dimensionMapping));
+    pipelines.add(new DimensionRewriterPipeline(P_DIMENSION_REWRITE, asSet(P_DIMENSION_METRIC_RAW), dimensionMapping));
     pipelines.add(new TopKPipeline(P_DIMENSION_TOPK, asSet(P_INPUT, P_DIMENSION_REWRITE), DimensionEntity.class, TOPK_DIMENSION));
 
     // Systems
@@ -213,7 +213,7 @@ public class RCAFrameworkRunner {
     pipelines.add(new TopKPipeline(P_EVENT_TOPK, asSet(P_INPUT, P_EVENT_ANOMALY, P_EVENT_HOLIDAY), EventEntity.class, TOPK_EVENT));
 
     // Aggregation
-    pipelines.add(new LinearAggregator(P_OUTPUT, asSet(P_EVENT_TOPK, P_METRIC_TOPK, P_DIMENSION_TOPK, P_SERVICE_TOPK)));
+    pipelines.add(new LinearAggregationPipeline(P_OUTPUT, asSet(P_EVENT_TOPK, P_METRIC_TOPK, P_DIMENSION_TOPK, P_SERVICE_TOPK)));
 
     // Executor
     ExecutorService executor = Executors.newSingleThreadExecutor();

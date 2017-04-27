@@ -5,22 +5,22 @@ import java.util.Map;
 
 /**
  * Class to keep configs of each individual external rca pipeline
- * name: name for pipeline
- * inputs: input names for pipeline
+ * outputName: output name for pipeline
+ * inputNames: input names for pipeline
  * className: class name containing implementation for this pipeline
  * properties: map of property name and value, which are required by this pipeline for instantiation
  */
 public class PipelineConfiguration {
-  private String name;
+  private String outputName;
   private String className;
-  private List<String> inputs;
+  private List<String> inputNames;
   private Map<String, String> properties = null;
 
-  public String getName() {
-    return name;
+  public String getOutputName() {
+    return outputName;
   }
-  public void setName(String name) {
-    this.name = name;
+  public void setOutputName(String outputName) {
+    this.outputName = outputName;
   }
   public String getClassName() {
     return className;
@@ -34,10 +34,10 @@ public class PipelineConfiguration {
   public void setProperties(Map<String, String> properties) {
     this.properties = properties;
   }
-  public List<String> getInputs() {
-    return inputs;
+  public List<String> getInputNames() {
+    return inputNames;
   }
-  public void setInputs(List<String> inputs) {
-    this.inputs = inputs;
+  public void setInputNames(List<String> inputNames) {
+    this.inputNames = inputNames;
   }
 }

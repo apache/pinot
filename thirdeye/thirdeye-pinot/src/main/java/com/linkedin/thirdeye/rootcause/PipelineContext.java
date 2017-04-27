@@ -11,7 +11,7 @@ import java.util.Set;
  * pipelines.
  */
 public class PipelineContext {
-  final Map<String, Set<Entity>> inputs;
+  private final Map<String, Set<Entity>> inputs;
 
   public PipelineContext(Map<String, Set<Entity>> inputs) {
     this.inputs = inputs;
@@ -19,9 +19,9 @@ public class PipelineContext {
 
   /**
    * Returns a map of sets of entities that were generated as the output of upstream (input)
-   * pipelines. The map is keyed by pipeline name.
+   * pipelines. The map is keyed by pipeline id.
    *
-   * @return Map of input entities, keyed by generating pipeline name
+   * @return Map of input entities, keyed by generating pipeline id
    */
   public Map<String, Set<Entity>> getInputs() {
     return inputs;

@@ -4,8 +4,8 @@ import java.util.Set;
 
 
 /**
- * StaticPipeline emits a fixed set of entities as a result. It is used to encapsulate
- * user input during framework execution.
+ * StaticPipeline emits a fixed set of entities as a result, regardless of the input. It is
+ * used to encapsulate constants (such as user input) during framework execution.
  */
 public class StaticPipeline extends Pipeline {
   private final Set<Entity> entities;
@@ -13,12 +13,12 @@ public class StaticPipeline extends Pipeline {
   /**
    * Constructor for dependency injection
    *
-   * @param name pipeline name
-   * @param inputs pipeline inputs
+   * @param outputName pipeline output name
+   * @param inputNames input pipeline names
    * @param entities entities to emit as result
    */
-  public StaticPipeline(String name, Set<String> inputs, Set<Entity> entities) {
-    super(name, inputs);
+  public StaticPipeline(String outputName, Set<String> inputNames, Set<Entity> entities) {
+    super(outputName, inputNames);
     this.entities = entities;
   }
 

@@ -33,14 +33,14 @@ public class MetricDatasetPipeline extends Pipeline {
   /**
    * Constructor for dependency injection
    *
-   * @param name pipeline name
-   * @param inputs pipeline inputs
+   * @param outputName pipeline output name
+   * @param inputNames input pipeline names
    * @param metricDAO metric config DAO
    * @param datasetDAO dataset config DAO
    */
-  public MetricDatasetPipeline(String name, Set<String> inputs, MetricConfigManager metricDAO,
+  public MetricDatasetPipeline(String outputName, Set<String> inputNames, MetricConfigManager metricDAO,
       DatasetConfigManager datasetDAO) {
-    super(name, inputs);
+    super(outputName, inputNames);
     this.metricDAO = metricDAO;
     this.datasetDAO = datasetDAO;
   }
@@ -48,12 +48,12 @@ public class MetricDatasetPipeline extends Pipeline {
   /**
    * Alternate constructor for PipelineLoader
    *
-   * @param name pipeline name
-   * @param inputs pipeline inputs
+   * @param outputName pipeline output name
+   * @param inputNames input pipeline names
    * @param ignore configuration properties (none)
    */
-  public MetricDatasetPipeline(String name, Set<String> inputs, Map<String, String> ignore) {
-    super(name, inputs);
+  public MetricDatasetPipeline(String outputName, Set<String> inputNames, Map<String, String> ignore) {
+    super(outputName, inputNames);
     this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
     this.datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
   }

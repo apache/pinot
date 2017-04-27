@@ -5,14 +5,14 @@ eventDataProvidersConfiguration:
           DEPLOYMENT_DATA_URL: http://myurl.com
 rcaPipelinesConfiguration:
     - name: PIPELINE_ONE
-      inputs:
+      inputNames:
           - INPUT
       className: com.linkedin.thirdeye.dummy.pipeline.DummyRCAPipeline1
       properties:
           DB_URL: value1
           EXTERNAL_ENDPOINT: value2
     - name: PIPELINE_TWO
-      inputs:
+      inputNames:
           - INPUT
           - PIPELINE_ONE
       className: com.linkedin.thirdeye.dummy.pipeline.DummyRCAPipeline2

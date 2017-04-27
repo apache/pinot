@@ -1,6 +1,6 @@
 package com.linkedin.thirdeye.rootcause;
 
-import com.linkedin.thirdeye.rootcause.impl.LinearAggregator;
+import com.linkedin.thirdeye.rootcause.impl.LinearAggregationPipeline;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -31,8 +31,8 @@ public class RCAFrameworkTest {
   }
 
   @Test
-  public void testLinearAggregator() {
-    LinearAggregator agg = new LinearAggregator("", Collections.<String>emptySet());
+  public void testLinearAggregationPipeline() {
+    LinearAggregationPipeline agg = new LinearAggregationPipeline("", Collections.<String>emptySet());
 
     Entity e1 = new Entity("e:one", 1.0);
     Entity e2 = new Entity("e:two", 2.1);
@@ -92,12 +92,22 @@ public class RCAFrameworkTest {
     new RCAFramework(pipelines, Executors.newSingleThreadExecutor());
   }
 
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testInvalidDAGDuplicateName() {
+    Collection<Pipeline> pipelines = new ArrayList<>();
+    pipelines.add(makePipeline("a"));
+    pipelines.add(makePipeline("a", INPUT));
+    pipelines.add(makePipeline(OUTPUT, INPUT, "a"));
+    new RCAFramework(pipelines, Executors.newSingleThreadExecutor());
+  }
+
   @Test
   public void testValidDAG() {
     Collection<Pipeline> pipelines = new ArrayList<>();
+    pipelines.add(makePipeline("none"));
     pipelines.add(makePipeline("a", INPUT));
     pipelines.add(makePipeline("b", INPUT, "a"));
-    pipelines.add(makePipeline(OUTPUT, "a", "b", INPUT));
+    pipelines.add(makePipeline(OUTPUT, INPUT, "a", "b", "none"));
     new RCAFramework(pipelines, Executors.newSingleThreadExecutor());
   }
 
