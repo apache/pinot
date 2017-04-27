@@ -33,7 +33,11 @@ public class AnomalyFunctionBean extends AbstractBean {
 
   private boolean isActive = true;
 
+<<<<<<< HEAD
   private String globalMetric;
+=======
+  private boolean metricSum = false;
+>>>>>>> Implement anomaly contribution to total metric and AnomalyDetectionInputContextBuilder
 
   private String properties;
 
@@ -157,12 +161,21 @@ public class AnomalyFunctionBean extends AbstractBean {
     this.cron = cron;
   }
 
+<<<<<<< HEAD
   public String getGlobalMetric() {
     return globalMetric;
   }
 
   public void setGlobalMetric(String globalMetric) {
     this.globalMetric = globalMetric;
+=======
+  public boolean isMetricSum() {
+    return metricSum;
+  }
+
+  public void setMetricSum(boolean metricSum) {
+    this.metricSum = metricSum;
+>>>>>>> Implement anomaly contribution to total metric and AnomalyDetectionInputContextBuilder
   }
 
   public TimeGranularity getFrequency() {
@@ -303,7 +316,11 @@ public class AnomalyFunctionBean extends AbstractBean {
         && Objects.equals(windowDelayUnit, af.getWindowDelayUnit())
         && Objects.equals(exploreDimensions, af.getExploreDimensions())
         && Objects.equals(filters, af.getFilters())
+<<<<<<< HEAD
         && Objects.equals(globalMetric, af.getGlobalMetric())
+=======
+        && Objects.equals(metricSum, af.isMetricSum())
+>>>>>>> Implement anomaly contribution to total metric and AnomalyDetectionInputContextBuilder
         && Objects.equals(alertFilter, af.getAlertFilter())
         && Objects.equals(requiresCompletenessCheck,  af.isRequiresCompletenessCheck());
   }
@@ -312,6 +329,10 @@ public class AnomalyFunctionBean extends AbstractBean {
   public int hashCode() {
     return Objects.hash(getId(), collection, metric, metrics, metricFunction, type, isActive, cron, frequency,
         properties, bucketSize, bucketUnit, windowSize, windowUnit, windowDelay, windowDelayUnit,
+<<<<<<< HEAD
         exploreDimensions, filters, globalMetric, alertFilter, requiresCompletenessCheck);
+=======
+        exploreDimensions, filters, metricSum, alertFilter, requiresCompletenessCheck);
+>>>>>>> Implement anomaly contribution to total metric and AnomalyDetectionInputContextBuilder
   }
 }
