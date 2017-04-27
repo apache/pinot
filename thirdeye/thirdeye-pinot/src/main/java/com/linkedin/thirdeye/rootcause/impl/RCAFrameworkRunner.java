@@ -13,7 +13,9 @@ import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.EntityToEntityMappingManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.datalayer.pojo.EntityToEntityMappingBean;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.Pipeline;
@@ -178,32 +180,22 @@ public class RCAFrameworkRunner {
 
     MetricConfigManager metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
     DatasetConfigManager datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
+    EntityToEntityMappingManager entityDAO = DAORegistry.getInstance().getEntityToEntityMappingDAO();
 
     // Metrics
-    Map<String, String> metricToMetricMapping = new HashMap<>();
-    Collection<StringMapping> metricMapping = StringMappingParser.fromMap(metricToMetricMapping, 1.0);
-
     pipelines.add(new MetricDatasetPipeline(P_METRIC_DATASET_RAW, asSet(P_INPUT), metricDAO, datasetDAO));
-    pipelines.add(new EntityMappingPipeline(P_METRIC_METRIC_RAW, asSet(P_INPUT), metricMapping));
+    pipelines.add(new EntityMappingPipeline(P_METRIC_METRIC_RAW, asSet(P_INPUT), entityDAO, EntityToEntityMappingBean.MappingType.METRIC_TO_METRIC, false, false));
     pipelines.add(new TopKPipeline(P_METRIC_TOPK, asSet(P_INPUT, P_METRIC_DATASET_RAW, P_METRIC_METRIC_RAW), MetricEntity.class, TOPK_METRIC));
 
     // Dimensions (from metrics)
     QueryCache cache = ThirdEyeCacheRegistry.getInstance().getQueryCache();
     ExecutorService executorScorer = Executors.newFixedThreadPool(3);
     pipelines.add(new DimensionAnalysisPipeline(P_DIMENSION_METRIC_RAW, asSet(P_INPUT, P_METRIC_TOPK), metricDAO, datasetDAO, cache, executorScorer));
-
-    Map<String, String> dimNameToDimNameMapping = new HashMap<>();
-    dimNameToDimNameMapping.put("country", "countryCode");
-    Collection<StringMapping> dimensionMapping = StringMappingParser.fromMap(dimNameToDimNameMapping, 1.0);
-
-    pipelines.add(new DimensionStandardizationPipeline(P_DIMENSION_REWRITE, asSet(P_DIMENSION_METRIC_RAW), dimensionMapping));
+    pipelines.add(new EntityMappingPipeline(P_DIMENSION_REWRITE, asSet(P_DIMENSION_METRIC_RAW), entityDAO, EntityToEntityMappingBean.MappingType.DIMENSION_TO_DIMENSION, true, true));
     pipelines.add(new TopKPipeline(P_DIMENSION_TOPK, asSet(P_INPUT, P_DIMENSION_REWRITE), DimensionEntity.class, TOPK_DIMENSION));
 
     // Systems
-    Map<String, String> metricToServiceMapping = new HashMap<>();
-    Collection<StringMapping> serviceMapping = StringMappingParser.fromMap(metricToServiceMapping, 1.0);
-
-    pipelines.add(new EntityMappingPipeline(P_SERVICE_METRIC_RAW, asSet(P_METRIC_TOPK), serviceMapping));
+    pipelines.add(new EntityMappingPipeline(P_SERVICE_METRIC_RAW, asSet(P_METRIC_TOPK), entityDAO, EntityToEntityMappingBean.MappingType.METRIC_TO_SERVICE, false, false));
     pipelines.add(new TopKPipeline(P_SERVICE_TOPK, asSet(P_INPUT, P_SERVICE_METRIC_RAW), ServiceEntity.class, TOPK_SERVICE));
 
     // Events (from metrics and dimensions)
