@@ -28,7 +28,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 
@@ -49,7 +48,83 @@ public abstract class TimeSeriesUtil {
   }
 
   /**
+   * Return a metricSum for an anomaly function to calculate the contribution of anomalies to the total metric
+   * @param anomalyFunctionSpec spec of the anomaly function
+   * @param startEndTimeRanges the time ranges to retrieve the data for constructing the time series
+   * @return the data that is needed by the anomaly function for knowing the total metric
+   * @throws JobExecutionException
+   * @throws ExecutionException
+   */
+  public static MetricTimeSeries getMetricSum (AnomalyFunctionDTO anomalyFunctionSpec, List<Pair<Long, Long>> startEndTimeRanges)
+      throws JobExecutionException, ExecutionException {
+    // Set empty dimension and filter
+    Multimap<String, String> filters = HashMultimap.create();
+    List<String> groupByDimensions = Collections.emptyList();
+
+    TimeGranularity timeGranularity = new TimeGranularity(anomalyFunctionSpec.getBucketSize(),
+        anomalyFunctionSpec.getBucketUnit());
+    DatasetConfigDTO dataset = DAORegistry.getInstance().getDatasetConfigDAO().findByDataset(anomalyFunctionSpec.getCollection());
+    boolean doRollUp = true;
+    if (!dataset.isAdditive()) {
+      doRollUp = false;
+    }
+
+    TimeSeriesResponse timeSeriesResponse =
+        getTimeSeriesResponseImpl(anomalyFunctionSpec, startEndTimeRanges, timeGranularity, filters,
+            groupByDimensions, false, doRollUp);
+
+    MetricTimeSeries metricSum = null;
+    try {
+      Map<DimensionKey, MetricTimeSeries> dimensionKeyMetricTimeSeriesMap =
+          TimeSeriesResponseConverter.toMap(timeSeriesResponse, Utils.getSchemaDimensionNames(anomalyFunctionSpec.getCollection()));
+
+      if(dimensionKeyMetricTimeSeriesMap.size() > 2) {
+        LOG.warn("More than 1 dimensions when fetching traffic data for {}; take the 1st dimension", anomalyFunctionSpec);
+      }
+      metricSum = dimensionKeyMetricTimeSeriesMap.values().iterator().next();
+    } catch (Exception e) {
+      LOG.info("Failed to get schema dimensions for constructing dimension keys:", e.toString());
+    }
+    return metricSum;
+  }
+
+  /**
+   * Get the metric filter setting for an anomaly function
+   * @param anomalyFunctionSpec
+   * @return
+   */
+  public static Multimap<String, String> getFiltersForFunction(AnomalyFunctionDTO anomalyFunctionSpec) {
+    // Get the original filter
+    Multimap<String, String> filters;
+    String filterString = anomalyFunctionSpec.getFilters();
+    if (StringUtils.isNotBlank(filterString)) {
+      filters = ThirdEyeUtils.getFilterSet(filterString);
+    } else {
+      filters = HashMultimap.create();
+    }
+    return filters;
+  }
+
+  /**
+   * Get the explore dimensions for an anomaly function
+   * @param anomalyFunctionSpec
+   * @return
+   */
+  public static List<String> getDimensionsForFunction (AnomalyFunctionDTO anomalyFunctionSpec) {
+    List<String> groupByDimensions;
+    String exploreDimensionString = anomalyFunctionSpec.getExploreDimensions();
+    if (StringUtils.isNotBlank(exploreDimensionString)) {
+      groupByDimensions = Arrays.asList(exploreDimensionString.trim().split(","));
+    } else {
+      groupByDimensions = Collections.emptyList();
+    }
+    return groupByDimensions;
+  }
+
+
+  /**
    * Returns the set of metric time series that are needed by the given anomaly function for detecting anomalies.
+   * The endTimeInclusive is set to false in default.
    *
    * The time granularity is the granularity of the function's collection, i.e., the buckets are not aggregated,
    * in order to increase the accuracy for detecting anomalies.
@@ -64,22 +139,30 @@ public abstract class TimeSeriesUtil {
   public static Map<DimensionKey, MetricTimeSeries> getTimeSeriesForAnomalyDetection(
       AnomalyFunctionDTO anomalyFunctionSpec, List<Pair<Long, Long>> startEndTimeRanges)
       throws JobExecutionException, ExecutionException {
+    return getTimeSeriesForAnomalyDetection(anomalyFunctionSpec, startEndTimeRanges);
+  }
 
-    String filterString = anomalyFunctionSpec.getFilters();
-    Multimap<String, String> filters;
-    if (StringUtils.isNotBlank(filterString)) {
-      filters = ThirdEyeUtils.getFilterSet(filterString);
-    } else {
-      filters = HashMultimap.create();
-    }
+  /**
+   * Returns the set of metric time series that are needed by the given anomaly function for detecting anomalies.
+   *
+   * The time granularity is the granularity of the function's collection, i.e., the buckets are not aggregated,
+   * in order to increase the accuracy for detecting anomalies.
+   *
+   * @param anomalyFunctionSpec spec of the anomaly function
+   * @param startEndTimeRanges the time ranges to retrieve the data for constructing the time series
+   * @param endTimeInclusive if the end time is included
+   *
+   * @return the data that is needed by the anomaly function for detecting anomalies.
+   * @throws JobExecutionException
+   * @throws ExecutionException
+   */
+  public static Map<DimensionKey, MetricTimeSeries> getTimeSeriesForAnomalyDetection(
+      AnomalyFunctionDTO anomalyFunctionSpec, List<Pair<Long, Long>> startEndTimeRanges, boolean endTimeInclusive)
+      throws JobExecutionException, ExecutionException {
 
-    List<String> groupByDimensions;
-    String exploreDimensionString = anomalyFunctionSpec.getExploreDimensions();
-    if (StringUtils.isNotBlank(exploreDimensionString)) {
-      groupByDimensions = Arrays.asList(exploreDimensionString.trim().split(","));
-    } else {
-      groupByDimensions = Collections.emptyList();
-    }
+    Multimap<String, String> filters = getFiltersForFunction(anomalyFunctionSpec);
+
+    List<String> groupByDimensions = getDimensionsForFunction(anomalyFunctionSpec);
 
     TimeGranularity timeGranularity = new TimeGranularity(anomalyFunctionSpec.getBucketSize(),
         anomalyFunctionSpec.getBucketUnit());
@@ -92,7 +175,7 @@ public abstract class TimeSeriesUtil {
 
     TimeSeriesResponse timeSeriesResponse =
       getTimeSeriesResponseImpl(anomalyFunctionSpec, startEndTimeRanges, timeGranularity, filters, groupByDimensions,
-          false, doRollUp);
+          endTimeInclusive, doRollUp);
 
     try {
       Map<DimensionKey, MetricTimeSeries> dimensionKeyMetricTimeSeriesMap =
@@ -126,13 +209,7 @@ public abstract class TimeSeriesUtil {
       throws JobExecutionException, ExecutionException {
 
     // Get the original filter
-    Multimap<String, String> filters;
-    String filterString = anomalyFunctionSpec.getFilters();
-    if (StringUtils.isNotBlank(filterString)) {
-      filters = ThirdEyeUtils.getFilterSet(filterString);
-    } else {
-      filters = HashMultimap.create();
-    }
+    Multimap<String, String> filters = getFiltersForFunction(anomalyFunctionSpec);
 
     // Decorate filters according to dimensionMap
     filters = ThirdEyeUtils.getFilterSetFromDimensionMap(dimensionMap, filters);

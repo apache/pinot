@@ -107,12 +107,24 @@ public class DetectionTaskRunner implements TaskRunner {
   }
 
 
-  private void runTask(DateTime windowStart, DateTime windowEnd) throws JobExecutionException, ExecutionException {
+  private void runTask(DateTime windowStart, DateTime windowEnd) throws Exception {
 
     LOG.info("Running anomaly detection for time range {} to  {}", windowStart, windowEnd);
 
+    AnomalyDetectionInputContextBuilder anomalyDetectionInputContextBuilder =
+        new AnomalyDetectionInputContextBuilder(anomalyFunctionFactory);
+    anomalyDetectionInputContextBuilder.init(anomalyFunctionSpec);
+
     // TODO: Change to DataFetchers/DataSources
-    AnomalyDetectionInputContext adContext = fetchData(windowStart, windowEnd);
+    anomalyDetectionInputContextBuilder = anomalyDetectionInputContextBuilder
+        .fetchTimeSeriesData(windowStart, windowEnd)
+        .fetchExixtingRawAnomalies(windowStart, windowEnd)
+        .fetchExixtingMergedAnomalies(windowStart, windowEnd)
+        .fetchSaclingFactors(windowStart, windowEnd);
+    if (anomalyFunctionSpec.isMetricSum()) {
+      anomalyDetectionInputContextBuilder.fetchTimeSeriesMetricSum(windowStart, windowEnd);
+    }
+    AnomalyDetectionInputContext adContext = anomalyDetectionInputContextBuilder.build();
 
     ListMultimap<DimensionMap, RawAnomalyResultDTO> resultRawAnomalies = dimensionalShuffleAndUnifyAnalyze(windowStart, windowEnd, adContext);
     detectionTaskSuccessCounter.inc();
@@ -130,10 +142,6 @@ public class DetectionTaskRunner implements TaskRunner {
     TimeBasedAnomalyMerger timeBasedAnomalyMerger = new TimeBasedAnomalyMerger(anomalyFunctionFactory);
     ListMultimap<DimensionMap, MergedAnomalyResultDTO> resultMergedAnomalies =
       timeBasedAnomalyMerger.mergeAnomalies(anomalyFunctionSpec, resultRawAnomalies, isBackfill);
-
-    // Calculate Traffic Contribution
-    AnomalyContribution anomalyContribution = new AnomalyContribution();
-    anomalyContribution.run(resultMergedAnomalies);
 
     detectionTaskSuccessCounter.inc();
 
@@ -336,6 +344,7 @@ public class DetectionTaskRunner implements TaskRunner {
    *
    * @return known raw anomalies in the given window
    */
+  @Deprecated
   private List<RawAnomalyResultDTO> getExistingRawAnomalies(long functionId, long monitoringWindowStart,
       long monitoringWindowEnd) {
     List<RawAnomalyResultDTO> results = new ArrayList<>();
@@ -356,6 +365,7 @@ public class DetectionTaskRunner implements TaskRunner {
 
    * @return known merged anomalies of the function id that are needed for anomaly detection
    */
+  @Deprecated
   public List<MergedAnomalyResultDTO> getKnownMergedAnomalies(long functionId, List<Pair<Long, Long>> startEndTimeRanges) {
 
     List<MergedAnomalyResultDTO> results = new ArrayList<>();

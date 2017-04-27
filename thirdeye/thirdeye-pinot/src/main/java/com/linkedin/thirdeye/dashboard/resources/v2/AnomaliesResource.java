@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.dashboard.resources.v2;
 import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContext;
+import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContextBuilder;
 import com.linkedin.thirdeye.anomaly.detection.TimeSeriesUtil;
 import com.linkedin.thirdeye.anomaly.merge.TimeBasedAnomalyMerger;
 import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
@@ -686,8 +687,8 @@ public class AnomaliesResource {
     // get anomaly window range - this is the data to fetch (anomaly region + some offset if required)
     // the function will tell us this range, as how much data we fetch can change depending on which function is being executed
     TimeRange anomalyWindowRange = getAnomalyWindowOffset(mergedAnomaly, anomalyFunction, datasetConfig);
-    long anomalyWindowStart = anomalyWindowRange.getStart();
-    long anomalyWindowEnd = anomalyWindowRange.getEnd();
+    DateTime anomalyWindowStart = new DateTime(anomalyWindowRange.getStart());
+    DateTime anomalyWindowEnd = new DateTime(anomalyWindowRange.getEnd());
 
     DimensionMap dimensions = mergedAnomaly.getDimensions();
     TimeGranularity timeGranularity =
@@ -700,9 +701,11 @@ public class AnomaliesResource {
       if(anomalyProps.containsKey("anomalyTimelinesView")) {
         anomalyTimelinesView = AnomalyTimelinesView.fromJsonString(anomalyProps.get("anomalyTimelinesView"));
       } else {
-        AnomalyDetectionInputContext adInputContext =
-            TimeBasedAnomalyMerger.fetchDataByDimension(anomalyWindowStart, anomalyWindowEnd, dimensions,
-                anomalyFunction, mergedAnomalyResultDAO, overrideConfigDAO, true);
+        AnomalyDetectionInputContextBuilder anomalyDetectionInputContextBuilder =
+            new AnomalyDetectionInputContextBuilder(anomalyFunctionFactory);
+        AnomalyDetectionInputContext adInputContext = anomalyDetectionInputContextBuilder
+            .fetchTimeSeriesData(anomalyWindowStart, anomalyWindowEnd, true)
+            .fetchExixtingMergedAnomalies(anomalyWindowStart, anomalyWindowEnd).build();
 
         MetricTimeSeries metricTimeSeries = adInputContext.getDimensionKeyMetricTimeSeriesMap().get(dimensions);
 
@@ -710,19 +713,15 @@ public class AnomaliesResource {
         List<ScalingFactor> scalingFactors = adInputContext.getScalingFactors();
         if (CollectionUtils.isNotEmpty(scalingFactors)) {
           Properties properties = anomalyFunction.getProperties();
-          MetricTransfer.rescaleMetric(metricTimeSeries, anomalyWindowStart, scalingFactors, anomalyFunctionSpec.getTopicMetric(), properties);
+          MetricTransfer.rescaleMetric(metricTimeSeries, anomalyWindowStart.getMillis(), scalingFactors,
+              anomalyFunctionSpec.getTopicMetric(), properties);
         }
 
         List<MergedAnomalyResultDTO> knownAnomalies = adInputContext.getKnownMergedAnomalies().get(dimensions);
-        // check if there is AnomalyTimelinesView in the Properties. If yes, use the AnomalyTimelinesView
-        if (anomalyProps.containsKey("anomalyTimelinesView")) {
-          anomalyTimelinesView = AnomalyTimelinesView.fromJsonString(anomalyProps.get("anomalyTimelinesView"));
-        } else {
-          // Known anomalies are ignored (the null parameter) because 1. we can reduce users' waiting time and 2. presentation
-          // data does not need to be as accurate as the one used for detecting anomalies
-          anomalyTimelinesView = anomalyFunction.getTimeSeriesView(metricTimeSeries, bucketMillis, anomalyFunctionSpec.getTopicMetric(),
-              anomalyWindowStart, anomalyWindowEnd, knownAnomalies);
-        }
+        // Known anomalies are ignored (the null parameter) because 1. we can reduce users' waiting time and 2. presentation
+        // data does not need to be as accurate as the one used for detecting anomalies
+        anomalyTimelinesView = anomalyFunction.getTimeSeriesView(metricTimeSeries, bucketMillis, anomalyFunctionSpec.getTopicMetric(),
+            anomalyWindowStart.getMillis(), anomalyWindowEnd.getMillis(), knownAnomalies);
       }
 
       // get viewing window range - this is the region to display along with anomaly, from all the fetched data.

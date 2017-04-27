@@ -4,6 +4,7 @@ import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ListMultimap;
 import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContext;
+import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContextBuilder;
 import com.linkedin.thirdeye.anomaly.detection.TimeSeriesUtil;
 import com.linkedin.thirdeye.anomaly.override.OverrideConfigHelper;
 import com.linkedin.thirdeye.api.DimensionMap;
@@ -233,13 +234,21 @@ public class TimeBasedAnomalyMerger {
       throws Exception {
     AnomalyFunctionDTO anomalyFunctionSpec = mergedAnomalies.getFunction();
     BaseAnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
-    long windowStartMillis = mergedAnomalies.getStartTime();
-    long windowEndMillis = mergedAnomalies.getEndTime();
+    DateTime windowStart = new DateTime(mergedAnomalies.getStartTime());
+    DateTime windowEnd = new DateTime(mergedAnomalies.getEndTime());
     DimensionMap dimensions = mergedAnomalies.getDimensions();
 
-    AnomalyDetectionInputContext adInputContext =
-        fetchDataByDimension(windowStartMillis, windowEndMillis, dimensions, anomalyFunction, mergedResultDAO,
-            overrideConfigDAO, false);
+    AnomalyDetectionInputContextBuilder anomalyDetectionInputContextBuilder =
+        new AnomalyDetectionInputContextBuilder(anomalyFunctionFactory);
+    anomalyDetectionInputContextBuilder.init(anomalyFunctionSpec);
+    anomalyDetectionInputContextBuilder
+        .fetchTimeSeriesData(windowStart, windowEnd)
+        .fetchSaclingFactors(windowStart, windowEnd)
+        .fetchExixtingMergedAnomalies(windowStart, windowEnd);
+    if (anomalyFunctionSpec.isMetricSum()) {
+      anomalyDetectionInputContextBuilder.fetchTimeSeriesMetricSum(windowStart, windowEnd);
+    }
+    AnomalyDetectionInputContext adInputContext = anomalyDetectionInputContextBuilder.build();
 
     MetricTimeSeries metricTimeSeries = adInputContext.getDimensionKeyMetricTimeSeriesMap().get(dimensions);
 
@@ -249,13 +258,25 @@ public class TimeBasedAnomalyMerger {
       List<ScalingFactor> scalingFactors = adInputContext.getScalingFactors();
       if (CollectionUtils.isNotEmpty(scalingFactors)) {
         Properties properties = anomalyFunction.getProperties();
-        MetricTransfer.rescaleMetric(metricTimeSeries, windowStartMillis, scalingFactors,
+        MetricTransfer.rescaleMetric(metricTimeSeries, windowStart.getMillis(), scalingFactors,
             anomalyFunctionSpec.getTopicMetric(), properties);
       }
-
-      DateTime windowStart = new DateTime(windowStartMillis);
-      DateTime windowEnd = new DateTime(windowEndMillis);
       anomalyFunction.updateMergedAnomalyInfo(mergedAnomalies, metricTimeSeries, windowStart, windowEnd, knownAnomalies);
+
+      // Calculate the impact to the total metric
+      if (anomalyFunctionSpec.isMetricSum()) {
+        double avgMetricSum = 0.0;
+        int numTS = 0;
+        MetricTimeSeries metricSum = adInputContext.getMetricSumTimeSeries();
+        for (long ts : metricSum.getTimeWindowSet()) {
+          if(ts >= windowStart.getMillis() && ts < windowEnd.getMillis()) {
+            avgMetricSum += metricSum.get(ts, mergedAnomalies.getMetric()).doubleValue();
+            numTS++;
+          }
+        }
+        avgMetricSum = avgMetricSum / numTS;
+        mergedAnomalies.setImpactToTotal((mergedAnomalies.getAvgCurrentVal() - mergedAnomalies.getAvgBaselineVal())/avgMetricSum);
+      }
     }
   }
 
@@ -274,6 +295,7 @@ public class TimeBasedAnomalyMerger {
    * @return an anomaly detection input context that contains all the retrieved data
    * @throws Exception if it fails to retrieve time series from DB.
    */
+  @Deprecated
   public static AnomalyDetectionInputContext fetchDataByDimension(long windowStartTime, long windowEndTime,
       DimensionMap dimensions, BaseAnomalyFunction anomalyFunction, MergedAnomalyResultManager mergedResultDAO,
       OverrideConfigManager overrideConfigDAO, boolean endTimeInclusive)
@@ -326,6 +348,7 @@ public class TimeBasedAnomalyMerger {
    * @return history merged anomalies of the function id that are needed for computing the weight of the new merged
    * anomalies
    */
+  @Deprecated
   private static List<MergedAnomalyResultDTO> getBaselineKnownAnomaliesByDimension(BaseAnomalyFunction anomalyFunction,
       long windowStart, long windowEnd, DimensionMap dimensions, MergedAnomalyResultManager mergedResultDAO) {
 
