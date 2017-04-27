@@ -1,7 +1,20 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
+import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContext;
+import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContextBuilder;
+import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
+import com.linkedin.thirdeye.api.DimensionMap;
+import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 
+import com.linkedin.thirdeye.dashboard.views.TimeBucket;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.detector.function.AnomalyFunction;
+import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
+import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
+import com.linkedin.thirdeye.detector.metric.transfer.MetricTransfer;
+import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URLDecoder;
@@ -10,6 +23,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Properties;
 import java.util.TreeSet;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -17,6 +32,7 @@ import java.util.concurrent.TimeUnit;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
@@ -26,9 +42,11 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
+import org.joda.time.format.ISODateTimeFormat;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.mozilla.javascript.tools.debugger.Dim;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,10 +101,11 @@ public class DashboardResource {
   private LoadingCache<String,String> dashboardsCache;
   private LoadingCache<String, String> dimensionFiltersCache;
 
+  private AnomalyFunctionFactory anomalyFunctionFactory;
   private MetricConfigManager metricConfigDAO;
   private DashboardConfigManager dashboardConfigDAO;
 
-  public DashboardResource() {
+  public DashboardResource(AnomalyFunctionFactory anomalyFunctionFactory) {
     this.queryCache = CACHE_REGISTRY_INSTANCE.getQueryCache();
     this.collectionsCache = CACHE_REGISTRY_INSTANCE.getCollectionsCache();
     this.collectionMaxDataTimeCache = CACHE_REGISTRY_INSTANCE.getCollectionMaxDataTimeCache();
@@ -94,6 +113,7 @@ public class DashboardResource {
     this.dimensionFiltersCache = CACHE_REGISTRY_INSTANCE.getDimensionFiltersCache();
     this.metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
     this.dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
+    this.anomalyFunctionFactory = anomalyFunctionFactory;
   }
 
   @GET
@@ -436,6 +456,72 @@ public class DashboardResource {
     }
 
     return jsonResponse;
+  }
+
+  @GET
+  @Path(value = "/timeseries/{id}")
+  @Produces(MediaType.APPLICATION_JSON)
+  public Map<String, AnomalyTimelinesView> getTimeSeriesAndBaselineData(@PathParam("id") long functionId,
+      @QueryParam("start") String startTimeIso, @QueryParam("end") String endTimeIso) throws Exception {
+    AnomalyFunctionDTO anomalyFunctionSpec = DAO_REGISTRY.getAnomalyFunctionDAO().findById(functionId);
+    if(anomalyFunctionSpec == null) {
+      LOG.warn("Cannot find anomaly function {}", functionId);
+      return null;
+    }
+
+    DateTime startTime = new DateTime(0);
+    DateTime endTime = DateTime.now();
+    if (StringUtils.isNotEmpty(startTimeIso)) {
+      startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso);
+    }
+    if (StringUtils.isNotEmpty(endTimeIso)) {
+      endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso);
+    }
+
+    Map<String, AnomalyTimelinesView> dimensionMapAnomalyTimelinesViewMap = new HashMap<>();
+    AnomalyDetectionInputContextBuilder anomalyDetectionInputContextBuilder =
+        new AnomalyDetectionInputContextBuilder(anomalyFunctionFactory);
+    anomalyDetectionInputContextBuilder.init(anomalyFunctionSpec);
+    AnomalyDetectionInputContext anomalyDetectionInputContext = anomalyDetectionInputContextBuilder
+        .fetchTimeSeriesData(startTime, endTime, true). fetchExixtingMergedAnomalies(startTime, endTime)
+        .fetchSaclingFactors(startTime, endTime).build();
+
+    for(DimensionMap dimensionMap : anomalyDetectionInputContext.getDimensionKeyMetricTimeSeriesMap().keySet()) {
+      dimensionMapAnomalyTimelinesViewMap.put(dimensionMap.toString(), getTimeSeriesAndBaselineDataWithDimension(anomalyFunctionSpec,
+          anomalyDetectionInputContext, startTime, endTime, dimensionMap));
+    }
+    return dimensionMapAnomalyTimelinesViewMap;
+  }
+
+  public AnomalyTimelinesView getTimeSeriesAndBaselineDataWithDimension (AnomalyFunctionDTO anomalyFunctionSpec,
+      AnomalyDetectionInputContext anomalyDetectionInputContext,
+      DateTime startTime, DateTime endTime, DimensionMap dimensionMap) throws Exception {
+    BaseAnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
+    long bucketMillis = new TimeGranularity(anomalyFunctionSpec.getBucketSize(), anomalyFunctionSpec.getBucketUnit()).toMillis();
+
+    MetricTimeSeries metricTimeSeries = anomalyDetectionInputContext.getDimensionKeyMetricTimeSeriesMap().get(dimensionMap);
+    List<MergedAnomalyResultDTO> knownAnomalies = anomalyDetectionInputContext.getKnownMergedAnomalies().get(dimensionMap);
+
+    // Transform time series with scaling factor
+    List<ScalingFactor> scalingFactors = anomalyDetectionInputContext.getScalingFactors();
+    if (CollectionUtils.isNotEmpty(scalingFactors)) {
+      Properties properties = anomalyFunction.getProperties();
+      MetricTransfer.rescaleMetric(metricTimeSeries, endTime.getMillis(), scalingFactors,
+          anomalyFunctionSpec.getTopicMetric(), properties);
+    }
+
+    AnomalyTimelinesView originalTimelinesView =  anomalyFunction.getTimeSeriesView(metricTimeSeries, bucketMillis,
+        anomalyFunctionSpec.getTopicMetric(), endTime.getMillis(), endTime.getMillis(), knownAnomalies);
+    AnomalyTimelinesView anomalyTimelinesView = new AnomalyTimelinesView();
+    for(int i = 0; i < originalTimelinesView.getTimeBuckets().size(); i++) {
+      TimeBucket timeBucket = originalTimelinesView.getTimeBuckets().get(i);
+      if(timeBucket.getCurrentStart() >= startTime.getMillis()) {
+        anomalyTimelinesView.addTimeBuckets(timeBucket);
+        anomalyTimelinesView.addCurrentValues(originalTimelinesView.getCurrentValues().get(i));
+        anomalyTimelinesView.addBaselineValues(originalTimelinesView.getBaselineValues().get(i));
+      }
+    }
+    return anomalyTimelinesView;
   }
 
   @GET
