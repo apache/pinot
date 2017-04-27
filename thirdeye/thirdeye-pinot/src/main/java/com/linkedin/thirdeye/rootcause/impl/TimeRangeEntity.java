@@ -16,21 +16,9 @@ public class TimeRangeEntity extends Entity {
   public static final String TYPE_CURRENT = "current";
   public static final String TYPE_BASELINE = "baseline";
 
-  public static TimeRangeEntity fromURN(String urn, double score) {
-    String[] parts = urn.split(":");
-    if(parts.length != 5)
-      throw new IllegalArgumentException(String.format("Timerange URN must have 5 parts but has '%s'", parts.length));
-    return fromRange(score, parts[2], Long.valueOf(parts[3]), Long.valueOf(parts[4]));
-  }
-
-  public static TimeRangeEntity fromRange(double score, String type, long start, long end) {
-    String urn = TYPE.formatURN(type, start, end);
-    return new TimeRangeEntity(urn, score, type, start, end);
-  }
-
-  final String type;
-  final long start;
-  final long end;
+  private final String type;
+  private final long start;
+  private final long end;
 
   protected TimeRangeEntity(String urn, double score, String type, long start, long end) {
     super(urn, score);
@@ -49,6 +37,18 @@ public class TimeRangeEntity extends Entity {
 
   public String getType() {
     return type;
+  }
+
+  public static TimeRangeEntity fromURN(String urn, double score) {
+    String[] parts = urn.split(":");
+    if(parts.length != 5)
+      throw new IllegalArgumentException(String.format("Timerange URN must have 5 parts but has '%s'", parts.length));
+    return fromRange(score, parts[2], Long.valueOf(parts[3]), Long.valueOf(parts[4]));
+  }
+
+  public static TimeRangeEntity fromRange(double score, String type, long start, long end) {
+    String urn = TYPE.formatURN(type, start, end);
+    return new TimeRangeEntity(urn, score, type, start, end);
   }
 
   /**

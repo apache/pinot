@@ -11,23 +11,23 @@ import com.linkedin.thirdeye.rootcause.Entity;
 public class EventEntity extends Entity {
   public static final EntityType TYPE = new EntityType("thirdeye:event:");
 
-  public static EventEntity fromDTO(double score, EventDTO dto) {
-    String urn = TYPE.formatURN(dto.getEventType(), dto.getName(), dto.getStartTime());
-    return new EventEntity(urn, score, dto);
-  }
-
-  final EventDTO dto;
+  private final EventDTO dto;
 
   protected EventEntity(String urn, double score, EventDTO dto) {
     super(urn, score);
     this.dto = dto;
   }
 
-  public EventDTO getDto() {
+  public EventDTO getDTO() {
     return dto;
   }
 
   public EventEntity withScore(double score) {
     return new EventEntity(this.getUrn(), score, this.dto);
+  }
+
+  public static EventEntity fromDTO(double score, EventDTO dto) {
+    String urn = TYPE.formatURN(dto.getEventType(), dto.getName(), dto.getStartTime());
+    return new EventEntity(urn, score, dto);
   }
 }

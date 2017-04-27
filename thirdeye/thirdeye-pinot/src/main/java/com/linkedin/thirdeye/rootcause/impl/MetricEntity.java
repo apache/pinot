@@ -10,19 +10,8 @@ import com.linkedin.thirdeye.rootcause.Entity;
 public class MetricEntity extends Entity {
   public static final EntityType TYPE = new EntityType("thirdeye:metric:");
 
-  public static MetricEntity fromMetric(double score, String dataset, String metric) {
-    return new MetricEntity(TYPE.formatURN(dataset, metric), score, dataset, metric);
-  }
-
-  public static MetricEntity fromURN(String urn, double score) {
-    String[] parts = urn.split(":");
-    if(parts.length != 4)
-      throw new IllegalArgumentException(String.format("URN must have 4 parts but has '%s'", parts.length));
-    return fromMetric(score, parts[2], parts[3]);
-  }
-
-  final String dataset;
-  final String metric;
+  private final String dataset;
+  private final String metric;
 
   protected MetricEntity(String urn, double score, String dataset, String metric) {
     super(urn, score);
@@ -36,5 +25,16 @@ public class MetricEntity extends Entity {
 
   public String getMetric() {
     return metric;
+  }
+
+  public static MetricEntity fromMetric(double score, String dataset, String metric) {
+    return new MetricEntity(TYPE.formatURN(dataset, metric), score, dataset, metric);
+  }
+
+  public static MetricEntity fromURN(String urn, double score) {
+    String[] parts = urn.split(":");
+    if(parts.length != 4)
+      throw new IllegalArgumentException(String.format("URN must have 4 parts but has '%s'", parts.length));
+    return fromMetric(score, parts[2], parts[3]);
   }
 }

@@ -8,7 +8,7 @@ import org.apache.commons.lang.StringUtils;
  * Wrapper class for URN prefix based typing of Entity.
  */
 public final class EntityType {
-  final String prefix;
+  private final String prefix;
 
   public static String extractPrefix(String urn) {
     String[] parts = urn.split(":");
