@@ -36,4 +36,5 @@ public abstract class Pipeline {
    * @return pipeline results
    */
   public abstract PipelineResult run(PipelineContext context);
+
 }

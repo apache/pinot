@@ -25,7 +25,7 @@ public class Entity {
   public static final Comparator<Entity> HIGHEST_SCORE_FIRST = new Comparator<Entity>() {
     @Override
     public int compare(Entity o1, Entity o2) {
-      return -Double.compare(o1.score, o2.score);
+      return -1 * Double.compare(o1.score, o2.score);
     }
   };
 

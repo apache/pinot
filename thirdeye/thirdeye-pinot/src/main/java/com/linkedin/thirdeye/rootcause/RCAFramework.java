@@ -70,7 +70,7 @@ public class RCAFramework {
    * @param input user-specified search entities
    * @return aggregated results
    */
-  public RCAFrameworkResult run(Set<Entity> input) throws Exception {
+  public RCAFrameworkExecutionResult run(Set<Entity> input) throws Exception {
     Map<String, Pipeline> pipelines = new HashMap<>(this.pipelines);
     pipelines.put(INPUT, new StaticPipeline(INPUT, Collections.<String>emptySet(), input));
 
@@ -85,7 +85,7 @@ public class RCAFramework {
       results.put(e.getKey(), r);
     }
 
-    return new RCAFrameworkResult(results.get(OUTPUT).getEntities(), results);
+    return new RCAFrameworkExecutionResult(results.get(OUTPUT).getEntities(), results);
   }
 
   static void logResultDetails(PipelineResult result) {

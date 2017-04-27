@@ -17,6 +17,12 @@ public class PipelineContext {
     this.inputs = inputs;
   }
 
+  /**
+   * Returns a map of sets of entities that were generated as the output of upstream (input)
+   * pipelines. The map is keyed by pipeline name.
+   *
+   * @return Map of input entities, keyed by generating pipeline name
+   */
   public Map<String, Set<Entity>> getInputs() {
     return inputs;
   }
