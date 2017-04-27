@@ -101,6 +101,15 @@ public class RCAFrameworkTest {
     new RCAFramework(pipelines, Executors.newSingleThreadExecutor());
   }
 
+  @Test(expectedExceptions = IllegalArgumentException.class)
+  public void testInvalidDAGCyclicDependency() {
+    Collection<Pipeline> pipelines = new ArrayList<>();
+    pipelines.add(makePipeline("a", INPUT, "b"));
+    pipelines.add(makePipeline("b", INPUT, "a"));
+    pipelines.add(makePipeline(OUTPUT, "a", "b"));
+    new RCAFramework(pipelines, Executors.newSingleThreadExecutor());
+  }
+
   @Test
   public void testValidDAG() {
     Collection<Pipeline> pipelines = new ArrayList<>();
