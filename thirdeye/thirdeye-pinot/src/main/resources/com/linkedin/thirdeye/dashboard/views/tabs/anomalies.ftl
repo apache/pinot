@@ -34,7 +34,6 @@
         </div>
 
         <a class="btn thirdeye-btn search-button" type="button" id="search-button"><span class="glyphicon glyphicon-search"></span></a>
-
       </div>
     </div>
   </div>
@@ -42,36 +41,7 @@
 
 <div class="container top-buffer bottom-buffer">
   <div class="page-content">
-    <div class="page-filter">
-      <div class="anomalies-panel">
-        <div class="filter-header">
-          Filter
-        </div>
-
-        <div class="filter-body">
-          <div id="#anomalies-time-range">
-            <div class="datepicker-field">
-              <h5 class="label-medium-semibold">Start date</label>
-              <div id="anomalies-time-range-start" class="datepicker-range">
-                <span></span>
-                <b class="caret"></b>
-              </div>
-            </div>
-            <div class="datepicker-field">
-              <h5 class="label-medium-semibold">End date</label>
-              <div id="anomalies-time-range-end" class="datepicker-range">
-                <span></span>
-                <b class="caret"></b>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="filter-footer">
-          <a type="button" id="apply-button" class="thirdeye-link">Apply Filter</a>
-        </div>
-      </div>
-    </div>
+    <div class="page-filter" id="anomaly-filters-place-holder"></div>
     <div id='anomaly-spin-area'></div>
     <div class="page-results" id="anomaly-results-place-holder"></div>
   </div>

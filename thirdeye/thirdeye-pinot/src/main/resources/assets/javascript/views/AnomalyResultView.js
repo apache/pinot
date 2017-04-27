@@ -115,12 +115,15 @@ function AnomalyResultView(anomalyResultModel) {
   };
 
   // Compile HTML template
-  var anomalies_template = $("#anomalies-template").html();
+  const anomalies_template = $("#anomalies-template").html();
   this.anomalies_template_compiled = Handlebars.compile(anomalies_template);
   $("#anomalies-place-holder").html(this.anomalies_template_compiled);
 
-  var anomaly_results_template = $("#anomaly-results-template").html();
+  const anomaly_results_template = $("#anomaly-results-template").html();
   this.anomaly_results_template_compiled = Handlebars.compile(anomaly_results_template);
+
+  const anomaly_filters_template = $("#anomaly-filters-template").html();
+  this.anomaly_filters_template_compiled = Handlebars.compile(anomaly_filters_template);
 
   // events
   this.applyButtonEvent = new Event(this);
@@ -145,62 +148,22 @@ AnomalyResultView.prototype = {
 
     this.setupSearchBar();
     this.showSearchBarBasedOnMode();
-
-    // TIME RANGE SELECTION
-    this.timeRangeConfig.startDate = this.anomalyResultModel.startDate;
-    this.timeRangeConfig.endDate = this.anomalyResultModel.endDate;
-
-    const $anomalyTimeRangeStart = $('#anomalies-time-range-start span');
-    const $anomalyTimeRangeEnd = $('#anomalies-time-range-end span');
-
-    function cb(start, end, rangeType = constants.DATE_RANGE_CUSTOM) {
-      $anomalyTimeRangeStart.addClass('time-range').html(start.format(constants.DATE_TIME_RANGE_FORMAT));
-      $anomalyTimeRangeEnd.addClass('time-range').html(end.format(constants.DATE_TIME_RANGE_FORMAT));
-    }
-    $('#anomalies-time-range-start').daterangepicker(this.timeRangeConfig, cb);
-
-    $('#anomalies-time-range-end').on('click', () => {
-      $('#anomalies-time-range-start').click();
-    });
-
-    // $('#anomalies-time-range-end').daterangepicker(this.timeRangeConfig, cb);
-    cb(this.timeRangeConfig.startDate, this.timeRangeConfig.endDate);
-
-
-    // APPLY BUTTON
-    this.setupListenerOnApplyButton();
+    this.setupSearchListener('#search-button');
   },
   renderViewEventHandler : function() {
     this.render();
   },
 
-  render : function() {
-
+  render() {
     var anomaliesWrapper = this.anomalyResultModel.getAnomaliesWrapper();
-
     var anomaly_results_template_compiled_with_results = this.anomaly_results_template_compiled(anomaliesWrapper);
     $("#anomaly-results-place-holder").html(anomaly_results_template_compiled_with_results);
+    $("#anomaly-filters-place-holder").html(this.anomaly_filters_template_compiled);
+
     this.renderAnomaliesTab(anomaliesWrapper);
-    self = this;
-
+    this.renderSearchFilters();
     this.showSearchBarBasedOnMode();
-
-    var totalAnomalies = anomaliesWrapper.totalAnomalies;
-    var pageSize = this.anomalyResultModel.pageSize;
-    var pageNumber = this.anomalyResultModel.pageNumber;
-    var numPages = Math.ceil(totalAnomalies / pageSize);
-
-    $('#pagination').twbsPagination({
-      totalPages: numPages,
-      visiblePages: 7,
-      startPage: pageNumber,
-      onPageClick: (event, page) => {
-        $('body').scrollTop(0);
-        if (page != pageNumber) {
-          this.pageClickEvent.notify(page);
-        }
-      }
-    });
+    this.renderPagination();
 
     // FUNCTION DROPDOWN
     var functions = this.anomalyResultModel.getAnomalyFunctions();
@@ -208,8 +171,6 @@ AnomalyResultView.prototype = {
     $.each(functions, function(val, text) {
       anomalyFunctionSelector.append($('<option></option>').val(val).html(text));
     });
-
-
   },
 
   destroy() {
@@ -254,8 +215,6 @@ AnomalyResultView.prototype = {
       if (!anomaly) {
         return;
       }
-
-
       const date = ['date'].concat(anomaly.dates);
       const currentValues = ['current'].concat(anomaly.currentValues);
       const baselineValues = ['baseline'].concat(anomaly.baselineValues);
@@ -311,6 +270,50 @@ AnomalyResultView.prototype = {
     })
   },
 
+  renderSearchFilters() {
+     // TIME RANGE SELECTION
+    this.timeRangeConfig.startDate = this.anomalyResultModel.startDate;
+    this.timeRangeConfig.endDate = this.anomalyResultModel.endDate;
+
+    const $anomalyTimeRangeStart = $('#anomalies-time-range-start span');
+    const $anomalyTimeRangeEnd = $('#anomalies-time-range-end span');
+
+    function cb(start, end, rangeType = constants.DATE_RANGE_CUSTOM) {
+      $anomalyTimeRangeStart.addClass('time-range').html(start.format(constants.DATE_TIME_RANGE_FORMAT));
+      $anomalyTimeRangeEnd.addClass('time-range').html(end.format(constants.DATE_TIME_RANGE_FORMAT));
+    }
+    $('#anomalies-time-range-start').daterangepicker(this.timeRangeConfig, cb);
+
+    $('#anomalies-time-range-end').on('click', () => {
+      $('#anomalies-time-range-start').click();
+    });
+
+    // $('#anomalies-time-range-end').daterangepicker(this.timeRangeConfig, cb);
+    cb(this.timeRangeConfig.startDate, this.timeRangeConfig.endDate);
+    this.setupSearchListener('#apply-button');
+
+    // APPLY BUTTON
+  },
+
+  renderPagination() {
+    const totalAnomalies = anomaliesWrapper.totalAnomalies;
+    const pageSize = this.anomalyResultModel.pageSize;
+    const pageNumber = this.anomalyResultModel.pageNumber;
+    const numPages = Math.ceil(totalAnomalies / pageSize);
+
+    $('#pagination').twbsPagination({
+      totalPages: numPages,
+      visiblePages: 7,
+      startPage: pageNumber,
+      onPageClick: (event, page) => {
+        $('body').scrollTop(0);
+        if (page != pageNumber) {
+          this.pageClickEvent.notify(page);
+        }
+      }
+    });
+  },
+
   dataEventHandler : function(e) {
     e.preventDefault();
     var currentTargetId = e.currentTarget.id;
@@ -320,8 +323,8 @@ AnomalyResultView.prototype = {
       this.showDetailsLinkClickEvent.notify(e.data);
     }
   },
-  setupListenerOnApplyButton : function() {
-    $('#search-button, #apply-button').click(() => {
+  setupSearchListener : function(buttonSelector) {
+    $(buttonSelector).click(() => {
       var anomaliesSearchMode = $('#anomalies-search-mode').val();
       var metricIds = undefined;
       var dashboardId = undefined;
@@ -329,15 +332,18 @@ AnomalyResultView.prototype = {
       var anomalyGroupIds = undefined;
 
       var functionName = $('#anomaly-function-dropdown').val();
-      var startDate = $('#anomalies-time-range-start').data('daterangepicker').startDate;
-      var endDate = $('#anomalies-time-range-start').data('daterangepicker').endDate;
+      const $anomalyDatePicker = $('#anomalies-time-range-start');
+      const dateRangeData = $('#anomalyDatePicker').data('daterangepicker');
+
+      const startDate = dateRangeData ? dateRangeData.startDate : this.anomalyResultModel.startDate;
+      const endDate = dateRangeData ? dateRangeData.endDate : this.anomalyResultModel.endDate;
 
       var anomaliesParams = {
-        anomaliesSearchMode : anomaliesSearchMode,
-        startDate : startDate,
-        endDate : endDate,
-        pageNumber : 1,
-        functionName : functionName
+        anomaliesSearchMode: anomaliesSearchMode,
+        startDate: startDate,
+        endDate: endDate,
+        pageNumber: 1,
+        functionName: functionName
       }
 
       if (anomaliesSearchMode == constants.MODE_METRIC) {
