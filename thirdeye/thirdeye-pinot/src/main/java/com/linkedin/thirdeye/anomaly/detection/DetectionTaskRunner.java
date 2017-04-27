@@ -12,7 +12,6 @@ import com.linkedin.thirdeye.anomaly.task.TaskRunner;
 import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
 import com.linkedin.thirdeye.anomalydetection.datafilter.DataFilter;
 import com.linkedin.thirdeye.anomalydetection.datafilter.DataFilterFactory;
-import com.linkedin.thirdeye.anomalydetection.model.operator.AnomalyContribution;
 import com.linkedin.thirdeye.api.DimensionKey;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
