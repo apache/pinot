@@ -66,6 +66,7 @@ public class AnomalyDetectionInputContextBuilder {
   public AnomalyDetectionInputContextBuilder init(AnomalyFunctionDTO anomalyFunctionSpec) throws Exception {
     return init(anomalyFunctionSpec, new AnomalyDetectionInputContext());
   }
+
   public AnomalyDetectionInputContextBuilder init(AnomalyFunctionDTO anomalyFunctionSpec, AnomalyDetectionInputContext anomalyDetectionInputContext)
       throws Exception {
     this.anomalyFunctionSpec = anomalyFunctionSpec;
@@ -165,7 +166,6 @@ public class AnomalyDetectionInputContextBuilder {
       throws JobExecutionException, ExecutionException {
     return fetchTimeSeriesData(startEndTimeRanges, false);
   }
-
 
   /**
    * Fetch time series, known merged anomalies, and scaling factor for the specified dimension. Note that scaling
