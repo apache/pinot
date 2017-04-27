@@ -25,6 +25,9 @@ public class TimeSeriesLineChart extends JFrame {
   private JPanel chartPanel;
   private JFreeChart chart;
   private double severity;
+  private double currentValue;
+  private double baselineValue;
+  private final String SUBTITLE_FORMAT = "Severity: %.2f %%, Current Value: %.2f, Baseline Value %.2f";
 
   private boolean showLegend = true;
   private boolean createURL = false;
@@ -49,9 +52,11 @@ public class TimeSeriesLineChart extends JFrame {
     for(int i = 0; i < timestamps.size(); i++) {
       DateTime timestamp = timestamps.get(i);
       Millisecond millisecondTick = new Millisecond(timestamp.toDate());
-      currentSeries.add(millisecondTick, timeseries.get(timestamp)._1());
-      baselineSeries.add(millisecondTick, timeseries.get(timestamp)._2());
-      severity = timeseries.get(timestamp)._1() / timeseries.get(timestamp)._2();
+      currentValue = timeseries.get(timestamp)._1();
+      currentSeries.add(millisecondTick, currentValue);
+      baselineValue = timeseries.get(timestamp)._2();
+      baselineSeries.add(millisecondTick, baselineValue);
+      severity = currentValue / baselineValue - 1;
     }
 
     xyDataset.addSeries(currentSeries);
@@ -64,7 +69,7 @@ public class TimeSeriesLineChart extends JFrame {
 
     chart = ChartFactory.createTimeSeriesChart(chartTitle,
         xAxisLabel, yAxisLabel, xyDataset, showLegend, createTooltip, createURL);
-    Title subTitle = new TextTitle(String.format("Severity: %.2f %%", (severity - 1) * 100));
+    Title subTitle = new TextTitle(String.format(SUBTITLE_FORMAT, severity * 100, currentValue, baselineValue));
     chart.addSubtitle(subTitle);
 
     chartPanel = new ChartPanel(chart);

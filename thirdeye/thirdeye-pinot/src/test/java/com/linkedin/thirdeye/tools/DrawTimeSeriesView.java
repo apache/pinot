@@ -5,6 +5,7 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
+import java.awt.*;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -16,6 +17,9 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.jfree.chart.ChartPanel;
+import org.jfree.ui.ApplicationFrame;
+import org.jfree.ui.RefineryUtilities;
 import org.joda.time.DateTime;
 import org.joda.time.format.ISODateTimeFormat;
 import org.slf4j.Logger;
@@ -40,6 +44,7 @@ public class DrawTimeSeriesView {
   private long functionId;
   private String dashboardHost;
   private int dashboardPort;
+  private Map<String, TimeSeriesLineChart> functionTimeSeriesChartMap;
 
   private AnomalyFunctionManager anomalyFunctionDAO;
 
@@ -54,6 +59,8 @@ public class DrawTimeSeriesView {
     DaoProviderUtil.init(persistenceFile);
     anomalyFunctionDAO = DaoProviderUtil
         .getInstance(com.linkedin.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl.class);
+
+    this.functionTimeSeriesChartMap = new HashMap<>();
   }
 
   public void draw(List<Long> functionIds, String outputPath) throws Exception {
@@ -92,7 +99,26 @@ public class DrawTimeSeriesView {
       TimeSeriesLineChart timeSeriesLineChart = new TimeSeriesLineChart("Time Series Chart");
       timeSeriesLineChart.loadData(timeSeries);
       timeSeriesLineChart.createChartPanel(dimensions);
+      this.functionTimeSeriesChartMap.put(fileName + ":" + dimensions, timeSeriesLineChart);
       timeSeriesLineChart.saveAsPNG(outputFile, 1280, 640);
+    }
+  }
+
+  private void view(String title) {
+    final TimeSeriesLineChart timeSeriesLineChart = functionTimeSeriesChartMap.get(title);
+    ApplicationFrame applicationFrame = new ApplicationFrame(title);
+    final ChartPanel chartPanel = new ChartPanel(timeSeriesLineChart.getChart());
+    chartPanel.setPreferredSize(new Dimension(1280, 640));
+    chartPanel.setMouseZoomable(true, true);
+    applicationFrame.setContentPane(chartPanel);
+    RefineryUtilities.positionFrameRandomly(applicationFrame);
+    applicationFrame.setVisible(true);
+    applicationFrame.setSize(1280, 640);
+  }
+
+  public void view() {
+    for (String title : functionTimeSeriesChartMap.keySet()) {
+      view(title);
     }
   }
 
@@ -119,7 +145,7 @@ public class DrawTimeSeriesView {
   }
 
   public static void main(String[] args) throws Exception {
-    args = new String[]{"/home/ychung/workspace/growth_timeseries/m2g-local.yml"};
+    args = new String[]{"/home/ychung/workspace/growth_timeseries/growth-local.yml"};
     DrawTimeSeriesViewConfig config =
         OBJECT_MAPPER.readValue(new File(args[0]), DrawTimeSeriesViewConfig.class);
     DrawTimeSeriesView drawTimeSeriesView = new DrawTimeSeriesView(new File(config.getPersistenceFile()),
@@ -130,5 +156,6 @@ public class DrawTimeSeriesView {
     }
 
     drawTimeSeriesView.draw(functionIds, config.getOutputPath());
+//    drawTimeSeriesView.view();
   }
 }
