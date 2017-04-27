@@ -1,0 +1,10 @@
+{{yield (hash
+  anomalies=anomalies
+  loading=loading
+  loaded=loaded
+  failed=failed
+) (hash
+  onRequest=(action "onRequest")
+  onLoad=(action "onLoad")
+  onLoading=(action "onLoading")
+)}}

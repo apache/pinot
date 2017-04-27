@@ -31,12 +31,22 @@ public abstract class ThirdEyeConfiguration extends Configuration {
 
   private String phantomJsPath = "";
 
+  private boolean cors = false;
+
   public String getRootDir() {
     return rootDir;
   }
 
   public void setRootDir(String rootDir) {
     this.rootDir = rootDir;
+  }
+
+  public boolean isCors() {
+    return cors;
+  }
+
+  public void setCors(boolean cors) {
+    this.cors = cors;
   }
 
   public String getClient() {
