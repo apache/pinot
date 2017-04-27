@@ -195,15 +195,30 @@ public class SegmentDeletionManagerTest {
     tempDir.deleteOnExit();
     FakeDeletionManager deletionManager = new FakeDeletionManager(tempDir.getAbsolutePath(), helixAdmin, propertyStore);
 
+    // Test delete when deleted segments directory does not exists
+    deletionManager.removeAgedDeletedSegments(1);
+
     // Create deleted directory
     String deletedDirectoryPath = tempDir + File.separator + "Deleted_Segments";
     File deletedDirectory = new File(deletedDirectoryPath);
     deletedDirectory.mkdir();
 
+    // Test delete when deleted segments directory is empty
+    deletionManager.removeAgedDeletedSegments(1);
+
     // Create dummy directories and files
     File dummyDir1 = new File(deletedDirectoryPath + File.separator + "dummy1");
     dummyDir1.mkdir();
     File dummyDir2 = new File(deletedDirectoryPath + File.separator + "dummy2");
+    dummyDir2.mkdir();
+
+    // Test delete when there is no files but some directories exist
+    deletionManager.removeAgedDeletedSegments(1);
+    Assert.assertEquals(dummyDir1.exists(), false);
+    Assert.assertEquals(dummyDir2.exists(), false);
+
+    // Create dummy directories and files
+    dummyDir1.mkdir();
     dummyDir2.mkdir();
 
     // Create dummy files

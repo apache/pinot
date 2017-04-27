@@ -31,7 +31,6 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.filefilter.AgeFileFilter;
 import org.apache.commons.io.filefilter.DirectoryFileFilter;
-import org.apache.commons.io.filefilter.TrueFileFilter;
 import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.ZNRecord;
@@ -205,21 +204,32 @@ public class SegmentDeletionManager {
    */
   public void removeAgedDeletedSegments(int retentionInDays) {
     if (_localDiskDir != null) {
-      File targetDir = new File(_localDiskDir, DELETED_SEGMENTS);
+      File deletedDir = new File(_localDiskDir, DELETED_SEGMENTS);
+      // Check that the directory for deleted segments exists
+      if (!deletedDir.isDirectory()) {
+        LOGGER.warn("Deleted segment directory {} does not exist or it is not directory.", deletedDir.getAbsolutePath());
+        return;
+      }
+
       AgeFileFilter fileFilter = new AgeFileFilter(DateTime.now().minusDays(retentionInDays).toDate());
-      for (File currentDir : targetDir.listFiles((FileFilter) DirectoryFileFilter.DIRECTORY)) {
+      File[] directories = deletedDir.listFiles((FileFilter) DirectoryFileFilter.DIRECTORY);
+      // Check that the directory for deleted segments is empty
+      if (directories == null) {
+        LOGGER.warn("Deleted segment directory {} does not exist or it caused an I/O error.", deletedDir);
+        return;
+      }
+
+      for (File currentDir : directories) {
         // Get files that are aged
         Collection<File> targetFiles = FileUtils.listFiles(currentDir, fileFilter, null);
-
         // Delete aged files
         for (File f : targetFiles) {
           if (!f.delete()) {
             LOGGER.warn("Cannot remove file {} from deleted directory.", f.getAbsolutePath());
           }
         }
-
         // Delete directory if it's empty
-        if (currentDir.list().length == 0) {
+        if (currentDir.list() != null && currentDir.list().length == 0) {
           if (!currentDir.delete()) {
             LOGGER.warn("The directory {} cannot be removed. The directory may not be empty.", currentDir.getAbsolutePath());
           }

@@ -124,6 +124,8 @@ public class RetentionManager {
         LOGGER.info("Finished update segment metadata for entire cluster!");
         scanSegmentMetadataAndPurge();
         LOGGER.info("Finished segment purge for entire cluster!");
+        removeAgedDeletedSegments();
+        LOGGER.info("Finished remove aged deleted segments!");
       } else {
         LOGGER.info("Not leader of the controller, sleep!");
       }
@@ -177,10 +179,12 @@ public class RetentionManager {
         LOGGER.info("Trying to delete {} segments for table {}", segmentsToDelete.size(), tableName);
         _pinotHelixResourceManager.deleteSegments(tableName, segmentsToDelete);
       }
-
-      // Trigger clean-up for deleted segments from the deleted directory
-      _pinotHelixResourceManager.getSegmentDeletionManager().removeAgedDeletedSegments(_deletedSegmentsRetentionInDays);
     }
+  }
+
+  private void removeAgedDeletedSegments() {
+    // Trigger clean-up for deleted segments from the deleted directory
+    _pinotHelixResourceManager.getSegmentDeletionManager().removeAgedDeletedSegments(_deletedSegmentsRetentionInDays);
   }
 
   private boolean shouldDeleteInProgressLLCSegment(final String segmentId, final IdealState idealState, RealtimeSegmentZKMetadata segmentZKMetadata) {
