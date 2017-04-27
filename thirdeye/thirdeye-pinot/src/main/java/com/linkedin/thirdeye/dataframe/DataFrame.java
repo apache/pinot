@@ -429,6 +429,26 @@ public class DataFrame {
   }
 
   /**
+   * Returns a copy of the DataFrame containing (up to) {@code n} first rows.
+   *
+   * @param n number of rows to include
+   * @return DataFrame copy with first {@code n} rows
+   */
+  public DataFrame head(int n) {
+    return this.slice(0, n);
+  }
+
+  /**
+   * Returns a copy of the DataFrame containing (up to) {@code n} last rows.
+   *
+   * @param n number of rows to include
+   * @return DataFrame copy with last {@code n} rows
+   */
+  public DataFrame tail(int n) {
+    return this.slice(this.size() - n, this.size());
+  }
+
+  /**
    * Returns {@code true} is the DataFrame does not hold any rows. Otherwise, returns {@code false}.
    *
    * @return {@code true} is empty, {@code false} otherwise.
@@ -1154,6 +1174,18 @@ public class DataFrame {
         df.addSeries(e.getKey(), e.getValue());
     }
     return df;
+  }
+
+  /**
+   * Returns a copy of the DataFrame with series {@code seriesName} replacing {@code null}
+   * values with its native default value.
+   *
+   * @param seriesName
+   * @return
+   */
+  public DataFrame fillNull(String seriesName) {
+    DataFrame df = new DataFrame(this);
+    return df.addSeries(seriesName, assertSeriesExists(seriesName).fillNull());
   }
 
   /* **************************************************************************
