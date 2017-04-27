@@ -1,0 +1,22 @@
+eventDataProvidersConfiguration:
+    - name: DEPLOYMENT
+      className: com.linkedin.thirdeye.anomaly.events.MyDeploymentEventProvider
+      properties:
+          DEPLOYMENT_DATA_URL: http://myurl.com
+rcaPipelinesConfiguration:
+    - name: PIPELINE_ONE
+      inputNames:
+          - INPUT
+      className: com.linkedin.thirdeye.dummy.pipeline.DummyRCAPipeline1
+      properties:
+          DB_URL: value1
+          EXTERNAL_ENDPOINT: value2
+    - name: PIPELINE_TWO
+      inputNames:
+          - INPUT
+          - PIPELINE_ONE
+      className: com.linkedin.thirdeye.dummy.pipeline.DummyRCAPipeline2
+      properties:
+          PROP1: value1
+          PROP2: value2
+          PROP3: value3

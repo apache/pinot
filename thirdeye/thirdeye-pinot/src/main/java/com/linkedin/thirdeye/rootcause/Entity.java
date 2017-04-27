@@ -19,8 +19,8 @@ import java.util.Comparator;
  * centralized repository of valid URNs.
  */
 public class Entity {
-  final String urn;
-  final double score;
+  private final String urn;
+  private final double score;
 
   public static final Comparator<Entity> HIGHEST_SCORE_FIRST = new Comparator<Entity>() {
     @Override

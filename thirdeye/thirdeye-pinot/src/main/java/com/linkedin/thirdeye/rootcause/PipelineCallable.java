@@ -28,18 +28,18 @@ class PipelineCallable implements Callable<PipelineResult> {
 
   @Override
   public PipelineResult call() throws Exception {
-    LOG.info("Preparing pipeline '{}'. Waiting for inputs '{}'", this.pipeline.getName(), this.dependencies.keySet());
+    LOG.info("Preparing pipeline '{}'. Waiting for inputs '{}'", this.pipeline.getOutputName(), this.dependencies.keySet());
     Map<String, Set<Entity>> inputs = new HashMap<>();
     for(Map.Entry<String, Future<PipelineResult>> e : this.dependencies.entrySet()) {
       PipelineResult r = e.getValue().get(TIMEOUT, TimeUnit.MILLISECONDS);
       inputs.put(e.getKey(), r.getEntities());
     }
 
-    LOG.info("Executing pipeline '{}'", this.pipeline.getName());
+    LOG.info("Executing pipeline '{}'", this.pipeline.getOutputName());
     PipelineContext context = new PipelineContext(inputs);
     PipelineResult result = this.pipeline.run(context);
 
-    LOG.info("Completed pipeline '{}'. Got {} results", this.pipeline.getName(), result.getEntities().size());
+    LOG.info("Completed pipeline '{}'. Got {} results", this.pipeline.getOutputName(), result.getEntities().size());
     return result;
   }
 }

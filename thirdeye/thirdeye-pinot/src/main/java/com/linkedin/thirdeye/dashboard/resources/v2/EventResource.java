@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
+import com.linkedin.thirdeye.anomaly.events.EventDataProviderLoader;
 import com.linkedin.thirdeye.anomaly.events.HolidayEventProvider;
 import com.linkedin.thirdeye.anomaly.events.EventDataProviderManager;
 import com.linkedin.thirdeye.anomaly.events.EventFilter;
@@ -37,6 +38,11 @@ public class EventResource {
         .registerEventDataProvider(EventType.HOLIDAY.toString(), new HolidayEventProvider());
     EVENT_DATA_PROVIDER_MANAGER.registerEventDataProvider(EventType.HISTORICAL_ANOMALY.toString(),
         new HistoricalAnomalyEventProvider());
+    // External event providers
+    File rcaConfig = new File(thirdeyeConfig.getRootDir() + "/rca.yml");
+    if (rcaConfig.exists()) {
+      EventDataProviderLoader.registerEventDataProvidersFromConfig(rcaConfig, EVENT_DATA_PROVIDER_MANAGER);
+    }
   }
 
   @GET

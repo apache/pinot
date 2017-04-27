@@ -41,26 +41,26 @@ public class RCAFramework {
   public static final String OUTPUT = "OUTPUT";
   public static final long TIMEOUT = 600000;
 
-  final Map<String, Pipeline> pipelines;
-  final ExecutorService executor;
+  private final Map<String, Pipeline> pipelines;
+  private final ExecutorService executor;
 
   public RCAFramework(Collection<Pipeline> pipelines, ExecutorService executor) {
     this.executor = executor;
 
     if(!isValidDAG(pipelines))
-      throw new IllegalArgumentException(String.format("Invalid DAG. '%s' not reachable from '%s'", OUTPUT, INPUT));
+      throw new IllegalArgumentException(String.format("Invalid DAG. '%s' not reachable output name '%s'", OUTPUT, INPUT));
 
     this.pipelines = new HashMap<>();
     for(Pipeline p : pipelines) {
-      if(INPUT.equals(p.getName()))
-        throw new IllegalArgumentException(String.format("Must not contain a pipeline with name '%s'", INPUT));
-      if(this.pipelines.containsKey(p.getName()))
-        throw new IllegalArgumentException(String.format("Already contains pipeline with name '%s'", p.getName()));
-      this.pipelines.put(p.getName(), p);
+      if(INPUT.equals(p.getOutputName()))
+        throw new IllegalArgumentException(String.format("Must not contain a pipeline with output name '%s'", INPUT));
+      if(this.pipelines.containsKey(p.getOutputName()))
+        throw new IllegalArgumentException(String.format("Already contains pipeline with output name '%s'", p.getOutputName()));
+      this.pipelines.put(p.getOutputName(), p);
     }
 
     if(!this.pipelines.containsKey(OUTPUT))
-      throw new IllegalArgumentException(String.format("Must contain a pipeline named '%s'", OUTPUT));
+      throw new IllegalArgumentException(String.format("Must contain a pipeline with output name '%s'", OUTPUT));
   }
 
   /**
@@ -110,8 +110,8 @@ public class RCAFramework {
     while(prevSize < visited.size()) {
       prevSize = visited.size();
       for (Pipeline p : pipelines) {
-        if (visited.containsAll(p.getInputs()))
-          visited.add(p.getName());
+        if (visited.containsAll(p.getInputNames()))
+          visited.add(p.getOutputName());
       }
     }
 
@@ -129,14 +129,14 @@ public class RCAFramework {
     while(prevSize < tasks.size()) {
       prevSize = tasks.size();
       for(Pipeline p : pipelines.values()) {
-        if(!tasks.containsKey(p.getName()) && tasks.keySet().containsAll(p.getInputs())) {
+        if(!tasks.containsKey(p.getOutputName()) && tasks.keySet().containsAll(p.getInputNames())) {
           Map<String, Future<PipelineResult>> dependencies = new HashMap<>();
-          for(String inputName : p.getInputs()) {
+          for(String inputName : p.getInputNames()) {
             dependencies.put(inputName, tasks.get(inputName));
           }
 
           PipelineCallable c = new PipelineCallable(dependencies, p);
-          tasks.put(p.getName(), this.executor.submit(c));
+          tasks.put(p.getOutputName(), this.executor.submit(c));
         }
       }
     }
