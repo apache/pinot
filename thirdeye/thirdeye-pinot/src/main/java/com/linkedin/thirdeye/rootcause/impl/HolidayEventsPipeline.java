@@ -7,13 +7,16 @@ import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.PipelineContext;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
 import org.apache.commons.collections.CollectionUtils;
+import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,14 +58,35 @@ public class HolidayEventsPipeline extends Pipeline {
   @Override
   public PipelineResult run(PipelineContext context) {
     TimeRangeEntity current = TimeRangeEntity.getContextCurrent(context);
-
-    EventFilter filter = new EventFilter();
-    filter.setEventType(EventType.HOLIDAY.toString());
-    filter.setStartTime(current.getStart());
-    filter.setEndTime(current.getEnd());
+    long currentStart = new DateTime(current.getStart()).minusDays(2).getMillis();
+    long currentEnd = current.getEnd();
+    long baselineStart = new DateTime(currentStart).minusDays(7).getMillis();
+    long baselineEnd = new DateTime(currentEnd).minusDays(7).getMillis();
+    TimeRangeEntity baseline = TimeRangeEntity.fromRange(1.0, "baseline", baselineStart, baselineEnd);
 
     Set<DimensionEntity> dimensionEntities = context.filter(DimensionEntity.class);
     Map<String, DimensionEntity> urn2entity = EntityUtils.mapEntityURNs(dimensionEntities);
+
+    List<EventDTO> events = getHolidayEvents(current, dimensionEntities);
+    events.addAll(getHolidayEvents(baseline, dimensionEntities));
+
+    Set<EventEntity> entities = new HashSet<>();
+    for(EventDTO ev : events) {
+      long distance = current.getEnd() - ev.getStartTime();
+      double dimensionScore = makeDimensionScore(urn2entity, ev.getTargetDimensionMap());
+      EventEntity entity = EventEntity.fromDTO(dimensionScore, ev);
+      LOG.debug("{}: dimension={}, filter={}", entity.getUrn(), dimensionScore, ev.getTargetDimensionMap());
+      entities.add(entity);
+    }
+
+    return new PipelineResult(context, entities);
+  }
+
+  private List<EventDTO> getHolidayEvents(TimeRangeEntity timerangeEntity, Set<DimensionEntity> dimensionEntities) {
+    EventFilter filter = new EventFilter();
+    filter.setEventType(EventType.HOLIDAY.toString());
+    filter.setStartTime(timerangeEntity.getStart());
+    filter.setEndTime(timerangeEntity.getEnd());
 
     Map<String, List<String>> filterMap = new HashMap<>();
     if (CollectionUtils.isNotEmpty(dimensionEntities)) {
@@ -78,17 +102,7 @@ public class HolidayEventsPipeline extends Pipeline {
     filter.setTargetDimensionMap(filterMap);
 
     List<EventDTO> events = eventDataProvider.getEvents(filter);
-
-    Set<EventEntity> entities = new HashSet<>();
-    for(EventDTO ev : events) {
-      long distance = current.getEnd() - ev.getStartTime();
-      double dimensionScore = makeDimensionScore(urn2entity, ev.getTargetDimensionMap());
-      EventEntity entity = EventEntity.fromDTO(dimensionScore, ev);
-      LOG.debug("{}: dimension={}, filter={}", entity.getUrn(), dimensionScore, ev.getTargetDimensionMap());
-      entities.add(entity);
-    }
-
-    return new PipelineResult(context, entities);
+    return events;
   }
 
   static double makeDimensionScore(Map<String, DimensionEntity> urn2entity, Map<String, List<String>> dimensionFilterMap) {
