@@ -22,6 +22,8 @@ public class TopKPipeline extends Pipeline {
   public static final String PROP_K = "k";
   public static final String PROP_CLASS = "class";
 
+  public static final String PROP_CLASS_DEFAULT = Entity.class.getName();
+
   private final int k;
   private final Class<? extends Entity> clazz;
 
@@ -48,8 +50,15 @@ public class TopKPipeline extends Pipeline {
    */
   public TopKPipeline(String outputName, Set<String> inputNames, Map<String, String> properties) throws Exception {
     super(outputName, inputNames);
+
+    if(!properties.containsKey(PROP_K))
+      throw new IllegalArgumentException(String.format("Property '%s' required, but not found", PROP_K));
     this.k = Integer.parseInt(properties.get(PROP_K));
-    this.clazz = (Class<? extends Entity>)Class.forName(properties.get(PROP_CLASS));
+
+    String classProp = PROP_CLASS_DEFAULT;
+    if(properties.containsKey(PROP_CLASS))
+      classProp = properties.get(PROP_CLASS);
+    this.clazz = (Class<? extends Entity>)Class.forName(classProp);
   }
 
   @Override

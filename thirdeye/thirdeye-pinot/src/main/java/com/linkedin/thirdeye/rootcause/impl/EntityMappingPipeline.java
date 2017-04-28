@@ -29,6 +29,9 @@ public class EntityMappingPipeline extends Pipeline {
   public static final String PROP_IS_REWRITER = "isRewriter";
   public static final String PROP_MATCH_PREFIX = "matchPrefix";
 
+  public static final String PROP_IS_REWRITER_DEFAULT = "false";
+  public static final String PROP_MATCH_PREFIX_DEFAULT = "false";
+
   private final EntityToEntityMappingManager entityDAO;
   private final EntityToEntityMappingBean.MappingType mappingType;
   private final boolean isRewriter;
@@ -66,11 +69,11 @@ public class EntityMappingPipeline extends Pipeline {
       throw new IllegalArgumentException(String.format("Property '%s' required, but not found", PROP_MAPPING_TYPE));
     String mappingTypeProp = properties.get(PROP_MAPPING_TYPE);
 
-    String isRewriterProp = String.valueOf(false);
+    String isRewriterProp = String.valueOf(PROP_IS_REWRITER_DEFAULT);
     if(properties.containsKey(PROP_IS_REWRITER))
       isRewriterProp = properties.get(PROP_IS_REWRITER);
 
-    String matchPrefixProp = String.valueOf(false);
+    String matchPrefixProp = String.valueOf(PROP_MATCH_PREFIX_DEFAULT);
     if(properties.containsKey(PROP_MATCH_PREFIX))
       matchPrefixProp = properties.get(PROP_MATCH_PREFIX);
 
