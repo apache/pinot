@@ -104,13 +104,14 @@ public class DrawTimeSeriesView {
     }
   }
 
-  private void view(String title) {
-    final TimeSeriesLineChart timeSeriesLineChart = functionTimeSeriesChartMap.get(title);
+  private void view(String title, TimeSeriesLineChart timeSeriesLineChart) {
     ApplicationFrame applicationFrame = new ApplicationFrame(title);
     final ChartPanel chartPanel = new ChartPanel(timeSeriesLineChart.getChart());
     chartPanel.setPreferredSize(new Dimension(1280, 640));
+    chartPanel.setDomainZoomable(true);
     chartPanel.setMouseZoomable(true, true);
     applicationFrame.setContentPane(chartPanel);
+    applicationFrame.pack();
     RefineryUtilities.positionFrameRandomly(applicationFrame);
     applicationFrame.setVisible(true);
     applicationFrame.setSize(1280, 640);
@@ -118,7 +119,7 @@ public class DrawTimeSeriesView {
 
   public void view() {
     for (String title : functionTimeSeriesChartMap.keySet()) {
-      view(title);
+      view(title, functionTimeSeriesChartMap.get(title));
     }
   }
 
@@ -156,6 +157,6 @@ public class DrawTimeSeriesView {
     }
 
     drawTimeSeriesView.draw(functionIds, config.getOutputPath());
-//    drawTimeSeriesView.view();
+    drawTimeSeriesView.view();
   }
 }
