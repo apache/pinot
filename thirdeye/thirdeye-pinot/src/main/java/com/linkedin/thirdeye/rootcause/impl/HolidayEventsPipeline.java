@@ -30,8 +30,6 @@ import org.slf4j.LoggerFactory;
 public class HolidayEventsPipeline extends Pipeline {
   private static final int HOLIDAY_DAYS_BUFFER = 2;
 
-  private static final int BASELINE_OFFSET = 7;
-
   private static final Logger LOG = LoggerFactory.getLogger(HolidayEventsPipeline.class);
 
   private final EventDataProviderManager eventDataProvider;
@@ -63,11 +61,7 @@ public class HolidayEventsPipeline extends Pipeline {
   @Override
   public PipelineResult run(PipelineContext context) {
     TimeRangeEntity current = TimeRangeEntity.getContextCurrent(context);
-    long currentStart = new DateTime(current.getStart()).minusDays(HOLIDAY_DAYS_BUFFER).getMillis();
-    long currentEnd = current.getEnd();
-    long baselineStart = new DateTime(currentStart).minusDays(BASELINE_OFFSET).getMillis();
-    long baselineEnd = new DateTime(currentEnd).minusDays(BASELINE_OFFSET).getMillis();
-    TimeRangeEntity baseline = TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_BASELINE, baselineStart, baselineEnd);
+    TimeRangeEntity baseline = TimeRangeEntity.getContextBaseline(context);
 
     Set<DimensionEntity> dimensionEntities = context.filter(DimensionEntity.class);
     Map<String, DimensionEntity> urn2entity = EntityUtils.mapEntityURNs(dimensionEntities);
@@ -88,10 +82,13 @@ public class HolidayEventsPipeline extends Pipeline {
   }
 
   private List<EventDTO> getHolidayEvents(TimeRangeEntity timerangeEntity, Set<DimensionEntity> dimensionEntities) {
+    long start = new DateTime(timerangeEntity.getStart()).minusDays(HOLIDAY_DAYS_BUFFER).getMillis();
+    long end = timerangeEntity.getEnd();
+
     EventFilter filter = new EventFilter();
     filter.setEventType(EventType.HOLIDAY.toString());
-    filter.setStartTime(timerangeEntity.getStart());
-    filter.setEndTime(timerangeEntity.getEnd());
+    filter.setStartTime(start);
+    filter.setEndTime(end);
 
     Map<String, List<String>> filterMap = new HashMap<>();
     if (CollectionUtils.isNotEmpty(dimensionEntities)) {
