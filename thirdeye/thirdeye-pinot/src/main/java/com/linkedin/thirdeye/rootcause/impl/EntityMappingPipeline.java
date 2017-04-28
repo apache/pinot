@@ -88,30 +88,50 @@ public class EntityMappingPipeline extends Pipeline {
 
     Set<Entity> output = new HashSet<>();
     for(Entity entity : entities) {
-      EntityToEntityMappingDTO mapping = find(entity, mappings);
+      try {
+        Entity newEntity = replace(entity, mappings);
 
-      if(mapping != null) {
-        try {
-          double score = entity.getScore() * mapping.getScore();
-          Entity newEntity = EntityUtils.parseURN(mapping.getToURN(), score);
-          LOG.info("Mapping {} [{}] {} to {} [{}] {}", entity.getScore(), entity.getClass().getSimpleName(), entity.getUrn(),
-              newEntity.getScore(), newEntity.getClass().getSimpleName(), newEntity.getUrn());
+        if(newEntity != null) {
+          if(LOG.isDebugEnabled()) {
+            LOG.debug("Mapping {} [{}] {} to {} [{}] {}", entity.getScore(), entity.getClass().getSimpleName(), entity.getUrn(),
+                newEntity.getScore(), newEntity.getClass().getSimpleName(), newEntity.getUrn());
+          }
           output.add(newEntity);
-        } catch (Exception ex) {
-          LOG.warn("Exception while mapping entity '{}' to '{}'. Skipping.", entity.getUrn(), mapping.getToURN());
         }
-      } else {
-        // no mapping found
-        if(this.isRewriter)
-          output.add(entity);
+      } catch (Exception ex) {
+        LOG.warn("Exception while mapping entity '{}'. Skipping.", entity.getUrn(), ex);
       }
     }
 
     return new PipelineResult(context, output);
   }
 
-  private EntityToEntityMappingDTO find(Entity entity, Map<String, EntityToEntityMappingDTO> mappings) {
-    return this.matchPrefix ? findPrefix(entity, mappings) : findFull(entity, mappings);
+  private Entity replace(Entity entity, Map<String, EntityToEntityMappingDTO> mappings) {
+    return this.matchPrefix ? replacePrefix(entity, mappings) : replaceFull(entity, mappings);
+  }
+
+  private Entity replacePrefix(Entity entity, Map<String, EntityToEntityMappingDTO> mappings) {
+    EntityToEntityMappingDTO mapping = findPrefix(entity, mappings);
+    if(mapping == null)
+      return handleNoMapping(entity);
+
+    String postfix = entity.getUrn().substring(mapping.getFromURN().length());
+    String toURN = mapping.getToURN() + postfix;
+    return EntityUtils.parseURN(toURN, entity.getScore() * mapping.getScore());
+  }
+
+  private Entity replaceFull(Entity entity, Map<String, EntityToEntityMappingDTO> mappings) {
+    EntityToEntityMappingDTO mapping = mappings.get(entity.getUrn());
+    if(mapping == null)
+      return handleNoMapping(entity);
+
+    return EntityUtils.parseURN(mapping.getToURN(), entity.getScore() * mapping.getScore());
+  }
+
+  private Entity handleNoMapping(Entity e) {
+    if(this.isRewriter)
+      return e;
+    return null;
   }
 
   private EntityToEntityMappingDTO findPrefix(Entity entity, Map<String, EntityToEntityMappingDTO> mappings) {
@@ -120,10 +140,6 @@ public class EntityMappingPipeline extends Pipeline {
         return mapping.getValue();
     }
     return null;
-  }
-
-  private EntityToEntityMappingDTO findFull(Entity entity, Map<String, EntityToEntityMappingDTO> mappings) {
-    return mappings.get(entity.getUrn());
   }
 
   private static Map<String, EntityToEntityMappingDTO> toMap(Iterable<EntityToEntityMappingDTO> mappings) {
