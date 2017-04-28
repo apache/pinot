@@ -36,7 +36,7 @@ import kafka.server.KafkaServerStartable;
  * Integration test that creates a Kafka broker, creates a Pinot cluster that consumes from Kafka and queries Pinot.
  *
  */
-public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTest {
+public class RealtimeClusterIntegrationTest extends BaseClusterIntegrationTestWithQueryGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeClusterIntegrationTest.class);
   private final File _tmpDir = new File("/tmp/RealtimeClusterIntegrationTest");
   protected static final String KAFKA_TOPIC = "realtime-integration-test";

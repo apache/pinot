@@ -49,7 +49,7 @@ import org.testng.annotations.Test;
  *
  * @author jfim
  */
-public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTest {
+public class UploadRefreshDeleteIntegrationTest extends BaseClusterIntegrationTestWithQueryGenerator {
   private static final Logger LOGGER = LoggerFactory.getLogger(UploadRefreshDeleteIntegrationTest.class);
   protected final File _tmpDir = new File("/tmp/" + getClass().getSimpleName());
   protected final File _segmentsDir = new File(_tmpDir, "segments");
