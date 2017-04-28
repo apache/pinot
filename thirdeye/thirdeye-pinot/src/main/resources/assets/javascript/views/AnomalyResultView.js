@@ -155,12 +155,8 @@ AnomalyResultView.prototype = {
   },
 
   render() {
-    var anomaliesWrapper = this.anomalyResultModel.getAnomaliesWrapper();
-    var anomaly_results_template_compiled_with_results = this.anomaly_results_template_compiled(anomaliesWrapper);
-    $("#anomaly-results-place-holder").html(anomaly_results_template_compiled_with_results);
-    $("#anomaly-filters-place-holder").html(this.anomaly_filters_template_compiled);
-
-    this.renderAnomaliesTab(anomaliesWrapper);
+    $('#anomaly-filters-place-holder').html(this.anomaly_filters_template_compiled);
+    this.renderAnomaliesTab();
     this.renderSearchFilters();
     this.showSearchBarBasedOnMode();
     this.renderPagination();
@@ -174,7 +170,8 @@ AnomalyResultView.prototype = {
   },
 
   destroy() {
-    $("#anomaly-results-place-holder").children().remove();
+    $('#anomaly-results-place-holder').children().remove();
+    $('#anomaly-filters-place-holder').children().remove();
   },
   showSearchBarBasedOnMode : function() {
     var anomaliesSearchMode = $('#anomalies-search-mode').val();
@@ -208,7 +205,10 @@ AnomalyResultView.prototype = {
     });
   },
 
-  renderAnomaliesTab : function(anomaliesWrapper) {
+  renderAnomaliesTab : function() {
+    const anomaliesWrapper = this.anomalyResultModel.getAnomaliesWrapper();
+    const anomaly_results_template_compiled_with_results = this.anomaly_results_template_compiled(anomaliesWrapper);
+    $("#anomaly-results-place-holder").html(anomaly_results_template_compiled_with_results);
     const anomalies = anomaliesWrapper.anomalyDetailsList;
     anomalies.forEach((anomaly, index) => {
 
@@ -296,6 +296,7 @@ AnomalyResultView.prototype = {
   },
 
   renderPagination() {
+    const anomaliesWrapper = this.anomalyResultModel.getAnomaliesWrapper();
     const totalAnomalies = anomaliesWrapper.totalAnomalies;
     const pageSize = this.anomalyResultModel.pageSize;
     const pageNumber = this.anomalyResultModel.pageNumber;
@@ -333,7 +334,7 @@ AnomalyResultView.prototype = {
 
       var functionName = $('#anomaly-function-dropdown').val();
       const $anomalyDatePicker = $('#anomalies-time-range-start');
-      const dateRangeData = $('#anomalyDatePicker').data('daterangepicker');
+      const dateRangeData = $anomalyDatePicker.data('daterangepicker');
 
       const startDate = dateRangeData ? dateRangeData.startDate : this.anomalyResultModel.startDate;
       const endDate = dateRangeData ? dateRangeData.endDate : this.anomalyResultModel.endDate;

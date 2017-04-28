@@ -14,6 +14,7 @@ function HashParams() {
   this.ANOMALIES_DASHBOARD_ID = 'dashboardId';
   this.ANOMALIES_ANOMALY_IDS = 'anomalyIds';
   this.ANOMALIES_GROUP_IDS = 'anomalyGroupIds';
+  this.ANOMALIES_SEARCH_FILTERS = 'searchFilters';
   this.INVESTIGATE_ANOMALY_ID = 'anomalyId';
 
   this.ANALYSIS_METRIC_ID = 'metricId';
