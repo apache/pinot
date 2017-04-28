@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.anomaly.utils;
 
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
+import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.sql.Timestamp;
 import java.util.ArrayList;
@@ -108,7 +109,7 @@ public class AnomalyUtils {
     public String startTimeISO;
     public String endTimeISO;
     public String functionName;
-    public AnomalyFeedback feedback;
+    public String feedback;
     public long anomalyId;
 
     public MetaDataNode(MergedAnomalyResultDTO anomaly){
@@ -117,7 +118,7 @@ public class AnomalyUtils {
       this.startTimeISO = new Timestamp(anomaly.getStartTime()).toString();
       this.endTimeISO = new Timestamp(anomaly.getEndTime()).toString();
       this.functionName = anomaly.getFunction().getFunctionName();
-      this.feedback = anomaly.getFeedback();
+      this.feedback = (anomaly.getFeedback() == null)? "null" : String.valueOf(anomaly.getFeedback().getFeedbackType());
       this.anomalyId = anomaly.getId();
     }
   }

@@ -739,7 +739,8 @@ public class DetectionJobResource {
   @Path("/replay/singlefunction")
   public Response replayAnomalyFunctionByFunctionId(@QueryParam("functionId") Long functionId,
       @QueryParam("autotuneId") Long autotuneId,
-      @QueryParam("start") @NotNull String replayStartTimeIso, @QueryParam("end") @NotNull String replayEndTimeIso) throws IllegalArgumentException{
+      @QueryParam("start") @NotNull String replayStartTimeIso, @QueryParam("end") @NotNull String replayEndTimeIso)
+      throws IllegalArgumentException, InterruptedException {
     if (functionId == null && autotuneId == null) {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
@@ -753,7 +754,9 @@ public class DetectionJobResource {
     } else {
       functionReplayRunnable = new FunctionReplayRunnable(detectionJobScheduler, anomalyFunctionDAO, mergedAnomalyResultDAO, rawAnomalyResultDAO, new HashMap<String, String>(), functionId, replayStart, replayEnd, false);
     }
-    functionReplayRunnable.run();
+    Thread thread = new Thread(functionReplayRunnable);
+    thread.start();
+    thread.join();
     Map<String, String> responseMessages = new HashMap<>();
     responseMessages.put("cloneFunctionId", String.valueOf(functionReplayRunnable.getLastClonedFunctionId()));
     if (target != null && functionId != null && functionId != target.getFunctionId()) {
