@@ -7,7 +7,9 @@ import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import java.awt.*;
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -18,6 +20,9 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.jfree.chart.ChartPanel;
+import org.jfree.data.time.RegularTimePeriod;
+import org.jfree.data.time.TimeSeries;
+import org.jfree.data.time.TimeSeriesCollection;
 import org.jfree.ui.ApplicationFrame;
 import org.jfree.ui.RefineryUtilities;
 import org.joda.time.DateTime;
@@ -40,6 +45,7 @@ public class DrawTimeSeriesView {
   public static final String CURRENT_VALUES = "currentValues";
   public static final String BASELINE_VALUES = "baselineValues";
   public static final String PNG_FILE_EXTENSION  = ".png";
+  public static final String CSV_FILE_EXTENSION  = ".csv";
 
   private long functionId;
   private String dashboardHost;
@@ -63,13 +69,25 @@ public class DrawTimeSeriesView {
     this.functionTimeSeriesChartMap = new HashMap<>();
   }
 
-  public void draw(final List<Long> functionIds, final String outputPath) throws Exception {
+  /**
+   * Draw the timeseries figure of a given list of functions and output CSV and PNG files to the given path
+   * @param functionIds
+   * @param outputPath
+   * @throws Exception
+   */
+  public void drawAndExport(final List<Long> functionIds, final String outputPath) throws Exception {
     for(Long id : functionIds) {
-      draw(id, outputPath);
+      drawAndExport(id, outputPath);
     }
   }
 
-  public void draw(long functionId, String outputPath) throws Exception {
+  /**
+   * Draw the timeseries figure of a given function and output CSV and PNG files to the given path
+   * @param functionId
+   * @param outputPath
+   * @throws Exception
+   */
+  public void drawAndExport(long functionId, String outputPath) throws Exception {
     AnomalyFunctionDTO anomalyFunctionDTO = anomalyFunctionDAO.findById(functionId);
     if(anomalyFunctionDTO == null) {
       LOG.warn("Anomaly Function {} doesn't exist", functionId);
@@ -81,6 +99,45 @@ public class DrawTimeSeriesView {
       if (!outputDir.exists()) {
         outputDir.mkdirs();
       }
+    }
+
+    List<String> keyList = loadDataByFunction(functionId);
+
+    for(String fileName : keyList) {
+      TimeSeriesLineChart timeSeriesLineChart = this.functionTimeSeriesChartMap.get(fileName);
+      if (outputDir != null) {
+        // Draw figure and save
+        File outputFile = new File(outputDir.getAbsolutePath() + "/" + fileName + PNG_FILE_EXTENSION);
+        saveAs(outputFile, timeSeriesLineChart);
+        outputFile = new File(outputDir.getAbsolutePath() + "/" + fileName + CSV_FILE_EXTENSION);
+        export(outputFile, timeSeriesLineChart);
+      }
+    }
+  }
+
+  /**
+   * Load the timeseries and the baseline data of given list of functions into class
+   * @param functionIds
+   * @throws Exception
+   */
+  public void loadDataByFunction(List<Long> functionIds) throws Exception {
+    for(long functionId : functionIds) {
+      loadDataByFunction(functionId);
+    }
+  }
+
+  /**
+   * Load the timeseries and the baseline data into class
+   * @param functionId
+   * @return
+   * @throws Exception
+   */
+  private List<String> loadDataByFunction(long functionId) throws Exception {
+    List<String> keyList = new ArrayList<>();
+    AnomalyFunctionDTO anomalyFunctionDTO = anomalyFunctionDAO.findById(functionId);
+    if(anomalyFunctionDTO == null) {
+      LOG.warn("Anomaly Function {} doesn't exist", functionId);
+      return keyList;
     }
     String fileName = anomalyFunctionDTO.getFunctionName() + "-" + DateTime.now().toString(ISODateTimeFormat.dateTime());
     String jsonResponse = getTimelinesViewForFunctionId(functionId);
@@ -94,32 +151,62 @@ public class DrawTimeSeriesView {
       ArrayList<Double> currentValues = (ArrayList<Double>) AnomalyTimelinesView.get(CURRENT_VALUES);
       ArrayList<Double> baselineValues = (ArrayList<Double>) AnomalyTimelinesView.get(BASELINE_VALUES);
       ArrayList timeBuckets = (ArrayList) AnomalyTimelinesView.get(TIME_BUCKETS);
-      for(int i = 0; i < timeBuckets.size(); i++) {
+      for (int i = 0; i < timeBuckets.size(); i++) {
         LinkedHashMap<String, Long> timeBucket = (LinkedHashMap<String, Long>) timeBuckets.get(i);
         Double currentValue = currentValues.get(i);
         Double baselineValue = baselineValues.get(i);
-        timeSeries.put(new DateTime(timeBucket.get(CURRENT_START)), new Tuple2<Double, Double>(currentValue, baselineValue));
+        timeSeries.put(new DateTime(timeBucket.get(CURRENT_START)),
+            new Tuple2<Double, Double>(currentValue, baselineValue));
       }
 
       // Draw Figure
       TimeSeriesLineChart timeSeriesLineChart = new TimeSeriesLineChart("Time Series Chart");
       timeSeriesLineChart.loadData(timeSeries);
       timeSeriesLineChart.createChartPanel(dimensions);
-      this.functionTimeSeriesChartMap.put(fileName + ":" + dimensions, timeSeriesLineChart);
-
-      if(outputDir != null) {
-        // Draw figure and save
-        File outputFile = new File(outputDir.getAbsolutePath() + "/" + fileName + "_" + dimensions + PNG_FILE_EXTENSION);
-        saveAs(outputFile, timeSeriesLineChart);
-      }
+      this.functionTimeSeriesChartMap.put(fileName + "_" + dimensions, timeSeriesLineChart);
+      keyList.add(fileName + "_" + dimensions);
     }
+    return keyList;
   }
 
+  /**
+   * Export a given timeseries to CSV file
+   * @param outputFile
+   * @param timeSeriesLineChart
+   * @throws Exception
+   */
+  public void export(File outputFile, TimeSeriesLineChart timeSeriesLineChart) throws Exception {
+    BufferedWriter bw = new BufferedWriter(new FileWriter(outputFile));
+    TimeSeriesCollection timeSeriesCollection = timeSeriesLineChart.getXyDataset();
+    TimeSeries current = timeSeriesCollection.getSeries(0);
+    TimeSeries baseline = timeSeriesCollection.getSeries(1);
+    int numItems = current.getItemCount();
+    for(int i = 0; i < numItems; i++) {
+      RegularTimePeriod timePeriod = current.getTimePeriod(i);
+      double currentVal = current.getDataItem(i).getValue().doubleValue();
+      double baselineVal = baseline.getDataItem(i).getValue().doubleValue();
+
+      bw.write(String.format("%s,%d,%.2f,%.2f", timePeriod.getStart().toString().toString(),
+          timePeriod.getFirstMillisecond(),  currentVal, baselineVal));
+      bw.newLine();
+    }
+    bw.close();
+  }
+
+  /**
+   * Save the timeseries as PNG
+   * @param outputFile
+   * @param timeSeriesLineChart
+   */
   public void saveAs(File outputFile, TimeSeriesLineChart timeSeriesLineChart) {
     timeSeriesLineChart.saveAsPNG(outputFile, 1280, 640);
-
   }
 
+  /**
+   * Pop out application window for showing the time series
+   * @param title
+   * @param timeSeriesLineChart
+   */
   private void view(String title, TimeSeriesLineChart timeSeriesLineChart) {
     ApplicationFrame applicationFrame = new ApplicationFrame(title);
     final ChartPanel chartPanel = new ChartPanel(timeSeriesLineChart.getChart());
@@ -133,21 +220,36 @@ public class DrawTimeSeriesView {
     applicationFrame.setSize(1280, 640);
   }
 
+  /**
+   * Pop out application window for showing all time series
+   */
   public void view() {
     for (String title : functionTimeSeriesChartMap.keySet()) {
       view(title, functionTimeSeriesChartMap.get(title));
     }
   }
 
+  /**
+   * Load timeseries jsnon file from http get
+   * @param functionId
+   * @return
+   * @throws Exception
+   */
   private String getTimelinesViewForFunctionId(long functionId) throws Exception {
     StringBuilder urlBuilder = new StringBuilder();
     urlBuilder.append("http://" +  dashboardHost + ":" + dashboardPort);
     urlBuilder.append("/dashboard/timeseries/");
     urlBuilder.append(Long.toString(functionId));
-    return getHTML(urlBuilder.toString());
+    return loadJsonFromHttpGet(urlBuilder.toString());
   }
 
-  private String getHTML(String urlToRead) throws Exception {
+  /**
+   * Execute Http Get and fetch Json
+   * @param urlToRead
+   * @return
+   * @throws Exception
+   */
+  public static String loadJsonFromHttpGet(String urlToRead) throws Exception {
     StringBuilder result = new StringBuilder();
     URL url = new URL(urlToRead);
     HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -159,6 +261,14 @@ public class DrawTimeSeriesView {
     }
     rd.close();
     return result.toString();
+  }
+
+  /**
+   * Return keys to access to the timeseries chart
+   * @return
+   */
+  public List<String> getKeys() {
+    return new ArrayList<>(this.functionTimeSeriesChartMap.keySet());
   }
 
   public static void main(String[] args) throws Exception {
@@ -173,7 +283,7 @@ public class DrawTimeSeriesView {
       functionIds.add(Long.valueOf(functionId));
     }
 
-    drawTimeSeriesView.draw(functionIds, config.getOutputPath());
+    drawTimeSeriesView.drawAndExport(functionIds, config.getOutputPath());
     drawTimeSeriesView.view();
   }
 }

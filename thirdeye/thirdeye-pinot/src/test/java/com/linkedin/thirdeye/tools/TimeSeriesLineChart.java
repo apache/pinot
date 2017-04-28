@@ -34,11 +34,12 @@ public class TimeSeriesLineChart extends JFrame {
   private boolean createTooltip = false;
   private boolean autoSort = false;
   private boolean allowDuplicateXValues = false;
+  private String timezoneCode = "America/Los_Angeles";
 
   public TimeSeriesLineChart(String panelTitle) {
     super(panelTitle);
 
-    TimeZone timeZone = TimeZone.getTimeZone("America/Los_Angeles");
+    TimeZone timeZone = TimeZone.getTimeZone(timezoneCode);
 
     this.xyDataset = new TimeSeriesCollection(timeZone);
   }
@@ -132,5 +133,17 @@ public class TimeSeriesLineChart extends JFrame {
 
   public void setAllowDuplicateXValues(boolean allowDuplicateXValues) {
     this.allowDuplicateXValues = allowDuplicateXValues;
+  }
+
+  public TimeSeriesCollection getXyDataset() {
+    return xyDataset;
+  }
+
+  public String getTimezoneCode() {
+    return timezoneCode;
+  }
+
+  public void setTimezoneCode(String timezoneCode) {
+    this.timezoneCode = timezoneCode;
   }
 }
