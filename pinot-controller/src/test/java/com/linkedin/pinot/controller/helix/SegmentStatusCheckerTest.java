@@ -15,12 +15,6 @@
  */
 package com.linkedin.pinot.controller.helix;
 
-import com.linkedin.pinot.common.metrics.ControllerGauge;
-import com.linkedin.pinot.common.metrics.ControllerMetrics;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.yammer.metrics.core.MetricsRegistry;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -35,7 +29,14 @@ import org.testng.annotations.AfterSuite;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.BeforeSuite;
 import org.testng.annotations.Test;
-import static org.mockito.Mockito.*;
+import com.linkedin.pinot.common.metrics.ControllerGauge;
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.controller.ControllerConf;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.yammer.metrics.core.MetricsRegistry;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 
 public class SegmentStatusCheckerTest {
@@ -275,7 +276,6 @@ public class SegmentStatusCheckerTest {
     final String tableName = "myTable_REALTIME";
     List<String> allTableNames = new ArrayList<String>();
     allTableNames.add(tableName);
-    IdealState idealState = null;
 
     HelixAdmin helixAdmin;
     {
@@ -469,11 +469,23 @@ public class SegmentStatusCheckerTest {
 
   @Test
   public void noSegments() throws Exception {
+    noSegmentsInternal(0);
+    noSegmentsInternal(5);
+    noSegmentsInternal(-1);
+  }
+
+  public void noSegmentsInternal(final int nReplicas) throws Exception {
     final String tableName = "myTable_REALTIME";
+    String nReplicasStr = Integer.toString(nReplicas);
+    int nReplicasExpectedValue = nReplicas;
+    if (nReplicas < 0) {
+      nReplicasStr = "abc";
+      nReplicasExpectedValue = 1;
+    }
     List<String> allTableNames = new ArrayList<String>();
     allTableNames.add(tableName);
     IdealState idealState = new IdealState(tableName);
-    idealState.setReplicas("0");
+    idealState.setReplicas(nReplicasStr);
     idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
 
     HelixAdmin helixAdmin;
@@ -502,7 +514,7 @@ public class SegmentStatusCheckerTest {
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
         ControllerGauge.SEGMENTS_IN_ERROR_STATE), 0);
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
-        ControllerGauge.NUMBER_OF_REPLICAS), 1);
+        ControllerGauge.NUMBER_OF_REPLICAS), nReplicasExpectedValue);
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
         ControllerGauge.PERCENT_OF_REPLICAS), 100);
     Assert.assertEquals(controllerMetrics.getValueOfTableGauge(tableName,
