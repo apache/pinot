@@ -339,6 +339,38 @@ public class SegmentCompletionTest {
         .withReason(SegmentCompletionProtocol.REASON_ROW_LIMIT);
     response = segmentCompletionMgr.segmentConsumed(params);
     Assert.assertEquals(response.getStatus(), ControllerResponseStatus.COMMIT);
+    // S2 comes with the same offset as S1
+    segmentCompletionMgr._secconds += 1;
+    params = new Request.Params().withInstanceId(s2).withOffset(s1Offset).withSegmentName(segmentNameStr)
+        .withReason(SegmentCompletionProtocol.REASON_ROW_LIMIT);
+    response = segmentCompletionMgr.segmentConsumed(params);
+    Assert.assertEquals(response.getStatus(), ControllerResponseStatus.HOLD);
+    segmentCompletionMgr._secconds += 1;
+    // S3 comes with a different offset and without row limit. we ask it to hold even though it is higher.
+    params = new Request.Params().withInstanceId(s3).withOffset(s3Offset).withSegmentName(segmentNameStr)
+        .withReason(SegmentCompletionProtocol.REASON_TIME_LIMIT);
+    response = segmentCompletionMgr.segmentConsumed(params);
+    Assert.assertEquals(response.getStatus(), ControllerResponseStatus.HOLD);
+    // S1 comes back to commit the segment
+    segmentCompletionMgr._secconds += 1;
+    params = new Request.Params().withInstanceId(s1).withOffset(s1Offset).withSegmentName(segmentNameStr);
+    response = segmentCompletionMgr.segmentCommitStart(params);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_CONTINUE);
+
+    segmentCompletionMgr._secconds += 5;
+    params = new Request.Params().withInstanceId(s1).withOffset(s1Offset).withSegmentName(segmentNameStr);
+    response = segmentCompletionMgr.segmentCommitEnd(params, true);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.COMMIT_SUCCESS);
+    // We ask S2 to keep the segment
+    params = new Request.Params().withInstanceId(s2).withOffset(s1Offset).withSegmentName(segmentNameStr)
+        .withReason(SegmentCompletionProtocol.REASON_ROW_LIMIT);
+    response = segmentCompletionMgr.segmentConsumed(params);
+    Assert.assertEquals(response.getStatus(), ControllerResponseStatus.KEEP);
+    // And we ask S3 to discard because it was ahead.
+    params = new Request.Params().withInstanceId(s3).withOffset(s3Offset).withSegmentName(segmentNameStr)
+        .withReason(SegmentCompletionProtocol.REASON_TIME_LIMIT);
+    response = segmentCompletionMgr.segmentConsumed(params);
+    Assert.assertEquals(response.getStatus(), ControllerResponseStatus.DISCARD);
   }
 
   @Test

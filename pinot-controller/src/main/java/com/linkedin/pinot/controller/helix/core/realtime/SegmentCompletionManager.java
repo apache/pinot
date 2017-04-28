@@ -704,7 +704,7 @@ public class SegmentCompletionManager {
       SegmentCompletionProtocol.Response response;
       // If we are past the max time to pick a winner, or we have heard from all replicas,
       // we are ready to pick a winner.
-      if (pickedWinner(instanceId, now, stopReason)) {
+      if (isWinnerPicked(instanceId, now, stopReason)) {
         if (_winner.equals(instanceId)) {
           LOGGER.info("{}:Committer notified winner instance={} offset={}", _state, instanceId, offset);
           response = commit(instanceId, offset);
@@ -1020,33 +1020,42 @@ public class SegmentCompletionManager {
     /**
      * Pick a winner if we can, preferring the instance that we are handling right now,
      *
+     * We accept the first server to report an offset as long as the server stopped consumption
+     * due to row limit. The premise is that other servers will also stop at row limit, and there
+     * is no need to wait for them to report an offset in order to decide on a winner. The state machine takes care
+     * of the cases where other servers may report different offsets (just in case).
+     *
+     * If the above condition is not satisfied (i.e. either this is not the first server, or it did not reach
+     * row limit), then we can pick a winner only if it is too late to pick a winner, or we have heard from all
+     * servers.
+     *
+     * Otherwise, we wait to hear from more servers.
+     *
      * @param preferredInstance The instance that is reporting in this thread.
      * @param now current time
      * @param stopReason reason reported by instance for stopping consumption.
      * @return true if winner picked, false otherwise.
      */
-    private boolean pickedWinner(String preferredInstance, long now, final String stopReason) {
+    private boolean isWinnerPicked(String preferredInstance, long now, final String stopReason) {
       if (SegmentCompletionProtocol.REASON_ROW_LIMIT.equals(stopReason) && _commitStateMap.size() == 1) {
-        // This is the first instance in the state map, and it stopped because of row limit.
-        // Pick this instance as winner.
         _winner = preferredInstance;
         _winningOffset = _commitStateMap.get(preferredInstance);
         return true;
       } else if (now > _maxTimeToPickWinnerMs || _commitStateMap.size() == numReplicasToLookFor()) {
         LOGGER.info("{}:Picking winner time={} size={}", _state, now- _startTimeMs, _commitStateMap.size());
-        long maxSoFar = -1;
-        String winner = null;
+        long maxOffsetSoFar = -1;
+        String winnerSoFar = null;
         for (Map.Entry<String, Long> entry : _commitStateMap.entrySet()) {
-          if (entry.getValue() > maxSoFar) {
-            maxSoFar = entry.getValue();
-            winner = entry.getKey();
+          if (entry.getValue() > maxOffsetSoFar) {
+            maxOffsetSoFar = entry.getValue();
+            winnerSoFar = entry.getKey();
           }
         }
-        _winningOffset = maxSoFar;
-        if (_commitStateMap.get(preferredInstance) == maxSoFar) {
-          winner = preferredInstance;
+        _winningOffset = maxOffsetSoFar;
+        if (_commitStateMap.get(preferredInstance) == maxOffsetSoFar) {
+          winnerSoFar = preferredInstance;
         }
-        _winner = winner;
+        _winner = winnerSoFar;
         return true;
       }
       return false;
