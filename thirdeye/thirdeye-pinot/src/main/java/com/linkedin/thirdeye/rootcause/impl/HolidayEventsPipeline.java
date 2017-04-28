@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory;
  * HolidayEventsPipeline produces EventEntities associated with holidays within the current
  * TimeRange. It matches holidays based on incoming DimensionEntities (e.g. from contribution
  * analysis) and scores them based on the number of matching DimensionEntities.
+ * Holiday pipeline will add a buffer of 2 days to the time range provided
  */
 public class HolidayEventsPipeline extends Pipeline {
   private static final int HOLIDAY_DAYS_BUFFER = 2;
