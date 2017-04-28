@@ -188,7 +188,7 @@ AnalysisView.prototype = {
       this.viewParams['currentStart'] = start;
       this.viewParams['currentEnd'] = end;
 
-      const compareMode = this.viewParams['compareMode'];
+      const compareMode = this.viewParams['compareMode'] || this.compareMode;
 
       if (compareMode !== constants.DATE_RANGE_CUSTOM) {
         $baselineRangePicker.length && $baselineRangePicker.data('daterangepicker').remove();
@@ -211,7 +211,6 @@ AnalysisView.prototype = {
     const currentRangeType = currentDatePicker.chosenLabel;
 
     setCurrentRange(currentStart, currentEnd, currentRangeType);
-    setBaselineRange(baselineStart, baselineEnd, this.viewParams.compareMode);
   },
 
   renderDatePicker($selector, callbackFun, initialStart, initialEnd, showTime, rangeGenerator, maxTime) {
