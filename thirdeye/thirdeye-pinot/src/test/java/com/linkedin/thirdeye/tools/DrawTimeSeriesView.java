@@ -8,7 +8,6 @@ import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import java.awt.*;
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -17,6 +16,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.jfree.chart.ChartPanel;
 import org.jfree.ui.ApplicationFrame;
 import org.jfree.ui.RefineryUtilities;
@@ -63,7 +63,7 @@ public class DrawTimeSeriesView {
     this.functionTimeSeriesChartMap = new HashMap<>();
   }
 
-  public void draw(List<Long> functionIds, String outputPath) throws Exception {
+  public void draw(final List<Long> functionIds, final String outputPath) throws Exception {
     for(Long id : functionIds) {
       draw(id, outputPath);
     }
@@ -71,9 +71,16 @@ public class DrawTimeSeriesView {
 
   public void draw(long functionId, String outputPath) throws Exception {
     AnomalyFunctionDTO anomalyFunctionDTO = anomalyFunctionDAO.findById(functionId);
-    File outputDir = new File(outputPath + "/" + anomalyFunctionDTO.getCollection());
-    if(!outputDir.exists()) {
-      outputDir.mkdirs();
+    if(anomalyFunctionDTO == null) {
+      LOG.warn("Anomaly Function {} doesn't exist", functionId);
+      return;
+    }
+    File outputDir = null;
+    if(StringUtils.isNotEmpty(outputPath)) {
+      outputDir = new File(outputPath + "/" + anomalyFunctionDTO.getCollection());
+      if (!outputDir.exists()) {
+        outputDir.mkdirs();
+      }
     }
     String fileName = anomalyFunctionDTO.getFunctionName() + "-" + DateTime.now().toString(ISODateTimeFormat.dateTime());
     String jsonResponse = getTimelinesViewForFunctionId(functionId);
@@ -94,14 +101,23 @@ public class DrawTimeSeriesView {
         timeSeries.put(new DateTime(timeBucket.get(CURRENT_START)), new Tuple2<Double, Double>(currentValue, baselineValue));
       }
 
-      // Draw figure and save
-      File outputFile = new File(outputDir.getAbsolutePath() + "/" + fileName + "_" + dimensions + PNG_FILE_EXTENSION);
+      // Draw Figure
       TimeSeriesLineChart timeSeriesLineChart = new TimeSeriesLineChart("Time Series Chart");
       timeSeriesLineChart.loadData(timeSeries);
       timeSeriesLineChart.createChartPanel(dimensions);
       this.functionTimeSeriesChartMap.put(fileName + ":" + dimensions, timeSeriesLineChart);
-      timeSeriesLineChart.saveAsPNG(outputFile, 1280, 640);
+
+      if(outputDir != null) {
+        // Draw figure and save
+        File outputFile = new File(outputDir.getAbsolutePath() + "/" + fileName + "_" + dimensions + PNG_FILE_EXTENSION);
+        saveAs(outputFile, timeSeriesLineChart);
+      }
     }
+  }
+
+  public void saveAs(File outputFile, TimeSeriesLineChart timeSeriesLineChart) {
+    timeSeriesLineChart.saveAsPNG(outputFile, 1280, 640);
+
   }
 
   private void view(String title, TimeSeriesLineChart timeSeriesLineChart) {
@@ -147,8 +163,9 @@ public class DrawTimeSeriesView {
 
   public static void main(String[] args) throws Exception {
     args = new String[]{"/home/ychung/workspace/growth_timeseries/growth-local.yml"};
-    DrawTimeSeriesViewConfig config =
+    final DrawTimeSeriesViewConfig config =
         OBJECT_MAPPER.readValue(new File(args[0]), DrawTimeSeriesViewConfig.class);
+
     DrawTimeSeriesView drawTimeSeriesView = new DrawTimeSeriesView(new File(config.getPersistenceFile()),
         config.getDashboardHost(), config.getDashboardPort());
     List<Long> functionIds = new ArrayList<>();
