@@ -48,7 +48,7 @@ public class SegmentCompletionManager {
   // TODO Can we log using the segment name in the log message?
   public static Logger LOGGER = LoggerFactory.getLogger(SegmentCompletionManager.class);
   private enum State {
-    PARTIAL_CONSUNIMG,  // Indicates that at least one replica has reported that it has stopped consuming.
+    PARTIAL_CONSUMING,  // Indicates that at least one replica has reported that it has stopped consuming.
     HOLDING,          // the segment has started finalizing.
     COMMITTER_DECIDED, // We know who the committer will be, we will let them know next time they call segmentConsumed()
     COMMITTER_NOTIFIED, // we notified the committer to commit.
@@ -151,6 +151,7 @@ public class SegmentCompletionManager {
     }
     final String segmentNameStr = reqParams.getSegmentName();
     final String instanceId = reqParams.getInstanceId();
+    final String stopReason = reqParams.getReason();
     final long offset = reqParams.getOffset();
 
     LLCSegmentName segmentName = new LLCSegmentName(segmentNameStr);
@@ -158,7 +159,7 @@ public class SegmentCompletionManager {
     SegmentCompletionFSM fsm = null;
     try {
       fsm = lookupOrCreateFsm(segmentName, SegmentCompletionProtocol.MSG_TYPE_CONSUMED);
-      response = fsm.segmentConsumed(instanceId, offset);
+      response = fsm.segmentConsumed(instanceId, offset, stopReason);
     } catch (Exception e) {
       // Return failed response
     }
@@ -354,7 +355,7 @@ public class SegmentCompletionManager {
 
     public static SegmentCompletionFSM fsmStoppedConsuming(PinotLLCRealtimeSegmentManager segmentManager, SegmentCompletionManager segmentCompletionManager, LLCSegmentName segmentName, int numReplicas) {
       SegmentCompletionFSM fsm = new SegmentCompletionFSM(segmentManager, segmentCompletionManager, segmentName, numReplicas);
-      fsm._state = State.PARTIAL_CONSUNIMG;
+      fsm._state = State.PARTIAL_CONSUMING;
       return fsm;
     }
 
@@ -415,7 +416,7 @@ public class SegmentCompletionManager {
      * we need to synchronize on the FSM to handle the messages. The processing time itself is small,
      * so we should be OK with this synchronization.
      */
-    public SegmentCompletionProtocol.Response segmentConsumed(String instanceId, long offset) {
+    public SegmentCompletionProtocol.Response segmentConsumed(String instanceId, long offset, final String stopReason) {
       final long now = _segmentCompletionManager.getCurrentTimeMs();
       // We can synchronize the entire block for the SegmentConsumed message.
       synchronized (this) {
@@ -428,11 +429,11 @@ public class SegmentCompletionManager {
         }
         _commitStateMap.put(instanceId, offset);
         switch (_state) {
-          case PARTIAL_CONSUNIMG:
-            return PARTIAL_CONSUMING__consumed(instanceId, offset, now);
+          case PARTIAL_CONSUMING:
+            return PARTIAL_CONSUMING__consumed(instanceId, offset, now, stopReason);
 
           case HOLDING:
-            return HOLDING__consumed(instanceId, offset, now);
+            return HOLDING__consumed(instanceId, offset, now, stopReason);
 
           case COMMITTER_DECIDED: // This must be a retransmit
             return COMMITTER_DECIDED__consumed(instanceId, offset, now);
@@ -478,7 +479,7 @@ public class SegmentCompletionManager {
       synchronized (this) {
         LOGGER.info("Processing segmentCommit({}, {})", instanceId, offset);
         switch (_state) {
-          case PARTIAL_CONSUNIMG:
+          case PARTIAL_CONSUMING:
             return PARTIAL_CONSUMING__commit(instanceId, offset, now);
 
           case HOLDING:
@@ -513,7 +514,7 @@ public class SegmentCompletionManager {
         LOGGER.info("Processing segmentCommit({}, {})", instanceId, offset);
         _excludedServerStateMap.add(instanceId);
         switch (_state) {
-          case PARTIAL_CONSUNIMG:
+          case PARTIAL_CONSUMING:
             return PARTIAL_CONSUMING__stoppedConsuming(instanceId, offset, reason);
 
           case HOLDING:
@@ -549,7 +550,7 @@ public class SegmentCompletionManager {
       synchronized (this) {
          LOGGER.info("Processing extendBuildTime({}, {}, {})", instanceId, offset, extTimeSec);
         switch (_state) {
-          case PARTIAL_CONSUNIMG:
+          case PARTIAL_CONSUMING:
           case HOLDING:
           case COMMITTER_DECIDED:
             return fail(instanceId, offset);
@@ -662,12 +663,13 @@ public class SegmentCompletionManager {
       return _numReplicas - _excludedServerStateMap.size();
     }
 
-    private SegmentCompletionProtocol.Response PARTIAL_CONSUMING__consumed(String instanceId, long offset, long now) {
+    private SegmentCompletionProtocol.Response PARTIAL_CONSUMING__consumed(String instanceId, long offset, long now,
+        final String stopReason) {
       // This is the first time we are getting segmentConsumed() for this segment.
       // Some instance thinks we can close this segment, so go to HOLDING state, and process as normal.
       // We will just be looking for less replicas.
       _state = State.HOLDING;
-      return HOLDING__consumed(instanceId, offset, now);
+      return HOLDING__consumed(instanceId, offset, now, stopReason);
     }
 
     /*
@@ -697,13 +699,12 @@ public class SegmentCompletionManager {
      *
      * If we can go to COMMITTER_NOTIFIED then we respond with a COMMIT message, otherwise with a HOLD message.
      */
-    private SegmentCompletionProtocol.Response HOLDING__consumed(String instanceId, long offset, long now) {
+    private SegmentCompletionProtocol.Response HOLDING__consumed(String instanceId, long offset, long now,
+        final String stopReason) {
       SegmentCompletionProtocol.Response response;
       // If we are past the max time to pick a winner, or we have heard from all replicas,
       // we are ready to pick a winner.
-      if (now > _maxTimeToPickWinnerMs || _commitStateMap.size() == numReplicasToLookFor()) {
-        LOGGER.info("{}:Picking winner time={} size={}", _state, now- _startTimeMs, _commitStateMap.size());
-        pickWinner(instanceId);
+      if (isWinnerPicked(instanceId, now, stopReason)) {
         if (_winner.equals(instanceId)) {
           LOGGER.info("{}:Committer notified winner instance={} offset={}", _state, instanceId, offset);
           response = commit(instanceId, offset);
@@ -1016,22 +1017,48 @@ public class SegmentCompletionManager {
       return hold(instanceId, offset);
     }
 
-    // Pick a winner, preferring this instance if tied for highest.
-    // Side-effect: Sets the _winner and _winningOffset
-    private void pickWinner(String preferredInstance) {
-      long maxSoFar = -1;
-      String winner = null;
-      for (Map.Entry<String, Long> entry : _commitStateMap.entrySet()) {
-        if (entry.getValue() > maxSoFar) {
-          maxSoFar = entry.getValue();
-          winner = entry.getKey();
+    /**
+     * Pick a winner if we can, preferring the instance that we are handling right now,
+     *
+     * We accept the first server to report an offset as long as the server stopped consumption
+     * due to row limit. The premise is that other servers will also stop at row limit, and there
+     * is no need to wait for them to report an offset in order to decide on a winner. The state machine takes care
+     * of the cases where other servers may report different offsets (just in case).
+     *
+     * If the above condition is not satisfied (i.e. either this is not the first server, or it did not reach
+     * row limit), then we can pick a winner only if it is too late to pick a winner, or we have heard from all
+     * servers.
+     *
+     * Otherwise, we wait to hear from more servers.
+     *
+     * @param preferredInstance The instance that is reporting in this thread.
+     * @param now current time
+     * @param stopReason reason reported by instance for stopping consumption.
+     * @return true if winner picked, false otherwise.
+     */
+    private boolean isWinnerPicked(String preferredInstance, long now, final String stopReason) {
+      if (SegmentCompletionProtocol.REASON_ROW_LIMIT.equals(stopReason) && _commitStateMap.size() == 1) {
+        _winner = preferredInstance;
+        _winningOffset = _commitStateMap.get(preferredInstance);
+        return true;
+      } else if (now > _maxTimeToPickWinnerMs || _commitStateMap.size() == numReplicasToLookFor()) {
+        LOGGER.info("{}:Picking winner time={} size={}", _state, now- _startTimeMs, _commitStateMap.size());
+        long maxOffsetSoFar = -1;
+        String winnerSoFar = null;
+        for (Map.Entry<String, Long> entry : _commitStateMap.entrySet()) {
+          if (entry.getValue() > maxOffsetSoFar) {
+            maxOffsetSoFar = entry.getValue();
+            winnerSoFar = entry.getKey();
+          }
         }
+        _winningOffset = maxOffsetSoFar;
+        if (_commitStateMap.get(preferredInstance) == maxOffsetSoFar) {
+          winnerSoFar = preferredInstance;
+        }
+        _winner = winnerSoFar;
+        return true;
       }
-      _winningOffset = maxSoFar;
-      if (_commitStateMap.get(preferredInstance) == maxSoFar) {
-        winner = preferredInstance;
-      }
-      _winner =  winner;
+      return false;
     }
   }
 }

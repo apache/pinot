@@ -16,10 +16,26 @@
 
 package com.linkedin.pinot.core.data.manager.realtime;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.tuple.Pair;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.IndexingConfig;
+import com.linkedin.pinot.common.config.SegmentPartitionConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.data.StarTreeIndexSpec;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
@@ -38,10 +54,7 @@ import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.extractors.FieldExtractorFactory;
 import com.linkedin.pinot.core.data.extractors.PlainFieldExtractor;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
-import com.linkedin.pinot.core.data.partition.PartitionFunctionFactory;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
-import com.linkedin.pinot.common.config.ColumnPartitionConfig;
-import com.linkedin.pinot.common.config.SegmentPartitionConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.realtime.converter.RealtimeSegmentConverter;
 import com.linkedin.pinot.core.realtime.impl.RealtimeSegmentImpl;
@@ -51,23 +64,7 @@ import com.linkedin.pinot.core.realtime.impl.kafka.KafkaSimpleConsumerFactoryImp
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicLong;
 import kafka.message.MessageAndOffset;
-import org.apache.commons.collections.map.HashedMap;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.tuple.Pair;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -188,6 +185,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
 
   private long _lastLogTime = 0;
   private int _lastConsumedCount = 0;
+  private String _stopReason = null;
 
 
   // TODO each time this method is called, we print reason for stop. Good to print only once.
@@ -206,15 +204,18 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
             return false;
           }
           segmentLogger.info("Stopping consumption due to time limit start={} now={} numRows={}", _startTimeMs, now, _numRowsConsumed);
+          _stopReason = SegmentCompletionProtocol.REASON_TIME_LIMIT;
           return true;
         } else if (_numRowsConsumed >= _segmentMaxRowCount) {
           segmentLogger.info("Stopping consumption due to row limit nRows={} maxNRows={}", _numRowsConsumed,
               _segmentMaxRowCount);
+          _stopReason = SegmentCompletionProtocol.REASON_ROW_LIMIT;
           return true;
         }
         return false;
 
       case CATCHING_UP:
+        _stopReason = null;
         // We have posted segmentConsumed() at least once, and the controller is asking us to catch up to a certain offset.
         // There is no time limit here, so just check to see that we are still within the offset we need to reach.
         // Going past the offset is an exception.
@@ -628,7 +629,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     // Post segmentConsumed to current leader.
     // Retry maybe once if leader is not found.
     SegmentCompletionProtocol.Request.Params params = new SegmentCompletionProtocol.Request.Params();
-    params.withOffset(_currentOffset).withSegmentName(_segmentNameStr);
+    params.withOffset(_currentOffset).withSegmentName(_segmentNameStr).withReason(_stopReason);
     return _protocolHandler.segmentConsumed(params);
   }
 
