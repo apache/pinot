@@ -89,7 +89,7 @@ public class DimensionAnalysisPipeline extends Pipeline {
    *
    * @param outputName pipeline output name
    * @param inputNames input pipeline names
-   * @param properties configuration properties ({@code PROP_PARALLELISM})
+   * @param properties configuration properties ({@code PROP_PARALLELISM=1})
    */
   public DimensionAnalysisPipeline(String outputName, Set<String> inputNames, Map<String, String> properties) {
     super(outputName, inputNames);
@@ -98,7 +98,9 @@ public class DimensionAnalysisPipeline extends Pipeline {
     this.datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
     this.cache = ThirdEyeCacheRegistry.getInstance().getQueryCache();
 
-    int parallelism = Integer.parseInt(properties.get(PROP_PARALLELISM));
+    int parallelism = 1;
+    if(properties.containsKey(PROP_PARALLELISM))
+      parallelism = Integer.parseInt(properties.get(PROP_PARALLELISM));
     this.executor = Executors.newFixedThreadPool(parallelism);
   }
 

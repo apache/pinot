@@ -9,6 +9,7 @@ import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.PipelineContext;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -84,6 +85,9 @@ public class MetricDatasetPipeline extends Pipeline {
 
       double datasetScore = datasetScores.get(d);
       Collection<MetricConfigDTO> dtos = metricDAO.findByDataset(d);
+
+      dtos = removeExisting(dtos, metrics);
+
       for(MetricConfigDTO dto : dtos) {
         double score = datasetScore / dtos.size();
         entities.add(MetricEntity.fromMetric(score, d, dto.getName()));
@@ -91,5 +95,24 @@ public class MetricDatasetPipeline extends Pipeline {
     }
 
     return new PipelineResult(context, entities);
+  }
+
+  static Collection<MetricConfigDTO> removeExisting(Iterable<MetricConfigDTO> dtos, Iterable<MetricEntity> existing) {
+    Collection<MetricConfigDTO> out = new ArrayList<>();
+    for(MetricConfigDTO dto : dtos) {
+      if(!findExisting(dto, existing))
+        out.add(dto);
+    }
+    return out;
+  }
+
+  static boolean findExisting(MetricConfigDTO dto, Iterable<MetricEntity> existing) {
+    for(MetricEntity me : existing) {
+      if(me.getDataset().equals(dto.getDataset()) &&
+          me.getMetric().equals(dto.getName())) {
+        return true;
+      }
+    }
+    return false;
   }
 }
