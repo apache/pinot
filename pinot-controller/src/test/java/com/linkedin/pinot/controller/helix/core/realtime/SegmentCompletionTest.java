@@ -320,6 +320,28 @@ public class SegmentCompletionTest {
   }
 
   @Test
+  public void testWinnerOnTimeLimit() throws Exception {
+    SegmentCompletionProtocol.Response response;
+    Request.Params params;
+    segmentCompletionMgr._secconds = 10L;
+    params = new Request.Params().withInstanceId(s1).withOffset(s1Offset).withSegmentName(segmentNameStr)
+        .withReason(SegmentCompletionProtocol.REASON_TIME_LIMIT);
+    response = segmentCompletionMgr.segmentConsumed(params);
+    Assert.assertEquals(response.getStatus(), SegmentCompletionProtocol.ControllerResponseStatus.HOLD);
+  }
+
+  @Test
+  public void testWinnerOnRowLimit() throws Exception {
+    SegmentCompletionProtocol.Response response;
+    Request.Params params;
+    segmentCompletionMgr._secconds = 10L;
+    params = new Request.Params().withInstanceId(s1).withOffset(s1Offset).withSegmentName(segmentNameStr)
+        .withReason(SegmentCompletionProtocol.REASON_ROW_LIMIT);
+    response = segmentCompletionMgr.segmentConsumed(params);
+    Assert.assertEquals(response.getStatus(), ControllerResponseStatus.COMMIT);
+  }
+
+  @Test
   public void testDelayedServer() throws Exception {
     SegmentCompletionProtocol.Response response;
     Request.Params params;

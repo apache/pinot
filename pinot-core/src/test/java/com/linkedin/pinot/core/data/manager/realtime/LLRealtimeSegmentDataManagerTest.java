@@ -15,6 +15,14 @@
  */
 package com.linkedin.pinot.core.data.manager.realtime;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.LinkedList;
+import org.apache.kafka.common.protocol.Errors;
+import org.json.JSONObject;
+import org.mockito.Mockito;
+import org.testng.annotations.Test;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
@@ -29,16 +37,7 @@ import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderCo
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.yammer.metrics.core.MetricsRegistry;
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.util.LinkedList;
 import junit.framework.Assert;
-import org.apache.kafka.common.protocol.Errors;
-import org.json.JSONObject;
-import org.mockito.Mockito;
-import org.testng.annotations.Test;
-
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -458,6 +457,7 @@ public class LLRealtimeSegmentDataManagerTest {
       Assert.assertFalse(segmentDataManager.invokeEndCriteriaReached());
       segmentDataManager.setNumRowsConsumed(maxRowsInSegment);
       Assert.assertTrue(segmentDataManager.invokeEndCriteriaReached());
+      Assert.assertEquals(segmentDataManager.getStopReason(), SegmentCompletionProtocol.REASON_ROW_LIMIT);
     }
     // test reaching max time limit
     {
@@ -471,6 +471,7 @@ public class LLRealtimeSegmentDataManagerTest {
       // Now we can test when we are far ahead in time
       _timeNow += maxTimeForSegmentCloseMs;
       Assert.assertTrue(segmentDataManager.invokeEndCriteriaReached());
+      Assert.assertEquals(segmentDataManager.getStopReason(), SegmentCompletionProtocol.REASON_TIME_LIMIT);
     }
     // In catching up state, test reaching final offset
     {
@@ -538,6 +539,7 @@ public class LLRealtimeSegmentDataManagerTest {
 
     public Field _state;
     public Field _shouldStop;
+    public Field _stopReason;
     public LinkedList<Long> _consumeOffsets = new LinkedList<>();
     public LinkedList<SegmentCompletionProtocol.Response> _responses = new LinkedList<>();
     public boolean _commitSegmentCalled = false;
@@ -559,6 +561,17 @@ public class LLRealtimeSegmentDataManagerTest {
       _state.setAccessible(true);
       _shouldStop = LLRealtimeSegmentDataManager.class.getDeclaredField("_shouldStop");
       _shouldStop.setAccessible(true);
+      _stopReason = LLRealtimeSegmentDataManager.class.getDeclaredField("_stopReason");
+      _stopReason.setAccessible(true);
+    }
+
+    public String getStopReason() {
+      try {
+        return (String) _stopReason.get(this);
+      } catch (Exception e) {
+        Assert.fail();
+      }
+      return null;
     }
 
     public PartitionConsumer createPartitionConsumer() {
