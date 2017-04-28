@@ -27,6 +27,8 @@ import org.slf4j.LoggerFactory;
  * analysis) and scores them based on the number of matching DimensionEntities.
  */
 public class HolidayEventsPipeline extends Pipeline {
+  private static final int BASELINE_OFFSET = 7;
+
   private static final Logger LOG = LoggerFactory.getLogger(HolidayEventsPipeline.class);
 
   private final EventDataProviderManager eventDataProvider;
@@ -60,9 +62,9 @@ public class HolidayEventsPipeline extends Pipeline {
     TimeRangeEntity current = TimeRangeEntity.getContextCurrent(context);
     long currentStart = new DateTime(current.getStart()).minusDays(2).getMillis();
     long currentEnd = current.getEnd();
-    long baselineStart = new DateTime(currentStart).minusDays(7).getMillis();
+    long baselineStart = new DateTime(currentStart).minusDays(BASELINE_OFFSET).getMillis();
     long baselineEnd = new DateTime(currentEnd).minusDays(7).getMillis();
-    TimeRangeEntity baseline = TimeRangeEntity.fromRange(1.0, "baseline", baselineStart, baselineEnd);
+    TimeRangeEntity baseline = TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_BASELINE, baselineStart, baselineEnd);
 
     Set<DimensionEntity> dimensionEntities = context.filter(DimensionEntity.class);
     Map<String, DimensionEntity> urn2entity = EntityUtils.mapEntityURNs(dimensionEntities);
