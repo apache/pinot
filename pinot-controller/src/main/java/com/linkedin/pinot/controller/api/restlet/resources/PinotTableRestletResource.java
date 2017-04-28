@@ -1,18 +1,5 @@
 package com.linkedin.pinot.controller.api.restlet.resources;
 
-import com.linkedin.pinot.common.config.AbstractTableConfig;
-import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metrics.ControllerMeter;
-import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
-import com.linkedin.pinot.common.restlet.swagger.Parameter;
-import com.linkedin.pinot.common.restlet.swagger.Paths;
-import com.linkedin.pinot.common.restlet.swagger.Summary;
-import com.linkedin.pinot.common.restlet.swagger.Tags;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
-import com.linkedin.pinot.controller.api.ControllerRestApplication;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 import java.io.File;
 import java.io.IOException;
 import java.util.Set;
@@ -34,6 +21,20 @@ import org.restlet.resource.Post;
 import org.restlet.resource.Put;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
+import com.linkedin.pinot.common.metrics.ControllerMeter;
+import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
+import com.linkedin.pinot.common.restlet.swagger.Parameter;
+import com.linkedin.pinot.common.restlet.swagger.Paths;
+import com.linkedin.pinot.common.restlet.swagger.Summary;
+import com.linkedin.pinot.common.restlet.swagger.Tags;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
+import com.linkedin.pinot.controller.api.ControllerRestApplication;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 
 
 public class PinotTableRestletResource extends BasePinotControllerRestletResource {
@@ -92,33 +93,46 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
     // For self-serviced cluster, ensure that the tables are created with atleast
     // min replication factor irrespective of table configuratio value.
     SegmentsValidationAndRetentionConfig segmentsConfig = config.getValidationConfig();
-    int requestReplication;
-    try {
-      requestReplication = segmentsConfig.getReplicationNumber();
-    } catch (NumberFormatException e) {
-      throw new PinotHelixResourceManager.InvalidTableConfigException("Invalid replication number", e);
-    }
     int configMinReplication = _controllerConf.getDefaultTableMinReplicas();
-    if (requestReplication < configMinReplication) {
-      LOGGER.info("Creating table with minimum replication factor of: {} instead of requested replication: {}",
-          configMinReplication, requestReplication);
-      segmentsConfig.setReplication(String.valueOf(configMinReplication));
-    }
 
-    String replicasPerPartitionStr = segmentsConfig.getReplicasPerPartition();
-    if (replicasPerPartitionStr != null) {
+    if (TableType.REALTIME.name().equalsIgnoreCase(config.getTableType())) {
+      KafkaStreamMetadata kafkaStreamMetadata;
       try {
-        int replicasPerPartition = Integer.valueOf(replicasPerPartitionStr);
-        if (replicasPerPartition < configMinReplication) {
-          LOGGER.info(
-              "Creating table with minimum replicasPerPartition of: {} instead of requested replicasPerPartition: {}",
-              configMinReplication, replicasPerPartition);
-          segmentsConfig.setReplicasPerPartition(String.valueOf(configMinReplication));
-        }
-      } catch (NumberFormatException e) {
-        throw new PinotHelixResourceManager.InvalidTableConfigException(
-            "Invalid replicas per partition: " + replicasPerPartitionStr, e);
+        kafkaStreamMetadata = new KafkaStreamMetadata(config.getIndexingConfig().getStreamConfigs());
+      } catch (Exception e) {
+        throw new PinotHelixResourceManager.InvalidTableConfigException("Invalid tableIndexConfig or streamConfigs", e);
       }
+      if (kafkaStreamMetadata.hasSimpleKafkaConsumerType()) {
+        String replicasPerPartitionStr = segmentsConfig.getReplicasPerPartition();
+        if (replicasPerPartitionStr == null) {
+          throw new PinotHelixResourceManager.InvalidTableConfigException("Field replicasPerPartition needs to be specified");
+        }
+        try {
+          int replicasPerPartition = Integer.valueOf(replicasPerPartitionStr);
+          if (replicasPerPartition < configMinReplication) {
+            LOGGER.info(
+                "Creating table with minimum replicasPerPartition of: {} instead of requested replicasPerPartition: {}",
+                configMinReplication, replicasPerPartition);
+            segmentsConfig.setReplicasPerPartition(String.valueOf(configMinReplication));
+          }
+        } catch (NumberFormatException e) {
+          throw new PinotHelixResourceManager.InvalidTableConfigException("Invalid value for replicasPerPartition: '" + replicasPerPartitionStr + "'", e);
+        }
+      }
+    } else if (TableType.OFFLINE.name().equalsIgnoreCase(config.getTableType())) {
+      int requestReplication;
+      try {
+        requestReplication = segmentsConfig.getReplicationNumber();
+      } catch (NumberFormatException e) {
+        throw new PinotHelixResourceManager.InvalidTableConfigException("Invalid replication number", e);
+      }
+      if (requestReplication < configMinReplication) {
+        LOGGER.info("Creating table with minimum replication factor of: {} instead of requested replication: {}",
+            configMinReplication, requestReplication);
+        segmentsConfig.setReplication(String.valueOf(configMinReplication));
+      }
+    } else {
+      throw new PinotHelixResourceManager.InvalidTableConfigException("Invalid table type: '" + config.getTableType() + "'");
     }
 
     _pinotHelixResourceManager.addTable(config);
@@ -178,7 +192,8 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
       }
     } catch (Exception e) {
       LOGGER.error("Caught exception while fetching table ", e);
-      ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_GET_ERROR, 1L);
+      ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_GET_ERROR,
+          1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
       return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }
