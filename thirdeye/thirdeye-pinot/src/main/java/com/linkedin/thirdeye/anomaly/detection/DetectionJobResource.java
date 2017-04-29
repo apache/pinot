@@ -766,7 +766,7 @@ public class DetectionJobResource {
     try{
       thread.join();
     } catch (InterruptedException e){
-      return Response.status(Response.Status.EXPECTATION_FAILED).entity("Threading failed").build();
+      return Response.status(Response.Status.EXPECTATION_FAILED).entity("Threading is interrupted").build();
     }
 
     Map<String, String> responseMessages = new HashMap<>();
