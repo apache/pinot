@@ -20,6 +20,7 @@ import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomaliesSummary;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomaliesWrapper;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalyDataCompare;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalyDetails;
+import com.linkedin.thirdeye.dashboard.resources.v2.pojo.SearchFilters;
 import com.linkedin.thirdeye.dashboard.views.TimeBucket;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
@@ -68,6 +69,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -264,7 +266,10 @@ public class AnomaliesResource {
   public AnomaliesWrapper getAnomaliesByTime(
       @PathParam("startTime") Long startTime,
       @PathParam("endTime") Long endTime,
-      @PathParam("pageNumber") int pageNumber) throws Exception {
+      @PathParam("pageNumber") int pageNumber,
+      @QueryParam("searchFilters") String searchFiltersJSON, 
+      @QueryParam("filterOnly") @DefaultValue("false") boolean filterOnly 
+      ) throws Exception {
 
     List<MergedAnomalyResultDTO> mergedAnomalies = mergedAnomalyResultDAO.findByTime(startTime, endTime, false);
     try {
@@ -274,7 +279,7 @@ public class AnomaliesResource {
           "Failed to apply alert filters on anomalies in start:{}, end:{}, exception:{}",
           new DateTime(startTime), new DateTime(endTime), e);
     }
-    AnomaliesWrapper anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(mergedAnomalies, pageNumber);
+    AnomaliesWrapper anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(mergedAnomalies, searchFiltersJSON, pageNumber, filterOnly);
     return anomaliesWrapper;
   }
 
@@ -294,7 +299,9 @@ public class AnomaliesResource {
       @PathParam("endTime") Long endTime,
       @PathParam("pageNumber") int pageNumber,
       @QueryParam("anomalyIds") String anomalyIdsString,
-      @QueryParam("functionName") String functionName) throws Exception {
+      @QueryParam("functionName") String functionName,
+      @QueryParam("searchFilters") String searchFiltersJSON, 
+      @QueryParam("filterOnly") @DefaultValue("false") boolean filterOnly) throws Exception {
 
     String[] anomalyIds = anomalyIdsString.split(COMMA_SEPARATOR);
     List<MergedAnomalyResultDTO> mergedAnomalies = new ArrayList<>();
@@ -305,7 +312,7 @@ public class AnomaliesResource {
         mergedAnomalies.add(anomaly);
       }
     }
-    AnomaliesWrapper anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(mergedAnomalies, pageNumber);
+    AnomaliesWrapper anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(mergedAnomalies, searchFiltersJSON, pageNumber, filterOnly);
     return anomaliesWrapper;
   }
 
@@ -325,11 +332,13 @@ public class AnomaliesResource {
       @PathParam("endTime") Long endTime,
       @PathParam("pageNumber") int pageNumber,
       @QueryParam("dashboardId") String dashboardId,
-      @QueryParam("functionName") String functionName) throws Exception {
+      @QueryParam("functionName") String functionName,
+      @QueryParam("searchFilters") String searchFiltersJSON,
+      @QueryParam("filterOnly") @DefaultValue("false") boolean filterOnly) throws Exception {
 
     DashboardConfigDTO dashboardConfig = dashboardConfigDAO.findById(Long.valueOf(dashboardId));
     String metricIdsString = Joiner.on(COMMA_SEPARATOR).join(dashboardConfig.getMetricIds());
-    return getAnomaliesByMetricIds(startTime, endTime, pageNumber, metricIdsString, functionName);
+    return getAnomaliesByMetricIds(startTime, endTime, pageNumber, metricIdsString, functionName, searchFiltersJSON, filterOnly);
   }
 
   /**
@@ -348,7 +357,9 @@ public class AnomaliesResource {
       @PathParam("endTime") Long endTime,
       @PathParam("pageNumber") int pageNumber,
       @QueryParam("metricIds") String metricIdsString,
-      @QueryParam("functionName") String functionName) throws Exception {
+      @QueryParam("functionName") String functionName,
+      @QueryParam("searchFilters") String searchFiltersJSON, 
+      @QueryParam("filterOnly") @DefaultValue("false") boolean filterOnly) throws Exception {
 
     String[] metricIdsList = metricIdsString.split(COMMA_SEPARATOR);
     List<Long> metricIds = new ArrayList<>();
@@ -356,7 +367,7 @@ public class AnomaliesResource {
       metricIds.add(Long.valueOf(metricId));
     }
     List<MergedAnomalyResultDTO> mergedAnomalies = getAnomaliesForMetricIdsInRange(metricIds, startTime, endTime);
-    AnomaliesWrapper anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(mergedAnomalies, pageNumber);
+    AnomaliesWrapper anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(mergedAnomalies, searchFiltersJSON, pageNumber, filterOnly);
     return anomaliesWrapper;
   }
 
@@ -378,8 +389,9 @@ public class AnomaliesResource {
       @PathParam("endTime") Long endTime,
       @PathParam("pageNumber") int pageNumber,
       @QueryParam("anomalyGroupIds") String anomalyGroupIdsString,
-      @QueryParam("functionName") String functionName) throws Exception {
-
+      @QueryParam("functionName") String functionName,
+      @QueryParam("searchFilters") String searchFiltersJSON,
+      @QueryParam("filterOnly") @DefaultValue("false") boolean filterOnly) throws Exception {
     String[] anomalyGroupIdsStrings = anomalyGroupIdsString.split(COMMA_SEPARATOR);
     Set<Long> anomalyIdSet = new HashSet<>();
     List<MergedAnomalyResultDTO> mergedAnomalies = new ArrayList<>();
@@ -404,7 +416,7 @@ public class AnomaliesResource {
       }
     }
 
-    AnomaliesWrapper anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(mergedAnomalies, pageNumber);
+    AnomaliesWrapper anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(mergedAnomalies, searchFiltersJSON, pageNumber, filterOnly);
     return anomaliesWrapper;
   }
 
@@ -584,12 +596,33 @@ public class AnomaliesResource {
    * @return
    * @throws ExecutionException
    */
-  private AnomaliesWrapper constructAnomaliesWrapperFromMergedAnomalies(List<MergedAnomalyResultDTO> mergedAnomalies, int pageNumber) throws ExecutionException {
+  private AnomaliesWrapper constructAnomaliesWrapperFromMergedAnomalies(List<MergedAnomalyResultDTO> anomalies, String searchFiltersJSON,
+      int pageNumber, boolean filterOnly) throws ExecutionException {
+    List<MergedAnomalyResultDTO> mergedAnomalies = anomalies;
+
     AnomaliesWrapper anomaliesWrapper = new AnomaliesWrapper();
+
+    //filter the anomalies
+    if (searchFiltersJSON != null) {
+      SearchFilters searchFilters = SearchFilters.fromJSON(searchFiltersJSON);
+      if (searchFilters != null) {
+        mergedAnomalies = SearchFilters.applySearchFilters(anomalies, searchFilters);
+      }
+    }
+    //set the search filters
+    anomaliesWrapper.setSearchFilters(SearchFilters.fromAnomalies(mergedAnomalies));
     anomaliesWrapper.setTotalAnomalies(mergedAnomalies.size());
+    
+    //set anomalyIds
+    List<Long> anomalyIds = new ArrayList<>();
+    for(MergedAnomalyResultDTO mergedAnomaly: mergedAnomalies){
+      anomalyIds.add(mergedAnomaly.getId());
+    }
+    anomaliesWrapper.setAnomalyIds(anomalyIds);
     LOG.info("Total anomalies: {}", mergedAnomalies.size());
-
-
+    if (filterOnly) {
+      return anomaliesWrapper;
+    }
     // TODO: get page number and page size from client
     int pageSize = DEFAULT_PAGE_SIZE;
     int maxPageNumber = (mergedAnomalies.size() - 1) / pageSize + 1;
@@ -644,6 +677,7 @@ public class AnomaliesResource {
     return anomaliesWrapper;
   }
 
+  
   /**
    * Return the natural order of MergedAnomaly by comparing their anomaly's end time.
    * The tie breaker is their anomaly ID.
@@ -876,7 +910,7 @@ public class AnomaliesResource {
     anomalyDetails.setAnomalyFunctionDimension(mergedAnomaly.getDimensions().toString());
     if (mergedAnomaly.getFeedback() != null) {
       anomalyDetails.setAnomalyFeedback(AnomalyDetails.getFeedbackStringFromFeedbackType(mergedAnomaly.getFeedback().getFeedbackType()));
-    }
+    } 
     anomalyDetails.setExternalUrl(externalUrl);
     return anomalyDetails;
   }
