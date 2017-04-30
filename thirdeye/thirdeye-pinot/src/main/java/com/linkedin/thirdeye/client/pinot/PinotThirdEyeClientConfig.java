@@ -1,13 +1,13 @@
 package com.linkedin.thirdeye.client.pinot;
 
-import io.dropwizard.configuration.ConfigurationFactory;
-import io.dropwizard.jackson.Jackson;
 import java.io.File;
+import java.io.FileInputStream;
 
+import com.fasterxml.jackson.dataformat.yaml.snakeyaml.Yaml;
+import com.fasterxml.jackson.dataformat.yaml.snakeyaml.constructor.Constructor;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.MoreObjects.ToStringHelper;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
-import javax.validation.Validation;
 
 public class PinotThirdEyeClientConfig {
 
@@ -72,17 +72,8 @@ public class PinotThirdEyeClientConfig {
   }
 
   public static PinotThirdEyeClientConfig fromFile(File dataSourceFile) throws Exception {
-    ConfigurationFactory<PinotThirdEyeClientConfig> factory =
-        new ConfigurationFactory<>(PinotThirdEyeClientConfig.class,
-            Validation.buildDefaultValidatorFactory().getValidator(), Jackson.newObjectMapper(),
-            "");
-    PinotThirdEyeClientConfig configuration;
-    try {
-      configuration = factory.build(dataSourceFile);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-    return configuration;
+    return (PinotThirdEyeClientConfig) new Yaml(new Constructor(PinotThirdEyeClientConfig.class))
+        .load(new FileInputStream(dataSourceFile));
   }
 
   @Override
