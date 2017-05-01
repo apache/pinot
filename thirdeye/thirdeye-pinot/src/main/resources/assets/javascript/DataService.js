@@ -38,13 +38,14 @@ DataService.prototype = {
         },
         error: function(e) {
         }
-      }).done(function(data) {
-        spinner.stop();
+      }).done(function(data){
         if (callback) {
           callback(data);
         } else {
           return data;
         }
+      }).always(function(data) {
+        spinner.stop();
       });
     },
 
@@ -97,7 +98,7 @@ DataService.prototype = {
           metricIds : metricIds,
           functionName : functionName
       };
-      this.getDataAsynchronous(url, data, callback, 'anomaly-spin-area');
+      return this.getDataAsynchronous(url, data, callback, 'anomaly-spin-area');
     },
     // Fetch anomalies for dashboard id in time range
     fetchAnomaliesForDashboardId : function(startTime, endTime, pageNumber, dashboardId, functionName, callback) {
@@ -106,7 +107,7 @@ DataService.prototype = {
           dashboardId : dashboardId,
           functionName : functionName
       };
-      this.getDataAsynchronous(url, data, callback, 'anomaly-spin-area');
+      return this.getDataAsynchronous(url, data, callback, 'anomaly-spin-area');
     },
     // Fetch anomalies for anomaly ids in array in time range
     fetchAnomaliesForAnomalyIds : function(startTime, endTime, pageNumber, anomalyIds, functionName, callback, spinner = 'anomaly-spin-area') {
@@ -115,7 +116,7 @@ DataService.prototype = {
           anomalyIds : anomalyIds,
           functionName : functionName
       };
-      this.getDataAsynchronous(url, data, callback, spinner);
+      return this.getDataAsynchronous(url, data, callback, spinner);
     },
 
     // Fetch anomalies for group ids in array
@@ -132,7 +133,7 @@ DataService.prototype = {
       var url = constants.SEARCH_ANOMALIES_TIME + startTime + this.URL_SEPARATOR + endTime + this.URL_SEPARATOR + pageNumber;
       var data = {
       };
-      this.getDataAsynchronous(url, data, callback, 'anomaly-spin-area');
+      return this.getDataAsynchronous(url, data, callback, 'anomaly-spin-area');
     },
     // Update anomaly feedback for anomaly id
     updateFeedback : function(anomalyId, feedbackType) {

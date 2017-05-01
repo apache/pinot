@@ -25,9 +25,9 @@ function AnomalyResultModel() {
   this.previousPageNumber = null;
   this.pageNumber = 1;
   this.pageSize = 10;
+  this.ajaxCall = null;
 
   this.renderViewEvent = new Event();
-
 }
 
 AnomalyResultModel.prototype = {
@@ -94,19 +94,23 @@ AnomalyResultModel.prototype = {
   },
   // Call rebuild every time new anomalies are to be loaded with new model
   rebuild : function() {
+    if (this.ajaxCall && !this.ajaxCall.status) {
+      console.log('aborting previous ajax call');
+      this.ajaxCall.abort();
+    }
     if (this.anomaliesSearchMode == constants.MODE_METRIC && this.metricIds != undefined && this.metricIds.length > 0) {
-      dataService.fetchAnomaliesForMetricIds(
+      this.ajaxCall = dataService.fetchAnomaliesForMetricIds(
           this.startDate, this.endDate, this.pageNumber, this.metricIds, this.functionName, this.updateModelAndNotifyView.bind(this));
     } else if (this.anomaliesSearchMode == constants.MODE_DASHBOARD && this.dashboardId != undefined) {
-      dataService.fetchAnomaliesForDashboardId(
+      this.ajaxCall = dataService.fetchAnomaliesForDashboardId(
           this.startDate, this.endDate, this.pageNumber, this.dashboardId, this.functionName, this.updateModelAndNotifyView.bind(this));
     } else if (this.anomaliesSearchMode == constants.MODE_ID && this.anomalyIds != undefined && this.anomalyIds.length > 0 && this.anomalyIds != this.previousAnomalyIds) {
-      dataService.fetchAnomaliesForAnomalyIds(
+      this.ajaxCall = dataService.fetchAnomaliesForAnomalyIds(
           this.startDate, this.endDate, this.pageNumber, this.anomalyIds, this.functionName, this.updateModelAndNotifyView.bind(this));
     } else if (this.anomaliesSearchMode == constants.MODE_TIME) {
-      dataService.fetchAnomaliesForTime(this.startDate, this.endDate, this.pageNumber, this.updateModelAndNotifyView.bind(this));
+      this.ajaxCall = dataService.fetchAnomaliesForTime(this.startDate, this.endDate, this.pageNumber, this.updateModelAndNotifyView.bind(this));
     } else if (this.anomaliesSearchMode == constants.MODE_GROUPID && this.anomalyGroupIds != undefined && this.anomalyGroupIds.length > 0) {
-      dataService.fetchAnomaliesforGroupIds(this.startDate, this.endDate, this.pageNumber, this.anomalyGroupIds, this.functionName, this.updateModelAndNotifyView.bind(this));
+      this.ajaxCall = dataService.fetchAnomaliesforGroupIds(this.startDate, this.endDate, this.pageNumber, this.anomalyGroupIds, this.functionName, this.updateModelAndNotifyView.bind(this));
     }
   },
   updateModelAndNotifyView : function(anomaliesWrapper) {

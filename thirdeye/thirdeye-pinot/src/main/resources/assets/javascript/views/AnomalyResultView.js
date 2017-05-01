@@ -148,7 +148,7 @@ AnomalyResultView.prototype = {
 
     this.setupSearchBar();
     this.showSearchBarBasedOnMode();
-    this.setupSearchListener('#search-button');
+    this.setupSearchListener();
   },
   renderViewEventHandler : function() {
     this.render();
@@ -290,7 +290,7 @@ AnomalyResultView.prototype = {
 
     // $('#anomalies-time-range-end').daterangepicker(this.timeRangeConfig, cb);
     cb(this.timeRangeConfig.startDate, this.timeRangeConfig.endDate);
-    this.setupSearchListener('#apply-button');
+    this.setupFilterListener();
 
     // APPLY BUTTON
   },
@@ -324,8 +324,10 @@ AnomalyResultView.prototype = {
       this.showDetailsLinkClickEvent.notify(e.data);
     }
   },
-  setupSearchListener : function(buttonSelector) {
-    $(buttonSelector).click(() => {
+
+
+  setupSearchListener() {
+    $('#search-button').click(() => {
       var anomaliesSearchMode = $('#anomalies-search-mode').val();
       var metricIds = undefined;
       var dashboardId = undefined;
@@ -364,6 +366,13 @@ AnomalyResultView.prototype = {
       this.applyButtonEvent.notify(anomaliesParams);
     })
   },
+
+  setupFilterListener() {
+    $('#apply-button').click(() => {
+      alert('searching');
+    })
+  },
+
   setupListenersOnAnomaly : function(idx, anomaly) {
 
     const investigateParams = {
