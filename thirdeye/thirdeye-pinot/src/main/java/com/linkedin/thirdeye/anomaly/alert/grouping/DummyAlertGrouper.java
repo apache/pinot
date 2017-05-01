@@ -11,25 +11,19 @@ import java.util.Map;
  * Returns a group that contains all input anomalies. Additionally, this class always returns empty auxiliary email
  * recipients.
  */
-public class DummyAlertGrouper extends BaseAlertGrouper<DimensionMap> {
+public class DummyAlertGrouper extends BaseAlertGrouper {
 
   @Override
-  public Map<AlertGroupKey<DimensionMap>, GroupedAnomalyResultsDTO> group(List<MergedAnomalyResultDTO> anomalyResults) {
-    Map<AlertGroupKey<DimensionMap>, GroupedAnomalyResultsDTO> groupMap = new HashMap<>();
-    AlertGroupKey<DimensionMap> alertGroupKey = this.constructGroupKey(null);
+  public Map<DimensionMap, GroupedAnomalyResultsDTO> group(List<MergedAnomalyResultDTO> anomalyResults) {
+    Map<DimensionMap, GroupedAnomalyResultsDTO> groupMap = new HashMap<>();
     GroupedAnomalyResultsDTO groupedAnomalyResults = new GroupedAnomalyResultsDTO();
     groupedAnomalyResults.setAnomalyResults(anomalyResults);
-    groupMap.put(alertGroupKey, groupedAnomalyResults);
+    groupMap.put(new DimensionMap(), groupedAnomalyResults);
     return groupMap;
   }
 
   @Override
-  public AlertGroupKey<DimensionMap> constructGroupKey(DimensionMap rawKey) {
-    return AlertGroupKey.emptyKey();
-  }
-
-  @Override
-  public String groupEmailRecipients(AlertGroupKey alertGroupKey) {
+  public String groupEmailRecipients(DimensionMap alertGroupKey) {
     return BaseAlertGrouper.EMPTY_RECIPIENTS;
   }
 }
