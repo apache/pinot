@@ -11,6 +11,7 @@ import com.linkedin.thirdeye.datalayer.bao.EmailConfigurationManager;
 import com.linkedin.thirdeye.datalayer.bao.EntityToEntityMappingManager;
 import com.linkedin.thirdeye.datalayer.bao.EventManager;
 import com.linkedin.thirdeye.datalayer.bao.AutotuneConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.GroupedAnomalyResultsManager;
 import com.linkedin.thirdeye.datalayer.bao.IngraphDashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.IngraphMetricConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
@@ -30,6 +31,7 @@ import com.linkedin.thirdeye.datalayer.bao.jdbc.EmailConfigurationManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.EntityToEntityMappingManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.EventManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.AutotuneConfigManagerImpl;
+import com.linkedin.thirdeye.datalayer.bao.jdbc.GroupedAnomalyResultsManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.IngraphDashboardConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.IngraphMetricConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.JobManagerImpl;
@@ -157,5 +159,9 @@ public class DAORegistry {
 
   public EntityToEntityMappingManager getEntityToEntityMappingDAO() {
     return DaoProviderUtil.getInstance(EntityToEntityMappingManagerImpl.class);
+  }
+
+  public GroupedAnomalyResultsManager getGroupedAnomalyResultsDAO() {
+    return DaoProviderUtil.getInstance(GroupedAnomalyResultsManagerImpl.class);
   }
 }

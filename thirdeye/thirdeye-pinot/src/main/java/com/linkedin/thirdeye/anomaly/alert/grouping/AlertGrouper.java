@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.anomaly.alert.grouping;
 
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.dto.GroupedAnomalyResultsDTO;
 import java.util.List;
 import java.util.Map;
 
@@ -18,7 +19,7 @@ public interface AlertGrouper<T> {
    *
    * @return groups of anomaly results.
    */
-  Map<AlertGroupKey<T>, GroupedAnomalyResults> group(List<MergedAnomalyResultDTO> anomalyResults);
+  Map<AlertGroupKey<T>, GroupedAnomalyResultsDTO> group(List<MergedAnomalyResultDTO> anomalyResults);
 
   /**
    * The additional recipients string for this group of anomalies.

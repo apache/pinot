@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.dto.GroupedAnomalyResultsDTO;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -78,14 +79,14 @@ public class DimensionalAlertGrouperTest {
   public void testGroup(List<MergedAnomalyResultDTO> anomalies, Set<MergedAnomalyResultDTO> expectedGroup1,
       Set<MergedAnomalyResultDTO> expectedGroup2, Set<MergedAnomalyResultDTO> expectedRollUpGroup) {
 
-    Map<AlertGroupKey<DimensionMap>, GroupedAnomalyResults> groupedAnomalies = alertGrouper.group(anomalies);
+    Map<AlertGroupKey<DimensionMap>, GroupedAnomalyResultsDTO> groupedAnomalies = alertGrouper.group(anomalies);
     Assert.assertEquals(groupedAnomalies.size(), 3);
     // Test group 1
     {
       DimensionMap dimensionGroup1 = new DimensionMap();
       dimensionGroup1.put(GROUP_BY_DIMENSION_NAME, "G1");
       AlertGroupKey<DimensionMap> alertGroupKey = new AlertGroupKey<>(dimensionGroup1);
-      GroupedAnomalyResults groupedAnomaly1 = groupedAnomalies.get(alertGroupKey);
+      GroupedAnomalyResultsDTO groupedAnomaly1 = groupedAnomalies.get(alertGroupKey);
       List<MergedAnomalyResultDTO> anomalyGroup1 = groupedAnomaly1.getAnomalyResults();
       Assert.assertEquals(anomalyGroup1.size(), 2);
       Set<MergedAnomalyResultDTO> group1 = new HashSet<>();
@@ -97,7 +98,7 @@ public class DimensionalAlertGrouperTest {
       DimensionMap dimensionGroup2 = new DimensionMap();
       dimensionGroup2.put(GROUP_BY_DIMENSION_NAME, "G2");
       AlertGroupKey<DimensionMap> alertGroupKey = new AlertGroupKey<>(dimensionGroup2);
-      GroupedAnomalyResults groupedAnomaly2 = groupedAnomalies.get(alertGroupKey);
+      GroupedAnomalyResultsDTO groupedAnomaly2 = groupedAnomalies.get(alertGroupKey);
       List<MergedAnomalyResultDTO> anomalyGroup2 = groupedAnomaly2.getAnomalyResults();
       Assert.assertEquals(anomalyGroup2.size(), 2);
       Set<MergedAnomalyResultDTO> group2 = new HashSet<>();
@@ -107,7 +108,7 @@ public class DimensionalAlertGrouperTest {
     // Test roll-up group
     {
       AlertGroupKey<DimensionMap> alertGroupKey = AlertGroupKey.emptyKey();
-      GroupedAnomalyResults groupedAnomaly = groupedAnomalies.get(alertGroupKey);
+      GroupedAnomalyResultsDTO groupedAnomaly = groupedAnomalies.get(alertGroupKey);
       List<MergedAnomalyResultDTO> anomalyRollUpGroup = groupedAnomaly.getAnomalyResults();
       Assert.assertEquals(anomalyRollUpGroup.size(), 2);
       Set<MergedAnomalyResultDTO> rollUpGroup = new HashSet<>();

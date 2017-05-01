@@ -4,6 +4,7 @@ import com.linkedin.thirdeye.datalayer.entity.AlertConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.ClassificationConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.EventIndex;
 import com.linkedin.thirdeye.datalayer.entity.AutotuneConfigIndex;
+import com.linkedin.thirdeye.datalayer.entity.GroupedAnomalyResultsIndex;
 import com.linkedin.thirdeye.datalayer.entity.OverrideConfigIndex;
 
 import io.dropwizard.configuration.ConfigurationFactory;
@@ -143,6 +144,8 @@ public abstract class DaoProviderUtil {
             convertCamelCaseToUnderscore(ClassificationConfigIndex.class.getSimpleName()));
         entityMappingHolder.register(conn, EntityToEntityMappingIndex.class,
             convertCamelCaseToUnderscore(EntityToEntityMappingIndex.class.getSimpleName()));
+        entityMappingHolder.register(conn, GroupedAnomalyResultsIndex.class,
+            convertCamelCaseToUnderscore(GroupedAnomalyResultsIndex.class.getSimpleName()));
       } catch (Exception e) {
         throw new RuntimeException(e);
       }

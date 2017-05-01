@@ -6,7 +6,7 @@ import com.linkedin.thirdeye.anomaly.alert.AlertTaskRunner;
 import com.linkedin.thirdeye.anomaly.alert.grouping.AlertGroupKey;
 import com.linkedin.thirdeye.anomaly.alert.grouping.AlertGrouper;
 import com.linkedin.thirdeye.anomaly.alert.grouping.AlertGrouperFactory;
-import com.linkedin.thirdeye.anomaly.alert.grouping.GroupedAnomalyResults;
+import com.linkedin.thirdeye.datalayer.dto.GroupedAnomalyResultsDTO;
 import com.linkedin.thirdeye.anomaly.alert.template.pojo.MetricDimensionReport;
 import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import com.linkedin.thirdeye.anomaly.alert.util.AnomalyReportGenerator;
@@ -139,9 +139,13 @@ public class AlertTaskRunnerV2 implements TaskRunner {
         // Input: a list of anomalies.
         // Output: lists of anomalies; each list contains the anomalies of the same group.
         AlertGrouper alertGrouper = AlertGrouperFactory.fromSpec(alertConfig.getGroupByConfig());
-        Map<AlertGroupKey, GroupedAnomalyResults> groupedAnomalyResultsMap = alertGrouper.group(results);
+        Map<AlertGroupKey, GroupedAnomalyResultsDTO> groupedAnomalyResultsMap = alertGrouper.group(results);
 
-        for (Map.Entry<AlertGroupKey, GroupedAnomalyResults> entry : groupedAnomalyResultsMap.entrySet()) {
+        // Read and update grouped anomalies in DB
+
+        // Filter out the grouped anomalies that trigger an alert
+
+        for (Map.Entry<AlertGroupKey, GroupedAnomalyResultsDTO> entry : groupedAnomalyResultsMap.entrySet()) {
           // Anomaly results for this group
           List<MergedAnomalyResultDTO> resultsForThisGroup = entry.getValue().getAnomalyResults();
           // Append auxiliary recipients for this group

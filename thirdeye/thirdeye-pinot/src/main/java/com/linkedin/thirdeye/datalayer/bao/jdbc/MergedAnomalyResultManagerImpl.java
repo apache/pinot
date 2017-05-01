@@ -326,7 +326,7 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
     return bean;
   }
 
-  protected MergedAnomalyResultDTO convertMergedAnomalyBean2DTO(
+  MergedAnomalyResultDTO convertMergedAnomalyBean2DTO(
       MergedAnomalyResultBean mergedAnomalyResultBean, boolean loadRawAnomalies) {
     MergedAnomalyResultDTO mergedAnomalyResultDTO;
     mergedAnomalyResultDTO =
@@ -359,7 +359,7 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
     return mergedAnomalyResultDTO;
   }
 
-  protected List<MergedAnomalyResultDTO> batchConvertMergedAnomalyBean2DTO(
+  List<MergedAnomalyResultDTO> batchConvertMergedAnomalyBean2DTO(
       List<MergedAnomalyResultBean> mergedAnomalyResultBeanList, final boolean loadRawAnomalies) {
     List<Future<MergedAnomalyResultDTO>> mergedAnomalyResultDTOFutureList = new ArrayList<>(mergedAnomalyResultBeanList.size());
     for (final MergedAnomalyResultBean mergedAnomalyResultBean : mergedAnomalyResultBeanList) {
