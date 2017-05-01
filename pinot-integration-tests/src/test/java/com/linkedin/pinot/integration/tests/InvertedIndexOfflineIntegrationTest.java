@@ -51,8 +51,8 @@ public class InvertedIndexOfflineIntegrationTest extends OfflineClusterIntegrati
     updateOfflineTable("DaysSinceEpoch", -1, "", null, null, UPDATED_INVERTED_INDEX_COLUMNS, null, "mytable",
         SegmentVersion.v1);
 
-    long endTime = System.currentTimeMillis() + MAX_RELOAD_TIME_IN_MILLIS;
     triggerReload();
+    long endTime = System.currentTimeMillis() + MAX_RELOAD_TIME_IN_MILLIS;
     while (System.currentTimeMillis() < endTime) {
       runQuery(TEST_QUERY, Collections.singletonList(TEST_QUERY));
       queryResponse = postQuery(TEST_QUERY);
@@ -62,7 +62,7 @@ public class InvertedIndexOfflineIntegrationTest extends OfflineClusterIntegrati
         break;
       }
     }
-    Assert.assertEquals(queryResponse.getLong("numEntriesScannedInFilter"), 0L);
+    Assert.assertTrue(System.currentTimeMillis() < endTime);
   }
 
   private void triggerReload()

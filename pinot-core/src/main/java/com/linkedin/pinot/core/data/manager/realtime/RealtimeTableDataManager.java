@@ -38,6 +38,7 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentLoader;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaConsumerManager;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
+import com.linkedin.pinot.core.segment.index.loader.LoaderUtils;
 import java.io.File;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -119,6 +120,10 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
     LOGGER.info("Attempting to add realtime segment {} for table {}", segmentName, tableName);
 
     File indexDir = new File(_indexDir, segmentName);
+    // Restart during segment reload might leave segment in inconsistent state (index directory might not exist but
+    // segment backup directory existed), need to first try to recover from reload failure before checking the existence
+    // of the index directory and loading segment from it
+    LoaderUtils.reloadFailureRecovery(indexDir);
     if (indexDir.exists() && (realtimeSegmentZKMetadata.getStatus() == Status.DONE)) {
       // segment already exists on file, and we have committed the realtime segment in ZK. Treat it like an offline segment
       if (_segmentsMap.containsKey(segmentName)) {
