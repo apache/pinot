@@ -14,6 +14,9 @@ function AnalysisModel() {
   this.baselineEnd;
   this.compareMode;
 
+  this.rootCauseData;
+  this.rootCausePipeline;
+  this.rootCauseEnabled;
 }
 
 AnalysisModel.prototype = {
@@ -31,6 +34,9 @@ AnalysisModel.prototype = {
     this.metricName = null;
     this.dataset = null;
     this.compareMode = constants.DEFAULT_COMPARE_MODE ;
+    this.rootCauseData = null;
+    this.rootCausePipeline = 'OUTPUT';
+    this.rootCauseEnabled = null;
   },
 
   update: function (params) {
@@ -64,6 +70,12 @@ AnalysisModel.prototype = {
     if (params.baselineEnd) {
       this.baselineEnd = params.baselineEnd;
     }
+    if(params.rootCauseEnabled) {
+      this.rootCauseEnabled = params.rootCauseEnabled;
+    }
+    if(params.rootCausePipeline) {
+      this.rootCausePipeline = params.rootCausePipeline;
+    }
   },
 
   fetchMetricData(metricId) {
@@ -84,6 +96,12 @@ AnalysisModel.prototype = {
 
   fetchMaxTimeForMetric(metricId) {
     return dataService.fetchMaxTimeForMetric(metricId);
+  },
+
+  fetchRootCauseData() {
+    const windowSize = this.currentEnd - this.currentStart;
+    const urn = `thirdeye:metric:${this.dataset}:${this.metricName}`;
+    return dataService.fetchRootCauseData(this.currentEnd, this.baselineEnd, windowSize, urn, this.rootCausePipeline);
   },
 
   /**
@@ -111,6 +129,13 @@ AnalysisModel.prototype = {
       return this.fetchFiltersForMetric(metricId);
     }).then((result) => {
       this.filtersOptions = result;
+      if (this.rootCauseEnabled) {
+        return this.fetchRootCauseData();
+      } else {
+        return null;
+      }
+    }).then((result) => {
+      this.rootCauseData = result;
       return result;
     }).then(() => {
       spinner.stop();
