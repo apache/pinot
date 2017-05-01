@@ -36,7 +36,7 @@ AnalysisModel.prototype = {
     this.compareMode = constants.DEFAULT_COMPARE_MODE ;
     this.rootCauseData = null;
     this.rootCausePipeline = 'OUTPUT';
-    this.rootCauseEnabled = null;
+    this.rootCauseEnabled = false;
   },
 
   update: function (params) {
@@ -70,10 +70,10 @@ AnalysisModel.prototype = {
     if (params.baselineEnd) {
       this.baselineEnd = params.baselineEnd;
     }
-    if(params.rootCauseEnabled) {
+    if (params.rootCauseEnabled) {
       this.rootCauseEnabled = params.rootCauseEnabled;
     }
-    if(params.rootCausePipeline) {
+    if (params.rootCausePipeline) {
       this.rootCausePipeline = params.rootCausePipeline;
     }
   },

@@ -136,7 +136,7 @@ public class RootCauseResource {
 
     @Override
     public RootCauseEntity format(Entity entity) {
-      String link = String.format("Entity %s", entity.getUrn());
+      String link = String.format("javascript:void(0);", entity.getUrn());
 
       return makeRootCauseEntity(entity, "Other", "(none)", link);
     }
@@ -153,7 +153,7 @@ public class RootCauseResource {
       MetricEntity e = MetricEntity.fromURN(entity.getUrn(), entity.getScore());
 
       String label = String.format("%s/%s", e.getDataset(), e.getMetric());
-      String link = String.format("Metric %s", e.getUrn());
+      String link = String.format("javascript:void(0);", e.getUrn());
 
       return makeRootCauseEntity(entity, "Metric", label, link);
     }
@@ -170,7 +170,7 @@ public class RootCauseResource {
       DimensionEntity e = DimensionEntity.fromURN(entity.getUrn(), entity.getScore());
 
       String label = String.format("%s='%s'", e.getName(), e.getValue());
-      String link = String.format("Dimension %s", e.getUrn());
+      String link = String.format("javascript:void(0);", e.getUrn());
 
       return makeRootCauseEntity(entity, "Dimension", label, link);
     }
@@ -186,7 +186,7 @@ public class RootCauseResource {
     public RootCauseEntity format(Entity entity) {
       ServiceEntity e = ServiceEntity.fromURN(entity.getUrn(), entity.getScore());
 
-      String link = String.format("Service %s", e.getUrn());
+      String link = String.format("javascript:void(0);", e.getUrn());
 
       return makeRootCauseEntity(entity, "Service", e.getName(), link);
     }
@@ -205,7 +205,7 @@ public class RootCauseResource {
       String name = parts[3];
 
       String label = String.format("%s (%s)", name, type);
-      String link = String.format("Event %s", entity.getUrn());
+      String link = String.format("javascript:void(0);", entity.getUrn());
 
       return makeRootCauseEntity(entity, "Event", label, link);
     }
@@ -214,7 +214,7 @@ public class RootCauseResource {
   static RootCauseEntity makeRootCauseEntity(Entity entity, String type, String label, String link) {
     RootCauseEntity out = new RootCauseEntity();
     out.setUrn(entity.getUrn());
-    out.setScore(entity.getScore());
+    out.setScore(Math.round(entity.getScore() * 1000) / 1000.0);
     out.setType(type);
     out.setLabel(label);
     out.setLink(link);

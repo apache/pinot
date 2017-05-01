@@ -92,12 +92,12 @@
 <script id="dimension-tree-map-template" type="text/x-handlebars-template">
   <#include "tabs/analysis/dimension-tree-map.ftl"/>
 </script>
-  <script id="dimension-tree-map-graph-template" type="text/x-handlebars-template">
+<script id="dimension-tree-map-graph-template" type="text/x-handlebars-template">
   <#include "tabs/analysis/dimension-tree-map-graph.ftl"/>
-  </script>
-  <script id="rootcause-table-template" type="text/x-handlebars-template">
+</script>
+<script id="rootcause-table-template" type="text/x-handlebars-template">
   <#include "tabs/analysis/rootcause-table.ftl"/>
-  </script>
+</script>
 <#include "admin/job-info.ftl"/>
 <#include "admin/ingraph-metric-config.ftl"/>
 <#include "admin/ingraph-dashboard-config.ftl"/>
