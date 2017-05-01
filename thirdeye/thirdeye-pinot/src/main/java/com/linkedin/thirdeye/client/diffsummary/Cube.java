@@ -103,6 +103,13 @@ public class Cube { // the cube (Ca|Cb)
     buildWithManualDimensionOrder(olapClient, this.dimensions);
   }
 
+  public void buildDimensionCostSet(OLAPDataBaseClient olapClient, Dimensions dimensions)
+      throws Exception {
+    Dimensions sanitizedDimensions = sanitizeDimensions(dimensions);
+    initializeBasicInfo(olapClient);
+    this.costSet = computeOneDimensionCost(olapClient, topRatio, sanitizedDimensions);
+  }
+
   private Dimensions sanitizeDimensions(Dimensions dimensions) {
     List<String> allDimensions = dimensions.allDimensions();
     List<String> dimensionsToRemove = new ArrayList<>();

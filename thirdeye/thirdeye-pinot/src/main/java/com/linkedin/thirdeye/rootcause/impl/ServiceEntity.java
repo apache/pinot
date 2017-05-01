@@ -30,7 +30,9 @@ public class ServiceEntity extends Entity {
   public static ServiceEntity fromURN(String urn, double score) {
     if(!TYPE.isType(urn))
       throw new IllegalArgumentException(String.format("URN '%s' is not type '%s'", urn, TYPE.getPrefix()));
-    String name = urn.split(":")[2];
-    return new ServiceEntity(urn, score, name);
+    String[] parts = urn.split(":", 3);
+    if(parts.length != 3)
+      throw new IllegalArgumentException(String.format("URN must have 3 parts but has '%d'", parts.length));
+    return new ServiceEntity(urn, score, parts[2]);
   }
 }
