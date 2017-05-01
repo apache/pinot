@@ -89,11 +89,18 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
   @Tags({ "table" })
   @Paths({ "/tables", "/tables/" })
   private void addTable(AbstractTableConfig config) throws IOException {
+    ensureMinReplicas(config);
 
+    _pinotHelixResourceManager.addTable(config);
+  }
+
+  private void ensureMinReplicas(AbstractTableConfig config) {
     // For self-serviced cluster, ensure that the tables are created with atleast
     // min replication factor irrespective of table configuratio value.
     SegmentsValidationAndRetentionConfig segmentsConfig = config.getValidationConfig();
     int configMinReplication = _controllerConf.getDefaultTableMinReplicas();
+    boolean verifyReplicasPerPartition = false;
+    boolean verifyReplication = true;
 
     if (TableType.REALTIME.name().equalsIgnoreCase(config.getTableType())) {
       KafkaStreamMetadata kafkaStreamMetadata;
@@ -102,24 +109,11 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
       } catch (Exception e) {
         throw new PinotHelixResourceManager.InvalidTableConfigException("Invalid tableIndexConfig or streamConfigs", e);
       }
-      if (kafkaStreamMetadata.hasSimpleKafkaConsumerType()) {
-        String replicasPerPartitionStr = segmentsConfig.getReplicasPerPartition();
-        if (replicasPerPartitionStr == null) {
-          throw new PinotHelixResourceManager.InvalidTableConfigException("Field replicasPerPartition needs to be specified");
-        }
-        try {
-          int replicasPerPartition = Integer.valueOf(replicasPerPartitionStr);
-          if (replicasPerPartition < configMinReplication) {
-            LOGGER.info(
-                "Creating table with minimum replicasPerPartition of: {} instead of requested replicasPerPartition: {}",
-                configMinReplication, replicasPerPartition);
-            segmentsConfig.setReplicasPerPartition(String.valueOf(configMinReplication));
-          }
-        } catch (NumberFormatException e) {
-          throw new PinotHelixResourceManager.InvalidTableConfigException("Invalid value for replicasPerPartition: '" + replicasPerPartitionStr + "'", e);
-        }
-      }
-    } else if (TableType.OFFLINE.name().equalsIgnoreCase(config.getTableType())) {
+      verifyReplicasPerPartition = kafkaStreamMetadata.hasSimpleKafkaConsumerType();
+      verifyReplication = kafkaStreamMetadata.hasHighLevelKafkaConsumerType();
+    }
+
+    if (verifyReplication) {
       int requestReplication;
       try {
         requestReplication = segmentsConfig.getReplicationNumber();
@@ -135,7 +129,23 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
       throw new PinotHelixResourceManager.InvalidTableConfigException("Invalid table type: '" + config.getTableType() + "'");
     }
 
-    _pinotHelixResourceManager.addTable(config);
+    if (verifyReplicasPerPartition) {
+      String replicasPerPartitionStr = segmentsConfig.getReplicasPerPartition();
+      if (replicasPerPartitionStr == null) {
+        throw new PinotHelixResourceManager.InvalidTableConfigException("Field replicasPerPartition needs to be specified");
+      }
+      try {
+        int replicasPerPartition = Integer.valueOf(replicasPerPartitionStr);
+        if (replicasPerPartition < configMinReplication) {
+          LOGGER.info(
+              "Creating table with minimum replicasPerPartition of: {} instead of requested replicasPerPartition: {}",
+              configMinReplication, replicasPerPartition);
+          segmentsConfig.setReplicasPerPartition(String.valueOf(configMinReplication));
+        }
+      } catch (NumberFormatException e) {
+        throw new PinotHelixResourceManager.InvalidTableConfigException("Invalid value for replicasPerPartition: '" + replicasPerPartitionStr + "'", e);
+      }
+    }
   }
 
   /**
@@ -407,6 +417,7 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
         tableNameWithType = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
       }
 
+      ensureMinReplicas(config);
       _pinotHelixResourceManager.setExistingTableConfig(config, tableNameWithType, tableType);
       return responseRepresentation(Status.SUCCESS_OK, "{\"status\" : \"Success\"}");
     } catch(PinotHelixResourceManager.InvalidTableConfigException e) {
