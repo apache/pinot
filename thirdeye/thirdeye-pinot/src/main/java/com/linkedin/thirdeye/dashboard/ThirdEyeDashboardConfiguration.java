@@ -5,6 +5,7 @@ import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 public class ThirdEyeDashboardConfiguration extends ThirdEyeConfiguration {
 
   String informedApiUrl;
+  String rcaConfigPath;
 
   public String getInformedApiUrl() {
     return informedApiUrl;
@@ -12,5 +13,13 @@ public class ThirdEyeDashboardConfiguration extends ThirdEyeConfiguration {
 
   public void setInformedApiUrl(String informedApiUrl) {
     this.informedApiUrl = informedApiUrl;
+  }
+
+  public String getRcaConfigPath() {
+    return rcaConfigPath;
+  }
+
+  public void setRcaConfigPath(String rcaConfigPath) {
+    this.rcaConfigPath = rcaConfigPath;
   }
 }

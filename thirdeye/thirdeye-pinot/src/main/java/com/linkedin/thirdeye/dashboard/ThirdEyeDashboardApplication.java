@@ -23,15 +23,23 @@ import com.linkedin.thirdeye.dashboard.resources.ThirdEyeResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.AnomaliesResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.DataResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.EventResource;
+import com.linkedin.thirdeye.dashboard.resources.v2.RootCauseResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.TimeSeriesResource;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
+import com.linkedin.thirdeye.rootcause.Pipeline;
+import com.linkedin.thirdeye.rootcause.RCAFramework;
+import com.linkedin.thirdeye.rootcause.impl.PipelineLoader;
 import io.dropwizard.assets.AssetsBundle;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 import io.dropwizard.views.ViewBundle;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.util.List;
+import java.util.concurrent.Executors;
 import org.eclipse.jetty.servlets.CrossOriginFilter;
 import javax.servlet.DispatcherType;
 import javax.servlet.FilterRegistration;
@@ -102,6 +110,17 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new EventResource(config));
     env.jersey().register(new DataCompletenessResource(DAO_REGISTRY.getDataCompletenessConfigDAO()));
     env.jersey().register(new EntityMappingResource());
+    env.jersey().register(new RootCauseResource(makeRCAFramework(config)));
+  }
+
+  private static RCAFramework makeRCAFramework(ThirdEyeDashboardConfiguration config) throws Exception {
+    if(config.getRcaConfigPath() == null)
+      throw new IllegalArgumentException("rcaConfigPath must not be null");
+    File configFile = new File(config.getRcaConfigPath());
+    if(!configFile.isAbsolute())
+      configFile = new File(config.getRootDir() + File.separator + configFile);
+    List<Pipeline> pipelines = PipelineLoader.getPipelinesFromConfig(configFile);
+    return new RCAFramework(pipelines, Executors.newSingleThreadExecutor());
   }
 
   public static void main(String[] args) throws Exception {
