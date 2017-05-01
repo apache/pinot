@@ -117,16 +117,14 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
       int requestReplication;
       try {
         requestReplication = segmentsConfig.getReplicationNumber();
+        if (requestReplication < configMinReplication) {
+          LOGGER.info("Creating table with minimum replication factor of: {} instead of requested replication: {}",
+              configMinReplication, requestReplication);
+          segmentsConfig.setReplication(String.valueOf(configMinReplication));
+        }
       } catch (NumberFormatException e) {
         throw new PinotHelixResourceManager.InvalidTableConfigException("Invalid replication number", e);
       }
-      if (requestReplication < configMinReplication) {
-        LOGGER.info("Creating table with minimum replication factor of: {} instead of requested replication: {}",
-            configMinReplication, requestReplication);
-        segmentsConfig.setReplication(String.valueOf(configMinReplication));
-      }
-    } else {
-      throw new PinotHelixResourceManager.InvalidTableConfigException("Invalid table type: '" + config.getTableType() + "'");
     }
 
     if (verifyReplicasPerPartition) {
