@@ -53,6 +53,8 @@ public class DimensionAnalysisPipeline extends Pipeline {
 
   public static final String PROP_PARALLELISM = "parallelism";
 
+  public static final String PROP_PARALLELISM_DEFAULT = "1";
+
   public static final long TIMEOUT = 120000;
 
   private static final String KEY = "key";
@@ -98,10 +100,10 @@ public class DimensionAnalysisPipeline extends Pipeline {
     this.datasetDAO = DAORegistry.getInstance().getDatasetConfigDAO();
     this.cache = ThirdEyeCacheRegistry.getInstance().getQueryCache();
 
-    int parallelism = 1;
+    String parallelismProp = PROP_PARALLELISM_DEFAULT;
     if(properties.containsKey(PROP_PARALLELISM))
-      parallelism = Integer.parseInt(properties.get(PROP_PARALLELISM));
-    this.executor = Executors.newFixedThreadPool(parallelism);
+      parallelismProp = properties.get(PROP_PARALLELISM);
+    this.executor = Executors.newFixedThreadPool(Integer.parseInt(parallelismProp));
   }
 
   @Override
@@ -226,10 +228,9 @@ public class DimensionAnalysisPipeline extends Pipeline {
     // build data cube
     OLAPDataBaseClient olapClient = getOlapDataBaseClient(current, baseline, metric, dataset);
     Dimensions dimensions = new Dimensions(dataset.getDimensions());
-    int topDimensions = dataset.getDimensions().size();
 
     Cube cube = new Cube();
-    cube.buildWithAutoDimensionOrder(olapClient, dimensions, topDimensions, Collections.<List<String>>emptyList());
+    cube.buildDimensionCostSet(olapClient, dimensions);
 
     return toNormalizedDataFrame(cube.getCostSet());
   }

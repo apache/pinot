@@ -11,7 +11,7 @@ public final class EntityType {
   private final String prefix;
 
   public static String extractPrefix(String urn) {
-    String[] parts = urn.split(":");
+    String[] parts = urn.split(":", 3);
     return parts[0] + ":" + parts[1] + ":";
   }
 

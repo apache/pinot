@@ -21,7 +21,7 @@ rcaPipelinesConfiguration:
       className: com.linkedin.thirdeye.rootcause.impl.TopKPipeline
       properties:
           class: com.linkedin.thirdeye.rootcause.impl.MetricEntity
-          k: 5
+          k: 20
 
     ###########################################################################
     # Dimensions
@@ -30,7 +30,7 @@ rcaPipelinesConfiguration:
       inputNames: [INPUT, METRIC_TOPK]
       className: com.linkedin.thirdeye.rootcause.impl.DimensionAnalysisPipeline
       properties:
-          parallelism: 3
+          parallelism: 5
 
     - outputName: DIMENSION_STANDARDIZED
       inputNames: [DIMENSION_FROM_METRIC]
@@ -45,7 +45,7 @@ rcaPipelinesConfiguration:
       className: com.linkedin.thirdeye.rootcause.impl.TopKPipeline
       properties:
           class: com.linkedin.thirdeye.rootcause.impl.DimensionEntity
-          k: 10
+          k: 50
 
     ###########################################################################
     # Services
@@ -61,7 +61,7 @@ rcaPipelinesConfiguration:
       className: com.linkedin.thirdeye.rootcause.impl.TopKPipeline
       properties:
           class: com.linkedin.thirdeye.rootcause.impl.ServiceEntity
-          k: 5
+          k: 10
 
     ###########################################################################
     # Events
@@ -84,7 +84,13 @@ rcaPipelinesConfiguration:
     ###########################################################################
     # Results
     ###########################################################################
-    - outputName: OUTPUT
+    - outputName: AGGREGATE
       inputNames: [EVENT_TOPK, METRIC_TOPK, DIMENSION_TOPK, SERVICE_TOPK]
       className: com.linkedin.thirdeye.rootcause.impl.LinearAggregationPipeline
+
+    - outputName: OUTPUT
+      inputNames: [AGGREGATE]
+      className: com.linkedin.thirdeye.rootcause.impl.TopKPipeline
+      properties:
+          k: 50
 

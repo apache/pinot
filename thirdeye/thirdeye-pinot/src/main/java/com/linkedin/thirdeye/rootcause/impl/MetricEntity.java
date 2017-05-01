@@ -32,9 +32,11 @@ public class MetricEntity extends Entity {
   }
 
   public static MetricEntity fromURN(String urn, double score) {
-    String[] parts = urn.split(":");
+    if(!TYPE.isType(urn))
+      throw new IllegalArgumentException(String.format("URN '%s' is not type '%s'", urn, TYPE.getPrefix()));
+    String[] parts = urn.split(":", 4);
     if(parts.length != 4)
-      throw new IllegalArgumentException(String.format("URN must have 4 parts but has '%s'", parts.length));
+      throw new IllegalArgumentException(String.format("URN must have 4 parts but has '%d'", parts.length));
     return fromMetric(score, parts[2], parts[3]);
   }
 }

@@ -40,9 +40,11 @@ public class TimeRangeEntity extends Entity {
   }
 
   public static TimeRangeEntity fromURN(String urn, double score) {
-    String[] parts = urn.split(":");
+    if(!TYPE.isType(urn))
+      throw new IllegalArgumentException(String.format("URN '%s' is not type '%s'", urn, TYPE.getPrefix()));
+    String[] parts = urn.split(":", 5);
     if(parts.length != 5)
-      throw new IllegalArgumentException(String.format("Timerange URN must have 5 parts but has '%s'", parts.length));
+      throw new IllegalArgumentException(String.format("Timerange URN must have 5 parts but has '%d'", parts.length));
     return fromRange(score, parts[2], Long.valueOf(parts[3]), Long.valueOf(parts[4]));
   }
 
