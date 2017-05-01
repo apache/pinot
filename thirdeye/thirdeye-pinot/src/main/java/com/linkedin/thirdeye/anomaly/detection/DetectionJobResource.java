@@ -739,12 +739,20 @@ public class DetectionJobResource {
   @Path("/replay/singlefunction")
   public Response replayAnomalyFunctionByFunctionId(@QueryParam("functionId") Long functionId,
       @QueryParam("autotuneId") Long autotuneId,
-      @QueryParam("start") @NotNull String replayStartTimeIso, @QueryParam("end") @NotNull String replayEndTimeIso) throws IllegalArgumentException{
+      @QueryParam("start") @NotNull String replayStartTimeIso, @QueryParam("end") @NotNull  String replayEndTimeIso)
+       {
     if (functionId == null && autotuneId == null) {
       return Response.status(Response.Status.BAD_REQUEST).build();
     }
-    DateTime replayStart = ISODateTimeFormat.dateTimeParser().parseDateTime(replayStartTimeIso);
-    DateTime replayEnd = ISODateTimeFormat.dateTimeParser().parseDateTime(replayEndTimeIso);
+    DateTime replayStart;
+    DateTime replayEnd;
+    try{
+      replayStart = ISODateTimeFormat.dateTimeParser().parseDateTime(replayStartTimeIso);
+      replayEnd = ISODateTimeFormat.dateTimeParser().parseDateTime(replayEndTimeIso);
+    } catch (IllegalArgumentException e){
+      return Response.status(Response.Status.BAD_REQUEST).entity("Input start and end time illegal! ").build();
+    }
+
     FunctionReplayRunnable functionReplayRunnable;
     AutotuneConfigDTO target = null;
     if (autotuneId != null) {
@@ -753,7 +761,14 @@ public class DetectionJobResource {
     } else {
       functionReplayRunnable = new FunctionReplayRunnable(detectionJobScheduler, anomalyFunctionDAO, mergedAnomalyResultDAO, rawAnomalyResultDAO, new HashMap<String, String>(), functionId, replayStart, replayEnd, false);
     }
-    functionReplayRunnable.run();
+    Thread thread = new Thread(functionReplayRunnable);
+    thread.start();
+    try{
+      thread.join();
+    } catch (InterruptedException e){
+      return Response.status(Response.Status.EXPECTATION_FAILED).entity("Threading is interrupted").build();
+    }
+
     Map<String, String> responseMessages = new HashMap<>();
     responseMessages.put("cloneFunctionId", String.valueOf(functionReplayRunnable.getLastClonedFunctionId()));
     if (target != null && functionId != null && functionId != target.getFunctionId()) {
