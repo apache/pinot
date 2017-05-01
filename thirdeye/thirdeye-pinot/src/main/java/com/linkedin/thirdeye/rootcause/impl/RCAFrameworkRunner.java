@@ -25,6 +25,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.InterruptedIOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -43,6 +44,9 @@ import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.commons.cli.Parser;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
+import org.joda.time.format.ISODateTimeFormat;
 import org.slf4j.LoggerFactory;
 
 
@@ -62,6 +66,8 @@ public class RCAFrameworkRunner {
   private static final String CLI_BASELINE_OFFSET = "baseline-offset";
   private static final String CLI_ENTITIES = "entities";
   private static final String CLI_PIPELINE = "pipeline";
+  private static final String CLI_TIME_START = "time-start";
+  private static final String CLI_TIME_END = "time-end";
 
   private static final String P_INPUT = RCAFramework.INPUT;
   private static final String P_EVENT_HOLIDAY = "eventHoliday";
@@ -77,6 +83,8 @@ public class RCAFrameworkRunner {
   private static final String P_SERVICE_TOPK = "serviceTopK";
   private static final String P_OUTPUT = RCAFramework.OUTPUT;
 
+  private static final DateTimeFormatter ISO8601 = ISODateTimeFormat.basicDateTimeNoMillis();
+
   private static final int TOPK_EVENT = 10;
   private static final int TOPK_METRIC = 5;
   private static final int TOPK_DIMENSION = 10;
@@ -91,10 +99,12 @@ public class RCAFrameworkRunner {
     optConfig.setRequired(true);
     options.addOption(optConfig);
 
-    options.addOption(null, CLI_WINDOW_SIZE, true, "window size for search window (in days)");
-    options.addOption(null, CLI_BASELINE_OFFSET, true, "baseline offset (in days)");
+    options.addOption(null, CLI_WINDOW_SIZE, true, "window size for search window (in days, defaults to '7')");
+    options.addOption(null, CLI_BASELINE_OFFSET, true, "baseline offset (in days, from start of window)");
     options.addOption(null, CLI_ENTITIES, true, "search context metric entities (not specifying this will activate interactive REPL mode)");
     options.addOption(null, CLI_PIPELINE, true, "pipeline config YAML file (not specifying this will launch default pipeline)");
+    options.addOption(null, CLI_TIME_START, true, "start time of the search window (ISO 8601, e.g. '20170701T150000Z')");
+    options.addOption(null, CLI_TIME_END, true, "end time of the search window (ISO 8601, e.g. '20170831T030000Z', defaults to now)");
 
     Parser parser = new BasicParser();
     CommandLine cmd = null;
@@ -103,6 +113,11 @@ public class RCAFrameworkRunner {
     } catch (ParseException e) {
       HelpFormatter formatter = new HelpFormatter();
       formatter.printHelp(RCAFrameworkRunner.class.getSimpleName(), options);
+      System.exit(1);
+    }
+
+    if(cmd.hasOption(CLI_WINDOW_SIZE) && cmd.hasOption(CLI_TIME_START)) {
+      System.out.println(String.format("--%s and --%s mutually exclusive", CLI_WINDOW_SIZE, CLI_TIME_START));
       System.exit(1);
     }
 
@@ -143,30 +158,50 @@ public class RCAFrameworkRunner {
     }
 
     // ************************************************************************
-    // Framework execution
+    // Entities
     // ************************************************************************
     Set<Entity> entities = new HashSet<>();
 
     // time range and baseline
-    if(cmd.hasOption(CLI_WINDOW_SIZE)) {
-      long windowSize = Long.parseLong(cmd.getOptionValue(CLI_WINDOW_SIZE, "1")) * DAY_IN_MS;
-      long baselineOffset = Long.parseLong(cmd.getOptionValue(CLI_BASELINE_OFFSET, "7")) * DAY_IN_MS;
+    long now = System.currentTimeMillis();
+    long windowEnd = now;
+    if(cmd.hasOption(CLI_TIME_END))
+      windowEnd = ISO8601.parseDateTime(cmd.getOptionValue(CLI_TIME_END)).getMillis();
 
-      long now = System.currentTimeMillis();
-      long windowEnd = now;
-      long windowStart = now - windowSize;
-      long baselineEnd = windowEnd - baselineOffset;
-      long baselineStart = windowStart - baselineOffset;
+    long windowSize = 7 * DAY_IN_MS;
+    if(cmd.hasOption(CLI_TIME_START))
+      windowSize = windowEnd - ISO8601.parseDateTime(cmd.getOptionValue(CLI_TIME_START)).getMillis();
+    else if(cmd.hasOption(CLI_WINDOW_SIZE))
+      windowEnd = Long.parseLong(cmd.getOptionValue(CLI_WINDOW_SIZE)) * DAY_IN_MS;
 
-      entities.add(TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_CURRENT, windowStart, windowEnd));
-      entities.add(TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_BASELINE, baselineStart, baselineEnd));
-    }
+    long baselineOffset = 0;
+    if(cmd.hasOption(CLI_BASELINE_OFFSET))
+      baselineOffset = Long.parseLong(cmd.getOptionValue(CLI_BASELINE_OFFSET)) * DAY_IN_MS;
 
+    long windowStart = windowEnd - windowSize;
+
+    long baselineEnd = windowStart - baselineOffset;
+    long baselineStart = baselineEnd - windowSize;
+
+    System.out.println(String.format("Using current time range '%d' (%s) to '%d' (%s)", windowStart, ISO8601.print(windowStart), windowEnd, ISO8601.print(windowEnd)));
+    System.out.println(String.format("Using baseline time range '%d' (%s) to '%d' (%s)", baselineStart, ISO8601.print(baselineStart), baselineEnd, ISO8601.print(baselineEnd)));
+
+    entities.add(TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_CURRENT, windowStart, windowEnd));
+    entities.add(TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_BASELINE, baselineStart, baselineEnd));
+
+    // ************************************************************************
+    // Framework execution
+    // ************************************************************************
     if (cmd.hasOption(CLI_ENTITIES)) {
       entities.addAll(parseURNSequence(cmd.getOptionValue(CLI_ENTITIES), 1.0));
       runFramework(framework, entities);
+
     } else {
-      readExecutePrintLoop(framework, entities);
+      try {
+        readExecutePrintLoop(framework, entities);
+      } catch (InterruptedIOException ignore) {
+        // left blank, exit
+      }
     }
 
     System.out.println("done.");
