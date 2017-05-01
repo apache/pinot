@@ -172,7 +172,7 @@ public class RCAFrameworkRunner {
     if(cmd.hasOption(CLI_TIME_START))
       windowSize = windowEnd - ISO8601.parseDateTime(cmd.getOptionValue(CLI_TIME_START)).getMillis();
     else if(cmd.hasOption(CLI_WINDOW_SIZE))
-      windowEnd = Long.parseLong(cmd.getOptionValue(CLI_WINDOW_SIZE)) * DAY_IN_MS;
+      windowSize = Long.parseLong(cmd.getOptionValue(CLI_WINDOW_SIZE)) * DAY_IN_MS;
 
     long baselineOffset = 0;
     if(cmd.hasOption(CLI_BASELINE_OFFSET))
