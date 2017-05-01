@@ -30,6 +30,7 @@ import com.linkedin.pinot.common.utils.SchemaUtils;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
 import com.linkedin.pinot.common.utils.helix.PinotHelixPropertyStoreZnRecordProvider;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
+import com.linkedin.pinot.core.segment.index.loader.LoaderUtils;
 import com.linkedin.pinot.core.segment.index.loader.V3RemoveIndexException;
 import java.io.File;
 import java.io.IOException;
@@ -105,16 +106,20 @@ public class SegmentFetcherAndLoader {
 
       if (localSegmentMetadata == null) {
         LOGGER.info("Segment {} of table {} is not loaded in memory, checking disk", segmentId, tableName);
-        final String localSegmentDir = getSegmentLocalDirectory(tableName, segmentId);
-        if (new File(localSegmentDir).exists()) {
+        File indexDir = new File(getSegmentLocalDirectory(tableName, segmentId));
+        // Restart during segment reload might leave segment in inconsistent state (index directory might not exist but
+        // segment backup directory existed), need to first try to recover from reload failure before checking the
+        // existence of the index directory and loading segment metadata from it
+        LoaderUtils.reloadFailureRecovery(indexDir);
+        if (indexDir.exists()) {
           LOGGER.info("Segment {} of table {} found on disk, attempting to load it", segmentId, tableName);
           try {
-            localSegmentMetadata = _metadataLoader.loadIndexSegmentMetadataFromDir(localSegmentDir);
+            localSegmentMetadata = new SegmentMetadataImpl(indexDir);
             LOGGER.info("Found segment {} of table {} with crc {} on disk", segmentId, tableName, localSegmentMetadata.getCrc());
           } catch (Exception e) {
             // The localSegmentDir should help us get the table name,
-            LOGGER.error("Failed to load segment metadata from {}. Deleting it.", localSegmentDir, e);
-            FileUtils.deleteQuietly(new File(localSegmentDir));
+            LOGGER.error("Failed to load segment metadata from {}. Deleting it.", indexDir, e);
+            FileUtils.deleteQuietly(indexDir);
             localSegmentMetadata = null;
           }
           try {
@@ -130,12 +135,12 @@ public class SegmentFetcherAndLoader {
             LOGGER.info(
                 "Unable to remove local index from V3 format segment: {}, table: {}, try to reload it from controller.",
                 segmentId, tableName, e);
-            FileUtils.deleteQuietly(new File(localSegmentDir));
+            FileUtils.deleteQuietly(indexDir);
             localSegmentMetadata = null;
           } catch (Exception e) {
             LOGGER.error("Failed to load {} of table {} from local, will try to reload it from controller!", segmentId,
                 tableName, e);
-            FileUtils.deleteQuietly(new File(localSegmentDir));
+            FileUtils.deleteQuietly(indexDir);
             localSegmentMetadata = null;
           }
         }

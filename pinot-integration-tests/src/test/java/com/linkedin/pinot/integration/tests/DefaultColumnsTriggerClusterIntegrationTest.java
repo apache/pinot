@@ -27,15 +27,17 @@ import org.testng.annotations.Test;
 public class DefaultColumnsTriggerClusterIntegrationTest extends DefaultColumnsClusterIntegrationTest {
   private static final String SCHEMA_WITH_MISSING_COLUMNS =
       "On_Time_On_Time_Performance_2014_100k_subset_nonulls_default_column_test_missing_columns.schema";
+
   private static final long MAX_RELOAD_TIME_IN_MILLIS = 5000L;
+  private static final String RELOAD_VERIFICATION_QUERY = "SELECT COUNT(*) FROM mytable WHERE NewAddedIntDimension < 0";
+  private static final String SELECT_STAR_QUERY = "SELECT * FROM mytable";
 
   @BeforeClass
   @Override
   public void setUp()
       throws Exception {
     setUp(false);
-    sendSchema("On_Time_On_Time_Performance_2014_100k_subset_nonulls_default_column_test_extra_columns.schema");
-    triggerReload();
+    triggerReload(true);
   }
 
   /**
@@ -50,39 +52,46 @@ public class DefaultColumnsTriggerClusterIntegrationTest extends DefaultColumnsC
   @Test
   public void testRemoveNewAddedColumns()
       throws Exception {
-    JSONObject queryResponse = postQuery("SELECT * FROM mytable");
+    JSONObject queryResponse = postQuery(SELECT_STAR_QUERY);
     Assert.assertEquals(queryResponse.getLong("totalDocs"), TOTAL_DOCS);
     Assert.assertEquals(queryResponse.getJSONObject("selectionResults").getJSONArray("columns").length(), 88);
 
-    sendSchema(SCHEMA_WITH_MISSING_COLUMNS);
-    long endTime = System.currentTimeMillis() + MAX_RELOAD_TIME_IN_MILLIS;
-    triggerReload();
-    while (System.currentTimeMillis() < endTime) {
-      queryResponse = postQuery("SELECT * FROM mytable");
-      // Total docs should not change during reload
-      Assert.assertEquals(queryResponse.getLong("totalDocs"), TOTAL_DOCS);
-      if (queryResponse.getJSONObject("selectionResults").getJSONArray("columns").length() == 79) {
-        break;
-      }
-    }
+    triggerReload(false);
+    queryResponse = postQuery(SELECT_STAR_QUERY);
+    Assert.assertEquals(queryResponse.getLong("totalDocs"), TOTAL_DOCS);
     Assert.assertEquals(queryResponse.getJSONObject("selectionResults").getJSONArray("columns").length(), 79);
 
-    sendSchema(SCHEMA_WITH_EXTRA_COLUMNS);
-    endTime = System.currentTimeMillis() + MAX_RELOAD_TIME_IN_MILLIS;
-    triggerReload();
-    while (System.currentTimeMillis() < endTime) {
-      queryResponse = postQuery("SELECT * FROM mytable");
-      // Total docs should not change during reload
-      Assert.assertEquals(queryResponse.getLong("totalDocs"), TOTAL_DOCS);
-      if (queryResponse.getJSONObject("selectionResults").getJSONArray("columns").length() == 88) {
-        break;
-      }
-    }
+    triggerReload(true);
+    queryResponse = postQuery(SELECT_STAR_QUERY);
+    Assert.assertEquals(queryResponse.getLong("totalDocs"), TOTAL_DOCS);
     Assert.assertEquals(queryResponse.getJSONObject("selectionResults").getJSONArray("columns").length(), 88);
   }
 
-  private void triggerReload()
+  private void triggerReload(boolean withExtraColumns)
       throws Exception {
+    if (withExtraColumns) {
+      sendSchema(SCHEMA_WITH_EXTRA_COLUMNS);
+    } else {
+      sendSchema(SCHEMA_WITH_MISSING_COLUMNS);
+    }
+
     sendGetRequest(CONTROLLER_BASE_API_URL + "/tables/mytable/segments/reload?type=offline");
+    long endTime = System.currentTimeMillis() + MAX_RELOAD_TIME_IN_MILLIS;
+    while (System.currentTimeMillis() < endTime) {
+      JSONObject queryResponse = postQuery(RELOAD_VERIFICATION_QUERY);
+      // Total docs should not change during reload
+      Assert.assertEquals(queryResponse.getLong("totalDocs"), TOTAL_DOCS);
+      long count = queryResponse.getJSONArray("aggregationResults").getJSONObject(0).getLong("value");
+      if (withExtraColumns) {
+        if (count == TOTAL_DOCS) {
+          break;
+        }
+      } else {
+        if (count == 0) {
+          break;
+        }
+      }
+    }
+    Assert.assertTrue(System.currentTimeMillis() < endTime);
   }
 }
