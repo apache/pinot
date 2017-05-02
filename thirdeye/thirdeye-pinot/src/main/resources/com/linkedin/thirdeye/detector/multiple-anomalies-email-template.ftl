@@ -76,8 +76,8 @@
 
         <#if cid?has_content>
           <tr>
-              <td style="padding: 24px;" colspan="2">
-                <img style="width: 100%;" src="cid:${cid}"\>
+              <td style="padding: 24px;" colspan="2" align="center">
+                <img style="width: 70%;" src="cid:${cid}"\>
               </td>
           </tr>
         </#if>
