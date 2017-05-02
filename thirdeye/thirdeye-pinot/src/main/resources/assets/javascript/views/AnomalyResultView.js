@@ -155,7 +155,6 @@ AnomalyResultView.prototype = {
   },
 
   render() {
-    $('#anomaly-filters-place-holder').html(this.anomaly_filters_template_compiled);
     this.renderAnomaliesTab();
     this.renderSearchFilters();
     this.showSearchBarBasedOnMode();
@@ -271,6 +270,9 @@ AnomalyResultView.prototype = {
   },
 
   renderSearchFilters() {
+    const anomaliesFilters = this.anomalyResultModel.getAnomaliesFilters();
+    const anomaly_filters_compiled = this.anomaly_filters_template_compiled(anomaliesFilters);
+    $('#anomaly-filters-place-holder').html(anomaly_filters_compiled);
      // TIME RANGE SELECTION
     this.timeRangeConfig.startDate = this.anomalyResultModel.startDate;
     this.timeRangeConfig.endDate = this.anomalyResultModel.endDate;

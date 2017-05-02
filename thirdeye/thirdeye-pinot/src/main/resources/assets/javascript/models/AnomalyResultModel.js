@@ -19,6 +19,7 @@ function AnomalyResultModel() {
   this.anomalyStatusUnresolved = true;
 
   this.anomaliesWrapper = null;
+  this.anomaliesFilters = null;
 
   this.anomalyForFeedbackUpdate = null;
 
@@ -115,6 +116,7 @@ AnomalyResultModel.prototype = {
   },
   updateModelAndNotifyView : function(anomaliesWrapper) {
     this.anomaliesWrapper = anomaliesWrapper;
+    this.anomaliesFilters = Object.assign({}, anomaliesWrapper.searchFilters);
     this.formatAnomalies();
     this.renderViewEvent.notify();
   },
@@ -189,8 +191,11 @@ AnomalyResultModel.prototype = {
     var feedbackType = this.getFeedbackTypeFromString(this.anomalyForFeedbackUpdate.anomalyFeedback);
     dataService.updateFeedback(this.anomalyForFeedbackUpdate.anomalyId, feedbackType);
   },
-  getAnomaliesWrapper : function() {
+  getAnomaliesWrapper() {
     return this.anomaliesWrapper;
+  },
+  getAnomaliesFilters() {
+    return this.anomaliesFilters;
   },
   getAnomalyFunctions : function() {
     return this.functions;

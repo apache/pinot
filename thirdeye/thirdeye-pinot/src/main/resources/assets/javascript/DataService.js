@@ -96,7 +96,12 @@ DataService.prototype = {
       var url = constants.SEARCH_ANOMALIES_METRICIDS + startTime + this.URL_SEPARATOR + endTime + this.URL_SEPARATOR + pageNumber;
       var data = {
           metricIds : metricIds,
-          functionName : functionName
+          functionName : functionName,
+          searchFilters: {
+          statusFilterMap: {
+            NEW: 0
+          }
+        }
       };
       return this.getDataAsynchronous(url, data, callback, 'anomaly-spin-area');
     },
@@ -105,7 +110,12 @@ DataService.prototype = {
       var url = constants.SEARCH_ANOMALIES_DASHBOARDID + startTime + this.URL_SEPARATOR + endTime + this.URL_SEPARATOR + pageNumber;
       var data = {
           dashboardId : dashboardId,
-          functionName : functionName
+          functionName : functionName,
+          searchFilters: {
+          statusFilterMap: {
+            NEW: 0
+          }
+        }
       };
       return this.getDataAsynchronous(url, data, callback, 'anomaly-spin-area');
     },
@@ -114,7 +124,12 @@ DataService.prototype = {
       var url = constants.SEARCH_ANOMALIES_ANOMALYIDS + startTime + this.URL_SEPARATOR + endTime + this.URL_SEPARATOR + pageNumber;
       var data = {
           anomalyIds : anomalyIds,
-          functionName : functionName
+          functionName : functionName,
+          searchFilters: {
+          statusFilterMap: {
+            NEW: 0
+          }
+        }
       };
       return this.getDataAsynchronous(url, data, callback, spinner);
     },
@@ -131,7 +146,13 @@ DataService.prototype = {
     // Fetch anomalies for anomaly ids in array in time range
     fetchAnomaliesForTime : function(startTime, endTime, pageNumber, callback) {
       var url = constants.SEARCH_ANOMALIES_TIME + startTime + this.URL_SEPARATOR + endTime + this.URL_SEPARATOR + pageNumber;
+      const searchFilters = JSON.stringify({
+          statusFilterMap: {
+            NEW: 0
+          }
+        });
       var data = {
+        searchFilters
       };
       return this.getDataAsynchronous(url, data, callback, 'anomaly-spin-area');
     },
