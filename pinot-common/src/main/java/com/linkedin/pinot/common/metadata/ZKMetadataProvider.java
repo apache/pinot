@@ -17,14 +17,17 @@ package com.linkedin.pinot.common.metadata;
 
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
+import com.linkedin.pinot.common.utils.SchemaUtils;
 import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.StringUtil;
 import java.util.ArrayList;
 import java.util.List;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ZNRecord;
@@ -130,15 +133,24 @@ public class ZKMetadataProvider {
         realtimeSegmentZKMetadata.toZNRecord(), AccessOption.PERSISTENT);
   }
 
-  public static OfflineSegmentZKMetadata getOfflineSegmentZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableName, String segmentName) {
+  @Nullable
+  public static OfflineSegmentZKMetadata getOfflineSegmentZKMetadata(
+      @Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore, @Nonnull String tableName, @Nonnull String segmentName) {
     String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
-    return new OfflineSegmentZKMetadata(propertyStore.get(constructPropertyStorePathForSegment(offlineTableName, segmentName), null, AccessOption.PERSISTENT));
+    ZNRecord znRecord = propertyStore.get(constructPropertyStorePathForSegment(offlineTableName, segmentName), null,
+        AccessOption.PERSISTENT);
+    if (znRecord == null) {
+      return null;
+    }
+    return new OfflineSegmentZKMetadata(znRecord);
   }
 
-  public static @Nullable RealtimeSegmentZKMetadata getRealtimeSegmentZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableName, String segmentName) {
+  @Nullable
+  public static RealtimeSegmentZKMetadata getRealtimeSegmentZKMetadata(
+      @Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore, @Nonnull String tableName, @Nonnull String segmentName) {
     String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
-    ZNRecord znRecord = propertyStore
-        .get(constructPropertyStorePathForSegment(realtimeTableName, segmentName), null, AccessOption.PERSISTENT);
+    ZNRecord znRecord = propertyStore.get(constructPropertyStorePathForSegment(realtimeTableName, segmentName), null,
+        AccessOption.PERSISTENT);
     // It is possible that the segment metadata has just been deleted due to retention.
     if (znRecord == null) {
       return null;
@@ -150,9 +162,28 @@ public class ZKMetadataProvider {
     }
   }
 
-  public static @Nullable AbstractTableConfig getOfflineTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableName) {
+  @Nullable
+  public static AbstractTableConfig getOfflineTableConfig(@Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore,
+      @Nonnull String tableName) {
     String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
-    ZNRecord znRecord = propertyStore.get(constructPropertyStorePathForResourceConfig(offlineTableName), null,
+    ZNRecord znRecord =
+        propertyStore.get(constructPropertyStorePathForResourceConfig(offlineTableName), null, AccessOption.PERSISTENT);
+    if (znRecord == null) {
+      return null;
+    }
+    try {
+      return AbstractTableConfig.fromZnRecord(znRecord);
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while getting offline table configuration for table: {}", tableName, e);
+      return null;
+    }
+  }
+
+  @Nullable
+  public static AbstractTableConfig getRealtimeTableConfig(@Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore,
+      @Nonnull String tableName) {
+    String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
+    ZNRecord znRecord = propertyStore.get(constructPropertyStorePathForResourceConfig(realtimeTableName), null,
         AccessOption.PERSISTENT);
     if (znRecord == null) {
       return null;
@@ -160,21 +191,58 @@ public class ZKMetadataProvider {
     try {
       return AbstractTableConfig.fromZnRecord(znRecord);
     } catch (Exception e) {
-      LOGGER.warn("Caught exception while getting offline table configuration", e);
+      LOGGER.error("Caught exception while getting realtime table configuration for table: {}", tableName, e);
       return null;
     }
   }
 
-  public static AbstractTableConfig getRealtimeTableConfig(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableName) {
-    String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
-    ZNRecord znRecord = propertyStore.get(constructPropertyStorePathForResourceConfig(realtimeTableName), null, AccessOption.PERSISTENT);
-    if (znRecord == null) {
+  @Nullable
+  public static Schema getSchema(@Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore, @Nonnull String schemaName) {
+    try {
+      ZNRecord schemaZNRecord =
+          propertyStore.get(constructPropertyStorePathForSchema(schemaName), null, AccessOption.PERSISTENT);
+      if (schemaZNRecord == null) {
+        return null;
+      }
+      return SchemaUtils.fromZNRecord(schemaZNRecord);
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while getting schema: {}", schemaName, e);
       return null;
     }
+  }
+
+  @Nullable
+  public static Schema getOfflineTableSchema(@Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore,
+      @Nonnull String tableName) {
+    // TODO: After uniform schema, always use raw table name
+
+    String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
+    // First try to get schema using offline table name
+    Schema schema = getSchema(propertyStore, offlineTableName);
+    if (schema != null) {
+      return schema;
+    }
+
+    // If cannot find schema using offline table name, try with raw table name
+    return getSchema(propertyStore, TableNameBuilder.extractRawTableName(offlineTableName));
+  }
+
+  @Nullable
+  public static Schema getRealtimeTableSchema(@Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore,
+      @Nonnull String tableName) {
+    // TODO: After uniform schema, get schema using raw table name
+
+    String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
     try {
-      return AbstractTableConfig.fromZnRecord(znRecord);
+      AbstractTableConfig realtimeTableConfig = getRealtimeTableConfig(propertyStore, realtimeTableName);
+      if (realtimeTableConfig == null) {
+        return null;
+      }
+
+      String schemaName = realtimeTableConfig.getValidationConfig().getSchemaName();
+      return getSchema(propertyStore, schemaName);
     } catch (Exception e) {
-      LOGGER.warn("Caught exception while getting realtime table configuration", e);
+      LOGGER.error("Caught exception while getting schema for realtime table: {}", realtimeTableName);
       return null;
     }
   }

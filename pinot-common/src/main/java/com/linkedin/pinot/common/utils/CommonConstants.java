@@ -161,10 +161,9 @@ public class CommonConstants {
       public static final String ADMIN_PORT_KEY = "adminPort";
     }
 
-    public static enum TableType {
+    public enum TableType {
       OFFLINE,
-      REALTIME,
-      HYBRID;
+      REALTIME;
 
       public ServerType getServerType() {
         if (this == OFFLINE) {

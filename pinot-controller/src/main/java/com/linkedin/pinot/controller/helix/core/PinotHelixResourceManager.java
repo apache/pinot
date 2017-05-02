@@ -910,12 +910,6 @@ public class PinotHelixResourceManager {
   /**
    * Schema APIs
    */
-  /**
-   *
-   * @param schema
-   * @throws IllegalArgumentException
-   * @throws IllegalAccessException
-   */
   public void addOrUpdateSchema(Schema schema) throws IllegalArgumentException, IllegalAccessException {
     ZNRecord record = SchemaUtils.toZNRecord(schema);
     String name = schema.getSchemaName();
@@ -941,21 +935,23 @@ public class PinotHelixResourceManager {
   }
 
   @Nullable
-  public Schema getSchema(String schemaName)
-      throws IOException {
-    PinotHelixPropertyStoreZnRecordProvider propertyStoreHelper =
-        PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore);
-    ZNRecord record = propertyStoreHelper.get(schemaName);
-    return record != null ? SchemaUtils.fromZNRecord(record) : null;
+  public Schema getSchema(@Nonnull String schemaName) {
+    return ZKMetadataProvider.getSchema(_propertyStore, schemaName);
   }
 
-  /**
-   *
-   * @return
-   */
+  @Nullable
+  public Schema getOfflineTableSchema(@Nonnull String tableName) {
+    return ZKMetadataProvider.getOfflineTableSchema(_propertyStore, tableName);
+  }
+
+  @Nullable
+  public Schema getRealtimeTableSchema(@Nonnull String tableName) {
+    return ZKMetadataProvider.getRealtimeTableSchema(_propertyStore, tableName);
+  }
+
   public List<String> getSchemaNames() {
-    return _propertyStore.getChildNames(PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore)
-        .getRelativePath(), AccessOption.PERSISTENT);
+    return _propertyStore.getChildNames(
+        PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore).getRelativePath(), AccessOption.PERSISTENT);
   }
 
   /**
@@ -1751,54 +1747,37 @@ public class PinotHelixResourceManager {
     return getAllPinotTableNames().contains(actualTableName);
   }
 
-  public AbstractTableConfig getOfflineTableConfig(String offlineTableName) throws JsonParseException,
-      JsonMappingException, JsonProcessingException, JSONException, IOException {
-    return ZKMetadataProvider.getOfflineTableConfig(getPropertyStore(), offlineTableName);
+  @Nullable
+  public AbstractTableConfig getOfflineTableConfig(@Nonnull String tableName) {
+    return ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
   }
 
-  public AbstractTableConfig getRealtimeTableConfig(String realtimeTableName) throws JsonParseException,
-      JsonMappingException, JsonProcessingException, JSONException, IOException {
-    return ZKMetadataProvider.getRealtimeTableConfig(getPropertyStore(), realtimeTableName);
+  @Nullable
+  public AbstractTableConfig getRealtimeTableConfig(@Nonnull String tableName) {
+    return ZKMetadataProvider.getRealtimeTableConfig(_propertyStore, tableName);
   }
 
-  public AbstractTableConfig getTableConfig(String tableName, TableType type) throws JsonParseException,
-      JsonMappingException, JsonProcessingException, JSONException, IOException {
-    String actualTableName = new TableNameBuilder(type).forTable(tableName);
-    AbstractTableConfig config = null;
-    if (type == TableType.REALTIME) {
-      config = ZKMetadataProvider.getRealtimeTableConfig(getPropertyStore(), actualTableName);
+  @Nullable
+  public AbstractTableConfig getTableConfig(@Nonnull String tableName, @Nonnull TableType tableType) {
+    if (tableType == TableType.OFFLINE) {
+      return getOfflineTableConfig(tableName);
     } else {
-      config = ZKMetadataProvider.getOfflineTableConfig(getPropertyStore(), actualTableName);
+      return getRealtimeTableConfig(tableName);
     }
-    return config;
   }
 
-  public List<String> getServerInstancesForTable(String tableName, TableType type) throws JsonParseException,
-      JsonMappingException, JsonProcessingException, JSONException, IOException {
-    String actualTableName = new TableNameBuilder(type).forTable(tableName);
-    AbstractTableConfig config = null;
-    if (type == TableType.REALTIME) {
-      config = ZKMetadataProvider.getRealtimeTableConfig(getPropertyStore(), actualTableName);
-    } else {
-      config = ZKMetadataProvider.getOfflineTableConfig(getPropertyStore(), actualTableName);
-    }
+  public List<String> getServerInstancesForTable(String tableName, TableType tableType) {
+    AbstractTableConfig tableConfig = getTableConfig(tableName, tableType);
     String serverTenantName =
-        ControllerTenantNameBuilder.getTenantName(config.getTenantConfig().getServer(), type.getServerType());
+        ControllerTenantNameBuilder.getTenantName(tableConfig.getTenantConfig().getServer(), tableType.getServerType());
     List<String> serverInstances = _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, serverTenantName);
     return serverInstances;
   }
 
-  public List<String> getBrokerInstancesForTable(String tableName, TableType type) throws JsonParseException,
-      JsonMappingException, JsonProcessingException, JSONException, IOException {
-    String actualTableName = new TableNameBuilder(type).forTable(tableName);
-    AbstractTableConfig config = null;
-    if (type == TableType.REALTIME) {
-      config = ZKMetadataProvider.getRealtimeTableConfig(getPropertyStore(), actualTableName);
-    } else {
-      config = ZKMetadataProvider.getOfflineTableConfig(getPropertyStore(), actualTableName);
-    }
+  public List<String> getBrokerInstancesForTable(String tableName, TableType tableType) {
+    AbstractTableConfig tableConfig = getTableConfig(tableName, tableType);
     String brokerTenantName =
-        ControllerTenantNameBuilder.getBrokerTenantNameForTenant(config.getTenantConfig().getBroker());
+        ControllerTenantNameBuilder.getBrokerTenantNameForTenant(tableConfig.getTenantConfig().getBroker());
     List<String> serverInstances = _helixAdmin.getInstancesInClusterWithTag(_helixClusterName, brokerTenantName);
     return serverInstances;
   }
