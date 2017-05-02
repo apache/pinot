@@ -1,6 +1,14 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
+import com.linkedin.thirdeye.anomaly.events.EventDataProviderManager;
+import com.linkedin.thirdeye.anomaly.events.EventFilter;
+import com.linkedin.thirdeye.anomaly.events.HolidayEventProvider;
+import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.RootCauseEntity;
+import com.linkedin.thirdeye.datalayer.bao.EventManager;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.EventDTO;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.RCAFramework;
 import com.linkedin.thirdeye.rootcause.RCAFrameworkExecutionResult;
@@ -32,8 +40,9 @@ import org.joda.time.format.ISODateTimeFormat;
 public class RootCauseResource {
   private static final DateTimeFormatter ISO8601 = ISODateTimeFormat.basicDateTimeNoMillis();
 
-  private static final List<EntityFormatter> FORMATTERS = Arrays.asList(
-      new MetricEntityFormatter(),
+  // NOTE: Must not be static to ensure DAO initialization order
+  private final List<EntityFormatter> formatters = Arrays.asList(
+      new MetricEntityFormatter(DAORegistry.getInstance().getMetricConfigDAO()),
       new DimensionEntityFormatter(),
       new ServiceEntityFormatter(),
       new EventEntityFormatter(),
@@ -115,8 +124,8 @@ public class RootCauseResource {
     return output;
   }
 
-  static RootCauseEntity applyFormatters(Entity e) {
-    for(EntityFormatter formatter : FORMATTERS) {
+  RootCauseEntity applyFormatters(Entity e) {
+    for(EntityFormatter formatter : this.formatters) {
       if(formatter.applies(e))
         return formatter.format(e);
     }
@@ -136,13 +145,19 @@ public class RootCauseResource {
 
     @Override
     public RootCauseEntity format(Entity entity) {
-      String link = String.format("javascript:void(0);", entity.getUrn());
+      String link = String.format("javascript:alert('%s');", entity.getUrn());
 
       return makeRootCauseEntity(entity, "Other", "(none)", link);
     }
   }
 
   static class MetricEntityFormatter implements EntityFormatter {
+    private final MetricConfigManager metricDAO;
+
+    public MetricEntityFormatter(MetricConfigManager metricDAO) {
+      this.metricDAO = metricDAO;
+    }
+
     @Override
     public boolean applies(Entity entity) {
       return MetricEntity.TYPE.isType(entity.getUrn());
@@ -152,8 +167,13 @@ public class RootCauseResource {
     public RootCauseEntity format(Entity entity) {
       MetricEntity e = MetricEntity.fromURN(entity.getUrn(), entity.getScore());
 
-      String label = String.format("%s/%s", e.getDataset(), e.getMetric());
-      String link = String.format("javascript:void(0);", e.getUrn());
+      MetricConfigDTO metricDTO = this.metricDAO.findById(e.getId());
+
+      String label = String.format("unknown (id=%d)", e.getId());
+      if(metricDTO != null)
+          label = String.format("%s/%s", metricDTO.getDataset(), metricDTO.getName());
+
+      String link = String.format("javascript:alert('%s');", e.getUrn());
 
       return makeRootCauseEntity(entity, "Metric", label, link);
     }
@@ -169,8 +189,8 @@ public class RootCauseResource {
     public RootCauseEntity format(Entity entity) {
       DimensionEntity e = DimensionEntity.fromURN(entity.getUrn(), entity.getScore());
 
-      String label = String.format("%s='%s'", e.getName(), e.getValue());
-      String link = String.format("javascript:void(0);", e.getUrn());
+      String label = String.format("%s=%s", e.getName(), e.getValue());
+      String link = String.format("javascript:alert('%s');", e.getUrn());
 
       return makeRootCauseEntity(entity, "Dimension", label, link);
     }
@@ -186,7 +206,7 @@ public class RootCauseResource {
     public RootCauseEntity format(Entity entity) {
       ServiceEntity e = ServiceEntity.fromURN(entity.getUrn(), entity.getScore());
 
-      String link = String.format("javascript:void(0);", e.getUrn());
+      String link = String.format("javascript:alert('%s');", e.getUrn());
 
       return makeRootCauseEntity(entity, "Service", e.getName(), link);
     }
@@ -200,12 +220,10 @@ public class RootCauseResource {
 
     @Override
     public RootCauseEntity format(Entity entity) {
-      String[] parts = entity.getUrn().split(":");
-      String type = parts[2];
-      String name = parts[3];
+      EventEntity e = EventEntity.fromURN(entity.getUrn(), entity.getScore());
 
-      String label = String.format("%s (%s)", name, type);
-      String link = String.format("javascript:void(0);", entity.getUrn());
+      String label = String.format("%s (%s)", e.getType(), e.getId());
+      String link = String.format("javascript:alert('%s');", entity.getUrn());
 
       return makeRootCauseEntity(entity, "Event", label, link);
     }

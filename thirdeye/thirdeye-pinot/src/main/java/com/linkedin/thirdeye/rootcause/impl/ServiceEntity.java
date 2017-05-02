@@ -6,7 +6,8 @@ import com.linkedin.thirdeye.rootcause.Entity;
 /**
  * ServiceEntity represents a service associated with certain metrics or dimensions. It typically
  * serves as a connecting piece between observed discrepancies between current and baseline metrics
- * and root cause events such as code deployments.
+ * and root cause events such as code deployments. The URN namespace is defined as
+ * 'thirdeye:service:{name}'.
  */
 public class ServiceEntity extends Entity {
   public static final EntityType TYPE = new EntityType("thirdeye:service:");

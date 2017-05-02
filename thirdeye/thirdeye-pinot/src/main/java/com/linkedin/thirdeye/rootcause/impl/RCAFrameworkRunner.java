@@ -234,7 +234,7 @@ public class RCAFrameworkRunner {
     pipelines.add(new TopKPipeline(P_SERVICE_TOPK, asSet(P_INPUT, P_SERVICE_METRIC_RAW), ServiceEntity.class, TOPK_SERVICE));
 
     // Events (from metrics and dimensions)
-    pipelines.add(new AnomalyEventsPipeline(P_EVENT_ANOMALY, asSet(P_INPUT, P_METRIC_TOPK), eventProvider));
+    pipelines.add(new AnomalyEventsPipeline(P_EVENT_ANOMALY, asSet(P_INPUT, P_METRIC_TOPK), eventProvider, metricDAO));
     pipelines.add(new HolidayEventsPipeline(P_EVENT_HOLIDAY, asSet(P_INPUT, P_DIMENSION_TOPK), eventProvider));
     pipelines.add(new TopKPipeline(P_EVENT_TOPK, asSet(P_INPUT, P_EVENT_ANOMALY, P_EVENT_HOLIDAY), EventEntity.class, TOPK_EVENT));
 

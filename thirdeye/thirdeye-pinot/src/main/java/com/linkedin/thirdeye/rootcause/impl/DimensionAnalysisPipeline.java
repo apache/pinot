@@ -120,16 +120,17 @@ public class DimensionAnalysisPipeline extends Pipeline {
 
     Map<String, Future<DataFrame>> scores = new HashMap<>();
     for(MetricEntity me : metricsEntities) {
-      final MetricConfigDTO metricDTO = metricDAO.findByMetricAndDataset(me.getMetric(), me.getDataset());
-      final DatasetConfigDTO datasetDTO = datasetDAO.findByDataset(me.getDataset());
+      final MetricConfigDTO metricDTO = metricDAO.findById(me.getId());
 
       if(metricDTO == null) {
-        LOG.warn("Could not resolve metric '{}'. Skipping.", me.getMetric());
+        LOG.warn("Could not resolve metric id {}. Skipping.", me.getId());
         continue;
       }
 
+      final DatasetConfigDTO datasetDTO = datasetDAO.findByDataset(metricDTO.getDataset());
+
       if(datasetDTO == null) {
-        LOG.warn("Could not resolve dataset '{}'. Skipping metric '{}'", me.getDataset(), me.getMetric());
+        LOG.warn("Could not resolve dataset '{}'. Skipping metric id {}", metricDTO.getDataset(), me.getId());
         continue;
       }
 
@@ -138,7 +139,7 @@ public class DimensionAnalysisPipeline extends Pipeline {
       Callable<DataFrame> scoreTask = new Callable<DataFrame>() {
         @Override
         public DataFrame call() throws Exception {
-          LOG.info("Scoring metric '{}' in dataset '{}' with weight {}", entity.getMetric(), entity.getDataset(), entity.getScore());
+          LOG.info("Scoring metric '{}' in dataset '{}' with weight {}", metricDTO.getName(), datasetDTO.getDataset(), entity.getScore());
           DataFrame dfMetric = DimensionAnalysisPipeline.this.score(datasetDTO, metricDTO, current, baseline);
 
           // modify cost by metric score

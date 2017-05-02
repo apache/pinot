@@ -6,7 +6,7 @@ import com.linkedin.thirdeye.rootcause.Entity;
 /**
  * DimensionEntity represents a data dimension (a cut) across multiple metrics. It is identified
  * by a key-value pair. Note, that dimension names may require standardization across different
- * metrics.
+ * metrics. The URN namespace is defined as 'thirdeye:dimension:{name}:{value}'.
  */
 public class DimensionEntity extends Entity {
   public static final EntityType TYPE = new EntityType("thirdeye:dimension:");
