@@ -188,14 +188,16 @@ public class AnomaliesResource {
     return (currentValue - baselineValue) / baselineValue;
   }
 
-  double getTotalFromTimeSeries (MetricTimeSeries mts, boolean isAdditive) {
+  double getTotalFromTimeSeries (MetricTimeSeries metricTimeSeries, boolean isAdditive) {
     double total = 0.0;
-    for (Number num : mts.getMetricSums()) {
-      total += num.doubleValue();
-    }
+
+    // MetricTimeSeries will have multiple values in case of derived/multimetric
+    Number[] metricTotals = metricTimeSeries.getMetricSums();
+    total = metricTotals[0].doubleValue();
+
     if (!isAdditive) {
       // for non Additive data sets return the average
-      total /= mts.getTimeWindowSet().size();
+      total /= metricTimeSeries.getTimeWindowSet().size();
     }
     return total;
   }
