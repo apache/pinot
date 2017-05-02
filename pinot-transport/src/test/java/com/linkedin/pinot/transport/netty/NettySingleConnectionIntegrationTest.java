@@ -15,26 +15,13 @@
  */
 package com.linkedin.pinot.transport.netty;
 
-import java.lang.reflect.Field;
-import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import org.apache.commons.lang.RandomStringUtils;
-import org.testng.Assert;
-import org.testng.annotations.AfterMethod;
-import org.testng.annotations.BeforeMethod;
-import org.testng.annotations.Test;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.response.ServerInstance;
 import com.linkedin.pinot.transport.common.AsyncResponseFuture;
 import com.linkedin.pinot.transport.common.Callback;
-import com.linkedin.pinot.transport.common.ServerResponseFuture;
 import com.linkedin.pinot.transport.common.LinkedDequeue;
 import com.linkedin.pinot.transport.common.NoneType;
+import com.linkedin.pinot.transport.common.ServerResponseFuture;
 import com.linkedin.pinot.transport.metrics.NettyClientMetrics;
 import com.linkedin.pinot.transport.metrics.PoolStats;
 import com.linkedin.pinot.transport.netty.NettyClientConnection.ResponseFuture;
@@ -48,6 +35,19 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.HashedWheelTimer;
+import java.lang.reflect.Field;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import org.apache.commons.lang.RandomStringUtils;
+import org.testng.Assert;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.Test;
 
 
 public class NettySingleConnectionIntegrationTest {
@@ -61,7 +61,8 @@ public class NettySingleConnectionIntegrationTest {
   private NettyTCPClientConnection _nettyTCPClientConnection;
 
   @BeforeMethod
-  public void setUp() {
+  public void setUp()
+      throws Exception {
     _requestHandler = new NettyTestUtils.LatchControlledRequestHandler(null);
     _requestHandler.setResponse(NettyTestUtils.DUMMY_RESPONSE);
     NettyTestUtils.LatchControlledRequestHandlerFactory handlerFactory =
@@ -69,6 +70,8 @@ public class NettySingleConnectionIntegrationTest {
     _nettyTCPServer = new NettyTCPServer(NettyTestUtils.DEFAULT_PORT, handlerFactory, null);
     Thread serverThread = new Thread(_nettyTCPServer, "NettyTCPServer");
     serverThread.start();
+    // Wait for at most 10 seconds for server to start
+    NettyTestUtils.waitForServerStarted(_nettyTCPServer, 10 * 1000L);
 
     _clientServer = new ServerInstance("localhost", NettyTestUtils.DEFAULT_PORT);
     _nettyTCPClientConnection =
@@ -190,7 +193,7 @@ public class NettySingleConnectionIntegrationTest {
       Assert.assertEquals(stats.getCheckedOut(), 1);
 
       // Now stop the server, so that the checked out connection is invalidated
-      closeServerConnection();
+      NettyTestUtils.closeServerConnection(_nettyTCPServer);
       Assert.assertTrue(pool.validate(false));
       stats = pool.getStats();
       Assert.assertEquals(stats.getPoolSize(), 2);
@@ -285,7 +288,7 @@ public class NettySingleConnectionIntegrationTest {
       Assert.assertEquals(waitersQueue.size(), 0);
 
       // If the server goes down, we should release all 3 connections and be able to get new connections
-      closeServerConnection();
+      NettyTestUtils.closeServerConnection(_nettyTCPServer);
       setUp();
       stats = pool.getStats();
       Assert.assertEquals(stats.getPoolSize(), 2);
@@ -305,18 +308,7 @@ public class NettySingleConnectionIntegrationTest {
   @AfterMethod
   public void tearDown()
       throws Exception {
-    closeClientConnection();
-    closeServerConnection();
-  }
-
-  private void closeClientConnection()
-      throws Exception {
-    _nettyTCPClientConnection.close();
-  }
-
-  private void closeServerConnection()
-      throws Exception {
-    // Wait for at most 1 minute to shutdown the server completely
-    _nettyTCPServer.waitForShutdown(60 * 1000L);
+    NettyTestUtils.closeClientConnection(_nettyTCPClientConnection);
+    NettyTestUtils.closeServerConnection(_nettyTCPServer);
   }
 }

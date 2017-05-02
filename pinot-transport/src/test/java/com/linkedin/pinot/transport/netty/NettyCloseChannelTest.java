@@ -35,7 +35,8 @@ public class NettyCloseChannelTest {
   private NettyTCPClientConnection _nettyTCPClientConnection;
 
   @BeforeMethod
-  public void setUp() {
+  public void setUp()
+      throws Exception {
     _countDownLatch = new CountDownLatch(1);
     NettyTestUtils.LatchControlledRequestHandler requestHandler =
         new NettyTestUtils.LatchControlledRequestHandler(_countDownLatch);
@@ -45,6 +46,8 @@ public class NettyCloseChannelTest {
     _nettyTCPServer = new NettyTCPServer(NettyTestUtils.DEFAULT_PORT, handlerFactory, null);
     Thread serverThread = new Thread(_nettyTCPServer, "NettyTCPServer");
     serverThread.start();
+    // Wait for at most 10 seconds for server to start
+    NettyTestUtils.waitForServerStarted(_nettyTCPServer, 10 * 1000L);
 
     ServerInstance clientServer = new ServerInstance("localhost", NettyTestUtils.DEFAULT_PORT);
     _nettyTCPClientConnection =
@@ -63,7 +66,7 @@ public class NettyCloseChannelTest {
         _nettyTCPClientConnection.sendRequest(Unpooled.wrappedBuffer(NettyTestUtils.DUMMY_REQUEST.getBytes()), 1L,
             5000L);
 
-    closeClientConnection();
+    NettyTestUtils.closeClientConnection(_nettyTCPClientConnection);
 
     _countDownLatch.countDown();
     ByteBuf serverResponse = responseFuture.getOne();
@@ -83,7 +86,7 @@ public class NettyCloseChannelTest {
         _nettyTCPClientConnection.sendRequest(Unpooled.wrappedBuffer(NettyTestUtils.DUMMY_REQUEST.getBytes()), 1L,
             5000L);
 
-    closeServerConnection();
+    NettyTestUtils.closeServerConnection(_nettyTCPServer);
 
     _countDownLatch.countDown();
     ByteBuf serverResponse = responseFuture.getOne();
@@ -95,18 +98,7 @@ public class NettyCloseChannelTest {
   @AfterMethod
   public void tearDown()
       throws Exception {
-    closeClientConnection();
-    closeServerConnection();
-  }
-
-  private void closeClientConnection()
-      throws Exception {
-    _nettyTCPClientConnection.close();
-  }
-
-  private void closeServerConnection()
-      throws Exception {
-    // Wait for at most 1 minute to shutdown the server completely
-    _nettyTCPServer.waitForShutdown(60 * 1000L);
+    NettyTestUtils.closeClientConnection(_nettyTCPClientConnection);
+    NettyTestUtils.closeServerConnection(_nettyTCPServer);
   }
 }
