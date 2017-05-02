@@ -120,8 +120,8 @@ public class DetectionTaskRunner implements TaskRunner {
         .fetchExixtingRawAnomalies(windowStart, windowEnd)
         .fetchExixtingMergedAnomalies(windowStart, windowEnd)
         .fetchSaclingFactors(windowStart, windowEnd);
-    if (anomalyFunctionSpec.isMetricSum()) {
-      anomalyDetectionInputContextBuilder.fetchTimeSeriesMetricSum(windowStart, windowEnd);
+    if (anomalyFunctionSpec.isTotalMetric()) {
+      anomalyDetectionInputContextBuilder.fetchTimeSeriesTotalMetric(windowStart, windowEnd);
     }
     AnomalyDetectionInputContext adContext = anomalyDetectionInputContextBuilder.build();
 
@@ -260,53 +260,6 @@ public class DetectionTaskRunner implements TaskRunner {
     }
 
     return resultsOfAnEntry;
-  }
-
-  /**
-   * Returns existing raw anomalies in the given monitoring window
-   *
-   * @param functionId the id of the anomaly function
-   * @param monitoringWindowStart inclusive
-   * @param monitoringWindowEnd inclusive but it doesn't matter
-   *
-   * @return known raw anomalies in the given window
-   */
-  @Deprecated
-  private List<RawAnomalyResultDTO> getExistingRawAnomalies(long functionId, long monitoringWindowStart,
-      long monitoringWindowEnd) {
-    List<RawAnomalyResultDTO> results = new ArrayList<>();
-    try {
-      results.addAll(DAO_REGISTRY.getRawAnomalyResultDAO().findAllByTimeAndFunctionId(monitoringWindowStart, monitoringWindowEnd, functionId));
-    } catch (Exception e) {
-      LOG.error("Exception in getting existing anomalies", e);
-    }
-    return results;
-  }
-
-  /**
-   * Returns all known merged anomalies of the function id that are needed for anomaly detection, i.e., the merged
-   * anomalies that overlap with the monitoring window and baseline windows.
-   *
-   * @param functionId the id of the anomaly function
-   * @param startEndTimeRanges the time ranges for retrieving the known merge anomalies
-
-   * @return known merged anomalies of the function id that are needed for anomaly detection
-   */
-  @Deprecated
-  public List<MergedAnomalyResultDTO> getKnownMergedAnomalies(long functionId, List<Pair<Long, Long>> startEndTimeRanges) {
-
-    List<MergedAnomalyResultDTO> results = new ArrayList<>();
-    for (Pair<Long, Long> startEndTimeRange : startEndTimeRanges) {
-      try {
-        results.addAll(
-            DAO_REGISTRY.getMergedAnomalyResultDAO().findAllConflictByFunctionId(functionId, startEndTimeRange.getFirst(),
-                startEndTimeRange.getSecond()));
-      } catch (Exception e) {
-        LOG.error("Exception in getting merged anomalies", e);
-      }
-    }
-
-    return results;
   }
 
   /**

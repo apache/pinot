@@ -238,8 +238,8 @@ public class TimeBasedAnomalyMerger {
         .fetchTimeSeriesDataByDimension(windowStart, windowEnd, dimensions, false)
         .fetchSaclingFactors(windowStart, windowEnd)
         .fetchExixtingMergedAnomalies(windowStart, windowEnd);
-    if (anomalyFunctionSpec.isMetricSum()) {
-      anomalyDetectionInputContextBuilder.fetchTimeSeriesMetricSum(windowStart, windowEnd);
+    if (anomalyFunctionSpec.isTotalMetric()) {
+      anomalyDetectionInputContextBuilder.fetchTimeSeriesTotalMetric(windowStart, windowEnd);
     }
     AnomalyDetectionInputContext adInputContext = anomalyDetectionInputContextBuilder.build();
 
@@ -257,18 +257,22 @@ public class TimeBasedAnomalyMerger {
       anomalyFunction.updateMergedAnomalyInfo(mergedAnomalies, metricTimeSeries, windowStart, windowEnd, knownAnomalies);
 
       // Calculate the impact to the total metric
-      if (anomalyFunctionSpec.isMetricSum()) {
+      if (anomalyFunctionSpec.isTotalMetric()) {
         double avgMetricSum = 0.0;
-        int numTS = 0;
+        int numTimestamps = 0;
         MetricTimeSeries metricSum = adInputContext.getMetricSumTimeSeries();
-        for (long ts : metricSum.getTimeWindowSet()) {
-          if(ts >= windowStart.getMillis() && ts < windowEnd.getMillis()) {
-            avgMetricSum += metricSum.get(ts, mergedAnomalies.getMetric()).doubleValue();
-            numTS++;
+        for (long timestamp : metricSum.getTimeWindowSet()) {
+          if(timestamp >= windowStart.getMillis() && timestamp < windowEnd.getMillis()) {
+            avgMetricSum += metricSum.get(timestamp, mergedAnomalies.getMetric()).doubleValue();
+            numTimestamps++;
           }
         }
-        avgMetricSum = avgMetricSum / numTS;
-        mergedAnomalies.setImpactToTotal((mergedAnomalies.getAvgCurrentVal() - mergedAnomalies.getAvgBaselineVal())/avgMetricSum);
+        if (numTimestamps > 0) {
+          avgMetricSum = avgMetricSum / numTimestamps;
+          mergedAnomalies.setImpactToTotal((mergedAnomalies.getAvgCurrentVal() - mergedAnomalies.getAvgBaselineVal())/avgMetricSum);
+        } else {
+          mergedAnomalies.setImpactToTotal(Double.NaN);
+        }
       }
     }
   }

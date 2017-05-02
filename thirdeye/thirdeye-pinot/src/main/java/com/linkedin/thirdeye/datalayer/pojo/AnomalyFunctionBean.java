@@ -34,7 +34,9 @@ public class AnomalyFunctionBean extends AbstractBean {
 
   private boolean isActive = true;
 
-  private boolean metricSum = false;
+  private List<String> totalMetricList;
+
+  private boolean totalMetric = false;
 
   private String properties;
 
@@ -158,12 +160,20 @@ public class AnomalyFunctionBean extends AbstractBean {
     this.cron = cron;
   }
 
-  public boolean isMetricSum() {
-    return metricSum;
+  public List<String> getTotalMetricList() {
+    return totalMetricList;
   }
 
-  public void setMetricSum(boolean metricSum) {
-    this.metricSum = metricSum;
+  public void setTotalMetricList(List<String> totalMetricList) {
+    this.totalMetricList = totalMetricList;
+  }
+
+  public boolean isTotalMetric() {
+    return totalMetric;
+  }
+
+  public void setTotalMetric(boolean totalMetric) {
+    this.totalMetric = totalMetric;
   }
 
   public TimeGranularity getFrequency() {
@@ -306,7 +316,8 @@ public class AnomalyFunctionBean extends AbstractBean {
         && Objects.equals(windowDelayUnit, af.getWindowDelayUnit())
         && Objects.equals(exploreDimensions, af.getExploreDimensions())
         && Objects.equals(filters, af.getFilters())
-        && Objects.equals(metricSum, af.isMetricSum())
+        && Objects.equals(totalMetric, af.isTotalMetric())
+        && Objects.equals(totalMetricList, af.getTotalMetricList())
         && Objects.equals(alertFilter, af.getAlertFilter())
         && Objects.equals(requiresCompletenessCheck,  af.isRequiresCompletenessCheck());
   }
@@ -315,6 +326,6 @@ public class AnomalyFunctionBean extends AbstractBean {
   public int hashCode() {
     return Objects.hash(getId(), collection, metric, metrics, metricFunction, type, isActive, cron, frequency,
         properties, bucketSize, bucketUnit, windowSize, windowUnit, windowDelay, windowDelayUnit,
-        exploreDimensions, filters, metricSum, alertFilter, requiresCompletenessCheck);
+        exploreDimensions, filters, totalMetric, totalMetricList, alertFilter, requiresCompletenessCheck);
   }
 }

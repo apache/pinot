@@ -91,7 +91,9 @@ public class AnomalyDetectionInputContextBuilder {
   /**
    * Fetch TimeSeriese data from Pinot in the startEndTimeRanges
    * @param startEndTimeRanges
-   * @return a AnomalyDetectionInputContextBuilder
+   * the time range when we actually fetch timeseries
+   * @return
+   * the builder of the AnomalyDetectionInputContext
    * @throws JobExecutionException
    * @throws ExecutionException
    */
@@ -124,7 +126,6 @@ public class AnomalyDetectionInputContextBuilder {
 
       if (entry.getValue().getTimeWindowSet().size() < 1) {
         LOG.warn("Insufficient data for {} to run anomaly detection function", dimensionMap);
-        continue;
       }
     }
     this.anomalyDetectionInputContext.setDimensionKeyMetricTimeSeriesMap(dimensionMapMetricTimeSeriesMap);
@@ -133,10 +134,16 @@ public class AnomalyDetectionInputContextBuilder {
   }
   /**
    * Fetch TimeSeriese data from Pinot with given monitoring window start and end time
+   * The data range is calculated by anomalyFunction.getDataRangeIntervals
+   * If endTimeInclusive is set true, the windowEnd is included in the timeseries; otherwise, not.
    * @param windowStart
+   * The start time of the monitoring window
    * @param windowEnd
+   * The start time of the monitoring window
    * @param endTimeInclusive
+   * true, if the end time is included in the data fetching process
    * @return
+   * the builder of the AnomalyDetectionInputContext
    */
   public AnomalyDetectionInputContextBuilder fetchTimeSeriesData(DateTime windowStart, DateTime windowEnd, boolean endTimeInclusive)
       throws JobExecutionException, ExecutionException {
@@ -145,10 +152,14 @@ public class AnomalyDetectionInputContextBuilder {
   }
   /**
    * Fetch TimeSeriese data from Pinot with given monitoring window start and end time
+   * The data range is calculated by anomalyFunction.getDataRangeIntervals
    * endTimeInclusive is set to false in default
    * @param windowStart
+   * The start time of the monitoring window
    * @param windowEnd
+   * The start time of the monitoring window
    * @return
+   * the builder of the AnomalyDetectionInputContext
    */
   public AnomalyDetectionInputContextBuilder fetchTimeSeriesData(DateTime windowStart, DateTime windowEnd)
       throws JobExecutionException, ExecutionException {
@@ -160,7 +171,9 @@ public class AnomalyDetectionInputContextBuilder {
    * endTimeInclusive is set to false in default
    *
    * @param startEndTimeRanges
+   * The time range when we should fetch data
    * @return
+   * the builder of the AnomalyDetectionInputContext
    */
   public AnomalyDetectionInputContextBuilder fetchTimeSeriesData(List<Pair<Long, Long>> startEndTimeRanges)
       throws JobExecutionException, ExecutionException {
@@ -176,7 +189,8 @@ public class AnomalyDetectionInputContextBuilder {
    * @param windowEnd the end time for retrieving the data
    * @param dimensions the dimension of the data
    * @param endTimeInclusive set to true if the end time should be inclusive; mainly used by the queries from UI
-   * @return an anomaly detection input context that contains all the retrieved data
+   * @return
+   * the builder of the AnomalyDetectionInputContext
    * @throws Exception if it fails to retrieve time series from DB.
    */
   public AnomalyDetectionInputContextBuilder fetchTimeSeriesDataByDimension(DateTime windowStart, DateTime windowEnd,
@@ -193,7 +207,8 @@ public class AnomalyDetectionInputContextBuilder {
    * @param startEndTimeRanges the start and end time range for retrieving the data
    * @param dimensions the dimension of the data
    * @param endTimeInclusive set to true if the end time should be inclusive; mainly used by the queries from UI
-   * @return an anomaly detection input context that contains all the retrieved data
+   * @return
+   * the builder of the AnomalyDetectionInputContext
    * @throws Exception if it fails to retrieve time series from DB.
    */
   public AnomalyDetectionInputContextBuilder fetchTimeSeriesDataByDimension(List<Pair<Long, Long>> startEndTimeRanges,
@@ -213,16 +228,20 @@ public class AnomalyDetectionInputContextBuilder {
 
   /**
    * Fetch the root metric without dimension and filter in a given monitoring start and end time
+   * the actual data fetching time range is calculated by anomalyFunction.getDataRangeIntervals
    * @param windowStart
+   * the start time of the monitoring window
    * @param windowEnd
+   * the end time of the monitoring window
    * @return
+   * the builder of the AnomalyDetectionInputContext
    * @throws JobExecutionException
    * @throws ExecutionException
    */
-  public AnomalyDetectionInputContextBuilder fetchTimeSeriesMetricSum(DateTime windowStart, DateTime windowEnd)
+  public AnomalyDetectionInputContextBuilder fetchTimeSeriesTotalMetric(DateTime windowStart, DateTime windowEnd)
       throws JobExecutionException, ExecutionException {
     List<Pair<Long, Long>> startEndTimeRanges = anomalyFunction.getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis());
-    this.fetchTimeSeriesMetricSum(startEndTimeRanges);
+    this.fetchTimeSeriesTotalMetric(startEndTimeRanges);
 
     return this;
   }
@@ -230,21 +249,25 @@ public class AnomalyDetectionInputContextBuilder {
   /**
    * Fetch the root metric without dimension and filter in a given time range
    * @param startEndTimeRanges
+   * the time range when we should fetch the timeseries data
    * @return
+   * the builder of the AnomalyDetectionInputContext
    * @throws JobExecutionException
    * @throws ExecutionException
    */
-  public AnomalyDetectionInputContextBuilder fetchTimeSeriesMetricSum (List<Pair<Long, Long>> startEndTimeRanges)
+  public AnomalyDetectionInputContextBuilder fetchTimeSeriesTotalMetric (List<Pair<Long, Long>> startEndTimeRanges)
       throws JobExecutionException, ExecutionException {
-    MetricTimeSeries metricSumTimeSeries = getMetricSum(anomalyFunctionSpec, startEndTimeRanges);
+    MetricTimeSeries metricSumTimeSeries = getTotalMetric(anomalyFunctionSpec, startEndTimeRanges);
     this.anomalyDetectionInputContext.setMetricSumTimeSeries(metricSumTimeSeries);
 
     return this;
   }
   /**
-   * Fetech existing RawAnomalyResults
+   * Fetech existing RawAnomalyResults in the monitoring window
    * @param windowStart
+   * the start time of the monitoring window
    * @param windowEnd
+   * the end time of the monitoring window
    * @return
    */
   public AnomalyDetectionInputContextBuilder fetchExixtingRawAnomalies(DateTime windowStart, DateTime windowEnd) {
@@ -260,9 +283,11 @@ public class AnomalyDetectionInputContextBuilder {
   }
 
   /**
-   * Fetch existing MergedAnomalyResults
+   * Fetch existing MergedAnomalyResults in the training window
    * @param windowStart
+   * the start time of the monitoring window
    * @param windowEnd
+   * the end time of the monitoring window
    * @return
    */
   public AnomalyDetectionInputContextBuilder fetchExixtingMergedAnomalies(DateTime windowStart, DateTime windowEnd) {
@@ -289,9 +314,11 @@ public class AnomalyDetectionInputContextBuilder {
   }
 
   /**
-   * Fetch Scaling Factors
+   * Fetch Scaling Factors in the training window
    * @param windowStart
+   * the start time of the monitoring window
    * @param windowEnd
+   * the end time of the monitoring window
    * @return
    */
   public AnomalyDetectionInputContextBuilder fetchSaclingFactors(DateTime windowStart, DateTime windowEnd) {
@@ -305,7 +332,7 @@ public class AnomalyDetectionInputContextBuilder {
 
   /**
    * Returns existing raw anomalies in the given monitoring window
-   *
+   *ingraph_dashboard_config_index
    * @param functionId the id of the anomaly function
    * @param monitoringWindowStart inclusive
    * @param monitoringWindowEnd inclusive but it doesn't matter
@@ -413,8 +440,8 @@ public class AnomalyDetectionInputContextBuilder {
     }
 
     TimeSeriesResponse timeSeriesResponse =
-        getTimeSeriesResponseImpl(anomalyFunctionSpec, startEndTimeRanges, timeGranularity, filters, groupByDimensions,
-            endTimeInclusive, doRollUp);
+        getTimeSeriesResponseImpl(anomalyFunctionSpec, startEndTimeRanges,
+            timeGranularity, filters, groupByDimensions, endTimeInclusive, doRollUp);
 
     try {
       Map<DimensionKey, MetricTimeSeries> dimensionKeyMetricTimeSeriesMap =
@@ -472,8 +499,8 @@ public class AnomalyDetectionInputContextBuilder {
 
     final boolean doRollUp = false;
     TimeSeriesResponse response =
-        getTimeSeriesResponseImpl(anomalyFunctionSpec, startEndTimeRanges, timeGranularity, filters, groupByDimensions,
-            endTimeInclusive, doRollUp);
+        getTimeSeriesResponseImpl(anomalyFunctionSpec, startEndTimeRanges,
+            timeGranularity, filters, groupByDimensions, endTimeInclusive, doRollUp);
     try {
       Map<DimensionKey, MetricTimeSeries> metricTimeSeriesMap = TimeSeriesResponseConverter.toMap(response,
           Utils.getSchemaDimensionNames(anomalyFunctionSpec.getCollection()));
@@ -492,7 +519,7 @@ public class AnomalyDetectionInputContextBuilder {
    * @throws JobExecutionException
    * @throws ExecutionException
    */
-  public MetricTimeSeries getMetricSum (AnomalyFunctionDTO anomalyFunctionSpec, List<Pair<Long, Long>> startEndTimeRanges)
+  public MetricTimeSeries getTotalMetric(AnomalyFunctionDTO anomalyFunctionSpec, List<Pair<Long, Long>> startEndTimeRanges)
       throws JobExecutionException, ExecutionException {
     // Set empty dimension and filter
     Multimap<String, String> filters = HashMultimap.create();
@@ -506,9 +533,13 @@ public class AnomalyDetectionInputContextBuilder {
       doRollUp = false;
     }
 
+    List<String> metricsToFetch = anomalyFunctionSpec.getTotalMetricList();
+    if (metricsToFetch == null || metricsToFetch.isEmpty()) {
+      metricsToFetch = anomalyFunctionSpec.getMetrics();
+    }
     TimeSeriesResponse timeSeriesResponse =
-        getTimeSeriesResponseImpl(anomalyFunctionSpec, startEndTimeRanges, timeGranularity, filters,
-            groupByDimensions, false, doRollUp);
+        getTimeSeriesResponseImpl(anomalyFunctionSpec, metricsToFetch, startEndTimeRanges,
+            timeGranularity, filters, groupByDimensions, false, doRollUp);
 
     MetricTimeSeries metricSum = null;
     try {
@@ -576,6 +607,14 @@ public class AnomalyDetectionInputContextBuilder {
       List<Pair<Long, Long>> startEndTimeRanges, TimeGranularity timeGranularity, Multimap<String, String> filters,
       List<String> groupByDimensions, boolean endTimeInclusive, boolean doRollUp)
       throws JobExecutionException, ExecutionException {
+    return getTimeSeriesResponseImpl(anomalyFunctionSpec, anomalyFunctionSpec.getMetrics(), startEndTimeRanges,
+        timeGranularity, filters, groupByDimensions, endTimeInclusive, doRollUp);
+  }
+
+  private TimeSeriesResponse getTimeSeriesResponseImpl(AnomalyFunctionDTO anomalyFunctionSpec, List<String> metrics,
+      List<Pair<Long, Long>> startEndTimeRanges, TimeGranularity timeGranularity, Multimap<String, String> filters,
+      List<String> groupByDimensions, boolean endTimeInclusive, boolean doRollUp)
+      throws JobExecutionException, ExecutionException {
 
     TimeSeriesHandler timeSeriesHandler =
         new TimeSeriesHandler(ThirdEyeCacheRegistry.getInstance().getQueryCache(), doRollUp);
@@ -584,7 +623,7 @@ public class AnomalyDetectionInputContextBuilder {
     TimeSeriesRequest seedRequest = new TimeSeriesRequest();
     seedRequest.setCollectionName(anomalyFunctionSpec.getCollection());
     // TODO: Check low level support for multiple metrics retrieval
-    String metricsToRetrieve = StringUtils.join(anomalyFunctionSpec.getMetrics(), ",");
+    String metricsToRetrieve = StringUtils.join(metrics, ",");
     List<MetricExpression> metricExpressions = Utils
         .convertToMetricExpressions(metricsToRetrieve,
             anomalyFunctionSpec.getMetricFunction(), anomalyFunctionSpec.getCollection());
