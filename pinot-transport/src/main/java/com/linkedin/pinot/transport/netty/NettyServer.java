@@ -109,7 +109,7 @@ public abstract class NettyServer implements Runnable {
   protected final EventLoopGroup _workerGroup = new NioEventLoopGroup(20);
 
   // Netty Channel
-  protected Channel _channel = null;
+  protected volatile Channel _channel = null;
 
   // Factory for generating request Handlers
   protected RequestHandlerFactory _handlerFactory;
@@ -155,6 +155,10 @@ public abstract class NettyServer implements Runnable {
    *
    */
   protected abstract ServerBootstrap getServerBootstrap();
+
+  public boolean isStarted() {
+    return _channel != null;
+  }
 
   /**
    *  Shutdown gracefully

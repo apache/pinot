@@ -17,9 +17,12 @@ package com.linkedin.pinot.transport.netty;
 
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.Uninterruptibles;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 
 
@@ -78,5 +81,27 @@ public class NettyTestUtils {
     public NettyServer.RequestHandler createNewRequestHandler() {
       return _requestHandler;
     }
+  }
+
+  public static void waitForServerStarted(NettyTCPServer server, long timeOutInMillis)
+      throws TimeoutException {
+    long endTime = System.currentTimeMillis() + timeOutInMillis;
+    while (System.currentTimeMillis() < endTime) {
+      if (server.isStarted()) {
+        return;
+      }
+      Uninterruptibles.sleepUninterruptibly(10L, TimeUnit.MILLISECONDS);
+    }
+    throw new TimeoutException("Failed to start server in " + timeOutInMillis + "ms");
+  }
+
+  public static void closeClientConnection(NettyTCPClientConnection clientConnection)
+      throws InterruptedException {
+    clientConnection.close();
+  }
+
+  public static void closeServerConnection(NettyTCPServer server) {
+    // Wait for at most 1 minute to shutdown the server completely
+    server.waitForShutdown(60 * 1000L);
   }
 }
