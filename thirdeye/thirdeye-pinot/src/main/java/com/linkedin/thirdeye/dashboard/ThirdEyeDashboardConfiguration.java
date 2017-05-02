@@ -6,6 +6,7 @@ public class ThirdEyeDashboardConfiguration extends ThirdEyeConfiguration {
 
   String informedApiUrl;
   String rcaConfigPath;
+  int rcaParallelism;
 
   public String getInformedApiUrl() {
     return informedApiUrl;
@@ -21,5 +22,13 @@ public class ThirdEyeDashboardConfiguration extends ThirdEyeConfiguration {
 
   public void setRcaConfigPath(String rcaConfigPath) {
     this.rcaConfigPath = rcaConfigPath;
+  }
+
+  public int getRcaParallelism() {
+    return rcaParallelism;
+  }
+
+  public void setRcaParallelism(int rcaParallelism) {
+    this.rcaParallelism = rcaParallelism;
   }
 }

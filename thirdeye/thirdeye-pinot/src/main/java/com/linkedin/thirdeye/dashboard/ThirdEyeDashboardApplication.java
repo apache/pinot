@@ -120,7 +120,7 @@ public class ThirdEyeDashboardApplication
     if(!configFile.isAbsolute())
       configFile = new File(config.getRootDir() + File.separator + configFile);
     List<Pipeline> pipelines = PipelineLoader.getPipelinesFromConfig(configFile);
-    return new RCAFramework(pipelines, Executors.newSingleThreadExecutor());
+    return new RCAFramework(pipelines, Executors.newFixedThreadPool(config.getRcaParallelism()));
   }
 
   public static void main(String[] args) throws Exception {
