@@ -191,6 +191,7 @@ public class AnomaliesResource {
   double getTotalFromTimeSeries (MetricTimeSeries metricTimeSeries, boolean isAdditive) {
     double total = 0.0;
 
+    // MetricTimeSeries will have multiple values in case of derived/multimetric
     Number[] metricTotals = metricTimeSeries.getMetricSums();
     total = metricTotals[0].doubleValue();
 
