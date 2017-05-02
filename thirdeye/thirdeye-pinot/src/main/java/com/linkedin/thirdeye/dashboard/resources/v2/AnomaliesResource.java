@@ -4,8 +4,6 @@ import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContext;
 import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContextBuilder;
-import com.linkedin.thirdeye.anomaly.detection.TimeSeriesUtil;
-import com.linkedin.thirdeye.anomaly.merge.TimeBasedAnomalyMerger;
 import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
 import com.linkedin.thirdeye.api.DimensionMap;
@@ -148,9 +146,13 @@ public class AnomaliesResource {
 
       // Lets compute currentTimeRange
       Pair<Long, Long> currentTimeRange = new Pair<>(anomaly.getStartTime(), anomaly.getEndTime());
-      MetricTimeSeries currentTimeSeries = TimeSeriesUtil
-          .getTimeSeriesByDimension(anomaly.getFunction(), Arrays.asList(currentTimeRange),
-              anomaly.getDimensions(), granularity, false);
+      AnomalyDetectionInputContextBuilder anomalyDetectionInputContextBuilder =
+          new AnomalyDetectionInputContextBuilder(anomalyFunctionFactory);
+      anomalyDetectionInputContextBuilder
+          .fetchTimeSeriesDataByDimension(Arrays.asList(currentTimeRange), anomaly.getDimensions(), false);
+
+      MetricTimeSeries currentTimeSeries = anomalyDetectionInputContextBuilder.build()
+          .getDimensionKeyMetricTimeSeriesMap().get(anomaly.getDimensions());
       double currentVal = getTotalFromTimeSeries(currentTimeSeries, dataset.isAdditive());
       response.setCurrentVal(currentVal);
 
@@ -160,9 +162,10 @@ public class AnomaliesResource {
         DateTime anomalyEndTimeOffset = new DateTime(anomaly.getEndTime(), dateTimeZone).minus(baselineOffsetPeriod);
         Pair<Long, Long> baselineTimeRange =
             new Pair<>(anomalyStartTimeOffset.getMillis(), anomalyEndTimeOffset.getMillis());
-        MetricTimeSeries baselineTimeSeries = TimeSeriesUtil
-            .getTimeSeriesByDimension(anomaly.getFunction(), Arrays.asList(baselineTimeRange),
-                anomaly.getDimensions(), granularity, false);
+        anomalyDetectionInputContextBuilder
+            .fetchTimeSeriesDataByDimension(Arrays.asList(baselineTimeRange), anomaly.getDimensions(), false);
+        MetricTimeSeries baselineTimeSeries = anomalyDetectionInputContextBuilder.build()
+            .getDimensionKeyMetricTimeSeriesMap().get(anomaly.getDimensions());
         AnomalyDataCompare.CompareResult compareResult = new AnomalyDataCompare.CompareResult();
         double baseLineval = getTotalFromTimeSeries(baselineTimeSeries, dataset.isAdditive());
         compareResult.setBaselineValue(baseLineval);
@@ -704,7 +707,7 @@ public class AnomaliesResource {
         AnomalyDetectionInputContextBuilder anomalyDetectionInputContextBuilder =
             new AnomalyDetectionInputContextBuilder(anomalyFunctionFactory);
         AnomalyDetectionInputContext adInputContext = anomalyDetectionInputContextBuilder
-            .fetchTimeSeriesData(anomalyWindowStart, anomalyWindowEnd, true)
+            .fetchTimeSeriesDataByDimension(anomalyWindowStart, anomalyWindowEnd, dimensions, true)
             .fetchExixtingMergedAnomalies(anomalyWindowStart, anomalyWindowEnd).build();
 
         MetricTimeSeries metricTimeSeries = adInputContext.getDimensionKeyMetricTimeSeriesMap().get(dimensions);
