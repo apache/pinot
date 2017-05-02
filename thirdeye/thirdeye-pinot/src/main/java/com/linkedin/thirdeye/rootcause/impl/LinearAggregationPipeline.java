@@ -16,23 +16,32 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Sample implementation of an aggregator that handles
- * the same entity being returned from multiple pipelines by summing the entity's weights.
+ * Implementation of an aggregator that handles the same entity being returned from multiple
+ * pipelines by summing the entity's weights. It optionally allows to truncate the input for
+ * each input pipeline <i>separately</i> to its top {@code k} elements before aggregation.
  */
 public class LinearAggregationPipeline extends Pipeline {
   private static Logger LOG = LoggerFactory.getLogger(LinearAggregationPipeline.class);
 
+  private final static String PROP_K = "k";
+  private final static String PROP_K_DEFAULT = "-1";
+
   private static final String URN = "urn";
   private static final String SCORE = "score";
+
+  private final int k;
 
   /**
    * Constructor for dependency injection
    *
    * @param outputName pipeline output name
    * @param inputNames input pipeline names
+   * @param k top k truncation before aggregation ({@code -1} for unbounded)
    */
-  public LinearAggregationPipeline(String outputName, Set<String> inputNames) {
+  public LinearAggregationPipeline(String outputName, Set<String> inputNames, int k) {
     super(outputName, inputNames);
+
+    this.k = k;
   }
 
   /**
@@ -40,10 +49,15 @@ public class LinearAggregationPipeline extends Pipeline {
    *
    * @param outputName pipeline output name
    * @param inputNames input pipeline names
-   * @param ignore configuration properties (none)
+   * @param properties configuration properties ({@code PROP_K})
    */
-  public LinearAggregationPipeline(String outputName, Set<String> inputNames, Map<String, String> ignore) {
+  public LinearAggregationPipeline(String outputName, Set<String> inputNames, Map<String, String> properties) {
     super(outputName, inputNames);
+
+    String kProp = PROP_K_DEFAULT;
+    if(properties.containsKey(PROP_K))
+      kProp = properties.get(PROP_K);
+    this.k = Integer.parseInt(kProp);
   }
 
   @Override
@@ -51,8 +65,15 @@ public class LinearAggregationPipeline extends Pipeline {
     StringSeries.Builder urnBuilder = StringSeries.builder();
     DoubleSeries.Builder scoreBuilder = DoubleSeries.builder();
 
-    for(Set<Entity> res : context.getInputs().values()) {
-      DataFrame df = toDataFrame(res);
+    for(Map.Entry<String, Set<Entity>> entry : context.getInputs().entrySet()) {
+      DataFrame df = toDataFrame(entry.getValue());
+
+      if(this.k >= 0) {
+        LOG.info("Truncating '{}' to {} entities (from {})", entry.getKey(), this.k, df.size());
+        df = df.sortedBy(SCORE).tail(this.k);
+      }
+
+      LOG.info("{}:\n{}", entry.getKey(), df.toString(50, URN, SCORE));
       urnBuilder.addSeries(df.get(URN));
       scoreBuilder.addSeries(df.getDoubles(SCORE));
     }

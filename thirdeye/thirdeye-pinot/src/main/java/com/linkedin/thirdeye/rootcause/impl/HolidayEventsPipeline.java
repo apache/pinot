@@ -71,7 +71,6 @@ public class HolidayEventsPipeline extends Pipeline {
 
     Set<EventEntity> entities = new HashSet<>();
     for(EventDTO ev : events) {
-      long distance = current.getEnd() - ev.getStartTime();
       double dimensionScore = makeDimensionScore(urn2entity, ev.getTargetDimensionMap());
       EventEntity entity = EventEntity.fromDTO(dimensionScore, ev);
       LOG.debug("{}: dimension={}, filter={}", entity.getUrn(), dimensionScore, ev.getTargetDimensionMap());
@@ -103,8 +102,7 @@ public class HolidayEventsPipeline extends Pipeline {
     }
     filter.setTargetDimensionMap(filterMap);
 
-    List<EventDTO> events = eventDataProvider.getEvents(filter);
-    return events;
+    return eventDataProvider.getEvents(filter);
   }
 
   static double makeDimensionScore(Map<String, DimensionEntity> urn2entity, Map<String, List<String>> dimensionFilterMap) {

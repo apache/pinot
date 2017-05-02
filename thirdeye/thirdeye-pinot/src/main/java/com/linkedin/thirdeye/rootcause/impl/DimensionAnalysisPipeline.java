@@ -204,7 +204,7 @@ public class DimensionAnalysisPipeline extends Pipeline {
     Set<DimensionEntity> entities = new HashSet<>();
     for(int i=0; i<df.size(); i++) {
       String dimension = df.getString(DIMENSION, i);
-      String value = df.getString(VALUE, i);
+      String value = df.getString(VALUE, i).toLowerCase();
       double score = df.getDouble(COST, i);
       entities.add(DimensionEntity.fromDimension(score, dimension, value));
     }
