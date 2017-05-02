@@ -97,10 +97,15 @@ public class CombinePlanNode implements PlanNode {
           Future<Operator> future = futures.get(index);
           try {
             operators.add(future.get(timeout - System.currentTimeMillis(), TimeUnit.MILLISECONDS));
-          } catch (BadQueryRequestException e) {
-            throw e;
           } catch (Exception e) {
-            throw new RuntimeException("Caught exception while running CombinePlanNode.", e);
+            // Future object will throw ExecutionException for execution exception, need to check the cause to determine
+            // whether it is caused by bad query
+            Throwable cause = e.getCause();
+            if (cause instanceof BadQueryRequestException) {
+              throw (BadQueryRequestException) cause;
+            } else {
+              throw new RuntimeException("Caught exception while running CombinePlanNode.", e);
+            }
           }
           index++;
         }
