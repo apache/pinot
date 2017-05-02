@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.dashboard.resources;
 import com.google.common.cache.LoadingCache;
 import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContext;
+import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContextBuilder;
 import com.linkedin.thirdeye.anomaly.merge.TimeBasedAnomalyMerger;
 import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
@@ -742,9 +743,16 @@ public class AnomalyResource {
         viewWindowEndTime = (anomalyResult.getEndTime() > maxDataTime) ? anomalyResult.getEndTime() : maxDataTime;
       }
 
-      AnomalyDetectionInputContext adInputContext =
-          TimeBasedAnomalyMerger.fetchDataByDimension(viewWindowStartTime, viewWindowEndTime, dimensions,
-              anomalyFunction, anomalyMergedResultDAO, overrideConfigDAO, false);
+      DateTime viewWindowStart = new DateTime(viewWindowStartTime);
+      DateTime viewWindowEnd = new DateTime(viewWindowEndTime);
+      AnomalyDetectionInputContextBuilder anomalyDetectionInputContextBuilder =
+          new AnomalyDetectionInputContextBuilder(anomalyFunctionFactory);
+      anomalyDetectionInputContextBuilder.init(anomalyFunctionSpec)
+          .fetchTimeSeriesDataByDimension(viewWindowStart, viewWindowEnd, dimensions, false)
+          .fetchSaclingFactors(viewWindowStart, viewWindowEnd)
+          .fetchExixtingMergedAnomalies(viewWindowStart, viewWindowEnd);
+
+      AnomalyDetectionInputContext adInputContext = anomalyDetectionInputContextBuilder.build();
 
       MetricTimeSeries metricTimeSeries = adInputContext.getDimensionKeyMetricTimeSeriesMap().get(dimensions);
 
