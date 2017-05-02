@@ -22,6 +22,7 @@ public class EventEntity extends Entity {
     return dto;
   }
 
+  @Override
   public EventEntity withScore(double score) {
     return new EventEntity(this.getUrn(), score, this.dto);
   }

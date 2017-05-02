@@ -27,6 +27,11 @@ public class MetricEntity extends Entity {
     return metric;
   }
 
+  @Override
+  public MetricEntity withScore(double score) {
+    return new MetricEntity(this.getUrn(), score, this.dataset, this.metric);
+  }
+
   public static MetricEntity fromMetric(double score, String dataset, String metric) {
     return new MetricEntity(TYPE.formatURN(dataset, metric), score, dataset, metric);
   }

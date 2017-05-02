@@ -41,4 +41,8 @@ public class Entity {
   public double getScore() {
     return score;
   }
+
+  public Entity withScore(double score) {
+    return new Entity(this.urn, score);
+  }
 }

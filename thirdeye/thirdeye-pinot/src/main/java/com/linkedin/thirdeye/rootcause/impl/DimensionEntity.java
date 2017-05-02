@@ -28,6 +28,11 @@ public class DimensionEntity extends Entity {
     return value;
   }
 
+  @Override
+  public DimensionEntity withScore(double score) {
+    return new DimensionEntity(this.getUrn(), score, this.name, this.value);
+  }
+
   public static DimensionEntity fromDimension(double score, String name, String value) {
     return new DimensionEntity(TYPE.formatURN(name, value), score, name, value);
   }

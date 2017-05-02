@@ -22,6 +22,11 @@ public class ServiceEntity extends Entity {
     return name;
   }
 
+  @Override
+  public ServiceEntity withScore(double score) {
+    return new ServiceEntity(this.getUrn(), score, this.name);
+  }
+
   public static ServiceEntity fromName(double score, String name) {
     String urn = TYPE.formatURN(name);
     return new ServiceEntity(urn, score, name);
