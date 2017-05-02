@@ -26,14 +26,11 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
 import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.SchemaUtils;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.common.utils.helix.PinotHelixPropertyStoreZnRecordProvider;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.segment.index.loader.LoaderUtils;
 import com.linkedin.pinot.core.segment.index.loader.V3RemoveIndexException;
 import java.io.File;
-import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.io.FileUtils;
@@ -89,12 +86,7 @@ public class SegmentFetcherAndLoader {
 
     // Try to load table schema from Helix property store.
     // This schema is used for adding default values for newly added columns.
-    Schema schema = null;
-    try {
-      schema = getSchema(tableName);
-    } catch (Exception e) {
-      LOGGER.error("Caught exception while trying to load schema for table: {}", tableName, e);
-    }
+    Schema schema = ZKMetadataProvider.getOfflineTableSchema(_propertyStore, tableName);
 
     LOGGER.info("Adding or replacing segment {} for table {}, metadata {}", segmentId, tableName, offlineSegmentZKMetadata);
     try {
@@ -221,19 +213,6 @@ public class SegmentFetcherAndLoader {
     }
   }
 
-  private Schema getSchema(String schemaName)
-      throws IOException {
-    PinotHelixPropertyStoreZnRecordProvider propertyStoreHelper =
-        PinotHelixPropertyStoreZnRecordProvider.forSchema(_propertyStore);
-    ZNRecord record = propertyStoreHelper.get(schemaName);
-    if (record != null) {
-      LOGGER.info("Found schema: {}", schemaName);
-      return SchemaUtils.fromZNRecord(record);
-    } else {
-      return null;
-    }
-  }
-
   private boolean isNewSegmentMetadata(SegmentMetadata segmentMetadataFromServer,
       SegmentMetadata segmentMetadataForCheck, String segmentName, String tableName) {
     if (segmentMetadataFromServer == null || segmentMetadataForCheck == null) {
@@ -316,12 +295,7 @@ public class SegmentFetcherAndLoader {
       case OFFLINE:
         AbstractTableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
         // For OFFLINE table, try to get schema for default columns
-        Schema schema = null;
-        try {
-          schema = getSchema(tableName);
-        } catch (Exception e) {
-          LOGGER.error("Caught exception while getting schema for table: {}", tableName, e);
-        }
+        Schema schema = ZKMetadataProvider.getOfflineTableSchema(_propertyStore, tableName);
         _dataManager.reloadSegment(segmentMetadata, tableType, offlineTableConfig, schema);
         break;
       case REALTIME:

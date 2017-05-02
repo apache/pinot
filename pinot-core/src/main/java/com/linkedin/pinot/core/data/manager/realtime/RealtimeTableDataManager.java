@@ -28,10 +28,8 @@ import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.fetcher.SegmentFetcherFactory;
 import com.linkedin.pinot.common.utils.CommonConstants.Segment.Realtime.Status;
 import com.linkedin.pinot.common.utils.NamedThreadFactory;
-import com.linkedin.pinot.common.utils.SchemaUtils;
 import com.linkedin.pinot.common.utils.SegmentName;
 import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.common.utils.helix.PinotHelixPropertyStoreZnRecordProvider;
 import com.linkedin.pinot.core.data.manager.offline.AbstractTableDataManager;
 import com.linkedin.pinot.core.data.manager.offline.SegmentDataManager;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
@@ -144,11 +142,7 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
             _segmentsMap.get(segmentName).getClass().getSimpleName());
         return;
       }
-      PinotHelixPropertyStoreZnRecordProvider propertyStoreHelper =
-          PinotHelixPropertyStoreZnRecordProvider.forSchema(propertyStore);
-      ZNRecord record = propertyStoreHelper.get(tableConfig.getValidationConfig().getSchemaName());
-      LOGGER.info("Found schema {} ", tableConfig.getValidationConfig().getSchemaName());
-      Schema schema = SchemaUtils.fromZNRecord(record);
+      Schema schema = ZKMetadataProvider.getRealtimeTableSchema(propertyStore, tableName);
       if (!isValid(schema, tableConfig.getIndexingConfig())) {
         LOGGER.error("Not adding segment {}", segmentName);
         throw new RuntimeException("Mismatching schema/table config for " + _tableName);
