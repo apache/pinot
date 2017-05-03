@@ -129,6 +129,12 @@
                                     <mainClass>com.linkedin.thirdeye.hadoop.ThirdEyeJob</mainClass>
                                 </transformer>
                             </transformers>
+                            <relocations>
+                                <relocation>
+                                    <pattern>org.apache.thrift</pattern>
+                                    <shadedPattern>org.apache.pinot.thrift</shadedPattern>
+                                </relocation>
+                            </relocations>
                         </configuration>
                     </execution>
                 </executions>
