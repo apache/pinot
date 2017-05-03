@@ -155,6 +155,14 @@ AnalysisView.prototype = {
     this.renderDimensions(metricId);
     this.renderFilters(metricId);
     this.setupApplyListener(metricId);
+
+    // TODO remove hack. use separate root cause view
+    if (this.analysisModel.rootCauseEnabled) {
+      const rootcause_table_template = $('#rootcause-table-template').html();
+      const compiled_rootcause_table_template = Handlebars.compile(rootcause_table_template);
+      const rootCauseHTML = compiled_rootcause_table_template(this.analysisModel);
+      $('#rootcause-table-placeholder').html(rootCauseHTML);
+    }
   },
 
   renderDateRangePickers(showTime) {

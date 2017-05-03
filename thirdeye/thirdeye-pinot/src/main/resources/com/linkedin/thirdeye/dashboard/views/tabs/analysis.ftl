@@ -27,4 +27,6 @@
   <div class="spinner-wrapper">
     <div id="dimension-tree-spin-area"></div>
   </div>
+  <div id="rootcause-table-placeholder"></div>
+  <div id="rootcause-spin-area"></div>
 </div>

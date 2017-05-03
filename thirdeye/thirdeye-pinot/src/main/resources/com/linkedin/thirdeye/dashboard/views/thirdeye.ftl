@@ -95,6 +95,9 @@
 <script id="dimension-tree-map-graph-template" type="text/x-handlebars-template">
   <#include "tabs/analysis/dimension-tree-map-graph.ftl"/>
 </script>
+<script id="rootcause-table-template" type="text/x-handlebars-template">
+  <#include "tabs/analysis/rootcause-table.ftl"/>
+</script>
 <#include "admin/job-info.ftl"/>
 <#include "admin/ingraph-metric-config.ftl"/>
 <#include "admin/ingraph-dashboard-config.ftl"/>

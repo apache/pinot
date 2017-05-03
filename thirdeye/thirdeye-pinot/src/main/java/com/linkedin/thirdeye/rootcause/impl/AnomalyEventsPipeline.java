@@ -3,7 +3,10 @@ package com.linkedin.thirdeye.rootcause.impl;
 import com.linkedin.thirdeye.anomaly.events.EventDataProviderManager;
 import com.linkedin.thirdeye.anomaly.events.EventFilter;
 import com.linkedin.thirdeye.anomaly.events.EventType;
+import com.linkedin.thirdeye.client.DAORegistry;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.PipelineContext;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
@@ -24,6 +27,7 @@ public class AnomalyEventsPipeline extends Pipeline {
   private static final Logger LOG = LoggerFactory.getLogger(AnomalyEventsPipeline.class);
 
   private final EventDataProviderManager manager;
+  private final MetricConfigManager metricDAO;
 
   /**
    * Constructor for dependency injection
@@ -31,10 +35,12 @@ public class AnomalyEventsPipeline extends Pipeline {
    * @param outputName pipeline output name
    * @param inputNames input pipeline names
    * @param manager event data provider manager
+   * @param metricDAO metric config DAO
    */
-  public AnomalyEventsPipeline(String outputName, Set<String> inputNames, EventDataProviderManager manager) {
+  public AnomalyEventsPipeline(String outputName, Set<String> inputNames, EventDataProviderManager manager, MetricConfigManager metricDAO) {
     super(outputName, inputNames);
     this.manager = manager;
+    this.metricDAO = metricDAO;
   }
 
   /**
@@ -47,6 +53,7 @@ public class AnomalyEventsPipeline extends Pipeline {
   public AnomalyEventsPipeline(String outputName, Set<String> inputNames, Map<String, String> ignore) {
     super(outputName, inputNames);
     this.manager = EventDataProviderManager.getInstance();
+    this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
   }
 
   @Override
@@ -57,13 +64,19 @@ public class AnomalyEventsPipeline extends Pipeline {
 
     Set<EventEntity> entities = new HashSet<>();
     for(MetricEntity me : metrics) {
+      MetricConfigDTO metricDTO = this.metricDAO.findById(me.getId());
+      if(metricDTO == null) {
+        LOG.warn("Could not resolve metric id {}. Skipping.", me.getId());
+        continue;
+      }
+
       EventFilter filter = new EventFilter();
       filter.setEventType(EventType.HISTORICAL_ANOMALY.toString());
-      filter.setMetricName(me.getMetric());
+      filter.setMetricName(metricDTO.getName());
 
-      for(EventDTO dto : manager.getEvents(filter)) {
-        double score = getScore(current, dto);
-        entities.add(EventEntity.fromDTO(score, dto));
+      for(EventDTO eventDTO : manager.getEvents(filter)) {
+        double score = getScore(current, eventDTO);
+        entities.add(EventEntity.fromDTO(score, eventDTO));
       }
     }
 

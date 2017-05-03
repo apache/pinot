@@ -32,7 +32,6 @@ public class NullPipeline extends Pipeline {
    * @param inputNames input pipeline names
    * @param ignore configuration properties (none)
    */
-
   public NullPipeline(String outputName, Set<String> inputNames, Map<String, String> ignore) {
     super(outputName, inputNames);
   }
