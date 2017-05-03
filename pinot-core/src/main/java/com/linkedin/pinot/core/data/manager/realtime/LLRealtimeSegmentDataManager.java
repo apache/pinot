@@ -266,9 +266,9 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   protected boolean consumeLoop() throws Exception {
     _fieldExtractor.resetCounters();
     final long idlePipeSleepTimeMillis = 100;
-    final int maxIdleCountBeforeStatUpdate = 180_000;  // 3 minutes
+    final long maxIdleCountBeforeStatUpdate = (3 * 60 * 1000)/idlePipeSleepTimeMillis;  // 3 minute count
     long lastUpdatedOffset = _currentOffset;  // so that we always update the metric when we enter this method.
-    int idleCount = 0;
+    long idleCount = 0;
 
     final long _endOffset = Long.MAX_VALUE; // No upper limit on Kafka offset
     segmentLogger.info("Starting consumption loop start offset {}, finalOffset {}", _currentOffset, _finalOffset);
