@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.dashboard.resources.v2.rootcause;
 
+import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.dashboard.resources.v2.RootCauseEntityFormatter;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.RootCauseEntity;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
@@ -13,6 +14,10 @@ public class MetricEntityFormatter extends RootCauseEntityFormatter {
 
   public MetricEntityFormatter(MetricConfigManager metricDAO) {
     this.metricDAO = metricDAO;
+  }
+
+  public MetricEntityFormatter() {
+    this.metricDAO = DAORegistry.getInstance().getMetricConfigDAO();
   }
 
   @Override
