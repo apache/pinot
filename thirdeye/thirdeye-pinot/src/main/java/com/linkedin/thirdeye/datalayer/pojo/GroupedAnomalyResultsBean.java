@@ -10,7 +10,7 @@ public class GroupedAnomalyResultsBean extends AbstractBean {
   private List<Long> anomalyResultsId = new ArrayList<>();
   // the max endTime among all its merged anomaly results
   private long endTime;
-
+  private boolean isNotified = false;
 
   public long getAlertConfigId() {
     return alertConfigId;
@@ -42,5 +42,13 @@ public class GroupedAnomalyResultsBean extends AbstractBean {
 
   public void setEndTime(long endTime) {
     this.endTime = endTime;
+  }
+
+  public boolean isNotified() {
+    return isNotified;
+  }
+
+  public void setNotified(boolean notified) {
+    isNotified = notified;
   }
 }

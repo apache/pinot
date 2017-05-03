@@ -326,4 +326,3 @@ create table if not exists grouped_anomaly_results_index (
     version int(10)
 ) ENGINE=InnoDB;
 create index grouped_anomaly_results_alert_config_id on grouped_anomaly_results_index(alert_config_id);
-create index grouped_anomaly_results_dimensions on grouped_anomaly_results_index(dimensions);

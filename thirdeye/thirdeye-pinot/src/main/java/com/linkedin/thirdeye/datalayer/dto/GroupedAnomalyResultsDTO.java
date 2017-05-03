@@ -14,7 +14,6 @@ public class GroupedAnomalyResultsDTO extends GroupedAnomalyResultsBean {
 
   private List<MergedAnomalyResultDTO> anomalyResults = new ArrayList<>();
 
-
   public List<MergedAnomalyResultDTO> getAnomalyResults() {
     return anomalyResults;
   }
@@ -36,5 +35,4 @@ public class GroupedAnomalyResultsDTO extends GroupedAnomalyResultsBean {
     });
     return anomalyResults.get(anomalyResults.size() - 1).getEndTime();
   }
-
 }

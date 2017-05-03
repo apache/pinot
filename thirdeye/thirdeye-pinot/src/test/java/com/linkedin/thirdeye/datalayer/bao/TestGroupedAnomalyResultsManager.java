@@ -60,9 +60,9 @@ public class TestGroupedAnomalyResultsManager extends AbstractManagerTestBase {
     Assert.assertNotEquals(id2, null);
 
     GroupedAnomalyResultsDTO groupedAnomalyResultsDTO3 = new GroupedAnomalyResultsDTO();
-    groupedAnomalyResultsDTO2.setAlertConfigId(1);
-    groupedAnomalyResultsDTO2.setDimensions(dimensionMap);
-    groupedAnomalyResultsDTO2.setAnomalyResults(mergedAnomalyResultsSet1);
+    groupedAnomalyResultsDTO3.setAlertConfigId(1);
+    groupedAnomalyResultsDTO3.setDimensions(dimensionMap);
+    groupedAnomalyResultsDTO3.setAnomalyResults(mergedAnomalyResultsSet1);
     Long id3 = groupedAnomalyResultsDAO.save(groupedAnomalyResultsDTO3);
 
     GroupedAnomalyResultsDTO groupedAnomalyResultsDTOByID = groupedAnomalyResultsDAO.findById(id2);
@@ -71,6 +71,7 @@ public class TestGroupedAnomalyResultsManager extends AbstractManagerTestBase {
         groupedAnomalyResultsDAO.findMostRecentInTimeWindow(1, dimensionMap.toString(), 0, 50);
     Assert.assertNotEquals(recentGroupedAnomalyResultsDTO, null);
     Assert.assertEquals(recentGroupedAnomalyResultsDTO.getId(), groupedAnomalyResultsDTOByID.getId());
+    Assert.assertEquals(recentGroupedAnomalyResultsDTO.getAnomalyResults(), groupedAnomalyResultsDTO2.getAnomalyResults());
   }
 
   @DataProvider(name = "groupedAnomalies")

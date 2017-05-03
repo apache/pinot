@@ -30,13 +30,4 @@ public interface AlertGrouper {
    * @return the additional recipients for the given group.
    */
   String groupEmailRecipients(DimensionMap alertGroupKey);
-
-  /**
-   * Constructs group key from the given raw key and based on the setting of this grouper.
-   *
-   * @param rawKey the information to construct a group key of this grouper.
-   *
-   * @return a group key.
-   */
-//  DimensionMap constructGroupKey(DimensionMap rawKey);
 }

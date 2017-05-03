@@ -340,6 +340,23 @@ public class RunAdhocDatabaseQueriesTool {
     datasetConfigDAO.update(datasetConfig);
   }
 
+  private void unsetMergedAnomalyNotifiedField(String dataset, long duration) {
+    long windowEnd = System.currentTimeMillis();
+    long windowStart = windowEnd - duration;
+
+    List<MergedAnomalyResultDTO> mergedAnomalyResults =
+        mergedResultDAO.findByCollectionTime(dataset, windowStart, windowEnd, false);
+    System.out.println(mergedAnomalyResults.size() + " anomalies to update for dataset " + dataset);
+    for (MergedAnomalyResultDTO mergedAnomalyResult : mergedAnomalyResults) {
+      if (mergedAnomalyResult.isNotified() == true) {
+        System.out.print(" Updating anomaly:" + mergedAnomalyResult.getId());
+        mergedAnomalyResult.setNotified(false);
+        mergedResultDAO.update(mergedAnomalyResult);
+      }
+    }
+    System.out.print("");
+  }
+
 
   public static void main(String[] args) throws Exception {
 
@@ -349,6 +366,12 @@ public class RunAdhocDatabaseQueriesTool {
       System.exit(1);
     }
     RunAdhocDatabaseQueriesTool dq = new RunAdhocDatabaseQueriesTool(persistenceFile);
+    String[] datasets = new String[] { "sitespeed_thirdeye", "sitespeed_thirdeye_native" };
+
+    long duration = 1000 * 60 * 60 * 24; // 1 day
+    for (String dataset : datasets) {
+      dq.unsetMergedAnomalyNotifiedField(dataset, duration);
+    }
   }
 
 }
