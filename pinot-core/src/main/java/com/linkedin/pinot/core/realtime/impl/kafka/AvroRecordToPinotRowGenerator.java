@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
+import com.linkedin.pinot.common.data.TimeFieldSpec;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -32,15 +33,30 @@ import com.linkedin.pinot.core.data.readers.AvroRecordReader;
 
 public class AvroRecordToPinotRowGenerator {
   private final Schema indexingSchema;
+  private final String timeColumnName;
+  private final FieldSpec timeFieldSpec;
 
   public AvroRecordToPinotRowGenerator(Schema indexingSchema) {
     this.indexingSchema = indexingSchema;
+    timeColumnName = indexingSchema.getTimeFieldSpec().getIncomingTimeColumnName();
+    if (indexingSchema.getTimeColumnName().equals(timeColumnName)) {
+      timeFieldSpec = new TimeFieldSpec(indexingSchema.getTimeFieldSpec().getIncomingGranularitySpec());
+    } else {
+      timeFieldSpec = indexingSchema.getTimeFieldSpec();
+    }
   }
 
   public GenericRow transform(GenericData.Record record, org.apache.avro.Schema schema, GenericRow destination) {
+    FieldSpec fieldSpec;
     for (String column : indexingSchema.getColumnNames()) {
+      if (column.equals(indexingSchema.getTimeColumnName())
+          && (!column.equals(indexingSchema.getTimeFieldSpec().getIncomingTimeColumnName()))){
+        column = timeColumnName;
+        fieldSpec = timeFieldSpec;
+      } else {
+        fieldSpec = indexingSchema.getFieldSpecFor(column);
+      }
       Object entry = record.get(column);
-      FieldSpec fieldSpec = indexingSchema.getFieldSpecFor(column);
 
       if (entry != null) {
         if (entry instanceof Array) {
