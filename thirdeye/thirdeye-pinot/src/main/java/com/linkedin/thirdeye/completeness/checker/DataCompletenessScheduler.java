@@ -24,7 +24,7 @@ public class DataCompletenessScheduler {
     dataCompletenessJobContext = new DataCompletenessJobContext();
     dataCompletenessJobRunner = new DataCompletenessJobRunner(dataCompletenessJobContext);
 
-    scheduledExecutorService.scheduleWithFixedDelay(dataCompletenessJobRunner, 0, 5, TimeUnit.MINUTES);
+    scheduledExecutorService.scheduleAtFixedRate(dataCompletenessJobRunner, 0, 15, TimeUnit.MINUTES);
   }
 
   public void shutdown() {
