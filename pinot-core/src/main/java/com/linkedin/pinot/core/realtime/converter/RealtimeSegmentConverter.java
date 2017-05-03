@@ -49,10 +49,10 @@ public class RealtimeSegmentConverter {
       throw new IllegalAccessError("path already exists:" + outputPath);
     }
     TimeFieldSpec original = schema.getTimeFieldSpec();
-    TimeGranularitySpec incoming = original.getIncomingGranularitySpec();
-    // incoming.setDataType(DataType.LONG);
+    // Use outgoing granularity for creating segment
+    TimeGranularitySpec outgoing = original.getOutgoingGranularitySpec();
 
-    TimeFieldSpec newTimeSpec = new TimeFieldSpec(incoming);
+    TimeFieldSpec newTimeSpec = new TimeFieldSpec(outgoing);
 
     Schema newSchema = new Schema();
     for (String dimension : schema.getDimensionNames()) {
