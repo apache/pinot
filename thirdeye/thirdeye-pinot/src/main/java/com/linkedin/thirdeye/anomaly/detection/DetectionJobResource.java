@@ -559,7 +559,7 @@ public class DetectionJobResource {
    *  - return list of parameter combinations along with their performance evaluation
    * @param functionId
    * the id of the target anomaly function
-   * @param replayStartTimeIso
+   * @param  replayTimeIso
    * the start time of the anomaly function replay in ISO format, e.g. 2017-02-27T00:00:00.000Z
    * @param replayDuration
    * the duration of the replay ahead of the replayStartTimeIso
@@ -785,7 +785,7 @@ public class DetectionJobResource {
     }
 
     Map<String, String> responseMessages = new HashMap<>();
-    responseMessages.put("cloneFunctionId", String.valueOf(functionReplayRunnable.getClonedFunctionId()));
+    responseMessages.put("cloneFunctionId", String.valueOf(functionReplayRunnable.getLastClonedFunctionId()));
     if (target != null && functionId != null && functionId != target.getFunctionId()) {
       responseMessages.put("Warning", "Input function Id does not consistent with autotune Id's function, use auto tune Id's information instead.");
     }
