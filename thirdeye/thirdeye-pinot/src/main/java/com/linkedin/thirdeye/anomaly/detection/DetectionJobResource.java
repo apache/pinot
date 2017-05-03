@@ -583,7 +583,7 @@ public class DetectionJobResource {
   @Path("replay/function/{id}")
   public Response anomalyFunctionReplay(@PathParam("id") @NotNull long functionId,
       @QueryParam("time") String replayTimeIso, @QueryParam("duration") @DefaultValue("30") int replayDuration,
-      @QueryParam("durationUnit") String durationUnit,
+      @QueryParam("durationUnit") @DefaultValue("DAYS") String durationUnit,
       @QueryParam("speedup") @DefaultValue("true") boolean speedup,
       @QueryParam("tune") @DefaultValue("{\"pValueThreshold\":[0.05, 0.01]}") String tuningJSON,
       @QueryParam("goal") @DefaultValue("0.05") double goal,
@@ -597,10 +597,8 @@ public class DetectionJobResource {
     DateTime replayStart = null;
     DateTime replayEnd = null;
     try {
-      TimeUnit timeUnit = anomalyFunction.getBucketUnit();
-      if (StringUtils.isNotEmpty(durationUnit)) {
-        timeUnit = TimeUnit.valueOf(durationUnit);
-      }
+      TimeUnit timeUnit = TimeUnit.valueOf(durationUnit.toUpperCase());
+
       TimeGranularity timeGranularity = new TimeGranularity(replayDuration, timeUnit);
       replayStart = DateTime.now();
       if (StringUtils.isNotEmpty(replayTimeIso)) {
