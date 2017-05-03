@@ -1,6 +1,8 @@
 package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
+import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.bao.GroupedAnomalyResultsManager;
+import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.GroupedAnomalyResultsDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.pojo.GroupedAnomalyResultsBean;
@@ -15,8 +17,6 @@ import org.modelmapper.ModelMapper;
 
 public class GroupedAnomalyResultsManagerImpl extends AbstractManagerImpl<GroupedAnomalyResultsDTO>
     implements GroupedAnomalyResultsManager {
-
-  private static MergedAnomalyResultManagerImpl mergedAnomalyDAO = new MergedAnomalyResultManagerImpl();
 
   protected static final ModelMapper MODEL_MAPPER = new ModelMapper();
 
@@ -104,22 +104,24 @@ public class GroupedAnomalyResultsManagerImpl extends AbstractManagerImpl<Groupe
   }
 
   /**
-   * Convert grouped anomaly result bean to DTO. The merged anomaly results in this group are also converted to their
+   * Convert grouped anomaly bean to DTO. The merged anomaly results in this group are also converted to their
    * corresponding DTO class; however, the raw anomalies of those merged results are not converted.
    *
    * @param groupedAnomalyResultsBean the bean class to be converted
    *
    * @return the DTO class that consists of the DTO of merged anomalies whose raw anomalies are not converted from bean.
    */
-  protected GroupedAnomalyResultsDTO convertGroupedAnomalyBean2DTO(GroupedAnomalyResultsBean groupedAnomalyResultsBean) {
+  protected GroupedAnomalyResultsDTO convertGroupedAnomalyBean2DTO(
+      GroupedAnomalyResultsBean groupedAnomalyResultsBean) {
     GroupedAnomalyResultsDTO groupedAnomalyResultsDTO =
         MODEL_MAPPER.map(groupedAnomalyResultsBean, GroupedAnomalyResultsDTO.class);
 
     if (CollectionUtils.isNotEmpty(groupedAnomalyResultsBean.getAnomalyResultsId())) {
       List<MergedAnomalyResultBean> list =
           genericPojoDao.get(groupedAnomalyResultsBean.getAnomalyResultsId(), MergedAnomalyResultBean.class);
+      MergedAnomalyResultManager mergedAnomalyDAO = DAORegistry.getInstance().getMergedAnomalyResultDAO();
       List<MergedAnomalyResultDTO> mergedAnomalyResults =
-          mergedAnomalyDAO.batchConvertMergedAnomalyBean2DTO(list, false);
+          mergedAnomalyDAO.convertMergedAnomalyBean2DTO(list, true);
       groupedAnomalyResultsDTO.setAnomalyResults(mergedAnomalyResults);
     }
 

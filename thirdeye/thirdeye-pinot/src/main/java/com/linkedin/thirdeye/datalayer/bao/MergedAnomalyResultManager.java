@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
+import com.linkedin.thirdeye.datalayer.pojo.MergedAnomalyResultBean;
 import java.util.List;
 
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
@@ -45,4 +46,12 @@ public interface MergedAnomalyResultManager extends AbstractManager<MergedAnomal
   List<MergedAnomalyResultDTO> findUnNotifiedByFunctionIdAndIdLesserThanAndEndTimeGreaterThanLastOneDay(long functionId, long anomalyId);
 
   void updateAnomalyFeedback(MergedAnomalyResultDTO entity);
+
+  MergedAnomalyResultBean convertMergeAnomalyDTO2Bean(MergedAnomalyResultDTO entity);
+
+  MergedAnomalyResultDTO convertMergedAnomalyBean2DTO(MergedAnomalyResultBean mergedAnomalyResultBean,
+      boolean loadRawAnomalies);
+
+  List<MergedAnomalyResultDTO> convertMergedAnomalyBean2DTO(
+      List<MergedAnomalyResultBean> mergedAnomalyResultBeanList, boolean loadRawAnomalies);
 }

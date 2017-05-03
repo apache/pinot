@@ -202,6 +202,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
           updateNotifiedStatus(resultsForThisGroup);
           if (!(alertGrouper instanceof DummyAlertGrouper)) {
             groupedAnomalyDTO.setNotified(true);
+            groupedAnomalyResultsDAO.update(groupedAnomalyDTO);
           }
         }
 
