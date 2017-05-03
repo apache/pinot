@@ -34,22 +34,16 @@ import org.joda.time.format.ISODateTimeFormat;
 public class RootCauseResource {
   private static final DateTimeFormatter ISO8601 = ISODateTimeFormat.basicDateTimeNoMillis();
 
-  // NOTE: Must not be static to ensure DAO initialization order
-  private final List<RootCauseEntityFormatter> formatters = Arrays.asList(
-      new MetricEntityFormatter(DAORegistry.getInstance().getMetricConfigDAO()),
-      new DimensionEntityFormatter(),
-      new ServiceEntityFormatter(),
-      new EventEntityFormatter(),
-      new DefaultEntityFormatter()
-  );
+  private final List<RootCauseEntityFormatter> formatters;
 
   private static final long HOUR_IN_MS = 60 * 60 * 1000;
   private static final long DAY_IN_MS = 24 * HOUR_IN_MS;
 
   private final RCAFramework rca;
 
-  public RootCauseResource(RCAFramework rca) {
+  public RootCauseResource(RCAFramework rca, List<RootCauseEntityFormatter> formatters) {
     this.rca = rca;
+    this.formatters = formatters;
   }
 
   @GET

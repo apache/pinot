@@ -23,8 +23,11 @@ import com.linkedin.thirdeye.dashboard.resources.ThirdEyeResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.AnomaliesResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.DataResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.EventResource;
+import com.linkedin.thirdeye.dashboard.resources.v2.RootCauseEntityFormatter;
 import com.linkedin.thirdeye.dashboard.resources.v2.RootCauseResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.TimeSeriesResource;
+import com.linkedin.thirdeye.dashboard.resources.v2.rootcause.DefaultEntityFormatter;
+import com.linkedin.thirdeye.dashboard.resources.v2.rootcause.FormatterLoader;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 
@@ -38,6 +41,7 @@ import io.dropwizard.views.ViewBundle;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
 import org.eclipse.jetty.servlets.CrossOriginFilter;
@@ -110,7 +114,7 @@ public class ThirdEyeDashboardApplication
     env.jersey().register(new EventResource(config));
     env.jersey().register(new DataCompletenessResource(DAO_REGISTRY.getDataCompletenessConfigDAO()));
     env.jersey().register(new EntityMappingResource());
-    env.jersey().register(new RootCauseResource(makeRCAFramework(config)));
+    env.jersey().register(new RootCauseResource(makeRCAFramework(config), makeRCAFormatters(config)));
   }
 
   private static RCAFramework makeRCAFramework(ThirdEyeDashboardConfiguration config) throws Exception {
@@ -121,6 +125,17 @@ public class ThirdEyeDashboardApplication
       configFile = new File(config.getRootDir() + File.separator + configFile);
     List<Pipeline> pipelines = PipelineLoader.getPipelinesFromConfig(configFile);
     return new RCAFramework(pipelines, Executors.newFixedThreadPool(config.getRcaParallelism()));
+  }
+
+  private static List<RootCauseEntityFormatter> makeRCAFormatters(ThirdEyeDashboardConfiguration config) throws Exception {
+    List<RootCauseEntityFormatter> formatters = new ArrayList<>();
+    if(config.getRcaFormatters() != null) {
+      for(String className : config.getRcaFormatters()) {
+        formatters.add(FormatterLoader.fromClassName(className));
+      }
+    }
+    formatters.add(new DefaultEntityFormatter());
+    return formatters;
   }
 
   public static void main(String[] args) throws Exception {
