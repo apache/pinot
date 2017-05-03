@@ -16,8 +16,6 @@
 package com.linkedin.pinot.core.realtime.impl.kafka;
 
 import com.linkedin.pinot.common.data.TimeFieldSpec;
-import java.util.HashMap;
-import java.util.Map;
 
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericData.Array;
@@ -33,26 +31,25 @@ import com.linkedin.pinot.core.data.readers.AvroRecordReader;
 
 public class AvroRecordToPinotRowGenerator {
   private final Schema indexingSchema;
-  private final String timeColumnName;
-  private final FieldSpec timeFieldSpec;
+  private final String incomingTimeColumnName;
+  private final FieldSpec incomingTimeFieldSpec;
 
   public AvroRecordToPinotRowGenerator(Schema indexingSchema) {
     this.indexingSchema = indexingSchema;
-    timeColumnName = indexingSchema.getTimeFieldSpec().getIncomingTimeColumnName();
-    if (indexingSchema.getTimeColumnName().equals(timeColumnName)) {
-      timeFieldSpec = new TimeFieldSpec(indexingSchema.getTimeFieldSpec().getIncomingGranularitySpec());
+    incomingTimeColumnName = indexingSchema.getTimeFieldSpec().getIncomingTimeColumnName();
+    if (indexingSchema.getTimeColumnName().equals(incomingTimeColumnName)) {
+      incomingTimeFieldSpec = new TimeFieldSpec(indexingSchema.getTimeFieldSpec().getIncomingGranularitySpec());
     } else {
-      timeFieldSpec = indexingSchema.getTimeFieldSpec();
+      incomingTimeFieldSpec = indexingSchema.getTimeFieldSpec();
     }
   }
 
   public GenericRow transform(GenericData.Record record, org.apache.avro.Schema schema, GenericRow destination) {
     FieldSpec fieldSpec;
     for (String column : indexingSchema.getColumnNames()) {
-      if (column.equals(indexingSchema.getTimeColumnName())
-          && (!column.equals(indexingSchema.getTimeFieldSpec().getIncomingTimeColumnName()))){
-        column = timeColumnName;
-        fieldSpec = timeFieldSpec;
+      if (column.equals(indexingSchema.getTimeFieldSpec().getOutgoingTimeColumnName())) {
+        column = incomingTimeColumnName;
+        fieldSpec = incomingTimeFieldSpec;
       } else {
         fieldSpec = indexingSchema.getFieldSpecFor(column);
       }
