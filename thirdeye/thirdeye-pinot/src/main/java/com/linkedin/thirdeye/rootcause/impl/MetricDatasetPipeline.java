@@ -66,7 +66,9 @@ public class MetricDatasetPipeline extends Pipeline {
     Set<String> datasets = new HashSet<>();
     Map<String, Double> datasetScores = new HashMap<>();
     for(MetricEntity me : metrics) {
-      String d = me.getDataset();
+      MetricConfigDTO metricDTO = this.metricDAO.findById(me.getId());
+
+      String d = metricDTO.getDataset();
       datasets.add(d);
 
       double metricScore = me.getScore();
@@ -90,7 +92,7 @@ public class MetricDatasetPipeline extends Pipeline {
 
       for(MetricConfigDTO dto : dtos) {
         double score = datasetScore / dtos.size();
-        entities.add(MetricEntity.fromMetric(score, d, dto.getName()));
+        entities.add(MetricEntity.fromMetric(score, dto.getId()));
       }
     }
 
@@ -108,8 +110,7 @@ public class MetricDatasetPipeline extends Pipeline {
 
   static boolean findExisting(MetricConfigDTO dto, Iterable<MetricEntity> existing) {
     for(MetricEntity me : existing) {
-      if(me.getDataset().equals(dto.getDataset()) &&
-          me.getMetric().equals(dto.getName())) {
+      if(me.getId() == dto.getId()) {
         return true;
       }
     }

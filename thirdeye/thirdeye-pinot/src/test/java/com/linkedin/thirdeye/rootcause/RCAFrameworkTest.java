@@ -32,7 +32,7 @@ public class RCAFrameworkTest {
 
   @Test
   public void testLinearAggregationPipeline() {
-    LinearAggregationPipeline agg = new LinearAggregationPipeline("", Collections.<String>emptySet());
+    LinearAggregationPipeline agg = new LinearAggregationPipeline("", Collections.<String>emptySet(), -1);
 
     Entity e1 = new Entity("e:one", 1.0);
     Entity e2 = new Entity("e:two", 2.1);

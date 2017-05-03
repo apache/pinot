@@ -41,4 +41,13 @@ public class Entity {
   public double getScore() {
     return score;
   }
+
+  public Entity withScore(double score) {
+    return new Entity(this.urn, score);
+  }
+
+  @Override
+  public String toString() {
+    return String.format("%s(urn=%s, score=%.3f)", getClass().getSimpleName(), this.urn, this.score);
+  }
 }

@@ -6,6 +6,7 @@ import com.linkedin.thirdeye.rootcause.Pipeline;
 import java.io.File;
 import java.lang.reflect.Constructor;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -38,9 +39,10 @@ public class PipelineLoader {
         Set<String> inputNames = new HashSet<>(pipelineConfig.getInputNames());
         String className = pipelineConfig.getClassName();
         Map<String, String> properties = pipelineConfig.getProperties();
+        if(properties == null)
+          properties = new HashMap<>();
 
-        if(properties != null)
-          properties = augmentPathProperty(properties, rcaConfig);
+        properties = augmentPathProperty(properties, rcaConfig);
 
         LOG.info("Creating pipeline '{}' [{}] with inputs '{}'", outputName, className, inputNames);
         Constructor<?> constructor = Class.forName(className).getConstructor(String.class, Set.class, Map.class);
