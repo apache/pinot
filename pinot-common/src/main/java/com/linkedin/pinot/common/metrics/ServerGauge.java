@@ -25,6 +25,7 @@ import com.linkedin.pinot.common.Utils;
 public enum ServerGauge implements AbstractMetrics.Gauge {
   DOCUMENT_COUNT("documents", false),
   SEGMENT_COUNT("segments", false),
+  LLC_PARTITION_CONSUMING("state", false),
   HIGHEST_KAFKA_OFFSET_CONSUMED("messages", false),
   LAST_REALTIME_SEGMENT_CREATION_DURATION_SECONDS("seconds", false),
   LAST_REALTIME_SEGMENT_INITIAL_CONSUMPTION_DURATION_SECONDS("seconds", false),
