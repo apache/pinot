@@ -1,22 +1,16 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
-import com.linkedin.thirdeye.anomaly.events.EventDataProviderManager;
-import com.linkedin.thirdeye.anomaly.events.EventFilter;
-import com.linkedin.thirdeye.anomaly.events.HolidayEventProvider;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.RootCauseEntity;
-import com.linkedin.thirdeye.datalayer.bao.EventManager;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.EventDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.dashboard.resources.v2.rootcause.DefaultEntityFormatter;
+import com.linkedin.thirdeye.dashboard.resources.v2.rootcause.DimensionEntityFormatter;
+import com.linkedin.thirdeye.dashboard.resources.v2.rootcause.EventEntityFormatter;
+import com.linkedin.thirdeye.dashboard.resources.v2.rootcause.MetricEntityFormatter;
+import com.linkedin.thirdeye.dashboard.resources.v2.rootcause.ServiceEntityFormatter;
 import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.RCAFramework;
 import com.linkedin.thirdeye.rootcause.RCAFrameworkExecutionResult;
-import com.linkedin.thirdeye.rootcause.impl.DimensionEntity;
 import com.linkedin.thirdeye.rootcause.impl.EntityUtils;
-import com.linkedin.thirdeye.rootcause.impl.EventEntity;
-import com.linkedin.thirdeye.rootcause.impl.MetricEntity;
-import com.linkedin.thirdeye.rootcause.impl.ServiceEntity;
 import com.linkedin.thirdeye.rootcause.impl.TimeRangeEntity;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -41,7 +35,7 @@ public class RootCauseResource {
   private static final DateTimeFormatter ISO8601 = ISODateTimeFormat.basicDateTimeNoMillis();
 
   // NOTE: Must not be static to ensure DAO initialization order
-  private final List<EntityFormatter> formatters = Arrays.asList(
+  private final List<RootCauseEntityFormatter> formatters = Arrays.asList(
       new MetricEntityFormatter(DAORegistry.getInstance().getMetricConfigDAO()),
       new DimensionEntityFormatter(),
       new ServiceEntityFormatter(),
@@ -125,117 +119,11 @@ public class RootCauseResource {
   }
 
   RootCauseEntity applyFormatters(Entity e) {
-    for(EntityFormatter formatter : this.formatters) {
+    for(RootCauseEntityFormatter formatter : this.formatters) {
       if(formatter.applies(e))
         return formatter.format(e);
     }
     throw new IllegalArgumentException(String.format("No formatter for Entity '%s'", e.getUrn()));
   }
 
-  interface EntityFormatter {
-    boolean applies(Entity entity);
-    RootCauseEntity format(Entity entity);
-  }
-
-  static class DefaultEntityFormatter implements EntityFormatter {
-    @Override
-    public boolean applies(Entity entity) {
-      return true;
-    }
-
-    @Override
-    public RootCauseEntity format(Entity entity) {
-      String link = String.format("javascript:alert('%s');", entity.getUrn());
-
-      return makeRootCauseEntity(entity, "Other", "(none)", link);
-    }
-  }
-
-  static class MetricEntityFormatter implements EntityFormatter {
-    private final MetricConfigManager metricDAO;
-
-    public MetricEntityFormatter(MetricConfigManager metricDAO) {
-      this.metricDAO = metricDAO;
-    }
-
-    @Override
-    public boolean applies(Entity entity) {
-      return MetricEntity.TYPE.isType(entity.getUrn());
-    }
-
-    @Override
-    public RootCauseEntity format(Entity entity) {
-      MetricEntity e = MetricEntity.fromURN(entity.getUrn(), entity.getScore());
-
-      MetricConfigDTO metricDTO = this.metricDAO.findById(e.getId());
-
-      String label = String.format("unknown (id=%d)", e.getId());
-      if(metricDTO != null)
-          label = String.format("%s/%s", metricDTO.getDataset(), metricDTO.getName());
-
-      String link = String.format("javascript:alert('%s');", e.getUrn());
-
-      return makeRootCauseEntity(entity, "Metric", label, link);
-    }
-  }
-
-  static class DimensionEntityFormatter implements EntityFormatter {
-    @Override
-    public boolean applies(Entity entity) {
-      return DimensionEntity.TYPE.isType(entity.getUrn());
-    }
-
-    @Override
-    public RootCauseEntity format(Entity entity) {
-      DimensionEntity e = DimensionEntity.fromURN(entity.getUrn(), entity.getScore());
-
-      String label = String.format("%s=%s", e.getName(), e.getValue());
-      String link = String.format("javascript:alert('%s');", e.getUrn());
-
-      return makeRootCauseEntity(entity, "Dimension", label, link);
-    }
-  }
-
-  static class ServiceEntityFormatter implements EntityFormatter {
-    @Override
-    public boolean applies(Entity entity) {
-      return ServiceEntity.TYPE.isType(entity.getUrn());
-    }
-
-    @Override
-    public RootCauseEntity format(Entity entity) {
-      ServiceEntity e = ServiceEntity.fromURN(entity.getUrn(), entity.getScore());
-
-      String link = String.format("javascript:alert('%s');", e.getUrn());
-
-      return makeRootCauseEntity(entity, "Service", e.getName(), link);
-    }
-  }
-
-  static class EventEntityFormatter implements EntityFormatter {
-    @Override
-    public boolean applies(Entity entity) {
-      return EventEntity.TYPE.isType(entity.getUrn());
-    }
-
-    @Override
-    public RootCauseEntity format(Entity entity) {
-      EventEntity e = EventEntity.fromURN(entity.getUrn(), entity.getScore());
-
-      String label = String.format("%s (%s)", e.getType(), e.getId());
-      String link = String.format("javascript:alert('%s');", entity.getUrn());
-
-      return makeRootCauseEntity(entity, "Event", label, link);
-    }
-  }
-
-  static RootCauseEntity makeRootCauseEntity(Entity entity, String type, String label, String link) {
-    RootCauseEntity out = new RootCauseEntity();
-    out.setUrn(entity.getUrn());
-    out.setScore(Math.round(entity.getScore() * 1000) / 1000.0);
-    out.setType(type);
-    out.setLabel(label);
-    out.setLink(link);
-    return out;
-  }
 }
