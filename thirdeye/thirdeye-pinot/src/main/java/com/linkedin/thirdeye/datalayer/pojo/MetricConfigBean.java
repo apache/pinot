@@ -39,7 +39,7 @@ public class MetricConfigBean extends AbstractBean {
 
   private Map<String, String> extSourceLinkTimeGranularity;
 
-  private Map<String, String> properties = null;
+  private Map<String, String> metricProperties = null;
 
 
   public String getName() {
@@ -138,12 +138,12 @@ public class MetricConfigBean extends AbstractBean {
     this.extSourceLinkTimeGranularity = extSourceLinkTimeGranularity;
   }
 
-  public Map<String, String> getProperties() {
-    return properties;
+  public Map<String, String> getMetricProperties() {
+    return metricProperties;
   }
 
-  public void setProperties(Map<String, String> properties) {
-    this.properties = properties;
+  public void setMetricProperties(Map<String, String> metricProperties) {
+    this.metricProperties = metricProperties;
   }
 
   @Override
@@ -163,12 +163,12 @@ public class MetricConfigBean extends AbstractBean {
         && Objects.equals(cellSizeExpression, mc.getCellSizeExpression())
         && Objects.equals(active, mc.isActive())
         && Objects.equals(extSourceLinkInfo, mc.getExtSourceLinkInfo())
-        && Objects.equals(properties, mc.getProperties());
+        && Objects.equals(metricProperties, mc.getMetricProperties());
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(getId(), dataset, alias, derived, derivedMetricExpression, rollupThreshold,
-        inverseMetric, cellSizeExpression, active, extSourceLinkInfo, properties);
+        inverseMetric, cellSizeExpression, active, extSourceLinkInfo, metricProperties);
   }
 }
