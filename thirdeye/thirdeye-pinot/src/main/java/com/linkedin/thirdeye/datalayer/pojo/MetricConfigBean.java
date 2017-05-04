@@ -2,6 +2,7 @@ package com.linkedin.thirdeye.datalayer.pojo;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.linkedin.thirdeye.api.MetricType;
+
 import java.util.Map;
 import java.util.Objects;
 
@@ -37,6 +38,8 @@ public class MetricConfigBean extends AbstractBean {
   private Map<String, String> extSourceLinkInfo;
 
   private Map<String, String> extSourceLinkTimeGranularity;
+
+  private Map<String, String> properties = null;
 
 
   public String getName() {
@@ -135,6 +138,14 @@ public class MetricConfigBean extends AbstractBean {
     this.extSourceLinkTimeGranularity = extSourceLinkTimeGranularity;
   }
 
+  public Map<String, String> getProperties() {
+    return properties;
+  }
+
+  public void setProperties(Map<String, String> properties) {
+    this.properties = properties;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (!(o instanceof MetricConfigBean)) {
@@ -151,12 +162,13 @@ public class MetricConfigBean extends AbstractBean {
         && Objects.equals(inverseMetric, mc.isInverseMetric())
         && Objects.equals(cellSizeExpression, mc.getCellSizeExpression())
         && Objects.equals(active, mc.isActive())
-        && Objects.equals(extSourceLinkInfo, mc.getExtSourceLinkInfo());
+        && Objects.equals(extSourceLinkInfo, mc.getExtSourceLinkInfo())
+        && Objects.equals(properties, mc.getProperties());
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(getId(), dataset, alias, derived, derivedMetricExpression, rollupThreshold,
-        inverseMetric, cellSizeExpression, active, extSourceLinkInfo);
+        inverseMetric, cellSizeExpression, active, extSourceLinkInfo, properties);
   }
 }
