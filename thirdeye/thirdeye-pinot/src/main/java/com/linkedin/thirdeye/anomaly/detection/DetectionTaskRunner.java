@@ -120,7 +120,7 @@ public class DetectionTaskRunner implements TaskRunner {
         .fetchExixtingRawAnomalies(windowStart, windowEnd)
         .fetchExixtingMergedAnomalies(windowStart, windowEnd)
         .fetchSaclingFactors(windowStart, windowEnd);
-    if (anomalyFunctionSpec.isTotalMetric()) {
+    if (anomalyFunctionSpec.isToCalculateTotalMetric()) {
       anomalyDetectionInputContextBuilder.fetchTimeSeriesTotalMetric(windowStart, windowEnd);
     }
     AnomalyDetectionInputContext adContext = anomalyDetectionInputContextBuilder.build();

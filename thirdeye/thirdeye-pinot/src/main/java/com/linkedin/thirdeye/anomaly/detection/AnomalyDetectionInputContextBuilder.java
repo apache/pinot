@@ -533,8 +533,9 @@ public class AnomalyDetectionInputContextBuilder {
       doRollUp = false;
     }
 
-    List<String> metricsToFetch = anomalyFunctionSpec.getTotalMetricList();
-    if (metricsToFetch == null || metricsToFetch.isEmpty()) {
+    List<String> metricsToFetch = new ArrayList<>();
+    metricsToFetch.add(anomalyFunctionSpec.getTotalMetric());
+    if (metricsToFetch.isEmpty()) {
       metricsToFetch = anomalyFunctionSpec.getMetrics();
     }
     TimeSeriesResponse timeSeriesResponse =

@@ -199,16 +199,16 @@ public class TimeBasedAnomalyMerger {
         mergedResult.setAvgBaselineVal(avgBaseline / normalizedTotalBucketSize);
       }
       mergedResult.setMessage(anomalyMessage);
+    }
 
-      // recompute weight using anomaly function specific method
-      try {
-        computeMergedAnomalyInfo(mergedResult, mergeConfig);
-      } catch (Exception e) {
-        AnomalyFunctionDTO function = mergedResult.getFunction();
-        LOG.warn(
-            "Unable to compute merged weight and the average weight of raw anomalies is used. Dataset: {}, Topic Metric: {}, Function: {}, Time:{} - {}, Exception: {}",
-            function.getCollection(), function.getTopicMetric(), function.getFunctionName(), new DateTime(mergedResult.getStartTime()), new DateTime(mergedResult.getEndTime()), e);
-      }
+    // recompute weight using anomaly function specific method
+    try {
+      computeMergedAnomalyInfo(mergedResult, mergeConfig);
+    } catch (Exception e) {
+      AnomalyFunctionDTO function = mergedResult.getFunction();
+      LOG.warn(
+          "Unable to compute merged weight and the average weight of raw anomalies is used. Dataset: {}, Topic Metric: {}, Function: {}, Time:{} - {}, Exception: {}",
+          function.getCollection(), function.getTopicMetric(), function.getFunctionName(), new DateTime(mergedResult.getStartTime()), new DateTime(mergedResult.getEndTime()), e);
     }
   }
 
@@ -238,7 +238,7 @@ public class TimeBasedAnomalyMerger {
         .fetchTimeSeriesDataByDimension(windowStart, windowEnd, dimensions, false)
         .fetchSaclingFactors(windowStart, windowEnd)
         .fetchExixtingMergedAnomalies(windowStart, windowEnd);
-    if (anomalyFunctionSpec.isTotalMetric()) {
+    if (anomalyFunctionSpec.isToCalculateTotalMetric()) {
       anomalyDetectionInputContextBuilder.fetchTimeSeriesTotalMetric(windowStart, windowEnd);
     }
     AnomalyDetectionInputContext adInputContext = anomalyDetectionInputContextBuilder.build();
@@ -256,24 +256,29 @@ public class TimeBasedAnomalyMerger {
       }
       anomalyFunction.updateMergedAnomalyInfo(mergedAnomalies, metricTimeSeries, windowStart, windowEnd, knownAnomalies);
 
-      // Calculate the impact to the total metric
-      if (anomalyFunctionSpec.isTotalMetric()) {
-        double avgMetricSum = 0.0;
-        int numTimestamps = 0;
-        MetricTimeSeries metricSum = adInputContext.getMetricSumTimeSeries();
-        for (long timestamp : metricSum.getTimeWindowSet()) {
-          if(timestamp >= windowStart.getMillis() && timestamp < windowEnd.getMillis()) {
-            avgMetricSum += metricSum.get(timestamp, mergedAnomalies.getMetric()).doubleValue();
-            numTimestamps++;
-          }
-        }
-        if (numTimestamps > 0) {
-          avgMetricSum = avgMetricSum / numTimestamps;
-          mergedAnomalies.setImpactToTotal((mergedAnomalies.getAvgCurrentVal() - mergedAnomalies.getAvgBaselineVal())/avgMetricSum);
-        } else {
-          mergedAnomalies.setImpactToTotal(Double.NaN);
-        }
+      if(anomalyFunctionSpec.isToCalculateTotalMetric()) {
+        computeImpactToToalMetric(adInputContext.getMetricSumTimeSeries(), mergedAnomalies);
       }
+    }
+  }
+
+  private void computeImpactToToalMetric(MetricTimeSeries metricSumTimeSerise, MergedAnomalyResultDTO mergedAnomaly) {
+    DateTime windowStart = new DateTime(mergedAnomaly.getStartTime());
+    DateTime windowEnd = new DateTime(mergedAnomaly.getEndTime());
+    // Calculate the impact to the total metric
+    double avgMetricSum = 0.0;
+    int numTimestamps = 0;
+    for (long timestamp : metricSumTimeSerise.getTimeWindowSet()) {
+      if(timestamp >= windowStart.getMillis() && timestamp < windowEnd.getMillis()) {
+        avgMetricSum += metricSumTimeSerise.get(timestamp, mergedAnomaly.getMetric()).doubleValue();
+        numTimestamps++;
+      }
+    }
+    if (numTimestamps > 0) {
+      avgMetricSum = avgMetricSum / numTimestamps;
+      mergedAnomaly.setImpactToTotal((mergedAnomaly.getAvgCurrentVal() - mergedAnomaly.getAvgBaselineVal())/avgMetricSum);
+    } else {
+      mergedAnomaly.setImpactToTotal(Double.NaN);
     }
   }
 }
