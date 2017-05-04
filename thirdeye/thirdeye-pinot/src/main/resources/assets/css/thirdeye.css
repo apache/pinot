@@ -982,6 +982,22 @@ text {
   white-space: nowrap;
 }
 
+.analysis-tooltip {
+  font-size: 12px;
+  font-weight: lighter;
+}
+
+.analysis-tooltip__list {
+  list-style: none;
+  margin-bottom: 0;
+  padding-left: 0;
+}
+
+.analysis-tooltip__list-item {
+  display: flex;
+  justify-content: space-between;
+}
+
 .contribution-analysis {
   display: flex;
   justify-content: space-between;

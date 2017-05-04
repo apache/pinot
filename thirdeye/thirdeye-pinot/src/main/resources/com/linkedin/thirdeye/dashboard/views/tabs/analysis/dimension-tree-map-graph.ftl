@@ -39,9 +39,14 @@
       </table>
     </div>
   </div>
-  <div id="tooltip" class="hidden">
-    <p><strong id="heading"></strong></p>
-    <p><span id="percentageChange"></span></p>
-    <p><span id="currentValue"></span></p>
-    <p><span id="baselineValue"></span></p>
+  <div id="tooltip" class="analysis-tooltip hidden">
+    <ul class="analysis-tooltip__list">
+      <li class="analysis-tooltip__list-item"><span>value</span><span id="heading"></span></li>
+      <li class="analysis-tooltip__list-item"><span>baseline value</span><span id="baselineValue"></span></li>
+      <li class="analysis-tooltip__list-item"><span>current value</span><span id="currentValue"></span></li>
+      <li class="analysis-tooltip__list-item"><span>percentage change </span><span id="percentageChange"></span></li>
+      <li class="analysis-tooltip__list-item"><span>baseline contribution</span><span id="baselineContribution"></span></li>
+      <li class="analysis-tooltip__list-item"><span>current contribution</span><span id="currentContribution"></span></li>
+      <li class="analysis-tooltip__list-item"><span>contribution change</span><span id="contributionChange"></span></li>
+    </ul>
   </div>

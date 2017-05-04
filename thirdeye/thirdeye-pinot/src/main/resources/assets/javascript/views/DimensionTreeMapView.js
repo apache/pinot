@@ -195,7 +195,7 @@ DimensionTreeMapView.prototype = {
       var dimensionPlaceHolderId = '#' + dimension + '-heatmap-placeholder';
       var height = $(dimensionPlaceHolderId).height();
       var width = $(dimensionPlaceHolderId).width();
-      var treeMap = d3.layout.treemap().mode("slice").size([ width, height ]).sort(function(a, b) {
+      var treeMap = d3.layout.treemap().size([ width, height ]).sort(function(a, b) {
         return a.value - b.value;
       });
 
@@ -221,6 +221,14 @@ DimensionTreeMapView.prototype = {
           .text(d.percentageChange);
         d3.select("#tooltip #currentValue")
           .text(d.value);
+        d3.select("#tooltip #contributionChange")
+          .text(d.contributionChange);
+        d3.select("#tooltip #currentContribution")
+          .text(d.currentContribution);
+        d3.select("#tooltip #baselineContribution")
+          .text(d.baselineContribution);
+        d3.select("#tooltip #baselineValue")
+          .text(d.baselineValue);
         d3.select("#tooltip").classed("hidden", false);
       }).on("mouseout", function() {
         d3.select("#tooltip").classed("hidden", true);
