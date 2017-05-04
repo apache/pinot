@@ -150,6 +150,10 @@
                                     <pattern>org.codehaus.jackson</pattern>
                                     <shadedPattern>pinot.org.codehaus.jackson</shadedPattern>
                                 </relocation>
+                                <relocation>
+                                    <pattern>org.yaml.snakeyaml</pattern>
+                                    <shadedPattern>pinot.org.yaml.snakeyaml</shadedPattern>
+                                </relocation>
                             </relocations>
                         </configuration>
                     </execution>
