@@ -52,13 +52,15 @@ public class PrecisionByTimePerformanceEvaluation extends BasePerformanceEvaluat
     }
 
     // take average of all the precisions
-    double avgPrecision = 0.0;
+    long totalDetectedAnomalyTimeLength = 0;
+    long totalDimensionOverlapTimeLength = 0;
     for(DimensionMap dimensions : dimensionToOverlapTimeLength.keySet()) {
-      if(dimensionToDetectedAnomalyTimeLength.get(dimensions) == 0l) {
-        continue;
-      }
-      avgPrecision += (double) dimensionToOverlapTimeLength.get(dimensions) / dimensionToDetectedAnomalyTimeLength.get(dimensions);
+      totalDetectedAnomalyTimeLength += dimensionToDetectedAnomalyTimeLength.get(dimensions);
+      totalDimensionOverlapTimeLength += dimensionToOverlapTimeLength.get(dimensions);
     }
-    return avgPrecision / ((double) dimensionToDetectedAnomalyTimeLength.size());
+    if (totalDetectedAnomalyTimeLength == 0) {
+      return Double.NaN;
+    }
+    return (double) totalDimensionOverlapTimeLength / totalDetectedAnomalyTimeLength;
   }
 }

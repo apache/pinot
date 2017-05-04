@@ -58,12 +58,15 @@ public class RecallByTimePreformanceEvaluation extends BasePerformanceEvaluate {
 
     // take average of all the recalls
     double avgRecall = 0.0;
+    long totalKnownAnomalyTimeLength = 0;
+    long totalDimensionOverlapTimeLength = 0;
     for(DimensionMap dimensions : dimensionToOverlapTimeLength.keySet()) {
-      if(knownAnomalyTimeLength.get(dimensions) == 0l) {
-        continue;
-      }
-      avgRecall += (double) dimensionToOverlapTimeLength.get(dimensions) / knownAnomalyTimeLength.get(dimensions);
+      totalKnownAnomalyTimeLength += knownAnomalyTimeLength.get(dimensions);
+      totalDimensionOverlapTimeLength += dimensionToOverlapTimeLength.get(dimensions);
     }
-    return avgRecall / ((double) knownAnomalyTimeLength.size());
+    if (totalKnownAnomalyTimeLength == 0) {
+      return Double.NaN;
+    }
+    return (double) totalDimensionOverlapTimeLength / totalKnownAnomalyTimeLength;
   }
 }
