@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.client;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Objects;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 
 public class MetricFunction implements Comparable<MetricFunction> {
@@ -12,6 +13,7 @@ public class MetricFunction implements Comparable<MetricFunction> {
   private Long metricId;
   private String dataset;
   private MetricConfigDTO metricConfig;
+  private DatasetConfigDTO datasetConfig;
 
   public MetricFunction() {
 
@@ -19,12 +21,14 @@ public class MetricFunction implements Comparable<MetricFunction> {
 
   public MetricFunction(@JsonProperty("functionName") MetricAggFunction functionName,
       @JsonProperty("metricName") String metricName, @JsonProperty("metricId") Long metricId,
-      @JsonProperty("dataset") String dataset, @JsonProperty("metricConfig") MetricConfigDTO metricConfig) {
+      @JsonProperty("dataset") String dataset, @JsonProperty("metricConfig") MetricConfigDTO metricConfig,
+      @JsonProperty("datasetConfig") DatasetConfigDTO datasetConfig) {
     this.functionName = functionName;
     this.metricName = metricName;
     this.metricId = metricId;
     this.dataset = dataset;
     this.metricConfig = metricConfig;
+    this.datasetConfig = datasetConfig;
   }
 
   private String format(String functionName, String metricName) {
@@ -100,6 +104,13 @@ public class MetricFunction implements Comparable<MetricFunction> {
     this.metricConfig = metricConfig;
   }
 
+  public DatasetConfigDTO getDatasetConfig() {
+    return datasetConfig;
+  }
+
+  public void setDatasetConfig(DatasetConfigDTO datasetConfig) {
+    this.datasetConfig = datasetConfig;
+  }
 
 
 
