@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.client;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Objects;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 
 public class MetricFunction implements Comparable<MetricFunction> {
 
@@ -10,6 +11,7 @@ public class MetricFunction implements Comparable<MetricFunction> {
   private String metricName;
   private Long metricId;
   private String dataset;
+  private MetricConfigDTO metricConfig;
 
   public MetricFunction() {
 
@@ -17,11 +19,12 @@ public class MetricFunction implements Comparable<MetricFunction> {
 
   public MetricFunction(@JsonProperty("functionName") MetricAggFunction functionName,
       @JsonProperty("metricName") String metricName, @JsonProperty("metricId") Long metricId,
-      @JsonProperty("dataset") String dataset) {
+      @JsonProperty("dataset") String dataset, @JsonProperty("metricConfig") MetricConfigDTO metricConfig) {
     this.functionName = functionName;
     this.metricName = metricName;
     this.metricId = metricId;
     this.dataset = dataset;
+    this.metricConfig = metricConfig;
   }
 
   private String format(String functionName, String metricName) {
@@ -88,6 +91,16 @@ public class MetricFunction implements Comparable<MetricFunction> {
   public void setDataset(String dataset) {
     this.dataset = dataset;
   }
+
+  public MetricConfigDTO getMetricConfig() {
+    return metricConfig;
+  }
+
+  public void setMetricConfig(MetricConfigDTO metricConfig) {
+    this.metricConfig = metricConfig;
+  }
+
+
 
 
 }

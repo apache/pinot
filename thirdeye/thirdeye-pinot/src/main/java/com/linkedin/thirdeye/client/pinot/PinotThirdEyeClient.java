@@ -46,6 +46,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
   public static final String FIXED_COLLECTIONS_PROPERTY_KEY = "fixedCollections";
   public static final String CLUSTER_NAME_PROPERTY_KEY = "clusterName";
   public static final String TAG_PROPERTY_KEY = "tag";
+  public static final String CLIENT_NAME = PinotThirdEyeClient.class.getSimpleName();
 
   String segementZKMetadataRootPath;
   private final HttpHost controllerHost;
