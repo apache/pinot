@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.client;
 
+import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient;
 import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
@@ -41,6 +42,7 @@ public class ThirdEyeRequest {
   private final List<String> groupByDimensions;
   private final TimeGranularity groupByTimeGranularity;
   private final List<String> metricNames;
+  private final String client;
   private final String requestReference;
 
   private ThirdEyeRequest(String requestReference, ThirdEyeRequestBuilder builder) {
@@ -52,6 +54,7 @@ public class ThirdEyeRequest {
     this.filterClause = builder.filterClause;
     this.groupByDimensions = builder.groupBy;
     this.groupByTimeGranularity = builder.groupByTimeGranularity;
+    this.client = builder.client;
     metricNames = new ArrayList<>();
     for (MetricFunction metric : metricFunctions) {
       metricNames.add(metric.toString());
@@ -100,6 +103,11 @@ public class ThirdEyeRequest {
     return groupByDimensions;
   }
 
+
+  public String getClient() {
+    return client;
+  }
+
   @Override
   public int hashCode() {
     // TODO do we intentionally omit request reference here?
@@ -144,11 +152,13 @@ public class ThirdEyeRequest {
     private String filterClause;
     private final List<String> groupBy;
     private TimeGranularity groupByTimeGranularity;
+    private String client;
 
     public ThirdEyeRequestBuilder() {
       this.filterSet = LinkedListMultimap.create();
       this.groupBy = new ArrayList<String>();
       metricFunctions = new ArrayList<>();
+      this.client = PinotThirdEyeClient.CLIENT_NAME;
     }
 
     public ThirdEyeRequestBuilder(ThirdEyeRequest request) {
@@ -159,6 +169,7 @@ public class ThirdEyeRequest {
       this.filterClause = request.getFilterClause();
       this.groupBy = new ArrayList<String>(request.getGroupBy());
       this.groupByTimeGranularity = request.getGroupByTimeGranularity();
+      this.client = request.getClient();
     }
 
     public ThirdEyeRequestBuilder setDatasets(List<String> datasets) {
@@ -247,6 +258,11 @@ public class ThirdEyeRequest {
     public ThirdEyeRequestBuilder setMetricFunctions(List<MetricFunction> metricFunctions) {
       this.metricFunctions = metricFunctions;
       return this;
+    }
+
+
+    public void setClient(String client) {
+      this.client = client;
     }
 
     public ThirdEyeRequest build(String requestReference) {

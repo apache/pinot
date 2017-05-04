@@ -72,6 +72,8 @@ public class ThirdEyeCacheRegistry {
 
   private static void init(ThirdEyeConfiguration config) {
     try {
+      // TODO: initialize all clients from clients.yml
+      // Create client map and register it with QueryCache
       pinotThirdeyeClientConfig = PinotThirdEyeClientConfig.createThirdEyeClientConfig(config);
       thirdEyeClient = PinotThirdEyeClient.fromClientConfig(pinotThirdeyeClientConfig);
       datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();

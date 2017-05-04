@@ -84,17 +84,18 @@ public class MetricExpression {
       ArrayList<MetricFunction> metricFunctions = new ArrayList<>();
       for (String metricToken : metricTokens) {
         Long metricId = null;
+        MetricConfigDTO metricConfig = null;
         String metricDataset = dataset;
         if (metricToken.equals(COUNT_METRIC_ESCAPED)) {
           metricToken = COUNT_METRIC;
         } else {
           metricId = Long.valueOf(metricToken.replace(MetricConfigBean.DERIVED_METRIC_ID_PREFIX, ""));
-          MetricConfigDTO metricConfig = ThirdEyeUtils.getMetricConfigFromId(metricId);
+          metricConfig = ThirdEyeUtils.getMetricConfigFromId(metricId);
           if (metricConfig != null) {
             metricDataset = metricConfig.getDataset();
           }
         }
-        metricFunctions.add(new MetricFunction(aggFunction, metricToken, metricId, metricDataset));
+        metricFunctions.add(new MetricFunction(aggFunction, metricToken, metricId, metricDataset, metricConfig));
       }
       return metricFunctions;
     } catch (ParseException e) {
