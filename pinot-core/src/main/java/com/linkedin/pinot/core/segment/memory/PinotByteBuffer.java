@@ -15,16 +15,17 @@
  */
 package com.linkedin.pinot.core.segment.memory;
 
-import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.common.utils.MmapUtils;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.common.utils.MmapUtils;
 
 public class PinotByteBuffer extends PinotDataBuffer {
 
@@ -352,6 +353,11 @@ public class PinotByteBuffer extends PinotDataBuffer {
   @Override
   protected long start() {
     return buffer.clear().position();
+  }
+
+  @Override
+  public void order(ByteOrder byteOrder) {
+    buffer.order(byteOrder);
   }
 
   @Override

@@ -64,7 +64,7 @@ public class SortedForwardIndexReaderTest {
     writer.close();
     PinotDataBuffer heapBuffer = PinotDataBuffer.fromFile(file, ReadMode.heap, FileChannel.MapMode.READ_ONLY, "testing");
     FixedByteSingleValueMultiColReader rawFileReader = new FixedByteSingleValueMultiColReader(heapBuffer,
-        cardinality, columnSizes.length, columnSizes);
+        cardinality, columnSizes);
     SortedForwardIndexReader reader = new SortedForwardIndexReader(rawFileReader, totalDocs);
     // without using context
     long start, end;

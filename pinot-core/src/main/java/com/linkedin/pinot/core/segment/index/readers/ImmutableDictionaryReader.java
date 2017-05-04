@@ -29,7 +29,7 @@ public abstract class ImmutableDictionaryReader implements Dictionary {
   private final int rows;
 
   protected ImmutableDictionaryReader(PinotDataBuffer dataBuffer, int rows, int columnSize) {
-    dataFileReader = new FixedByteSingleValueMultiColReader(dataBuffer, rows, 1, new int[] { columnSize });
+    dataFileReader = new FixedByteSingleValueMultiColReader(dataBuffer, rows, new int[] { columnSize });
     this.rows = rows;
     fileSearcher = new ByteBufferBinarySearchUtil(dataFileReader);
   }

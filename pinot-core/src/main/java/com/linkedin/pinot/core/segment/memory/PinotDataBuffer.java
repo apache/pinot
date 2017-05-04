@@ -15,12 +15,13 @@
  */
 package com.linkedin.pinot.core.segment.memory;
 
-import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.segment.ReadMode;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
+import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.segment.ReadMode;
 
 
 /**
@@ -254,4 +255,6 @@ public abstract class PinotDataBuffer implements AutoCloseable {
   public abstract ByteBuffer toDirectByteBuffer(long bufferOffset, int size);
 
   protected abstract long start();
+
+  public abstract void order(ByteOrder byteOrder);
 }

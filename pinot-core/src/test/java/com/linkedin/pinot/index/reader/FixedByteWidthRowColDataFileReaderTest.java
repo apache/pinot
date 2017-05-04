@@ -55,7 +55,7 @@ public class FixedByteWidthRowColDataFileReaderTest {
     
     PinotDataBuffer heapBuffer = PinotDataBuffer.fromFile(f, ReadMode.heap, FileChannel.MapMode.READ_ONLY, "testing");
     FixedByteSingleValueMultiColReader heapReader =
-        new FixedByteSingleValueMultiColReader(heapBuffer, data.length, 1, new int[] { 4 });
+        new FixedByteSingleValueMultiColReader(heapBuffer, data.length, new int[] { 4 });
     heapReader.open();
     for (int i = 0; i < data.length; i++) {
       Assert.assertEquals(heapReader.getInt(i, 0), data[i]);
@@ -67,7 +67,7 @@ public class FixedByteWidthRowColDataFileReaderTest {
     // TODO: remove me
     PinotDataBuffer mmapBuffer = PinotDataBuffer.fromFile(f, ReadMode.mmap, FileChannel.MapMode.READ_ONLY, "mmap_testing");
     FixedByteSingleValueMultiColReader mmapReader =
-        new FixedByteSingleValueMultiColReader(mmapBuffer, data.length, 1, new int[] { 4 });
+        new FixedByteSingleValueMultiColReader(mmapBuffer, data.length, new int[] { 4 });
     mmapReader.open();
     for (int i = 0; i < data.length; i++) {
       Assert.assertEquals(mmapReader.getInt(i, 0), data[i]);
@@ -103,7 +103,7 @@ public class FixedByteWidthRowColDataFileReaderTest {
 //    System.out.println("file size: " + raf.getChannel().size());
     raf.close();
     PinotDataBuffer heapBuffer = PinotDataBuffer.fromFile(f, ReadMode.heap, FileChannel.MapMode.READ_ONLY, "testing-heap");
-    FixedByteSingleValueMultiColReader heapReader = new FixedByteSingleValueMultiColReader(heapBuffer, numRows, numCols, new int[] { 4, 4 });
+    FixedByteSingleValueMultiColReader heapReader = new FixedByteSingleValueMultiColReader(heapBuffer, numRows, new int[] { 4, 4 });
     heapReader.open();
     for (int i = 0; i < numRows; i++) {
       for (int j = 0; j < numCols; j++) {
@@ -112,7 +112,7 @@ public class FixedByteWidthRowColDataFileReaderTest {
     }
     heapReader.close();
     PinotDataBuffer mmapBuffer = PinotDataBuffer.fromFile(f, ReadMode.mmap, FileChannel.MapMode.READ_ONLY, "mmap_testing");
-    FixedByteSingleValueMultiColReader mmapReader = new FixedByteSingleValueMultiColReader(mmapBuffer, numRows, numCols, new int[] { 4, 4 });
+    FixedByteSingleValueMultiColReader mmapReader = new FixedByteSingleValueMultiColReader(mmapBuffer, numRows, new int[] { 4, 4 });
     mmapReader.open();
     for (int i = 0; i < numRows; i++) {
       for (int j = 0; j < numCols; j++) {

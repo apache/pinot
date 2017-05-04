@@ -15,6 +15,19 @@
  */
 package com.linkedin.pinot.core.realtime.impl;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.joda.time.DateTime;
+import org.joda.time.Interval;
+import org.roaringbitmap.IntIterator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.config.SegmentPartitionConfig;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec.FieldType;
@@ -43,23 +56,8 @@ import com.linkedin.pinot.core.realtime.impl.invertedIndex.DimensionInvertertedI
 import com.linkedin.pinot.core.realtime.impl.invertedIndex.MetricInvertedIndex;
 import com.linkedin.pinot.core.realtime.impl.invertedIndex.RealtimeInvertedIndex;
 import com.linkedin.pinot.core.realtime.impl.invertedIndex.TimeInvertedIndex;
-import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.linkedin.pinot.core.startree.StarTree;
-import com.linkedin.pinot.core.startree.StarTreeBuilderConfig;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
-import org.joda.time.DateTime;
-import org.joda.time.Interval;
-import org.roaringbitmap.IntIterator;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class RealtimeSegmentImpl implements RealtimeSegment {
@@ -145,7 +143,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
       }
       if (schema.getFieldSpecFor(dimension).isSingleValueField()) {
         columnIndexReaderWriterMap.put(dimension,
-            new FixedByteSingleColumnSingleValueReaderWriter(capacity, V1Constants.Dict.INT_DICTIONARY_COL_SIZE));
+            new FixedByteSingleColumnSingleValueReaderWriter(capacity, Integer.SIZE/8));
       } else {
         columnIndexReaderWriterMap.put(dimension,
             new FixedByteSingleColumnMultiValueReaderWriter(capacity, Integer.SIZE / 8,
@@ -158,14 +156,14 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
         invertedIndexMap.put(metric, new MetricInvertedIndex(metric));
       }
       columnIndexReaderWriterMap.put(metric,
-          new FixedByteSingleColumnSingleValueReaderWriter(capacity, V1Constants.Dict.INT_DICTIONARY_COL_SIZE));
+          new FixedByteSingleColumnSingleValueReaderWriter(capacity, Integer.SIZE/8));
     }
 
     if (invertedIndexColumns.contains(outgoingTimeColumnName)) {
       invertedIndexMap.put(outgoingTimeColumnName, new TimeInvertedIndex(outgoingTimeColumnName));
     }
     columnIndexReaderWriterMap.put(outgoingTimeColumnName,
-        new FixedByteSingleColumnSingleValueReaderWriter(capacity, V1Constants.Dict.INT_DICTIONARY_COL_SIZE));
+        new FixedByteSingleColumnSingleValueReaderWriter(capacity, Integer.SIZE/8));
 
     tableAndStreamName = tableName + "-" + streamName;
   }

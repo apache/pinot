@@ -15,11 +15,11 @@
  */
 package com.linkedin.pinot.index.readerwriter;
 
-import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
 import java.io.IOException;
 import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnSingleValueReaderWriter;
 
 
 public class FixedByteSingleColumnSingleValueReaderWriterTest {
@@ -27,7 +27,7 @@ public class FixedByteSingleColumnSingleValueReaderWriterTest {
   public void testInt() throws IOException {
     FixedByteSingleColumnSingleValueReaderWriter readerWriter;
     int rows = 10;
-    int[] columnSizesInBytes = new int[] { Integer.SIZE / 8 };
+    final int columnSizesInBytes = Integer.SIZE / 8;
     readerWriter = new FixedByteSingleColumnSingleValueReaderWriter(rows, columnSizesInBytes);
     Random r = new Random();
     int[] data = new int[rows];
@@ -45,7 +45,7 @@ public class FixedByteSingleColumnSingleValueReaderWriterTest {
   public void testLong() throws IOException {
     FixedByteSingleColumnSingleValueReaderWriter readerWriter;
     int rows = 10;
-    int[] columnSizesInBytes = new int[] { Long.SIZE / 8 };
+    final int columnSizesInBytes = Long.SIZE / 8;
     readerWriter = new FixedByteSingleColumnSingleValueReaderWriter(rows, columnSizesInBytes);
     Random r = new Random();
     long[] data = new long[rows];

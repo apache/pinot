@@ -15,16 +15,15 @@
  */
 package com.linkedin.pinot.core.io.writer.impl;
 
-import com.linkedin.pinot.common.segment.ReadMode;
-import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 import java.io.File;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
+import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 
 
 public class FixedByteSingleValueMultiColWriter {
-  private int cols;
   private int[] columnOffsets;
   private int rows;
   private PinotDataBuffer indexDataBuffer;
@@ -34,7 +33,6 @@ public class FixedByteSingleValueMultiColWriter {
       int[] columnSizes)
       throws IOException {
     this.rows = rows;
-    this.cols = cols;
     this.columnOffsets = new int[cols];
     rowSizeInBytes = 0;
     for (int i = 0; i < columnSizes.length; i++) {
@@ -51,7 +49,6 @@ public class FixedByteSingleValueMultiColWriter {
       int[] columnSizes)
       throws IOException {
     this.rows = rows;
-    this.cols = cols;
     this.columnOffsets = new int[cols];
     rowSizeInBytes = 0;
     for (int i = 0; i < columnSizes.length; i++) {
