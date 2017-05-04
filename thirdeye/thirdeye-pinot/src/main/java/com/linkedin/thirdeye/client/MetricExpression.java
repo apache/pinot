@@ -8,6 +8,7 @@ import java.util.Set;
 import java.util.TreeSet;
 
 import com.linkedin.thirdeye.constant.MetricAggFunction;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
@@ -86,6 +87,7 @@ public class MetricExpression {
         Long metricId = null;
         MetricConfigDTO metricConfig = null;
         String metricDataset = dataset;
+        DatasetConfigDTO datasetConfig = ThirdEyeUtils.getDatasetConfigFromName(metricDataset);
         if (metricToken.equals(COUNT_METRIC_ESCAPED)) {
           metricToken = COUNT_METRIC;
         } else {
@@ -95,7 +97,8 @@ public class MetricExpression {
             metricDataset = metricConfig.getDataset();
           }
         }
-        metricFunctions.add(new MetricFunction(aggFunction, metricToken, metricId, metricDataset, metricConfig));
+        metricFunctions.add(
+            new MetricFunction(aggFunction, metricToken, metricId, metricDataset, metricConfig, datasetConfig));
       }
       return metricFunctions;
     } catch (ParseException e) {

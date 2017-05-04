@@ -13,7 +13,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
@@ -70,7 +69,8 @@ public class Utils {
       String requestReference, List<String> dimensions, DateTime start,
       DateTime end) throws Exception {
 
-    MetricFunction metricFunction = new MetricFunction(MetricAggFunction.COUNT, "*", null, dataset, null);
+    MetricFunction metricFunction = new MetricFunction(MetricAggFunction.COUNT, "*", null, dataset, null,
+        ThirdEyeUtils.getDatasetConfigFromName(dataset));
 
     List<ThirdEyeRequest> requests =
         generateRequests(dataset, requestReference, metricFunction, dimensions, start, end);
