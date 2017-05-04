@@ -259,12 +259,16 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     } else {
       segmentLogger.warn("Kafka transient exception when fetching messages, retrying (count={})", consecutiveErrorCount, e);
       Uninterruptibles.sleepUninterruptibly(1, TimeUnit.SECONDS);
-      makeConsumerWrapper();
+      makeConsumerWrapper("Too many transient errors");
     }
   }
 
   protected boolean consumeLoop() throws Exception {
     _fieldExtractor.resetCounters();
+    final long idlePipeSleepTimeMillis = 100;
+    final long maxIdleCountBeforeStatUpdate = (3 * 60 * 1000)/idlePipeSleepTimeMillis;  // 3 minute count
+    long lastUpdatedOffset = _currentOffset;  // so that we always update the metric when we enter this method.
+    long idleCount = 0;
 
     final long _endOffset = Long.MAX_VALUE; // No upper limit on Kafka offset
     segmentLogger.info("Starting consumption loop start offset {}, finalOffset {}", _currentOffset, _finalOffset);
@@ -296,7 +300,22 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
         continue;
       }
 
-      processKafkaEvents(messagesAndOffsets, highWatermark);
+      processKafkaEvents(messagesAndOffsets, highWatermark, idlePipeSleepTimeMillis);
+
+      if (_currentOffset != lastUpdatedOffset) {
+        // We consumed something. Update the highest kafka offset as well as partition-consuming metric.
+        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_KAFKA_OFFSET_CONSUMED, _currentOffset);
+        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 1);
+        lastUpdatedOffset = _currentOffset;
+      } else {
+        // We did not consume any rows. Update the partition-consuming metric only if we have been idling for a long time.
+        // Create a new kafka consumer wrapper, in case we are stuck on something.
+        if (++idleCount > maxIdleCountBeforeStatUpdate) {
+          _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 1);
+          idleCount = 0;
+          makeConsumerWrapper("Idle for too long");
+        }
+      }
     }
 
     _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.ROWS_WITH_ERRORS,
@@ -310,7 +329,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     return true;
   }
 
-  private void processKafkaEvents(Iterable<MessageAndOffset> messagesAndOffsets, Long highWatermark) {
+  private void processKafkaEvents(Iterable<MessageAndOffset> messagesAndOffsets, Long highWatermark, long idlePipeSleepTimeMillis) {
     Iterator<MessageAndOffset> msgIterator = messagesAndOffsets.iterator();
 
     int indexedMessageCount = 0;
@@ -376,11 +395,10 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     if (kafkaMessageCount != 0) {
       segmentLogger.debug("Indexed {} messages ({} messages read from Kafka) current offset {}", indexedMessageCount,
           kafkaMessageCount, _currentOffset);
-      _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_KAFKA_OFFSET_CONSUMED, _currentOffset);
     } else {
       // If there were no messages to be fetched from Kafka, wait for a little bit as to avoid hammering the
       // Kafka broker
-      Uninterruptibles.sleepUninterruptibly(100, TimeUnit.MILLISECONDS);
+      Uninterruptibles.sleepUninterruptibly(idlePipeSleepTimeMillis, TimeUnit.MILLISECONDS);
     }
   }
 
@@ -489,7 +507,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
         segmentLogger.error("Exception while in work", e);
         postStopConsumedMsg(e.getClass().getName());
         _state = State.ERROR;
-        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.HIGHEST_KAFKA_OFFSET_CONSUMED, 0L);
+        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
         return;
       }
 
@@ -498,6 +516,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
             ServerGauge.LAST_REALTIME_SEGMENT_COMPLETION_DURATION_SECONDS,
             TimeUnit.MILLISECONDS.toSeconds(now() - initialConsumptionEnd));
       }
+      _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.LLC_PARTITION_CONSUMING, 0);
     }
   }
 
@@ -847,7 +866,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
 
     // Create field extractor
     _fieldExtractor = FieldExtractorFactory.getPlainFieldExtractor(schema);
-    makeConsumerWrapper();
+    makeConsumerWrapper("Starting");
 
     SegmentPartitionConfig segmentPartitionConfig = indexingConfig.getSegmentPartitionConfig();
     if (segmentPartitionConfig != null) {
@@ -858,7 +877,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
       } catch (Exception e) {
         segmentLogger.warn("Couldn't get number of partitions in 5s, not using partition config {}", e.getMessage());
         _realtimeSegment.setSegmentPartitionConfig(null);
-        makeConsumerWrapper();
+        makeConsumerWrapper("Timeout getting number of partitions");
       }
     }
 
@@ -904,7 +923,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
     }
   }
 
-  private void makeConsumerWrapper() {
+  private void makeConsumerWrapper(String reason) {
     if (_consumerWrapper != null) {
       try {
         _consumerWrapper.close();
@@ -912,7 +931,7 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
         segmentLogger.warn("Could not close Kafka consumer wrapper");
       }
     }
-    segmentLogger.info("Creating new Kafka consumer wrapper");
+    segmentLogger.info("Creating new Kafka consumer wrapper, reason: {}", reason);
     _consumerWrapper = SimpleConsumerWrapper.forPartitionConsumption(new KafkaSimpleConsumerFactoryImpl(),
         _kafkaBootstrapNodes, _clientId, _kafkaTopic, _kafkaPartitionId,
         _kafkaStreamMetadata.getKafkaConnectionTimeoutMillis());
