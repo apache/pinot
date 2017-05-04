@@ -144,11 +144,11 @@
                             <relocations>
                                 <relocation>
                                     <pattern>com.fasterxml.jackson</pattern>
-                                    <shadedPattern>com.fasterxml.jackson.pinotshaded</shadedPattern>
+                                    <shadedPattern>pinot.com.fasterxml.jackson</shadedPattern>
                                 </relocation>
                                 <relocation>
                                     <pattern>org.codehaus.jackson</pattern>
-                                    <shadedPattern>org.codehaus.jackson.pinotshaded</shadedPattern>
+                                    <shadedPattern>pinot.org.codehaus.jackson</shadedPattern>
                                 </relocation>
                             </relocations>
                         </configuration>
