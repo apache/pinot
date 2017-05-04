@@ -13,7 +13,6 @@ import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.datalayer.ScriptRunner;
 import com.linkedin.thirdeye.datalayer.dto.AlertConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.AutometricsConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.ClassificationConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
@@ -72,7 +71,6 @@ public abstract class AbstractManagerTestBase {
   protected DetectionStatusManager detectionStatusDAO;
   protected AutotuneConfigManager autotuneConfigDAO;
   protected ClassificationConfigManager classificationConfigDAO;
-  protected AutometricsConfigManager autometricsConfigDAO;
   protected EntityToEntityMappingManager entityToEntityMappingDAO;
 
   //  protected TestDBResources testDBResources;
@@ -109,7 +107,6 @@ public abstract class AbstractManagerTestBase {
       detectionStatusDAO = daoRegistry.getDetectionStatusDAO();
       autotuneConfigDAO = daoRegistry.getAutotuneConfigDAO();
       classificationConfigDAO = daoRegistry.getClassificationConfigDAO();
-      autometricsConfigDAO = daoRegistry.getAutometricsConfigDAO();
       entityToEntityMappingDAO = daoRegistry.getEntityToEntityMappingDAO();
     } catch (Exception e) {
       throw new RuntimeException(e);
@@ -287,19 +284,6 @@ public abstract class AbstractManagerTestBase {
     metricConfigDTO.setName(metric);
     metricConfigDTO.setAlias(ThirdEyeUtils.constructMetricAlias(collection, metric));
     return metricConfigDTO;
-  }
-
-
-  protected AutometricsConfigDTO getTestAutometricsConfig(String rrd, String metric, String dashboard) {
-    AutometricsConfigDTO autometricsConfig = new AutometricsConfigDTO();
-    autometricsConfig.setMetric(metric);
-    autometricsConfig.setDashboard(dashboard);
-    autometricsConfig.setRrd(rrd);
-    autometricsConfig.setMetricDataType("DOUBLE");
-    autometricsConfig.setAutometricsType("COUNTER");
-    autometricsConfig.setFabricGroup("corp");
-    autometricsConfig.setContainer("container");
-    return autometricsConfig;
   }
 
   protected IngraphMetricConfigDTO getTestIngraphMetricConfig(String rrd, String metric,

@@ -2,7 +2,6 @@ package com.linkedin.thirdeye.client;
 
 import com.linkedin.thirdeye.datalayer.bao.AlertConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
-import com.linkedin.thirdeye.datalayer.bao.AutometricsConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.ClassificationConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DataCompletenessConfigManager;
@@ -22,7 +21,6 @@ import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.AlertConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.AnomalyFunctionManagerImpl;
-import com.linkedin.thirdeye.datalayer.bao.jdbc.AutometricsConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.ClassificationConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.DashboardConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.DataCompletenessConfigManagerImpl;
@@ -155,10 +153,6 @@ public class DAORegistry {
 
   public ClassificationConfigManager getClassificationConfigDAO() {
     return DaoProviderUtil.getInstance(ClassificationConfigManagerImpl.class);
-  }
-
-  public AutometricsConfigManager getAutometricsConfigDAO() {
-    return DaoProviderUtil.getInstance(AutometricsConfigManagerImpl.class);
   }
 
   public EntityToEntityMappingManager getEntityToEntityMappingDAO() {
