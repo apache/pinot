@@ -15,43 +15,34 @@
  */
 package com.linkedin.pinot.core.io.readerwriter.impl;
 
+import java.io.IOException;
+import java.nio.ByteOrder;
 import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
 import com.linkedin.pinot.core.io.readerwriter.BaseSingleColumnSingleValueReaderWriter;
 import com.linkedin.pinot.core.io.writer.impl.FixedByteSingleValueMultiColWriter;
 import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
-import java.io.IOException;
 
 
 public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColumnSingleValueReaderWriter {
 
   FixedByteSingleValueMultiColReader reader;
   FixedByteSingleValueMultiColWriter writer;
-  private int cols;
-  private int[] colOffSets;
   private int rowSize;
   private PinotDataBuffer _buffer;
 
-  public FixedByteSingleColumnSingleValueReaderWriter(int rows, int columnSizesInBytes) throws IOException {
-    this(rows, new int[]{columnSizesInBytes});
-  }
   /**
-   *
-   * @param rows
+   *  @param rows
    * @param columnSizesInBytes
    */
-  public FixedByteSingleColumnSingleValueReaderWriter(int rows, int[] columnSizesInBytes) throws IOException {
-    this.cols = 1;
-    colOffSets = new int[columnSizesInBytes.length];
-    rowSize = 0;
-    for (int i = 0; i < columnSizesInBytes.length; i++) {
-      colOffSets[i] = rowSize;
-      rowSize += columnSizesInBytes[i];
-    }
+  public FixedByteSingleColumnSingleValueReaderWriter(int rows, int columnSizesInBytes) throws IOException {
+    rowSize = columnSizesInBytes;
     final int totalSize = rowSize * rows;
     _buffer = PinotDataBuffer.allocateDirect(totalSize);
-    //_buffer.order(ByteOrder.nativeOrder());
-    reader = new FixedByteSingleValueMultiColReader(_buffer, rows, cols, columnSizesInBytes);
-    writer = new FixedByteSingleValueMultiColWriter(_buffer, rows, cols, columnSizesInBytes);
+    // We know that these bufers will not be written directly to a file, or mapped from a file.
+    // So, we can use native byte ordering here.
+    _buffer.order(ByteOrder.nativeOrder());
+    reader = new FixedByteSingleValueMultiColReader(_buffer, rows, new int[]{columnSizesInBytes});
+    writer = new FixedByteSingleValueMultiColWriter(_buffer, rows, /*cols=*/1, new int[]{columnSizesInBytes});
   }
 
   @Override

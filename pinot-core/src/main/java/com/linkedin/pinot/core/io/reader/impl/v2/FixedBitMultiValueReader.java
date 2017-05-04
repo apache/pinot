@@ -89,8 +89,7 @@ public class FixedBitMultiValueReader extends BaseSingleColumnMultiValueReader {
     int bitsetEndPos = chunkOffsetHeaderSize + bitsetSize;
     bitsetBuffer = indexDataBuffer.view(chunkOffsetHeaderSize, bitsetEndPos);
     rawDataBuffer = indexDataBuffer.view(bitsetEndPos, bitsetEndPos+rawDataSize);
-    chunkOffsetsReader = new FixedByteSingleValueMultiColReader(chunkOffsetsBuffer, numChunks,
-        NUM_COLS_IN_HEADER, new int[] {
+    chunkOffsetsReader = new FixedByteSingleValueMultiColReader(chunkOffsetsBuffer, numChunks, new int[] {
         SIZE_OF_INT
     });
 

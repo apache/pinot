@@ -119,7 +119,7 @@ public class PinotSegmentRecordReader extends BaseRecordReader {
       } else if (columnMetadataFor.isSingleValue() && columnMetadataFor.isSorted()) {
         PinotDataBuffer dataBuffer = reader.getIndexFor(column, ColumnIndexType.FORWARD_INDEX);
         FixedByteSingleValueMultiColReader indexReader = new FixedByteSingleValueMultiColReader(
-            dataBuffer, columnMetadataFor.getCardinality(), 2, new int[] {
+            dataBuffer, columnMetadataFor.getCardinality(), new int[] {
             4, 4
         });
         SortedForwardIndexReader fwdIndexReader = new SortedForwardIndexReader(indexReader, totalDocs);

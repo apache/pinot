@@ -71,14 +71,12 @@ public class FixedByteMultiValueReader extends BaseSingleColumnMultiValueReader 
     totalSize = chunkOffsetHeaderSize + bitsetSize + rawDataSize;
     Preconditions.checkState(totalSize > 0 && totalSize < Integer.MAX_VALUE, "Total size can not exceed 2GB");
     chunkOffsetsBuffer = indexDataBuffer.view(0, chunkOffsetHeaderSize);
-    chunkOffsetsReader = new FixedByteSingleValueMultiColReader(chunkOffsetsBuffer, numChunks,
-        NUM_COLS_IN_HEADER, new int[] { SIZE_OF_INT });
+    chunkOffsetsReader = new FixedByteSingleValueMultiColReader(chunkOffsetsBuffer, numChunks, new int[] { SIZE_OF_INT });
     int bitsetEndPos = chunkOffsetHeaderSize + bitsetSize;
     bitsetBuffer = indexDataBuffer.view(chunkOffsetHeaderSize, bitsetEndPos);
     rawDataBuffer = indexDataBuffer.view(bitsetEndPos, bitsetEndPos + rawDataSize);
     customBitSet = PinotDataCustomBitSet.withDataBuffer(bitsetSize, bitsetBuffer);
-    rawDataReader = new FixedByteSingleValueMultiColReader(rawDataBuffer, totalNumValues, 1,
-        new int[] { columnSizeInBytes });
+    rawDataReader = new FixedByteSingleValueMultiColReader(rawDataBuffer, totalNumValues, new int[] { columnSizeInBytes });
   }
 
 
