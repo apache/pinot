@@ -120,10 +120,10 @@ public class DataFrame {
     }
 
     public Builder append(Collection<Object[]> rows) {
-      for(Object[] r : rows) {
-        if (r.length != this.seriesNames.size())
-          throw new IllegalArgumentException(String.format("Expected %d values, but got %d", seriesNames.size(), r.length));
-        this.rows.add(r);
+      for(Object[] row : rows) {
+        if (row.length != this.seriesNames.size())
+          throw new IllegalArgumentException(String.format("Expected %d values, but got %d", seriesNames.size(), row.length));
+        this.rows.add(row);
       }
       return this;
     }
@@ -154,13 +154,14 @@ public class DataFrame {
           isDynamicType = false;
         }
 
-        Series s = buildSeries(type, i);
+        Series series = buildSeries(type, i);
 
         // infer type if not provided
-        if(isDynamicType)
-          s = s.get(((StringSeries)s).inferType());
+        if(isDynamicType) {
+          series = series.get(((StringSeries) series).inferType());
+        }
 
-        df.addSeries(name, s);
+        df.addSeries(name, series);
       }
 
       return df;
