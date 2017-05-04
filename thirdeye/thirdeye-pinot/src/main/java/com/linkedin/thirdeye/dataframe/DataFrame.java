@@ -113,22 +113,16 @@ public class DataFrame {
    */
   public static final class Builder {
     final List<String> seriesNames;
-    final List<String[]> rows = new ArrayList<>();
+    final List<Object[]> rows = new ArrayList<>();
 
     Builder(List<String> seriesNames) {
       this.seriesNames = seriesNames;
     }
 
     public Builder append(Collection<Object[]> rows) {
-      for(Object[] r : rows) {
-        if (r.length != this.seriesNames.size())
-          throw new IllegalArgumentException(String.format("Expected %d values, but got %d", seriesNames.size(), r.length));
-        String[] row = new String[this.seriesNames.size()];
-        for (int i = 0; i < row.length; i++) {
-          if(r[i] != null) {
-            row[i] = r[i].toString();
-          }
-        }
+      for(Object[] row : rows) {
+        if (row.length != this.seriesNames.size())
+          throw new IllegalArgumentException(String.format("Expected %d values, but got %d", seriesNames.size(), row.length));
         this.rows.add(row);
       }
       return this;
@@ -145,17 +139,114 @@ public class DataFrame {
     public DataFrame build() {
       DataFrame df = new DataFrame();
 
-      // transpose rows to columns
-      for(int i=0; i<this.seriesNames.size(); i++) {
-        String[] column = new String[this.rows.size()];
-        for(int j=0; j<this.rows.size(); j++) {
-          column[j] = this.rows.get(j)[i];
+      // infer column types
+      for(int i=0; i<seriesNames.size(); i++) {
+        String rawName = seriesNames.get(i);
+
+        boolean isDynamicType = true;
+        String name = rawName;
+        Series.SeriesType type = Series.SeriesType.STRING;
+
+        String[] parts = rawName.split(":", 2);
+        if(parts.length == 2) {
+          name = parts[0];
+          type = Series.SeriesType.valueOf(parts[1].toUpperCase());
+          isDynamicType = false;
         }
 
-        df.addSeries(this.seriesNames.get(i), StringSeries.buildFrom(column).toInferredType());
+        Series series = buildSeries(type, i);
+
+        // infer type if not provided
+        if(isDynamicType) {
+          series = series.get(((StringSeries) series).inferType());
+        }
+
+        df.addSeries(name, series);
       }
 
       return df;
+    }
+
+    private Series buildSeries(Series.SeriesType type, int columnIndex) {
+      switch (type) {
+        case DOUBLE:
+          return buildDoubleSeries(columnIndex);
+        case LONG:
+          return buildLongSeries(columnIndex);
+        case STRING:
+          return buildStringSeries(columnIndex);
+        case BOOLEAN:
+          return buildBooleanSeries(columnIndex);
+        default:
+          throw new IllegalArgumentException(String.format("Unknown series type '%s'", type));
+      }
+    }
+
+    // TODO implement ObjectSeries
+    private DoubleSeries buildDoubleSeries(int columnIndex) {
+      double[] values = new double[this.rows.size()];
+      int i = 0;
+      for(Object[] r : this.rows) {
+        values[i++] = toDouble(r[columnIndex]);
+      }
+      return DoubleSeries.buildFrom(values);
+    }
+
+    private static double toDouble(Object o) {
+      if(o == null)
+        return DoubleSeries.NULL;
+      if(o instanceof Number)
+        return ((Number)o).doubleValue();
+      return StringSeries.getDouble(o.toString());
+    }
+
+    private LongSeries buildLongSeries(int columnIndex) {
+      long[] values = new long[this.rows.size()];
+      int i = 0;
+      for(Object[] r : this.rows) {
+        values[i++] = toLong(r[columnIndex]);
+      }
+      return LongSeries.buildFrom(values);
+    }
+
+    private static long toLong(Object o) {
+      if(o == null)
+        return LongSeries.NULL;
+      if(o instanceof Number)
+        return ((Number)o).longValue();
+      return StringSeries.getLong(o.toString());
+    }
+
+    private StringSeries buildStringSeries(int columnIndex) {
+      String[] values = new String[this.rows.size()];
+      int i = 0;
+      for(Object[] r : this.rows) {
+        values[i++] = toString(r[columnIndex]);
+      }
+      return StringSeries.buildFrom(values);
+    }
+
+    private static String toString(Object o) {
+      if(o == null)
+        return StringSeries.NULL;
+      return StringSeries.getString(o.toString());
+    }
+
+    private BooleanSeries buildBooleanSeries(int columnIndex) {
+      byte[] values = new byte[this.rows.size()];
+      int i = 0;
+      for(Object[] r : this.rows) {
+        values[i++] = toBoolean(r[columnIndex]);
+      }
+      return BooleanSeries.buildFrom(values);
+    }
+
+    private static byte toBoolean(Object o) {
+      if(o == null)
+        return BooleanSeries.NULL;
+      if(o instanceof Number)
+        return BooleanSeries.valueOf(((Number)o).doubleValue() != 0.0d);
+      return StringSeries.getBoolean(o.toString());
     }
   }
 

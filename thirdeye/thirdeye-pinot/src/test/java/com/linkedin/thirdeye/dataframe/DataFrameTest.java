@@ -241,7 +241,7 @@ public class DataFrameTest {
   }
 
   @Test
-  public void testDataFrameBuilder() {
+  public void testDataFrameBuilderDynamicTyping() {
     DataFrame.Builder builder = DataFrame.builder("double", "long", "string", "boolean");
 
     builder.append(4.0d, 1, null, "true");
@@ -259,6 +259,37 @@ public class DataFrameTest {
     assertEquals(df.getLongs("long"), 1, 2, LNULL, 4);
     assertEquals(df.getStrings("string"), SNULL, "2", "hi", "4");
     assertEquals(df.getBooleans("boolean"),TRUE, TRUE, FALSE, BNULL);
+  }
+
+  @Test
+  public void testDataFrameBuilderStaticTyping() {
+    DataFrame.Builder builder = DataFrame.builder("double:DOUBLE", "long:LONG", "string:STRING", "boolean:BOOLEAN");
+
+    builder.append(4.0d, 1, null, "true");
+    builder.append(null, 2.34, "2", "1");
+    builder.append("2", "", "3", "false");
+    builder.append(1.0d, 4, "4", "");
+
+    DataFrame df = builder.build();
+    Assert.assertEquals(df.get("double").type(), Series.SeriesType.DOUBLE);
+    Assert.assertEquals(df.get("long").type(), Series.SeriesType.LONG);
+    Assert.assertEquals(df.get("string").type(), Series.SeriesType.STRING);
+    Assert.assertEquals(df.get("boolean").type(), Series.SeriesType.BOOLEAN);
+
+    assertEquals(df.getDoubles("double"), 4, DNULL, 2, 1);
+    assertEquals(df.getLongs("long"), 1, 2, LNULL, 4);
+    assertEquals(df.getStrings("string"), SNULL, "2", "3", "4");
+    assertEquals(df.getBooleans("boolean"),TRUE, TRUE, FALSE, BNULL);
+  }
+
+  @Test(expectedExceptions = NumberFormatException.class)
+  public void testDataFrameBuilderStaticTypingFailDouble() {
+    DataFrame.builder("double:DOUBLE").append("true").build();
+  }
+
+  @Test(expectedExceptions = NumberFormatException.class)
+  public void testDataFrameBuilderStaticTypingFailLong() {
+    DataFrame.builder("long:LONG").append("true").build();
   }
 
   @Test
