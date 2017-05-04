@@ -16,6 +16,7 @@
 package com.linkedin.pinot.core.io.readerwriter.impl;
 
 import java.io.IOException;
+import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.List;
 import com.linkedin.pinot.core.io.reader.impl.FixedByteSingleValueMultiColReader;
@@ -63,7 +64,6 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
   private static final int SIZE_OF_INT = 4;
   private static final int NUM_COLS_IN_HEADER = 3;
 
-  private static final int AVERAGE_NUM_VALUES_PER_ROW = 10;//used to compute the initial size
   private static final int INCREMENT_PERCENTAGE = 100;//Increments the Initial size by 100% of initial capacity every time we runs out of capacity
 
   private PinotDataBuffer headerBuffer;
@@ -95,14 +95,15 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
     this.maxNumberOfMultiValuesPerRow = maxNumberOfMultiValuesPerRow;
     headerSize = rows * SIZE_OF_INT * NUM_COLS_IN_HEADER;
     headerBuffer = PinotDataBuffer.allocateDirect(headerSize);
-//    headerBuffer.order(ByteOrder.nativeOrder());
+    // We know that these bufffers will not be copied directly into a file (or mapped from a file).
+    // So, we can use native byte order here.
+    headerBuffer.order(ByteOrder.nativeOrder());
     //dataBufferId, startIndex, length
     headerWriter =
         new FixedByteSingleValueMultiColWriter(headerBuffer, rows, 3,
             new int[] { SIZE_OF_INT, SIZE_OF_INT, SIZE_OF_INT });
     headerReader =
-        new FixedByteSingleValueMultiColReader(headerBuffer, rows, 3,
-            new int[] { SIZE_OF_INT, SIZE_OF_INT, SIZE_OF_INT });
+        new FixedByteSingleValueMultiColReader(headerBuffer, rows, new int[] { SIZE_OF_INT, SIZE_OF_INT, SIZE_OF_INT });
     //at least create space for million entries, which for INT translates into 4mb buffer
     this.incrementalCapacity = incrementalCapacity;
     addCapacity(initialCapacity);
@@ -124,7 +125,7 @@ public class FixedByteSingleColumnMultiValueReaderWriter extends BaseSingleColum
       dataWriters.add(currentDataWriter);
 
       FixedByteSingleValueMultiColReader dataFileReader =
-          new FixedByteSingleValueMultiColReader(dataBuffer, rowCapacity, 1, new int[] { columnSizeInBytes });
+          new FixedByteSingleValueMultiColReader(dataBuffer, rowCapacity, new int[] { columnSizeInBytes });
       dataReaders.add(dataFileReader);
       //update the capacity
       currentCapacity = rowCapacity;

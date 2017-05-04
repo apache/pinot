@@ -121,7 +121,7 @@ public abstract class ColumnIndexContainer {
       throws IOException {
     PinotDataBuffer dataBuffer = segmentReader.getIndexFor(column, ColumnIndexType.FORWARD_INDEX);
     FixedByteSingleValueMultiColReader indexReader = new FixedByteSingleValueMultiColReader(
-        dataBuffer, metadata.getCardinality(), 2, new int[] {
+        dataBuffer, metadata.getCardinality(), new int[] {
         4, 4
     });
     return new SortedSVColumnIndexContainer(column, metadata, indexReader, dictionary);

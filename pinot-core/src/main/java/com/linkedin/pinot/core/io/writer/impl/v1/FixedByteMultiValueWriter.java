@@ -52,7 +52,7 @@ public class FixedByteMultiValueWriter implements
     headerWriter = new FixedByteSingleValueMultiColWriter(headerBuffer,
         numDocs, 2, new int[] { SIZE_OF_INT, SIZE_OF_INT });
     headerReader = new FixedByteSingleValueMultiColReader(headerBuffer,
-        numDocs, 2, new int[] { SIZE_OF_INT, SIZE_OF_INT });
+        numDocs, new int[] { SIZE_OF_INT, SIZE_OF_INT });
 
     dataWriter = new FixedByteSingleValueMultiColWriter(dataBuffer,
         totalNumValues, 1, new int[] { columnSizeInBytes });
