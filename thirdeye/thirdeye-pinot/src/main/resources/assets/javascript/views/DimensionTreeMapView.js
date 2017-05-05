@@ -210,8 +210,9 @@ DimensionTreeMapView.prototype = {
       }).on("click", function(d) {
         // return zoom(node == d.parent ? root : d.parent);
       }).on("mousemove", function(d) {
-        var xPosition = d3.event.pageX + 5;
-        var yPosition = d3.event.pageY + 5;
+        const tooltipWidth = 200;
+        const xPosition = d3.event.pageX - (tooltipWidth + 20);
+        const yPosition = d3.event.pageY + 5;
         d3.select("#tooltip")
           .style("left", xPosition + "px")
           .style("top", yPosition + "px");
