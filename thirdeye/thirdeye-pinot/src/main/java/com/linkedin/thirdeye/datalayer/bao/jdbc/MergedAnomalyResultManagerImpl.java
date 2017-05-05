@@ -60,7 +60,11 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
       "where functionId=:functionId " + "and dimensions is null order by endTime desc";
 
 
-  private ExecutorService executorService = Executors.newFixedThreadPool(10);
+  // TODO: Make sure DAO registry's getMergedAnomalyResultDAO() returns previously created instance.
+  // Hotfix for reducing the number of threads being created. The root cause of too many thread pools being created
+  // in this class is that DAO registry's getMergedAnomalyResultDAO() method keeps creating a new manager whenever it
+  // is invoked.
+  private final static ExecutorService executorService = Executors.newFixedThreadPool(20);
 
   public MergedAnomalyResultManagerImpl() {
     super(MergedAnomalyResultDTO.class, MergedAnomalyResultBean.class);
