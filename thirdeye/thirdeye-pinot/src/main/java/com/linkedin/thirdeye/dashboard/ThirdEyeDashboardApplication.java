@@ -48,9 +48,13 @@ import org.eclipse.jetty.servlets.CrossOriginFilter;
 import javax.servlet.DispatcherType;
 import javax.servlet.FilterRegistration;
 import java.util.EnumSet;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 public class ThirdEyeDashboardApplication
     extends BaseThirdEyeApplication<ThirdEyeDashboardConfiguration> {
+  private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeDashboardApplication.class);
 
   @Override
   public String getName() {
@@ -131,7 +135,11 @@ public class ThirdEyeDashboardApplication
     List<RootCauseEntityFormatter> formatters = new ArrayList<>();
     if(config.getRcaFormatters() != null) {
       for(String className : config.getRcaFormatters()) {
-        formatters.add(FormatterLoader.fromClassName(className));
+        try {
+          formatters.add(FormatterLoader.fromClassName(className));
+        } catch(ClassNotFoundException e) {
+          LOG.warn("Could not find formatter class '{}'. Skipping.", className, e);
+        }
       }
     }
     formatters.add(new DefaultEntityFormatter());
