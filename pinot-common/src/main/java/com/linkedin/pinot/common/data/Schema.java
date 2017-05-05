@@ -58,8 +58,11 @@ public final class Schema {
   private final List<MetricFieldSpec> metricFieldSpecs = new ArrayList<>();
   private TimeFieldSpec timeFieldSpec;
   private final Map<String, FieldSpec> fieldSpecMap = new HashMap<>();
-  private final Set<String> dimensions = new HashSet<>();
-  private final Set<String> metrics = new HashSet<>();
+  private final Set<String> dimensionSet = new HashSet<>();
+  private final Set<String> metricSet = new HashSet<>();
+  private final List<String> dimensionList = new ArrayList<>();
+  private final List<String> metricList = new ArrayList<>();
+
   private transient String jsonSchema;
 
   public static Schema fromFile(@Nonnull File schemaFile)
@@ -132,11 +135,17 @@ public final class Schema {
     FieldType fieldType = fieldSpec.getFieldType();
     switch (fieldType) {
       case DIMENSION:
-        dimensions.add(columnName);
+        if (!dimensionSet.contains(columnName)) {
+          dimensionSet.add(columnName);
+          dimensionList.add(columnName);
+        }
         dimensionFieldSpecs.add((DimensionFieldSpec) fieldSpec);
         break;
       case METRIC:
-        metrics.add(columnName);
+        if (!metricSet.contains(columnName)) {
+          metricSet.add(columnName);
+          metricList.add(columnName);
+        }
         metricFieldSpecs.add((MetricFieldSpec) fieldSpec);
         break;
       case TIME:
@@ -204,12 +213,12 @@ public final class Schema {
 
   @JsonIgnore
   public List<String> getDimensionNames() {
-    return new ArrayList<>(dimensions);
+    return dimensionList;
   }
 
   @JsonIgnore
   public List<String> getMetricNames() {
-    return new ArrayList<>(metrics);
+    return metricList;
   }
 
   @JsonIgnore
