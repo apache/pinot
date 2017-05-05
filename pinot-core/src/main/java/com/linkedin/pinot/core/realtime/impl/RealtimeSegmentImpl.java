@@ -97,9 +97,15 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   private StarTreeIndexSpec starTreeIndexSpec = null;
   private SegmentPartitionConfig segmentPartitionConfig = null;
 
+  // TODO Dynamcally adjust these variables, maybe on a per column basis
+
+  // For multi-valued column, forward-index.
+  // Maximum number of multi-values per row. We assert on this.
+  private static final int MAX_MULTI_VALUES_PER_ROW = 1000;
+
   public RealtimeSegmentImpl(Schema schema, int capacity, String tableName, String segmentName, String streamName,
       ServerMetrics serverMetrics, List<String> invertedIndexColumns, int avgMultiValueCount)
-      throws IOException {
+      {
     // initial variable setup
     this.segmentName = segmentName;
     this.serverMetrics = serverMetrics;
@@ -145,9 +151,10 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
         columnIndexReaderWriterMap.put(dimension,
             new FixedByteSingleColumnSingleValueReaderWriter(capacity, Integer.SIZE/8));
       } else {
+        // TODO Start with a smaller capacity on FixedByteSingleColumnMultiValueReaderWriter and let it expand
         columnIndexReaderWriterMap.put(dimension,
-            new FixedByteSingleColumnMultiValueReaderWriter(capacity, Integer.SIZE / 8,
-                FixedByteSingleColumnMultiValueReaderWriter.DEFAULT_MAX_NUMBER_OF_MULTIVALUES, avgMultiValueCount));
+            new FixedByteSingleColumnMultiValueReaderWriter(MAX_MULTI_VALUES_PER_ROW, avgMultiValueCount,
+                capacity, Integer.SIZE/8));
       }
     }
 

@@ -15,15 +15,15 @@
  */
 package com.linkedin.pinot.core.realtime.impl.dictionary;
 
-import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnMultiValueReaderWriter;
 import java.util.Random;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+import com.linkedin.pinot.core.io.readerwriter.impl.FixedByteSingleColumnMultiValueReaderWriter;
 
 
 public class MultiValueDictionaryTest {
   private static final int NROWS = 1000;
-  private static final int MAX_N_VALUES = FixedByteSingleColumnMultiValueReaderWriter.DEFAULT_MAX_NUMBER_OF_MULTIVALUES;
+  private static final int MAX_N_VALUES = 1000;
 
   @Test
   public void testMultiValueIndexing() {
@@ -39,7 +39,7 @@ public class MultiValueDictionaryTest {
       throws Exception {
     final LongOnHeapMutableDictionary dict = new LongOnHeapMutableDictionary();
     final FixedByteSingleColumnMultiValueReaderWriter indexer =
-        new FixedByteSingleColumnMultiValueReaderWriter(NROWS, Integer.SIZE / 8, MAX_N_VALUES, 2);
+        new FixedByteSingleColumnMultiValueReaderWriter(MAX_N_VALUES, MAX_N_VALUES/2, NROWS/3, Integer.SIZE/8);
 
     // Insert rows into the indexer and dictionary
     Random random = new Random(seed);
