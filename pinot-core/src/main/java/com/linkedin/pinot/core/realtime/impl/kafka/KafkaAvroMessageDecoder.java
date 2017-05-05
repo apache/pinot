@@ -19,10 +19,12 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
+import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericData.Record;
 import org.apache.avro.generic.GenericDatumReader;
@@ -36,13 +38,17 @@ import com.linkedin.pinot.common.utils.retry.RetryPolicies;
 import com.linkedin.pinot.core.data.GenericRow;
 
 
+@NotThreadSafe
 public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
   private static final Logger LOGGER = LoggerFactory.getLogger(KafkaAvroMessageDecoder.class);
 
   private static final String SCHEMA_REGISTRY_REST_URL = "schema.registry.rest.url";
   private static final String SCHEMA_REGISTRY_SCHEMA_NAME = "schema.registry.schema.name";
   private org.apache.avro.Schema defaultAvroSchema;
-  private Map<String, org.apache.avro.Schema> md5ToAvroSchemaMap;
+  private MD5AvroSchemaMap md5ToAvroSchemaMap;
+
+  // Reusable byte[] to read MD5 from payload. This is OK as this class is used only by a single thread.
+  private final byte[] reusableMD5Bytes = new byte[SCHEMA_HASH_LENGTH];
 
   private String schemaRegistryBaseUrl;
   private DecoderFactory decoderFactory;
@@ -53,7 +59,6 @@ public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
   private static final int HEADER_LENGTH = MAGIC_BYTE_LENGTH + SCHEMA_HASH_LENGTH;
 
   private static final int SCHEMA_HASH_START_OFFSET = MAGIC_BYTE_LENGTH;
-  private static final int SCHEMA_HASH_END_OFFSET = SCHEMA_HASH_START_OFFSET + SCHEMA_HASH_LENGTH;
 
   private static final int MAXIMUM_SCHEMA_FETCH_RETRY_COUNT = 5;
   private static final int MINIMUM_SCHEMA_FETCH_RETRY_TIME_MILLIS = 500;
@@ -73,7 +78,7 @@ public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
     defaultAvroSchema = fetchSchema(new URL(schemaRegistryBaseUrl + "/latest_with_type=" + avroSchemaName));
     this.avroRecordConvetrer = new AvroRecordToPinotRowGenerator(indexingSchema);
     this.decoderFactory = new DecoderFactory();
-    md5ToAvroSchemaMap = new HashMap<String, org.apache.avro.Schema>();
+    md5ToAvroSchemaMap = new MD5AvroSchemaMap();
   }
 
   @Override
@@ -87,18 +92,15 @@ public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
       return null;
     }
 
-    byte[] md5 = Arrays.copyOfRange(payload, SCHEMA_HASH_START_OFFSET + offset, SCHEMA_HASH_END_OFFSET + offset);
+    System.arraycopy(payload, SCHEMA_HASH_START_OFFSET + offset, reusableMD5Bytes, 0, SCHEMA_HASH_LENGTH);
 
-    String md5String = hex(md5);
-    org.apache.avro.Schema schema = null;
     boolean schemaUpdateFailed = false;
-    if (md5ToAvroSchemaMap.containsKey(md5String)) {
-      schema = md5ToAvroSchemaMap.get(md5String);
-    } else {
-      final String schemaUri = schemaRegistryBaseUrl + "/id=" + md5String;
+    org.apache.avro.Schema schema = md5ToAvroSchemaMap.getSchema(reusableMD5Bytes);
+    if (schema == null) {
+      final String schemaUri = schemaRegistryBaseUrl + "/id=" + hex(reusableMD5Bytes);
       try {
         schema = fetchSchema(new URL(schemaUri));
-        md5ToAvroSchemaMap.put(md5String, schema);
+        md5ToAvroSchemaMap.addSchema(reusableMD5Bytes, schema);
       } catch (Exception e) {
         schema = defaultAvroSchema;
         LOGGER.error("Error fetching schema using url {}. Attempting to continue with previous schema", schemaUri, e);
@@ -173,6 +175,53 @@ public class KafkaAvroMessageDecoder implements KafkaMessageDecoder {
     } else {
       throw new RuntimeException(
           "Failed to fetch schema from " + url + " after " + MAXIMUM_SCHEMA_FETCH_RETRY_COUNT + "retries");
+    }
+  }
+
+  /**
+   * Private class for encapsulating MD5 to Avro schema mapping.
+   * <ul>
+   *   <li> Maintains two lists, one for md5s and another for schema. </li>
+   *   <li> MD5 at index i in the MD5 list, corresponds to Schema at index i in the schema list. </li>
+   * </ul>
+   */
+  private static class MD5AvroSchemaMap {
+    private List<byte[]> md5s;
+    private List<org.apache.avro.Schema> schemas;
+
+    /**
+     * Constructor for the class.
+     */
+    private MD5AvroSchemaMap() {
+      md5s = new ArrayList<>();
+      schemas = new ArrayList<>();
+    }
+
+    /**
+     * Returns the Avro schema corresponding to the given MD5.
+     *
+     * @param md5ForSchema MD5 for which to get the avro schema.
+     * @return Avro schema for the given MD5.
+     */
+    private org.apache.avro.Schema getSchema(byte[] md5ForSchema) {
+      for (int i = 0; i < md5s.size(); i++) {
+        if (Arrays.equals(md5s.get(i), md5ForSchema)) {
+          return schemas.get(i);
+        }
+      }
+      return null;
+    }
+
+    /**
+     * Adds mapping between MD5 and Avro schema.
+     * Caller to ensure that addSchema is called only once per MD5-Schema pair.
+     *
+     * @param md5 MD5 for the Schema
+     * @param schema Avro Schema
+     */
+    private void addSchema(byte[] md5, org.apache.avro.Schema schema) {
+      md5s.add(Arrays.copyOf(md5, md5.length));
+      schemas.add(schema);
     }
   }
 }
