@@ -1,11 +1,13 @@
 package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
+import com.google.inject.Singleton;
 import com.linkedin.thirdeye.datalayer.bao.EventManager;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
 import com.linkedin.thirdeye.datalayer.pojo.EventBean;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
 import java.util.List;
 
+@Singleton
 public class EventManagerImpl extends AbstractManagerImpl<EventDTO> implements EventManager {
   protected EventManagerImpl() {
     super(EventDTO.class, EventBean.class);

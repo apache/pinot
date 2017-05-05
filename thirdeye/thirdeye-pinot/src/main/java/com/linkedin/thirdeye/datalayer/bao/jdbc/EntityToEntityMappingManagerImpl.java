@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
+import com.google.inject.Singleton;
 import com.linkedin.thirdeye.datalayer.bao.EntityToEntityMappingManager;
 import com.linkedin.thirdeye.datalayer.dto.EntityToEntityMappingDTO;
 import com.linkedin.thirdeye.datalayer.pojo.EntityToEntityMappingBean;
@@ -10,6 +11,7 @@ import java.util.List;
 
 import org.apache.commons.collections.CollectionUtils;
 
+@Singleton
 public class EntityToEntityMappingManagerImpl extends AbstractManagerImpl<EntityToEntityMappingDTO> implements EntityToEntityMappingManager {
   protected EntityToEntityMappingManagerImpl() {
     super(EntityToEntityMappingDTO.class, EntityToEntityMappingBean.class);

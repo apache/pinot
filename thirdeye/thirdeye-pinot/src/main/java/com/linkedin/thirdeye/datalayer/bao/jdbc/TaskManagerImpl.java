@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
+import com.google.inject.Singleton;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -16,6 +17,7 @@ import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
 import com.linkedin.thirdeye.datalayer.pojo.TaskBean;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
 
+@Singleton
 public class TaskManagerImpl extends AbstractManagerImpl<TaskDTO> implements TaskManager {
 
   private static final String FIND_BY_STATUS_ORDER_BY_CREATE_TIME_ASC =

@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
+import com.google.inject.Singleton;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -11,6 +12,7 @@ import com.linkedin.thirdeye.datalayer.pojo.EmailConfigurationBean;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
 
 @Deprecated
+@Singleton
 public class EmailConfigurationManagerImpl extends AbstractManagerImpl<EmailConfigurationDTO>
     implements EmailConfigurationManager {
 

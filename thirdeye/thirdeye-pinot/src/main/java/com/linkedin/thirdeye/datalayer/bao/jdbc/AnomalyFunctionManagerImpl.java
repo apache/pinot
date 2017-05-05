@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
+import com.google.inject.Singleton;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -10,6 +11,7 @@ import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
 
+@Singleton
 public class AnomalyFunctionManagerImpl extends AbstractManagerImpl<AnomalyFunctionDTO>
     implements AnomalyFunctionManager {
 

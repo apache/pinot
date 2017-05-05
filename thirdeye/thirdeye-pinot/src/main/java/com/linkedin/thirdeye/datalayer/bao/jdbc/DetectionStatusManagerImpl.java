@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
+import com.google.inject.Singleton;
 import java.sql.Timestamp;
 import java.util.Collections;
 import java.util.List;
@@ -13,6 +14,7 @@ import com.linkedin.thirdeye.datalayer.dto.DetectionStatusDTO;
 import com.linkedin.thirdeye.datalayer.pojo.DetectionStatusBean;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
 
+@Singleton
 public class DetectionStatusManagerImpl extends AbstractManagerImpl<DetectionStatusDTO>
     implements DetectionStatusManager {
 

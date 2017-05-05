@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
+import com.google.inject.Singleton;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.DashboardConfigBean;
@@ -12,6 +13,7 @@ import org.apache.commons.collections.CollectionUtils;
 
 import com.linkedin.thirdeye.datalayer.util.Predicate;
 
+@Singleton
 public class DashboardConfigManagerImpl extends AbstractManagerImpl<DashboardConfigDTO>
     implements DashboardConfigManager {
 

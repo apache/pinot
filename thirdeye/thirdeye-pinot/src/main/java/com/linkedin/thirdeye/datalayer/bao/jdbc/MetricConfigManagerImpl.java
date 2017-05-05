@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
+import com.google.inject.Singleton;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -12,6 +13,7 @@ import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
 
+@Singleton
 public class MetricConfigManagerImpl extends AbstractManagerImpl<MetricConfigDTO>
     implements MetricConfigManager {
 
