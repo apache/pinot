@@ -1,22 +1,40 @@
 package com.linkedin.thirdeye.dashboard.resources.v2;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.base.Joiner;
 import com.linkedin.pinot.pql.parsers.utils.Pair;
 import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContext;
-import com.linkedin.thirdeye.anomaly.detection.TimeSeriesUtil;
-import com.linkedin.thirdeye.anomaly.merge.TimeBasedAnomalyMerger;
+import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContextBuilder;
 import com.linkedin.thirdeye.anomaly.views.AnomalyTimelinesView;
 import com.linkedin.thirdeye.anomalydetection.context.AnomalyFeedback;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.api.TimeRange;
+import com.linkedin.thirdeye.api.TimeSpec;
+import com.linkedin.thirdeye.client.DAORegistry;
+import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
+import com.linkedin.thirdeye.constant.FeedbackStatus;
+import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomaliesSummary;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomaliesWrapper;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalyDataCompare;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.AnomalyDetails;
 import com.linkedin.thirdeye.dashboard.views.TimeBucket;
+import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
+import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
+import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
+import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
@@ -24,7 +42,8 @@ import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
 import com.linkedin.thirdeye.detector.metric.transfer.MetricTransfer;
 import com.linkedin.thirdeye.detector.metric.transfer.ScalingFactor;
-
+import com.linkedin.thirdeye.util.AnomalyOffset;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
@@ -43,7 +62,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
@@ -51,7 +69,6 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
-
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.text.StrSubstitutor;
@@ -65,27 +82,6 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.base.Joiner;
-import com.linkedin.thirdeye.api.TimeRange;
-import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.client.DAORegistry;
-import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
-import com.linkedin.thirdeye.constant.FeedbackStatus;
-import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
-import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
-import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
-import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
-import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
-import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
-import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
-import com.linkedin.thirdeye.util.AnomalyOffset;
-import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 @Path(value = "/anomalies")
 @Produces(MediaType.APPLICATION_JSON)
@@ -147,9 +143,13 @@ public class AnomaliesResource {
 
       // Lets compute currentTimeRange
       Pair<Long, Long> currentTimeRange = new Pair<>(anomaly.getStartTime(), anomaly.getEndTime());
-      MetricTimeSeries currentTimeSeries = TimeSeriesUtil
-          .getTimeSeriesByDimension(anomaly.getFunction(), Arrays.asList(currentTimeRange),
-              anomaly.getDimensions(), granularity, false);
+      AnomalyDetectionInputContextBuilder anomalyDetectionInputContextBuilder =
+          new AnomalyDetectionInputContextBuilder(anomalyFunctionFactory);
+      anomalyDetectionInputContextBuilder
+          .fetchTimeSeriesDataByDimension(Arrays.asList(currentTimeRange), anomaly.getDimensions(), false);
+
+      MetricTimeSeries currentTimeSeries = anomalyDetectionInputContextBuilder.build()
+          .getDimensionKeyMetricTimeSeriesMap().get(anomaly.getDimensions());
       double currentVal = getTotalFromTimeSeries(currentTimeSeries, dataset.isAdditive());
       response.setCurrentVal(currentVal);
 
@@ -159,9 +159,10 @@ public class AnomaliesResource {
         DateTime anomalyEndTimeOffset = new DateTime(anomaly.getEndTime(), dateTimeZone).minus(baselineOffsetPeriod);
         Pair<Long, Long> baselineTimeRange =
             new Pair<>(anomalyStartTimeOffset.getMillis(), anomalyEndTimeOffset.getMillis());
-        MetricTimeSeries baselineTimeSeries = TimeSeriesUtil
-            .getTimeSeriesByDimension(anomaly.getFunction(), Arrays.asList(baselineTimeRange),
-                anomaly.getDimensions(), granularity, false);
+        anomalyDetectionInputContextBuilder
+            .fetchTimeSeriesDataByDimension(Arrays.asList(baselineTimeRange), anomaly.getDimensions(), false);
+        MetricTimeSeries baselineTimeSeries = anomalyDetectionInputContextBuilder.build()
+            .getDimensionKeyMetricTimeSeriesMap().get(anomaly.getDimensions());
         AnomalyDataCompare.CompareResult compareResult = new AnomalyDataCompare.CompareResult();
         double baseLineval = getTotalFromTimeSeries(baselineTimeSeries, dataset.isAdditive());
         compareResult.setBaselineValue(baseLineval);
@@ -688,8 +689,8 @@ public class AnomaliesResource {
     // get anomaly window range - this is the data to fetch (anomaly region + some offset if required)
     // the function will tell us this range, as how much data we fetch can change depending on which function is being executed
     TimeRange anomalyWindowRange = getAnomalyWindowOffset(mergedAnomaly, anomalyFunction, datasetConfig);
-    long anomalyWindowStart = anomalyWindowRange.getStart();
-    long anomalyWindowEnd = anomalyWindowRange.getEnd();
+    DateTime anomalyWindowStart = new DateTime(anomalyWindowRange.getStart());
+    DateTime anomalyWindowEnd = new DateTime(anomalyWindowRange.getEnd());
 
     DimensionMap dimensions = mergedAnomaly.getDimensions();
     TimeGranularity timeGranularity =
@@ -702,9 +703,11 @@ public class AnomaliesResource {
       if(anomalyProps.containsKey("anomalyTimelinesView")) {
         anomalyTimelinesView = AnomalyTimelinesView.fromJsonString(anomalyProps.get("anomalyTimelinesView"));
       } else {
-        AnomalyDetectionInputContext adInputContext =
-            TimeBasedAnomalyMerger.fetchDataByDimension(anomalyWindowStart, anomalyWindowEnd, dimensions,
-                anomalyFunction, mergedAnomalyResultDAO, overrideConfigDAO, true);
+        AnomalyDetectionInputContextBuilder anomalyDetectionInputContextBuilder =
+            new AnomalyDetectionInputContextBuilder(anomalyFunctionFactory);
+        AnomalyDetectionInputContext adInputContext = anomalyDetectionInputContextBuilder
+            .fetchTimeSeriesDataByDimension(anomalyWindowStart, anomalyWindowEnd, dimensions, true)
+            .fetchExixtingMergedAnomalies(anomalyWindowStart, anomalyWindowEnd).build();
 
         MetricTimeSeries metricTimeSeries = adInputContext.getDimensionKeyMetricTimeSeriesMap().get(dimensions);
 
@@ -712,19 +715,15 @@ public class AnomaliesResource {
         List<ScalingFactor> scalingFactors = adInputContext.getScalingFactors();
         if (CollectionUtils.isNotEmpty(scalingFactors)) {
           Properties properties = anomalyFunction.getProperties();
-          MetricTransfer.rescaleMetric(metricTimeSeries, anomalyWindowStart, scalingFactors, anomalyFunctionSpec.getTopicMetric(), properties);
+          MetricTransfer.rescaleMetric(metricTimeSeries, anomalyWindowStart.getMillis(), scalingFactors,
+              anomalyFunctionSpec.getTopicMetric(), properties);
         }
 
         List<MergedAnomalyResultDTO> knownAnomalies = adInputContext.getKnownMergedAnomalies().get(dimensions);
-        // check if there is AnomalyTimelinesView in the Properties. If yes, use the AnomalyTimelinesView
-        if (anomalyProps.containsKey("anomalyTimelinesView")) {
-          anomalyTimelinesView = AnomalyTimelinesView.fromJsonString(anomalyProps.get("anomalyTimelinesView"));
-        } else {
-          // Known anomalies are ignored (the null parameter) because 1. we can reduce users' waiting time and 2. presentation
-          // data does not need to be as accurate as the one used for detecting anomalies
-          anomalyTimelinesView = anomalyFunction.getTimeSeriesView(metricTimeSeries, bucketMillis, anomalyFunctionSpec.getTopicMetric(),
-              anomalyWindowStart, anomalyWindowEnd, knownAnomalies);
-        }
+        // Known anomalies are ignored (the null parameter) because 1. we can reduce users' waiting time and 2. presentation
+        // data does not need to be as accurate as the one used for detecting anomalies
+        anomalyTimelinesView = anomalyFunction.getTimeSeriesView(metricTimeSeries, bucketMillis, anomalyFunctionSpec.getTopicMetric(),
+            anomalyWindowStart.getMillis(), anomalyWindowEnd.getMillis(), knownAnomalies);
       }
 
       // get viewing window range - this is the region to display along with anomaly, from all the fetched data.

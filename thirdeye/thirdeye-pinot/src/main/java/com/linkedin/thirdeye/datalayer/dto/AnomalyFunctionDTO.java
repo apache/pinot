@@ -8,8 +8,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 public class AnomalyFunctionDTO extends AnomalyFunctionBean {
   private static final Logger LOGGER = LoggerFactory.getLogger(AnomalyFunctionDTO.class);
@@ -36,6 +38,15 @@ public class AnomalyFunctionDTO extends AnomalyFunctionBean {
     } else {
       return super.getMetrics();
     }
+  }
+
+  /**
+   * Return if this function should get total metric for anomaly calculation
+   * @return
+   * true if this function should get total metric
+   */
+  public boolean isToCalculateTotalMetric() {
+    return StringUtils.isNotEmpty(this.getTotalMetric());
   }
 
   /**
