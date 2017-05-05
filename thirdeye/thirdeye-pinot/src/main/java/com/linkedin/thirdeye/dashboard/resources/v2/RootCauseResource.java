@@ -27,11 +27,15 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.ISODateTimeFormat;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 @Path(value = "/rootcause")
 @Produces(MediaType.APPLICATION_JSON)
 public class RootCauseResource {
+  private static final Logger LOG = LoggerFactory.getLogger(RootCauseResource.class);
+
   private static final DateTimeFormatter ISO8601 = ISODateTimeFormat.basicDateTimeNoMillis();
 
   private final List<RootCauseEntityFormatter> formatters;
@@ -114,8 +118,13 @@ public class RootCauseResource {
 
   RootCauseEntity applyFormatters(Entity e) {
     for(RootCauseEntityFormatter formatter : this.formatters) {
-      if(formatter.applies(e))
-        return formatter.format(e);
+      if(formatter.applies(e)) {
+        try {
+          return formatter.format(e);
+        } catch (Exception ex) {
+          LOG.warn("Error applying formatter '{}'. Skipping.", ex);
+        }
+      }
     }
     throw new IllegalArgumentException(String.format("No formatter for Entity '%s'", e.getUrn()));
   }
