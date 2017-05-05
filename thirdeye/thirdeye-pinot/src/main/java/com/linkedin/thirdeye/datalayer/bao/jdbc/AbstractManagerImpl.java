@@ -1,11 +1,5 @@
 package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-
-import org.modelmapper.ModelMapper;
-import org.modelmapper.convention.MatchingStrategies;
 import com.linkedin.thirdeye.datalayer.bao.AbstractManager;
 import com.linkedin.thirdeye.datalayer.dao.GenericPojoDao;
 import com.linkedin.thirdeye.datalayer.dto.AbstractDTO;
@@ -17,13 +11,16 @@ import com.linkedin.thirdeye.datalayer.pojo.AnomalyFeedbackBean;
 import com.linkedin.thirdeye.datalayer.pojo.AnomalyFunctionBean;
 import com.linkedin.thirdeye.datalayer.pojo.RawAnomalyResultBean;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
-
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import org.modelmapper.ModelMapper;
+import org.modelmapper.convention.MatchingStrategies;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public abstract class AbstractManagerImpl<E extends AbstractDTO> implements AbstractManager<E> {
-
-  protected final Logger LOG = LoggerFactory.getLogger(getClass());
+  private static final Logger LOG = LoggerFactory.getLogger(AbstractManagerImpl.class);
 
   protected static final ModelMapper MODEL_MAPPER = new ModelMapper();
 

@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
+import com.google.inject.Singleton;
 import com.linkedin.thirdeye.datalayer.bao.AutotuneConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.AutotuneConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AutotuneConfigBean;
@@ -7,6 +8,7 @@ import com.linkedin.thirdeye.datalayer.util.Predicate;
 import java.util.List;
 
 
+@Singleton
 public class AutotuneConfigManagerImpl extends AbstractManagerImpl<AutotuneConfigDTO>
     implements AutotuneConfigManager {
 

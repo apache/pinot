@@ -1,11 +1,13 @@
 package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
+import com.google.inject.Singleton;
 import com.linkedin.thirdeye.datalayer.bao.OverrideConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.OverrideConfigBean;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
 import java.util.List;
 
+@Singleton
 public class OverrideConfigManagerImpl extends AbstractManagerImpl<OverrideConfigDTO> implements
     OverrideConfigManager {
 

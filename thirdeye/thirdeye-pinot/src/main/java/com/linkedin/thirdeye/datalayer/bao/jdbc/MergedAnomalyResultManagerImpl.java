@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
+import com.google.inject.Singleton;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
@@ -24,10 +25,15 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.commons.collections.CollectionUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
+@Singleton
 public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAnomalyResultDTO>
     implements MergedAnomalyResultManager {
+  private static final Logger LOG = LoggerFactory.getLogger(MergedAnomalyResultManagerImpl.class);
+
   // find a conflicting window
   private static final String FIND_BY_COLLECTION_METRIC_DIMENSIONS_TIME =
       " where collection=:collection and metric=:metric " + "and dimensions in (:dimensions) "
@@ -59,8 +65,8 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
   private static final String FIND_BY_FUNCTION_AND_NULL_DIMENSION =
       "where functionId=:functionId " + "and dimensions is null order by endTime desc";
 
-
-  private ExecutorService executorService = Executors.newFixedThreadPool(10);
+  // TODO inject as dependency
+  private static final ExecutorService EXECUTOR_SERVICE = Executors.newFixedThreadPool(10);
 
   public MergedAnomalyResultManagerImpl() {
     super(MergedAnomalyResultDTO.class, MergedAnomalyResultBean.class);
@@ -358,7 +364,7 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
     List<Future<MergedAnomalyResultDTO>> mergedAnomalyResultDTOFutureList = new ArrayList<>(mergedAnomalyResultBeanList.size());
     for (final MergedAnomalyResultBean mergedAnomalyResultBean : mergedAnomalyResultBeanList) {
       Future<MergedAnomalyResultDTO> future =
-          executorService.submit(new Callable<MergedAnomalyResultDTO>() {
+          EXECUTOR_SERVICE.submit(new Callable<MergedAnomalyResultDTO>() {
             @Override public MergedAnomalyResultDTO call() throws Exception {
               return MergedAnomalyResultManagerImpl.this
                   .convertMergedAnomalyBean2DTO(mergedAnomalyResultBean, loadRawAnomalies);

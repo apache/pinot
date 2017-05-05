@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
+import com.google.inject.Singleton;
 import com.linkedin.thirdeye.anomaly.detection.DetectionTaskRunner;
 import com.linkedin.thirdeye.anomaly.task.TaskConstants;
 import java.sql.Timestamp;
@@ -20,6 +21,7 @@ import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.pojo.JobBean;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
 
+@Singleton
 public class JobManagerImpl extends AbstractManagerImpl<JobDTO> implements JobManager {
 
   private static final String FIND_LATEST_COMPLETED_ANOMALY_JOB_BY_FUNCTION_ID =

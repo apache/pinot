@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
+import com.google.inject.Singleton;
 import com.linkedin.thirdeye.datalayer.bao.ClassificationConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.ClassificationConfigDTO;
 import com.linkedin.thirdeye.datalayer.pojo.ClassificationConfigBean;
@@ -7,6 +8,7 @@ import com.linkedin.thirdeye.datalayer.util.Predicate;
 import java.util.List;
 import org.apache.commons.collections.CollectionUtils;
 
+@Singleton
 public class ClassificationConfigManagerImpl extends AbstractManagerImpl<ClassificationConfigDTO>
     implements ClassificationConfigManager {
 
