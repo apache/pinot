@@ -4,7 +4,7 @@
     <thead>
     <tr>
       <td class="label-medium-semibold">Type</td>
-      <td class="label-medium-semibold" style="max-width: 600px;">Details</td>
+      <td class="label-medium-semibold rootcause__details">Details</td>
       <td class="label-medium-semibold">Score</td>
     </tr>
     </thead>
@@ -12,7 +12,7 @@
     {{#each rootCauseData}}
       <tr>
         <td>{{type}}</td>
-        <td style="max-width: 600px;"><a href="{{link}}" target="_blank">{{label}}</a></td>
+        <td class="rootcause__details"><a href="{{link}}" target="_blank">{{label}}</a></td>
         <td>{{score}}</td>
       </tr>
     {{/each}}

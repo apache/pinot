@@ -1066,3 +1066,8 @@ text {
 .a11y-text {
    display: none;
 }
+
+.rootcause__details {
+  max-width: 600px;
+  word-wrap: break-word;
+}
