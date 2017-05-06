@@ -15,7 +15,6 @@
  */
 package com.linkedin.pinot.common.data;
 
-import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.utils.DataSchema;
 import javax.annotation.Nonnull;
 import org.apache.avro.Schema.Type;
@@ -58,8 +57,6 @@ public abstract class FieldSpec {
   }
 
   public FieldSpec(@Nonnull String name, @Nonnull DataType dataType, boolean isSingleValueField) {
-    Preconditions.checkNotNull(name);
-
     _name = name;
     _dataType = dataType.getStoredType();
     _isSingleValueField = isSingleValueField;
@@ -67,26 +64,25 @@ public abstract class FieldSpec {
 
   public FieldSpec(@Nonnull String name, @Nonnull DataType dataType, boolean isSingleValueField,
       @Nonnull Object defaultNullValue) {
-    Preconditions.checkNotNull(name);
-
     _name = name;
     _dataType = dataType.getStoredType();
     _isSingleValueField = isSingleValueField;
     _stringDefaultNullValue = defaultNullValue.toString();
   }
 
+  @Nonnull
   public abstract FieldType getFieldType();
 
+  @Nonnull
   public String getName() {
     return _name;
   }
 
   public void setName(@Nonnull String name) {
-    Preconditions.checkNotNull(name);
-
     _name = name;
   }
 
+  @Nonnull
   public DataType getDataType() {
     return _dataType;
   }
@@ -104,6 +100,7 @@ public abstract class FieldSpec {
     _isSingleValueField = isSingleValueField;
   }
 
+  @Nonnull
   public Object getDefaultNullValue() {
     FieldType fieldType = getFieldType();
     if (_cachedDefaultNullValue == null) {

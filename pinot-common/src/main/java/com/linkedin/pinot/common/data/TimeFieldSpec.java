@@ -108,8 +108,6 @@ public final class TimeFieldSpec extends FieldSpec {
   public TimeFieldSpec(@Nonnull TimeGranularitySpec incomingGranularitySpec,
       @Nonnull TimeGranularitySpec outgoingGranularitySpec) {
     super(outgoingGranularitySpec.getName(), outgoingGranularitySpec.getDataType(), true);
-    Preconditions.checkNotNull(incomingGranularitySpec);
-
     _incomingGranularitySpec = incomingGranularitySpec;
     _outgoingGranularitySpec = outgoingGranularitySpec;
   }
@@ -117,13 +115,12 @@ public final class TimeFieldSpec extends FieldSpec {
   public TimeFieldSpec(@Nonnull TimeGranularitySpec incomingGranularitySpec,
       @Nonnull TimeGranularitySpec outgoingGranularitySpec, @Nonnull Object defaultNullValue) {
     super(outgoingGranularitySpec.getName(), outgoingGranularitySpec.getDataType(), true, defaultNullValue);
-    Preconditions.checkNotNull(incomingGranularitySpec);
-
     _incomingGranularitySpec = incomingGranularitySpec;
     _outgoingGranularitySpec = outgoingGranularitySpec;
   }
 
   @JsonIgnore
+  @Nonnull
   @Override
   public FieldType getFieldType() {
     return FieldType.TIME;
@@ -145,29 +142,31 @@ public final class TimeFieldSpec extends FieldSpec {
   }
 
   @JsonIgnore
+  @Nonnull
   public String getIncomingTimeColumnName() {
     return _incomingGranularitySpec.getName();
   }
 
   @JsonIgnore
+  @Nonnull
   public String getOutgoingTimeColumnName() {
     return getName();
   }
 
-  @JsonIgnore
-  @Deprecated
   // For third-eye backward compatible.
+  @Deprecated
+  @JsonIgnore
+  @Nonnull
   public String getOutGoingTimeColumnName() {
     return getName();
   }
 
+  @Nonnull
   public TimeGranularitySpec getIncomingGranularitySpec() {
     return _incomingGranularitySpec;
   }
 
   public void setIncomingGranularitySpec(@Nonnull TimeGranularitySpec incomingGranularitySpec) {
-    Preconditions.checkNotNull(incomingGranularitySpec);
-
     _incomingGranularitySpec = incomingGranularitySpec;
     if (_outgoingGranularitySpec == null) {
       super.setName(incomingGranularitySpec.getName());
@@ -175,6 +174,7 @@ public final class TimeFieldSpec extends FieldSpec {
     }
   }
 
+  @Nonnull
   public TimeGranularitySpec getOutgoingGranularitySpec() {
     if (_outgoingGranularitySpec == null) {
       return _incomingGranularitySpec;
@@ -184,8 +184,6 @@ public final class TimeFieldSpec extends FieldSpec {
   }
 
   public void setOutgoingGranularitySpec(@Nonnull TimeGranularitySpec outgoingGranularitySpec) {
-    Preconditions.checkNotNull(outgoingGranularitySpec);
-
     _outgoingGranularitySpec = outgoingGranularitySpec;
     super.setName(outgoingGranularitySpec.getName());
     super.setDataType(outgoingGranularitySpec.getDataType());

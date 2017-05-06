@@ -39,6 +39,7 @@ public final class DimensionFieldSpec extends FieldSpec {
   }
 
   @JsonIgnore
+  @Nonnull
   @Override
   public FieldType getFieldType() {
     return FieldType.DIMENSION;
