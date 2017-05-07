@@ -15,6 +15,8 @@
  */
 package com.linkedin.pinot.controller;
 
+import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
+import com.linkedin.pinot.common.utils.StringUtil;
 import java.io.File;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
@@ -22,8 +24,6 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
-import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
-import com.linkedin.pinot.common.utils.StringUtil;
 
 public class ControllerConf extends PropertiesConfiguration {
   private static final String CONTROLLER_VIP_HOST = "controller.vip.host";
@@ -45,6 +45,7 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final String SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS = "server.request.timeoutSeconds";
   private static final String SEGMENT_COMMIT_TIMEOUT_SECONDS = "controller.realtime.segment.commit.timeoutSeconds";
   private static final String DELETED_SEGMENTS_RETENTION_IN_DAYS = "controller.deleted.segments.retentionInDays";
+  private static final String TASK_MANAGER_FREQUENCY_IN_SECONDS = "controller.task.frequencyInSeconds";
   private static final String TABLE_MIN_REPLICAS = "table.minReplicas";
 
   private static final int DEFAULT_RETENTION_CONTROLLER_FREQUENCY_IN_SECONDS = 6 * 60 * 60; // 6 Hours.
@@ -54,6 +55,7 @@ public class ControllerConf extends PropertiesConfiguration {
   private static final long DEFAULT_EXTERNAL_VIEW_ONLINE_TO_OFFLINE_TIMEOUT_MILLIS = 120_000L; // 2 minutes
   private static final int DEFAULT_SERVER_ADMIN_REQUEST_TIMEOUT_SECONDS = 30;
   private static final int DEFAULT_DELETED_SEGMENTS_RETENTION_IN_DAYS = 7;
+  private static final int DEFAULT_TASK_MANAGER_FREQUENCY_IN_SECONDS = -1; // Disabled
   private static final int DEFAULT_TABLE_MIN_REPLICAS = 1;
 
   public ControllerConf(File file) throws ConfigurationException {
@@ -281,6 +283,14 @@ public class ControllerConf extends PropertiesConfiguration {
 
   public void setDeletedSegmentsRetentionInDays(int retentionInDays) {
     setProperty(DELETED_SEGMENTS_RETENTION_IN_DAYS, retentionInDays);
+  }
+
+  public int getTaskManagerFrequencyInSeconds() {
+    return getInt(TASK_MANAGER_FREQUENCY_IN_SECONDS, DEFAULT_TASK_MANAGER_FREQUENCY_IN_SECONDS);
+  }
+
+  public void setTaskManagerFrequencyInSeconds(int frequencyInSeconds) {
+    setProperty(TASK_MANAGER_FREQUENCY_IN_SECONDS, Integer.toString(frequencyInSeconds));
   }
 
   public int getDefaultTableMinReplicas() {

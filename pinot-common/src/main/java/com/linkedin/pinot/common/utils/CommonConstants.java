@@ -25,16 +25,19 @@ public class CommonConstants {
   public static class Helix {
     public static final String IS_SHUTDOWN_IN_PROGRESS = "shutdownInProgress";
 
-    public static final String PREFIX_OF_BROKER_RESOURCE_TAG = "broker_";
     public static final String PREFIX_OF_SERVER_INSTANCE = "Server_";
     public static final String PREFIX_OF_BROKER_INSTANCE = "Broker_";
+    public static final String PREFIX_OF_MINION_INSTANCE = "Minion_";
 
     public static final String SERVER_INSTANCE_TYPE = "server";
     public static final String BROKER_INSTANCE_TYPE = "broker";
+    public static final String MINION_INSTANCE_TYPE = "minion";
 
     public static final String BROKER_RESOURCE_INSTANCE = "brokerResource";
+
     public static final String UNTAGGED_SERVER_INSTANCE = "server_untagged";
     public static final String UNTAGGED_BROKER_INSTANCE = "broker_untagged";
+    public static final String UNTAGGED_MINION_INSTANCE = "minion_untagged";
 
     public static class StateModel {
       public static class SegmentOnlineOfflineStateModel {
@@ -158,6 +161,7 @@ public class CommonConstants {
       public static final String INSTANCE_NAME = "instance.name";
       public static final String GROUP_ID_SUFFIX = "kafka.hlc.groupId";
       public static final String PARTITION_SUFFIX = "kafka.hlc.partition";
+      public static final String INSTANCE_ID_KEY = "instanceId";
       public static final String ADMIN_PORT_KEY = "adminPort";
     }
 
@@ -234,7 +238,6 @@ public class CommonConstants {
       public static final String CURRENT_NUMBER_OF_DOCUMENTS = "currentNumberOfDocuments";
       public static final String NUMBER_OF_DELETED_SEGMENTS = "numberOfDeletedSegments";
     }
-
   }
 
   public static class Segment {

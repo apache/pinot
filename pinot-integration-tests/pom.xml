@@ -161,6 +161,16 @@
       <artifactId>pinot-broker</artifactId>
     </dependency>
     <dependency>
+      <groupId>com.linkedin.pinot</groupId>
+      <artifactId>pinot-minion</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.linkedin.pinot</groupId>
+      <artifactId>pinot-minion</artifactId>
+      <version>${project.version}</version>
+      <type>test-jar</type>
+    </dependency>
+    <dependency>
       <groupId>org.testng</groupId>
       <artifactId>testng</artifactId>
     </dependency>

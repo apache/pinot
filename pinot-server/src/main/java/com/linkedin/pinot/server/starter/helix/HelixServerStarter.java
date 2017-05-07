@@ -17,6 +17,21 @@ package com.linkedin.pinot.server.starter.helix;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Uninterruptibles;
+import com.linkedin.pinot.common.Utils;
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.metrics.ServerMeter;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
+import com.linkedin.pinot.common.utils.MmapUtils;
+import com.linkedin.pinot.common.utils.NetUtil;
+import com.linkedin.pinot.common.utils.ServiceStatus;
+import com.linkedin.pinot.common.utils.ZkUtils;
+import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadataLoader;
+import com.linkedin.pinot.server.conf.ServerConf;
+import com.linkedin.pinot.server.realtime.ControllerLeaderLocator;
+import com.linkedin.pinot.server.starter.ServerInstance;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,21 +55,6 @@ import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.common.Utils;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.metrics.ServerMeter;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
-import com.linkedin.pinot.common.utils.MmapUtils;
-import com.linkedin.pinot.common.utils.NetUtil;
-import com.linkedin.pinot.common.utils.ServiceStatus;
-import com.linkedin.pinot.common.utils.ZkUtils;
-import com.linkedin.pinot.core.indexsegment.columnar.ColumnarSegmentMetadataLoader;
-import com.linkedin.pinot.server.conf.ServerConf;
-import com.linkedin.pinot.server.realtime.ControllerLeaderLocator;
-import com.linkedin.pinot.server.starter.ServerInstance;
-import com.yammer.metrics.core.MetricsRegistry;
 
 
 /**
@@ -101,7 +101,7 @@ public class HelixServerStarter {
         NetUtil.getHostAddress());
     _instanceId =
         pinotHelixProperties.getString(
-            "instanceId",
+            CommonConstants.Helix.Instance.INSTANCE_ID_KEY,
             CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE
                 + hostname
                 + "_"
