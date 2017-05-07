@@ -22,15 +22,15 @@ import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
-import com.linkedin.pinot.common.restlet.swagger.Response;
-import com.linkedin.pinot.common.restlet.swagger.Responses;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
-import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
 import com.linkedin.pinot.common.restlet.swagger.Parameter;
 import com.linkedin.pinot.common.restlet.swagger.Paths;
+import com.linkedin.pinot.common.restlet.swagger.Response;
+import com.linkedin.pinot.common.restlet.swagger.Responses;
 import com.linkedin.pinot.common.restlet.swagger.Summary;
 import com.linkedin.pinot.common.restlet.swagger.Tags;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
+import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 import java.net.URLDecoder;
 import java.util.ArrayList;
@@ -194,7 +194,7 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
     JSONArray ret = new JSONArray();
     if ((tableType == null || TableType.REALTIME.name().equalsIgnoreCase(tableType))
         && _pinotHelixResourceManager.hasRealtimeTable(tableName)) {
-      String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
+      String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
       JSONObject realtime = new JSONObject();
       realtime.put(TABLE_NAME, realtimeTableName);
       realtime.put("segments", new ObjectMapper().writeValueAsString(_pinotHelixResourceManager
@@ -205,7 +205,7 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
 
     if ((tableType == null || TableType.OFFLINE.name().equalsIgnoreCase(tableType))
         && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
-      String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
+      String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
       JSONObject offline = new JSONObject();
       offline.put(TABLE_NAME, offlineTableName);
       offline.put("segments", new ObjectMapper().writeValueAsString(_pinotHelixResourceManager
@@ -242,8 +242,8 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
       @Parameter(name = "type", in = "query", description = "Type of table {offline|realtime}",
           required = false) String tableType)
       throws JsonProcessingException, JSONException {
-    String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
-    String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     List<String> offlineSegments = _pinotHelixResourceManager.getAllSegmentsForResource(offlineTableName);
     List<String> realtimeSegments = _pinotHelixResourceManager.getAllSegmentsForResource(realtimeTableName);
 
@@ -298,8 +298,8 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
 
     JSONArray ret = new JSONArray();
     List<String> segmentsToToggle = new ArrayList<>();
-    String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
-    String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     String tableNameWithType = "";
     List<String> realtimeSegments = _pinotHelixResourceManager.getAllSegmentsForResource(realtimeTableName);
     List<String> offlineSegments = _pinotHelixResourceManager.getAllSegmentsForResource(offlineTableName);
@@ -396,13 +396,13 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
     JSONArray ret = new JSONArray();
     if ((tableType == null || TableType.OFFLINE.name().equalsIgnoreCase(tableType))
         && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
-      String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
+      String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
       ret.put(getSegmentMetaData(offlineTableName, segmentName, TableType.OFFLINE));
     }
 
     if ((tableType == null || TableType.REALTIME.name().equalsIgnoreCase(tableType))
         && _pinotHelixResourceManager.hasRealtimeTable(tableName)) {
-      String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
+      String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
       ret.put(getSegmentMetaData(realtimeTableName, segmentName, TableType.REALTIME));
     }
 
@@ -463,12 +463,12 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
     int numReloadMessagesSent = 0;
 
     if ((tableType == null) || TableType.OFFLINE.name().equalsIgnoreCase(tableType)) {
-      String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
+      String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
       numReloadMessagesSent += _pinotHelixResourceManager.reloadSegment(offlineTableName, segmentName);
     }
 
     if ((tableType == null) || TableType.REALTIME.name().equalsIgnoreCase(tableType)) {
-      String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
+      String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
       numReloadMessagesSent += _pinotHelixResourceManager.reloadSegment(realtimeTableName, segmentName);
     }
 
@@ -488,12 +488,12 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
     int numReloadMessagesSent = 0;
 
     if ((tableType == null) || TableType.OFFLINE.name().equalsIgnoreCase(tableType)) {
-      String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
+      String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
       numReloadMessagesSent += _pinotHelixResourceManager.reloadAllSegments(offlineTableName);
     }
 
     if ((tableType == null) || TableType.REALTIME.name().equalsIgnoreCase(tableType)) {
-      String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
+      String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
       numReloadMessagesSent += _pinotHelixResourceManager.reloadAllSegments(realtimeTableName);
     }
 

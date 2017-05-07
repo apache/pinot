@@ -16,6 +16,20 @@
 package com.linkedin.pinot.broker.broker;
 
 import com.google.common.util.concurrent.Uninterruptibles;
+import com.linkedin.pinot.broker.broker.helix.DefaultHelixBrokerConfig;
+import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
+import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.ZkStarter;
+import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
+import com.linkedin.pinot.controller.helix.starter.HelixConfig;
+import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
+import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
+import com.linkedin.pinot.routing.ServerToSegmentSetMap;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.lang.reflect.Field;
@@ -38,20 +52,6 @@ import org.testng.Assert;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
-import com.linkedin.pinot.broker.broker.helix.DefaultHelixBrokerConfig;
-import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.ZkStarter;
-import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
-import com.linkedin.pinot.controller.helix.starter.HelixConfig;
-import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
-import com.linkedin.pinot.routing.HelixExternalViewBasedRouting;
-import com.linkedin.pinot.routing.ServerToSegmentSetMap;
 
 
 public class HelixBrokerStarterTest {
@@ -60,8 +60,8 @@ public class HelixBrokerStarterTest {
   private static final int SEGMENT_COUNT = 6;
   private PinotHelixResourceManager _pinotResourceManager;
   private final static String HELIX_CLUSTER_NAME = "TestHelixBrokerStarter";
-  private final static String DINING_TABLE_NAME = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable("dining");
-  private final static String COFFEE_TABLE_NAME = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable("coffee");
+  private final static String DINING_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType("dining");
+  private final static String COFFEE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType("coffee");
 
   private ZkClient _zkClient;
   private HelixManager _helixZkManager;
@@ -102,9 +102,8 @@ public class HelixBrokerStarterTest {
     for (int i = 1; i <= 5; i++) {
       addOneSegment(tableName);
       Thread.sleep(2000);
-      final ExternalView externalView =
-          _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME,
-              TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName));
+      final ExternalView externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME,
+          TableNameBuilder.OFFLINE.tableNameWithType(tableName));
       Assert.assertEquals(externalView.getPartitionSet().size(), i);
     }
   }

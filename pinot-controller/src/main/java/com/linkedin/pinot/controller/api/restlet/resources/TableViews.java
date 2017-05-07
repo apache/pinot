@@ -161,30 +161,32 @@ public class TableViews extends BasePinotControllerRestletResource {
     return tableView;
   }
 
-  public @Nullable
-  Map<String, Map<String, String>> getIdealState(@Nonnull String tableNameOptType,
-      @Parameter(name = "tableType", in="query", description = "Table type", required = false)@Nullable TableType tableType) {
-    String tableName = getTableName(tableNameOptType, tableType);
+  @Nullable
+  public Map<String, Map<String, String>> getIdealState(@Nonnull String tableNameOptType,
+      @Parameter(name = "tableType", in = "query", description = "Table type", required = false) @Nullable TableType tableType) {
+    String tableNameWithType = getTableNameWithType(tableNameOptType, tableType);
     IdealState resourceIdealState = _pinotHelixResourceManager.getHelixAdmin()
-        .getResourceIdealState(_pinotHelixResourceManager.getHelixClusterName(), tableName);
+        .getResourceIdealState(_pinotHelixResourceManager.getHelixClusterName(), tableNameWithType);
     return resourceIdealState == null ? null : resourceIdealState.getRecord().getMapFields();
   }
 
-  public @Nullable Map<String, Map<String, String>> getExternalView(@Nonnull String tableNameOptType, TableType tableType) {
-    String tableName = getTableName(tableNameOptType, tableType);
+  @Nullable
+  public Map<String, Map<String, String>> getExternalView(@Nonnull String tableNameOptType, TableType tableType) {
+    String tableNameWithType = getTableNameWithType(tableNameOptType, tableType);
     ExternalView resourceEV = _pinotHelixResourceManager.getHelixAdmin()
-        .getResourceExternalView(_pinotHelixResourceManager.getHelixClusterName(), tableName);
+        .getResourceExternalView(_pinotHelixResourceManager.getHelixClusterName(), tableNameWithType);
     return resourceEV == null ? null : resourceEV.getRecord().getMapFields();
   }
 
-  private String getTableName(@Nonnull String tableNameOptType, @Nullable TableType tableType) {
-    String tableName = tableNameOptType;
-    if (tableType != null && tableType == CommonConstants.Helix.TableType.OFFLINE) {
-      tableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableNameOptType);
-    } else if (tableType != null && tableType == CommonConstants.Helix.TableType.REALTIME) {
-      tableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableNameOptType);
+  private String getTableNameWithType(@Nonnull String tableNameOptType, @Nullable TableType tableType) {
+    if (tableType != null) {
+      if (tableType == CommonConstants.Helix.TableType.OFFLINE) {
+        return TableNameBuilder.OFFLINE.tableNameWithType(tableNameOptType);
+      } else {
+        return TableNameBuilder.REALTIME.tableNameWithType(tableNameOptType);
+      }
+    } else {
+      return tableNameOptType;
     }
-    return tableName;
   }
-
 }

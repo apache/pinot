@@ -121,22 +121,24 @@ public class ZKMetadataProvider {
     }
   }
 
-  public static void setOfflineSegmentZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, OfflineSegmentZKMetadata offlineSegmentZKMetadata) {
+  public static void setOfflineSegmentZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      OfflineSegmentZKMetadata offlineSegmentZKMetadata) {
     propertyStore.set(constructPropertyStorePathForSegment(
-        TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(offlineSegmentZKMetadata.getTableName()), offlineSegmentZKMetadata.getSegmentName()),
-        offlineSegmentZKMetadata.toZNRecord(), AccessOption.PERSISTENT);
+        TableNameBuilder.OFFLINE.tableNameWithType(offlineSegmentZKMetadata.getTableName()),
+        offlineSegmentZKMetadata.getSegmentName()), offlineSegmentZKMetadata.toZNRecord(), AccessOption.PERSISTENT);
   }
 
-  public static void setRealtimeSegmentZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore, RealtimeSegmentZKMetadata realtimeSegmentZKMetadata) {
+  public static void setRealtimeSegmentZKMetadata(ZkHelixPropertyStore<ZNRecord> propertyStore,
+      RealtimeSegmentZKMetadata realtimeSegmentZKMetadata) {
     propertyStore.set(constructPropertyStorePathForSegment(
-        TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(realtimeSegmentZKMetadata.getTableName()), realtimeSegmentZKMetadata.getSegmentName()),
-        realtimeSegmentZKMetadata.toZNRecord(), AccessOption.PERSISTENT);
+        TableNameBuilder.REALTIME.tableNameWithType(realtimeSegmentZKMetadata.getTableName()),
+        realtimeSegmentZKMetadata.getSegmentName()), realtimeSegmentZKMetadata.toZNRecord(), AccessOption.PERSISTENT);
   }
 
   @Nullable
   public static OfflineSegmentZKMetadata getOfflineSegmentZKMetadata(
       @Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore, @Nonnull String tableName, @Nonnull String segmentName) {
-    String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     ZNRecord znRecord = propertyStore.get(constructPropertyStorePathForSegment(offlineTableName, segmentName), null,
         AccessOption.PERSISTENT);
     if (znRecord == null) {
@@ -148,7 +150,7 @@ public class ZKMetadataProvider {
   @Nullable
   public static RealtimeSegmentZKMetadata getRealtimeSegmentZKMetadata(
       @Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore, @Nonnull String tableName, @Nonnull String segmentName) {
-    String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     ZNRecord znRecord = propertyStore.get(constructPropertyStorePathForSegment(realtimeTableName, segmentName), null,
         AccessOption.PERSISTENT);
     // It is possible that the segment metadata has just been deleted due to retention.
@@ -165,7 +167,7 @@ public class ZKMetadataProvider {
   @Nullable
   public static AbstractTableConfig getOfflineTableConfig(@Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore,
       @Nonnull String tableName) {
-    String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     ZNRecord znRecord =
         propertyStore.get(constructPropertyStorePathForResourceConfig(offlineTableName), null, AccessOption.PERSISTENT);
     if (znRecord == null) {
@@ -182,7 +184,7 @@ public class ZKMetadataProvider {
   @Nullable
   public static AbstractTableConfig getRealtimeTableConfig(@Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore,
       @Nonnull String tableName) {
-    String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     ZNRecord znRecord = propertyStore.get(constructPropertyStorePathForResourceConfig(realtimeTableName), null,
         AccessOption.PERSISTENT);
     if (znRecord == null) {
@@ -216,7 +218,7 @@ public class ZKMetadataProvider {
       @Nonnull String tableName) {
     // TODO: After uniform schema, always use raw table name
 
-    String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     // First try to get schema using offline table name
     Schema schema = getSchema(propertyStore, offlineTableName);
     if (schema != null) {
@@ -232,7 +234,7 @@ public class ZKMetadataProvider {
       @Nonnull String tableName) {
     // TODO: After uniform schema, get schema using raw table name
 
-    String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     try {
       AbstractTableConfig realtimeTableConfig = getRealtimeTableConfig(propertyStore, realtimeTableName);
       if (realtimeTableConfig == null) {
@@ -247,14 +249,17 @@ public class ZKMetadataProvider {
     }
   }
 
-  public static List<OfflineSegmentZKMetadata> getOfflineSegmentZKMetadataListForTable(ZkHelixPropertyStore<ZNRecord> propertyStore, String tableName) {
-    List<OfflineSegmentZKMetadata> resultList = new ArrayList<OfflineSegmentZKMetadata>();
+  public static List<OfflineSegmentZKMetadata> getOfflineSegmentZKMetadataListForTable(
+      ZkHelixPropertyStore<ZNRecord> propertyStore, String tableName) {
+    List<OfflineSegmentZKMetadata> resultList = new ArrayList<>();
     if (propertyStore == null) {
       return resultList;
     }
-    String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     if (propertyStore.exists(constructPropertyStorePathForResource(offlineTableName), AccessOption.PERSISTENT)) {
-      List<ZNRecord> znRecordList = propertyStore.getChildren(constructPropertyStorePathForResource(offlineTableName), null, AccessOption.PERSISTENT);
+      List<ZNRecord> znRecordList =
+          propertyStore.getChildren(constructPropertyStorePathForResource(offlineTableName), null,
+              AccessOption.PERSISTENT);
       if (znRecordList != null) {
         for (ZNRecord record : znRecordList) {
           resultList.add(new OfflineSegmentZKMetadata(record));
@@ -264,14 +269,17 @@ public class ZKMetadataProvider {
     return resultList;
   }
 
-  public static List<RealtimeSegmentZKMetadata> getRealtimeSegmentZKMetadataListForTable(ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceName) {
-    List<RealtimeSegmentZKMetadata> resultList = new ArrayList<RealtimeSegmentZKMetadata>();
+  public static List<RealtimeSegmentZKMetadata> getRealtimeSegmentZKMetadataListForTable(
+      ZkHelixPropertyStore<ZNRecord> propertyStore, String resourceName) {
+    List<RealtimeSegmentZKMetadata> resultList = new ArrayList<>();
     if (propertyStore == null) {
       return resultList;
     }
-    String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(resourceName);
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(resourceName);
     if (propertyStore.exists(constructPropertyStorePathForResource(realtimeTableName), AccessOption.PERSISTENT)) {
-      List<ZNRecord> znRecordList = propertyStore.getChildren(constructPropertyStorePathForResource(realtimeTableName), null, AccessOption.PERSISTENT);
+      List<ZNRecord> znRecordList =
+          propertyStore.getChildren(constructPropertyStorePathForResource(realtimeTableName), null,
+              AccessOption.PERSISTENT);
       if (znRecordList != null) {
         for (ZNRecord record : znRecordList) {
           resultList.add(new RealtimeSegmentZKMetadata(record));

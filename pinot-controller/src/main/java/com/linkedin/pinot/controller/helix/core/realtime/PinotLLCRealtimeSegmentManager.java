@@ -479,7 +479,7 @@ public class PinotLLCRealtimeSegmentManager {
    */
   public boolean commitSegment(String rawTableName, final String committingSegmentNameStr, long nextOffset) {
     final long now = System.currentTimeMillis();
-    final String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(rawTableName);
+    final String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
 
     final LLCRealtimeSegmentZKMetadata oldSegMetadata = getRealtimeSegmentZKMetadata(realtimeTableName,
         committingSegmentNameStr);
@@ -926,7 +926,7 @@ public class PinotLLCRealtimeSegmentManager {
   */
   public void segmentStoppedConsuming(final LLCSegmentName segmentName, final String instance) {
     String rawTableName = segmentName.getTableName();
-    String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(rawTableName);
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(rawTableName);
     final String segmentNameStr = segmentName.getSegmentName();
     try {
       HelixHelper.updateIdealState(_helixManager, realtimeTableName, new Function<IdealState, IdealState>() {

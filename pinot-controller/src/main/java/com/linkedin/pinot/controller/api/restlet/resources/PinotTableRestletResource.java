@@ -1,5 +1,19 @@
 package com.linkedin.pinot.controller.api.restlet.resources;
 
+import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
+import com.linkedin.pinot.common.metrics.ControllerMeter;
+import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
+import com.linkedin.pinot.common.restlet.swagger.Parameter;
+import com.linkedin.pinot.common.restlet.swagger.Paths;
+import com.linkedin.pinot.common.restlet.swagger.Summary;
+import com.linkedin.pinot.common.restlet.swagger.Tags;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
+import com.linkedin.pinot.controller.api.ControllerRestApplication;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 import java.io.File;
 import java.io.IOException;
 import java.util.Set;
@@ -21,20 +35,6 @@ import org.restlet.resource.Post;
 import org.restlet.resource.Put;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
-import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metadata.stream.KafkaStreamMetadata;
-import com.linkedin.pinot.common.metrics.ControllerMeter;
-import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
-import com.linkedin.pinot.common.restlet.swagger.Parameter;
-import com.linkedin.pinot.common.restlet.swagger.Paths;
-import com.linkedin.pinot.common.restlet.swagger.Summary;
-import com.linkedin.pinot.common.restlet.swagger.Tags;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
-import com.linkedin.pinot.controller.api.ControllerRestApplication;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 
 
 public class PinotTableRestletResource extends BasePinotControllerRestletResource {
@@ -265,7 +265,7 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
 
     if ((type == null || TableType.OFFLINE.name().equalsIgnoreCase(type))
         && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
-      String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
+      String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
       JSONObject offline = new JSONObject();
       tableExists = true;
 
@@ -276,7 +276,7 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
 
     if ((type == null || TableType.REALTIME.name().equalsIgnoreCase(type))
         && _pinotHelixResourceManager.hasRealtimeTable(tableName)) {
-      String realTimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
+      String realTimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
       JSONObject realTime = new JSONObject();
       tableExists = true;
 
@@ -375,50 +375,40 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
   @Summary("Update table configuration. Request body is offline or realtime table configuration")
   @Tags({"table"})
   @Paths({"/tables/{tableName}"})
-  public Representation updateTableConfig(@Parameter(name = "tableName", in="path",
-      description = "Table name (without type)") String tableName,
-      Representation entity) {
-
-    AbstractTableConfig config = null;
+  public Representation updateTableConfig(@Parameter(name = "tableName", in = "path",
+      description = "Table name (without type)") String tableName, Representation entity) {
+    AbstractTableConfig tableConfig;
     try {
-      config = AbstractTableConfig.init(entity.getText());
+      tableConfig = AbstractTableConfig.init(entity.getText());
     } catch (JSONException e) {
-      errorResponseRepresentation(Status.CLIENT_ERROR_BAD_REQUEST,
-          "Invalid json in table configuration");
+      return errorResponseRepresentation(Status.CLIENT_ERROR_BAD_REQUEST, "Invalid json in table configuration");
     } catch (IOException e) {
       LOGGER.error("Failed to read request body while updating configuration for table: {}", tableName, e);
-      return errorResponseRepresentation(Status.SERVER_ERROR_INTERNAL,
-          "Failed to read request");
+      return errorResponseRepresentation(Status.SERVER_ERROR_INTERNAL, "Failed to read request");
     }
     try {
-      String tableTypeStr = config.getTableType();
-      TableType tableType = TableType.valueOf(tableTypeStr.toUpperCase());
-      String configTableName = config.getTableName();
-      String requestTablNameWithType = new TableNameBuilder(tableType).forTable(tableName);
-      if (! configTableName.equals(requestTablNameWithType)) {
+      TableType tableType = TableType.valueOf(tableConfig.getTableType().toUpperCase());
+      String configTableName = tableConfig.getTableName();
+      String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
+      if (!configTableName.equals(tableNameWithType)) {
         return errorResponseRepresentation(Status.CLIENT_ERROR_BAD_REQUEST,
-            "Request table " + requestTablNameWithType + " does not match table name in the body " + configTableName);
+            "Request table " + tableNameWithType + " does not match table name in the body " + configTableName);
       }
 
-      String tableNameWithType = null;
-      if (config.getTableType().equalsIgnoreCase(TableType.OFFLINE.name())) {
-        if (! _pinotHelixResourceManager.hasOfflineTable(tableName)) {
-          return errorResponseRepresentation(Status.CLIENT_ERROR_NOT_FOUND,
-              "Table " + tableName + " does not exist");
+      if (tableType == TableType.OFFLINE) {
+        if (!_pinotHelixResourceManager.hasOfflineTable(tableName)) {
+          return errorResponseRepresentation(Status.CLIENT_ERROR_NOT_FOUND, "Table " + tableName + " does not exist");
         }
-        tableNameWithType = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
-      } else if (config.getTableType().equalsIgnoreCase(TableType.REALTIME.name())) {
-        if (! _pinotHelixResourceManager.hasRealtimeTable(tableName)) {
-          return errorResponseRepresentation(Status.CLIENT_ERROR_NOT_FOUND,
-              "Table " + tableName + " does not exist");
+      } else {
+        if (!_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
+          return errorResponseRepresentation(Status.CLIENT_ERROR_NOT_FOUND, "Table " + tableName + " does not exist");
         }
-        tableNameWithType = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
       }
 
-      ensureMinReplicas(config);
-      _pinotHelixResourceManager.setExistingTableConfig(config, tableNameWithType, tableType);
+      ensureMinReplicas(tableConfig);
+      _pinotHelixResourceManager.setExistingTableConfig(tableConfig, tableNameWithType, tableType);
       return responseRepresentation(Status.SUCCESS_OK, "{\"status\" : \"Success\"}");
-    } catch(PinotHelixResourceManager.InvalidTableConfigException e) {
+    } catch (PinotHelixResourceManager.InvalidTableConfigException e) {
       LOGGER.info("Failed to update configuration for table {}, message: {}", tableName, e.getMessage());
       ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(
           ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);

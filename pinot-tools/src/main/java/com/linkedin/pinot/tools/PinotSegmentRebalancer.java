@@ -15,20 +15,6 @@
  */
 package com.linkedin.pinot.tools;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
-import org.apache.helix.controller.stages.ClusterDataCache;
-import org.apache.helix.model.ExternalView;
-import org.apache.helix.model.IdealState;
-import org.apache.zookeeper.data.Stat;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.google.common.collect.Lists;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
@@ -37,7 +23,21 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.common.utils.EqualityUtils;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.common.utils.retry.RetryPolicies;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
+import org.apache.helix.controller.stages.ClusterDataCache;
+import org.apache.helix.model.ExternalView;
+import org.apache.helix.model.IdealState;
+import org.apache.zookeeper.data.Stat;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class PinotSegmentRebalancer extends PinotZKChanger {
@@ -161,8 +161,7 @@ public class PinotSegmentRebalancer extends PinotZKChanger {
     }
     AutoRebalanceStrategy rebalanceStrategy = new AutoRebalanceStrategy(tableName, partitions, states);
 
-    TableNameBuilder builder = new TableNameBuilder(tableType);
-    String serverTenant = builder.forTable(tenantName);
+    String serverTenant = TableNameBuilder.forType(tableType).tableNameWithType(tenantName);
     List<String> instancesInClusterWithTag = helixAdmin.getInstancesInClusterWithTag(clusterName, serverTenant);
     List<String> enabledInstancesWithTag =
         HelixHelper.getEnabledInstancesWithTag(helixAdmin, clusterName, serverTenant);

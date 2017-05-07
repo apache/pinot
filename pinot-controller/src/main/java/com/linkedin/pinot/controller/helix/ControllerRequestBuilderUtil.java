@@ -120,10 +120,12 @@ public class ControllerRequestBuilderUtil {
           .registerStateModelFactory(EmptySegmentOnlineOfflineStateModelFactory.getStateModelDef(), stateModelFactory);
       helixZkManager.connect();
       if (isSingleTenant) {
-        helixZkManager.getClusterManagmentTool().addInstanceTag(helixClusterName, instanceId,
-            TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
-        helixZkManager.getClusterManagmentTool().addInstanceTag(helixClusterName, instanceId,
-            TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
+        helixZkManager.getClusterManagmentTool()
+            .addInstanceTag(helixClusterName, instanceId,
+                TableNameBuilder.OFFLINE.tableNameWithType(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
+        helixZkManager.getClusterManagmentTool()
+            .addInstanceTag(helixClusterName, instanceId,
+                TableNameBuilder.REALTIME.tableNameWithType(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
       } else {
         helixZkManager.getClusterManagmentTool().addInstanceTag(helixClusterName, instanceId, UNTAGGED_SERVER_INSTANCE);
       }

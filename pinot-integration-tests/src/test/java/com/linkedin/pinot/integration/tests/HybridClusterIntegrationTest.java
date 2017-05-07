@@ -16,10 +16,16 @@
 package com.linkedin.pinot.integration.tests;
 
 import com.google.common.base.Function;
-import com.google.common.util.concurrent.Uninterruptibles;
-import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.data.FieldSpec;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.utils.FileUploadUtils;
+import com.linkedin.pinot.common.utils.KafkaStarterUtils;
+import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
+import com.linkedin.pinot.common.utils.ZkStarter;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.ControllerTestUtils;
+import com.linkedin.pinot.util.TestUtils;
 import java.io.File;
 import java.sql.ResultSet;
 import java.sql.Statement;
@@ -32,33 +38,20 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import kafka.server.KafkaServerStartable;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.ExternalViewChangeListener;
-import org.apache.helix.HelixAdmin;
-import org.apache.helix.HelixManager;
 import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.model.ExternalView;
-import org.apache.helix.model.InstanceConfig;
 import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.utils.FileUploadUtils;
-import com.linkedin.pinot.common.utils.KafkaStarterUtils;
-import com.linkedin.pinot.common.utils.TarGzCompressionUtils;
-import com.linkedin.pinot.common.utils.ZkStarter;
-import com.linkedin.pinot.util.TestUtils;
-import kafka.server.KafkaServerStartable;
 
 
 /**
@@ -330,11 +323,13 @@ public class HybridClusterIntegrationTest extends BaseClusterIntegrationTestWith
     if (getTableName() != null) {
       Assert.assertNotNull(getDebugInfo("debug/timeBoundary" + ""));
       Assert.assertNotNull(getDebugInfo("debug/timeBoundary/" + tableName));
-      Assert.assertNotNull(getDebugInfo("debug/timeBoundary/" + TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName)));
-      Assert.assertNotNull(getDebugInfo("debug/timeBoundary/" + TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName)));
+      Assert.assertNotNull(getDebugInfo("debug/timeBoundary/" + TableNameBuilder.OFFLINE.tableNameWithType(tableName)));
+      Assert.assertNotNull(
+          getDebugInfo("debug/timeBoundary/" + TableNameBuilder.REALTIME.tableNameWithType(tableName)));
       Assert.assertNotNull(getDebugInfo("debug/routingTable/" + tableName));
-      Assert.assertNotNull(getDebugInfo("debug/routingTable/" + TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName)));
-      Assert.assertNotNull(getDebugInfo("debug/routingTable/" + TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName)));
+      Assert.assertNotNull(getDebugInfo("debug/routingTable/" + TableNameBuilder.OFFLINE.tableNameWithType(tableName)));
+      Assert.assertNotNull(
+          getDebugInfo("debug/routingTable/" + TableNameBuilder.REALTIME.tableNameWithType(tableName)));
     }
   }
 

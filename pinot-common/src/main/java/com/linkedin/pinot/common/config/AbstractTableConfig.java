@@ -46,10 +46,9 @@ public abstract class AbstractTableConfig {
   protected @Nullable QuotaConfig quotaConfig;
 
   protected AbstractTableConfig(String tableName, String tableType,
-      SegmentsValidationAndRetentionConfig validationConfig,
-      TenantConfig tenantConfig, TableCustomConfig customConfigs,
+      SegmentsValidationAndRetentionConfig validationConfig, TenantConfig tenantConfig, TableCustomConfig customConfigs,
       @Nullable QuotaConfig quotaConfig) {
-    this.tableName = new TableNameBuilder(TableType.valueOf(tableType.toUpperCase())).forTable(tableName);
+    this.tableName = TableNameBuilder.forType(TableType.valueOf(tableType.toUpperCase())).tableNameWithType(tableName);
     this.tableType = tableType;
     this.validationConfig = validationConfig;
     this.tenantConfig = tenantConfig;
@@ -60,8 +59,8 @@ public abstract class AbstractTableConfig {
   public static AbstractTableConfig init(String jsonString) throws JSONException, IOException {
     JSONObject tableJson = new JSONObject(jsonString);
     String tableType = tableJson.getString("tableType").toLowerCase();
-    String tableName =
-        new TableNameBuilder(TableType.valueOf(tableType.toUpperCase())).forTable(tableJson.getString("tableName"));
+    String tableName = TableNameBuilder.forType(TableType.valueOf(tableType.toUpperCase()))
+        .tableNameWithType(tableJson.getString("tableName"));
     SegmentsValidationAndRetentionConfig validationConfig =
         loadSegmentsConfig(new ObjectMapper().readTree(tableJson.getJSONObject("segmentsConfig").toString()));
     TenantConfig tenantConfig = loadTenantsConfig(new ObjectMapper().readTree(tableJson.getJSONObject("tenants").toString()));

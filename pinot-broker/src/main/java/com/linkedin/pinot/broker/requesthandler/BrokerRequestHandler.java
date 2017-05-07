@@ -15,21 +15,6 @@
  */
 package com.linkedin.pinot.broker.requesthandler;
 
-import java.net.InetAddress;
-import java.net.UnknownHostException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
-import org.apache.commons.configuration.Configuration;
-import org.apache.thrift.protocol.TCompactProtocol;
-import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.google.common.base.Splitter;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.exception.QueryException;
@@ -66,9 +51,24 @@ import com.linkedin.pinot.transport.scattergather.ScatterGather;
 import com.linkedin.pinot.transport.scattergather.ScatterGatherRequest;
 import com.linkedin.pinot.transport.scattergather.ScatterGatherStats;
 import io.netty.buffer.ByteBuf;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.commons.configuration.Configuration;
+import org.apache.thrift.protocol.TCompactProtocol;
+import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -264,11 +264,11 @@ public class BrokerRequestHandler {
     ResponseType responseType = BrokerResponseFactory.getResponseType(brokerRequest.getResponseFormat());
     LOGGER.debug("Broker Response Type: {}", responseType.name());
 
-    String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     if (!_routingTable.routingTableExists(offlineTableName)) {
       offlineTableName = null;
     }
-    String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     if (!_routingTable.routingTableExists(realtimeTableName)) {
       realtimeTableName = null;
     }
@@ -331,7 +331,7 @@ public class BrokerRequestHandler {
   private BrokerRequest getOfflineBrokerRequest(@Nonnull BrokerRequest brokerRequest) {
     BrokerRequest offlineRequest = brokerRequest.deepCopy();
     String hybridTableName = brokerRequest.getQuerySource().getTableName();
-    String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(hybridTableName);
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(hybridTableName);
     offlineRequest.getQuerySource().setTableName(offlineTableName);
     attachTimeBoundary(hybridTableName, offlineRequest, true);
     return offlineRequest;
@@ -347,7 +347,7 @@ public class BrokerRequestHandler {
   private BrokerRequest getRealtimeBrokerRequest(@Nonnull BrokerRequest brokerRequest) {
     BrokerRequest realtimeRequest = brokerRequest.deepCopy();
     String hybridTableName = brokerRequest.getQuerySource().getTableName();
-    String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(hybridTableName);
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(hybridTableName);
     realtimeRequest.getQuerySource().setTableName(realtimeTableName);
     attachTimeBoundary(hybridTableName, realtimeRequest, false);
     return realtimeRequest;
@@ -362,8 +362,8 @@ public class BrokerRequestHandler {
    */
   private void attachTimeBoundary(@Nonnull String hybridTableName, @Nonnull BrokerRequest brokerRequest,
       boolean isOfflineRequest) {
-    TimeBoundaryInfo timeBoundaryInfo = _timeBoundaryService.getTimeBoundaryInfoFor(
-        TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(hybridTableName));
+    TimeBoundaryInfo timeBoundaryInfo =
+        _timeBoundaryService.getTimeBoundaryInfoFor(TableNameBuilder.OFFLINE.tableNameWithType(hybridTableName));
     if (timeBoundaryInfo == null || timeBoundaryInfo.getTimeColumn() == null
         || timeBoundaryInfo.getTimeValue() == null) {
       LOGGER.warn("No time boundary attached for table: {}", hybridTableName);
