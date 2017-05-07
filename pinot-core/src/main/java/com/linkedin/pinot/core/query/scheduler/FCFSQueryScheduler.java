@@ -20,7 +20,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.linkedin.pinot.common.metrics.ServerQueryPhase;
 import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.common.query.QueryRequest;
+import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.utils.DataTable;
 import java.util.concurrent.Callable;
 import javax.annotation.Nonnull;
@@ -43,7 +43,7 @@ public class FCFSQueryScheduler extends QueryScheduler {
   }
 
   @Override
-  public ListenableFuture<DataTable> submit(final QueryRequest queryRequest) {
+  public ListenableFuture<DataTable> submit(final ServerQueryRequest queryRequest) {
     Preconditions.checkNotNull(queryRequest);
 
     queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT);

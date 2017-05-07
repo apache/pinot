@@ -45,7 +45,7 @@ public interface QueryExecutor {
    *
    * @return
    */
-  DataTable processQuery(QueryRequest queryRequest, ExecutorService executorService);
+  DataTable processQuery(ServerQueryRequest queryRequest, ExecutorService executorService);
 
   void shutDown();
 

@@ -20,9 +20,13 @@ import com.linkedin.pinot.common.config.SegmentPartitionConfig;
 import com.linkedin.pinot.common.data.DimensionFieldSpec;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
+import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.segment.ReadMode;
+import com.linkedin.pinot.common.utils.request.FilterQueryTree;
+import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.data.GenericRow;
 import com.linkedin.pinot.core.data.readers.RecordReader;
 import com.linkedin.pinot.core.data.readers.TestRecordReader;
@@ -142,14 +146,16 @@ public class SegmentPartitionTest {
       // Test for partitioned column.
       String query = buildQuery(TABLE_NAME, PARTITIONED_COLUMN_NAME, columnValue);
       BrokerRequest brokerRequest = compiler.compileToBrokerRequest(query);
+      FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
 
-      Assert.assertEquals(pruner.prune(_segment, brokerRequest), (columnValue % NUM_PARTITIONS > MAX_PARTITION_VALUE),
+      Assert.assertEquals(pruner.prune(_segment, filterQueryTree), (columnValue % NUM_PARTITIONS > MAX_PARTITION_VALUE),
           "Failed for column value: " + columnValue);
 
       // Test for non partitioned column.
       query = buildQuery(TABLE_NAME, NON_PARTITIONED_COLUMN_NAME, columnValue);
       brokerRequest = compiler.compileToBrokerRequest(query);
-      Assert.assertFalse(pruner.prune(_segment, brokerRequest));
+      filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
+      Assert.assertFalse(pruner.prune(_segment, filterQueryTree));
 
       // Test for AND query: Segment can be pruned out if partitioned column has value outside of range.
       int partitionColumnValue = Math.abs(random.nextInt());
@@ -158,14 +164,16 @@ public class SegmentPartitionTest {
           nonPartitionColumnValue, FilterOperator.AND);
 
       brokerRequest = compiler.compileToBrokerRequest(query);
-      Assert.assertEquals(pruner.prune(_segment, brokerRequest),
+      filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
+      Assert.assertEquals(pruner.prune(_segment, filterQueryTree),
           (partitionColumnValue % NUM_PARTITIONS) > MAX_PARTITION_VALUE);
 
       // Test for OR query: Segment should never be pruned as there's an OR with non partitioned column.
       query = buildAndQuery(TABLE_NAME, PARTITIONED_COLUMN_NAME, partitionColumnValue, NON_PARTITIONED_COLUMN_NAME,
           nonPartitionColumnValue, FilterOperator.OR);
       brokerRequest = compiler.compileToBrokerRequest(query);
-      Assert.assertFalse(pruner.prune(_segment, brokerRequest));
+      filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
+      Assert.assertFalse(pruner.prune(_segment, filterQueryTree));
     }
   }
 

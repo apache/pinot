@@ -22,7 +22,7 @@ import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.common.query.QueryRequest;
+import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.utils.DataTable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -116,7 +116,7 @@ public abstract class QueryScheduler {
   }
 
 
-  public abstract ListenableFuture<DataTable> submit(@Nonnull QueryRequest queryRequest);
+  public abstract ListenableFuture<DataTable> submit(@Nonnull ServerQueryRequest queryRequest);
 
   public @Nullable QueryExecutor getQueryExecutor() {
     return queryExecutor;

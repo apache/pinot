@@ -22,6 +22,8 @@ import com.linkedin.pinot.common.query.context.TimerContext;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.utils.DataTable;
+import com.linkedin.pinot.common.utils.request.FilterQueryTree;
+import com.linkedin.pinot.common.utils.request.RequestUtils;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,10 +35,11 @@ import org.slf4j.LoggerFactory;
  * etc.
  *
  */
-public class QueryRequest {
-  private static final Logger LOGGER = LoggerFactory.getLogger(QueryRequest.class);
+public class ServerQueryRequest {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ServerQueryRequest.class);
 
   private final InstanceRequest instanceRequest;
+  private final FilterQueryTree filterQueryTree;
   // Future to track result of query execution
   private ListenableFuture<DataTable> resultFuture;
   // Timing information for different phases of query execution
@@ -45,10 +48,11 @@ public class QueryRequest {
   private final ServerMetrics serverMetrics;
   private int segmentCountAfterPruning;
 
-  public QueryRequest(InstanceRequest request, ServerMetrics serverMetrics) {
+  public ServerQueryRequest(InstanceRequest request, ServerMetrics serverMetrics) {
     this.instanceRequest = request;
     this.serverMetrics = serverMetrics;
     BrokerRequest brokerRequest = (request == null) ? null : request.getQuery();
+    filterQueryTree = (brokerRequest == null) ? null : RequestUtils.generateFilterQueryTree(brokerRequest);
     timerContext = new TimerContext(brokerRequest, serverMetrics);
   }
 
@@ -71,6 +75,13 @@ public class QueryRequest {
    */
   public BrokerRequest getBrokerRequest() {
     return instanceRequest.getQuery();
+  }
+
+  /**
+   * Returns the filter query tree for the server request.
+   */
+  public FilterQueryTree getFilterQueryTree() {
+    return filterQueryTree;
   }
 
   /**

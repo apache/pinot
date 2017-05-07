@@ -15,11 +15,12 @@
  */
 package com.linkedin.pinot.core.query.pruner;
 
+import com.linkedin.pinot.common.query.ServerQueryRequest;
+import com.linkedin.pinot.common.request.BrokerRequest;
 import org.apache.commons.configuration.Configuration;
 
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.request.AggregationInfo;
-import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterQuery;
 import com.linkedin.pinot.common.request.FilterQueryMap;
 import com.linkedin.pinot.common.request.SelectionSort;
@@ -37,10 +38,13 @@ public class DataSchemaSegmentPruner implements SegmentPruner {
   private static final String COLUMN_KEY = "column";
 
   @Override
-  public boolean prune(IndexSegment segment, BrokerRequest brokerRequest) {
+  public boolean prune(IndexSegment segment, ServerQueryRequest queryRequest) {
+    BrokerRequest brokerRequest = queryRequest.getBrokerRequest();
     Schema schema = segment.getSegmentMetadata().getSchema();
+
     // Check filtering columns
-    if (brokerRequest.getFilterQuery() != null && !filterQueryMatchedSchema(schema, brokerRequest.getFilterQuery(), brokerRequest.getFilterSubQueryMap())) {
+    if (brokerRequest.getFilterQuery() != null && !filterQueryMatchedSchema(schema, brokerRequest.getFilterQuery(),
+        brokerRequest.getFilterSubQueryMap())) {
       return true;
     }
     // Check aggregation function columns.

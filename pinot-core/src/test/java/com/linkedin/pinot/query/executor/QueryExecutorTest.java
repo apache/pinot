@@ -16,7 +16,7 @@
 package com.linkedin.pinot.query.executor;
 
 import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.query.QueryRequest;
+import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.FilterQuery;
@@ -147,7 +147,7 @@ public class QueryExecutorTest {
     for (IndexSegment segment : _indexSegmentList) {
       instanceRequest.getSearchSegments().add(segment.getSegmentName());
     }
-    QueryRequest queryRequest = new QueryRequest(instanceRequest, serverMetrics);
+    ServerQueryRequest queryRequest = new ServerQueryRequest(instanceRequest, serverMetrics);
     DataTable instanceResponse = _queryExecutor.processQuery(queryRequest, queryRunners);
     LOGGER.info("InstanceResponse is " + instanceResponse.getLong(0, 0));
     Assert.assertEquals(instanceResponse.getLong(0, 0), 400002L);
@@ -167,7 +167,7 @@ public class QueryExecutorTest {
     for (IndexSegment segment : _indexSegmentList) {
       instanceRequest.getSearchSegments().add(segment.getSegmentName());
     }
-    QueryRequest queryRequest = new QueryRequest(instanceRequest, serverMetrics);
+    ServerQueryRequest queryRequest = new ServerQueryRequest(instanceRequest, serverMetrics);
     DataTable instanceResponse = _queryExecutor.processQuery(queryRequest, queryRunners);
     LOGGER.info("InstanceResponse is " + instanceResponse.getDouble(0, 0));
     Assert.assertEquals(instanceResponse.getDouble(0, 0), 40000200000.0);
@@ -188,7 +188,7 @@ public class QueryExecutorTest {
     for (IndexSegment segment : _indexSegmentList) {
       instanceRequest.getSearchSegments().add(segment.getSegmentName());
     }
-    QueryRequest queryRequest = new QueryRequest(instanceRequest, serverMetrics);
+    ServerQueryRequest queryRequest = new ServerQueryRequest(instanceRequest, serverMetrics);
     DataTable instanceResponse = _queryExecutor.processQuery(queryRequest, queryRunners);
     LOGGER.info("InstanceResponse is " + instanceResponse.getDouble(0, 0));
     Assert.assertEquals(instanceResponse.getDouble(0, 0), 200000.0);
@@ -208,7 +208,7 @@ public class QueryExecutorTest {
     for (IndexSegment segment : _indexSegmentList) {
       instanceRequest.getSearchSegments().add(segment.getSegmentName());
     }
-    QueryRequest queryRequest = new QueryRequest(instanceRequest, serverMetrics);
+    ServerQueryRequest queryRequest = new ServerQueryRequest(instanceRequest, serverMetrics);
     DataTable instanceResponse = _queryExecutor.processQuery(queryRequest, queryRunners);
     LOGGER.info("InstanceResponse is " + instanceResponse.getDouble(0, 0));
     Assert.assertEquals(instanceResponse.getDouble(0, 0), 0.0);

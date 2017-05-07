@@ -21,7 +21,7 @@ import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.metrics.ServerQueryPhase;
 import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.common.query.QueryRequest;
+import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.query.context.TimerContext;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
@@ -89,7 +89,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
   }
 
   @Override
-  public DataTable processQuery(final QueryRequest queryRequest, ExecutorService executorService) {
+  public DataTable processQuery(final ServerQueryRequest queryRequest, ExecutorService executorService) {
     TimerContext timerContext = queryRequest.getTimerContext();
     TimerContext.Timer schedulerWaitTimer = timerContext.getPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT);
     if (schedulerWaitTimer != null) {
@@ -112,7 +112,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       final String tableName = instanceRequest.getQuery().getQuerySource().getTableName();
       TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(tableName);
       queryableSegmentDataManagerList = acquireQueryableSegments(tableDataManager, instanceRequest);
-      long totalRawDocs = pruneSegments(tableDataManager, queryableSegmentDataManagerList, instanceRequest.getQuery());
+      long totalRawDocs = pruneSegments(tableDataManager, queryableSegmentDataManagerList, queryRequest);
       segmentPruneTimer.stopAndRecord();
 
       int numSegmentsMatched = queryableSegmentDataManagerList.size();
@@ -215,11 +215,11 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
    *
    * @param tableDataManager Table data manager
    * @param segments List of segments to prune
-   * @param brokerRequest Broker request
+   * @param serverQueryRequest Server query request
    * @return Total number of docs across all segments (including the ones that were pruned).
    */
   private long pruneSegments(TableDataManager tableDataManager, List<SegmentDataManager> segments,
-      BrokerRequest brokerRequest) {
+      ServerQueryRequest serverQueryRequest) {
     long totalRawDocs = 0;
     Iterator<SegmentDataManager> it = segments.iterator();
 
@@ -228,7 +228,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       final IndexSegment indexSegment = segmentDataManager.getSegment();
       // We need to compute the total raw docs for the table before any pruning.
       totalRawDocs += indexSegment.getSegmentMetadata().getTotalRawDocs();
-      if (_segmentPrunerService.prune(indexSegment, brokerRequest)) {
+      if (_segmentPrunerService.prune(indexSegment, serverQueryRequest)) {
         it.remove();
         tableDataManager.releaseSegment(segmentDataManager);
       }

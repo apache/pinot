@@ -39,6 +39,22 @@ import javax.annotation.Nonnull;
 public class DefaultGroupByExecutor implements GroupByExecutor {
   public static final int MAX_INITIAL_RESULT_HOLDER_CAPACITY = 10_000;
 
+  // Thread local (reusable) array for dict id to group key mapping.
+  private static final ThreadLocal<int[]> THREAD_LOCAL_DICT_ID_TO_GROUP_KEY = new ThreadLocal<int[]>() {
+    @Override
+    protected int[] initialValue() {
+      return new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    }
+  };
+
+  // Thread local (reusable) array for dict id to MV group key mapping.
+  private static final ThreadLocal<int[][]> THREAD_LOCAL_DICT_ID_TO_MV_GROUP_KEY = new ThreadLocal<int[][]>() {
+    @Override
+    protected int[][] initialValue() {
+      return new int[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+    }
+  };
+
   private static final double GROUP_BY_TRIM_FACTOR = 0.9;
   private final int _numAggrFunc;
   private final int _numGroupsLimit;
@@ -234,9 +250,9 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   private void initDocIdToGroupKeyMap() {
     if (_hasMVGroupByColumns) {
       // TODO: Revisit block fetching of multi-valued columns
-      _docIdToMVGroupKey = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL][];
+      _docIdToMVGroupKey = THREAD_LOCAL_DICT_ID_TO_MV_GROUP_KEY.get();
     } else {
-      _docIdToSVGroupKey = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+      _docIdToSVGroupKey = THREAD_LOCAL_DICT_ID_TO_GROUP_KEY.get();
     }
   }
 
