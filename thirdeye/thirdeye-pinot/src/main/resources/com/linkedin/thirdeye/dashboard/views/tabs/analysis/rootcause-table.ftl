@@ -12,7 +12,7 @@
     {{#each rootCauseData}}
       <tr>
         <td>{{type}}</td>
-        <td class="rootcause__details"><a href="{{link}}" target="_blank">{{label}}</a></td>
+        <td class="rootcause__details"><a href="{{link}}" target="_blank">{{truncate label 500}}</a></td>
         <td>{{score}}</td>
       </tr>
     {{/each}}

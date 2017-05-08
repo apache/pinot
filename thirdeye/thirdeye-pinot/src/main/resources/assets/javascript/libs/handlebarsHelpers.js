@@ -84,6 +84,14 @@ Handlebars.registerHelper('if_eq', function(a, b, opts) {
   }
 });
 
+Handlebars.registerHelper('truncate', function(str, maxlen) {
+  if (str.length > maxlen) {
+    return str.substr(0, maxlen-3) + "...";
+  } else {
+    return str
+  }
+});
+
 Handlebars.registerHelper('if_no_anomalies', function(info, opts) {
   if( info.open == 0 && info.resolved == 0) {
     return opts.fn(this)
