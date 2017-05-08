@@ -63,19 +63,28 @@ DimensionTreeMapModel.prototype = {
           var dataKey = this.metricName + "." + dimension;
           var row = {"t": "0", "children": []};
           if (heatMapData.data && heatMapData.data[dataKey]) {
-            var dimensionValueIndex = heatMapData.data[dataKey].schema.columnsToIndexMapping['dimensionValue'];
-            var percentageChangeIndex = heatMapData.data[dataKey].schema.columnsToIndexMapping['percentageChange'];
-            var currentValueIndex = heatMapData.data[dataKey].schema.columnsToIndexMapping['currentValue'];
-            var contributionToOverallChangeIndex = heatMapData.data[dataKey].schema.columnsToIndexMapping['contributionToOverallChange'];
-            var contributionChangeIndex = heatMapData.data[dataKey].schema.columnsToIndexMapping['contributionDifference'];
+            const {
+              dimensionValue: dimensionValueIndex,
+              percentageChange: percentageChangeIndex,
+              currentValue: currentValueIndex,
+              baselineValue: baselineValueIndex,
+              baselineContribution: baselineContributionIndex,
+              contributionToOverallChange: contributionToOverallChangeIndex,
+              currentContribution: currentContributionIndex,
+              contributionDifference: contributionChangeIndex
+            } = heatMapData.data[dataKey].schema.columnsToIndexMapping;
+
             for (var j in heatMapData.data[dataKey].responseData) {
               var record = heatMapData.data[dataKey].responseData[j];
               var item = {
-                "t": record[dimensionValueIndex],
-                "value": record[currentValueIndex],
-                "percentageChange": record[percentageChangeIndex],
-                "contributionChange": record[contributionChangeIndex],
-                "contributionToOverallChange": record[contributionToOverallChangeIndex]
+                t: record[dimensionValueIndex],
+                value: record[currentValueIndex],
+                baselineValue: record[baselineValueIndex],
+                currentContribution: record[currentContributionIndex],
+                baselineContribution: record[baselineContributionIndex],
+                percentageChange: record[percentageChangeIndex],
+                contributionChange: record[contributionChangeIndex],
+                contributionToOverallChange: record[contributionToOverallChangeIndex]
               };
               row.children.push(item);
             }
@@ -90,5 +99,5 @@ DimensionTreeMapModel.prototype = {
       this.absoluteChange = heatMapData.summary.simpleFields.deltaChange;
     }
   }
-}
+};
 

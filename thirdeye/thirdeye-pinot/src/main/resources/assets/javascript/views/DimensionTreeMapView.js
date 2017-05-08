@@ -195,7 +195,7 @@ DimensionTreeMapView.prototype = {
       var dimensionPlaceHolderId = '#' + dimension + '-heatmap-placeholder';
       var height = $(dimensionPlaceHolderId).height();
       var width = $(dimensionPlaceHolderId).width();
-      var treeMap = d3.layout.treemap().mode("slice").size([ width, height ]).sort(function(a, b) {
+      var treeMap = d3.layout.treemap().size([ width, height ]).sort(function(a, b) {
         return a.value - b.value;
       });
 
@@ -210,17 +210,26 @@ DimensionTreeMapView.prototype = {
       }).on("click", function(d) {
         // return zoom(node == d.parent ? root : d.parent);
       }).on("mousemove", function(d) {
-        var xPosition = d3.event.pageX + 5;
-        var yPosition = d3.event.pageY + 5;
+        const tooltipWidth = 200;
+        const xPosition = d3.event.pageX - (tooltipWidth + 20);
+        const yPosition = d3.event.pageY + 5;
         d3.select("#tooltip")
           .style("left", xPosition + "px")
           .style("top", yPosition + "px");
         d3.select("#tooltip #heading")
           .text(d.t);
         d3.select("#tooltip #percentageChange")
-          .text(d.percentageChange);
+          .text(`${d.percentageChange}%`);
         d3.select("#tooltip #currentValue")
           .text(d.value);
+        d3.select("#tooltip #contributionChange")
+          .text(`${d.contributionChange}%`);
+        d3.select("#tooltip #currentContribution")
+          .text(d.currentContribution);
+        d3.select("#tooltip #baselineContribution")
+          .text(d.baselineContribution);
+        d3.select("#tooltip #baselineValue")
+          .text(d.baselineValue);
         d3.select("#tooltip").classed("hidden", false);
       }).on("mouseout", function() {
         d3.select("#tooltip").classed("hidden", true);
