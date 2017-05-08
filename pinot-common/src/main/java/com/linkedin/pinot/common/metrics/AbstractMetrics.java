@@ -181,12 +181,31 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param unitCount The number of units to add to the meter
    */
   public void addMeteredGlobalValue(final M meter, final long unitCount) {
-    final String fullMeterName;
-    String meterName = meter.getMeterName();
-    fullMeterName = _metricPrefix + meterName;
-    final MetricName metricName = new MetricName(_clazz, fullMeterName);
+    addMeteredGlobalValue(meter, unitCount, null);
+  }
 
-    MetricsHelper.newMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS).mark(unitCount);
+  /**
+   * Logs a value to a meter.
+   *
+   * @param meter The meter to use
+   * @param unitCount The number of units to add to the meter
+   * @param reusedMeter The meter to reuse
+   */
+  public com.yammer.metrics.core.Meter addMeteredGlobalValue(final M meter, final long unitCount, com.yammer.metrics.core.Meter reusedMeter) {
+    if (reusedMeter != null) {
+      reusedMeter.mark(unitCount);
+      return reusedMeter;
+    } else {
+      final String fullMeterName;
+      String meterName = meter.getMeterName();
+      fullMeterName = _metricPrefix + meterName;
+      final MetricName metricName = new MetricName(_clazz, fullMeterName);
+
+      final com.yammer.metrics.core.Meter newMeter =
+          MetricsHelper.newMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS);
+      newMeter.mark(unitCount);
+      return newMeter;
+    }
   }
 
   /**
@@ -197,12 +216,31 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param unitCount The number of units to add to the meter
    */
   public void addMeteredTableValue(final String tableName, final M meter, final long unitCount) {
-    final String fullMeterName;
-    String meterName = meter.getMeterName();
-    fullMeterName = _metricPrefix + getTableName(tableName) + "." + meterName;
-    final MetricName metricName = new MetricName(_clazz, fullMeterName);
+    addMeteredTableValue(tableName, meter, unitCount, null);
+  }
 
-    MetricsHelper.newMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS).mark(unitCount);
+  /**
+   * Logs a value to a table-level meter.
+   * @param tableName The table name
+   * @param meter The meter to use
+   * @param unitCount The number of units to add to the meter
+   * @param reusedMeter The meter to reuse
+   */
+  public com.yammer.metrics.core.Meter addMeteredTableValue(final String tableName, final M meter, final long unitCount, com.yammer.metrics.core.Meter reusedMeter) {
+    if (reusedMeter != null) {
+      reusedMeter.mark(unitCount);
+      return reusedMeter;
+    } else {
+      final String fullMeterName;
+      String meterName = meter.getMeterName();
+      fullMeterName = _metricPrefix + getTableName(tableName) + "." + meterName;
+      final MetricName metricName = new MetricName(_clazz, fullMeterName);
+
+      final com.yammer.metrics.core.Meter newMeter =
+          MetricsHelper.newMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS);
+      newMeter.mark(unitCount);
+      return newMeter;
+    }
   }
 
   /**

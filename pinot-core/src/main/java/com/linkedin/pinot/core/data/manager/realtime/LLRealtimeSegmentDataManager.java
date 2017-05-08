@@ -64,6 +64,7 @@ import com.linkedin.pinot.core.realtime.impl.kafka.KafkaSimpleConsumerFactoryImp
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.linkedin.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
+import com.yammer.metrics.core.Meter;
 import kafka.message.MessageAndOffset;
 
 
@@ -330,6 +331,9 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
   }
 
   private void processKafkaEvents(Iterable<MessageAndOffset> messagesAndOffsets, Long highWatermark, long idlePipeSleepTimeMillis) {
+    Meter realtimeRowsConsumedMeter = null;
+    Meter realtimeRowsDroppedMeter = null;
+
     Iterator<MessageAndOffset> msgIterator = messagesAndOffsets.iterator();
 
     int indexedMessageCount = 0;
@@ -376,15 +380,15 @@ public class LLRealtimeSegmentDataManager extends SegmentDataManager {
         transformedRow = _fieldExtractor.transform(decodedRow, transformedRow);
 
         if (transformedRow != null) {
-          _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.REALTIME_ROWS_CONSUMED, 1);
+          realtimeRowsConsumedMeter = _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.REALTIME_ROWS_CONSUMED, 1, realtimeRowsConsumedMeter);
           indexedMessageCount++;
         } else {
-          _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1);
+          realtimeRowsDroppedMeter = _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1, realtimeRowsDroppedMeter);
         }
 
         canTakeMore = _realtimeSegment.index(transformedRow);
       } else {
-        _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1);
+        realtimeRowsDroppedMeter = _serverMetrics.addMeteredTableValue(_metricKeyName, ServerMeter.INVALID_REALTIME_ROWS_DROPPED, 1, realtimeRowsDroppedMeter);
       }
 
       _currentOffset = messageAndOffset.nextOffset();
