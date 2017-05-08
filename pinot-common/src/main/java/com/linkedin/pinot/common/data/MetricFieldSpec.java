@@ -56,10 +56,8 @@ public final class MetricFieldSpec extends FieldSpec {
       @Nonnull DerivedMetricType derivedMetricType) {
     super(name, dataType, true);
     Preconditions.checkArgument(fieldSize > 0, "Field size must be a positive number.");
-    Preconditions.checkNotNull(derivedMetricType);
-
-    this._fieldSize = fieldSize;
-    this._derivedMetricType = derivedMetricType;
+    _fieldSize = fieldSize;
+    _derivedMetricType = derivedMetricType;
   }
 
   // For derived metric fields.
@@ -67,10 +65,8 @@ public final class MetricFieldSpec extends FieldSpec {
       @Nonnull DerivedMetricType derivedMetricType, @Nonnull Object defaultNullValue) {
     super(name, dataType, true, defaultNullValue);
     Preconditions.checkArgument(fieldSize > 0, "Field size must be a positive number.");
-    Preconditions.checkNotNull(derivedMetricType);
-
-    this._fieldSize = fieldSize;
-    this._derivedMetricType = derivedMetricType;
+    _fieldSize = fieldSize;
+    _derivedMetricType = derivedMetricType;
   }
 
   public int getFieldSize() {
@@ -83,19 +79,21 @@ public final class MetricFieldSpec extends FieldSpec {
 
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setFieldSize(int fieldSize) {
-    this._fieldSize = fieldSize;
+    _fieldSize = fieldSize;
   }
 
-  public @Nullable DerivedMetricType getDerivedMetricType() {
+  @Nullable
+  public DerivedMetricType getDerivedMetricType() {
     return _derivedMetricType;
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
   public void setDerivedMetricType(@Nonnull DerivedMetricType derivedMetricType) {
-    this._derivedMetricType = derivedMetricType;
+    _derivedMetricType = derivedMetricType;
   }
 
   @JsonIgnore
+  @Nonnull
   @Override
   public FieldType getFieldType() {
     return FieldType.METRIC;

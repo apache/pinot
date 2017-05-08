@@ -44,7 +44,8 @@ public class SchemaTest {
   }
 
   @Test
-  public void testValidation() throws Exception {
+  public void testValidation()
+      throws Exception {
     Schema schemaToValidate;
 
     schemaToValidate = Schema.fromString(makeSchema(FieldSpec.DataType.LONG, FieldSpec.DataType.STRING, true));
@@ -133,7 +134,7 @@ public class SchemaTest {
     Assert.assertNotNull(fieldSpec);
     Assert.assertEquals(fieldSpec.isSingleValueField(), true);
     Assert.assertEquals(fieldSpec.getDataType(), FieldSpec.DataType.LONG);
-    Assert.assertEquals(fieldSpec.getDefaultNullValue(), new Long(0));
+    Assert.assertEquals(fieldSpec.getDefaultNullValue(), 0L);
 
     fieldSpec = schema.getMetricSpec("derivedMetricWithDefault");
     Assert.assertNotNull(fieldSpec);
@@ -261,14 +262,13 @@ public class SchemaTest {
     Assert.assertEquals(newSchema, schema);
     Assert.assertEquals(newSchema.hashCode(), schema.hashCode());
   }
-  
+
   @Test
   public void testSimpleDateFormat() throws IOException {
     TimeGranularitySpec incomingTimeGranularitySpec = new TimeGranularitySpec(DataType.STRING, 1,
         TimeUnit.DAYS, TimeFormat.SIMPLE_DATE_FORMAT + ":yyyyMMdd" , "Date");
     TimeGranularitySpec outgoingTimeGranularitySpec = new TimeGranularitySpec(DataType.STRING, 1,
         TimeUnit.DAYS, TimeFormat.SIMPLE_DATE_FORMAT + ":yyyyMMdd", "Date");
-//    System.out.println(incomingTimeGranularitySpec);
     Schema schema = new Schema.SchemaBuilder().setSchemaName("testSchema")
         .addTime(incomingTimeGranularitySpec, outgoingTimeGranularitySpec).build();
     String jsonSchema = schema.getJSONSchema();
