@@ -219,11 +219,11 @@ DimensionTreeMapView.prototype = {
         d3.select("#tooltip #heading")
           .text(d.t);
         d3.select("#tooltip #percentageChange")
-          .text(d.percentageChange);
+          .text(`${d.percentageChange}%`);
         d3.select("#tooltip #currentValue")
           .text(d.value);
         d3.select("#tooltip #contributionChange")
-          .text(d.contributionChange);
+          .text(`${d.contributionChange}%`);
         d3.select("#tooltip #currentContribution")
           .text(d.currentContribution);
         d3.select("#tooltip #baselineContribution")

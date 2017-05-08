@@ -63,11 +63,6 @@ DimensionTreeMapModel.prototype = {
           var dataKey = this.metricName + "." + dimension;
           var row = {"t": "0", "children": []};
           if (heatMapData.data && heatMapData.data[dataKey]) {
-            // var dimensionValueIndex = heatMapData.data[dataKey].schema.columnsToIndexMapping['dimensionValue'];
-            // var percentageChangeIndex = heatMapData.data[dataKey].schema.columnsToIndexMapping['percentageChange'];
-            // var currentValueIndex = heatMapData.data[dataKey].schema.columnsToIndexMapping['currentValue'];
-            // var contributionToOverallChangeIndex = heatMapData.data[dataKey].schema.columnsToIndexMapping['contributionToOverallChange'];
-            // var contributionChangeIndex = heatMapData.data[dataKey].schema.columnsToIndexMapping['contributionDifference'];
             const {
               dimensionValue: dimensionValueIndex,
               percentageChange: percentageChangeIndex,
@@ -89,8 +84,7 @@ DimensionTreeMapModel.prototype = {
                 baselineContribution: record[baselineContributionIndex],
                 percentageChange: record[percentageChangeIndex],
                 contributionChange: record[contributionChangeIndex],
-                contributionToOverallChange: record[contributionToOverallChangeIndex],
-
+                contributionToOverallChange: record[contributionToOverallChangeIndex]
               };
               row.children.push(item);
             }
@@ -105,5 +99,5 @@ DimensionTreeMapModel.prototype = {
       this.absoluteChange = heatMapData.summary.simpleFields.deltaChange;
     }
   }
-}
+};
 
