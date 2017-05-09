@@ -47,6 +47,16 @@ AnomalyFilterView.prototype = {
 
     // APPLY BUTTON
   },
+  // parse through checkSelected filters and check them in the front end
+  // To do implement this with hash params
+  checkSelectedFilters() {
+    const selectedFilters = this.anomalyFilterModel.getSelectedFilters();
+    selectedFilters.forEach((filter) => {
+      const [section, filterName] = filter;
+      $(`#${section} .filter-item__checkbox[data-filter="${filterName}"]`).prop('checked', true);
+    });
+  },
+
   setupFilterListener() {
     // show hide filter sections
     $('.filter-section').on('click', '.filter-title', (event) => {
@@ -58,12 +68,16 @@ AnomalyFilterView.prototype = {
 
     // on filter selection
     $('.filter-section').on('click', '.filter-item__checkbox', (event) => {
-      const {
-        id: filter,
-        checked: isChecked
-      } = event.target;
+      const $currentSelection = $(event.target);
+      const isChecked = $currentSelection.prop('checked')
+      const filter = $currentSelection.data('filter');
+      const section = $(event.delegateTarget).data('section');
 
-      this.checkedFilterEvent.notify({ filter, isChecked});
+      this.checkedFilterEvent.notify({
+        filter,
+        isChecked,
+        section
+      });
     });
 
     // clear

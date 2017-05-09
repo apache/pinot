@@ -18,13 +18,15 @@ AnomalyFilterController.prototype = {
   checkedFilterEventHandler(sender, args = {}) {
     const {
       filter,
-      isChecked
+      isChecked,
+      section
     } = args;
 
     const action = isChecked ? 'addFilter' : 'removeFilter';
-    this.anomalyFilterModel[action](filter);
+    this.anomalyFilterModel[action](filter, section);
     // call rerender;
     this.anomalyFilterView.render();
+    this.anomalyFilterView.checkSelectedFilters();
   },
 
   expandedFilterEventHandler(sender, args = {}) {

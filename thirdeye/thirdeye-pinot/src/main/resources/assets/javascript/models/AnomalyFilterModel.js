@@ -38,12 +38,16 @@ AnomalyFilterModel.prototype = {
           func(key, obj[key]) :
           this.filtersIterator(obj[key], func, formatter);
 
-      result = formatter ? formatter(key, result) : result;
+      result = (result && formatter) ? formatter(key, result) : result;
       if (result) {
         acc[key] = result;
       }
     });
     return Object.keys(acc).length ? acc : false;
+  },
+
+  getSelectedFilters() {
+    return [...this.selectedAnomalies.keys()].map((key) => key.split('/'));
   },
 
   /**
@@ -58,18 +62,20 @@ AnomalyFilterModel.prototype = {
       anomaliesFilters,
       (key, anomalyIds) => {
         if (!anomalyIds.length) return;
-        if (this.selectedAnomalies.has(key)) {
-          anomalyIds.selected = true;
-        }
+        // if (this.selectedAnomalies.has(section/key)) {
+        //   anomalyIds.selected = true;
+        // }
         return anomalyIds;
       },
       (key, result) => {
-        if (this.hiddenFilters.includes(key)) {
+        if (!result || this.hiddenFilters.includes(key)) {
           return false;
         }
         if (this.expandedFilters.has(key)) {
           result.expanded = true;
         }
+
+        //
         return result;
       }
     );
@@ -100,35 +106,36 @@ AnomalyFilterModel.prototype = {
     });
   },
 
-  addFilter(filter) {
-    this.selectedFilters.add(filter);
+  addFilter(filter, section) {
     // const filters = this.searchFilters;
     const selectedAnomalyIds = this.selectedAnomalyIds;
-    this.filtersIterator(this.searchFilters, (filterName, anomalyIds) => {
-      if (filterName !== filter) { return; }
-      this.selectedAnomalies.set(filterName, anomalyIds);
-    });
+    this.filtersIterator(
+      this.searchFilters,
+      (filterName, anomalyIds) => {
+        if (filterName === filter) {
+          debugger;
+          return anomalyIds;
+        }
+        // this.selectedAnomalies.set(filterName, anomalyIds);
+      },
+      (key, value) => {
+        if (key === filter) {
+          return value;
+        }
+        if (key === section) {
+          debugger;
+          this.selectedAnomalies.set(`${section}/${filter}`, value[filter]);
+        }
+      }
+    );
+    this.updateSelectedAnomalyIds();
+    this.updateViewFilters();
 
-    // Object.keys(filters).forEach((key) => {
-    //   const anomalyLists = filters[key];
-
-    //   if (anomalyLists[filter] && Array.isArray(anomalyLists[filter])) {
-        // anomalyLists[filter].checked = isChecked;
-        // this.selectedAnomalies.set(filter, anomalyLists[filter]);
-        this.updateSelectedAnomalyIds();
-        this.updateViewFilters();
-        // selectedAnomalyIds.add.apply(anomalyLists[filter]);
-      // }
-    // });
-    // update
-    console.log(this.selectedFilters);
-    console.log(this.selectedAnomalies);
     console.log(this.selectedAnomalyIds);
-    // console.log("in model", filter, isChecked);
   },
 
-  removeFilter(filter) {
-    this.selectedAnomalies.delete(filter);
+  removeFilter(filter, section) {
+    this.selectedAnomalies.delete(`${section}/${filter}`);
     this.updateSelectedAnomalyIds();
     this.updateViewFilters();
   },
