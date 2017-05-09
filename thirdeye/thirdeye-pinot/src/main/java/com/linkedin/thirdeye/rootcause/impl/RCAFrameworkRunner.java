@@ -316,7 +316,7 @@ public class RCAFrameworkRunner {
   private static Map<String, Collection<Entity>> topKPerType(Collection<Entity> entities, int k) {
     Map<String, Collection<Entity>> map = new HashMap<>();
     for(Entity e : entities) {
-      String prefix = EntityType.extractPrefix(e);
+      String prefix = extractPrefix(e);
 
       if(!map.containsKey(prefix))
         map.put(prefix, new ArrayList<Entity>());
@@ -337,4 +337,8 @@ public class RCAFrameworkRunner {
     return new HashSet<>(Arrays.asList(s));
   }
 
+  static String extractPrefix(Entity e) {
+    String[] parts = e.getUrn().split(":", 3);
+    return parts[0] + ":" + parts[1] + ":";
+  }
 }

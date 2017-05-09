@@ -10,15 +10,6 @@ import org.apache.commons.lang.StringUtils;
 public final class EntityType {
   private final String prefix;
 
-  public static String extractPrefix(String urn) {
-    String[] parts = urn.split(":", 3);
-    return parts[0] + ":" + parts[1] + ":";
-  }
-
-  public static String extractPrefix(Entity e) {
-    return extractPrefix(e.getUrn());
-  }
-
   public String getPrefix() {
     return prefix;
   }
@@ -34,6 +25,10 @@ public final class EntityType {
   }
 
   public boolean isType(String urn) {
-    return prefix.equals(extractPrefix(urn));
+    return urn.startsWith(this.prefix);
+  }
+
+  public boolean isType(Entity e) {
+    return e.getUrn().startsWith(this.prefix);
   }
 }
