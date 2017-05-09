@@ -16,7 +16,7 @@
 package com.linkedin.pinot.server.integration;
 
 import com.linkedin.pinot.common.metrics.ServerMetrics;
-import com.linkedin.pinot.common.query.QueryRequest;
+import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.core.query.scheduler.QueryScheduler;
 import com.yammer.metrics.core.MetricsRegistry;
 import java.io.File;
@@ -83,7 +83,7 @@ public class InstanceServerStarter {
     brokerRequest.setQuerySource(querySource);
     InstanceRequest instanceRequest = new InstanceRequest(0, brokerRequest);
     try {
-      QueryRequest queryRequest = new QueryRequest(instanceRequest, metrics);
+      ServerQueryRequest queryRequest = new ServerQueryRequest(instanceRequest, metrics);
       DataTable instanceResponse = queryExecutor.processQuery(queryRequest, queryScheduler.getWorkerExecutorService());
       System.out.println(instanceResponse.toString());
       System.out.println("Query Time Used : " + instanceResponse.getMetadata().get(DataTable.TIME_USED_MS_METADATA_KEY));

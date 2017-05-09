@@ -43,11 +43,24 @@ public class DataFetcher {
   // Map from MV column name to max number of entries for the column.
   private final Map<String, Integer> _columnToMaxNumMultiValuesMap;
 
-  // Re-usable array for all dictionary ids in the block, of a single valued column
-  private final int[] _reusableDictIds;
+  // Thread local (reusable) array for all dictionary ids in the block, of a single valued column
+  private static final ThreadLocal<int[]> THREAD_LOCAL_DICT_IDS = new ThreadLocal<int[]>() {
+    @Override
+    protected int[] initialValue() {
+      return new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
+    }
+  };
 
   // Re-usable array to store MV dictionary id's for a given docId
-  private final int[] _reusableMVDictIds;
+  private static final ThreadLocal<int[]> THREAD_LOCAL_MV_DICT_IDS = new ThreadLocal<int[]>() {
+    @Override
+    protected int[] initialValue() {
+      // Size is known only at runtime, which is when the array is expanded.
+      return new int[0];
+    }
+  };
+
+  private int _reusableMVDictIdSize;
 
   /**
    * Constructor for DataFetcher.
@@ -59,11 +72,9 @@ public class DataFetcher {
     _columnToBlockValSetMap = new HashMap<>();
     _columnToBlockValIteratorMap = new HashMap<>();
     _columnToBlockMetadataMap = new HashMap<>();
-
-    _reusableDictIds = new int[DocIdSetPlanNode.MAX_DOC_PER_CALL];
     _columnToMaxNumMultiValuesMap = new HashMap<>();
 
-    int reusableMVDictIdSize = 0;
+    _reusableMVDictIdSize = 0;
     for (String column : columnToDataSourceMap.keySet()) {
       BaseOperator dataSource = columnToDataSourceMap.get(column);
       Block dataSourceBlock = dataSource.nextBlock(BLOCK_ZERO);
@@ -77,10 +88,8 @@ public class DataFetcher {
 
       int maxNumberOfMultiValues = metadata.getMaxNumberOfMultiValues();
       _columnToMaxNumMultiValuesMap.put(column, maxNumberOfMultiValues);
-      reusableMVDictIdSize = Math.max(reusableMVDictIdSize, maxNumberOfMultiValues);
+      _reusableMVDictIdSize = Math.max(_reusableMVDictIdSize, maxNumberOfMultiValues);
     }
-
-    _reusableMVDictIds = new int[reusableMVDictIdSize];
   }
 
   /**
@@ -178,8 +187,9 @@ public class DataFetcher {
   public void fetchIntValues(String column, int[] inDocIds, int inStartPos, int length, int[] outValues, int outStartPos) {
     Dictionary dictionary = getDictionaryForColumn(column);
     if (dictionary != null) {
-      fetchSingleDictIds(column, inDocIds, inStartPos, length, _reusableDictIds, 0);
-      dictionary.readIntValues(_reusableDictIds, 0, length, outValues, outStartPos);
+      int[] dictIds = THREAD_LOCAL_DICT_IDS.get();
+      fetchSingleDictIds(column, inDocIds, inStartPos, length, dictIds, 0);
+      dictionary.readIntValues(dictIds, 0, length, outValues, outStartPos);
     } else {
       BlockValSet blockValSet = _columnToBlockValSetMap.get(column);
       blockValSet.getIntValues(inDocIds, inStartPos, length, outValues, outStartPos);
@@ -201,11 +211,12 @@ public class DataFetcher {
     BlockMultiValIterator iterator = (BlockMultiValIterator) getBlockValIteratorForColumn(column);
 
     int inEndPos = inStartPos + length;
+    int[] reusableMVDictIds = getReusableMVDictIds(_reusableMVDictIdSize);
     for (int i = inStartPos; i < inEndPos; i++, outStartPos++) {
       iterator.skipTo(inDocIds[i]);
-      int numValues = iterator.nextIntVal(_reusableMVDictIds);
+      int numValues = iterator.nextIntVal(reusableMVDictIds);
       outValues[outStartPos] = new int[numValues];
-      dictionary.readIntValues(_reusableMVDictIds, 0, numValues, outValues[outStartPos], 0);
+      dictionary.readIntValues(reusableMVDictIds, 0, numValues, outValues[outStartPos], 0);
     }
   }
 
@@ -222,8 +233,9 @@ public class DataFetcher {
   public void fetchLongValues(String column, int[] inDocIds, int inStartPos, int length, long[] outValues, int outStartPos) {
     Dictionary dictionary = getDictionaryForColumn(column);
     if (dictionary != null) {
-      fetchSingleDictIds(column, inDocIds, inStartPos, length, _reusableDictIds, 0);
-      dictionary.readLongValues(_reusableDictIds, 0, length, outValues, outStartPos);
+      int[] dictIds = THREAD_LOCAL_DICT_IDS.get();
+      fetchSingleDictIds(column, inDocIds, inStartPos, length, dictIds, 0);
+      dictionary.readLongValues(dictIds, 0, length, outValues, outStartPos);
     } else {
       BlockValSet blockValSet = _columnToBlockValSetMap.get(column);
       blockValSet.getLongValues(inDocIds, inStartPos, length, outValues, outStartPos);
@@ -245,11 +257,12 @@ public class DataFetcher {
     BlockMultiValIterator iterator = (BlockMultiValIterator) getBlockValIteratorForColumn(column);
 
     int inEndPos = inStartPos + length;
+    int[] reusableMVDictIds = getReusableMVDictIds(_reusableMVDictIdSize);
     for (int i = inStartPos; i < inEndPos; i++, outStartPos++) {
       iterator.skipTo(inDocIds[i]);
-      int numValues = iterator.nextIntVal(_reusableMVDictIds);
+      int numValues = iterator.nextIntVal(reusableMVDictIds);
       outValues[outStartPos] = new long[numValues];
-      dictionary.readLongValues(_reusableMVDictIds, 0, numValues, outValues[outStartPos], 0);
+      dictionary.readLongValues(reusableMVDictIds, 0, numValues, outValues[outStartPos], 0);
     }
   }
 
@@ -266,8 +279,9 @@ public class DataFetcher {
   public void fetchFloatValues(String column, int[] inDocIds, int inStartPos, int length, float[] outValues, int outStartPos) {
     Dictionary dictionary = getDictionaryForColumn(column);
     if (dictionary != null) {
-      fetchSingleDictIds(column, inDocIds, inStartPos, length, _reusableDictIds, 0);
-      dictionary.readFloatValues(_reusableDictIds, 0, length, outValues, outStartPos);
+      int[] dictIds = THREAD_LOCAL_DICT_IDS.get();
+      fetchSingleDictIds(column, inDocIds, inStartPos, length, dictIds, 0);
+      dictionary.readFloatValues(dictIds, 0, length, outValues, outStartPos);
     } else {
       BlockValSet blockValSet = _columnToBlockValSetMap.get(column);
       blockValSet.getFloatValues(inDocIds, inStartPos, length, outValues, outStartPos);
@@ -289,11 +303,12 @@ public class DataFetcher {
     BlockMultiValIterator iterator = (BlockMultiValIterator) getBlockValIteratorForColumn(column);
 
     int inEndPos = inStartPos + length;
+    int[] reusableMVDictIds = getReusableMVDictIds(_reusableMVDictIdSize);
     for (int i = inStartPos; i < inEndPos; i++, outStartPos++) {
       iterator.skipTo(inDocIds[i]);
-      int numValues = iterator.nextIntVal(_reusableMVDictIds);
+      int numValues = iterator.nextIntVal(reusableMVDictIds);
       outValues[outStartPos] = new float[numValues];
-      dictionary.readFloatValues(_reusableMVDictIds, 0, numValues, outValues[outStartPos], 0);
+      dictionary.readFloatValues(reusableMVDictIds, 0, numValues, outValues[outStartPos], 0);
     }
   }
 
@@ -310,8 +325,9 @@ public class DataFetcher {
   public void fetchDoubleValues(String column, int[] inDocIds, int inStartPos, int length, double[] outValues, int outStartPos) {
     Dictionary dictionary = getDictionaryForColumn(column);
     if (dictionary != null) {
-      fetchSingleDictIds(column, inDocIds, inStartPos, length, _reusableDictIds, 0);
-      dictionary.readDoubleValues(_reusableDictIds, 0, length, outValues, outStartPos);
+      int[] dictIds = THREAD_LOCAL_DICT_IDS.get();
+      fetchSingleDictIds(column, inDocIds, inStartPos, length, dictIds, 0);
+      dictionary.readDoubleValues(dictIds, 0, length, outValues, outStartPos);
     } else {
       BlockValSet blockValSet = _columnToBlockValSetMap.get(column);
       blockValSet.getDoubleValues(inDocIds, inStartPos, length, outValues, outStartPos);
@@ -333,11 +349,12 @@ public class DataFetcher {
     BlockMultiValIterator iterator = (BlockMultiValIterator) getBlockValIteratorForColumn(column);
 
     int inEndPos = inStartPos + length;
+    int[] reusableMVDictIds = getReusableMVDictIds(_reusableMVDictIdSize);
     for (int i = inStartPos; i < inEndPos; i++, outStartPos++) {
       iterator.skipTo(inDocIds[i]);
-      int numValues = iterator.nextIntVal(_reusableMVDictIds);
+      int numValues = iterator.nextIntVal(reusableMVDictIds);
       outValues[outStartPos] = new double[numValues];
-      dictionary.readDoubleValues(_reusableMVDictIds, 0, numValues, outValues[outStartPos], 0);
+      dictionary.readDoubleValues(reusableMVDictIds, 0, numValues, outValues[outStartPos], 0);
     }
   }
 
@@ -351,8 +368,9 @@ public class DataFetcher {
   public void fetchStringValues(String column, int[] inDocIds, int inStartPos, int length, String[] outValues, int outStartPos) {
     Dictionary dictionary = getDictionaryForColumn(column);
     if (dictionary != null) {
-      fetchSingleDictIds(column, inDocIds, inStartPos, length, _reusableDictIds, 0);
-      dictionary.readStringValues(_reusableDictIds, 0, length, outValues, outStartPos);
+      int[] dictIds = THREAD_LOCAL_DICT_IDS.get();
+      fetchSingleDictIds(column, inDocIds, inStartPos, length, dictIds, 0);
+      dictionary.readStringValues(dictIds, 0, length, outValues, outStartPos);
     } else {
       BlockValSet blockValSet = _columnToBlockValSetMap.get(column);
       blockValSet.getStringValues(inDocIds, inStartPos, length, outValues, outStartPos);
@@ -371,11 +389,12 @@ public class DataFetcher {
     BlockMultiValIterator iterator = (BlockMultiValIterator) getBlockValIteratorForColumn(column);
 
     int inEndPos = inStartPos + length;
+    int[] reusableMVDictIds = getReusableMVDictIds(_reusableMVDictIdSize);
     for (int i = inStartPos; i < inEndPos; i++, outStartPos++) {
       iterator.skipTo(inDocIds[i]);
-      int numValues = iterator.nextIntVal(_reusableMVDictIds);
+      int numValues = iterator.nextIntVal(reusableMVDictIds);
       outValues[outStartPos] = new String[numValues];
-      dictionary.readStringValues(_reusableMVDictIds, 0, numValues, outValues[outStartPos], 0);
+      dictionary.readStringValues(reusableMVDictIds, 0, numValues, outValues[outStartPos], 0);
     }
   }
 
@@ -389,5 +408,23 @@ public class DataFetcher {
     BlockMetadata blockMetadata = _columnToBlockMetadataMap.get(column);
     Preconditions.checkNotNull(blockMetadata, "Invalid column " + column + " specified in DataFetcher.");
     return blockMetadata.getDataType();
+  }
+
+  /**
+   * Helper method that returns ThreadLocal reusable int array for MV dictionary ids.
+   * If desired size is larger than existing thread local storage, the latter is expanded.
+   *
+   * @param size Desired size.
+   * @return Thread local int array of at least desired size.
+   */
+  private int[] getReusableMVDictIds(int size) {
+    // If current size is not large enough, expand to new size.
+    int[] reusableMVDictIds = THREAD_LOCAL_MV_DICT_IDS.get();
+
+    if (reusableMVDictIds.length < size) {
+      reusableMVDictIds = new int[size];
+      THREAD_LOCAL_MV_DICT_IDS.set(reusableMVDictIds);
+    }
+    return reusableMVDictIds;
   }
 }

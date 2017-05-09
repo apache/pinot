@@ -15,10 +15,9 @@
  */
 package com.linkedin.pinot.core.query.pruner;
 
-import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
-import com.linkedin.pinot.common.utils.request.RequestUtils;
 import com.linkedin.pinot.core.data.partition.PartitionFunction;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.segment.index.ColumnMetadata;
@@ -39,8 +38,19 @@ public class PartitionSegmentPruner extends AbstractSegmentPruner {
   }
 
   @Override
-  public boolean prune(IndexSegment segment, BrokerRequest brokerRequest) {
-    FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
+  public boolean prune(IndexSegment segment, ServerQueryRequest queryRequest) {
+    FilterQueryTree filterQueryTree = queryRequest.getFilterQueryTree();
+    return prune(segment, filterQueryTree);
+  }
+
+  /**
+   * Version of prune that directly takes filter query tree.
+   *
+   * @param segment Segment to prune
+   * @param filterQueryTree Filter query tree
+   * @return True if segment can be pruned, false otherwise.
+   */
+  public boolean prune(IndexSegment segment, FilterQueryTree filterQueryTree) {
     if (filterQueryTree == null) {
       return false;
     }

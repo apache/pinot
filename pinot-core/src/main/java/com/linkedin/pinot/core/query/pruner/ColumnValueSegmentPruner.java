@@ -16,7 +16,7 @@
 package com.linkedin.pinot.core.query.pruner;
 
 import com.linkedin.pinot.common.data.FieldSpec;
-import com.linkedin.pinot.common.request.BrokerRequest;
+import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.request.FilterOperator;
 import com.linkedin.pinot.common.utils.request.FilterQueryTree;
 import com.linkedin.pinot.common.utils.request.RequestUtils;
@@ -41,8 +41,8 @@ public class ColumnValueSegmentPruner extends AbstractSegmentPruner {
   }
 
   @Override
-  public boolean prune(@Nonnull IndexSegment segment, @Nonnull BrokerRequest brokerRequest) {
-    FilterQueryTree filterQueryTree = RequestUtils.generateFilterQueryTree(brokerRequest);
+  public boolean prune(@Nonnull IndexSegment segment, @Nonnull ServerQueryRequest queryRequest) {
+    FilterQueryTree filterQueryTree = queryRequest.getFilterQueryTree();
     if (filterQueryTree == null) {
       return false;
     }

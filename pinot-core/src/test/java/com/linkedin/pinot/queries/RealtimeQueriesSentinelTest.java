@@ -40,7 +40,7 @@ import com.linkedin.pinot.common.data.FieldSpec.FieldType;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.common.query.QueryRequest;
+import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.query.ReduceService;
 import com.linkedin.pinot.common.query.gen.AvroQueryGenerator;
 import com.linkedin.pinot.common.query.gen.AvroQueryGenerator.TestGroupByAggreationQuery;
@@ -121,7 +121,7 @@ public class RealtimeQueriesSentinelTest {
       InstanceRequest instanceRequest = new InstanceRequest(counter++, brokerRequest);
       instanceRequest.setSearchSegments(new ArrayList<String>());
       instanceRequest.getSearchSegments().add("testTable_testTable");
-      QueryRequest queryRequest = new QueryRequest(instanceRequest, TableDataManagerProvider.getServerMetrics());
+      ServerQueryRequest queryRequest = new ServerQueryRequest(instanceRequest, TableDataManagerProvider.getServerMetrics());
       DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest, queryRunners);
       instanceResponseMap.clear();
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
@@ -158,7 +158,7 @@ public class RealtimeQueriesSentinelTest {
     InstanceRequest instanceRequest = new InstanceRequest(485, brokerRequest);
     instanceRequest.setSearchSegments(new ArrayList<String>());
     instanceRequest.getSearchSegments().add("testTable_testTable");
-    QueryRequest queryRequest = new QueryRequest(instanceRequest, TableDataManagerProvider.getServerMetrics());
+    ServerQueryRequest queryRequest = new ServerQueryRequest(instanceRequest, TableDataManagerProvider.getServerMetrics());
     DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest, queryRunners);
     instanceResponseMap.clear();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);
@@ -179,7 +179,7 @@ public class RealtimeQueriesSentinelTest {
       InstanceRequest instanceRequest = new InstanceRequest(counter++, brokerRequest);
       instanceRequest.setSearchSegments(new ArrayList<String>());
       instanceRequest.getSearchSegments().add("testTable_testTable");
-      QueryRequest queryRequest = new QueryRequest(instanceRequest, TableDataManagerProvider.getServerMetrics());
+      ServerQueryRequest queryRequest = new ServerQueryRequest(instanceRequest, TableDataManagerProvider.getServerMetrics());
       DataTable instanceResponse = QUERY_EXECUTOR.processQuery(queryRequest, queryRunners);
       instanceResponseMap.clear();
       instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);

@@ -22,7 +22,7 @@ import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.metrics.ServerMeter;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.metrics.ServerQueryPhase;
-import com.linkedin.pinot.common.query.QueryRequest;
+import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.query.context.TimerContext;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.utils.DataTable;
@@ -69,11 +69,11 @@ public class ScheduledRequestHandler implements NettyServer.RequestHandler {
       DataTable result = new DataTableImplV2();
       result.addException(QueryException.INTERNAL_ERROR);
       serverMetrics.addMeteredGlobalValue(ServerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS, 1);
-      QueryRequest queryRequest = new QueryRequest(null, serverMetrics);
+      ServerQueryRequest queryRequest = new ServerQueryRequest(null, serverMetrics);
       queryRequest.getTimerContext().setQueryArrivalTimeNs(queryStartTimeNs);
       return Futures.immediateFuture(serializeDataTable(queryRequest, result));
     }
-    final QueryRequest queryRequest = new QueryRequest(instanceRequest, serverMetrics);
+    final ServerQueryRequest queryRequest = new ServerQueryRequest(instanceRequest, serverMetrics);
     final TimerContext timerContext = queryRequest.getTimerContext();
      timerContext.setQueryArrivalTimeNs(queryStartTimeNs);
     TimerContext.Timer deserializationTimer =
@@ -123,7 +123,7 @@ public class ScheduledRequestHandler implements NettyServer.RequestHandler {
     return serializedQueryResponse;
   }
 
-  static byte[] serializeDataTable(QueryRequest queryRequest, DataTable instanceResponse) {
+  static byte[] serializeDataTable(ServerQueryRequest queryRequest, DataTable instanceResponse) {
     byte[] responseByte;
 
     InstanceRequest instanceRequest = queryRequest.getInstanceRequest();

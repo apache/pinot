@@ -17,7 +17,7 @@ package com.linkedin.pinot.queries;
 
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.common.query.QueryRequest;
+import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.query.ReduceService;
 import com.linkedin.pinot.common.query.gen.AvroQueryGenerator;
 import com.linkedin.pinot.common.request.BrokerRequest;
@@ -64,7 +64,7 @@ public class ApproximateQueryTestUtil {
     for (String segment : segments) {
       instanceRequest.getSearchSegments().add(segment);
     }
-    QueryRequest queryRequest = new QueryRequest(instanceRequest, metrics);
+    ServerQueryRequest queryRequest = new ServerQueryRequest(instanceRequest, metrics);
     final DataTable instanceResponse = queryExecutor.processQuery(queryRequest, queryRunners);
     final Map<ServerInstance, DataTable> instanceResponseMap = new HashMap<ServerInstance, DataTable>();
     instanceResponseMap.put(new ServerInstance("localhost:0000"), instanceResponse);

@@ -20,7 +20,7 @@ import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.exception.QueryException;
 import com.linkedin.pinot.common.metrics.ServerMetrics;
 import com.linkedin.pinot.common.query.QueryExecutor;
-import com.linkedin.pinot.common.query.QueryRequest;
+import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.request.BrokerRequest;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.utils.DataSchema;
@@ -119,7 +119,7 @@ public class ScheduledRequestHandlerTest {
       throws Exception {
     ScheduledRequestHandler handler = new ScheduledRequestHandler(new QueryScheduler(queryExecutor) {
       @Override
-      public ListenableFuture<DataTable> submit(QueryRequest queryRequest) {
+      public ListenableFuture<DataTable> submit(ServerQueryRequest queryRequest) {
         return queryWorkers.submit(new Callable<DataTable>() {
           @Override
           public DataTable call()
@@ -145,7 +145,7 @@ public class ScheduledRequestHandlerTest {
       throws InterruptedException, ExecutionException, TimeoutException, IOException {
     ScheduledRequestHandler handler = new ScheduledRequestHandler(new QueryScheduler(queryExecutor) {
       @Override
-      public ListenableFuture<DataTable> submit(QueryRequest queryRequest) {
+      public ListenableFuture<DataTable> submit(ServerQueryRequest queryRequest) {
         return queryRunners.submit(new Callable<DataTable>() {
           @Override
           public DataTable call()
