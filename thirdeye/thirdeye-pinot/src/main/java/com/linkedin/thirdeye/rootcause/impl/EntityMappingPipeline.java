@@ -3,7 +3,6 @@ package com.linkedin.thirdeye.rootcause.impl;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.bao.EntityToEntityMappingManager;
 import com.linkedin.thirdeye.datalayer.dto.EntityToEntityMappingDTO;
-import com.linkedin.thirdeye.datalayer.pojo.EntityToEntityMappingBean;
 import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.PipelineContext;
@@ -33,7 +32,7 @@ public class EntityMappingPipeline extends Pipeline {
   public static final String PROP_MATCH_PREFIX_DEFAULT = "false";
 
   private final EntityToEntityMappingManager entityDAO;
-  private final EntityToEntityMappingBean.MappingType mappingType;
+  private final String mappingType;
   private final boolean isRewriter;
   private final boolean matchPrefix;
 
@@ -47,7 +46,7 @@ public class EntityMappingPipeline extends Pipeline {
    * @param isRewriter enable rewriter mode (pass-through for entities without mapping)
    * @param matchPrefix match on URN prefix rather than entire URN
    */
-  public EntityMappingPipeline(String outputName, Set<String> inputNames, EntityToEntityMappingManager entityDAO, EntityToEntityMappingBean.MappingType mappingType, boolean isRewriter, boolean matchPrefix) {
+  public EntityMappingPipeline(String outputName, Set<String> inputNames, EntityToEntityMappingManager entityDAO, String mappingType, boolean isRewriter, boolean matchPrefix) {
     super(outputName, inputNames);
     this.entityDAO = entityDAO;
     this.mappingType = mappingType;
@@ -78,7 +77,7 @@ public class EntityMappingPipeline extends Pipeline {
       matchPrefixProp = properties.get(PROP_MATCH_PREFIX);
 
     this.entityDAO = DAORegistry.getInstance().getEntityToEntityMappingDAO();
-    this.mappingType = EntityToEntityMappingBean.MappingType.valueOf(mappingTypeProp);
+    this.mappingType = mappingTypeProp;
     this.isRewriter = Boolean.parseBoolean(isRewriterProp);
     this.matchPrefix = Boolean.parseBoolean(matchPrefixProp);
   }

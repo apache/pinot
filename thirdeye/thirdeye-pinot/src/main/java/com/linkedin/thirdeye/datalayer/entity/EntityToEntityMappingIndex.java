@@ -1,11 +1,9 @@
 package com.linkedin.thirdeye.datalayer.entity;
 
-import com.linkedin.thirdeye.datalayer.pojo.EntityToEntityMappingBean.MappingType;
-
 public class EntityToEntityMappingIndex extends AbstractIndexEntity {
   String fromURN;
   String toURN;
-  MappingType mappingType;
+  String mappingType;
 
   public String getFromURN() {
     return fromURN;
@@ -19,10 +17,10 @@ public class EntityToEntityMappingIndex extends AbstractIndexEntity {
   public void setToURN(String toURN) {
     this.toURN = toURN;
   }
-  public MappingType getMappingType() {
+  public String getMappingType() {
     return mappingType;
   }
-  public void setMappingType(MappingType mappingType) {
+  public void setMappingType(String mappingType) {
     this.mappingType = mappingType;
   }
 

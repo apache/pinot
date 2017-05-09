@@ -1,10 +1,13 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linkedin.thirdeye.client.DAORegistry;
+import com.linkedin.thirdeye.datalayer.bao.EntityToEntityMappingManager;
+import com.linkedin.thirdeye.datalayer.dto.EntityToEntityMappingDTO;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -15,13 +18,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
-
 import org.apache.commons.lang3.StringUtils;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.client.DAORegistry;
-import com.linkedin.thirdeye.datalayer.bao.EntityToEntityMappingManager;
-import com.linkedin.thirdeye.datalayer.dto.EntityToEntityMappingDTO;
-import com.linkedin.thirdeye.datalayer.pojo.EntityToEntityMappingBean.MappingType;
 
 @Path(value = "/entityMapping")
 @Produces(MediaType.APPLICATION_JSON)
@@ -41,7 +38,7 @@ public class EntityMappingResource {
   public List<EntityToEntityMappingDTO> viewEntityMappings(
       @QueryParam("fromURN") String fromURN,
       @QueryParam("toURN") String toURN,
-      @QueryParam("mappingType") MappingType mappingType) {
+      @QueryParam("mappingType") String mappingType) {
 
     List<EntityToEntityMappingDTO> mappings = new ArrayList<>();
     if (StringUtils.isBlank(fromURN) && StringUtils.isBlank(toURN) && mappingType == null) {
@@ -93,7 +90,7 @@ public class EntityMappingResource {
   @Path("/view/mappingType/{mappingType}")
   @Produces(MediaType.APPLICATION_JSON)
   public List<EntityToEntityMappingDTO> viewEntityMappingsForMappingType(
-      @PathParam("mappingType") MappingType mappingType) {
+      @PathParam("mappingType") String mappingType) {
 
     List<EntityToEntityMappingDTO> mappings = entityMappingDAO.findByMappingType(mappingType);
     return mappings;
@@ -117,7 +114,7 @@ public class EntityMappingResource {
   @Produces(MediaType.APPLICATION_JSON)
   public List<EntityToEntityMappingDTO> viewEntityMappingsFromURNAndMappingType(
       @PathParam("fromURN") String fromURN,
-      @PathParam("mappingType") MappingType mappingType) {
+      @PathParam("mappingType") String mappingType) {
 
     List<EntityToEntityMappingDTO> mappings = entityMappingDAO.findByFromURNAndMappingType(fromURN, mappingType);
     return mappings;
@@ -129,7 +126,7 @@ public class EntityMappingResource {
   @Produces(MediaType.APPLICATION_JSON)
   public List<EntityToEntityMappingDTO> viewEntityMappingsToURNAndMappingType(
       @PathParam("toURN") String toURN,
-      @PathParam("mappingType") MappingType mappingType) {
+      @PathParam("mappingType") String mappingType) {
 
     List<EntityToEntityMappingDTO> mappings = entityMappingDAO.findByToURNAndMappingType(toURN, mappingType);
     return mappings;
@@ -176,7 +173,7 @@ public class EntityMappingResource {
       @PathParam("id") Long id,
       @QueryParam("fromURN") String fromURN,
       @QueryParam("toURN") String toURN,
-      @QueryParam("mappingType") MappingType mappingType,
+      @QueryParam("mappingType") String mappingType,
       @QueryParam("score") Double score) {
 
     Response response = Response.status(Status.NOT_FOUND).build();

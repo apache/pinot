@@ -1,8 +1,6 @@
 package com.linkedin.thirdeye.datalayer.bao;
 
 import com.linkedin.thirdeye.datalayer.dto.EntityToEntityMappingDTO;
-import com.linkedin.thirdeye.datalayer.pojo.EntityToEntityMappingBean.MappingType;
-
 import java.util.List;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -20,6 +18,9 @@ public class TestEntityToEntityMappingManager extends AbstractManagerTestBase {
   String dimensionURN1 = "thirdeye:dimension:country:UnitedStates";
   String dimensionURN2 = "thirdeye:dimension:country:US";
 
+  private static final String METRIC_TO_METRIC = "METRIC_TO_METRIC";
+  private static final String METRIC_TO_SERVICE = "METRIC_TO_SERVICE";
+  private static final String DIMENSION_TO_DIMENSION = "DIMENSION_TO_DIMENSION";
 
   @BeforeClass
   void beforeClass() {
@@ -33,13 +34,13 @@ public class TestEntityToEntityMappingManager extends AbstractManagerTestBase {
 
   @Test
   public void testCreate() {
-    EntityToEntityMappingDTO dto = getTestEntityToEntityMapping(metricURN1, metricURN2, MappingType.METRIC_TO_METRIC);
+    EntityToEntityMappingDTO dto = getTestEntityToEntityMapping(metricURN1, metricURN2, METRIC_TO_METRIC);
     testId1 = entityToEntityMappingDAO.save(dto);
     Assert.assertNotNull(testId1);
-    dto = getTestEntityToEntityMapping(metricURN1, serviceURN1, MappingType.METRIC_TO_SERVICE);
+    dto = getTestEntityToEntityMapping(metricURN1, serviceURN1, METRIC_TO_SERVICE);
     testId2 = entityToEntityMappingDAO.save(dto);
     Assert.assertNotNull(testId2);
-    dto = getTestEntityToEntityMapping(dimensionURN1, dimensionURN2, MappingType.DIMENSION_TO_DIMENSION);
+    dto = getTestEntityToEntityMapping(dimensionURN1, dimensionURN2, DIMENSION_TO_DIMENSION);
     testId3 = entityToEntityMappingDAO.save(dto);
     Assert.assertNotNull(testId3);
   }
@@ -50,7 +51,7 @@ public class TestEntityToEntityMappingManager extends AbstractManagerTestBase {
     Assert.assertEquals(dto.getId(), testId1);
     Assert.assertEquals(dto.getFromURN(), metricURN1);
     Assert.assertEquals(dto.getToURN(), metricURN2);
-    Assert.assertEquals(dto.getMappingType(), MappingType.METRIC_TO_METRIC);
+    Assert.assertEquals(dto.getMappingType(), METRIC_TO_METRIC);
 
     List<EntityToEntityMappingDTO> list = entityToEntityMappingDAO.findAll();
     Assert.assertEquals(list.size(), 3);
@@ -64,13 +65,13 @@ public class TestEntityToEntityMappingManager extends AbstractManagerTestBase {
     dto = entityToEntityMappingDAO.findByFromAndToURN(dimensionURN1, dimensionURN2);
     Assert.assertEquals(dto.getId(), testId3);
 
-    list = entityToEntityMappingDAO.findByMappingType(MappingType.METRIC_TO_SERVICE);
+    list = entityToEntityMappingDAO.findByMappingType(METRIC_TO_SERVICE);
     Assert.assertEquals(list.size(), 1);
 
-    list = entityToEntityMappingDAO.findByFromURNAndMappingType(metricURN1, MappingType.METRIC_TO_METRIC);
+    list = entityToEntityMappingDAO.findByFromURNAndMappingType(metricURN1, METRIC_TO_METRIC);
     Assert.assertEquals(list.size(), 1);
 
-    list = entityToEntityMappingDAO.findByToURNAndMappingType(dimensionURN2, MappingType.METRIC_TO_METRIC);
+    list = entityToEntityMappingDAO.findByToURNAndMappingType(dimensionURN2, METRIC_TO_METRIC);
     Assert.assertEquals(list.size(), 0);
   }
 

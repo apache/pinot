@@ -4,11 +4,8 @@ import com.google.inject.Singleton;
 import com.linkedin.thirdeye.datalayer.bao.EntityToEntityMappingManager;
 import com.linkedin.thirdeye.datalayer.dto.EntityToEntityMappingDTO;
 import com.linkedin.thirdeye.datalayer.pojo.EntityToEntityMappingBean;
-import com.linkedin.thirdeye.datalayer.pojo.EntityToEntityMappingBean.MappingType;
 import com.linkedin.thirdeye.datalayer.util.Predicate;
-
 import java.util.List;
-
 import org.apache.commons.collections.CollectionUtils;
 
 @Singleton
@@ -41,19 +38,19 @@ public class EntityToEntityMappingManagerImpl extends AbstractManagerImpl<Entity
   }
 
   @Override
-  public List<EntityToEntityMappingDTO> findByMappingType(MappingType mappingType) {
+  public List<EntityToEntityMappingDTO> findByMappingType(String mappingType) {
     Predicate predicate = Predicate.EQ("mappingType", mappingType.toString());
     return findByPredicate(predicate);
   }
 
   @Override
-  public List<EntityToEntityMappingDTO> findByFromURNAndMappingType(String fromURN, MappingType mappingType) {
+  public List<EntityToEntityMappingDTO> findByFromURNAndMappingType(String fromURN, String mappingType) {
     Predicate predicate = Predicate.AND(Predicate.EQ("fromURN", fromURN), Predicate.EQ("mappingType", mappingType.toString()));
     return findByPredicate(predicate);
   }
 
   @Override
-  public List<EntityToEntityMappingDTO> findByToURNAndMappingType(String toURN, MappingType mappingType) {
+  public List<EntityToEntityMappingDTO> findByToURNAndMappingType(String toURN, String mappingType) {
     Predicate predicate = Predicate.AND(Predicate.EQ("toURN", toURN), Predicate.EQ("mappingType", mappingType.toString()));
     return findByPredicate(predicate);
   }
