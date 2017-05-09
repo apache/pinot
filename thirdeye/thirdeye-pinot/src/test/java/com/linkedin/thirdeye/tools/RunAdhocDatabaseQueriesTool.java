@@ -349,7 +349,7 @@ public class RunAdhocDatabaseQueriesTool {
     LOG.info("{} anomalies to update for dataset {}", mergedAnomalyResults.size(), dataset);
     for (MergedAnomalyResultDTO mergedAnomalyResult : mergedAnomalyResults) {
       if (mergedAnomalyResult.isNotified()) {
-        LOG.info((" Updating anomaly: {}", mergedAnomalyResult.getId());
+        LOG.info((" Updating anomaly: {}"), mergedAnomalyResult.getId());
         mergedAnomalyResult.setNotified(false);
         mergedResultDAO.update(mergedAnomalyResult);
       }
