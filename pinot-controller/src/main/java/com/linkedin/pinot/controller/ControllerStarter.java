@@ -15,23 +15,6 @@
  */
 package com.linkedin.pinot.controller;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.concurrent.Callable;
-import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import org.apache.commons.httpclient.HttpConnectionManager;
-import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
-import org.apache.commons.io.FileUtils;
-import org.apache.helix.PreConnectCallback;
-import org.restlet.Application;
-import org.restlet.Component;
-import org.restlet.Context;
-import org.restlet.data.Protocol;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.google.common.primitives.Longs;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.linkedin.pinot.common.Utils;
@@ -43,29 +26,53 @@ import com.linkedin.pinot.common.utils.ServiceStatus;
 import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import com.linkedin.pinot.controller.helix.SegmentStatusChecker;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
+import com.linkedin.pinot.controller.helix.core.minion.PinotTaskManager;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import com.linkedin.pinot.controller.helix.core.realtime.PinotRealtimeSegmentManager;
 import com.linkedin.pinot.controller.helix.core.retention.RetentionManager;
 import com.linkedin.pinot.controller.validation.ValidationManager;
 import com.yammer.metrics.core.MetricsRegistry;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import org.apache.commons.httpclient.HttpConnectionManager;
+import org.apache.commons.httpclient.MultiThreadedHttpConnectionManager;
+import org.apache.commons.io.FileUtils;
+import org.apache.helix.PreConnectCallback;
+import org.apache.helix.task.TaskDriver;
+import org.restlet.Application;
+import org.restlet.Component;
+import org.restlet.Context;
+import org.restlet.data.Protocol;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ControllerStarter {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerStarter.class);
-  private static final String MetricsRegistryName = "pinot.controller.metrics";
+
+  private static final String METRICS_REGISTRY_NAME = "pinot.controller.metrics";
   private static final Long DATA_DIRECTORY_MISSING_VALUE = 1000000L;
   private static final Long DATA_DIRECTORY_EXCEPTION_VALUE = 1100000L;
 
   private final ControllerConf config;
-
   private final Component component;
   private final Application controllerRestApp;
   private final PinotHelixResourceManager helixResourceManager;
   private final RetentionManager retentionManager;
-  private ValidationManager validationManager;
   private final MetricsRegistry _metricsRegistry;
   private final PinotRealtimeSegmentManager realtimeSegmentsManager;
   private final SegmentStatusChecker segmentStatusChecker;
   private final ExecutorService executorService;
+
+  // Can only be constructed after resource manager getting started
+  private ValidationManager _validationManager;
+  private PinotHelixTaskResourceManager _helixTaskResourceManager;
+  private PinotTaskManager _taskManager;
 
   public ControllerStarter(ControllerConf conf) {
     config = conf;
@@ -86,7 +93,15 @@ public class ControllerStarter {
   }
 
   public ValidationManager getValidationManager() {
-    return validationManager;
+    return _validationManager;
+  }
+
+  public PinotHelixTaskResourceManager getHelixTaskResourceManager() {
+    return _helixTaskResourceManager;
+  }
+
+  public PinotTaskManager getTaskManager() {
+    return _taskManager;
   }
 
   public void start() {
@@ -113,28 +128,42 @@ public class ControllerStarter {
 
     component.getDefaultHost().attach(controllerRestApp);
 
-    MetricsHelper.initializeMetrics(config.subset("pinot.controller.metrics"));
+    MetricsHelper.initializeMetrics(config.subset(METRICS_REGISTRY_NAME));
     MetricsHelper.registerMetricsRegistry(_metricsRegistry);
     final ControllerMetrics controllerMetrics = new ControllerMetrics(_metricsRegistry);
 
     try {
       LOGGER.info("Starting Pinot Helix resource manager and connecting to Zookeeper");
       helixResourceManager.start();
+
       // Helix resource manager must be started in order to create PinotLLCRealtimeSegmentManager
       PinotLLCRealtimeSegmentManager.create(helixResourceManager, config, controllerMetrics);
       ValidationMetrics validationMetrics = new ValidationMetrics(_metricsRegistry);
-      validationManager = new ValidationManager(validationMetrics, helixResourceManager, config, PinotLLCRealtimeSegmentManager.getInstance());
+      _validationManager = new ValidationManager(validationMetrics, helixResourceManager, config,
+          PinotLLCRealtimeSegmentManager.getInstance());
+
+      // Helix resource manager must be started in order to get TaskDriver
+      TaskDriver taskDriver = new TaskDriver(helixResourceManager.getHelixZkManager());
+      _helixTaskResourceManager = new PinotHelixTaskResourceManager(taskDriver);
+      _taskManager = new PinotTaskManager(taskDriver, helixResourceManager, _helixTaskResourceManager);
+      _taskManager.ensureTaskQueuesExist();
+
       LOGGER.info("Starting Pinot REST API component");
       component.start();
       LOGGER.info("Starting retention manager");
       retentionManager.start();
       LOGGER.info("Starting validation manager");
-      validationManager.start();
+      _validationManager.start();
       LOGGER.info("Starting realtime segment manager");
       realtimeSegmentsManager.start(controllerMetrics);
       PinotLLCRealtimeSegmentManager.getInstance().start();
       LOGGER.info("Starting segment status manager");
       segmentStatusChecker.start(controllerMetrics);
+      int taskManagerFrequencyInSeconds = config.getTaskManagerFrequencyInSeconds();
+      if (taskManagerFrequencyInSeconds > 0) {
+        LOGGER.info("Starting task manager with running frequency of {} seconds", taskManagerFrequencyInSeconds);
+        _taskManager.startScheduler(taskManagerFrequencyInSeconds);
+      }
       LOGGER.info("Pinot controller ready and listening on port {} for API requests", config.getControllerPort());
       LOGGER.info("Controller services available at http://{}:{}/", config.getControllerHost(),
           config.getControllerPort());
@@ -231,7 +260,7 @@ public class ControllerStarter {
   public void stop() {
     try {
       LOGGER.info("Stopping validation manager");
-      validationManager.stop();
+      _validationManager.stop();
 
       LOGGER.info("Stopping retention manager");
       retentionManager.stop();
@@ -247,6 +276,9 @@ public class ControllerStarter {
 
       LOGGER.info("Stopping segment status manager");
       segmentStatusChecker.stop();
+
+      LOGGER.info("Stopping task manager");
+      _taskManager.stopScheduler();
 
       executorService.shutdownNow();
     } catch (final Exception e) {

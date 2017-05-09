@@ -36,6 +36,7 @@ import com.linkedin.pinot.core.indexsegment.utils.AvroUtils;
 import com.linkedin.pinot.core.realtime.impl.kafka.AvroRecordToPinotRowGenerator;
 import com.linkedin.pinot.core.realtime.impl.kafka.KafkaMessageDecoder;
 import com.linkedin.pinot.minion.MinionStarter;
+import com.linkedin.pinot.minion.executor.PinotTaskExecutor;
 import com.linkedin.pinot.server.starter.helix.DefaultHelixStarterServerConfig;
 import com.linkedin.pinot.server.starter.helix.HelixServerStarter;
 import java.io.File;
@@ -45,6 +46,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumReader;
@@ -124,15 +126,24 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   protected void startMinion() {
-    startMinions(1);
+    startMinions(1, null);
   }
 
-  protected void startMinions(int minionCount) {
+  protected void startMinions(int minionCount,
+      @Nullable Map<String, Class<? extends PinotTaskExecutor>> taskExecutorsToRegister) {
     try {
       for (int i = 0; i < minionCount; i++) {
         Configuration config = new PropertiesConfiguration();
-        config.setProperty(Helix.Instance.INSTANCE_ID_KEY, "minion" + i);
+        config.setProperty(Helix.Instance.INSTANCE_ID_KEY, Helix.PREFIX_OF_MINION_INSTANCE + "minion" + i);
         MinionStarter minionStarter = new MinionStarter(ZkStarter.DEFAULT_ZK_STR, getHelixClusterName(), config);
+
+        // Register plug-in task executors
+        if (taskExecutorsToRegister != null) {
+          for (Map.Entry<String, Class<? extends PinotTaskExecutor>> entry : taskExecutorsToRegister.entrySet()) {
+            minionStarter.registerTaskExecutorClass(entry.getKey(), entry.getValue());
+          }
+        }
+
         minionStarter.start();
         _minionStarters.add(minionStarter);
       }

@@ -159,6 +159,8 @@ public class PinotTaskManager {
    * Stop the task scheduler.
    */
   public void stopScheduler() {
-    _executorService.shutdown();
+    if (_executorService != null) {
+      _executorService.shutdown();
+    }
   }
 }

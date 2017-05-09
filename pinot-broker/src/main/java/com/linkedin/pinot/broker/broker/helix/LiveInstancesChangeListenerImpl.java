@@ -15,6 +15,10 @@
  */
 package com.linkedin.pinot.broker.broker.helix;
 
+import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.transport.netty.PooledNettyClientResourceManager;
+import com.linkedin.pinot.transport.pool.KeyedPool;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,10 +27,6 @@ import org.apache.helix.NotificationContext;
 import org.apache.helix.model.LiveInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.transport.netty.PooledNettyClientResourceManager;
-import com.linkedin.pinot.transport.pool.KeyedPool;
 
 
 public class LiveInstancesChangeListenerImpl implements LiveInstanceChangeListener {
@@ -62,12 +62,12 @@ public class LiveInstancesChangeListenerImpl implements LiveInstanceChangeListen
       String instanceId = instance.getInstanceName();
       String sessionId = instance.getSessionId();
 
-      if (instanceId.startsWith("Broker_")) {
-        LOGGER.info("skipping broker instances {}", instanceId);
+      if (!instanceId.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)) {
+        LOGGER.info("Skipping non-server instance: {}", instanceId);
         continue;
       }
 
-      String namePortStr = instanceId.split("Server_")[1];
+      String namePortStr = instanceId.split(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)[1];
       String hostName = namePortStr.split("_")[0];
       int port;
       try {
@@ -103,6 +103,4 @@ public class LiveInstancesChangeListenerImpl implements LiveInstanceChangeListen
       }
     }
   }
-
-
 }
