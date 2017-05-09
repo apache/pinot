@@ -36,6 +36,7 @@ import org.slf4j.LoggerFactory;
 public class PinotHelixTaskResourceManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotHelixTaskResourceManager.class);
 
+  // Do not change this because Helix uses the same separator
   public static final String TASK_NAME_SEPARATOR = "_";
 
   private static final String TASK_QUEUE_PREFIX = "TaskQueue" + TASK_NAME_SEPARATOR;
@@ -169,7 +170,7 @@ public class PinotHelixTaskResourceManager {
    */
   @Nonnull
   private static String getHelixJobName(@Nonnull String taskType, @Nonnull String pinotTaskName) {
-    return TASK_QUEUE_PREFIX + taskType + "_" + pinotTaskName;
+    return TASK_QUEUE_PREFIX + taskType + TASK_NAME_SEPARATOR + pinotTaskName;
   }
 
   /**

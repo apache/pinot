@@ -15,6 +15,14 @@
  */
 package com.linkedin.pinot.controller.helix;
 
+import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.utils.ZkStarter;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
+import com.linkedin.pinot.controller.helix.starter.HelixConfig;
+import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
@@ -33,14 +41,6 @@ import org.testng.Assert;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.utils.ZkStarter;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
-import com.linkedin.pinot.controller.helix.starter.HelixConfig;
-import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
 
 
 public class PinotResourceManagerTest {
@@ -101,26 +101,23 @@ public class PinotResourceManagerTest {
   }
 
   @Test
-  public void testAddingAndDeletingSegments() throws Exception {
+  public void testAddingAndDeletingSegments()
+      throws Exception {
     for (int i = 1; i <= 5; i++) {
       addOneSegment(TABLE_NAME);
       Thread.sleep(2000);
-      final ExternalView externalView =
-          _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME,
-              TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(TABLE_NAME));
+      final ExternalView externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME,
+          TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME));
       Assert.assertEquals(externalView.getPartitionSet().size(), i);
     }
     final ExternalView externalView =
-        _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME,
-            TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(TABLE_NAME));
+        _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME, TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME));
     int i = 4;
     for (final String segmentId : externalView.getPartitionSet()) {
-      deleteOneSegment(TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(TABLE_NAME), segmentId);
+      deleteOneSegment(TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME), segmentId);
       Thread.sleep(2000);
-      Assert.assertEquals(
-          _helixAdmin
-              .getResourceExternalView(HELIX_CLUSTER_NAME,
-                  TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(TABLE_NAME)).getPartitionSet().size(), i);
+      Assert.assertEquals(_helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME,
+          TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME)).getPartitionSet().size(), i);
       i--;
     }
   }
@@ -156,7 +153,7 @@ public class PinotResourceManagerTest {
     while (!addSegmentExecutor.isTerminated()) {
     }
 
-    final String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(TABLE_NAME);
+    final String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME);
     IdealState idealState = _helixAdmin.getResourceIdealState(HELIX_CLUSTER_NAME, offlineTableName);
     Assert.assertEquals(idealState.getPartitionSet().size(), 100);
 
@@ -194,15 +191,14 @@ public class PinotResourceManagerTest {
       // Waiting for the external view to update
       Thread.sleep(2000);
 
-      final ExternalView externalView =
-          _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME,
-              TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(TABLE_NAME));
+      final ExternalView externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME,
+          TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME));
 
       List<String> segmentsList = new ArrayList<>(externalView.getPartitionSet().size());
       segmentsList.addAll(externalView.getPartitionSet());
-      _pinotHelixResourceManager.deleteSegments(TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(TABLE_NAME), segmentsList);
+      _pinotHelixResourceManager.deleteSegments(TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME), segmentsList);
     }
-    assert(!segmentFile.exists());
+    Assert.assertTrue(!segmentFile.exists());
   }
 
   public void testWithCmdLines() throws Exception {

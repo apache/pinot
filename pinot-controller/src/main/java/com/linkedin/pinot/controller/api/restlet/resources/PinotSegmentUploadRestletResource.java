@@ -211,8 +211,8 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
 
     final JSONArray ret = new JSONArray();
 
-    String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
-    String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
+    String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
 
     String tableNameWithType;
     if (CommonConstants.Helix.TableType.valueOf(tableType).toString().equals("REALTIME")) {
@@ -634,9 +634,8 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
       @Nonnull OfflineTableConfig offlineTableConfig) {
     TableSizeReader tableSizeReader = new TableSizeReader(executor, connectionManager, _pinotHelixResourceManager);
     StorageQuotaChecker quotaChecker = new StorageQuotaChecker(offlineTableConfig, tableSizeReader);
-    String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(metadata.getTableName());
-    return quotaChecker.isSegmentStorageWithinQuota(segmentFile, offlineTableName,
-        metadata.getName(), _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(metadata.getTableName());
+    return quotaChecker.isSegmentStorageWithinQuota(segmentFile, offlineTableName, metadata.getName(),
+        _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
   }
-
 }

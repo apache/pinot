@@ -16,6 +16,22 @@
 
 package com.linkedin.pinot.integration.tests;
 
+import com.google.common.util.concurrent.Uninterruptibles;
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
+import com.linkedin.pinot.common.utils.KafkaStarterUtils;
+import com.linkedin.pinot.common.utils.LLCSegmentName;
+import com.linkedin.pinot.common.utils.NetUtil;
+import com.linkedin.pinot.common.utils.ZkStarter;
+import com.linkedin.pinot.common.utils.ZkUtils;
+import com.linkedin.pinot.common.utils.helix.HelixHelper;
+import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
+import com.linkedin.pinot.server.realtime.ControllerLeaderLocator;
+import com.linkedin.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
+import com.linkedin.pinot.server.starter.helix.SegmentOnlineOfflineStateModelFactory;
 import java.io.File;
 import java.util.Collections;
 import java.util.Map;
@@ -39,22 +55,6 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import com.google.common.util.concurrent.Uninterruptibles;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.data.Schema;
-import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
-import com.linkedin.pinot.common.utils.KafkaStarterUtils;
-import com.linkedin.pinot.common.utils.LLCSegmentName;
-import com.linkedin.pinot.common.utils.NetUtil;
-import com.linkedin.pinot.common.utils.ZkStarter;
-import com.linkedin.pinot.common.utils.ZkUtils;
-import com.linkedin.pinot.common.utils.helix.HelixHelper;
-import com.linkedin.pinot.controller.helix.core.PinotHelixSegmentOnlineOfflineStateModelGenerator;
-import com.linkedin.pinot.server.realtime.ControllerLeaderLocator;
-import com.linkedin.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
-import com.linkedin.pinot.server.starter.helix.SegmentOnlineOfflineStateModelFactory;
 
 
 public class SegmentCompletionIntegrationTests extends RealtimeClusterIntegrationTest {
@@ -124,7 +124,7 @@ public class SegmentCompletionIntegrationTests extends RealtimeClusterIntegratio
     _helixAdmin = _helixManager.getClusterManagmentTool();
 
     _helixAdmin.addInstanceTag(_clusterName, _serverInstance,
-        TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
+        TableNameBuilder.REALTIME.tableNameWithType(ControllerTenantNameBuilder.DEFAULT_TENANT_NAME));
     ControllerLeaderLocator.create(_helixManager);
   }
 
@@ -134,8 +134,9 @@ public class SegmentCompletionIntegrationTests extends RealtimeClusterIntegratio
 
   // Test that if we send stoppedConsuming to the controller, the segment goes offline.
   @Test
-  public void testStopConsumingToOfflineAndAutofix() throws  Exception {
-    final String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(_tableName);
+  public void testStopConsumingToOfflineAndAutofix()
+      throws Exception {
+    final String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(_tableName);
     long endTime = now() + MAX_RUN_TIME_SECONDS * 1000L;
 
     while (now() < endTime) {

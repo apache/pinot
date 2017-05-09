@@ -15,9 +15,17 @@
  */
 package com.linkedin.pinot.transport.common;
 
+import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
+import com.linkedin.pinot.common.utils.StringUtil;
+import com.linkedin.pinot.common.utils.ZkStarter;
+import com.linkedin.pinot.routing.HelixExternalViewBasedTimeBoundaryService;
+import com.linkedin.pinot.routing.TimeBoundaryService.TimeBoundaryInfo;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.commons.lang.StringUtils;
 import org.apache.helix.ZNRecord;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
@@ -31,16 +39,6 @@ import org.testng.Assert;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
-
-import com.linkedin.pinot.common.config.AbstractTableConfig;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import com.linkedin.pinot.common.utils.CommonConstants.Segment.SegmentType;
-import com.linkedin.pinot.common.utils.StringUtil;
-import com.linkedin.pinot.common.utils.ZkStarter;
-import com.linkedin.pinot.routing.HelixExternalViewBasedTimeBoundaryService;
-import com.linkedin.pinot.routing.TimeBoundaryService.TimeBoundaryInfo;
 
 
 public class TimeBoundaryServiceTest {
@@ -162,7 +160,7 @@ public class TimeBoundaryServiceTest {
     metadata.put("customConfigs", customConfigs);
     offlineTableConfigJson.put("metadata", metadata);
     AbstractTableConfig offlineTableConfig = AbstractTableConfig.init(offlineTableConfigJson.toString());
-    String offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     ZKMetadataProvider.setOfflineTableConfig(_propertyStore, offlineTableName,
         AbstractTableConfig.toZnRecord(offlineTableConfig));
   }

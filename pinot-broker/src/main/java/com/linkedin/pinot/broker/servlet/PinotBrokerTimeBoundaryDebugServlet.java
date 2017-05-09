@@ -16,17 +16,17 @@
 
 package com.linkedin.pinot.broker.servlet;
 
-import java.io.IOException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.routing.TimeBoundaryService;
+import java.io.IOException;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /*
@@ -62,7 +62,7 @@ public class PinotBrokerTimeBoundaryDebugServlet extends HttpServlet {
       if (!tableName.isEmpty()) {
         CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
         if (tableType == null) {
-          tableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
+          tableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
         }
         TimeBoundaryService.TimeBoundaryInfo tbInfo = _timeBoundaryService.getTimeBoundaryInfoFor(tableName);
         if (tbInfo != null) {

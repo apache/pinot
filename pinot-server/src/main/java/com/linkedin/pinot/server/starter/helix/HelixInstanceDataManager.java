@@ -162,9 +162,9 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       LOGGER.debug("Trying to add segment with Metadata: " + segmentMetadata.toString());
     }
     if (segmentMetadata.getIndexType().equalsIgnoreCase("realtime")) {
-      tableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
+      tableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     } else {
-      tableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
+      tableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     }
     if (!_tableDataManagerMap.containsKey(tableName)) {
       LOGGER.info("Trying to add TableDataManager for OFFLINE table: {}", tableName);
@@ -187,9 +187,9 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       LOGGER.debug("Trying to add segment with Metadata: " + segmentZKMetadata.toString());
     }
     if (segmentZKMetadata instanceof RealtimeSegmentZKMetadata) {
-      tableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
+      tableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     } else {
-      tableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
+      tableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     }
     if (!_tableDataManagerMap.containsKey(tableName)) {
       LOGGER.info("Trying to add TableDataManager for REALTIME table: {}", tableName);
@@ -234,9 +234,9 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     String segmentName = segmentMetadata.getName();
     String tableName = segmentMetadata.getTableName();
     if (tableType == CommonConstants.Helix.TableType.OFFLINE) {
-      tableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(tableName);
+      tableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     } else {
-      tableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
+      tableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     }
     LOGGER.info("Reloading segment: {} in table: {}", segmentName, tableName);
 

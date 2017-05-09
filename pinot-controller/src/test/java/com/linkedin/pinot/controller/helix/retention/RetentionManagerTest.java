@@ -15,33 +15,6 @@
  */
 package com.linkedin.pinot.controller.helix.retention;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
-import org.apache.commons.io.FileUtils;
-import org.apache.helix.AccessOption;
-import org.apache.helix.HelixAdmin;
-import org.apache.helix.HelixManager;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.manager.zk.ZkClient;
-import org.apache.helix.model.IdealState;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.joda.time.Duration;
-import org.joda.time.Interval;
-import org.json.JSONException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.testng.Assert;
-import org.testng.annotations.AfterTest;
-import org.testng.annotations.BeforeTest;
-import org.testng.annotations.Test;
 import com.alibaba.fastjson.JSONObject;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
@@ -66,7 +39,34 @@ import com.linkedin.pinot.controller.helix.core.util.ZKMetadataUtils;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.creator.impl.V1Constants;
 import com.linkedin.pinot.core.startree.hll.HllConstants;
+import java.io.File;
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
+import org.apache.commons.io.FileUtils;
+import org.apache.helix.AccessOption;
+import org.apache.helix.HelixAdmin;
+import org.apache.helix.HelixManager;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.manager.zk.ZkClient;
+import org.apache.helix.model.IdealState;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.joda.time.Duration;
+import org.joda.time.Interval;
+import org.json.JSONException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.testng.Assert;
+import org.testng.annotations.AfterTest;
+import org.testng.annotations.BeforeTest;
+import org.testng.annotations.Test;
 
 
 public class RetentionManagerTest {
@@ -88,8 +88,8 @@ public class RetentionManagerTest {
   private HelixManager _helixZkManager;
   private HelixAdmin _helixAdmin;
   private String _testTableName = "testTable";
-  private String _offlineTableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(_testTableName);
-  private String _realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(_testTableName);
+  private String _offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(_testTableName);
+  private String _realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(_testTableName);
 
   private RetentionManager _retentionManager;
   private ZkStarter.ZookeeperInstance _zookeeperInstance;

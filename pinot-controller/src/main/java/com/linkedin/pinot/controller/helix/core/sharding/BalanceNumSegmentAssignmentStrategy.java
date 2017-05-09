@@ -45,10 +45,10 @@ public class BalanceNumSegmentAssignmentStrategy implements SegmentAssignmentStr
     String serverTenantName;
     String tableName;
     if ("realtime".equalsIgnoreCase(segmentMetadata.getIndexType())) {
-      tableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(segmentMetadata.getTableName());
+      tableName = TableNameBuilder.REALTIME.tableNameWithType(segmentMetadata.getTableName());
       serverTenantName = ControllerTenantNameBuilder.getRealtimeTenantNameForTenant(tenantName);
     } else {
-      tableName = TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(segmentMetadata.getTableName());
+      tableName = TableNameBuilder.OFFLINE.tableNameWithType(segmentMetadata.getTableName());
       serverTenantName = ControllerTenantNameBuilder.getOfflineTenantNameForTenant(tenantName);
     }
 

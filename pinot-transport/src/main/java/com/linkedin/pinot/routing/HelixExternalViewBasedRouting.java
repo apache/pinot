@@ -17,9 +17,21 @@
 package com.linkedin.pinot.routing;
 
 import com.google.common.collect.Sets;
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.metrics.BrokerMeter;
+import com.linkedin.pinot.common.metrics.BrokerMetrics;
+import com.linkedin.pinot.common.metrics.BrokerTimer;
+import com.linkedin.pinot.common.response.ServerInstance;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.common.utils.EqualityUtils;
+import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
+import com.linkedin.pinot.routing.builder.BalancedRandomRoutingTableBuilder;
+import com.linkedin.pinot.routing.builder.KafkaHighLevelConsumerBasedRoutingTableBuilder;
+import com.linkedin.pinot.routing.builder.KafkaLowLevelConsumerRoutingTableBuilder;
 import com.linkedin.pinot.routing.builder.LargeClusterRoutingTableBuilder;
+import com.linkedin.pinot.routing.builder.RoutingTableBuilder;
+import com.linkedin.pinot.transport.common.SegmentIdSet;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -45,18 +57,6 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metrics.BrokerMeter;
-import com.linkedin.pinot.common.metrics.BrokerMetrics;
-import com.linkedin.pinot.common.metrics.BrokerTimer;
-import com.linkedin.pinot.common.response.ServerInstance;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.NetUtil;
-import com.linkedin.pinot.routing.builder.BalancedRandomRoutingTableBuilder;
-import com.linkedin.pinot.routing.builder.KafkaHighLevelConsumerBasedRoutingTableBuilder;
-import com.linkedin.pinot.routing.builder.KafkaLowLevelConsumerRoutingTableBuilder;
-import com.linkedin.pinot.routing.builder.RoutingTableBuilder;
-import com.linkedin.pinot.transport.common.SegmentIdSet;
 
 
 /*
@@ -444,7 +444,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
       if (tableType == CommonConstants.Helix.TableType.OFFLINE) {
         // Does a realtime table exist?
         String realtimeTableName =
-            TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(TableNameBuilder.extractRawTableName(tableName));
+            TableNameBuilder.REALTIME.tableNameWithType(TableNameBuilder.extractRawTableName(tableName));
         if (_brokerRoutingTable.containsKey(realtimeTableName)) {
           tableForTimeBoundaryUpdate = tableName;
           externalViewForTimeBoundaryUpdate = externalView;
@@ -454,7 +454,7 @@ public class HelixExternalViewBasedRouting implements RoutingTable {
       if (tableType == CommonConstants.Helix.TableType.REALTIME) {
         // Does an offline table exist?
         String offlineTableName =
-            TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(TableNameBuilder.extractRawTableName(tableName));
+            TableNameBuilder.OFFLINE.tableNameWithType(TableNameBuilder.extractRawTableName(tableName));
         if (_brokerRoutingTable.containsKey(offlineTableName)) {
           // Is there no time boundary?
           if (_timeBoundaryService.getTimeBoundaryInfoFor(offlineTableName) == null) {

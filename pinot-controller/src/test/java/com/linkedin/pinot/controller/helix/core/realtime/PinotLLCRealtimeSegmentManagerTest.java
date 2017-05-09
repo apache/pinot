@@ -16,21 +16,6 @@
 
 package com.linkedin.pinot.controller.helix.core.realtime;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-import java.util.Set;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.model.IdealState;
-import org.joda.time.Interval;
-import org.testng.Assert;
-import org.testng.annotations.BeforeTest;
-import org.testng.annotations.Test;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
@@ -48,6 +33,22 @@ import com.linkedin.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
 import com.linkedin.pinot.core.segment.index.SegmentMetadataImpl;
 import com.yammer.metrics.core.MetricsRegistry;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.Set;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.model.IdealState;
+import org.joda.time.Interval;
+import org.testng.Assert;
+import org.testng.annotations.BeforeTest;
+import org.testng.annotations.Test;
+
 import static org.mockito.Mockito.*;
 
 
@@ -603,7 +604,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       final int maxSeq = 10;
       final long now = System.currentTimeMillis();
       final String tableName = "table";
-      final String realtimeTableName = TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName);
+      final String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
       final IdealState idealState = PinotTableIdealStateBuilder.buildEmptyKafkaConsumerRealtimeIdealStateFor(realtimeTableName,
           19);
       int nIncompleteCommits = 0;
@@ -661,7 +662,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
       segmentManager._tableIdealState = idealState;
       segmentManager._existingSegmentMetadata = existingSegmentMetadata;
 
-      segmentManager.completeCommittingSegments(TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(tableName));
+      segmentManager.completeCommittingSegments(TableNameBuilder.REALTIME.tableNameWithType(tableName));
 
       Assert.assertEquals(segmentManager._nCallsToUpdateHelix, nIncompleteCommits, "Failed with seed " + seed);
     }

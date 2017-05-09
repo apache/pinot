@@ -15,19 +15,17 @@
  */
 package com.linkedin.pinot.common.metadata.instance;
 
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.metadata.ZKMetadata;
+import com.linkedin.pinot.common.utils.StringUtil;
+import java.util.HashMap;
+import java.util.Map;
+import org.apache.helix.ZNRecord;
+
 import static com.linkedin.pinot.common.utils.EqualityUtils.hashCodeOf;
 import static com.linkedin.pinot.common.utils.EqualityUtils.isEqual;
 import static com.linkedin.pinot.common.utils.EqualityUtils.isNullOrNotSameClass;
 import static com.linkedin.pinot.common.utils.EqualityUtils.isSameReference;
-
-import java.util.HashMap;
-import java.util.Map;
-
-import org.apache.helix.ZNRecord;
-
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metadata.ZKMetadata;
-import com.linkedin.pinot.common.utils.StringUtil;
 
 
 public final class InstanceZKMetadata implements ZKMetadata {
@@ -96,19 +94,19 @@ public final class InstanceZKMetadata implements ZKMetadata {
   }
 
   public String getGroupId(String resourceName) {
-    return _groupIdMap.get(TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(resourceName));
+    return _groupIdMap.get(TableNameBuilder.REALTIME.tableNameWithType(resourceName));
   }
 
   public void setGroupId(String resourceName, String groupId) {
-    _groupIdMap.put(TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(resourceName), groupId);
+    _groupIdMap.put(TableNameBuilder.REALTIME.tableNameWithType(resourceName), groupId);
   }
 
   public String getPartition(String resourceName) {
-    return _partitionMap.get(TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(resourceName));
+    return _partitionMap.get(TableNameBuilder.REALTIME.tableNameWithType(resourceName));
   }
 
   public void setPartition(String resourceName, String partition) {
-    _partitionMap.put(TableNameBuilder.REALTIME_TABLE_NAME_BUILDER.forTable(resourceName), partition);
+    _partitionMap.put(TableNameBuilder.REALTIME.tableNameWithType(resourceName), partition);
   }
 
   public void removeResource(String resourceName) {

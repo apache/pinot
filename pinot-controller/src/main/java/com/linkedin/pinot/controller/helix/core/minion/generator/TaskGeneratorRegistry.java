@@ -44,7 +44,8 @@ public class TaskGeneratorRegistry {
   public void registerTaskGenerator(@Nonnull PinotTaskGenerator pinotTaskGenerator) {
     // Task type cannot contain the task name separator
     String taskType = pinotTaskGenerator.getTaskType();
-    Preconditions.checkArgument(!taskType.contains(PinotHelixTaskResourceManager.TASK_NAME_SEPARATOR));
+    Preconditions.checkArgument(!taskType.contains(PinotHelixTaskResourceManager.TASK_NAME_SEPARATOR),
+        "Task type: %s cannot contain underscore character", taskType);
 
     _taskGeneratorRegistry.put(taskType, pinotTaskGenerator);
   }

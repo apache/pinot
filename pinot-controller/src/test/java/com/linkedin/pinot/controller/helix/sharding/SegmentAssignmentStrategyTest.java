@@ -15,10 +15,18 @@
  */
 package com.linkedin.pinot.controller.helix.sharding;
 
+import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.segment.SegmentMetadata;
+import com.linkedin.pinot.common.utils.ZkStarter;
+import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
+import com.linkedin.pinot.controller.helix.starter.HelixConfig;
+import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-
 import org.I0Itec.zkclient.ZkClient;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
@@ -29,16 +37,6 @@ import org.testng.Assert;
 import org.testng.annotations.AfterTest;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
-
-import com.linkedin.pinot.common.config.AbstractTableConfig;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.segment.SegmentMetadata;
-import com.linkedin.pinot.common.utils.ZkStarter;
-import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
-import com.linkedin.pinot.controller.helix.starter.HelixConfig;
-import com.linkedin.pinot.core.query.utils.SimpleSegmentMetadata;
 
 
 public class SegmentAssignmentStrategyTest {
@@ -115,7 +113,7 @@ public class SegmentAssignmentStrategyTest {
         instance2NumSegmentsMap.put(instance, 0);
       }
       final ExternalView externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME,
-          TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(TABLE_NAME_RANDOM));
+          TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME_RANDOM));
       Assert.assertEquals(externalView.getPartitionSet().size(), i + 1);
       for (final String segmentId : externalView.getPartitionSet()) {
         Assert.assertEquals(externalView.getStateMap(segmentId).size(), numReplicas);
@@ -146,7 +144,7 @@ public class SegmentAssignmentStrategyTest {
       instance2NumSegmentsMap.put(instance, 0);
     }
     final ExternalView externalView = _helixAdmin.getResourceExternalView(HELIX_CLUSTER_NAME,
-        TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(TABLE_NAME_BALANCED));
+        TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME_BALANCED));
     for (final String segmentId : externalView.getPartitionSet()) {
       for (final String instance : externalView.getStateMap(segmentId).keySet()) {
         instance2NumSegmentsMap.put(instance, instance2NumSegmentsMap.get(instance) + 1);
@@ -164,8 +162,7 @@ public class SegmentAssignmentStrategyTest {
       Assert.assertTrue(instance2NumSegmentsMap.get(instance) <= maxNumSegmentsPerInstance,
           "expected <=" + maxNumSegmentsPerInstance + " actual:" + instance2NumSegmentsMap.get(instance));
     }
-    _helixAdmin.dropResource(HELIX_CLUSTER_NAME,
-        TableNameBuilder.OFFLINE_TABLE_NAME_BUILDER.forTable(TABLE_NAME_BALANCED));
+    _helixAdmin.dropResource(HELIX_CLUSTER_NAME, TableNameBuilder.OFFLINE.tableNameWithType(TABLE_NAME_BALANCED));
   }
 
   private void addOneSegment(String tableName) {

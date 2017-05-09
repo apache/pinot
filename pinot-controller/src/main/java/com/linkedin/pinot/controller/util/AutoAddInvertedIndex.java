@@ -145,7 +145,7 @@ public class AutoAddInvertedIndex {
 
     for (String tableName : resourcesInCluster) {
       // Skip non-table resources
-      if (!tableName.endsWith("_OFFLINE") && !tableName.endsWith("_REALTIME")) {
+      if (!TableNameBuilder.isTableResource(tableName)) {
         continue;
       }
 
@@ -157,6 +157,7 @@ public class AutoAddInvertedIndex {
 
       // Get the table type
       CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
+      Preconditions.checkNotNull(tableType);
 
       // Get the inverted index config
       AbstractTableConfig tableConfig = getTableConfig(tableName, tableType);
