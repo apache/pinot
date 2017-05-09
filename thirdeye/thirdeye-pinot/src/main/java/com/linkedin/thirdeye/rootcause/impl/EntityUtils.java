@@ -102,6 +102,9 @@ public class EntityUtils {
 
     } else if(ServiceEntity.TYPE.isType(urn)) {
       return ServiceEntity.fromURN(urn, score);
+
+    } else if(HyperlinkEntity.TYPE.isType(urn)) {
+      return HyperlinkEntity.fromURL(urn, score);
     }
     throw new IllegalArgumentException(String.format("Could not parse URN '%s'", urn));
   }
