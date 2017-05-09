@@ -162,6 +162,27 @@ AnalysisView.prototype = {
       const compiled_rootcause_table_template = Handlebars.compile(rootcause_table_template);
       const rootCauseHTML = compiled_rootcause_table_template(this.analysisModel);
       $('#rootcause-table-placeholder').html(rootCauseHTML);
+      $('#rootcause-data-table').DataTable({
+        data: this.analysisModel.rootCauseData,
+        columns: [
+          {
+            title: 'Type',
+            data: null,
+            render: function(data, type, row) { return "<a href=\"" + row.link + "\" target=\"_blank\">" + row.type + "</a>" }
+          },
+          {
+            title: 'Label',
+            data: 'label'
+          },
+          {
+            title: 'Score',
+            data: 'score',
+            visible: false
+          }
+        ],
+        order: [[ 2, 'desc' ], [ 0, 'asc' ], [ 1, 'asc' ]],
+        iDisplayLength: 50
+      });
     }
   },
 
