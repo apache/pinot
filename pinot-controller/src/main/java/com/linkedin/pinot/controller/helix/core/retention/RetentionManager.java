@@ -15,21 +15,6 @@
  */
 package com.linkedin.pinot.controller.helix.core.retention;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
-import org.apache.helix.ZNRecord;
-import org.apache.helix.model.IdealState;
-import org.apache.helix.store.zk.ZkHelixPropertyStore;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
@@ -45,7 +30,22 @@ import com.linkedin.pinot.common.utils.helix.HelixHelper;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
 import com.linkedin.pinot.controller.helix.core.retention.strategy.TimeRetentionStrategy;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nonnull;
+import org.apache.helix.ZNRecord;
+import org.apache.helix.model.IdealState;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -211,7 +211,7 @@ public class RetentionManager {
   }
 
   private void updateDeletionStrategiesForEntireCluster() {
-    List<String> tableNames = _pinotHelixResourceManager.getAllPinotTableNames();
+    List<String> tableNames = _pinotHelixResourceManager.getAllTables();
     for (String tableName : tableNames) {
       updateDeletionStrategyForTable(tableName);
     }
@@ -336,7 +336,7 @@ public class RetentionManager {
   }
 
   private void updateSegmentMetadataForEntireCluster() {
-    List<String> tableNames = _pinotHelixResourceManager.getAllPinotTableNames();
+    List<String> tableNames = _pinotHelixResourceManager.getAllTables();
     for (String tableName : tableNames) {
       _segmentMetadataMap.put(tableName, retrieveSegmentMetadataForTable(tableName));
     }

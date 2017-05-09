@@ -16,8 +16,8 @@ import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 import java.io.File;
 import java.io.IOException;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.Collections;
+import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.codehaus.jackson.JsonParseException;
@@ -237,16 +237,14 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
   @Summary("Views all tables' configuration")
   @Tags({ "table" })
   @Paths({ "/tables", "/tables/" })
-  private Representation getAllTables() throws JSONException {
-    JSONObject object = new JSONObject();
-    JSONArray tableArray = new JSONArray();
-    Set<String> tableNames = new TreeSet<String>();
-    tableNames.addAll(_pinotHelixResourceManager.getAllUniquePinotRawTableNames());
-    for (String pinotTableName : tableNames) {
-      tableArray.put(pinotTableName);
-    }
-    object.put("tables", tableArray);
-    return new StringRepresentation(object.toString(2));
+  private Representation getAllTables()
+      throws JSONException {
+    List<String> rawTables = _pinotHelixResourceManager.getAllRawTables();
+    Collections.sort(rawTables);
+    JSONArray tableArray = new JSONArray(rawTables);
+    JSONObject resultObject = new JSONObject();
+    resultObject.put("tables", tableArray);
+    return new StringRepresentation(resultObject.toString(2));
   }
 
   @HttpVerb("get")

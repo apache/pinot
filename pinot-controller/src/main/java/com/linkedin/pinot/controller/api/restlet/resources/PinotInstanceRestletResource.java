@@ -15,10 +15,20 @@
  */
 package com.linkedin.pinot.controller.api.restlet.resources;
 
-import java.util.List;
-
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.io.ByteStreams;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
+import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
+import com.linkedin.pinot.common.restlet.swagger.Parameter;
+import com.linkedin.pinot.common.restlet.swagger.Paths;
+import com.linkedin.pinot.common.restlet.swagger.Response;
+import com.linkedin.pinot.common.restlet.swagger.Responses;
+import com.linkedin.pinot.common.restlet.swagger.Summary;
+import com.linkedin.pinot.common.restlet.swagger.Tags;
 import com.linkedin.pinot.controller.api.ControllerRestApplication;
+import com.linkedin.pinot.controller.api.pojos.Instance;
+import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
+import java.util.List;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.helix.model.InstanceConfig;
 import org.json.JSONArray;
@@ -34,18 +44,6 @@ import org.restlet.resource.Get;
 import org.restlet.resource.Post;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.io.ByteStreams;
-import com.linkedin.pinot.controller.api.pojos.Instance;
-import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
-import com.linkedin.pinot.common.restlet.swagger.Parameter;
-import com.linkedin.pinot.common.restlet.swagger.Paths;
-import com.linkedin.pinot.common.restlet.swagger.Response;
-import com.linkedin.pinot.common.restlet.swagger.Responses;
-import com.linkedin.pinot.common.restlet.swagger.Summary;
-import com.linkedin.pinot.common.restlet.swagger.Tags;
-import com.linkedin.pinot.controller.helix.core.PinotResourceManagerResponse;
 
 
 /**
@@ -223,7 +221,7 @@ public class PinotInstanceRestletResource extends BasePinotControllerRestletReso
     JSONObject object = new JSONObject();
     JSONArray instanceArray = new JSONArray();
 
-    List<String> instanceNames = _pinotHelixResourceManager.getAllInstanceNames();
+    List<String> instanceNames = _pinotHelixResourceManager.getAllInstances();
     for (String instanceName : instanceNames) {
       instanceArray.put(instanceName);
     }

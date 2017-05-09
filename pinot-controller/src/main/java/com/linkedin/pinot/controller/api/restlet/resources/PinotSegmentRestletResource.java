@@ -244,8 +244,8 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
       throws JsonProcessingException, JSONException {
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
-    List<String> offlineSegments = _pinotHelixResourceManager.getAllSegmentsForResource(offlineTableName);
-    List<String> realtimeSegments = _pinotHelixResourceManager.getAllSegmentsForResource(realtimeTableName);
+    List<String> offlineSegments = _pinotHelixResourceManager.getSegmentsFor(offlineTableName);
+    List<String> realtimeSegments = _pinotHelixResourceManager.getSegmentsFor(realtimeTableName);
 
     if (tableType == null) {
       if(offlineSegments.contains(segmentName)) {
@@ -301,8 +301,8 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
     String realtimeTableName = TableNameBuilder.REALTIME.tableNameWithType(tableName);
     String tableNameWithType = "";
-    List<String> realtimeSegments = _pinotHelixResourceManager.getAllSegmentsForResource(realtimeTableName);
-    List<String> offlineSegments = _pinotHelixResourceManager.getAllSegmentsForResource(offlineTableName);
+    List<String> realtimeSegments = _pinotHelixResourceManager.getSegmentsFor(realtimeTableName);
+    List<String> offlineSegments = _pinotHelixResourceManager.getSegmentsFor(offlineTableName);
 
     if (tableType == null) {
       PinotResourceManagerResponse responseRealtime = toggleSegmentsForTable(realtimeSegments, realtimeTableName, segmentName, state);
@@ -360,7 +360,7 @@ public class PinotSegmentRestletResource extends BasePinotControllerRestletResou
     if (segmentName == null) {
       // For enable, allow 5 seconds per segment for an instance as timeout.
       if (StateType.ENABLE.name().equalsIgnoreCase(state)) {
-        int instanceCount = _pinotHelixResourceManager.getAllInstanceNames().size();
+        int instanceCount = _pinotHelixResourceManager.getAllInstances().size();
         if (instanceCount != 0) {
           timeOutInSeconds = (long) ((_offlineToOnlineTimeoutInseconds * segmentsToToggle.size()) / instanceCount);
         } else {

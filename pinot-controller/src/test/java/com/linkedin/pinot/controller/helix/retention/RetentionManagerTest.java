@@ -130,7 +130,7 @@ public class RetentionManagerTest {
   private void cleanupSegments(String tableName) throws InterruptedException {
     _retentionManager.stop();
     _pinotHelixResourceManager.deleteSegments(tableName,
-        _pinotHelixResourceManager.getAllSegmentsForResource(tableName));
+        _pinotHelixResourceManager.getSegmentsFor(tableName));
     while (_helixZkManager.getHelixPropertyStore()
         .getChildNames(ZKMetadataProvider.constructPropertyStorePathForResource(tableName),
             AccessOption.PERSISTENT)

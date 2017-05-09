@@ -15,6 +15,15 @@
  */
 package com.linkedin.pinot.controller.helix;
 
+import com.linkedin.pinot.common.config.TableNameBuilder;
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
+import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
+import com.linkedin.pinot.common.metrics.ControllerGauge;
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
+import com.linkedin.pinot.controller.ControllerConf;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
@@ -30,15 +39,6 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.linkedin.pinot.common.config.TableNameBuilder;
-import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
-import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
-import com.linkedin.pinot.common.metrics.ControllerGauge;
-import com.linkedin.pinot.common.metrics.ControllerMetrics;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
-import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 
 
 /**
@@ -159,7 +159,7 @@ public class SegmentStatusChecker {
     LOGGER.info("Starting Segment Status check for metrics");
 
     // Fetch the list of tables
-    List<String> allTableNames = _pinotHelixResourceManager.getAllPinotTableNames();
+    List<String> allTableNames = _pinotHelixResourceManager.getAllTables();
     String helixClusterName = _pinotHelixResourceManager.getHelixClusterName();
     HelixAdmin helixAdmin = _pinotHelixResourceManager.getHelixAdmin();
     int realTimeTableCount = 0;
@@ -299,7 +299,7 @@ public class SegmentStatusChecker {
 
   void setStatusToDefault() {
     // Fetch the list of tables
-    List<String> allTableNames = _pinotHelixResourceManager.getAllPinotTableNames();
+    List<String> allTableNames = _pinotHelixResourceManager.getAllTables();
     // Synchronization provided by Controller Gauge to make sure that only one thread updates the gauge
     for (String tableName : allTableNames) {
       _metricsRegistry.setValueOfTableGauge(tableName, ControllerGauge.NUMBER_OF_REPLICAS, 0);
