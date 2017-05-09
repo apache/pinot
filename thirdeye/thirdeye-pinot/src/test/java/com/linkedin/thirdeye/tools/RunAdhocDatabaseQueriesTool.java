@@ -354,7 +354,6 @@ public class RunAdhocDatabaseQueriesTool {
         mergedResultDAO.update(mergedAnomalyResult);
       }
     }
-    System.out.print("");
   }
 
 

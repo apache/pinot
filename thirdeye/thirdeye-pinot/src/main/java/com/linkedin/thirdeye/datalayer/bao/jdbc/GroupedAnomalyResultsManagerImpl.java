@@ -24,6 +24,7 @@ public class GroupedAnomalyResultsManagerImpl extends AbstractManagerImpl<Groupe
     super(GroupedAnomalyResultsDTO.class, GroupedAnomalyResultsBean.class);
   }
 
+  @Override
   public Long save(GroupedAnomalyResultsDTO groupedAnomalyResultDTO) {
     if (groupedAnomalyResultDTO.getId() != null) {
       update(groupedAnomalyResultDTO);
@@ -36,6 +37,7 @@ public class GroupedAnomalyResultsManagerImpl extends AbstractManagerImpl<Groupe
     }
   }
 
+  @Override
   public int update(GroupedAnomalyResultsDTO groupedAnomalyResultDTO) {
     if (groupedAnomalyResultDTO.getId() == null) {
       Long id = save(groupedAnomalyResultDTO);
