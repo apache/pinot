@@ -15,7 +15,6 @@ import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.EntityToEntityMappingManager;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
-import com.linkedin.thirdeye.datalayer.pojo.EntityToEntityMappingBean;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.Pipeline;
@@ -44,7 +43,6 @@ import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.commons.cli.Parser;
-import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.ISODateTimeFormat;
 import org.slf4j.LoggerFactory;
@@ -219,18 +217,18 @@ public class RCAFrameworkRunner {
 
     // Metrics
     pipelines.add(new MetricDatasetPipeline(P_METRIC_DATASET_RAW, asSet(P_INPUT), metricDAO, datasetDAO));
-    pipelines.add(new EntityMappingPipeline(P_METRIC_METRIC_RAW, asSet(P_INPUT), entityDAO, EntityToEntityMappingBean.MappingType.METRIC_TO_METRIC, false, false));
+    pipelines.add(new EntityMappingPipeline(P_METRIC_METRIC_RAW, asSet(P_INPUT), entityDAO, "METRIC_TO_METRIC", false, false));
     pipelines.add(new TopKPipeline(P_METRIC_TOPK, asSet(P_INPUT, P_METRIC_DATASET_RAW, P_METRIC_METRIC_RAW), MetricEntity.class, TOPK_METRIC));
 
     // Dimensions (from metrics)
     QueryCache cache = ThirdEyeCacheRegistry.getInstance().getQueryCache();
     ExecutorService executorScorer = Executors.newFixedThreadPool(3);
     pipelines.add(new DimensionAnalysisPipeline(P_DIMENSION_METRIC_RAW, asSet(P_INPUT, P_METRIC_TOPK), metricDAO, datasetDAO, cache, executorScorer));
-    pipelines.add(new EntityMappingPipeline(P_DIMENSION_REWRITE, asSet(P_DIMENSION_METRIC_RAW), entityDAO, EntityToEntityMappingBean.MappingType.DIMENSION_TO_DIMENSION, true, true));
+    pipelines.add(new EntityMappingPipeline(P_DIMENSION_REWRITE, asSet(P_DIMENSION_METRIC_RAW), entityDAO, "DIMENSION_TO_DIMENSION", true, true));
     pipelines.add(new TopKPipeline(P_DIMENSION_TOPK, asSet(P_INPUT, P_DIMENSION_REWRITE), DimensionEntity.class, TOPK_DIMENSION));
 
     // Systems
-    pipelines.add(new EntityMappingPipeline(P_SERVICE_METRIC_RAW, asSet(P_METRIC_TOPK), entityDAO, EntityToEntityMappingBean.MappingType.METRIC_TO_SERVICE, false, false));
+    pipelines.add(new EntityMappingPipeline(P_SERVICE_METRIC_RAW, asSet(P_METRIC_TOPK), entityDAO, "METRIC_TO_SERVICE", false, false));
     pipelines.add(new TopKPipeline(P_SERVICE_TOPK, asSet(P_INPUT, P_SERVICE_METRIC_RAW), ServiceEntity.class, TOPK_SERVICE));
 
     // Events (from metrics and dimensions)

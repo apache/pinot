@@ -11,16 +11,9 @@ import java.util.Objects;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class EntityToEntityMappingBean extends AbstractBean {
-
-  public enum MappingType {
-    METRIC_TO_SERVICE,
-    SERVICE_TO_METRIC,
-    METRIC_TO_METRIC,
-    DIMENSION_TO_DIMENSION
-  }
   String fromURN;
   String toURN;
-  MappingType mappingType;
+  String mappingType;
   double score;
 
   public String getFromURN() {
@@ -35,10 +28,10 @@ public class EntityToEntityMappingBean extends AbstractBean {
   public void setToURN(String toURN) {
     this.toURN = toURN;
   }
-  public MappingType getMappingType() {
+  public String getMappingType() {
     return mappingType;
   }
-  public void setMappingType(MappingType mappingType) {
+  public void setMappingType(String mappingType) {
     this.mappingType = mappingType;
   }
   public double getScore() {

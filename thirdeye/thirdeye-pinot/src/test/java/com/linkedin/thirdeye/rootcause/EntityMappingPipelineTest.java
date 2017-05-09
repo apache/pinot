@@ -20,8 +20,8 @@ import org.testng.annotations.Test;
 
 
 public class EntityMappingPipelineTest {
-  private static final EntityToEntityMappingBean.MappingType DIMENSION_TO_DIMENSION = EntityToEntityMappingBean.MappingType.DIMENSION_TO_DIMENSION;
-  private static final EntityToEntityMappingBean.MappingType METRIC_TO_SERVICE = EntityToEntityMappingBean.MappingType.METRIC_TO_SERVICE;
+  private static final String DIMENSION_TO_DIMENSION = "DIMENSION_TO_DIMENSION";
+  private static final String METRIC_TO_SERVICE = "METRIC_TO_SERVICE";
 
   private static final PipelineContext CONTEXT_DEFAULT = makeContext(makeEntities(1.0, "country:us", "country:at", "other:value"));
 
@@ -150,7 +150,7 @@ public class EntityMappingPipelineTest {
     return new PipelineContext(inputs);
   }
 
-  private static EntityToEntityMappingDTO makeMapping(String from, String to, double score, EntityToEntityMappingBean.MappingType type) {
+  private static EntityToEntityMappingDTO makeMapping(String from, String to, double score, String type) {
     EntityToEntityMappingDTO dto = new EntityToEntityMappingDTO();
     dto.setFromURN(from);
     dto.setToURN(to);
@@ -182,7 +182,7 @@ public class EntityMappingPipelineTest {
     }
 
     @Override
-    public List<EntityToEntityMappingDTO> findByMappingType(EntityToEntityMappingBean.MappingType mappingType) {
+    public List<EntityToEntityMappingDTO> findByMappingType(String mappingType) {
       List<EntityToEntityMappingDTO> entities = new ArrayList<>();
       for(EntityToEntityMappingDTO dto : this.entities) {
         if(dto.getMappingType().equals(mappingType))
@@ -192,12 +192,12 @@ public class EntityMappingPipelineTest {
     }
 
     @Override
-    public List<EntityToEntityMappingDTO> findByFromURNAndMappingType(String fromURN, EntityToEntityMappingBean.MappingType mappingType) {
+    public List<EntityToEntityMappingDTO> findByFromURNAndMappingType(String fromURN, String mappingType) {
       throw new AssertionError("not implemented");
     }
 
     @Override
-    public List<EntityToEntityMappingDTO> findByToURNAndMappingType(String toURN, EntityToEntityMappingBean.MappingType mappingType) {
+    public List<EntityToEntityMappingDTO> findByToURNAndMappingType(String toURN, String mappingType) {
       throw new AssertionError("not implemented");
     }
   }
