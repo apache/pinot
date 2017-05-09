@@ -587,6 +587,7 @@ text {
 
 .search-select {
   flex-basis: 25%;
+  min-width: 250px;
 }
 
 .search-input .select2-container--bootstrap .select2-selection {
@@ -632,6 +633,11 @@ text {
   padding: 16px;
 }
 
+.filter-section--no-padding {
+  padding-left: 0;
+  padding-right: 0;
+}
+
 .filter-section + .filter-section {
   border-top: 1px solid #CCC
 }
@@ -640,10 +646,31 @@ text {
   display: flex;
   font-weight: 600;
   font-size: 17px;
+  cursor: pointer;
+}
+
+.filter-title--small {
+  font-size: 15px;
 }
 
 .filter-title__name {
   flex-grow: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-right: 4px;
+  text-transform: capitalize;
+}
+
+.filter-title__action {
+  cursor: pointer;
+}
+
+.filter-title__action::after {
+  content: '+';
+}
+
+.filter-title__action--expanded::after {
+  content: '-';
 }
 
 .filter-body__list {

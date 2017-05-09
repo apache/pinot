@@ -128,6 +128,10 @@
 <script src="assets/javascript/views/WoWSummaryView.js"></script>
 <script src="assets/javascript/controllers/WoWSummaryController.js"></script>
 
+<script src="assets/javascript/models/AnomalyFilterModel.js"></script>
+<script src="assets/javascript/views/AnomalyFilterView.js"></script>
+<script src="assets/javascript/controllers/AnomalyFilterController.js"></script>
+
 <script src="assets/javascript/models/AnomalyResultModel.js"></script>
 <script src="assets/javascript/views/AnomalyResultView.js"></script>
 <script src="assets/javascript/controllers/AnomalyResultController.js"></script>

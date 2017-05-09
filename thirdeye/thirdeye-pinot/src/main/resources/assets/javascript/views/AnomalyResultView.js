@@ -122,18 +122,17 @@ function AnomalyResultView(anomalyResultModel) {
   const anomaly_results_template = $("#anomaly-results-template").html();
   this.anomaly_results_template_compiled = Handlebars.compile(anomaly_results_template);
 
-  const anomaly_filters_template = $("#anomaly-filters-template").html();
-  this.anomaly_filters_template_compiled = Handlebars.compile(anomaly_filters_template);
-
   // events
   this.applyButtonEvent = new Event(this);
+  this.checkedFilterEvent = new Event(this);
+  this.filterButtonEvent = new Event(this);
+  this.resetButtonEvent = new Event(this);
   this.investigateButtonClickEvent = new Event(this);
   this.showDetailsLinkClickEvent = new Event(this);
   this.anomalyFeedbackSelectEvent = new Event(this);
-  this.pageClickEvent = new Event(this)
+  this.pageClickEvent = new Event(this);
 
   this.anomalyResultModel.renderViewEvent.attach(this.renderViewEventHandler.bind(this));
-
 }
 
 AnomalyResultView.prototype = {
@@ -150,13 +149,14 @@ AnomalyResultView.prototype = {
     this.showSearchBarBasedOnMode();
     this.setupSearchListener();
   },
+  // *** should send data here to handle conditional rendering?
   renderViewEventHandler : function() {
     this.render();
   },
 
   render() {
     this.renderAnomaliesTab();
-    this.renderSearchFilters();
+    // this.renderSearchFilters();
     this.showSearchBarBasedOnMode();
     this.renderPagination();
 
@@ -168,9 +168,17 @@ AnomalyResultView.prototype = {
     });
   },
 
+  // should have 2type of destroy
+  // need to destroy date picker
   destroy() {
     $('#anomaly-results-place-holder').children().remove();
-    $('#anomaly-filters-place-holder').children().remove();
+  },
+
+  destroyDatePickers() {
+    const $currentRangePicker = $('#current-range');
+    const $baselineRangePicker = $('#baseline-range');
+    $currentRangePicker.length && $currentRangePicker.data('daterangepicker').remove();
+    $baselineRangePicker.length && $baselineRangePicker.data('daterangepicker').remove();
   },
   showSearchBarBasedOnMode : function() {
     var anomaliesSearchMode = $('#anomalies-search-mode').val();
@@ -270,8 +278,12 @@ AnomalyResultView.prototype = {
   },
 
   renderSearchFilters() {
+    if (this.searchFilters) return;
+
     const anomaliesFilters = this.anomalyResultModel.getAnomaliesFilters();
-    const anomaly_filters_compiled = this.anomaly_filters_template_compiled(anomaliesFilters);
+    const anomaly_filters_compiled = this.anomaly_filters_template_compiled({ anomaliesFilters });
+    this.destroyDatePickers();
+    $('#anomaly-filters-place-holder').children().remove();
     $('#anomaly-filters-place-holder').html(anomaly_filters_compiled);
      // TIME RANGE SELECTION
     this.timeRangeConfig.startDate = this.anomalyResultModel.startDate;
@@ -283,6 +295,7 @@ AnomalyResultView.prototype = {
     function cb(start, end, rangeType = constants.DATE_RANGE_CUSTOM) {
       $anomalyTimeRangeStart.addClass('time-range').html(start.format(constants.DATE_TIME_RANGE_FORMAT));
       $anomalyTimeRangeEnd.addClass('time-range').html(end.format(constants.DATE_TIME_RANGE_FORMAT));
+      console.log("changed")
     }
     $('#anomalies-time-range-start').daterangepicker(this.timeRangeConfig, cb);
 
@@ -303,6 +316,11 @@ AnomalyResultView.prototype = {
     const pageSize = this.anomalyResultModel.pageSize;
     const pageNumber = this.anomalyResultModel.pageNumber;
     const numPages = Math.ceil(totalAnomalies / pageSize);
+
+    // Don't display pagination when result is empty
+    if (!totalAnomalies) {
+      return;
+    }
 
     $('#pagination').twbsPagination({
       totalPages: numPages,
@@ -327,56 +345,140 @@ AnomalyResultView.prototype = {
     }
   },
 
+  getSearchParams() {
+    var anomaliesSearchMode = $('#anomalies-search-mode').val();
+    var metricIds = undefined;
+    var dashboardId = undefined;
+    var anomalyIds = undefined;
+    var functionName = $('#anomaly-function-dropdown').val();
 
-  setupSearchListener() {
-    $('#search-button').click(() => {
-      var anomaliesSearchMode = $('#anomalies-search-mode').val();
-      var metricIds = undefined;
-      var dashboardId = undefined;
-      var anomalyIds = undefined;
-      var anomalyGroupIds = undefined;
+    // const $anomalyDatePicker = $('#anomalies-time-range-start');
+    // const dateRangeData = $anomalyDatePicker.data('daterangepicker');
 
-      var functionName = $('#anomaly-function-dropdown').val();
-      const $anomalyDatePicker = $('#anomalies-time-range-start');
-      const dateRangeData = $anomalyDatePicker.data('daterangepicker');
+    // uses default startDate and endDate
+    const startDate = this.anomalyResultModel.startDate;
+    const endDate = this.anomalyResultModel.endDate;
 
-      const startDate = dateRangeData ? dateRangeData.startDate : this.anomalyResultModel.startDate;
-      const endDate = dateRangeData ? dateRangeData.endDate : this.anomalyResultModel.endDate;
+    const anomaliesParams = {
+      anomaliesSearchMode: anomaliesSearchMode,
+      startDate: startDate,
+      endDate: endDate,
+      pageNumber: 1,
+      functionName: functionName
+    }
 
-      var anomaliesParams = {
-        anomaliesSearchMode: anomaliesSearchMode,
-        startDate: startDate,
-        endDate: endDate,
-        pageNumber: 1,
-        functionName: functionName
-      }
-
-      if (anomaliesSearchMode == constants.MODE_METRIC) {
-        anomaliesParams.metricIds = $('#anomalies-search-metrics-input').val().join();
-      } else if (anomaliesSearchMode == constants.MODE_DASHBOARD) {
-        anomaliesParams.dashboardId = $('#anomalies-search-dashboard-input').val();
-      } else if (anomaliesSearchMode == constants.MODE_ID) {
-        anomaliesParams.anomalyIds = $('#anomalies-search-anomaly-input').val().join();
-        delete anomaliesParams.startDate;
-        delete anomaliesParams.endDate;
-      } else if (anomaliesSearchMode == constants.MODE_GROUPID) {
+    if (anomaliesSearchMode == constants.MODE_METRIC) {
+      anomaliesParams.metricIds = $('#anomalies-search-metrics-input').val().join();
+    } else if (anomaliesSearchMode == constants.MODE_DASHBOARD) {
+      anomaliesParams.dashboardId = $('#anomalies-search-dashboard-input').val();
+    } else if (anomaliesSearchMode == constants.MODE_ID) {
+      anomaliesParams.anomalyIds = $('#anomalies-search-anomaly-input').val().join();
+      delete anomaliesParams.startDate;
+      delete anomaliesParams.endDate;
+    } else if (anomaliesSearchMode == constants.MODE_GROUPID) {
         anomaliesParams.anomalyGroupIds = $('#anomalies-search-group-input').val().join();
         delete anomaliesParams.startDate;
         delete anomaliesParams.endDate;
-      }
+    }
 
+    return anomaliesParams;
+  },
+
+  setupSearchListener() {
+    $('#search-button').click(() => {
+      this.searchFilters = null;
+      const anomaliesParams = this.getSearchParams();
+      anomaliesParams.searchFilters = null;
       this.applyButtonEvent.notify(anomaliesParams);
     })
   },
 
   setupFilterListener() {
+    // search with filters
     $('#apply-button').click(() => {
-      alert('searching');
+      $('body').scrollTop(0);
+      // getting all checked
+      this.searchFilters = Object.assign({}, this.anomalyResultModel.getAnomaliesFilters());
+      // const filterType = Object.keys(filters);
+      const searchFilters = {};
+
+      // for each prop in the filters, find the checked and update
+      // $("#functionFilterMap").find(".filter-item__checkbox:checked");
+      const checkedFilters = $('.filter-item__checkbox:checked');
+// get the parent
+//
+//
+// ------***** coding from
+//
+const newSearchFilters = {};
+//getting parents with all level
+const section = $('.filter-section:not(".filter-section--no-padding")').has('.filter-item__checkbox:checked');
+
+section.each((index, section) => {
+  newSearchFilters[section.id] = {};
+  const selectedFilters = $(section).find('.filter-item__checkbox:checked');
+  selectedFilters.each((index, filter) => {
+    const filterBlockName = filter.closest('.filter-section').id;
+    if (filterBlockName !== section.id) {
+      newSearchFilters[section.id][filterBlockName] = newSearchFilters[section.id][filterBlockName] || {};
+      newSearchFilters[section.id][filterBlockName][filter.id] = 1;
+    } else {
+      newSearchFilters[section.id][filter.id] = 1;
+    }
+  });
+});
+
+// do something with newSearchFilters
+  // anomaliesParams.searchFilters = newSearchFilters;
+  // constructing filter
+
+  this.applyButtonEvent.notify({ searchFilters: newSearchFilters })
+  });
+// ------*****
+// $('.filter-section').has('.filter-section>.filter-item__checkbox:checked')
+    //   checkedFilters.each((index, filter) => {
+    //     const filterType = filter.closest('.filter-section').id
+    //     if (searchFilters[filterType] || allFilters.hasOwnProperty(filterType)) {
+    //       searchFilters[filterType] = searchFilters[filterType] || {};
+    //       searchFilters[filterType][filter.id] = 1;
+    //     }
+    //   })
+    //   // getting time
+    //   const anomaliesParams = this.getSearchParams();
+    //   anomaliesParams.searchFilters = searchFilters;
+    //   // constructing filter
+
+    //   this.applyButtonEvent.notify(anomaliesParams)
+    //   // update view
+    // })
+
+    // search with no filters
+    $('.filter-section').on('click', '.filter-title', function(event) {
+      $(event.delegateTarget).children('.filter-body__list').toggleClass('filter-body__list--hidden')
+      $(this).find('.filter-title__action').toggleClass('filter-title__action--expanded');
+      event.stopPropagation()
+    })
+
+    // on check for filters
+    $('.filter-section').on('click', '.filter-item__checkbox', (event) => {
+      const {
+        id: filter,
+        checked: isChecked
+      } = event.target;
+
+      debugger;
+      this.checkedFilterEvent.notify({ filter, isChecked});
+      // filter through all anomalies
+      //
+      // keep a selected anomalies
+      //
+      // keep a filter data structure
+      //
+      // keep all filters
     })
   },
 
   setupListenersOnAnomaly : function(idx, anomaly) {
-
     const investigateParams = {
       anomalyId : anomaly.anomalyId,
     }

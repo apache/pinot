@@ -19,7 +19,6 @@ function AnomalyResultModel() {
   this.anomalyStatusUnresolved = true;
 
   this.anomaliesWrapper = null;
-  this.anomaliesFilters = null;
 
   this.anomalyForFeedbackUpdate = null;
 
@@ -27,8 +26,11 @@ function AnomalyResultModel() {
   this.pageNumber = 1;
   this.pageSize = 10;
   this.ajaxCall = null;
+  this.searchFilters ;
+  this.hiddenFilters = ['statusFilterMap'];
 
   this.renderViewEvent = new Event();
+  this.updateModelAndNotifyView = this.updateModelAndNotifyView.bind(this)
 }
 
 AnomalyResultModel.prototype = {
@@ -91,32 +93,58 @@ AnomalyResultModel.prototype = {
         this.anomaliesWrapper.anomalyDetailsList[idx].anomalyFeedback = params['feedback'];
         this.anomalyForFeedbackUpdate = this.anomaliesWrapper.anomalyDetailsList[idx];
       }
+      this.searchFilters = params.searchFilters ? Object.assign({}, params.searchFilters) : this.searchFilters;
     }
   },
   // Call rebuild every time new anomalies are to be loaded with new model
-  rebuild : function() {
+  rebuild() {
     if (this.ajaxCall && !this.ajaxCall.status) {
-      console.log('aborting previous ajax call');
       this.ajaxCall.abort();
     }
-    if (this.anomaliesSearchMode == constants.MODE_METRIC && this.metricIds != undefined && this.metricIds.length > 0) {
-      this.ajaxCall = dataService.fetchAnomaliesForMetricIds(
-          this.startDate, this.endDate, this.pageNumber, this.metricIds, this.functionName, this.updateModelAndNotifyView.bind(this));
-    } else if (this.anomaliesSearchMode == constants.MODE_DASHBOARD && this.dashboardId != undefined) {
-      this.ajaxCall = dataService.fetchAnomaliesForDashboardId(
-          this.startDate, this.endDate, this.pageNumber, this.dashboardId, this.functionName, this.updateModelAndNotifyView.bind(this));
-    } else if (this.anomaliesSearchMode == constants.MODE_ID && this.anomalyIds != undefined && this.anomalyIds.length > 0 && this.anomalyIds != this.previousAnomalyIds) {
-      this.ajaxCall = dataService.fetchAnomaliesForAnomalyIds(
-          this.startDate, this.endDate, this.pageNumber, this.anomalyIds, this.functionName, this.updateModelAndNotifyView.bind(this));
-    } else if (this.anomaliesSearchMode == constants.MODE_TIME) {
-      this.ajaxCall = dataService.fetchAnomaliesForTime(this.startDate, this.endDate, this.pageNumber, this.updateModelAndNotifyView.bind(this));
-    } else if (this.anomaliesSearchMode == constants.MODE_GROUPID && this.anomalyGroupIds != undefined && this.anomalyGroupIds.length > 0) {
-      this.ajaxCall = dataService.fetchAnomaliesforGroupIds(this.startDate, this.endDate, this.pageNumber, this.anomalyGroupIds, this.functionName, this.updateModelAndNotifyView.bind(this));
-    }
+    const params = this.getSearchParams();
+    this.ajaxCall = dataService.fetchAnomalies(params);
   },
-  updateModelAndNotifyView : function(anomaliesWrapper) {
+
+  getSearchParams() {
+    return function(obj) {
+      const {
+          anomaliesSearchMode,
+          startDate,
+          endDate,
+          pageNumber,
+          metricIds,
+          dashboardId,
+          anomalyIds,
+          anomalyGroupIds,
+          functionName,
+          updateModelAndNotifyView
+      } = obj;
+
+      return {
+        anomaliesSearchMode,
+        startDate,
+        endDate,
+        pageNumber,
+        metricIds,
+        dashboardId,
+        anomalyIds,
+        anomalyGroupIds,
+        functionName,
+        updateModelAndNotifyView
+      };
+    }(this);
+  },
+
+  getSearchFilters() {
+    // ajax only for now, will need to cach it somehow
+    const params = this.getSearchParams();
+    params.filterOnly = true;
+    return dataService.fetchAnomalies(params);
+  },
+
+
+  updateModelAndNotifyView(anomaliesWrapper) {
     this.anomaliesWrapper = anomaliesWrapper;
-    this.anomaliesFilters = Object.assign({}, anomaliesWrapper.searchFilters);
     this.formatAnomalies();
     this.renderViewEvent.notify();
   },
@@ -194,9 +222,22 @@ AnomalyResultModel.prototype = {
   getAnomaliesWrapper() {
     return this.anomaliesWrapper;
   },
+
+  /**
+   * Return non empty filters
+   * @return {Object} Subset of searchFilters
+   */
   getAnomaliesFilters() {
-    return this.anomaliesFilters;
+    const anomaliesFilters = this.anomaliesWrapper.searchFilters || {};
+
+    return Object.keys(anomaliesFilters)
+      .filter(key => Object.keys(anomaliesFilters[key]).length && !this.hiddenFilters.includes(key))
+      .reduce((filters, key) => {
+        filters[key] = anomaliesFilters[key];
+        return filters;
+      }, {});
   },
+
   getAnomalyFunctions : function() {
     return this.functions;
   },
@@ -225,4 +266,4 @@ AnomalyResultModel.prototype = {
       return feedbackType;
     }
   },
-}
+};

@@ -91,47 +91,76 @@ DataService.prototype = {
       };
       this.getDataAsynchronous(url, data, callback, 'summary-spin-area');
     },
+
+    fetchAnomalies(args = {}) {
+      const {
+        anomaliesSearchMode,
+        startDate,
+        endDate,
+        pageNumber,
+        metricIds,
+        dashboardId,
+        anomalyIds,
+        anomalyGroupIds,
+        functionName,
+        updateModelAndNotifyView,
+        filterOnly,
+      } = args;
+
+      switch(anomaliesSearchMode) {
+        case constants.MODE_TIME:
+          return this.fetchAnomaliesForTime(startDate, endDate, pageNumber, filterOnly, updateModelAndNotifyView);
+        case constants.MODE_METRIC:
+          if (!metricIds || !metricIds.length) return;
+          return this.fetchAnomaliesForMetricIds(startDate, endDate, pageNumber, metricIds, functionName, filterOnly, updateModelAndNotifyView);
+        case constants.MODE_DASHBOARD:
+          if (!dashboardId || !dashboardId.length) return;
+          return this.fetchAnomaliesForDashboardId(startDate, endDate, pageNumber, dashboardId, functionName, filterOnly, updateModelAndNotifyView);
+        case constants.MODE_ID:
+          if (!anomalyIds || !anomalyIds.length) return;
+          return this.fetchAnomaliesForAnomalyIds(startDate, endDate, pageNumber, anomalyIds, functionName, filterOnly, updateModelAndNotifyView);
+        case constants.MODE_GROUPID:
+          if (!anomalyGroupIds || !!anomalyGroupIds.length) return;
+          return this.fetchAnomaliesforGroupIds(startDate, endDate, pageNumber, anomalyGroupIds, functionName, filterOnly, updateModelAndNotifyView);
+        default:
+          return;
+      }
+    },
     // Fetch anomalies for metric ids in array in time range
-    fetchAnomaliesForMetricIds : function(startTime, endTime, pageNumber, metricIds, functionName, callback) {
-      var url = constants.SEARCH_ANOMALIES_METRICIDS + startTime + this.URL_SEPARATOR + endTime + this.URL_SEPARATOR + pageNumber;
-      var data = {
-          metricIds : metricIds,
-          functionName : functionName,
-          searchFilters: {
-          statusFilterMap: {
-            NEW: 0
-          }
-        }
+    fetchAnomaliesForMetricIds : function(startTime, endTime, pageNumber, metricIds, functionName, filterOnly, callback, filters = {}) {
+      const url = constants.SEARCH_ANOMALIES_METRICIDS + startTime + this.URL_SEPARATOR + endTime + this.URL_SEPARATOR + pageNumber;
+      const searchFilters = filters ? JSON.stringify(filters) : {};
+      const data = {
+        metricIds,
+        functionName,
+        searchFilters,
+        filterOnly
       };
       return this.getDataAsynchronous(url, data, callback, 'anomaly-spin-area');
     },
     // Fetch anomalies for dashboard id in time range
-    fetchAnomaliesForDashboardId : function(startTime, endTime, pageNumber, dashboardId, functionName, callback) {
-      var url = constants.SEARCH_ANOMALIES_DASHBOARDID + startTime + this.URL_SEPARATOR + endTime + this.URL_SEPARATOR + pageNumber;
-      var data = {
-          dashboardId : dashboardId,
-          functionName : functionName,
-          searchFilters: {
-          statusFilterMap: {
-            NEW: 0
-          }
-        }
+    fetchAnomaliesForDashboardId : function(startTime, endTime, pageNumber, dashboardId, functionName, filterOnly, callback, filters = {}) {
+      const url = constants.SEARCH_ANOMALIES_DASHBOARDID + startTime + this.URL_SEPARATOR + endTime + this.URL_SEPARATOR + pageNumber;
+      const searchFilters = filters ? JSON.stringify(filters) : {};
+      const data = {
+        dashboardId : dashboardId,
+        functionName : functionName,
+        searchFilters,
+        filterOnly
       };
       return this.getDataAsynchronous(url, data, callback, 'anomaly-spin-area');
     },
     // Fetch anomalies for anomaly ids in array in time range
-    fetchAnomaliesForAnomalyIds : function(startTime, endTime, pageNumber, anomalyIds, functionName, callback, spinner = 'anomaly-spin-area') {
-      var url = constants.SEARCH_ANOMALIES_ANOMALYIDS + startTime + this.URL_SEPARATOR + endTime + this.URL_SEPARATOR + pageNumber;
-      var data = {
-          anomalyIds : anomalyIds,
-          functionName : functionName,
-          searchFilters: {
-          statusFilterMap: {
-            NEW: 0
-          }
-        }
+    fetchAnomaliesForAnomalyIds : function(startTime, endTime, pageNumber, anomalyIds, functionName, filterOnly, callback, filters = {}) {
+      const url = constants.SEARCH_ANOMALIES_ANOMALYIDS + startTime + this.URL_SEPARATOR + endTime + this.URL_SEPARATOR + pageNumber;
+      const searchFilters = filters ? JSON.stringify(filters) : {};
+      const data = {
+        anomalyIds,
+        functionName,
+        searchFilters,
+        filterOnly
       };
-      return this.getDataAsynchronous(url, data, callback, spinner);
+      return this.getDataAsynchronous(url, data, callback, 'anomaly-spin-area');
     },
 
     // Fetch anomalies for group ids in array
@@ -144,16 +173,14 @@ DataService.prototype = {
     },
 
     // Fetch anomalies for anomaly ids in array in time range
-    fetchAnomaliesForTime : function(startTime, endTime, pageNumber, callback) {
-      var url = constants.SEARCH_ANOMALIES_TIME + startTime + this.URL_SEPARATOR + endTime + this.URL_SEPARATOR + pageNumber;
-      const searchFilters = JSON.stringify({
-          statusFilterMap: {
-            NEW: 0
-          }
-        });
-      var data = {
-        searchFilters
+    fetchAnomaliesForTime : function(startTime, endTime, pageNumber, filterOnly, callback, filters = {}) {
+      const url = constants.SEARCH_ANOMALIES_TIME + startTime + this.URL_SEPARATOR + endTime + this.URL_SEPARATOR + pageNumber;
+      const searchFilters = filters ? JSON.stringify(filters) : {};
+      const data = {
+        searchFilters,
+        filterOnly
       };
+
       return this.getDataAsynchronous(url, data, callback, 'anomaly-spin-area');
     },
     // Update anomaly feedback for anomaly id

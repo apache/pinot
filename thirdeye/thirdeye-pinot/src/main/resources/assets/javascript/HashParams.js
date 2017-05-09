@@ -101,6 +101,7 @@ HashParams.prototype = {
       paramNamesToDefaultValuesMap[this.ANOMALIES_DASHBOARD_ID] = undefined;
       paramNamesToDefaultValuesMap[this.ANOMALIES_GROUP_IDS] = undefined;
       paramNamesToDefaultValuesMap[this.ANOMALIES_ANOMALY_IDS] = undefined;
+      paramNamesToDefaultValuesMap[this.ANOMALIES_SEARCH_FILTERS] = null;
       this.controllerNameToParamNamesMap[this.ANOMALIES_CONTROLLER] = paramNamesToDefaultValuesMap;
 
       // analysis

@@ -157,3 +157,11 @@ Handlebars.registerHelper('abbreviateNumber', function(value, digits) {
   return num.toFixed(digits).replace(rx, "$1");
 });
 
+Handlebars.registerHelper('isObject', function(item) {
+  return typeof item === 'object' && !Array.isArray(item);
+});
+
+Handlebars.registerHelper('displayFilterName', function(filter) {
+  return filter.split('FilterMap')[0];
+});
+
