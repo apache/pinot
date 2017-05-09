@@ -135,7 +135,7 @@ public class PinotTaskManager {
     }
 
     // Scan all table configs to get the tables with tasks enabled
-    for (String tableName : _pinotHelixResourceManager.getAllPinotTableNames()) {
+    for (String tableName : _pinotHelixResourceManager.getAllTables()) {
       AbstractTableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableName);
       if (tableConfig != null) {
         // TODO: add table configs that have certain types of tasks enabled into the map

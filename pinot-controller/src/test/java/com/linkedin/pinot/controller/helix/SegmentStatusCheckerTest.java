@@ -15,6 +15,12 @@
  */
 package com.linkedin.pinot.controller.helix;
 
+import com.linkedin.pinot.common.metrics.ControllerGauge;
+import com.linkedin.pinot.common.metrics.ControllerMetrics;
+import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.controller.ControllerConf;
+import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.yammer.metrics.core.MetricsRegistry;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -29,12 +35,7 @@ import org.testng.annotations.AfterSuite;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.BeforeSuite;
 import org.testng.annotations.Test;
-import com.linkedin.pinot.common.metrics.ControllerGauge;
-import com.linkedin.pinot.common.metrics.ControllerMetrics;
-import com.linkedin.pinot.common.utils.CommonConstants;
-import com.linkedin.pinot.controller.ControllerConf;
-import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
-import com.yammer.metrics.core.MetricsRegistry;
+
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -89,7 +90,7 @@ public class SegmentStatusCheckerTest {
     {
       helixResourceManager = mock(PinotHelixResourceManager.class);
       when(helixResourceManager.isLeader()).thenReturn(true);
-      when(helixResourceManager.getAllPinotTableNames()).thenReturn(allTableNames);
+      when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
       when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
       when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
     }
@@ -127,7 +128,7 @@ public class SegmentStatusCheckerTest {
     {
       helixResourceManager = mock(PinotHelixResourceManager.class);
       when(helixResourceManager.isLeader()).thenReturn(false);
-      when(helixResourceManager.getAllPinotTableNames()).thenReturn(allTableNames);
+      when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
       when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
       when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
     }
@@ -201,7 +202,7 @@ public class SegmentStatusCheckerTest {
     {
       helixResourceManager = mock(PinotHelixResourceManager.class);
       when(helixResourceManager.isLeader()).thenReturn(true);
-      when(helixResourceManager.getAllPinotTableNames()).thenReturn(allTableNames);
+      when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
       when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
       when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
       when(helixResourceManager.getPropertyStore()).thenReturn(propertyStore);
@@ -250,7 +251,7 @@ public class SegmentStatusCheckerTest {
     {
       helixResourceManager = mock(PinotHelixResourceManager.class);
       when(helixResourceManager.isLeader()).thenReturn(true);
-      when(helixResourceManager.getAllPinotTableNames()).thenReturn(allTableNames);
+      when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
       when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
       when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
     }
@@ -286,7 +287,7 @@ public class SegmentStatusCheckerTest {
     {
       helixResourceManager = mock(PinotHelixResourceManager.class);
       when(helixResourceManager.isLeader()).thenReturn(true);
-      when(helixResourceManager.getAllPinotTableNames()).thenReturn(allTableNames);
+      when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
       when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
       when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
     }
@@ -355,7 +356,7 @@ public class SegmentStatusCheckerTest {
     {
       helixResourceManager = mock(PinotHelixResourceManager.class);
       when(helixResourceManager.isLeader()).thenReturn(true);
-      when(helixResourceManager.getAllPinotTableNames()).thenReturn(allTableNames);
+      when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
       when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
       when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
       when(helixResourceManager.getPropertyStore()).thenReturn(propertyStore);
@@ -402,7 +403,7 @@ public class SegmentStatusCheckerTest {
     {
       helixResourceManager = mock(PinotHelixResourceManager.class);
       when(helixResourceManager.isLeader()).thenReturn(true);
-      when(helixResourceManager.getAllPinotTableNames()).thenReturn(allTableNames);
+      when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
       when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
       when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
     }
@@ -442,7 +443,7 @@ public class SegmentStatusCheckerTest {
     {
       helixResourceManager = mock(PinotHelixResourceManager.class);
       when(helixResourceManager.isLeader()).thenReturn(true);
-      when(helixResourceManager.getAllPinotTableNames()).thenReturn(allTableNames);
+      when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
       when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
       when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
     }
@@ -497,7 +498,7 @@ public class SegmentStatusCheckerTest {
     {
       helixResourceManager = mock(PinotHelixResourceManager.class);
       when(helixResourceManager.isLeader()).thenReturn(true);
-      when(helixResourceManager.getAllPinotTableNames()).thenReturn(allTableNames);
+      when(helixResourceManager.getAllTables()).thenReturn(allTableNames);
       when(helixResourceManager.getHelixClusterName()).thenReturn("StatusChecker");
       when(helixResourceManager.getHelixAdmin()).thenReturn(helixAdmin);
     }

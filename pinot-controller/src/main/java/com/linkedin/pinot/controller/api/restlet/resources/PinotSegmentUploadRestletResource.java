@@ -221,7 +221,7 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
       tableNameWithType = offlineTableName;
     }
 
-    List<String> segmentList = _pinotHelixResourceManager.getAllSegmentsForResource(tableNameWithType);
+    List<String> segmentList = _pinotHelixResourceManager.getSegmentsFor(tableNameWithType);
     IdealState idealState =
         HelixHelper.getTableIdealState(_pinotHelixResourceManager.getHelixZkManager(), tableNameWithType);
 

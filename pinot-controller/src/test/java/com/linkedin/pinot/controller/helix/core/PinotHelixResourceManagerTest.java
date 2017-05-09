@@ -15,20 +15,17 @@
  */
 package com.linkedin.pinot.controller.helix.core;
 
-import com.google.common.util.concurrent.Uninterruptibles;
+import com.google.common.collect.BiMap;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
-import com.linkedin.pinot.common.config.IndexingConfig;
-import com.linkedin.pinot.common.config.OfflineTableConfig;
-import com.linkedin.pinot.common.config.QuotaConfig;
-import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
-import com.linkedin.pinot.common.config.TableCustomConfig;
 import com.linkedin.pinot.common.config.Tenant;
-import com.linkedin.pinot.common.config.TenantConfig;
 import com.linkedin.pinot.common.utils.CommonConstants;
+import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
+import com.linkedin.pinot.common.utils.ZkStarter;
+import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
+import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
+import com.linkedin.pinot.controller.helix.starter.HelixConfig;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.IdealState;
@@ -36,12 +33,6 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import com.google.common.collect.BiMap;
-import com.linkedin.pinot.common.utils.ControllerTenantNameBuilder;
-import com.linkedin.pinot.common.utils.ZkStarter;
-import com.linkedin.pinot.controller.helix.ControllerRequestBuilderUtil;
-import com.linkedin.pinot.controller.helix.core.util.HelixSetupUtils;
-import com.linkedin.pinot.controller.helix.starter.HelixConfig;
 
 public class PinotHelixResourceManagerTest {
   ZkStarter.ZookeeperInstance zkServer;
@@ -123,7 +114,7 @@ public class PinotHelixResourceManagerTest {
 
     // Tag five instances
     int instancesRemainingToTag = 5;
-    List<String> instances = pinotHelixResourceManager.getAllInstanceNames();
+    List<String> instances = pinotHelixResourceManager.getAllInstances();
     for (String instance : instances) {
       if (instance.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE)) {
         pinotHelixResourceManager.getHelixAdmin()
