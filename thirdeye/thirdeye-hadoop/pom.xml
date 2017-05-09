@@ -154,6 +154,10 @@
                                     <pattern>org.yaml.snakeyaml</pattern>
                                     <shadedPattern>pinot.org.yaml.snakeyaml</shadedPattern>
                                 </relocation>
+                                <relocation>
+                                    <pattern>org.apache.avro</pattern>
+                                    <shadedPattern>pinot.org.apache.avro</shadedPattern>
+                                </relocation>
                             </relocations>
                         </configuration>
                     </execution>
