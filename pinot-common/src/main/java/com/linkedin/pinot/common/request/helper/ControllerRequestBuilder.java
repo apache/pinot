@@ -53,12 +53,12 @@ public class ControllerRequestBuilder {
       String segmentAssignmentStrategy) throws JSONException {
     List<String> invertedIndexColumns = Collections.emptyList();
     return buildCreateOfflineTableJSON(tableName, serverTenant, brokerTenant, timeColumnName, timeType,
-        retentionTimeUnit, retentionTimeValue, numReplicas, segmentAssignmentStrategy, invertedIndexColumns, null, "v1");
+        retentionTimeUnit, retentionTimeValue, numReplicas, segmentAssignmentStrategy, invertedIndexColumns, null, "v1", null);
   }
 
   public static JSONObject buildCreateOfflineTableJSON(String tableName, String serverTenant, String brokerTenant,
       String timeColumnName, String timeType, String retentionTimeUnit, String retentionTimeValue, int numReplicas,
-      String segmentAssignmentStrategy, List<String> invertedIndexColumns, String loadMode, String segmentVersion) throws JSONException {
+      String segmentAssignmentStrategy, List<String> invertedIndexColumns, String loadMode, String segmentVersion, String simpleDateFormat) throws JSONException {
     JSONObject creationRequest = new JSONObject();
     creationRequest.put("tableName", tableName);
 
@@ -72,6 +72,9 @@ public class ControllerRequestBuilder {
     segmentsConfig.put("timeColumnName", timeColumnName);
     segmentsConfig.put("timeType", timeType);
     segmentsConfig.put("segmentAssignmentStrategy", segmentAssignmentStrategy);
+    if (simpleDateFormat != null) {
+      segmentsConfig.put("simpleDateFormat", simpleDateFormat);
+    }
     creationRequest.put("segmentsConfig", segmentsConfig);
     JSONObject tableIndexConfig = new JSONObject();
     tableIndexConfig.put("invertedIndexColumns", invertedIndexColumns);

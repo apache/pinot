@@ -34,6 +34,7 @@ public class SegmentsValidationAndRetentionConfig {
   private String timeColumnName;
   private String timeType;
   private String segmentAssignmentStrategy;
+  private String simpleDate;
 
   // Number of replicas per partition of low-level kafka consumers. This config is used for realtime tables only.
   private String replicasPerPartition;
@@ -123,6 +124,14 @@ public class SegmentsValidationAndRetentionConfig {
 
   public void setReplicasPerPartition(String replicasPerPartition) {
     this.replicasPerPartition = replicasPerPartition;
+  }
+
+  public String getSimpleDate() {
+    return simpleDate;
+  }
+
+  public void setSimpleDate(String simpleDate) {
+    this.simpleDate = simpleDate;
   }
 
   @Override

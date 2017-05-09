@@ -54,7 +54,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     // Create a table with an invalid name
     JSONObject request = ControllerRequestBuilder.buildCreateOfflineTableJSON("bad__table__name", "default", "default",
         "potato", "DAYS", "DAYS", "5", 3, "BalanceNumSegmentAssignmentStrategy", Collections.<String>emptyList(),
-        "MMAP", "v1");
+        "MMAP", "v1", null);
 
     try {
       sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(),
@@ -67,7 +67,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     // Create a table with a valid name
     request = ControllerRequestBuilder.buildCreateOfflineTableJSON("valid_table_name", "default", "default",
         "potato", "DAYS", "DAYS", "5", 3, "BalanceNumSegmentAssignmentStrategy", Collections.<String>emptyList(),
-        "MMAP", "v1");
+        "MMAP", "v1", null);
 
     sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), request.toString());
     boolean tableExistsError = false;
@@ -126,7 +126,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
       throws JSONException, IOException {
     JSONObject request = ControllerRequestBuilder
         .buildCreateOfflineTableJSON(tableName, "default", "default", "potato", "DAYS", "DAYS", "5", tableReplication,
-            "BalanceNumSegmentAssignmentStrategy", Collections.<String>emptyList(), "MMAP", "v3");
+            "BalanceNumSegmentAssignmentStrategy", Collections.<String>emptyList(), "MMAP", "v3", null);
 
     sendPostRequest(ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL).forTableCreate(), request.toString());
     // table creation should succeed
@@ -171,7 +171,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     String tableName = "updateTC";
     JSONObject request = ControllerRequestBuilder
         .buildCreateOfflineTableJSON(tableName, "default", "default", "potato", "DAYS", "DAYS", "5", 2,
-            "BalanceNumSegmentAssignmentStrategy", Collections.<String>emptyList(), "MMAP", "v3");
+            "BalanceNumSegmentAssignmentStrategy", Collections.<String>emptyList(), "MMAP", "v3", null);
     ControllerRequestURLBuilder controllerUrlBuilder = ControllerRequestURLBuilder.baseUrl(CONTROLLER_BASE_API_URL);
     sendPostRequest(controllerUrlBuilder.forTableCreate(), request.toString());
     // table creation should succeed
