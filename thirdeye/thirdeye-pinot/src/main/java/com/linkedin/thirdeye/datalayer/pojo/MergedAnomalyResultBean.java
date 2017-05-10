@@ -21,7 +21,7 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
   private double avgBaselineVal; // expected value
   private double score; // confidence level
   private double weight; // change percentage, whose absolute value is severity
-  private double impactToTotal; // the impact of this anomaly to the total metric
+  private double impactToGlobal; // the impact of this anomaly to the global metric
   // Additional anomaly detection properties (e.g., patter=UP, etc.)
   private Map<String, String> properties = new HashMap<>();
 
@@ -161,17 +161,17 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
     this.rawAnomalyIdList = rawAnomalyIdList;
   }
 
-  public double getImpactToTotal() {
-    return impactToTotal;
+  public double getImpactToGlobal() {
+    return impactToGlobal;
   }
 
-  public void setImpactToTotal(double impactToTotal) {
-    this.impactToTotal = impactToTotal;
+  public void setImpactToGlobal(double impactToGlobal) {
+    this.impactToGlobal = impactToGlobal;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(getId(), startTime, endTime, collection, metric, dimensions, score, impactToTotal, avgBaselineVal, avgCurrentVal);
+    return Objects.hash(getId(), startTime, endTime, collection, metric, dimensions, score, impactToGlobal, avgBaselineVal, avgCurrentVal);
   }
 
   @Override
@@ -184,7 +184,7 @@ public class MergedAnomalyResultBean extends AbstractBean implements Comparable<
         .equals(endTime, m.getEndTime()) && Objects.equals(collection, m.getCollection()) && Objects
         .equals(metric, m.getMetric()) && Objects.equals(dimensions, m.getDimensions()) && Objects
         .equals(score, m.getScore()) && Objects.equals(avgBaselineVal, m.getAvgBaselineVal()) && Objects
-        .equals(avgCurrentVal, m.getAvgCurrentVal()) && Objects.equals(impactToTotal, m.getImpactToTotal());
+        .equals(avgCurrentVal, m.getAvgCurrentVal()) && Objects.equals(impactToGlobal, m.getImpactToGlobal());
   }
 
   @Override

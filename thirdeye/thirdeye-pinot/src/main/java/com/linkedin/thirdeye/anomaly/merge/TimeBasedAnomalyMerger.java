@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -238,9 +239,9 @@ public class TimeBasedAnomalyMerger {
     anomalyDetectionInputContextBuilder
         .fetchTimeSeriesDataByDimension(windowStart, windowEnd, dimensions, false)
         .fetchSaclingFactors(windowStart, windowEnd)
-        .fetchExixtingMergedAnomalies(windowStart, windowEnd);
-    if (anomalyFunctionSpec.isToCalculateTotalMetric()) {
-      anomalyDetectionInputContextBuilder.fetchTimeSeriesTotalMetric(windowStart, windowEnd);
+        .fetchExistingMergedAnomaliesByDimension(windowStart, windowEnd, dimensions);
+    if (anomalyFunctionSpec.isToCalculateGlobalMetric()) {
+      anomalyDetectionInputContextBuilder.fetchTimeSeriesGlobalMetric(windowStart, windowEnd);
     }
     AnomalyDetectionInputContext adInputContext = anomalyDetectionInputContextBuilder.build();
 
@@ -257,29 +258,37 @@ public class TimeBasedAnomalyMerger {
       }
       anomalyFunction.updateMergedAnomalyInfo(mergedAnomalies, metricTimeSeries, windowStart, windowEnd, knownAnomalies);
 
-      if(anomalyFunctionSpec.isToCalculateTotalMetric()) {
-        computeImpactToToalMetric(adInputContext.getTotalMetric(), mergedAnomalies);
+      if(anomalyFunctionSpec.isToCalculateGlobalMetric()) {
+        computeImpactToGlobalMetric(adInputContext.getGlobalMetric(), mergedAnomalies);
       }
     }
   }
 
-  private void computeImpactToToalMetric(MetricTimeSeries metricSumTimeSerise, MergedAnomalyResultDTO mergedAnomaly) {
+  private void computeImpactToGlobalMetric(MetricTimeSeries globalMetricTimeSerise, MergedAnomalyResultDTO mergedAnomaly) {
+    if (globalMetricTimeSerise == null || globalMetricTimeSerise.getTimeWindowSet().isEmpty()) {
+      return;
+    }
+
     DateTime windowStart = new DateTime(mergedAnomaly.getStartTime());
     DateTime windowEnd = new DateTime(mergedAnomaly.getEndTime());
-    // Calculate the impact to the total metric
+    String globalMetric = mergedAnomaly.getFunction().getGlobalMetric();
+    if (StringUtils.isNotEmpty(globalMetric)) {
+      globalMetric = mergedAnomaly.getFunction().getMetric();
+    }
+    // Calculate the impact to the global metric
     double avgMetricSum = 0.0;
     int numTimestamps = 0;
-    for (long timestamp : metricSumTimeSerise.getTimeWindowSet()) {
+    for (long timestamp : globalMetricTimeSerise.getTimeWindowSet()) {
       if(timestamp >= windowStart.getMillis() && timestamp < windowEnd.getMillis()) {
-        avgMetricSum += metricSumTimeSerise.get(timestamp, mergedAnomaly.getMetric()).doubleValue();
+        avgMetricSum += globalMetricTimeSerise.get(timestamp, globalMetric).doubleValue();
         numTimestamps++;
       }
     }
     if (numTimestamps > 0) {
       avgMetricSum = avgMetricSum / numTimestamps;
-      mergedAnomaly.setImpactToTotal((mergedAnomaly.getAvgCurrentVal() - mergedAnomaly.getAvgBaselineVal())/avgMetricSum);
+      mergedAnomaly.setImpactToGlobal((mergedAnomaly.getAvgCurrentVal() - mergedAnomaly.getAvgBaselineVal())/avgMetricSum);
     } else {
-      mergedAnomaly.setImpactToTotal(Double.NaN);
+      mergedAnomaly.setImpactToGlobal(Double.NaN);
     }
   }
 }

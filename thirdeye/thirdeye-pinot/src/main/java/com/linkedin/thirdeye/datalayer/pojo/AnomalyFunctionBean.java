@@ -33,7 +33,7 @@ public class AnomalyFunctionBean extends AbstractBean {
 
   private boolean isActive = true;
 
-  private String totalMetric;
+  private String globalMetric;
 
   private String properties;
 
@@ -157,12 +157,12 @@ public class AnomalyFunctionBean extends AbstractBean {
     this.cron = cron;
   }
 
-  public String getTotalMetric() {
-    return totalMetric;
+  public String getGlobalMetric() {
+    return globalMetric;
   }
 
-  public void setTotalMetric(String totalMetric) {
-    this.totalMetric = totalMetric;
+  public void setGlobalMetric(String globalMetric) {
+    this.globalMetric = globalMetric;
   }
 
   public TimeGranularity getFrequency() {
@@ -303,7 +303,7 @@ public class AnomalyFunctionBean extends AbstractBean {
         && Objects.equals(windowDelayUnit, af.getWindowDelayUnit())
         && Objects.equals(exploreDimensions, af.getExploreDimensions())
         && Objects.equals(filters, af.getFilters())
-        && Objects.equals(totalMetric, af.getTotalMetric())
+        && Objects.equals(globalMetric, af.getGlobalMetric())
         && Objects.equals(alertFilter, af.getAlertFilter())
         && Objects.equals(requiresCompletenessCheck,  af.isRequiresCompletenessCheck());
   }
@@ -312,6 +312,6 @@ public class AnomalyFunctionBean extends AbstractBean {
   public int hashCode() {
     return Objects.hash(getId(), collection, metric, metrics, metricFunction, type, isActive, cron, frequency,
         properties, bucketSize, bucketUnit, windowSize, windowUnit, windowDelay, windowDelayUnit,
-        exploreDimensions, filters, totalMetric, alertFilter, requiresCompletenessCheck);
+        exploreDimensions, filters, globalMetric, alertFilter, requiresCompletenessCheck);
   }
 }

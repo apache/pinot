@@ -14,7 +14,7 @@ import java.util.Map;
 
 public class AnomalyDetectionInputContext {
   Map<DimensionMap, MetricTimeSeries> dimensionKeyMetricTimeSeriesMap = Collections.emptyMap();
-  MetricTimeSeries totalMetric;
+  MetricTimeSeries globalMetric;
   ListMultimap<DimensionMap, RawAnomalyResultDTO> existingRawAnomalies = ArrayListMultimap.create();;
   ListMultimap<DimensionMap, MergedAnomalyResultDTO> knownMergedAnomalies = ArrayListMultimap.create();;
   List<ScalingFactor> scalingFactors = Collections.emptyList();
@@ -52,11 +52,11 @@ public class AnomalyDetectionInputContext {
     this.scalingFactors = scalingFactors;
   }
 
-  public MetricTimeSeries getTotalMetric() {
-    return totalMetric;
+  public MetricTimeSeries getGlobalMetric() {
+    return globalMetric;
   }
 
-  public void setTotalMetric(MetricTimeSeries totalMetric) {
-    this.totalMetric = totalMetric;
+  public void setGlobalMetric(MetricTimeSeries globalMetric) {
+    this.globalMetric = globalMetric;
   }
 }

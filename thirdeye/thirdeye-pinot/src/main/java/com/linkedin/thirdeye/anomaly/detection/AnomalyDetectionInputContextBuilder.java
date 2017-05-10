@@ -228,7 +228,7 @@ public class AnomalyDetectionInputContextBuilder {
   }
 
   /**
-   * Fetch the root metric without dimension and filter in a given monitoring start and end time
+   * Fetch the global metric without dimension and filter in a given monitoring start and end time
    * the actual data fetching time range is calculated by anomalyFunction.getDataRangeIntervals
    * @param windowStart
    * the start time of the monitoring window
@@ -239,16 +239,16 @@ public class AnomalyDetectionInputContextBuilder {
    * @throws JobExecutionException
    * @throws ExecutionException
    */
-  public AnomalyDetectionInputContextBuilder fetchTimeSeriesTotalMetric(DateTime windowStart, DateTime windowEnd)
+  public AnomalyDetectionInputContextBuilder fetchTimeSeriesGlobalMetric(DateTime windowStart, DateTime windowEnd)
       throws JobExecutionException, ExecutionException {
     List<Pair<Long, Long>> startEndTimeRanges = anomalyFunction.getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis());
-    this.fetchTimeSeriesTotalMetric(startEndTimeRanges);
+    this.fetchTimeSeriesGlobalMetric(startEndTimeRanges);
 
     return this;
   }
 
   /**
-   * Fetch the root metric without dimension and filter in a given time range
+   * Fetch the global metric without dimension and filter in a given time range
    * @param startEndTimeRanges
    * the time range when we should fetch the timeseries data
    * @return
@@ -256,10 +256,10 @@ public class AnomalyDetectionInputContextBuilder {
    * @throws JobExecutionException
    * @throws ExecutionException
    */
-  public AnomalyDetectionInputContextBuilder fetchTimeSeriesTotalMetric (List<Pair<Long, Long>> startEndTimeRanges)
+  public AnomalyDetectionInputContextBuilder fetchTimeSeriesGlobalMetric(List<Pair<Long, Long>> startEndTimeRanges)
       throws JobExecutionException, ExecutionException {
-    MetricTimeSeries metricSumTimeSeries = getTotalMetric(anomalyFunctionSpec, startEndTimeRanges);
-    this.anomalyDetectionInputContext.setTotalMetric(metricSumTimeSeries);
+    MetricTimeSeries metricSumTimeSeries = getGlobalMetric(anomalyFunctionSpec, startEndTimeRanges);
+    this.anomalyDetectionInputContext.setGlobalMetric(metricSumTimeSeries);
 
     return this;
   }
@@ -296,14 +296,20 @@ public class AnomalyDetectionInputContextBuilder {
     List<MergedAnomalyResultDTO> knownMergedAnomalies;
     if (anomalyFunction.useHistoryAnomaly()) {
       // if this anomaly function uses history data, then we get all time ranges
-      knownMergedAnomalies = getKnownMergedAnomalies(anomalyFunctionSpec.getId(),
+      return fetchExixtingMergedAnomalies(
           anomalyFunction.getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis()));
     } else {
       // otherwise, we only get the merge anomaly for current window in order to remove duplicate raw anomalies
       List<Pair<Long, Long>> currentTimeRange = new ArrayList<>();
       currentTimeRange.add(new Pair<>(windowStart.getMillis(), windowEnd.getMillis()));
-      knownMergedAnomalies = getKnownMergedAnomalies(anomalyFunctionSpec.getId(), currentTimeRange);
+      return fetchExixtingMergedAnomalies(currentTimeRange);
     }
+  }
+
+  public AnomalyDetectionInputContextBuilder fetchExixtingMergedAnomalies(List<Pair<Long, Long>> startEndTimeRanges) {
+// Get existing anomalies for this time range and this function id for all combinations of dimensions
+    List<MergedAnomalyResultDTO> knownMergedAnomalies;
+    knownMergedAnomalies = getKnownMergedAnomalies(anomalyFunctionSpec.getId(), startEndTimeRanges);
     // Sort the known merged and raw anomalies by their dimension names
     ArrayListMultimap<DimensionMap, MergedAnomalyResultDTO> dimensionMapToKnownMergedAnomalies = ArrayListMultimap.create();
     for (MergedAnomalyResultDTO knownMergedAnomaly : knownMergedAnomalies) {
@@ -314,6 +320,21 @@ public class AnomalyDetectionInputContextBuilder {
     return this;
   }
 
+  public AnomalyDetectionInputContextBuilder fetchExistingMergedAnomaliesByDimension(DateTime windowStart,
+      DateTime windowEnd, DimensionMap dimensions) {
+    return fetchExistingMergedAnomaliesByDimension(
+        anomalyFunction.getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis()), dimensions);
+  }
+
+  public AnomalyDetectionInputContextBuilder fetchExistingMergedAnomaliesByDimension(List<Pair<Long, Long>> startEndTimeRanges,
+      DimensionMap dimensions) {
+    ArrayListMultimap<DimensionMap, MergedAnomalyResultDTO> dimensionMapToKnownMergedAnomalies = ArrayListMultimap.create();
+    dimensionMapToKnownMergedAnomalies.putAll(dimensions,
+        getKnownMergedAnomaliesByDimension(anomalyFunctionSpec.getId(), startEndTimeRanges, dimensions));
+
+    this.anomalyDetectionInputContext.setKnownMergedAnomalies(dimensionMapToKnownMergedAnomalies);
+    return this;
+  }
   /**
    * Fetch Scaling Factors in the training window
    * @param windowStart
@@ -377,6 +398,32 @@ public class AnomalyDetectionInputContextBuilder {
   }
 
   /**
+   * Returns all known merged anomalies of the function id that are needed for anomaly detection, i.e., the merged
+   * anomalies that overlap with the monitoring window and baseline windows.
+   *
+   * @param functionId the id of the anomaly function
+   * @param startEndTimeRanges the time ranges for retrieving the known merge anomalies
+
+   * @return known merged anomalies of the function id that are needed for anomaly detection
+   */
+  private List<MergedAnomalyResultDTO> getKnownMergedAnomaliesByDimension(long functionId,
+      List<Pair<Long, Long>> startEndTimeRanges, DimensionMap dimensions) {
+
+    List<MergedAnomalyResultDTO> results = new ArrayList<>();
+    for (Pair<Long, Long> startEndTimeRange : startEndTimeRanges) {
+      try {
+        results.addAll(
+            DAO_REGISTRY.getMergedAnomalyResultDAO().findAllConflictByFunctionIdDimensions(functionId,
+                startEndTimeRange.getFirst(), startEndTimeRange.getSecond(), dimensions.toString()));
+      } catch (Exception e) {
+        LOG.error("Exception in getting merged anomalies", e);
+      }
+    }
+
+    return results;
+  }
+
+  /**
    * Get the metric filter setting for an anomaly function
    * @param anomalyFunctionSpec
    * @return
@@ -398,7 +445,7 @@ public class AnomalyDetectionInputContextBuilder {
    * @param anomalyFunctionSpec
    * @return
    */
-  public static List<String> getDimensionsForFunction (AnomalyFunctionDTO anomalyFunctionSpec) {
+  public static List<String> getDimensionsForFunction(AnomalyFunctionDTO anomalyFunctionSpec) {
     List<String> groupByDimensions;
     String exploreDimensionString = anomalyFunctionSpec.getExploreDimensions();
     if (StringUtils.isNotBlank(exploreDimensionString)) {
@@ -513,14 +560,14 @@ public class AnomalyDetectionInputContextBuilder {
   }
 
   /**
-   * Return a metricSum for an anomaly function to calculate the contribution of anomalies to the total metric
+   * Return a global metric for an anomaly function to calculate the contribution of anomalies to the global metric
    * @param anomalyFunctionSpec spec of the anomaly function
    * @param startEndTimeRanges the time ranges to retrieve the data for constructing the time series
-   * @return the data that is needed by the anomaly function for knowing the total metric
+   * @return the data that is needed by the anomaly function for knowing the global metric
    * @throws JobExecutionException
    * @throws ExecutionException
    */
-  public MetricTimeSeries getTotalMetric(AnomalyFunctionDTO anomalyFunctionSpec, List<Pair<Long, Long>> startEndTimeRanges)
+  public MetricTimeSeries getGlobalMetric(AnomalyFunctionDTO anomalyFunctionSpec, List<Pair<Long, Long>> startEndTimeRanges)
       throws JobExecutionException, ExecutionException {
     // Set empty dimension and filter
     Multimap<String, String> filters = HashMultimap.create();
@@ -529,33 +576,34 @@ public class AnomalyDetectionInputContextBuilder {
     TimeGranularity timeGranularity = new TimeGranularity(anomalyFunctionSpec.getBucketSize(),
         anomalyFunctionSpec.getBucketUnit());
     DatasetConfigDTO dataset = DAORegistry.getInstance().getDatasetConfigDAO().findByDataset(anomalyFunctionSpec.getCollection());
-    boolean doRollUp = true;
-    if (!dataset.isAdditive()) {
-      doRollUp = false;
-    }
+    boolean doRollUp = false;
 
     List<String> metricsToFetch = new ArrayList<>();
-    metricsToFetch.add(anomalyFunctionSpec.getTotalMetric());
-    if (metricsToFetch.isEmpty()) {
-      metricsToFetch = anomalyFunctionSpec.getMetrics();
+    if(StringUtils.isNotEmpty(anomalyFunctionSpec.getGlobalMetric())) {
+      metricsToFetch.add(anomalyFunctionSpec.getGlobalMetric());
+    } else {
+      metricsToFetch.add(anomalyFunctionSpec.getMetric());
     }
     TimeSeriesResponse timeSeriesResponse =
         getTimeSeriesResponseImpl(anomalyFunctionSpec, metricsToFetch, startEndTimeRanges,
             timeGranularity, filters, groupByDimensions, false, doRollUp);
 
-    MetricTimeSeries metricSum = null;
+    MetricTimeSeries globalMetric = null;
     try {
       Map<DimensionKey, MetricTimeSeries> dimensionKeyMetricTimeSeriesMap =
           TimeSeriesResponseConverter.toMap(timeSeriesResponse, Utils.getSchemaDimensionNames(anomalyFunctionSpec.getCollection()));
 
-      if(dimensionKeyMetricTimeSeriesMap.size() > 2) {
+      if (dimensionKeyMetricTimeSeriesMap == null || dimensionKeyMetricTimeSeriesMap.isEmpty()) {
+        LOG.error("Unable to fetch global metric for {}", anomalyFunctionSpec);
+      }
+      if (dimensionKeyMetricTimeSeriesMap.size() > 2) {
         LOG.warn("More than 1 dimensions when fetching traffic data for {}; take the 1st dimension", anomalyFunctionSpec);
       }
-      metricSum = dimensionKeyMetricTimeSeriesMap.values().iterator().next();
+      globalMetric = dimensionKeyMetricTimeSeriesMap.values().iterator().next();
     } catch (Exception e) {
-      LOG.info("Failed to get schema dimensions for constructing dimension keys:", e.toString());
+      LOG.warn("Failed to get schema dimensions for constructing dimension keys:", e.toString());
     }
-    return metricSum;
+    return globalMetric;
   }
 
   /**
@@ -589,7 +637,6 @@ public class AnomalyDetectionInputContextBuilder {
           DimensionKey dimensionKey = entry.getKey();
           boolean foundOTHER = false;
           for (String dimensionValue : dimensionKey.getDimensionValues()) {
-
             if (dimensionValue.equalsIgnoreCase(ResponseParserUtils.OTHER)) {
               metricTimeSeries = entry.getValue();
               foundOTHER = true;

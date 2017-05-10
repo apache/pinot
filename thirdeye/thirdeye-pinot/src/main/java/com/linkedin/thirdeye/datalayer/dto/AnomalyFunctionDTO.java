@@ -45,8 +45,8 @@ public class AnomalyFunctionDTO extends AnomalyFunctionBean {
    * @return
    * true if this function should get total metric
    */
-  public boolean isToCalculateTotalMetric() {
-    return StringUtils.isNotEmpty(this.getTotalMetric());
+  public boolean isToCalculateGlobalMetric() {
+    return StringUtils.isNotEmpty(this.getGlobalMetric());
   }
 
   /**
