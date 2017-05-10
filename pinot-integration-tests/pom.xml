@@ -78,9 +78,10 @@
             <configuration>
               <skipTests>false</skipTests>
               <excludes>
-                <!-- jfim: Those two tests are covered by the HybridClusterIntegrationTest -->
+                <!-- Those 3 tests are covered by the MinionClusterIntegrationTest -->
                 <exclude>**/OfflineClusterIntegrationTest.java</exclude>
                 <exclude>**/RealtimeClusterIntegrationTest.java</exclude>
+                <exclude>**/HybridClusterIntegrationTest.java</exclude>
               </excludes>
             </configuration>
           </plugin>
