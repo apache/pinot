@@ -18,7 +18,11 @@
         <tr>
           <td style="padding: 0 24px;" colspan="2">
               <p style="font-size: 20px; margin-bottom: 8px;">Hi,</p> <br>
-              <p style="color: rgba(0,0,0,0.55); margin-top: 0px;"> ThirdEye has detected <strong style="color: black;">${anomalyCount} ${(anomalyCount == 1)?string("anomaly", "anomalies")}</strong>. Below is a summary, please go <strong><a style="color:#33aada;" href="${dashboardHost}/thirdeye#anomalies?anomaliesSearchMode=id&anomalyIds=${anomalyIds}">here</a></strong> for a detailed view.</p>
+              <#if isGroupedAnomaly == 1>
+                <p style="color: rgba(0,0,0,0.55); margin-top: 0px;"> ThirdEye has detected <strong style="color: black;">${anomalyCount} ${(anomalyCount == 1)?string("anomaly", "anomalies")}</strong>. Below is a summary, please go <strong><a style="color:#33aada;" href="${dashboardHost}/thirdeye#anomalies?anomaliesSearchMode=group&groupIds="${groupedIds}">here</a></strong> for a detailed and up-to-dated view.</p>
+              <#else>
+                <p style="color: rgba(0,0,0,0.55); margin-top: 0px;"> ThirdEye has detected <strong style="color: black;">${anomalyCount} ${(anomalyCount == 1)?string("anomaly", "anomalies")}</strong>. Below is a summary, please go <strong><a style="color:#33aada;" href="${dashboardHost}/thirdeye#anomalies?anomaliesSearchMode=id&anomalyIds="${anomalyIds}">here</a></strong> for a detailed view.</p>
+              </#if>
             </p>
           </td>
         </tr>

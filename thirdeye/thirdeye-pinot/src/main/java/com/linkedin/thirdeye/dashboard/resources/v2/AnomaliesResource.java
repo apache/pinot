@@ -368,7 +368,7 @@ public class AnomaliesResource {
    * @throws Exception
    */
   @GET
-  @Path("search/anomalyIds/{startTime}/{endTime}/{pageNumber}")
+  @Path("search/groupIds/{startTime}/{endTime}/{pageNumber}")
   public AnomaliesWrapper getAnomaliesByGroupIds(
       @PathParam("startTime") Long startTime,
       @PathParam("endTime") Long endTime,
@@ -379,13 +379,16 @@ public class AnomaliesResource {
     String[] groupIds = groupIdsString.split(COMMA_SEPARATOR);
     Set<Long> anomalyIdSet = new HashSet<>();
     for (String idString : groupIds) {
+      Long groupId = null;
       try {
-        Long groupId = Long.parseLong(idString);
-        // TODO: read anomalies from the grouped anomaly
+        groupId = Long.parseLong(idString);
+      } catch (Exception e) {
+        LOG.info("Skipping group id {} due to parsing error: {}", idString, e);
+      }
+      if (groupId != null) {
+        // TODO: Read anomalies from the grouped anomaly (Need to ensure that groupId is actually a "group id")
         ArrayList<Long> anomaliesIdOfGroup = new ArrayList<>();
         anomalyIdSet.addAll(anomaliesIdOfGroup);
-      } catch (Exception e) {
-        LOG.info("Skipping group id {} due to error: {}", idString, e);
       }
     }
 

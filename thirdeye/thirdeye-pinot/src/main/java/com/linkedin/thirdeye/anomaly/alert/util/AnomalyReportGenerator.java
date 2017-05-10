@@ -188,6 +188,7 @@ public class AnomalyReportGenerator {
       templateData.put("reportGenerationTimeMillis", System.currentTimeMillis());
       templateData.put("dashboardHost", configuration.getDashboardHost());
       templateData.put("anomalyIds", Joiner.on(",").join(anomalyIds));
+//      templateData.put("isGroupedAnomaly", true or false);
       if(precisionRecallEvaluator.getTotalResponses() > 0) {
         templateData.put("precision", precisionRecallEvaluator.getPrecisionInResponse());
         templateData.put("recall", precisionRecallEvaluator.getRecall());
