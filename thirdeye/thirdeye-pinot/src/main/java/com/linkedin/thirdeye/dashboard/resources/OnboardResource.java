@@ -72,14 +72,14 @@ public class OnboardResource {
   /**
    * toggle anomaly functions to active and inactive
    *
-   * @param functionIds string comma separated function ids, if
-   * @param tag boolean true or false, set function as true or false
+   * @param functionIds string comma separated function ids, ALL meaning all functions
+   * @param isActive boolean true or false, set function as true or false
    */
-  private void toggleFunctions(String functionIds, boolean tag) {
+  private void toggleFunctions(String functionIds, boolean isActive) {
     List<Long> functionIdsList = new ArrayList<>();
-    if (functionIds.equals("ALL")) {
+    if (functionIds.equals("ALLDEMONS")) {
       for (AnomalyFunctionDTO dto: anomalyFunctionDAO.findAll()) {
-        dto.setActive(tag);
+        dto.setActive(isActive);
         anomalyFunctionDAO.update(dto);
       }
       return;  // early return
@@ -88,12 +88,13 @@ public class OnboardResource {
     if (StringUtils.isNotBlank(functionIds)) {
       String[] tokens = functionIds.split(",");
       for (String token : tokens) {
-        functionIdsList.add(Long.valueOf(token));
+        functionIdsList.add(Long.valueOf(token));  // unhandled exception is expected
       }
     }
-    for (long id:functionIdsList) {
+
+    for (long id : functionIdsList) {
       AnomalyFunctionDTO anomalyFunction = anomalyFunctionDAO.findById(id);
-      anomalyFunction.setActive(tag);
+      anomalyFunction.setActive(isActive);
       anomalyFunctionDAO.update(anomalyFunction);
     }
   }
