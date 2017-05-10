@@ -1,8 +1,8 @@
 package com.linkedin.thirdeye.anomaly.detection;
 
 import com.google.common.collect.Lists;
-import com.linkedin.thirdeye.anomaly.job.JobConstants;
-import com.linkedin.thirdeye.anomaly.task.TaskConstants;
+import com.linkedin.thirdeye.anomaly.job.JobConstants.JobStatus;
+import com.linkedin.thirdeye.anomaly.task.TaskConstants.TaskStatus;
 import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
@@ -322,7 +322,6 @@ public class DetectionJobScheduler implements Runnable {
     // If any time periods found, for which detection needs to be run, run anomaly function update detection status
     List<Long> analysisTimeList = new ArrayList<>();
     analysisTimeList.add(analysisTime.getMillis());
-    List<DetectionStatusDTO> findAllInTimeRange = new ArrayList<>();
     jobId = runAnomalyFunctionOnRanges(anomalyFunction, analysisTimeList, analysisTimeList, DetectionJobType.OFFLINE);
     LOG.info("Function: {} Dataset: {} Generated offline analysis job for detecting anomalies for data points "
         + "whose ends before {}", functionId, dataset, analysisTime);
@@ -438,51 +437,48 @@ public class DetectionJobScheduler implements Runnable {
       return;
     }
 
+    int retryCounter = 0;
+    while (waitForJobDone(jobExecutionId).equals(JobStatus.FAILED) && retryCounter < MAX_BACKFILL_RETRY) {
+      jobExecutionId = runBackfill(functionId, backfillStartTime, backfillEndTime, force);
+      retryCounter++;
+    }
+  }
+
+  public JobStatus waitForJobDone(long jobExecutionId) {
     TaskManager taskDAO = DAO_REGISTRY.getTaskDAO();
     JobManager jobDAO = DAO_REGISTRY.getJobDAO();
-    JobDTO jobDTO = null;
-    List<TaskDTO> scheduledTaskDTO = taskDAO.findByJobIdStatusNotIn(jobExecutionId, TaskConstants.TaskStatus.COMPLETED);
+    JobDTO jobDTO;
+    List<TaskDTO> scheduledTaskDTO = taskDAO.findByJobIdStatusNotIn(jobExecutionId, TaskStatus.COMPLETED);
+    long functionId = jobDAO.findById(jobExecutionId).getAnomalyFunctionId();
 
-    int retryCounter = 0;
     while (scheduledTaskDTO.size() > 0) {
-      boolean hasFailedTask = false;
+      List<Long> failedTaskIds = new ArrayList<>();
       for (TaskDTO taskDTO : scheduledTaskDTO) {
-        if (taskDTO.getStatus() == TaskConstants.TaskStatus.FAILED) {
-          if (retryCounter >= MAX_BACKFILL_RETRY) {
-            LOG.warn("The backfill of anomaly function {} (task id: {}) failed. Stop retry.", functionId, jobExecutionId);
-
-            // Set job to be failed
-            jobDTO = jobDAO.findById(jobExecutionId);
-            if (jobDTO.getStatus() != JobConstants.JobStatus.FAILED) {
-              jobDTO.setStatus(JobConstants.JobStatus.FAILED);
-              jobDAO.save(jobDTO);
-            }
-
-            return;
-          }
-          hasFailedTask = true;
-          LOG.warn("The backfill of anomaly function {} (task id: {}) failed. Retry count: {}", functionId,
-              jobExecutionId, retryCounter);
+        if (taskDTO.getStatus() == TaskStatus.FAILED) {
+          failedTaskIds.add(taskDTO.getId());
         }
       }
-      if (hasFailedTask) {
-        retryCounter++;
-        jobExecutionId = runBackfill(functionId, backfillStartTime, backfillEndTime, force);
+
+      if(failedTaskIds.size() > 0) {
+        LOG.info("Tasks Failed under Job {}: {}", jobDAO, failedTaskIds);
+        return JobStatus.FAILED;
       }
+
       try {
         TimeUnit.SECONDS.sleep(SYNC_SLEEP_SECONDS);
       } catch (InterruptedException e) {
         LOG.warn("The monitoring thread for anomaly function {} (task id: {}) backfill is awakened.", functionId,
             jobExecutionId);
       }
-      scheduledTaskDTO = taskDAO.findByJobIdStatusNotIn(jobExecutionId, TaskConstants.TaskStatus.COMPLETED);
+      scheduledTaskDTO = taskDAO.findByJobIdStatusNotIn(jobExecutionId, TaskStatus.COMPLETED);
     }
     // Set job to be completed
     jobDTO = jobDAO.findById(jobExecutionId);
-    if (jobDTO.getStatus() != JobConstants.JobStatus.COMPLETED) {
-      jobDTO.setStatus(JobConstants.JobStatus.COMPLETED);
+    if (!jobDTO.getStatus().equals(JobStatus.COMPLETED)) {
+      jobDTO.setStatus(JobStatus.COMPLETED);
       jobDAO.save(jobDTO);
     }
+    return jobDTO.getStatus();
   }
 
   private JobDTO getPreviousJob(long functionId, long backfillWindowStart, long backfillWindowEnd) {
@@ -506,7 +502,7 @@ public class DetectionJobScheduler implements Runnable {
     if (previousJob != null) {
       long previousStartTime = previousJob.getWindowStartTime();
       cleanUpJob(previousJob);
-      if (previousJob.getStatus().equals(JobConstants.JobStatus.COMPLETED)) {
+      if (previousJob.getStatus().equals(JobStatus.COMPLETED)) {
         // Schedule a job after previous job
         currentStart = new DateTime(cronExpression.getNextValidTimeAfter(new Date(previousStartTime)));
       } else {
@@ -527,17 +523,17 @@ public class DetectionJobScheduler implements Runnable {
    * @param job
    */
   private void cleanUpJob(JobDTO job) {
-    if (!job.getStatus().equals(JobConstants.JobStatus.COMPLETED)) {
-      List<TaskDTO> tasks = DAO_REGISTRY.getTaskDAO().findByJobIdStatusNotIn(job.getId(), TaskConstants.TaskStatus.COMPLETED);
+    if (!job.getStatus().equals(JobStatus.COMPLETED)) {
+      List<TaskDTO> tasks = DAO_REGISTRY.getTaskDAO().findByJobIdStatusNotIn(job.getId(), TaskStatus.COMPLETED);
       if (CollectionUtils.isNotEmpty(tasks)) {
         for (TaskDTO task : tasks) {
-          task.setStatus(TaskConstants.TaskStatus.FAILED);
+          task.setStatus(TaskStatus.FAILED);
           DAO_REGISTRY.getTaskDAO().save(task);
         }
-        job.setStatus(JobConstants.JobStatus.FAILED);
+        job.setStatus(JobStatus.FAILED);
       } else {
         // This case happens when scheduler dies before it knows that all its tasks are actually finished
-        job.setStatus(JobConstants.JobStatus.COMPLETED);
+        job.setStatus(JobStatus.COMPLETED);
       }
       DAO_REGISTRY.getJobDAO().save(job);
     }
