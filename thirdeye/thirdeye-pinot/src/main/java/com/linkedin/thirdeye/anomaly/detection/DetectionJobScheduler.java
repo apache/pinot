@@ -350,7 +350,7 @@ public class DetectionJobScheduler implements Runnable {
     String dataset = anomalyFunction.getCollection();
     boolean isActive = anomalyFunction.getIsActive();
     if (!isActive) {
-      LOG.info("Skipping function {}", functionId);
+      LOG.info("Skipping function {}, since it is NOT active", functionId);
       return null;
     }
 
