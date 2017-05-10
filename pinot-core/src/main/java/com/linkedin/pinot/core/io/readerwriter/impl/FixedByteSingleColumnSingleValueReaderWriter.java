@@ -34,7 +34,7 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
    *  @param rows
    * @param columnSizesInBytes
    */
-  public FixedByteSingleColumnSingleValueReaderWriter(int rows, int columnSizesInBytes) throws IOException {
+  public FixedByteSingleColumnSingleValueReaderWriter(int rows, int columnSizesInBytes) {
     rowSize = columnSizesInBytes;
     final int totalSize = rowSize * rows;
     _buffer = PinotDataBuffer.allocateDirect(totalSize);
