@@ -264,7 +264,6 @@ public class AnomalyMergeExecutor implements Runnable {
     if (metricTimeSeries != null) {
       DateTime windowStart = new DateTime(anomalyMergedResult.getStartTime());
       DateTime windowEnd = new DateTime(anomalyMergedResult.getEndTime());
-
       List<MergedAnomalyResultDTO> knownAnomalies = Collections.emptyList();
 
       // Retrieve history merged anomalies
