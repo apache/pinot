@@ -340,6 +340,22 @@ public class RunAdhocDatabaseQueriesTool {
     datasetConfigDAO.update(datasetConfig);
   }
 
+  private void unsetMergedAnomalyNotifiedField(String dataset, long duration) {
+    long windowEnd = System.currentTimeMillis();
+    long windowStart = windowEnd - duration;
+
+    List<MergedAnomalyResultDTO> mergedAnomalyResults =
+        mergedResultDAO.findByCollectionTime(dataset, windowStart, windowEnd, false);
+    LOG.info("{} anomalies to update for dataset {}", mergedAnomalyResults.size(), dataset);
+    for (MergedAnomalyResultDTO mergedAnomalyResult : mergedAnomalyResults) {
+      if (mergedAnomalyResult.isNotified()) {
+        LOG.info((" Updating anomaly: {}"), mergedAnomalyResult.getId());
+        mergedAnomalyResult.setNotified(false);
+        mergedResultDAO.update(mergedAnomalyResult);
+      }
+    }
+  }
+
 
   public static void main(String[] args) throws Exception {
 

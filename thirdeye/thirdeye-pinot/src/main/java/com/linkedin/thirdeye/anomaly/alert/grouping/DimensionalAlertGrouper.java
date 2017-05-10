@@ -3,6 +3,7 @@ package com.linkedin.thirdeye.anomaly.alert.grouping;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.dto.GroupedAnomalyResultsDTO;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -30,7 +31,7 @@ import org.slf4j.LoggerFactory;
  * User could assign the auxiliary email recipients as follows and retrieved through group keys:
  *     {{D1=G1}:"group1AuxiliaryRecipents.com",{}:"rollUp.com"}
  */
-public class DimensionalAlertGrouper extends BaseAlertGrouper<DimensionMap> {
+public class DimensionalAlertGrouper extends BaseAlertGrouper {
   private static final Logger LOG = LoggerFactory.getLogger(DimensionalAlertGrouper.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
@@ -92,19 +93,19 @@ public class DimensionalAlertGrouper extends BaseAlertGrouper<DimensionMap> {
   }
 
   @Override
-  public Map<AlertGroupKey<DimensionMap>, GroupedAnomalyResults> group(List<MergedAnomalyResultDTO> anomalyResults) {
+  public Map<DimensionMap, GroupedAnomalyResultsDTO> group(List<MergedAnomalyResultDTO> anomalyResults) {
     if (CollectionUtils.isEmpty(groupByDimensions)) {
       return DUMMY_ALERT_GROUPER.group(anomalyResults);
     } else {
-      Map<AlertGroupKey<DimensionMap>, GroupedAnomalyResults> groupedAnomaliesMap = new HashMap<>();
+      Map<DimensionMap, GroupedAnomalyResultsDTO> groupedAnomaliesMap = new HashMap<>();
       for (MergedAnomalyResultDTO anomalyResult : anomalyResults) {
         DimensionMap anomalyDimensionMap = anomalyResult.getDimensions();
-        AlertGroupKey<DimensionMap> alertGroupKey = this.constructGroupKey(anomalyDimensionMap);
+        DimensionMap alertGroupKey = this.constructGroupKey(anomalyDimensionMap);
         if (groupedAnomaliesMap.containsKey(alertGroupKey)) {
-          GroupedAnomalyResults groupedAnomalyResults = groupedAnomaliesMap.get(alertGroupKey);
+          GroupedAnomalyResultsDTO groupedAnomalyResults = groupedAnomaliesMap.get(alertGroupKey);
           groupedAnomalyResults.getAnomalyResults().add(anomalyResult);
         } else {
-          GroupedAnomalyResults groupedAnomalyResults = new GroupedAnomalyResults();
+          GroupedAnomalyResultsDTO groupedAnomalyResults = new GroupedAnomalyResultsDTO();
           groupedAnomalyResults.getAnomalyResults().add(anomalyResult);
           groupedAnomaliesMap.put(alertGroupKey, groupedAnomalyResults);
         }
@@ -112,12 +113,12 @@ public class DimensionalAlertGrouper extends BaseAlertGrouper<DimensionMap> {
 
       // Group all grouped anomalies that have only one anomaly
       if (doRollUp) {
-        GroupedAnomalyResults rolledUpGroupedAnomaly = new GroupedAnomalyResults();
+        GroupedAnomalyResultsDTO rolledUpGroupedAnomaly = new GroupedAnomalyResultsDTO();
         List<MergedAnomalyResultDTO> groupedAnomalyList = rolledUpGroupedAnomaly.getAnomalyResults();
-        Iterator<Map.Entry<AlertGroupKey<DimensionMap>, GroupedAnomalyResults>> iterator =
+        Iterator<Map.Entry<DimensionMap, GroupedAnomalyResultsDTO>> iterator =
             groupedAnomaliesMap.entrySet().iterator();
         while (iterator.hasNext()) {
-          Map.Entry<AlertGroupKey<DimensionMap>, GroupedAnomalyResults> entry = iterator.next();
+          Map.Entry<DimensionMap, GroupedAnomalyResultsDTO> entry = iterator.next();
           List<MergedAnomalyResultDTO> groupedAnomalyResults = entry.getValue().getAnomalyResults();
           if (CollectionUtils.isNotEmpty(groupedAnomalyResults) && groupedAnomalyResults.size() == 1) {
             groupedAnomalyList.add(groupedAnomalyResults.get(0));
@@ -125,8 +126,7 @@ public class DimensionalAlertGrouper extends BaseAlertGrouper<DimensionMap> {
           }
         }
         if (groupedAnomalyList.size() > 0) {
-          AlertGroupKey<DimensionMap> alertGroupKey = AlertGroupKey.emptyKey();
-          groupedAnomaliesMap.put(alertGroupKey, rolledUpGroupedAnomaly);
+          groupedAnomaliesMap.put(new DimensionMap(), rolledUpGroupedAnomaly);
         }
       }
 
@@ -135,22 +135,19 @@ public class DimensionalAlertGrouper extends BaseAlertGrouper<DimensionMap> {
   }
 
   @Override
-  public String groupEmailRecipients(AlertGroupKey<DimensionMap> alertGroupKey) {
-    if (alertGroupKey == null || AlertGroupKey.emptyKey().equals(alertGroupKey) || !auxiliaryEmailRecipients
-        .containsKey(alertGroupKey.getKey())) {
+  public String groupEmailRecipients(DimensionMap alertGroupKey) {
+    if (alertGroupKey == null || !auxiliaryEmailRecipients.containsKey(alertGroupKey)) {
       return EMPTY_RECIPIENTS;
     } else {
-      return auxiliaryEmailRecipients.get(alertGroupKey.getKey());
+      return auxiliaryEmailRecipients.get(alertGroupKey);
     }
   }
 
-  @Override
-  public AlertGroupKey<DimensionMap> constructGroupKey(DimensionMap rawKey) {
-    AlertGroupKey<DimensionMap> alertGroupKey = new AlertGroupKey<>(new DimensionMap());
-    DimensionMap groupKeyDimensionMap = alertGroupKey.getKey();
+  private DimensionMap constructGroupKey(DimensionMap rawKey) {
+    DimensionMap alertGroupKey = new DimensionMap();
     for (String groupByDimensionName : groupByDimensions) {
       if (rawKey.containsKey(groupByDimensionName)) {
-        groupKeyDimensionMap.put(groupByDimensionName, rawKey.get(groupByDimensionName));
+        alertGroupKey.put(groupByDimensionName, rawKey.get(groupByDimensionName));
       }
     }
     return alertGroupKey;

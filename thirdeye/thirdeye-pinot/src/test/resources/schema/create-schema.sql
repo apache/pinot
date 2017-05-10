@@ -42,13 +42,6 @@ create table if not exists email_configuration_index (
     version int(10)
 ) ENGINE=InnoDB;
 
--- ALTER TABLE thirdeye.job_index ADD type VARCHAR(100) DEFAULT "NULL" NOT NULL;
--- ALTER TABLE thirdeye.job_index ADD anomaly_function_id BIGINT(20) DEFAULT 0 NULL;
--- ALTER TABLE thirdeye.job_index
---   MODIFY COLUMN type VARCHAR(100) NOT NULL DEFAULT "NULL" AFTER status,
---   MODIFY COLUMN anomaly_function_id BIGINT(20) DEFAULT 0 AFTER type;
--- CREATE INDEX job_anomaly_function_id_idx ON thirdeye.job_index (anomaly_function_id);
--- CREATE INDEX job_type_idx ON thirdeye.job_index (type);
 create table if not exists job_index (
     name varchar(200) not null,
     status varchar(100) not null,
@@ -322,3 +315,14 @@ ALTER TABLE `entity_to_entity_mapping_index` ADD UNIQUE `entity_mapping_unique_i
 create index entity_mapping_from_urn_idx on entity_to_entity_mapping_index(from_urn);
 create index entity_mapping_to_urn_idx on entity_to_entity_mapping_index(to_urn);
 create index entity_mapping_type_idx on entity_to_entity_mapping_index(mapping_type);
+
+create table if not exists grouped_anomaly_results_index (
+    alert_config_id bigint(20) not null,
+    dimensions varchar(1023),
+    end_time bigint(20) not null,
+    base_id bigint(20) not null,
+    create_time timestamp,
+    update_time timestamp default current_timestamp,
+    version int(10)
+) ENGINE=InnoDB;
+create index grouped_anomaly_results_alert_config_id on grouped_anomaly_results_index(alert_config_id);

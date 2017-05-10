@@ -1,10 +1,12 @@
 package com.linkedin.thirdeye.anomaly.alert.grouping;
 
+import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
+import com.linkedin.thirdeye.datalayer.dto.GroupedAnomalyResultsDTO;
 import java.util.List;
 import java.util.Map;
 
-public interface AlertGrouper<T> {
+public interface AlertGrouper {
   /**
    * Sets the properties of this grouper.
    *
@@ -18,7 +20,7 @@ public interface AlertGrouper<T> {
    *
    * @return groups of anomaly results.
    */
-  Map<AlertGroupKey<T>, GroupedAnomalyResults> group(List<MergedAnomalyResultDTO> anomalyResults);
+  Map<DimensionMap, GroupedAnomalyResultsDTO> group(List<MergedAnomalyResultDTO> anomalyResults);
 
   /**
    * The additional recipients string for this group of anomalies.
@@ -27,14 +29,5 @@ public interface AlertGrouper<T> {
    *
    * @return the additional recipients for the given group.
    */
-  String groupEmailRecipients(AlertGroupKey<T> alertGroupKey);
-
-  /**
-   * Constructs group key from the given raw key and based on the setting of this grouper.
-   *
-   * @param rawKey the information to construct a group key of this grouper.
-   *
-   * @return a group key.
-   */
-  AlertGroupKey<T> constructGroupKey(T rawKey);
+  String groupEmailRecipients(DimensionMap alertGroupKey);
 }

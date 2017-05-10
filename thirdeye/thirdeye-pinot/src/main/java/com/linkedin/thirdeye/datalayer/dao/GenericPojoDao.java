@@ -5,11 +5,13 @@ import com.linkedin.thirdeye.datalayer.entity.AlertConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.ClassificationConfigIndex;
 import com.linkedin.thirdeye.datalayer.entity.EventIndex;
 import com.linkedin.thirdeye.datalayer.entity.AutotuneConfigIndex;
+import com.linkedin.thirdeye.datalayer.entity.GroupedAnomalyResultsIndex;
 import com.linkedin.thirdeye.datalayer.entity.OverrideConfigIndex;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.ClassificationConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.EventBean;
 import com.linkedin.thirdeye.datalayer.pojo.AutotuneConfigBean;
+import com.linkedin.thirdeye.datalayer.pojo.GroupedAnomalyResultsBean;
 import com.linkedin.thirdeye.datalayer.pojo.OverrideConfigBean;
 
 import java.sql.Connection;
@@ -125,6 +127,8 @@ public class GenericPojoDao {
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, ClassificationConfigIndex.class));
     pojoInfoMap.put(EntityToEntityMappingBean.class,
         newPojoInfo(DEFAULT_BASE_TABLE_NAME, EntityToEntityMappingIndex.class));
+    pojoInfoMap.put(GroupedAnomalyResultsBean.class,
+        newPojoInfo(DEFAULT_BASE_TABLE_NAME, GroupedAnomalyResultsIndex.class));
   }
 
   private static PojoInfo newPojoInfo(String baseTableName,

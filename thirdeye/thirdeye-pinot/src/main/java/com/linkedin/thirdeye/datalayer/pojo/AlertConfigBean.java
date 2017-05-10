@@ -14,6 +14,8 @@ public class AlertConfigBean extends AbstractBean {
   EmailConfig emailConfig;
   ReportConfigCollection reportConfigCollection;
   Map<String, String> groupByConfig = new HashMap<>();
+  Map<String, String> groupFilterConfig = new HashMap<>();
+  Map<String, String> groupTimeBasedMergeConfig = new HashMap<>();
   String recipients;
   String fromAddress;
 
@@ -79,6 +81,22 @@ public class AlertConfigBean extends AbstractBean {
 
   public void setGroupByConfig(Map<String, String> groupByConfig) {
     this.groupByConfig = groupByConfig;
+  }
+
+  public Map<String, String> getGroupFilterConfig() {
+    return groupFilterConfig;
+  }
+
+  public void setGroupFilterConfig(Map<String, String> groupFilterConfig) {
+    this.groupFilterConfig = groupFilterConfig;
+  }
+
+  public Map<String, String> getGroupTimeBasedMergeConfig() {
+    return groupTimeBasedMergeConfig;
+  }
+
+  public void setGroupTimeBasedMergeConfig(Map<String, String> groupTimeBasedMergeConfig) {
+    this.groupTimeBasedMergeConfig = groupTimeBasedMergeConfig;
   }
 
   @JsonIgnoreProperties(ignoreUnknown = true)

@@ -10,7 +10,7 @@ public class AlertGrouperFactory {
   private static final AlertGrouper DUMMY_ALERT_GROUPER = new DummyAlertGrouper();
 
   public enum GrouperType {
-    DUMMY, DIMENSIONAL
+    DUMMY, DIMENSIONAL, HORIZONTAL_DIMENSIONAL
   }
 
   public static AlertGrouper fromSpec(Map<String, String> spec) {
@@ -41,6 +41,8 @@ public class AlertGrouperFactory {
       return DUMMY_ALERT_GROUPER;
     case DIMENSIONAL:
       return new DimensionalAlertGrouper();
+    case HORIZONTAL_DIMENSIONAL:
+      return new HorizontalDimensionalAlertGrouper();
     default:
       return DUMMY_ALERT_GROUPER;
     }

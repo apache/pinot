@@ -3,7 +3,7 @@ package com.linkedin.thirdeye.anomaly.alert.grouping;
 import java.util.Collections;
 import java.util.Map;
 
-public abstract class BaseAlertGrouper<T> implements AlertGrouper<T> {
+public abstract class BaseAlertGrouper implements AlertGrouper {
   public static final String EMPTY_RECIPIENTS = "";
 
   protected Map<String, String> props = Collections.emptyMap();

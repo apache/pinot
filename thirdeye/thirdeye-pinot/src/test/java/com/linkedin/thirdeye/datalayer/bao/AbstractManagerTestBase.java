@@ -65,6 +65,7 @@ public abstract class AbstractManagerTestBase {
   protected AutotuneConfigManager autotuneConfigDAO;
   protected ClassificationConfigManager classificationConfigDAO;
   protected EntityToEntityMappingManager entityToEntityMappingDAO;
+  protected GroupedAnomalyResultsManager groupedAnomalyResultsDAO;
 
   //  protected TestDBResources testDBResources;
   protected DAORegistry daoRegistry;
@@ -101,6 +102,7 @@ public abstract class AbstractManagerTestBase {
       autotuneConfigDAO = daoRegistry.getAutotuneConfigDAO();
       classificationConfigDAO = daoRegistry.getClassificationConfigDAO();
       entityToEntityMappingDAO = daoRegistry.getEntityToEntityMappingDAO();
+      groupedAnomalyResultsDAO = daoRegistry.getGroupedAnomalyResultsDAO();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
