@@ -20,9 +20,6 @@ import java.util.Collections;
 import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
-import org.codehaus.jackson.JsonParseException;
-import org.codehaus.jackson.JsonProcessingException;
-import org.codehaus.jackson.map.JsonMappingException;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -39,15 +36,14 @@ import org.slf4j.LoggerFactory;
 
 public class PinotTableRestletResource extends BasePinotControllerRestletResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotTableRestletResource.class);
-  private final File baseDataDir;
-  private final File tempDir;
 
-  public PinotTableRestletResource() throws IOException {
-    baseDataDir = new File(_controllerConf.getDataDir());
+  public PinotTableRestletResource()
+      throws IOException {
+    File baseDataDir = new File(_controllerConf.getDataDir());
     if (!baseDataDir.exists()) {
       FileUtils.forceMkdir(baseDataDir);
     }
-    tempDir = new File(baseDataDir, "schemasTemp");
+    File tempDir = new File(baseDataDir, "schemasTemp");
     if (!tempDir.exists()) {
       FileUtils.forceMkdir(tempDir);
     }
@@ -62,14 +58,15 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
       try {
         addTable(config);
       } catch (Exception e) {
+        String tableName = config.getTableName();
         if (e instanceof PinotHelixResourceManager.InvalidTableConfigException) {
-          LOGGER.info("Invalid table config for table: {}, {}", config.getTableName(), e.getMessage());
+          LOGGER.info("Invalid table config for table: {}, {}", tableName, e.getMessage());
           setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
         } else if (e instanceof PinotHelixResourceManager.TableAlreadyExistsException) {
-          LOGGER.info("Table: {} already exists", config.getTableName());
+          LOGGER.info("Table: {} already exists", tableName);
           setStatus(Status.CLIENT_ERROR_CONFLICT);
         } else {
-          LOGGER.error("Caught exception while adding table: {}", config.getTableName(), e);
+          LOGGER.error("Caught exception while adding table: {}", tableName, e);
           setStatus(Status.SERVER_ERROR_INTERNAL);
         }
         ControllerRestApplication.getControllerMetrics()
@@ -95,8 +92,8 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
   }
 
   private void ensureMinReplicas(AbstractTableConfig config) {
-    // For self-serviced cluster, ensure that the tables are created with atleast
-    // min replication factor irrespective of table configuratio value.
+    // For self-serviced cluster, ensure that the tables are created with at least min replication factor irrespective
+    // of table configuration value
     SegmentsValidationAndRetentionConfig segmentsConfig = config.getValidationConfig();
     int configMinReplication = _controllerConf.getDefaultTableMinReplicas();
     boolean verifyReplicasPerPartition = false;
@@ -130,7 +127,8 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
     if (verifyReplicasPerPartition) {
       String replicasPerPartitionStr = segmentsConfig.getReplicasPerPartition();
       if (replicasPerPartitionStr == null) {
-        throw new PinotHelixResourceManager.InvalidTableConfigException("Field replicasPerPartition needs to be specified");
+        throw new PinotHelixResourceManager.InvalidTableConfigException(
+            "Field replicasPerPartition needs to be specified");
       }
       try {
         int replicasPerPartition = Integer.valueOf(replicasPerPartitionStr);
@@ -141,7 +139,8 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
           segmentsConfig.setReplicasPerPartition(String.valueOf(configMinReplication));
         }
       } catch (NumberFormatException e) {
-        throw new PinotHelixResourceManager.InvalidTableConfigException("Invalid value for replicasPerPartition: '" + replicasPerPartitionStr + "'", e);
+        throw new PinotHelixResourceManager.InvalidTableConfigException(
+            "Invalid value for replicasPerPartition: '" + replicasPerPartitionStr + "'", e);
       }
     }
   }
@@ -173,9 +172,10 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
     final String tableType = getReference().getQueryAsForm().getValues(TABLE_TYPE);
 
     if (tableType != null && !isValidTableType(tableType)) {
-      LOGGER.error(INVALID_TABLE_TYPE_ERROR);
+      String errorMessage = "Invalid table type: " + tableType + ", must be one of {offline|realtime}";
+      LOGGER.info(errorMessage);
       setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
-      return new StringRepresentation(INVALID_TABLE_TYPE_ERROR);
+      return new StringRepresentation("Failed: " + errorMessage);
     }
 
     if (tableName == null) {
@@ -183,25 +183,28 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
         return getAllTables();
       } catch (Exception e) {
         LOGGER.error("Caught exception while fetching table ", e);
-        ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_GET_ERROR, 1L);
+        ControllerRestApplication.getControllerMetrics()
+            .addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_GET_ERROR, 1L);
         setStatus(Status.SERVER_ERROR_INTERNAL);
         return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
       }
     }
+
     try {
       if (state == null) {
         return getTable(tableName, tableType);
       } else if (isValidState(state)) {
-        return setTablestate(tableName, tableType, state);
+        return setTableState(tableName, tableType, state);
       } else {
-        LOGGER.error(INVALID_STATE_ERROR);
+        String errorMessage = "Invalid state: " + state + ", must be one of {enable|disable|drop}";
+        LOGGER.info(errorMessage);
         setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
-        return new StringRepresentation(INVALID_STATE_ERROR);
+        return new StringRepresentation("Failed: " + errorMessage);
       }
     } catch (Exception e) {
       LOGGER.error("Caught exception while fetching table ", e);
-      ControllerRestApplication.getControllerMetrics().addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_GET_ERROR,
-          1L);
+      ControllerRestApplication.getControllerMetrics()
+          .addMeteredGlobalValue(ControllerMeter.CONTROLLER_TABLE_GET_ERROR, 1L);
       setStatus(Status.SERVER_ERROR_INTERNAL);
       return PinotSegmentUploadRestletResource.exceptionToStringRepresentation(e);
     }
@@ -215,7 +218,7 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
       @Parameter(name = "tableName", in = "path", description = "The name of the table for which to toggle its state",
           required = true) String tableName,
       @Parameter(name = "type", in = "query", description = "Type of table, Offline or Realtime", required = true) String tableType)
-      throws JSONException, JsonParseException, JsonMappingException, JsonProcessingException, IOException {
+      throws JSONException, IOException {
     JSONObject ret = new JSONObject();
 
     if ((tableType == null || TableType.OFFLINE.name().equalsIgnoreCase(tableType))
@@ -251,12 +254,13 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
   @Summary("Enable, disable or drop a table")
   @Tags({ "table" })
   @Paths({ "/tables/{tableName}", "/table/{tableName}/" })
-  private StringRepresentation setTablestate(
+  private StringRepresentation setTableState(
       @Parameter(name = "tableName", in = "path", description = "The name of the table for which to toggle its state",
           required = true) String tableName,
       @Parameter(name = "type", in = "query", description = "Type of table, Offline or Realtime", required = false) String type,
       @Parameter(name = "state", in = "query", description = "The desired table state, either enable or disable",
-          required = true) String state) throws JSONException {
+          required = true) String state)
+      throws JSONException {
 
     JSONArray ret = new JSONArray();
     boolean tableExists = false;
@@ -285,8 +289,10 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
     if (tableExists) {
       return new StringRepresentation(ret.toString());
     } else {
+      String errorMessage = "Table: " + tableName + " does not exist";
+      LOGGER.info(errorMessage);
       setStatus(Status.CLIENT_ERROR_NOT_FOUND);
-      return new StringRepresentation("Error: Table " + tableName + " not found.");
+      return new StringRepresentation("Failed: " + errorMessage);
     }
   }
 
@@ -305,26 +311,26 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
     } else if (StateType.DROP.name().equalsIgnoreCase(state)) {
       return _pinotHelixResourceManager.dropTable(tableName);
     } else {
-      LOGGER.error(INVALID_STATE_ERROR);
+      String errorMessage = "Invalid state: " + state + ", must be one of {enable|disable|drop}";
+      LOGGER.info(errorMessage);
       setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
-      return new PinotResourceManagerResponse(INVALID_STATE_ERROR, false);
+      return new PinotResourceManagerResponse("Failed: " + errorMessage, false);
     }
   }
 
   @Override
   @Delete
   public Representation delete() {
-    StringRepresentation presentation = null;
-
     final String tableName = (String) getRequest().getAttributes().get(TABLE_NAME);
     final String type = getReference().getQueryAsForm().getValues(TABLE_TYPE);
+    // TODO: fix the problem where deleteTable always return true unless tableName is null
     if (!deleteTable(tableName, type)) {
-      String error = new String("Error: Table " + tableName + " not found.");
-      LOGGER.error(error);
-      setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
-      return new StringRepresentation(error);
+      String errorMessage = "Table: " + tableName + " does not exist";
+      LOGGER.info(errorMessage);
+      setStatus(Status.CLIENT_ERROR_NOT_FOUND);
+      return new StringRepresentation("Failed: " + errorMessage);
     }
-    return presentation;
+    return new StringRepresentation("Success");
   }
 
   @HttpVerb("delete")
@@ -335,7 +341,6 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
       description = "The name of the table to delete", required = true) String tableName, @Parameter(name = "type",
       in = "query", description = "The type of table to delete, either offline or realtime") String type) {
     if (tableName == null) {
-      LOGGER.error("Error: Table name null.");
       setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
       return false;
     }
@@ -351,13 +356,12 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
   @Override
   @Put
   public Representation put(Representation entity) {
-    String inputTableName = (String) getRequest().getAttributes().get("tableName");
+    String inputTableName = (String) getRequest().getAttributes().get(TABLE_NAME);
     if (inputTableName == null) {
-      LOGGER.error("Error: Table name is required. Input: null");
+      LOGGER.info("Table name cannot be null");
       setStatus(Status.CLIENT_ERROR_BAD_REQUEST);
       return new StringRepresentation("{\"error\" : \"Table name is required. Input: null\"}");
     }
-
 
     return updateTableConfig(inputTableName, entity);
   }
@@ -417,7 +421,6 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
           ControllerMeter.CONTROLLER_TABLE_UPDATE_ERROR, 1L);
       return errorResponseRepresentation(Status.SERVER_ERROR_INTERNAL,
           "Internal error while updating table configuration");
-
     }
   }
 }
