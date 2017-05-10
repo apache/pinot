@@ -2,15 +2,15 @@ function AnomalyResultController(parentController) {
   this.parentController = parentController;
   this.anomalyResultModel = new AnomalyResultModel();
   this.anomalyResultView = new AnomalyResultView(this.anomalyResultModel);
-  this.anomalyFiltercontroller = new AnomalyFilterController(this);
-  // this.anomalyFilterModel = new AnomalyFilterModel();
-  // this.anomalyFilterView = new AnomalyFilterView(this.anomalyFilterModel);
+  this.anomalyFilterController = new AnomalyFilterController(this);
 
+  this.anomalyResultView.searchButtonEvent.attach(this.searchButtonEventHandler.bind(this));
   this.anomalyResultView.applyButtonEvent.attach(this.applyButtonEventHandler.bind(this));
   this.anomalyResultView.investigateButtonClickEvent.attach(this.investigateButtonClickEventHandler.bind(this));
   this.anomalyResultView.pageClickEvent.attach(this.pageClickEventHandler.bind(this));
   this.anomalyResultView.filterButtonEvent.attach(this.filterEventHandler.bind(this));
-  this.anomalyResultView.checkedFilterEvent.attach(this.checkedFilterEvent.bind(this));
+  this.anomalyResultView.checkedFilterEvent.attach(this.checkedFilterEventHandler.bind(this));
+  this.anomalyResultView.changedTimeEvent.attach(this.changedTimeEventHandler.bind(this));
 
   this.anomalyResultView.init();
 }
@@ -29,22 +29,37 @@ AnomalyResultController.prototype = {
       this.anomalyResultView.destroy();
       this.anomalyResultModel.reset();
       this.anomalyResultModel.setParams(params);
-      this.anomalyResultModel.getSearchFilters().then((filter) => {
-        this.anomalyFiltercontroller.handleAppEvent(filter);
+      // need to add conditional redendering for date pickers
+      this.anomalyResultView.renderDatePickers();
+      // if has searchMode
+      this.anomalyResultModel.getSearchFilters((filter) => {
+        this.anomalyFilterController.handleAppEvent(filter);
       });
       // this.anomalyResultModel.rebuild();
     }
   },
 
   // new search, should trigger new filters
-  applyButtonEventHandler: function(sender, args) {
+  searchButtonEventHandler(sender, args = {}) {
     HASH_SERVICE.clear();
     HASH_SERVICE.set('tab', 'anomalies');
     HASH_SERVICE.update(args);
     HASH_SERVICE.refreshWindowHashForRouting('anomalies');
     HASH_SERVICE.routeTo('anomalies');
   },
-  investigateButtonClickEventHandler: function (sender, args) {
+
+  applyButtonEventHandler(sender, args = {}) {
+    // get anomalies
+    const anomalyIds = this.anomalyFilterController.getSelectedAnomalies().join(',');
+    // get details for anomalies
+    debugger;
+    this.anomalyResultModel.getDetailsForAnomalyIds(anomalyIds);
+    // get page
+    // display anomalyresult
+  },
+
+
+  investigateButtonClickEventHandler(sender, args = {}) {
     HASH_SERVICE.clear();
     HASH_SERVICE.set('tab', 'investigate');
     HASH_SERVICE.update(args);
@@ -69,7 +84,7 @@ AnomalyResultController.prototype = {
   },
 
 
-  checkedFilterEvent(sender, args = {}) {
+  checkedFilterEventHandler(sender, args = {}) {
     const {
       filter,
       isChecked
@@ -111,7 +126,12 @@ AnomalyResultController.prototype = {
     //
   },
 
-
+  changedTimeEventHandler(sender, args ={}) {
+    // reload filters
+    HASH_SERVICE.update(args);
+    HASH_SERVICE.refreshWindowHashForRouting('anomalies');
+    // HASH_SERVICE.routeTo('anomalies');
+  },
 
   filterEventHandler(sender, args = {}) {
     HASH_SERVICE.update(args);

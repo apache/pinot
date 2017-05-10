@@ -41,7 +41,7 @@
 
 <div class="container top-buffer bottom-buffer">
   <div class="page-content">
-    <div class="page-filter" id="anomaly-filters-place-holder"></div>
+    <div class="page-filter" id="anomaly-filters-wrapper-place-holder"></div>
     <div id='anomaly-spin-area'></div>
     <div class="page-results" id="anomaly-results-place-holder"></div>
   </div>

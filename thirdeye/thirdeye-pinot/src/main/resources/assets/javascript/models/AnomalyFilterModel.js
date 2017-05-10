@@ -99,10 +99,7 @@ AnomalyFilterModel.prototype = {
 
   updateViewFilters() {
     this.viewFilters = this.filtersIterator(this.searchFilters, (filterName, anomalyIds) => {
-      return[...this.getIntersection(this.selectedAnomalyIds, anomalyIds)];
-      // $(`.filter-item__checkbox[data-filter="${filterName}"] ~ .filter-item__count`).first().html(intersection.length);
-      // $(`#${filterName} ~ .filter-item__count`).first().html(intersection.length);
-      // return intersection;
+      return [...this.getIntersection(this.selectedAnomalyIds, anomalyIds)];
     });
   },
 
@@ -113,17 +110,14 @@ AnomalyFilterModel.prototype = {
       this.searchFilters,
       (filterName, anomalyIds) => {
         if (filterName === filter) {
-          debugger;
           return anomalyIds;
         }
-        // this.selectedAnomalies.set(filterName, anomalyIds);
       },
       (key, value) => {
         if (key === filter) {
           return value;
         }
         if (key === section) {
-          debugger;
           this.selectedAnomalies.set(`${section}/${filter}`, value[filter]);
         }
       }
@@ -131,7 +125,7 @@ AnomalyFilterModel.prototype = {
     this.updateSelectedAnomalyIds();
     this.updateViewFilters();
 
-    console.log(this.selectedAnomalyIds);
+    console.log('selected anomalids: ', this.selectedAnomalyIds);
   },
 
   removeFilter(filter, section) {
@@ -140,9 +134,9 @@ AnomalyFilterModel.prototype = {
     this.updateViewFilters();
   },
 
-  updatefilterSection(id) {
-    this.expandedFilters.has(id) ?
-      this.expandedFilters.delete(id) :
-      this.expandedFilters.add(id);
+  updatefilterSection(filter) {
+    this.expandedFilters.has(filter) ?
+      this.expandedFilters.delete(filter) :
+      this.expandedFilters.add(filter);
   }
 };

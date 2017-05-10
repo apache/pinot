@@ -30,13 +30,21 @@ AnomalyFilterController.prototype = {
   },
 
   expandedFilterEventHandler(sender, args = {}) {
-    const { id } = args;
-    this.anomalyFilterModel.updatefilterSection(id);
+    const { filter } = args;
+    this.anomalyFilterModel.updatefilterSection(filter);
   },
 
   clearEventHandler(sender) {
     this.anomalyFilterModel.clear();
     this.anomalyFilterView.render();
-  }
+  },
+
+  getSelectedAnomalies(pageNumber = 1) {
+    const pageSize = constants.ANOMALIES_PER_PAGE;
+    const startIndex = (pageNumber - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+
+    return this.anomalyFilterModel.selectedAnomalyIds.slice(startIndex, endIndex);
+  },
 };
 

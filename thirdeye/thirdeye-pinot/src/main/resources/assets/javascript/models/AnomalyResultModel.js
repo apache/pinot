@@ -24,7 +24,7 @@ function AnomalyResultModel() {
 
   this.previousPageNumber = null;
   this.pageNumber = 1;
-  this.pageSize = 10;
+  this.pageSize = constants.ANOMALIES_PER_PAGE;
   this.ajaxCall = null;
   this.searchFilters ;
   this.hiddenFilters = ['statusFilterMap'];
@@ -135,10 +135,24 @@ AnomalyResultModel.prototype = {
     }(this);
   },
 
-  getSearchFilters() {
+  getSearchFilters(callback) {
     // ajax only for now, will need to cach it somehow
     const params = this.getSearchParams();
     params.filterOnly = true;
+    params.updateModelAndNotifyView = callback;
+    params.spinner = 'anomaly-filter-spinner';
+    return dataService.fetchAnomalies(params);
+  },
+
+  getDetailsForAnomalyIds(anomalyIds = []) {
+    if (!anomalyIds.length) { return; }
+    const params = {};
+    params.startDate = this.startDate;
+    params.endDate = this.endDate;
+    params.pageNumber = 1;
+    params.anomaliesSearchMode = constants.MODE_ID;
+    params.updateModelAndNotifyView = this.updateModelAndNotifyView;
+    params.anomalyIds = anomalyIds;
     return dataService.fetchAnomalies(params);
   },
 

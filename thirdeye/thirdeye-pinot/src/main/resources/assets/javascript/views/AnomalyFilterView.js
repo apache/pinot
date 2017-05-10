@@ -60,10 +60,12 @@ AnomalyFilterView.prototype = {
   setupFilterListener() {
     // show hide filter sections
     $('.filter-section').on('click', '.filter-title', (event) => {
-      $(event.delegateTarget).children('.filter-body__list').toggleClass('filter-body__list--hidden')
-      $(event.target.parentElement).find('.filter-title__action').toggleClass('filter-title__action--expanded');
       event.stopPropagation();
-      this.expandedFilterEvent.notify({ id: event.delegateTarget.id });
+      $(event.delegateTarget).children('.filter-body__list').toggleClass('filter-body__list--hidden');
+      $(event.target.parentElement).find('.filter-title__action').toggleClass('filter-title__action--expanded');
+      const filter = $(event.delegateTarget).data('section');
+
+      this.expandedFilterEvent.notify({ filter });
     });
 
     // on filter selection
@@ -88,32 +90,7 @@ AnomalyFilterView.prototype = {
     // search with filters
     $('#apply-button').click(() => {
       $('body').scrollTop(0);
-      // getting all checked
-      this.searchFilters = Object.assign({}, this.anomalyResultModel.getAnomaliesFilters());
-      // const filterType = Object.keys(filters);
-      const searchFilters = {};
 
-      // for each prop in the filters, find the checked and update
-      // $("#functionFilterMap").find(".filter-item__checkbox:checked");
-      const checkedFilters = $('.filter-item__checkbox:checked');
-
-      const newSearchFilters = {};
-        //getting parents with all level
-      const section = $('.filter-section:not(".filter-section--no-padding")').has('.filter-item__checkbox:checked');
-
-      section.each((index, section) => {
-        newSearchFilters[section.id] = {};
-        const selectedFilters = $(section).find('.filter-item__checkbox:checked');
-        selectedFilters.each((index, filter) => {
-          const filterBlockName = filter.closest('.filter-section').id;
-          if (filterBlockName !== section.id) {
-            newSearchFilters[section.id][filterBlockName] = newSearchFilters[section.id][filterBlockName] || {};
-            newSearchFilters[section.id][filterBlockName][filter.id] = 1;
-          } else {
-            newSearchFilters[section.id][filter.id] = 1;
-          }
-        });
-      });
     });
   }
 };

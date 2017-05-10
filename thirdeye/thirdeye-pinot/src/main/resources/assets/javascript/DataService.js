@@ -23,10 +23,9 @@ DataService.prototype = {
     },
     // Make asynchronous get call
     getDataAsynchronous: function(url, data, callback, spinArea)  {
-      var target = document.getElementById(spinArea);
-      var spinner = new Spinner();
+      const target = document.getElementById(spinArea);
+      const spinner = new Spinner().spin(target);
       let results;
-      spinner.spin(target);
 
       return $.ajax({
         url: url,
@@ -105,59 +104,54 @@ DataService.prototype = {
         functionName,
         updateModelAndNotifyView,
         filterOnly,
+        spinner
       } = args;
 
       switch(anomaliesSearchMode) {
         case constants.MODE_TIME:
-          return this.fetchAnomaliesForTime(startDate, endDate, pageNumber, filterOnly, updateModelAndNotifyView);
+          return this.fetchAnomaliesForTime(startDate, endDate, pageNumber, filterOnly, updateModelAndNotifyView, spinner);
         case constants.MODE_METRIC:
           if (!metricIds || !metricIds.length) return;
-          return this.fetchAnomaliesForMetricIds(startDate, endDate, pageNumber, metricIds, functionName, filterOnly, updateModelAndNotifyView);
+          return this.fetchAnomaliesForMetricIds(startDate, endDate, pageNumber, metricIds, functionName, filterOnly, updateModelAndNotifyView, spinner);
         case constants.MODE_DASHBOARD:
           if (!dashboardId || !dashboardId.length) return;
-          return this.fetchAnomaliesForDashboardId(startDate, endDate, pageNumber, dashboardId, functionName, filterOnly, updateModelAndNotifyView);
+          return this.fetchAnomaliesForDashboardId(startDate, endDate, pageNumber, dashboardId, functionName, filterOnly, updateModelAndNotifyView, spinner);
         case constants.MODE_ID:
           if (!anomalyIds || !anomalyIds.length) return;
-          return this.fetchAnomaliesForAnomalyIds(startDate, endDate, pageNumber, anomalyIds, functionName, filterOnly, updateModelAndNotifyView);
+          return this.fetchAnomaliesForAnomalyIds(startDate, endDate, pageNumber, anomalyIds, functionName, filterOnly, updateModelAndNotifyView, spinner);
         case constants.MODE_GROUPID:
           if (!anomalyGroupIds || !!anomalyGroupIds.length) return;
-          return this.fetchAnomaliesforGroupIds(startDate, endDate, pageNumber, anomalyGroupIds, functionName, filterOnly, updateModelAndNotifyView);
+          return this.fetchAnomaliesforGroupIds(startDate, endDate, pageNumber, anomalyGroupIds, functionName, filterOnly, updateModelAndNotifyView, spinner);
         default:
           return;
       }
     },
     // Fetch anomalies for metric ids in array in time range
-    fetchAnomaliesForMetricIds : function(startTime, endTime, pageNumber, metricIds, functionName, filterOnly, callback, filters = {}) {
+    fetchAnomaliesForMetricIds : function(startTime, endTime, pageNumber, metricIds, functionName, filterOnly, callback, spinner) {
       const url = constants.SEARCH_ANOMALIES_METRICIDS + startTime + this.URL_SEPARATOR + endTime + this.URL_SEPARATOR + pageNumber;
-      const searchFilters = filters ? JSON.stringify(filters) : {};
       const data = {
         metricIds,
         functionName,
-        searchFilters,
         filterOnly
       };
       return this.getDataAsynchronous(url, data, callback, 'anomaly-spin-area');
     },
     // Fetch anomalies for dashboard id in time range
-    fetchAnomaliesForDashboardId : function(startTime, endTime, pageNumber, dashboardId, functionName, filterOnly, callback, filters = {}) {
+    fetchAnomaliesForDashboardId : function(startTime, endTime, pageNumber, dashboardId, functionName, filterOnly, callback, spinner) {
       const url = constants.SEARCH_ANOMALIES_DASHBOARDID + startTime + this.URL_SEPARATOR + endTime + this.URL_SEPARATOR + pageNumber;
-      const searchFilters = filters ? JSON.stringify(filters) : {};
       const data = {
         dashboardId : dashboardId,
         functionName : functionName,
-        searchFilters,
         filterOnly
       };
       return this.getDataAsynchronous(url, data, callback, 'anomaly-spin-area');
     },
     // Fetch anomalies for anomaly ids in array in time range
-    fetchAnomaliesForAnomalyIds : function(startTime, endTime, pageNumber, anomalyIds, functionName, filterOnly, callback, filters = {}) {
+    fetchAnomaliesForAnomalyIds : function(startTime, endTime, pageNumber, anomalyIds, functionName, filterOnly, callback, spinner) {
       const url = constants.SEARCH_ANOMALIES_ANOMALYIDS + startTime + this.URL_SEPARATOR + endTime + this.URL_SEPARATOR + pageNumber;
-      const searchFilters = filters ? JSON.stringify(filters) : {};
       const data = {
         anomalyIds,
         functionName,
-        searchFilters,
         filterOnly
       };
       return this.getDataAsynchronous(url, data, callback, 'anomaly-spin-area');
@@ -173,15 +167,13 @@ DataService.prototype = {
     },
 
     // Fetch anomalies for anomaly ids in array in time range
-    fetchAnomaliesForTime : function(startTime, endTime, pageNumber, filterOnly, callback, filters = {}) {
+    fetchAnomaliesForTime : function(startTime, endTime, pageNumber, filterOnly, callback, spinner) {
       const url = constants.SEARCH_ANOMALIES_TIME + startTime + this.URL_SEPARATOR + endTime + this.URL_SEPARATOR + pageNumber;
-      const searchFilters = filters ? JSON.stringify(filters) : {};
       const data = {
-        searchFilters,
         filterOnly
       };
 
-      return this.getDataAsynchronous(url, data, callback, 'anomaly-spin-area');
+      return this.getDataAsynchronous(url, data, callback, spinner);
     },
     // Update anomaly feedback for anomaly id
     updateFeedback : function(anomalyId, feedbackType) {
