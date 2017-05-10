@@ -40,11 +40,13 @@ import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.commons.mail.EmailException;
@@ -68,6 +70,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
   private AlertConfigDTO alertConfig;
   private ThirdEyeAnomalyConfiguration thirdeyeConfig;
   private AlertFilterFactory alertFilterFactory;
+  private final String MAX_ALLOWED_MERGE_GAP_KEY = "maxAllowedMergeGap";
   private final long DEFAULT_MAX_ALLOWED_MERGE_GAP = 14400000L;
 
   public AlertTaskRunnerV2() {
@@ -365,6 +368,22 @@ public class AlertTaskRunnerV2 implements TaskRunner {
    */
   private Map<DimensionMap, GroupedAnomalyResultsDTO> timeBasedMergeGroupedAnomalyResults(
       Map<DimensionMap, GroupedAnomalyResultsDTO> newGroupedAnomalies) {
+
+    // Parse max allowed merge gap from config
+    long maxAllowedMergeGap = DEFAULT_MAX_ALLOWED_MERGE_GAP;
+    Map<String, String> mergeConfig = alertConfig.getGroupTimeBasedMergeConfig();
+    if (MapUtils.isNotEmpty(mergeConfig)) {
+      if (mergeConfig.containsKey(MAX_ALLOWED_MERGE_GAP_KEY)) {
+        try {
+          Long value = Long.parseLong(mergeConfig.get(MAX_ALLOWED_MERGE_GAP_KEY));
+          maxAllowedMergeGap = value;
+        } catch (Exception e) {
+          LOG.warn("Failed to parse {} as 'MAX_ALLOWED_MERGE_GAP_KEY'; Use default value {}",
+              mergeConfig.get(MAX_ALLOWED_MERGE_GAP_KEY), DEFAULT_MAX_ALLOWED_MERGE_GAP);
+        }
+      }
+    }
+
     // Retrieve the most recent grouped anomalies from DB
     // TODO: Get update time from merged anomaly after the field "updateTime" is updated in DB correctly
     Map<DimensionMap, GroupedAnomalyResultsDTO> recentGroupedAnomalies = new HashMap<>();
@@ -375,7 +394,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
       long approximateUpdateTime = newGroupedAnomaly.getEndTime();
       GroupedAnomalyResultsDTO recentGroupedAnomaly = groupedAnomalyResultsDAO
           .findMostRecentInTimeWindow(alertConfig.getId(), dimensions.toString(),
-              approximateUpdateTime - DEFAULT_MAX_ALLOWED_MERGE_GAP, approximateUpdateTime);
+              approximateUpdateTime - maxAllowedMergeGap, approximateUpdateTime);
       recentGroupedAnomalies.put(dimensions, recentGroupedAnomaly);
     }
     // Merge grouped anomalies
