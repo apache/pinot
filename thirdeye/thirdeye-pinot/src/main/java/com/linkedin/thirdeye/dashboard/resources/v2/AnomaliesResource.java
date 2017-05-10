@@ -53,9 +53,11 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -350,6 +352,45 @@ public class AnomaliesResource {
       metricIds.add(Long.valueOf(metricId));
     }
     List<MergedAnomalyResultDTO> mergedAnomalies = getAnomaliesForMetricIdsInRange(metricIds, startTime, endTime);
+    AnomaliesWrapper anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(mergedAnomalies, pageNumber);
+    return anomaliesWrapper;
+  }
+
+  /**
+   * Find anomalies by anomaly group ids.
+   *
+   * @param startTime not used.
+   * @param endTime not used.
+   * @param groupIdsString a list of group ids that are separated by commas.
+   * @param functionName not used.
+   *
+   * @return A list of detailed anomalies in the specified page.
+   * @throws Exception
+   */
+  @GET
+  @Path("search/anomalyIds/{startTime}/{endTime}/{pageNumber}")
+  public AnomaliesWrapper getAnomaliesByGroupIds(
+      @PathParam("startTime") Long startTime,
+      @PathParam("endTime") Long endTime,
+      @PathParam("pageNumber") int pageNumber,
+      @QueryParam("groupIds") String groupIdsString,
+      @QueryParam("functionName") String functionName) throws Exception {
+
+    String[] groupIds = groupIdsString.split(COMMA_SEPARATOR);
+    Set<Long> anomalyIdSet = new HashSet<>();
+    for (String idString : groupIds) {
+      try {
+        Long groupId = Long.parseLong(idString);
+        // TODO: read anomalies from the grouped anomaly
+        ArrayList<Long> anomaliesIdOfGroup = new ArrayList<>();
+        anomalyIdSet.addAll(anomaliesIdOfGroup);
+      } catch (Exception e) {
+        LOG.info("Skipping group id {} due to error: {}", idString, e);
+      }
+    }
+
+    List<Long> anomalyIdList = new ArrayList<>(anomalyIdSet);
+    List<MergedAnomalyResultDTO> mergedAnomalies = mergedAnomalyResultDAO.findByIdList(anomalyIdList, false);
     AnomaliesWrapper anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(mergedAnomalies, pageNumber);
     return anomaliesWrapper;
   }
