@@ -63,6 +63,7 @@ public class AnomalyTimelinesView {
    * @throws JsonProcessingException
    */
   public String toJsonString() throws JsonProcessingException {
+    // Convert the new AnomalyTimelinesView to condensed one
     return CondensedAnomalyTimelinesView.fromAnomalyTimelinesView(this).toJsonString();
   }
 
@@ -80,6 +81,7 @@ public class AnomalyTimelinesView {
   public static AnomalyTimelinesView fromJsonString(String jsonString) throws IOException {
     AnomalyTimelinesView anomalyTimelinesView = new AnomalyTimelinesView();
     try {
+      // Try if the json string can be parsed to condensed view; otherwise, use AnomalyTimelinesView
       CondensedAnomalyTimelinesView condensedView = CondensedAnomalyTimelinesView.fromJsonString(jsonString);
       anomalyTimelinesView = condensedView.toAnomalyTimelinesView();
     } catch (Exception e) {

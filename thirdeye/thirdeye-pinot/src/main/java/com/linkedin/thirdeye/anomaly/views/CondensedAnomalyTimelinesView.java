@@ -5,20 +5,24 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.dashboard.views.TimeBucket;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 
+/**
+ * We face a problem that if we store the timelines view using AnomalyTimelinesView. The DB has overflow exception when
+ * storing merged anomalies. As TimeBucket is not space efficient for storage. To solve the problem, we introduce a
+ * condensed version of AnomalyTimelinesView.
+ */
 public class CondensedAnomalyTimelinesView {
   private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-  Long bucketMillis = 0l;
-  List<Long> timeStamps = new ArrayList<>();
-  Map<String, String> summary = new HashMap<>();
-  List<Double> currentValues = new ArrayList<>();
-  List<Double> baselineValues = new ArrayList<>();
+  Long bucketMillis = 0l;  // the bucket size of current time series
+  List<Long> timeStamps = new ArrayList<>(); // the start time of data points
+  Map<String, String> summary = new HashMap<>(); // the summary of the view
+  List<Double> currentValues = new ArrayList<>();  // the observed values
+  List<Double> baselineValues = new ArrayList<>(); // the expected values
 
   public Long getBucketMillis() {
     return bucketMillis;
@@ -60,6 +64,10 @@ public class CondensedAnomalyTimelinesView {
     this.baselineValues.add(baselineValue);
   }
 
+  /**
+   * Convert current instance to an AnomalyTimelinesView instance
+   * @return
+   */
   public AnomalyTimelinesView toAnomalyTimelinesView() {
     AnomalyTimelinesView anomalyTimelinesView = new AnomalyTimelinesView();
     for (int i = 0; i < timeStamps.size(); i++) {
@@ -75,6 +83,11 @@ public class CondensedAnomalyTimelinesView {
     return anomalyTimelinesView;
   }
 
+  /**
+   * Convert an AnomalyTimelinesView instance to CondensedAnomalyTimelinesView
+   * @param anomalyTimelinesView
+   * @return
+   */
   public static CondensedAnomalyTimelinesView fromAnomalyTimelinesView(AnomalyTimelinesView anomalyTimelinesView) {
     CondensedAnomalyTimelinesView condensedView = new CondensedAnomalyTimelinesView();
     for (int i = 0; i < anomalyTimelinesView.getTimeBuckets().size(); i++) {
