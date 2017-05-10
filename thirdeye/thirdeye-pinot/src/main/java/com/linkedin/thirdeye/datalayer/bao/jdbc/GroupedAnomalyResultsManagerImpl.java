@@ -1,5 +1,6 @@
 package com.linkedin.thirdeye.datalayer.bao.jdbc;
 
+import com.google.inject.Singleton;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.bao.GroupedAnomalyResultsManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
@@ -15,6 +16,7 @@ import java.util.List;
 import org.apache.commons.collections.CollectionUtils;
 import org.modelmapper.ModelMapper;
 
+@Singleton
 public class GroupedAnomalyResultsManagerImpl extends AbstractManagerImpl<GroupedAnomalyResultsDTO>
     implements GroupedAnomalyResultsManager {
 

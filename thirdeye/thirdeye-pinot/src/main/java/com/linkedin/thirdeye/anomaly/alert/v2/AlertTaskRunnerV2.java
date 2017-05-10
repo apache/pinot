@@ -154,7 +154,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
         if (alertGrouper instanceof DummyAlertGrouper) {
           filteredGroupedAnomalyResultsMap = groupedAnomalyResultsMap;
         } else {
-          filteredGroupedAnomalyResultsMap = timeBasedMergeAndFilterGroupedAnomlaies(groupedAnomalyResultsMap);
+          filteredGroupedAnomalyResultsMap = timeBasedMergeAndFilterGroupedAnomalies(groupedAnomalyResultsMap);
         }
 
         for (Map.Entry<DimensionMap, GroupedAnomalyResultsDTO> entry : filteredGroupedAnomalyResultsMap.entrySet()) {
@@ -327,7 +327,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
    *
    * @return a map of merged GroupedAnomaly that pass through the filter.
    */
-  private Map<DimensionMap,GroupedAnomalyResultsDTO> timeBasedMergeAndFilterGroupedAnomlaies(
+  private Map<DimensionMap,GroupedAnomalyResultsDTO> timeBasedMergeAndFilterGroupedAnomalies(
       Map<DimensionMap, GroupedAnomalyResultsDTO> groupedAnomalyResultsMap) {
     // Populate basic fields of the new grouped anomaly
     for (Map.Entry<DimensionMap, GroupedAnomalyResultsDTO> entry : groupedAnomalyResultsMap.entrySet()) {

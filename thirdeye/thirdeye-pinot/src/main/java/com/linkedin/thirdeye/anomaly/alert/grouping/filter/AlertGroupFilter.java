@@ -3,6 +3,10 @@ package com.linkedin.thirdeye.anomaly.alert.grouping.filter;
 import com.linkedin.thirdeye.datalayer.dto.GroupedAnomalyResultsDTO;
 import java.util.Map;
 
+// TODO: Unify merged and grouped anomaly. Afterwards, unify their alert filter.
+/**
+ * A filter for determining if a given grouped anomaly is qualified for sending an alert.
+ */
 public interface AlertGroupFilter {
 
   /**
