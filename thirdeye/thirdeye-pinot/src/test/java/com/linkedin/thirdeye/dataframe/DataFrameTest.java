@@ -1357,33 +1357,52 @@ public class DataFrameTest {
   }
 
   @Test
-  public void testJoinSameNameSameContent() {
+  public void testJoinSameName() {
     DataFrame left = new DataFrame()
-        .addSeries("name", 1, 2, 3, 4);
+        .addSeries("name", 1, 2, 3, 4)
+        .addSeries("value", 1, 2, 3, 4)
+        .addSeries("left", 1, 2, 3, 4);
 
     DataFrame right = new DataFrame()
-        .addSeries("name", 3, 4, 5, 6);
+        .addSeries("name", 3, 4, 5, 6)
+        .addSeries("value", 3, 4, 5, 6)
+        .addSeries("right", 1, 2, 3, 4);
 
     DataFrame df = left.joinInner(right, "name", "name");
 
-    Assert.assertEquals(df.getSeriesNames().size(), 1);
+    Assert.assertEquals(df.getSeriesNames().size(), 5);
+
     Assert.assertTrue(df.contains("name"));
-    Assert.assertFalse(df.contains("name_right"));
+    Assert.assertFalse(df.contains("name" + DataFrame.COLUMN_JOIN_LEFT));
+    Assert.assertFalse(df.contains("name" + DataFrame.COLUMN_JOIN_RIGHT));
+
+    Assert.assertFalse(df.contains("value"));
+    Assert.assertTrue(df.contains("value" + DataFrame.COLUMN_JOIN_LEFT));
+    Assert.assertTrue(df.contains("value" + DataFrame.COLUMN_JOIN_RIGHT));
+
+    Assert.assertTrue(df.contains("left"));
+    Assert.assertFalse(df.contains("left" + DataFrame.COLUMN_JOIN_LEFT));
+    Assert.assertFalse(df.contains("left" + DataFrame.COLUMN_JOIN_RIGHT));
+
+    Assert.assertTrue(df.contains("right"));
+    Assert.assertFalse(df.contains("right" + DataFrame.COLUMN_JOIN_LEFT));
+    Assert.assertFalse(df.contains("right" + DataFrame.COLUMN_JOIN_RIGHT));
   }
 
   @Test
-  public void testJoinSameNameDifferentContent() {
+  public void testJoinDifferentName() {
     DataFrame left = new DataFrame()
         .addSeries("name", 1, 2, 3, 4);
 
     DataFrame right = new DataFrame()
-        .addSeries("name", 3, 4, 5, 6);
+        .addSeries("key", 3, 4, 5, 6);
 
-    DataFrame df = left.joinOuter(right, "name", "name");
+    DataFrame df = left.joinInner(right, "name", "key");
 
     Assert.assertEquals(df.getSeriesNames().size(), 2);
+
     Assert.assertTrue(df.contains("name"));
-    Assert.assertTrue(df.contains("name_right"));
+    Assert.assertTrue(df.contains("key"));
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
