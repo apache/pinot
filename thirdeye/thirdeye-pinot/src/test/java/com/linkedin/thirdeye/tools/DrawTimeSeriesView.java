@@ -13,6 +13,7 @@ import java.io.FileWriter;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -26,6 +27,9 @@ import org.jfree.data.time.TimeSeriesCollection;
 import org.jfree.ui.ApplicationFrame;
 import org.jfree.ui.RefineryUtilities;
 import org.joda.time.DateTime;
+import org.joda.time.Days;
+import org.joda.time.format.DateTimeFormatter;
+import org.joda.time.format.DateTimeParser;
 import org.joda.time.format.ISODateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,6 +73,10 @@ public class DrawTimeSeriesView {
     this.functionTimeSeriesChartMap = new HashMap<>();
   }
 
+
+  private String jodaDateTimeToISO(DateTime dateTime) {
+    return dateTime.toString(ISODateTimeFormat.dateTime());
+  }
   /**
    * Draw the timeseries figure of a given list of functions and output CSV and PNG files to the given path
    * @param functionIds
@@ -80,14 +88,22 @@ public class DrawTimeSeriesView {
       drawAndExport(id, outputPath);
     }
   }
+  public void drawAndExport(final List<Long> functionIds, DateTime start, DateTime end, final String outputPath) throws Exception {
+    for(Long id : functionIds) {
+      drawAndExport(id, start, end, outputPath);
+    }
+  }
 
+  public void drawAndExport(long functionId, String outputPath) throws Exception {
+    drawAndExport(functionId, null, null, outputPath);
+  }
   /**
    * Draw the timeseries figure of a given function and output CSV and PNG files to the given path
    * @param functionId
    * @param outputPath
    * @throws Exception
    */
-  public void drawAndExport(long functionId, String outputPath) throws Exception {
+  public void drawAndExport(long functionId, DateTime start, DateTime end, String outputPath) throws Exception {
     AnomalyFunctionDTO anomalyFunctionDTO = anomalyFunctionDAO.findById(functionId);
     if(anomalyFunctionDTO == null) {
       LOG.warn("Anomaly Function {} doesn't exist", functionId);
@@ -101,7 +117,7 @@ public class DrawTimeSeriesView {
       }
     }
 
-    List<String> keyList = loadDataByFunction(functionId);
+    List<String> keyList = loadDataByFunction(functionId, start, end);
 
     for(String fileName : keyList) {
       TimeSeriesLineChart timeSeriesLineChart = this.functionTimeSeriesChartMap.get(fileName);
@@ -120,9 +136,19 @@ public class DrawTimeSeriesView {
    * @param functionIds
    * @throws Exception
    */
-  public void loadDataByFunction(List<Long> functionIds) throws Exception {
+  public void loadDataByFunctions(List<Long> functionIds) throws Exception {
     for(long functionId : functionIds) {
-      loadDataByFunction(functionId);
+      loadDataByFunction(functionId, null, null);
+    }
+  }
+  /**
+   * Load the timeseries and the baseline data of given list of functions into class
+   * @param functionIds
+   * @throws Exception
+   */
+  public void loadDataByFunctionsInDateTimeRange(List<Long> functionIds, DateTime start, DateTime end) throws Exception {
+    for(long functionId : functionIds) {
+      loadDataByFunction(functionId, start, end);
     }
   }
 
@@ -132,15 +158,20 @@ public class DrawTimeSeriesView {
    * @return
    * @throws Exception
    */
-  private List<String> loadDataByFunction(long functionId) throws Exception {
+  private List<String> loadDataByFunction(long functionId, DateTime start, DateTime end) throws Exception {
     List<String> keyList = new ArrayList<>();
+
+    if (start == null || end == null) {
+      start = new DateTime(0);
+      end = DateTime.now();
+    }
     AnomalyFunctionDTO anomalyFunctionDTO = anomalyFunctionDAO.findById(functionId);
     if(anomalyFunctionDTO == null) {
       LOG.warn("Anomaly Function {} doesn't exist", functionId);
       return keyList;
     }
-    String fileName = anomalyFunctionDTO.getFunctionName() + "-" + DateTime.now().toString(ISODateTimeFormat.dateTime());
-    String jsonResponse = getTimelinesViewForFunctionId(functionId);
+    String fileName = anomalyFunctionDTO.getFunctionName() + "-" + jodaDateTimeToISO(start);
+    String jsonResponse = getTimelinesViewForFunctionIdInDateTimeRange(functionId, start, end);
     ObjectMapper objectMapper = new ObjectMapper();
     Map<String, Map<String, Object>> dimensionAnomalyTimelinesViewMap = objectMapper.readValue(jsonResponse, HashMap.class);
 
@@ -230,16 +261,21 @@ public class DrawTimeSeriesView {
   }
 
   /**
-   * Load timeseries jsnon file from http get
+   * Load timeseries jsnon file from http get with start and end date time range
    * @param functionId
    * @return
    * @throws Exception
    */
-  private String getTimelinesViewForFunctionId(long functionId) throws Exception {
+  private String getTimelinesViewForFunctionIdInDateTimeRange(long functionId, DateTime start, DateTime end) throws Exception {
+    DateTimeFormatter isoDateTimeFormatter = ISODateTimeFormat.dateTimeParser();
     StringBuilder urlBuilder = new StringBuilder();
     urlBuilder.append("http://" +  dashboardHost + ":" + dashboardPort);
     urlBuilder.append("/dashboard/timeseries/");
     urlBuilder.append(Long.toString(functionId));
+    urlBuilder.append("?");
+    urlBuilder.append("start=" + URLEncoder.encode(jodaDateTimeToISO(start)));
+    urlBuilder.append("&");
+    urlBuilder.append("end=" + URLEncoder.encode(jodaDateTimeToISO(end)));
     return loadJsonFromHttpGet(urlBuilder.toString());
   }
 
@@ -283,7 +319,11 @@ public class DrawTimeSeriesView {
       functionIds.add(Long.valueOf(functionId));
     }
 
-    drawTimeSeriesView.drawAndExport(functionIds, config.getOutputPath());
+    DateTime end = ISODateTimeFormat.dateTimeParser().parseDateTime("2017-05-04");
+    DateTime start = end.minus(Days.days(90));
+
+
+    drawTimeSeriesView.drawAndExport(functionIds, start, end, config.getOutputPath());
     drawTimeSeriesView.view();
   }
 }

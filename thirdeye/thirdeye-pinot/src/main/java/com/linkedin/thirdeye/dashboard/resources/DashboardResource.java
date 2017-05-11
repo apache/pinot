@@ -458,6 +458,16 @@ public class DashboardResource {
     return jsonResponse;
   }
 
+  /**
+   * Get the timeseries with baseline for an anomaly function
+   * @param functionId
+   *      the target anomaly function
+   * @param startTimeIso
+   *      the start time
+   * @param endTimeIso
+   * @return
+   * @throws Exception
+   */
   @GET
   @Path(value = "/timeseries/{id}")
   @Produces(MediaType.APPLICATION_JSON)
@@ -469,7 +479,7 @@ public class DashboardResource {
       return null;
     }
 
-    DateTime startTime = new DateTime(0);
+    DateTime startTime = DateTime.now();
     DateTime endTime = DateTime.now();
     if (StringUtils.isNotEmpty(startTimeIso)) {
       startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso);
