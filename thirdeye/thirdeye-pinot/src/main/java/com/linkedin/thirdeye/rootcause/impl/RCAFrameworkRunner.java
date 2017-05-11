@@ -66,6 +66,7 @@ public class RCAFrameworkRunner {
   private static final String CLI_PIPELINE = "pipeline";
   private static final String CLI_TIME_START = "time-start";
   private static final String CLI_TIME_END = "time-end";
+  private static final String CLI_INTERACTIVE = "interactive";
 
   private static final String P_INPUT = RCAFramework.INPUT;
   private static final String P_EVENT_HOLIDAY = "eventHoliday";
@@ -99,10 +100,11 @@ public class RCAFrameworkRunner {
 
     options.addOption(null, CLI_WINDOW_SIZE, true, "window size for search window (in days, defaults to '7')");
     options.addOption(null, CLI_BASELINE_OFFSET, true, "baseline offset (in days, from start of window)");
-    options.addOption(null, CLI_ENTITIES, true, "search context metric entities (not specifying this will activate interactive REPL mode)");
+    options.addOption(null, CLI_ENTITIES, true, "search context metric entities");
     options.addOption(null, CLI_PIPELINE, true, "pipeline config YAML file (not specifying this will launch default pipeline)");
     options.addOption(null, CLI_TIME_START, true, "start time of the search window (ISO 8601, e.g. '20170701T150000Z')");
     options.addOption(null, CLI_TIME_END, true, "end time of the search window (ISO 8601, e.g. '20170831T030000Z', defaults to now)");
+    options.addOption(null, CLI_INTERACTIVE, false, "enters interacive REPL mode (specified entities will be added automatically)");
 
     Parser parser = new BasicParser();
     CommandLine cmd = null;
@@ -121,7 +123,7 @@ public class RCAFrameworkRunner {
 
     // runtime logger config
     ((Logger)LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME)).setLevel(Level.WARN);
-    ((Logger)LoggerFactory.getLogger("com.linkedin.thirdeye.rootcause")).setLevel(Level.INFO);
+    ((Logger)LoggerFactory.getLogger("com.linkedin.thirdeye.rootcause")).setLevel(Level.DEBUG);
 
     // config
     File config = new File(cmd.getOptionValue(CLI_CONFIG_DIR));
@@ -187,19 +189,22 @@ public class RCAFrameworkRunner {
     entities.add(TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_CURRENT, windowStart, windowEnd));
     entities.add(TimeRangeEntity.fromRange(1.0, TimeRangeEntity.TYPE_BASELINE, baselineStart, baselineEnd));
 
+    if(cmd.hasOption(CLI_ENTITIES)) {
+      entities.addAll(parseURNSequence(cmd.getOptionValue(CLI_ENTITIES), 1.0));
+    }
+
     // ************************************************************************
     // Framework execution
     // ************************************************************************
-    if (cmd.hasOption(CLI_ENTITIES)) {
-      entities.addAll(parseURNSequence(cmd.getOptionValue(CLI_ENTITIES), 1.0));
-      runFramework(framework, entities);
-
-    } else {
+    if (cmd.hasOption(CLI_INTERACTIVE)) {
       try {
         readExecutePrintLoop(framework, entities);
       } catch (InterruptedIOException ignore) {
         // left blank, exit
       }
+
+    } else {
+      runFramework(framework, entities);
     }
 
     System.out.println("done.");
@@ -298,6 +303,8 @@ public class RCAFrameworkRunner {
   }
 
   private static Collection<Entity> parseURNSequence(String urns, double score) {
+    if(urns.isEmpty())
+      return Collections.emptySet();
     Set<Entity> entities = new HashSet<>();
     String[] parts = urns.split(",");
     for(String part : parts) {
