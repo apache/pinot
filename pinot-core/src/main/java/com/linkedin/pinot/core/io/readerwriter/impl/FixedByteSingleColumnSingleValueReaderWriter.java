@@ -30,6 +30,14 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
 
   FixedByteSingleValueMultiColWriter currentWriter;
   private List<FixedByteSingleValueMultiColWriter> writers = new ArrayList<>();
+  // For readers it is useful to keep a "chunked-reader" class that is aware of the start and end offset of that buffer.
+  // If we do that then we avoid the % operation on the record on every read.
+  // For the bulk read operation, we can do a loop like this one:
+  //   foreach(row in rows[]) {
+  //     bufferId = row / chunkSize;
+  //     chunked-readers.get(bufferId).getInt(row);
+  //   }
+  // TODO the logic above
   private List<FixedByteSingleValueMultiColReader> readers = new ArrayList<>();
   private List<PinotDataBuffer> buffers = new ArrayList<>();
   private final long chunkSizeInBytes;
