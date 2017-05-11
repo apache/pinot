@@ -58,6 +58,7 @@ import org.slf4j.LoggerFactory;
  *
  */
 public class RCAFrameworkRunner {
+  private static final String ROOTCAUSE_LOGGER_NAME = "com.linkedin.thirdeye.rootcause";
 
   private static final String CLI_CONFIG_DIR = "config-dir";
   private static final String CLI_WINDOW_SIZE = "window-size";
@@ -67,6 +68,7 @@ public class RCAFrameworkRunner {
   private static final String CLI_TIME_START = "time-start";
   private static final String CLI_TIME_END = "time-end";
   private static final String CLI_INTERACTIVE = "interactive";
+  private static final String CLI_VERBOSE = "verbose";
 
   private static final String P_INPUT = RCAFramework.INPUT;
   private static final String P_EVENT_HOLIDAY = "eventHoliday";
@@ -105,6 +107,7 @@ public class RCAFrameworkRunner {
     options.addOption(null, CLI_TIME_START, true, "start time of the search window (ISO 8601, e.g. '20170701T150000Z')");
     options.addOption(null, CLI_TIME_END, true, "end time of the search window (ISO 8601, e.g. '20170831T030000Z', defaults to now)");
     options.addOption(null, CLI_INTERACTIVE, false, "enters interacive REPL mode (specified entities will be added automatically)");
+    options.addOption("v",  CLI_VERBOSE, false, "verbose output mode (set RCA log level to DEBUG)");
 
     Parser parser = new BasicParser();
     CommandLine cmd = null;
@@ -123,7 +126,10 @@ public class RCAFrameworkRunner {
 
     // runtime logger config
     ((Logger)LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME)).setLevel(Level.WARN);
-    ((Logger)LoggerFactory.getLogger("com.linkedin.thirdeye.rootcause")).setLevel(Level.DEBUG);
+    ((Logger)LoggerFactory.getLogger(ROOTCAUSE_LOGGER_NAME)).setLevel(Level.INFO);
+
+    if(cmd.hasOption(CLI_VERBOSE))
+      ((Logger)LoggerFactory.getLogger(ROOTCAUSE_LOGGER_NAME)).setLevel(Level.DEBUG);
 
     // config
     File config = new File(cmd.getOptionValue(CLI_CONFIG_DIR));
