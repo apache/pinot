@@ -6,6 +6,8 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import org.apache.commons.math.stat.correlation.Covariance;
+import org.apache.commons.math.stat.correlation.PearsonsCorrelation;
 
 
 /**
@@ -422,6 +424,14 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     return this.aggregate(STD).value();
   }
 
+  public double corr(Series other) {
+    return corr(this, other);
+  }
+
+  public double cov(Series other) {
+    return cov(this, other);
+  }
+
   public DoubleSeries normalize() {
     try {
       return this.map(new DoubleMapNormalize(this.min(), this.max()));
@@ -771,6 +781,18 @@ public final class DoubleSeries extends TypedSeries<DoubleSeries> {
     if(series.hasNull())
       return BooleanSeries.buildFrom(BooleanSeries.NULL);
     return BooleanSeries.builder().addBooleanValues(function.apply(series.getDoubles().values)).build();
+  }
+
+  public static double corr(Series a, Series b) {
+    if(a.hasNull() || b.hasNull())
+      return NULL;
+    return new PearsonsCorrelation().correlation(a.getDoubles().values(), b.getDoubles().values());
+  }
+
+  public static double cov(Series a, Series b) {
+    if(a.hasNull() || b.hasNull())
+      return NULL;
+    return new Covariance().covariance(a.getDoubles().values(), b.getDoubles().values());
   }
 
   private static int nullSafeDoubleComparator(double a, double b) {
