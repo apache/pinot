@@ -162,24 +162,26 @@ public class AlertTaskRunnerV2 implements TaskRunner {
 
         for (Map.Entry<DimensionMap, GroupedAnomalyResultsDTO> entry : filteredGroupedAnomalyResultsMap.entrySet()) {
           // Anomaly results for this group
+          DimensionMap dimensions = entry.getKey();
           GroupedAnomalyResultsDTO groupedAnomalyDTO = entry.getValue();
           List<MergedAnomalyResultDTO> resultsForThisGroup = groupedAnomalyDTO.getAnomalyResults();
           // Append auxiliary recipients for this group
           String recipientsForThisGroup = alertConfig.getRecipients();
-          String auxiliaryRecipients = alertGrouper.groupEmailRecipients(entry.getKey());
+          // TODO: Replace with AuxiliaryRecipient provider
+          String auxiliaryRecipients = alertGrouper.groupEmailRecipients(dimensions);
           if (StringUtils.isNotBlank(auxiliaryRecipients)) {
             recipientsForThisGroup = recipientsForThisGroup + EmailHelper.EMAIL_ADDRESS_SEPARATOR + auxiliaryRecipients;
           }
-          // Append group name after config name if the group name is not an empty string or group
-          String emailName = alertConfig.getName();
-          String groupName = entry.getKey().toJavaString();
-          if (StringUtils.isNotBlank(groupName)) {
-            emailName = emailName + " " + groupName;
+          // Append group name after config name if dimensions of this group is not empty
+          String emailSubjectName = alertConfig.getName();
+          if (dimensions.size() != 0) {
+            String groupName = dimensions.toJavaString();
+            emailSubjectName = emailSubjectName + " " + groupName;
           }
           // Generate and send out an anomaly report for this group
           AnomalyReportGenerator.getInstance()
               .buildReport(resultsForThisGroup, thirdeyeConfig, recipientsForThisGroup, alertConfig.getFromAddress(),
-                  emailName);
+                  emailSubjectName);
           // Update notified flag
           if (alertGrouper instanceof DummyAlertGrouper) {
             // DummyAlertGroupFilter does not generate real GroupedAnomaly, so the flag has to be set on merged anomalies.
