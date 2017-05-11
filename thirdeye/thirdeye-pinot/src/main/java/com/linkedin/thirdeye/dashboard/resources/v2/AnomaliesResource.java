@@ -33,6 +33,8 @@ import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.datalayer.bao.GroupedAnomalyResultsManager;
+import com.linkedin.thirdeye.datalayer.dto.GroupedAnomalyResultsDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 import com.linkedin.thirdeye.datasource.DAORegistry;
@@ -109,6 +111,7 @@ public class AnomaliesResource {
 
   private final MetricConfigManager metricConfigDAO;
   private final MergedAnomalyResultManager mergedAnomalyResultDAO;
+  private final GroupedAnomalyResultsManager groupedAnomalyResultsDAO;
   private final OverrideConfigManager overrideConfigDAO;
   private final AnomalyFunctionManager anomalyFunctionDAO;
   private final DashboardConfigManager dashboardConfigDAO;
@@ -120,6 +123,7 @@ public class AnomaliesResource {
   public AnomaliesResource(AnomalyFunctionFactory anomalyFunctionFactory, AlertFilterFactory alertFilterFactory) {
     metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
     mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
+    groupedAnomalyResultsDAO = DAO_REGISTRY.getGroupedAnomalyResultsDAO();
     overrideConfigDAO = DAO_REGISTRY.getOverrideConfigDAO();
     anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
@@ -387,8 +391,10 @@ public class AnomaliesResource {
       }
       if (groupId != null) {
         // TODO: Read anomalies from the grouped anomaly (Need to ensure that groupId is actually a "group id")
-        ArrayList<Long> anomaliesIdOfGroup = new ArrayList<>();
-        anomalyIdSet.addAll(anomaliesIdOfGroup);
+        GroupedAnomalyResultsDTO groupedAnomalyResultsDTO = groupedAnomalyResultsDAO.findById(groupId);
+        AnomaliesWrapper anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(groupedAnomalyResultsDTO.getAnomalyResults(), pageNumber);
+        return anomaliesWrapper;
+//        anomalyIdSet.addAll(anomaliesIdOfGroup);
       }
     }
 
