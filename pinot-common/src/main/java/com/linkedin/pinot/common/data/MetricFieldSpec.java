@@ -88,7 +88,7 @@ public final class MetricFieldSpec extends FieldSpec {
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
-  public void setDerivedMetricType(@Nonnull DerivedMetricType derivedMetricType) {
+  public void setDerivedMetricType(@Nullable DerivedMetricType derivedMetricType) {
     _derivedMetricType = derivedMetricType;
   }
 
