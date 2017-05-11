@@ -30,7 +30,8 @@ public class DataFrame {
   public static Pattern SERIES_NAME_PATTERN = Pattern.compile("([A-Za-z_]\\w*)");
 
   public static final String COLUMN_INDEX_DEFAULT = "index";
-  public static final String COLUMN_JOIN_POSTFIX = "_right";
+  public static final String COLUMN_JOIN_LEFT = "_left";
+  public static final String COLUMN_JOIN_RIGHT = "_right";
   public static final int DEFAULT_MAX_COLUMN_WIDTH = 30;
 
   /**
@@ -1294,7 +1295,7 @@ public class DataFrame {
 
   public DataFrame joinInner(DataFrame other, String onSeriesLeft, String onSeriesRight) {
     List<Series.JoinPair> pairs = this.get(onSeriesLeft).join(other.get(onSeriesRight), Series.JoinType.INNER);
-    return DataFrame.join(this, other, pairs);
+    return DataFrame.join(this, other, pairs, onSeriesLeft, onSeriesRight);
   }
 
   public DataFrame joinLeft(DataFrame other) {
@@ -1308,7 +1309,7 @@ public class DataFrame {
 
   public DataFrame joinLeft(DataFrame other, String onSeriesLeft, String onSeriesRight) {
     List<Series.JoinPair> pairs = this.get(onSeriesLeft).join(other.get(onSeriesRight), Series.JoinType.LEFT);
-    return DataFrame.join(this, other, pairs);
+    return DataFrame.join(this, other, pairs, onSeriesLeft, onSeriesRight);
   }
 
   public DataFrame joinRight(DataFrame other) {
@@ -1322,7 +1323,7 @@ public class DataFrame {
 
   public DataFrame joinRight(DataFrame other, String onSeriesLeft, String onSeriesRight) {
     List<Series.JoinPair> pairs = this.get(onSeriesLeft).join(other.get(onSeriesRight), Series.JoinType.RIGHT);
-    return DataFrame.join(this, other, pairs);
+    return DataFrame.join(this, other, pairs, onSeriesLeft, onSeriesRight);
   }
 
   public DataFrame joinOuter(DataFrame other) {
@@ -1336,10 +1337,10 @@ public class DataFrame {
 
   public DataFrame joinOuter(DataFrame other, String onSeriesLeft, String onSeriesRight) {
     List<Series.JoinPair> pairs = this.get(onSeriesLeft).join(other.get(onSeriesRight), Series.JoinType.OUTER);
-    return DataFrame.join(this, other, pairs);
+    return DataFrame.join(this, other, pairs, onSeriesLeft, onSeriesRight);
   }
 
-  private static DataFrame join(DataFrame left, DataFrame right, List<Series.JoinPair> pairs) {
+  private static DataFrame join(DataFrame left, DataFrame right, List<Series.JoinPair> pairs, String onSeriesLeft, String onSeriesRight) {
     int[] fromIndexLeft = new int[pairs.size()];
     int i=0;
     for(Series.JoinPair p : pairs) {
@@ -1356,17 +1357,31 @@ public class DataFrame {
     DataFrame rightData = right.project(fromIndexRight);
 
     Set<String> seriesLeft = left.getSeriesNames();
-    for(Map.Entry<String, Series> e : rightData.getSeries().entrySet()) {
-      String seriesName = e.getKey();
-      // TODO: better approach to conditional rename
-      if(seriesLeft.contains(seriesName) && !leftData.get(seriesName).equals(rightData.get(seriesName))) {
-        seriesName = e.getKey() + COLUMN_JOIN_POSTFIX;
-      }
+    Set<String> seriesRight = right.getSeriesNames();
 
-      leftData.addSeries(seriesName, e.getValue());
+    DataFrame joined = new DataFrame();
+
+    for(String name : seriesRight) {
+      Series s = rightData.get(name);
+      if(!seriesLeft.contains(name) || name.equals(onSeriesRight)) {
+        joined.addSeries(name, s);
+      } else {
+        joined.addSeries(name + COLUMN_JOIN_RIGHT, s);
+      }
     }
 
-    return leftData;
+    for(String name : seriesLeft) {
+      Series s = leftData.get(name);
+      if(!seriesRight.contains(name) || name.equals(onSeriesLeft)) {
+        joined.addSeries(name, s);
+      } else {
+        joined.addSeries(name + COLUMN_JOIN_LEFT, s);
+      }
+    }
+
+    joined.setIndex(onSeriesLeft);
+
+    return joined;
   }
 
   /**
