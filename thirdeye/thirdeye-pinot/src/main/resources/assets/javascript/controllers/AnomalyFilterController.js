@@ -44,7 +44,7 @@ AnomalyFilterController.prototype = {
     const startIndex = (pageNumber - 1) * pageSize;
     const endIndex = startIndex + pageSize;
 
-    return this.anomalyFilterModel.selectedAnomalyIds.slice(startIndex, endIndex);
+    return this.anomalyFilterModel.getSelectedAnomalyIds().slice(startIndex, endIndex);
   },
 };
 

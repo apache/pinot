@@ -4,7 +4,7 @@
       <span class="filter-title__name">{{displayFilterName @key}}</span>
       <a class="filter-title__action {{#if this.expanded}}filter-title__action--expanded{{/if}}"></a>
     </h5>
-    <ul class="filter-body__list {{#unless this.expanded}}filter-body__list--hidden{{/unless}}" id="statusFilterMap">
+    <ul class="filter-body__list {{#unless this.expanded}}filter-body__list--hidden{{/unless}}">
 
       {{#each this}}
         {{#if (isObject this)}}

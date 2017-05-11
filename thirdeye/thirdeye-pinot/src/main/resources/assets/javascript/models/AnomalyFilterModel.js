@@ -81,6 +81,12 @@ AnomalyFilterModel.prototype = {
     );
   },
 
+  getSelectedAnomalyIds() {
+    return this.selectedAnomalyIds.length ?
+      this.selectedAnomalyIds :
+      this.allAnomalyIds;
+  },
+
   getIntersection(set1, set2) {
     set1 = new Set(set1);
     set2 = new Set(set2);

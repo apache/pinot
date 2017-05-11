@@ -60,11 +60,12 @@ AnomalyFilterView.prototype = {
   setupFilterListener() {
     // show hide filter sections
     $('.filter-section').on('click', '.filter-title', (event) => {
-      event.stopPropagation();
-      $(event.delegateTarget).children('.filter-body__list').toggleClass('filter-body__list--hidden');
+      const $section = $(event.delegateTarget);
+      const filter = $section.data('section');
+      $section.children('.filter-body__list').toggleClass('filter-body__list--hidden');
       $(event.target.parentElement).find('.filter-title__action').toggleClass('filter-title__action--expanded');
-      const filter = $(event.delegateTarget).data('section');
 
+      event.stopPropagation();
       this.expandedFilterEvent.notify({ filter });
     });
 
@@ -85,12 +86,6 @@ AnomalyFilterView.prototype = {
     // clear
     $('#clear-button').click(() => {
       this.clearEvent.notify();
-    });
-
-    // search with filters
-    $('#apply-button').click(() => {
-      $('body').scrollTop(0);
-
     });
   }
 };
