@@ -121,6 +121,9 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       if (numSegmentsMatched == 0) {
         DataTable emptyDataTable = DataTableBuilder.buildEmptyDataTable(brokerRequest);
         emptyDataTable.getMetadata().put(DataTable.TOTAL_DOCS_METADATA_KEY, String.valueOf(totalRawDocs));
+
+        // Stop and record the query processing timer for early bailout.
+        queryProcessingTimer.stopAndRecord();
         return emptyDataTable;
       }
 
