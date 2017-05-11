@@ -382,6 +382,7 @@ public class AnomaliesResource {
 
     String[] groupIds = groupIdsString.split(COMMA_SEPARATOR);
     Set<Long> anomalyIdSet = new HashSet<>();
+    List<MergedAnomalyResultDTO> mergedAnomalies = new ArrayList<>();
     for (String idString : groupIds) {
       Long groupId = null;
       try {
@@ -390,16 +391,19 @@ public class AnomaliesResource {
         LOG.info("Skipping group id {} due to parsing error: {}", idString, e);
       }
       if (groupId != null) {
-        // TODO: Read anomalies from the grouped anomaly (Need to ensure that groupId is actually a "group id")
-        GroupedAnomalyResultsDTO groupedAnomalyResultsDTO = groupedAnomalyResultsDAO.findById(groupId);
-        AnomaliesWrapper anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(groupedAnomalyResultsDTO.getAnomalyResults(), pageNumber);
-        return anomaliesWrapper;
-//        anomalyIdSet.addAll(anomaliesIdOfGroup);
+        GroupedAnomalyResultsDTO groupedAnomalyDTO = groupedAnomalyResultsDAO.findById(groupId);
+        if (groupedAnomalyDTO != null) {
+          List<MergedAnomalyResultDTO> mergedAnomalyOfGroup = groupedAnomalyDTO.getAnomalyResults();
+          for (MergedAnomalyResultDTO mergedAnomalyDTO : mergedAnomalyOfGroup) {
+            if (!anomalyIdSet.contains(mergedAnomalyDTO.getId())) {
+              mergedAnomalies.add(mergedAnomalyDTO);
+              anomalyIdSet.add(mergedAnomalyDTO.getId());
+            }
+          }
+        }
       }
     }
 
-    List<Long> anomalyIdList = new ArrayList<>(anomalyIdSet);
-    List<MergedAnomalyResultDTO> mergedAnomalies = mergedAnomalyResultDAO.findByIdList(anomalyIdList, false);
     AnomaliesWrapper anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(mergedAnomalies, pageNumber);
     return anomaliesWrapper;
   }

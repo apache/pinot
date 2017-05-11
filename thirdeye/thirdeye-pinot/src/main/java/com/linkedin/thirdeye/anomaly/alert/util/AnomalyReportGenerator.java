@@ -200,10 +200,10 @@ public class AnomalyReportGenerator {
       templateData.put("anomalyIds", Joiner.on(",").join(anomalyIds));
       if (groupId != null) {
         templateData.put("isGroupedAnomaly", true);
-        templateData.put("groupId", groupId);
+        templateData.put("groupId", Long.toString(groupId));
       } else {
         templateData.put("isGroupedAnomaly", false);
-        templateData.put("groupId", -1);
+        templateData.put("groupId", Long.toString(-1));
       }
       if(precisionRecallEvaluator.getTotalResponses() > 0) {
         templateData.put("precision", precisionRecallEvaluator.getPrecisionInResponse());
