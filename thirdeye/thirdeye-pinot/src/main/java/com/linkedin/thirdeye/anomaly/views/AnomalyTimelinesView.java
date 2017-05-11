@@ -8,9 +8,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class AnomalyTimelinesView {
+  private static final Logger LOG = LoggerFactory.getLogger(AnomalyTimelinesView.class);
   private static ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   List<TimeBucket> timeBuckets = new ArrayList<>();
@@ -56,13 +59,12 @@ public class AnomalyTimelinesView {
    * NOTE, as long as the getter and setter is implemented, the ObjectMapper constructs the JSON String via
    * the getter and setter
    * @return
-   *    The JSON String of current instance
+   *    The JSON String of the condensed view of current instance
    * @throws JsonProcessingException
    */
   public String toJsonString() throws JsonProcessingException {
-    String jsonString = OBJECT_MAPPER.writeValueAsString(this);
-
-    return jsonString;
+    // Convert the new AnomalyTimelinesView to condensed one
+    return CondensedAnomalyTimelinesView.fromAnomalyTimelinesView(this).toJsonString();
   }
 
   /**
@@ -77,7 +79,15 @@ public class AnomalyTimelinesView {
    * @throws IOException
    */
   public static AnomalyTimelinesView fromJsonString(String jsonString) throws IOException {
-    AnomalyTimelinesView view = OBJECT_MAPPER.readValue(jsonString, AnomalyTimelinesView.class);
-    return view;
+    AnomalyTimelinesView anomalyTimelinesView = new AnomalyTimelinesView();
+    try {
+      // Try if the json string can be parsed to condensed view; otherwise, use AnomalyTimelinesView
+      CondensedAnomalyTimelinesView condensedView = CondensedAnomalyTimelinesView.fromJsonString(jsonString);
+      anomalyTimelinesView = condensedView.toAnomalyTimelinesView();
+    } catch (Exception e) {
+      LOG.warn("The view instance is not in CondensedAnomalyTimelinesView; using the AnomalyTimelinesView instead");
+      anomalyTimelinesView = OBJECT_MAPPER.readValue(jsonString, AnomalyTimelinesView.class);
+    }
+    return anomalyTimelinesView;
   }
 }
