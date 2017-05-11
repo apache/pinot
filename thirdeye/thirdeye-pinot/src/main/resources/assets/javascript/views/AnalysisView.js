@@ -320,7 +320,7 @@ AnalysisView.prototype = {
       var values = filters[key];
       var children = [];
       for (var i in values) {
-        children.push({id:key +":"+ values[i], text:values[i]});
+        children.push({id:key +"::"+ values[i], text:values[i]});
       }
       filterData.push({text:key, children:children});
     }
@@ -357,7 +357,7 @@ AnalysisView.prototype = {
     var filterMap = {};
     for (var i in selectedFilters) {
       var filterStr = selectedFilters[i];
-      var keyVal = filterStr.split(":");
+      var keyVal = filterStr.split("::");
       var list = filterMap[keyVal[0]];
       if (list) {
         filterMap[keyVal[0]].push(keyVal[1]);
