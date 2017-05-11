@@ -71,6 +71,36 @@ public final class RealtimeSingleValueIterator extends BlockSingleValIterator {
   }
 
   @Override
+  public long nextLongVal() {
+    if (!hasNext()) {
+      return Constants.EOF;
+    }
+
+    long ret = reader.getLong(counter);
+    return ret;
+  }
+
+  @Override
+  public float nextFloatVal() {
+    if (!hasNext()) {
+      return Constants.EOF;
+    }
+
+    float ret = reader.getFloat(counter);
+    return ret;
+  }
+
+  @Override
+  public double nextDoubleVal() {
+    if (!hasNext()) {
+      return Constants.EOF;
+    }
+
+    double ret = reader.getDouble(counter);
+    return ret;
+  }
+
+  @Override
   public boolean hasNext() {
     return (counter < max);
   }

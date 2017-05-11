@@ -37,7 +37,7 @@ public class RealtimeSegmentImplTest {
   public static RealtimeSegmentImpl createRealtimeSegmentImpl(Schema schema, int sizeThresholdToFlushSegment, String tableName, String segmentName, String streamName,
       ServerMetrics serverMetrics) throws IOException {
     return new RealtimeSegmentImpl(schema, sizeThresholdToFlushSegment, tableName, segmentName, streamName, serverMetrics, new ArrayList<String>(),
-        2);
+        2, new ArrayList<String>());
   }
   @Test
   public void testDropInvalidRows() throws Exception {

@@ -96,6 +96,7 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   private final String tableAndStreamName;
   private StarTreeIndexSpec starTreeIndexSpec = null;
   private SegmentPartitionConfig segmentPartitionConfig = null;
+  private final List<String> noDictionaryColumns;
 
   // TODO Dynamcally adjust these variables, maybe on a per column basis
 
@@ -104,8 +105,9 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
   private static final int MAX_MULTI_VALUES_PER_ROW = 1000;
 
   public RealtimeSegmentImpl(Schema schema, int capacity, String tableName, String segmentName, String streamName,
-      ServerMetrics serverMetrics, List<String> invertedIndexColumns, int avgMultiValueCount)
-      {
+      ServerMetrics serverMetrics, List<String> invertedIndexColumns, int avgMultiValueCount,
+      List<String> noDictionaryColumns)
+  {
     // initial variable setup
     this.segmentName = segmentName;
     this.serverMetrics = serverMetrics;
@@ -114,6 +116,8 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     dictionaryMap = new HashMap<String, BaseOnHeapMutableDictionary>();
     maxNumberOfMultivaluesMap = new HashMap<String, Integer>();
     outgoingTimeColumnName = dataSchema.getTimeFieldSpec().getOutgoingTimeColumnName();
+
+    this.noDictionaryColumns = noDictionaryColumns;
     this.capacity = capacity;
 
     for (FieldSpec col : dataSchema.getAllFieldSpecs()) {
@@ -129,8 +133,9 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
         dataSchema.getFieldSpecFor(outgoingTimeColumnName).getDataType()));
 
     for (String metric : dataSchema.getMetricNames()) {
-      dictionaryMap.put(metric,
-          MutableDictionaryFactory.getMutableDictionary(dataSchema.getFieldSpecFor(metric).getDataType()));
+      if (!isNoDictionaryFixedWidthColumn(metric)) {
+        dictionaryMap.put(metric, MutableDictionaryFactory.getMutableDictionary(dataSchema.getFieldSpecFor(metric).getDataType()));
+      }
     }
 
     // docId generator and time granularity converter
@@ -162,8 +167,12 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
       if (invertedIndexColumns.contains(metric)) {
         invertedIndexMap.put(metric, new MetricInvertedIndex(metric));
       }
+      int colSize = Integer.SIZE/8;
+      if (isNoDictionaryFixedWidthColumn(metric)) {
+        colSize = getColWidth(schema.getFieldSpecFor(metric).getDataType());
+      }
       columnIndexReaderWriterMap.put(metric,
-          new FixedByteSingleColumnSingleValueReaderWriter(capacity, Integer.SIZE/8));
+          new FixedByteSingleColumnSingleValueReaderWriter(capacity, colSize));
     }
 
     if (invertedIndexColumns.contains(outgoingTimeColumnName)) {
@@ -173,6 +182,59 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
         new FixedByteSingleColumnSingleValueReaderWriter(capacity, Integer.SIZE/8));
 
     tableAndStreamName = tableName + "-" + streamName;
+  }
+
+  private int getColWidth(FieldSpec.DataType dataType) {
+    switch (dataType) {
+      case SHORT:
+        return Short.SIZE/8;
+      case INT:
+        return Integer.SIZE/8;
+      case LONG:
+        return Long.SIZE/8;
+      case FLOAT:
+        return Float.SIZE/8;
+      case DOUBLE:
+        return Double.SIZE/8;
+      default:
+        throw new UnsupportedOperationException("Unknown width for datatype " + dataType.toString());
+    }
+  }
+
+  /*
+   * TODO Decide on a mechanism to indicate which columns are no dictionary.
+   * Options are:
+   * - Include metrics in the noDictionary column list
+   *   (con: when schema changes, we need to remember to add new columns to no-dictionary list)
+   * - Introduce a new flag in table config to disable dictionary for all metrics.
+   *   (con: a new config variable)
+   * TODO: In either case we also need to make changes to handle SV float/int/long/double dimensions for no-dict as well.
+   */
+  private boolean isNoDictionaryFixedWidthColumn(String columnName) {
+    return false;
+    /*
+     * TODO Uncomment this line after segment generation for no dictionary columns is implemented.
+    if (!isNoDictionarySupportedForColumn(columnName)) {
+      return false;
+    }
+    if (noDictionaryColumns.contains(columnName)) {
+      return true;
+    }
+    return false;
+    */
+  }
+
+  private boolean isNoDictionarySupportedForColumn(String columnName) {
+    FieldSpec.DataType dataType = dataSchema.getFieldSpecFor(columnName).getDataType();
+    switch (dataType) {
+      case INT:
+      case LONG:
+      case DOUBLE:
+      case FLOAT:
+        return true;
+      default:
+        return false;
+    }
   }
 
   @Override
@@ -248,7 +310,9 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     }
 
     for (String metric : dataSchema.getMetricNames()) {
-      dictionaryMap.get(metric).index(row.getValue(metric));
+      if (!isNoDictionaryFixedWidthColumn(metric)) {
+        dictionaryMap.get(metric).index(row.getValue(metric));
+      }
     }
 
     // Conversion already happens in PlainFieldExtractor
@@ -300,9 +364,29 @@ public class RealtimeSegmentImpl implements RealtimeSegment {
     for (String metric : dataSchema.getMetricNames()) {
       FixedByteSingleColumnSingleValueReaderWriter readerWriter =
           (FixedByteSingleColumnSingleValueReaderWriter) columnIndexReaderWriterMap.get(metric);
-      int dicId = dictionaryMap.get(metric).indexOf(row.getValue(metric));
-      readerWriter.setInt(docId, dicId);
-      rawRowToDicIdMap.put(metric, dicId);
+      if (isNoDictionaryFixedWidthColumn(metric)) {
+        switch (dataSchema.getFieldSpecFor(metric).getDataType()) {
+          case SHORT:
+            readerWriter.setShort(docId, (short)row.getValue(metric));
+            break;
+          case INT:
+            readerWriter.setInt(docId, (int)row.getValue(metric));
+            break;
+          case LONG:
+            readerWriter.setLong(docId, (long)row.getValue(metric));
+            break;
+          case FLOAT:
+            readerWriter.setFloat(docId, (float)row.getValue(metric));
+            break;
+          case DOUBLE:
+            readerWriter.setDouble(docId, (double)row.getValue(metric));
+            break;
+        }
+      } else {
+        int dicId = dictionaryMap.get(metric).indexOf(row.getValue(metric));
+        readerWriter.setInt(docId, dicId);
+        rawRowToDicIdMap.put(metric, dicId);
+      }
     }
 
     int timeDicId = dictionaryMap.get(outgoingTimeColumnName).indexOf(timeValueObj);

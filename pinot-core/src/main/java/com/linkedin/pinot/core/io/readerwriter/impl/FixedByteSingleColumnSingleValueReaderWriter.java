@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.core.io.readerwriter.impl;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
@@ -28,22 +29,100 @@ import com.linkedin.pinot.core.segment.memory.PinotDataBuffer;
 // TODO Check if MMAP allows us to pack more partitions on a single machine.
 public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColumnSingleValueReaderWriter {
 
-  FixedByteSingleValueMultiColWriter currentWriter;
-  private List<FixedByteSingleValueMultiColWriter> writers = new ArrayList<>();
-  // For readers it is useful to keep a "chunked-reader" class that is aware of the start and end offset of that buffer.
-  // If we do that then we avoid the % operation on the record on every read.
-  // For the bulk read operation, we can do a loop like this one:
-  //   foreach(row in rows[]) {
-  //     bufferId = row / chunkSize;
-  //     chunked-readers.get(bufferId).getInt(row);
-  //   }
-  // TODO the logic above
-  private List<FixedByteSingleValueMultiColReader> readers = new ArrayList<>();
+  WriterWithOffset currentWriter;
+  private List<WriterWithOffset> writers = new ArrayList<>();
+  private List<ReaderWithOffset> readers = new ArrayList<>();
   private List<PinotDataBuffer> buffers = new ArrayList<>();
   private final long chunkSizeInBytes;
   private final int numRowsPerChunk;
   private final int columnSizesInBytes;
   private long numBytesInCurrentWriter = 0;
+
+  private static class WriterWithOffset implements Closeable {
+    final FixedByteSingleValueMultiColWriter writer;
+    final int startRowId;
+
+    private WriterWithOffset(FixedByteSingleValueMultiColWriter writer, int startRowId) {
+      this.writer = writer;
+      this.startRowId = startRowId;
+    }
+
+    @Override
+    public void close() {
+      writer.close();
+    }
+
+    public void setInt(int row, int value) {
+      writer.setInt(row - startRowId, 0, value);
+    }
+
+    public void setLong(int row, long value) {
+      writer.setLong(row - startRowId, 0, value);
+    }
+
+    public void setFloat(int row, float value) {
+      writer.setFloat(row - startRowId, 0, value);
+    }
+
+    public void setDouble(int row, double value) {
+      writer.setDouble(row - startRowId, 0, value);
+    }
+
+    public void setShort(int row, short value) {
+      writer.setShort(row - startRowId, 0, value);
+    }
+  }
+
+  private static class ReaderWithOffset implements Closeable {
+    final FixedByteSingleValueMultiColReader reader;
+    final int startRowId;
+
+    private ReaderWithOffset(FixedByteSingleValueMultiColReader reader, int startRowId) {
+      this.reader = reader;
+      this.startRowId = startRowId;
+    }
+
+    @Override
+    public void close() {
+      reader.close();
+    }
+
+    public int getInt(int row) {
+      return reader.getInt(row - startRowId, 0);
+    }
+
+    public long getLong(int row) {
+      return reader.getLong(row - startRowId, 0);
+    }
+
+    public float getFloat(int row) {
+      return reader.getFloat(row - startRowId, 0);
+    }
+
+    public double getDouble(int row) {
+      return reader.getDouble(row - startRowId, 0);
+    }
+
+    public short getShort(int row) {
+      return reader.getShort(row - startRowId, 0);
+    }
+
+    public void readValues(int[] rows, int rowStartPos, int rowSize, int[] values, int valuesStartPos) {
+      reader.readIntValues(rows, 0, rowStartPos, rowSize, values, valuesStartPos);
+    }
+
+    public void readValues(int[] rows, int rowStartPos, int rowSize, long[] values, int valuesStartPos) {
+      reader.readLongValues(rows, 0, rowStartPos, rowSize, values, valuesStartPos);
+    }
+
+    public void readValues(int[] rows, int rowStartPos, int rowSize, float[] values, int valuesStartPos) {
+      reader.readFloatValues(rows, 0, rowStartPos, rowSize, values, valuesStartPos);
+    }
+
+    public void readValues(int[] rows, int rowStartPos, int rowSize, double[] values, int valuesStartPos) {
+      reader.readDoubleValues(rows, 0, rowStartPos, rowSize, values, valuesStartPos);
+    }
+  }
 
   /**
    *  @param numRowsPerChunk Number of rows to pack in one chunk before a new chunk is created.
@@ -61,8 +140,10 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
     buffer.order(ByteOrder.nativeOrder());
     buffers.add(buffer);
     FixedByteSingleValueMultiColReader reader = new FixedByteSingleValueMultiColReader(buffer, numRowsPerChunk, new int[]{columnSizesInBytes});
-    currentWriter = new FixedByteSingleValueMultiColWriter(buffer, numRowsPerChunk, /*cols=*/1, new int[]{columnSizesInBytes});
-    readers.add(reader);
+    FixedByteSingleValueMultiColWriter writer  = new FixedByteSingleValueMultiColWriter(buffer, numRowsPerChunk, /*cols=*/1, new int[]{columnSizesInBytes});
+    final int startRowId = numRowsPerChunk * (buffers.size()-1);
+    currentWriter = new WriterWithOffset(writer, startRowId);
+    readers.add(new ReaderWithOffset(reader, startRowId));
     writers.add(currentWriter);
     numBytesInCurrentWriter = 0;
   }
@@ -76,10 +157,10 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
 
   @Override
   public void close() throws IOException {
-    for (FixedByteSingleValueMultiColReader reader : readers) {
+    for (ReaderWithOffset reader : readers) {
       reader.close();
     }
-    for (FixedByteSingleValueMultiColWriter writer : writers) {
+    for (WriterWithOffset writer : writers) {
       writer.close();
     }
     for (PinotDataBuffer buffer : buffers) {
@@ -96,115 +177,63 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
   }
 
   @Override
-  public void setChar(int row, char ch) {
-    addBufferIfNeeded(row);
-    int rowInChunk = getRowInChunk(row);
-    currentWriter.setChar(rowInChunk, 0, ch);
-  }
-
-  @Override
   public void setInt(int row, int i) {
     addBufferIfNeeded(row);
-    int rowInChunk = getRowInChunk(row);
-    currentWriter.setInt(rowInChunk, 0, i);
+    currentWriter.setInt(row, i);
   }
 
   @Override
   public void setShort(int row, short s) {
     addBufferIfNeeded(row);
-    int rowInChunk = getRowInChunk(row);
-    currentWriter.setShort(rowInChunk, 0, s);
+    currentWriter.setShort(row, s);
   }
 
   @Override
   public void setLong(int row, long l) {
     addBufferIfNeeded(row);
-    int rowInChunk = getRowInChunk(row);
-    currentWriter.setLong(rowInChunk, 0, l);
+    currentWriter.setLong(row, l);
   }
 
   @Override
   public void setFloat(int row, float f) {
     addBufferIfNeeded(row);
-    int rowInChunk = getRowInChunk(row);
-    currentWriter.setFloat(rowInChunk, 0, f);
+    currentWriter.setFloat(row, f);
   }
 
   @Override
   public void setDouble(int row, double d) {
     addBufferIfNeeded(row);
-    int rowInChunk = getRowInChunk(row);
-    currentWriter.setDouble(rowInChunk, 0, d);
-  }
-
-  @Override
-  public void setString(int row, String string) {
-    addBufferIfNeeded(row);
-    int rowInChunk = getRowInChunk(row);
-    currentWriter.setString(rowInChunk, 0, string);
-  }
-
-  @Override
-  public void setBytes(int row, byte[] bytes) {
-    addBufferIfNeeded(row);
-    int rowInChunk = getRowInChunk(row);
-    currentWriter.setBytes(rowInChunk, 0, bytes);
-  }
-
-  @Override
-  public char getChar(int row) {
-    int rowInChunk = getRowInChunk(row);
-    int bufferId = getBufferId(row);
-    return readers.get(bufferId).getChar(rowInChunk, 0);
+    currentWriter.setDouble(row, d);
   }
 
   @Override
   public short getShort(int row) {
-    int rowInChunk = getRowInChunk(row);
     int bufferId = getBufferId(row);
-    return readers.get(bufferId).getShort(rowInChunk, 0);
+    return readers.get(bufferId).getShort(row);
   }
 
   @Override
   public int getInt(int row) {
-    int rowInChunk = getRowInChunk(row);
     int bufferId = getBufferId(row);
-    return readers.get(bufferId).getInt(rowInChunk, 0);
+    return readers.get(bufferId).getInt(row);
   }
 
   @Override
   public long getLong(int row) {
-    int rowInChunk = getRowInChunk(row);
     int bufferId = getBufferId(row);
-    return readers.get(bufferId).getLong(rowInChunk, 0);
+    return readers.get(bufferId).getLong(row);
   }
 
   @Override
   public float getFloat(int row) {
-    int rowInChunk = getRowInChunk(row);
     int bufferId = getBufferId(row);
-    return readers.get(bufferId).getFloat(rowInChunk, 0);
+    return readers.get(bufferId).getFloat(row);
   }
 
   @Override
   public double getDouble(int row) {
-    int rowInChunk = getRowInChunk(row);
     int bufferId = getBufferId(row);
-    return readers.get(bufferId).getDouble(rowInChunk, 0);
-  }
-
-  @Override
-  public String getString(int row) {
-    int rowInChunk = getRowInChunk(row);
-    int bufferId = getBufferId(row);
-    return readers.get(bufferId).getString(rowInChunk, 0);
-  }
-
-  @Override
-  public byte[] getBytes(int row) {
-    int rowInChunk = getRowInChunk(row);
-    int bufferId = getBufferId(row);
-    return readers.get(bufferId).getBytes(rowInChunk, 0);
+    return readers.get(bufferId).getDouble(row);
   }
 
   @Override
@@ -218,29 +247,66 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
      * An alternative is to not have multiple buffers, but just copy the values from one buffer to next as we
      * increase the number of rows.
      */
-    if (rowSize == 0) {
-      return;
-    }
     if (readers.size() == 1) {
-      readers.get(0).readIntValues(rows, 0, rowStartPos, rowSize, values, valuesStartPos);
+      readers.get(0).readValues(rows, rowStartPos, rowSize, values, valuesStartPos);
       return;
     }
     else
     {
-      int valueIter = valuesStartPos;
-      int bufferId = Integer.MIN_VALUE;
-      int startRowIdInBuffer = Integer.MAX_VALUE;
-      int endRowIdInBuffer = Integer.MIN_VALUE;
-
-      for (int rowIter = rowStartPos; rowIter < rowStartPos + rowSize; rowIter++, valueIter++) {
+      for (int rowIter = rowStartPos, valueIter = valuesStartPos;
+          rowIter < rowStartPos + rowSize;
+          rowIter++, valueIter++) {
         int row = rows[rowIter];
-        // The first time around, row >= endRowIdInBuffer will be true, since row is always positive.
-        if (row < startRowIdInBuffer || row > endRowIdInBuffer) {
-          bufferId = getBufferId(row);
-          startRowIdInBuffer = bufferId * numRowsPerChunk;
-          endRowIdInBuffer = startRowIdInBuffer + numRowsPerChunk - 1;
-        }
-        values[valueIter] = readers.get(bufferId).getInt(row-startRowIdInBuffer, 0);
+        int bufferId = getBufferId(row);
+        values[valueIter] = readers.get(bufferId).getInt(row);
+      }
+    }
+  }
+
+  public void readValues(int[] rows, int rowStartPos, int rowSize, long[] values, int valuesStartPos) {
+    if (readers.size() == 1) {
+      readers.get(0).readValues(rows, rowStartPos, rowSize, values, valuesStartPos);
+      return;
+    }
+    else
+    {
+      for (int rowIter = rowStartPos, valueIter = valuesStartPos;
+          rowIter < rowStartPos + rowSize;
+          rowIter++, valueIter++) {
+        int row = rows[rowIter];
+        int bufferId = getBufferId(row);
+        values[valueIter] = readers.get(bufferId).getLong(row);
+      }
+    }
+  }
+
+  public void readValues(int[] rows, int rowStartPos, int rowSize, float[] values, int valuesStartPos) {
+    if (readers.size() == 1) {
+      readers.get(0).readValues(rows, rowStartPos, rowSize, values, valuesStartPos);
+      return;
+    }
+    else
+    {
+      for (int rowIter = rowStartPos, valueIter = valuesStartPos;
+          rowIter < rowStartPos + rowSize;
+          rowIter++, valueIter++) {
+        int row = rows[rowIter];
+        int bufferId = getBufferId(row);
+        values[valueIter] = readers.get(bufferId).getFloat(row);
+      }
+    }
+  }
+
+  public void readValues(int[] rows, int rowStartPos, int rowSize, double[] values, int valuesStartPos) {
+    if (readers.size() == 1) {
+      readers.get(0).readValues(rows, rowStartPos, rowSize, values, valuesStartPos);
+      return;
+    } else {
+      for (int rowIter = rowStartPos, valueIter = valuesStartPos; rowIter < rowStartPos + rowSize;
+          rowIter++, valueIter++) {
+        int row = rows[rowIter];
+        int bufferId = getBufferId(row);
+        values[valueIter] = readers.get(bufferId).getDouble(row);
       }
     }
   }
