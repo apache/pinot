@@ -114,7 +114,7 @@ public class MergedAnomalyResultManagerImpl extends AbstractManagerImpl<MergedAn
         genericPojoDao.get(idList, MergedAnomalyResultBean.class);
     if (CollectionUtils.isNotEmpty(mergedAnomalyResultBeanList)) {
       List<MergedAnomalyResultDTO> mergedAnomalyResultDTOList =
-          batchConvertMergedAnomalyBean2DTO(mergedAnomalyResultBeanList, loadRawAnomalies);
+          convertMergedAnomalyBean2DTO(mergedAnomalyResultBeanList, loadRawAnomalies);
       return mergedAnomalyResultDTOList;
     } else {
       return Collections.emptyList();
