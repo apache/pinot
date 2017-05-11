@@ -10,6 +10,7 @@
             <option value="dashboard">Dashboard</option>
             <option value="id">Anomaly ID</option>
             <option value="time" selected>Time</option>
+            <option value="groupId">Group ID</option>
           </select>
         </div>
 
@@ -25,6 +26,10 @@
           </div>
           <div id="anomalies-search-time-container" class=""  style="overflow:hidden; display: none;">
             <select id="anomalies-search-time-input" class="label-large-light"></select>
+          </div>
+
+          <div id="anomalies-search-group-container" class=""  style="overflow:hidden; display: none;">
+            <select id="anomalies-search-group-input" class="label-large-light" multiple="multiple"></select>
           </div>
         </div>
 

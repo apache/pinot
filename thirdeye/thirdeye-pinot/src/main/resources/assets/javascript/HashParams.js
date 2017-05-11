@@ -13,6 +13,7 @@ function HashParams() {
   this.ANOMALIES_METRIC_IDS = 'metricIds';
   this.ANOMALIES_DASHBOARD_ID = 'dashboardId';
   this.ANOMALIES_ANOMALY_IDS = 'anomalyIds';
+  this.ANOMALIES_GROUP_IDS = 'groupIds';
   this.INVESTIGATE_ANOMALY_ID = 'anomalyId';
 
   this.ANALYSIS_METRIC_ID = 'metricId';
@@ -97,6 +98,7 @@ HashParams.prototype = {
       paramNamesToDefaultValuesMap[this.ANOMALIES_PAGE_NUMBER] = 1;
       paramNamesToDefaultValuesMap[this.ANOMALIES_METRIC_IDS] = undefined;
       paramNamesToDefaultValuesMap[this.ANOMALIES_DASHBOARD_ID] = undefined;
+      paramNamesToDefaultValuesMap[this.ANOMALIES_GROUP_IDS] = undefined;
       paramNamesToDefaultValuesMap[this.ANOMALIES_ANOMALY_IDS] = undefined;
       this.controllerNameToParamNamesMap[this.ANOMALIES_CONTROLLER] = paramNamesToDefaultValuesMap;
 
