@@ -272,7 +272,7 @@ public class TimeBasedAnomalyMerger {
     DateTime windowStart = new DateTime(mergedAnomaly.getStartTime());
     DateTime windowEnd = new DateTime(mergedAnomaly.getEndTime());
     String globalMetric = mergedAnomaly.getFunction().getGlobalMetric();
-    if (StringUtils.isNotEmpty(globalMetric)) {
+    if (StringUtils.isNotBlank(globalMetric)) {
       globalMetric = mergedAnomaly.getFunction().getMetric();
     }
     // Calculate the impact to the global metric

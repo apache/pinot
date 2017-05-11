@@ -593,7 +593,7 @@ public class AnomalyDetectionInputContextBuilder {
       Map<DimensionKey, MetricTimeSeries> dimensionKeyMetricTimeSeriesMap =
           TimeSeriesResponseConverter.toMap(timeSeriesResponse, Utils.getSchemaDimensionNames(anomalyFunctionSpec.getCollection()));
 
-      if (dimensionKeyMetricTimeSeriesMap == null || dimensionKeyMetricTimeSeriesMap.isEmpty()) {
+      if (MapUtils.isEmpty(dimensionKeyMetricTimeSeriesMap)) {
         LOG.error("Unable to fetch global metric for {}", anomalyFunctionSpec);
       }
       if (dimensionKeyMetricTimeSeriesMap.size() > 2) {
