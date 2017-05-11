@@ -210,13 +210,30 @@ public class FixedByteSingleColumnSingleValueReaderWriter extends BaseSingleColu
      * An alternative is to not have multiple buffers, but just copy the values from one buffer to next as we
      * increase the number of rows.
      */
+    if (rowSize == 0) {
+      return;
+    }
     if (readers.size() == 1) {
       readers.get(0).readIntValues(rows, 0, rowStartPos, rowSize, values, valuesStartPos);
+      return;
     }
-    int numRows = 0;
-    for (int rowIter = rowStartPos, valueIter = valuesStartPos; numRows < rowSize; numRows++, rowIter++, valueIter++) {
-      int row = rows[rowIter];
-      values[valueIter] = getInt(row);
+    else
+    {
+      int valueIter = valuesStartPos;
+      int bufferId = Integer.MIN_VALUE;
+      int startRowIdInBuffer = Integer.MAX_VALUE;
+      int endRowIdInBuffer = Integer.MIN_VALUE;
+
+      for (int rowIter = rowStartPos; rowIter < rowStartPos + rowSize; rowIter++, valueIter++) {
+        int row = rows[rowIter];
+        // The first time around, row >= endRowIdInBuffer will be true, since row is always positive.
+        if (row < startRowIdInBuffer || row > endRowIdInBuffer) {
+          bufferId = getBufferId(row);
+          startRowIdInBuffer = bufferId * numRowsPerChunk;
+          endRowIdInBuffer = startRowIdInBuffer + numRowsPerChunk - 1;
+        }
+        values[valueIter] = readers.get(bufferId).getInt(row-startRowIdInBuffer, 0);
+      }
     }
   }
 }
