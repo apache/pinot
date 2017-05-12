@@ -111,7 +111,6 @@
                     <forceCreation>true</forceCreation>
                 </configuration>
             </plugin>
-            <!--
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
@@ -144,26 +143,53 @@
                             </transformers>
                             <relocations>
                                 <relocation>
-                                    <pattern>com.fasterxml.jackson</pattern>
-                                    <shadedPattern>pinot.com.fasterxml.jackson</shadedPattern>
+                                    <pattern>com.</pattern>
+                                    <shadedPattern>thirdeye.com.</shadedPattern>
+                                    <excludes>
+                                        <exclude>com.linkedin.thirdeye.**</exclude>
+                                    </excludes>
                                 </relocation>
                                 <relocation>
-                                    <pattern>org.codehaus.jackson</pattern>
-                                    <shadedPattern>pinot.org.codehaus.jackson</shadedPattern>
+                                    <pattern>org.</pattern>
+                                    <shadedPattern>thirdeye.org.</shadedPattern>
                                 </relocation>
                                 <relocation>
-                                    <pattern>org.yaml.snakeyaml</pattern>
-                                    <shadedPattern>pinot.org.yaml.snakeyaml</shadedPattern>
+                                    <pattern>me.</pattern>
+                                    <shadedPattern>thirdeye.me.</shadedPattern>
                                 </relocation>
                                 <relocation>
-                                    <pattern>org.apache.avro</pattern>
-                                    <shadedPattern>pinot.org.apache.avro</shadedPattern>
+                                    <pattern>jline.</pattern>
+                                    <shadedPattern>thirdeye.jline.</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>it.</pattern>
+                                    <shadedPattern>thirdeye.it.</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>xerial.</pattern>
+                                    <shadedPattern>thirdeye.xerial.</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>scala.</pattern>
+                                    <shadedPattern>thirdeye.scala.</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>kafka.</pattern>
+                                    <shadedPattern>thirdeye.kafka.</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>net.</pattern>
+                                    <shadedPattern>thirdeye.net.</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>joptsimple.</pattern>
+                                    <shadedPattern>thirdeye.joptsimple.</shadedPattern>
                                 </relocation>
                             </relocations>
                         </configuration>
                     </execution>
                 </executions>
-            </plugin>-->
+            </plugin>
         </plugins>
     </build>
 </project>
