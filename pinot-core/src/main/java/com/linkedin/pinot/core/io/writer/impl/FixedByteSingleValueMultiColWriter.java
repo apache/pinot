@@ -46,8 +46,7 @@ public class FixedByteSingleValueMultiColWriter {
   }
 
   public FixedByteSingleValueMultiColWriter(PinotDataBuffer dataBuffer, int rows, int cols,
-      int[] columnSizes)
-      {
+      int[] columnSizes) {
     this.rows = rows;
     this.columnOffsets = new int[cols];
     rowSizeInBytes = 0;
