@@ -34,6 +34,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * The MetricCorrelationRankingPipeline ranks metrics based on their similarity to a set of
+ * target metrics. It takes two sets of MetricEntities as inputs - candidate and target
+ * metrics - and ranks the candidate metrics based on the absolute strength of their
+ * correlation with the target metrics over the given time range.
+ */
 public class MetricCorrelationRankingPipeline extends Pipeline {
   private static final Logger LOG = LoggerFactory.getLogger(MetricCorrelationRankingPipeline.class);
 
@@ -48,7 +54,7 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
   private final QueryCache cache;
   private final MetricConfigManager metricDAO;
   private final DatasetConfigManager datasetDAO;
-  private String targetInput;
+  private final String targetInput;
 
   /**
    * Constructor for dependency injection
@@ -94,9 +100,9 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
     TimeRangeEntity baselineRange = TimeRangeEntity.getContextBaseline(context);
 
     Set<MetricEntity> targetMetrics = new HashSet<>();
-    for(Entity e : context.getInputs().get(this.targetInput)) {
-      if(MetricEntity.class.isInstance(e))
-        targetMetrics.add((MetricEntity) e);
+    for(Entity entity : context.getInputs().get(this.targetInput)) {
+      if(entity instanceof MetricEntity)
+        targetMetrics.add((MetricEntity) entity);
     }
 
     LOG.info("Processing {} target metrics and {} candidate metrics", targetMetrics.size(), candidateMetrics.size());
@@ -115,8 +121,9 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
     LOG.info("Requesting {} time series", requestList.size());
 
     Map<String, RequestContainer> requests = new HashMap<>();
-    for(RequestContainer c : requestList)
-      requests.put(c.request.getRequestReference(), c);
+    for(RequestContainer somethingVerbose : requestList) {
+      requests.put(somethingVerbose.request.getRequestReference(), somethingVerbose);
+    }
 
     // fetch responses and calculate derived metrics
     Map<String, DataFrame> responses = new HashMap<>();
@@ -164,12 +171,12 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
         public double apply(double... values) {
           return (values[0] - values[1]) / values[1];
         }
-      }, COL_VALUE, COL_VALUE + "_right");
+      }, COL_VALUE + DataFrame.COLUMN_JOIN_LEFT, COL_VALUE + DataFrame.COLUMN_JOIN_RIGHT);
 
       pctChanges.put(e, pctChange);
     }
 
-    // determine relevance - by strength of correlation
+    // determine score - by absolute strength of correlation
     Map<MetricEntity, Double> scores = new HashMap<>();
     for(MetricEntity target : targetMetrics) {
       if(!pctChanges.containsKey(target)) {
