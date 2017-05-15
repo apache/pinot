@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 
 /**
- * Test the performance on {@link IntOnHeapMutableDictionary} vs {@link IntBiMapDictionary}.
+ * Test the performance on {@link IntOnHeapMutableDictionary}.
  */
 public class DictionaryPerfRunner {
   private static final Runtime RUNTIME = Runtime.getRuntime();
@@ -37,7 +37,6 @@ public class DictionaryPerfRunner {
    * <p>Test both CPU (including random) and memory usage.
    */
   private static void readWritePerfOnCardinality(int cardinality) {
-    IntBiMapDictionary intBiMapDictionary = new IntBiMapDictionary("DummyColumn");
     IntOnHeapMutableDictionary intOnHeapMutableDictionary = new IntOnHeapMutableDictionary();
 
     System.out.println("Starting read write perf on cardinality: " + cardinality + " for " + NUM_VALUES + " values");
@@ -45,25 +44,6 @@ public class DictionaryPerfRunner {
 
     long usedMemory = RUNTIME.totalMemory();
     long start = System.currentTimeMillis();
-    for (int i = 0; i < NUM_VALUES; i++) {
-      intBiMapDictionary.index(i % cardinality);
-    }
-    System.out.println("Index time for IntBiMapDictionary: " + (System.currentTimeMillis() - start));
-    start = System.currentTimeMillis();
-    for (int i = 0; i < NUM_VALUES; i++) {
-      intBiMapDictionary.indexOf(i % cardinality);
-    }
-    System.out.println("DictId fetching time for IntBiMapDictionary: " + (System.currentTimeMillis() - start));
-    start = System.currentTimeMillis();
-    for (int i = 0; i < NUM_VALUES; i++) {
-      intBiMapDictionary.get(i % cardinality);
-    }
-    System.out.println("Value fetching time for IntBiMapDictionary: " + (System.currentTimeMillis() - start));
-    System.out.println("Memory usage for IntBiMapDictionary: " + (RUNTIME.totalMemory() - usedMemory));
-
-    System.out.println("--------------------------------------------------------------------------------");
-    usedMemory = RUNTIME.totalMemory();
-    start = System.currentTimeMillis();
     for (int i = 0; i < NUM_VALUES; i++) {
       intOnHeapMutableDictionary.index(i % cardinality);
     }
@@ -87,7 +67,6 @@ public class DictionaryPerfRunner {
    */
   private static void multiReadersPerfOnCardinality(final int cardinality)
       throws InterruptedException {
-    final IntBiMapDictionary intBiMapDictionary = new IntBiMapDictionary("DummyColumn");
     final IntOnHeapMutableDictionary intOnHeapMutableDictionary = new IntOnHeapMutableDictionary();
 
     System.out.println(
@@ -96,13 +75,10 @@ public class DictionaryPerfRunner {
 
     // Index all values
     for (int i = 0; i < cardinality; i++) {
-      intBiMapDictionary.index(i);
       intOnHeapMutableDictionary.index(i);
     }
 
     // Count dictId and value fetching time
-    countMultiReadersFetchingTime(cardinality, intBiMapDictionary);
-    System.out.println("--------------------------------------------------------------------------------");
     countMultiReadersFetchingTime(cardinality, intOnHeapMutableDictionary);
   }
 
