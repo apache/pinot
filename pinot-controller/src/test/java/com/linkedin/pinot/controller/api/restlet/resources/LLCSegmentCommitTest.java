@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,17 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.controller.api.restlet.resources;
 
-import java.io.IOException;
-import java.util.concurrent.ConcurrentHashMap;
-import org.apache.helix.HelixManager;
-import org.restlet.Application;
-import org.restlet.Context;
-import org.restlet.representation.Representation;
-import org.testng.Assert;
-import org.testng.annotations.Test;
 import com.alibaba.fastjson.JSONObject;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.protocols.SegmentCompletionProtocol;
@@ -32,6 +23,15 @@ import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.ControllerTestUtils;
 import com.linkedin.pinot.controller.helix.core.realtime.SegmentCompletionManager;
 import com.yammer.metrics.core.MetricsRegistry;
+import java.io.IOException;
+import java.util.concurrent.ConcurrentHashMap;
+import org.apache.helix.HelixManager;
+import org.restlet.Application;
+import org.restlet.Context;
+import org.restlet.representation.Representation;
+import org.testng.Assert;
+import org.testng.annotations.Test;
+
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 

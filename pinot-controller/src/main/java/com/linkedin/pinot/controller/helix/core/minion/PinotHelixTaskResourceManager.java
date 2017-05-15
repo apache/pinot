@@ -19,7 +19,9 @@ import com.linkedin.pinot.common.config.PinotTaskConfig;
 import com.linkedin.pinot.common.utils.CommonConstants;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nonnull;
 import org.apache.helix.task.JobConfig;
 import org.apache.helix.task.JobQueue;
@@ -49,11 +51,26 @@ public class PinotHelixTaskResourceManager {
   }
 
   /**
-   * Create a task queue of the given task type.
+   * Get all task types.
+   *
+   * @return Set of all task types
+   */
+  @Nonnull
+  public synchronized Set<String> getTaskTypes() {
+    Set<String> helixJobQueues = _taskDriver.getWorkflows().keySet();
+    Set<String> taskTypes = new HashSet<>(helixJobQueues.size());
+    for (String helixJobQueue : helixJobQueues) {
+      taskTypes.add(getTaskType(helixJobQueue));
+    }
+    return taskTypes;
+  }
+
+  /**
+   * Create a task queue for the given task type.
    *
    * @param taskType Task type
    */
-  public void createTaskQueue(@Nonnull String taskType) {
+  public synchronized void createTaskQueue(@Nonnull String taskType) {
     String helixJobQueueName = getHelixJobQueueName(taskType);
     LOGGER.info("Creating task queue: {} for task type: {}", helixJobQueueName, taskType);
 
@@ -64,36 +81,55 @@ public class PinotHelixTaskResourceManager {
   }
 
   /**
-   * Stop a task queue of the given task type.
+   * Stop the task queue for the given task type.
    *
    * @param taskType Task type
    */
-  public void stopTaskQueue(@Nonnull String taskType) {
+  public synchronized void stopTaskQueue(@Nonnull String taskType) {
     String helixJobQueueName = getHelixJobQueueName(taskType);
     LOGGER.info("Stopping task queue: {} for task type: {}", helixJobQueueName, taskType);
     _taskDriver.stop(helixJobQueueName);
   }
 
   /**
-   * Resume a task queue of the given task type.
+   * Resume the task queue for the given task type.
    *
    * @param taskType Task type
    */
-  public void resumeTaskQueue(@Nonnull String taskType) {
+  public synchronized void resumeTaskQueue(@Nonnull String taskType) {
     String helixJobQueueName = getHelixJobQueueName(taskType);
     LOGGER.info("Resuming task queue: {} for task type: {}", helixJobQueueName, taskType);
     _taskDriver.resume(helixJobQueueName);
   }
 
   /**
-   * Delete a task queue of the given task type.
+   * Delete the task queue for the given task type.
    *
    * @param taskType Task type
    */
-  public void deleteTaskQueue(@Nonnull String taskType) {
+  public synchronized void deleteTaskQueue(@Nonnull String taskType) {
     String helixJobQueueName = getHelixJobQueueName(taskType);
     LOGGER.info("Deleting task queue: {} for task type: {}", helixJobQueueName, taskType);
     _taskDriver.delete(helixJobQueueName);
+  }
+
+  /**
+   * Get all task queues.
+   *
+   * @return Set of task queue names
+   */
+  public synchronized Set<String> getTaskQueues() {
+    return _taskDriver.getWorkflows().keySet();
+  }
+
+  /**
+   * Get the task queue state for the given task type.
+   *
+   * @param taskType Task type
+   * @return Task queue state
+   */
+  public synchronized TaskState getTaskQueueState(@Nonnull String taskType) {
+    return _taskDriver.getWorkflowContext(getHelixJobQueueName(taskType)).getWorkflowState();
   }
 
   /**
@@ -103,7 +139,7 @@ public class PinotHelixTaskResourceManager {
    * @return Name of the submitted task
    */
   @Nonnull
-  public String submitTask(@Nonnull PinotTaskConfig pinotTaskConfig) {
+  public synchronized String submitTask(@Nonnull PinotTaskConfig pinotTaskConfig) {
     return submitTask(pinotTaskConfig, CommonConstants.Helix.UNTAGGED_MINION_INSTANCE);
   }
 
@@ -115,7 +151,7 @@ public class PinotHelixTaskResourceManager {
    * @return Name of the submitted task
    */
   @Nonnull
-  public String submitTask(@Nonnull PinotTaskConfig pinotTaskConfig, @Nonnull String minionInstanceTag) {
+  public synchronized String submitTask(@Nonnull PinotTaskConfig pinotTaskConfig, @Nonnull String minionInstanceTag) {
     String taskType = pinotTaskConfig.getTaskType();
     String taskName = TASK_PREFIX + taskType + TASK_NAME_SEPARATOR + System.nanoTime();
     LOGGER.info("Submitting task: {} of type: {} with config: {} to Minion instances with tag: {}", taskName, taskType,
@@ -127,37 +163,67 @@ public class PinotHelixTaskResourceManager {
   }
 
   /**
+   * Get all tasks for the given task type.
+   *
+   * @param taskType Task type
+   * @return Set of task names
+   */
+  @Nonnull
+  public synchronized Set<String> getTasks(@Nonnull String taskType) {
+    Set<String> helixJobs = _taskDriver.getWorkflowContext(getHelixJobQueueName(taskType)).getJobStates().keySet();
+    Set<String> tasks = new HashSet<>(helixJobs.size());
+    for (String helixJobName : helixJobs) {
+      tasks.add(getPinotTaskName(helixJobName));
+    }
+    return tasks;
+  }
+
+  /**
    * Get all task states for the given task type.
    *
    * @param taskType Task type
    * @return Map from task name to task state
    */
   @Nonnull
-  public Map<String, TaskState> getTaskStates(@Nonnull String taskType) {
+  public synchronized Map<String, TaskState> getTaskStates(@Nonnull String taskType) {
     Map<String, TaskState> helixJobStates =
         _taskDriver.getWorkflowContext(getHelixJobQueueName(taskType)).getJobStates();
     Map<String, TaskState> taskStates = new HashMap<>(helixJobStates.size());
     for (Map.Entry<String, TaskState> entry : helixJobStates.entrySet()) {
-      taskStates.put(getPinotTaskName(taskType, entry.getKey()), entry.getValue());
+      taskStates.put(getPinotTaskName(entry.getKey()), entry.getValue());
     }
     return taskStates;
   }
 
   /**
-   * Get the task config for the given submitted task name.
+   * Get the task state for the given task name.
    *
-   * @param taskName Name of the submitted task
-   * @return Task config of the submitted task
+   * @param taskName Task name
+   * @return Task state
+   */
+  public synchronized TaskState getTaskState(@Nonnull String taskName) {
+    String taskType = getTaskType(taskName);
+    return _taskDriver.getWorkflowContext(getHelixJobQueueName(taskType)).getJobState(getHelixJobName(taskName));
+  }
+
+  /**
+   * Get the task config for the given task name.
+   *
+   * @param taskName Task name
+   * @return Task config
    */
   @Nonnull
-  public PinotTaskConfig getTaskConfig(@Nonnull String taskName) {
+  public synchronized PinotTaskConfig getTaskConfig(@Nonnull String taskName) {
     return PinotTaskConfig.fromHelixTaskConfig(
-        _taskDriver.getJobConfig(getHelixJobName(getTaskType(taskName), taskName)).getTaskConfig(taskName));
+        _taskDriver.getJobConfig(getHelixJobName(taskName)).getTaskConfig(taskName));
   }
 
   /**
    * Helper method to convert task type to Helix JobQueue name.
    * <p>E.g. DummyTask -> TaskQueue_DummyTask
+   *
+   * @param taskType Task type
+   * @return Helix JobQueue name
    */
   @Nonnull
   protected static String getHelixJobQueueName(@Nonnull String taskType) {
@@ -165,29 +231,40 @@ public class PinotHelixTaskResourceManager {
   }
 
   /**
-   * Helper method to convert Pinot task name to Helix Job name with JobQueue prefix based on the given task type.
-   * <p>E.g. Task_DummyTask_12345 (type DummyTask) -> TaskQueue_DummyTask_Task_DummyTask_12345
+   * Helper method to convert Pinot task name to Helix Job name with JobQueue prefix.
+   * <p>E.g. Task_DummyTask_12345 -> TaskQueue_DummyTask_Task_DummyTask_12345
+   *
+   * @param pinotTaskName Pinot task name
+   * @return helixJobName Helix Job name
    */
   @Nonnull
-  private static String getHelixJobName(@Nonnull String taskType, @Nonnull String pinotTaskName) {
-    return TASK_QUEUE_PREFIX + taskType + TASK_NAME_SEPARATOR + pinotTaskName;
+  private static String getHelixJobName(@Nonnull String pinotTaskName) {
+    return getHelixJobQueueName(getTaskType(pinotTaskName)) + TASK_NAME_SEPARATOR + pinotTaskName;
   }
 
   /**
-   * Helper method to convert Helix Job name with JobQueue prefix to Pinot task name based on the given task type.
-   * <p>E.g. TaskQueue_DummyTask_Task_DummyTask_12345 (type DummyTask) -> Task_DummyTask_12345
+   * Helper method to convert Helix Job name with JobQueue prefix to Pinot task name.
+   * <p>E.g. TaskQueue_DummyTask_Task_DummyTask_12345 -> Task_DummyTask_12345
+   *
+   * @param helixJobName Helix Job name
+   * @return Pinot task name
    */
   @Nonnull
-  private static String getPinotTaskName(@Nonnull String taskType, @Nonnull String helixJobName) {
-    return helixJobName.substring(TASK_QUEUE_PREFIX.length() + taskType.length() + 1);
+  private static String getPinotTaskName(@Nonnull String helixJobName) {
+    return helixJobName.substring(TASK_QUEUE_PREFIX.length() + getTaskType(helixJobName).length() + 1);
   }
 
   /**
-   * Helper method to extract task type from Pinot task name.
-   * <p>E.g. Task_DummyTask_12345 -> DummyTask
+   * Helper method to extract task type from Pinot task name, Helix JobQueue name or Helix Job name.
+   * <p>E.g. Task_DummyTask_12345 -> DummyTask (from Pinot task name)
+   * <p>E.g. TaskQueue_DummyTask -> DummyTask (from Helix JobQueue name)
+   * <p>E.g. TaskQueue_DummyTask_Task_DummyTask_12345 -> DummyTask (from Helix Job name)
+   *
+   * @param name Pinot task name, Helix JobQueue name or Helix Job name
+   * @return Task type
    */
   @Nonnull
-  private static String getTaskType(@Nonnull String pinotTaskName) {
-    return pinotTaskName.split(TASK_NAME_SEPARATOR)[1];
+  private static String getTaskType(@Nonnull String name) {
+    return name.split(TASK_NAME_SEPARATOR)[1];
   }
 }

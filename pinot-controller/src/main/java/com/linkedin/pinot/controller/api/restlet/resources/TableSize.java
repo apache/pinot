@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.controller.api.restlet.resources;
 
 import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
@@ -62,7 +61,7 @@ public class TableSize extends BasePinotControllerRestletResource {
       description = "true=Provide detailed size information; false=Only aggregated size",
       required = false)
       boolean detailed) {
-    TableSizeReader tableSizeReader = new TableSizeReader(executor, connectionManager, _pinotHelixResourceManager);
+    TableSizeReader tableSizeReader = new TableSizeReader(_executor, _connectionManager, _pinotHelixResourceManager);
 
 
     TableSizeReader.TableSizeDetails tableSizeDetails = null;

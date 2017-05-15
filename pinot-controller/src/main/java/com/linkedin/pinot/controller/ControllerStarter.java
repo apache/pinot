@@ -37,6 +37,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -109,61 +110,68 @@ public class ControllerStarter {
 
     Utils.logVersions();
 
-    component.getServers().add(Protocol.HTTP, Integer.parseInt(config.getControllerPort()));
-    component.getClients().add(Protocol.FILE);
-    component.getClients().add(Protocol.JAR);
-
-    final Context applicationContext = component.getContext().createChildContext();
-
-    LOGGER.info("Controller download url base: {}", config.generateVipUrl());
-    LOGGER.info("Injecting configuration and resource manager to the API context");
-    applicationContext.getAttributes().put(ControllerConf.class.toString(), config);
-    applicationContext.getAttributes().put(PinotHelixResourceManager.class.toString(), helixResourceManager);
-    MultiThreadedHttpConnectionManager connectionManager = new MultiThreadedHttpConnectionManager();
-    connectionManager.getParams().setConnectionTimeout(config.getServerAdminRequestTimeoutSeconds());
-    applicationContext.getAttributes().put(HttpConnectionManager.class.toString(), connectionManager);
-    applicationContext.getAttributes().put(Executor.class.toString(), executorService);
-
-    controllerRestApp.setContext(applicationContext);
-
-    component.getDefaultHost().attach(controllerRestApp);
-
+    // Set up controller metrics
     MetricsHelper.initializeMetrics(config.subset(METRICS_REGISTRY_NAME));
     MetricsHelper.registerMetricsRegistry(_metricsRegistry);
     final ControllerMetrics controllerMetrics = new ControllerMetrics(_metricsRegistry);
 
+    // Start all components
     try {
       LOGGER.info("Starting Pinot Helix resource manager and connecting to Zookeeper");
       helixResourceManager.start();
 
-      // Helix resource manager must be started in order to create PinotLLCRealtimeSegmentManager
-      PinotLLCRealtimeSegmentManager.create(helixResourceManager, config, controllerMetrics);
-      ValidationMetrics validationMetrics = new ValidationMetrics(_metricsRegistry);
-      _validationManager = new ValidationManager(validationMetrics, helixResourceManager, config,
-          PinotLLCRealtimeSegmentManager.getInstance());
-
+      LOGGER.info("Starting task resource manager");
       // Helix resource manager must be started in order to get TaskDriver
       TaskDriver taskDriver = new TaskDriver(helixResourceManager.getHelixZkManager());
       _helixTaskResourceManager = new PinotHelixTaskResourceManager(taskDriver);
+
+      LOGGER.info("Starting task manager");
       _taskManager = new PinotTaskManager(taskDriver, helixResourceManager, _helixTaskResourceManager);
       _taskManager.ensureTaskQueuesExist();
-
-      LOGGER.info("Starting Pinot REST API component");
-      component.start();
-      LOGGER.info("Starting retention manager");
-      retentionManager.start();
-      LOGGER.info("Starting validation manager");
-      _validationManager.start();
-      LOGGER.info("Starting realtime segment manager");
-      realtimeSegmentsManager.start(controllerMetrics);
-      PinotLLCRealtimeSegmentManager.getInstance().start();
-      LOGGER.info("Starting segment status manager");
-      segmentStatusChecker.start(controllerMetrics);
       int taskManagerFrequencyInSeconds = config.getTaskManagerFrequencyInSeconds();
       if (taskManagerFrequencyInSeconds > 0) {
         LOGGER.info("Starting task manager with running frequency of {} seconds", taskManagerFrequencyInSeconds);
         _taskManager.startScheduler(taskManagerFrequencyInSeconds);
       }
+
+      LOGGER.info("Starting retention manager");
+      retentionManager.start();
+
+      LOGGER.info("Starting validation manager");
+      // Helix resource manager must be started in order to create PinotLLCRealtimeSegmentManager
+      PinotLLCRealtimeSegmentManager.create(helixResourceManager, config, controllerMetrics);
+      ValidationMetrics validationMetrics = new ValidationMetrics(_metricsRegistry);
+      _validationManager = new ValidationManager(validationMetrics, helixResourceManager, config,
+          PinotLLCRealtimeSegmentManager.getInstance());
+      _validationManager.start();
+
+      LOGGER.info("Starting realtime segment manager");
+      realtimeSegmentsManager.start(controllerMetrics);
+      PinotLLCRealtimeSegmentManager.getInstance().start();
+
+      LOGGER.info("Starting segment status manager");
+      segmentStatusChecker.start(controllerMetrics);
+
+      LOGGER.info("Starting Pinot REST API component");
+      component.getServers().add(Protocol.HTTP, Integer.parseInt(config.getControllerPort()));
+      component.getClients().add(Protocol.FILE);
+      component.getClients().add(Protocol.JAR);
+      Context applicationContext = component.getContext().createChildContext();
+      LOGGER.info("Controller download url base: {}", config.generateVipUrl());
+      LOGGER.info("Injecting configuration and resource managers to the API context");
+      ConcurrentMap<String, Object> attributes = applicationContext.getAttributes();
+      attributes.put(ControllerConf.class.toString(), config);
+      attributes.put(PinotHelixResourceManager.class.toString(), helixResourceManager);
+      attributes.put(PinotHelixTaskResourceManager.class.toString(), _helixTaskResourceManager);
+      attributes.put(PinotTaskManager.class.toString(), _taskManager);
+      MultiThreadedHttpConnectionManager connectionManager = new MultiThreadedHttpConnectionManager();
+      connectionManager.getParams().setConnectionTimeout(config.getServerAdminRequestTimeoutSeconds());
+      attributes.put(HttpConnectionManager.class.toString(), connectionManager);
+      attributes.put(Executor.class.toString(), executorService);
+      controllerRestApp.setContext(applicationContext);
+      component.getDefaultHost().attach(controllerRestApp);
+      component.start();
+
       LOGGER.info("Pinot controller ready and listening on port {} for API requests", config.getControllerPort());
       LOGGER.info("Controller services available at http://{}:{}/", config.getControllerHost(),
           config.getControllerPort());

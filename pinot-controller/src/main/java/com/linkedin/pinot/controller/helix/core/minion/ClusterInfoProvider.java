@@ -15,20 +15,21 @@
  */
 package com.linkedin.pinot.controller.helix.core.minion;
 
+import com.google.common.base.Preconditions;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.PinotTaskConfig;
+import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
+import com.linkedin.pinot.common.utils.CommonConstants;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import org.apache.helix.model.IdealState;
 import org.apache.helix.task.TaskState;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -36,8 +37,6 @@ import org.slf4j.LoggerFactory;
  * {@link PinotHelixTaskResourceManager} which provides cluster information for {@link PinotTaskGenerator}.
  */
 public class ClusterInfoProvider {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ClusterInfoProvider.class);
-
   private final PinotHelixResourceManager _pinotHelixResourceManager;
   private final PinotHelixTaskResourceManager _pinotHelixTaskResourceManager;
 
@@ -47,34 +46,70 @@ public class ClusterInfoProvider {
     _pinotHelixTaskResourceManager = pinotHelixTaskResourceManager;
   }
 
+  /**
+   * Get the table config for the given table name with type suffix.
+   *
+   * @param tableNameWithType Table name with type suffix
+   * @return Table config
+   */
   @Nullable
-  public IdealState getTableIdealState(@Nonnull String tableName) {
-    // TODO: add implementation
-    throw new UnsupportedOperationException();
+  public AbstractTableConfig getTableConfig(@Nonnull String tableNameWithType) {
+    return _pinotHelixResourceManager.getTableConfig(tableNameWithType);
   }
 
+  /**
+   * Get the table schema for the given table name with type suffix.
+   *
+   * @param tableNameWithType Table name with type suffix
+   * @return Table schema
+   */
   @Nullable
-  public AbstractTableConfig getTableConfig(@Nonnull String tableName) {
-    return _pinotHelixResourceManager.getTableConfig(tableName);
+  public Schema getTableSchema(@Nonnull String tableNameWithType) {
+    CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+    Preconditions.checkNotNull(tableType);
+    if (tableType == CommonConstants.Helix.TableType.OFFLINE) {
+      return _pinotHelixResourceManager.getOfflineTableSchema(tableNameWithType);
+    } else {
+      return _pinotHelixResourceManager.getRealtimeTableSchema(tableNameWithType);
+    }
   }
 
-  @Nullable
-  public Schema getTableSchema(@Nonnull String tableName) {
-    // TODO: add implementation
-    throw new UnsupportedOperationException();
+  /**
+   * Get all segment metadata for the given table name with type suffix.
+   *
+   * @param tableNameWithType Table name with type suffix
+   * @return List of segment metadata
+   */
+  @Nonnull
+  public List<? extends SegmentZKMetadata> getSegmentsMetadata(@Nonnull String tableNameWithType) {
+    CommonConstants.Helix.TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+    Preconditions.checkNotNull(tableType);
+    if (tableType == CommonConstants.Helix.TableType.OFFLINE) {
+      return ZKMetadataProvider.getOfflineSegmentZKMetadataListForTable(_pinotHelixResourceManager.getPropertyStore(),
+          tableNameWithType);
+    } else {
+      return ZKMetadataProvider.getRealtimeSegmentZKMetadataListForTable(_pinotHelixResourceManager.getPropertyStore(),
+          tableNameWithType);
+    }
   }
 
-  @Nullable
-  public List<SegmentZKMetadata> getSegmentsMetadata(@Nonnull String tableName) {
-    // TODO: add implementation
-    throw new UnsupportedOperationException();
-  }
-
+  /**
+   * Get all task states for the given task type.
+   *
+   * @param taskType Task type
+   * @return Map from task name to task state
+   */
   @Nonnull
   public Map<String, TaskState> getTaskStates(@Nonnull String taskType) {
     return _pinotHelixTaskResourceManager.getTaskStates(taskType);
   }
 
+  /**
+   * Get the task config for the given task name.
+   *
+   * @param taskName Task name
+   * @return Task config
+   */
   @Nonnull
   public PinotTaskConfig getTaskConfig(@Nonnull String taskName) {
     return _pinotHelixTaskResourceManager.getTaskConfig(taskName);

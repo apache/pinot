@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.linkedin.pinot.controller.api.restlet.resources;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -37,6 +36,7 @@ import org.restlet.representation.Representation;
 import org.restlet.resource.Get;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 public class TableViews extends BasePinotControllerRestletResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableViews.class);
