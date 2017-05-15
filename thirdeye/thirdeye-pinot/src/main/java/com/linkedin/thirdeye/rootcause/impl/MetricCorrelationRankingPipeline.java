@@ -101,8 +101,9 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
 
     Set<MetricEntity> targetMetrics = new HashSet<>();
     for(Entity entity : context.getInputs().get(this.targetInput)) {
-      if(entity instanceof MetricEntity)
+      if(entity instanceof MetricEntity) {
         targetMetrics.add((MetricEntity) entity);
+      }
     }
 
     LOG.info("Processing {} target metrics and {} candidate metrics", targetMetrics.size(), candidateMetrics.size());
@@ -121,25 +122,27 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
     LOG.info("Requesting {} time series", requestList.size());
 
     Map<String, RequestContainer> requests = new HashMap<>();
-    for(RequestContainer somethingVerbose : requestList) {
-      requests.put(somethingVerbose.request.getRequestReference(), somethingVerbose);
+    for(RequestContainer rc : requestList) {
+      requests.put(rc.request.getRequestReference(), rc);
     }
 
     // fetch responses and calculate derived metrics
     Map<String, DataFrame> responses = new HashMap<>();
     try {
       List<ThirdEyeRequest> thirdeyeRequests = new ArrayList<>();
-      for(RequestContainer c : requestList)
-        thirdeyeRequests.add(c.request);
+      for(RequestContainer rc : requestList) {
+        thirdeyeRequests.add(rc.request);
+      }
 
       Collection<ThirdEyeResponse> result = this.cache.getQueryResultsAsyncAndWait(thirdeyeRequests).values();
 
-      for(ThirdEyeResponse r : result) {
-        String id = r.getRequest().getRequestReference();
-        DataFrame df = parseResponse(r);
+      for(ThirdEyeResponse response : result) {
+        String id = response.getRequest().getRequestReference();
+        DataFrame df = parseResponse(response);
         evaluateExpressions(df, requests.get(id).expressions);
-        if(LOG.isDebugEnabled())
+        if(LOG.isDebugEnabled()) {
           LOG.debug("DataFrame '{}':\n{}", id, df);
+        }
 
         responses.put(id, df);
       }
@@ -149,17 +152,17 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
 
     // determine current-baseline changes
     Map<MetricEntity, DoubleSeries> pctChanges = new HashMap<>();
-    for(MetricEntity e : allMetrics) {
-      String currentId = makeIdentifier(e.getUrn(), PRE_CURRENT);
-      String baselineId = makeIdentifier(e.getUrn(), PRE_BASELINE);
+    for(MetricEntity entity : allMetrics) {
+      String currentId = makeIdentifier(entity.getUrn(), PRE_CURRENT);
+      String baselineId = makeIdentifier(entity.getUrn(), PRE_BASELINE);
 
       if(!responses.containsKey(currentId)) {
-        LOG.warn("No current data for '{}'. Skipping.", e.getUrn());
+        LOG.warn("No current data for '{}'. Skipping.", entity.getUrn());
         continue;
       }
 
       if(!responses.containsKey(baselineId)) {
-        LOG.warn("No baseline data for '{}'. Skipping.", e.getUrn());
+        LOG.warn("No baseline data for '{}'. Skipping.", entity.getUrn());
         continue;
       }
 
@@ -173,7 +176,7 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
         }
       }, COL_VALUE + DataFrame.COLUMN_JOIN_LEFT, COL_VALUE + DataFrame.COLUMN_JOIN_RIGHT);
 
-      pctChanges.put(e, pctChange);
+      pctChanges.put(entity, pctChange);
     }
 
     // determine score - by absolute strength of correlation
@@ -197,8 +200,9 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
         try {
           double score = Math.abs(changesTarget.corr(changesCandidate)) * target.getScore();
 
-          if (!scores.containsKey(candidate))
+          if (!scores.containsKey(candidate)) {
             scores.put(candidate, 0.0);
+          }
           scores.put(candidate, scores.get(candidate) + score);
 
         } catch (Exception e) {
@@ -242,8 +246,9 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
 
     List<MetricFunction> functions = new ArrayList<>();
     List<MetricExpression> expressions = Utils.convertToMetricExpressions(metric.getName(), MetricAggFunction.SUM, metric.getDataset());
-    for(MetricExpression exp : expressions)
+    for(MetricExpression exp : expressions) {
       functions.addAll(exp.computeMetricFunctions());
+    }
 
     ThirdEyeRequest request = ThirdEyeRequest.newBuilder()
         .setStartTimeInclusive(t.getStart())
@@ -261,9 +266,11 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
     for(Map.Entry<String, Set<Entity>> input : context.getInputs().entrySet()) {
       if(this.targetInput.equals(input.getKey()))
         continue;
+
       for (Entity e : input.getValue()) {
-        if(MetricEntity.class.isInstance(e))
+        if(MetricEntity.class.isInstance(e)) {
           filtered.add((MetricEntity) e);
+        }
       }
     }
     return filtered;
@@ -279,11 +286,13 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
     List<StringSeries.Builder> dimensionBuilders = new ArrayList<>();
     List<DoubleSeries.Builder> functionBuilders = new ArrayList<>();
 
-    for(int i=0; i<response.getGroupKeyColumns().size(); i++)
+    for(int i=0; i<response.getGroupKeyColumns().size(); i++) {
       dimensionBuilders.add(StringSeries.builder());
+    }
 
-    for(int i=0; i<response.getMetricFunctions().size(); i++)
+    for(int i=0; i<response.getMetricFunctions().size(); i++) {
       functionBuilders.add(DoubleSeries.builder());
+    }
 
     // values
     for(int i=0; i<response.getNumRows(); i++) {
@@ -308,8 +317,9 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
 
     int i = 0;
     for(String n : response.getGroupKeyColumns()) {
-      if(!timeColumn.equals(n))
+      if(!timeColumn.equals(n)) {
         df.addSeries(n, dimensionBuilders.get(i++).build());
+      }
     }
 
     int j = 0;
