@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -80,8 +81,10 @@ public class RCAFramework {
     Map<String, PipelineResult> results = new HashMap<>();
     for(Map.Entry<String, Future<PipelineResult>> e : flow.entrySet()) {
       PipelineResult r = e.getValue().get(TIMEOUT, TimeUnit.MILLISECONDS);
-      if(LOG.isDebugEnabled())
+      if(LOG.isDebugEnabled()) {
+        LOG.debug("Results for pipeline '{}':", e.getKey());
         logResultDetails(r);
+      }
       results.put(e.getKey(), r);
     }
 
@@ -120,7 +123,7 @@ public class RCAFramework {
 
   Map<String, Future<PipelineResult>> constructDAG(Map<String, Pipeline> pipelines) {
     // TODO purge pipelines not on critical path
-    Map<String, Future<PipelineResult>> tasks = new HashMap<>();
+    Map<String, Future<PipelineResult>> tasks = new LinkedHashMap<>();
     Pipeline input = pipelines.get(INPUT);
     PipelineCallable inputCallable = new PipelineCallable(Collections.<String, Future<PipelineResult>>emptyMap(), input);
     tasks.put(INPUT, this.executor.submit(inputCallable));
