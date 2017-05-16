@@ -26,7 +26,7 @@ AnomalyFilterController.prototype = {
     this.anomalyFilterModel[action](filter, section);
     // call rerender;
     this.anomalyFilterView.render();
-    this.anomalyFilterView.checkSelectedFilters();
+    // this.anomalyFilterView.checkSelectedFilters();
   },
 
   expandedFilterEventHandler(sender, args = {}) {
@@ -46,5 +46,9 @@ AnomalyFilterController.prototype = {
 
     return this.anomalyFilterModel.getSelectedAnomalyIds().slice(startIndex, endIndex);
   },
+
+  getViewFiltersHash() {
+    return this.anomalyFilterModel.getViewFiltersHash();
+  }
 };
 

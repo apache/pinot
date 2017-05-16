@@ -2,10 +2,11 @@ function AnomalyFilterModel() {
   this.allAnomalyIds = [];
   this.selectedAnomalyIds = [];
   this.selectedAnomalies = new Map([]);
-  this.selectedFilters = new Set([]);
   this.expandedFilters = new Set([]);
   this.searchFilters = {};
   this.viewFilters = null;
+  this.selectedFilters = null;
+  this.pageNumber = 1;
   this.hiddenFilters = ['statusFilterMap'];
 }
 
@@ -13,10 +14,17 @@ AnomalyFilterModel.prototype = {
   init(params = {}) {
     const {
       anomalyIds,
-      searchFilters
+      searchFilters,
+      selectedFilters,
+      pageNumber
     } = params;
-    this.anomalyIds = new Set(anomalyIds);
+    this.allAnomalyIds = new Set(anomalyIds);
     this.searchFilters = searchFilters;
+    this.selectedFilters = selectedFilters;
+    this.pageNumber = pageNumber || this.pageNumber;
+    if (selectedFilters) {
+      this.convertFromHash(selectedFilters);
+    }
   },
 
   resetSelection() {
@@ -47,7 +55,7 @@ AnomalyFilterModel.prototype = {
   },
 
   getSelectedFilters() {
-    return [...this.selectedAnomalies.keys()].map((key) => key.split('/'));
+    return [...this.selectedAnomalies.keys()].map((key) => key.split('::'));
   },
 
   /**
@@ -81,10 +89,47 @@ AnomalyFilterModel.prototype = {
     );
   },
 
+  getViewFiltersHash() {
+    const selectedFilters = this.getSelectedFilters();
+
+    return this.convertToHash(selectedFilters);
+  },
+
+  convertToHash(selectedFilters) {
+    const hash = {};
+    const searchFilters = this.searchFilters;
+    selectedFilters.forEach((filterGroup) => {
+      const [section, filter] = filterGroup;
+        if (searchFilters[section] && searchFilters[section][filter]) {
+          hash[section] = hash[section] || [];
+          hash[section].push(filter);
+        } else {
+          Object.keys(searchFilters).forEach((searchFilter) => {
+            if (searchFilters[searchFilter][section] && searchFilters[searchFilter][section][filter]) {
+              hash[searchFilter] = hash[searchFilter]|| {};
+              hash[searchFilter][section] = hash[searchFilter][section] || [];
+              hash[searchFilter][section].push(filter);
+            }
+          });
+        }
+    });
+    return hash;
+  },
+
+  convertFromHash(selectedFilters) {
+    this.filtersIterator(
+      selectedFilters,
+      (section, filters) => {
+        filters.forEach((filter) => {
+          this.addFilter(filter, section);
+        });
+      });
+  },
+
   getSelectedAnomalyIds() {
     return this.selectedAnomalyIds.length ?
       this.selectedAnomalyIds :
-      this.allAnomalyIds;
+      [...this.allAnomalyIds];
   },
 
   getIntersection(set1, set2) {
@@ -124,7 +169,7 @@ AnomalyFilterModel.prototype = {
           return value;
         }
         if (key === section) {
-          this.selectedAnomalies.set(`${section}/${filter}`, value[filter]);
+          this.selectedAnomalies.set(`${section}::${filter}`, value[filter]);
         }
       }
     );
@@ -135,7 +180,7 @@ AnomalyFilterModel.prototype = {
   },
 
   removeFilter(filter, section) {
-    this.selectedAnomalies.delete(`${section}/${filter}`);
+    this.selectedAnomalies.delete(`${section}::${filter}`);
     this.updateSelectedAnomalyIds();
     this.updateViewFilters();
   },

@@ -319,8 +319,8 @@ AnomalyResultView.prototype = {
   },
 
   renderPagination() {
-    const anomaliesWrapper = this.anomalyResultModel.getAnomaliesWrapper();
-    const totalAnomalies = anomaliesWrapper.totalAnomalies;
+    // const anomaliesWrapper = this.anomalyResultModel.getAnomaliesWrapper();
+    const totalAnomalies = this.anomalyResultModel.totalAnomalies;
     const pageSize = this.anomalyResultModel.pageSize;
     const pageNumber = this.anomalyResultModel.pageNumber;
     const numPages = Math.ceil(totalAnomalies / pageSize);
@@ -405,7 +405,6 @@ AnomalyResultView.prototype = {
     // search with filters
     $('#apply-button').click(() => {
       $('body').scrollTop(0);
-      debugger;
       this.applyButtonEvent.notify();
     })
   },

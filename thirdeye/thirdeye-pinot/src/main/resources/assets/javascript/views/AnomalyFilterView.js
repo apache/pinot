@@ -44,6 +44,7 @@ AnomalyFilterView.prototype = {
 
     // cb(this.timeRangeConfig.startDate, this.timeRangeConfig.endDate);
     this.setupFilterListener();
+    this.checkSelectedFilters();
 
     // APPLY BUTTON
   },

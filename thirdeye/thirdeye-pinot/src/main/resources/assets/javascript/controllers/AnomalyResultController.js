@@ -15,28 +15,72 @@ function AnomalyResultController(parentController) {
   this.anomalyResultView.init();
 }
 
+// To do : use total Anomaly from filter
+
 AnomalyResultController.prototype = {
   handleAppEvent: function () {
     const params = HASH_SERVICE.getParams();
     const hasSameParams = this.anomalyResultModel.hasSameParams(params);
-
+    const hasSearchMode = !!params.anomaliesSearchMode;
+    const hasSearchFilters = !!params.searchFilters && Object.keys(params.searchFilters).length;
+    const pageNumber = params.pageNumber || 1;
+    // const hasSearchFilters =
     // if same search dont' rebuild filter
+    // has searchFilters and same
+    // has search filters not same
+    // has none
+    if (!hasSearchMode) { return; }
     if (hasSameParams) {
-      this.anomalyResultView.render();
-    // } else if (isNewSearch) {
-    //   this.
+      if (hasSearchFilters) {
+        const anomalyIds = this.anomalyFilterController.getSelectedAnomalies(pageNumber).join(',');
+        this.anomalyResultModel.setParams({ pageNumber });
+        this.anomalyResultModel.getDetailsForAnomalyIds(anomalyIds);
+      } else {
+        this.anomalyResultModel.setParams({ pageNumber });
+        this.anomalyResultModel.rebuild();
+      }
     } else {
-      this.anomalyResultView.destroy();
-      this.anomalyResultModel.reset();
-      this.anomalyResultModel.setParams(params);
-      // need to add conditional redendering for date pickers
-      this.anomalyResultView.renderDatePickers();
-      // if has searchMode
-      this.anomalyResultModel.getSearchFilters((filter) => {
-        this.anomalyFilterController.handleAppEvent(filter);
-      });
-      // this.anomalyResultModel.rebuild();
-    }
+      // if (hasSearchFilters) {
+        // load search filters first
+        // if (hasSameSearchFilters) {
+
+        // }
+        this.anomalyResultView.renderDatePickers();
+        this.anomalyResultView.destroy();
+        this.anomalyResultModel.reset();
+        this.anomalyResultModel.setParams(params);
+        this.anomalyResultModel.getSearchFilters((filter) => {
+          filter.selectedFilters = params.searchFilters;
+          this.anomalyFilterController.handleAppEvent(filter);
+          this.anomalyResultModel.setParams({ totalAnomalies: filter.totalAnomalies });
+          if (hasSearchFilters) {
+            const anomalyIds = this.anomalyFilterController.getSelectedAnomalies(pageNumber).join(',');
+            this.anomalyResultModel.getDetailsForAnomalyIds(anomalyIds);
+          } else {
+            this.anomalyResultModel.rebuild();
+          }
+        });
+      }
+    //   else {
+    //     this.anomalyResultView.renderDatePickers();
+    //     this.anomalyResultView.destroy();
+    //     this.anomalyResultModel.reset();
+    //     this.anomalyResultModel.setParams(params);
+    //     // need to add conditional redendering for date pickers
+    //     // if has searchMode
+    //     this.anomalyResultModel.getSearchFilters((filter) => {
+    //       filter.selectedFilters = params.searchFilters;
+    //       debugger;
+    //       this.anomalyResultModel.setParams({ totalAnomalies: filter.totalAnomalies });
+    //       this.anomalyFilterController.handleAppEvent(filter);
+    //     });
+    //     this.anomalyResultModel.rebuild();
+    //   }
+    // }
+
+    // if () {
+
+    // }
   },
 
   // new search, should trigger new filters
@@ -52,10 +96,19 @@ AnomalyResultController.prototype = {
     // get anomalies
     const anomalyIds = this.anomalyFilterController.getSelectedAnomalies().join(',');
     // get details for anomalies
-    debugger;
-    this.anomalyResultModel.getDetailsForAnomalyIds(anomalyIds);
+    const searchFilters = this.anomalyFilterController.getViewFiltersHash();
+    const pageNumber = 1;
+    HASH_SERVICE.update({
+      searchFilters,
+      pageNumber
+    });
+    HASH_SERVICE.refreshWindowHashForRouting('anomalies');
+    // update hash
+
     // get page
     // display anomalyresult
+
+    // this.anomalyResultModel.getDetailsForAnomalyIds(anomalyIds);
   },
 
 
@@ -76,7 +129,7 @@ AnomalyResultController.prototype = {
   pageClickEventHandler(sender, pageNumber) {
     HASH_SERVICE.update({ pageNumber });
     HASH_SERVICE.refreshWindowHashForRouting('anomalies');
-    HASH_SERVICE.routeTo('anomalies');
+    // HASH_SERVICE.routeTo('anomalies');
   },
 
   initFilters() {
@@ -130,7 +183,7 @@ AnomalyResultController.prototype = {
     // reload filters
     HASH_SERVICE.update(args);
     HASH_SERVICE.refreshWindowHashForRouting('anomalies');
-    // HASH_SERVICE.routeTo('anomalies');
+    HASH_SERVICE.routeTo('anomalies');
   },
 
   filterEventHandler(sender, args = {}) {
