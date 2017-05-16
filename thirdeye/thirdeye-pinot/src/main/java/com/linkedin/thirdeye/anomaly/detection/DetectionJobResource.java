@@ -11,15 +11,18 @@ import com.linkedin.thirdeye.anomalydetection.performanceEvaluation.PerformanceE
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.ThirdEyeClient;
+import com.linkedin.thirdeye.constant.AnomalyFeedbackType;
 import com.linkedin.thirdeye.datalayer.bao.AutotuneConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.bao.RawAnomalyResultManager;
+import com.linkedin.thirdeye.datalayer.dto.AnomalyFeedbackDTO;
 import com.linkedin.thirdeye.datalayer.dto.AutotuneConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilter;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.email.filter.PrecisionRecallEvaluator;
+import com.linkedin.thirdeye.detector.function.AnomalyFunction;
 import com.linkedin.thirdeye.util.SeverityComputationUtil;
 
 import java.util.ArrayList;
@@ -28,6 +31,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.StringTokenizer;
 import java.util.concurrent.TimeUnit;
 
@@ -48,6 +52,9 @@ import org.apache.commons.lang.NullArgumentException;
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
 import org.joda.time.Interval;
+import org.joda.time.Months;
+import org.joda.time.Period;
+import org.joda.time.Weeks;
 import org.joda.time.format.ISODateTimeFormat;
 
 import com.linkedin.thirdeye.client.DAORegistry;
@@ -210,6 +217,145 @@ public class DetectionJobResource {
         util.computeSeverity(currentWindowStart, currentWindowEnd, seasonalPeriodMillis, seasonCountInt);
 
     return Response.ok(severity.toString(), MediaType.TEXT_PLAIN_TYPE).build();
+  }
+
+  /**
+   * Perform offline analysis on a given anomaly function before the given start time.
+   * Anomalies are label as true in default.
+   * Backfill is then executed in the start and end time range.
+   * @param functionId
+   *    The id of the function to be analyzed
+   * @param startTimeIso
+   *    The start time of the backfill, in the format of ISO, e.g. 2017-05-16T07:00:00Z
+   *    In default, start time is 1 month before endTimeISO
+   * @param endTimeIso
+   *    The end time of the backfill, in the format of ISO, e.g. 2017-05-16T07:00:00Z
+   *    In defualt, end time is now
+   * @param offlinePValueThreshold
+   *    The p-value threshold when performing offline analysis.
+   *    In default, it is the same as pValueThreshold
+   * @return
+   *    A message containing the list of offline anomalies, and the start and end time for backfill
+   */
+  @POST
+  @Path("/{id}/offlineThenBackfill")
+  public Response offlineAnalysisThenBackfill(@PathParam("id") @NotNull long functionId,
+      @QueryParam("start") @NotNull String startTimeIso,
+      @QueryParam("end") @NotNull String endTimeIso,
+      @QueryParam("offlinePValue") String offlinePValueThreshold) {
+    // constants
+    final String WARN = "Warn";
+    final String ERROR = "Exception";
+
+    Map<String, String> messageMap = new HashMap<>();
+    // Check parameters and assign default values
+    AnomalyFunctionDTO anomalyFunctionDTO = anomalyFunctionDAO.findById(functionId);
+    // check if function exist
+    if (anomalyFunctionDTO == null) {
+      String message = "Unable to find anomaly function with id " + functionId;
+      messageMap.put(ERROR, message);
+      LOG.error(message);
+      return Response.status(Response.Status.BAD_REQUEST).entity(messageMap).build();
+    }
+    // check if function activated
+    if (!anomalyFunctionDTO.getIsActive()) {
+      LOG.warn("Anomaly function {} is inactive. Force to activate.", functionId);
+      messageMap.put(WARN, "Anomaly function " + functionId + " is forced to be activated.\n");
+    }
+
+    final Period oneMonth = Months.ONE.toPeriod();
+    DateTime endTime = DateTime.now();
+    if (StringUtils.isNotBlank(endTimeIso)) {
+      try {
+        endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso);
+      } catch (Exception e) {
+        String message = "ISO DateTime String endTimeISO=" + endTimeIso + " is not acceptable. Use current time\n";
+        LOG.warn(message);
+        if (!messageMap.containsKey("Warn")) {
+          messageMap.put(WARN, "");
+        }
+        messageMap.put(WARN, messageMap.get(WARN) + message);
+      }
+    }
+    DateTime startTime = endTime.minus(oneMonth);
+    if (StringUtils.isNotBlank(startTimeIso)) {
+      try {
+        startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso);
+      } catch (Exception e) {
+        String message = "ISO DateTime String startTimeISO=" + startTimeIso + " is not acceptable. Use current time\n";
+        LOG.warn(message);
+        if (!messageMap.containsKey("Warn")) {
+          messageMap.put(WARN, "");
+        }
+        messageMap.put(WARN, messageMap.get(WARN) + message);
+      }
+    }
+    // check if start time is before end time
+    if (startTime.isAfter(endTime)) {
+      String message = "Start time (" + startTime.toString() + ") is after end time (" + endTime.toString() + ")";
+      LOG.error(message);
+      messageMap.put(ERROR, message);
+      return Response.status(Response.Status.BAD_REQUEST).entity(messageMap).build();
+    }
+
+    // check if offline p-value threshold is given
+    Properties properties = anomalyFunctionDTO.toProperties();
+    if (StringUtils.isNotBlank(offlinePValueThreshold)) {
+      double offlinePValue = Double.parseDouble(properties.getProperty("pValueThreshold", "0.05"));
+      try {
+         offlinePValue = Double.valueOf(offlinePValueThreshold);
+      } catch (Exception e) {
+        String message = "Cannot parse offlinePValueThreshold (" + offlinePValueThreshold + ") to Double. Use default value";
+        LOG.warn(message);
+        if (!messageMap.containsKey("Warn")) {
+          messageMap.put(WARN, "");
+        }
+        messageMap.put(WARN, messageMap.get(WARN) + message);
+      }
+      Map<String, String> config = new HashMap<>();
+      config.put("offlineAnalysisPValueThreshold", Double.toString(offlinePValue));
+      anomalyFunctionDTO.updateProperties(config);
+      anomalyFunctionDAO.update(anomalyFunctionDTO);
+    }
+
+    // Perform offline analysis from start time
+    List<Long> anomalyIds = new ArrayList<>();
+    try {
+      Response offlineResponse = generateAnomaliesInTrainingData(functionId, startTime.toString(ISODateTimeFormat.dateTime()));
+      anomalyIds = (List<Long>) offlineResponse.getEntity();
+      messageMap.put("offline", anomalyIds.toString());
+    } catch (Exception e) {
+      String message = "Exception happened when performing offline analysis from " + startTime.toString()
+          + "\n Please check system logs for more detail";
+      messageMap.put(ERROR, message);
+      LOG.error(message, e);
+      return Response.status(Response.Status.BAD_REQUEST).entity(messageMap).build();
+    }
+
+    // Label anomalies as true
+    if(CollectionUtils.isNotEmpty(anomalyIds)) {
+      for (Long anomalyId : anomalyIds) {
+        MergedAnomalyResultDTO mergedAnomaly = mergedAnomalyResultDAO.findById(anomalyId);
+        AnomalyFeedbackDTO anomalyFeedbackDTO = new AnomalyFeedbackDTO();
+        anomalyFeedbackDTO.setFeedbackType(AnomalyFeedbackType.ANOMALY);
+        mergedAnomaly.setFeedback(anomalyFeedbackDTO);
+        mergedAnomalyResultDAO.updateAnomalyFeedback(mergedAnomaly);
+      }
+    }
+
+     // Perform synchronous backfill
+    try {
+      this.generateAnomaliesInRange(Long.toString(functionId), startTime.toString(ISODateTimeFormat.dateTime()), endTime.toString(ISODateTimeFormat.dateTime()), Boolean.toString(true));
+    } catch (Exception e) {
+      String message = "Exception happened when performing backfill analysis from " + startTime.toString()
+          + " to " + endTime.toString() + "\n Please check system logs for more detail";
+      messageMap.put(ERROR, message);
+      LOG.error(message, e);
+      return Response.status(Response.Status.BAD_REQUEST).entity(messageMap).build();
+
+    }
+
+    return Response.ok(messageMap).build();
   }
 
   /**
