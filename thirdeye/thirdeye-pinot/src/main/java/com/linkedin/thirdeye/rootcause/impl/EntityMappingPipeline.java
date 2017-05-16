@@ -8,8 +8,11 @@ import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.PipelineContext;
 import com.linkedin.thirdeye.rootcause.PipelineResult;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.slf4j.Logger;
@@ -20,6 +23,8 @@ import org.slf4j.LoggerFactory;
  * The EntityMappingPipeline is a generic implementation for emitting Entities based on
  * association with incoming Entities. For example, it may be used to generate "similar" metrics
  * for each incoming MetricEntity based on a per-defined mapping of Entity URNs to other URNs.
+ *
+ * <br/><b>NOTE:</b> An entity may map to multiple different entities
  */
 public class EntityMappingPipeline extends Pipeline {
   private static final Logger LOG = LoggerFactory.getLogger(EntityMappingPipeline.class);
@@ -86,20 +91,22 @@ public class EntityMappingPipeline extends Pipeline {
   public PipelineResult run(PipelineContext context) {
     Set<Entity> entities = context.filter(Entity.class);
 
-    Map<String, EntityToEntityMappingDTO> mappings = toMap(this.entityDAO.findByMappingType(this.mappingType));
+    Map<String, Set<EntityToEntityMappingDTO>> mappings = toMap(this.entityDAO.findByMappingType(this.mappingType));
 
     Set<Entity> output = new HashSet<>();
     for(Entity entity : entities) {
       try {
-        Entity newEntity = replace(entity, mappings);
+        Set<Entity> newEntities = replace(entity, mappings);
 
-        if(newEntity != null) {
-          if(LOG.isDebugEnabled()) {
-            LOG.debug("Mapping {} [{}] {} to {} [{}] {}", entity.getScore(), entity.getClass().getSimpleName(), entity.getUrn(),
-                newEntity.getScore(), newEntity.getClass().getSimpleName(), newEntity.getUrn());
+        if(LOG.isDebugEnabled()) {
+          for(Entity ne : newEntities) {
+            LOG.debug("Mapping {} [{}] {} to {} [{}] {}",
+                entity.getScore(), entity.getClass().getSimpleName(), entity.getUrn(),
+                ne.getScore(), ne.getClass().getSimpleName(), ne.getUrn());
           }
-          output.add(newEntity);
         }
+
+        output.addAll(newEntities);
       } catch (Exception ex) {
         LOG.warn("Exception while mapping entity '{}'. Skipping.", entity.getUrn(), ex);
       }
@@ -108,47 +115,61 @@ public class EntityMappingPipeline extends Pipeline {
     return new PipelineResult(context, output);
   }
 
-  private Entity replace(Entity entity, Map<String, EntityToEntityMappingDTO> mappings) {
+  private Set<Entity> replace(Entity entity, Map<String, Set<EntityToEntityMappingDTO>> mappings) {
     return this.matchPrefix ? replacePrefix(entity, mappings) : replaceFull(entity, mappings);
   }
 
-  private Entity replacePrefix(Entity entity, Map<String, EntityToEntityMappingDTO> mappings) {
-    EntityToEntityMappingDTO mapping = findPrefix(entity, mappings);
-    if(mapping == null)
+  private Set<Entity> replacePrefix(Entity entity, Map<String, Set<EntityToEntityMappingDTO>> mappings) {
+    List<EntityToEntityMappingDTO> matches = findPrefix(entity, mappings);
+    if(matches == null || matches.isEmpty())
       return handleNoMapping(entity);
 
-    String postfix = entity.getUrn().substring(mapping.getFromURN().length());
-    String toURN = mapping.getToURN() + postfix;
-    return EntityUtils.parseURN(toURN, entity.getScore() * mapping.getScore());
+    Set<Entity> entities = new HashSet<>();
+    for(EntityToEntityMappingDTO match : matches) {
+      String postfix = entity.getUrn().substring(match.getFromURN().length());
+      String toURN = match.getToURN() + postfix;
+      entities.add(EntityUtils.parseURN(toURN, entity.getScore() * match.getScore()));
+    }
+
+    return entities;
   }
 
-  private Entity replaceFull(Entity entity, Map<String, EntityToEntityMappingDTO> mappings) {
-    EntityToEntityMappingDTO mapping = mappings.get(entity.getUrn());
-    if(mapping == null)
+  private Set<Entity> replaceFull(Entity entity, Map<String, Set<EntityToEntityMappingDTO>> mappings) {
+    Set<EntityToEntityMappingDTO> matches = mappings.get(entity.getUrn());
+    if(matches == null || matches.isEmpty())
       return handleNoMapping(entity);
 
-    return EntityUtils.parseURN(mapping.getToURN(), entity.getScore() * mapping.getScore());
+    Set<Entity> entities = new HashSet<>();
+    for(EntityToEntityMappingDTO match : matches) {
+      entities.add(EntityUtils.parseURN(match.getToURN(), entity.getScore() * match.getScore()));
+    }
+
+    return entities;
   }
 
-  private Entity handleNoMapping(Entity e) {
+  private Set<Entity> handleNoMapping(Entity e) {
     if(this.isRewriter)
-      return e;
-    return null;
+      return Collections.singleton(e);
+    return Collections.emptySet();
   }
 
-  private EntityToEntityMappingDTO findPrefix(Entity entity, Map<String, EntityToEntityMappingDTO> mappings) {
-    for(Map.Entry<String, EntityToEntityMappingDTO> mapping : mappings.entrySet()) {
+  private List<EntityToEntityMappingDTO> findPrefix(Entity entity, Map<String, Set<EntityToEntityMappingDTO>> mappings) {
+    List<EntityToEntityMappingDTO> matches = new ArrayList<>();
+    for(Map.Entry<String, Set<EntityToEntityMappingDTO>> mapping : mappings.entrySet()) {
       if(entity.getUrn().startsWith(mapping.getKey()))
-        return mapping.getValue();
+        matches.addAll(mapping.getValue());
     }
-    return null;
+    return matches;
   }
 
-  private static Map<String, EntityToEntityMappingDTO> toMap(Iterable<EntityToEntityMappingDTO> mappings) {
-    Map<String, EntityToEntityMappingDTO> m = new HashMap<>();
+  private static Map<String, Set<EntityToEntityMappingDTO>> toMap(Iterable<EntityToEntityMappingDTO> mappings) {
+    Map<String, Set<EntityToEntityMappingDTO>> map = new HashMap<>();
     for(EntityToEntityMappingDTO dto : mappings) {
-      m.put(dto.getFromURN(), dto);
+      String key = dto.getFromURN();
+      if(!map.containsKey(key))
+        map.put(key, new HashSet<EntityToEntityMappingDTO>());
+      map.get(key).add(dto);
     }
-    return m;
+    return map;
   }
 }
