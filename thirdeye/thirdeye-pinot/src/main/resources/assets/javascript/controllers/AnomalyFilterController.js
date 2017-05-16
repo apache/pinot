@@ -47,6 +47,10 @@ AnomalyFilterController.prototype = {
     return this.anomalyFilterModel.getSelectedAnomalyIds().slice(startIndex, endIndex);
   },
 
+  getTotalAnomalies() {
+    return this.anomalyFilterModel.getSelectedAnomalyIds().length;
+  },
+
   getViewFiltersHash() {
     return this.anomalyFilterModel.getViewFiltersHash();
   }

@@ -1,6 +1,9 @@
 <aside class="anomalies-panel">
   <div class="filter-header">
     Filter
+    <a type="button" id="clear-button" class="thirdeye-link">
+      <span class="glyphicon glyphicon-trash" area-hidden=true title="clear filters"></span>
+    </a>
   </div>
 
   <div class="filter-body">
@@ -29,7 +32,7 @@
     </section>
   </div>
   <div class="filter-footer">
-    <a type="button" id="clear-button" class="thirdeye-link">Clear</a>
-    <a type="button" id="apply-button" class="thirdeye-link">Apply Filter</a>
+<!--     <a type="button" id="clear-button" class="thirdeye-link">Clear</a> -->
+    <a type="button" id="apply-button" class="thirdeye-link">Apply</a>
   </div>
 </aside>

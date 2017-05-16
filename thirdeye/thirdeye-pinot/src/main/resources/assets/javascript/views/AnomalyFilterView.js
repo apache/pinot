@@ -9,19 +9,19 @@ function AnomalyFilterView(anomalyFilterModel) {
 }
 
 AnomalyFilterView.prototype = {
-  destroyDatePickers() {
-    const $currentRangePicker = $('#current-range');
-    const $baselineRangePicker = $('#baseline-range');
-    $currentRangePicker.length && $currentRangePicker.data('daterangepicker').remove();
-    $baselineRangePicker.length && $baselineRangePicker.data('daterangepicker').remove();
-  },
+  // destroyDatePickers() {
+  //   const $currentRangePicker = $('#current-range');
+  //   const $baselineRangePicker = $('#baseline-range');
+  //   $currentRangePicker.length && $currentRangePicker.data('daterangepicker').remove();
+  //   $baselineRangePicker.length && $baselineRangePicker.data('daterangepicker').remove();
+  // },
 
   render() {
     // if (this.anomalyFilterModel.searchFilters) return;
 
     const anomaliesFilters = this.anomalyFilterModel.getAnomaliesFilters();
     const anomaly_filters_compiled = this.anomaly_filters_template_compiled({ anomaliesFilters });
-    this.destroyDatePickers();
+    // this.destroyDatePickers();
     $('#anomaly-filters-place-holder').children().remove();
     $('#anomaly-filters-place-holder').html(anomaly_filters_compiled);
      // TIME RANGE SELECTION

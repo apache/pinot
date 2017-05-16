@@ -140,13 +140,14 @@ function AnomalyResultView(anomalyResultModel) {
 }
 
 AnomalyResultView.prototype = {
-  init : function() {
+  init() {
     var self = this;
     $('#anomalies-search-mode').select2({
       minimumResultsForSearch : -1,
       theme : "bootstrap"
-    }).on("change", function(e) {
-      self.showSearchBarBasedOnMode();
+    }).on("change", (e) => {
+      this.showSearchBarBasedOnMode();
+      this.destroyFilter();
     });
 
     this.setupSearchBar();
@@ -172,10 +173,14 @@ AnomalyResultView.prototype = {
     });
   },
 
-  // should have 2type of destroy
-  // need to destroy date picker
   destroy() {
+    this.destroyFilter();
     $('#anomaly-results-place-holder').children().remove();
+  },
+
+  destroyFilter() {
+    this.destroyDatePickers();
+    $('#anomaly-filters-wrapper-place-holder').children().remove();
   },
 
   destroyDatePickers() {

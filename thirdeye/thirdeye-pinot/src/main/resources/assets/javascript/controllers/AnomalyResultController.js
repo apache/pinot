@@ -33,7 +33,11 @@ AnomalyResultController.prototype = {
     if (hasSameParams) {
       if (hasSearchFilters) {
         const anomalyIds = this.anomalyFilterController.getSelectedAnomalies(pageNumber).join(',');
-        this.anomalyResultModel.setParams({ pageNumber });
+        const totalAnomalies = this.anomalyFilterController.getTotalAnomalies();
+        this.anomalyResultModel.setParams({
+          pageNumber,
+          totalAnomalies
+         });
         this.anomalyResultModel.getDetailsForAnomalyIds(anomalyIds);
       } else {
         this.anomalyResultModel.setParams({ pageNumber });
@@ -52,7 +56,9 @@ AnomalyResultController.prototype = {
         this.anomalyResultModel.getSearchFilters((filter) => {
           filter.selectedFilters = params.searchFilters;
           this.anomalyFilterController.handleAppEvent(filter);
-          this.anomalyResultModel.setParams({ totalAnomalies: filter.totalAnomalies });
+          this.anomalyResultModel.setParams({
+            totalAnomalies: filter.totalAnomalies,
+          });
           if (hasSearchFilters) {
             const anomalyIds = this.anomalyFilterController.getSelectedAnomalies(pageNumber).join(',');
             this.anomalyResultModel.getDetailsForAnomalyIds(anomalyIds);
@@ -129,7 +135,6 @@ AnomalyResultController.prototype = {
   pageClickEventHandler(sender, pageNumber) {
     HASH_SERVICE.update({ pageNumber });
     HASH_SERVICE.refreshWindowHashForRouting('anomalies');
-    // HASH_SERVICE.routeTo('anomalies');
   },
 
   initFilters() {
