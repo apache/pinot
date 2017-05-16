@@ -149,7 +149,7 @@ public class AnomaliesResource {
       anomalyDetectionInputContextBuilder
           .fetchTimeSeriesDataByDimension(Arrays.asList(currentTimeRange), anomaly.getDimensions(), false);
 
-      MetricTimeSeries currentTimeSeries = anomalyDetectionInpudtContextBuilder.build()
+      MetricTimeSeries currentTimeSeries = anomalyDetectionInputContextBuilder.build()
           .getDimensionKeyMetricTimeSeriesMap().get(anomaly.getDimensions());
       double currentVal = getTotalFromTimeSeries(currentTimeSeries, dataset.isAdditive());
       response.setCurrentVal(currentVal);
