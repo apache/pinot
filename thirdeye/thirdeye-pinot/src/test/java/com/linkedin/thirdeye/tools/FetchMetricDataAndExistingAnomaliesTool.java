@@ -283,10 +283,10 @@ public class FetchMetricDataAndExistingAnomaliesTool {
     urlBuilder.append(TIME_START + EQUALS + Long.toString(startTime.getMillis()) + AND);
     urlBuilder.append(TIME_END + EQUALS + Long.toString(endTime.getMillis()) + AND);
     urlBuilder.append(GRANULARITY + EQUALS + timeGranularity.toString() + AND);
-    if (dimensions != null || !dimensions.isEmpty()) {
+    if (dimensions != null && !dimensions.isEmpty()) {
       urlBuilder.append(DIMENSIONS + EQUALS + dimensions + AND);
     }
-    if (filterJson != null || !filterJson.isEmpty()) {
+    if (filterJson != null && !filterJson.isEmpty()) {
       urlBuilder.append(FILTERS + EQUALS + URLEncoder.encode(filterJson, "UTF-8"));
     }
 
