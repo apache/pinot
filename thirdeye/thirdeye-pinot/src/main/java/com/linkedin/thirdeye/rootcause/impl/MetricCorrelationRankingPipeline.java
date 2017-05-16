@@ -50,6 +50,7 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
 
   private static final String COL_TIME = "timestamp";
   private static final String COL_VALUE = "value";
+  private static final String COL_REL_DIFF = "rel_diff";
 
   private final QueryCache cache;
   private final MetricConfigManager metricDAO;
@@ -151,7 +152,7 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
     }
 
     // determine current-baseline changes
-    Map<MetricEntity, DoubleSeries> pctChanges = new HashMap<>();
+    Map<MetricEntity, DataFrame> pctChanges = new HashMap<>();
     for(MetricEntity entity : allMetrics) {
       String currentId = makeIdentifier(entity.getUrn(), PRE_CURRENT);
       String baselineId = makeIdentifier(entity.getUrn(), PRE_BASELINE);
@@ -166,47 +167,58 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
         continue;
       }
 
+      LOG.info("Preparing data for metric '{}'", entity.getUrn());
       DataFrame current = responses.get(currentId);
       DataFrame baseline = responses.get(baselineId);
+      DataFrame joined = current.joinInner(baseline);
 
-      DoubleSeries pctChange = current.joinInner(baseline).map(new Series.DoubleFunction() {
+      DataFrame pctChange = joined.mapInPlace(new Series.DoubleFunction() {
         @Override
         public double apply(double... values) {
           return (values[0] - values[1]) / values[1];
         }
-      }, COL_VALUE + DataFrame.COLUMN_JOIN_LEFT, COL_VALUE + DataFrame.COLUMN_JOIN_RIGHT);
+      },
+          COL_REL_DIFF,
+          COL_VALUE + DataFrame.COLUMN_JOIN_LEFT, COL_VALUE + DataFrame.COLUMN_JOIN_RIGHT);
 
       pctChanges.put(entity, pctChange);
     }
 
     // determine score - by absolute strength of correlation
     Map<MetricEntity, Double> scores = new HashMap<>();
-    for(MetricEntity target : targetMetrics) {
-      if(!pctChanges.containsKey(target)) {
-        LOG.warn("No diff data for target metric '{}'. Skipping.", target.getUrn());
+    for(MetricEntity targetMetric : targetMetrics) {
+      if(!pctChanges.containsKey(targetMetric)) {
+        LOG.warn("No diff data for target metric '{}'. Skipping.", targetMetric.getUrn());
         continue;
       }
 
-      DoubleSeries changesTarget = pctChanges.get(target);
+      DataFrame changesTarget = pctChanges.get(targetMetric);
 
-      for(MetricEntity candidate : candidateMetrics) {
-        if(!pctChanges.containsKey(target)) {
-          LOG.warn("No diff data for candidate metric '{}'. Skipping.", candidate.getUrn());
+      for(MetricEntity candidateMetric : candidateMetrics) {
+        if(!pctChanges.containsKey(targetMetric)) {
+          LOG.warn("No diff data for candidate metric '{}'. Skipping.", candidateMetric.getUrn());
           continue;
         }
 
-        DoubleSeries changesCandidate = pctChanges.get(candidate);
+        LOG.info("Calculating correlation for metric '{}'", candidateMetric.getUrn());
+        DataFrame changesCandidate = pctChanges.get(candidateMetric);
+        DataFrame joined = changesTarget.joinInner(changesCandidate);
+
+        DoubleSeries target = joined.getDoubles(COL_REL_DIFF + DataFrame.COLUMN_JOIN_LEFT);
+        DoubleSeries candidate = joined.getDoubles(COL_REL_DIFF + DataFrame.COLUMN_JOIN_RIGHT);
 
         try {
-          double score = Math.abs(changesTarget.corr(changesCandidate)) * target.getScore();
+          double score = Math.abs(target.corr(candidate)) * targetMetric.getScore();
 
-          if (!scores.containsKey(candidate)) {
-            scores.put(candidate, 0.0);
+          LOG.debug("Score for target '{}' and candidate '{}' is {} (based on {} data points)", targetMetric.getUrn(), candidateMetric.getUrn(), score, target.size());
+
+          if (!scores.containsKey(candidateMetric)) {
+            scores.put(candidateMetric, 0.0);
           }
-          scores.put(candidate, scores.get(candidate) + score);
+          scores.put(candidateMetric, scores.get(candidateMetric) + score);
 
         } catch (Exception e) {
-          LOG.warn("Could not calculate correlation of target '{}' and candidate '{}'. Skipping.", target.getUrn(), candidate.getUrn(), e);
+          LOG.warn("Could not calculate correlation of target '{}' and candidate '{}'. Skipping.", targetMetric.getUrn(), candidateMetric.getUrn(), e);
         }
       }
     }
