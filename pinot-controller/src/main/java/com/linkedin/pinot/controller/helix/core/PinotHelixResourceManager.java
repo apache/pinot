@@ -1060,12 +1060,7 @@ public class PinotHelixResourceManager {
    */
   public void addTable(AbstractTableConfig config)
       throws IOException {
-    TableType type;
-    try {
-      type = TableType.valueOf(config.getTableType().toUpperCase());
-    } catch (Exception e) {
-      throw new InvalidTableConfigException(e);
-    }
+    TableType type = config.getTableType();
 
     if (isSingleTenantCluster()) {
       TenantConfig tenantConfig = new TenantConfig();
@@ -1293,12 +1288,12 @@ public class PinotHelixResourceManager {
     if (type == TableType.REALTIME) {
       config = ZKMetadataProvider.getRealtimeTableConfig(getPropertyStore(), tableNameWithType);
       if (config != null) {
-        ((RealtimeTableConfig) config).setIndexConfig(newConfigs);
+        config.setIndexingConfig(newConfigs);
       }
     } else {
       config = ZKMetadataProvider.getOfflineTableConfig(getPropertyStore(), tableNameWithType);
       if (config != null) {
-        ((OfflineTableConfig) config).setIndexConfig(newConfigs);
+        config.setIndexingConfig(newConfigs);
       }
     }
     if (config == null) {

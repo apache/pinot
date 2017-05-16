@@ -16,11 +16,11 @@
 
 package com.linkedin.pinot.common.config;
 
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import java.io.IOException;
 import org.json.JSONException;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-
 
 
 public class AbstractTableConfigTest {
@@ -35,13 +35,15 @@ public class AbstractTableConfigTest {
       AbstractTableConfig tableConfig = AbstractTableConfig.init(tableConfigStr);
 
       Assert.assertEquals(tableConfig.getTableName(), "myTable_OFFLINE");
-      Assert.assertEquals(tableConfig.getTableType().toLowerCase(), "offline");
+      Assert.assertEquals(tableConfig.getTableType(), TableType.OFFLINE);
       Assert.assertEquals(tableConfig.getIndexingConfig().getLoadMode(), "HEAP");
       Assert.assertNotNull(tableConfig.getQuotaConfig());
       Assert.assertEquals(tableConfig.getQuotaConfig().getStorage(), "30G");
       String tcFromJson = tableConfig.toJSON().toString();
       AbstractTableConfig validator = AbstractTableConfig.init(tcFromJson);
-      Assert.assertEquals(validator.getQuotaConfig().getStorage(), tableConfig.getQuotaConfig().getStorage());
+      QuotaConfig quotaConfig = validator.getQuotaConfig();
+      Assert.assertNotNull(quotaConfig);
+      Assert.assertEquals(quotaConfig.getStorage(), tableConfig.getQuotaConfig().getStorage());
       Assert.assertEquals(validator.getTableName(), tableConfig.getTableName());
     }
     {
@@ -51,15 +53,13 @@ public class AbstractTableConfigTest {
       AbstractTableConfig tableConfig = AbstractTableConfig.init(tableConfigStr);
 
       Assert.assertEquals(tableConfig.getTableName(), "myTable_OFFLINE");
-      Assert.assertEquals(tableConfig.getTableType().toLowerCase(), "offline");
+      Assert.assertEquals(tableConfig.getTableType(), TableType.OFFLINE);
       Assert.assertEquals(tableConfig.getIndexingConfig().getLoadMode(), "HEAP");
       Assert.assertNull(tableConfig.getQuotaConfig());
       String tcFromJson = tableConfig.toJSON().toString();
       AbstractTableConfig validator = AbstractTableConfig.init(tcFromJson);
       Assert.assertNull(validator.getQuotaConfig());
       Assert.assertEquals(validator.getTableName(), tableConfig.getTableName());
-
     }
   }
-
 }

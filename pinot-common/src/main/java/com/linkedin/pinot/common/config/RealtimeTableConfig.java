@@ -15,35 +15,14 @@
  */
 package com.linkedin.pinot.common.config;
 
-import org.antlr.v4.runtime.misc.Nullable;
+import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
+import javax.annotation.Nullable;
 
 
 public class RealtimeTableConfig extends AbstractTableConfig {
-
-  private IndexingConfig indexConfig;
-
-  protected RealtimeTableConfig(String tableName, String tableType,
-      SegmentsValidationAndRetentionConfig validationConfig, TenantConfig tenantConfig,
-      TableCustomConfig customConfigs, IndexingConfig indexConfig, @Nullable QuotaConfig quotaConfig) {
-    super(tableName, tableType, validationConfig, tenantConfig, customConfigs, quotaConfig);
-    this.indexConfig = indexConfig;
+  protected RealtimeTableConfig(String tableName, TableType tableType,
+      SegmentsValidationAndRetentionConfig validationConfig, TenantConfig tenantConfig, IndexingConfig indexConfig,
+      TableCustomConfig customConfigs, @Nullable QuotaConfig quotaConfig) {
+    super(tableName, tableType, validationConfig, tenantConfig, indexConfig, customConfigs, quotaConfig);
   }
-
-  @Override
-  public IndexingConfig getIndexingConfig() {
-    return indexConfig;
-  }
-
-  public void setIndexConfig(IndexingConfig indexConfig) {
-    this.indexConfig = indexConfig;
-  }
-
-  @Override
-  public String toString() {
-    StringBuilder bld = new StringBuilder(super.toString());
-    bld.append(indexConfig.toString());
-    return bld.toString();
-  }
-
-
 }

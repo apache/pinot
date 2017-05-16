@@ -20,214 +20,183 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.commons.configuration.ConfigurationRuntimeException;
 import org.apache.helix.ZNRecord;
-import org.codehaus.jackson.JsonGenerationException;
-import org.codehaus.jackson.JsonNode;
-import org.codehaus.jackson.JsonParseException;
-import org.codehaus.jackson.JsonProcessingException;
-import org.codehaus.jackson.map.JsonMappingException;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.json.JSONException;
 import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public abstract class AbstractTableConfig {
-  private static final Logger LOGGER = LoggerFactory.getLogger(AbstractTableConfig.class);
-  private static final String TABLE_TYPE_REALTIME = "realtime";
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-  protected String tableName;
-  protected String tableType;
-  protected SegmentsValidationAndRetentionConfig validationConfig;
-  protected TenantConfig tenantConfig;
-  protected TableCustomConfig customConfigs;
-  protected @Nullable QuotaConfig quotaConfig;
+  protected String _tableName;
+  protected TableType _tableType;
+  protected SegmentsValidationAndRetentionConfig _validationConfig;
+  protected TenantConfig _tenantConfig;
+  protected IndexingConfig _indexingConfig;
+  protected TableCustomConfig _customConfigs;
+  protected QuotaConfig _quotaConfig;
 
-  protected AbstractTableConfig(String tableName, String tableType,
-      SegmentsValidationAndRetentionConfig validationConfig, TenantConfig tenantConfig, TableCustomConfig customConfigs,
-      @Nullable QuotaConfig quotaConfig) {
-    this.tableName = TableNameBuilder.forType(TableType.valueOf(tableType.toUpperCase())).tableNameWithType(tableName);
-    this.tableType = tableType;
-    this.validationConfig = validationConfig;
-    this.tenantConfig = tenantConfig;
-    this.customConfigs = customConfigs;
-    this.quotaConfig = quotaConfig;
+  protected AbstractTableConfig(String tableName, TableType tableType,
+      SegmentsValidationAndRetentionConfig validationConfig, TenantConfig tenantConfig, IndexingConfig indexingConfig,
+      TableCustomConfig customConfigs, @Nullable QuotaConfig quotaConfig) {
+    _tableName = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
+    _tableType = tableType;
+    _validationConfig = validationConfig;
+    _tenantConfig = tenantConfig;
+    _indexingConfig = indexingConfig;
+    _customConfigs = customConfigs;
+    _quotaConfig = quotaConfig;
   }
 
-  public static AbstractTableConfig init(String jsonString) throws JSONException, IOException {
-    JSONObject tableJson = new JSONObject(jsonString);
-    String tableType = tableJson.getString("tableType").toLowerCase();
-    String tableName = TableNameBuilder.forType(TableType.valueOf(tableType.toUpperCase()))
-        .tableNameWithType(tableJson.getString("tableName"));
+  public static AbstractTableConfig init(String jsonString)
+      throws JSONException, IOException {
+    JSONObject jsonConfig = new JSONObject(jsonString);
+    TableType tableType = TableType.valueOf(jsonConfig.getString("tableType").toUpperCase());
+    String tableName = TableNameBuilder.forType(tableType).tableNameWithType(jsonConfig.getString("tableName"));
     SegmentsValidationAndRetentionConfig validationConfig =
-        loadSegmentsConfig(new ObjectMapper().readTree(tableJson.getJSONObject("segmentsConfig").toString()));
-    TenantConfig tenantConfig = loadTenantsConfig(new ObjectMapper().readTree(tableJson.getJSONObject("tenants").toString()));
+        OBJECT_MAPPER.readValue(jsonConfig.getJSONObject("segmentsConfig").toString(),
+            SegmentsValidationAndRetentionConfig.class);
+    TenantConfig tenantConfig =
+        OBJECT_MAPPER.readValue(jsonConfig.getJSONObject("tenants").toString(), TenantConfig.class);
     TableCustomConfig customConfig =
-        loadCustomConfig(new ObjectMapper().readTree(tableJson.getJSONObject("metadata").toString()));
+        OBJECT_MAPPER.readValue(jsonConfig.getJSONObject("metadata").toString(), TableCustomConfig.class);
     IndexingConfig indexingConfig =
-        loadIndexingConfig(new ObjectMapper().readTree(tableJson.getJSONObject("tableIndexConfig").toString()));
+        OBJECT_MAPPER.readValue(jsonConfig.getJSONObject("tableIndexConfig").toString(), IndexingConfig.class);
     QuotaConfig quotaConfig = null;
-    if (tableJson.has(QuotaConfig.QUOTA_SECTION_NAME)) {
-      try {
-        quotaConfig = loadQuotaConfig(
-            new ObjectMapper().readTree(tableJson.getJSONObject(QuotaConfig.QUOTA_SECTION_NAME).toString()));
-      } catch(ConfigurationRuntimeException e) {
-        LOGGER.error("Invalid quota configuration value for table: {}", tableName);
-        throw e;
-      }
+    if (jsonConfig.has(QuotaConfig.QUOTA_SECTION_NAME)) {
+      quotaConfig = OBJECT_MAPPER.readValue(jsonConfig.getJSONObject(QuotaConfig.QUOTA_SECTION_NAME).toString(),
+          QuotaConfig.class);
+      quotaConfig.validate();
     }
 
-    if (tableType.equals("offline")) {
-      return new OfflineTableConfig(tableName, tableType, validationConfig, tenantConfig, customConfig, indexingConfig, quotaConfig);
-    } else if (tableType.equals(TABLE_TYPE_REALTIME)) {
-      return new RealtimeTableConfig(tableName, tableType, validationConfig, tenantConfig, customConfig, indexingConfig, quotaConfig);
+    if (tableType == TableType.OFFLINE) {
+      return new OfflineTableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
+          quotaConfig);
+    } else {
+      return new RealtimeTableConfig(tableName, tableType, validationConfig, tenantConfig, indexingConfig, customConfig,
+          quotaConfig);
     }
-    throw new UnsupportedOperationException("unknown tableType : " + tableType);
   }
 
-  public static AbstractTableConfig fromZnRecord(ZNRecord record) throws JsonParseException, JsonMappingException,
-      JsonProcessingException, JSONException, IOException {
+  public static AbstractTableConfig fromZnRecord(ZNRecord record)
+      throws JSONException, IOException {
     Map<String, String> simpleFields = record.getSimpleFields();
-    JSONObject str = new JSONObject();
-    str.put("tableName", simpleFields.get("tableName"));
-    str.put("tableType", simpleFields.get("tableType"));
-    str.put("segmentsConfig", new JSONObject(simpleFields.get("segmentsConfig")));
-    str.put("tenants", new JSONObject(simpleFields.get("tenants")));
-    str.put("tableIndexConfig", new JSONObject(simpleFields.get("tableIndexConfig")));
-    str.put("metadata", new JSONObject(simpleFields.get("metadata")));
+    JSONObject jsonConfig = new JSONObject();
+    jsonConfig.put("tableName", simpleFields.get("tableName"));
+    jsonConfig.put("tableType", simpleFields.get("tableType"));
+    jsonConfig.put("segmentsConfig", new JSONObject(simpleFields.get("segmentsConfig")));
+    jsonConfig.put("tenants", new JSONObject(simpleFields.get("tenants")));
+    jsonConfig.put("tableIndexConfig", new JSONObject(simpleFields.get("tableIndexConfig")));
+    jsonConfig.put("metadata", new JSONObject(simpleFields.get("metadata")));
     String quotaConfig = simpleFields.get(QuotaConfig.QUOTA_SECTION_NAME);
     if (quotaConfig != null) {
-      str.put(QuotaConfig.QUOTA_SECTION_NAME, new JSONObject(quotaConfig));
+      jsonConfig.put(QuotaConfig.QUOTA_SECTION_NAME, new JSONObject(quotaConfig));
     }
-    return init(str.toString());
+    return init(jsonConfig.toString());
   }
 
-  public static ZNRecord toZnRecord(AbstractTableConfig config) throws JsonGenerationException, JsonMappingException,
-      IOException {
-    ZNRecord rec = new ZNRecord(config.getTableName());
-    Map<String, String> rawMap = new HashMap<String, String>();
-    rawMap.put("tableName", config.getTableName());
-    rawMap.put("tableType", config.getTableType());
-    rawMap.put("segmentsConfig", new ObjectMapper().writeValueAsString(config.getValidationConfig()));
-    rawMap.put("tenants", new ObjectMapper().writeValueAsString(config.getTenantConfig()));
-    rawMap.put("metadata", new ObjectMapper().writeValueAsString(config.getCustomConfigs()));
-    rawMap.put("tableIndexConfig", new ObjectMapper().writeValueAsString(config.getIndexingConfig()));
-    if (config.quotaConfig != null) {
-      rawMap.put("quota", new ObjectMapper().writeValueAsString(config.getQuotaConfig()));
-    }
-    rec.setSimpleFields(rawMap);
-    return rec;
-  }
-
-  public static SegmentsValidationAndRetentionConfig loadSegmentsConfig(JsonNode node) throws JsonParseException,
-      JsonMappingException, IOException {
-    return new ObjectMapper().readValue(node, SegmentsValidationAndRetentionConfig.class);
-  }
-
-  public static TenantConfig loadTenantsConfig(JsonNode node) throws JsonParseException, JsonMappingException,
-      IOException {
-    return new ObjectMapper().readValue(node, TenantConfig.class);
-  }
-
-  public static TableCustomConfig loadCustomConfig(JsonNode node) throws JsonParseException, JsonMappingException,
-      IOException {
-    return new ObjectMapper().readValue(node, TableCustomConfig.class);
-  }
-
-  public static IndexingConfig loadIndexingConfig(JsonNode node) throws JsonParseException, JsonMappingException,
-      IOException {
-    return new ObjectMapper().readValue(node, IndexingConfig.class);
-  }
-
-  private static QuotaConfig loadQuotaConfig(JsonNode jsonNode)
+  public static ZNRecord toZnRecord(AbstractTableConfig config)
       throws IOException {
-    QuotaConfig quotaConfig = new ObjectMapper().readValue(jsonNode, QuotaConfig.class);
-    quotaConfig.validate();
-    return quotaConfig;
+    ZNRecord record = new ZNRecord(config.getTableName());
+    Map<String, String> simpleFields = new HashMap<>();
+    simpleFields.put("tableName", config.getTableName());
+    simpleFields.put("tableType", config.getTableType().toString().toLowerCase());
+    simpleFields.put("segmentsConfig", OBJECT_MAPPER.writeValueAsString(config.getValidationConfig()));
+    simpleFields.put("tenants", OBJECT_MAPPER.writeValueAsString(config.getTenantConfig()));
+    simpleFields.put("tableIndexConfig", OBJECT_MAPPER.writeValueAsString(config.getIndexingConfig()));
+    simpleFields.put("metadata", OBJECT_MAPPER.writeValueAsString(config.getCustomConfigs()));
+    if (config._quotaConfig != null) {
+      simpleFields.put(QuotaConfig.QUOTA_SECTION_NAME, OBJECT_MAPPER.writeValueAsString(config.getQuotaConfig()));
+    }
+    record.setSimpleFields(simpleFields);
+    return record;
   }
 
   public void setTableName(String tableName) {
-    this.tableName = tableName;
+    _tableName = tableName;
   }
 
-  public void setTableType(String tableType) {
-    this.tableType = tableType;
+  public void setTableType(TableType tableType) {
+    _tableType = tableType;
   }
 
   public void setValidationConfig(SegmentsValidationAndRetentionConfig validationConfig) {
-    this.validationConfig = validationConfig;
+    _validationConfig = validationConfig;
   }
 
   public void setTenantConfig(TenantConfig tenantConfig) {
-    this.tenantConfig = tenantConfig;
+    _tenantConfig = tenantConfig;
+  }
+
+  public void setIndexingConfig(IndexingConfig indexingConfig) {
+    _indexingConfig = indexingConfig;
   }
 
   public void setCustomConfigs(TableCustomConfig customConfigs) {
-    this.customConfigs = customConfigs;
+    _customConfigs = customConfigs;
   }
 
   public void setQuotaConfig(@Nullable QuotaConfig quotaConfig) {
-    this.quotaConfig = quotaConfig;
+    _quotaConfig = quotaConfig;
   }
 
   public String getTableName() {
-    return tableName;
+    return _tableName;
   }
 
-  public String getTableType() {
-    return tableType;
-  }
-
-  public boolean isRealTime() {
-    return tableType.equalsIgnoreCase(TABLE_TYPE_REALTIME);
+  public TableType getTableType() {
+    return _tableType;
   }
 
   public SegmentsValidationAndRetentionConfig getValidationConfig() {
-    return validationConfig;
+    return _validationConfig;
   }
 
   public TenantConfig getTenantConfig() {
-    return tenantConfig;
+    return _tenantConfig;
+  }
+
+  public IndexingConfig getIndexingConfig() {
+    return _indexingConfig;
   }
 
   public TableCustomConfig getCustomConfigs() {
-    return customConfigs;
+    return _customConfigs;
   }
 
-  public abstract IndexingConfig getIndexingConfig();
-
-  public @Nullable QuotaConfig getQuotaConfig() {
-    return quotaConfig;
+  @Nullable
+  public QuotaConfig getQuotaConfig() {
+    return _quotaConfig;
   }
 
   @Override
   public String toString() {
-    final StringBuilder result = new StringBuilder();
-    result.append("tableName:" + tableName + "\n");
-    result.append("tableType:" + tableType + "\n");
-    result.append("tenant : " + tenantConfig.toString() + " \n");
-    result.append("segments : " + validationConfig.toString() + "\n");
-    result.append("customConfigs : " + customConfigs.toString() + "\n");
-    if (quotaConfig != null) {
-      result.append("quota : " + quotaConfig.toString() + "\n");
+    StringBuilder stringBuilder = new StringBuilder();
+    stringBuilder.append("tableName: ").append(_tableName).append('\n');
+    stringBuilder.append("tableType: ").append(_tableType).append('\n');
+    stringBuilder.append("segmentsConfig: ").append(_validationConfig).append('\n');
+    stringBuilder.append("tenants: ").append(_tenantConfig).append('\n');
+    stringBuilder.append("tableIndexConfig: ").append(_indexingConfig).append('\n');
+    stringBuilder.append("metadata: ").append(_customConfigs).append('\n');
+    if (_quotaConfig != null) {
+      stringBuilder.append("quota: ").append(_quotaConfig).append('\n');
     }
-    return result.toString();
+    return stringBuilder.toString();
   }
 
-  public JSONObject toJSON() throws JSONException, JsonGenerationException, JsonMappingException, IOException {
-    JSONObject ret = new JSONObject();
-    ret.put("tableName", tableName);
-    ret.put("tableType", tableType);
-    ret.put("segmentsConfig", new JSONObject(new ObjectMapper().writeValueAsString(validationConfig)));
-    ret.put("tenants", new JSONObject(new ObjectMapper().writeValueAsString(tenantConfig)));
-    ret.put("tableIndexConfig", new JSONObject(new ObjectMapper().writeValueAsString(getIndexingConfig())));
-    ret.put("metadata", new JSONObject(new ObjectMapper().writeValueAsString(customConfigs)));
-    if (quotaConfig != null) {
-      ret.put("quota", new JSONObject(new ObjectMapper().writeValueAsString(quotaConfig)));
+  public JSONObject toJSON()
+      throws JSONException, IOException {
+    JSONObject jsonConfig = new JSONObject();
+    jsonConfig.put("tableName", _tableName);
+    jsonConfig.put("tableType", _tableType.toString().toLowerCase());
+    jsonConfig.put("segmentsConfig", new JSONObject(OBJECT_MAPPER.writeValueAsString(_validationConfig)));
+    jsonConfig.put("tenants", new JSONObject(OBJECT_MAPPER.writeValueAsString(_tenantConfig)));
+    jsonConfig.put("tableIndexConfig", new JSONObject(OBJECT_MAPPER.writeValueAsString(_indexingConfig)));
+    jsonConfig.put("metadata", new JSONObject(OBJECT_MAPPER.writeValueAsString(_customConfigs)));
+    if (_quotaConfig != null) {
+      jsonConfig.put(QuotaConfig.QUOTA_SECTION_NAME, new JSONObject(OBJECT_MAPPER.writeValueAsString(_quotaConfig)));
     }
-    return ret;
+    return jsonConfig;
   }
-
 }
