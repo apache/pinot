@@ -112,12 +112,13 @@ public class AnomalyFunctionResource {
     // TODO: replace this with Job/Task framework and job tracker page
     BaseAnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
 
-    AnomalyDetectionInputContextBuilder anomalyDetectionInputContextBuilder =
-        new AnomalyDetectionInputContextBuilder(anomalyFunctionFactory);
-    anomalyDetectionInputContextBuilder.init(anomalyFunctionSpec);
     DateTime windowStart = new DateTime(startTime);
     DateTime windowEnd = new DateTime(endTime);
+
+    AnomalyDetectionInputContextBuilder anomalyDetectionInputContextBuilder =
+        new AnomalyDetectionInputContextBuilder(anomalyFunctionFactory);
     anomalyDetectionInputContextBuilder
+        .setFunction(anomalyFunctionSpec)
         .fetchTimeSeriesData(windowStart, windowEnd)
         .fetchSaclingFactors(windowStart, windowEnd);
     AnomalyDetectionInputContext anomalyDetectionInputContext = anomalyDetectionInputContextBuilder.build();

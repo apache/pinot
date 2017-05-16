@@ -145,8 +145,7 @@ public class AnomaliesResource {
       Pair<Long, Long> currentTimeRange = new Pair<>(anomaly.getStartTime(), anomaly.getEndTime());
       AnomalyDetectionInputContextBuilder anomalyDetectionInputContextBuilder =
           new AnomalyDetectionInputContextBuilder(anomalyFunctionFactory);
-      anomalyDetectionInputContextBuilder.init(anomaly.getFunction());
-      anomalyDetectionInputContextBuilder
+      anomalyDetectionInputContextBuilder.setFunction(anomaly.getFunction())
           .fetchTimeSeriesDataByDimension(Arrays.asList(currentTimeRange), anomaly.getDimensions(), false);
 
       MetricTimeSeries currentTimeSeries = anomalyDetectionInputContextBuilder.build()
@@ -706,8 +705,8 @@ public class AnomaliesResource {
       } else {
         AnomalyDetectionInputContextBuilder anomalyDetectionInputContextBuilder =
             new AnomalyDetectionInputContextBuilder(anomalyFunctionFactory);
-        anomalyDetectionInputContextBuilder.init(anomalyFunctionSpec);
         AnomalyDetectionInputContext adInputContext = anomalyDetectionInputContextBuilder
+            .setFunction(anomalyFunctionSpec)
             .fetchTimeSeriesDataByDimension(anomalyWindowStart, anomalyWindowEnd, dimensions, true)
             .fetchExixtingMergedAnomalies(anomalyWindowStart, anomalyWindowEnd).build();
 

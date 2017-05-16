@@ -235,8 +235,7 @@ public class TimeBasedAnomalyMerger {
 
     AnomalyDetectionInputContextBuilder anomalyDetectionInputContextBuilder =
         new AnomalyDetectionInputContextBuilder(anomalyFunctionFactory);
-    anomalyDetectionInputContextBuilder.init(anomalyFunctionSpec);
-    anomalyDetectionInputContextBuilder
+    anomalyDetectionInputContextBuilder.setFunction(anomalyFunctionSpec)
         .fetchTimeSeriesDataByDimension(windowStart, windowEnd, dimensions, false)
         .fetchSaclingFactors(windowStart, windowEnd)
         .fetchExistingMergedAnomaliesByDimension(windowStart, windowEnd, dimensions);
