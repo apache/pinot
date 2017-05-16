@@ -114,10 +114,10 @@ public class AnomalyFunctionResource {
 
     AnomalyDetectionInputContextBuilder anomalyDetectionInputContextBuilder =
         new AnomalyDetectionInputContextBuilder(anomalyFunctionFactory);
-
+    anomalyDetectionInputContextBuilder.init(anomalyFunctionSpec);
     DateTime windowStart = new DateTime(startTime);
     DateTime windowEnd = new DateTime(endTime);
-    anomalyDetectionInputContextBuilder.init(anomalyFunctionSpec)
+    anomalyDetectionInputContextBuilder
         .fetchTimeSeriesData(windowStart, windowEnd)
         .fetchSaclingFactors(windowStart, windowEnd);
     AnomalyDetectionInputContext anomalyDetectionInputContext = anomalyDetectionInputContextBuilder.build();
