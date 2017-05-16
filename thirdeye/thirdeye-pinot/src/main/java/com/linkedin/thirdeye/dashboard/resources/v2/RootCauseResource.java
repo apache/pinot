@@ -122,7 +122,7 @@ public class RootCauseResource {
         try {
           return formatter.format(e);
         } catch (Exception ex) {
-          LOG.warn("Error applying formatter '{}'. Skipping.", ex);
+          LOG.warn("Error applying formatter '{}'. Skipping.", formatter.getClass().getName(), ex);
         }
       }
     }
