@@ -747,7 +747,7 @@ public class AnomalyResource {
       DateTime viewWindowEnd = new DateTime(viewWindowEndTime);
       AnomalyDetectionInputContextBuilder anomalyDetectionInputContextBuilder =
           new AnomalyDetectionInputContextBuilder(anomalyFunctionFactory);
-      anomalyDetectionInputContextBuilder.init(anomalyFunctionSpec)
+      anomalyDetectionInputContextBuilder.setFunction(anomalyFunctionSpec)
           .fetchTimeSeriesDataByDimension(viewWindowStart, viewWindowEnd, dimensions, false)
           .fetchSaclingFactors(viewWindowStart, viewWindowEnd)
           .fetchExixtingMergedAnomalies(viewWindowStart, viewWindowEnd);
