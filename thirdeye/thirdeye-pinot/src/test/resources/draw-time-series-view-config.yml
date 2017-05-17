@@ -1,0 +1,6 @@
+persistenceFile: /home/ychung/workspace/thirdeye-configs/local-configs/persistence.yml
+dashboardHost: localhost
+dashboardPort: 1426
+functionIds: 3347665,3347659
+outputPath: /home/ychung/workspace/growth_timeseries
+comparisonMode: WoW
