@@ -12,10 +12,18 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
+/**
+ * This class contains helper classes to load/transform clients from file
+ */
 public class ClientConfigLoader {
  private static final Logger LOG = LoggerFactory.getLogger(ClientConfigLoader.class);
  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper(new YAMLFactory());
 
+ /**
+  * Returns client config from yml file
+  * @param clientConfigPath
+  * @return ClientConfig
+  */
  public static ClientConfig fromClientConfigPath(String clientConfigPath) {
    ClientConfig clientConfig = null;
    try {
@@ -26,6 +34,11 @@ public class ClientConfigLoader {
    return clientConfig;
  }
 
+ /**
+  * Returns client name to client map
+  * @param clientConfig
+  * @return
+  */
  public static Map<String, ThirdEyeClient> getClientMap(ClientConfig clientConfig) {
    Map<String, ThirdEyeClient> clientMap = new HashMap<>();
    for (Client client : clientConfig.getClients()) {
