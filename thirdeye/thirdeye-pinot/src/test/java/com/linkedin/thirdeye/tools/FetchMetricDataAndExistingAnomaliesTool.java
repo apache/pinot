@@ -129,7 +129,7 @@ public class FetchMetricDataAndExistingAnomaliesTool {
     }
 
     List<MergedAnomalyResultDTO> mergedResults =
-        mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(startTime.getMillis(), endTime.getMillis(), functionId);
+        mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(startTime.getMillis(), endTime.getMillis(), functionId, true);
     for(MergedAnomalyResultDTO mergedResult : mergedResults){
       ResultNode res = new ResultNode();
       res.functionId = functionId;

@@ -271,7 +271,7 @@ public class AnomalyDetectionInputContextBuilder {
    * the end time of the monitoring window
    * @return
    */
-  public AnomalyDetectionInputContextBuilder fetchExixtingRawAnomalies(DateTime windowStart, DateTime windowEnd) {
+  public AnomalyDetectionInputContextBuilder fetchExistingRawAnomalies(DateTime windowStart, DateTime windowEnd) {
     // We always find existing raw anomalies to prevent duplicate raw anomalies are generated
     List<RawAnomalyResultDTO> existingRawAnomalies = getExistingRawAnomalies(anomalyFunctionSpec.getId(), windowStart.getMillis(), windowEnd.getMillis());
     ArrayListMultimap<DimensionMap, RawAnomalyResultDTO> dimensionNamesToKnownRawAnomalies = ArrayListMultimap.create();
@@ -291,25 +291,25 @@ public class AnomalyDetectionInputContextBuilder {
    * the end time of the monitoring window
    * @return
    */
-  public AnomalyDetectionInputContextBuilder fetchExixtingMergedAnomalies(DateTime windowStart, DateTime windowEnd) {
+  public AnomalyDetectionInputContextBuilder fetchExistingMergedAnomalies(DateTime windowStart, DateTime windowEnd, boolean loadRawAnomalies) {
 // Get existing anomalies for this time range and this function id for all combinations of dimensions
     List<MergedAnomalyResultDTO> knownMergedAnomalies;
     if (anomalyFunction.useHistoryAnomaly()) {
       // if this anomaly function uses history data, then we get all time ranges
-      return fetchExixtingMergedAnomalies(
-          anomalyFunction.getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis()));
+      return fetchExistingMergedAnomalies(
+          anomalyFunction.getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis()), loadRawAnomalies);
     } else {
       // otherwise, we only get the merge anomaly for current window in order to remove duplicate raw anomalies
       List<Pair<Long, Long>> currentTimeRange = new ArrayList<>();
       currentTimeRange.add(new Pair<>(windowStart.getMillis(), windowEnd.getMillis()));
-      return fetchExixtingMergedAnomalies(currentTimeRange);
+      return fetchExistingMergedAnomalies(currentTimeRange, loadRawAnomalies);
     }
   }
 
-  public AnomalyDetectionInputContextBuilder fetchExixtingMergedAnomalies(List<Pair<Long, Long>> startEndTimeRanges) {
+  public AnomalyDetectionInputContextBuilder fetchExistingMergedAnomalies(List<Pair<Long, Long>> startEndTimeRanges, boolean loadRawAnomalies) {
 // Get existing anomalies for this time range and this function id for all combinations of dimensions
     List<MergedAnomalyResultDTO> knownMergedAnomalies;
-    knownMergedAnomalies = getKnownMergedAnomalies(anomalyFunctionSpec.getId(), startEndTimeRanges);
+    knownMergedAnomalies = getKnownMergedAnomalies(anomalyFunctionSpec.getId(), startEndTimeRanges, loadRawAnomalies);
     // Sort the known merged and raw anomalies by their dimension names
     ArrayListMultimap<DimensionMap, MergedAnomalyResultDTO> dimensionMapToKnownMergedAnomalies = ArrayListMultimap.create();
     for (MergedAnomalyResultDTO knownMergedAnomaly : knownMergedAnomalies) {
@@ -381,14 +381,14 @@ public class AnomalyDetectionInputContextBuilder {
 
    * @return known merged anomalies of the function id that are needed for anomaly detection
    */
-  private List<MergedAnomalyResultDTO> getKnownMergedAnomalies(long functionId, List<Pair<Long, Long>> startEndTimeRanges) {
+  private List<MergedAnomalyResultDTO> getKnownMergedAnomalies(long functionId, List<Pair<Long, Long>> startEndTimeRanges, boolean loadRawAnomalies) {
 
     List<MergedAnomalyResultDTO> results = new ArrayList<>();
     for (Pair<Long, Long> startEndTimeRange : startEndTimeRanges) {
       try {
         results.addAll(
-            DAO_REGISTRY.getMergedAnomalyResultDAO().findAllConflictByFunctionId(functionId, startEndTimeRange.getFirst(),
-                startEndTimeRange.getSecond()));
+            DAO_REGISTRY.getMergedAnomalyResultDAO().findAllOverlapByFunctionId(functionId, startEndTimeRange.getFirst(),
+                startEndTimeRange.getSecond(), loadRawAnomalies));
       } catch (Exception e) {
         LOG.error("Exception in getting merged anomalies", e);
       }
@@ -413,8 +413,8 @@ public class AnomalyDetectionInputContextBuilder {
     for (Pair<Long, Long> startEndTimeRange : startEndTimeRanges) {
       try {
         results.addAll(
-            DAO_REGISTRY.getMergedAnomalyResultDAO().findAllConflictByFunctionIdDimensions(functionId,
-                startEndTimeRange.getFirst(), startEndTimeRange.getSecond(), dimensions.toString()));
+            DAO_REGISTRY.getMergedAnomalyResultDAO().findAllOverlapByFunctionIdDimensions(functionId,
+                startEndTimeRange.getFirst(), startEndTimeRange.getSecond(), dimensions.toString(), true));
       } catch (Exception e) {
         LOG.error("Exception in getting merged anomalies", e);
       }

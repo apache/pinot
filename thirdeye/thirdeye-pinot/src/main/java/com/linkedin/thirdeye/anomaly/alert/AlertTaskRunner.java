@@ -99,7 +99,7 @@ public class AlertTaskRunner implements TaskRunner {
     // Get the anomalies in that range
     final List<MergedAnomalyResultDTO> allResults = anomalyMergedResultDAO
         .getAllByTimeEmailIdAndNotifiedFalse(windowStart.getMillis(), windowEnd.getMillis(),
-            alertConfig.getId());
+            alertConfig.getId(), false);
 
     // apply filtration rule
     List<MergedAnomalyResultDTO> results = AlertFilterHelper.applyFiltrationRule(allResults, alertFilterFactory);
