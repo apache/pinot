@@ -10,6 +10,7 @@ import com.linkedin.thirdeye.anomaly.alert.grouping.filter.AlertGroupFilter;
 import com.linkedin.thirdeye.anomaly.alert.grouping.filter.AlertGroupFilterFactory;
 import com.linkedin.thirdeye.anomaly.alert.grouping.SimpleGroupedAnomalyMerger;
 import com.linkedin.thirdeye.anomaly.alert.grouping.recipientprovider.AlertGroupRecipientProvider;
+import com.linkedin.thirdeye.anomaly.alert.grouping.recipientprovider.AlertGroupRecipientProviderFactory;
 import com.linkedin.thirdeye.anomaly.alert.template.pojo.MetricDimensionReport;
 import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import com.linkedin.thirdeye.anomaly.alert.util.AnomalyReportGenerator;
@@ -41,7 +42,6 @@ import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -170,13 +170,17 @@ public class AlertTaskRunnerV2 implements TaskRunner {
           DimensionMap dimensions = entry.getKey();
           GroupedAnomalyResultsDTO groupedAnomalyDTO = entry.getValue();
           List<MergedAnomalyResultDTO> resultsForThisGroup = groupedAnomalyDTO.getAnomalyResults();
+
           // Append auxiliary recipients for this group
           String recipientsForThisGroup = alertConfig.getRecipients();
-          // TODO: Replace with AuxiliaryRecipient provider
-//          String auxiliaryRecipients = alertGrouper.groupEmailRecipients(dimensions);
-//          if (StringUtils.isNotBlank(auxiliaryRecipients)) {
-//            recipientsForThisGroup = recipientsForThisGroup + EmailHelper.EMAIL_ADDRESS_SEPARATOR + auxiliaryRecipients;
-//          }
+          //   Get auxiliary email recipient from provider
+          AlertGroupRecipientProvider recipientProvider =
+            AlertGroupRecipientProviderFactory.fromSpec(alertGroupConfig.getGroupAuxiliaryEmailProvider());
+          String auxiliaryRecipients = recipientProvider.getAlertGroupRecipients(dimensions);
+          if (StringUtils.isNotBlank(auxiliaryRecipients)) {
+            recipientsForThisGroup = recipientsForThisGroup + EmailHelper.EMAIL_ADDRESS_SEPARATOR + auxiliaryRecipients;
+          }
+
           // Append group name after config name if dimensions of this group is not empty
           String emailSubjectName = alertConfig.getName();
           if (dimensions.size() != 0) {
