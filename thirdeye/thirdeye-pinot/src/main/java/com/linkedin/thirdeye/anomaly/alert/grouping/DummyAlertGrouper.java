@@ -21,9 +21,4 @@ public class DummyAlertGrouper extends BaseAlertGrouper {
     groupMap.put(new DimensionMap(), groupedAnomalyResults);
     return groupMap;
   }
-
-  @Override
-  public String groupEmailRecipients(DimensionMap alertGroupKey) {
-    return BaseAlertGrouper.EMPTY_RECIPIENTS;
-  }
 }

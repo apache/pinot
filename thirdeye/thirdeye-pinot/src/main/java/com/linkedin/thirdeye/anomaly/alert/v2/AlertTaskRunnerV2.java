@@ -9,6 +9,7 @@ import com.linkedin.thirdeye.anomaly.alert.grouping.DummyAlertGrouper;
 import com.linkedin.thirdeye.anomaly.alert.grouping.filter.AlertGroupFilter;
 import com.linkedin.thirdeye.anomaly.alert.grouping.filter.AlertGroupFilterFactory;
 import com.linkedin.thirdeye.anomaly.alert.grouping.SimpleGroupedAnomalyMerger;
+import com.linkedin.thirdeye.anomaly.alert.grouping.recipientprovider.AlertGroupRecipientProvider;
 import com.linkedin.thirdeye.anomaly.alert.template.pojo.MetricDimensionReport;
 import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import com.linkedin.thirdeye.anomaly.alert.util.AnomalyReportGenerator;
@@ -172,10 +173,10 @@ public class AlertTaskRunnerV2 implements TaskRunner {
           // Append auxiliary recipients for this group
           String recipientsForThisGroup = alertConfig.getRecipients();
           // TODO: Replace with AuxiliaryRecipient provider
-          String auxiliaryRecipients = alertGrouper.groupEmailRecipients(dimensions);
-          if (StringUtils.isNotBlank(auxiliaryRecipients)) {
-            recipientsForThisGroup = recipientsForThisGroup + EmailHelper.EMAIL_ADDRESS_SEPARATOR + auxiliaryRecipients;
-          }
+//          String auxiliaryRecipients = alertGrouper.groupEmailRecipients(dimensions);
+//          if (StringUtils.isNotBlank(auxiliaryRecipients)) {
+//            recipientsForThisGroup = recipientsForThisGroup + EmailHelper.EMAIL_ADDRESS_SEPARATOR + auxiliaryRecipients;
+//          }
           // Append group name after config name if dimensions of this group is not empty
           String emailSubjectName = alertConfig.getName();
           if (dimensions.size() != 0) {
