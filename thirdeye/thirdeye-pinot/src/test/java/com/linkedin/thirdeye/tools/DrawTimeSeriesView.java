@@ -33,6 +33,8 @@ import org.jfree.ui.ApplicationFrame;
 import org.jfree.ui.RefineryUtilities;
 import org.joda.time.DateTime;
 import org.joda.time.Days;
+import org.joda.time.Months;
+import org.joda.time.ReadablePeriod;
 import org.joda.time.Weeks;
 import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.ISODateTimeFormat;
@@ -55,6 +57,7 @@ public class DrawTimeSeriesView {
   public static final String BASELINE_VALUES = "baselineValues";
   public static final String PNG_FILE_EXTENSION  = ".png";
   public static final String CSV_FILE_EXTENSION  = ".csv";
+  public static final ReadablePeriod DEFAULT_VIEWING_PERIOD = Months.THREE;
 
   public enum ComparisonMode {
     WoW(1), Wo2W(2), Wo3W(3), Wo4W(4), NONE(0);
@@ -190,8 +193,8 @@ public class DrawTimeSeriesView {
     List<String> keyList = new ArrayList<>();
 
     if (start == null || end == null) {
-      start = new DateTime(0);
       end = DateTime.now();
+      start = end.minus(DEFAULT_VIEWING_PERIOD);
     }
     AnomalyFunctionDTO anomalyFunctionDTO = anomalyFunctionDAO.findById(functionId);
     if(anomalyFunctionDTO == null) {
@@ -199,13 +202,10 @@ public class DrawTimeSeriesView {
       return keyList;
     }
     String fileName = anomalyFunctionDTO.getFunctionName() + "-" + jodaDateTimeToISO(start);
+
+    // load function baseline and current values from ThirdEye server
     String jsonResponse = getTimelinesViewForFunctionIdInDateTimeRange(functionId, start, end);
-    TimeSeriesCompareMetricView timeSeriesCompareMetricView = null;
-    if (!comparisonMode.equals(ComparisonMode.NONE)) {
-      String wowJsonResponse =
-          getTimeSeriesComparisonForFunctionIdInDataTimeRange(functionId, start, end, ComparisonMode.WoW);
-      timeSeriesCompareMetricView = OBJECT_MAPPER.readValue(wowJsonResponse, TimeSeriesCompareMetricView.class);
-    }
+
     ObjectMapper objectMapper = new ObjectMapper();
     Map<String, Map<String, Object>> dimensionAnomalyTimelinesViewMap = objectMapper.readValue(jsonResponse, HashMap.class);
 
@@ -229,11 +229,19 @@ public class DrawTimeSeriesView {
         currentTimeSeries.put(new DateTime(timeBucket.get(CURRENT_START)), currentValue);
       }
 
-      // Draw Figure
+      // Initiate Figure
       TimeSeriesLineChart timeSeriesLineChart = new TimeSeriesLineChart("Time Series Chart");
 
       // Load WoW data
       if (!comparisonMode.equals(ComparisonMode.NONE)) {
+        // Load WoW timeseries from ThirdEye
+        TimeSeriesCompareMetricView timeSeriesCompareMetricView = null;
+
+        String wowJsonResponse =
+            getTimeSeriesComparisonForFunctionIdInDataTimeRange(functionId, start, end, ComparisonMode.WoW);
+        timeSeriesCompareMetricView = OBJECT_MAPPER.readValue(wowJsonResponse, TimeSeriesCompareMetricView.class);
+
+        // Extract WoW baseline and current value from server response
         Map<DateTime, Double> wowTimeSeries = new HashMap<>();
         DimensionMap dimensionMap = OBJECT_MAPPER.readValue(dimensions, DimensionMap.class);
         String dimenstionValue = dimensionMap.get(dimensionMap.firstKey());
@@ -248,6 +256,8 @@ public class DrawTimeSeriesView {
         }
         timeSeriesLineChart.loadTimeSeries(comparisonMode.name(), wowTimeSeries);
       }
+
+      // Draw timeseries data
       timeSeriesLineChart.loadTimeSeries("current", currentTimeSeries);
       timeSeriesLineChart.loadTimeSeries("baseline", baselineTimeSeries);
       timeSeriesLineChart.createChartPanel(dimensions, TimeSeriesLineChart.defaultSubtitle(currentValue, baselineValue));
@@ -266,16 +276,31 @@ public class DrawTimeSeriesView {
   public void export(File outputFile, TimeSeriesLineChart timeSeriesLineChart) throws Exception {
     BufferedWriter bw = new BufferedWriter(new FileWriter(outputFile));
     TimeSeriesCollection timeSeriesCollection = timeSeriesLineChart.getXyDataset();
-    TimeSeries current = timeSeriesCollection.getSeries(0);
-    TimeSeries baseline = timeSeriesCollection.getSeries(1);
-    int numItems = current.getItemCount();
+    Map<String, TimeSeries> timeSeriesMap = new HashMap<>();
+    int numItems = 0;
+    bw.write("Date Time, timestamp");
+    List<String> titles = new ArrayList<>();
+    int seriesCount = timeSeriesCollection.getSeriesCount();
+    for(int i = 0; i < seriesCount; i++) {
+      TimeSeries timeSeries = timeSeriesCollection.getSeries(i);
+      String key = (String) timeSeries.getKey();
+      timeSeriesMap.put(key, timeSeries);
+      titles.add(key);
+      numItems = timeSeries.getItemCount();
+      bw.write("," + key);
+    }
+    bw.newLine();
     for(int i = 0; i < numItems; i++) {
-      RegularTimePeriod timePeriod = current.getTimePeriod(i);
-      double currentVal = current.getDataItem(i).getValue().doubleValue();
-      double baselineVal = baseline.getDataItem(i).getValue().doubleValue();
+      RegularTimePeriod timePeriod = null;
 
-      bw.write(String.format("%s,%d,%.2f,%.2f", timePeriod.getStart().toString().toString(),
-          timePeriod.getFirstMillisecond(),  currentVal, baselineVal));
+      StringBuilder values = new StringBuilder();
+      for(int j = 0; j < seriesCount; j++) {
+        TimeSeries timeSeries = timeSeriesMap.get(titles.get(j));
+        timePeriod = timeSeries.getTimePeriod(i);
+        values.append(Double.toString(timeSeries.getDataItem(i).getValue().doubleValue()) + ",");
+      }
+      bw.write(String.format("%s,%d,", timePeriod.getStart().toString(), timePeriod.getFirstMillisecond()));
+      bw.write(values.deleteCharAt(values.length()-1).toString());
       bw.newLine();
     }
     bw.close();
