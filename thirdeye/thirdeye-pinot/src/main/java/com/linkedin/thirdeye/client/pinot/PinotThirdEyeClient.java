@@ -36,7 +36,7 @@ import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
-public class PinotThirdEyeClient extends ThirdEyeClient {
+public class PinotThirdEyeClient implements ThirdEyeClient {
 
   private static final Logger LOG = LoggerFactory.getLogger(PinotThirdEyeClient.class);
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
@@ -79,6 +79,12 @@ public class PinotThirdEyeClient extends ThirdEyeClient {
 
   public static ThirdEyeClient fromClientConfig(PinotThirdEyeClientConfig config) {
     return fromZookeeper(config.getControllerHost(), config.getControllerPort(), config.getZookeeperUrl());
+  }
+
+
+  @Override
+  public String getName() {
+    return CLIENT_NAME;
   }
 
   @Override
@@ -277,5 +283,6 @@ public class PinotThirdEyeClient extends ThirdEyeClient {
         "localhost:12913/pinot-cluster";
     return fromZookeeper(controllerHost, controllerPort, zkUrl);
   }
+
 
 }

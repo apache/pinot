@@ -2,24 +2,22 @@ package com.linkedin.thirdeye.client;
 
 import java.util.List;
 
-public abstract class ThirdEyeClient {
+public interface ThirdEyeClient {
 
   /**
-   * Returns simple name of the sub class
+   * Returns simple name of the class
    */
-  public String getName() {
-    return this.getClass().getSimpleName();
-  }
+  public String getName();
 
-  public abstract ThirdEyeResponse execute(ThirdEyeRequest request) throws Exception;
+  public ThirdEyeResponse execute(ThirdEyeRequest request) throws Exception;
 
-  public abstract List<String> getCollections() throws Exception;
+  public List<String> getCollections() throws Exception;
 
   /** Clear any cached values. */
-  public abstract void clear() throws Exception;
+  public void clear() throws Exception;
 
-  public abstract void close() throws Exception;
+  public void close() throws Exception;
 
-  public abstract long getMaxDataTime(String collection) throws Exception;
+  public long getMaxDataTime(String collection) throws Exception;
 
 }
