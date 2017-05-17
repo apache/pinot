@@ -47,7 +47,7 @@ public class HolidayEventsPipeline extends Pipeline {
   }
 
   /**
-   * Alternate constructor for PipelineLoader
+   * Alternate constructor for RCAFrameworkLoader
    *
    * @param outputName pipeline output name
    * @param inputNames input pipeline names

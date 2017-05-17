@@ -7,9 +7,11 @@ import java.util.List;
 public class ThirdEyeDashboardConfiguration extends ThirdEyeConfiguration {
 
   String informedApiUrl;
+
   String rcaConfigPath;
   int rcaParallelism;
   List<String> rcaFormatters;
+  String rcaDefaultFramework;
 
   public String getInformedApiUrl() {
     return informedApiUrl;
@@ -41,5 +43,13 @@ public class ThirdEyeDashboardConfiguration extends ThirdEyeConfiguration {
 
   public void setRcaFormatters(List<String> rcaFormatters) {
     this.rcaFormatters = rcaFormatters;
+  }
+
+  public String getRcaDefaultFramework() {
+    return rcaDefaultFramework;
+  }
+
+  public void setRcaDefaultFramework(String rcaDefaultFramework) {
+    this.rcaDefaultFramework = rcaDefaultFramework;
   }
 }

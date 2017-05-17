@@ -23,7 +23,7 @@ public class EventDataProviderLoader {
 
     try {
       RCAConfiguration rcaConfiguration = OBJECT_MAPPER.readValue(rcaConfig, RCAConfiguration.class);
-      List<EventDataProviderConfiguration> eventDataProvidersConfiguration = rcaConfiguration.getEventDataProvidersConfiguration();
+      List<EventDataProviderConfiguration> eventDataProvidersConfiguration = rcaConfiguration.getEventDataProviders();
       if (CollectionUtils.isNotEmpty(eventDataProvidersConfiguration)) {
         for (EventDataProviderConfiguration eventDataProviderConfig : eventDataProvidersConfiguration) {
           String name = eventDataProviderConfig.getName();

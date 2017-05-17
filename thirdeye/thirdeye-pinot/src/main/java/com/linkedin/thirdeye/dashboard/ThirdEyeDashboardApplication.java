@@ -32,25 +32,19 @@ import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.RCAFramework;
-import com.linkedin.thirdeye.rootcause.impl.PipelineLoader;
-
+import com.linkedin.thirdeye.rootcause.impl.RCAFrameworkLoader;
 import io.dropwizard.assets.AssetsBundle;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 import io.dropwizard.views.ViewBundle;
-
 import java.io.File;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.concurrent.Executors;
-
-import org.eclipse.jetty.servlets.CrossOriginFilter;
-
 import javax.servlet.DispatcherType;
 import javax.servlet.FilterRegistration;
-
-import java.util.EnumSet;
-
+import org.eclipse.jetty.servlets.CrossOriginFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -128,10 +122,10 @@ public class ThirdEyeDashboardApplication
   private static RCAFramework makeRCAFramework(ThirdEyeDashboardConfiguration config) throws Exception {
     if(config.getRcaConfigPath() == null)
       throw new IllegalArgumentException("rcaConfigPath must not be null");
-    File configFile = new File(config.getRcaConfigPath());
-    if(!configFile.isAbsolute())
-      configFile = new File(config.getRootDir() + File.separator + configFile);
-    List<Pipeline> pipelines = PipelineLoader.getPipelinesFromConfig(configFile);
+    File rcaConfigFile = new File(config.getRcaConfigPath());
+    if(!rcaConfigFile.isAbsolute())
+      rcaConfigFile = new File(config.getRootDir() + File.separator + rcaConfigFile);
+    List<Pipeline> pipelines = RCAFrameworkLoader.getPipelinesFromConfig(rcaConfigFile, config.getRcaDefaultFramework());
     return new RCAFramework(pipelines, Executors.newFixedThreadPool(config.getRcaParallelism()));
   }
 
