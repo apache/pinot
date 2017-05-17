@@ -104,10 +104,10 @@ public class DetectionTaskRunner implements TaskRunner {
 
     AnomalyDetectionInputContextBuilder anomalyDetectionInputContextBuilder =
         new AnomalyDetectionInputContextBuilder(anomalyFunctionFactory);
+    anomalyDetectionInputContextBuilder.init(anomalyFunctionSpec);
 
     // TODO: Change to DataFetchers/DataSources
     anomalyDetectionInputContextBuilder = anomalyDetectionInputContextBuilder
-        .setFunction(anomalyFunctionSpec)
         .fetchTimeSeriesData(windowStart, windowEnd)
         .fetchExixtingRawAnomalies(windowStart, windowEnd)
         .fetchExixtingMergedAnomalies(windowStart, windowEnd)

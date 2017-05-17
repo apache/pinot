@@ -63,11 +63,11 @@ public class AnomalyDetectionInputContextBuilder {
     this.anomalyFunctionFactory = anomalyFunctionFactory;
   }
 
-  public AnomalyDetectionInputContextBuilder setFunction(AnomalyFunctionDTO anomalyFunctionSpec) throws Exception {
-    return setFunction(anomalyFunctionSpec, new AnomalyDetectionInputContext());
+  public AnomalyDetectionInputContextBuilder init(AnomalyFunctionDTO anomalyFunctionSpec) throws Exception {
+    return init(anomalyFunctionSpec, new AnomalyDetectionInputContext());
   }
 
-  public AnomalyDetectionInputContextBuilder setFunction(AnomalyFunctionDTO anomalyFunctionSpec, AnomalyDetectionInputContext anomalyDetectionInputContext)
+  public AnomalyDetectionInputContextBuilder init(AnomalyFunctionDTO anomalyFunctionSpec, AnomalyDetectionInputContext anomalyDetectionInputContext)
       throws Exception {
     this.anomalyFunctionSpec = anomalyFunctionSpec;
     this.anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
