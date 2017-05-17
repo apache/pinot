@@ -440,4 +440,21 @@ public abstract class ThirdEyeUtils {
     return decimalFormat.format(value);
   }
 
+
+  //TODO: currently assuming all metrics in one request are for the same client
+  // It would be better to not assume that, and split the thirdeye request into more requests depending upon the clients
+  public static String getClientFromMetricFunctions(List<MetricFunction> metricFunctions) {
+    String client = null;
+    for (MetricFunction metricFunction : metricFunctions) {
+      String functionDatasetClient = metricFunction.getDatasetConfig().getClient();
+      if (client == null) {
+        client = functionDatasetClient;
+      } else if (!client.equals(functionDatasetClient)) {
+        throw new IllegalStateException("All metric funcitons of one request must belong to the same client. "
+            + client + " is not equal to" + functionDatasetClient);
+      }
+    }
+    return client;
+  }
+
 }

@@ -44,8 +44,8 @@ public class Utils {
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static ThirdEyeCacheRegistry CACHE_REGISTRY = ThirdEyeCacheRegistry.getInstance();
 
-  public static List<ThirdEyeRequest> generateRequests(String dataset, String requestReference,
-      MetricFunction metricFunction, List<String> dimensions, DateTime start, DateTime end) {
+  public static List<ThirdEyeRequest> generateFilterRequests(String dataset, String requestReference,
+      MetricFunction metricFunction, List<String> dimensions, DateTime start, DateTime end, String client) {
 
     List<ThirdEyeRequest> requests = new ArrayList<>();
 
@@ -57,7 +57,7 @@ public class Utils {
       requestBuilder.setStartTimeInclusive(start);
       requestBuilder.setEndTimeExclusive(end);
       requestBuilder.setGroupBy(dimension);
-
+      requestBuilder.setClient(client);
       ThirdEyeRequest request = requestBuilder.build(requestReference);
       requests.add(request);
     }
@@ -69,11 +69,11 @@ public class Utils {
       String requestReference, List<String> dimensions, DateTime start,
       DateTime end) throws Exception {
 
-    MetricFunction metricFunction = new MetricFunction(MetricAggFunction.COUNT, "*", null, dataset, null,
-        ThirdEyeUtils.getDatasetConfigFromName(dataset));
+    DatasetConfigDTO datasetConfig = ThirdEyeUtils.getDatasetConfigFromName(dataset);
+    MetricFunction metricFunction = new MetricFunction(MetricAggFunction.COUNT, "*", null, dataset, null, datasetConfig);
 
     List<ThirdEyeRequest> requests =
-        generateRequests(dataset, requestReference, metricFunction, dimensions, start, end);
+        generateFilterRequests(dataset, requestReference, metricFunction, dimensions, start, end, datasetConfig.getClient());
 
     Map<ThirdEyeRequest, Future<ThirdEyeResponse>> queryResultMap =
         queryCache.getQueryResultsAsync(requests);

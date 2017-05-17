@@ -1,13 +1,13 @@
 package com.linkedin.thirdeye.client.pinot;
 
-import io.dropwizard.configuration.ConfigurationFactory;
-import io.dropwizard.jackson.Jackson;
-import java.io.File;
+import java.util.Map;
+
+import org.apache.commons.lang3.StringUtils;
 
 import com.google.common.base.MoreObjects;
 import com.google.common.base.MoreObjects.ToStringHelper;
-import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
-import javax.validation.Validation;
+import com.linkedin.thirdeye.client.Client;
+import com.linkedin.thirdeye.client.ClientConfig;
 
 public class PinotThirdEyeClientConfig {
 
@@ -71,19 +71,6 @@ public class PinotThirdEyeClientConfig {
     this.clusterName = clusterName;
   }
 
-  public static PinotThirdEyeClientConfig fromFile(File dataSourceFile) throws Exception {
-    ConfigurationFactory<PinotThirdEyeClientConfig> factory =
-        new ConfigurationFactory<>(PinotThirdEyeClientConfig.class,
-            Validation.buildDefaultValidatorFactory().getValidator(), Jackson.newObjectMapper(),
-            "");
-    PinotThirdEyeClientConfig configuration;
-    try {
-      configuration = factory.build(dataSourceFile);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-    return configuration;
-  }
 
   @Override
   public String toString() {
@@ -94,12 +81,41 @@ public class PinotThirdEyeClientConfig {
     return stringHelper.toString();
   }
 
+  /**
+   * Returns pinot thirdeye client config from all client config. There can be only ONE client of each type
+   * @param clientConfig
+   * @return
+   */
+  public static PinotThirdEyeClientConfig createThirdeyeClientConfig(ClientConfig clientConfig) {
+    PinotThirdEyeClientConfig config = null;
+    for (Client client : clientConfig.getClients()) {
+      if (client.getClassName().equals(PinotThirdEyeClient.class.getCanonicalName())) {
+        if (config == null) {
+          Map<String, String> properties = client.getProperties();
+          String controllerHost = properties.get(PinotThirdeyeClientProperties.CONTROLLER_HOST.getValue());
+          int controllerPort = Integer.valueOf(properties.get(PinotThirdeyeClientProperties.CONTROLLER_PORT.getValue()));
+          String clusterName = properties.get(PinotThirdeyeClientProperties.CLUSTER_NAME.getValue());
+          String zookeeperUrl = properties.get(PinotThirdeyeClientProperties.ZOOKEEPER_URL.getValue());
+          String brokerUrl = properties.get(PinotThirdeyeClientProperties.BROKER_URL.getValue());
+          String tag = properties.get(PinotThirdeyeClientProperties.TAG.getValue());
 
-  public static PinotThirdEyeClientConfig createThirdEyeClientConfig(ThirdEyeConfiguration config) throws Exception {
-    File clientConfigDir = new File(config.getRootDir(), "client-config");
-    File clientConfigFile = new File(clientConfigDir, config.getClient() + ".yml");
-    PinotThirdEyeClientConfig thirdEyeClientConfig =
-        PinotThirdEyeClientConfig.fromFile(clientConfigFile);
-    return thirdEyeClientConfig;
+          config = new PinotThirdEyeClientConfig();
+          config.setControllerHost(controllerHost);
+          config.setControllerPort(controllerPort);
+          config.setClusterName(clusterName);
+          config.setZookeeperUrl(zookeeperUrl);
+          if (StringUtils.isNotBlank(brokerUrl)) {
+            config.setBrokerUrl(brokerUrl);
+          }
+          if (StringUtils.isNotBlank(tag)) {
+            config.setTag(tag);
+          }
+        } else {
+          throw new IllegalStateException("Found another client of type PinotThirdEyeClient. "
+              + "There can only be ONE client of each type" + clientConfig);
+        }
+      }
+    }
+    return config;
   }
 }

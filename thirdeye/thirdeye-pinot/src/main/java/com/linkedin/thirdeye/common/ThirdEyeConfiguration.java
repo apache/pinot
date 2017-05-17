@@ -9,19 +9,6 @@ public abstract class ThirdEyeConfiguration extends Configuration {
    * Root directory for all other configuration
    */
   private String rootDir = "";
-  /**
-   * pinot/mysql etc. Impl specific file will be in
-   * <configRootDir>/dataSources e.g
-   * <configRootDir>/dataSources/pinot.yml
-   */
-  private String client = "pinot";
-  /**
-   * file, mysql etc
-   * <configRootDir>/configStores/
-   * <configRootDir>/configStores/file.yml
-   */
-  private String configStoreType = "FILE";
-  private String implMode = "hibernate";
 
   private List<String> whitelistCollections = new ArrayList<>();
   private List<String> blacklistCollections = new ArrayList<>();
@@ -31,7 +18,14 @@ public abstract class ThirdEyeConfiguration extends Configuration {
 
   private String phantomJsPath = "";
 
+  /**
+   * allow cross request for local development
+   */
   private boolean cors = false;
+
+  public String getClientsPath() {
+    return getRootDir() + "/client-config/clients.yml";
+  }
 
   public String getRootDir() {
     return rootDir;
@@ -47,30 +41,6 @@ public abstract class ThirdEyeConfiguration extends Configuration {
 
   public void setCors(boolean cors) {
     this.cors = cors;
-  }
-
-  public String getClient() {
-    return client;
-  }
-
-  public void setClient(String client) {
-    this.client = client;
-  }
-
-  public String getConfigStoreType() {
-    return configStoreType;
-  }
-
-  public void setConfigStoreType(String configStoreType) {
-    this.configStoreType = configStoreType;
-  }
-
-  public String getImplMode() {
-    return implMode;
-  }
-
-  public void setImplMode(String implMode) {
-    this.implMode = implMode;
   }
 
   public List<String> getWhitelistCollections() {

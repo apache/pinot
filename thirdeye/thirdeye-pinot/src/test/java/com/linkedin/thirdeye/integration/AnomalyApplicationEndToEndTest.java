@@ -24,6 +24,7 @@ import com.linkedin.thirdeye.client.ThirdEyeResponse;
 import com.linkedin.thirdeye.client.cache.MetricDataset;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.pinot.PinotQuery;
+import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeResponse;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessConstants.DataCompletenessType;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessScheduler;
@@ -41,7 +42,9 @@ import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -131,8 +134,10 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
         return response;
       }
     });
+    Map<String, ThirdEyeClient> clientMap = new HashMap<>();
+    clientMap.put(PinotThirdEyeClient.class.getSimpleName(), mockThirdeyeClient);
 
-    QueryCache mockQueryCache = new QueryCache(mockThirdeyeClient, Executors.newFixedThreadPool(10));
+    QueryCache mockQueryCache = new QueryCache(clientMap, Executors.newFixedThreadPool(10));
     cacheRegistry.registerQueryCache(mockQueryCache);
 
     MetricConfigDTO metricConfig = getTestMetricConfig(collection, metric, 1L);

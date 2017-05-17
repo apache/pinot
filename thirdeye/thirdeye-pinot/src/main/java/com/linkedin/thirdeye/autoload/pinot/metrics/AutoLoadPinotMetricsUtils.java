@@ -17,6 +17,8 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.pinot.common.data.Schema;
+import com.linkedin.thirdeye.client.ClientConfig;
+import com.linkedin.thirdeye.client.ClientConfigLoader;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 
@@ -33,7 +35,12 @@ public class AutoLoadPinotMetricsUtils {
 
   public AutoLoadPinotMetricsUtils(ThirdEyeConfiguration config) {
     try {
-      PinotThirdEyeClientConfig pinotThirdeyeClientConfig = PinotThirdEyeClientConfig.createThirdEyeClientConfig(config);
+      String clientConfigPath = config.getClientsPath();
+      ClientConfig clientConfig = ClientConfigLoader.fromClientConfigPath(clientConfigPath);
+      if (clientConfig == null) {
+        throw new IllegalStateException("Could not create client config from path " + clientConfigPath);
+      }
+      PinotThirdEyeClientConfig pinotThirdeyeClientConfig = PinotThirdEyeClientConfig.createThirdeyeClientConfig(clientConfig);
       this.pinotControllerClient = HttpClients.createDefault();
       this.pinotControllerHost = new HttpHost(pinotThirdeyeClientConfig.getControllerHost(),
           pinotThirdeyeClientConfig.getControllerPort());

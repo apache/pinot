@@ -14,19 +14,24 @@ import com.linkedin.thirdeye.client.ThirdEyeResponse;
 
 public class QueryCache {
   private final ExecutorService executorService;
-  private final ThirdEyeClient client;
+  private final Map<String, ThirdEyeClient> clientMap;
 
-  public QueryCache(ThirdEyeClient clientMap, ExecutorService executorService) {
+  public QueryCache(Map<String, ThirdEyeClient> clientMap, ExecutorService executorService) {
     this.executorService = executorService;
-    this.client = clientMap;
+    this.clientMap = clientMap;
   }
 
-  public ThirdEyeClient getClient() {
-    return client;
+  public Map<String, ThirdEyeClient> getClientMap() {
+    return clientMap;
+  }
+
+  public ThirdEyeClient getClient(String client) {
+    return clientMap.get(client);
   }
 
   public ThirdEyeResponse getQueryResult(ThirdEyeRequest request) throws Exception {
-    ThirdEyeResponse response = client.execute(request);
+    String client = request.getClient();
+    ThirdEyeResponse response = getClient(client).execute(request);
     return response;
   }
 
@@ -78,7 +83,7 @@ public class QueryCache {
   }
 
   public void clear() throws Exception {
-    client.clear();
+    clientMap.clear();
   }
 
 }

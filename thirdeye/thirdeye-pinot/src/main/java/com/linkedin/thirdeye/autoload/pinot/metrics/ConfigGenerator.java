@@ -10,6 +10,7 @@ import com.linkedin.pinot.common.data.TimeGranularitySpec;
 import com.linkedin.pinot.common.data.TimeGranularitySpec.TimeFormat;
 import com.linkedin.thirdeye.api.MetricType;
 import com.linkedin.thirdeye.api.TimeGranularity;
+import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient;
 import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
@@ -37,6 +38,7 @@ public class ConfigGenerator {
     if (timeSpec.getTimeFormat().startsWith(TimeFormat.SIMPLE_DATE_FORMAT.toString())) {
       datasetConfigDTO.setTimezone(PDT_TIMEZONE);
     }
+    datasetConfigDTO.setClient(PinotThirdEyeClient.CLIENT_NAME);
     return datasetConfigDTO;
   }
 

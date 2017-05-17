@@ -1,7 +1,9 @@
 package com.linkedin.thirdeye.client.comparison;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
@@ -11,6 +13,7 @@ import com.google.common.collect.Lists;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.MetricFunction;
+import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.comparison.Row.Metric;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient;
@@ -26,8 +29,10 @@ public class TimeOnTimeTest {
     // configurable;
     // PinotThirdEyeClient pinotThirdEyeClient =
     // PinotThirdEyeClient.fromHostList("localhost", 8100, "localhost:8099");
+    Map<String, ThirdEyeClient> clientMap = new HashMap<>();
+    clientMap.put(PinotThirdEyeClient.class.getSimpleName(), pinotThirdEyeClient);
 
-    QueryCache queryCache = new QueryCache(pinotThirdEyeClient, Executors.newFixedThreadPool(10));
+    QueryCache queryCache = new QueryCache(clientMap, Executors.newFixedThreadPool(10));
     // QueryCache queryCache = new QueryCache(pinotThirdEyeClient, Executors.newCachedThreadPool());
 
     TimeOnTimeComparisonRequest comparisonRequest;

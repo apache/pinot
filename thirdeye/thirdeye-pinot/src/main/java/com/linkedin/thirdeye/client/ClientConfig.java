@@ -3,6 +3,8 @@ package com.linkedin.thirdeye.client;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.commons.lang3.builder.ToStringBuilder;
+
 /**
  * This class keeps the client configs for all the clients used in thirdeye
  */
@@ -15,6 +17,12 @@ public class ClientConfig {
   }
   public void setClients(List<Client> clients) {
     this.clients = clients;
+  }
+
+
+  @Override
+  public String toString() {
+    return ToStringBuilder.reflectionToString(this);
   }
 
 }

@@ -4,8 +4,8 @@ import com.linkedin.thirdeye.anomaly.alert.v2.AlertJobSchedulerV2;
 import com.linkedin.thirdeye.anomaly.grouping.GroupingJobScheduler;
 import com.linkedin.thirdeye.anomalydetection.alertFilterAutotune.AlertFilterAutotuneFactory;
 import com.linkedin.thirdeye.dashboard.resources.AnomalyFunctionResource;
-
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -24,6 +24,7 @@ import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessScheduler;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
+
 import io.dropwizard.assets.AssetsBundle;
 import io.dropwizard.lifecycle.Managed;
 import io.dropwizard.setup.Bootstrap;
@@ -76,7 +77,11 @@ public class ThirdEyeAnomalyApplication
       throws Exception {
     LOG.info("Starting ThirdeyeAnomalyApplication : Scheduler {} Worker {}", config.isScheduler(), config.isWorker());
     super.initDAOs();
-    ThirdEyeCacheRegistry.initializeCaches(config);
+    try {
+      ThirdEyeCacheRegistry.initializeCaches(config);
+    } catch (Exception e) {
+      LOG.error("Exception while loading caches", e);
+    }
     environment.lifecycle().manage(new Managed() {
       @Override
       public void start() throws Exception {

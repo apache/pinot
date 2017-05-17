@@ -103,6 +103,9 @@ public class DataCompletenessTaskRunner implements TaskRunner {
               dataCompletenessAlgorithm, dateTimeFormatter, bucketSize);
           LOG.info("Got {} buckets to process", bucketNameToBucketValueMS.size());
 
+          // TODO: for clients other than pinot, this will change
+          // We can either implement a new algorithm for the external client
+          // Or use query cache for the count * queries (cleaner method?)
           if (!bucketNameToBucketValueMS.isEmpty()) {
             // create current entries in database if not already present
             int numEntriesCreated = createEntriesInDatabaseIfNotPresent(dataset, bucketNameToBucketValueMS);

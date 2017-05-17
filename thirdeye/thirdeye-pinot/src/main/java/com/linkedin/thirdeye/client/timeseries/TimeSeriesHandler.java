@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.client.timeseries;
 
-import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -14,12 +13,14 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import org.joda.time.DateTime;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.Range;
+import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.MetricFunction;
-import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
 import com.linkedin.thirdeye.client.ThirdEyeResponse;
@@ -27,8 +28,7 @@ import com.linkedin.thirdeye.client.TimeRangeUtils;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.timeseries.TimeSeriesRow.TimeSeriesMetric;
 import com.linkedin.thirdeye.dashboard.Utils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 public class TimeSeriesHandler {
   private static final Logger LOG = LoggerFactory.getLogger(TimeSeriesHandler.class);
@@ -173,11 +173,8 @@ public class TimeSeriesHandler {
     List<MetricFunction> metricFunctionsFromExpressions =
         Utils.computeMetricFunctionsFromExpressions(metricExpressions);
     requestBuilder.setMetricFunctions(metricFunctionsFromExpressions);
+    requestBuilder.setClient(ThirdEyeUtils.getClientFromMetricFunctions(metricFunctionsFromExpressions));
     return requestBuilder.build(requestReference);
-  }
-
-  public ThirdEyeClient getClient() {
-    return queryCache.getClient();
   }
 
 }
