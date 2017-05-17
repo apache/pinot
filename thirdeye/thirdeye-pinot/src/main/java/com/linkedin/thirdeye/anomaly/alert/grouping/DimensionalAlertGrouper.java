@@ -39,23 +39,14 @@ public class DimensionalAlertGrouper extends BaseAlertGrouper {
   private static final DummyAlertGrouper DUMMY_ALERT_GROUPER = new DummyAlertGrouper();
 
   public static final String GROUP_BY_KEY = "dimensions";
-  public static final String AUXILIARY_RECIPIENTS_MAP_KEY = "auxiliaryRecipients";
   public static final String ROLL_UP_SINGLE_DIMENSION_KEY = "rollUp";
   public static final String GROUP_BY_SEPARATOR = ",";
 
   // The dimension names to group the anomalies (e.g., country, page_name)
   private List<String> groupByDimensions = new ArrayList<>();
 
-  // The map from a dimension map to auxiliary email recipients
-  private NavigableMap<DimensionMap, String> auxiliaryEmailRecipients = new TreeMap<>();
-
   // Rollup the groups of anomaly, which contains only one anomaly, to a group
   private boolean doRollUp = false;
-
-  // For testing purpose
-  NavigableMap<DimensionMap, String> getAuxiliaryEmailRecipients() {
-    return auxiliaryEmailRecipients;
-  }
 
   @Override
   public void setParameters(Map<String, String> props) {
@@ -65,20 +56,6 @@ public class DimensionalAlertGrouper extends BaseAlertGrouper {
       String[] dimensions = this.props.get(GROUP_BY_KEY).split(GROUP_BY_SEPARATOR);
       for (String dimension : dimensions) {
         groupByDimensions.add(dimension.trim());
-      }
-    }
-    // Initialize the lookup table for overriding thresholds
-    if (props.containsKey(AUXILIARY_RECIPIENTS_MAP_KEY)) {
-      String recipientsJsonPayLoad = props.get(AUXILIARY_RECIPIENTS_MAP_KEY);
-      try {
-        Map<String, String> rawAuxiliaryRecipientsMap = OBJECT_MAPPER.readValue(recipientsJsonPayLoad, HashMap.class);
-        for (Map.Entry<String, String> auxiliaryRecipientsEntry : rawAuxiliaryRecipientsMap.entrySet()) {
-          DimensionMap dimensionMap = new DimensionMap(auxiliaryRecipientsEntry.getKey());
-          String recipients = auxiliaryRecipientsEntry.getValue();
-          auxiliaryEmailRecipients.put(dimensionMap, recipients);
-        }
-      } catch (IOException e) {
-        LOG.error("Failed to reconstruct auxiliary recipients mappings from this json string: {}", recipientsJsonPayLoad);
       }
     }
     // Initialize roll up parameter
@@ -136,11 +113,7 @@ public class DimensionalAlertGrouper extends BaseAlertGrouper {
 
   @Override
   public String groupEmailRecipients(DimensionMap alertGroupKey) {
-    if (alertGroupKey == null || !auxiliaryEmailRecipients.containsKey(alertGroupKey)) {
-      return EMPTY_RECIPIENTS;
-    } else {
-      return auxiliaryEmailRecipients.get(alertGroupKey);
-    }
+    return EMPTY_RECIPIENTS;
   }
 
   private DimensionMap constructGroupKey(DimensionMap rawKey) {
