@@ -1,12 +1,10 @@
 package com.linkedin.thirdeye.anomaly.merge;
 
-import com.linkedin.pinot.pql.parsers.utils.Pair;
-import com.linkedin.thirdeye.anomaly.detection.TimeSeriesUtil;
-import com.linkedin.thirdeye.anomaly.override.OverrideConfigHelper;
+import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContext;
+import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContextBuilder;
 import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
-import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
@@ -250,31 +248,31 @@ public class AnomalyMergeExecutor implements Runnable {
     AnomalyFunctionDTO anomalyFunctionSpec = anomalyMergedResult.getFunction();
     BaseAnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
 
-    List<Pair<Long, Long>> startEndTimeRanges =
-        anomalyFunction.getDataRangeIntervals(anomalyMergedResult.getStartTime(), anomalyMergedResult.getEndTime());
-
-    TimeGranularity timeGranularity = new TimeGranularity(anomalyFunctionSpec.getBucketSize(),
-        anomalyFunctionSpec.getBucketUnit());
-
-    MetricTimeSeries metricTimeSeries =
-        TimeSeriesUtil.getTimeSeriesByDimension(anomalyFunctionSpec, startEndTimeRanges,
-            anomalyMergedResult.getDimensions(), timeGranularity, false);
+    DateTime anomalyResultStart = new DateTime(anomalyMergedResult.getStartTime());
+    DateTime anomalyResultEnd = new DateTime(anomalyMergedResult.getEndTime());
+    DimensionMap dimensions = anomalyMergedResult.getDimensions();
+    AnomalyDetectionInputContextBuilder anomalyDetectionInputContextBuilder =
+        new AnomalyDetectionInputContextBuilder(anomalyFunctionFactory);
+    anomalyDetectionInputContextBuilder.setFunction(anomalyFunctionSpec)
+        .fetchTimeSeriesDataByDimension(anomalyResultStart, anomalyResultEnd, dimensions, false)
+        .fetchExistingMergedAnomaliesByDimension(anomalyResultStart, anomalyResultEnd, dimensions)
+        .fetchSaclingFactors(anomalyResultStart, anomalyResultEnd);
+    AnomalyDetectionInputContext anomalyDetectionInputContext = anomalyDetectionInputContextBuilder.build();
+    MetricTimeSeries metricTimeSeries = anomalyDetectionInputContext.getDimensionKeyMetricTimeSeriesMap().get(dimensions);
 
     if (metricTimeSeries != null) {
       DateTime windowStart = new DateTime(anomalyMergedResult.getStartTime());
       DateTime windowEnd = new DateTime(anomalyMergedResult.getEndTime());
-
       List<MergedAnomalyResultDTO> knownAnomalies = Collections.emptyList();
 
       // Retrieve history merged anomalies
       if (anomalyFunction.useHistoryAnomaly()) {
         switch (mergeConfig.getMergeStrategy()) {
           case FUNCTION:
-            knownAnomalies = getHistoryMergedAnomalies(anomalyFunction, windowStart.getMillis(), windowEnd.getMillis());
+            knownAnomalies = anomalyDetectionInputContext.getKnownMergedAnomalies().get(dimensions);
             break;
           case FUNCTION_DIMENSIONS:
-            knownAnomalies = getHistoryMergedAnomalies(anomalyFunction, windowStart.getMillis(), windowEnd.getMillis(),
-                anomalyMergedResult.getDimensions());
+            knownAnomalies = anomalyDetectionInputContext.getKnownMergedAnomalies().get(dimensions);
             break;
           default:
             throw new IllegalArgumentException("Merge strategy " + mergeConfig.getMergeStrategy() + " not supported");
@@ -288,10 +286,7 @@ public class AnomalyMergeExecutor implements Runnable {
       }
 
       // Transform Time Series
-      List<ScalingFactor> scalingFactors = OverrideConfigHelper
-          .getTimeSeriesScalingFactors(overrideConfigDAO, anomalyFunctionSpec.getCollection(),
-              anomalyFunctionSpec.getTopicMetric(), anomalyFunctionSpec.getId(), anomalyFunction
-                  .getDataRangeIntervals(windowStart.getMillis(), windowEnd.getMillis()));
+      List<ScalingFactor> scalingFactors = anomalyDetectionInputContext.getScalingFactors();
       if (CollectionUtils.isNotEmpty(scalingFactors)) {
         Properties properties = anomalyFunction.getProperties();
         MetricTransfer.rescaleMetric(metricTimeSeries, windowStart.getMillis(), scalingFactors,
@@ -301,81 +296,6 @@ public class AnomalyMergeExecutor implements Runnable {
       anomalyFunction.updateMergedAnomalyInfo(anomalyMergedResult, metricTimeSeries, windowStart, windowEnd,
           knownAnomalies);
     }
-  }
-
-  /**
-   * Returns history merged anomalies of the function id that are needed for computing the weight of the new merged
-   * anomalies; history anomalies are anomalies that occurs before the window of current merged anomaly.
-   *
-   * @param anomalyFunction the anomaly function that detects the merged anomaly
-   * @param anomalyWindowStart the start of the merged anomaly
-   * @param anomalyWindowEnd the end of the merged anomaly
-   *
-   * @return history merged anomalies of the function id that are needed for computing the weight of the new merged
-   * anomalies
-   */
-  private List<MergedAnomalyResultDTO> getHistoryMergedAnomalies(BaseAnomalyFunction anomalyFunction,
-      long anomalyWindowStart, long anomalyWindowEnd) {
-
-    List<Pair<Long, Long>> startEndTimeRanges =
-        anomalyFunction.getDataRangeIntervals(anomalyWindowStart, anomalyWindowEnd);
-
-    List<MergedAnomalyResultDTO> results = new ArrayList<>();
-    for (Pair<Long, Long> startEndTimeRange : startEndTimeRanges) {
-      // we don't need the known anomalies on current window; we only need those on history data
-      if (anomalyWindowStart <= startEndTimeRange.getFirst()
-          && startEndTimeRange.getSecond() <= anomalyWindowEnd) {
-        continue;
-      }
-      try {
-        results.addAll(
-            mergedResultDAO.findAllConflictByFunctionId(anomalyFunction.getSpec().getId(), startEndTimeRange.getFirst(),
-                startEndTimeRange.getSecond()));
-      } catch (Exception e) {
-        LOG.error("Unable to get history merged anomalies for function {} in the anomaly window {} -- {}: {}",
-            anomalyFunction.getSpec().getId(), anomalyWindowStart, anomalyWindowEnd, e);
-      }
-    }
-
-    return results;
-  }
-
-  /**
-   * Returns history merged anomalies of the function id that are needed for computing the weight of the new merged
-   * anomalies; history anomalies are anomalies that occurs before the window of current merged anomaly.
-   *
-   * @param anomalyFunction the anomaly function that detects the merged anomaly
-   * @param anomalyWindowStart the start of the merged anomaly
-   * @param anomalyWindowEnd the end of the merged anomaly
-   * @param dimensions the dimensions of the merge anomaly
-   *
-   * @return history merged anomalies of the function id that are needed for computing the weight of the new merged
-   * anomalies
-   */
-  private List<MergedAnomalyResultDTO> getHistoryMergedAnomalies(BaseAnomalyFunction anomalyFunction,
-      long anomalyWindowStart, long anomalyWindowEnd, DimensionMap dimensions) {
-
-    List<Pair<Long, Long>> startEndTimeRanges =
-        anomalyFunction.getDataRangeIntervals(anomalyWindowStart, anomalyWindowEnd);
-
-    List<MergedAnomalyResultDTO> results = new ArrayList<>();
-    for (Pair<Long, Long> startEndTimeRange : startEndTimeRanges) {
-      // we don't need the known anomalies on current window; we only need those on history data
-      if (anomalyWindowStart <= startEndTimeRange.getFirst()
-          && startEndTimeRange.getSecond() <= anomalyWindowEnd) {
-        continue;
-      }
-      try {
-        results.addAll(
-            mergedResultDAO.findAllConflictByFunctionIdDimensions(anomalyFunction.getSpec().getId(), startEndTimeRange.getFirst(),
-                startEndTimeRange.getSecond(), dimensions.toString()));
-      } catch (Exception e) {
-        LOG.error("Unable to get history merged anomalies for function {} on dimensions {} in the anomaly window {} -- {}: {}",
-            anomalyFunction.getSpec().getId(), dimensions.toString(), anomalyWindowStart, anomalyWindowEnd, e);
-      }
-    }
-
-    return results;
   }
 
   @Deprecated

@@ -1,17 +1,17 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
-import com.linkedin.pinot.pql.parsers.utils.Pair;
-import com.linkedin.thirdeye.anomaly.detection.TimeSeriesUtil;
-import com.linkedin.thirdeye.api.DimensionKey;
+import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContext;
+import com.linkedin.thirdeye.anomaly.detection.AnomalyDetectionInputContextBuilder;
 import com.linkedin.thirdeye.api.DimensionMap;
 import com.linkedin.thirdeye.api.MetricTimeSeries;
 import com.linkedin.thirdeye.client.DAORegistry;
+import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.datalayer.dto.AnomalyFunctionDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
+import com.linkedin.thirdeye.detector.function.AnomalyFunction;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.detector.function.BaseAnomalyFunction;
-
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -22,7 +22,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -31,14 +30,11 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-
 import org.apache.commons.io.IOUtils;
 import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.thirdeye.constant.MetricAggFunction;
-import com.linkedin.thirdeye.detector.function.AnomalyFunction;
 
 @Path("thirdeye/function")
 @Produces(MediaType.APPLICATION_JSON)
@@ -116,19 +112,25 @@ public class AnomalyFunctionResource {
     // TODO: replace this with Job/Task framework and job tracker page
     BaseAnomalyFunction anomalyFunction = anomalyFunctionFactory.fromSpec(anomalyFunctionSpec);
 
-    List<Pair<Long, Long>> startEndTimeRanges = anomalyFunction.getDataRangeIntervals(startTime, endTime);
+    DateTime windowStart = new DateTime(startTime);
+    DateTime windowEnd = new DateTime(endTime);
 
-    Map<DimensionKey, MetricTimeSeries> dimensionKeyMetricTimeSeriesMap =
-        TimeSeriesUtil.getTimeSeriesForAnomalyDetection(anomalyFunctionSpec, startEndTimeRanges);
+    AnomalyDetectionInputContextBuilder anomalyDetectionInputContextBuilder =
+        new AnomalyDetectionInputContextBuilder(anomalyFunctionFactory);
+    anomalyDetectionInputContextBuilder
+        .setFunction(anomalyFunctionSpec)
+        .fetchTimeSeriesData(windowStart, windowEnd)
+        .fetchSaclingFactors(windowStart, windowEnd);
+    AnomalyDetectionInputContext anomalyDetectionInputContext = anomalyDetectionInputContextBuilder.build();
+
+    Map<DimensionMap, MetricTimeSeries> dimensionKeyMetricTimeSeriesMap =
+        anomalyDetectionInputContext.getDimensionKeyMetricTimeSeriesMap();
 
     List<RawAnomalyResultDTO> anomalyResults = new ArrayList<>();
     List<RawAnomalyResultDTO> results = new ArrayList<>();
-    List<String> collectionDimensions = DAO_REGISTRY.getDatasetConfigDAO()
-        .findByDataset(anomalyFunctionSpec.getCollection()).getDimensions();
 
-    for (Map.Entry<DimensionKey, MetricTimeSeries> entry : dimensionKeyMetricTimeSeriesMap.entrySet()) {
-      DimensionKey dimensionKey = entry.getKey();
-      DimensionMap dimensionMap = DimensionMap.fromDimensionKey(dimensionKey, collectionDimensions);
+    for (Map.Entry<DimensionMap, MetricTimeSeries> entry : dimensionKeyMetricTimeSeriesMap.entrySet()) {
+      DimensionMap dimensionMap = entry.getKey();
       if (entry.getValue().getTimeWindowSet().size() < 2) {
         LOG.warn("Insufficient data for {} to run anomaly detection function", dimensionMap);
         continue;
