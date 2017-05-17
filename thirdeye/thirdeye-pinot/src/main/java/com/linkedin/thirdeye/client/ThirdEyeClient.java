@@ -7,17 +7,17 @@ public interface ThirdEyeClient {
   /**
    * Returns simple name of the class
    */
-  public String getName();
+  String getName();
 
-  public ThirdEyeResponse execute(ThirdEyeRequest request) throws Exception;
+  ThirdEyeResponse execute(ThirdEyeRequest request) throws Exception;
 
-  public List<String> getCollections() throws Exception;
+  List<String> getCollections() throws Exception;
 
   /** Clear any cached values. */
-  public void clear() throws Exception;
+  void clear() throws Exception;
 
-  public void close() throws Exception;
+  void close() throws Exception;
 
-  public long getMaxDataTime(String collection) throws Exception;
+  long getMaxDataTime(String collection) throws Exception;
 
 }
