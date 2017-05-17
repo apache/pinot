@@ -48,20 +48,28 @@ InvestigateView.prototype = {
     const {
       anomalyStart,
       anomalyEnd,
-      dataset,
       metricId,
       timeUnit,
       currentStart,
       currentEnd,
       anomalyFunctionDimension
       } = args;
+
     const granularity = timeUnit === 'MINUTES' ? '5_MINUTES' : timeUnit;
-    const filters = {}
+    const filters = {};
     const start = moment(currentStart);
     const end = moment(currentEnd);
     const heatMapCurrentStart = moment(anomalyStart);
     const heatMapCurrentEnd = moment(anomalyEnd);
-    const dimension = anomalyFunctionDimension && Object.keys(JSON.parse(anomalyFunctionDimension)).length ? Object.keys(JSON.parse(anomalyFunctionDimension))[0] : 'ALL';
+
+    const parsedDimensions = JSON.parse(anomalyFunctionDimension);
+    const dimensionKeys = Object.keys(parsedDimensions);
+    const dimension = dimensionKeys.length ? dimensionKeys[0] : 'ALL';
+
+    dimensionKeys.forEach((key) => {
+      filters[key] = filters[key] || [];
+      filters[key].push(parsedDimensions[key]);
+    });
 
     return wowResults
       .filter(wow => wow.compareMode !== 'Wo4W')
@@ -77,12 +85,10 @@ InvestigateView.prototype = {
             `compareMode=${wow.compareMode}&filters={}&granularity=${granularity}&` +
             `heatMapCurrentStart=${heatMapCurrentStart.valueOf()}&` +
             `heatMapCurrentEnd=${heatMapCurrentEnd.valueOf()}&heatMapBaselineStart=${heatMapBaselineStart.valueOf()}&` +
-            `heatMapBaselineEnd=${heatMapBaselineEnd.valueOf()}`;
+            `heatMapBaselineEnd=${heatMapBaselineEnd.valueOf()}&filters=${JSON.stringify(filters)}&heatMapFilters=${JSON.stringify(filters)}`;
         return wow;
       });
   },
-
-
 
   render() {
     const template_with_anomaly = this.investigate_template_compiled(this.investigateData);
