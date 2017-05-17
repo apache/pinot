@@ -499,7 +499,7 @@ public class DashboardResource {
     anomalyDetectionInputContextBuilder.setFunction(anomalyFunctionSpec);
     // Take start time == end time to generate the baseline before end time
     AnomalyDetectionInputContext anomalyDetectionInputContext = anomalyDetectionInputContextBuilder
-        .fetchTimeSeriesData(endTime, endTime, true). fetchExixtingMergedAnomalies(endTime, endTime)
+        .fetchTimeSeriesData(endTime, endTime, true).fetchExistingMergedAnomalies(endTime, endTime, false)
         .fetchSaclingFactors(endTime, endTime).build();
 
     for(DimensionMap dimensionMap : anomalyDetectionInputContext.getDimensionKeyMetricTimeSeriesMap().keySet()) {
