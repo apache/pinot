@@ -1,7 +1,9 @@
 package com.linkedin.thirdeye.dashboard.handler;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
@@ -10,6 +12,7 @@ import org.joda.time.DateTime;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.MetricExpression;
+import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewHandler;
@@ -38,7 +41,9 @@ public class ContributorTest {
                                                                                           // make
                                                                                           // this
     // configurable;
-    QueryCache queryCache = new QueryCache(pinotThirdEyeClient, Executors.newFixedThreadPool(10));
+    Map<String, ThirdEyeClient> clientMap = new HashMap<>();
+    clientMap.put(PinotThirdEyeClient.class.getSimpleName(), pinotThirdEyeClient);
+    QueryCache queryCache = new QueryCache(clientMap, Executors.newFixedThreadPool(10));
 
     ContributorViewHandler handler = new ContributorViewHandler(queryCache);
     ContributorViewResponse response = handler.process(request);

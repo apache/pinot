@@ -1,7 +1,9 @@
 package com.linkedin.thirdeye.client;
 
 import com.google.common.cache.Weigher;
+
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -25,7 +27,6 @@ import com.linkedin.thirdeye.client.cache.MetricDataset;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.cache.ResultSetGroupCacheLoader;
 import com.linkedin.thirdeye.client.pinot.PinotQuery;
-import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient;
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClientConfig;
 import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
 import com.linkedin.thirdeye.dashboard.resources.CacheResource;
@@ -51,8 +52,7 @@ public class ThirdEyeCacheRegistry {
   private static DatasetConfigManager datasetConfigDAO;
   private static MetricConfigManager metricConfigDAO;
   private static DashboardConfigManager dashboardConfigDAO;
-  private static PinotThirdEyeClientConfig pinotThirdeyeClientConfig;
-  private static ThirdEyeClient thirdEyeClient;
+  private static Map<String, ThirdEyeClient> thirdEyeClientMap;
   private static final DAORegistry DAO_REGISTRY = DAORegistry.getInstance();
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ThirdEyeCacheRegistry.class);
@@ -70,12 +70,9 @@ public class ThirdEyeCacheRegistry {
     return Holder.INSTANCE;
   }
 
-  private static void init(ThirdEyeConfiguration config) {
+  private static void init(ThirdEyeConfiguration config, ClientConfig clientConfig) {
     try {
-      // TODO: initialize all clients from clients.yml
-      // Create client map and register it with QueryCache
-      pinotThirdeyeClientConfig = PinotThirdEyeClientConfig.createThirdEyeClientConfig(config);
-      thirdEyeClient = PinotThirdEyeClient.fromClientConfig(pinotThirdeyeClientConfig);
+      thirdEyeClientMap = ClientConfigLoader.getClientMap(clientConfig);
       datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
       metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
       dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
@@ -85,10 +82,9 @@ public class ThirdEyeCacheRegistry {
     }
   }
 
-  private static void init(ThirdEyeConfiguration config, PinotThirdEyeClientConfig pinotThirdEyeClientConfig) {
+  private static void init(ThirdEyeConfiguration config, Map<String, ThirdEyeClient> clientMap) {
     try {
-      pinotThirdeyeClientConfig = pinotThirdEyeClientConfig;
-      thirdEyeClient = PinotThirdEyeClient.fromClientConfig(pinotThirdeyeClientConfig);
+      thirdEyeClientMap = clientMap;
       datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
       metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
       dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
@@ -102,16 +98,16 @@ public class ThirdEyeCacheRegistry {
    * Initializes webapp caches
    * @param config
    */
-  public static void initializeCaches(ThirdEyeConfiguration config) {
+  public static void initializeCaches(ThirdEyeConfiguration config, ClientConfig clientConfig) {
 
-    init(config);
+    init(config, clientConfig);
 
-    initCaches(config);
+    initCaches(config, clientConfig);
 
     initPeriodicCacheRefresh();
   }
 
-  private static void initCaches(ThirdEyeConfiguration config) {
+  private static void initCaches(ThirdEyeConfiguration config, ClientConfig clientConfig) {
     ThirdEyeCacheRegistry cacheRegistry = ThirdEyeCacheRegistry.getInstance();
 
     RemovalListener<PinotQuery, ResultSetGroup> listener = new RemovalListener<PinotQuery, ResultSetGroup>() {
@@ -124,6 +120,7 @@ public class ThirdEyeCacheRegistry {
     // ResultSetGroup Cache. The size of this cache is limited by the total number of buckets in all ResultSetGroup.
     // We estimate that 1 bucket (including overhead) consumes 1KB and this cache is allowed to use up to 50% of max
     // heap space.
+    PinotThirdEyeClientConfig pinotThirdeyeClientConfig = PinotThirdEyeClientConfig.createThirdeyeClientConfig(clientConfig);
     long maxBucketNumber = getApproximateMaxBucketNumber(DEFAULT_HEAP_PERCENTAGE_FOR_RESULTSETGROUP_CACHE);
     LoadingCache<PinotQuery, ResultSetGroup> resultSetGroupCache = CacheBuilder.newBuilder()
         .removalListener(listener)
@@ -151,7 +148,7 @@ public class ThirdEyeCacheRegistry {
     cacheRegistry.registerCollectionMaxDataTimeCache(collectionMaxDataTimeCache);
 
     // Query Cache
-    QueryCache queryCache = new QueryCache(thirdEyeClient, Executors.newFixedThreadPool(10));
+    QueryCache queryCache = new QueryCache(thirdEyeClientMap, Executors.newFixedThreadPool(10));
     cacheRegistry.registerQueryCache(queryCache);
 
     // Dimension Filter cache

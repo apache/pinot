@@ -1,7 +1,6 @@
 package com.linkedin.thirdeye.client;
 
 import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient;
-import com.linkedin.thirdeye.dashboard.configs.CollectionConfig;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
@@ -143,7 +142,6 @@ public class ThirdEyeRequest {
 
   public static class ThirdEyeRequestBuilder {
     private static final Logger LOG = LoggerFactory.getLogger(ThirdEyeRequestBuilder.class);
-    private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
 
     private List<MetricFunction> metricFunctions;
     private DateTime startTime;
@@ -152,24 +150,12 @@ public class ThirdEyeRequest {
     private String filterClause;
     private final List<String> groupBy;
     private TimeGranularity groupByTimeGranularity;
-    private String client;
+    private String client = PinotThirdEyeClient.CLIENT_NAME;
 
     public ThirdEyeRequestBuilder() {
       this.filterSet = LinkedListMultimap.create();
       this.groupBy = new ArrayList<String>();
       metricFunctions = new ArrayList<>();
-      this.client = PinotThirdEyeClient.CLIENT_NAME;
-    }
-
-    public ThirdEyeRequestBuilder(ThirdEyeRequest request) {
-      this.metricFunctions = request.getMetricFunctions();
-      this.startTime = request.getStartTimeInclusive();
-      this.endTime = request.getEndTimeExclusive();
-      this.filterSet = LinkedListMultimap.create(request.getFilterSet());
-      this.filterClause = request.getFilterClause();
-      this.groupBy = new ArrayList<String>(request.getGroupBy());
-      this.groupByTimeGranularity = request.getGroupByTimeGranularity();
-      this.client = request.getClient();
     }
 
     public ThirdEyeRequestBuilder setDatasets(List<String> datasets) {

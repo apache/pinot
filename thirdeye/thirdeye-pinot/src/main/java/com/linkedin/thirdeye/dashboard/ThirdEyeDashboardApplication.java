@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.dashboard;
 
+import com.linkedin.thirdeye.client.ClientConfig;
+import com.linkedin.thirdeye.client.ClientConfigLoader;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import com.linkedin.thirdeye.dashboard.resources.AdminResource;
@@ -30,10 +32,10 @@ import com.linkedin.thirdeye.dashboard.resources.v2.rootcause.DefaultEntityForma
 import com.linkedin.thirdeye.dashboard.resources.v2.rootcause.FormatterLoader;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
-
 import com.linkedin.thirdeye.rootcause.Pipeline;
 import com.linkedin.thirdeye.rootcause.RCAFramework;
 import com.linkedin.thirdeye.rootcause.impl.PipelineLoader;
+
 import io.dropwizard.assets.AssetsBundle;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
@@ -44,10 +46,14 @@ import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
+
 import org.eclipse.jetty.servlets.CrossOriginFilter;
+
 import javax.servlet.DispatcherType;
 import javax.servlet.FilterRegistration;
+
 import java.util.EnumSet;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -87,8 +93,14 @@ public class ThirdEyeDashboardApplication
     }
 
     super.initDAOs();
+
+    String clientConfigPath = config.getClientsPath();
+    ClientConfig clientConfig = ClientConfigLoader.fromClientConfigPath(clientConfigPath);
+    if (clientConfig == null) {
+      throw new IllegalStateException("Could not create client config from path " + clientConfigPath);
+    }
     try {
-      ThirdEyeCacheRegistry.initializeCaches(config);
+      ThirdEyeCacheRegistry.initializeCaches(config, clientConfig);
     } catch (Exception e) {
       LOG.error("Exception while loading caches", e);
     }

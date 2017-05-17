@@ -556,7 +556,7 @@ public class DashboardResource {
 
     String file = null;
     if (type.equals("dataset")) {
-      List<String> collections = queryCache.getClient().getCollections();
+      List<String> collections = CACHE_REGISTRY_INSTANCE.getCollectionsCache().getCollections();
       JSONArray array = new JSONArray(collections);
       response = array.toString();
       // file = "assets/data/getdataset.json";

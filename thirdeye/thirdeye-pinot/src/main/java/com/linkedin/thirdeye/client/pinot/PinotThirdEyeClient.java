@@ -9,9 +9,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 
+import org.apache.commons.collections.MapUtils;
 import org.apache.helix.manager.zk.ZNRecordSerializer;
 import org.apache.helix.manager.zk.ZkClient;
 import org.apache.http.HttpHost;
@@ -36,77 +36,51 @@ import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
-public class PinotThirdEyeClient implements ThirdEyeClient {
+public class PinotThirdEyeClient extends ThirdEyeClient {
 
   private static final Logger LOG = LoggerFactory.getLogger(PinotThirdEyeClient.class);
-
   private static final ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
-  public static final String CONTROLLER_HOST_PROPERTY_KEY = "controllerHost";
-  public static final String CONTROLLER_PORT_PROPERTY_KEY = "controllerPort";
-  public static final String FIXED_COLLECTIONS_PROPERTY_KEY = "fixedCollections";
-  public static final String CLUSTER_NAME_PROPERTY_KEY = "clusterName";
-  public static final String TAG_PROPERTY_KEY = "tag";
-  public static final String CLIENT_NAME = PinotThirdEyeClient.class.getSimpleName();
 
-  String segementZKMetadataRootPath;
   private final HttpHost controllerHost;
   private final CloseableHttpClient controllerClient;
+  public static final String CLIENT_NAME = PinotThirdEyeClient.class.getSimpleName();
 
-  protected PinotThirdEyeClient(String controllerHostName, int controllerPort) {
+  public PinotThirdEyeClient(Map<String, String> properties) {
+    super(CLIENT_NAME);
+    if (!isValidProperties(properties)) {
+      throw new IllegalStateException("Invalid properties for client " + CLIENT_NAME + " " + properties);
+    }
+    String host = properties.get(PinotThirdeyeClientProperties.CONTROLLER_HOST.getValue());
+    int port = Integer.valueOf(properties.get(PinotThirdeyeClientProperties.CONTROLLER_PORT.getValue()));
+    String zookeeperUrl = properties.get(PinotThirdeyeClientProperties.ZOOKEEPER_URL.getValue());
 
-    this.controllerHost = new HttpHost(controllerHostName, controllerPort);
-    // TODO currently no way to configure the CloseableHttpClient
+    ZkClient zkClient = new ZkClient(zookeeperUrl);
+    zkClient.setZkSerializer(new ZNRecordSerializer());
+    zkClient.waitUntilConnected();
+    this.controllerHost = new HttpHost(host, port);
+    this.controllerClient = HttpClients.createDefault();
+
+    LOG.info("Created PinotThirdEyeClient with controller {}", controllerHost);
+  }
+
+  protected PinotThirdEyeClient(String host, int port) {
+    super(PinotThirdEyeClient.class.getSimpleName());
+    this.controllerHost = new HttpHost(host, port);
     this.controllerClient = HttpClients.createDefault();
     LOG.info("Created PinotThirdEyeClient with controller {}", controllerHost);
   }
 
-  /* Static builder methods to mirror Pinot Java API (ConnectionFactory) */
-  public static PinotThirdEyeClient fromHostList(String controllerHost, int controllerPort,
-      String... brokers) {
-    if (brokers == null || brokers.length == 0) {
-      throw new IllegalArgumentException("Please specify at least one broker.");
-    }
-    LOG.info("Created PinotThirdEyeClient to hosts: {}", (Object[]) brokers);
-    return new PinotThirdEyeClient(controllerHost, controllerPort);
-  }
-
-  /**
-   * Creates a new PinotThirdEyeClient using the clusterName and broker tag
-   * @param controllerHost
-   * @param controllerPort
-   * @param zkUrl
-   * @param clusterName : required property
-   * @return
-   */
-  public static PinotThirdEyeClient fromZookeeper(String controllerHost, int controllerPort,
-      String zkUrl, String clusterName) {
+  public static PinotThirdEyeClient fromZookeeper(String controllerHost, int controllerPort, String zkUrl) {
     ZkClient zkClient = new ZkClient(zkUrl);
     zkClient.setZkSerializer(new ZNRecordSerializer());
     zkClient.waitUntilConnected();
-    PinotThirdEyeClient pinotThirdEyeClient =
-        new PinotThirdEyeClient(controllerHost, controllerPort);
-    LOG.info("Created PinotThirdEyeClient to zookeeper: {} controller: {}:{}", zkUrl,
-        controllerHost, controllerPort);
+    PinotThirdEyeClient pinotThirdEyeClient = new PinotThirdEyeClient(controllerHost, controllerPort);
+    LOG.info("Created PinotThirdEyeClient to zookeeper: {} controller: {}:{}", zkUrl, controllerHost, controllerPort);
     return pinotThirdEyeClient;
   }
 
-  public static PinotThirdEyeClient fromProperties(Properties properties) {
-    LOG.info("Created PinotThirdEyeClient from properties {}", properties);
-    if (!properties.containsKey(CONTROLLER_HOST_PROPERTY_KEY)
-        || !properties.containsKey(CONTROLLER_PORT_PROPERTY_KEY)) {
-      throw new IllegalArgumentException("Properties file must contain controller mappings for "
-          + CONTROLLER_HOST_PROPERTY_KEY + " and " + CONTROLLER_PORT_PROPERTY_KEY);
-    }
-    return new PinotThirdEyeClient(properties.getProperty(CONTROLLER_HOST_PROPERTY_KEY),
-        Integer.valueOf(properties.getProperty(CONTROLLER_PORT_PROPERTY_KEY)));
-  }
-
   public static ThirdEyeClient fromClientConfig(PinotThirdEyeClientConfig config) {
-    if (config.getBrokerUrl() != null && config.getBrokerUrl().trim().length() > 0) {
-      return fromHostList(config.getControllerHost(), config.getControllerPort(), config.brokerUrl);
-    }
-    return fromZookeeper(config.getControllerHost(), config.getControllerPort(),
-        config.getZookeeperUrl(), config.getClusterName());
+    return fromZookeeper(config.getControllerHost(), config.getControllerPort(), config.getZookeeperUrl());
   }
 
   @Override
@@ -282,6 +256,19 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     controllerClient.close();
   }
 
+  private boolean isValidProperties(Map<String, String> properties) {
+    boolean valid = true;
+    if (MapUtils.isEmpty(properties) ||
+        !properties.containsKey(PinotThirdeyeClientProperties.CONTROLLER_HOST.getValue()) ||
+        !properties.containsKey(PinotThirdeyeClientProperties.CONTROLLER_PORT.getValue()) ||
+        !properties.containsKey(PinotThirdeyeClientProperties.ZOOKEEPER_URL.getValue()) ||
+        !properties.containsKey(PinotThirdeyeClientProperties.CLUSTER_NAME.getValue())) {
+      LOG.error("LixEventsPipeline is missing required property {}", properties);
+      valid = false;
+    }
+    return valid;
+  }
+
   /** TESTING ONLY - WE SHOULD NOT BE USING THIS. */
   @Deprecated
   public static PinotThirdEyeClient getDefaultTestClient() {
@@ -290,9 +277,7 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
     int controllerPort = 11984;
     String zkUrl =
         "localhost:12913/pinot-cluster";
-    String clusterName = "mpSprintDemoCluster";
-    String tag = "thirdeye_BROKER";
-    // return fromZookeeper(controllerHost, controllerPort, zkUrl, clusterName, tag);
-    return fromHostList(controllerHost, controllerPort, "localhost:7001");
+    return fromZookeeper(controllerHost, controllerPort, zkUrl);
   }
+
 }

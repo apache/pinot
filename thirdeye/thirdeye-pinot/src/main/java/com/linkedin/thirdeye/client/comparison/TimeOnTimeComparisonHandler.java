@@ -16,7 +16,6 @@ import com.google.common.collect.Range;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.MetricFunction;
-import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
 import com.linkedin.thirdeye.client.ThirdEyeResponse;
@@ -24,6 +23,7 @@ import com.linkedin.thirdeye.client.TimeRangeUtils;
 import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.client.comparison.Row.Metric;
 import com.linkedin.thirdeye.dashboard.Utils;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 public class TimeOnTimeComparisonHandler {
   private static final String CURRENT = "current";
@@ -154,11 +154,8 @@ public class TimeOnTimeComparisonHandler {
     List<MetricFunction> metricFunctionsFromExpressions =
         Utils.computeMetricFunctionsFromExpressions(metricExpressions);
     requestBuilder.setMetricFunctions(metricFunctionsFromExpressions);
+    requestBuilder.setClient(ThirdEyeUtils.getClientFromMetricFunctions(metricFunctionsFromExpressions));
     return requestBuilder.build(requestReference);
-  }
-
-  public ThirdEyeClient getClient() {
-    return queryCache.getClient();
   }
 
 }

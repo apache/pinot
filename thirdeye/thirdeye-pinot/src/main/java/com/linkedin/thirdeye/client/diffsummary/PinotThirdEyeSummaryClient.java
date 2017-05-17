@@ -1,16 +1,10 @@
 package com.linkedin.thirdeye.client.diffsummary;
 
-import com.linkedin.thirdeye.constant.MetricAggFunction;
-import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
-import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
@@ -20,16 +14,11 @@ import org.joda.time.DateTime;
 import com.google.common.collect.Lists;
 import com.linkedin.thirdeye.client.MetricExpression;
 import com.linkedin.thirdeye.client.MetricFunction;
-import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.client.ThirdEyeClient;
 import com.linkedin.thirdeye.client.ThirdEyeRequest;
 import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
 import com.linkedin.thirdeye.client.ThirdEyeResponse;
 import com.linkedin.thirdeye.client.cache.QueryCache;
-import com.linkedin.thirdeye.common.ThirdEyeConfiguration;
-import com.linkedin.thirdeye.dashboard.ThirdEyeDashboardConfiguration;
-import com.linkedin.thirdeye.dashboard.Utils;
-import com.linkedin.thirdeye.dashboard.views.diffsummary.Summary;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 /**
  * This class generates query requests to the backend database and retrieve the data for summary algorithm.
@@ -63,9 +52,6 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
     this.queryCache = queryCache;
   }
 
-  public PinotThirdEyeSummaryClient(ThirdEyeClient thirdEyeClient) {
-    this(new QueryCache(thirdEyeClient, Executors.newFixedThreadPool(10)));
-  }
 
   @Override
   public void setCollection(String collection) {
@@ -148,6 +134,7 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
     builder.setGroupBy(groupBy);
     builder.setStartTimeInclusive(baselineStartInclusive);
     builder.setEndTimeExclusive(baselineEndExclusive);
+    builder.setClient(ThirdEyeUtils.getClientFromMetricFunctions(metricFunctions));
     ThirdEyeRequest baselineRequest = builder.build("baseline");
     requests.add(baselineRequest);
 
@@ -157,6 +144,7 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
     builder.setGroupBy(groupBy);
     builder.setStartTimeInclusive(currentStartInclusive);
     builder.setEndTimeExclusive(currentEndExclusive);
+    builder.setClient(ThirdEyeUtils.getClientFromMetricFunctions(metricFunctions));
     ThirdEyeRequest currentRequest = builder.build("current");
     requests.add(currentRequest);
 

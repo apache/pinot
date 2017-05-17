@@ -2,9 +2,6 @@ package com.linkedin.thirdeye.datalayer.pojo;
 
 import java.util.Objects;
 
-import com.google.common.base.MoreObjects;
-
-
 /**
  * This class corresponds to data completeness config.
  */

@@ -8,7 +8,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.StringUtils;
 import org.joda.time.DateTime;
@@ -21,7 +20,6 @@ import org.slf4j.LoggerFactory;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.linkedin.pinot.client.ResultSetGroup;
-import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
 import com.linkedin.thirdeye.client.pinot.PinotQuery;
 import com.linkedin.thirdeye.dashboard.Utils;
@@ -46,6 +44,7 @@ public class CollectionMaxDataTimeCacheLoader extends CacheLoader<String, Long> 
     this.datasetConfigDAO = datasetConfigDAO;
   }
 
+  // TODO: Move loading logic to individual clients, and simply call client's getMaxDataTime
   @Override
   public Long load(String collection) throws Exception {
     LOGGER.info("Loading maxDataTime cache {}", collection);

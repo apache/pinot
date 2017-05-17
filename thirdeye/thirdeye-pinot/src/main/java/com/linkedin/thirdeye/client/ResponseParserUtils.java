@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
+import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 public class ResponseParserUtils {
   public static ThirdEyeCacheRegistry CACHE_REGISTRY_INSTANCE = ThirdEyeCacheRegistry.getInstance();
@@ -66,6 +67,7 @@ public class ResponseParserUtils {
     requestBuilder.setEndTimeExclusive(request.getEndTimeExclusive());
     requestBuilder.setFilterSet(request.getFilterSet());
     requestBuilder.setMetricFunctions(request.getMetricFunctions());
+    requestBuilder.setClient(ThirdEyeUtils.getClientFromMetricFunctions(request.getMetricFunctions()));
     ThirdEyeRequest metricSumsRequest = requestBuilder.build("metricSums");
     ThirdEyeResponse metricSumsResponse = null;
     try {
@@ -88,6 +90,7 @@ public class ResponseParserUtils {
     requestBuilder.setFilterSet(request.getFilterSet());
     requestBuilder.setGroupByTimeGranularity(request.getGroupByTimeGranularity());
     requestBuilder.setMetricFunctions(request.getMetricFunctions());
+    requestBuilder.setClient(ThirdEyeUtils.getClientFromMetricFunctions(request.getMetricFunctions()));
     ThirdEyeRequest metricSumsRequest = requestBuilder.build("metricSums");
     ThirdEyeResponse metricSumsResponse = null;
     try {
