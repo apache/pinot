@@ -8,6 +8,10 @@ public class DrawTimeSeriesViewConfig {
   private String dashboardHost;
   private int dashboardPort;
 
+  private String startTimeISO;
+  private String endTimeISO;
+  private boolean weekOverWeek;
+
   // function ids to cleanup/regenerate
   private String functionIds;
   private String outputPath;
@@ -43,5 +47,29 @@ public class DrawTimeSeriesViewConfig {
 
   public void setOutputPath(String outputPath) {
     this.outputPath = outputPath;
+  }
+
+  public String getStartTimeISO() {
+    return startTimeISO;
+  }
+
+  public void setStartTimeISO(String startTimeISO) {
+    this.startTimeISO = startTimeISO;
+  }
+
+  public String getEndTimeISO() {
+    return endTimeISO;
+  }
+
+  public void setEndTimeISO(String endTimeISO) {
+    this.endTimeISO = endTimeISO;
+  }
+
+  public boolean isWeekOverWeek() {
+    return weekOverWeek;
+  }
+
+  public void setWeekOverWeek(boolean weekOverWeek) {
+    this.weekOverWeek = weekOverWeek;
   }
 }

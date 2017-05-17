@@ -24,10 +24,7 @@ public class TimeSeriesLineChart extends JFrame {
   private TimeSeriesCollection xyDataset;
   private JPanel chartPanel;
   private JFreeChart chart;
-  private double severity;
-  private double currentValue;
-  private double baselineValue;
-  private final String SUBTITLE_FORMAT = "Severity: %.2f %%, Current Value: %.2f, Baseline Value %.2f";
+  private final static String DEFAULT_SUBTITLE_FORMAT = "Severity: %.2f %%, Current Value: %.2f, Baseline Value %.2f";
 
   private boolean showLegend = true;
   private boolean createURL = false;
@@ -44,36 +41,39 @@ public class TimeSeriesLineChart extends JFrame {
     this.xyDataset = new TimeSeriesCollection(timeZone);
   }
 
-  public void loadData(Map<DateTime, Tuple2<Double, Double>> timeseries) {
-    TimeSeries currentSeries = new TimeSeries("Current Value");
-    TimeSeries baselineSeries = new TimeSeries("Baseline Value");
+  public void loadTimeSeries(String legendTitle, Map<DateTime, Double> wowTimeSeries) {
+    TimeSeries timeSeries = new TimeSeries(legendTitle);
 
-    ArrayList<DateTime> timestamps = new ArrayList<>(timeseries.keySet());
+    ArrayList<DateTime> timestamps = new ArrayList<>(wowTimeSeries.keySet());
     Collections.sort(timestamps);
+
+
     for(int i = 0; i < timestamps.size(); i++) {
       DateTime timestamp = timestamps.get(i);
       Millisecond millisecondTick = new Millisecond(timestamp.toDate());
-      currentValue = timeseries.get(timestamp)._1();
-      currentSeries.add(millisecondTick, currentValue);
-      baselineValue = timeseries.get(timestamp)._2();
-      baselineSeries.add(millisecondTick, baselineValue);
-      severity = currentValue / baselineValue - 1;
+      double timeSeriesValue = wowTimeSeries.get(timestamp);
+      timeSeries.add(millisecondTick, timeSeriesValue);
     }
 
-    xyDataset.addSeries(currentSeries);
-    xyDataset.addSeries(baselineSeries);
+    xyDataset.addSeries(timeSeries);
   }
 
-  public void createChartPanel(String chartTitle) {
+  public void createChartPanel(String chartTitle, String subTitleString) {
     String xAxisLabel = "Date";
     String yAxisLabel = "Count";
 
     chart = ChartFactory.createTimeSeriesChart(chartTitle,
         xAxisLabel, yAxisLabel, xyDataset, showLegend, createTooltip, createURL);
-    Title subTitle = new TextTitle(String.format(SUBTITLE_FORMAT, severity * 100, currentValue, baselineValue));
+
+    Title subTitle = new TextTitle(subTitleString);
     chart.addSubtitle(subTitle);
 
     chartPanel = new ChartPanel(chart);
+  }
+
+  public static String defaultSubtitle(double currentValue, double baselineValue) {
+    double severity = currentValue/baselineValue - 1;
+    return String.format(DEFAULT_SUBTITLE_FORMAT, severity * 100, currentValue, baselineValue);
   }
 
   public void saveAsPNG(File imageFile) {

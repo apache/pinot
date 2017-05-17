@@ -491,7 +491,7 @@ public class DashboardResource {
     Map<String, AnomalyTimelinesView> dimensionMapAnomalyTimelinesViewMap = new HashMap<>();
     AnomalyDetectionInputContextBuilder anomalyDetectionInputContextBuilder =
         new AnomalyDetectionInputContextBuilder(anomalyFunctionFactory);
-    anomalyDetectionInputContextBuilder.init(anomalyFunctionSpec);
+    anomalyDetectionInputContextBuilder.setFunction(anomalyFunctionSpec);
     AnomalyDetectionInputContext anomalyDetectionInputContext = anomalyDetectionInputContextBuilder
         .fetchTimeSeriesData(startTime, endTime, true). fetchExixtingMergedAnomalies(startTime, endTime)
         .fetchSaclingFactors(startTime, endTime).build();
