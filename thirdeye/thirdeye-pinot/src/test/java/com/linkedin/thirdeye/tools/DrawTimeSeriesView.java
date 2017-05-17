@@ -422,7 +422,7 @@ public class DrawTimeSeriesView {
     final DrawTimeSeriesViewConfig config =
         OBJECT_MAPPER.readValue(new File(args[0]), DrawTimeSeriesViewConfig.class);
 
-    ComparisonMode comparisonMode = ComparisonMode.WoW;
+    ComparisonMode comparisonMode = config.getComparisonMode();
 
     DrawTimeSeriesView drawTimeSeriesView = new DrawTimeSeriesView(new File(config.getPersistenceFile()),
         comparisonMode, config.getDashboardHost(), config.getDashboardPort());
@@ -432,7 +432,13 @@ public class DrawTimeSeriesView {
     }
 
     DateTime end = ISODateTimeFormat.dateTimeParser().parseDateTime("2017-05-16");
+    if(StringUtils.isNotBlank(config.getEndTimeISO())) {
+      end = ISODateTimeFormat.dateTimeParser().parseDateTime(config.getEndTimeISO());
+    }
     DateTime start = end.minus(Days.days(90));
+    if(StringUtils.isNotBlank(config.getStartTimeISO())) {
+      start = ISODateTimeFormat.dateTimeParser().parseDateTime(config.getStartTimeISO());
+    }
 
 
     drawTimeSeriesView.drawAndExport(functionIds, start, end, config.getOutputPath());

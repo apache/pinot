@@ -479,22 +479,28 @@ public class DashboardResource {
       return null;
     }
 
-    DateTime startTime = DateTime.now();
+    DateTime startTime = new DateTime(0); // Set start time = 0 in default, so that all the baseline is exposed
     DateTime endTime = DateTime.now();
-    if (StringUtils.isNotEmpty(startTimeIso)) {
+    if (StringUtils.isNotBlank(startTimeIso)) {
       startTime = ISODateTimeFormat.dateTimeParser().parseDateTime(startTimeIso);
     }
-    if (StringUtils.isNotEmpty(endTimeIso)) {
+    if (StringUtils.isNotBlank(endTimeIso)) {
       endTime = ISODateTimeFormat.dateTimeParser().parseDateTime(endTimeIso);
+    }
+
+    if (startTime.isAfter(endTime)) {
+      LOG.warn("Start time {} is after end time {}", startTime, endTime);
+      return null;
     }
 
     Map<String, AnomalyTimelinesView> dimensionMapAnomalyTimelinesViewMap = new HashMap<>();
     AnomalyDetectionInputContextBuilder anomalyDetectionInputContextBuilder =
         new AnomalyDetectionInputContextBuilder(anomalyFunctionFactory);
     anomalyDetectionInputContextBuilder.setFunction(anomalyFunctionSpec);
+    // Take start time == end time to generate the baseline before end time
     AnomalyDetectionInputContext anomalyDetectionInputContext = anomalyDetectionInputContextBuilder
-        .fetchTimeSeriesData(startTime, endTime, true). fetchExixtingMergedAnomalies(startTime, endTime)
-        .fetchSaclingFactors(startTime, endTime).build();
+        .fetchTimeSeriesData(endTime, endTime, true). fetchExixtingMergedAnomalies(endTime, endTime)
+        .fetchSaclingFactors(endTime, endTime).build();
 
     for(DimensionMap dimensionMap : anomalyDetectionInputContext.getDimensionKeyMetricTimeSeriesMap().keySet()) {
       dimensionMapAnomalyTimelinesViewMap.put(dimensionMap.toString(), getTimeSeriesAndBaselineDataWithDimension(anomalyFunctionSpec,

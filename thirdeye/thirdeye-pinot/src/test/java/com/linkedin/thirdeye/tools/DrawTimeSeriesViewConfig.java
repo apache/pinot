@@ -1,5 +1,7 @@
 package com.linkedin.thirdeye.tools;
 
+import com.linkedin.thirdeye.tools.DrawTimeSeriesView.ComparisonMode;
+
 public class DrawTimeSeriesViewConfig {
 
   // File containing db details
@@ -10,7 +12,7 @@ public class DrawTimeSeriesViewConfig {
 
   private String startTimeISO;
   private String endTimeISO;
-  private boolean weekOverWeek;
+  private ComparisonMode comparisonMode;
 
   // function ids to cleanup/regenerate
   private String functionIds;
@@ -65,11 +67,11 @@ public class DrawTimeSeriesViewConfig {
     this.endTimeISO = endTimeISO;
   }
 
-  public boolean isWeekOverWeek() {
-    return weekOverWeek;
+  public ComparisonMode getComparisonMode() {
+    return comparisonMode;
   }
 
-  public void setWeekOverWeek(boolean weekOverWeek) {
-    this.weekOverWeek = weekOverWeek;
+  public void setComparisonMode(ComparisonMode comparisonMode) {
+    this.comparisonMode = comparisonMode;
   }
 }
