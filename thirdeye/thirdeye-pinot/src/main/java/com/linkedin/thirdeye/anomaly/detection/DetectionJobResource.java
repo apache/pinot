@@ -262,7 +262,7 @@ public class DetectionJobResource {
     // Check if the merged anomaly results have been cleaned up before regeneration
     List<MergedAnomalyResultDTO> mergedResults =
         mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(startTime.getMillis(), endTime.getMillis(),
-            functionId);
+            functionId, true);
     if (CollectionUtils.isNotEmpty(mergedResults) && !forceBackfill) {
       throw new IllegalArgumentException(String.format(
           "[functionId %s] Merged anomaly results should be cleaned up before regeneration", id));
@@ -314,7 +314,7 @@ public class DetectionJobResource {
         return Response.status(Response.Status.NO_CONTENT).entity("Detection job failed").build();
       } else {
         List<MergedAnomalyResultDTO> mergedAnomalies = mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(
-            0, analysisTime.getMillis(), id);
+            0, analysisTime.getMillis(), id, true);
         for (MergedAnomalyResultDTO mergedAnomaly : mergedAnomalies) {
           anomalyIds.add(mergedAnomaly.getId());
         }
@@ -337,14 +337,14 @@ public class DetectionJobResource {
     StringTokenizer starts = new StringTokenizer(holidayStarts, ",");
     StringTokenizer ends = new StringTokenizer(holidayEnds, ",");
     MergedAnomalyResultManager anomalyMergedResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
-    List<MergedAnomalyResultDTO> totalAnomalies = anomalyMergedResultDAO.findByStartTimeInRangeAndFunctionId(startTime, endTime, functionId);
+    List<MergedAnomalyResultDTO> totalAnomalies = anomalyMergedResultDAO.findByStartTimeInRangeAndFunctionId(startTime, endTime, functionId, true);
     int origSize = totalAnomalies.size();
     long start;
     long end;
     while (starts.hasMoreElements() && ends.hasMoreElements()){
       start = ISODateTimeFormat.dateTimeParser().parseDateTime(starts.nextToken()).getMillis();
       end = ISODateTimeFormat.dateTimeParser().parseDateTime(ends.nextToken()).getMillis();
-      List<MergedAnomalyResultDTO> holidayMergedAnomalies = anomalyMergedResultDAO.findByStartTimeInRangeAndFunctionId(start, end, functionId);
+      List<MergedAnomalyResultDTO> holidayMergedAnomalies = anomalyMergedResultDAO.findByStartTimeInRangeAndFunctionId(start, end, functionId, true);
       totalAnomalies.removeAll(holidayMergedAnomalies);
     }
     if(starts.hasMoreElements() || ends.hasMoreElements()){

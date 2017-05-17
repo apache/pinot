@@ -27,10 +27,10 @@ public class PerformanceEvaluateHelper {
       long functionId, long clonedFunctionId, Interval windowInterval,
       MergedAnomalyResultManager mergedAnomalyResultDAO) {
     PerformanceEvaluate performanceEvaluator = null;
-    List<MergedAnomalyResultDTO> knownAnomalies = mergedAnomalyResultDAO.findAllConflictByFunctionId(functionId,
-        windowInterval.getStartMillis(), windowInterval.getEndMillis());
-    List<MergedAnomalyResultDTO> detectedMergedAnomalies = mergedAnomalyResultDAO.findAllConflictByFunctionId(
-        clonedFunctionId, windowInterval.getStartMillis(), windowInterval.getEndMillis());
+    List<MergedAnomalyResultDTO> knownAnomalies = mergedAnomalyResultDAO.findAllOverlapByFunctionId(functionId,
+        windowInterval.getStartMillis(), windowInterval.getEndMillis(), true);
+    List<MergedAnomalyResultDTO> detectedMergedAnomalies = mergedAnomalyResultDAO.findAllOverlapByFunctionId(
+        clonedFunctionId, windowInterval.getStartMillis(), windowInterval.getEndMillis(), true);
     switch (performanceEvaluationMethod){
       case F1_SCORE:
         performanceEvaluator = new F1ScoreByTimePerformanceEvaluation(knownAnomalies, detectedMergedAnomalies);

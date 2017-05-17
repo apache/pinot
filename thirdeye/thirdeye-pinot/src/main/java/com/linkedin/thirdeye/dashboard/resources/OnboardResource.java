@@ -220,7 +220,7 @@ public class OnboardResource {
 
     LOG.info("clone merged anomaly results from source anomaly function id {} to id {}", srcId, destId);
 
-    List<MergedAnomalyResultDTO> mergedAnomalyResultDTOs = mergedAnomalyResultDAO.findByFunctionId(srcId);
+    List<MergedAnomalyResultDTO> mergedAnomalyResultDTOs = mergedAnomalyResultDAO.findByFunctionId(srcId, true);
     if (mergedAnomalyResultDTOs == null || mergedAnomalyResultDTOs.isEmpty()) {
       LOG.error("No merged anomaly results found for anomaly function Id: {}", srcId);
       return false;
@@ -273,7 +273,7 @@ public class OnboardResource {
         functionId, anomalyFunction.getCollection(), anomalyFunction.getMetric());
     int mergedAnomaliesDeleted = 0;
     List<MergedAnomalyResultDTO> mergedResults =
-        mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(monitoringWindowStartTime, monitoringWindowEndTime, functionId);
+        mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(monitoringWindowStartTime, monitoringWindowEndTime, functionId, true);
     if (CollectionUtils.isNotEmpty(mergedResults)) {
       mergedAnomaliesDeleted = deleteMergedResults(mergedResults);
     }
@@ -347,7 +347,7 @@ public class OnboardResource {
       return mergedResults;
     }
     mergedResults = mergedAnomalyResultDAO.findByStartTimeInRangeAndFunctionId(monitoringWindowStartTime,
-        monitoringWindowEndTime, functionId);
+        monitoringWindowEndTime, functionId, true);
     return mergedResults;
   }
 

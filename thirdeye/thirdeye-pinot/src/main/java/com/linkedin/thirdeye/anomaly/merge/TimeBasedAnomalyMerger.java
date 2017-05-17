@@ -125,8 +125,8 @@ public class TimeBasedAnomalyMerger {
       // Moreover, the window start is modified by mergeConfig.getSequentialAllowedGap() in order to allow a gap between
       // anomalies to be merged.
       MergedAnomalyResultDTO latestOverlappedMergedResult =
-          mergedResultDAO.findLatestConflictByFunctionIdDimensions(function.getId(), dimensionMap.toString(),
-              anomalyWindowStart - mergeConfig.getSequentialAllowedGap(), anomalyWindowEnd);
+          mergedResultDAO.findLatestOverlapByFunctionIdDimensions(function.getId(), dimensionMap.toString(),
+              anomalyWindowStart - mergeConfig.getSequentialAllowedGap(), anomalyWindowEnd, true);
 
       List<MergedAnomalyResultDTO> mergedResults = AnomalyTimeBasedSummarizer
           .mergeAnomalies(latestOverlappedMergedResult, unmergedResultsByDimensions,

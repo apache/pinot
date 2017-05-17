@@ -10,11 +10,11 @@ public interface MergedAnomalyResultManager extends AbstractManager<MergedAnomal
   MergedAnomalyResultDTO findById(Long id, boolean loadRawAnomalies);
 
   List<MergedAnomalyResultDTO> getAllByTimeEmailIdAndNotifiedFalse(long startTime, long endTime,
-      long emailId);
+      long emailId, boolean loadRawAnomalies);
 
-  List<MergedAnomalyResultDTO> findAllConflictByFunctionId(long functionId, long conflictWindowStart, long conflictWindowEnd);
+  List<MergedAnomalyResultDTO> findAllOverlapByFunctionId(long functionId, long conflictWindowStart, long conflictWindowEnd, boolean loadRawAnomalies);
 
-  List<MergedAnomalyResultDTO> findAllConflictByFunctionIdDimensions(long functionId, long conflictWindowStart, long conflictWindowEnd, String dimensions);
+  List<MergedAnomalyResultDTO> findAllOverlapByFunctionIdDimensions(long functionId, long conflictWindowStart, long conflictWindowEnd, String dimensions, boolean loadRawAnomalies);
 
   List<MergedAnomalyResultDTO> findByCollectionMetricDimensionsTime(String collection,
       String metric, String dimensions, long startTime, long endTime, boolean loadRawAnomalies);
@@ -29,21 +29,21 @@ public interface MergedAnomalyResultManager extends AbstractManager<MergedAnomal
   List<MergedAnomalyResultDTO> findByCollectionTime(String collection, long startTime,
       long endTime, boolean loadRawAnomalies);
 
-  MergedAnomalyResultDTO findLatestConflictByFunctionIdDimensions(Long functionId, String dimensions,
-      long conflictWindowStart, long conflictWindowEnd);
+  MergedAnomalyResultDTO findLatestOverlapByFunctionIdDimensions(Long functionId, String dimensions,
+      long conflictWindowStart, long conflictWindowEnd, boolean loadRawAnomalies);
 
-  MergedAnomalyResultDTO findLatestByFunctionIdOnly(Long functionId);
+  MergedAnomalyResultDTO findLatestByFunctionIdOnly(Long functionId, boolean loadRawAnomalies);
 
-  List<MergedAnomalyResultDTO> findByFunctionId(Long functionId);
+  List<MergedAnomalyResultDTO> findByFunctionId(Long functionId, boolean loadRawAnomalies);
 
-  List<MergedAnomalyResultDTO> findUnNotifiedByFunctionIdAndIdGreaterThan(Long functionId, Long anomalyId);
+  List<MergedAnomalyResultDTO> findUnNotifiedByFunctionIdAndIdGreaterThan(Long functionId, Long anomalyId, boolean loadRawAnomalies);
 
   List<MergedAnomalyResultDTO> findByStartTimeInRangeAndFunctionId(long startTime, long endTime,
-      long functionId);
+      long functionId, boolean loadRawAnomalies);
 
-  List<MergedAnomalyResultDTO> findByTime(long startTime, long endTime);
+  List<MergedAnomalyResultDTO> findByTime(long startTime, long endTime, boolean loadRawAnomalies);
 
-  List<MergedAnomalyResultDTO> findUnNotifiedByFunctionIdAndIdLesserThanAndEndTimeGreaterThanLastOneDay(long functionId, long anomalyId);
+  List<MergedAnomalyResultDTO> findUnNotifiedByFunctionIdAndIdLesserThanAndEndTimeGreaterThanLastOneDay(long functionId, long anomalyId, boolean loadRawAnomalies);
 
   void updateAnomalyFeedback(MergedAnomalyResultDTO entity);
 

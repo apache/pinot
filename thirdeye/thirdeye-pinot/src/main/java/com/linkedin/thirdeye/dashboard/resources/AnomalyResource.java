@@ -520,7 +520,7 @@ public class AnomalyResource {
    * true if there are labeled anomalies detected by the function
    */
   private boolean containsLabeledAnomalies(long functionId) {
-    List<MergedAnomalyResultDTO> mergedAnomalies = mergedAnomalyResultDAO.findByFunctionId(functionId);
+    List<MergedAnomalyResultDTO> mergedAnomalies = mergedAnomalyResultDAO.findByFunctionId(functionId, true);
 
     for(MergedAnomalyResultDTO mergedAnomaly : mergedAnomalies) {
       AnomalyFeedback feedback = mergedAnomaly.getFeedback();
@@ -596,7 +596,7 @@ public class AnomalyResource {
     }
 
     // merged anomaly mapping
-    List<MergedAnomalyResultDTO> mergedResults = anomalyMergedResultDAO.findByFunctionId(id);
+    List<MergedAnomalyResultDTO> mergedResults = anomalyMergedResultDAO.findByFunctionId(id, true);
     for (MergedAnomalyResultDTO result : mergedResults) {
       anomalyMergedResultDAO.delete(result);
     }
@@ -750,7 +750,7 @@ public class AnomalyResource {
       anomalyDetectionInputContextBuilder.setFunction(anomalyFunctionSpec)
           .fetchTimeSeriesDataByDimension(viewWindowStart, viewWindowEnd, dimensions, false)
           .fetchSaclingFactors(viewWindowStart, viewWindowEnd)
-          .fetchExixtingMergedAnomalies(viewWindowStart, viewWindowEnd);
+          .fetchExistingMergedAnomalies(viewWindowStart, viewWindowEnd, false);
 
       AnomalyDetectionInputContext adInputContext = anomalyDetectionInputContextBuilder.build();
 

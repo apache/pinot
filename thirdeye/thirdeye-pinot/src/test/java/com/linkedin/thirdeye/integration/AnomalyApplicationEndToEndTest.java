@@ -333,7 +333,7 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
     Assert.assertTrue(rawAnomalies.size() == 0);
 
     // check merged anomalies
-    List<MergedAnomalyResultDTO> mergedAnomalies = mergedAnomalyResultDAO.findByFunctionId(functionId);
+    List<MergedAnomalyResultDTO> mergedAnomalies = mergedAnomalyResultDAO.findByFunctionId(functionId, true);
     Assert.assertTrue(mergedAnomalies.size() > 0);
 
     // THE FOLLOWING TEST MAY FAIL OCCASIONALLY DUE TO MACHINE COMPUTATION POWER

@@ -257,7 +257,7 @@ public class AnomaliesResource {
       @PathParam("endTime") Long endTime,
       @PathParam("pageNumber") int pageNumber) throws Exception {
 
-    List<MergedAnomalyResultDTO> mergedAnomalies = mergedAnomalyResultDAO.findByTime(startTime, endTime);
+    List<MergedAnomalyResultDTO> mergedAnomalies = mergedAnomalyResultDAO.findByTime(startTime, endTime, false);
     try {
       mergedAnomalies = AlertFilterHelper.applyFiltrationRule(mergedAnomalies, alertFilterFactory);
     } catch (Exception e) {
@@ -708,7 +708,7 @@ public class AnomaliesResource {
         AnomalyDetectionInputContext adInputContext = anomalyDetectionInputContextBuilder
             .setFunction(anomalyFunctionSpec)
             .fetchTimeSeriesDataByDimension(anomalyWindowStart, anomalyWindowEnd, dimensions, true)
-            .fetchExixtingMergedAnomalies(anomalyWindowStart, anomalyWindowEnd).build();
+            .fetchExistingMergedAnomalies(anomalyWindowStart, anomalyWindowEnd, false).build();
 
         MetricTimeSeries metricTimeSeries = adInputContext.getDimensionKeyMetricTimeSeriesMap().get(dimensions);
 
