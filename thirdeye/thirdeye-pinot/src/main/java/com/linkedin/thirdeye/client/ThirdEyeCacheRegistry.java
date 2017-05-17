@@ -57,6 +57,9 @@ public class ThirdEyeCacheRegistry {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ThirdEyeCacheRegistry.class);
 
+  private static ThirdEyeConfiguration thirdeyeConfig = null;
+  private static ClientConfig clientConfig = null;
+
   // TODO: make default cache size configurable
   private static final int DEFAULT_HEAP_PERCENTAGE_FOR_RESULTSETGROUP_CACHE = 50;
   private static final int DEFAULT_LOWER_BOUND_OF_RESULTSETGROUP_CACHE_SIZE_IN_MB = 100;
@@ -70,8 +73,26 @@ public class ThirdEyeCacheRegistry {
     return Holder.INSTANCE;
   }
 
-  private static void init(ThirdEyeConfiguration config, ClientConfig clientConfig) {
+
+  /**
+   * Initializes webapp caches
+   * @param config
+   */
+  public static void initializeCaches(ThirdEyeConfiguration config) {
+
+    thirdeyeConfig = config;
+    init();
+    initCaches();
+    initPeriodicCacheRefresh();
+  }
+
+  private static void init() {
     try {
+      String clientConfigPath = thirdeyeConfig.getClientsPath();
+      clientConfig = ClientConfigLoader.fromClientConfigPath(clientConfigPath);
+      if (clientConfig == null) {
+        throw new IllegalStateException("Could not create client config from path " + clientConfigPath);
+      }
       thirdEyeClientMap = ClientConfigLoader.getClientMap(clientConfig);
       datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
       metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
@@ -82,32 +103,7 @@ public class ThirdEyeCacheRegistry {
     }
   }
 
-  private static void init(ThirdEyeConfiguration config, Map<String, ThirdEyeClient> clientMap) {
-    try {
-      thirdEyeClientMap = clientMap;
-      datasetConfigDAO = DAO_REGISTRY.getDatasetConfigDAO();
-      metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
-      dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
-    } catch (Exception e) {
-     LOGGER.info("Caught exception while initializing caches", e);
-    }
-  }
-
-
-  /**
-   * Initializes webapp caches
-   * @param config
-   */
-  public static void initializeCaches(ThirdEyeConfiguration config, ClientConfig clientConfig) {
-
-    init(config, clientConfig);
-
-    initCaches(config, clientConfig);
-
-    initPeriodicCacheRefresh();
-  }
-
-  private static void initCaches(ThirdEyeConfiguration config, ClientConfig clientConfig) {
+  private static void initCaches() {
     ThirdEyeCacheRegistry cacheRegistry = ThirdEyeCacheRegistry.getInstance();
 
     RemovalListener<PinotQuery, ResultSetGroup> listener = new RemovalListener<PinotQuery, ResultSetGroup>() {
@@ -162,7 +158,7 @@ public class ThirdEyeCacheRegistry {
     cacheRegistry.registerDashboardsCache(dashboardsCache);
 
     // Collections cache
-    CollectionsCache collectionsCache = new CollectionsCache(datasetConfigDAO, config);
+    CollectionsCache collectionsCache = new CollectionsCache(datasetConfigDAO, thirdeyeConfig);
     cacheRegistry.registerCollectionsCache(collectionsCache);
 
     // DatasetConfig cache

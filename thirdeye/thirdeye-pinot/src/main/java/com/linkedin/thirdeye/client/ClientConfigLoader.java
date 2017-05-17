@@ -48,7 +48,12 @@ public class ClientConfigLoader {
        LOG.info("Creating thirdeye client {} with properties '{}'", className, properties);
        Constructor<?> constructor = Class.forName(className).getConstructor(Map.class);
        ThirdEyeClient thirdeyeClient = (ThirdEyeClient) constructor.newInstance(properties);
+       // use class simple name as key, this enforces that there cannot be more than one client of the same type
        String name = thirdeyeClient.getName();
+       if (clientMap.containsKey(name)) {
+         throw new IllegalStateException("Client " + name + " already exists. "
+             + "There can be only ONE client of each type");
+       }
        clientMap.put(name, thirdeyeClient);
      } catch (Exception e) {
        LOG.error("Exception in creating thirdeye client {}", className, e);

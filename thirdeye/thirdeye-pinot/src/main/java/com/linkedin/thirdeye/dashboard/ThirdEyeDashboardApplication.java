@@ -1,7 +1,5 @@
 package com.linkedin.thirdeye.dashboard;
 
-import com.linkedin.thirdeye.client.ClientConfig;
-import com.linkedin.thirdeye.client.ClientConfigLoader;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import com.linkedin.thirdeye.dashboard.resources.AdminResource;
@@ -42,7 +40,6 @@ import io.dropwizard.setup.Environment;
 import io.dropwizard.views.ViewBundle;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
@@ -94,13 +91,8 @@ public class ThirdEyeDashboardApplication
 
     super.initDAOs();
 
-    String clientConfigPath = config.getClientsPath();
-    ClientConfig clientConfig = ClientConfigLoader.fromClientConfigPath(clientConfigPath);
-    if (clientConfig == null) {
-      throw new IllegalStateException("Could not create client config from path " + clientConfigPath);
-    }
     try {
-      ThirdEyeCacheRegistry.initializeCaches(config, clientConfig);
+      ThirdEyeCacheRegistry.initializeCaches(config);
     } catch (Exception e) {
       LOG.error("Exception while loading caches", e);
     }

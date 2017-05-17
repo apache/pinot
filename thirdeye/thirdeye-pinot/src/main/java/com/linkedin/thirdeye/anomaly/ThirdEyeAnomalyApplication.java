@@ -20,8 +20,6 @@ import com.linkedin.thirdeye.anomaly.merge.AnomalyMergeExecutor;
 import com.linkedin.thirdeye.anomaly.monitor.MonitorJobScheduler;
 import com.linkedin.thirdeye.anomaly.task.TaskDriver;
 import com.linkedin.thirdeye.autoload.pinot.metrics.AutoLoadPinotMetricsService;
-import com.linkedin.thirdeye.client.ClientConfig;
-import com.linkedin.thirdeye.client.ClientConfigLoader;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessScheduler;
@@ -79,13 +77,8 @@ public class ThirdEyeAnomalyApplication
       throws Exception {
     LOG.info("Starting ThirdeyeAnomalyApplication : Scheduler {} Worker {}", config.isScheduler(), config.isWorker());
     super.initDAOs();
-    String clientConfigPath = config.getClientsPath();
-    ClientConfig clientConfig = ClientConfigLoader.fromClientConfigPath(clientConfigPath);
-    if (clientConfig == null) {
-      throw new IllegalStateException("Could not create client config from path " + clientConfigPath);
-    }
     try {
-      ThirdEyeCacheRegistry.initializeCaches(config, clientConfig);
+      ThirdEyeCacheRegistry.initializeCaches(config);
     } catch (Exception e) {
       LOG.error("Exception while loading caches", e);
     }

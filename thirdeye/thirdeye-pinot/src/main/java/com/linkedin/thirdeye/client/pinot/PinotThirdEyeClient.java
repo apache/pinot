@@ -46,7 +46,6 @@ public class PinotThirdEyeClient extends ThirdEyeClient {
   public static final String CLIENT_NAME = PinotThirdEyeClient.class.getSimpleName();
 
   public PinotThirdEyeClient(Map<String, String> properties) {
-    super(CLIENT_NAME);
     if (!isValidProperties(properties)) {
       throw new IllegalStateException("Invalid properties for client " + CLIENT_NAME + " " + properties);
     }
@@ -64,7 +63,6 @@ public class PinotThirdEyeClient extends ThirdEyeClient {
   }
 
   protected PinotThirdEyeClient(String host, int port) {
-    super(PinotThirdEyeClient.class.getSimpleName());
     this.controllerHost = new HttpHost(host, port);
     this.controllerClient = HttpClients.createDefault();
     LOG.info("Created PinotThirdEyeClient with controller {}", controllerHost);

@@ -9,8 +9,6 @@ import com.linkedin.thirdeye.anomaly.events.EventDataProviderManager;
 import com.linkedin.thirdeye.anomaly.events.EventType;
 import com.linkedin.thirdeye.anomaly.events.HistoricalAnomalyEventProvider;
 import com.linkedin.thirdeye.anomaly.events.HolidayEventProvider;
-import com.linkedin.thirdeye.client.ClientConfig;
-import com.linkedin.thirdeye.client.ClientConfigLoader;
 import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.cache.QueryCache;
@@ -144,12 +142,8 @@ public class RCAFrameworkRunner {
 
     ThirdEyeConfiguration thirdEyeConfig = new ThirdEyeAnomalyConfiguration();
     thirdEyeConfig.setRootDir(config.getAbsolutePath());
-    String clientConfigPath = thirdEyeConfig.getClientsPath();
-    ClientConfig clientConfig = ClientConfigLoader.fromClientConfigPath(clientConfigPath);
-    if (clientConfig == null) {
-      throw new IllegalStateException("Could not create client config from path " + clientConfigPath);
-    }
-    ThirdEyeCacheRegistry.initializeCaches(thirdEyeConfig, clientConfig);
+
+    ThirdEyeCacheRegistry.initializeCaches(thirdEyeConfig);
 
     EventDataProviderManager eventProvider = EventDataProviderManager.getInstance();
     eventProvider.registerEventDataProvider(EventType.HOLIDAY.toString(), new HolidayEventProvider());

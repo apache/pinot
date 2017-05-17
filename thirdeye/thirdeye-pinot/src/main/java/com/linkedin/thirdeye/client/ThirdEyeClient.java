@@ -4,19 +4,11 @@ import java.util.List;
 
 public abstract class ThirdEyeClient {
 
-  private String name;
-
+  /**
+   * Returns simple name of the sub class
+   */
   public String getName() {
-    return name;
-  }
-
-  public void setName(String name) {
-    this.name = name;
-  }
-
-
-  public ThirdEyeClient(String name) {
-    this.name = name;
+    return this.getClass().getSimpleName();
   }
 
   public abstract ThirdEyeResponse execute(ThirdEyeRequest request) throws Exception;

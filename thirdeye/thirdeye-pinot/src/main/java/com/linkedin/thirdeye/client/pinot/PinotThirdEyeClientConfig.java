@@ -81,29 +81,39 @@ public class PinotThirdEyeClientConfig {
     return stringHelper.toString();
   }
 
+  /**
+   * Returns pinot thirdeye client config from all client config. There can be only ONE client of each type
+   * @param clientConfig
+   * @return
+   */
   public static PinotThirdEyeClientConfig createThirdeyeClientConfig(ClientConfig clientConfig) {
-    PinotThirdEyeClientConfig config = new PinotThirdEyeClientConfig();
+    PinotThirdEyeClientConfig config = null;
     for (Client client : clientConfig.getClients()) {
       if (client.getClassName().equals(PinotThirdEyeClient.class.getCanonicalName())) {
-        Map<String, String> properties = client.getProperties();
-        String controllerHost = properties.get(PinotThirdeyeClientProperties.CONTROLLER_HOST.getValue());
-        int controllerPort = Integer.valueOf(properties.get(PinotThirdeyeClientProperties.CONTROLLER_PORT.getValue()));
-        String clusterName = properties.get(PinotThirdeyeClientProperties.CLUSTER_NAME.getValue());
-        String zookeeperUrl = properties.get(PinotThirdeyeClientProperties.ZOOKEEPER_URL.getValue());
-        String brokerUrl = properties.get(PinotThirdeyeClientProperties.BROKER_URL.getValue());
-        String tag = properties.get(PinotThirdeyeClientProperties.TAG.getValue());
+        if (config == null) {
+          Map<String, String> properties = client.getProperties();
+          String controllerHost = properties.get(PinotThirdeyeClientProperties.CONTROLLER_HOST.getValue());
+          int controllerPort = Integer.valueOf(properties.get(PinotThirdeyeClientProperties.CONTROLLER_PORT.getValue()));
+          String clusterName = properties.get(PinotThirdeyeClientProperties.CLUSTER_NAME.getValue());
+          String zookeeperUrl = properties.get(PinotThirdeyeClientProperties.ZOOKEEPER_URL.getValue());
+          String brokerUrl = properties.get(PinotThirdeyeClientProperties.BROKER_URL.getValue());
+          String tag = properties.get(PinotThirdeyeClientProperties.TAG.getValue());
 
-        config.setControllerHost(controllerHost);
-        config.setControllerPort(controllerPort);
-        config.setClusterName(clusterName);
-        config.setZookeeperUrl(zookeeperUrl);
-        if (StringUtils.isNotBlank(brokerUrl)) {
-          config.setBrokerUrl(brokerUrl);
+          config = new PinotThirdEyeClientConfig();
+          config.setControllerHost(controllerHost);
+          config.setControllerPort(controllerPort);
+          config.setClusterName(clusterName);
+          config.setZookeeperUrl(zookeeperUrl);
+          if (StringUtils.isNotBlank(brokerUrl)) {
+            config.setBrokerUrl(brokerUrl);
+          }
+          if (StringUtils.isNotBlank(tag)) {
+            config.setTag(tag);
+          }
+        } else {
+          throw new IllegalStateException("Found another client of type PinotThirdEyeClient. "
+              + "There can only be ONE client of each type" + clientConfig);
         }
-        if (StringUtils.isNotBlank(tag)) {
-          config.setTag(tag);
-        }
-        break;
       }
     }
     return config;
