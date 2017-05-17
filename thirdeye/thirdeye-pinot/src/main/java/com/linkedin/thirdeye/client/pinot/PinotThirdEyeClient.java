@@ -262,13 +262,25 @@ public class PinotThirdEyeClient implements ThirdEyeClient {
 
   private boolean isValidProperties(Map<String, String> properties) {
     boolean valid = true;
-    if (MapUtils.isEmpty(properties) ||
-        !properties.containsKey(PinotThirdeyeClientProperties.CONTROLLER_HOST.getValue()) ||
-        !properties.containsKey(PinotThirdeyeClientProperties.CONTROLLER_PORT.getValue()) ||
-        !properties.containsKey(PinotThirdeyeClientProperties.ZOOKEEPER_URL.getValue()) ||
-        !properties.containsKey(PinotThirdeyeClientProperties.CLUSTER_NAME.getValue())) {
-      LOG.error("LixEventsPipeline is missing required property {}", properties);
+    if (MapUtils.isEmpty(properties)) {
       valid = false;
+      LOG.error("PinotThirdEyeClient is missing properties {}", properties);
+    }
+    if (!properties.containsKey(PinotThirdeyeClientProperties.CONTROLLER_HOST.getValue())) {
+      valid = false;
+      LOG.error("PinotThirdEyeClient is missing required property {}", PinotThirdeyeClientProperties.CONTROLLER_HOST.getValue());
+    }
+    if (!properties.containsKey(PinotThirdeyeClientProperties.CONTROLLER_PORT.getValue())) {
+      valid = false;
+      LOG.error("PinotThirdEyeClient is missing required property {}", PinotThirdeyeClientProperties.CONTROLLER_PORT.getValue());
+    }
+    if (!properties.containsKey(PinotThirdeyeClientProperties.ZOOKEEPER_URL.getValue())) {
+      valid = false;
+      LOG.error("PinotThirdEyeClient is missing required property {}", PinotThirdeyeClientProperties.ZOOKEEPER_URL.getValue());
+    }
+    if (!properties.containsKey(PinotThirdeyeClientProperties.CLUSTER_NAME.getValue())) {
+      valid = false;
+      LOG.error("PinotThirdEyeClient is missing required property {}", PinotThirdeyeClientProperties.CLUSTER_NAME.getValue());
     }
     return valid;
   }
