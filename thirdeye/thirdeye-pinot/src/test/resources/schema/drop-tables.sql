@@ -21,4 +21,5 @@ DROP TABLE IF EXISTS detection_status_index;
 DROP TABLE IF EXISTS autotune_config_index;
 DROP TABLE IF EXISTS entity_to_entity_mapping_index;
 DROP TABLE IF EXISTS grouped_anomaly_results_index;
+DROP TABLE IF EXISTS onboard_dataset_metric_index;
 SET FOREIGN_KEY_CHECKS = 1;

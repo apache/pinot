@@ -23,6 +23,7 @@ import com.linkedin.thirdeye.datalayer.dto.IngraphDashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.IngraphMetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.datalayer.dto.OnboardDatasetMetricDTO;
 import com.linkedin.thirdeye.datalayer.dto.OverrideConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
@@ -68,6 +69,7 @@ public abstract class AbstractManagerTestBase {
   protected ClassificationConfigManager classificationConfigDAO;
   protected EntityToEntityMappingManager entityToEntityMappingDAO;
   protected GroupedAnomalyResultsManager groupedAnomalyResultsDAO;
+  protected OnboardDatasetMetricManager onboardDatasetMetricDAO;
 
   //  protected TestDBResources testDBResources;
   protected DAORegistry daoRegistry;
@@ -105,6 +107,7 @@ public abstract class AbstractManagerTestBase {
       classificationConfigDAO = daoRegistry.getClassificationConfigDAO();
       entityToEntityMappingDAO = daoRegistry.getEntityToEntityMappingDAO();
       groupedAnomalyResultsDAO = daoRegistry.getGroupedAnomalyResultsDAO();
+      onboardDatasetMetricDAO = daoRegistry.getOnboardDatasetMetricDAO();
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -386,6 +389,14 @@ public abstract class AbstractManagerTestBase {
     dto.setToURN(toURN);
     dto.setMappingType(mappingType);
     dto.setScore(1);
+    return dto;
+  }
+
+  protected OnboardDatasetMetricDTO getTestOnboardConfig(String datasetName, String metricName, String dataSource) {
+    OnboardDatasetMetricDTO dto = new OnboardDatasetMetricDTO();
+    dto.setDatasetName(datasetName);
+    dto.setMetricName(metricName);
+    dto.setDataSource(dataSource);
     return dto;
   }
 }
