@@ -270,6 +270,7 @@ public class MetricCorrelationRankingPipeline extends Pipeline {
         .setMetricFunctions(functions)
         .setGroupBy(dataset.getTimeColumn())
         .setGroupByTimeGranularity(dataset.bucketTimeGranularity())
+        .setDataSource(dataset.getDataSource())
         .build(reference);
 
     return new RequestContainer(request, expressions);
