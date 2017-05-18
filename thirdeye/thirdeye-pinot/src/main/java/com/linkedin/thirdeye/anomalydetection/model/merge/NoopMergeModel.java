@@ -9,4 +9,9 @@ public class NoopMergeModel extends AbstractMergeModel implements NoPredictionMe
       MergedAnomalyResultDTO anomalyToUpdated) {
     // Does nothing
   }
+
+  @Override
+  public Boolean isMergeable(MergedAnomalyResultDTO anomaly1, MergedAnomalyResultDTO anomaly2) {
+    return true;
+  }
 }

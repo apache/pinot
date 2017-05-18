@@ -102,4 +102,9 @@ public class SimplePercentageMergeModel extends AbstractMergeModel {
     anomalyToUpdated.setMessage(
         String.format(DEFAULT_MESSAGE_TEMPLATE, weight * 100, avgCurrent, avgBaseline, score));
   }
+
+  @Override
+  public Boolean isMergeable(MergedAnomalyResultDTO anomaly1, MergedAnomalyResultDTO anomaly2) {
+    return true;
+  }
 }

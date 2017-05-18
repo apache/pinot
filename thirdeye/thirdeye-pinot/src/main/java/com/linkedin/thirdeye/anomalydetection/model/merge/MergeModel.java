@@ -26,4 +26,14 @@ public interface MergeModel {
    * @param anomalyToUpdated the anomaly of which the information is updated.
    */
   void update(AnomalyDetectionContext anomalyDetectionContext, MergedAnomalyResultDTO anomalyToUpdated);
+
+  /**
+   * Justify if two anomalies can be merged based on properties
+   * e.g. anomalies generated from different anomaly function configurations should not be merged
+   * @param anomaly1 the first anomaly
+   * @param anomaly2 the second anomaly
+   * @return True if two anomalies are eligible to be merged
+   */
+  Boolean isMergeable(MergedAnomalyResultDTO anomaly1, MergedAnomalyResultDTO anomaly2);
+
 }
