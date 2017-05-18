@@ -6,7 +6,7 @@ function AnomalyResultModel() {
   this.dashboardId = null;
   this.previousDashboardId = null;
   this.anomalyIds = null;
-  this.groupIds = null;
+  this.anomalyGroupIds = null;
   this.previousAnomalyIds = null
 
   this.previousStartDate = null;
@@ -50,7 +50,7 @@ AnomalyResultModel.prototype = {
     this.metricIds = null;
     this.dashboardId = null;
     this.anomalyIds = null;
-    this.groupIds = null;
+    this.anomalyGroupIds = null;
     this.functionName = null;
     this.pageNumber = 1;
 
@@ -71,7 +71,7 @@ AnomalyResultModel.prototype = {
         this.anomalyIds = params[HASH_PARAMS.ANOMALIES_ANOMALY_IDS];
       }
 
-      this.groupIds = params[HASH_PARAMS.ANOMALIES_GROUP_IDS] || this.groupIds;
+      this.anomalyGroupIds = params[HASH_PARAMS.ANOMALIES_GROUP_IDS] || this.anomalyGroupIds;
 
       if (params[HASH_PARAMS.ANOMALIES_START_DATE] != undefined) {
         this.startDate = params[HASH_PARAMS.ANOMALIES_START_DATE];
@@ -105,8 +105,8 @@ AnomalyResultModel.prototype = {
           this.startDate, this.endDate, this.pageNumber, this.anomalyIds, this.functionName, this.updateModelAndNotifyView.bind(this));
     } else if (this.anomaliesSearchMode == constants.MODE_TIME) {
       dataService.fetchAnomaliesForTime(this.startDate, this.endDate, this.pageNumber, this.updateModelAndNotifyView.bind(this));
-    } else if (this.anomaliesSearchMode == constants.MODE_GROUPID && this.groupIds != undefined && this.groupIds.length > 0) {
-      dataService.fetchAnomaliesforGroupIds(this.startDate, this.endDate, this.pageNumber, this.groupIds, this.functionName, this.updateModelAndNotifyView.bind(this));
+    } else if (this.anomaliesSearchMode == constants.MODE_GROUPID && this.anomalyGroupIds != undefined && this.anomalyGroupIds.length > 0) {
+      dataService.fetchAnomaliesforGroupIds(this.startDate, this.endDate, this.pageNumber, this.anomalyGroupIds, this.functionName, this.updateModelAndNotifyView.bind(this));
     }
   },
   updateModelAndNotifyView : function(anomaliesWrapper) {

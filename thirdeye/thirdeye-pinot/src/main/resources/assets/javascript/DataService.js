@@ -119,10 +119,10 @@ DataService.prototype = {
     },
 
     // Fetch anomalies for group ids in array
-    fetchAnomaliesforGroupIds(startTime, endTime, pageNumber, groupIds, functionName, callback) {
+    fetchAnomaliesforGroupIds(startTime, endTime, pageNumber, anomalyGroupIds, functionName, callback) {
       const url = constants.SEARCH_ANOMALIES_GROUPIDS + startTime + this.URL_SEPARATOR + endTime + this.URL_SEPARATOR + pageNumber;
       var data = {
-        groupIds
+        anomalyGroupIds
       };
       this.getDataAsynchronous(url, data, callback, 'anomaly-spin-area');
     },

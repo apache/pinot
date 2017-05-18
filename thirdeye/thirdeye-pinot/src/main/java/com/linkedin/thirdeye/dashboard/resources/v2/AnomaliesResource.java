@@ -365,25 +365,25 @@ public class AnomaliesResource {
    *
    * @param startTime not used.
    * @param endTime not used.
-   * @param groupIdsString a list of group ids that are separated by commas.
+   * @param anomalyGroupIdsString a list of anomaly group ids that are separated by commas.
    * @param functionName not used.
    *
    * @return A list of detailed anomalies in the specified page.
    * @throws Exception
    */
   @GET
-  @Path("search/groupIds/{startTime}/{endTime}/{pageNumber}")
+  @Path("search/anomalyGroupIds/{startTime}/{endTime}/{pageNumber}")
   public AnomaliesWrapper getAnomaliesByGroupIds(
       @PathParam("startTime") Long startTime,
       @PathParam("endTime") Long endTime,
       @PathParam("pageNumber") int pageNumber,
-      @QueryParam("groupIds") String groupIdsString,
+      @QueryParam("anomalyGroupIds") String anomalyGroupIdsString,
       @QueryParam("functionName") String functionName) throws Exception {
 
-    String[] groupIds = groupIdsString.split(COMMA_SEPARATOR);
+    String[] anomalyGroupIdsStrings = anomalyGroupIdsString.split(COMMA_SEPARATOR);
     Set<Long> anomalyIdSet = new HashSet<>();
     List<MergedAnomalyResultDTO> mergedAnomalies = new ArrayList<>();
-    for (String idString : groupIds) {
+    for (String idString : anomalyGroupIdsStrings) {
       Long groupId = null;
       try {
         groupId = Long.parseLong(idString);

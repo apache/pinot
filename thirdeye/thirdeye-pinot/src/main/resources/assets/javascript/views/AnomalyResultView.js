@@ -326,7 +326,7 @@ AnomalyResultView.prototype = {
       var metricIds = undefined;
       var dashboardId = undefined;
       var anomalyIds = undefined;
-      var groupIds = undefined;
+      var anomalyGroupIds = undefined;
 
       var functionName = $('#anomaly-function-dropdown').val();
       var startDate = $('#anomalies-time-range-start').data('daterangepicker').startDate;
@@ -349,7 +349,7 @@ AnomalyResultView.prototype = {
         delete anomaliesParams.startDate;
         delete anomaliesParams.endDate;
       } else if (anomaliesSearchMode == constants.MODE_GROUPID) {
-        anomaliesParams.groupIds = $('#anomalies-search-group-input').val().join();
+        anomaliesParams.anomalyGroupIds = $('#anomalies-search-group-input').val().join();
         delete anomaliesParams.startDate;
         delete anomaliesParams.endDate;
       }
