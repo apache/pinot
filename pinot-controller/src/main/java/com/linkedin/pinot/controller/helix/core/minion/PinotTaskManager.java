@@ -16,8 +16,8 @@
 package com.linkedin.pinot.controller.helix.core.minion;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.PinotTaskConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
 import com.linkedin.pinot.controller.helix.core.minion.generator.TaskGeneratorRegistry;
@@ -129,14 +129,14 @@ public class PinotTaskManager {
   public void scheduleTasks() {
     // TODO: add JobQueue health check here
 
-    Map<String, List<AbstractTableConfig>> enabledTableConfigMap = new HashMap<>();
+    Map<String, List<TableConfig>> enabledTableConfigMap = new HashMap<>();
     for (String taskType : _taskGeneratorRegistry.getAllTaskTypes()) {
-      enabledTableConfigMap.put(taskType, new ArrayList<AbstractTableConfig>());
+      enabledTableConfigMap.put(taskType, new ArrayList<TableConfig>());
     }
 
     // Scan all table configs to get the tables with tasks enabled
     for (String tableName : _pinotHelixResourceManager.getAllTables()) {
-      AbstractTableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableName);
+      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableName);
       if (tableConfig != null) {
         // TODO: add table configs that have certain types of tasks enabled into the map
       }

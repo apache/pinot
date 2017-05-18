@@ -16,16 +16,16 @@
 
 package com.linkedin.pinot.controller.validation;
 
+import com.google.common.base.Preconditions;
+import com.linkedin.pinot.common.config.QuotaConfig;
+import com.linkedin.pinot.common.config.TableConfig;
+import com.linkedin.pinot.controller.api.restlet.resources.TableSizeReader;
 import java.io.File;
+import javax.annotation.Nonnegative;
+import javax.annotation.Nonnull;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
-import com.linkedin.pinot.common.config.QuotaConfig;
-import com.linkedin.pinot.controller.api.restlet.resources.TableSizeReader;
-import javax.annotation.Nonnegative;
-import javax.annotation.Nonnull;
 
 
 /**
@@ -36,9 +36,9 @@ public class StorageQuotaChecker {
   private static final Logger LOGGER = LoggerFactory.getLogger(StorageQuotaChecker.class);
 
   private final TableSizeReader tableSizeReader;
-  private final AbstractTableConfig tableConfig;
+  private final TableConfig tableConfig;
 
-  public StorageQuotaChecker(AbstractTableConfig tableConfig, TableSizeReader tableSizeReader) {
+  public StorageQuotaChecker(TableConfig tableConfig, TableSizeReader tableSizeReader) {
     this.tableConfig = tableConfig;
     this.tableSizeReader = tableSizeReader;
   }

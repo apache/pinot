@@ -15,8 +15,8 @@
  */
 package com.linkedin.pinot.controller.util;
 
-import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
 import com.linkedin.pinot.common.utils.time.TimeUtils;
@@ -178,9 +178,9 @@ public class TableRetentionValidator {
     }
   }
 
-  private AbstractTableConfig getTableConfig(String tableName)
+  private TableConfig getTableConfig(String tableName)
       throws Exception {
-    return AbstractTableConfig.fromZnRecord(
+    return TableConfig.fromZnRecord(
         _propertyStore.get(ZKMetadataProvider.constructPropertyStorePathForResourceConfig(tableName), null, 0));
   }
 

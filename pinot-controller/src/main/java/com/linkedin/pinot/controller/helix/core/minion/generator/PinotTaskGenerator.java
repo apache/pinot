@@ -15,8 +15,8 @@
  */
 package com.linkedin.pinot.controller.helix.core.minion.generator;
 
-import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.PinotTaskConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import java.util.List;
 import javax.annotation.Nonnull;
 
@@ -36,5 +36,5 @@ public interface PinotTaskGenerator {
    * Given a list of table configs, generate a list of new tasks to be scheduled.
    */
   @Nonnull
-  List<PinotTaskConfig> generateTasks(@Nonnull List<AbstractTableConfig> tableConfigs);
+  List<PinotTaskConfig> generateTasks(@Nonnull List<TableConfig> tableConfigs);
 }

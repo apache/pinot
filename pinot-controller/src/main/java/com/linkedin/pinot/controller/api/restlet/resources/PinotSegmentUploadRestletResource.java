@@ -17,7 +17,7 @@ package com.linkedin.pinot.controller.api.restlet.resources;
 
 import com.alibaba.fastjson.JSONObject;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.linkedin.pinot.common.config.OfflineTableConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
@@ -460,21 +460,21 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
     final File tableDir = new File(baseDataDir, metadata.getTableName());
     String tableName = metadata.getTableName();
     File segmentFile = new File(tableDir, dataFile.getName());
-    OfflineTableConfig offlineTableConfig = (OfflineTableConfig) ZKMetadataProvider
-        .getOfflineTableConfig(_pinotHelixResourceManager.getPropertyStore(), tableName);
+    TableConfig offlineTableConfig =
+        ZKMetadataProvider.getOfflineTableConfig(_pinotHelixResourceManager.getPropertyStore(), tableName);
 
     if (offlineTableConfig == null) {
       LOGGER.info("Missing configuration for table: {} in helix", metadata.getTableName());
       setStatus(Status.CLIENT_ERROR_NOT_FOUND);
-      StringRepresentation repr = new StringRepresentation("{\"error\" : \"Missing table: "  +  tableName + "\"}");
+      StringRepresentation repr = new StringRepresentation("{\"error\" : \"Missing table: " + tableName + "\"}");
       repr.setMediaType(MediaType.APPLICATION_JSON);
       return repr;
     }
     StorageQuotaChecker.QuotaCheckerResponse quotaResponse = checkStorageQuota(indexDir, metadata, offlineTableConfig);
     if (!quotaResponse.isSegmentWithinQuota) {
       // this is not an "error" hence we don't increment segment upload errors
-      LOGGER.info("Rejecting segment upload for table: {}, segment: {}, reason: {}",
-          metadata.getTableName(), metadata.getName(), quotaResponse.reason);
+      LOGGER.info("Rejecting segment upload for table: {}, segment: {}, reason: {}", metadata.getTableName(),
+          metadata.getName(), quotaResponse.reason);
       setStatus(Status.CLIENT_ERROR_FORBIDDEN);
       StringRepresentation repr = new StringRepresentation("{\"error\" : \"" + quotaResponse.reason + "\"}");
       repr.setMediaType(MediaType.APPLICATION_JSON);
@@ -630,8 +630,8 @@ public class PinotSegmentUploadRestletResource extends BasePinotControllerRestle
    *                    segmentFile must exist on disk and must be a directory
    * @param metadata segment metadata. This should not be null
    */
-  private StorageQuotaChecker.QuotaCheckerResponse checkStorageQuota(@Nonnull File segmentFile, @Nonnull SegmentMetadata metadata,
-      @Nonnull OfflineTableConfig offlineTableConfig) {
+  private StorageQuotaChecker.QuotaCheckerResponse checkStorageQuota(@Nonnull File segmentFile,
+      @Nonnull SegmentMetadata metadata, @Nonnull TableConfig offlineTableConfig) {
     TableSizeReader tableSizeReader = new TableSizeReader(_executor, _connectionManager, _pinotHelixResourceManager);
     StorageQuotaChecker quotaChecker = new StorageQuotaChecker(offlineTableConfig, tableSizeReader);
     String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(metadata.getTableName());

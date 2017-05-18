@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.controller.validation;
 
-import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
@@ -141,7 +141,7 @@ public class ValidationManager {
       List<SegmentMetadata> segmentMetadataList = new ArrayList<SegmentMetadata>();
 
       TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
-      AbstractTableConfig tableConfig = null;
+      TableConfig tableConfig = null;
       _pinotHelixResourceManager.rebuildBrokerResourceFromHelixTags(tableName);
       // For each table, fetch the metadata for all its segments
       if (tableType.equals(TableType.OFFLINE)) {
@@ -184,7 +184,7 @@ public class ValidationManager {
   }
 
   // For LLC segments, validate that there is at least one segment in CONSUMING state for every partition.
-  void validateLLCSegments(final String realtimeTableName, AbstractTableConfig tableConfig) {
+  void validateLLCSegments(final String realtimeTableName, TableConfig tableConfig) {
     LOGGER.info("Validating LLC Segments for {}", realtimeTableName);
     Map<String, String> streamConfigs = tableConfig.getIndexingConfig().getStreamConfigs();
     ZNRecord partitionAssignment = _llcRealtimeSegmentManager.getKafkaPartitionAssignment(realtimeTableName);

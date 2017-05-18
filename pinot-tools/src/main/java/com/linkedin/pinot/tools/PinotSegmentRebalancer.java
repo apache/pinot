@@ -16,7 +16,7 @@
 package com.linkedin.pinot.tools;
 
 import com.google.common.collect.Lists;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
@@ -88,9 +88,9 @@ public class PinotSegmentRebalancer extends PinotZKChanger {
     String rawTenantName = tenantName.replaceAll("_OFFLINE", "").replace("_REALTIME", "");
     int nRebalances = 0;
     for (ZNRecord znRecord : tableConfigs) {
-      AbstractTableConfig tableConfig;
+      TableConfig tableConfig;
       try {
-        tableConfig = AbstractTableConfig.fromZnRecord(znRecord);
+        tableConfig = TableConfig.fromZnRecord(znRecord);
       } catch (Exception e) {
         LOGGER.warn("Failed to parse table configuration for ZnRecord id: {}. Skipping", znRecord.getId());
         continue;
@@ -115,7 +115,7 @@ public class PinotSegmentRebalancer extends PinotZKChanger {
     String tableConfigPath = "/CONFIGS/TABLE/" + tableName;
     Stat stat = new Stat();
     ZNRecord znRecord = propertyStore.get(tableConfigPath, stat, 0);
-    AbstractTableConfig tableConfig = AbstractTableConfig.fromZnRecord(znRecord);
+    TableConfig tableConfig = TableConfig.fromZnRecord(znRecord);
     String tenantName = tableConfig.getTenantConfig().getServer().replaceAll(TableType.OFFLINE.toString(), "")
         .replace(TableType.OFFLINE.toString(), "");
     rebalanceTable(tableName, tenantName);
@@ -139,8 +139,7 @@ public class PinotSegmentRebalancer extends PinotZKChanger {
     List<String> partitions = Lists.newArrayList(currentIdealState.getPartitionSet());
     LinkedHashMap<String, Integer> states = new LinkedHashMap<>();
     int numReplicasInIdealState = Integer.parseInt(currentIdealState.getReplicas());
-    final AbstractTableConfig offlineTableConfig =
-        ZKMetadataProvider.getOfflineTableConfig(propertyStore, tableName);
+    final TableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(propertyStore, tableName);
     final int numReplicasInTableConfig = Integer.parseInt(offlineTableConfig.getValidationConfig().getReplication());
 
     final int targetNumReplicas = numReplicasInTableConfig;

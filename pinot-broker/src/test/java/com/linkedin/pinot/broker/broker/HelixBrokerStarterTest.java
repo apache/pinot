@@ -18,7 +18,7 @@ package com.linkedin.pinot.broker.broker;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.broker.broker.helix.DefaultHelixBrokerConfig;
 import com.linkedin.pinot.broker.broker.helix.HelixBrokerStarter;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.utils.CommonConstants;
@@ -96,7 +96,7 @@ public class HelixBrokerStarterTest {
     final String tableName = "dining";
     JSONObject buildCreateOfflineTableV2JSON =
         ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(tableName, null, null, 1);
-    AbstractTableConfig config = AbstractTableConfig.init(buildCreateOfflineTableV2JSON.toString());
+    TableConfig config = TableConfig.init(buildCreateOfflineTableV2JSON.toString());
     _pinotResourceManager.addTable(config);
 
     for (int i = 1; i <= 5; i++) {
@@ -148,7 +148,7 @@ public class HelixBrokerStarterTest {
     final String tableName = "coffee";
     JSONObject buildCreateOfflineTableV2JSON =
         ControllerRequestBuilderUtil.buildCreateOfflineTableJSON(tableName, "testServer", "testBroker", 1);
-    AbstractTableConfig config = AbstractTableConfig.init(buildCreateOfflineTableV2JSON.toString());
+    TableConfig config = TableConfig.init(buildCreateOfflineTableV2JSON.toString());
     _pinotResourceManager.addTable(config);
 
     Assert.assertEquals(_helixAdmin.getInstancesInClusterWithTag(HELIX_CLUSTER_NAME, "DefaultTenant_BROKER").size(), 6);

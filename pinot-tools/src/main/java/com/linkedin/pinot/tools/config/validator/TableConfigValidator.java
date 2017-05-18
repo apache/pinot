@@ -15,14 +15,14 @@
  */
 package com.linkedin.pinot.tools.config.validator;
 
-import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 
 
 public class TableConfigValidator {
   private TableConfigValidator() {
   }
 
-  public static boolean validate(AbstractTableConfig tableConfig) {
+  public static boolean validate(TableConfig tableConfig) {
     // TODO: ADD MORE VALIDATIONS.
     String tableName = tableConfig.getTableName();
     return !tableName.contains(" ");

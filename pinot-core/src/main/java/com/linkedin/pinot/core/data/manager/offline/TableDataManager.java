@@ -16,7 +16,7 @@
 package com.linkedin.pinot.core.data.manager.offline;
 
 import com.google.common.collect.ImmutableList;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -63,7 +63,7 @@ public interface TableDataManager {
    * Adds a segment into the REALTIME table.
    * <p>The segment could be committed or under consuming.
    */
-  void addSegment(@Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore, @Nonnull AbstractTableConfig tableConfig,
+  void addSegment(@Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore, @Nonnull TableConfig tableConfig,
       @Nullable InstanceZKMetadata instanceZKMetadata, @Nonnull SegmentZKMetadata segmentZKMetadata,
       @Nonnull IndexLoadingConfig indexLoadingConfig)
       throws Exception;

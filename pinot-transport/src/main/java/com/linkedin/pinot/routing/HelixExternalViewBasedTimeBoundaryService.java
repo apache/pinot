@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.routing;
 
-import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
@@ -65,7 +65,7 @@ public class HelixExternalViewBasedTimeBoundaryService implements TimeBoundarySe
       return;
     }
 
-    AbstractTableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
+    TableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(_propertyStore, tableName);
     String timeType = offlineTableConfig.getValidationConfig().getTimeType();
     TimeUnit tableTimeUnit = getTimeUnitFromString(timeType);
     if (tableTimeUnit == null) {

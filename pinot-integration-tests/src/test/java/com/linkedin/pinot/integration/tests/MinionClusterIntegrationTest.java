@@ -17,8 +17,8 @@ package com.linkedin.pinot.integration.tests;
 
 import com.clearspring.analytics.util.Preconditions;
 import com.google.common.util.concurrent.Uninterruptibles;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.PinotTaskConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import com.linkedin.pinot.controller.helix.core.minion.ClusterInfoProvider;
 import com.linkedin.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
@@ -184,7 +184,7 @@ public class MinionClusterIntegrationTest extends HybridClusterIntegrationTest {
 
     @Nonnull
     @Override
-    public List<PinotTaskConfig> generateTasks(@Nonnull List<AbstractTableConfig> tableConfigs) {
+    public List<PinotTaskConfig> generateTasks(@Nonnull List<TableConfig> tableConfigs) {
       // Generate at most 4 tasks
       if (_clusterInfoProvider.getTaskStates(TASK_TYPE).size() < 4) {
         Map<String, String> config1 = new HashMap<>();

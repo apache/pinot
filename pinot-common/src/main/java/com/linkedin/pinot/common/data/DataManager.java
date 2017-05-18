@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.common.data;
 
-import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.segment.SegmentMetadata;
 import com.linkedin.pinot.common.segment.SegmentMetadataLoader;
 import com.linkedin.pinot.common.utils.CommonConstants;
@@ -32,14 +32,13 @@ public interface DataManager {
   /**
    * Adds a segment from local disk into the OFFLINE table.
    */
-  void addSegment(@Nonnull SegmentMetadata segmentMetadata, @Nullable AbstractTableConfig tableConfig,
-      @Nullable Schema schema)
+  void addSegment(@Nonnull SegmentMetadata segmentMetadata, @Nullable TableConfig tableConfig, @Nullable Schema schema)
       throws Exception;
 
   void removeSegment(String segmentName);
 
   void reloadSegment(@Nonnull SegmentMetadata segmentMetadata, @Nonnull CommonConstants.Helix.TableType tableType,
-      @Nullable AbstractTableConfig tableConfig, @Nullable Schema schema)
+      @Nullable TableConfig tableConfig, @Nullable Schema schema)
       throws Exception;
 
   void shutDown();

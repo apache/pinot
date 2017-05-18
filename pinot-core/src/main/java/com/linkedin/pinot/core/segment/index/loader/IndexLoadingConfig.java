@@ -15,8 +15,8 @@
  */
 package com.linkedin.pinot.core.segment.index.loader;
 
-import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.IndexingConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.segment.ReadMode;
 import com.linkedin.pinot.core.data.manager.config.InstanceDataManagerConfig;
 import com.linkedin.pinot.core.indexsegment.generator.SegmentVersion;
@@ -47,7 +47,7 @@ public class IndexLoadingConfig {
   private int _realtimeAvgMultiValueCount = DEFAULT_REALTIME_AVG_MULTI_VALUE_COUNT;
 
   public IndexLoadingConfig(@Nullable InstanceDataManagerConfig instanceDataManagerConfig,
-      @Nullable AbstractTableConfig tableConfig) {
+      @Nullable TableConfig tableConfig) {
     // Extract config from instance config
     if (instanceDataManagerConfig != null) {
       ReadMode instanceReadMode = instanceDataManagerConfig.getReadMode();

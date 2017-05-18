@@ -15,8 +15,8 @@
  */
 package com.linkedin.pinot.core.data.manager.realtime;
 
-import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.IndexingConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.FieldSpec;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
@@ -99,9 +99,9 @@ public class RealtimeTableDataManager extends AbstractTableDataManager {
    *   to start consuming or download the segment.
    */
   @Override
-  public void addSegment(@Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore,
-      @Nonnull AbstractTableConfig tableConfig, @Nullable InstanceZKMetadata instanceZKMetadata,
-      @Nonnull SegmentZKMetadata segmentZKMetadata, @Nonnull IndexLoadingConfig indexLoadingConfig)
+  public void addSegment(@Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore, @Nonnull TableConfig tableConfig,
+      @Nullable InstanceZKMetadata instanceZKMetadata, @Nonnull SegmentZKMetadata segmentZKMetadata,
+      @Nonnull IndexLoadingConfig indexLoadingConfig)
       throws Exception {
     // TODO FIXME
     // Hack. We get the _helixPropertyStore here and save it, knowing that we will get this addSegment call

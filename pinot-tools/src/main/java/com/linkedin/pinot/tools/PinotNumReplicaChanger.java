@@ -17,7 +17,7 @@
 package com.linkedin.pinot.tools;
 
 import com.google.common.base.Function;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.utils.helix.HelixHelper;
@@ -50,8 +50,7 @@ public class PinotNumReplicaChanger extends PinotZKChanger {
       throws Exception {
     // Get the number of replicas in the tableconfig.
     final String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
-    final AbstractTableConfig offlineTableConfig =
-        ZKMetadataProvider.getOfflineTableConfig(propertyStore, offlineTableName);
+    final TableConfig offlineTableConfig = ZKMetadataProvider.getOfflineTableConfig(propertyStore, offlineTableName);
     final int newNumReplicas = Integer.parseInt(offlineTableConfig.getValidationConfig().getReplication());
 
     // Now get the idealstate, and get the number of replicas in it.

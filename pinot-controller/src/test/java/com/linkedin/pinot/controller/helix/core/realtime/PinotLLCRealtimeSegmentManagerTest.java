@@ -16,9 +16,9 @@
 
 package com.linkedin.pinot.controller.helix.core.realtime;
 
-import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.IndexingConfig;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.config.TenantConfig;
 import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
@@ -309,8 +309,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
   }
 
   // Make a tableconfig that returns the topic name and nReplicas per partition as we need it.
-  private AbstractTableConfig makeTableConfig(int nReplicas, String topic) {
-    AbstractTableConfig mockTableConfig = mock(AbstractTableConfig.class);
+  private TableConfig makeTableConfig(int nReplicas, String topic) {
+    TableConfig mockTableConfig = mock(TableConfig.class);
     SegmentsValidationAndRetentionConfig mockValidationConfig = mock(SegmentsValidationAndRetentionConfig.class);
     when(mockValidationConfig.getReplicasPerPartition()).thenReturn(Integer.toString(nReplicas));
     when(mockTableConfig.getValidationConfig()).thenReturn(mockValidationConfig);
@@ -357,7 +357,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentManager._currentInstanceList = instances;
 
     // Call to update the partition list should do nothing.
-    AbstractTableConfig tableConfig = makeTableConfig(nReplicas, topic);
+    TableConfig tableConfig = makeTableConfig(nReplicas, topic);
     segmentManager.updateKafkaPartitionsIfNecessary(rtTableName, tableConfig);
     Assert.assertTrue(segmentManager._partitionAssignment == partitionAssignment);
 
@@ -469,7 +469,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
         CommonConstants.Helix.DataSource.Realtime.Kafka.KAFKA_CONSUMER_PROPS_PREFIX,
         CommonConstants.Helix.DataSource.Realtime.Kafka.AUTO_OFFSET_RESET), tableConfigStartOffset);
     KafkaStreamMetadata kafkaStreamMetadata = new KafkaStreamMetadata(streamPropMap);
-    AbstractTableConfig tableConfig = mock(AbstractTableConfig.class);
+    TableConfig tableConfig = mock(TableConfig.class);
     IndexingConfig indexingConfig = mock(IndexingConfig.class);
     when(indexingConfig.getStreamConfigs()).thenReturn(streamPropMap);
     when(tableConfig.getIndexingConfig()).thenReturn(indexingConfig);

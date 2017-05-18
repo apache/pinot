@@ -15,7 +15,7 @@
  */
 package com.linkedin.pinot.controller.api.restlet.resources;
 
-import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.metrics.ControllerMeter;
 import com.linkedin.pinot.common.restlet.swagger.HttpVerb;
 import com.linkedin.pinot.common.restlet.swagger.Parameter;
@@ -89,11 +89,10 @@ public class PinotTableIndexingConfigs extends BasePinotControllerRestletResourc
       "/tables/{tableName}/indexingConfigs"
   })
   private Representation updateIndexingConfig(
-      @Parameter(name = "tableName", in = "path", description = "The name of the table for which to update the indexing configuration", required = true)
-      String tableName,
+      @Parameter(name = "tableName", in = "path", description = "The name of the table for which to update the indexing configuration", required = true) String tableName,
       Representation entity)
       throws Exception {
-    AbstractTableConfig config = AbstractTableConfig.init(entity.getText());
+    TableConfig config = TableConfig.init(entity.getText());
     _pinotHelixResourceManager.updateIndexingConfigFor(config.getTableName(), config.getTableType(),
         config.getIndexingConfig());
     return new StringRepresentation("done");

@@ -16,7 +16,7 @@
 package com.linkedin.pinot.server.starter.helix;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
@@ -152,8 +152,8 @@ public class HelixInstanceDataManager implements InstanceDataManager {
   }
 
   @Override
-  public synchronized void addSegment(@Nonnull SegmentMetadata segmentMetadata,
-      @Nullable AbstractTableConfig tableConfig, @Nullable Schema schema)
+  public synchronized void addSegment(@Nonnull SegmentMetadata segmentMetadata, @Nullable TableConfig tableConfig,
+      @Nullable Schema schema)
       throws Exception {
     String segmentName = segmentMetadata.getName();
     String tableName = segmentMetadata.getTableName();
@@ -177,7 +177,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
   @Override
   public synchronized void addSegment(@Nonnull ZkHelixPropertyStore<ZNRecord> propertyStore,
-      @Nonnull AbstractTableConfig tableConfig, @Nullable InstanceZKMetadata instanceZKMetadata,
+      @Nonnull TableConfig tableConfig, @Nullable InstanceZKMetadata instanceZKMetadata,
       @Nonnull SegmentZKMetadata segmentZKMetadata, @Nonnull String serverInstance)
       throws Exception {
     String segmentName = segmentZKMetadata.getSegmentName();
@@ -201,7 +201,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
     LOGGER.info("Added segment: {} to REALTIME table: {}", segmentName, tableName);
   }
 
-  public synchronized void addTableIfNeed(@Nullable AbstractTableConfig tableConfig, @Nonnull String tableName,
+  public synchronized void addTableIfNeed(@Nullable TableConfig tableConfig, @Nonnull String tableName,
       @Nullable String serverInstance)
       throws ConfigurationException {
     TableDataManagerConfig tableDataManagerConfig = getDefaultHelixTableDataManagerConfig(tableName);
@@ -228,8 +228,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
 
   @Override
   public synchronized void reloadSegment(@Nonnull SegmentMetadata segmentMetadata,
-      @Nonnull CommonConstants.Helix.TableType tableType, @Nullable AbstractTableConfig tableConfig,
-      @Nullable Schema schema)
+      @Nonnull CommonConstants.Helix.TableType tableType, @Nullable TableConfig tableConfig, @Nullable Schema schema)
       throws Exception {
     String segmentName = segmentMetadata.getName();
     String tableName = segmentMetadata.getTableName();

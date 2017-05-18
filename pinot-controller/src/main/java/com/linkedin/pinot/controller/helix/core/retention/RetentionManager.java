@@ -15,8 +15,8 @@
  */
 package com.linkedin.pinot.controller.helix.core.retention;
 
-import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.SegmentsValidationAndRetentionConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
 import com.linkedin.pinot.common.metadata.segment.OfflineSegmentZKMetadata;
@@ -252,7 +252,7 @@ public class RetentionManager {
    */
   private void updateDeletionStrategyForOfflineTable(String offlineTableName) {
     // Fetch table config.
-    AbstractTableConfig offlineTableConfig;
+    TableConfig offlineTableConfig;
     try {
       offlineTableConfig =
           ZKMetadataProvider.getOfflineTableConfig(_pinotHelixResourceManager.getPropertyStore(), offlineTableName);
@@ -322,7 +322,7 @@ public class RetentionManager {
    */
   private void updateDeletionStrategyForRealtimeTable(String realtimeTableName) {
     try {
-      AbstractTableConfig realtimeTableConfig =
+      TableConfig realtimeTableConfig =
           ZKMetadataProvider.getRealtimeTableConfig(_pinotHelixResourceManager.getPropertyStore(), realtimeTableName);
       assert realtimeTableConfig != null;
       SegmentsValidationAndRetentionConfig validationConfig = realtimeTableConfig.getValidationConfig();

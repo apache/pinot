@@ -16,8 +16,8 @@
 package com.linkedin.pinot.controller.helix.core.minion;
 
 import com.google.common.base.Preconditions;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.PinotTaskConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.config.TableNameBuilder;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.ZKMetadataProvider;
@@ -53,7 +53,7 @@ public class ClusterInfoProvider {
    * @return Table config
    */
   @Nullable
-  public AbstractTableConfig getTableConfig(@Nonnull String tableNameWithType) {
+  public TableConfig getTableConfig(@Nonnull String tableNameWithType) {
     return _pinotHelixResourceManager.getTableConfig(tableNameWithType);
   }
 

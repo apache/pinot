@@ -16,7 +16,7 @@
 package com.linkedin.pinot.core.data.manager.realtime;
 
 import com.google.common.util.concurrent.Uninterruptibles;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.RealtimeSegmentZKMetadata;
@@ -91,10 +91,10 @@ public class HLRealtimeSegmentDataManager extends SegmentDataManager {
 
   // An instance of this class exists only for the duration of the realtime segment that is currently being consumed.
   // Once the segment is committed, the segment is handled by OfflineSegmentDataManager
-  public HLRealtimeSegmentDataManager(final RealtimeSegmentZKMetadata segmentMetadata,
-      final AbstractTableConfig tableConfig, InstanceZKMetadata instanceMetadata,
-      final RealtimeTableDataManager realtimeTableDataManager, final String resourceDataDir,
-      final IndexLoadingConfig indexLoadingConfig, final Schema schema, final ServerMetrics serverMetrics)
+  public HLRealtimeSegmentDataManager(final RealtimeSegmentZKMetadata segmentMetadata, final TableConfig tableConfig,
+      InstanceZKMetadata instanceMetadata, final RealtimeTableDataManager realtimeTableDataManager,
+      final String resourceDataDir, final IndexLoadingConfig indexLoadingConfig, final Schema schema,
+      final ServerMetrics serverMetrics)
       throws Exception {
     super();
     _realtimeTableDataManager = realtimeTableDataManager;

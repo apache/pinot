@@ -15,15 +15,7 @@
  */
 package com.linkedin.pinot.core.data.manager.realtime;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.util.LinkedList;
-import org.apache.kafka.common.protocol.Errors;
-import org.json.JSONObject;
-import org.mockito.Mockito;
-import org.testng.annotations.Test;
-import com.linkedin.pinot.common.config.AbstractTableConfig;
+import com.linkedin.pinot.common.config.TableConfig;
 import com.linkedin.pinot.common.data.Schema;
 import com.linkedin.pinot.common.metadata.instance.InstanceZKMetadata;
 import com.linkedin.pinot.common.metadata.segment.LLCRealtimeSegmentZKMetadata;
@@ -37,7 +29,16 @@ import com.linkedin.pinot.core.realtime.impl.kafka.KafkaLowLevelStreamProviderCo
 import com.linkedin.pinot.core.realtime.impl.kafka.SimpleConsumerWrapper;
 import com.linkedin.pinot.core.segment.index.loader.IndexLoadingConfig;
 import com.yammer.metrics.core.MetricsRegistry;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.LinkedList;
 import junit.framework.Assert;
+import org.apache.kafka.common.protocol.Errors;
+import org.json.JSONObject;
+import org.mockito.Mockito;
+import org.testng.annotations.Test;
+
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -100,12 +101,13 @@ public class LLRealtimeSegmentDataManagerTest {
         + "}";
   }
 
-  private AbstractTableConfig createTableConfig(String tableConfigJsonStr) throws Exception {
-    AbstractTableConfig tableConfig = AbstractTableConfig.init(tableConfigJsonStr);
-    return tableConfig;
+  private TableConfig createTableConfig(String tableConfigJsonStr)
+      throws Exception {
+    return TableConfig.init(tableConfigJsonStr);
   }
 
-  private AbstractTableConfig createTableConfig() throws Exception {
+  private TableConfig createTableConfig()
+      throws Exception {
     return createTableConfig(_tableConfigJson);
   }
 
@@ -127,7 +129,7 @@ public class LLRealtimeSegmentDataManagerTest {
 
   private FakeLLRealtimeSegmentDataManager createFakeSegmentManager() throws Exception {
     LLCRealtimeSegmentZKMetadata segmentZKMetadata = createZkMetadata();
-    AbstractTableConfig tableConfig = createTableConfig();
+    TableConfig tableConfig = createTableConfig();
     InstanceZKMetadata instanceZKMetadata = new InstanceZKMetadata();
     RealtimeTableDataManager tableDataManager = createTableDataManager();
     String resourceDir = _segmentDir;
@@ -145,7 +147,7 @@ public class LLRealtimeSegmentDataManagerTest {
     JSONObject streamConfigs = (JSONObject)tableIndexConfig.get("streamConfigs");
     {
       streamConfigs.put(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_TIME, "3h");
-      AbstractTableConfig tableConfig = createTableConfig(tableConfigJson.toString());
+      TableConfig tableConfig = createTableConfig(tableConfigJson.toString());
       InstanceZKMetadata instanceZKMetadata = new InstanceZKMetadata();
       Schema schema = Schema.fromString(makeSchema());
       KafkaLowLevelStreamProviderConfig config = new KafkaLowLevelStreamProviderConfig();
@@ -155,7 +157,7 @@ public class LLRealtimeSegmentDataManagerTest {
 
     {
       streamConfigs.put(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_TIME, "3h30m");
-      AbstractTableConfig tableConfig = createTableConfig(tableConfigJson.toString());
+      TableConfig tableConfig = createTableConfig(tableConfigJson.toString());
       InstanceZKMetadata instanceZKMetadata = new InstanceZKMetadata();
       Schema schema = Schema.fromString(makeSchema());
       KafkaLowLevelStreamProviderConfig config = new KafkaLowLevelStreamProviderConfig();
@@ -166,7 +168,7 @@ public class LLRealtimeSegmentDataManagerTest {
     {
       final long segTime = 898789748357L;
       streamConfigs.put(CommonConstants.Helix.DataSource.Realtime.REALTIME_SEGMENT_FLUSH_TIME, String.valueOf(segTime));
-      AbstractTableConfig tableConfig = createTableConfig(tableConfigJson.toString());
+      TableConfig tableConfig = createTableConfig(tableConfigJson.toString());
       InstanceZKMetadata instanceZKMetadata = new InstanceZKMetadata();
       Schema schema = Schema.fromString(makeSchema());
       KafkaLowLevelStreamProviderConfig config = new KafkaLowLevelStreamProviderConfig();
@@ -550,10 +552,9 @@ public class LLRealtimeSegmentDataManagerTest {
     public boolean _throwExceptionFromConsume = false;
     public boolean _postConsumeStoppedCalled = false;
 
-    public FakeLLRealtimeSegmentDataManager(RealtimeSegmentZKMetadata segmentZKMetadata,
-        AbstractTableConfig tableConfig, InstanceZKMetadata instanceZKMetadata,
-        RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir, Schema schema,
-        ServerMetrics serverMetrics)
+    public FakeLLRealtimeSegmentDataManager(RealtimeSegmentZKMetadata segmentZKMetadata, TableConfig tableConfig,
+        InstanceZKMetadata instanceZKMetadata, RealtimeTableDataManager realtimeTableDataManager,
+        String resourceDataDir, Schema schema, ServerMetrics serverMetrics)
         throws Exception {
       super(segmentZKMetadata, tableConfig, instanceZKMetadata, realtimeTableDataManager, resourceDataDir,
           new IndexLoadingConfig(null, tableConfig), schema, serverMetrics);
@@ -619,7 +620,7 @@ public class LLRealtimeSegmentDataManagerTest {
     @Override
     protected KafkaLowLevelStreamProviderConfig createStreamProviderConfig() {
       KafkaLowLevelStreamProviderConfig config = mock(KafkaLowLevelStreamProviderConfig.class);
-      Mockito.doNothing().when(config).init(any(AbstractTableConfig.class), any(InstanceZKMetadata.class), any(Schema.class));
+      Mockito.doNothing().when(config).init(any(TableConfig.class), any(InstanceZKMetadata.class), any(Schema.class));
       when(config.getTopicName()).thenReturn(_topicName);
       when(config.getStreamName()).thenReturn(_topicName);
       when(config.getSizeThresholdToFlushSegment()).thenReturn(maxRowsInSegment);
