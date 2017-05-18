@@ -1,3 +1,18 @@
+/**
+ * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.linkedin.pinot.controller.api.restlet.resources;
 
 import com.alibaba.fastjson.JSONObject;
@@ -6,6 +21,8 @@ import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.common.utils.NetUtil;
 import com.linkedin.pinot.controller.ControllerConf;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
+import com.linkedin.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
+import com.linkedin.pinot.controller.helix.core.minion.PinotTaskManager;
 import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executor;
@@ -32,6 +49,9 @@ public class BasePinotControllerRestletResource extends ServerResource {
   protected static final String TABLE_NAME = "tableName";
   protected static final String TABLE_TYPE = "type";
 
+  protected static final String TASK_NAME = "taskName";
+  protected static final String TASK_TYPE = "taskType";
+
   protected static final String INSTANCE_NAME = "instanceName";
   protected static final String SEGMENT_NAME = "segmentName";
   protected static final String STATE = "state";
@@ -47,7 +67,7 @@ public class BasePinotControllerRestletResource extends ServerResource {
   private final static String CONTROLLER_COMPONENT = "pinot-controller";
   private static String controllerVersion =  null;
 
-  static enum StateType {
+  enum StateType {
     ENABLE,
     DISABLE,
     DROP
@@ -55,9 +75,10 @@ public class BasePinotControllerRestletResource extends ServerResource {
 
   protected final ControllerConf _controllerConf;
   protected final PinotHelixResourceManager _pinotHelixResourceManager;
-
-  protected final Executor executor;
-  protected final HttpConnectionManager connectionManager;
+  protected final PinotHelixTaskResourceManager _pinotHelixTaskResourceManager;
+  protected final PinotTaskManager _pinotTaskManager;
+  protected final HttpConnectionManager _connectionManager;
+  protected final Executor _executor;
 
   private static String getHostName() {
     if (controllerHostName != null) {
@@ -90,8 +111,11 @@ public class BasePinotControllerRestletResource extends ServerResource {
     _controllerConf = (ControllerConf) appAttributes.get(ControllerConf.class.toString());
     _pinotHelixResourceManager =
         (PinotHelixResourceManager) appAttributes.get(PinotHelixResourceManager.class.toString());
-    connectionManager = (HttpConnectionManager) appAttributes.get(HttpConnectionManager.class.toString());
-    executor = (Executor) appAttributes.get(Executor.class.toString());
+    _pinotHelixTaskResourceManager =
+        (PinotHelixTaskResourceManager) appAttributes.get(PinotHelixTaskResourceManager.class.toString());
+    _pinotTaskManager = (PinotTaskManager) appAttributes.get(PinotTaskManager.class.toString());
+    _connectionManager = (HttpConnectionManager) appAttributes.get(HttpConnectionManager.class.toString());
+    _executor = (Executor) appAttributes.get(Executor.class.toString());
   }
 
   /**

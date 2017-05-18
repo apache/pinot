@@ -68,6 +68,7 @@ public class PinotTaskManager {
    *
    * @return Cluster info provider
    */
+  @Nonnull
   public ClusterInfoProvider getClusterInfoProvider() {
     return _clusterInfoProvider;
   }
@@ -112,7 +113,12 @@ public class PinotTaskManager {
     _executorService.scheduleWithFixedDelay(new Runnable() {
       @Override
       public void run() {
-        execute();
+        // Only schedule new tasks from leader controller
+        if (!_pinotHelixResourceManager.isLeader()) {
+          LOGGER.info("Skip scheduling new tasks on non-leader controller");
+          return;
+        }
+        scheduleTasks();
       }
     }, Math.min(60, runFrequencyInSeconds), runFrequencyInSeconds, TimeUnit.SECONDS);
   }
@@ -120,13 +126,7 @@ public class PinotTaskManager {
   /**
    * Check the Pinot cluster status and schedule new tasks.
    */
-  public void execute() {
-    // Only schedule new tasks from leader controller
-    if (!_pinotHelixResourceManager.isLeader()) {
-      LOGGER.info("Skip scheduling new tasks on non-leader controller");
-      return;
-    }
-
+  public void scheduleTasks() {
     // TODO: add JobQueue health check here
 
     Map<String, List<AbstractTableConfig>> enabledTableConfigMap = new HashMap<>();

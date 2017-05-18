@@ -24,8 +24,6 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
-
-import java.util.Set;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -97,6 +95,7 @@ public class SwaggerResource extends ServerResource {
       addTag(tags, "table", "Table-related operations");
       addTag(tags, "segment", "Segment-related operations");
       addTag(tags, "schema", "Schema-related operations");
+      addTag(tags, "task", "Task-related operations");
       addTag(tags, "version", "Version-related operations");
 
       // Swagger

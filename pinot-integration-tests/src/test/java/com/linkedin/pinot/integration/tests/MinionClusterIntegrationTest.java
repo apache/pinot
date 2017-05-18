@@ -15,6 +15,7 @@
  */
 package com.linkedin.pinot.integration.tests;
 
+import com.clearspring.analytics.util.Preconditions;
 import com.google.common.util.concurrent.Uninterruptibles;
 import com.linkedin.pinot.common.config.AbstractTableConfig;
 import com.linkedin.pinot.common.config.PinotTaskConfig;
@@ -23,6 +24,7 @@ import com.linkedin.pinot.controller.helix.core.minion.ClusterInfoProvider;
 import com.linkedin.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import com.linkedin.pinot.controller.helix.core.minion.PinotTaskManager;
 import com.linkedin.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
+import com.linkedin.pinot.minion.exception.FatalException;
 import com.linkedin.pinot.minion.exception.TaskCancelledException;
 import com.linkedin.pinot.minion.executor.BaseTaskExecutor;
 import com.linkedin.pinot.minion.executor.PinotTaskExecutor;
@@ -73,8 +75,8 @@ public class MinionClusterIntegrationTest extends HybridClusterIntegrationTest {
   public void testStopAndResumeTaskQueue()
       throws Exception {
     // Generate 4 tasks
-    _pinotTaskManager.execute();
-    _pinotTaskManager.execute();
+    _pinotTaskManager.scheduleTasks();
+    _pinotTaskManager.scheduleTasks();
 
     // Wait at most 60 seconds for all tasks showing up in the cluster
     long endTime = System.currentTimeMillis() + 60_000L;
@@ -86,7 +88,7 @@ public class MinionClusterIntegrationTest extends HybridClusterIntegrationTest {
         "Not all tasks showed up within 60 seconds");
 
     // Should not generate more tasks
-    _pinotTaskManager.execute();
+    _pinotTaskManager.scheduleTasks();
 
     // Check if all tasks IN_PROGRESS
     Map<String, TaskState> taskStates = _pinotHelixTaskResourceManager.getTaskStates(TestTaskGenerator.TASK_TYPE);
@@ -201,6 +203,15 @@ public class MinionClusterIntegrationTest extends HybridClusterIntegrationTest {
   public static class TestTaskExecutor extends BaseTaskExecutor {
     @Override
     public void executeTask(@Nonnull PinotTaskConfig pinotTaskConfig) {
+      try {
+        Preconditions.checkArgument(pinotTaskConfig.getTaskType().equals(TestTaskGenerator.TASK_TYPE));
+        Preconditions.checkArgument(pinotTaskConfig.getConfigs().size() == 2);
+        Preconditions.checkArgument(pinotTaskConfig.getConfigs().containsKey("arg1"));
+        Preconditions.checkArgument(pinotTaskConfig.getConfigs().containsKey("arg2"));
+      } catch (IllegalArgumentException e) {
+        throw new FatalException("Got unexpected task config: " + pinotTaskConfig, e);
+      }
+
       Uninterruptibles.sleepUninterruptibly(5, TimeUnit.SECONDS);
 
       if (_cancelled) {

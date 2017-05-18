@@ -878,7 +878,9 @@
             <exclude>**/*.txt</exclude>
             <exclude>**/*.log</exclude>
             <exclude>**/target/**/*.*</exclude>
-            <exclude>**/resources/**/*.*</exclude>
+            <!-- Top level resources under main and test -->
+            <exclude>**/main/resources/**/*.*</exclude>
+            <exclude>**/test/resources/**/*.*</exclude>
             <!-- Stuff that's generated through Thrift -->
             <exclude>**/com/linkedin/pinot/common/request/*.*</exclude>
             <exclude>**/com/linkedin/pinot/common/response/*.*</exclude>

@@ -15,18 +15,6 @@
  */
 package com.linkedin.pinot.controller.api;
 
-import org.restlet.Context;
-import org.restlet.Request;
-import org.restlet.Response;
-import org.restlet.Restlet;
-import org.restlet.resource.Directory;
-import org.restlet.resource.ServerResource;
-import org.restlet.routing.Filter;
-import org.restlet.routing.Redirector;
-import org.restlet.routing.Router;
-import org.restlet.routing.Template;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import com.linkedin.pinot.common.metrics.ControllerMetrics;
 import com.linkedin.pinot.common.restlet.PinotRestletApplication;
 import com.linkedin.pinot.common.restlet.swagger.SwaggerResource;
@@ -46,11 +34,24 @@ import com.linkedin.pinot.controller.api.restlet.resources.PinotTableRestletReso
 import com.linkedin.pinot.controller.api.restlet.resources.PinotTableSchema;
 import com.linkedin.pinot.controller.api.restlet.resources.PinotTableSegmentConfigs;
 import com.linkedin.pinot.controller.api.restlet.resources.PinotTableTenantConfigs;
+import com.linkedin.pinot.controller.api.restlet.resources.PinotTaskRestletResource;
 import com.linkedin.pinot.controller.api.restlet.resources.PinotTenantRestletResource;
 import com.linkedin.pinot.controller.api.restlet.resources.PinotVersionRestletResource;
 import com.linkedin.pinot.controller.api.restlet.resources.PqlQueryResource;
 import com.linkedin.pinot.controller.api.restlet.resources.TableSize;
 import com.linkedin.pinot.controller.api.restlet.resources.TableViews;
+import org.restlet.Context;
+import org.restlet.Request;
+import org.restlet.Response;
+import org.restlet.Restlet;
+import org.restlet.resource.Directory;
+import org.restlet.resource.ServerResource;
+import org.restlet.routing.Filter;
+import org.restlet.routing.Redirector;
+import org.restlet.routing.Router;
+import org.restlet.routing.Template;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ControllerRestApplication extends PinotRestletApplication {
   private static final Logger LOGGER = LoggerFactory.getLogger(ControllerRestApplication.class);
@@ -87,6 +88,7 @@ public class ControllerRestApplication extends PinotRestletApplication {
     attachRoutesForClass(router, PinotTenantRestletResource.class);
     attachRoutesForClass(router, PinotSchemaRestletResource.class);
     attachRoutesForClass(router, PinotTableRestletResource.class);
+    attachRoutesForClass(router, PinotTaskRestletResource.class);
 
     // GET
     attachRoutesForClass(router, PinotTableInstances.class);

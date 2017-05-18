@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2014-2015 LinkedIn Corp. (pinot-core@linkedin.com)
+ * Copyright (C) 2014-2016 LinkedIn Corp. (pinot-core@linkedin.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,15 +15,13 @@
  */
 package com.linkedin.pinot.controller.api.restlet.resources;
 
+import com.linkedin.pinot.controller.ControllerConf;
 import java.io.IOException;
-
 import org.apache.commons.lang.StringUtils;
 import org.restlet.representation.Representation;
 import org.restlet.representation.StringRepresentation;
 import org.restlet.resource.ServerResource;
 
-import com.linkedin.pinot.common.utils.StringUtil;
-import com.linkedin.pinot.controller.ControllerConf;
 
 public class PinotControllerHealthCheck extends ServerResource {
   private final ControllerConf conf;
