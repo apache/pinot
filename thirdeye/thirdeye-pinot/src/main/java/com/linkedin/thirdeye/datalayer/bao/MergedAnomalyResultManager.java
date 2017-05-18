@@ -9,6 +9,10 @@ public interface MergedAnomalyResultManager extends AbstractManager<MergedAnomal
 
   MergedAnomalyResultDTO findById(Long id, boolean loadRawAnomalies);
 
+  List<MergedAnomalyResultDTO> findByIdList(List<Long> idList);
+
+  List<MergedAnomalyResultDTO> findByIdList(List<Long> idList, boolean loadRawAnomalies);
+
   List<MergedAnomalyResultDTO> getAllByTimeEmailIdAndNotifiedFalse(long startTime, long endTime,
       long emailId, boolean loadRawAnomalies);
 

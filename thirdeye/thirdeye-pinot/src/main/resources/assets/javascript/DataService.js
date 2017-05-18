@@ -117,6 +117,16 @@ DataService.prototype = {
       };
       this.getDataAsynchronous(url, data, callback, spinner);
     },
+
+    // Fetch anomalies for group ids in array
+    fetchAnomaliesforGroupIds(startTime, endTime, pageNumber, anomalyGroupIds, functionName, callback) {
+      const url = constants.SEARCH_ANOMALIES_GROUPIDS + startTime + this.URL_SEPARATOR + endTime + this.URL_SEPARATOR + pageNumber;
+      var data = {
+        anomalyGroupIds
+      };
+      this.getDataAsynchronous(url, data, callback, 'anomaly-spin-area');
+    },
+
     // Fetch anomalies for anomaly ids in array in time range
     fetchAnomaliesForTime : function(startTime, endTime, pageNumber, callback) {
       var url = constants.SEARCH_ANOMALIES_TIME + startTime + this.URL_SEPARATOR + endTime + this.URL_SEPARATOR + pageNumber;

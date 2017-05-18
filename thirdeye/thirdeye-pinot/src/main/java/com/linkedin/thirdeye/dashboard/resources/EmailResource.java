@@ -216,7 +216,7 @@ public class EmailResource {
     String emailSub = Strings.isNullOrEmpty(subject) ? "Thirdeye Anomaly Report" : subject;
 
     anomalyReportGenerator
-        .buildReport(startTime, endTime, anomalies, emailSub, configuration,
+        .buildReport(startTime, endTime, null, anomalies, emailSub, configuration,
             includeSentAnomaliesOnly, toAddr, fromAddr, "Thirdeye Anomaly Report", true);
     return Response.ok().build();
   }
@@ -282,7 +282,7 @@ public class EmailResource {
     configuration.setPhantomJsPath(phantomJsPath);
     String emailSub = Strings.isNullOrEmpty(subject) ? "Thirdeye Anomaly Report" : subject;
     anomalyReportGenerator
-        .buildReport(startTime, endTime, anomalies, emailSub, configuration,
+        .buildReport(startTime, endTime, null, anomalies, emailSub, configuration,
             includeSentAnomaliesOnly, toAddr, fromAddr, "Thirdeye Anomaly Report", true);
     return Response.ok().build();
   }

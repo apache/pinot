@@ -16,6 +16,7 @@ function Constants() {
   this.SEARCH_ANOMALIES_DASHBOARDID = '/anomalies/search/dashboardId/';
   this.SEARCH_ANOMALIES_ANOMALYIDS = '/anomalies/search/anomalyIds/';
   this.SEARCH_ANOMALIES_TIME = '/anomalies/search/time/';
+  this.SEARCH_ANOMALIES_GROUPIDS = '/anomalies/search/anomalyGroupIds/';
   this.UPDATE_ANOMALY_FEEDBACK = '/anomalies/updateFeedback/';
   this.METRIC_GRANULARITY = '/data/agg/granularity/metric/';
   this.METRIC_DIMENSION = '/data/autocomplete/dimensions/metric/';
@@ -38,6 +39,7 @@ function Constants() {
   this.MODE_METRIC = 'metric';
   this.MODE_DASHBOARD = 'dashboard';
   this.MODE_ID = 'id';
+  this.MODE_GROUPID = 'groupId'
   this.MODE_TIME = 'time';
   this.DASHBOARD_MODE_METRIC_SUMMARY = 'MetricSummary';
   this.DASHBOARD_MODE_ANOMALY_SUMMARY = 'AnomalySummary';

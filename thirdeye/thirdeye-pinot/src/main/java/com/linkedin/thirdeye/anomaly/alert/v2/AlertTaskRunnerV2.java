@@ -172,8 +172,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
           // Anomaly results for this group
           DimensionMap dimensions = entry.getKey();
           GroupedAnomalyResultsDTO groupedAnomalyDTO = entry.getValue();
-          List<MergedAnomalyResultDTO> resultsForThisGroup = groupedAnomalyDTO.getAnomalyResults();
-
+          List<MergedAnomalyResultDTO> anomalyResultListOfGroup = groupedAnomalyDTO.getAnomalyResults();
           // Append auxiliary recipients for this group
           String recipientsForThisGroup = alertConfig.getRecipients();
           //   Get auxiliary email recipient from provider
@@ -192,12 +191,12 @@ public class AlertTaskRunnerV2 implements TaskRunner {
           }
           // Generate and send out an anomaly report for this group
           AnomalyReportGenerator.getInstance()
-              .buildReport(resultsForThisGroup, thirdeyeConfig, recipientsForThisGroup, alertConfig.getFromAddress(),
-                  emailSubjectName);
+              .buildReport(groupedAnomalyDTO.getId(), anomalyResultListOfGroup, thirdeyeConfig, recipientsForThisGroup,
+                  alertConfig.getFromAddress(), emailSubjectName);
           // Update notified flag
           if (alertGrouper instanceof DummyAlertGrouper) {
             // DummyAlertGroupFilter does not generate real GroupedAnomaly, so the flag has to be set on merged anomalies.
-            updateNotifiedStatus(resultsForThisGroup);
+            updateNotifiedStatus(anomalyResultListOfGroup);
           } else {
             // For other alert groupers, the notified flag is set on the grouped anomalies.
             groupedAnomalyDTO.setNotified(true);
@@ -362,7 +361,8 @@ public class AlertTaskRunnerV2 implements TaskRunner {
     // Read and update grouped anomalies in DB
     for (Map.Entry<DimensionMap, GroupedAnomalyResultsDTO> entry : mergedGroupedAnomalyResultsMap.entrySet()) {
       GroupedAnomalyResultsDTO groupedAnomaly = entry.getValue();
-      groupedAnomalyResultsDAO.save(groupedAnomaly);
+      Long groupId = groupedAnomalyResultsDAO.save(groupedAnomaly);
+      groupedAnomaly.setId(groupId);
       for (MergedAnomalyResultDTO mergedAnomalyResultDTO : groupedAnomaly.getAnomalyResults()) {
         if (!mergedAnomalyResultDTO.isNotified()) {
           mergedAnomalyResultDTO.setNotified(true);

@@ -18,7 +18,14 @@
         <tr>
           <td style="padding: 0 24px;" colspan="2">
               <p style="font-size: 20px; margin-bottom: 8px;">Hi,</p> <br>
-              <p style="color: rgba(0,0,0,0.55); margin-top: 0px;"> ThirdEye has detected <strong style="color: black;">${anomalyCount} ${(anomalyCount == 1)?string("anomaly", "anomalies")}</strong>. Below is a summary, please go <strong><a style="color:#33aada;" href="${dashboardHost}/thirdeye#anomalies?anomaliesSearchMode=id&anomalyIds=${anomalyIds}">here</a></strong> for a detailed view.</p>
+                <p style="color: rgba(0,0,0,0.55); margin-top: 0px;"> ThirdEye has detected <strong style="color: black;">${anomalyCount} ${(anomalyCount == 1)?string("anomaly", "anomalies")}</strong>. Below is a summary, please go <strong>
+                  <#if isGroupedAnomaly>
+                    <a style="color:#33aada;" href="${dashboardHost}/thirdeye#anomalies?anomaliesSearchMode=groupId&anomalyGroupIds=${groupId}">here</a>
+                  <#else>
+                    <a style="color:#33aada;" href="${dashboardHost}/thirdeye#anomalies?anomaliesSearchMode=id&anomalyIds=${anomalyIds}">here</a>
+                  </#if>
+                  </strong> for a detailed view.
+                </p>
             </p>
           </td>
         </tr>

@@ -33,6 +33,8 @@ import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
+import com.linkedin.thirdeye.datalayer.bao.GroupedAnomalyResultsManager;
+import com.linkedin.thirdeye.datalayer.dto.GroupedAnomalyResultsDTO;
 import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
 import com.linkedin.thirdeye.datasource.DAORegistry;
@@ -53,9 +55,11 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -107,6 +111,7 @@ public class AnomaliesResource {
 
   private final MetricConfigManager metricConfigDAO;
   private final MergedAnomalyResultManager mergedAnomalyResultDAO;
+  private final GroupedAnomalyResultsManager groupedAnomalyResultsDAO;
   private final OverrideConfigManager overrideConfigDAO;
   private final AnomalyFunctionManager anomalyFunctionDAO;
   private final DashboardConfigManager dashboardConfigDAO;
@@ -118,6 +123,7 @@ public class AnomaliesResource {
   public AnomaliesResource(AnomalyFunctionFactory anomalyFunctionFactory, AlertFilterFactory alertFilterFactory) {
     metricConfigDAO = DAO_REGISTRY.getMetricConfigDAO();
     mergedAnomalyResultDAO = DAO_REGISTRY.getMergedAnomalyResultDAO();
+    groupedAnomalyResultsDAO = DAO_REGISTRY.getGroupedAnomalyResultsDAO();
     overrideConfigDAO = DAO_REGISTRY.getOverrideConfigDAO();
     anomalyFunctionDAO = DAO_REGISTRY.getAnomalyFunctionDAO();
     dashboardConfigDAO = DAO_REGISTRY.getDashboardConfigDAO();
@@ -350,6 +356,54 @@ public class AnomaliesResource {
       metricIds.add(Long.valueOf(metricId));
     }
     List<MergedAnomalyResultDTO> mergedAnomalies = getAnomaliesForMetricIdsInRange(metricIds, startTime, endTime);
+    AnomaliesWrapper anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(mergedAnomalies, pageNumber);
+    return anomaliesWrapper;
+  }
+
+  /**
+   * Find anomalies by anomaly group ids.
+   *
+   * @param startTime not used.
+   * @param endTime not used.
+   * @param anomalyGroupIdsString a list of anomaly group ids that are separated by commas.
+   * @param functionName not used.
+   *
+   * @return A list of detailed anomalies in the specified page.
+   * @throws Exception
+   */
+  @GET
+  @Path("search/anomalyGroupIds/{startTime}/{endTime}/{pageNumber}")
+  public AnomaliesWrapper getAnomaliesByGroupIds(
+      @PathParam("startTime") Long startTime,
+      @PathParam("endTime") Long endTime,
+      @PathParam("pageNumber") int pageNumber,
+      @QueryParam("anomalyGroupIds") String anomalyGroupIdsString,
+      @QueryParam("functionName") String functionName) throws Exception {
+
+    String[] anomalyGroupIdsStrings = anomalyGroupIdsString.split(COMMA_SEPARATOR);
+    Set<Long> anomalyIdSet = new HashSet<>();
+    List<MergedAnomalyResultDTO> mergedAnomalies = new ArrayList<>();
+    for (String idString : anomalyGroupIdsStrings) {
+      Long groupId = null;
+      try {
+        groupId = Long.parseLong(idString);
+      } catch (Exception e) {
+        LOG.info("Skipping group id {} due to parsing error: {}", idString, e);
+      }
+      if (groupId != null) {
+        GroupedAnomalyResultsDTO groupedAnomalyDTO = groupedAnomalyResultsDAO.findById(groupId);
+        if (groupedAnomalyDTO != null) {
+          List<MergedAnomalyResultDTO> mergedAnomalyOfGroup = groupedAnomalyDTO.getAnomalyResults();
+          for (MergedAnomalyResultDTO mergedAnomalyDTO : mergedAnomalyOfGroup) {
+            if (!anomalyIdSet.contains(mergedAnomalyDTO.getId())) {
+              mergedAnomalies.add(mergedAnomalyDTO);
+              anomalyIdSet.add(mergedAnomalyDTO.getId());
+            }
+          }
+        }
+      }
+    }
+
     AnomaliesWrapper anomaliesWrapper = constructAnomaliesWrapperFromMergedAnomalies(mergedAnomalies, pageNumber);
     return anomaliesWrapper;
   }

@@ -74,6 +74,13 @@ function AnomalyResultView(anomalyResultModel) {
       placeholder : "Search for anomaly ID",
       tags: true
     };
+  this.groupSearchConfig = {
+      theme : "bootstrap",
+      width: '100%',
+      allowClear: true,
+      placeholder : "Search for group ID",
+      tags: true
+    };
   this.timeSearchConfig = {
       theme : "bootstrap",
       width: '100%',
@@ -211,17 +218,20 @@ AnomalyResultView.prototype = {
   showSearchBarBasedOnMode : function() {
     var anomaliesSearchMode = $('#anomalies-search-mode').val();
     $('#anomalies-search-dashboard-container').hide();
-    $('#anomalies-search-anomaly-container').hide()
+    $('#anomalies-search-anomaly-container').hide();
     $('#anomalies-search-metrics-container').hide();
     $('#anomalies-search-time-container').hide();
+    $('#anomalies-search-group-container').hide();
     if (anomaliesSearchMode == constants.MODE_METRIC) {
       $('#anomalies-search-metrics-container').show();
     } else if (anomaliesSearchMode == constants.MODE_DASHBOARD) {
       $('#anomalies-search-dashboard-container').show();
     } else if (anomaliesSearchMode == constants.MODE_ID) {
-      $('#anomalies-search-anomaly-container').show()
+      $('#anomalies-search-anomaly-container').show();
     } else if (anomaliesSearchMode == constants.MODE_TIME) {
-      $('#anomalies-search-time-container').show()
+      $('#anomalies-search-time-container').show();
+    } else if (anomaliesSearchMode == constants.MODE_GROUPID) {
+      $('#anomalies-search-group-container').show();
     }
   },
   setupSearchBar : function() {
@@ -231,9 +241,10 @@ AnomalyResultView.prototype = {
     });
     $('#anomalies-search-anomaly-input').select2(this.anomalySearchConfig).on("select2:select", function(e) {
     });
+    $('#anomalies-search-group-input').select2(this.groupSearchConfig).on("select2:select", function(e) {
+    });
     $('#anomalies-search-time-input').select2(this.timeSearchConfig).on("select2:select", function(e) {
     });
-
   },
 
   renderAnomaliesTab : function(anomaliesWrapper) {
@@ -315,6 +326,7 @@ AnomalyResultView.prototype = {
       var metricIds = undefined;
       var dashboardId = undefined;
       var anomalyIds = undefined;
+      var anomalyGroupIds = undefined;
 
       var functionName = $('#anomaly-function-dropdown').val();
       var startDate = $('#anomalies-time-range-start').data('daterangepicker').startDate;
@@ -334,6 +346,10 @@ AnomalyResultView.prototype = {
         anomaliesParams.dashboardId = $('#anomalies-search-dashboard-input').val();
       } else if (anomaliesSearchMode == constants.MODE_ID) {
         anomaliesParams.anomalyIds = $('#anomalies-search-anomaly-input').val().join();
+        delete anomaliesParams.startDate;
+        delete anomaliesParams.endDate;
+      } else if (anomaliesSearchMode == constants.MODE_GROUPID) {
+        anomaliesParams.anomalyGroupIds = $('#anomalies-search-group-input').val().join();
         delete anomaliesParams.startDate;
         delete anomaliesParams.endDate;
       }

@@ -92,11 +92,21 @@ public class AnomalyReportGenerator {
 
   public void buildReport(List<MergedAnomalyResultDTO> anomalies,
       ThirdEyeAnomalyConfiguration configuration, AlertConfigDTO alertConfig) {
-    buildReport(anomalies, configuration, alertConfig.getRecipients(), alertConfig.getFromAddress(),
+    buildReport(null, anomalies, configuration, alertConfig.getRecipients(), alertConfig.getFromAddress(),
         alertConfig.getName());
   }
 
-  public void buildReport(List<MergedAnomalyResultDTO> anomalies,
+  /**
+   * Build report/alert for the given list of anomalies, which could belong to a grouped anomaly if groupId is not null.
+   *
+   * @param groupId the group id of the list of anomalies; null means they does not belong to any grouped anomaly.
+   * @param anomalies the list of anomalies to be put in the report/alert.
+   * @param configuration the configuration that contains the information of ThirdEye host.
+   * @param recipients the recipients of this (group) list of anomalies.
+   * @param fromAddress the source email address of this report/alert.
+   * @param alertConfigName the name of this alert configuration.
+   */
+  public void buildReport(Long groupId, List<MergedAnomalyResultDTO> anomalies,
       ThirdEyeAnomalyConfiguration configuration, String recipients, String fromAddress, String alertConfigName) {
     String subject = "Thirdeye Alert : " + alertConfigName;
     long startTime = System.currentTimeMillis();
@@ -109,14 +119,14 @@ public class AnomalyReportGenerator {
         endTime = anomaly.getEndTime();
       }
     }
-    buildReport(startTime, endTime, anomalies, subject, configuration, false,
+    buildReport(startTime, endTime, groupId, anomalies, subject, configuration, false,
         recipients, fromAddress, alertConfigName, false);
   }
 
 
 
 
-  public void buildReport(long startTime, long endTime, List<MergedAnomalyResultDTO> anomalies,
+  public void buildReport(long startTime, long endTime, Long groupId, List<MergedAnomalyResultDTO> anomalies,
       String subject, ThirdEyeAnomalyConfiguration configuration, boolean includeSentAnomaliesOnly,
       String emailRecipients, String fromEmail, String alertConfigName, boolean includeSummary) {
     if (anomalies == null || anomalies.size() == 0) {
@@ -188,6 +198,13 @@ public class AnomalyReportGenerator {
       templateData.put("reportGenerationTimeMillis", System.currentTimeMillis());
       templateData.put("dashboardHost", configuration.getDashboardHost());
       templateData.put("anomalyIds", Joiner.on(",").join(anomalyIds));
+      if (groupId != null) {
+        templateData.put("isGroupedAnomaly", true);
+        templateData.put("groupId", Long.toString(groupId));
+      } else {
+        templateData.put("isGroupedAnomaly", false);
+        templateData.put("groupId", Long.toString(-1));
+      }
       if(precisionRecallEvaluator.getTotalResponses() > 0) {
         templateData.put("precision", precisionRecallEvaluator.getPrecisionInResponse());
         templateData.put("recall", precisionRecallEvaluator.getRecall());
