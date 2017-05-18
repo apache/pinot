@@ -11,7 +11,9 @@ public class ThirdEyeDashboardConfiguration extends ThirdEyeConfiguration {
   String rcaConfigPath;
   int rcaParallelism;
   List<String> rcaFormatters;
-  String rcaDefaultFramework;
+
+  String rcaRootCauseFramework;
+  String rcaRelatedMetricsFramework;
 
   public String getInformedApiUrl() {
     return informedApiUrl;
@@ -45,11 +47,19 @@ public class ThirdEyeDashboardConfiguration extends ThirdEyeConfiguration {
     this.rcaFormatters = rcaFormatters;
   }
 
-  public String getRcaDefaultFramework() {
-    return rcaDefaultFramework;
+  public String getRcaRootCauseFramework() {
+    return rcaRootCauseFramework;
   }
 
-  public void setRcaDefaultFramework(String rcaDefaultFramework) {
-    this.rcaDefaultFramework = rcaDefaultFramework;
+  public void setRcaRootCauseFramework(String rcaRootCauseFramework) {
+    this.rcaRootCauseFramework = rcaRootCauseFramework;
+  }
+
+  public String getRcaRelatedMetricsFramework() {
+    return rcaRelatedMetricsFramework;
+  }
+
+  public void setRcaRelatedMetricsFramework(String rcaRelatedMetricsFramework) {
+    this.rcaRelatedMetricsFramework = rcaRelatedMetricsFramework;
   }
 }
