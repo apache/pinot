@@ -21,7 +21,6 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.core.common.DataSource;
 import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.BReusableFilteredDocIdSetOperator;
@@ -37,14 +36,14 @@ public class ProjectionPlanNode implements PlanNode {
   private static final Logger LOGGER = LoggerFactory.getLogger(ProjectionPlanNode.class);
 
   private final Map<String, ColumnarDataSourcePlanNode> _dataSourcePlanNodeMap =
-      new HashMap<String, ColumnarDataSourcePlanNode>();
+      new HashMap<>();
   private final DocIdSetPlanNode _docIdSetPlanNode;
   private MProjectionOperator _projectionOperator = null;
 
   public ProjectionPlanNode(IndexSegment indexSegment, String[] columns, DocIdSetPlanNode docIdSetPlanNode) {
     _docIdSetPlanNode = docIdSetPlanNode;
     for (String column : columns) {
-      _dataSourcePlanNodeMap.put(column, new ColumnarDataSourcePlanNode(indexSegment, column, docIdSetPlanNode));
+      _dataSourcePlanNodeMap.put(column, new ColumnarDataSourcePlanNode(indexSegment, column));
     }
   }
 
@@ -52,7 +51,7 @@ public class ProjectionPlanNode implements PlanNode {
   public Operator run() {
     long start = System.currentTimeMillis();
     if (_projectionOperator == null) {
-      Map<String, BaseOperator> dataSourceMap = new HashMap<String, BaseOperator>();
+      Map<String, BaseOperator> dataSourceMap = new HashMap<>();
       BReusableFilteredDocIdSetOperator docIdSetOperator = (BReusableFilteredDocIdSetOperator) _docIdSetPlanNode.run();
       for (String column : _dataSourcePlanNodeMap.keySet()) {
         ColumnarDataSourcePlanNode columnarDataSourcePlanNode = _dataSourcePlanNodeMap.get(column);
@@ -77,9 +76,5 @@ public class ProjectionPlanNode implements PlanNode {
       _dataSourcePlanNodeMap.get(column).showTree(prefix + "    ");
       i++;
     }
-  }
-
-  public ColumnarDataSourcePlanNode getDataSourcePlanNode(String column) {
-    return _dataSourcePlanNodeMap.get(column);
   }
 }

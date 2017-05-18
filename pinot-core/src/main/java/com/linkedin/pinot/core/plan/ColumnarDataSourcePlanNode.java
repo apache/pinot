@@ -18,8 +18,6 @@ package com.linkedin.pinot.core.plan;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.pinot.core.common.DataSource;
-import com.linkedin.pinot.core.common.Operator;
 import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.operator.BaseOperator;
 
@@ -38,15 +36,9 @@ public class ColumnarDataSourcePlanNode implements PlanNode {
     _columnName = columnName;
   }
 
-  public ColumnarDataSourcePlanNode(IndexSegment indexSegment, String columnName, DocIdSetPlanNode docIdSetPlanNode) {
-    _indexSegment = indexSegment;
-    _columnName = columnName;
-  }
-
   @Override
   public BaseOperator run() {
-    DataSource dataSource = _indexSegment.getDataSource(_columnName);
-    return dataSource;
+    return _indexSegment.getDataSource(_columnName);
   }
 
   @Override

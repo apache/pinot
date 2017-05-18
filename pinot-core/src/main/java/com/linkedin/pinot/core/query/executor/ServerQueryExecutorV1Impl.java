@@ -23,9 +23,7 @@ import com.linkedin.pinot.common.metrics.ServerQueryPhase;
 import com.linkedin.pinot.common.query.QueryExecutor;
 import com.linkedin.pinot.common.query.ServerQueryRequest;
 import com.linkedin.pinot.common.query.context.TimerContext;
-import com.linkedin.pinot.common.request.AggregationInfo;
 import com.linkedin.pinot.common.request.BrokerRequest;
-import com.linkedin.pinot.common.request.FilterQuery;
 import com.linkedin.pinot.common.request.InstanceRequest;
 import com.linkedin.pinot.common.utils.DataTable;
 import com.linkedin.pinot.core.common.datatable.DataTableBuilder;
@@ -37,7 +35,6 @@ import com.linkedin.pinot.core.indexsegment.IndexSegment;
 import com.linkedin.pinot.core.plan.Plan;
 import com.linkedin.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import com.linkedin.pinot.core.plan.maker.PlanMaker;
-import com.linkedin.pinot.core.query.aggregation.function.AggregationFunctionFactory;
 import com.linkedin.pinot.core.query.config.QueryExecutorConfig;
 import com.linkedin.pinot.core.query.exception.BadQueryRequestException;
 import com.linkedin.pinot.core.query.pruner.SegmentPrunerService;
@@ -117,12 +114,6 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       queryableSegmentDataManagerList = acquireQueryableSegments(tableDataManager, instanceRequest);
       long totalRawDocs = pruneSegments(tableDataManager, queryableSegmentDataManagerList, queryRequest);
       segmentPruneTimer.stopAndRecord();
-
-      // Short-circuit the simple count(*) query without any predicates and group-by's.
-      if (isCountAllDocsQuery(brokerRequest)) {
-        queryProcessingTimer.stopAndRecord();
-        return DataTableBuilder.buildCountStarDataTable(totalRawDocs);
-      }
 
       int numSegmentsMatched = queryableSegmentDataManagerList.size();
       queryRequest.setSegmentCountAfterPruning(numSegmentsMatched);
@@ -208,22 +199,6 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
    * @param brokerRequest Broker request for the query
    * @return True if simple count star query, false otherwise.
    */
-  private static boolean isCountAllDocsQuery(BrokerRequest brokerRequest) {
-    FilterQuery filterQuery = brokerRequest.getFilterQuery();
-    if (filterQuery != null) {
-      return false;
-    }
-
-    List<AggregationInfo> aggregationsInfo = brokerRequest.getAggregationsInfo();
-    if (aggregationsInfo != null && aggregationsInfo.size() == 1 && !brokerRequest.isSetGroupBy()) {
-      if (aggregationsInfo.get(0)
-          .getAggregationType()
-          .equalsIgnoreCase(AggregationFunctionFactory.AggregationFunctionType.COUNT.getName())) {
-        return true;
-      }
-    }
-    return false;
-  }
 
   /**
    * Helper method to acquire segments that can be queried for the request.
