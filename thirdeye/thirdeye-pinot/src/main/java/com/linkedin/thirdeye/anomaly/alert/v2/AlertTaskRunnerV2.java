@@ -9,6 +9,8 @@ import com.linkedin.thirdeye.anomaly.alert.grouping.DummyAlertGrouper;
 import com.linkedin.thirdeye.anomaly.alert.grouping.filter.AlertGroupFilter;
 import com.linkedin.thirdeye.anomaly.alert.grouping.filter.AlertGroupFilterFactory;
 import com.linkedin.thirdeye.anomaly.alert.grouping.SimpleGroupedAnomalyMerger;
+import com.linkedin.thirdeye.anomaly.alert.grouping.recipientprovider.AlertGroupRecipientProvider;
+import com.linkedin.thirdeye.anomaly.alert.grouping.recipientprovider.AlertGroupRecipientProviderFactory;
 import com.linkedin.thirdeye.anomaly.alert.template.pojo.MetricDimensionReport;
 import com.linkedin.thirdeye.anomaly.alert.util.AlertFilterHelper;
 import com.linkedin.thirdeye.anomaly.alert.util.AnomalyReportGenerator;
@@ -42,7 +44,6 @@ import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -152,7 +153,11 @@ public class AlertTaskRunnerV2 implements TaskRunner {
         //     approach 1 in order to consider multi-metric grouping.
         // Input: a list of anomalies.
         // Output: lists of anomalies; each list contains the anomalies of the same group.
-        AlertGrouper alertGrouper = AlertGrouperFactory.fromSpec(alertConfig.getGroupByConfig());
+        AlertConfigBean.AlertGroupConfig alertGroupConfig = alertConfig.getAlertGroupConfig();
+        if (alertGroupConfig == null) {
+          alertGroupConfig = new AlertConfigBean.AlertGroupConfig();
+        }
+        AlertGrouper alertGrouper = AlertGrouperFactory.fromSpec(alertGroupConfig.getGroupByConfig());
         Map<DimensionMap, GroupedAnomalyResultsDTO> groupedAnomalyResultsMap = alertGrouper.group(results);
 
         Map<DimensionMap, GroupedAnomalyResultsDTO> filteredGroupedAnomalyResultsMap;
@@ -160,7 +165,7 @@ public class AlertTaskRunnerV2 implements TaskRunner {
         if (alertGrouper instanceof DummyAlertGrouper) {
           filteredGroupedAnomalyResultsMap = groupedAnomalyResultsMap;
         } else {
-          filteredGroupedAnomalyResultsMap = timeBasedMergeAndFilterGroupedAnomalies(groupedAnomalyResultsMap);
+          filteredGroupedAnomalyResultsMap = timeBasedMergeAndFilterGroupedAnomalies(groupedAnomalyResultsMap, alertGroupConfig);
         }
 
         for (Map.Entry<DimensionMap, GroupedAnomalyResultsDTO> entry : filteredGroupedAnomalyResultsMap.entrySet()) {
@@ -168,13 +173,17 @@ public class AlertTaskRunnerV2 implements TaskRunner {
           DimensionMap dimensions = entry.getKey();
           GroupedAnomalyResultsDTO groupedAnomalyDTO = entry.getValue();
           List<MergedAnomalyResultDTO> resultsForThisGroup = groupedAnomalyDTO.getAnomalyResults();
+
           // Append auxiliary recipients for this group
           String recipientsForThisGroup = alertConfig.getRecipients();
-          // TODO: Replace with AuxiliaryRecipient provider
-          String auxiliaryRecipients = alertGrouper.groupEmailRecipients(dimensions);
+          //   Get auxiliary email recipient from provider
+          AlertGroupRecipientProvider recipientProvider =
+            AlertGroupRecipientProviderFactory.fromSpec(alertGroupConfig.getGroupAuxiliaryEmailProvider());
+          String auxiliaryRecipients = recipientProvider.getAlertGroupRecipients(dimensions);
           if (StringUtils.isNotBlank(auxiliaryRecipients)) {
             recipientsForThisGroup = recipientsForThisGroup + EmailHelper.EMAIL_ADDRESS_SEPARATOR + auxiliaryRecipients;
           }
+
           // Append group name after config name if dimensions of this group is not empty
           String emailSubjectName = alertConfig.getName();
           if (dimensions.size() != 0) {
@@ -332,11 +341,13 @@ public class AlertTaskRunnerV2 implements TaskRunner {
    * anomaly passes through the filter, it is returned in a map.
    *
    * @param groupedAnomalyResultsMap a map of new GroupedAnomaly.
+   * @param alertGroupConfig the configuration for alert group.
    *
    * @return a map of merged GroupedAnomaly that pass through the filter.
    */
-  private Map<DimensionMap,GroupedAnomalyResultsDTO> timeBasedMergeAndFilterGroupedAnomalies(
-      Map<DimensionMap, GroupedAnomalyResultsDTO> groupedAnomalyResultsMap) {
+  private Map<DimensionMap, GroupedAnomalyResultsDTO> timeBasedMergeAndFilterGroupedAnomalies(
+      Map<DimensionMap, GroupedAnomalyResultsDTO> groupedAnomalyResultsMap,
+      AlertConfigBean.AlertGroupConfig alertGroupConfig) {
     // Populate basic fields of the new grouped anomaly
     for (Map.Entry<DimensionMap, GroupedAnomalyResultsDTO> entry : groupedAnomalyResultsMap.entrySet()) {
       GroupedAnomalyResultsDTO groupedAnomaly = entry.getValue();
@@ -346,7 +357,8 @@ public class AlertTaskRunnerV2 implements TaskRunner {
     }
 
     Map<DimensionMap, GroupedAnomalyResultsDTO> mergedGroupedAnomalyResultsMap =
-        this.timeBasedMergeGroupedAnomalyResults(groupedAnomalyResultsMap);
+        this.timeBasedMergeGroupedAnomalyResults(groupedAnomalyResultsMap,
+            alertGroupConfig.getGroupTimeBasedMergeConfig());
     // Read and update grouped anomalies in DB
     for (Map.Entry<DimensionMap, GroupedAnomalyResultsDTO> entry : mergedGroupedAnomalyResultsMap.entrySet()) {
       GroupedAnomalyResultsDTO groupedAnomaly = entry.getValue();
@@ -360,7 +372,8 @@ public class AlertTaskRunnerV2 implements TaskRunner {
     }
 
     // Filter out the grouped anomalies that trigger an alert
-    return this.filterMergedGroupedAnomalyResults(mergedGroupedAnomalyResultsMap);
+    return this
+        .filterMergedGroupedAnomalyResults(mergedGroupedAnomalyResultsMap, alertGroupConfig.getGroupFilterConfig());
   }
 
   /**
@@ -368,15 +381,15 @@ public class AlertTaskRunnerV2 implements TaskRunner {
    * a time based merged with existing grouped anomalies, which are stored in a DB.
    *
    * @param newGroupedAnomalies a map of new GroupedAnomaly.
+   * @param mergeConfig the configuration for time-based merge strategy.
    *
    * @return a map of merged GroupedAnomaly in time dimensions.
    */
   private Map<DimensionMap, GroupedAnomalyResultsDTO> timeBasedMergeGroupedAnomalyResults(
-      Map<DimensionMap, GroupedAnomalyResultsDTO> newGroupedAnomalies) {
+      Map<DimensionMap, GroupedAnomalyResultsDTO> newGroupedAnomalies, Map<String, String> mergeConfig) {
 
     // Parse max allowed merge gap from config
     long maxAllowedMergeGap = DEFAULT_MAX_ALLOWED_MERGE_GAP;
-    Map<String, String> mergeConfig = alertConfig.getGroupTimeBasedMergeConfig();
     if (MapUtils.isNotEmpty(mergeConfig)) {
       if (mergeConfig.containsKey(MAX_ALLOWED_MERGE_GAP_KEY)) {
         try {
@@ -411,17 +424,18 @@ public class AlertTaskRunnerV2 implements TaskRunner {
    * the GroupedAnomalies that pass through the filter.
    *
    * @param mergedGroupedAnomalies a map of GroupedAnomaly.
+   * @param filterConfig the configuration for group filter
    *
    * @return a map of GroupedAnomaly that pass through the filter.
    */
   private Map<DimensionMap, GroupedAnomalyResultsDTO> filterMergedGroupedAnomalyResults(
-      Map<DimensionMap, GroupedAnomalyResultsDTO> mergedGroupedAnomalies) {
+      Map<DimensionMap, GroupedAnomalyResultsDTO> mergedGroupedAnomalies, Map<String, String> filterConfig) {
     Map<DimensionMap, GroupedAnomalyResultsDTO> filteredGroupedAnomalies = new HashMap<>();
-    AlertGroupFilter filter = AlertGroupFilterFactory.fromSpec(alertConfig.getGroupFilterConfig());
+    AlertGroupFilter filter = AlertGroupFilterFactory.fromSpec(filterConfig);
     for (Map.Entry<DimensionMap, GroupedAnomalyResultsDTO> groupedAnomalyEntry : mergedGroupedAnomalies.entrySet()) {
       GroupedAnomalyResultsDTO groupedAnomaly = groupedAnomalyEntry.getValue();
       if (!groupedAnomaly.isNotified()) {
-        assert(groupedAnomalyEntry.getKey().equals(groupedAnomaly.getDimensions()));
+        assert (groupedAnomalyEntry.getKey().equals(groupedAnomaly.getDimensions()));
         if (filter.isQualified(groupedAnomaly)) {
           filteredGroupedAnomalies.put(groupedAnomalyEntry.getKey(), groupedAnomaly);
         }

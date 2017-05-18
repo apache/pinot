@@ -21,13 +21,4 @@ public interface AlertGrouper {
    * @return groups of anomaly results.
    */
   Map<DimensionMap, GroupedAnomalyResultsDTO> group(List<MergedAnomalyResultDTO> anomalyResults);
-
-  /**
-   * The additional recipients string for this group of anomalies.
-   *
-   * @param alertGroupKey the key of the group
-   *
-   * @return the additional recipients for the given group.
-   */
-  String groupEmailRecipients(DimensionMap alertGroupKey);
 }

@@ -13,9 +13,7 @@ public class AlertConfigBean extends AbstractBean {
   boolean active;
   EmailConfig emailConfig;
   ReportConfigCollection reportConfigCollection;
-  Map<String, String> groupByConfig = new HashMap<>();
-  Map<String, String> groupFilterConfig = new HashMap<>();
-  Map<String, String> groupTimeBasedMergeConfig = new HashMap<>();
+  AlertGroupConfig alertGroupConfig;
   String recipients;
   String fromAddress;
 
@@ -75,28 +73,12 @@ public class AlertConfigBean extends AbstractBean {
     this.reportConfigCollection = reportConfigCollection;
   }
 
-  public Map<String, String> getGroupByConfig() {
-    return groupByConfig;
+  public AlertGroupConfig getAlertGroupConfig() {
+    return alertGroupConfig;
   }
 
-  public void setGroupByConfig(Map<String, String> groupByConfig) {
-    this.groupByConfig = groupByConfig;
-  }
-
-  public Map<String, String> getGroupFilterConfig() {
-    return groupFilterConfig;
-  }
-
-  public void setGroupFilterConfig(Map<String, String> groupFilterConfig) {
-    this.groupFilterConfig = groupFilterConfig;
-  }
-
-  public Map<String, String> getGroupTimeBasedMergeConfig() {
-    return groupTimeBasedMergeConfig;
-  }
-
-  public void setGroupTimeBasedMergeConfig(Map<String, String> groupTimeBasedMergeConfig) {
-    this.groupTimeBasedMergeConfig = groupTimeBasedMergeConfig;
+  public void setAlertGroupConfig(AlertGroupConfig alertGroupConfig) {
+    this.alertGroupConfig = alertGroupConfig;
   }
 
   @JsonIgnoreProperties(ignoreUnknown = true)
@@ -214,6 +196,46 @@ public class AlertConfigBean extends AbstractBean {
           ", enabled=" + enabled +
           ", reportMetricConfigs=" + reportMetricConfigs +
           '}';
+    }
+  }
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public static class AlertGroupConfig {
+    Map<String, String> groupByConfig = new HashMap<>();
+    Map<String, String> groupFilterConfig = new HashMap<>();
+    Map<String, String> groupTimeBasedMergeConfig = new HashMap<>();
+    Map<String, String> groupAuxiliaryEmailProvider = new HashMap<>();
+
+    public Map<String, String> getGroupByConfig() {
+      return groupByConfig;
+    }
+
+    public void setGroupByConfig(Map<String, String> groupByConfig) {
+      this.groupByConfig = groupByConfig;
+    }
+
+    public Map<String, String> getGroupFilterConfig() {
+      return groupFilterConfig;
+    }
+
+    public void setGroupFilterConfig(Map<String, String> groupFilterConfig) {
+      this.groupFilterConfig = groupFilterConfig;
+    }
+
+    public Map<String, String> getGroupTimeBasedMergeConfig() {
+      return groupTimeBasedMergeConfig;
+    }
+
+    public void setGroupTimeBasedMergeConfig(Map<String, String> groupTimeBasedMergeConfig) {
+      this.groupTimeBasedMergeConfig = groupTimeBasedMergeConfig;
+    }
+
+    public Map<String, String> getGroupAuxiliaryEmailProvider() {
+      return groupAuxiliaryEmailProvider;
+    }
+
+    public void setGroupAuxiliaryEmailProvider(Map<String, String> groupAuxiliaryEmailProvider) {
+      this.groupAuxiliaryEmailProvider = groupAuxiliaryEmailProvider;
     }
   }
 

@@ -71,11 +71,6 @@ public class HorizontalDimensionalAlertGrouper extends BaseAlertGrouper {
     }
   }
 
-  @Override
-  public String groupEmailRecipients(DimensionMap alertGroupKey) {
-    return EMPTY_RECIPIENTS;
-  }
-
   private DimensionMap constructGroupKey(DimensionMap rawKey, String dimensionName) {
     DimensionMap alertGroupKey = new DimensionMap();
     if (rawKey.containsKey(dimensionName)) {

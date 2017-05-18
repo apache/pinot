@@ -1,26 +1,19 @@
 package com.linkedin.thirdeye.anomaly.alert.grouping;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.api.DimensionMap;
-import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.GroupedAnomalyResultsDTO;
+import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.NavigableMap;
 import java.util.Set;
-import java.util.TreeMap;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 public class DimensionalAlertGrouperTest {
-  private final static String EMAIL1 = "k1v1.com,k1v1.com2";
-  private final static String EMAIL2 = "k1v2.com,k1v2.com2";
-  private final static String EMAIL_NOT_USED = "k1v1k2v3.com";
   private final static String GROUP_BY_DIMENSION_NAME = "K1";
 
   private DimensionalAlertGrouper alertGrouper;
@@ -31,35 +24,8 @@ public class DimensionalAlertGrouperTest {
     props.put(DimensionalAlertGrouper.ROLL_UP_SINGLE_DIMENSION_KEY, "true");
     props.put(DimensionalAlertGrouper.GROUP_BY_KEY, GROUP_BY_DIMENSION_NAME);
 
-    Map<DimensionMap, String> auxiliaryRecipients = new TreeMap<>();
-    DimensionMap dimensionMap1 = new DimensionMap();
-    dimensionMap1.put(GROUP_BY_DIMENSION_NAME, "V1");
-    auxiliaryRecipients.put(dimensionMap1, EMAIL1);
-    DimensionMap dimensionMap2 = new DimensionMap();
-    dimensionMap2.put(GROUP_BY_DIMENSION_NAME, "V2");
-    auxiliaryRecipients.put(dimensionMap2, EMAIL2);
-    DimensionMap dimensionMap3 = new DimensionMap();
-    dimensionMap3.put(GROUP_BY_DIMENSION_NAME, "V1");
-    dimensionMap3.put("K2", "V3");
-    auxiliaryRecipients.put(dimensionMap3, EMAIL_NOT_USED);
-
-    try {
-      ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-      String writeValueAsString = OBJECT_MAPPER.writeValueAsString(auxiliaryRecipients);
-      props.put(DimensionalAlertGrouper.AUXILIARY_RECIPIENTS_MAP_KEY, writeValueAsString);
-
-      alertGrouper = new DimensionalAlertGrouper();
-      alertGrouper.setParameters(props);
-      NavigableMap<DimensionMap, String> auxiliaryRecipientsRecovered = alertGrouper.getAuxiliaryEmailRecipients();
-
-      // Test the map of auxiliary recipients
-      Assert.assertEquals(auxiliaryRecipientsRecovered.get(dimensionMap1), EMAIL1);
-      Assert.assertEquals(auxiliaryRecipientsRecovered.get(dimensionMap2), EMAIL2);
-      Assert.assertEquals(auxiliaryRecipientsRecovered.get(dimensionMap3), EMAIL_NOT_USED);
-    } catch (JsonProcessingException e) {
-      e.printStackTrace();
-      Assert.fail();
-    }
+    alertGrouper = new DimensionalAlertGrouper();
+    alertGrouper.setParameters(props);
   }
 
   @Test(dependsOnMethods = { "testCreate" })
@@ -111,25 +77,6 @@ public class DimensionalAlertGrouperTest {
       rollUpGroup.addAll(anomalyRollUpGroup);
       Assert.assertEquals(rollUpGroup, expectedRollUpGroup);
     }
-  }
-
-  @Test(dependsOnMethods = { "testCreate", "testConstructGroupKey" })
-  public void testGroupEmailRecipients() {
-    // Test AlertGroupKey to auxiliary recipients
-    DimensionMap alertGroupKey1 = new DimensionMap();
-    alertGroupKey1.put(GROUP_BY_DIMENSION_NAME, "V1");
-    Assert.assertEquals(alertGrouper.groupEmailRecipients(alertGroupKey1), EMAIL1);
-
-    DimensionMap alertGroupKey2 = new DimensionMap();
-    alertGroupKey2.put(GROUP_BY_DIMENSION_NAME, "V1");
-    Assert.assertEquals(alertGrouper.groupEmailRecipients(alertGroupKey2), EMAIL1);
-
-    // Test empty recipients
-    Assert.assertEquals(alertGrouper.groupEmailRecipients(new DimensionMap()), BaseAlertGrouper.EMPTY_RECIPIENTS);
-    Assert.assertEquals(alertGrouper.groupEmailRecipients(null), BaseAlertGrouper.EMPTY_RECIPIENTS);
-    DimensionMap dimensionMapNonExist = new DimensionMap();
-    dimensionMapNonExist.put("K2", "V1");
-    Assert.assertEquals(alertGrouper.groupEmailRecipients(dimensionMapNonExist), BaseAlertGrouper.EMPTY_RECIPIENTS);
   }
 
   @DataProvider(name = "prepareAnomalyGroups")
