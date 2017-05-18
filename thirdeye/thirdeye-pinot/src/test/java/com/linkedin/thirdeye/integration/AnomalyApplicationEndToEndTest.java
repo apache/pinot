@@ -17,15 +17,6 @@ import com.linkedin.thirdeye.anomaly.task.TaskDriverConfiguration;
 import com.linkedin.thirdeye.anomaly.task.TaskInfoFactory;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.client.ThirdEyeClient;
-import com.linkedin.thirdeye.client.ThirdEyeRequest;
-import com.linkedin.thirdeye.client.ThirdEyeResponse;
-import com.linkedin.thirdeye.client.cache.MetricDataset;
-import com.linkedin.thirdeye.client.cache.QueryCache;
-import com.linkedin.thirdeye.client.pinot.PinotQuery;
-import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient;
-import com.linkedin.thirdeye.client.pinot.PinotThirdEyeResponse;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessConstants.DataCompletenessType;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessScheduler;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessTaskInfo;
@@ -36,6 +27,15 @@ import com.linkedin.thirdeye.datalayer.dto.MergedAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.RawAnomalyResultDTO;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
+import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.datasource.ThirdEyeDataSource;
+import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
+import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
+import com.linkedin.thirdeye.datasource.cache.MetricDataset;
+import com.linkedin.thirdeye.datasource.cache.QueryCache;
+import com.linkedin.thirdeye.datasource.pinot.PinotQuery;
+import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
+import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeResponse;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
@@ -122,8 +122,8 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
   private void setup() throws Exception {
 
     // Mock query cache
-    ThirdEyeClient mockThirdeyeClient = Mockito.mock(ThirdEyeClient.class);
-    Mockito.when(mockThirdeyeClient.execute(Matchers.any(ThirdEyeRequest.class)))
+    ThirdEyeDataSource mockThirdeyeDataSource = Mockito.mock(ThirdEyeDataSource.class);
+    Mockito.when(mockThirdeyeDataSource.execute(Matchers.any(ThirdEyeRequest.class)))
     .thenAnswer(new Answer<ThirdEyeResponse>() {
 
       @Override
@@ -134,10 +134,10 @@ public class AnomalyApplicationEndToEndTest extends AbstractManagerTestBase {
         return response;
       }
     });
-    Map<String, ThirdEyeClient> clientMap = new HashMap<>();
-    clientMap.put(PinotThirdEyeClient.class.getSimpleName(), mockThirdeyeClient);
+    Map<String, ThirdEyeDataSource> dataSourceMap = new HashMap<>();
+    dataSourceMap.put(PinotThirdEyeDataSource.class.getSimpleName(), mockThirdeyeDataSource);
 
-    QueryCache mockQueryCache = new QueryCache(clientMap, Executors.newFixedThreadPool(10));
+    QueryCache mockQueryCache = new QueryCache(dataSourceMap, Executors.newFixedThreadPool(10));
     cacheRegistry.registerQueryCache(mockQueryCache);
 
     MetricConfigDTO metricConfig = getTestMetricConfig(collection, metric, 1L);

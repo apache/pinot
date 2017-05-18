@@ -1,8 +1,8 @@
 package com.linkedin.thirdeye.anomaly.events;
 
-import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.bao.EventManager;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 
 import java.util.List;
 

@@ -3,7 +3,7 @@ package com.linkedin.thirdeye.dashboard.configs;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.linkedin.thirdeye.client.MetricExpression;
+import com.linkedin.thirdeye.datasource.MetricExpression;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class DashboardConfig extends AbstractConfig {

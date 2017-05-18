@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye;
 
-import com.linkedin.thirdeye.client.DAORegistry;
+import com.linkedin.thirdeye.datasource.DAORegistry;
+
 import org.testng.ITestContext;
 import org.testng.ITestListener;
 import org.testng.ITestResult;

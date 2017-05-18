@@ -20,10 +20,10 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang.NullArgumentException;
 import org.codehaus.jackson.node.ObjectNode;
 
-import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.bao.DatasetConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.util.JsonResponseUtil;
 
 @Path(value = "/thirdeye-admin/dataset-config")

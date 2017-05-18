@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.anomaly.monitor;
 
-import com.linkedin.thirdeye.client.DAORegistry;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -17,6 +16,7 @@ import com.linkedin.thirdeye.anomaly.task.TaskResult;
 import com.linkedin.thirdeye.anomaly.task.TaskRunner;
 import com.linkedin.thirdeye.datalayer.dto.JobDTO;
 import com.linkedin.thirdeye.datalayer.dto.TaskDTO;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 
 public class MonitorTaskRunner implements TaskRunner {
 

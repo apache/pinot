@@ -1,15 +1,16 @@
 package com.linkedin.thirdeye.anomaly.monitor;
 
 import com.linkedin.thirdeye.anomaly.utils.AnomalyUtils;
+
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.bao.JobManager;
 import com.linkedin.thirdeye.datalayer.bao.TaskManager;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 
 public class MonitorJobScheduler {
 

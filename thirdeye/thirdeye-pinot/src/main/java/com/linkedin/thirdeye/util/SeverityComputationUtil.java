@@ -11,15 +11,15 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.joda.time.DateTime;
 
 import com.google.common.collect.Maps;
-import com.linkedin.thirdeye.client.MetricExpression;
-import com.linkedin.thirdeye.client.MetricFunction;
-import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.client.ThirdEyeRequest;
-import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
-import com.linkedin.thirdeye.client.ThirdEyeResponse;
-import com.linkedin.thirdeye.client.ThirdEyeResponseRow;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.dashboard.Utils;
+import com.linkedin.thirdeye.datasource.MetricExpression;
+import com.linkedin.thirdeye.datasource.MetricFunction;
+import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
+import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
+import com.linkedin.thirdeye.datasource.ThirdEyeResponseRow;
+import com.linkedin.thirdeye.datasource.ThirdEyeRequest.ThirdEyeRequestBuilder;
 
 public class SeverityComputationUtil {
 
@@ -83,7 +83,7 @@ public class SeverityComputationUtil {
         Utils.convertToMetricExpressions(metricName, MetricAggFunction.SUM, collectionName);
     List<MetricFunction> metricFunctions = metricExpressions.get(0).computeMetricFunctions();
     requestBuilder.setMetricFunctions(metricFunctions);
-    requestBuilder.setClient(ThirdEyeUtils.getClientFromMetricFunctions(metricFunctions));
+    requestBuilder.setDataSource(ThirdEyeUtils.getDataSourceFromMetricFunctions(metricFunctions));
     ThirdEyeRequest thirdEyeRequest = requestBuilder.build("test-" + System.currentTimeMillis());
     return thirdEyeRequest;
   }

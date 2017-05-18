@@ -3,9 +3,9 @@ package com.linkedin.thirdeye.datalayer.pojo;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessConstants.DataCompletenessAlgorithmName;
 import com.linkedin.thirdeye.completeness.checker.Wo4WAvgDataCompletenessAlgorithm;
+import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
 
 import java.util.Collections;
 import java.util.List;
@@ -35,7 +35,7 @@ public class DatasetConfigBean extends AbstractBean {
   private String timezone = TimeSpec.DEFAULT_TIMEZONE;
 
   /** Introduce this as a dataset property because count* queries will have no metric information **/
-  private String client = PinotThirdEyeClient.CLIENT_NAME;
+  private String dataSource = PinotThirdEyeDataSource.DATA_SOURCE_NAME;
 
   private boolean metricAsDimension = false;
 
@@ -155,12 +155,12 @@ public class DatasetConfigBean extends AbstractBean {
     this.timezone = timezone;
   }
 
-  public String getClient() {
-    return client;
+  public String getDataSource() {
+    return dataSource;
   }
 
-  public void setClient(String client) {
-    this.client = client;
+  public void setDataSource(String dataSource) {
+    this.dataSource = dataSource;
   }
 
   public boolean isMetricAsDimension() {
@@ -303,7 +303,7 @@ public class DatasetConfigBean extends AbstractBean {
         && Objects.equals(timeDuration, dc.getTimeDuration())
         && Objects.equals(timeFormat, dc.getTimeFormat())
         && Objects.equals(timezone, dc.getTimezone())
-        && Objects.equals(client, dc.getClient())
+        && Objects.equals(dataSource, dc.getDataSource())
         && Objects.equals(metricAsDimension, dc.isMetricAsDimension())
         && Objects.equals(metricNamesColumn, dc.getMetricNamesColumn())
         && Objects.equals(metricValuesColumn, dc.getMetricValuesColumn())
@@ -318,15 +318,16 @@ public class DatasetConfigBean extends AbstractBean {
         && Objects.equals(requiresCompletenessCheck, dc.isRequiresCompletenessCheck())
         && Objects.equals(expectedDelay, dc.getExpectedDelay())
         && Objects.equals(dataCompletenessAlgorithmName, dc.getDataCompletenessAlgorithmName())
-        && Objects.equals(expectedCompleteness,dc.getExpectedCompleteness());
+        && Objects.equals(expectedCompleteness,dc.getExpectedCompleteness())
+        && Objects.equals(dataSource, dc.getDataSource());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(getId(), dataset, dimensions, timeColumn, timeUnit, timeDuration, timeFormat, timezone, client,
+    return Objects.hash(getId(), dataset, dimensions, timeColumn, timeUnit, timeDuration, timeFormat, timezone, dataSource,
         metricAsDimension, metricNamesColumn, metricValuesColumn, autoDiscoverMetrics, active, additive,
         dimensionsHaveNoPreAggregation, preAggregatedKeyword, nonAdditiveBucketSize, nonAdditiveBucketUnit, realtime,
-        requiresCompletenessCheck, expectedDelay, dataCompletenessAlgorithmName, expectedCompleteness);
+        requiresCompletenessCheck, expectedDelay, dataCompletenessAlgorithmName, expectedCompleteness, dataSource);
   }
 
 }

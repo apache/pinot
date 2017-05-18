@@ -1,6 +1,7 @@
 package com.linkedin.thirdeye.dashboard.resources;
 
 import com.linkedin.thirdeye.constant.MetricAggFunction;
+
 import java.util.Arrays;
 import java.util.List;
 
@@ -18,8 +19,6 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linkedin.thirdeye.client.MetricExpression;
-import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.client.diffsummary.Cube;
 import com.linkedin.thirdeye.client.diffsummary.Dimensions;
 import com.linkedin.thirdeye.client.diffsummary.OLAPDataBaseClient;
@@ -27,6 +26,8 @@ import com.linkedin.thirdeye.client.diffsummary.PinotThirdEyeSummaryClient;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.dashboard.views.diffsummary.Summary;
 import com.linkedin.thirdeye.dashboard.views.diffsummary.SummaryResponse;
+import com.linkedin.thirdeye.datasource.MetricExpression;
+import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 
 
 @Path(value = "/dashboard")

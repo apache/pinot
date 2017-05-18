@@ -23,8 +23,8 @@ public abstract class ThirdEyeConfiguration extends Configuration {
    */
   private boolean cors = false;
 
-  public String getClientsPath() {
-    return getRootDir() + "/client-config/clients.yml";
+  public String getDataSourcesPath() {
+    return getRootDir() + "/data-sources/data-sources-config.yml";
   }
 
   public String getRootDir() {

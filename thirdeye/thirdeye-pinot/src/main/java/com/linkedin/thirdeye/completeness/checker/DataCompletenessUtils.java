@@ -20,8 +20,8 @@ import com.google.common.collect.ListMultimap;
 import com.linkedin.pinot.client.ResultSet;
 import com.linkedin.pinot.client.ResultSetGroup;
 import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.client.pinot.PinotQuery;
+import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.datasource.pinot.PinotQuery;
 
 /**
  * Util methods for data completeness

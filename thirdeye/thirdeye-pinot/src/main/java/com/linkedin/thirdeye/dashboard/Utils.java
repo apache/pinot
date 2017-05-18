@@ -25,17 +25,17 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.client.MetricExpression;
-import com.linkedin.thirdeye.client.MetricFunction;
-import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.client.ThirdEyeRequest;
-import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
-import com.linkedin.thirdeye.client.ThirdEyeResponse;
-import com.linkedin.thirdeye.client.cache.QueryCache;
 import com.linkedin.thirdeye.constant.MetricAggFunction;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DashboardConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.datasource.MetricExpression;
+import com.linkedin.thirdeye.datasource.MetricFunction;
+import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
+import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
+import com.linkedin.thirdeye.datasource.ThirdEyeRequest.ThirdEyeRequestBuilder;
+import com.linkedin.thirdeye.datasource.cache.QueryCache;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 public class Utils {
@@ -45,7 +45,7 @@ public class Utils {
   private static ThirdEyeCacheRegistry CACHE_REGISTRY = ThirdEyeCacheRegistry.getInstance();
 
   public static List<ThirdEyeRequest> generateFilterRequests(String dataset, String requestReference,
-      MetricFunction metricFunction, List<String> dimensions, DateTime start, DateTime end, String client) {
+      MetricFunction metricFunction, List<String> dimensions, DateTime start, DateTime end, String dataSource) {
 
     List<ThirdEyeRequest> requests = new ArrayList<>();
 
@@ -57,7 +57,7 @@ public class Utils {
       requestBuilder.setStartTimeInclusive(start);
       requestBuilder.setEndTimeExclusive(end);
       requestBuilder.setGroupBy(dimension);
-      requestBuilder.setClient(client);
+      requestBuilder.setDataSource(dataSource);
       ThirdEyeRequest request = requestBuilder.build(requestReference);
       requests.add(request);
     }
@@ -73,7 +73,7 @@ public class Utils {
     MetricFunction metricFunction = new MetricFunction(MetricAggFunction.COUNT, "*", null, dataset, null, datasetConfig);
 
     List<ThirdEyeRequest> requests =
-        generateFilterRequests(dataset, requestReference, metricFunction, dimensions, start, end, datasetConfig.getClient());
+        generateFilterRequests(dataset, requestReference, metricFunction, dimensions, start, end, datasetConfig.getDataSource());
 
     Map<ThirdEyeRequest, Future<ThirdEyeResponse>> queryResultMap =
         queryCache.getQueryResultsAsync(requests);

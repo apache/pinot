@@ -12,12 +12,12 @@ import org.jfree.util.Log;
 import org.joda.time.DateTime;
 
 import com.google.common.collect.Lists;
-import com.linkedin.thirdeye.client.MetricExpression;
-import com.linkedin.thirdeye.client.MetricFunction;
-import com.linkedin.thirdeye.client.ThirdEyeRequest;
-import com.linkedin.thirdeye.client.ThirdEyeRequest.ThirdEyeRequestBuilder;
-import com.linkedin.thirdeye.client.ThirdEyeResponse;
-import com.linkedin.thirdeye.client.cache.QueryCache;
+import com.linkedin.thirdeye.datasource.MetricExpression;
+import com.linkedin.thirdeye.datasource.MetricFunction;
+import com.linkedin.thirdeye.datasource.ThirdEyeRequest;
+import com.linkedin.thirdeye.datasource.ThirdEyeResponse;
+import com.linkedin.thirdeye.datasource.ThirdEyeRequest.ThirdEyeRequestBuilder;
+import com.linkedin.thirdeye.datasource.cache.QueryCache;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 /**
@@ -134,7 +134,7 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
     builder.setGroupBy(groupBy);
     builder.setStartTimeInclusive(baselineStartInclusive);
     builder.setEndTimeExclusive(baselineEndExclusive);
-    builder.setClient(ThirdEyeUtils.getClientFromMetricFunctions(metricFunctions));
+    builder.setDataSource(ThirdEyeUtils.getDataSourceFromMetricFunctions(metricFunctions));
     ThirdEyeRequest baselineRequest = builder.build("baseline");
     requests.add(baselineRequest);
 
@@ -144,7 +144,7 @@ public class PinotThirdEyeSummaryClient implements OLAPDataBaseClient {
     builder.setGroupBy(groupBy);
     builder.setStartTimeInclusive(currentStartInclusive);
     builder.setEndTimeExclusive(currentEndExclusive);
-    builder.setClient(ThirdEyeUtils.getClientFromMetricFunctions(metricFunctions));
+    builder.setDataSource(ThirdEyeUtils.getDataSourceFromMetricFunctions(metricFunctions));
     ThirdEyeRequest currentRequest = builder.build("current");
     requests.add(currentRequest);
 
