@@ -7,7 +7,6 @@ import com.linkedin.pinot.common.restlet.swagger.Parameter;
 import com.linkedin.pinot.common.restlet.swagger.Paths;
 import com.linkedin.pinot.common.restlet.swagger.Summary;
 import com.linkedin.pinot.common.restlet.swagger.Tags;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import java.io.File;
@@ -80,7 +79,7 @@ public class PinotTableIndexingConfigs extends BasePinotControllerRestletResourc
       Representation entity)
       throws Exception {
     AbstractTableConfig config = AbstractTableConfig.init(entity.getText());
-    _pinotHelixResourceManager.updateIndexingConfigFor(config.getTableName(), TableType.valueOf(config.getTableType().toUpperCase()),
+    _pinotHelixResourceManager.updateIndexingConfigFor(config.getTableName(), config.getTableType(),
         config.getIndexingConfig());
     return new StringRepresentation("done");
   }

@@ -7,7 +7,6 @@ import com.linkedin.pinot.common.restlet.swagger.Parameter;
 import com.linkedin.pinot.common.restlet.swagger.Paths;
 import com.linkedin.pinot.common.restlet.swagger.Summary;
 import com.linkedin.pinot.common.restlet.swagger.Tags;
-import com.linkedin.pinot.common.utils.CommonConstants.Helix.TableType;
 import com.linkedin.pinot.controller.api.ControllerRestApplication;
 import com.linkedin.pinot.controller.helix.core.PinotHelixResourceManager;
 import java.io.File;
@@ -72,12 +71,12 @@ public class PinotTableSegmentConfigs extends BasePinotControllerRestletResource
       "/tables/{tableName}/segmentConfigs"
   })
   private Representation updateSegmentConfig(
-      @Parameter(name = "tableName", in = "path", description = "The name of the table for which to update the segment configuration", required = true)
-      String tableName, Representation entity)
+      @Parameter(name = "tableName", in = "path", description = "The name of the table for which to update the segment configuration", required = true) String tableName,
+      Representation entity)
       throws Exception {
     AbstractTableConfig config = AbstractTableConfig.init(entity.getText());
     _pinotHelixResourceManager.updateSegmentsValidationAndRetentionConfigFor(config.getTableName(),
-        TableType.valueOf(config.getTableType().toUpperCase()), config.getValidationConfig());
+        config.getTableType(), config.getValidationConfig());
     return new StringRepresentation("done");
   }
 }

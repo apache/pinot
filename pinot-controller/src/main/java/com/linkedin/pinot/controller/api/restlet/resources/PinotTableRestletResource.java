@@ -99,7 +99,7 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
     boolean verifyReplicasPerPartition = false;
     boolean verifyReplication = true;
 
-    if (TableType.REALTIME.name().equalsIgnoreCase(config.getTableType())) {
+    if (config.getTableType() == TableType.REALTIME) {
       KafkaStreamMetadata kafkaStreamMetadata;
       try {
         kafkaStreamMetadata = new KafkaStreamMetadata(config.getIndexingConfig().getStreamConfigs());
@@ -389,7 +389,7 @@ public class PinotTableRestletResource extends BasePinotControllerRestletResourc
       return errorResponseRepresentation(Status.SERVER_ERROR_INTERNAL, "Failed to read request");
     }
     try {
-      TableType tableType = TableType.valueOf(tableConfig.getTableType().toUpperCase());
+      TableType tableType = tableConfig.getTableType();
       String configTableName = tableConfig.getTableName();
       String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
       if (!configTableName.equals(tableNameWithType)) {
