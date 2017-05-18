@@ -1,11 +1,13 @@
 package com.linkedin.thirdeye.dashboard.configs;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-import com.linkedin.thirdeye.client.MetricExpression;
+import com.linkedin.thirdeye.datasource.MetricExpression;
+
 import java.util.concurrent.TimeUnit;
 
 

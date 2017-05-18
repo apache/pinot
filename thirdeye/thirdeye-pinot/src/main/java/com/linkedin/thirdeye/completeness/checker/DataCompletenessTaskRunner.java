@@ -24,12 +24,12 @@ import com.linkedin.thirdeye.anomaly.task.TaskInfo;
 import com.linkedin.thirdeye.anomaly.task.TaskResult;
 import com.linkedin.thirdeye.anomaly.task.TaskRunner;
 import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessConstants.DataCompletenessAlgorithmName;
 import com.linkedin.thirdeye.completeness.checker.DataCompletenessConstants.DataCompletenessType;
 import com.linkedin.thirdeye.dashboard.Utils;
 import com.linkedin.thirdeye.datalayer.dto.DataCompletenessConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.util.ThirdEyeUtils;
 
 /**
@@ -103,8 +103,8 @@ public class DataCompletenessTaskRunner implements TaskRunner {
               dataCompletenessAlgorithm, dateTimeFormatter, bucketSize);
           LOG.info("Got {} buckets to process", bucketNameToBucketValueMS.size());
 
-          // TODO: for clients other than pinot, this will change
-          // We can either implement a new algorithm for the external client
+          // TODO: for datasources other than pinot, this will change
+          // We can either implement a new algorithm for the external datasources
           // Or use query cache for the count * queries (cleaner method?)
           if (!bucketNameToBucketValueMS.isEmpty()) {
             // create current entries in database if not already present

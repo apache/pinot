@@ -1,13 +1,14 @@
 package com.linkedin.thirdeye.dashboard.resources.v2.rootcause;
 
-import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.dashboard.resources.v2.RootCauseEntityFormatter;
 import com.linkedin.thirdeye.dashboard.resources.v2.pojo.RootCauseEntity;
 import com.linkedin.thirdeye.datalayer.bao.EventManager;
 import com.linkedin.thirdeye.datalayer.bao.MergedAnomalyResultManager;
 import com.linkedin.thirdeye.datalayer.dto.EventDTO;
+import com.linkedin.thirdeye.datasource.DAORegistry;
 import com.linkedin.thirdeye.rootcause.Entity;
 import com.linkedin.thirdeye.rootcause.impl.EventEntity;
+
 import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;

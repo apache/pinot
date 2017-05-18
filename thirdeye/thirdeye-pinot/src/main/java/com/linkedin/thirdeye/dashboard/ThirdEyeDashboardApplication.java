@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.dashboard;
 
-import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.common.BaseThirdEyeApplication;
 import com.linkedin.thirdeye.dashboard.resources.AdminResource;
 import com.linkedin.thirdeye.dashboard.resources.AnomalyFunctionResource;
@@ -28,6 +27,7 @@ import com.linkedin.thirdeye.dashboard.resources.v2.RootCauseResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.TimeSeriesResource;
 import com.linkedin.thirdeye.dashboard.resources.v2.rootcause.DefaultEntityFormatter;
 import com.linkedin.thirdeye.dashboard.resources.v2.rootcause.FormatterLoader;
+import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
 import com.linkedin.thirdeye.detector.email.filter.AlertFilterFactory;
 import com.linkedin.thirdeye.detector.function.AnomalyFunctionFactory;
 import com.linkedin.thirdeye.rootcause.Pipeline;

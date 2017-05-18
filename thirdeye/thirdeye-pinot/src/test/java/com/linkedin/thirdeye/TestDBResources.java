@@ -1,14 +1,16 @@
 package com.linkedin.thirdeye;
 
-import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.ScriptRunner;
 import com.linkedin.thirdeye.datalayer.bao.AbstractManagerTestBase;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
 import com.linkedin.thirdeye.datalayer.util.PersistenceConfig;
+import com.linkedin.thirdeye.datasource.DAORegistry;
+
 import java.io.File;
 import java.io.FileReader;
 import java.net.URL;
 import java.sql.Connection;
+
 import org.apache.tomcat.jdbc.pool.DataSource;
 
 

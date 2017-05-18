@@ -39,11 +39,6 @@ import com.linkedin.thirdeye.api.DimensionSpec;
 import com.linkedin.thirdeye.api.MetricSpec;
 import com.linkedin.thirdeye.api.TimeGranularity;
 import com.linkedin.thirdeye.api.TimeSpec;
-import com.linkedin.thirdeye.client.DAORegistry;
-import com.linkedin.thirdeye.client.MetricExpression;
-import com.linkedin.thirdeye.client.MetricFunction;
-import com.linkedin.thirdeye.client.ThirdEyeCacheRegistry;
-import com.linkedin.thirdeye.client.cache.MetricDataset;
 import com.linkedin.thirdeye.datalayer.bao.MetricConfigManager;
 import com.linkedin.thirdeye.datalayer.dto.DatasetConfigDTO;
 import com.linkedin.thirdeye.datalayer.dto.MetricConfigDTO;
@@ -51,6 +46,11 @@ import com.linkedin.thirdeye.datalayer.pojo.AlertConfigBean.COMPARE_MODE;
 import com.linkedin.thirdeye.datalayer.pojo.DashboardConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.DatasetConfigBean;
 import com.linkedin.thirdeye.datalayer.pojo.MetricConfigBean;
+import com.linkedin.thirdeye.datasource.DAORegistry;
+import com.linkedin.thirdeye.datasource.MetricExpression;
+import com.linkedin.thirdeye.datasource.MetricFunction;
+import com.linkedin.thirdeye.datasource.ThirdEyeCacheRegistry;
+import com.linkedin.thirdeye.datasource.cache.MetricDataset;
 
 
 public abstract class ThirdEyeUtils {
@@ -441,20 +441,20 @@ public abstract class ThirdEyeUtils {
   }
 
 
-  //TODO: currently assuming all metrics in one request are for the same client
-  // It would be better to not assume that, and split the thirdeye request into more requests depending upon the clients
-  public static String getClientFromMetricFunctions(List<MetricFunction> metricFunctions) {
-    String client = null;
+  //TODO: currently assuming all metrics in one request are for the same data source
+  // It would be better to not assume that, and split the thirdeye request into more requests depending upon the data sources
+  public static String getDataSourceFromMetricFunctions(List<MetricFunction> metricFunctions) {
+    String dataSource = null;
     for (MetricFunction metricFunction : metricFunctions) {
-      String functionDatasetClient = metricFunction.getDatasetConfig().getClient();
-      if (client == null) {
-        client = functionDatasetClient;
-      } else if (!client.equals(functionDatasetClient)) {
-        throw new IllegalStateException("All metric funcitons of one request must belong to the same client. "
-            + client + " is not equal to" + functionDatasetClient);
+      String functionDatasetDatasource = metricFunction.getDatasetConfig().getDataSource();
+      if (dataSource == null) {
+        dataSource = functionDatasetDatasource;
+      } else if (!dataSource.equals(functionDatasetDatasource)) {
+        throw new IllegalStateException("All metric funcitons of one request must belong to the same data source. "
+            + dataSource + " is not equal to" + functionDatasetDatasource);
       }
     }
-    return client;
+    return dataSource;
   }
 
 }

@@ -11,13 +11,13 @@ import org.joda.time.DateTime;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linkedin.thirdeye.api.TimeGranularity;
-import com.linkedin.thirdeye.client.MetricExpression;
-import com.linkedin.thirdeye.client.ThirdEyeClient;
-import com.linkedin.thirdeye.client.cache.QueryCache;
-import com.linkedin.thirdeye.client.pinot.PinotThirdEyeClient;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewHandler;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewRequest;
 import com.linkedin.thirdeye.dashboard.views.contributor.ContributorViewResponse;
+import com.linkedin.thirdeye.datasource.MetricExpression;
+import com.linkedin.thirdeye.datasource.ThirdEyeDataSource;
+import com.linkedin.thirdeye.datasource.cache.QueryCache;
+import com.linkedin.thirdeye.datasource.pinot.PinotThirdEyeDataSource;
 
 /** Manual test for verifying code works as expected (ie without exceptions thrown) */
 public class ContributorTest {
@@ -37,13 +37,13 @@ public class ContributorTest {
     request.setTimeGranularity(new TimeGranularity(1, TimeUnit.HOURS));
     request.setMetricExpressions(metricExpressions);
 
-    PinotThirdEyeClient pinotThirdEyeClient = PinotThirdEyeClient.getDefaultTestClient(); // TODO
+    PinotThirdEyeDataSource pinotThirdEyeDataSource = PinotThirdEyeDataSource.getDefaultTestDataSource(); // TODO
                                                                                           // make
                                                                                           // this
     // configurable;
-    Map<String, ThirdEyeClient> clientMap = new HashMap<>();
-    clientMap.put(PinotThirdEyeClient.class.getSimpleName(), pinotThirdEyeClient);
-    QueryCache queryCache = new QueryCache(clientMap, Executors.newFixedThreadPool(10));
+    Map<String, ThirdEyeDataSource> dataSourceMap = new HashMap<>();
+    dataSourceMap.put(PinotThirdEyeDataSource.class.getSimpleName(), pinotThirdEyeDataSource);
+    QueryCache queryCache = new QueryCache(dataSourceMap, Executors.newFixedThreadPool(10));
 
     ContributorViewHandler handler = new ContributorViewHandler(queryCache);
     ContributorViewResponse response = handler.process(request);

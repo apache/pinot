@@ -1,6 +1,5 @@
 package com.linkedin.thirdeye.common;
 
-import com.linkedin.thirdeye.client.DAORegistry;
 import com.linkedin.thirdeye.datalayer.bao.AnomalyFunctionManager;
 import com.linkedin.thirdeye.datalayer.bao.AutotuneConfigManager;
 import com.linkedin.thirdeye.datalayer.bao.DashboardConfigManager;
@@ -20,9 +19,13 @@ import com.linkedin.thirdeye.datalayer.bao.jdbc.MergedAnomalyResultManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.MetricConfigManagerImpl;
 import com.linkedin.thirdeye.datalayer.bao.jdbc.RawAnomalyResultManagerImpl;
 import com.linkedin.thirdeye.datalayer.util.DaoProviderUtil;
+import com.linkedin.thirdeye.datasource.DAORegistry;
+
 import io.dropwizard.Application;
 import io.dropwizard.Configuration;
+
 import java.io.File;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
